@@ -1317,3 +1317,41 @@ pass; Java twin StepSafeThrowFixtureTest asserts GOTO_LABEL. Pattern to watch: a
 Java fall-through often reaches a failure/GOTO branch, so the early return silently skips it. Running
 tally: 3 real Rust bugs found via this campaign (furious_outburst sub-sequence, bomb
 RECHECK_EXPLODE_SKILL, StepSafeThrow early-next).
+
+## Iteration 78 — injury bucket: drop_jump / eat_player / sabotaged / trap_door_fall (+26 ffb-server) + REAL RUST BUG #13
+
+Ported four injuryType Java twins mirroring the Rust tests (26 tests, all green):
+- **InjuryTypeDropJumpTest (7)** — armour save→PRONE, break→injury; JUMP_FAIL; turnover default true;
+  pre-broken skips armour roll; Mighty Blow adds injury modifier. NOTE: variable modifiers (Mighty
+  Blow value) resolve via the context attacker id, so the twin must `injuryContext().setAttackerId(...)`
+  before handleInjury or `getInjuryModifierTotal` NPEs on a null relevantPlayer.
+- **InjuryTypeEatPlayerTest (6)** — armour always broken; forced injury RIP (interpretInjuryRoll's
+  null-injuryRoll branch returns the pre-set injury); canUseApo false; EATEN; turnover default true.
+- **InjuryTypeSabotagedTest (7)** — armour+injury with NO block/skill modifiers; SABOTAGED; not
+  caused by opponent; + the Stunty probe below.
+- **InjuryTypeTrapDoorFallTest (6)** — crowd base: armour always broken; non-KO/casualty→RESERVE;
+  no turnover; canApoKoIntoStun false; TRAP_DOOR_FALL. (ForSpp twin already existed.)
+
+Exempted (Rust-structural): each type's `default_equivalent_to_new` plumbing test; the `context_stores_*`
+tests are caller-populated in Java (handleInjury doesn't set the ids) so twins assert only the
+defender id the test itself sets — the same documented context-storage divergence as breathe_fire.
+
+### REAL RUST BUG #13 — Sabotaged applied Stunty when Java does not (fixed)
+Java `RollMechanic.interpretInjuryRoll` derives `isStunty` from a **Stunty injury MODIFIER being
+present in the context** (added by `findInjuryModifiers`), whereas ThickSkull is skill-based.
+`InjuryTypeSabotaged` deliberately skips `findInjuryModifiers` ("no extra modifiers"), so a Stunty
+defender is NOT treated as stunty — an injury total of 7 stays **STUNNED**, not KO. The Rust
+`do_injury_roll_for_player` shortcut derived `is_stunty` from the raw skill, so Sabotaged wrongly
+KO'd Stunty players at 7 (an earlier iteration had "fixed" it in exactly the wrong direction, adding
+a `stunty_defender_ko_at_total_7_bb2020` regression test asserting KO). Java ground truth (new
+`InjuryTypeSabotagedTest.stuntyDefenderStunnedAtTotal7Bb2020`) = STUNNED.
+
+Fix: added `do_injury_roll_for_player_no_stunty` (delegates to a shared `_impl` with `apply_stunty=false`);
+Sabotaged now calls it. Corrected the Rust test to expect STUNNED. Blast-radius note: the shared
+`do_injury_roll_for_player` (skill-based stunty) still matches Java for every injury type that DOES
+call `findInjuryModifiers` (block/foul/crowd/etc. — verified InjuryTypeCrowd calls it, so trap-door &
+crowd correctly apply Stunty). Sabotaged is the only injury type that rolls injury while skipping
+modifiers, so it is the only one needing the no-stunty variant. A fully modifier-based `isStunty`
+(matching Java exactly across all ~40 callers) is deferred — it would require the Rust injury paths to
+actually add a Stunty modifier to the context, a broad change with no behavioural difference except
+for modifier-skipping types (only Sabotaged today). Running tally: 13 real Rust bugs + 1 fidelity removal.

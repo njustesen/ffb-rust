@@ -4,7 +4,7 @@ use ffb_model::enums::{ApothecaryMode, PlayerState, SendToBoxReason, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
-use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
+use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player_no_stunty};
 
 pub struct InjuryTypeSabotaged { ctx: InjuryContext }
 impl InjuryTypeSabotaged { pub fn new() -> Self { Self { ctx: InjuryContext::new(ApothecaryMode::Defender) } } }
@@ -18,12 +18,12 @@ impl InjuryTypeServer for InjuryTypeSabotaged {
         self.ctx.defender_coordinate = Some(coord);
         self.ctx.apothecary_mode = apo_mode;
         do_armor_roll(game, rng, &mut self.ctx, defender_id);
-        // Java: `setInjury(defender, gameState, diceRoller, injuryContext)` routes through
-        // `RollMechanic.interpretInjuryRoll`, which is edition-aware (Stunty/ThickSkull handling)
-        // — the same path every other "standard" injury type uses. This previously called the
-        // non-edition-aware `do_injury_roll`, silently dropping Stunty/ThickSkull interpretation
-        // for Sabotaged injuries.
-        if self.ctx.armor_broken { do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id); }
+        // Java: `setInjury(defender, gameState, diceRoller, injuryContext)` routes through the
+        // edition-aware `RollMechanic.interpretInjuryRoll`. Because Sabotaged deliberately skips
+        // `findInjuryModifiers`, no Stunty injury modifier is in the context, so `interpretInjuryRoll`
+        // treats the defender as non-stunty (a total of 7 stays Stunned rather than KO). ThickSkull
+        // is skill-based in Java and still applies — hence `do_injury_roll_for_player_no_stunty`.
+        if self.ctx.armor_broken { do_injury_roll_for_player_no_stunty(rng, &mut self.ctx, game, defender_id); }
         else { self.ctx.injury = Some(PlayerState::new(PS_PRONE)); }
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
@@ -86,12 +86,14 @@ mod tests {
     }
 
     #[test]
-    fn stunty_defender_ko_at_total_7_bb2020() {
-        // Regression test: Java's Sabotaged.setInjury routes through the edition-aware
-        // RollMechanic.interpretInjuryRoll (Stunty/ThickSkull handling), which this file
-        // previously bypassed by calling the non-edition-aware `do_injury_roll` helper (Stunty
-        // would then incorrectly be Stunned instead of KO'd at an injury total of 7).
-        use ffb_model::enums::{SkillId, PS_STUNNED, PS_KNOCKED_OUT};
+    fn stunty_defender_stunned_at_total_7_bb2020_no_modifiers() {
+        // Ground truth (Java InjuryTypeSabotagedTest.stuntyDefenderAtTotal7Bb2020): Sabotaged skips
+        // `findInjuryModifiers`, so no Stunty injury modifier is in the context and
+        // `RollMechanic.interpretInjuryRoll` treats the defender as NON-stunty — an injury total of
+        // 7 resolves to STUNNED, not KO. (An earlier iteration wrongly routed through the
+        // skill-based stunty path and asserted KO; that diverged from Java. See
+        // `do_injury_roll_for_player_no_stunty`.)
+        use ffb_model::enums::{SkillId, PS_STUNNED};
         use std::collections::HashSet;
         use ffb_model::model::player::Player;
         use ffb_model::model::SkillWithValue;
@@ -117,12 +119,11 @@ mod tests {
             if let Some([d1, d2]) = t.ctx.injury_roll {
                 if d1 + d2 == 7 {
                     found_total_7 = true;
-                    assert_eq!(t.ctx.injury.map(|s| s.base()), Some(PS_KNOCKED_OUT),
-                        "seed={seed}: Stunty at injury total 7 must be KO in BB2020, got {:?}", t.ctx.injury);
+                    assert_eq!(t.ctx.injury.map(|s| s.base()), Some(PS_STUNNED),
+                        "seed={seed}: Sabotaged adds no Stunty modifier, so total 7 must be Stunned in BB2020, got {:?}", t.ctx.injury);
                 }
             }
         }
         assert!(found_total_7, "test setup failure: no seed in range produced an injury total of 7");
-        let _ = PS_STUNNED;
     }
 }

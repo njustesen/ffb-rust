@@ -425,6 +425,19 @@ pub fn do_injury_roll(rng: &mut GameRng, ctx: &mut InjuryContext) {
 /// Uses `interpret_injury_total_bb2016` or `interpret_injury_total_bb2020` based on `rules`.
 /// Falls back to a standard Casualty when `interpret_*` returns `None`.
 pub fn do_injury_roll_for_player(rng: &mut GameRng, ctx: &mut InjuryContext, game: &Game, defender_id: &str) {
+    do_injury_roll_for_player_impl(rng, ctx, game, defender_id, true);
+}
+
+/// Variant for injury types that skip `findInjuryModifiers` (e.g. Sabotaged). Java's
+/// `RollMechanic.interpretInjuryRoll` derives `isStunty` from a Stunty injury MODIFIER being
+/// present in the context — so when no modifiers are gathered, a Stunty defender is NOT treated as
+/// stunty (e.g. an injury total of 7 stays Stunned instead of becoming KO). ThickSkull remains
+/// skill-based in Java (`hasSkillProperty(convertKOToStunOn8)`) and still applies here.
+pub fn do_injury_roll_for_player_no_stunty(rng: &mut GameRng, ctx: &mut InjuryContext, game: &Game, defender_id: &str) {
+    do_injury_roll_for_player_impl(rng, ctx, game, defender_id, false);
+}
+
+fn do_injury_roll_for_player_impl(rng: &mut GameRng, ctx: &mut InjuryContext, game: &Game, defender_id: &str, apply_stunty: bool) {
     use ffb_model::enums::{Rules, SkillId};
     use ffb_model::model::property::named_properties::NamedProperties;
     let d1 = rng.d6();
@@ -433,7 +446,7 @@ pub fn do_injury_roll_for_player(rng: &mut GameRng, ctx: &mut InjuryContext, gam
     let modifier_sum: i32 = ctx.injury_modifiers.iter().map(|m| m.value).sum();
     let total = d1 + d2 + modifier_sum;
     let outcome = if let Some(defender) = game.player(defender_id) {
-        let is_stunty = defender.has_skill(SkillId::Stunty);
+        let is_stunty = apply_stunty && defender.has_skill(SkillId::Stunty);
         let has_thick_skull = defender.has_skill(SkillId::ThickSkull);
         let interpreted = match game.rules {
             Rules::Bb2016 => interpret_injury_total_bb2016(total, is_stunty, has_thick_skull),
