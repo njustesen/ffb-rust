@@ -533,3 +533,33 @@ MA>=3), ending STANDING. Rust must mirror:
     equivalent; VERIFY the post_hash == 90e19713af7cd274 and REVERT if it over/under-sets.
 Add a driver-level test: prone MA6 player activated with Move → ends STANDING, current_move==3, 0 dice.
 VERIFY step23 fully matches + comparator advances PAST step23. 10 fixes committed; seed1 through step22.
+
+## Iters 20-23 (2026-08-01) — step23 stand-up SOLVED + half-2 kickoff + touchback + prone-blitz
+
+Seeds 1 and 2 now FULLY match Java per-step. Four root-caused engine/agent fixes:
+
+- **Iter 20 (7cf718e4) — set_player full field reset + same-id guard.** The step23 stand-up bug's real
+  cause: `ActingPlayer::set_player` reset only a subset of Java `setPlayerId`'s fields, OMITTING
+  `has_moved` (and dodging/has_blocked/fouled/passed/fed). A prone player re-activated after moving earlier
+  carried a stale `has_moved=true` into StepStandUp, whose Java guard `isStandingUp() && !hasMoved()` then
+  skipped the free stand-up → player stayed Prone. Fix: set_player now mirrors setPlayerId's full reset and
+  adds Java's same-id early-return (so Move→Block on one blitzer keeps has_moved). StepStandUp free branch
+  also sets base PRONE→STANDING. `standing_up` itself is set in `change_player_action` = (old base==PRONE),
+  mirroring Java UtilActingPlayer. Seed 1: step 23 → 156.
+
+- **Iter 21 (1e8a8f49) — away kickoff coord pre-transform.** Java ParityRunner sends the kick target as
+  `home ? kickCoord : kickCoord.transform()`; StepKickoff transforms again for the away side, netting the
+  server-frame target. The Rust agent omitted the away pre-transform, so StepKickoff mirrored (6,8)→(19,8),
+  landing the half-2 kick in the kicking half → spurious touchback + diverged kickoff. Seed 1 fully matches.
+
+- **Iter 22 (ab26e19e) — touchback nearest-to-(13,8), 0 rng.** Java ParityRunner TOUCHBACK picks the
+  receiving player nearest to fixed kick-from (13,8) by squared distance (team order breaks ties), NO
+  decisionRng draw. Rust random-picked a PlayerId-sorted candidate, consuming a spurious decision_rng draw
+  that desynced every later pick in the half. Seed 2: step 157 → 233.
+
+- **Iter 23 (d900548d) — prone blitz offers BLITZ not STAND_UP_BLITZ.** Java computeEligiblePlayers offers a
+  prone player [MOVE, BLITZ] (BLITZ dispatched as BLITZ_MOVE; stand-up via the standing_up flow). Rust
+  offered StandUpBlitz → different step sequence, diverged post-state (seed 2 step 233). Updated 2 stale
+  legal_actions tests. Seeds 1-2: 2/2 match.
+
+Next: seed 3 diverges early at step 6 (turn 1 half 1) — a distinct seed-3 divergence under investigation.
