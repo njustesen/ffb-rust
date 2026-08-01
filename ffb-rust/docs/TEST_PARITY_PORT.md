@@ -1369,3 +1369,22 @@ Exempted (Rust-structural): each type's initial_context_has_no_injury / default_
 new_context_uses_defender_apo_mode plumbing tests.
 Remaining injury GAP (3 files/18 tests): injury_type_ball_and_chain (7),
 injury_type_crowd_push_for_spp (6), modification_aware_injury_type_server (5).
+
+## Iteration 80 — injury bucket CLOSED: ball_and_chain + crowd_push_for_spp (+11 ffb-server)
+
+- **InjuryTypeBallAndChainTest (6)** — always breaks armour on knock-down; rolls injury directly with
+  attacker injury modifiers (Mighty Blow via findInjuryModifiers, resolved through the context
+  attacker id); BALL_AND_CHAIN; failedArmourPlacesProne default true. Exempt: attacker_id_stored_in_context
+  (caller-populated context-storage divergence — Java handleInjury doesn't set the ids).
+- **InjuryTypeCrowdPushForSppTest (5)** — crowd base (armour always broken; non-KO/casualty→RESERVE);
+  worth SPPs; caused by opponent; no turnover; CROWD_PUSHED. Exempt: context_stores_defender_id
+  (caller-populated), default_equivalent_to_new (Rust-structural).
+
+Injury GAP now = **1 file / 5 tests: modification_aware_injury_type_server** — EXEMPT (Rust-structural):
+its tests instantiate fabricated Rust test structs (AlwaysBrokenType/NeverBrokenType/
+OverridesSavedByArmour) to exercise the template-method free function. Java's
+`ModificationAwareInjuryTypeServer` is abstract with no direct unit test; its template behaviour
+(armour-broken→injuryRoll, saved-by-armour→PRONE / STUNNED / null overrides) is already covered by the
+concrete twins (block_prone, block_stunned, etc.). **The Step-3 injury bucket is now fully reconciled
+on testable surface.** Next Step-3 buckets by gap size: skill_behaviour (118), factory (53), model (19),
+inducements (5); plus the non-injury engine-infra files (talk/replay/id_generator/active_effects/etc.).
