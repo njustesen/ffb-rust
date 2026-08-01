@@ -589,3 +589,18 @@ Compare the Rust parity agent's blitz-target pick (RUST_BLOCK_PICK, arc=) agains
 SELECT_BLITZ_TARGET case + computeBlitzTargets; align the target-selection so both pick the same
 defender and the same move path. This likely needs Rust to route blitzes through SelectBlitzTarget
 (agent target choice) rather than auto-picking in InitBlocking — verify it doesn't regress seeds 1-2.
+
+## Iter 25 (2026-08-02) — bb2025 additional block assist (Cheering Fans) — seeds 1-4 green (fbbc7714)
+
+Seed 3 i=131 turnover traced to a +1 game-die rng offset originating at seed 3 i=129 (home_01 BLOCK:
+Java 2 dice, Rust 1). Deep dive (findBlockStrength gave 3,3 in both, but Java's findNrOfBlockDice=2):
+the bb2025 RollMechanic.getTotalAttackerStrength adds `gameState.getAdditionalAssist(actingTeam)` — the
+Cheering Fans kickoff event grants a team +1 offensive block assist. Rust's handle_cheering_fans set
+game.home/away_additional_assists but the block-dice calc never added it → att 3 not 4 → 1 die not 2.
+FIX 1 (StepBlockRoll bb2025): add acting-team additional_assists to attacker_str before block_dice_count.
+That alone REGRESSED seed 1 (its assist leaked into a later turn) → FIX 2 (StepEndTurn bb2025): mirror
+Java removeAdditionalAssist(actingTeam) at end of a REGULAR/BLITZ turn. Seeds 1-4: 4/4 match. +1 test.
+(Method: temporarily instrumented the co-editable ParityRunner harness with ServerUtilBlock/ServerUtilPlayer
+calls to read Java's engine strengths — reverted + jar rebuilt clean afterward.)
+
+Next: seed 5 first divergence i=159 (turn 1 half 2, home BLITZ) — investigate.
