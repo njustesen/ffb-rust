@@ -392,16 +392,23 @@ impl Agent for RandomAgent {
             // Keeping both at 0 advances avoids RNG divergence.
             Some(AgentPrompt::Interception { .. }) =>
                 Action::Intercept { attempt: false },
-            // Touchback: pick uniformly from eligible players sorted by PlayerId — 1 decision_rng.
-            // Synced with Java ParityRunner TOUCHBACK dialog case.
+            // Touchback: Java ParityRunner picks the receiving player NEAREST to the fixed kick-from
+            // square (13,8) by squared distance, iterating team order so the first candidate wins ties.
+            // This is fully deterministic — NO decisionRng draw. The previous random pick both chose the
+            // wrong player and consumed a spurious decision_rng draw, desyncing every later pick this half.
             Some(AgentPrompt::Touchback { eligible_players }) => {
                 if eligible_players.is_empty() {
                     return Action::Acknowledge;
                 }
-                let mut sorted = eligible_players.clone();
-                sorted.sort_by(|a, b| a.0.cmp(&b.0));
-                let idx = self.pick(sorted.len());
-                Action::Touchback { player_id: sorted[idx].0.clone() }
+                let kick_from = FieldCoordinate::new(13, 8);
+                let best = eligible_players.iter()
+                    .min_by_key(|(_, c)| {
+                        let dx = c.x - kick_from.x;
+                        let dy = c.y - kick_from.y;
+                        dx * dx + dy * dy
+                    })
+                    .unwrap();
+                Action::Touchback { player_id: best.0.clone() }
             }
             // Argue the call: AGENT_CONTRACT §7 — ALWAYS argue, deterministically, 0 rng. Java
             // ARGUE_THE_CALL always sends ClientCommandArgueTheCall(firstPlayer). Was random-sampled
