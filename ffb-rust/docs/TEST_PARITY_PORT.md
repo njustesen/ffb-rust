@@ -1070,6 +1070,14 @@ tests are Rust-structural (exempt/prune as encountered).
   replaced it). Removed the file, mod entries, bb2025 registry registration; registry count
   test 35→34. Wild animal remains bb2016-only (matching Java). Behavior-neutral (no bb2025
   player can have the skill) but violates the no-invented-code ground rule.
+- **swoop bb2025 → Java tests (4 green).** TTM single-direction scatter; invoke the modifier
+  directly with a constructed StepSwoop.StepState (usingSwoop, coordinateTo). Swoop skill has
+  ttmScattersInSingleDirection property; scatter rolls 1 die (rollThrowInDirection). Asserts
+  swoopDirection set, coordinateFrom pulled from field model, NEXT_STEP.
+- **EXEMPT (registry-plumbing-only skill_behaviour files):** pass_behaviour (bb2025),
+  wrestle_behaviour, tentacles_behaviour, dauntless_behaviour (mixed) — their Rust test suites
+  are register_into/applies_to/hook_state-default plumbing with no behavioral hook assertions
+  and no Java twin. Documented here rather than porting.
 - **horns (common) → Java tests (4 green).** +1 STR when BLITZING; StepHorns.StepState is a
   NON-static inner class so usingHorns is asserted via observable side-effects (markSkillUsed,
   report present, NEXT_STEP) rather than reading the transient. Run the real StepHorns via
