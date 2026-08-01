@@ -1355,3 +1355,17 @@ modifiers, so it is the only one needing the no-stunty variant. A fully modifier
 (matching Java exactly across all ~40 callers) is deferred — it would require the Rust injury paths to
 actually add a Stunty modifier to the context, a broad change with no behavioural difference except
 for modifier-skipping types (only Sabotaged today). Running tally: 13 real Rust bugs + 1 fidelity removal.
+
+## Iteration 79 — injury bucket: block_prone + block_prone_for_spp (+9 ffb-server)
+
+reconcile_step3.sh injury GAP now 5 files/32 tests. Ported the block_prone pair:
+- **InjuryTypeBlockProneTest (4)** — ModificationAware block: saved-by-armour→PRONE, break→injury,
+  BLOCKED, and no-niggling-modifier (BlockProne.injuryRoll only adds the value-0 Stunty marker, never
+  a niggling modifier). Confirms Bug #13 scoping: BlockProne DOES apply Stunty (its injuryRoll adds the
+  marker modifier), so the skill-based `do_injury_roll_for_player` is correct here — only Sabotaged,
+  which skips findInjuryModifiers, needed the no-stunty variant.
+- **InjuryTypeBlockProneForSppTest (5)** — same + isWorthSpps/isCausedByOpponent.
+Exempted (Rust-structural): each type's initial_context_has_no_injury / default_equivalent_to_new /
+new_context_uses_defender_apo_mode plumbing tests.
+Remaining injury GAP (3 files/18 tests): injury_type_ball_and_chain (7),
+injury_type_crowd_push_for_spp (6), modification_aware_injury_type_server (5).
