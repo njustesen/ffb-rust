@@ -55,8 +55,9 @@ impl InjuryTypeServer for InjuryTypePilingOnInjury {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn falling_down_causes_turnover(&self) -> bool { false }
-    fn can_use_apo(&self) -> bool { false }
+    // Bug (fixed): both falling_down_causes_turnover and can_use_apo were hardcoded false —
+    // copied from PilingOnKnockedOut. Java's PilingOnInjury overrides NEITHER (base defaults
+    // are true), so the trait defaults (true) apply.
     /// Java: `PilingOnInjury()` constructor passes `SendToBoxReason.PILED_ON`.
     fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::PiledOn) }
     /// Java: `PilingOnInjury()` constructor passes `isWorthSpps=true`.
@@ -83,7 +84,10 @@ mod tests {
         assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
     #[test]
-    fn no_apo() { assert!(!InjuryTypePilingOnInjury::new().can_use_apo()); }
+    fn apo_allowed() {
+        // Java: PilingOnInjury inherits canUseApo() == true (only PilingOnKnockedOut is false).
+        assert!(InjuryTypePilingOnInjury::new().can_use_apo());
+    }
     #[test]
     fn send_to_box_reason_is_piled_on() {
         assert_eq!(InjuryTypePilingOnInjury::new().send_to_box_reason(), Some(SendToBoxReason::PiledOn));
@@ -95,7 +99,10 @@ mod tests {
         assert!(t.is_caused_by_opponent());
     }
     #[test]
-    fn no_turnover() { assert!(!InjuryTypePilingOnInjury::new().falling_down_causes_turnover()); }
+    fn turnover_default_true() {
+        // Java: PilingOnInjury does not override fallingDownCausesTurnover (base default true).
+        assert!(InjuryTypePilingOnInjury::new().falling_down_causes_turnover());
+    }
     #[test]
     fn injury_context_returns_context() {
         let t = InjuryTypePilingOnInjury::new();

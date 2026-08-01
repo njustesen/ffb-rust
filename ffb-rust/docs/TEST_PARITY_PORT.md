@@ -924,11 +924,20 @@ GoForItModifierFactoryTest pins min-roll 3 for a Drunkard player. Tally: 5 real 
   conditional. Dedup guard: pre-add via GameFixture.skill(game,"Chainsaw").getArmorModifiers().
 - **injury_type_chainsaw_for_spp 11/11 → Java InjuryTypeChainsawForSppTest (ffb-server 3,611
   green).** Mechanical clone of chainsaw (isWorthSpps flips to true; no niggling test).
-- Next: piling_on ×2 (bb2016 game; PILING_ON_DOES_NOT_STACK / CLAW_DOES_NOT_STACK boolean game
-  options drive the stacking branches; InjuryTypePilingOnArmour extends plain InjuryTypeServer
-  with its own handleInjury — armour save → PRONE, claw = reducesArmourToFixedValue modifier;
-  prune the Rust default_equivalent tests), lightning 11, drop_dodge_for_spp 11; then
-  inducements 432, skill_behaviour 359, util 138.
+## Step 3 REAL RUST BUG #6: piling-on apothecary/turnover flags (fixed 2026-08-01)
+Both InjuryTypePilingOnArmour and InjuryTypePilingOnInjury hardcoded `can_use_apo=false` and
+`falling_down_causes_turnover=false` — copied from PilingOnKnockedOut. Java ground truth: ONLY
+EatPlayer/PilingOnKnockedOut/Saboteur override canUseApo to false; PilingOnArmour/PilingOnInjury
+inherit BOTH base defaults (true). Gameplay impact: the Rust apothecary steps
+(bb2016/bb2020 step_apothecary consult can_use_apo via make_injury_type) wrongly blocked the apo
+after a piled-on casualty. Fixed by deleting the overrides (trait defaults true); flipped the
+no_apo/no_turnover Rust tests. Tally: 6 real Rust bugs.
+- NEXT: Java piling_on test ports ×2 (bb2016 game recipe drafted: BB2025/BB2016 fixture,
+  PILING_ON_DOES_NOT_STACK / CLAW_DOES_NOT_STACK boolean options via createGameOption+setValue,
+  own handleInjury — armour save → PRONE, claw = reducesArmourToFixedValue modifier, "Claws"
+  mixed skill / "Claw" bb2016; Java canUseApo asserts TRUE per bug #6; prune Rust
+  default_equivalent tests), then lightning 11, drop_dodge_for_spp 11; then inducements 432,
+  skill_behaviour 359, util 138.
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
   scripts/reconcile_step3.sh for the live list.
 

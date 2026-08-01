@@ -106,8 +106,10 @@ impl InjuryTypeServer for InjuryTypePilingOnArmour {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn falling_down_causes_turnover(&self) -> bool { false }
-    fn can_use_apo(&self) -> bool { false }
+    // Bug (fixed): both falling_down_causes_turnover and can_use_apo were hardcoded false —
+    // copied from PilingOnKnockedOut. Java's PilingOnArmour overrides NEITHER (base defaults
+    // are true; only EatPlayer/PilingOnKnockedOut/Saboteur disable the apothecary), so the
+    // trait defaults (true) apply.
     /// Java: `PilingOnArmour()` constructor passes `SendToBoxReason.PILED_ON`.
     fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::PiledOn) }
     /// Java: `PilingOnArmour()` constructor passes `isWorthSpps=true`.
@@ -170,7 +172,11 @@ mod tests {
         assert!(t.ctx.armor_broken); assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
     #[test]
-    fn no_apo() { assert!(!InjuryTypePilingOnArmour::new().can_use_apo()); }
+    fn apo_allowed() {
+        // Java: PilingOnArmour inherits canUseApo() == true (only PilingOnKnockedOut is false).
+        assert!(InjuryTypePilingOnArmour::new().can_use_apo());
+        assert!(InjuryTypePilingOnArmour::new().falling_down_causes_turnover());
+    }
     #[test]
     fn send_to_box_reason_is_piled_on() {
         assert_eq!(InjuryTypePilingOnArmour::new().send_to_box_reason(), Some(SendToBoxReason::PiledOn));
