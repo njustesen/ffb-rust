@@ -44,6 +44,9 @@ pub struct RandomAgent {
     last_turn_key: Option<(i32, i32, bool)>,
     /// Debug: cumulative actionRng call count (for FFB_TRACE divergence diagnosis).
     action_rng_count: u64,
+    /// Debug: cumulative decisionRng call count — compare vs Java ParityRunner.decisionRngAdvances
+    /// to localize decision-stream desyncs. Counts every decision_rng draw (pick/pick_bool/KickBall).
+    decision_rng_count: u64,
     /// True once the current activation is a Blitz/StandUpBlitz. Mirrors Java ParityRunner's
     /// `blitzBlockSent`: a blitzer blocks immediately and then ENDS its activation — it never
     /// spends remaining MA moving (before or after the block). Set when a Blitz action is picked,
@@ -64,6 +67,7 @@ impl RandomAgent {
             used_this_turn: HashSet::new(),
             last_turn_key: None,
             action_rng_count: 0,
+            decision_rng_count: 0,
             current_activation_is_blitz: false,
             moved_this_activation: false,
         }
@@ -78,6 +82,7 @@ impl RandomAgent {
             used_this_turn: HashSet::new(),
             last_turn_key: None,
             action_rng_count: 0,
+            decision_rng_count: 0,
             current_activation_is_blitz: false,
             moved_this_activation: false,
         }
@@ -85,12 +90,17 @@ impl RandomAgent {
 
     /// Decision-RNG fair coin: `decisionRng.nextLong() % 2 == 0` (Java parity).
     fn pick_bool(&mut self) -> bool {
+        self.decision_rng_count += 1;
+        if std::env::var("FFB_TRACE").is_ok() { eprintln!("DRC_DRAW kind=bool n={}", self.decision_rng_count); }
         self.decision_rng.next_u64() % 2 == 0
     }
 
     /// Decision-RNG uniform index in `[0, len)`: `remainderUnsigned(nextLong(), len)`.
     fn pick(&mut self, len: usize) -> usize {
-        if len == 0 { 0 } else { (self.decision_rng.next_u64() as usize) % len }
+        if len == 0 { return 0; }
+        self.decision_rng_count += 1;
+        if std::env::var("FFB_TRACE").is_ok() { eprintln!("DRC_DRAW kind=pick len={} n={}", len, self.decision_rng_count); }
+        (self.decision_rng.next_u64() as usize) % len
     }
 
     /// Action-RNG uniform index — diversity picks (move target, block/foul target).
@@ -117,6 +127,7 @@ impl Agent for RandomAgent {
             // decisionRng draws (x then y), x offset into the receiving half. 1:1 with the
             // monolith's KickBall handler so the decisionRng stream stays synced with Java.
             Some(AgentPrompt::KickBall) => {
+                self.decision_rng_count += 2;
                 let x_raw = (self.decision_rng.next_u64() % 13) as i32;
                 let y_raw = (self.decision_rng.next_u64() % 13) as i32;
                 let x = if gs.game.home_playing { x_raw + 13 } else { x_raw };
@@ -189,7 +200,7 @@ impl Agent for RandomAgent {
                 let action_idx = self.pick_action(live_actions.len());
                 let player_action = player_action_to_pac(&live_actions[action_idx]);
                 if std::env::var("FFB_TRACE").is_ok() {
-                    eprintln!("RUST_ACT_PICK pid={player_id} N={} idx={action_idx} action={player_action:?} arc={}", live_actions.len(), self.action_rng_count);
+                    eprintln!("RUST_ACT_PICK pid={player_id} N={} idx={action_idx} action={player_action:?} arc={} drc={}", live_actions.len(), self.action_rng_count, self.decision_rng_count);
                 }
                 // For Block/Blitz: pick target from adjacent opponents
                 // For Foul: pick foul target from adjacent prone/stunned opponents (1 actionRng call)

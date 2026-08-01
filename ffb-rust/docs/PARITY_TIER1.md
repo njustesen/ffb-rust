@@ -375,3 +375,31 @@ Rerun seed1; compare decision-count at each turn-2 pick. The pick where the coun
 the extra/missing draw → root-cause that specific site (likely a dialog or the prone-StandUp path drawing
 decisionRng where Java doesn't, per the recurring pattern). Fix Rust (0-rng align), verify step23 picks
 home1, commit. (8 fixes so far; seed1 matches through step22.)
+
+## Iter 15 (2026-08-01) — INSTRUMENTED decisionRng counter; step23 localized to engine active-bit bug
+
+Added `decision_rng_count` to RandomAgent (counts pick/pick_bool/KickBall draws), printed as `drc=` in
+RUST_ACT_PICK, plus a DRC_DRAW per-draw trace; mirrored `decisionRngAdvances` into ParityRunner's
+JAVA_ACT_PICK (drc=) and rebuilt the jar. (Java change stays uncommitted in the ffb repo per precedent;
+Rust instrumentation committed — a keeper for all future desync hunts.)
+
+LOCALIZED: turn-2 picks — Java drc 26(home3)→27(home1); Rust drc 26(home3)→28(home9), i.e. Rust draws +1.
+DRC_DRAW shows the pick loop after home3: pick(len=9) [n=27] then pick(len=8) [n=28] — the FIRST pick
+(idx0 = home_01) is REJECTED as inactive, then home9 is picked. Java picks home_01 (draw 27) with NO
+rejection. Java's reject condition (ParityRunner L371) is `!pickedState.isActive()`; Rust's is
+`ps.is_prone() && !ps.is_active()`. So the real divergence: **home_01.is_active() == false in Rust but
+true in Java** at step23. home_01 is PRONE at turn 2 (fell in turn 1). A player that fell KD is
+prone+ACTIVE (can stand up); only a just-recovered-from-STUNNED player is prone+INACTIVE. Rust wrongly
+marks home_01 inactive.
+
+### Open item #8 (next): why is home_01.is_active()==false at step23 (Rust engine turn-processing)
+ELIGIBLE_CHECK at turn-2 BUILD showed home_01 active=true, but by the step23 PICK it's inactive → the
+active bit changed DURING turn 2 (after home7/home3 activated), OR the turn-start stun-recovery wrongly
+marked it inactive. Investigate the Rust engine: (a) start-of-turn player refresh / stun-recovery
+(STUNNED→PRONE sets inactive only for THIS turn) — did home_01 get stunned (not just KD) in turn 1, and is
+Rust mis-classifying KD vs stunned? (b) does activating another player (home3) wrongly clear home_01's
+active bit? Compare Rust's turn-start/active-bit logic (refreshPlayersForTurnStart / StepEndTurn start_half
+/ engine turn handover) to Java (ffb-server engine — READ-ONLY ground truth; fix RUST only). Determine
+home_01's turn-1 fate (KD vs stunned) from the events log. Fix Rust so home_01 is active at step23 (matching
+Java); verify step23 picks home1 and matches. This is an ENGINE bug (active-bit), distinct from the agent
+0-rng pattern.
