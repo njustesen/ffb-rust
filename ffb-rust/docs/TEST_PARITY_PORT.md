@@ -609,6 +609,10 @@ Remaining ffb-common GAP files are all DOCUMENTED EXEMPTIONS (Rust-only, no fait
 - **util_server_catch_scatter_throw_in → Java tests (4 green).** findScatterCoordinate offsets
   start by direction*distance (pure); findDivingCatchers returns adjacent team-mates with Diving
   Catch (canAttemptCatchInAdjacentSquares).
+- **util_server_inducement_use → Java tests (7 green).** useInducement consumes N charges when
+  (value - uses) >= N and increments uses, else fails consuming nothing (zero-value fails,
+  nr=0 vacuously succeeds). Built a real InducementSet with new Inducement(type, value) +
+  setUses. The Rust bare-int use_one/use_inducement helper form is Rust-only (exempt).
 Plus the in-file util_player exemptions (canGaze x4, refresh x7, partner-not-on-field x1, new/default x2)
 and UtilDisturbingPresence empty-player x1 — all commented at their Java test sites.
 - prayer_state (6): NOT ffb-common — com.fumbbl.ffb.server.PrayerState → belongs to Step 3 (ffb-server).
