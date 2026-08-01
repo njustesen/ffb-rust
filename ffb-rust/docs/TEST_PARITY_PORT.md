@@ -1070,6 +1070,12 @@ tests are Rust-structural (exempt/prune as encountered).
   replaced it). Removed the file, mod entries, bb2025 registry registration; registry count
   test 35→34. Wild animal remains bb2016-only (matching Java). Behavior-neutral (no bb2025
   player can have the skill) but violates the no-invented-code ground rule.
+- **sneaky_git bb2025 (eject-player) → Java tests (7 green first run).** Ejected fouler set
+  BANNED unless Argue-the-Call succeeded; reason recorded on PlayerResult
+  (OFFICIOUS_REF via state.officiousRef / THREW_TWO_BOMBS via passState.originalBombardier /
+  FOUL_BAN default) + sendToBoxTurn/Half. StepEjectPlayer is mixed.foul (StepState static with
+  officiousRef+argueTheCallSuccessful); pick the eject modifier via getConcreteClass (behaviour
+  has 2). Referee-modifier tests deferred (injuryResultDefender context setup) as a future batch.
 - **saboteur bb2025 → Java tests (6 green first run).** Falling attacker with Saboteur
   (canSabotageBlockerOnKnockdown) during a block rolls 4+ to knock the defender FALLING too.
   Setup: attacker placed then setPlayerState(FALLING), defender STANDING, BLOCK action,
