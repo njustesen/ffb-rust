@@ -131,7 +131,14 @@ impl Agent for RandomAgent {
                 let x_raw = (self.decision_rng.next_u64() % 13) as i32;
                 let y_raw = (self.decision_rng.next_u64() % 13) as i32;
                 let x = if gs.game.home_playing { x_raw + 13 } else { x_raw };
-                Action::KickBall { coord: FieldCoordinate::new(x, y_raw + 1) }
+                // Java ParityRunner: `home ? kickCoord : kickCoord.transform()`. The kick target is
+                // built in server frame (away kicks into home's half, x 0..12); an away "client" sends
+                // it in client frame, so StepKickoff's own transform (applied when !home_playing) maps
+                // it back. Without this pre-transform, StepKickoff mirrored (6,8)->(19,8), landing the
+                // ball in the kicking half -> spurious touchback and a diverged half-2 kickoff.
+                let coord = FieldCoordinate::new(x, y_raw + 1);
+                let coord = if gs.game.home_playing { coord } else { coord.transform() };
+                Action::KickBall { coord }
             }
             // AGENT_CONTRACT.md §4-5: 1 decisionRng for player pick over remaining (§4 — EndTurn
             // is automatic when remaining is empty, NOT an explicit pick option),
