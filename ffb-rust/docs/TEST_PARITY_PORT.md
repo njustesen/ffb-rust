@@ -606,6 +606,9 @@ Remaining ffb-common GAP files are all DOCUMENTED EXEMPTIONS (Rust-only, no fait
   new square is active=false; occupied square / unknown id / wrong-team-not-playing rejected.
   GOTCHA: the fixture keeps unplaced players in a reserve BOX coordinate (-1,N), NOT null — assert
   "not at target square", not null-coordinate.
+- **util_server_catch_scatter_throw_in → Java tests (4 green).** findScatterCoordinate offsets
+  start by direction*distance (pure); findDivingCatchers returns adjacent team-mates with Diving
+  Catch (canAttemptCatchInAdjacentSquares).
 Plus the in-file util_player exemptions (canGaze x4, refresh x7, partner-not-on-field x1, new/default x2)
 and UtilDisturbingPresence empty-player x1 — all commented at their Java test sites.
 - prayer_state (6): NOT ffb-common — com.fumbbl.ffb.server.PrayerState → belongs to Step 3 (ffb-server).
