@@ -1417,3 +1417,24 @@ mostly negatrait step files whose behaviour is covered, verify vs exempt), model
 
 Remaining Step-3 factory GAP (36 tests): prayer_handler_factory (11), card_handler_factory (10),
 sequence_generator_factory (7), observer_factory (6). Then skill_behaviour (118), model (19).
+
+## Iteration 83 — factory bucket: observer_factory (+5 ffb-server); sequence_generator_factory exempt
+
+- **ObserverFactoryTest (5)** — Scanner-populated observer set: empty before initialize; BB2025 registers
+  ChompRemovalObserver (@RulesCollection BB2025), BB2016/BB2020 register none; forName is a Java no-op
+  returning null for any name (verified via getObservers() class-membership instead — the Rust for_name
+  positive lookup is a Rust-specific accessor). Exempt: get_observers_returns_empty_slice_before_init
+  (duplicate of newFactoryHasNoObservers).
+- **sequence_generator_factory (7) — EXEMPT (Rust-structural non-functional stub):** the Rust factory is a
+  hand-maintained `HashSet<&str>` name-validation list, NOT a reflection-faithful translation of Java's
+  `Scanner`-populated `Map<String, SequenceGenerator>` (the Rust comment notes "full generator dispatch
+  not ported — Rust generators have incompatible parameter types, no common trait"). Porting revealed it
+  diverges from Java ground truth: Java registers the `KickTeamMate` generator ONLY for bb2016
+  (`generator/bb2016/KickTeamMate.java @RulesCollection(BB2016)`; `Kickoff` is bb2016+bb2020+bb2025 via
+  `generator/mixed/Kickoff.java`), but the Rust list adds KickTeamMate for bb2020 AND bb2025. The
+  edition lists + `len()>=31`/`len()>=15` count assertions are interdependent approximations with no
+  Java getters. A faithful reimplementation is deferred until real generator dispatch lands; the
+  hand-list inaccuracy is non-functional (validation-only, never used for dispatch). NOTE (known
+  divergence): Rust bb2020/bb2025 KickTeamMate registration has no Java counterpart.
+
+Remaining Step-3 factory GAP (21 tests): prayer_handler_factory (11), card_handler_factory (10).
