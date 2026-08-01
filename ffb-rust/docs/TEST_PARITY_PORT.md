@@ -1070,6 +1070,10 @@ tests are Rust-structural (exempt/prune as encountered).
   replaced it). Removed the file, mod entries, bb2025 registry registration; registry count
   test 35→34. Wild animal remains bb2016-only (matching Java). Behavior-neutral (no bb2025
   player can have the skill) but violates the no-invented-code ground rule.
+- **really_stupid ×3 + wild_animal bb2016 → Java tests (13 green first run).** Cancel-mapping
+  matrix pinned: bb2016 KTM→blitzUsed / bb2020 KTM→ktmUsed; Wild Animal failure = STANDING +
+  inactive (NOT confused; standing-up → PRONE), StepWildAnimal is bb2016-only. bb2020
+  flag-helper Rust tests exempt (duplicates of cancel twins).
 - **bone_head bb2016 + bb2025 → Java tests (6 green).** bb2016 skill name is "Bone-Head";
   bb2016 cancel maps KICK_TEAM_MATE→blitzUsed (vs bb2020 ktmUsed / bb2025 ttmUsed for TTM).
   BUCKET-WIDE EXEMPTION: the Rust registry plumbing tests (register_into_adds_step_modifier,
