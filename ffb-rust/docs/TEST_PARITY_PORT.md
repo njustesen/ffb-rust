@@ -2008,3 +2008,26 @@ batch; AbstractStep.setParameter returns false always, so every subclass switch 
   super → false. TV-difference prayer roll deferred (dice/inducement, unit-tested Rust-side).
 
 17 untested StepId families remain.
+
+## Iteration 121 — Step-4: StepAnimosity + StepKickoffScatterRollAskAfter + StepReferee (+7 ffb-server)
+
+Cleared the LAST families with a return-true setParameter key. Cross-checked each Rust twin — all match Java.
+- **StepAnimosityFixtureTest (2, bb2020/COMMON)** — CATCHER_ID consumed; unknown → false. Roll deferred (dice/hook).
+- **StepKickoffScatterRollAskAfterFixtureTest (2, bb2025)** — KICKOFF_START_COORDINATE consumed; unknown →
+  false. Scatter roll / ask-after dialog deferred (dice/command).
+- **StepRefereeFixtureTest (3, bb2020/COMMON)** — INJURY_RESULT is a CONDITIONAL accept: true only when
+  apothecaryMode==DEFENDER (built via `new InjuryResult(); ir.injuryContext().setApothecaryMode(DEFENDER)`),
+  ATTACKER → false, unknown → false. Eject resolution deferred (hook).
+
+### Step-4 frontier CONVERGED — remaining 13 StepId families are documented DEFERRALS
+Recomputed via the class-name measure. All 13 are pure hook-delegating steps (start()→executeStepHooks,
+3-4 line body, NO return-true setParameter, NO inline no-dice guard) whose only observable behavior needs
+scripted dice / client commands / dialogs / published params — not fixture-expressible per the step-YIELD
+triage. TEST is a synthetic StepId with no class (exempt). No fixture tests to add for these:
+- ALL_YOU_CAN_EAT (StepAllYouCanEat), BOMBARDIER (StepBombardier), BRIBES (StepBribes — init GOTO_LABEL_ON_END
+  only, init-throw not tested per convention), GETTING_EVEN (StepGettingEven), KICKOFF (StepKickoff),
+  KICKOFF_RESULT_ROLL (StepKickoffResultRoll), PILE_DRIVER (StepPileDriver — init GOTO_LABEL_ON_END+PLAYER_ID),
+  PLAY_CARD (StepPlayCard), PRAYER (StepPrayer), SETUP (StepSetup), TRICKSTER (StepTrickster — USING_* keys
+  store-but-return-false, param-store exempt), WEATHER_MAGE (StepWeatherMage), WIZARD (StepWizard).
+Their roll/command/hook logic is exercised Rust-side in colocated #[cfg(test)] modules and (where applicable)
+by Java behaviour tests. Next: verify TRANSLATION_TRACKER (no ○/~ non-GUI) + reconcile + full suites toward stop.
