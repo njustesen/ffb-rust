@@ -1824,3 +1824,14 @@ are mostly ported. 46 untested StepId families remain.
   init-consumed (setParameter twin exempt).
 
 44 untested StepId families remain.
+
+## Iteration 107 — Step-4: StepMasterChef + StepBlockBallAndChain guard subsets (+5 ffb-server)
+
+- **StepMasterChefFixtureTest (2)** — start() → NEXT_STEP; half≥3 short-circuits the chef reroll-steal
+  (both teams' rerolls unchanged). Chef roll/event/report + first-turn-of-half detail deferred (dice).
+- **StepBlockBallAndChainFixtureTest (3)** — non-Ball-and-Chain blocker → NEXT_STEP; OLD_DEFENDER_STATE
+  accepted; unknown → false. Pushback GOTO (skill + prone defender + init GOTO_LABEL_ON_PUSHBACK) deferred.
+
+Also noted: StepDedicatedFans is dice/modifier/report-heavy (fan-factor roll) — deferred; StepTrickster
+deferred (2 editions, setParameter returns false for USING_* flags by design, default-action-dependent
+usingTrickster==false path). 41 untested StepId families remain.
