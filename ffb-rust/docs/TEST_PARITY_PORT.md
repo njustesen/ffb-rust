@@ -1039,6 +1039,16 @@ handledPrayer()/selector()/addedSkills(). Test recipe:
 - **under_scrutiny ×3 + fan_interaction ×3 → Java tests (29 green).** Same PrayerState-flag
   shape; UNDER_SCRUTINY targets the OPPONENT team (getOtherTeam) — Rust verified matching.
   5 Rust prunes (case-sensitivity ×4 + duplicate animation test in mixed under_scrutiny).
+- **iron_man ×3 + knuckle_dusters ×3 → Java tests (26 green).** SelectPlayerPrayerHandler
+  (dialog-based) recipe: Java initEffect shows a player-choice dialog and returns FALSE when
+  eligible players exist (true only when wasted/empty); the effect lands via
+  applySelection(game, new PrayerDialogSelection(playerId, null)). DOCUMENTED DIVERGENCE:
+  Rust's headless init_effect random-selects and applies immediately — the Rust
+  init_effect_grants_*/marks_* tests have NO Java twin (Java twin = wasted-case
+  initEffectReturnsTrueWhenNoEligiblePlayers via createGameState(0)). Portable: applySelection
+  (Iron Man +1 getArmourWithModifiers; Knuckle Dusters grants temporary Mighty Blow via
+  getSkillsIncludingTemporaryOnes), removeEffectInternal, bb2025 IronManPlayerSelector
+  armour>=11 filter (Java twin: all players setArmour(11) → prayer wasted, nobody enhanced).
 - **moles_under_the_pitch ×3 + greasy_cleats ×3 → Java tests (30 green).** Moles =
   PrayerState-flag (check via getMolesUnderThePitch().contains(teamId)); greasy_cleats =
   RandomSelection with affectedPlayers()==1 hardcoded (NO dice) + opponent selector.
