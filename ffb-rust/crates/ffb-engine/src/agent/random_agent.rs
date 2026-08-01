@@ -333,16 +333,16 @@ impl Agent for RandomAgent {
             Some(AgentPrompt::FollowUp { .. }) => {
                 Action::FollowUp { follow_up: false }
             }
-            // Block die selection: uniformly sample from available dice — 1 decision_rng call.
-            // Synced with Java ParityRunner BLOCK_ROLL dialog case.
-            Some(AgentPrompt::BlockChoice { dice, .. }) => {
-                let idx = self.pick(dice.len().max(1));
-                Action::BlockChoice { die_index: idx, target_id: None }
+            // Block die selection: AGENT_CONTRACT §7/§8 — ALWAYS pick index 0, deterministically,
+            // consuming 0 rng. Java ParityRunner BLOCK_ROLL = `sendBlockChoice(0)` (no decisionRng).
+            // The old code random-sampled via pick(), consuming a spurious decision_rng draw that
+            // desynced the stream for the next player pick (even a 1-die block drew a call).
+            Some(AgentPrompt::BlockChoice { .. }) => {
+                Action::BlockChoice { die_index: 0, target_id: None }
             }
-            // Block choice with re-roll properties: consume 1 decision_rng call for consistency.
-            // Synced with Java ParityRunner BLOCK_ROLL_PROPERTIES case.
+            // Block choice with re-roll properties (BB2025): also index 0, 0 rng — Java
+            // BLOCK_ROLL_PROPERTIES = `sendBlockChoice(0)`. The old code drew pick_bool (spurious).
             Some(AgentPrompt::BlockChoiceProperties { .. }) => {
-                let _ = self.pick_bool();
                 Action::BlockChoice { die_index: 0, target_id: None }
             }
             // Re-roll offer: uniformly sample use/decline — 1 decision_rng call.

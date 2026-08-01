@@ -276,3 +276,24 @@ at step2 on both sides; compare to Java ParityRunner's eligible construction + S
 Add a test. Verify step2 picks away5 and step2 post matches, then advance. NOTE: correct the iter10 commit's
 "move-target occupied squares" lead — that was mis-diagnosed; the occupied-square N=6 trace was away5 in a
 LATER turn, not step2.
+
+## Iter 11 (2026-08-01) — FIX #6 (verified, big advance): block-die choice = index 0, 0 rng
+
+step2's player-pick divergence root-caused to a decisionRng DESYNC in step1's blitz: Rust prompts
+BlockChoice even for a 1-die block and the agent did `self.pick(dice.len())` — consuming a spurious
+decision_rng draw. Java BLOCK_ROLL / BLOCK_ROLL_PROPERTIES = `sendBlockChoice(0)`: index 0, deterministic,
+0 rng (AGENT_CONTRACT §7/§8). Same pattern as pushback (#2) & follow-up (#4). FIX (Rust agent): BlockChoice
+AND BlockChoiceProperties → die_index 0, no rng draw. cargo test 9 passed.
+
+RESULT (big advance): the extra draw had offset every subsequent decisionRng player-pick; removing it
+re-synced the whole away turn. Comparator moved from STEP 2 → STEP 9 (steps 2-8, the away team's entire
+first turn, now match). 6 of 6 agent-dialog bugs so far share the pattern "Java deterministic 0-rng vs
+Rust random + spurious draw".
+
+### Open item #4 (next): step9 — home team's turn 1, player pick diverges
+seed1 step9 (i=10, active=home): Java picks home1 MOVE, Rust picks home_05; step9 pre-state (=step8 post)
+differs (Java 09c99d383af1f9f1 vs Rust fdad079a524e32ad). So step8 (last away activation) or the away→home
+turn transition diverged. Diagnose: JSONL steps 8-9 chosen/hashes; diff post-step8 full state; check the
+turn-handover (end-turn/start-turn) and whether another decisionRng/actionRng desync crept in during the
+late away activations, or a home-turn-start difference. Likely another instance of the recurring pattern OR
+a turn-transition state delta. Root-cause, fix Rust only, add a test, verify step9 before commit.
