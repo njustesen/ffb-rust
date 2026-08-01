@@ -1036,6 +1036,9 @@ handledPrayer()/selector()/addedSkills(). Test recipe:
   add/remove/hasFoulingFrenzy / isFriendsWithRef — no dice, no players needed. 4 Rust prunes
   (handles_prayer_is_case_sensitive ×4 — string-based check inexpressible against Java's
   enum-typed handles(Prayer)). getName() == simple class name is portable.
+- **under_scrutiny ×3 + fan_interaction ×3 → Java tests (29 green).** Same PrayerState-flag
+  shape; UNDER_SCRUTINY targets the OPPONENT team (getOtherTeam) — Rust verified matching.
+  5 Rust prunes (case-sensitivity ×4 + duplicate animation test in mixed under_scrutiny).
 
 ## Step 4 REAL RUST BUG #3: StepSafeThrow early NEXT_STEP (fixed 2026-07-26)
 

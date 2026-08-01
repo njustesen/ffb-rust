@@ -72,10 +72,8 @@ mod tests {
         assert!(!state.is_under_scrutiny("away"));
     }
 
-    #[test]
-    fn animation_type_is_under_scrutiny() {
-        assert_eq!(animation_type(), AnimationType::PRAYER_UNDER_SCRUTINY);
-    }
+    // NOTE (test equalization): `animation_type_is_under_scrutiny` pruned - exact duplicate
+    // of `animation_type_is_correct` above.
 
     #[test]
     fn init_effect_away_team_adds_scrutiny_to_home() {
