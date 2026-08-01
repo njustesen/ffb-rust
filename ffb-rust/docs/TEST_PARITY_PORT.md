@@ -613,6 +613,9 @@ Remaining ffb-common GAP files are all DOCUMENTED EXEMPTIONS (Rust-only, no fait
   (value - uses) >= N and increments uses, else fails consuming nothing (zero-value fails,
   nr=0 vacuously succeeds). Built a real InducementSet with new Inducement(type, value) +
   setUses. The Rust bare-int use_one/use_inducement helper form is Rust-only (exempt).
+- **util_server_re_roll (is*ReRollAvailable) → Java tests (5 green).** Skill-less player has no
+  Pro re-roll; team with 0 TRR / re-roll-blocking turn mode (bb2025 Kickoff, bb2020 Blitz) has
+  no team re-roll; empty single-use pool has none. All delegate to the edition RollMechanic.
 Plus the in-file util_player exemptions (canGaze x4, refresh x7, partner-not-on-field x1, new/default x2)
 and UtilDisturbingPresence empty-player x1 — all commented at their Java test sites.
 - prayer_state (6): NOT ffb-common — com.fumbbl.ffb.server.PrayerState → belongs to Step 3 (ffb-server).
