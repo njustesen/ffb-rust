@@ -505,3 +505,31 @@ bb2025 StepStandUp fully to pin where STANDING is set for a free/successful stan
 (prone MA6 player activates Move → base STANDING, current_move==3, no dice). Rebuild, rerun seeds 1-3, VERIFY
 step23 post == 90e19713af7cd274 (fully matches). This is the LAST bit for step23. 10 fixes committed;
 seed1 matches through step22; step23 is one base-bit from green.
+
+## Iter 19 (2026-08-01) — step23 stand-up: standing_up flag NOT set on the live prone Move activation
+
+Confirmed (reverted an unreached free-branch STANDING edit): StepStandUp's guard (~L82) early-returns
+unless `game.acting_player.standing_up`==true, and for home_01's Move activation standing_up is FALSE — so
+StepStandUp is a no-op and the player never leaves PRONE. The `standing_up=true` setters found in
+bb2016/move_/step_init_selecting.rs L468/495 are TEST code, not production. In the live driver path a prone
+player activated with Move does not get standing_up set, so no stand-up happens. (Build gotcha this iter:
+cargo returned 0.25-0.27s "Finished" without recompiling even after `rm` the exe and `cargo clean -p
+ffb-engine`; a real recompile only happened when a build actually showed "Compiling ffb-engine". Always
+confirm a Compiling line, not just Finished, before trusting a rerun.)
+
+### Open item #10 (next, TWO-PART engine fix): make a prone Move activation stand the player up
+Java: activating a prone player with MOVE sets it standing-up (StepInitSelecting sets currentMove =
+min(MINIMUM_MOVE_TO_STAND_UP, MA) and the standing-up flow), then StepStandUp resolves the stand-up (free if
+MA>=3), ending STANDING. Rust must mirror:
+(1) In the LIVE activation path (the production StepInitSelecting the driver uses via
+    `step_init_selecting::StepInitSelecting`, driver.rs:104 — FIND the actual production file, NOT the test
+    module), set `game.acting_player.standing_up = true` (and current_move = min(STAND_UP_COST, MA)) when a
+    PRONE player is activated (Move/Blitz), matching Java StepInitSelecting. Verify via FFB_TRACE that
+    standing_up is true entering StepStandUp for home_01.
+(2) In StepStandUp free-stand-up branch (and successful-roll branch), set the player base PRONE→STANDING
+    (`ps.change_base(PS_STANDING)`), mirroring the deleted engine.rs:1031-1036 (set_player_state(PS_STANDING)
+    + current_move = STAND_UP_COST). The Java StepStandUp free branch only sets hasMoved(true) — Java's
+    STANDING comes from the InitSelecting/standing-up flow, so setting it in StepStandUp is the pragmatic
+    equivalent; VERIFY the post_hash == 90e19713af7cd274 and REVERT if it over/under-sets.
+Add a driver-level test: prone MA6 player activated with Move → ends STANDING, current_move==3, 0 dice.
+VERIFY step23 fully matches + comparator advances PAST step23. 10 fixes committed; seed1 through step22.
