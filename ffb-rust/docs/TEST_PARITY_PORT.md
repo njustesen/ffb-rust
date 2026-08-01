@@ -1844,3 +1844,19 @@ usingTrickster==false path). 41 untested StepId families remain.
   (choice arrives via CLIENT_COIN_CHOICE command). Coin-throw / choosing-team / report deferred (command+dice).
 
 StepAllYouCanEat deferred (dice + passState originalBombardier). 39 untested StepId families remain.
+
+## Iteration 109 — Step-4: StepRiotousRookies + StepWisdomOfTheWhiteDwarf guard/param (+2 ffb-server)
+
+- **StepRiotousRookiesFixtureTest (1)** — start() hires rookies both teams → NEXT_STEP. Created-journeyman
+  inspection (count roll, journeyman status / RIOTOUS_ROOKIE type / Loner / id / nr / reserves / stats)
+  deferred (dice + player construction).
+- **StepWisdomOfTheWhiteDwarfFixtureTest (1)** — setParameter → false (skill granted via player/skill-selection
+  COMMANDS, no setParameter keys). start / select-player / select-skill / report deferred (command-driven).
+
+TAIL STATUS: the remaining ~37 untested StepId families are overwhelmingly command/dice/dialog-driven
+(StepBribes, StepKickTeamMate, StepPileDriver, StepAllYouCanEat, StepDedicatedFans, kickoff/wizard/prayer
+steps, etc.) — their Rust tests assert roll outcomes / published params / command handling that the headless
+`startStep` fixture can't reach, so per-family fixture-expressible yield is now 0-2 guard/param tests. The
+high-yield immediate-execute/dispatch steps are essentially exhausted. Remaining behaviour is genuinely
+covered by the Rust-side unit tests + would need a command/dice-injection harness to equalize in Java.
+37 untested StepId families remain.
