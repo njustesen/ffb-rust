@@ -297,3 +297,31 @@ turn transition diverged. Diagnose: JSONL steps 8-9 chosen/hashes; diff post-ste
 turn-handover (end-turn/start-turn) and whether another decisionRng/actionRng desync crept in during the
 late away activations, or a home-turn-start difference. Likely another instance of the recurring pattern OR
 a turn-transition state delta. Root-cause, fix Rust only, add a test, verify step9 before commit.
+
+## Iter 12 (2026-08-01) — FIX #7 (verified, big advance): re-roll offer = always decline, 0 rng
+
+step9 root cause: away1's dodge failed (target 5, roll 4); Rust USED a team reroll (rerolled=true, roll 2,
+fail → stunned at 13,6) but Java DECLINES team rerolls. Rust's ReRollOffer handler did `pick_bool()`
+(random use/decline + a decisionRng draw). Java RE_ROLL/RE_ROLL_PROPERTIES = sendUseReRoll(action,null) —
+always decline, deterministic, 0 rng, no extra game die (AGENT_CONTRACT §7). Same pattern (#7). FIX (Rust
+agent): ReRollOffer → use_reroll:false. cargo test 9 passed.
+
+RESULT: comparator advanced STEP 9 → STEP 23 (now turn 2)! The spurious reroll had both changed injuries
+(extra game die) and desynced decisions; removing it re-synced home turn 1 + into turn 2.
+
+### DIALOG-HANDLER AUDIT (found, NOT yet fixed — verify each vs ParityRunner before changing):
+Still random-sampling via pick_bool/pick where AGENT_CONTRACT §7 says deterministic:
+- SkillUse (§7 "always use") — Rust pick_bool → should be true.
+- PilingOn (§7 "always use") — Rust pick_bool → should be true.
+- ApothecaryChoice (§7 "decline") — Rust pick_bool → should be false.
+- Touchback (§7 "nearest to (13,8) by squared distance, first on ties") — Rust sorts by PlayerId + random
+  pick → should be deterministic nearest-center (WRONG choice AND rng).
+- ArgueTheCall (§7 "ALWAYS argue") — Rust pick_bool → should be true.
+Interception already correct (decline, 0 rng). VERIFY each against the matching ParityRunner case (does Java
+draw decisionRng? deterministic value?) before flipping — don't blind-change. These are the likely causes of
+step23 and beyond.
+
+### Open item #5 (next): step23 (i=24, turn2, home) player pick diverges (Java home9 vs Rust home_08)
+Almost certainly one of the audited dialog handlers fired between step9's fixed point and step23 and desynced
+again. Diagnose which dialog occurred (FFB_TRACE LOOP applied= between the last matching step and step23),
+map it to the audit list, verify vs ParityRunner, fix, verify step23 matches.

@@ -345,10 +345,13 @@ impl Agent for RandomAgent {
             Some(AgentPrompt::BlockChoiceProperties { .. }) => {
                 Action::BlockChoice { die_index: 0, target_id: None }
             }
-            // Re-roll offer: uniformly sample use/decline — 1 decision_rng call.
-            // Synced with Java ParityRunner RE_ROLL dialog case.
+            // Re-roll offer: AGENT_CONTRACT §7 — ALWAYS DECLINE, deterministically, 0 rng. Java
+            // ParityRunner RE_ROLL / RE_ROLL_PROPERTIES = sendUseReRoll(action, null) (decline, no
+            // decisionRng, no extra game die). The old code random-sampled via pick_bool, which both
+            // sometimes USED a team reroll (extra dodge/etc. die → wrong injury) and drew a spurious
+            // decision_rng call desyncing later picks.
             Some(AgentPrompt::ReRollOffer { .. }) =>
-                Action::UseReRoll { use_reroll: self.pick_bool() },
+                Action::UseReRoll { use_reroll: false },
             // Skill use: uniformly sample use/decline — 1 decision_rng call.
             // Synced with Java ParityRunner SKILL_USE dialog case.
             // skill_id=Block is a placeholder (engine identifies the skill from step state, not
