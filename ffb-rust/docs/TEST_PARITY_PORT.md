@@ -1814,3 +1814,13 @@ idle gap) since nothing external gates them; a wakeup is only used to hand off a
 NOTE (yield): the remaining Step-4 families are increasingly command/dice/dialog-heavy, so per-family
 fixture-expressible yield is dropping (1-2 guard tests each) — the clean immediate-execute/dispatch steps
 are mostly ported. 46 untested StepId families remain.
+
+## Iteration 106 — Step-4: StepTouchback + StepFoulChainsaw (+6 ffb-server)
+
+- **StepTouchbackFixtureTest (4)** — no touchback → NEXT_STEP; touchback-without-coordinate → CONTINUE
+  (dialog); TOUCHBACK accepted; unknown → false. With-coordinate ball resolution deferred (needs catcher).
+- **StepFoulChainsawFixtureTest (2)** — fouling player without chainsaw → NEXT_STEP; unknown → false.
+  Chainsaw roll/report/USING_CHAINSAW deferred; no_acting_player Rust-defensive; GOTO_LABEL_ON_FAILURE
+  init-consumed (setParameter twin exempt).
+
+44 untested StepId families remain.
