@@ -1909,3 +1909,14 @@ covered by the Rust-side unit tests + would need a command/dice-injection harnes
   no_player_id Rust-defensive (Java null-player deref).
 
 29 untested StepId families remain.
+
+## Iteration 114 — Step-4: StepShadowing + StepFirstMoveFuriousOutburst param subsets (+6 ffb-server)
+
+- **StepShadowingFixtureTest (4, bb2016)** — COORDINATE_FROM / DEFENDER_POSITION / USING_DIVING_TACKLE
+  accepted (pure stores); unknown → false. no-coordinate guard / shadower prompt / diving-tackle & turn-mode
+  disables / player-choice deferred (hook + command); USING_SHADOWING command-set (twin exempt).
+- **StepFirstMoveFuriousOutburstFixtureTest (2, bb2020)** — END_PLAYER_ACTION accepted; unknown → false.
+  start() derefs a null TargetSelectionState in a bare fixture (NPE) so the CONTINUE guard + coordinate-move
+  + publish tests need a blitz/pass target — deferred.
+
+27 untested StepId families remain.
