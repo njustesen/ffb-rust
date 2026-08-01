@@ -1765,3 +1765,15 @@ in the last three).
   Rust-defensive), set_parameter_player_id_accepted (init-consumed → setParameter false).
 
 53 untested StepId families remain.
+
+## Iteration 102 — Step-4: StepConsumeParameter (+4 ffb-server)
+
+- **StepConsumeParameterFixtureTest (4)** — start()→NEXT_STEP; setParameter consumes (true) exactly the
+  keys registered via init CONSUME_PARAMETER (a Collection<StepParameterKey>), defers others to
+  AbstractStep.setParameter (which returns false unconditionally — verified). Exempt:
+  parameters_to_consume_itself_is_consumed (Rust threads the consume-set via
+  setParameter(ParametersToConsume); Java consumes CONSUME_PARAMETER via init() → setParameter false).
+  Recipe note: AbstractStep.setParameter has NO default key handling (returns false), so "unregistered
+  key → false" tests are reliable across all steps.
+
+52 untested StepId families remain.
