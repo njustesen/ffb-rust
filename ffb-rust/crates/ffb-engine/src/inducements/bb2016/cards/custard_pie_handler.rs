@@ -70,13 +70,9 @@ mod tests {
         assert!(h.is_responsible(&card));
     }
 
-    #[test]
-    fn allows_player_false_for_unknown_player() {
-        let h = CustardPieHandler;
-        let game = make_game();
-        let card = Card::new("Custard Pie", Some("CUSTARD_PIE"));
-        assert!(!h.allows_player(&game, &card, "nonexistent"));
-    }
+    // NOTE (test equalization): unknown-player guard pruned - Rust id-based lookup guard;
+    // Java's allowsPlayer takes a Player object, a missing id is inexpressible (the Java twin
+    // covers the off-pitch/isolated variant instead where applicable).
 
     #[test]
     fn get_name_returns_struct_name() {

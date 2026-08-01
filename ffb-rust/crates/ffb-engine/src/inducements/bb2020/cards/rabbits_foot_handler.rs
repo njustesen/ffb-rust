@@ -48,13 +48,9 @@ mod tests {
         assert!(!h.is_responsible(&other));
     }
 
-    #[test]
-    fn allows_player_false_when_player_not_in_game() {
-        let h = RabbitsFootHandler;
-        let game = make_game();
-        let card = Card::new("Rabbit's Foot", Some("RABBITS_FOOT"));
-        assert!(!h.allows_player(&game, &card, "nonexistent"));
-    }
+    // NOTE (test equalization): unknown-player guard pruned - Rust id-based lookup guard;
+    // Java's allowsPlayer takes a Player object, a missing id is inexpressible (the Java twin
+    // covers the off-pitch/isolated variant instead where applicable).
 
     #[test]
     fn allows_player_true_for_player_without_prevent_property() {

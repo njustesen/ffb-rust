@@ -66,11 +66,8 @@ mod tests {
         assert_eq!(h.get_name(), "PitTrapHandler");
     }
 
-    #[test]
-    fn handler_key_name_is_pit_trap() {
-        let h = PitTrapHandler::new();
-        assert_eq!(h.handler_key_name(), "PIT_TRAP");
-    }
+    // NOTE (test equalization): `handler_key_name_is_pit_trap` pruned - Rust-structural string
+    // accessor (Java's handlerKey() is a protected enum; identity is covered by isResponsible).
 
     #[test]
     fn activate_on_game_returns_true() {

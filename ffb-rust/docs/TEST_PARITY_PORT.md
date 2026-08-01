@@ -1053,8 +1053,12 @@ granted). Fixed handler const + effect map + flipped test. Tally: 11 real Rust b
   handler keys. activate(card, step, player) with GameFixture.createStep; effects via
   fieldModel.hasCardEffect. Witch brew d6: 1=MadCap, 2=none, 3-6=Sedative
   (rollCardEffect = 1 die). Distract: 3-square radius, deactivate clears confusion.
-  Remaining cards: chop_block, custard_pie, force_shield, illegal_substitution, pit_trap,
-  rabbits_foot (×2 each) + card_handler base.
+  Remaining cards: chop_block, force_shield, illegal_substitution (×2 each) + card_handler base.
+- **CARDS: custard_pie/rabbits_foot/pit_trap ×6 → Java tests (32 green).** Custard pie
+  allowsPlayer: raw card is in neither InducementSet so ownTeam resolves to AWAY — test with
+  away players adjacent. Pit trap activate = UtilServerInjury.dropPlayer (PRONE + ball scatter
+  when carried, isBallMoving twin; 4 scripted dice for the scatter). 6 Rust prunes
+  (unknown-player id guards ×4, handler_key_name accessor ×2).
 - **prayer_player_effect + select_player base → Java tests (9 green). PRAYER SUB-BUCKET
   CLOSED.** PrayerEnhancementsTest twins the Rust effect map against Java
   Prayer.enhancements()/FieldModel.addPrayerEnhancements (stat mods, skill grants with values,
