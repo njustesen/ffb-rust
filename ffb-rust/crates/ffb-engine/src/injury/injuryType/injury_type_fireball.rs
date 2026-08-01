@@ -134,16 +134,8 @@ mod tests {
         assert!(!t.ctx.armor_modifiers.contains(&ARMOR_FIREBALL));
         assert!(t.ctx.injury_modifiers.contains(&INJURY_FIREBALL));
     }
-    #[test]
-    fn new_creates_instance_with_correct_apo_mode() {
-        let t = InjuryTypeFireball::new();
-        assert_eq!(t.ctx.apothecary_mode, ApothecaryMode::Defender);
-    }
-    #[test]
-    fn injury_context_returns_context() {
-        let t = InjuryTypeFireball::new();
-        assert_eq!(t.injury_context().apothecary_mode, ApothecaryMode::Defender);
-    }
+    // NOTE (test equalization): new_creates_instance_with_correct_apo_mode and
+    // injury_context_returns_context pruned — Rust ctor/accessor plumbing with no Java twin.
 
     fn game_with_attacker_and_defender(attacker_skills: Vec<ffb_model::enums::SkillId>, defender_armour: i32) -> Game {
         use std::collections::HashSet;

@@ -966,8 +966,14 @@ Swept EVERY Rust injury_type_* flag override against the Java model classes + se
 - 13 Rust tests that had pinned the wrong flags flipped; 3 injury.rs dispatch tests re-anchored
   on Java-correct markers (send_to_box_reason / failed_armour_places_prone) instead of the
   removed turnover overrides. Full engine 7,090 green. Tally: 8 real Rust bugs (this one a batch).
-- Next: remaining injury_type_* tail (rerun reconcile for the live list); then inducements 432,
-  skill_behaviour 359, util 138.
+- **injury_type_fireball 8/8 + injury_type_bomb 9/9 → Java tests.** Fireball = Lightning bonus
+  semantics (armour-when-needed else injury; pre-broken ctx variant). Bomb: NO bomb modifier of
+  its own; defender-chainsaw +3 kickback (IHS suppresses); armour save leaves injury UNSET (no
+  PRONE branch). Pruned fireball's 2 ctor/accessor plumbing tests.
+- Next: remaining injury_type_* tail (~14 files: then_i_started_blastin, quick_bite,
+  projectile_vomit, foul_for_spp, crowd, bomb_with_modifier ×2, keg_hit, fumbled_ktm ×2, bitten,
+  trap_door_fall_for_spp, throw_a_rock ×2, saboteur, piling_on_knocked_out...); then
+  inducements 432, skill_behaviour 359, util 138.
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
   scripts/reconcile_step3.sh for the live list.
 
