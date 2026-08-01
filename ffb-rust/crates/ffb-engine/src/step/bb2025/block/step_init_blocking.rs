@@ -130,7 +130,25 @@ impl StepInitBlocking {
 
         let defender_id = match self.block_defender_id.clone() {
             Some(id) => id,
-            None => return StepOutcome::cont(),
+            None => {
+                // A Blitz declared with no valid block target: the turn-start eligibility snapshot
+                // offered BLITZ, but by activation the only adjacent opponent had been knocked prone
+                // (no standing target left, and the blitzer isn't adjacent to anyone blockable). Java's
+                // SelectBlitzTarget prompts the agent, which returns EndTurn on a null target
+                // (BLITZ_TARGET_NONE); Rust auto-resolves the target and would otherwise wait forever
+                // for a CLIENT_BLOCK that never comes. The player has already stood up via the Select
+                // StandUp, so just end the turn here to match Java. Restricted to blitz actions so the
+                // interactive "wait for the block command" path (plain Block) is unaffected.
+                let is_blitzing = game.acting_player.player_action
+                    .map(|a| a.is_blitzing())
+                    .unwrap_or(false);
+                if is_blitzing {
+                    return StepOutcome::goto(&label)
+                        .publish(StepParameter::EndTurn(true))
+                        .publish(StepParameter::CheckForgo(true));
+                }
+                return StepOutcome::cont();
+            }
         };
 
         // Ask for block kind (Trickster etc.) before proceeding

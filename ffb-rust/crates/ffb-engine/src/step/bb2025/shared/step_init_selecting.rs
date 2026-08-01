@@ -104,6 +104,14 @@ impl Step for StepInitSelecting {
                     PlayerActionChoice::Block | PlayerActionChoice::Blitz
                 );
                 self.dispatch_player_action = Some(pa);
+                // A prone Blitz declared with NO target: Java's SelectBlitzTarget resolves the target
+                // BEFORE the stand-up, so a null-target blitz (BLITZ_TARGET_NONE) ends the turn with the
+                // player still PRONE. Rust stands up in the Select sequence first, so suppress the
+                // stand-up here — StepInitBlocking's no-defender branch then ends the turn, leaving the
+                // blitzer prone to match Java (seed 7 i=39: away_01 stayed Prone in Java, stood up in Rust).
+                if matches!(player_action, PlayerActionChoice::Blitz) && block_defender_id.is_none() {
+                    game.acting_player.standing_up = false;
+                }
                 // Java: if (playerAction.isMoving() || playerAction.isStandingUp())
                 //   UtilServerPlayerMove.updateMoveSquares(getGameState(), actingPlayer.isJumping())
                 // — computes per-square dodging/GFI flags for the fresh activation. Without this
@@ -358,11 +366,31 @@ mod tests {
     }
 
     #[test]
-    fn activate_prone_player_blitz_runs_standup_via_next() {
+    fn activate_prone_player_blitz_with_target_runs_standup_via_next() {
         use ffb_model::enums::{PS_PRONE, PlayerState};
-        // A prone player activated for a Blitz must proceed via next() so the Select sequence's
-        // StandUp runs (Java reaches it through SelectBlitzTarget). Without this the force_goto for
-        // Block/Blitz jumped straight to the block and the prone blitzer never stood up.
+        // A prone player activated for a Blitz WITH a target must proceed via next() so the Select
+        // sequence's StandUp runs (Java reaches it through SelectBlitzTarget). Without this the
+        // force_goto for Block/Blitz jumped straight to the block and the prone blitzer never stood up.
+        let mut game = make_game();
+        game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE));
+        game.acting_player.player_id = Some("p1".into());
+        let mut step = StepInitSelecting::new("end_label".into());
+        let action = Action::ActivatePlayer {
+            player_id: "p1".into(),
+            player_action: PlayerActionChoice::Blitz,
+            block_defender_id: Some("def".into()),
+        };
+        let out = step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(game.acting_player.standing_up, "prone blitz with a target sets standing_up");
+        assert_eq!(out.action, StepAction::NextStep, "prone blitz proceeds to StandUp via next()");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(_))));
+    }
+
+    #[test]
+    fn activate_prone_player_blitz_no_target_suppresses_standup() {
+        use ffb_model::enums::{PS_PRONE, PlayerState};
+        // A prone Blitz with NO target must NOT stand up: Java resolves the blitz target before the
+        // stand-up, so a null-target blitz (BLITZ_TARGET_NONE) ends the turn with the player prone.
         let mut game = make_game();
         game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE));
         game.acting_player.player_id = Some("p1".into());
@@ -373,9 +401,8 @@ mod tests {
             block_defender_id: None,
         };
         let out = step.handle_command(&action, &mut game, &mut GameRng::new(0));
-        assert!(game.acting_player.standing_up, "prone activation sets standing_up");
-        assert_eq!(out.action, StepAction::NextStep, "prone blitz proceeds to StandUp via next()");
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(_))));
+        assert!(!game.acting_player.standing_up, "no-target blitz must not stand the player up");
+        assert_eq!(out.action, StepAction::GotoLabel, "no-target blitz force-gotos to the (no-defender) block");
     }
 
     #[test]

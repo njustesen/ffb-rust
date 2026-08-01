@@ -42,6 +42,12 @@ pub struct RandomAgent {
     /// Turn key (half, turn_nr, home_playing) — detects when a new turn starts so we can
     /// clear `used_this_turn`.
     last_turn_key: Option<(i32, i32, bool)>,
+    /// Java ParityRunner `eligibleThisTurn`: the player→actions eligible list is computed ONCE at
+    /// the start of the turn and reused for every activation. The engine recomputes its live legal
+    /// list each activation, so without this snapshot a player's cached action (e.g. BLITZ, offered
+    /// when an opponent was adjacent-standing at turn start) would silently vanish after that
+    /// opponent is knocked prone mid-turn — diverging from Java (seed 7 i=39: away_01 BLITZ vs Move).
+    eligible_this_turn: Vec<(String, Vec<PlayerAction>)>,
     /// Debug: cumulative actionRng call count (for FFB_TRACE divergence diagnosis).
     action_rng_count: u64,
     /// Debug: cumulative decisionRng call count — compare vs Java ParityRunner.decisionRngAdvances
@@ -66,6 +72,7 @@ impl RandomAgent {
             action_rng: Xoshiro256StarStar::seed_from_u64(game_seed ^ 0xC0FFEE_ACE0_0001),
             used_this_turn: HashSet::new(),
             last_turn_key: None,
+            eligible_this_turn: Vec::new(),
             action_rng_count: 0,
             decision_rng_count: 0,
             current_activation_is_blitz: false,
@@ -81,6 +88,7 @@ impl RandomAgent {
             action_rng: Xoshiro256StarStar::seed_from_u64(seed ^ 0xC0FFEE_ACE0_0001),
             used_this_turn: HashSet::new(),
             last_turn_key: None,
+            eligible_this_turn: Vec::new(),
             action_rng_count: 0,
             decision_rng_count: 0,
             current_activation_is_blitz: false,
@@ -162,9 +170,15 @@ impl Agent for RandomAgent {
                 if self.last_turn_key != Some(turn_key) {
                     self.last_turn_key = Some(turn_key);
                     self.used_this_turn.clear();
+                    // Java: eligibleThisTurn = computeEligiblePlayers(game) — snapshot once at turn start.
+                    self.eligible_this_turn = eligible_players.clone();
                 }
+                // Pick from the turn-start snapshot (Java `eligibleThisTurn`), NOT the engine's live
+                // per-activation list, so an action offered at turn start (e.g. BLITZ) survives even if
+                // its target is knocked down later in the same turn. Clone to sidestep the &mut self pick.
+                let eligible_players = self.eligible_this_turn.clone();
 
-                // Build `remaining` as indices into eligible_players, excluding already-skipped.
+                // Build `remaining` as indices into the snapshot, excluding already-skipped.
                 let mut remaining: Vec<usize> = (0..eligible_players.len())
                     .filter(|&i| !self.used_this_turn.contains(&eligible_players[i].0))
                     .collect();
