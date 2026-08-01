@@ -1597,3 +1597,20 @@ turn_data.{apothecaries, wanderingApothecaries, plagueDoctors}, the defender's p
 (Star→empty, Mercenary→Wandering-only, Journeyman→Wandering+Plague-if-KO, else Team/Wandering), and
 KO-vs-other player state. Needs a dedicated setup iteration (set turn-data apo counts + player types).
 Next: bb2020 then bb2025 apothecary_mechanic; then the big skill_behaviour bucket (118).
+
+## Iteration 93 — bb2020 + bb2025 apothecary_mechanic (+12 ffb-server) — mechanic bucket CLOSED
+
+- **bb2020 ApothecaryMechanicTest (6)** — STAR/zapped → empty; regular gets TEAM (apothecaries >
+  wandering) else WANDERING; PLAGUE only when the team has a plague doctor AND the player is KO'd;
+  mercenary → WANDERING-only. Setup recipe: `(RosterPlayer) game.getPlayerById("home1")` with
+  `.setType(PlayerType.X)` (the setter is `setType`, not setPlayerType) + `game.getTurnDataHome()
+  .setApothecaries/.setWanderingApothecaries/.setPlagueDoctors(n)`; defender must be on the home team.
+- **bb2025 ApothecaryMechanicTest (6)** — simplifies BB2020: NO star exclusion, NO player-type
+  branching, and plague is NOT gated on KO (playerState ignored) — TEAM/WANDERING by apo-vs-wandering
+  count, PLAGUE whenever a plague doctor exists.
+All three editions' ApothecaryMechanic + SppMechanic now ported. **Step-3 mechanic bucket (bb2016/
+bb2020/bb2025 spp + apothecary) is CLOSED.**
+
+Remaining Step-3 gap: the big skill_behaviour bucket (118) — mostly negatrait/registry step-modifier
+files; per earlier notes many are behaviour-covered registry plumbing (verify vs exempt). That's the
+last major P2 bucket. Next: begin the skill_behaviour verification pass.
