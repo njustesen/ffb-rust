@@ -480,3 +480,28 @@ leaves base=PRONE. Compare to Java ffb-server StepMove stand-up handling (READ-O
 Rust test (activate a prone player with Move → base becomes STANDING, MA spent), verify step23 post ==
 90e19713af7cd274. Note the stand-up may also consume game dice (MA<3 stand-up roll) — for MA6 linemen it's
 free (3 MA), no dice. Verify the whole game dice stream stays aligned after this.
+
+## Iter 18b (2026-08-01) — step23 down to ONE bit: StepStandUp doesn't set base→STANDING (live driver)
+
+After the prone-eligible-action=Move fix (c5da8bee), step23 chosen + home_01 coordinate (11,7) match Java;
+the ONLY remaining diff is home_01's base: Java STANDING, Rust PRONE. So Rust's stand-up execution is broken.
+Traced: the live driver runs the select sequence which includes StepStandUp (bb2025 select.rs:51). StepStandUp
+(crates/ffb-engine/src/step/bb2025/move_/step_stand_up.rs) execute_step:
+- Guard (~L82): early-returns unless `game.acting_player.standing_up` is true. (bb2016 step_init_selecting
+  sets standing_up=true for a prone activation at L468/L495 — VERIFY the bb2025/live path also sets it for a
+  Move activation of a prone player; if not, StepStandUp is skipped entirely.)
+- Free-stand-up branch (L105-110, MA>=3 / canStandUpForFree): sets `has_moved=true; standing_up=false;
+  return` — but does NOT set the player's base to PS_STANDING. The DELETED engine.rs did
+  (`set_player_state(PS_STANDING); current_move = STAND_UP_COST`), and Java sets STANDING for a successful/
+  free stand-up (pin the exact site — Java StepStandUp L47-48 sets PRONE for a sub-case, so STANDING is set
+  elsewhere: possibly on setStandingUp(false)+move, or a base-set the Rust free branch omitted).
+
+### Open item #10 (next): make StepStandUp actually stand the player up (base→STANDING) + set current_move
+Fix (Rust engine, bb2025 StepStandUp, and bb2016/bb2020 if same): in the free-stand-up branch (and after a
+successful roll) set the player's base PRONE→STANDING and current_move += STAND_UP_COST (3), mirroring Java +
+the deleted engine.rs. FIRST verify `standing_up` is set true for the bb2025 Move activation of a prone
+player (trace: is StepStandUp even reaching the free branch, or early-returning on the guard?). Read Java
+bb2025 StepStandUp fully to pin where STANDING is set for a free/successful stand-up. Add a Rust test
+(prone MA6 player activates Move → base STANDING, current_move==3, no dice). Rebuild, rerun seeds 1-3, VERIFY
+step23 post == 90e19713af7cd274 (fully matches). This is the LAST bit for step23. 10 fixes committed;
+seed1 matches through step22; step23 is one base-bit from green.
