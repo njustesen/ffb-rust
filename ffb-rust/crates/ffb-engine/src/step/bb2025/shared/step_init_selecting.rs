@@ -228,7 +228,13 @@ impl StepInitSelecting {
                         _ => {}
                     }
                 }
-                let mut outcome = if standing_up && !self.force_goto_on_dispatch {
+                // A prone player (standing_up) must run the Select sequence's StandUp before its
+                // action, so it always proceeds via next() — even for Block/Blitz where
+                // force_goto_on_dispatch is set. Java reaches the StandUp via SelectBlitzTarget (which
+                // BLITZ_SELECT dispatches to); Rust skips SelectBlitzTarget and dispatches Blitz
+                // straight to the block, so without this a prone blitzer with an adjacent target (no
+                // move) never stood up. force_goto only skips StandUp for an already-standing player.
+                let mut outcome = if standing_up {
                     StepOutcome::next()
                 } else {
                     StepOutcome::goto(label)
@@ -349,6 +355,45 @@ mod tests {
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("end_label"));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(_))));
+    }
+
+    #[test]
+    fn activate_prone_player_blitz_runs_standup_via_next() {
+        use ffb_model::enums::{PS_PRONE, PlayerState};
+        // A prone player activated for a Blitz must proceed via next() so the Select sequence's
+        // StandUp runs (Java reaches it through SelectBlitzTarget). Without this the force_goto for
+        // Block/Blitz jumped straight to the block and the prone blitzer never stood up.
+        let mut game = make_game();
+        game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE));
+        game.acting_player.player_id = Some("p1".into());
+        let mut step = StepInitSelecting::new("end_label".into());
+        let action = Action::ActivatePlayer {
+            player_id: "p1".into(),
+            player_action: PlayerActionChoice::Blitz,
+            block_defender_id: None,
+        };
+        let out = step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(game.acting_player.standing_up, "prone activation sets standing_up");
+        assert_eq!(out.action, StepAction::NextStep, "prone blitz proceeds to StandUp via next()");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(_))));
+    }
+
+    #[test]
+    fn activate_standing_player_blitz_force_gotos() {
+        use ffb_model::enums::{PS_STANDING, PlayerState};
+        // A standing player's Blitz still force-gotos (skips StandUp) — the fix only changes prone.
+        let mut game = make_game();
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+        game.acting_player.player_id = Some("p1".into());
+        let mut step = StepInitSelecting::new("end_label".into());
+        let action = Action::ActivatePlayer {
+            player_id: "p1".into(),
+            player_action: PlayerActionChoice::Blitz,
+            block_defender_id: None,
+        };
+        let out = step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(!game.acting_player.standing_up);
+        assert_eq!(out.action, StepAction::GotoLabel, "standing blitz force-gotos to the block");
     }
 
     #[test]
