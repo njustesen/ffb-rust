@@ -1899,3 +1899,13 @@ covered by the Rust-side unit tests + would need a command/dice-injection harnes
   param-store** (true immediately marks the pro skill used → NPE without playerId+context) — that twin deferred.
 
 31 untested StepId families remain.
+
+## Iteration 113 — Step-4: StepQuickBite + StepPro param subsets (+3 ffb-server)
+
+- **StepQuickBiteFixtureTest (2, bb2020)** — CATCHER_ID accepted; unknown → false. start/find-opponent/
+  use-skill-command/report/revert-end-turn deferred (catcher deref + command).
+- **StepProFixtureTest (1, bb2020)** — setParameter → false (PLAYER_ID is init-consumed, no setParameter
+  keys; set_parameter_player_id twin exempt). Pro reroll roll/publish/mark/decline deferred (dice/reroll);
+  no_player_id Rust-defensive (Java null-player deref).
+
+29 untested StepId families remain.
