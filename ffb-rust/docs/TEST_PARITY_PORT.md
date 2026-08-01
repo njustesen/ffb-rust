@@ -1920,3 +1920,14 @@ covered by the Rust-side unit tests + would need a command/dice-injection harnes
   + publish tests need a blitz/pass target — deferred.
 
 27 untested StepId families remain.
+
+## Iteration 115 — Step-4: StepReportStabInjury + StepHitAndRun guard/param subsets (+6 ffb-server)
+
+Note: authoritative untested-StepId count is 32 (my per-turn running tally had drifted; the StepId-reference
+measure is the truth).
+- **StepReportStabInjuryFixtureTest (2, bb2020)** — no injury → NEXT_STEP; unknown → false (PLAYER_ID /
+  INJURY_RESULT init-consumed → setParameter twins exempt). With-injury report + handle-command deferred.
+- **StepHitAndRunFixtureTest (4, bb2020)** — no Hit-and-Run property → NEXT_STEP; END_TURN /
+  END_PLAYER_ACTION accepted; unknown → false. Command coordinate / reports / square-finding deferred.
+
+30 untested StepId families remain.
