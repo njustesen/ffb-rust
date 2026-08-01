@@ -988,9 +988,20 @@ Swept EVERY Rust injury_type_* flag override against the Java model classes + se
 - **then_i_started_blastin 8/8 + foul_for_spp 11/11 → Java tests (19 green).** ForSpp generated
   as a Foul-test transform; ADDED the IHS-blocks-chainsaw test to the Rust ForSpp file for parity
   (real shared armourRoll behavior, cheaper than deleting the Java twin). 2 Rust prunes.
-- Next: last injury_type_* files (bomb_with_modifier ×2, fumbled_ktm ×2 — the fumbled pair has
-  filtered-by-block-property semantics, read carefully); then inducements 432,
-  skill_behaviour 359, util 138.
+## Step 3 REAL RUST BUG #9: skill injury modifiers carried no registered_to (fixed 2026-08-01)
+Found porting fumbled_ktm: the Rust InjuryModifierFactory's skill_to_injury_modifier never
+tagged created modifiers with their owning skill, so isRegisteredToSkillWithProperty-style
+filters saw None and dropped EVERYTHING — InjuryTypeFumbledKtm's block-property filter wrongly
+excluded Mighty Blow (Java's MightyBlow registers affectsEitherArmourOrInjuryOnBlock in every
+edition, so a fumbled KTM landing DOES get the kicker's MB bonus — confirmed by running the Java
+twin, which failed against the old expectation). Fixed by tagging every factory-created modifier
+with skill_id.class_name(); flipped the Rust test (mighty_blow_kept_by_block_property_filter).
+Tally: 9 real Rust bugs.
+- **fumbled_ktm 7/7 + fumbled_ktm_apo_ko 5/5 → Java tests (12 green).** ApoKo variant passes a
+  NULL attacker to the factory internally (attacker skills never apply; defender niggling does).
+  4 Rust prunes.
+- Next: LAST injury files — bomb_with_modifier ×2 (BOMB_USES_MB bb2020 option branches); then
+  inducements 432, skill_behaviour 359, util 138.
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
   scripts/reconcile_step3.sh for the live list.
 

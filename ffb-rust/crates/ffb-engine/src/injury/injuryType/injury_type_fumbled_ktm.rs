@@ -78,20 +78,8 @@ mod tests {
     }
     #[test]
     fn causes_turnover_by_default() { assert!(InjuryTypeFumbledKtm::new().falling_down_causes_turnover()); }
-    #[test]
-    fn context_stores_attacker_and_defender() {
-        let mut t = InjuryTypeFumbledKtm::new(); let mut rng = GameRng::new(1);
-        t.handle_injury(&make_game(), &mut rng, Some("att"), "def", coord(), None, None, ApothecaryMode::Defender);
-        assert_eq!(t.ctx.attacker_id.as_deref(), Some("att"));
-        assert_eq!(t.ctx.defender_id.as_deref(), Some("def"));
-    }
-    #[test]
-    fn default_equivalent_to_new() {
-        let t1 = InjuryTypeFumbledKtm::new();
-        let t2 = InjuryTypeFumbledKtm::default();
-        assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
-        assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
-    }
+    // NOTE (test equalization): context-storage and Default plumbing tests pruned — no
+    // faithful Java twins (Java's CALLER sets the context ids).
 
     fn game_with_attacker_and_defender(attacker_skills: Vec<SkillId>, defender_niggling: i32) -> Game {
         use std::collections::HashSet;
@@ -131,17 +119,18 @@ mod tests {
         assert!(!t.ctx.injury_modifiers.iter().any(|m| m.name.contains("Niggling")));
     }
 
-    /// Mighty Blow is likewise not registered to `affectsEitherArmourOrInjuryOnBlock`, so it is
-    /// found by the factory but filtered out — the field's TODO note is resolved by wiring in
-    /// the real factory + filter, not by inventing new skill registrations.
+    /// Bug (fixed, #9): Java's MightyBlow skill DOES register affectsEitherArmourOrInjuryOnBlock,
+    /// so the FumbledKtm block-property filter KEEPS Mighty Blow — verified against the Java
+    /// twin (a fumbled KTM landing gets the kicker's Mighty Blow bonus). The old test asserted
+    /// the opposite because the factory's modifiers carried no registered_to skill.
     #[test]
-    fn mighty_blow_found_but_filtered_by_block_property() {
+    fn mighty_blow_kept_by_block_property_filter() {
         use ffb_mechanics::modifiers::Modifier;
         let game = game_with_attacker_and_defender(vec![SkillId::MightyBlow], 0);
         let mut t = InjuryTypeFumbledKtm::new();
         let mut rng = GameRng::new(1);
         t.handle_injury(&game, &mut rng, Some("attacker"), "defender", coord(), None, None, ApothecaryMode::Defender);
         assert!(t.ctx.armor_broken);
-        assert!(!t.ctx.injury_modifiers.contains(&Modifier::new("Mighty Blow", 1, game.rules)));
+        assert!(t.ctx.injury_modifiers.contains(&Modifier::new("Mighty Blow", 1, game.rules)));
     }
 }

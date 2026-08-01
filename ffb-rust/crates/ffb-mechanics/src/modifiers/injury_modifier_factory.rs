@@ -144,6 +144,22 @@ fn skill_to_injury_modifier(
     skill_id: SkillId,
     context: &InjuryModifierContext,
 ) -> Option<Box<dyn InjuryModifier>> {
+    // Bug (fixed, #9): the created modifiers carried no `registered_to` skill, so downstream
+    // isRegisteredToSkillWithProperty-style filters (e.g. InjuryTypeFumbledKtm keeping only
+    // affectsEitherArmourOrInjuryOnBlock modifiers = Mighty Blow) dropped everything. Java's
+    // Skill.registerModifier ties every modifier to its owning skill — mirrored here by
+    // tagging the result with the skill's Java class name.
+    let mut modifier = skill_to_injury_modifier_untagged(skill_id, context);
+    if let Some(m) = modifier.as_mut() {
+        m.set_registered_to(Some(skill_id.class_name().to_string()));
+    }
+    modifier
+}
+
+fn skill_to_injury_modifier_untagged(
+    skill_id: SkillId,
+    context: &InjuryModifierContext,
+) -> Option<Box<dyn InjuryModifier>> {
     if context.is_defender_mode() { return None; }
     match skill_id {
         SkillId::MightyBlow => {

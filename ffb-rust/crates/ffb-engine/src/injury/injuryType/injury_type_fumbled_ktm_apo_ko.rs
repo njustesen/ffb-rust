@@ -58,20 +58,8 @@ mod tests {
     }
     #[test]
     fn causes_turnover_by_default() { assert!(InjuryTypeFumbledKtmApoKo::new().falling_down_causes_turnover()); }
-    #[test]
-    fn context_stores_attacker_and_defender() {
-        let mut t = InjuryTypeFumbledKtmApoKo::new(); let mut rng = GameRng::new(1);
-        t.handle_injury(&make_game(), &mut rng, Some("att"), "def", coord(), None, None, ApothecaryMode::Defender);
-        assert_eq!(t.ctx.attacker_id.as_deref(), Some("att"));
-        assert_eq!(t.ctx.defender_id.as_deref(), Some("def"));
-    }
-    #[test]
-    fn default_equivalent_to_new() {
-        let t1 = InjuryTypeFumbledKtmApoKo::new();
-        let t2 = InjuryTypeFumbledKtmApoKo::default();
-        assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
-        assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
-    }
+    // NOTE (test equalization): context-storage and Default plumbing tests pruned — no
+    // faithful Java twins (Java's CALLER sets the context ids).
 
     fn game_with_attacker_and_defender(attacker_skills: Vec<ffb_model::enums::SkillId>, defender_niggling: i32) -> Game {
         use std::collections::HashSet;
