@@ -461,3 +461,22 @@ Java's stands the player up (prone→standing, 90e1). Investigate the Rust Stand
 actually stand the player up and spend/refresh state?) vs Java (StepInitMoving/standup + move). Also confirm
 the agent should pick the SAME action Java does (MOVE vs StandUp) so the `chosen` + post align. Fix Rust,
 add a test, verify step23 fully matches (chosen + post 90e1).
+
+## Iter 18 (2026-08-01) — FIX #10 (partial-advance): prone player's eligible action = Move (was StandUp)
+
+legal_activate_player_actions offered a PRONE player [StandUp], but its OWN comment said "Java offers MOVE
+for prone", and JAVA_ACT_PICK confirms action=MOVE. Changed the prone eligible action StandUp→Move
+(mod.rs). RESULT: step23 `chosen` now matches (both Activate(home_01,Move)) AND home_01's coordinate now
+matches Java (both moved to (11,7)). REMAINING (one bit): Java h00=(11,7)**Standing**, Rust=(11,7)**Prone**
+— Rust's Move for a prone player moved the coordinate WITHOUT standing the player up (base stayed PRONE). In
+BB a prone player activating Move must STAND UP first (base prone→standing, cost 3 MA / a 4+ roll if MA<3)
+before moving. Rust's move/stand-up execution skips the stand-up.
+
+### Open item #10 (next): Move-for-prone must stand the player up (Rust engine)
+Find the Rust move step (StepMove / StepInitMoving / the move sequence) and make a prone player's first
+Move action STAND IT UP (change_base prone→STANDING, current_move += 3 or the MA<3 stand-up roll, coordinate
+UNCHANGED on the stand-up), matching Java StepMove/standUp. Currently Rust just changes the coordinate and
+leaves base=PRONE. Compare to Java ffb-server StepMove stand-up handling (READ-ONLY). Fix RUST engine, add a
+Rust test (activate a prone player with Move → base becomes STANDING, MA spent), verify step23 post ==
+90e19713af7cd274. Note the stand-up may also consume game dice (MA<3 stand-up roll) — for MA6 linemen it's
+free (3 MA), no dice. Verify the whole game dice stream stays aligned after this.

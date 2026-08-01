@@ -62,12 +62,14 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             continue; // stunned / KO / dead
         }
 
-        // Prone players can stand up (StandUp) or blitz without pre-block move (Blitz).
-        // Java computeEligiblePlayers offers MOVE + BLITZ for prone players — not STAND_UP_BLITZ.
+        // Prone players activate with MOVE (which stands them up, spending MA) or BLITZ — matching
+        // Java computeEligiblePlayers (offers MOVE + BLITZ for prone, not a distinct STAND_UP). The
+        // move path stands the player up prone→standing; offering StandUp here diverged from Java's
+        // MOVE label AND (in Rust) left the player prone.
         if is_prone {
             actions.push(Action::ActivatePlayer {
                 player_id: pid.clone(),
-                player_action: PlayerActionChoice::StandUp,
+                player_action: PlayerActionChoice::Move,
                 block_defender_id: None,
             });
             if !turn_data.blitz_used {
