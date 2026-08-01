@@ -1788,3 +1788,17 @@ in the last three).
   Exempt: handle_command twin (AbstractStep default command path, no override).
 
 50 untested StepId families remain.
+
+## Iteration 104 — Step-4: StepDropActingPlayer + StepDoubleStrength (+6 ffb-server) [chained in-turn, no idle timer]
+
+Loop cadence change (user request): iterations now chain back-to-back within a turn (no ScheduleWakeup
+idle gap) since nothing external gates them; a wakeup is only used to hand off across turns.
+
+- **StepDropActingPlayerFixtureTest (2)** — standing acting player dropped prone (own-skill injury);
+  stunned player left as-is. Exempt: no_acting_player (Java derefs getPlayerCoordinate(null)),
+  ball_carrier_triggers_scatter_param (published param, deferred).
+- **StepDoubleStrengthFixtureTest (4)** — no targets → NEXT_STEP; target present but no Indomitable →
+  NEXT_STEP; PLAYER_ID_DAUNTLESS_SUCCESS accepted; unknown → false. The Indomitable prompt/publish/
+  report/multi-target-choice tests are command-driven — deferred.
+
+48 untested StepId families remain.
