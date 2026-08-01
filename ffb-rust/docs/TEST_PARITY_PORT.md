@@ -1070,6 +1070,11 @@ tests are Rust-structural (exempt/prune as encountered).
   replaced it). Removed the file, mod entries, bb2025 registry registration; registry count
   test 35→34. Wild animal remains bb2016-only (matching Java). Behavior-neutral (no bb2025
   player can have the skill) but violates the no-invented-code ground rule.
+- **throw_team_mate bb2025 → Java tests (5 green first run).** Executes the full hook with a
+  placed thrower + setPassCoordinate + scripted die (rollSkill); asserts the deterministic early
+  side-effects (hasPassed, throwerId, concession cleared, TTM-used non-kicked / KTM-used kicked).
+  The pass-roll evaluation itself is exercised via the step-logic tests. Skill is
+  skill.mixed.ThrowTeamMate ("Throw Team-Mate").
 - **the_ballista bb2020 + bb2025 → Java tests (10 green).** COMMAND-HOOK recipe: pick the
   modifier by `m.getConcreteClass() == StepThrowTeamMate.class` (StepModifier exposes
   getConcreteClass, NOT getSubject), build `new StepXxx.StepState()` (STATIC nested), and call
