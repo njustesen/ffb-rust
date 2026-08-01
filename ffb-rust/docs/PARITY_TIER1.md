@@ -604,3 +604,19 @@ Java removeAdditionalAssist(actingTeam) at end of a REGULAR/BLITZ turn. Seeds 1-
 calls to read Java's engine strengths — reverted + jar rebuilt clean afterward.)
 
 Next: seed 5 first divergence i=159 (turn 1 half 2, home BLITZ) — investigate.
+
+## Iter 26 (2026-08-02) — bb2025 knocked-down ball carrier (attacker) drops the ball (9ff8c5d8)
+
+Seed 5 i=159: away_03 (the BALL CARRIER at (13,8)) blitzes home_03, Both Down → away_03 falls. Java
+bounces the dropped ball to (14,9) via StepCatchScatterThrowIn (extra d8 at pos54); Rust left the ball at
+(13,8) — the only i=160 state diff, and the +1 game-die rng offset that cascaded to the i=159/i=160 hash
+mismatch. ROOT: Java bb2025 StepDropFallingPlayers adds a deferred DropPlayerCommand(attacker, ATTACKER,
+true) in the normal Both-Down attacker-fall branch, which scatters the ball. Rust left the DeferredCommand
+mechanism unported AND gated the direct drop_player(attacker) on `piling_on_supported` (bb2016/bb2020
+only) → in bb2025 a ball-carrying attacker knocked down on Both Down never dropped the ball. FIX: in the
+non-saboteur attacker-fall branch, for `!piling_on_supported` (bb2025), apply drop_player(attacker, true)
+— converts FALLING→PRONE and sets the ball scattering (bounce d8 rolls later in StepCatchScatterThrowIn).
+Seeds 1-6: 6/6 match. +1 test. (Diagnosis: first rng_calls divergence → prior step's dice COUNT; Java
+DICE_TRACE caller=StepCatchScatterThrowIn.bounceBall pinpointed the missing bounce.)
+
+Next: seed 7 first divergence i=39/40 (turn 3 half 1, turn-structure desync — Java home vs Rust away active).
