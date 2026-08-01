@@ -1039,6 +1039,15 @@ handledPrayer()/selector()/addedSkills(). Test recipe:
 - **under_scrutiny ×3 + fan_interaction ×3 → Java tests (29 green).** Same PrayerState-flag
   shape; UNDER_SCRUTINY targets the OPPONENT team (getOtherTeam) — Rust verified matching.
   5 Rust prunes (case-sensitivity ×4 + duplicate animation test in mixed under_scrutiny).
+- **moles_under_the_pitch ×3 + greasy_cleats ×3 → Java tests (30 green).** Moles =
+  PrayerState-flag (check via getMolesUnderThePitch().contains(teamId)); greasy_cleats =
+  RandomSelection with affectedPlayers()==1 hardcoded (NO dice) + opponent selector.
+  3 Rust prunes (case-sensitivity ×2, PRAYER_NAME constant ×1). Remaining prayer handlers:
+  iron_man/knuckle_dusters (SelectPlayerPrayerHandler — dialog-based, needs new recipe),
+  perfect_passing, throw_a_rock, treacherous_trapdoor, pit_trap, stiletto, necessary_violence,
+  rabbits_foot, custard_pie, bad_habits done; plus select_player/random_selection/prayer_handler
+  base tests, prayer_dialog_selection, player_selector ×2, opponent_player_selector ×2,
+  enhancement_remover, card_handler, witch_brew ×2 (cards).
 
 ## Step 4 REAL RUST BUG #3: StepSafeThrow early NEXT_STEP (fixed 2026-07-26)
 

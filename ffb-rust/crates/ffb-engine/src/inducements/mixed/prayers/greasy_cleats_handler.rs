@@ -66,10 +66,9 @@ mod tests {
         remove_effect_internal(&mut game, "home", &StubPlayerSelector);
     }
 
-    #[test]
-    fn prayer_name_constant_is_greasy_cleats() {
-        assert_eq!(PRAYER_NAME, "GREASY_CLEATS");
-    }
+    // NOTE (test equalization): `prayer_name_constant_is_greasy_cleats` pruned - Rust-structural
+    // constant plumbing (Java's mixed handler is abstract with no name constant; the prayer
+    // identity is covered by the bb2020/bb2025 handledPrayer twins).
 
     #[test]
     fn remove_effect_after_init_is_safe() {
