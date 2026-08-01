@@ -1954,3 +1954,26 @@ measure is the truth).
   setParameter keys are conditionally accepted (return false without prior state) — verify before asserting true.
 
 26 untested StepId families remain.
+
+## Iteration 118 — Step-4: StepDedicatedFans + StepMultipleBlockFork + StepDauntlessMultiple (+7 ffb-server)
+
+FRONTIER REFINEMENT: the `StepId.X`-reference grep UNDERCOUNTS — behaviour/other tests exercise a step
+via its class (`new StepWildAnimal(...)`) without ever naming the enum. Re-derived by mapping each untested
+StepId → its step class and grepping the class name in the test tree: WILD_ANIMAL (WildAnimalBehaviourTest,
+4) and HAIL_MARY_PASS (StepHailMaryPass) are ALREADY covered; TEST is a synthetic StepId with no class
+(exempt). True remaining after this iteration: 21 families.
+
+- **StepDedicatedFansFixtureTest (3, bb2020)** — inline start() (no hooks): a draw with no concession →
+  NEXT_STEP, no dice, both modifiers 0; higher-score winner rolls at/above its dedicated-fans value → +1
+  and the loser below → -1 (scripted homeDie-then-awayDie); an illegally-conceding home team rolls a d3
+  capped at fans-1 and negated (-2) while away is treated as winner (+1). Scripted dice in fixed
+  home-then-away order via installScriptedDice. Private modifier() matrix unit-tested Rust-side.
+- **StepMultipleBlockForkFixtureTest (2, bb2020)** — PLAYER_ID_TO_REMOVE accepted (no-op removal on empty
+  target list still returns true); unknown → super → false. Fork target-selection deferred (hook/command).
+- **StepDauntlessMultipleFixtureTest (2, bb2020)** — PLAYER_ID_TO_REMOVE accepted (no-op removal on empty
+  shared block-targets set still returns true); unknown → false. Per-target dauntless rolls deferred (dice).
+
+Note: StepTrickster's 4 USING_* setParameter keys all fall through to `return false` (init-consumed
+style) — no fixture-expressible param test; Rust twins exempt.
+
+21 untested StepId families remain (measured by class-name refs, not enum refs).
