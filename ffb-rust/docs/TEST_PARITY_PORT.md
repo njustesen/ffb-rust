@@ -1070,6 +1070,11 @@ tests are Rust-structural (exempt/prune as encountered).
   replaced it). Removed the file, mod entries, bb2025 registry registration; registry count
   test 35→34. Wild animal remains bb2016-only (matching Java). Behavior-neutral (no bb2025
   player can have the skill) but violates the no-invented-code ground rule.
+- **side_step ×3 → Java tests (16 green first run).** Same pushback-hook recipe with the
+  sideStepping map + freeSquareAroundDefender + pushbackSquares=new PushbackSquare[0]; the
+  accepted path needs a startingPushbackSquare (new PushbackSquare(coord, Direction.NORTH,
+  false)) and asserts pushbackMode==SIDE_STEP. bb2025 class/skill are SidestepBehaviour /
+  "Sidestep" (one word); bb2016 extra prone-defender decline.
 - **stand_firm bb2016 + bb2025 → Java tests (12 green first run).** bb2016 extra:
   prone/stunned defender auto-declines; bb2025 mirrors bb2020 (no-tacklezone auto-decline).
   StepPushback paths: bb2016 step/bb2016/, bb2020+bb2025 step/<ed>/block/. StandFirm remains
