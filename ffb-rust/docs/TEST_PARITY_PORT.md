@@ -1070,6 +1070,11 @@ tests are Rust-structural (exempt/prune as encountered).
   replaced it). Removed the file, mod entries, bb2025 registry registration; registry count
   test 35→34. Wild animal remains bb2016-only (matching Java). Behavior-neutral (no bb2025
   player can have the skill) but violates the no-invented-code ground rule.
+- **take_root + blood_lust (bb2025) → Java tests (6 green first run).** Take Root: rolls only
+  when oldPlayerState was STANDING and not already rooted; failed roll → isRooted; with a team
+  reroll available the dialog is asked first (not rooted yet, game.getDialogParameter() set).
+  Skill names: "Take Root", "Bloodlust" (one word, mixed skill classes). 1 Rust prune
+  (no-acting-player guard).
 - **really_stupid ×3 + wild_animal bb2016 → Java tests (13 green first run).** Cancel-mapping
   matrix pinned: bb2016 KTM→blitzUsed / bb2020 KTM→ktmUsed; Wild Animal failure = STANDING +
   inactive (NOT confused; standing-up → PRONE), StepWildAnimal is bb2016-only. bb2020

@@ -198,19 +198,9 @@ mod tests {
         assert!(!m.applies_to(StepId::BlockRoll));
     }
 
-    #[test]
-    fn modifier_no_acting_player_returns_false() {
-        let m = TakeRootStepModifier;
-        let mut game = test_game();
-        let mut hook = StepTakeRootHookState {
-            re_rolled_action: None, re_roll_source: None,
-            old_player_state: Some(PlayerState::new(PS_STANDING)),
-            outcome: None,
-            updated_re_rolled_action: None, updated_re_roll_source: None,
-        };
-        let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hook);
-        assert!(!result);
-    }
+    // NOTE (test equalization): `modifier_no_acting_player_returns_false` pruned - defensive
+    // no-acting-player guard; Java's hook derefs game.getActingPlayer() unconditionally, the
+    // state is inexpressible there.
 
     #[test]
     fn modifier_started_prone_skips_roll() {
