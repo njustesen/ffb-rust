@@ -1625,8 +1625,17 @@ pattern is uniform — every Java skill-behaviour class (com.fumbbl.ffb.server.s
 on the behaviour class. The Rust skill_behaviour tests fall into three Rust-structural categories:
   1. **Registry/trait plumbing** — `register_into_adds_step_modifier`, `applies_to(StepId)` — verifies the
      Rust SkillRegistry/StepModifierTrait wiring; Java's `registerModifier(...)` glue has no unit test.
-  2. **Rust-invented dispatch infra** — `HookPoint` enum + `StepHookHandler` trait (step_hook.rs): eq/clone/
-     hash/debug/hook_points — a Rust dispatch mechanism with NO Java counterpart.
+  2. **`step_hook.rs` — CORRECTION (was mischaracterized as "Rust-invented, no Java counterpart"):** it is a
+     faithful 1:1 translation of Java's `com.fumbbl.ffb.server.skillbehaviour.StepHook` annotation +
+     `StepFactory.getSteps(HookPoint)`. `HookPoint` enum = 1:1 of `StepHook.HookPoint`; the `StepHookHandler`
+     trait stands in for the `@StepHook` **annotation** (Rust has no runtime annotations); `hooked_steps(rules,
+     hp)` is the static-table analogue of `StepFactory.getSteps(HookPoint)` (Rust has no reflection — the same
+     substitution used for every reflection registry here). Both differences are FORCED by the language, not
+     chosen, and produce identical behaviour. → The `hooked_steps_bb20xx_*` tests ARE portable via
+     `GameState.getStepFactory().getSteps(HookPoint.PASS_INTERCEPT)` and are ported in StepHookTest (validates
+     the Rust table against Java's real reflection output: bb2016→SafeThrow, bb2020→CloudBurster, bb2025→∅).
+     Only the enum-derive (Eq/Clone/Hash/Debug) + StepHookHandler-trait-via-fabricated-handler tests remain
+     Rust-structural. hooked_steps_common (Rules::Common) has no Java game-options equivalent — exempt.
   3. **Step-modifier hook-logic tests** — e.g. horns `modifier_sets_using_horns_true_when_blitzing`,
      take_root `modifier_failed_roll_roots_player`, really_stupid `turn_data_flag_for_action_bb2020` — drive
      the hook via Rust hook-state structs / extracted helpers. In Java this logic is reachable only by
