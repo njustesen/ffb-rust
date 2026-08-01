@@ -1070,6 +1070,9 @@ tests are Rust-structural (exempt/prune as encountered).
   replaced it). Removed the file, mod entries, bb2025 registry registration; registry count
   test 35→34. Wild animal remains bb2016-only (matching Java). Behavior-neutral (no bb2025
   player can have the skill) but violates the no-invented-code ground rule.
+- **eye_gouge bb2025 → Java tests (3 green).** canRemoveOpponentAssists property marks the MAIN
+  defender eye-gouged (changeEyeGouged) during a push; hook ALWAYS returns false. Skill "Eye
+  Gouge" bb2025-only. Report presence via step.getResult().getReportList().size()>0.
 - **grab ×3 → Java tests (10 green).** Grab is an ATTACKER skill (acting player must be adjacent
   to the pushed defender during a block). GOTCHA: Java resets state.grabbing to null AFTER a
   successful auto-grab (else-branch tail) — assert pushbackMode==GRAB only, not the grabbing
