@@ -1,7 +1,7 @@
 /// 1:1 translation of `com.fumbbl.ffb.server.step.mixed.start.StepSpectators`.
 ///
-/// Rolls fan factor for both teams at the start of the game (2D6 + dedicated fans).
-/// Java: `rollFanFactor()` → `DiceRoller.rollFanFactor()` → 2D6.
+/// Rolls fan factor for both teams at the start of the game (dedicated fans + a single D3).
+/// Java: `rollFanFactor()` → `DiceRoller.rollFanFactor()` → `rollDice(3)` (one D3 per team).
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::mixed::report_fan_factor::ReportFanFactor;
@@ -15,10 +15,11 @@ impl StepSpectators {
     pub fn new() -> Self { Self }
 
     fn roll_spectators(game: &mut Game, rng: &mut GameRng) {
-        let fan_roll_home = rng.d6_two();
+        // Java mixed StepSpectators: `int fanRollHome = rollFanFactor()` = a single `rollDice(3)`.
+        let fan_roll_home = rng.d3();
         game.game_result.home.fan_factor = game.team_home.dedicated_fans + fan_roll_home;
 
-        let fan_roll_away = rng.d6_two();
+        let fan_roll_away = rng.d3();
         game.game_result.away.fan_factor = game.team_away.dedicated_fans + fan_roll_away;
 
         // Java: getResult().addReport(new ReportFanFactor(teamId, fanRoll, dedicatedFans)) — once per team
@@ -96,50 +97,36 @@ mod tests {
         assert_eq!(count, 2, "should add exactly two ReportFanFactor (one per team)");
     }
 
+    // Parity fix (Bug: bb2025 rolled 2d6): Java mixed StepSpectators rolls a SINGLE d3 per team.
     #[test]
-    fn fan_factor_at_least_dedicated_fans_plus_2() {
-        let mut step = StepSpectators::new();
+    fn fan_factor_is_dedicated_fans_plus_one_d3_each() {
         let mut game = make_game(5, 4);
         let mut rng = GameRng::new(0);
-        step.start(&mut game, &mut rng);
-        // 2D6 min is 2, so fan_factor >= dedicated_fans + 2
-        assert!(game.game_result.home.fan_factor >= 5 + 2);
-        assert!(game.game_result.away.fan_factor >= 4 + 2);
+        StepSpectators::roll_spectators(&mut game, &mut rng);
+        // d3 range is 1..=3, so fan_factor - dedicated_fans ∈ [1,3] for each team.
+        let home_roll = game.game_result.home.fan_factor - 5;
+        let away_roll = game.game_result.away.fan_factor - 4;
+        assert!((1..=3).contains(&home_roll), "home d3 roll {home_roll} out of 1..=3");
+        assert!((1..=3).contains(&away_roll), "away d3 roll {away_roll} out of 1..=3");
     }
 
     #[test]
-    fn fan_factor_at_most_dedicated_fans_plus_12() {
-        let mut step = StepSpectators::new();
-        let mut game = make_game(3, 7);
-        let mut rng = GameRng::new(42);
-        step.start(&mut game, &mut rng);
-        assert!(game.game_result.home.fan_factor <= 3 + 12);
-        assert!(game.game_result.away.fan_factor <= 7 + 12);
+    fn consumes_exactly_one_d3_per_team_two_draws_total() {
+        // Java rolls rollFanFactor() (one rollDice(3)) for home then away — exactly two dice, no more.
+        // This is the crux of the parity fix: 2d6-per-team (4 draws) shifted the whole game-die stream.
+        let mut game = make_game(0, 0);
+        let mut rng = GameRng::new(7);
+        assert_eq!(rng.call_count, 0);
+        StepSpectators::roll_spectators(&mut game, &mut rng);
+        assert_eq!(rng.call_count, 2, "must consume exactly 2 dice (one d3 per team), not 4 (old 2d6)");
     }
 
     #[test]
-    fn different_seeds_may_give_different_results() {
-        let mut game1 = make_game(5, 5);
-        let mut game2 = make_game(5, 5);
-        let mut rng1 = GameRng::new(1);
-        let mut rng2 = GameRng::new(999999);
-        StepSpectators::roll_spectators(&mut game1, &mut rng1);
-        StepSpectators::roll_spectators(&mut game2, &mut rng2);
-        // With different seeds at least one team should differ (probabilistic but very likely)
-        let same = game1.game_result.home.fan_factor == game2.game_result.home.fan_factor
-            && game1.game_result.away.fan_factor == game2.game_result.away.fan_factor;
-        // We don't assert here since seeds could theoretically collide; just check both are valid
-        let _ = same;
-        assert!(game1.game_result.home.fan_factor >= 7);
-    }
-
-    #[test]
-    fn zero_dedicated_fans_still_rolls() {
-        let mut step = StepSpectators::new();
+    fn fan_factor_bounds_for_zero_dedicated_fans() {
         let mut game = make_game(0, 0);
         let mut rng = GameRng::new(0);
-        step.start(&mut game, &mut rng);
-        assert!(game.game_result.home.fan_factor >= 2);
-        assert!(game.game_result.away.fan_factor >= 2);
+        StepSpectators::roll_spectators(&mut game, &mut rng);
+        assert!((1..=3).contains(&game.game_result.home.fan_factor));
+        assert!((1..=3).contains(&game.game_result.away.fan_factor));
     }
 }

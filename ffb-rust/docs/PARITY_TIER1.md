@@ -55,3 +55,21 @@ Rust's own comment is even self-contradictory ("rollFanFactor() → 2D6"). The b
 Add a Rust unit test asserting the mixed spectators step consumes exactly ONE d3 per team and sets
 fan_factor = dedicated_fans + d3. Then `cargo build -p ffb-parity --release` + rerun `--seeds 1-3` and
 re-diff. Expect the coin/receive/first-activation divergence to clear; proceed to the next first-divergence.
+
+## Iter 3 (2026-08-01) — FIX APPLIED & VERIFIED: bb2025 fan-factor now single d3
+
+Changed `mixed/start/step_spectators.rs`: `rng.d6_two()` → `rng.d3()` per team (matches Java
+`rollFanFactor()`=`rollDice(3)`). Added Rust tests: `consumes_exactly_one_d3_per_team_two_draws_total`
+(asserts rng.call_count==2, the crux), `fan_factor_is_dedicated_fans_plus_one_d3_each`, updated bounds.
+`cargo test -p ffb-engine step_spectators` = 13 passed.
+
+RESULT: the ENTIRE pre-game now aligns — seed 1 step 0 `state_hash` is IDENTICAL on both
+(`dc491fa21c88693b`), both pick `away3 BLITZ`. Coin/receive/setup/kickoff cascade resolved.
+
+### Open item #2 (next): first-activation BLITZ execution diverges
+seed 1, step 0: same pre-state (dc49…) + same action (away3 BLITZ), but `post_hash` differs:
+Java `9c55510376cb6887` vs Rust `b118148452e3779f`. So executing the blitz (block dice / target / push /
+armour / follow-up) produces different state. Dice-trace the blitz: FFB_DICE_TRACE=1, compare Rust
+(`DICE_TRACE` no caller) vs Java (`caller=`) game dice AT/after the first activation to find the first
+differing block/armour/injury die or a step-logic difference. Root-cause in the relevant Rust block/blitz
+step vs its Java ground-truth class; fix Rust; add a test; rerun seeds 1-3.
