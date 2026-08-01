@@ -229,3 +229,24 @@ state string 0-based (a04). Also re-examine whether Java's away5 first-square pi
 the ball) vs Rust's (→21,8, toward ball) is a separate move-square-PICK divergence (coord-sort/actionRng,
 §3/§6) that must ALSO be aligned — the destination difference may be the real step1 bug, independent of the
 continuation count.
+
+## Iter 10 (2026-08-01) — FIX #5 APPLIED (verified): non-carrier moves exactly one square
+
+Re-applied the INIT_MOVING mirror (moved_this_activation flag) — this time VERIFIED via bounded trace:
+each non-carrier now makes EXACTLY ONE RUST_PICK per activation (away_10, away_05: 1 move each; were 7-8).
+The iter9 "0 moves" was an ID-mapping misread. cargo test 9 passed. Java: carrier moves until MA spent,
+all others 1 square then deselect.
+
+### Open item #3B (next): move-target set includes OCCUPIED squares (Rust engine bug)
+step1 still fails because away5's FIRST move goes to the wrong square. Direct compare:
+- JAVA_SMA away5 coord=(20,7) targets=4 → idx=2 → (20,8). Java builds adjacent, UNOCCUPIED, on-pitch squares:
+  of the 8 neighbours of (20,7), four are occupied ((19,6)a06,(19,8)a07,(21,6)a08,(21,8)a09) → 4 free:
+  (19,7),(20,6),(20,8),(21,7).
+- RUST away5 N=6 → idx=5 → (21,8). Rust offers 6 targets INCLUDING (21,8), which is OCCUPIED by a09.
+So Rust's legal-move-square set includes occupied squares that Java excludes → wrong count → wrong idx →
+wrong destination. FIX (Rust): exclude occupied (and off-pitch) squares from the Move prompt's target set
+to match Java sendMoveAction. Find the source of the Move prompt `squares` (engine legal_move_targets /
+the step that emits AgentPrompt::Move) — if the ENGINE includes occupied squares that's a Rust engine bug;
+fix it there. If instead the agent should filter (mirroring ParityRunner computing its own list), filter in
+the agent. Verify targets=4 for away5 and step1 post_hash == 69d972900b86dfd0. Add a Rust test. NOTE ordering
+also matters: after excluding occupied, both sort by (x,y) then actionRng-pick — confirm idx aligns.

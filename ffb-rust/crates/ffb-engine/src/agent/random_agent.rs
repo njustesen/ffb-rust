@@ -49,6 +49,10 @@ pub struct RandomAgent {
     /// spends remaining MA moving (before or after the block). Set when a Blitz action is picked,
     /// consumed by the Move-prompt handler to deselect instead of continuing to move.
     current_activation_is_blitz: bool,
+    /// True once the current activation has already moved one square. Mirrors Java ParityRunner
+    /// INIT_MOVING: after the first square, only the BALL CARRIER keeps moving (until MA is spent);
+    /// every other player deselects. Reset at the start of every activation (ActivatePlayer).
+    moved_this_activation: bool,
 }
 
 impl RandomAgent {
@@ -61,6 +65,7 @@ impl RandomAgent {
             last_turn_key: None,
             action_rng_count: 0,
             current_activation_is_blitz: false,
+            moved_this_activation: false,
         }
     }
 
@@ -74,6 +79,7 @@ impl RandomAgent {
             last_turn_key: None,
             action_rng_count: 0,
             current_activation_is_blitz: false,
+            moved_this_activation: false,
         }
     }
 
@@ -250,6 +256,8 @@ impl Agent for RandomAgent {
                     player_action,
                     PlayerActionChoice::Blitz | PlayerActionChoice::StandUpBlitz
                 );
+                // New activation → reset the "moved one square" tracker (Java INIT_MOVING policy).
+                self.moved_this_activation = false;
                 Action::ActivatePlayer { player_id: player_id.clone(), player_action, block_defender_id }
             }
             // Move prompt: pick destination from legal squares using actionRng.
@@ -281,6 +289,13 @@ impl Agent for RandomAgent {
                     && gs.game.field_model.ball_coordinate.is_some()
                     && gs.game.field_model.ball_coordinate
                         == gs.game.field_model.player_coordinate(player_id);
+                // Java ParityRunner INIT_MOVING: after the first square, only the ball carrier keeps
+                // moving; every other player deselects. `moved_this_activation` is false on the FIRST
+                // Move prompt of an activation (reset in ActivatePlayer) so the first square always
+                // happens; on the 2nd+ prompt a non-carrier ends here. 0 rng, matching Java's deselect.
+                if self.moved_this_activation && !carrying {
+                    return Action::EndPlayerAction;
+                }
                 let pool: Vec<FieldCoordinate> = if carrying {
                     let cur_x = gs.game.field_model.player_coordinate(player_id).map(|c| c.x).unwrap_or(0);
                     let dir = if gs.game.home_playing { 1 } else { -1 };
@@ -296,6 +311,7 @@ impl Agent for RandomAgent {
                 if std::env::var("FFB_TRACE").is_ok() {
                     eprintln!("RUST_PICK pid={} N={} idx={} t=({},{})", player_id, pool.len(), idx, pool[idx].x, pool[idx].y);
                 }
+                self.moved_this_activation = true;
                 Action::Move { path: vec![pool[idx]] }
             }
             // Pushback: AGENT_CONTRACT §7 — choose the min-(x,y) on-pitch square, DETERMINISTICALLY.
