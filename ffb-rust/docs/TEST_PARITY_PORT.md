@@ -1478,3 +1478,23 @@ deferred_command_factory (2) (Phase-ZU stubs). Reconcile GAP by dir now: skill_b
 model (11), bb2016/bb2020/bb2025 (11 each), + engine-infra singles (talk/replay_state/id_generator/
 active_effects/etc.). Next: model (11) or the skill_behaviour bucket (largest — mostly negatrait step
 files whose behaviour is covered; verify vs exempt).
+
+## Iteration 86 — id_generator (+7 ffb-server); model bucket exempt
+
+- **IdGeneratorTest (7)** — IdGenerator sequential counter: generateId() pre-increments and returns the
+  new value; lastId() returns current without incrementing; nonzero/negative starts; strictly
+  increasing; lastId tracks generateId. (Java has no no-arg ctor, so default-start uses new(0).)
+- **model bucket EXEMPT (Rust-structural):**
+  - conditional_model_change_observer (4) — Java `ConditionalModelChangeObserver` is an INTERFACE
+    (default getName() = simple class name + abstract next()); the Rust tests use fabricated
+    DummyObserver/CountingObserver structs to check trait-object dispatch/get_name. No Java interface
+    unit test; real behaviour covered by ChompRemovalObserver (already COVERED).
+  - model/skill_behaviour (7) — Java `SkillBehaviour<T>` is an ABSTRACT base (protected
+    registerModifier/registerStep/getStepModifiers registration container); the Rust tests use
+    fabricated Noop modifiers to check register/get collection counts. The base plumbing is exercised
+    indirectly by every concrete skill behaviour; not directly unit-tested in Java.
+
+Reconcile GAP by dir now (approx): skill_behaviour (118), bb2016/bb2020/bb2025 (11 each), + engine-infra
+singles (talk 8, replay_state 7, active_effects 7, wording 6, server_replayer/server_replay 6 each,
+stats_drawing_modifier 5, replay_cache 4, ...). Next: active_effects (7, portable getters/setters) or
+begin the skill_behaviour verification pass.
