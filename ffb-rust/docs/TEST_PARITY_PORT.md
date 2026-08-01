@@ -587,6 +587,11 @@ Remaining ffb-common GAP files are all DOCUMENTED EXEMPTIONS (Rust-only, no fait
 - model_change_observable (1): Rust trait compile-test (Java interface, no behavioral twin).
 - keyed_item_registry (1) / enhancement_registry (1) / entropy_source (1): Rust registry/RNG infra
   patterns with no ffb-common class-level Java twin.
+- **util_server_cards (findAllowedPlayersForCard) → Java tests (3 green).** Non-player-targeted
+  (TURN) cards allow nobody; OWN_PLAYER/OPPOSING_PLAYER filter by the card-owning team
+  (owner = turn-data inducement set the card is available in via addAvailableCard). Java fixture
+  has 3 players/team so the twin asserts team-membership of ALL returned rather than an exact
+  single. activate/deactivateCard subset deferred (needs IStep + CardHandler wiring).
 Plus the in-file util_player exemptions (canGaze x4, refresh x7, partner-not-on-field x1, new/default x2)
 and UtilDisturbingPresence empty-player x1 — all commented at their Java test sites.
 - prayer_state (6): NOT ffb-common — com.fumbbl.ffb.server.PrayerState → belongs to Step 3 (ffb-server).
