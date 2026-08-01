@@ -92,12 +92,9 @@ mod tests {
         assert!(game.field_model.has_prayer_enhancement("h1", PRAYER_NAME));
     }
 
-    #[test]
-    fn apply_selection_is_noop() {
-        let mut state = PrayerState::new();
-        let mut game = make_game();
-        apply_selection(&mut state, &mut game, "player1");
-    }
+    // NOTE (test equalization): `apply_selection_is_noop` pruned - the Rust headless
+    // apply_selection is a no-op stub, but Java's applySelection applies the dialog-chosen
+    // skill (addIntensiveTrainingSkill); asserting noop-ness has no Java counterpart.
 
     #[test]
     fn remove_effect_clears_enhancement() {

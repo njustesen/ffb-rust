@@ -1,13 +1,23 @@
 /// 1:1 translation of `com.fumbbl.ffb.server.inducements.bb2025.prayers.BlessedStatueOfNuffleHandler`.
-/// Extends mixed BlessedStatueOfNuffleHandler with BB2025 PlayerSelector (own team RESERVE).
-/// Selects 1 random player on the praying team, marks prayer, and grants Pro.
+/// Java BB2025 extends RandomSelectionPrayerHandler DIRECTLY (not the mixed
+/// BlessedStatueOfNuffleHandler) and handles Prayer.BLESSING_OF_NUFFLE — a different prayer id
+/// than bb2020's BLESSED_STATUE_OF_NUFFLE. Selects 1 random player, marks prayer, grants Pro.
 use ffb_model::model::animation_type::AnimationType;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::enums::SkillId;
 use crate::inducements::bb2025::prayers::player_selector::PlayerSelector;
-use crate::inducements::mixed::prayers::blessed_statue_of_nuffle_handler::{self, PRAYER_NAME};
 use crate::inducements::mixed::prayers::prayer_handler::PrayerHandler;
+use crate::inducements::mixed::prayers::random_selection_prayer_handler::{
+    init_effect_random_selection, remove_effect_internal_random_selection,
+};
 use crate::prayer_state::PrayerState;
+
+// Bug (fixed, #11): this handler previously reused the mixed module's
+// PRAYER_NAME = "BLESSED_STATUE_OF_NUFFLE" for dispatch and enhancement tagging, but the
+// bb2025 prayer catalog (data/prayers/bb2025_prayers.json and Java bb2025 Prayer enum) uses
+// BLESSING_OF_NUFFLE — the handler could never match the bb2025 prayer.
+pub const PRAYER_NAME: &str = "BLESSING_OF_NUFFLE";
 
 pub struct BlessedStatueOfNuffleHandler;
 
@@ -24,13 +34,14 @@ impl PrayerHandler for BlessedStatueOfNuffleHandler {
     fn animation_type(&self) -> AnimationType { AnimationType::PRAYER_BLESSED_STATUE_OF_NUFFLE }
     fn get_name(&self) -> &'static str { "BlessedStatueOfNuffleHandler" }
 
-    /// Java: initEffect — selects 1 RESERVE player on the praying team, grants Pro.
+    /// Java: initEffect (RandomSelectionPrayerHandler) — selects 1 RESERVE player on the
+    /// praying team, marks BLESSING_OF_NUFFLE, grants Pro.
     fn init_effect(&self, prayer_state: &mut PrayerState, game: &mut Game, rng: &mut GameRng, team_id: &str) -> bool {
-        blessed_statue_of_nuffle_handler::init_effect(prayer_state, game, rng, team_id, &PlayerSelector::new())
+        init_effect_random_selection(prayer_state, game, rng, team_id, PRAYER_NAME, 1, &PlayerSelector::new(), &[SkillId::Pro])
     }
 
     fn remove_effect_internal(&self, _prayer_state: &mut PrayerState, game: &mut Game, team_id: &str) {
-        blessed_statue_of_nuffle_handler::remove_effect_internal(game, team_id, &PlayerSelector::new());
+        remove_effect_internal_random_selection(game, team_id, PRAYER_NAME, &PlayerSelector::new());
     }
 }
 
@@ -63,9 +74,12 @@ mod tests {
     }
 
     #[test]
-    fn handles_prayer_blessed_statue_of_nuffle() {
+    // Bug (fixed, #11): previously asserted the bb2020 name BLESSED_STATUE_OF_NUFFLE; the
+    // bb2025 prayer id is BLESSING_OF_NUFFLE (Java bb2025 Prayer enum / bb2025_prayers.json).
+    fn handles_prayer_blessing_of_nuffle() {
         let h = BlessedStatueOfNuffleHandler;
-        assert!(h.handles_prayer("BLESSED_STATUE_OF_NUFFLE"));
+        assert!(h.handles_prayer("BLESSING_OF_NUFFLE"));
+        assert!(!h.handles_prayer("BLESSED_STATUE_OF_NUFFLE"));
         assert!(!h.handles_prayer("OTHER"));
     }
 

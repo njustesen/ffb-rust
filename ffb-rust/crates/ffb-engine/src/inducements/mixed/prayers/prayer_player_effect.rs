@@ -36,7 +36,9 @@ pub fn apply_prayer_player_effect(game: &mut Game, player_id: &str, prayer_name:
             player.add_prayer_skill(prayer_name, SkillId::MightyBlow, Some("+1".to_string()));
         }
         // BLESSED_STATUE_OF_NUFFLE: withSkills({Pro}) — dialog-based, applied here post-selection
-        "BLESSED_STATUE_OF_NUFFLE" => {
+        // Bug (fixed, #11): BLESSING_OF_NUFFLE (the bb2025 prayer id, Java bb2025 Prayer enum)
+        // also grants Pro — it was missing from this map entirely.
+        "BLESSED_STATUE_OF_NUFFLE" | "BLESSING_OF_NUFFLE" => {
             player.add_prayer_skill(prayer_name, SkillId::Pro, None);
         }
         _ => {}

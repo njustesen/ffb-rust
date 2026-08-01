@@ -1039,6 +1039,18 @@ handledPrayer()/selector()/addedSkills(). Test recipe:
 - **under_scrutiny ×3 + fan_interaction ×3 → Java tests (29 green).** Same PrayerState-flag
   shape; UNDER_SCRUTINY targets the OPPONENT team (getOtherTeam) — Rust verified matching.
   5 Rust prunes (case-sensitivity ×4 + duplicate animation test in mixed under_scrutiny).
+## Step 3 REAL RUST BUG #11: bb2025 BlessedStatue handled the WRONG PRAYER ID (fixed 2026-08-01)
+Java bb2025 BlessedStatueOfNuffleHandler extends RandomSelectionPrayerHandler DIRECTLY and
+handles Prayer.BLESSING_OF_NUFFLE — a different id than bb2020's BLESSED_STATUE_OF_NUFFLE.
+The Rust bb2025 handler reused the mixed module's PRAYER_NAME ("BLESSED_STATUE_OF_NUFFLE"),
+so it could NEVER match the bb2025 prayer (data/prayers/bb2025_prayers.json id is
+BLESSING_OF_NUFFLE), and prayer_player_effect had no BLESSING_OF_NUFFLE arm (Pro never
+granted). Fixed handler const + effect map + flipped test. Tally: 11 real Rust bugs.
+- **intensive_training ×3 + blessed_statue_of_nuffle ×3 → Java tests (27 green).** Intensive
+  training = skill-choice dialog (applySelection applies via addIntensiveTrainingSkill; remove
+  clears the temp skill). bb2025 BlessedStatue is RandomSelection → the Pro grant IS portable
+  (initEffect applies immediately, unlike the bb2020 dialog variant). 1 Rust prune
+  (apply_selection_is_noop — Rust headless stub, Java applySelection is not a noop).
 - **throw_a_rock ×3 → Java tests (10 green).** bb2020 marks the OPPONENT team should-not-stall
   (PrayerState.shouldNotStall); bb2025's Java initEffect registers a THROW_ROCK-usage inducement
   — Rust documents this as UNPORTED (headless no-op, in-file note) → OPEN GAP for a future
