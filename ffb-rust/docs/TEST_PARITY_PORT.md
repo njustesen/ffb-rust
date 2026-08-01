@@ -1070,6 +1070,12 @@ tests are Rust-structural (exempt/prune as encountered).
   replaced it). Removed the file, mod entries, bb2025 registry registration; registry count
   test 35→34. Wild animal remains bb2016-only (matching Java). Behavior-neutral (no bb2025
   player can have the skill) but violates the no-invented-code ground rule.
+- **saboteur bb2025 → Java tests (6 green first run).** Falling attacker with Saboteur
+  (canSabotageBlockerOnKnockdown) during a block rolls 4+ to knock the defender FALLING too.
+  Setup: attacker placed then setPlayerState(FALLING), defender STANDING, BLOCK action,
+  setDefenderId; StepDropFallingPlayers.StepState (static) with usingSaboteurAttacker +
+  oldDefenderState. Guards (no-defender, no-skill, non-block), declined-no-roll, accepted-report,
+  scripted-6-success-triggers-falling. no-acting-player guard pruned (inexpressible).
 - **throw_team_mate bb2025 → Java tests (5 green first run).** Executes the full hook with a
   placed thrower + setPassCoordinate + scripted die (rollSkill); asserts the deterministic early
   side-effects (hasPassed, throwerId, concession cleared, TTM-used non-kicked / KTM-used kicked).
