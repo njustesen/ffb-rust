@@ -1046,6 +1046,15 @@ The Rust bb2025 handler reused the mixed module's PRAYER_NAME ("BLESSED_STATUE_O
 so it could NEVER match the bb2025 prayer (data/prayers/bb2025_prayers.json id is
 BLESSING_OF_NUFFLE), and prayer_player_effect had no BLESSING_OF_NUFFLE arm (Pro never
 granted). Fixed handler const + effect map + flipped test. Tally: 11 real Rust bugs.
+- **CARDS: witch_brew ×2 + distract ×2 → Java tests (34 green).** CARD RECIPE: construct
+  `new Card("Test Card", "tc", bb2020.CardType.DIRTY_TRICK, CardTarget.ANY_PLAYER, false,
+  new InducementPhase[0], InducementDuration.UNTIL_END_OF_GAME, "test", CardHandlerKey.X)` —
+  the bb2020 Cards catalog is EMPTY so raw Card construction is the only way to hit bb2020
+  handler keys. activate(card, step, player) with GameFixture.createStep; effects via
+  fieldModel.hasCardEffect. Witch brew d6: 1=MadCap, 2=none, 3-6=Sedative
+  (rollCardEffect = 1 die). Distract: 3-square radius, deactivate clears confusion.
+  Remaining cards: chop_block, custard_pie, force_shield, illegal_substitution, pit_trap,
+  rabbits_foot (×2 each) + card_handler base.
 - **prayer_player_effect + select_player base → Java tests (9 green). PRAYER SUB-BUCKET
   CLOSED.** PrayerEnhancementsTest twins the Rust effect map against Java
   Prayer.enhancements()/FieldModel.addPrayerEnhancements (stat mods, skill grants with values,
