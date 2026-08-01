@@ -180,3 +180,26 @@ vs Java to find exactly which player(s) and coordinate differ, then root-cause t
 
 NOTE: fix #3 is verified at integration level (parity events match Java's blitz-end). A focused agent
 unit test needs a driver fixture that presents a Move prompt with the blitz flag set — add next iteration.
+
+## Iter 8 (2026-08-01) — FIX #4 APPLIED: follow-up after push = always decline (no rng). STEP 0 NOW MATCHES.
+
+Full 22-player step0 state diff isolated the residual to ONE coordinate: the blitzer a02 (away_03) —
+Java (13,8, its start) vs Rust (12,8, home_03's VACATED square). That's a FOLLOW-UP into the pushed
+player's square. AGENT_CONTRACT §7 = decline; Java ParityRunner FOLLOWUP_CHOICE = `sendFollowupChoice(false)`
+(deterministic, 0 rng). Rust's FollowUp handler used `self.pick_bool()` (random + consumed a decision_rng
+draw) — same bug pattern as the pushback bug: wrong choice AND a stream desync. FIX (Rust agent only):
+FollowUp → `follow_up: false`, 0 rng.
+
+RESULT (big step): seed1 step0 post_hash now == Java 9c55510376cb6887 (blitzer stays at 13,8). Removing the
+spurious decision_rng draw ALSO re-synced the decision stream so step1's player pick now matches (both pick
+away5 MOVE). Comparator now fails at STEP 2 (was step 1) — steps 0 and 1 (pick+pre-state) align.
+
+### Open item #3 (next): step1 move execution (away5 MOVE) diverges
+seed1 step1 = away5 MOVE; pre-state matches but post_hash differs (Java 69d972900b86dfd0 vs Rust
+bd7994458e997710), and the subsequent step2 pick differs (Java away7 vs Rust away_06) as a consequence.
+So a plain MOVE activation's execution/path diverges. Diff step1 pre- vs post- state (full 22 players) to
+find which coordinate(s) differ after away5's move; compare the move-square sequence in rust_events.jsonl
+(playerMoved for away5) vs Java's JAVA_P2 away5 + JAVA_GFI/move trace. Candidates: move-square pick
+(coord-sorted actionRng §3/§6), number of squares moved / MA-spend policy (INIT_MOVING keep-moving), GFI
+handling, or a dodge along the path. Root-cause, fix Rust only, add a test, rerun. Carry-over: still add a
+focused unit test for the blitz-end + follow-up agent fixes if a driver fixture is feasible.

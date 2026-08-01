@@ -309,10 +309,13 @@ impl Agent for RandomAgent {
                     None => Action::Acknowledge,
                 }
             }
-            // Follow-up: uniformly sample — consumes 1 decision_rng call.
-            // Synced with Java ParityRunner FOLLOWUP_CHOICE dialog case.
+            // Follow-up: AGENT_CONTRACT §7 — ALWAYS DECLINE, deterministically, consuming 0 rng.
+            // Java ParityRunner FOLLOWUP_CHOICE = `sendFollowupChoice(false)` (no decisionRng draw).
+            // The old code random-sampled (pick_bool) AND consumed a decision_rng call, which both
+            // sometimes followed up into the pushed player's vacated square (wrong final position)
+            // and desynced the decision stream.
             Some(AgentPrompt::FollowUp { .. }) => {
-                Action::FollowUp { follow_up: self.pick_bool() }
+                Action::FollowUp { follow_up: false }
             }
             // Block die selection: uniformly sample from available dice — 1 decision_rng call.
             // Synced with Java ParityRunner BLOCK_ROLL dialog case.
