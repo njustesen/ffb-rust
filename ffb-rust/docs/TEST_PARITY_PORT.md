@@ -636,6 +636,15 @@ Remaining ffb-common GAP files are all DOCUMENTED EXEMPTIONS (Rust-only, no fait
   entropy_server / network_entropy_source (network-fed Fortuna seeding infrastructure, Rust-side
   tests are construction/plumbing with no behavioral Java twin). Util bucket effectively closed
   on testable surface; NEXT: Step 4 ffb-engine step-logic bulk.
+## Step 3 injury bucket REOPENED — reconcile found remaining injuryType twins
+The earlier "INJURY BUCKET CLOSED" was premature: reconcile_step3 flags injuryType Rust files
+whose PascalCase type (InjuryTypeBreatheFire etc.) is referenced by NO ffb-server test. Several
+remain (breathe_fire+for_spp, drop_jump, block_stunned+for_spp, eat_player, sabotaged,
+trap_door_fall...). Same proven injury recipe (same-package handleInjury + scripted 2d6).
+- **injury_type_breathe_fire → Java tests (8 green).** Vomit-like + caused-by-opponent; armour
+  save prone / break injury / bb2016 niggling. GOTCHA: InjuryContext accessor is
+  getDefenderPosition() (not getDefenderCoordinate); Java handleInjury does NOT store the defender
+  coordinate (caller sets it) — context_stores twin asserts only defenderId (documented divergence).
 Plus the in-file util_player exemptions (canGaze x4, refresh x7, partner-not-on-field x1, new/default x2)
 and UtilDisturbingPresence empty-player x1 — all commented at their Java test sites.
 - prayer_state (6): NOT ffb-common — com.fumbbl.ffb.server.PrayerState → belongs to Step 3 (ffb-server).
