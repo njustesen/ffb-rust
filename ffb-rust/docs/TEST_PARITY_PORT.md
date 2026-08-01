@@ -1756,3 +1756,12 @@ flags, player-result counters) are full-yield — assert the mutated getters aft
 54 untested StepId families remain. Milestone: 100 loop iterations. Step-4 momentum strong on
 immediate-execute/dispatch steps (StepDispatchPassing 9, StepBlockStatistics 6, StepSetActingTeam 7
 in the last three).
+
+## Iteration 101 — Step-4: StepSetActingPlayerAndTeam FULL port (+6 ffb-server)
+
+- **StepSetActingPlayerAndTeamFixtureTest (6)** — sibling of StepSetActingTeam: sets acting player to
+  PLAYER_ID + flips homePlaying when that player's team differs from the acting team; NEXT_STEP. PLAYER_ID
+  init-consumed. Exempt: no_player_id_returns_next (Java derefs player.getTeam() → NPE on null id,
+  Rust-defensive), set_parameter_player_id_accepted (init-consumed → setParameter false).
+
+53 untested StepId families remain.
