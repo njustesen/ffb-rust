@@ -1498,3 +1498,17 @@ Reconcile GAP by dir now (approx): skill_behaviour (118), bb2016/bb2020/bb2025 (
 singles (talk 8, replay_state 7, active_effects 7, wording 6, server_replayer/server_replay 6 each,
 stats_drawing_modifier 5, replay_cache 4, ...). Next: active_effects (7, portable getters/setters) or
 begin the skill_behaviour verification pass.
+
+## Iteration 87 — active_effects (+7 ffb-server)
+
+- **ActiveEffectsTest (7)** — ActiveEffects per-turn state container: defaults empty/false; old weather
+  set/get (Weather.BLIZZARD); skip-restore-weather + stalling toggles; additional-assist team ids
+  (setTeamIdsAdditionalAssist(Set) + removeAdditionalAssist removes only matching); shadowers
+  add/clear; leaders add/clear + multi-tracking. Pure container, no fixture. (JSON initFrom/toJsonValue
+  round-trip is a separate serialization concern, not in the Rust unit tests.)
+
+Remaining engine-infra singles: talk (8), replay_state (7), wording (6), server_replayer/server_replay
+(6 each), stats_drawing_modifier (5), replay_cache (4), team_setup_cache (2), server_sketch_manager (2),
+i_server_property/i_server_json_option/i_game_id_listener/card_deck (2 each). Plus the big buckets:
+skill_behaviour (118), bb2016/bb2020/bb2025 (11 each). Next: triage engine-infra singles (many are
+DB/replay/network infra likely exempt) then start skill_behaviour verification.
