@@ -1730,3 +1730,16 @@ Running tally unchanged: 13 real Rust bugs + 1 fidelity removal (Wrestle was a f
 
 56 untested StepId families remain. Dispatch/report/immediate-execute steps (hooks=0) are the high-yield
 targets — prefer them over hook-delegating negatraits.
+
+## Iteration 99 — Step-4: StepBlockStatistics FULL port (+6 ffb-server)
+
+- **StepBlockStatisticsFixtureTest (6)** — immediate-execute stats step, fully ported via observable
+  state: first block → NEXT_STEP + actingPlayer.hasBlocked() + turnData.isTurnStarted() +
+  !game.isConcessionPossible() + playerResult.getBlocks()==1; second call skips (hasBlocked guard);
+  INCREMENT via init(StepParameterSet) → blocks==3; PLAYER_ID_TO_REMOVE via setParameter decrements
+  the increment (blocks==0). Exempt: no_acting_player_returns_next (Rust-defensive — Java always has an
+  acting player during a block). Recipe: setConcessionPossible(true) in setup to make the clear
+  observable; INCREMENT is init-consumed in Java (Rust threads it via setParameter — structural).
+
+55 untested StepId families remain. Immediate-execute steps with observable state (block/stat/turn
+flags, player-result counters) are full-yield — assert the mutated getters after startStep.
