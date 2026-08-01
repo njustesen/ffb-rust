@@ -1438,3 +1438,21 @@ sequence_generator_factory (7), observer_factory (6). Then skill_behaviour (118)
   divergence): Rust bb2020/bb2025 KickTeamMate registration has no Java counterpart.
 
 Remaining Step-3 factory GAP (21 tests): prayer_handler_factory (11), card_handler_factory (10).
+
+## Iteration 84 — factory bucket: card_handler_factory (+4 ffb-server)
+
+- **CardHandlerFactoryTest (4)** — Scanner-populated CardHandlerFactory: forCard finds the responsible
+  handler after initialize (bb2016 CHOP_BLOCK, bb2020 DISTRACT — real Java registration, edition-filtered);
+  forName is case-insensitive by simple class name; forName miss → null. Card built via the
+  ChopBlockHandlerTest recipe (`new Card(..., CardHandlerKey)`).
+- Exempt: initialize_bb20xx_registers_eight_handlers ×3 (Rust Vec len — no Java getHandlers/size getter);
+  the fabricated-test-handler for_name/for_card mechanics tests (Rust-structural); for_card_no_match
+  (fixture-inexpressible — needs a card whose key no registered handler matches). Per-handler behaviour
+  is covered by the individual *HandlerTest twins.
+- **for_card_finds_witch_brew_after_initialize_bb2025 EXEMPT (edition-resolution divergence):** Java has
+  NO @RulesCollection(BB2025) card-handler classes (only bb2016/bb2020), so a pure-BB2025 Scanner
+  registers none — but the Rust factory hand-registers the bb2020 handlers for bb2025. Non-functional
+  (bb2020 handler twins cover behaviour); faithful bb2025 card-registration deferred (same class of issue
+  as the sequence_generator_factory stub). NOTE (known divergence).
+
+Remaining Step-3 factory GAP (11 tests): prayer_handler_factory (11) — next iteration.
