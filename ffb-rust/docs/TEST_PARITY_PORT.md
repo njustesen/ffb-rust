@@ -616,6 +616,9 @@ Remaining ffb-common GAP files are all DOCUMENTED EXEMPTIONS (Rust-only, no fait
 - **util_server_re_roll (is*ReRollAvailable) → Java tests (5 green).** Skill-less player has no
   Pro re-roll; team with 0 TRR / re-roll-blocking turn mode (bb2025 Kickoff, bb2020 Blitz) has
   no team re-roll; empty single-use pool has none. All delegate to the edition RollMechanic.
+- **util_server_dialog → Java tests (6 green).** showDialog stores the dialog parameter (sets
+  waitingForOpponent only when the turn timer is stopped); hideDialog clears both (idempotent).
+  Used DialogReRollParameter() as a simple IDialogParameter.
 Plus the in-file util_player exemptions (canGaze x4, refresh x7, partner-not-on-field x1, new/default x2)
 and UtilDisturbingPresence empty-player x1 — all commented at their Java test sites.
 - prayer_state (6): NOT ffb-common — com.fumbbl.ffb.server.PrayerState → belongs to Step 3 (ffb-server).
