@@ -1039,6 +1039,11 @@ handledPrayer()/selector()/addedSkills(). Test recipe:
 - **under_scrutiny ×3 + fan_interaction ×3 → Java tests (29 green).** Same PrayerState-flag
   shape; UNDER_SCRUTINY targets the OPPONENT team (getOtherTeam) — Rust verified matching.
   5 Rust prunes (case-sensitivity ×4 + duplicate animation test in mixed under_scrutiny).
+- **throw_a_rock ×3 → Java tests (10 green).** bb2020 marks the OPPONENT team should-not-stall
+  (PrayerState.shouldNotStall); bb2025's Java initEffect registers a THROW_ROCK-usage inducement
+  — Rust documents this as UNPORTED (headless no-op, in-file note) → OPEN GAP for a future
+  translation pass; Java twin mirrors only shared behaviors. 7 Rust prunes (6 no-op mixed
+  helper tests — Java mixed class has ONLY animationType(); 1 case-sensitivity).
 - **stiletto ×3 + necessary_violence ×1 → Java tests (19 green).** Stiletto = RandomSelection,
   1 player, OWN-team selector (bb2025 twin proves home-team enhancement); necessary_violence =
   bb2020-ONLY PrayerState flag (getAdditionalCasSppTeams). 2 Rust prunes. Prayer handler files
