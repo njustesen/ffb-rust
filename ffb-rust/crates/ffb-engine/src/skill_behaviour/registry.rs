@@ -109,7 +109,6 @@ impl SkillRegistry {
             the_ballista_behaviour::TheBallistaBehaviour,
             throw_team_mate_behaviour::ThrowTeamMateBehaviour,
             unchannelled_fury_behaviour::UnchannelledFuryBehaviour,
-            wild_animal_behaviour::WildAnimalBehaviour,
             wrestle_behaviour::WrestleBehaviour,
         };
         use crate::skill_behaviour::mixed::dauntless_behaviour::DauntlessBehaviour;
@@ -150,7 +149,6 @@ impl SkillRegistry {
         TheBallistaBehaviour::register_into(&mut reg);
         ThrowTeamMateBehaviour::register_into(&mut reg);
         UnchannelledFuryBehaviour::register_into(&mut reg);
-        WildAnimalBehaviour::register_into(&mut reg);
         WrestleBehaviour::register_into(&mut reg);
         // Mixed (shared logic across editions)
         DauntlessBehaviour::register_into(&mut reg);
@@ -370,9 +368,12 @@ mod tests {
     }
 
     #[test]
-    fn bb2025_registry_has_thirty_five_entries() {
+    // Translation fidelity (2026-08-01): dropped from 35 — the bb2025 WildAnimalBehaviour was an
+    // over-translation with no Java counterpart (Java bb2025 has AnimalSavageryBehaviour and no
+    // Wild Animal skill); the spurious file and its registration were removed.
+    fn bb2025_registry_has_thirty_four_entries() {
         let reg = SkillRegistry::build_bb2025();
-        assert_eq!(reg.len(), 35, "BB2025 registry should have 35 registered skill entries (33 + Dodge + WatchOut)");
+        assert_eq!(reg.len(), 34, "BB2025 registry should have 34 registered skill entries (32 + Dodge + WatchOut)");
     }
 
     #[test]

@@ -1064,6 +1064,12 @@ fieldModel playerState isConfused, turnData flags (isPassUsed etc.).
 KICKOFF_RETURN/PASS_BLOCK/bomb turns skip negatraits. Rust registry/applies_to/flag-helper
 tests are Rust-structural (exempt/prune as encountered).
 - **bone_head bb2020 pilot → Java tests (5 green first run).**
+- **TRANSLATION FIDELITY: removed spurious bb2025 wild_animal_behaviour.rs.** The Rust file
+  claimed to translate com.fumbbl.ffb.server.skillbehaviour.bb2025.WildAnimalBehaviour, which
+  does NOT exist — Java bb2025 has AnimalSavageryBehaviour and no Wild Animal skill (BB2020+
+  replaced it). Removed the file, mod entries, bb2025 registry registration; registry count
+  test 35→34. Wild animal remains bb2016-only (matching Java). Behavior-neutral (no bb2025
+  player can have the skill) but violates the no-invented-code ground rule.
 - **bone_head bb2016 + bb2025 → Java tests (6 green).** bb2016 skill name is "Bone-Head";
   bb2016 cancel maps KICK_TEAM_MATE→blitzUsed (vs bb2020 ktmUsed / bb2025 ttmUsed for TTM).
   BUCKET-WIDE EXEMPTION: the Rust registry plumbing tests (register_into_adds_step_modifier,

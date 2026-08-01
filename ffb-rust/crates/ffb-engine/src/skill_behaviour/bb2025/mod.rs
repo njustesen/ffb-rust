@@ -30,7 +30,6 @@ pub mod tentacles_behaviour;
 pub mod the_ballista_behaviour;
 pub mod throw_team_mate_behaviour;
 pub mod unchannelled_fury_behaviour;
-pub mod wild_animal_behaviour;
 pub mod wrestle_behaviour;
 
 pub use animal_savagery_behaviour::AnimalSavageryBehaviour;
@@ -63,5 +62,4 @@ pub use tentacles_behaviour::TentaclesBehaviour;
 pub use the_ballista_behaviour::TheBallistaBehaviour;
 pub use throw_team_mate_behaviour::ThrowTeamMateBehaviour;
 pub use unchannelled_fury_behaviour::UnchannelledFuryBehaviour;
-pub use wild_animal_behaviour::WildAnimalBehaviour;
 pub use wrestle_behaviour::WrestleBehaviour;
