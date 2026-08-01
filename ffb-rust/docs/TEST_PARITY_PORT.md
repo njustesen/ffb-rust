@@ -1053,7 +1053,12 @@ granted). Fixed handler const + effect map + flipped test. Tally: 11 real Rust b
   handler keys. activate(card, step, player) with GameFixture.createStep; effects via
   fieldModel.hasCardEffect. Witch brew d6: 1=MadCap, 2=none, 3-6=Sedative
   (rollCardEffect = 1 die). Distract: 3-square radius, deactivate clears confusion.
-  Remaining cards: chop_block, force_shield, illegal_substitution (×2 each) + card_handler base.
+- **CARDS: chop_block/force_shield/illegal_substitution ×6 + card_handler base → Java tests
+  (32 green). INDUCEMENTS BUCKET CLOSED.** ForceShield hasBall needs setBallInPlay(true) +
+  setBallMoving(false) + ball on player coord. IllegalSubstitution activate returns FALSE and
+  sets TurnMode.ILLEGAL_SUBSTITUTION. Nil-key isResponsible false is portable (Card ctor takes
+  null handlerKey). CardHandler base via named nested TestCardHandler. 2 Rust prunes
+  (chop_block unknown-player id guards).
 - **CARDS: custard_pie/rabbits_foot/pit_trap ×6 → Java tests (32 green).** Custard pie
   allowsPlayer: raw card is in neither InducementSet so ownTeam resolves to AWAY — test with
   away players adjacent. Pit trap activate = UtilServerInjury.dropPlayer (PRONE + ball scatter
