@@ -1070,6 +1070,10 @@ tests are Rust-structural (exempt/prune as encountered).
   replaced it). Removed the file, mod entries, bb2025 registry registration; registry count
   test 35→34. Wild animal remains bb2016-only (matching Java). Behavior-neutral (no bb2025
   player can have the skill) but violates the no-invented-code ground rule.
+- **horns (common) → Java tests (4 green).** +1 STR when BLITZING; StepHorns.StepState is a
+  NON-static inner class so usingHorns is asserted via observable side-effects (markSkillUsed,
+  report present, NEXT_STEP) rather than reading the transient. Run the real StepHorns via
+  step.start() (no init params needed). Horns is a common-package skill/behaviour.
 - **catch ×3 → Java tests (6 green first run).** Same catch-reroll shape as monstrous_mouth;
   common Catch skill, per-edition StepCatchScatterThrowIn step imports (bb2016 direct,
   bb2020/bb2025 .shared).
