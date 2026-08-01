@@ -1868,3 +1868,11 @@ covered by the Rust-side unit tests + would need a command/dice-injection harnes
   (dice/sequence). PASS_RESULT param twin deferred (PassResult name-collision — avoided the CCE risk).
 
 36 untested StepId families remain.
+
+## Iteration 110 (cont.) — Step-4: StepRecheckExplodeSkill param/guard subset (+3 ffb-server)
+
+- **StepRecheckExplodeSkillFixtureTest (3, bb2025)** — no catcher → bomb marked used, passes through to
+  NEXT_STEP; SKIP / CATCHER_ID accepted; unknown → false. Explode-skill prompt / KABOOM use-skill command /
+  clear-catcher deferred (command + BOMB_BOUNCES_ON_EMPTY_SQUARES option).
+
+35 untested StepId families remain.
