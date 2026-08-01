@@ -1046,6 +1046,11 @@ The Rust bb2025 handler reused the mixed module's PRAYER_NAME ("BLESSED_STATUE_O
 so it could NEVER match the bb2025 prayer (data/prayers/bb2025_prayers.json id is
 BLESSING_OF_NUFFLE), and prayer_player_effect had no BLESSING_OF_NUFFLE arm (Pro never
 granted). Fixed handler const + effect map + flipped test. Tally: 11 real Rust bugs.
+- **player_selector ×2 + opponent_player_selector ×2 → Java tests (24 green).** Eligibility
+  twins: bb2020 = RESERVE@START_GAME / on-pitch@REGULAR (setTurnMode) + Loner excluded;
+  bb2025 = RESERVE-only + PlayerType.STAR excluded (RosterPlayer.setType). selectPlayers count
+  limits + opponent redirection both editions. 9 Rust prunes (5 StubPlayerSelector scaffolding
+  tests in mixed, 4 Default-impl tests).
 - **intensive_training ×3 + blessed_statue_of_nuffle ×3 → Java tests (27 green).** Intensive
   training = skill-choice dialog (applySelection applies via addIntensiveTrainingSkill; remove
   clears the temp skill). bb2025 BlessedStatue is RandomSelection → the Pro grant IS portable

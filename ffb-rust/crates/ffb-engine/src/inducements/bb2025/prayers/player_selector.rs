@@ -114,10 +114,8 @@ mod tests {
         game.field_model.set_player_state(id, state);
     }
 
-    #[test]
-    fn player_selector_default() {
-        let _ = PlayerSelector::default();
-    }
+    // NOTE (test equalization): `player_selector_default` pruned - Rust Default-impl plumbing
+    // (Java uses a static INSTANCE; construction is exercised by every other test here).
 
     #[test]
     fn selects_reserve_regular_player() {

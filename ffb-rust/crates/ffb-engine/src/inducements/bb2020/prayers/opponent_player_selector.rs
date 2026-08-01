@@ -112,10 +112,8 @@ mod tests {
         game.field_model.set_player_state(id, state);
     }
 
-    #[test]
-    fn opponent_selector_default() {
-        let _ = OpponentPlayerSelector::default();
-    }
+    // NOTE (test equalization): `opponent_selector_default` pruned - Rust Default-impl plumbing
+    // (Java uses a static INSTANCE; construction is exercised by every other test here).
 
     #[test]
     fn selects_from_opposing_team() {
