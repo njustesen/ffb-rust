@@ -1070,6 +1070,12 @@ tests are Rust-structural (exempt/prune as encountered).
   replaced it). Removed the file, mod entries, bb2025 registry registration; registry count
   test 35→34. Wild animal remains bb2016-only (matching Java). Behavior-neutral (no bb2025
   player can have the skill) but violates the no-invented-code ground rule.
+- **the_ballista bb2020 + bb2025 → Java tests (10 green).** COMMAND-HOOK recipe: pick the
+  modifier by `m.getConcreteClass() == StepThrowTeamMate.class` (StepModifier exposes
+  getConcreteClass, NOT getSubject), build `new StepXxx.StepState()` (STATIC nested), and call
+  `modifier.handleCommandHook(step, state, new ClientCommandUseSkill(skill, used, id, null,
+  false))`; assert step.getReRolledAction()/getReRollSource() (ReRollSources.THE_BALLISTA).
+  bb2025 KTM-when-kicked vs bb2020 always-TTM. TheBallista skill lives in skill.<ed>.special.
 - **swoop bb2025 → Java tests (4 green).** TTM single-direction scatter; invoke the modifier
   directly with a constructed StepSwoop.StepState (usingSwoop, coordinateTo). Swoop skill has
   ttmScattersInSingleDirection property; scatter rolls 1 die (rollThrowInDirection). Asserts
