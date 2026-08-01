@@ -629,6 +629,13 @@ Remaining ffb-common GAP files are all DOCUMENTED EXEMPTIONS (Rust-only, no fait
   out-of-bounds/unknown-id no-panic (Rust-structural). Remaining util: util_server_db (2) +
   entropy_pool/entropy_server/network_entropy_source (2 each) are RNG/DB infrastructure —
   candidates for exemption; verify next then the util bucket closes.
+- **rng/entropy_pool → Java tests (3 green).** SHA-256 entropy accumulator: not-enough
+  initially, 32 bytes -> hasEnoughEntropy, getEntropy resets. (Rust byte_count() accessor is
+  Rust-only — Java has no getter.) **UTIL BUCKET — remaining EXEMPT:** util_server_db (Rust body
+  is todo!() DB/SQLx wiring, Phase ZU — unported production, not a test gap);
+  entropy_server / network_entropy_source (network-fed Fortuna seeding infrastructure, Rust-side
+  tests are construction/plumbing with no behavioral Java twin). Util bucket effectively closed
+  on testable surface; NEXT: Step 4 ffb-engine step-logic bulk.
 Plus the in-file util_player exemptions (canGaze x4, refresh x7, partner-not-on-field x1, new/default x2)
 and UtilDisturbingPresence empty-player x1 — all commented at their Java test sites.
 - prayer_state (6): NOT ffb-common — com.fumbbl.ffb.server.PrayerState → belongs to Step 3 (ffb-server).
