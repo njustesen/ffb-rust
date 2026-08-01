@@ -1931,3 +1931,13 @@ measure is the truth).
   END_PLAYER_ACTION accepted; unknown → false. Command coordinate / reports / square-finding deferred.
 
 30 untested StepId families remain.
+
+## Iteration 116 — Step-4: StepKickoffAnimation + StepEjectPlayer subsets (+7 ffb-server)
+
+- **StepKickoffAnimationFixtureTest (4)** — start() sets ball-in-play + NEXT_STEP (observable via
+  fieldModel.isBallInPlay()); KICKED_PLAYER_COORDINATE / TOUCHBACK accepted; unknown → false.
+  CATCH_KICKOFF publish + default kicking-square deferred (published/internal).
+- **StepEjectPlayerFixtureTest (3, bb2016)** — FOULER_HAS_BALL / ARGUE_THE_CALL_SUCCESSFUL accepted;
+  unknown → false. Hook box-placement / END_TURN publish / scatter / GOTO deferred.
+
+28 untested StepId families remain.
