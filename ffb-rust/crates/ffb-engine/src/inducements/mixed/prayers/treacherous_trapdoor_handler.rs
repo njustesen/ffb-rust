@@ -40,11 +40,9 @@ mod tests {
         assert_eq!(animation_type(), AnimationType::PRAYER_TREACHEROUS_TRAPDOOR);
     }
 
-    #[test]
-    fn trapdoor_coordinates_are_correct() {
-        assert!(TRAPDOOR_COORDINATES.contains(&(6, 1)));
-        assert!(TRAPDOOR_COORDINATES.contains(&(19, 13)));
-    }
+    // NOTE (test equalization): `trapdoor_coordinates_are_correct` pruned - Rust-structural
+    // constant plumbing (Java keeps the coordinates in a private field; the observable
+    // behavior is covered by `init_effect_adds_two_trapdoors` on both sides).
 
     #[test]
     fn init_effect_adds_two_trapdoors() {

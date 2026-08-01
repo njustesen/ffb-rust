@@ -1039,6 +1039,10 @@ handledPrayer()/selector()/addedSkills(). Test recipe:
 - **under_scrutiny ×3 + fan_interaction ×3 → Java tests (29 green).** Same PrayerState-flag
   shape; UNDER_SCRUTINY targets the OPPONENT team (getOtherTeam) — Rust verified matching.
   5 Rust prunes (case-sensitivity ×4 + duplicate animation test in mixed under_scrutiny).
+- **perfect_passing ×3 + treacherous_trapdoor ×3 → Java tests (26 green).** Perfect passing =
+  PrayerState-flag (getAdditionalCompletionSppTeams); trapdoor initEffect adds TrapDoors at
+  (6,1)/(19,13) — check via fieldModel.getTrapDoors().contains(new TrapDoor(coord)) (TrapDoor
+  has equals). 3 Rust prunes (case-sensitivity ×2, TRAPDOOR_COORDINATES constant ×1).
 - **iron_man ×3 + knuckle_dusters ×3 → Java tests (26 green).** SelectPlayerPrayerHandler
   (dialog-based) recipe: Java initEffect shows a player-choice dialog and returns FALSE when
   eligible players exist (true only when wasted/empty); the effect lands via
