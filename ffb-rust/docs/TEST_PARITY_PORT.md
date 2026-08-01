@@ -1860,3 +1860,11 @@ steps, etc.) — their Rust tests assert roll outcomes / published params / comm
 high-yield immediate-execute/dispatch steps are essentially exhausted. Remaining behaviour is genuinely
 covered by the Rust-side unit tests + would need a command/dice-injection harness to equalize in Java.
 37 untested StepId families remain.
+
+## Iteration 110 — Step-4: StepDispatchScatterPlayer param subset (+3 ffb-server)
+
+- **StepDispatchScatterPlayerFixtureTest (3, bb2020)** — THROWN_PLAYER_ID / OLD_DEFENDER_STATE accepted;
+  unknown → false. Fumble / wildly-inaccurate scatter-sequence-push + kick-team-mate-fumble report deferred
+  (dice/sequence). PASS_RESULT param twin deferred (PassResult name-collision — avoided the CCE risk).
+
+36 untested StepId families remain.
