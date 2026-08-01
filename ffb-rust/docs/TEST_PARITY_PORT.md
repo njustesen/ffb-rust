@@ -1070,6 +1070,11 @@ tests are Rust-structural (exempt/prune as encountered).
   replaced it). Removed the file, mod entries, bb2025 registry registration; registry count
   test 35→34. Wild animal remains bb2016-only (matching Java). Behavior-neutral (no bb2025
   player can have the skill) but violates the no-invented-code ground rule.
+- **monstrous_mouth ×3 → Java tests (7 green).** bb2016/bb2020 = CATCH-step reroll grant
+  (StepCatchScatterThrowIn.StepState with catcher/rerollCatch; assert step.getReRolledAction()
+  == ReRolledActions.CATCH, package com.fumbbl.ffb NOT util); bb2025 = pushback CHOMP force-push
+  + chomped-ball-carrier strip prevention. dauntless_behaviour is registry-plumbing-only (no
+  behavioral Java twin) — exempt.
 - **eye_gouge bb2025 → Java tests (3 green).** canRemoveOpponentAssists property marks the MAIN
   defender eye-gouged (changeEyeGouged) during a push; hook ALWAYS returns false. Skill "Eye
   Gouge" bb2025-only. Report presence via step.getResult().getReportList().size()>0.
