@@ -1403,3 +1403,17 @@ Remaining Step-3 factory GAP (45 tests): prayer_handler_factory (11), card_handl
 step_action_factory (7), sequence_generator_factory (7), observer_factory (6),
 deferred_command_id_factory (2), deferred_command_factory (2). Next buckets: skill_behaviour (118 —
 mostly negatrait step files whose behaviour is covered, verify vs exempt), model (19).
+
+## Iteration 82 — factory bucket: step_action_factory (+7 ffb-server); deferred_command factories exempt
+
+- **StepActionFactoryTest (7)** — StepActionFactory.forName: case-insensitive name lookup
+  (continue/nextStep/gotoLabel), unknown→null, round-trips. Same recipe as StepIdFactory.
+- **deferred_command_id_factory (2) + deferred_command_factory (2) — EXEMPT (Phase ZU stubs):** the Rust
+  bb2025 deferred-command subsystem is unimplemented — `DeferredCommandFactory::create` is `todo!()`
+  ("Phase ZU"), and `deferred_command_id_factory` is an empty `Vec<String>` register/lookup stub rather
+  than Java's `DeferredCommandId.values()` enum iteration. Their Rust tests
+  (test_new_factory_empty/test_default_same_as_new/test_empty_factory/test_register_and_lookup) exercise
+  the stub scaffolding, not portable Java behaviour. Revisit when Phase ZU lands.
+
+Remaining Step-3 factory GAP (36 tests): prayer_handler_factory (11), card_handler_factory (10),
+sequence_generator_factory (7), observer_factory (6). Then skill_behaviour (118), model (19).
