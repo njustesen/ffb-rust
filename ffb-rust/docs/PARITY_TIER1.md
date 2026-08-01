@@ -325,3 +325,25 @@ step23 and beyond.
 Almost certainly one of the audited dialog handlers fired between step9's fixed point and step23 and desynced
 again. Diagnose which dialog occurred (FFB_TRACE LOOP applied= between the last matching step and step23),
 map it to the audit list, verify vs ParityRunner, fix, verify step23 matches.
+
+## Iter 13 (2026-08-01) — dialog audit: SkillUse/PilingOn/Apothecary/Argue fixed (verified vs Java); step23 is a DIFFERENT bug
+
+Verified against ParityRunner + fixed (all deterministic 0 rng, were pick_bool): SkillUse → always use
+(sendUseSkill(...,true,...)); PilingOn → always use (no Java case; §7 always use); ApothecaryChoice →
+decline (sendApothecaryChoice keeps playerStateOld); ArgueTheCall → always argue (ClientCommandArgueTheCall
+firstPlayer). cargo test 9 passed. These are correct alignments but did NOT change step23 (none of those
+dialogs fire before step23 in seed1) — committed as correctness/no-regression (steps 0-22 still match).
+
+### Open item #6 (next): step23 — prone player NOT skipped in Java but (likely) skipped in Rust
+seed1 steps 20-22 match; step23 (turn2, home) diverges on PLAYER PICK: Java picks home1, Rust picks home9.
+The step23 eligible list is `[(home_01,[StandUp]), (home_02,[Move]), ...]` — home_01 is PRONE (only StandUp
+available). Java picks home_01 (idx 0, stands it up). Rust picks home_09. Hypothesis: Rust's inactive-skip
+loop (random_agent.rs ~L167-176: `ps.is_prone() && !ps.is_active()` → skip + the pick already consumed a
+decisionRng) WRONGLY skips prone-but-active home_01, then re-picks (extra decisionRng) landing on home9 —
+OR home_01's `is_active()` is false in Rust where Java treats a prone (fell, not stun-recovered) player as
+activatable (StandUp). A player is inactive ONLY if just-recovered-from-STUNNED this turn; a normally-prone
+player CAN stand up. DIAGNOSE: FFB_TRACE ELIGIBLE_CHECK for home_01 at step23 (active flag?), and whether
+Rust enters the is_inactive skip for it; compare to Java's eligibility (StepInitSelecting / ParityRunner
+usedThisTurn). Java ground truth: prone home1 is pickable (StandUp). Fix Rust's active-flag or inactive-skip
+so prone-but-active players are NOT skipped; verify step23 picks home1 and matches. This is a NEW bug class
+(eligibility/active-flag), distinct from the dialog 0-rng pattern.

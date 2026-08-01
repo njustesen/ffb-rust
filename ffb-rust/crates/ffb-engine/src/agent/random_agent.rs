@@ -352,22 +352,21 @@ impl Agent for RandomAgent {
             // decision_rng call desyncing later picks.
             Some(AgentPrompt::ReRollOffer { .. }) =>
                 Action::UseReRoll { use_reroll: false },
-            // Skill use: uniformly sample use/decline — 1 decision_rng call.
-            // Synced with Java ParityRunner SKILL_USE dialog case.
-            // skill_id=Block is a placeholder (engine identifies the skill from step state, not
-            // from the action's skill_id field when responding to a SkillUse prompt).
+            // Skill use: AGENT_CONTRACT §7 — ALWAYS use, deterministically, 0 rng. Java ParityRunner
+            // SKILL_USE = `sendUseSkill(skill, true, playerId)` (no decisionRng). The old code
+            // random-sampled via pick_bool (spurious draw + wrong choice → decision-stream desync).
+            // skill_id=Block is a placeholder (engine identifies the skill from step state).
             Some(AgentPrompt::SkillUse { .. }) =>
-                Action::UseSkill { skill_id: SkillId::Block, use_skill: self.pick_bool() },
-            // Piling On: uniformly sample — 1 decision_rng call.
-            // Synced with Java ParityRunner PILING_ON dialog case.
-            Some(AgentPrompt::PilingOn { .. }) => {
-                let use_it = self.pick_bool();
-                Action::UseSkill { skill_id: SkillId::Block, use_skill: use_it }
-            }
-            // Apothecary choice: uniformly sample use/decline — 1 decision_rng call.
-            // Synced with Java ParityRunner APOTHECARY_CHOICE dialog case.
+                Action::UseSkill { skill_id: SkillId::Block, use_skill: true },
+            // Piling On: AGENT_CONTRACT §7 — always use, 0 rng (Java has no separate PILING_ON case;
+            // treated as SKILL_USE = always use). Was random-sampled via pick_bool.
+            Some(AgentPrompt::PilingOn { .. }) =>
+                Action::UseSkill { skill_id: SkillId::Block, use_skill: true },
+            // Apothecary: AGENT_CONTRACT §7 — DECLINE, deterministically, 0 rng. Java
+            // APOTHECARY_CHOICE = sendApothecaryChoice(..., playerStateOld) i.e. keep the original
+            // result (decline the apothecary). Was random-sampled via pick_bool (spurious draw).
             Some(AgentPrompt::ApothecaryChoice { player_id, .. }) =>
-                Action::UseApothecary { player_id: player_id.clone(), use_apothecary: self.pick_bool() },
+                Action::UseApothecary { player_id: player_id.clone(), use_apothecary: false },
             Some(AgentPrompt::UseApothecary { .. }) =>
                 Action::Acknowledge,
             // Interception: always decline — 0 RNG calls.
@@ -386,10 +385,11 @@ impl Agent for RandomAgent {
                 let idx = self.pick(sorted.len());
                 Action::Touchback { player_id: sorted[idx].0.clone() }
             }
-            // Argue the call: uniformly sample — 1 decision_rng call.
-            // Synced with Java ParityRunner ARGUE_THE_CALL dialog case.
+            // Argue the call: AGENT_CONTRACT §7 — ALWAYS argue, deterministically, 0 rng. Java
+            // ARGUE_THE_CALL always sends ClientCommandArgueTheCall(firstPlayer). Was random-sampled
+            // via pick_bool (spurious draw + wrong choice).
             Some(AgentPrompt::ArgueTheCall { .. }) =>
-                Action::ArgueTheCall { argue: self.pick_bool() },
+                Action::ArgueTheCall { argue: true },
             // Player choice: pick uniformly from eligible sorted by PlayerId — 1 decision_rng call.
             // Synced with Java ParityRunner PLAYER_CHOICE dialog case.
             Some(AgentPrompt::PlayerChoice { eligible_players, .. }) => {
