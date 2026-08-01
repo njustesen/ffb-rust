@@ -347,3 +347,31 @@ Rust enters the is_inactive skip for it; compare to Java's eligibility (StepInit
 usedThisTurn). Java ground truth: prone home1 is pickable (StandUp). Fix Rust's active-flag or inactive-skip
 so prone-but-active players are NOT skipped; verify step23 picks home1 and matches. This is a NEW bug class
 (eligibility/active-flag), distinct from the dialog 0-rng pattern.
+
+## Iter 14 (2026-08-01) — step23 is a decisionRng DESYNC (NOT a prone-skip); source between turn-2 picks #2 and #3
+
+Corrected iter13's hypothesis: home_01 is PRONE but active=TRUE in Rust (ELIGIBLE_CHECK h=1 t=2:
+prone=true active=true), so it is NOT skipped by the is_inactive loop. Authoritative JSONL turn-2 home pick
+order:
+- JAVA: home7, home3, home1, home9, home8, home4, home5, home11, home2, home10
+- RUST: home7, home3, home9, home8, home4, home5, home11, home2, home10, home6
+Picks #1-2 (home7, home3) MATCH; pick #3 diverges — Java home1 (idx 0 of the 9-remaining), Rust home9
+(idx 6). Same remaining list/size, different decisionRng value → a decisionRng desync that occurred
+BETWEEN turn-2 pick #2 (home3, step22) and pick #3 (step23). Rust's order is Java's with home1 displaced to
+last — a permutation shift consistent with one extra/missing decisionRng draw around step22.
+
+Puzzle: step22 (home3 MOVE) shows NO decisionRng-consuming dialog in the trace (player pick=matched pick#2;
+move-square=actionRng; 2nd prompt=EndPlayerAction 0 rng). So a hidden decisionRng draw (or a missing one)
+happens during home3's activation or the step22→23 transition. Note home3 was activated in turn 2 with
+action MOVE; but the step23 eligible list shows home_01 with action [StandUp] (prone) — check whether a
+prone player's StandUp/Move activation path, or home3's move (dodge? carrier?), draws decisionRng
+asymmetrically.
+
+### Open item #7 (next): add a decisionRng counter and localize the desync
+Add `decision_rng_count` to RandomAgent (mirror the existing `action_rng_count`): increment in pick()/
+pick_bool(), print in RUST_ACT_PICK (like arc). Have ParityRunner print its `decisionRngAdvances` at each
+JAVA_ACT_PICK (it already tracks the field — add to the DEBUG line; ParityRunner is co-editable harness).
+Rerun seed1; compare decision-count at each turn-2 pick. The pick where the counts first differ localizes
+the extra/missing draw → root-cause that specific site (likely a dialog or the prone-StandUp path drawing
+decisionRng where Java doesn't, per the recurring pattern). Fix Rust (0-rng align), verify step23 picks
+home1, commit. (8 fixes so far; seed1 matches through step22.)
