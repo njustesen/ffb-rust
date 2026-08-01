@@ -100,3 +100,30 @@ dodge CONTEXT first differs (e.g. does away3 attempt the same blitz path / same 
 context divergence — not the casualty roll — is the real bug. Likely candidates: blitz move-square choice,
 dodge modifier/target computation, or the order in which the blitzer's move dodges resolve. Fix Rust only,
 add a test, rerun. (Fan-factor fix from iter 3 stands: pre-game fully aligned.)
+
+## Iter 5 (2026-08-01) — narrowed Open item #2 to the blitzer's post-block MOVE/follow-up path
+
+Correlated first activation (away_03 BLITZ) via FFB_TRACE/FFB_DRIVE_TRACE + rust_events.jsonl + Java
+JAVA_*/DICE caller stacks. Block itself matches: both block home_03, 1 die = 4 (pos13), pushback.
+Then they DIVERGE in the blitzer's continued move:
+- RUST (events): away_03 pushback home_03→(11,9); away_03 moves (14,7); dodgeRoll target 3 roll 6 SUCCESS;
+  continues (14,8)→(14,9)→(14,8)… away_03 NEVER falls, no injury.
+- JAVA (trace): JAVA_P2 away3 BLITZ_MOVE; pos14,15 StepMoveDodge.dodge (6,4); then InjuryTypeDropDodge
+  (armour pos16,17=2,6=8 broken; injury pos18,19=6,5=11) → CASUALTY d16 (pos20). A player falls from a
+  dodge during the blitz move and is cas'd.
+
+So the divergence is the BLITZER'S POST-BLOCK MOVE: pushback square, FOLLOW-UP decision, and/or the
+continued move-square sequence differ, putting the blitzer into a different dodge (Java fails/falls, Rust
+succeeds and wanders). Die VALUES align through pos19 only because both draw the same shared GameRng
+stream; the true split is the extra casualty roll Java makes.
+
+### Open item #2 (further refined, next): compare blitzer post-block move step-by-step
+Prime suspects (check in this order): (1) FOLLOW-UP after the block push — AGENT_CONTRACT §7 says decline;
+verify Rust's blitz actually offers/declines follow-up like Java (a wrong follow-up moves the blitzer to a
+different square). (2) The continued BLITZ_MOVE square sequence / count (how many squares the blitzer moves
+after the block, and the coord-sorted actionRng move-square picks) — Rust wandered (14,7)→(14,8)→(14,9)→
+(14,8) which looks like aimless back-and-forth vs Java's directed move into a dodge. (3) whether Rust even
+enters a StepMoveDodge for the blitzer's continuation. Open crates/ffb-engine/src/step/**/*blitz*/*move*
+and the Java StepBlitz/StepMove/StepMoveDodge + the follow-up step; find the first behavioral difference;
+fix Rust only; add a test; rerun. NOTE the Rust move wander (14,8↔14,9) may itself be an agent move-target
+bug — cross-check against AGENT_CONTRACT §3/§6 (coord-sorted move-square pick).
