@@ -1388,3 +1388,18 @@ OverridesSavedByArmour) to exercise the template-method free function. Java's
 concrete twins (block_prone, block_stunned, etc.). **The Step-3 injury bucket is now fully reconciled
 on testable surface.** Next Step-3 buckets by gap size: skill_behaviour (118), factory (53), model (19),
 inducements (5); plus the non-injury engine-infra files (talk/replay/id_generator/active_effects/etc.).
+
+## Iteration 81 — inducements bucket CLOSED (dazzling_catching) + factory bucket started (step_id_factory) (+12 ffb-server)
+
+- **DazzlingCatchingHandlerTest (4)** — bb2025 prayer handler (PrayerHandler recipe): handledPrayer
+  DAZZLING_CATCHING; initEffect adds team to getAdditionalCatchesSppTeams; removeEffectInternal empty
+  (entry persists); getName. Pruned the Rust handles_prayer_is_case_sensitive test (Java handles()
+  takes a Prayer enum, not a string — inexpressible). **Inducements Step-3 bucket now fully reconciled.**
+- **StepIdFactoryTest (8)** — factory forName: case-insensitive name lookup, old-name fallback
+  (recoverFromGaze→INIT_ACTIVATION, removeBlitzState→REMOVE_TARGET_SELECTION_STATE), reportInjury→
+  REPORT_STAB_INJURY, unknown→null, name round-trips. Pure factory, no fixture.
+
+Remaining Step-3 factory GAP (45 tests): prayer_handler_factory (11), card_handler_factory (10),
+step_action_factory (7), sequence_generator_factory (7), observer_factory (6),
+deferred_command_id_factory (2), deferred_command_factory (2). Next buckets: skill_behaviour (118 —
+mostly negatrait step files whose behaviour is covered, verify vs exempt), model (19).
