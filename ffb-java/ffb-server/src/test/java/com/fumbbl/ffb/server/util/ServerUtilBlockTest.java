@@ -1,5 +1,6 @@
 package com.fumbbl.ffb.server.util;
 
+import com.fumbbl.ffb.PlayerState;
 import com.fumbbl.ffb.RulesCollection;
 import com.fumbbl.ffb.model.Game;
 import com.fumbbl.ffb.model.Player;
@@ -82,5 +83,83 @@ public class ServerUtilBlockTest {
 		assertEquals(1, nrOfDice(5, 3, false, true));
 		// attacker 6 - 2 = 4 > defender 3 -> 2 dice
 		assertEquals(2, nrOfDice(6, 3, false, true));
+	}
+
+	/** As nrOfDice but with the canAddBlockDie modifier (7-arg overload returns a Pair). */
+	private int nrOfDiceAddDie(int attStr, int defStr) {
+		GameFixture.placePlayer(gameState, "away1", 13, 8);
+		((RosterPlayer) game.getPlayerById("home1")).setStrength(attStr);
+		((RosterPlayer) game.getPlayerById("away1")).setStrength(defStr);
+		return ServerUtilBlock.findNrOfBlockDice(gameState, game.getPlayerById("home1"),
+			game.getPlayerById("away1"), false, false, false, true).getLeft();
+	}
+
+	// rust: add_block_die_increments_one_die_to_two
+	@Test
+	public void addBlockDieIncrementsOneDieToTwo() {
+		assertEquals(2, nrOfDiceAddDie(3, 3));
+	}
+
+	// rust: add_block_die_increments_two_dice_to_three
+	@Test
+	public void addBlockDieIncrementsTwoDiceToThree() {
+		assertEquals(3, nrOfDiceAddDie(6, 3));
+	}
+
+	// rust: add_block_die_does_not_increment_three_dice
+	@Test
+	public void addBlockDieDoesNotIncrementThreeDice() {
+		assertEquals(3, nrOfDiceAddDie(9, 3));
+	}
+
+	// ── removePlayerBlockStates ──────────────────────────────────────────────
+
+	private int base(String playerId) {
+		return game.getFieldModel().getPlayerState(game.getPlayerById(playerId)).getBase();
+	}
+
+	private void setBase(String playerId, int newBase) {
+		PlayerState ps = game.getFieldModel().getPlayerState(game.getPlayerById(playerId));
+		game.getFieldModel().setPlayerState(game.getPlayerById(playerId), ps.changeBase(newBase));
+	}
+
+	// rust: remove_player_block_states_resets_blocked_to_standing
+	@Test
+	public void removePlayerBlockStatesResetsBlockedToStanding() {
+		GameFixture.placePlayer(gameState, "home2", 4, 4);
+		setBase("home1", PlayerState.BLOCKED);
+		setBase("home2", PlayerState.STANDING);
+		ServerUtilBlock.removePlayerBlockStates(game, null);
+		assertEquals(PlayerState.STANDING, base("home1"));
+		assertEquals(PlayerState.STANDING, base("home2"));
+	}
+
+	// rust: remove_player_block_states_preserves_prone_defender
+	@Test
+	public void removePlayerBlockStatesPreservesProneDefender() {
+		GameFixture.placePlayer(gameState, "away1", 13, 8);
+		game.setDefenderId("away1");
+		setBase("away1", PlayerState.BLOCKED);
+		ServerUtilBlock.removePlayerBlockStates(game, new PlayerState(PlayerState.PRONE));
+		assertEquals(PlayerState.PRONE, base("away1"));
+	}
+
+	// rust: remove_player_block_states_non_defender_always_standing
+	@Test
+	public void removePlayerBlockStatesNonDefenderAlwaysStanding() {
+		GameFixture.placePlayer(gameState, "away1", 13, 8);
+		game.setDefenderId("away1");
+		setBase("home1", PlayerState.BLOCKED);
+		setBase("away1", PlayerState.BLOCKED);
+		ServerUtilBlock.removePlayerBlockStates(game, new PlayerState(PlayerState.PRONE));
+		assertEquals(PlayerState.STANDING, base("home1"));
+	}
+
+	// rust: remove_player_block_states_non_blocked_untouched
+	@Test
+	public void removePlayerBlockStatesNonBlockedUntouched() {
+		setBase("home1", PlayerState.PRONE);
+		ServerUtilBlock.removePlayerBlockStates(game, null);
+		assertEquals(PlayerState.PRONE, base("home1"));
 	}
 }

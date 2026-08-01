@@ -1078,7 +1078,12 @@ edition-specific RollMechanic modifiers: attacker gets multiBlockAttackerModifie
 else 0). Fixed the helper to take `rules` and apply both via ffb_mechanics::mechanics
 multi_block_{attacker,defender}_modifier; removed the decoration-path attacker+1; updated the
 3 step_block_roll callers and the Rust tests; added ServerUtilBlockTest twin. Tally: 12 real
-Rust bugs. START of util bucket (server_util_block block-dice-count subset, 7 Java tests).
+Rust bugs. START of util bucket. **server_util_block → Java tests (14 total: 7 dice-count + 3
+add-block-die + 4 removePlayerBlockStates).** removePlayerBlockStates resets BLOCKED→STANDING
+(defender keeps its old prone/stun base). EXEMPT: the update_dice_decorations / add_dice_decoration
+Rust tests are client-only display-path (the Rust production marks the whole
+update_dice_decorations path client-only / headless-conservative) with no ffb-server behavioral
+Java twin.
 - **sneaky_git bb2025 (eject-player) → Java tests (7 green first run).** Ejected fouler set
   BANNED unless Argue-the-Call succeeded; reason recorded on PlayerResult
   (OFFICIOUS_REF via state.officiousRef / THREW_TWO_BOMBS via passState.originalBombardier /
