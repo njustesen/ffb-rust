@@ -1070,6 +1070,9 @@ tests are Rust-structural (exempt/prune as encountered).
   replaced it). Removed the file, mod entries, bb2025 registry registration; registry count
   test 35→34. Wild animal remains bb2016-only (matching Java). Behavior-neutral (no bb2025
   player can have the skill) but violates the no-invented-code ground rule.
+- **catch ×3 → Java tests (6 green first run).** Same catch-reroll shape as monstrous_mouth;
+  common Catch skill, per-edition StepCatchScatterThrowIn step imports (bb2016 direct,
+  bb2020/bb2025 .shared).
 - **monstrous_mouth ×3 → Java tests (7 green).** bb2016/bb2020 = CATCH-step reroll grant
   (StepCatchScatterThrowIn.StepState with catcher/rerollCatch; assert step.getReRolledAction()
   == ReRolledActions.CATCH, package com.fumbbl.ffb NOT util); bb2025 = pushback CHOMP force-push
