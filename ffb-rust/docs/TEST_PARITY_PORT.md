@@ -1777,3 +1777,14 @@ in the last three).
   key → false" tests are reliable across all steps.
 
 52 untested StepId families remain.
+
+## Iteration 103 — Step-4: StepGotoLabel + StepNextStepAndRepeat (+7 ffb-server)
+
+- **StepGotoLabelFixtureTest (5)** — start() → GOTO_LABEL to GOTO_LABEL (or ALTERNATE_GOTO_LABEL when
+  USE_ALTERNATE_LABEL set); label asserted via getResult().getNextActionParameter(). GOTO_LABEL /
+  ALTERNATE_GOTO_LABEL init-consumed; USE_ALTERNATE_LABEL via setParameter. Exempt: goto_label /
+  alternate_goto_label param-accepted twins (init-consumed → setParameter false).
+- **StepNextStepAndRepeatFixtureTest (2)** — start() → NEXT_STEP_AND_REPEAT; setParameter → false.
+  Exempt: handle_command twin (AbstractStep default command path, no override).
+
+50 untested StepId families remain.
