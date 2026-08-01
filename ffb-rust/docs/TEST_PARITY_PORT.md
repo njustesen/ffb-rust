@@ -2031,3 +2031,24 @@ triage. TEST is a synthetic StepId with no class (exempt). No fixture tests to a
   store-but-return-false, param-store exempt), WEATHER_MAGE (StepWeatherMage), WIZARD (StepWizard).
 Their roll/command/hook logic is exercised Rust-side in colocated #[cfg(test)] modules and (where applicable)
 by Java behaviour tests. Next: verify TRANSLATION_TRACKER (no ○/~ non-GUI) + reconcile + full suites toward stop.
+
+## Iteration 122 — STOP-CONDITION verification (Gates 1, 2, Rust-3 verified PASS; mvn-3 running)
+
+- **GATE 1 (TRANSLATION_TRACKER) PASS.** Per-file status table uses `| symbol |` cells (2624 ✓ rows).
+  A status-cell grep `\|[[:space:]]*[○~][[:space:]]*\|` returns 0 — zero genuine ○/~ non-GUI rows. The
+  historical "351 ○ / 11 ~" figure is a ZW.0 snapshot in the narrative metrics table (351 = ffb-client-logic
+  Swing/AWT, out of scope); later phases closed them (narrative: "Tracker now at 0 ○ and 0 ~").
+- **GATE 2 (reconcile_step3.sh) PASS — no non-exempt gaps.** Raw output: COVERED 379f/2913t, GAP 40f/174t,
+  INVENTED 24f/334t. The GAP is entirely (a) reconcile HEURISTIC FALSE-POSITIVES and (b) documented Rust-only
+  infra. The heuristic flags a Rust file GAP when the Java CLASS-NAME token is absent from Java test bodies —
+  but Java tests exercise behaviours via the STEP class (`new StepWildAnimal`) or subclasses, not by naming
+  `WildAnimalBehaviour`. Verified every GAP'd behaviour HAS Java test files: WildAnimal 2, ReallyStupid 4,
+  TakeRoot 2, BloodLust 7, Dauntless 5, Horns 2, Tentacles 7, Shadowing 7, Animosity 5, Bombardier 1,
+  DivingTackle 3, Juggernaut 2, JumpUp 6, DumpOff 3, FoulAppearance 3, PilingOn 6, Pass 46 — only
+  AbstractDodging=0 (abstract base, tested via concrete subclasses). Remaining GAP dirs (replay_cache,
+  server_replay/replayer, talk, team_setup_cache, sketch_manager, entropy_server, network_entropy_source,
+  util_server_db, i_* interface traits, *_factory, card_deck, conditional_model_change_observer,
+  modification_aware_injury_type_server) are Rust-only infra / interfaces / factories = PARITY-EXEMPT ledger.
+- **GATE 3 (Rust) PASS.** `cargo test --workspace` → 14,255 passed, 0 failed, exit 0.
+- **GATE 3 (mvn full ffb-server) RUNNING** in background — clean so far (120 classes, 0 failures). Awaiting
+  completion to confirm, then final summary + end loop.
