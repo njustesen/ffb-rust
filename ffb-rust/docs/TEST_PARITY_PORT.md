@@ -1583,3 +1583,17 @@ add* methods read the team via pr.getPlayer().getTeam() (2-arg); the Rust thread
 
 Remaining Step-3 mechanic gaps: bb2016/bb2020/bb2025 apothecary_mechanic (6 each). Then the big
 skill_behaviour bucket (118). Next: apothecary_mechanic across the three editions.
+
+## Iteration 92 — bb2016 apothecary_mechanic (+4 ffb-server)
+
+- **bb2016 ApothecaryMechanicTest (4)** — BB2016 apothecaryTypes always returns empty (apothecary use
+  not modelled per-type); getType == Mechanic.Type.APOTHECARY; getName == "APOTHECARY" (Mechanic's
+  default getName = getType().name()). Exempt: default_creates_instance (Rust plumbing);
+  apothecary_types_empty_for_star_player_too (redundant in BB2016 — unconditionally empty; the
+  star/mercenary/journeyman + turn-data apothecary/plague/wandering logic is exercised in bb2020/bb2025).
+
+NOTE: bb2020/bb2025 apothecary_mechanic is substantially more complex — apothecaryTypes depends on
+turn_data.{apothecaries, wanderingApothecaries, plagueDoctors}, the defender's player type
+(Star→empty, Mercenary→Wandering-only, Journeyman→Wandering+Plague-if-KO, else Team/Wandering), and
+KO-vs-other player state. Needs a dedicated setup iteration (set turn-data apo counts + player types).
+Next: bb2020 then bb2025 apothecary_mechanic; then the big skill_behaviour bucket (118).
