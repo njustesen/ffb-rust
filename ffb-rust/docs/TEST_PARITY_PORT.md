@@ -1994,3 +1994,17 @@ init→set_parameter adaptation, NOT a bug — left as-is.
   scatter deferred (dice/hook).
 
 20 untested StepId families remain.
+
+## Iteration 120 — Step-4: StepApplyKickoffResult + StepKickoffReturn + StepPrayers param subsets (+11 ffb-server)
+
+Cross-checked each set_parameter return against Java — all three match (no Bug #14-style divergence this
+batch; AbstractStep.setParameter returns false always, so every subclass switch case is reached).
+- **StepApplyKickoffResultFixtureTest (4, bb2016)** — KICKOFF_RESULT / TOUCHBACK / KICKOFF_BOUNDS consumed
+  (return true); unknown → false. Kickoff-result dispatch deferred (hook/command).
+- **StepKickoffReturnFixtureTest (4, bb2020/COMMON)** — END_PLAYER_ACTION / END_TURN / TOUCHBACK consumed
+  (they call consume() only in KICKOFF_RETURN turn mode but return true regardless); unknown → false.
+  Move/command handling deferred.
+- **StepPrayersFixtureTest (3, bb2020)** — TV_HOME / TV_AWAY consumed (store each treasury); unknown →
+  super → false. TV-difference prayer roll deferred (dice/inducement, unit-tested Rust-side).
+
+17 untested StepId families remain.
