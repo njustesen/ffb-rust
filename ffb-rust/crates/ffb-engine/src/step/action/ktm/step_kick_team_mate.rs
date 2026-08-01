@@ -70,7 +70,12 @@ impl Step for StepKickTeamMate {
             StepParameter::KickedPlayerId(v) => { self.kicked_player_id = v.clone(); true }
             StepParameter::KickedPlayerState(v) => { self.kicked_player_state = Some(*v); true }
             StepParameter::KickedPlayerHasBall(v) => { self.kicked_player_has_ball = *v; true }
-            StepParameter::NrOfDice(v) => { self.num_dice = (*v).max(0).min(2); true }
+            // Java StepKickTeamMate.setParameter: NR_OF_DICE stores fNumDice then `break;` → the
+            // method returns FALSE (unlike the KICKED_* cases right above, which `return true`). A
+            // false return means the published NR_OF_DICE keeps propagating DOWN the stack to lower
+            // steps (StepStack.publishParameter stops only on a true return). StepInitKickTeamMate
+            // publishes NR_OF_DICE, so this step is a mid-stack consumer that must not swallow it.
+            StepParameter::NrOfDice(v) => { self.num_dice = (*v).max(0).min(2); false }
             _ => false,
         }
     }
@@ -193,6 +198,20 @@ mod tests {
         step.kicked_player_state = Some(PlayerState::new(PS_STANDING));
         step.num_dice = 1;
         step
+    }
+
+    #[test]
+    fn nr_of_dice_stored_but_not_consumed_so_it_keeps_propagating() {
+        // Fidelity regression (Bug #14): Java StepKickTeamMate.setParameter stores fNumDice for
+        // NR_OF_DICE then `break;` → returns FALSE, so a published NR_OF_DICE keeps flowing DOWN the
+        // stack to lower steps (StepInitKickTeamMate publishes it). The KICKED_* keys `return true`
+        // (consumed). Rust previously returned true for NrOfDice too, wrongly swallowing it.
+        let mut step = StepKickTeamMate::new("fail");
+        assert!(!step.set_parameter(&StepParameter::NrOfDice(2)), "NR_OF_DICE must not be consumed");
+        assert_eq!(step.num_dice, 2, "…but the value is still stored locally");
+        // The KICKED_* keys, by contrast, are consumed (return true).
+        assert!(step.set_parameter(&StepParameter::KickedPlayerId(Some("k1".into()))));
+        assert!(step.set_parameter(&StepParameter::KickedPlayerHasBall(true)));
     }
 
     #[test]

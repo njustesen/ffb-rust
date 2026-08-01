@@ -1977,3 +1977,20 @@ Note: StepTrickster's 4 USING_* setParameter keys all fall through to `return fa
 style) — no fixture-expressible param test; Rust twins exempt.
 
 21 untested StepId families remain (measured by class-name refs, not enum refs).
+
+## Iteration 119 — Step-4: StepKickTeamMate param subset + BUG #14 (NR_OF_DICE propagation)
+
+BUG #14 (Rust prod fix): StepKickTeamMate.set_parameter returned `true` for NrOfDice, but Java's
+`case NR_OF_DICE: fNumDice=…; break;` returns FALSE (deliberately distinct from the KICKED_* cases that
+`return true` immediately above it). A false return means a published NR_OF_DICE keeps propagating DOWN
+the stack (StepStack.publishParameter stops only on true); StepInitKickTeamMate PUBLISHES NR_OF_DICE, so
+KickTeamMate is a mid-stack consumer that must not swallow it. Rust wrongly stopped propagation. Fixed:
+NrOfDice now stores num_dice (clamped 0..2) and returns false; added regression test
+`nr_of_dice_stored_but_not_consumed_so_it_keeps_propagating`. (Tally: 14 bugs + 1 fidelity removal.)
+Note: GotoLabelOnFailure returning true in Rust vs Java's init-only handling is the accepted structural
+init→set_parameter adaptation, NOT a bug — left as-is.
+- **StepKickTeamMateFixtureTest (5, bb2020/COMMON)** — KICKED_PLAYER_ID/STATE/HAS_BALL consumed (true);
+  NR_OF_DICE stored-but-not-consumed (false, the Bug #14 assertion); unknown → false. Kick roll/distance/
+  scatter deferred (dice/hook).
+
+20 untested StepId families remain.
