@@ -1802,3 +1802,15 @@ idle gap) since nothing external gates them; a wakeup is only used to hand off a
   report/multi-target-choice tests are command-driven — deferred.
 
 48 untested StepId families remain.
+
+## Iteration 105 — Step-4: StepPlayerLoss + StepPickMeUp guard subsets (+3 ffb-server) [in-turn chain]
+
+- **StepPlayerLossFixtureTest (2, bb2020)** — no-concession → NEXT_STEP; legal-concession → defection
+  skipped (playerResult.isDefecting() false). Defection-eligibility (3+ advancements over position) +
+  rollPlayerLoss + ReportDefectingPlayers deferred (dice/eligibility).
+- **StepPickMeUpFixtureTest (1)** — last-turn (both teams turn 8) short-circuits to NEXT_STEP. Touchdown-
+  skip / eligible-collection / player-choice / roll / report deferred (touchdown state or dialog commands).
+
+NOTE (yield): the remaining Step-4 families are increasingly command/dice/dialog-heavy, so per-family
+fixture-expressible yield is dropping (1-2 guard tests each) — the clean immediate-execute/dispatch steps
+are mostly ported. 46 untested StepId families remain.
