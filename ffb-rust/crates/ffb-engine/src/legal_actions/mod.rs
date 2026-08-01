@@ -84,9 +84,12 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
                 if adj_opponent {
                     actions.push(Action::ActivatePlayer {
                         player_id: pid.clone(),
-                        // A prone player blitzing declares STAND_UP_BLITZ, not plain Blitz —
-                        // the coverage checklist and Java both distinguish the two.
-                        player_action: PlayerActionChoice::StandUpBlitz,
+                        // A prone player blitzing declares plain BLITZ (dispatched as BLITZ_MOVE), NOT
+                        // STAND_UP_BLITZ — Java ParityRunner.computeEligiblePlayers offers a prone player
+                        // [MOVE, BLITZ] and the stand-up is handled by the standing_up activation flow
+                        // (mirrors the prone MOVE case above). Offering StandUpBlitz diverged from Java's
+                        // BLITZ label and dispatched a different step sequence.
+                        player_action: PlayerActionChoice::Blitz,
                         block_defender_id: None,
                     });
                 }
@@ -766,13 +769,15 @@ mod tests {
     }
 
     #[test]
-    fn prone_player_offered_only_stand_up_without_adjacent_opponent() {
+    fn prone_player_offered_move_without_adjacent_opponent() {
         let mut game = make_game(Rules::Bb2025);
         add_player(&mut game, true, "p1", c(5, 5), PS_PRONE, vec![]);
         let actions = legal_activate_player_actions(&game, TeamSide::Home);
-        assert!(has_action(&actions, "p1", PlayerActionChoice::StandUp));
+        // Java offers a prone player MOVE (= stand up and move), no distinct StandUp; no adjacent
+        // opponent means no Blitz.
+        assert!(has_action(&actions, "p1", PlayerActionChoice::Move));
         assert!(!has_action(&actions, "p1", PlayerActionChoice::Blitz));
-        assert!(!has_action(&actions, "p1", PlayerActionChoice::Move));
+        assert!(!has_action(&actions, "p1", PlayerActionChoice::StandUpBlitz));
     }
 
     #[test]
@@ -781,8 +786,10 @@ mod tests {
         add_player(&mut game, true, "p1", c(5, 5), PS_PRONE, vec![]);
         add_player(&mut game, false, "op1", c(6, 5), PS_STANDING, vec![]);
         let actions = legal_activate_player_actions(&game, TeamSide::Home);
-        // A prone player blitzing declares STAND_UP_BLITZ (stand up + blitz), not plain Blitz.
-        assert!(has_action(&actions, "p1", PlayerActionChoice::StandUpBlitz));
+        // A prone player blitzing declares plain BLITZ (dispatched BLITZ_MOVE); Java ParityRunner
+        // offers [MOVE, BLITZ], not STAND_UP_BLITZ.
+        assert!(has_action(&actions, "p1", PlayerActionChoice::Blitz));
+        assert!(!has_action(&actions, "p1", PlayerActionChoice::StandUpBlitz));
     }
 
     #[test]
