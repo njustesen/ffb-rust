@@ -335,6 +335,17 @@ impl StepBlockRoll {
             } else {
                 (attacker_str, defender_str)
             };
+            // bb2025 RollMechanic.getTotalAttackerStrength: for a non-multiblock the acting team's
+            // additional assists (granted by the Cheering Fans kickoff result) are added to the
+            // attacker's block strength. handle_cheering_fans increments home/away_additional_assists,
+            // but the block-dice calc dropped it — so a +1 additional assist turned a 2-dice block into
+            // a 1-die block, rolling one fewer die and desyncing the whole game-die stream.
+            let additional_assists = if game.home_playing {
+                game.home_additional_assists
+            } else {
+                game.away_additional_assists
+            };
+            let attacker_str = attacker_str + additional_assists;
             self.nr_of_dice = block_dice_count(attacker_str, defender_str);
         }
 
@@ -439,6 +450,38 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(42));
         assert_eq!(step.block_roll.len(), 1);
         assert_eq!(step.nr_of_dice, 1);
+    }
+
+    #[test]
+    fn additional_assist_adds_a_block_die() {
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerAction, PlayerState, PS_STANDING};
+        fn add(game: &mut Game, home: bool, id: &str, c: FieldCoordinate) {
+            let team = if home { &mut game.team_home } else { &mut game.team_away };
+            team.players.push(Player {
+                id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+                player_type: PlayerType::Regular, gender: PlayerGender::Male,
+                movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+                starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+                used_skills: HashSet::new(), niggling_injuries: 0, stat_injuries: vec![],
+                current_spps: 0, career_spps: 0, race: None, is_big_guy: false, ..Default::default()
+            });
+            game.field_model.set_player_coordinate(id, c);
+            game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+        }
+        // Equal ST=3, no positional assists → 1 die; a bb2025 Cheering Fans additional assist for the
+        // acting team adds +1 to the attacker strength → 2 dice.
+        for (extra, expected) in [(0, 1), (1, 2)] {
+            let mut game = make_game();
+            add(&mut game, true, "att", FieldCoordinate::new(5, 5));
+            add(&mut game, false, "def", FieldCoordinate::new(6, 5));
+            game.home_playing = true;
+            game.home_additional_assists = extra;
+            game.acting_player.set_player("att".into(), PlayerAction::Block);
+            game.defender_id = Some("def".into());
+            let mut step = StepBlockRoll::new();
+            step.start(&mut game, &mut GameRng::new(1));
+            assert_eq!(step.nr_of_dice, expected, "extra additional assists = {}", extra);
+        }
     }
 
     #[test]

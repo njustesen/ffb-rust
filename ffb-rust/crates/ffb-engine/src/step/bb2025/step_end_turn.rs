@@ -172,6 +172,19 @@ impl StepEndTurn {
         if !self.next_sequence_pushed {
             self.next_sequence_pushed = true;
 
+            // Java StepEndTurn: removeAdditionalAssist(actingTeam) when ending a REGULAR/BLITZ turn.
+            // The Cheering Fans additional block assist lasts only for the turn it was granted; without
+            // this clear it leaked into later turns and inflated a block's dice count, rolling an extra
+            // die and desyncing the game-die stream. Runs before any home_playing flip so it targets the
+            // acting team.
+            if matches!(game.turn_mode, TurnMode::Regular | TurnMode::Blitz) {
+                if game.home_playing {
+                    game.home_additional_assists = 0;
+                } else {
+                    game.away_additional_assists = 0;
+                }
+            }
+
             if touchdown {
                 // Identify ball carrier and update score
                 if let Some(ball_coord) = game.field_model.ball_coordinate {
