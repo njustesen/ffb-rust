@@ -1694,3 +1694,25 @@ established step-YIELD triage. 60 untested families remain after this.
 Recipe note: hook-delegating block/blitz steps that only short-circuit on an action/skill guard (Juggernaut,
 Dauntless) port their guard fall-throughs cleanly with a placed defender + setDefenderId; those that consume
 defender state first (Wrestle, BlockDodge) yield only the setParameter subset. 58 untested StepId families remain.
+
+## Iteration 97 — RESOLVED: StepWrestle NEXT-vs-REPEAT is a loop-structure divergence (NOT a bug)
+
+Investigated iteration 96's flag. Java bb2016 `WrestleBehaviour.askAttackerForWrestleUse` returns
+`StepAction.REPEAT` (setting `usingWrestleAttacker=false`) when the attacker lacks Wrestle — Java
+processes ONE gate per executeStep pass (attacker→REPEAT→defender→REPEAT→performWrestle→NEXT_STEP),
+whereas the Rust `StepWrestle::execute_step` collapses all three gates into a single pass returning
+`NextStep`. So Java's FIRST `startStep` returns REPEAT, not the terminal NEXT — a manifestation of the
+documented Java-REPEAT ↔ Rust-single-pass loop pattern (CLAUDE.md), **not a translation bug**. The
+`neither_has_wrestle_returns_next` twin stays EXEMPT (a single headless startStep can't observe the
+terminal action; driving the repeat loop wouldn't mirror the Rust one-shot assertion). Juggernaut/
+Dauntless differ because their guard returns NEXT on the FIRST pass (single gate), so those ported.
+Running tally unchanged: 13 real Rust bugs + 1 fidelity removal (Wrestle was a false alarm).
+
+## Iteration 97 (cont.) — Step-4: StepDivingTackle param subset (+3 ffb-server)
+
+- **StepDivingTackleFixtureTest (3)** — move-dodge negatrait: COORDINATE_FROM/TO, DODGE_ROLL,
+  USING_BREAK_TACKLE/USING_MODIFYING_SKILL/USING_DIVING_TACKLE accepted via setParameter; unrecognised
+  key → false; no-COORDINATE_FROM → NEXT_STEP (first-pass guard short-circuits, like Juggernaut). The
+  eligible-tackler prompt / dodge-roll / goto-label / command tests are dice/command-driven — deferred.
+
+57 untested StepId families remain.
