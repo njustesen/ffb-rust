@@ -850,6 +850,15 @@ impl StepCatchScatterThrowIn {
                 .unwrap_or(false);
             if !consumed {
                 do_roll = false;
+            } else {
+                // Java re-rolls the catch with a FRESH die whenever the re-roll is consumed
+                // (doRoll → rollSkill()). A skill auto-re-roll (Catch, via the CatchBehaviour hook
+                // recursion) reaches here with self.roll still holding the FAILED first roll; the
+                // team-re-roll path resets self.roll=0 before re-entry, so mirror that here — clear
+                // it so the guarded `self.roll == 0` roll below actually draws a new catch die.
+                // Without this the "re-roll" reused the failed roll, so a Catcher's failed catch was
+                // never really re-rolled and the ball scattered/turned over (human seed 7 i=81).
+                self.roll = 0;
             }
         }
 
@@ -1175,6 +1184,42 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(99));
         assert!(out.events.iter().any(|e| matches!(e, GameEvent::CatchRoll { .. })),
             "expected CatchRoll event, got {:?}", out.events);
+    }
+
+    #[test]
+    fn consumed_catch_reroll_rolls_a_fresh_die_not_the_stale_failed_roll() {
+        // Regression (human seed 7 i=81): a Catcher's failed catch auto-re-rolled by the Catch skill
+        // (CatchBehaviour hook → reroll_catch → catch_ball recursion) must draw a FRESH catch die.
+        // The already_rerolled path reached catch_ball with self.roll still holding the FAILED first
+        // roll and a `self.roll == 0` guard that skipped the re-roll, so the "re-roll" reused the
+        // failed value → the catch failed again and the ball scattered / turned over.
+        use ffb_model::enums::{SkillId, PS_STANDING, ReRollSource};
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::model::re_rolled_action::ReRolledAction;
+        let mut game = make_game();
+        let coord = FieldCoordinate::new(12, 7);
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = true;
+        let mut catcher = make_player("c1", 3);
+        catcher.starting_skills.push(SkillWithValue { skill_id: SkillId::Catch, value: None });
+        game.team_home.players.push(catcher);
+        game.field_model.set_player_coordinate("c1", coord);
+        game.field_model.set_player_state("c1", PlayerState::new(PS_STANDING));
+
+        let mut step = StepCatchScatterThrowIn::new();
+        step.catch_scatter_throw_in_mode = Some(CatchScatterThrowInMode::CatchScatter);
+        step.catcher_id = Some("c1".into());
+        // Simulate re-entry after the Catch skill granted an auto re-roll, carrying the FAILED roll.
+        step.re_roll_state.re_rolled_action = Some(ReRolledAction::new("CATCH"));
+        step.re_roll_state.re_roll_source = Some(ReRollSource::new("Catch"));
+        step.roll = 1; // the stale, failed first catch roll
+
+        step.start(&mut game, &mut GameRng::new(7));
+
+        assert!(game.player("c1").unwrap().used_skills.contains(&SkillId::Catch),
+            "the Catch re-roll must be consumed (skill marked used)");
+        assert_ne!(step.roll, 1, "the re-roll must draw a FRESH catch die, not reuse the failed roll");
     }
 
     // ── failed_catch tests ────────────────────────────────────────────────────────
