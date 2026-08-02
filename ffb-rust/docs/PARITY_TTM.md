@@ -204,3 +204,33 @@ ogre is green (TTM will then correctly deselect there — no throwable player).
   selection or an activation-eligibility difference specific to turn 2.
 - **Also latent:** bb2020 + bb2016 BoneHeadBehaviour still mark Player.used_skills (same bug Iter8 fixed for
   bb2025) — migrate to ActingPlayer.used_skills when those editions' tiers are worked.
+
+## Iter 9 (2026-08-02) — FIX: TTM-landing injury applies Stunty (huge advance step 21 → step 105)
+- **Root cause:** `make_injury_type("InjuryTypeTTMLanding")` dispatched to a stale duplicate
+  `InjuryTypeTtmLandingImpl` (in injury.rs) that rolled the injury with the player-less
+  `do_injury_roll` — so Stunty was never applied. bb2016/bb2020 StepRightStuff construct the proper
+  `injuryType::injury_type_ttm_landing::InjuryTypeTTMLanding` directly; only bb2025 dispatches by name.
+  So an Ogre-thrown Stunty Snotling landing on an injury total of 7 was Stunned in Rust vs KO in Java
+  (7 + Stunty = 8) — ogre seed 1 i=21 (away_06 threw the Snotling away_10).
+- **Fix:** route the name dispatch to the full `InjuryTypeTTMLanding` (find_injury_modifiers +
+  do_injury_roll_for_player, turnover=true, send-to-box=LandingFail); delete the dead duplicate.
+  Test `ttm_landing_by_name_applies_stunty_ko_on_seven`. ffb-engine 7012/0, lineman 100/100.
+
+## FRONTIER (2026-08-02) — ogre seed 1 step 105 (i=106, turn 6→7) — Mighty Blow armour-vs-injury, UNSOLVED
+- i=13..104 match; first divergent step i=105 = home_01 (Ogre) BLITZ. pre-hash 8af0fad5 matches, post
+  differs. **State-only divergence** (dice match): away_08-MOVE state at i=106 differs ONLY in h00
+  (home_01): **Java `11,7,Stunned` vs Rust `-1,-1,Ko`**.
+- home_01 blitzes away_02, gets a BothDown (block die 2) and FALLS (both-down attacker). Its landing
+  injury: armour [6,2]=8, injury [5,3]=8. home_01 is an Ogre (has Thick Skull → 8 converts KO→Stunned).
+  But Rust's injury total = **9** because it adds away_02's **Mighty Blow (+1)**; total 9 is past the
+  Thick-Skull 8-only conversion → KO. Java keeps total 8 → Stunned.
+- **Root cause (to fix):** Mighty Blow is armour-OR-injury, not both (Java `MightyBlow` injury modifier
+  `appliesToContext` excludes itself when an armour modifier registered to
+  `affectsEitherArmourOrInjuryOnBlock` was already applied — see MightyBlow.java + InjuryTypeBlock
+  Mode.REGULAR armourRoll/injuryRoll). Java applies the opponent's MB to home_01's ARMOUR roll (8+1=9,
+  breaks AV) and therefore NOT to the injury (stays 8 → Stunned). Rust applies MB to the INJURY instead
+  (→9 → KO). The attacker-fall injury goes through `handle_injury_by_name("InjuryTypeBlock")` →
+  InjuryTypeBlock(Regular). NEXT: replicate the armour-first / mutual-exclusion choice for the
+  `affectsEitherArmourOrInjuryOnBlock` (Mighty Blow) modifier in the Rust InjuryTypeBlock armour+injury
+  path — check `do_armor_roll` / `find_injury_modifiers` and whether the armour application marks MB as
+  consumed so the injury excludes it. First exercised only now (Ogres are the first Mighty-Blow players).
