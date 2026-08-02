@@ -332,14 +332,34 @@ impl StepEndTurn {
                     if base == PS_EXHAUSTED {
                         game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));
                     }
-                    if let Some(coord) = game.field_model.player_coordinate(player_id) {
-                        if game.field_model.weather == Weather::SwelteringHeat && !coord.is_box_coordinate() {
-                            let roll = rng.d6();
-                            if DiceInterpreter::is_exhausted(roll) {
-                                let cur = game.field_model.player_state(player_id).unwrap_or_default();
-                                game.field_model.set_player_state(player_id, cur.change_base(PS_EXHAUSTED));
-                                heat_exhaustions.push(HeatExhaustion::new(player_id.clone(), roll));
+                }
+                // Java StepEndTurn.getFaintingCount: AFTER KO recovery, if the weather is Sweltering
+                // Heat roll ONE d3 (the fainting count) and, for each team in [home, away] order,
+                // select that many random on-pitch players — one `rollDice(onPitch.size())` per faint,
+                // the candidate list shrinking as each is removed — knocking them EXHAUSTED into the
+                // box. The previous code rolled a d6 PER on-pitch player, consuming the wrong dice and
+                // desyncing the whole stream from the first faint on (seed 57: the shifted 2d6 kickoff
+                // result then produced a different kickoff event and an extra turn).
+                if game.field_model.weather == Weather::SwelteringHeat {
+                    let fainting_count = rng.d3();
+                    for is_home in [true, false] {
+                        let team = if is_home { &game.team_home } else { &game.team_away };
+                        let mut on_pitch: Vec<String> = team.players.iter()
+                            .filter(|p| game.field_model.player_coordinate(&p.id)
+                                .map(|c| !c.is_box_coordinate())
+                                .unwrap_or(false))
+                            .map(|p| p.id.clone())
+                            .collect();
+                        let mut i = 0;
+                        while i < fainting_count && !on_pitch.is_empty() {
+                            let idx = rng.range(on_pitch.len());
+                            let pid = on_pitch.remove(idx);
+                            if let Some(cur) = game.field_model.player_state(&pid) {
+                                game.field_model.set_player_state(&pid, cur.change_base(PS_EXHAUSTED));
                             }
+                            UtilBox::put_player_into_box(game, &pid);
+                            heat_exhaustions.push(HeatExhaustion::new(pid, 0));
+                            i += 1;
                         }
                     }
                 }
@@ -499,6 +519,35 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(game.turn_mode, TurnMode::Setup);
+    }
+
+    #[test]
+    fn sweltering_heat_faints_random_players_at_half_end() {
+        use ffb_model::enums::{Weather, PS_EXHAUSTED};
+        // Java StepEndTurn.getFaintingCount: under Sweltering Heat a d3 count of random on-pitch
+        // players per team is knocked EXHAUSTED at the half break. d3 is always >= 1, so with plenty
+        // of standing players at least one per team must faint.
+        let mut game = make_game();
+        game.field_model.weather = Weather::SwelteringHeat;
+        for i in 0..6 {
+            let hid = format!("hh{i}");
+            let aid = format!("aa{i}");
+            game.team_home.players.push(make_player(&hid));
+            game.team_away.players.push(make_player(&aid));
+            game.field_model.set_player_coordinate(&hid, FieldCoordinate::new(4 + i, 5));
+            game.field_model.set_player_state(&hid, PlayerState::new(PS_STANDING));
+            game.field_model.set_player_coordinate(&aid, FieldCoordinate::new(20 - i, 5));
+            game.field_model.set_player_state(&aid, PlayerState::new(PS_STANDING));
+        }
+        game.turn_data_home.turn_nr = 8;
+        game.turn_data_away.turn_nr = 8;
+        let mut step = StepEndTurn::new();
+        let mut rng = GameRng::new(3);
+        step.start(&mut game, &mut rng);
+        let exhausted = game.team_home.players.iter().chain(game.team_away.players.iter())
+            .filter(|p| game.field_model.player_state(&p.id).map(|s| s.base() == PS_EXHAUSTED).unwrap_or(false))
+            .count();
+        assert!(exhausted >= 2, "sweltering heat should faint at least one player per team, got {exhausted}");
     }
 
     #[test]
