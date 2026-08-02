@@ -261,7 +261,15 @@ impl Step for StepThrowTeamMate {
                 }
             }
             Action::UseReRoll { use_reroll: false } => {
-                self.re_rolled_action = None;
+                // Decline: clear only the reroll SOURCE, keep re_rolled_action set. Java's
+                // ThrowTeamMateBehaviour calls step.setReRolledAction(rerolledAction) BEFORE showing
+                // the reroll dialog, so a declined reroll (reRollSource == null) re-enters with
+                // reRolledAction still == the key and takes the "already rolled" branch —
+                // handlePassResult(state.passResult) — accepting the ORIGINAL pass result rather than
+                // rolling a fresh pass. Clearing re_rolled_action here made a declined TTM-fumble
+                // reroll fall through to do_roll=true and re-roll the pass, turning a 1-scatter FUMBLE
+                // into a fresh 3-scatter throw and desyncing the game (ogre seed 1 i=12: home_06's
+                // fumbled throw of home_08).
                 self.re_roll_source = None;
             }
             _ => {}
@@ -347,6 +355,35 @@ mod tests {
     fn unknown_parameter_rejected() {
         let mut step = StepThrowTeamMate::new();
         assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
+    }
+
+    #[test]
+    fn declined_reroll_keeps_rerolled_action_and_does_not_reroll() {
+        // After a fumbled TTM throw the step offers a reroll (re_rolled_action + re_roll_source set).
+        // Declining (UseReRoll{false}) must NOT roll a fresh pass: it clears only the source, keeps
+        // re_rolled_action, and re-emits the ORIGINAL pass result (FUMBLE). Java keeps reRolledAction
+        // set across the decline; clearing it made Rust re-roll the pass (ogre seed 1 i=12).
+        let mut game = make_game();
+        add_thrower(&mut game, "ogre1", FieldCoordinate::new(10, 7), 3);
+        game.acting_player.player_id = Some("ogre1".into());
+        game.home_playing = true;
+
+        let mut step = StepThrowTeamMate::new();
+        // Simulate the post-offer state: the pass was rolled (FUMBLE) and a reroll was offered.
+        step.pass_result = Some(PassOutcome::Fumble);
+        step.re_rolled_action = Some("THROW_TEAM_MATE".into());
+        step.re_roll_source = Some("TRR".into());
+
+        let mut rng = GameRng::new(0);
+        let before = rng.call_count;
+        let out = step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut rng);
+
+        assert_eq!(rng.call_count, before, "declining a TTM reroll must not roll a fresh pass");
+        assert_eq!(step.re_rolled_action.as_deref(), Some("THROW_TEAM_MATE"),
+            "re_rolled_action must be kept so the 'already rolled' branch is taken");
+        assert!(step.re_roll_source.is_none(), "the reroll source must be cleared on decline");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassResultParam(PassOutcome::Fumble))),
+            "the original FUMBLE result must be re-emitted, not a fresh roll");
     }
 
     #[test]
