@@ -147,6 +147,26 @@ impl StepInitBlocking {
                         .publish(StepParameter::EndTurn(true))
                         .publish(StepParameter::CheckForgo(true));
                 }
+                // A plain BLOCK with no block_defender_id. Two cases, distinguished by whether any
+                // blockable target actually exists:
+                //   * No adjacent blockable opponent (the turn-start eligibility snapshot offered
+                //     BLOCK, but the only adjacent opponent has since moved/been knocked away): Java's
+                //     ParityRunner.sendBlockAction DESELECTS — ClientCommandActingPlayer(null), which
+                //     StepInitBlocking turns into END_PLAYER_ACTION (NOT EndTurn; that is the separate
+                //     blitz BLITZ_TARGET_NONE path above). Deselect here to match, instead of stalling
+                //     on cont() forever (the headless runner breaks on the promptless wait — seed 30
+                //     i=154).
+                //   * A blockable target does exist but no defender has been chosen yet: this is the
+                //     interactive GUI path — keep waiting for the CLIENT_BLOCK command.
+                let side = if game.home_playing { crate::legal_actions::TeamSide::Home }
+                    else { crate::legal_actions::TeamSide::Away };
+                let has_target = game.acting_player.player_id.as_deref()
+                    .map(|pid| !crate::legal_actions::legal_block_targets(game, pid, side).is_empty())
+                    .unwrap_or(false);
+                if !has_target {
+                    return StepOutcome::goto(&label)
+                        .publish(StepParameter::EndPlayerAction(true));
+                }
                 return StepOutcome::cont();
             }
         };
@@ -244,11 +264,26 @@ mod tests {
     }
 
     #[test]
-    fn no_defender_id_stays_cont() {
+    fn no_defender_id_with_adjacent_target_stays_cont() {
+        use ffb_model::enums::{PlayerState, PlayerAction};
+        use ffb_model::types::FieldCoordinate;
+        // No block_defender_id yet, but an ADJACENT blockable opponent EXISTS → the interactive GUI
+        // path: keep waiting for the CLIENT_BLOCK command (do NOT deselect).
         let mut step = StepInitBlocking::new("end".into());
         let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("atk".into());
+        game.acting_player.player_action = Some(PlayerAction::Block);
+        let mut atk = ffb_model::model::player::Player::default();
+        atk.id = "atk".into();
+        game.team_home.players.push(atk);
+        game.field_model.set_player_coordinate("atk", FieldCoordinate::new(5, 5));
+        let mut def = ffb_model::model::player::Player::default();
+        def.id = "def".into();
+        game.team_away.players.push(def);
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(5, 6)); // adjacent
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
         let out = step.start(&mut game, &mut GameRng::new(0));
-        // No block_defender_id → CONTINUE waiting for block command
         assert_eq!(out.action, StepAction::Continue);
     }
 
@@ -374,6 +409,37 @@ mod tests {
         game.field_model.set_player_state("def4", ffb_model::enums::PlayerState::new(PS_STANDING));
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(!out.published.iter().any(|p| matches!(p, StepParameter::BlockDefenderId(_))));
+    }
+
+    #[test]
+    fn no_defender_plain_block_deselects_ends_player_action() {
+        use ffb_model::enums::PlayerAction;
+        // A plain Block with no valid target (turn-start eligibility offered Block, the adjacent
+        // opponent then moved away): Java's ParityRunner deselects (ClientCommandActingPlayer null →
+        // END_PLAYER_ACTION). The engine must deselect too, not stall on cont() (seed 30 i=154).
+        let mut step = StepInitBlocking::new("end".into());
+        step.block_defender_id = None;
+        let mut game = make_game();
+        game.acting_player.player_action = Some(PlayerAction::Block);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))),
+            "no-defender plain block deselects (EndPlayerAction), not EndTurn");
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
+    }
+
+    #[test]
+    fn no_defender_blitz_ends_the_turn() {
+        use ffb_model::enums::PlayerAction;
+        // A no-target BLITZ is the separate path (BLITZ_TARGET_NONE → EndTurn), not a deselect.
+        let mut step = StepInitBlocking::new("end".into());
+        step.block_defender_id = None;
+        let mut game = make_game();
+        game.acting_player.player_action = Some(PlayerAction::Blitz);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "no-defender blitz ends the turn");
     }
 
     #[test]

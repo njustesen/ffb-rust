@@ -839,16 +839,23 @@ identical observable result (turnover, ball unmoved, 0 dice) without needing a p
 can't surface. Updated 5 existing unit tests to use in-range setups + added out_of_range_pass_ends_the_turn.
 Seeds 1-29 now fully match.
 
-Next: seed 30 i=154 (turn 2 half 2) — Activate(away_02, BLOCK) STALLS in Rust (InitBlocking runs, prompt_after=
-None, finished=false; Rust log truncates at 156 vs Java 278; runner then breaks on current_prompt()==None).
-Both agree on the i=154 pre-state (9fcf6429). UNRELATED to the pass fix (a block never enters StepInitPassing;
-seeds 1-29 incl. all passes pass). DIAGNOSIS: away_02 = a01 at (13,6) has NO adjacent opponent (nearest home
-players h00:11,6 / h03:11,5 / h04:11,7 are all 2 squares away), yet the agent chose Block — the Iter-27
-eligibility-snapshot pattern AGAIN but for a BLOCK (not a blitz): away_02 was block-eligible at TURN START,
-its adjacent target then moved/was knocked away, and the cached eligibility still offered Block. Java resolves
-a no-defender block by ending the turn (cf. Iter-27 StepInitBlocking no-defender blitz → EndTurn); Rust's
-StepInitBlocking stalls with no prompt. FIX likely mirrors Iter-27: a no-defender BLOCK (block_defender_id
-None / no adjacent target) should end the turn (publish EndTurn + CheckForgo) instead of surfacing nothing.
-Check crates/ffb-engine/src/step/bb2025/block/step_init_blocking.rs (the Iter-27 fix added a no-defender
-BLITZ branch there — extend/verify it also covers plain BLOCK). Isolate `--seeds 30-30`, FFB_DRIVE_TRACE the
-InitBlocking sequence + confirm the Activate(away_02,Block) block_defender_id is None. VERIFY seeds 1-29 hold.
+## Iter 37 — seed 30 i=154 FIXED (no-defender plain block deselects); seeds 1-40 green
+
+Root cause (seed 30 i=154, Activate(away_02, BLOCK)): the turn-start eligibility snapshot offered away_02
+(a01 at (13,6)) a BLOCK, but by activation its only adjacent opponent had moved/been knocked away — no
+blockable target remained (nearest home players were 2 squares off). Both agents still pick BLOCK from the
+cached snapshot (Iter-27 pattern), then need a defender. Java's ParityRunner.sendBlockAction: pickBlockTarget
+returns null → it DESELECTS (ClientCommandActingPlayer(null) → END_PLAYER_ACTION), and since away_02 was the
+last unused away player the turn then ends (i=155 = home). Rust's agent supplies block_defender_id=None and
+StepInitBlocking's no-defender path returned cont() (wait for a CLIENT_BLOCK that never comes) for a plain
+block — the headless runner then broke on the promptless wait (Rust log truncated 156 vs Java 278).
+
+The Iter-27 fix had handled the no-defender BLITZ (→ EndTurn, BLITZ_TARGET_NONE) but deliberately left plain
+BLOCK on cont() to preserve the interactive GUI wait-for-command path. Fix (step_init_blocking.rs): on a
+no-defender plain block, distinguish the two cases via legal_block_targets — if NO adjacent blockable target
+exists, DESELECT (publish EndPlayerAction) to mirror Java's sendBlockAction; if a target DOES exist (defender
+just not chosen yet), keep waiting (cont()) for the GUI path. Tests: no_defender_plain_block_deselects_ends_
+player_action, no_defender_blitz_ends_the_turn, and no_defender_id_with_adjacent_target_stays_cont (GUI wait
+preserved). Seeds 1-40 now fully match (was 1-29).
+
+Next: run seeds 1-50+ to find the next divergence (frontier now ≥41).
