@@ -401,3 +401,35 @@ MOVE) vs Rust home Activate(home_03,Block); pre-step state_hash already differs 
   CatchScatterThrowInMode), (3) fix whichever is wrong — most likely thread the real catcher_id (the player at
   the caught square) into the hook state so the Catch skill is detected. Verify lineman 100/100 + human seeds
   1-7; add a Rust test; REVERT if regressed. Detail: run `--seeds 7-7` with FFB_TRACE+FFB_DICE_TRACE+FFB_DRIVE_TRACE.
+
+## seed 7 step 81 — FIXED (2026-08-03 ~00:40, commit 0929b84b) + NEW frontier step 217
+FIX: StepCatchScatterThrowIn.catch_ball now resets self.roll=0 when a catch re-roll is consumed
+(already_rerolled + use_reroll true), so the Catch skill auto-re-roll draws a FRESH die instead of reusing
+the failed roll. human seed 7 advanced step 81 -> 217; seeds 1-6 stay green; lineman 100/100; ffb-engine
+7016/0 (+consumed_catch_reroll_rolls_a_fresh_die).
+
+## FRONTIER (human) — seed 7 step 217: STANDING no-target BLITZ rolls an extra Bone-head (2026-08-03 ~01:00, DIAGNOSED)
+- Real divergence is a 1-die RNG desync originating at i=196 (NOT i=217 where it first changes state). At
+  i=196 the STANDING Ogre away_01 declares BLITZ with NO adjacent target. JAVA: ParityRunner picks the block
+  target at SELECT_BLITZ_TARGET; blockTarget==null → "BLITZ_TARGET_NONE ... ending turn" → injects
+  ClientCommandEndTurn → away turn ENDS, and NO Bone-head is rolled (the block sequence never runs). RUST:
+  the agent picks Blitz with block_defender_id=None → StepInitSelecting force_goto dispatch → block/blitz
+  sequence whose ACTIVATION rolls **Bone-head (pos=87 d6=4, EXTRA die)** → StepInitBlocking no-defender → ends
+  the turn. Both END THE TURN (home_04 next in both), so the ONLY divergence is Rust's extra Bone-head die.
+  That +1 die shift stays invisible until i=217, where the Ogre's next Bone-head lands on pos=89 d6=1 (FAIL)
+  in Rust vs pos=88 d6=3 (PASS) in Java → the Ogre moves in Java but stays in Rust → post_hash diverges.
+- KEY nuance (do NOT break the prone case): Java rolls Bone-head for a no-target blitz ONLY when the blitzer
+  is PRONE (the Select-sequence ACTIVATION runs Bone-head during the free stand-up), NOT when STANDING
+  (SelectBlitzTarget → EndTurn happens before any ACTIVATION). Rust currently rolls Bone-head for BOTH
+  (block-sequence ACTIVATION), so it matches the PRONE case but over-rolls the STANDING case. The existing
+  prone-blitz-no-target handling (step_init_selecting.rs L113-120 sets standing_up=false) erases the
+  standing/prone flag, so the fix must check the player's ACTUAL PlayerState (is_prone) at dispatch.
+- FIX DIRECTION: in StepInitSelecting's dispatch (bb2025/shared/step_init_selecting.rs ~L234-303), when
+  dispatch==Blitz AND game.defender_id.is_none() AND the acting player is STANDING (base != PRONE), end the
+  activation the way Java's standing no-target blitz does — END THE TURN before the block-sequence ACTIVATION
+  (so NO Bone-head), mirroring ParityRunner's ClientCommandEndTurn. Keep the current path (block sequence →
+  Bone-head → StepInitBlocking no-defender) for a PRONE no-target blitz (Java rolls Bone-head there). Verify
+  lineman 100/100 + human seeds 1-7 (1-6 stay green, seed 7 past step 217); add a Rust test (standing player
+  Blitz with no adjacent target → NO Bone-head die, turn ends). REVERT if regressed. Confirm via
+  `--seeds 7-7` FFB_TRACE+FFB_DICE_TRACE: Java Bone-head at pos=88 vs Rust pos=89; the desync onset is i=196
+  (rng diff 0→1); grep "BLITZ_TARGET_NONE".
