@@ -334,3 +334,33 @@ ogre is green (TTM will then correctly deselect there — no throwable player).
   174** (next frontier: i=175 turn1 half2 away Activate(away_02,MOVE), post-hash mismatch). Lineman tier
   **100/100** (no regression), ffb-engine **7014/0** (added prone_move_predraw_is_reused_without_second_
   action_rng_draw). Committed. NEXT: drive human seed 4 step 174.
+
+## FRONTIER (human) — seed 4 step 174: PASS skill-reroll not used (2026-08-02 ~23:58, DIAGNOSED, fix pending)
+- Seeds 1-3 GREEN. Seed 4 fails at i=174: home_03 (h02, ball carrier @12,8, HAS the **Pass** skill) throws
+  LONG to home_08 @(6,9). Both engines roll the SAME pass die (d6=4, DICE_TRACE pos=62) and it FUMBLES
+  (2 tackle zones from away a00@13,7 + a02@13,8, + Long-pass mod → modified roll ≤1 → FUMBLE; same in both).
+- DIVERGENCE = the **Pass skill re-roll**. JAVA: pos62 d6=4 (StepPass.start) → **pos63 d6=4 (StepPass.handleCommand
+  = a re-roll USED)** → still fumble → ball bounces 3× (pos64/66/68 d8, StepCatchScatterThrowIn.bounceBall)
+  with catch attempts (pos65/67 d6, catchBall) → ball ends (12,9). RUST: pos62 d6=4 → emits
+  `ReRollOffer{source:"Pass", action:"PASS"}` → agent **NoReRoll (declines)** → fumble → 1 bounce (pos63 d8=8)
+  → ball ends (11,7). So Java USES the Pass skill re-roll, Rust DECLINES → 5-die RNG desync + wrong ball.
+- WHY Java uses it: the Pass re-roll is offered as a **SKILL_USE** (Java AbstractPassBehaviour registers a
+  handleCommandHook on CLIENT_USE_SKILL: setReRolledAction(PASS), setReRollSource(isSkillUsed? PASS : null)),
+  and ParityRunner's SKILL_USE case ALWAYS uses the skill ("matches Rust engine which auto-uses Sure
+  Hands/Catch"). Rust instead routes the Pass re-roll through ask_for_reroll_if_available → ReRollOffer,
+  which the agent's ReRollOffer handler always declines (correct for TEAM re-rolls, wrong for this free
+  single-use SKILL re-roll).
+- Rust infra ALREADY supports skill re-rolls: find_skill_reroll_source(game,"PASS") returns the Pass source;
+  use_reroll(game, skill_source, pid) marks the skill used + returns true (non-TRR branch). But StepPass
+  (bb2025/pass/step_pass.rs) HARDCODES `self.re_roll_source = Some("TRR")` in BOTH the FUMBLE (~L330) and
+  INACCURATE|WILDLY (~L355) branches, and the agent declines the offer anyway.
+- FIX PLAN (engine, most localized, matches Java always-use + Rust's Sure-Hands/Catch auto-use pattern): in
+  StepPass, when find_skill_reroll_source(game,"PASS") is Some (a FREE single-use skill re-roll available and
+  unused), AUTO-USE it — set re_rolled_action=PASS, re_roll_source=<skill source name>, call use_reroll (marks
+  skill used), reset roll=0/pass_result=None to re-roll the pass die, WITHOUT emitting a ReRollOffer prompt.
+  Only fall back to the team-reroll ReRollOffer (agent declines) when NO skill re-roll is available. Guard with
+  already_rerolled so it re-rolls at most once. VERIFY: lineman 100/100 (linemen lack Pass so unaffected) AND
+  human seeds 1-4 (seeds 1-3 must stay green; seed 4 must advance past step 174). Add a Rust test in step_pass.rs
+  (fumble + thrower with Pass skill → re-roll die consumed + skill marked used, no prompt). REVERT if regressed.
+- Alternative (riskier): agent uses skill-source ReRollOffers but declines TRR — rejected for now because it
+  changes ALL skill re-rolls routed through ask_for_reroll_if_available, not just Pass.
