@@ -118,6 +118,20 @@ impl Step for StepInitSelecting {
                 // the MoveSquare table stays empty, StepInitMoving never sets
                 // acting_player.dodging, and no dodge is ever rolled.
                 if pa.is_moving() || game.acting_player.standing_up {
+                    // Java StepInitSelecting: on a standing-up (was PRONE) activation without
+                    // canStandUpForFree, the stand-up consumes min(MINIMUM_MOVE_TO_STAND_UP=3, MA) of
+                    // movement — set current_move so the player can only move MA-3 more squares. Without
+                    // this a stood-up ball carrier ran its FULL MA (3 extra squares), diverging its final
+                    // position (seed 11 i=237: home_07 ended (14,2) in Rust vs (11,2) in Java).
+                    if game.acting_player.standing_up {
+                        let has_free = game.player(player_id)
+                            .map(|p| p.has_skill_property(NamedProperties::CAN_STAND_UP_FOR_FREE))
+                            .unwrap_or(false);
+                        if !has_free {
+                            let ma = game.player(player_id).map(|p| p.movement_with_modifiers()).unwrap_or(0);
+                            game.acting_player.current_move = 3.min(ma);
+                        }
+                    }
                     crate::util::UtilServerPlayerMove::update_move_squares(game, game.acting_player.jumping);
                 }
                 // Java: checkForStaller() called after CLIENT_ACTIVATE_PLAYER
@@ -403,6 +417,36 @@ mod tests {
         let out = step.handle_command(&action, &mut game, &mut GameRng::new(0));
         assert!(!game.acting_player.standing_up, "no-target blitz must not stand the player up");
         assert_eq!(out.action, StepAction::GotoLabel, "no-target blitz force-gotos to the (no-defender) block");
+    }
+
+    #[test]
+    fn prone_move_activation_sets_current_move_to_stand_up_cost() {
+        use ffb_model::enums::{PS_PRONE, PlayerState, PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+        use ffb_model::types::FieldCoordinate;
+        // Java StepInitSelecting: a prone (standing_up) player activated for a Move without
+        // canStandUpForFree gets current_move = min(MINIMUM_MOVE_TO_STAND_UP=3, MA). The stand-up
+        // costs 3 movement, so an MA-4 player can move only 1 more square. Without this the stood-up
+        // carrier ran its full MA (3 extra squares), diverging its final position (seed 11 i=237).
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 4, strength: 3, agility: 3, passing: 4, armour: 8,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("p1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE));
+        game.acting_player.player_id = Some("p1".into());
+        let mut step = StepInitSelecting::new("end_label".into());
+        let action = Action::ActivatePlayer {
+            player_id: "p1".into(),
+            player_action: PlayerActionChoice::Move,
+            block_defender_id: None,
+        };
+        let _ = step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(game.acting_player.standing_up, "prone Move activation stands the player up");
+        assert_eq!(game.acting_player.current_move, 3, "stand-up costs min(3, MA=4) = 3 movement");
     }
 
     #[test]

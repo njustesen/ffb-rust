@@ -711,3 +711,25 @@ Next: seed 11 first state_hash divergence i=238 (turn 7 half 2, home): home_03 M
 pre-state, POST differs (Java 37a7be82 vs Rust dbb7bbed) — a STATE/positional divergence (rng still aligned
 through i=258; rng only diverges later at i=259 where the turn structure has desynced). Diff the i=238 state
 (RUST_STEP vs JSTEP) to find the single changed token.
+
+## Iter 32 — seed 11 FIXED (stand-up movement cost); seeds 1-11 green
+
+Root cause (seed 11 i=237): home_07 was PRONE, activated Move, stood up + picked up the ball, then RAN.
+Rust moved it 6 squares (full MA) to (14,2); Java stopped at (11,2) after 3 squares. rng aligned — a pure
+positional/state divergence. Java `StepInitSelecting` (bb2025 shared, line 504) sets
+`currentMove = min(MINIMUM_MOVE_TO_STAND_UP=3, MA)` when a standing-up player (was PRONE, no
+canStandUpForFree) is activated for a moving/standing-up action — the stand-up itself consumes 3 movement.
+Rust's InitSelecting never set current_move, leaving it 0, so the stood-up carrier ran its full MA (3 extra
+squares). Combined with the Iter-31 carrier-stops-at-MA agent fix, the carrier then over-ran and its final
+position (and the ball) diverged.
+
+Fix (crates/ffb-engine/src/step/bb2025/shared/step_init_selecting.rs): in the ActivatePlayer handler, when
+`pa.is_moving() || standing_up` and the player `standing_up` without CAN_STAND_UP_FOR_FREE, set
+`acting_player.current_move = 3.min(ma)` BEFORE update_move_squares — mirroring Java line 504. The
+StepStandUp free-branch comment ("current_move already holds the STAND_UP_COST from the activation") was
+aspirational; this is the activation set it referred to. Test: `prone_move_activation_sets_current_move_to_stand_up_cost`
+(prone MA-4 player, Move activation → current_move==3). Seeds 1-11 now fully match; frontier is seed 12 step 31.
+
+Next: seed 12 first state_hash divergence step 31/32 (turn 2 half 1, home): Activate(home_03/teamLinemanParityHome3, MOVE),
+same action, pre-state differs already (Java 46a3e1ea vs Rust d092a2eb) — divergence is EARLIER than i=31; find
+the first differing index in seed_12_{java,rust}.jsonl.
