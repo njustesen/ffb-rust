@@ -374,3 +374,30 @@ GREEN; lineman 100/100; ffb-engine 7015/0 (+fumble_auto_uses_free_pass_skill_rer
 NEXT FRONTIER: human seed 7 step 81 (i=82 turn5 half1) — ACTIVE-TEAM divergence: Java away Activate(away_04,
 MOVE) vs Rust home Activate(home_03,Block); pre-step state_hash already differs (java bf89d517090d40b4 vs rust
 36b5190e4fcd91ca), so the real divergence is earlier — trace seed 7, find the first differing post_hash/dice.
+
+## FRONTIER (human) — seed 7 step 81: CATCH skill re-roll not auto-used (2026-08-03 ~00:28, DIAGNOSED)
+- Seeds 1-6 GREEN. Seed 7 fails at i=81: away_03 (ball carrier @13,10) passes LONG to away_09 @(19,5). Chosen
+  actions match through i=80; i=81's RESOLUTION diverges (post_hash differs → i=82 active team flips: Java stays
+  away t45, Rust turns over to home). NOTE the Pass-reroll fix WORKS here: both engines now roll pos37 d6=1
+  (pass fumble) + **pos38 d6=4 (Pass skill re-roll, auto-used)** → accurate → ball to (19,5) → pos39 d6=1
+  (catch attempt, FAIL). They diverge at **pos40**: JAVA d6=5 = a **CATCH skill re-roll** (auto, via
+  StepCatchScatterThrowIn.catchBall recursion / state.rerollCatch) → catch SUCCESS, away_09 holds the ball, no
+  turnover. RUST d8=3 = a SCATTER (ball bounces, NO catch re-roll) → ball leaves → turnover to home.
+- ROOT: Rust's catch auto-re-roll is gated by the CatchBehaviour hook (skill_behaviour/bb2025/catch_behaviour.rs:
+  CatchStepModifier.handle_execute_step) which sets state.reroll_catch=true iff game.player(state.catcher_id)
+  .has_skill(SkillId::Catch). For this catch the hook returned false (no auto-re-roll), so StepCatchScatterThrowIn
+  .catch_ball fell through to ask_for_reroll_if_available("CATCH") (checks the ACTING player = thrower, not the
+  catcher; hardcodes TRR) → declined → FailedCatch → scatter. Java's rerollCatch fired (catcher has a
+  CATCH-reroll skill), so it auto-re-rolled.
+- Both engines build the SAME 11-player team (runner.rs make_team_from_roster sorts positions by (quantity ASC,
+  cost DESC) to match gen_java_teams.py), and the human roster's Catcher (qty 4) has <skill>Catch</skill>, so
+  away_09 (a Catcher by fill order) SHOULD have Catch in BOTH. So the leading hypothesis is that the
+  CatchBehaviour hook's `state.catcher_id` is WRONG/empty for this ACCURATE-pass catch — StepResolvePass has a
+  KNOWN CatcherId-propagation gap (step_resolve_pass.rs L99-108: the CatcherId param is consumed by
+  StepDispatchPassing before reaching StepResolvePass, so it falls back to player_at(pass_coordinate)); if that
+  fallback catcher_id isn't threaded into StepCatchScatterThrowIn's hook state, has_skill(catcher) reads None →
+  no Catch → no auto-re-roll. NEXT: (1) confirm away_09 has Catch in the Rust team (log its skills), (2) confirm
+  what state.catcher_id the CatchBehaviour hook sees at this catch (instrument or FFB_TRACE the catcher_id +
+  CatchScatterThrowInMode), (3) fix whichever is wrong — most likely thread the real catcher_id (the player at
+  the caught square) into the hook state so the Catch skill is detected. Verify lineman 100/100 + human seeds
+  1-7; add a Rust test; REVERT if regressed. Detail: run `--seeds 7-7` with FFB_TRACE+FFB_DICE_TRACE+FFB_DRIVE_TRACE.
