@@ -778,5 +778,13 @@ stack and return — mirroring Java, where a FINISHED game tears down and runs n
 `finished_game_drops_leftover_stack_without_running_it` (leftover RngSteps under an end_game push never roll
 after EndGame flips Finished). Seeds 1-22 now fully match.
 
-Next: seed 23 first state_hash divergence i=159 (turn 3 half 2): pre-state already differs (Java cbef36bc /
-Rust 0df69b67) AND active differs (Java away / Rust home) — find the first differing index in seed_23.
+Next: seed 23 first state_hash divergence is at i=158 (turn 3 half 2) — Activate(away_10, PASS). BOTH agree
+on the pre-state (b77bf65a); the pass RESULT diverges: Java stays active=away (away_11 activates next at
+i=159 → pass CAUGHT, no turnover), Rust flips to active=home at i=159 (home_11) → Rust had a TURNOVER. away_10
+is a09 in the state string (0-based; a10 = away_11), holding the ball at (15,7). Rust's pass rolled a d8
+deviation (inaccurate) → ball scattered to ~(21,5) with no away teammate there → turnover. This is the FIRST
+pass-turnover to reach the frontier — a PASS-mechanic divergence (accuracy roll interpretation / passing
+distance modifiers / deviation / catch). METHOD for next iter: isolate seed 23 (the FFB_TRACE file mixes all
+seeds ≤N — filter or run a single seed), compare the away_10 pass accuracy d6 + range + deviation + catch
+resolution between Rust StepPass/StepThrow and Java bb2025 pass steps; the Rust engine likely mis-scores the
+pass as inaccurate (or wrong passing distance/target) where Java scores it accurate/complete. Fix Rust engine.
