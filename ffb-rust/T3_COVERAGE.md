@@ -1,62 +1,64 @@
-# T3 lineman coverage — 10 games
+# T3 lineman coverage — 13 games
 
 | Item | Count | Status | Note |
 |---|---:|---|---|
-| action Move | 2633 | ok |  |
+| action Move | 3377 | ok |  |
 | action StandUp | 0 | **MISSING** | prone player stands (mapped from Move choice) |
-| action Block | 33 | ok |  |
-| action Blitz | 73 | ok |  |
+| action Block | 48 | ok |  |
+| action Blitz | 89 | ok |  |
 | action StandUpBlitz | 0 | **MISSING** | prone + adjacent + blitz available |
-| action Foul | 22 | ok |  |
-| action Pass | 2 | ok | needs a ball carrier |
-| action HandOver | 2 | ok | needs carrier + adjacent teammate |
-| dodge success | 40 | ok |  |
-| dodge failure | 44 | ok |  |
+| action Foul | 31 | ok |  |
+| action Pass | 6 | ok | needs a ball carrier |
+| action HandOver | 3 | ok | needs carrier + adjacent teammate |
+| dodge success | 53 | ok |  |
+| dodge failure | 59 | ok |  |
 | GFI rolls | 0 | **MISSING** |  |
-| pickup success | 4 | ok |  |
+| pickup success | 8 | ok |  |
 | pickup failure | 2 | ok | turnover + scatter |
-| catch success | 1 | ok |  |
-| catch failure | 5 | ok |  |
-| ball scatters | 31 | ok | failed pickup / dropped ball / bounces |
+| catch success | 4 | ok |  |
+| catch failure | 7 | ok |  |
+| ball scatters | 44 | ok | failed pickup / dropped ball / bounces |
 | throw-ins | 0 | **MISSING** | ball out of bounds |
-| pass rolls | 2 | ok |  |
+| pass rolls | 6 | ok |  |
 | pass deviates | 0 | absent (optional) | wildly inaccurate passes only |
 | interceptions | 0 | absent (optional) | contract: agents decline voluntary interference |
-| block 1 die | 77 | ok |  |
-| block 2 dice | 19 | ok |  |
-| block 2 dice against | 9 | ok | defender's choice |
+| block 1 die | 99 | ok |  |
+| block 2 dice | 27 | ok |  |
+| block 2 dice against | 10 | ok | defender's choice |
 | block 3 dice | 0 | absent (optional) | needs ST5+ differential via assists |
-| block result Skull | 15 | ok |  |
-| block result BothDown | 22 | ok |  |
-| block result Pushback | 38 | ok |  |
-| block result PowPushback | 15 | ok |  |
-| block result Pow | 15 | ok |  |
-| pushbacks | 68 | ok |  |
+| block result Skull | 17 | ok |  |
+| block result BothDown | 28 | ok |  |
+| block result Pushback | 52 | ok |  |
+| block result PowPushback | 21 | ok |  |
+| block result Pow | 18 | ok |  |
+| pushbacks | 91 | ok |  |
 | crowd surfs | 0 | absent (optional) | push off pitch — board-position dependent |
-| players fell | 96 | ok |  |
-| armor held | 87 | ok |  |
-| stunned | 40 | ok | injury 2-7 |
-| KO | 21 | ok |  |
-| casualty (d16) | 7 | ok |  |
+| players fell | 126 | ok |  |
+| armor held | 122 | ok |  |
+| stunned | 45 | ok | injury 2-7 |
+| KO | 27 | ok |  |
+| casualty (d16) | 8 | ok |  |
 | death | 0 | absent (optional) | d16 = 15-16 only |
-| fouls | 22 | ok |  |
-| argue the call | 4 | ok | referee spotted a foul (doubles) |
-| argue success | 0 | absent (optional) | d6 = 6 only |
-| players ejected | 4 | ok |  |
+| fouls | 31 | ok |  |
+| argue the call | 8 | ok | referee spotted a foul (doubles) |
+| argue success | 1 | ok | d6 = 6 only |
+| players ejected | 7 | ok |  |
 | touchdowns | 0 | **MISSING** |  |
-| half starts | 20 | ok |  |
+| half starts | 26 | ok |  |
 | weather changes | 2 | ok | kickoff event roll of 8 only |
-| kickoff events | 20 | ok | per-result table below |
+| kickoff events | 26 | ok | per-result table below |
 
 ## Kickoff results
 
 - Brilliant Coaching: 6
-- Charge: 2
-- Cheering Fans: 4
+- Charge: 3
+- Cheering Fans: 5
 - Dodgy Snack: 1
+- Get the Ref: 1
 - High Kick: 2
-- Quick Snap: 1
-- Solid Defence: 2
+- Pitch Invasion: 1
+- Quick Snap: 2
+- Solid Defence: 3
 - Weather Change: 2
 
 ## Hash-verified (not evented)

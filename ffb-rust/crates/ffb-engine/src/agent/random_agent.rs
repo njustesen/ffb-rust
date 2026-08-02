@@ -297,12 +297,17 @@ impl Agent for RandomAgent {
                 if std::env::var("FFB_TRACE").is_ok() {
                     eprintln!("RUST_SMA pid={} N={}", player_id, squares.len());
                 }
-                // Java ParityRunner ends a Blitz activation right after its block (blitzBlockSent →
-                // deselect); the blitzer never spends remaining MA. Match that: on the post-block
-                // Move prompt, deselect instead of moving. 0 RNG consumed (same as Java's deselect).
+                // After the blitz block the Java sequence enters INIT_MOVING, where the SAME
+                // carrier-continue rule applies as any move: `imCarrying && movesLeft` → keep moving,
+                // otherwise deselect (ParityRunner INIT_MOVING, lines 435-445). The block is not a
+                // move, but it reaches that continue-decision point, so treat the blitzer as having
+                // "moved" and fall through to the carrier logic below: a NON-carrier deselects (as
+                // before), a ball-carrying blitzer with movement left keeps advancing. Without this
+                // a blitzing carrier stopped dead after the block while Java ran it on toward the
+                // endzone (seed 12 i=31: away_03 carrier ended (13,9) in Rust vs (8,11) in Java).
                 if self.current_activation_is_blitz {
                     self.current_activation_is_blitz = false;
-                    return Action::EndPlayerAction;
+                    self.moved_this_activation = true;
                 }
                 if squares.is_empty() {
                     // No adjacent empty square: deselect, ending the activation — 1:1 with Java
@@ -671,6 +676,45 @@ mod tests {
         gs.game.acting_player.current_move = 5;
         gs.pending_prompt = Some(AgentPrompt::Move { player_id: "carrier".into(), squares });
         assert!(matches!(agent.act(&gs), Action::Move { .. }), "carrier below MA keeps moving");
+    }
+
+    #[test]
+    fn blitzing_carrier_continues_after_block_non_carrier_stops() {
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_STANDING};
+        use ffb_model::model::player::Player;
+        // After a blitz block the Java sequence enters INIT_MOVING, where the carrier-continue rule
+        // applies: a ball-carrying blitzer with movement left keeps advancing; a non-carrier deselects.
+        let mut gs = new_game(1);
+        gs.game.team_home.players.push(Player {
+            id: "blitzer".into(), name: "blitzer".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            ..Default::default()
+        });
+        let coord = FieldCoordinate::new(9, 9);
+        gs.game.field_model.set_player_coordinate("blitzer", coord);
+        gs.game.field_model.set_player_state("blitzer", PlayerState::new(PS_STANDING));
+        gs.game.home_playing = true;
+        gs.game.acting_player.set_player("blitzer".into(), PlayerAction::Move);
+        gs.game.acting_player.current_move = 0; // block spent no movement
+        let squares = vec![FieldCoordinate::new(8, 8), FieldCoordinate::new(8, 9)];
+
+        // Carrier (holds the ball) with movement left → continue moving after the block.
+        gs.game.field_model.ball_coordinate = Some(coord);
+        gs.game.field_model.ball_moving = false;
+        let mut agent = RandomAgent::new_parity(1);
+        agent.current_activation_is_blitz = true;
+        agent.moved_this_activation = false; // fresh post-block Move prompt
+        gs.pending_prompt = Some(AgentPrompt::Move { player_id: "blitzer".into(), squares: squares.clone() });
+        assert!(matches!(agent.act(&gs), Action::Move { .. }), "blitzing carrier keeps moving after the block");
+
+        // Non-carrier (ball elsewhere) → deselect after the block.
+        gs.game.field_model.ball_coordinate = Some(FieldCoordinate::new(1, 1));
+        let mut agent2 = RandomAgent::new_parity(1);
+        agent2.current_activation_is_blitz = true;
+        agent2.moved_this_activation = false;
+        gs.pending_prompt = Some(AgentPrompt::Move { player_id: "blitzer".into(), squares });
+        assert!(matches!(agent2.act(&gs), Action::EndPlayerAction), "non-carrier blitzer stops after the block");
     }
 
     #[test]

@@ -733,3 +733,27 @@ aspirational; this is the activation set it referred to. Test: `prone_move_activ
 Next: seed 12 first state_hash divergence step 31/32 (turn 2 half 1, home): Activate(home_03/teamLinemanParityHome3, MOVE),
 same action, pre-state differs already (Java 46a3e1ea vs Rust d092a2eb) — divergence is EARLIER than i=31; find
 the first differing index in seed_12_{java,rust}.jsonl.
+
+## Iter 33 — seed 12 FIXED (blitzing carrier continues after block); seeds 1-13 green
+
+Root cause (seed 12 i=31): away_03 (the ball carrier, a02 in the state string, at (13,9) holding the ball)
+was adjacent to home_03 and declared a BLITZ. Both engines blitz-blocked home_03 (1 die, rolled 4 → Push,
+home_03 12,8→11,7 — identical) and chose NoFollowUp. Java then CONTINUED moving the carrier toward the
+endzone, ending at (8,11) (ball follows); Rust's agent stopped dead at (13,9). rng aligned — pure agent
+heuristic divergence.
+
+The Rust agent's Move handler had a blitz shortcut: `if current_activation_is_blitz { end }` — a blitz
+ALWAYS deselected right after its block, regardless of whether the blitzer carried the ball. But Java's
+ParityRunner routes the post-blitz-block state through INIT_MOVING (lines 419-446), which applies the SAME
+carrier-continue rule as any move: `imCarrying && movesLeft → sendMoveAction, else deselect`. Blitz targets
+are always adjacent (pickBlockTarget/isAdjacentCoord), so a blitz never pre-moves — the block is the whole
+"pre-move" action and INIT_MOVING is the continue-decision point.
+
+Fix (crates/ffb-engine/src/agent/random_agent.rs Move handler): on the post-block Move prompt of a blitz,
+clear the blitz flag and set `moved_this_activation = true` (the block reached the continue-decision point)
+and FALL THROUGH to the normal carrier-continue logic instead of unconditionally ending. Net effect matches
+Java exactly: a non-carrier blitzer still deselects (`moved && !(carrying&&moves)` = true), a ball-carrying
+blitzer with movement left keeps advancing. Test: `blitzing_carrier_continues_after_block_non_carrier_stops`.
+Seeds 1-13 now fully match; frontier is seed 14.
+
+Next: run seeds 1-14+, find seed 14's first state_hash divergence.
