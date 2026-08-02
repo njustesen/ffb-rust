@@ -433,3 +433,18 @@ the failed roll. human seed 7 advanced step 81 -> 217; seeds 1-6 stay green; lin
   Blitz with no adjacent target → NO Bone-head die, turn ends). REVERT if regressed. Confirm via
   `--seeds 7-7` FFB_TRACE+FFB_DICE_TRACE: Java Bone-head at pos=88 vs Rust pos=89; the desync onset is i=196
   (rng diff 0→1); grep "BLITZ_TARGET_NONE".
+
+## seed 16 step 11 — FIXED (2026-08-03 ~01:30, commit 34ec0ea1) + NEW frontier step 74
+FIX: added reset_blocked_and_moving_players() (Java UtilActingPlayer.changeActingPlayer) — resets BLOCKED→
+STANDING (always) and MOVING→STANDING (except acting player + thrower) whenever the acting player changes.
+Called from change_player_action, StepEndPlayerAction, and StepEndBlocking's end branch (the last so the
+restore lands within the block step's resolution → captured in the post-block state hash). Root cause: an Ogre's
+BLOCK cancelled by a failed Bone-head left the defender BLOCKED (StepInitBlocking marks it before the
+ACTIVATION); Java's changeActingPlayer reset restored it, Rust had none. human seeds 1-15 GREEN; seed 16
+step 11 -> 74; lineman 100/100; ffb-engine 7018/0 (+reset_blocked_and_moving_players test).
+NEXT FRONTIER: human seed 16 step 74 (i=74 = the Ogre home_01 does a PASS). Rust rolls 4 d8 scatters
+(pos 55-58) while Java rolls 0 dice in the i=74 window → big desync surfacing at i=75. Likely the Ogre's pass
+should deselect / not execute in Rust (matching Java's 0 dice — maybe no valid pass target, or bone-head/
+negatrait path), OR the fumble-scatter count differs. NEXT: diff JAVA vs RUST dice+state at i=74; check the
+Ogre's pass target/receiver selection and whether Java even executes the pass (0 dice suggests deselect/fumble
+with no roll). Run `--seeds 16-16` FFB_TRACE+FFB_DICE_TRACE.
