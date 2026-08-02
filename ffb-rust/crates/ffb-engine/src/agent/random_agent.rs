@@ -196,11 +196,15 @@ impl Agent for RandomAgent {
                     // once every player has been picked once. Without this the agent re-activates
                     // the same players forever and the turn never ends.
                     self.used_this_turn.insert(pid.clone());
-                    // Check if the player is inactive (PRONE with active=false = just recovered
-                    // from STUNNED this turn). Only PRONE+inactive players are skipped; STANDING
-                    // players should always be active after refreshPlayersForTurnStart.
+                    // Skip a picked player whose PlayerState is inactive — mirrors Java
+                    // ParityRunner tier>=3 `!pickedState.isActive()` (SKIP_INACTIVE), which does
+                    // NOT restrict to prone. A player just recovered from STUNNED (STUNNED→PRONE)
+                    // is prone+inactive, but a team-mate THROWN this turn lands STANDING yet
+                    // active=false (it already used its activation via the throw) — Java rejects
+                    // that pick, so Rust must too (ogre seed 1 i=11: away_09, thrown by away_05's
+                    // TTM, must not re-activate). Restricting to prone let the thrown player act again.
                     let ps = gs.game.field_model.player_state(pid);
-                    let is_inactive = ps.map(|s| s.is_prone() && !s.is_active()).unwrap_or(false);
+                    let is_inactive = ps.map(|s| !s.is_active()).unwrap_or(false);
                     if is_inactive {
                         // Rejected: decisionRng already consumed; excluded for the rest of the turn.
                         continue;
