@@ -172,3 +172,35 @@ ogre is green (TTM will then correctly deselect there — no throwable player).
   Engine landing steps don't mark it moved, so this is an AGENT eligibility/snapshot difference
   (ParityRunner.computeEligiblePlayers/filterStaleActions vs random_agent). NEXT: make a thrown player
   ineligible for its own later activation in the same team turn, matching Java.
+
+## Iter 6-8 (2026-08-02) — ogre seed 1 driven step 10 → step 21 (three fixes)
+- **Iter6 (random_agent.rs):** a THROWN team-mate lands STANDING but active=false; Java ParityRunner
+  tier>=3 rejects ANY picked player with `!PlayerState.isActive()` (not just prone). Rust only skipped
+  PRONE inactive players, so the thrown player re-activated. Fixed to `!is_active()`. i=11 fixed.
+- **Iter7 (step_throw_team_mate.rs):** a declined TTM reroll re-rolled the pass. Java keeps reRolledAction
+  set across the decline (accepts original result); Rust cleared it → fresh roll → 1-scatter FUMBLE became
+  a 3-scatter throw. Keep re_rolled_action, clear only the source. i=12 fixed.
+- **Iter8 (acting_player.rs + bb2025 bone_head_behaviour.rs):** Bone Head use tracked on persistent
+  Player.used_skills, never reset → a player that rolled Bone Head in turn 1 skipped it forever. Java tracks
+  it on ActingPlayer.fUsedSkills (cleared by setPlayerId each activation). Added per-activation
+  ActingPlayer.used_skills; routed BoneHead through it. i=21 dice divergence moved pos 50 → pos 78.
+- **All three: lineman tier re-verified 100/100; ffb-engine 7011/0, ffb-model 2771/0.**
+
+## FRONTIER (2026-08-02) — ogre seed 1 step 21 (i=22, turn 2) — STEP-SEQUENCE divergence, UNSOLVED
+- i=13..20 match; first divergent step i=21 = away_06 THROW_TEAM_MATE (pre-hash 44bc8e52 matches, post
+  differs). **This is a step-SEQUENCE divergence, NOT a throw-mechanic bug.** Evidence:
+  - Rust's 5th TTM pass roll is at dice pos 89; Java's is at pos 77 → Rust does ~12 EXTRA dice rolls before
+    its 5th throw in away's turn 2. The two engines' action/step sequences desync somewhere in i=15..21.
+  - First dice-TYPE divergence is pos 78: Java rolls a d8 `UtilThrowTeamMateSequence.scatterPlayer` (a
+    fumbled throw's single scatter, pass=1 at pos 77), while Rust consumes the same RNG position as a d6
+    from a NON-scatter step (verified: no scatter_player/swoop_scatter call at callcount 78; d6 values
+    coincidentally align through pos 77, then die-type mismatches at 78).
+  - So Java performs a throw (pass 77 + scatter 78) where Rust does other d6 rolls; the state hashes only
+    coincidentally matched until i=21.
+- **NEXT:** DRIVE_TRACE (FFB_DRIVE_TRACE=1) BOTH engines across away's turn-2 activations (i=15..21) and
+  diff the step/activation sequence to find WHERE they diverge (which player activates, which action, or a
+  thrown-player/target selection difference). The dice interleave unreliably under buffering — rely on the
+  DRIVE step names + per-activation state hashes, not raw dice position. Suspect a TTM target/thrown-player
+  selection or an activation-eligibility difference specific to turn 2.
+- **Also latent:** bb2020 + bb2016 BoneHeadBehaviour still mark Player.used_skills (same bug Iter8 fixed for
+  bb2025) — migrate to ActingPlayer.used_skills when those editions' tiers are worked.
