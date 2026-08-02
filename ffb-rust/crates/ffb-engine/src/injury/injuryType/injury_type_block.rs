@@ -274,6 +274,23 @@ impl ModificationAwareInjuryType for InjuryTypeBlock {
                     for m in factory.find_injury_modifiers_without_niggling(
                         game, Some(attacker), defender, false, false, false, false,
                     ) {
+                        // Java: the MightyBlow injury modifier's appliesToContext excludes itself
+                        // when an armour modifier registered to a skill with
+                        // `affectsEitherArmourOrInjuryOnBlock` was already applied — Mighty Blow adds
+                        // +1 to EITHER the armour OR the injury roll, never both. If MB already broke
+                        // the armour it must NOT also boost the injury (ogre seed 1 i=105: a both-down
+                        // Ogre fall — MB on armour keeps the injury at 8 → Thick Skull → Stunned,
+                        // instead of 9 → KO). The affects-either skills name their armour and injury
+                        // modifiers identically, so a same-named armour modifier means "already used".
+                        let affects_either_on_block = m.registered_to()
+                            .and_then(SkillId::from_class_name)
+                            .map(|id| id.properties().contains(&NamedProperties::AFFECTS_EITHER_ARMOUR_OR_INJURY_ON_BLOCK))
+                            .unwrap_or(false);
+                        if affects_either_on_block
+                            && self.ctx.armor_modifiers.iter().any(|am| am.name == m.get_name())
+                        {
+                            continue;
+                        }
                         self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), Some(attacker), defender, game.rules));
                     }
                 }
@@ -329,6 +346,32 @@ mod tests {
     fn coord() -> FieldCoordinate { FieldCoordinate::new(5, 5) }
 
     // ── 1:1 mirrors of InjuryTypeBlockBB2025Test.java ───────────────────────────
+
+    /// Regression: Mighty Blow is armour-OR-injury, never both. When MB is applied to the armour
+    /// roll (breaking it), the injury roll must NOT also receive Mighty Blow — otherwise a Thick
+    /// Skull player who would be Stunned on an 8 injury total is turned into a KO on 9 (ogre seed 1
+    /// i=105: a both-down Ogre fall). Java's MightyBlow injury modifier excludes itself when an
+    /// armour modifier registered to affectsEitherArmourOrInjuryOnBlock is present.
+    #[test]
+    fn mighty_blow_on_armour_is_excluded_from_injury() {
+        // When Mighty Blow was already applied to the armour roll (present in armor_modifiers), the
+        // injury roll must NOT also receive it. Contrast: with no MB armour modifier, injury DOES.
+        let game = game_with_attacker_and_defender(vec![SkillId::MightyBlow], 8);
+
+        let run = |mb_on_armour: bool| -> bool {
+            let mut it = InjuryTypeBlock::new(BlockMode::Regular, true);
+            it.injury_context_mut().armor_broken = true; // armour already broken → go straight to injury
+            if mb_on_armour {
+                it.injury_context_mut().add_armor_modifier(Modifier::new("Mighty Blow", 1, Rules::Bb2025));
+            }
+            let mut rng = GameRng::new(1);
+            it.injury_roll(&game, &mut rng, Some("attacker"), "defender");
+            it.injury_context().injury_modifiers.iter().any(|m| m.name == "Mighty Blow")
+        };
+
+        assert!(!run(true), "Mighty Blow already on the armour roll must NOT also apply to injury");
+        assert!(run(false), "with no armour Mighty Blow, the injury roll DOES receive Mighty Blow");
+    }
 
     #[test]
     fn use_armour_modifiers_only_mode_should_exist() {
