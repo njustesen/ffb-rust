@@ -321,11 +321,17 @@ impl Agent for RandomAgent {
                     && gs.game.field_model.ball_coordinate.is_some()
                     && gs.game.field_model.ball_coordinate
                         == gs.game.field_model.player_coordinate(player_id);
-                // Java ParityRunner INIT_MOVING: after the first square, only the ball carrier keeps
-                // moving; every other player deselects. `moved_this_activation` is false on the FIRST
-                // Move prompt of an activation (reset in ActivatePlayer) so the first square always
-                // happens; on the 2nd+ prompt a non-carrier ends here. 0 rng, matching Java's deselect.
-                if self.moved_this_activation && !carrying {
+                // Java ParityRunner INIT_MOVING (`imCarrying && movesLeft`): after the first square, only
+                // the ball carrier keeps moving, and ONLY while it still has movement left
+                // (currentMove < MA) — the carrier NEVER rushes (goes for it past MA). Every other
+                // player deselects after one square; the carrier deselects at MA. `moved_this_activation`
+                // is false on the FIRST Move prompt (reset in ActivatePlayer) so the first square always
+                // happens. Without the movesLeft check the Rust carrier rushed past MA, rolling extra
+                // GFI/dodge dice and desyncing the game-die stream (seed 8 i=76). 0 rng either way.
+                let moves_left = gs.game.player(player_id)
+                    .map(|p| gs.game.acting_player.current_move < p.movement_with_modifiers())
+                    .unwrap_or(false);
+                if self.moved_this_activation && !(carrying && moves_left) {
                     return Action::EndPlayerAction;
                 }
                 let pool: Vec<FieldCoordinate> = if carrying {
@@ -629,6 +635,42 @@ mod tests {
         }
         assert_eq!(game_dice, gs2.rng.call_count,
             "game-dice stream is deterministic — the agent's decision RNG never perturbs it");
+    }
+
+    #[test]
+    fn carrier_stops_at_ma_does_not_rush() {
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_STANDING};
+        use ffb_model::model::player::Player;
+        let mut gs = new_game(1);
+        gs.game.team_home.players.push(Player {
+            id: "carrier".into(), name: "carrier".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None, is_big_guy: false, ..Default::default()
+        });
+        let coord = FieldCoordinate::new(9, 9);
+        gs.game.field_model.set_player_coordinate("carrier", coord);
+        gs.game.field_model.set_player_state("carrier", PlayerState::new(PS_STANDING));
+        gs.game.field_model.ball_coordinate = Some(coord); // carrier holds the ball
+        gs.game.field_model.ball_moving = false;
+        gs.game.home_playing = true;
+        gs.game.acting_player.set_player("carrier".into(), PlayerAction::Move);
+
+        let squares = vec![FieldCoordinate::new(8, 8), FieldCoordinate::new(8, 9)];
+        let mut agent = RandomAgent::new_parity(1);
+        agent.moved_this_activation = true; // 2nd+ Move prompt of the activation
+
+        // At MA (current_move == 6 == movement) the carrier must NOT rush → deselect (Java movesLeft=false).
+        gs.game.acting_player.current_move = 6;
+        gs.pending_prompt = Some(AgentPrompt::Move { player_id: "carrier".into(), squares: squares.clone() });
+        assert!(matches!(agent.act(&gs), Action::EndPlayerAction), "carrier at MA must not rush");
+
+        // Below MA (current_move == 5 < movement) the carrier keeps moving (Java movesLeft=true).
+        gs.game.acting_player.current_move = 5;
+        gs.pending_prompt = Some(AgentPrompt::Move { player_id: "carrier".into(), squares });
+        assert!(matches!(agent.act(&gs), Action::Move { .. }), "carrier below MA keeps moving");
     }
 
     #[test]
