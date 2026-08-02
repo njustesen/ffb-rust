@@ -260,6 +260,12 @@ impl StepEndBlocking {
             }
             // Java: game.setDefenderId(null)
             game.defender_id = None;
+            // Java UtilActingPlayer.changeActingPlayer resets transient BLOCKED/MOVING states when the
+            // acting player is deselected at the end of the (here cancelled) block — restoring a
+            // defender left BLOCKED by a block that was declared then cancelled before the block roll
+            // (e.g. a failed Bone Head). This must run within THIS step's resolution so the restored
+            // state is captured in the post-block state hash (human seed 16 i=11: away_02 stayed BLOCKED).
+            crate::step::util_server_steps::reset_blocked_and_moving_players(game);
             // Java: endGenerator.pushSequence(EndPlayerAction.SequenceParams(gs, true, true, fEndTurn, checkForgo))
             let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
                 feeding_allowed: true,

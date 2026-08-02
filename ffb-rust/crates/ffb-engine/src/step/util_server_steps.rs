@@ -6,6 +6,37 @@ use ffb_model::enums::{PlayerAction, Rules};
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use crate::step::framework::StepId;
 
+/// Java `UtilActingPlayer.changeActingPlayer`'s transient-state reset: when the acting player
+/// changes (deselect / next activation), every BLOCKED player reverts to STANDING, and every MOVING
+/// player except the current acting player and the thrower reverts to STANDING. Call this right after
+/// the acting player is cleared/changed. A block DECLARED then CANCELLED before the block roll (e.g. a
+/// failed Bone Head / Really Stupid) leaves the defender in the transient BLOCKED state that
+/// StepInitBlocking sets before the ACTIVATION — only this reset clears it (human seed 16 i=11: an
+/// Ogre's Bone-head-cancelled block left the defender BLOCKED in Rust vs STANDING in Java). A
+/// normally-resolved block's defender is already Prone/Standing/Stunned by activation end, so this
+/// only touches cancelled-block defenders and stray MOVING states.
+pub fn reset_blocked_and_moving_players(game: &mut Game) {
+    use ffb_model::enums::{PS_BLOCKED, PS_MOVING, PS_STANDING};
+    let acting_id = game.acting_player.player_id.clone();
+    let thrower_id = game.thrower_id.clone();
+    let ids: Vec<String> = game.team_home.players.iter()
+        .chain(game.team_away.players.iter())
+        .map(|p| p.id.clone())
+        .collect();
+    for id in ids {
+        if let Some(ps) = game.field_model.player_state(&id) {
+            let base = ps.base();
+            let reset = base == PS_BLOCKED
+                || (base == PS_MOVING
+                    && acting_id.as_deref() != Some(id.as_str())
+                    && thrower_id.as_deref() != Some(id.as_str()));
+            if reset {
+                game.field_model.set_player_state(&id, ps.change_base(PS_STANDING));
+            }
+        }
+    }
+}
+
 /// Java `validateStepId(IStep, StepId)`.
 /// Panics if the step's id does not match `expected_id`.
 pub fn validate_step_id(actual_id: StepId, expected_id: StepId) {
@@ -37,6 +68,10 @@ pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerActi
         game.acting_player.set_player(player_id.to_owned(), action);
         game.acting_player.standing_up = was_prone;
         game.acting_player.jumping = jumping;
+        // Java UtilActingPlayer.changeActingPlayer (`if (changed)` block): resets transient
+        // BLOCKED/MOVING states whenever the acting player changes. A block declared then cancelled
+        // (e.g. failed Bone Head) leaves the defender BLOCKED until this runs (human seed 16 i=11).
+        reset_blocked_and_moving_players(game);
         // Java: UtilServerPlayerMove.updateMoveSquares(pStep.getGameState(), actingPlayer.isJumping());
         crate::util::util_server_player_move::UtilServerPlayerMove::update_move_squares(game, jumping);
         // Java: ServerUtilBlock.updateDiceDecorations(pStep.getGameState());
@@ -136,6 +171,35 @@ mod tests {
         let mut game = make_game();
         change_player_action(&mut game, "", PlayerAction::Move, false);
         assert!(game.acting_player.player_id.is_none());
+    }
+
+    #[test]
+    fn reset_blocked_and_moving_players_restores_blocked_and_stray_moving() {
+        // Java UtilActingPlayer.changeActingPlayer: BLOCKED → STANDING (always), MOVING → STANDING
+        // except the acting player and the thrower. This restores a defender left BLOCKED by a block
+        // that was declared then cancelled before the block roll (human seed 16 i=11).
+        use ffb_model::enums::{PS_BLOCKED, PS_MOVING, PlayerState, PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+        let mut game = make_game();
+        let mk = |id: &str| Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8, ..Default::default()
+        };
+        for id in ["blk", "mov", "thr", "act"] { game.team_home.players.push(mk(id)); }
+        game.field_model.set_player_state("blk", PlayerState::new(PS_BLOCKED));
+        game.field_model.set_player_state("mov", PlayerState::new(PS_MOVING));
+        game.field_model.set_player_state("thr", PlayerState::new(PS_MOVING));
+        game.field_model.set_player_state("act", PlayerState::new(PS_MOVING));
+        game.thrower_id = Some("thr".into());
+        game.acting_player.set_player("act".into(), PlayerAction::Move);
+
+        reset_blocked_and_moving_players(&mut game);
+
+        assert_eq!(game.field_model.player_state("blk").unwrap().base(), PS_STANDING, "BLOCKED → STANDING");
+        assert_eq!(game.field_model.player_state("mov").unwrap().base(), PS_STANDING, "stray MOVING → STANDING");
+        assert_eq!(game.field_model.player_state("thr").unwrap().base(), PS_MOVING, "thrower MOVING preserved");
+        assert_eq!(game.field_model.player_state("act").unwrap().base(), PS_MOVING, "acting-player MOVING preserved");
     }
 
     #[test]

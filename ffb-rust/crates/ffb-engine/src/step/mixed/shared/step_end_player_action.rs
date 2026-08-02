@@ -60,6 +60,10 @@ impl StepEndPlayerAction {
             td.acted_player_ids.push(pid);
         }
         game.acting_player.clear();
+        // Java UtilActingPlayer.changeActingPlayer resets transient BLOCKED/MOVING states whenever
+        // the acting player changes — a Bone-head-cancelled block leaves the defender BLOCKED
+        // otherwise (human seed 16 i=11).
+        crate::step::util_server_steps::reset_blocked_and_moving_players(game);
 
         // Short-circuit: if end_turn push the EndTurn sequence (no feeding needed).
         if self.end_turn {
