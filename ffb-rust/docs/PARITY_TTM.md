@@ -234,3 +234,34 @@ ogre is green (TTM will then correctly deselect there — no throwable player).
   `affectsEitherArmourOrInjuryOnBlock` (Mighty Blow) modifier in the Rust InjuryTypeBlock armour+injury
   path — check `do_armor_roll` / `find_injury_modifiers` and whether the armour application marks MB as
   consumed so the injury excludes it. First exercised only now (Ogres are the first Mighty-Blow players).
+
+## Iter 10 (2026-08-02) — FIX: Mighty Blow armour-OR-injury exclusion (step 105 → 143)
+- Java's MightyBlow injury modifier excludes itself when an armour modifier registered to a skill
+  with `affectsEitherArmourOrInjuryOnBlock` is already applied (MB is +1 to armour OR injury, never
+  both). Rust offered it to both (known unported gap). A both-down Ogre fall got MB on the injury
+  (8→9), past Thick Skull's 8-only KO→Stun → KO vs Java's Stunned (ogre seed 1 i=105, home_01). Fix in
+  InjuryTypeBlock.injury_roll: skip an affectsEither injury modifier when a same-named armour modifier
+  is present. Test mighty_blow_on_armour_is_excluded_from_injury. lineman 100/100, ffb-engine 7013/0.
+
+## DIRECTION CHANGE (2026-08-02 ~22:10) — user switched the loop target to FULL HUMAN vs HUMAN
+- Per user decision, the OGRE detour is paused (its Iter5-10 fixes are general engine corrections and
+  stay committed). The loop now drives HUMAN vs HUMAN (bb2025, tier3, seeds 1-100) to green — the
+  actual stated goal. TTM's throw path won't be exercised there (human roster has no Right Stuff /
+  canBeThrown player; its Ogre can't find a throwable teammate → TTM only deselects). Hard rule: the
+  loop must STOP at 02:00 local.
+
+## FRONTIER (human) — seed 1 step 39 (i=39, turn 3) — action_rng desync from a no-op move
+- i=1..38 match; first divergence i=39 = away_09 MOVE (from (21,5)): Java → (21,4), Rust → (22,4).
+  Same 6-square target list, but Java picks idx 2 vs Rust idx 3 → the ACTION_RNG is misaligned by 1.
+- Root: at i=37 both activate away_01 (at (14,7)) for MOVE — a no-op in BOTH (post==pre). Java's
+  ParityRunner.sendMoveAction computes adjacent-empty squares ITSELF (7 targets), picks (14,6) and
+  sends the move (consuming 1 actionRng); the engine rejects/no-ops it. Rust's agent uses the engine's
+  Move-prompt `squares`; away_09... i.e. away_01 there produced NO move-target pick (deselect,
+  0 actionRng). So Java consumes 1 actionRng where Rust consumes 0 → every later pick shifts.
+- NEXT: reconcile the move-target source. Java's agent picks from ALL adjacent-empty squares
+  regardless of the engine's move legality (0-MA / pinned still counts, move gets rejected → no-op but
+  actionRng consumed). Rust must consume actionRng identically for such a no-op move. Determine why
+  Rust's away_01 at i=37 yields no move-pick (engine gives 0 squares? deselect path?) — grep
+  RUST_ACT_PICK / RUST_SMA / RUST_PICK per activation, compare vs JAVA_SMA/JAVA_PICK counts (they match
+  through pick 31 (away_08), diverge at pick 32: Java=Away1→(14,6), Rust=Away6). Verify lineman stays
+  100/100 (its moves must not regress).
