@@ -448,3 +448,26 @@ should deselect / not execute in Rust (matching Java's 0 dice — maybe no valid
 negatrait path), OR the fumble-scatter count differs. NEXT: diff JAVA vs RUST dice+state at i=74; check the
 Ogre's pass target/receiver selection and whether Java even executes the pass (0 dice suggests deselect/fumble
 with no roll). Run `--seeds 16-16` FFB_TRACE+FFB_DICE_TRACE.
+
+## FRONTIER (human) — seed 16 step 74: Ogre PASS hits ParityRunner UNHANDLED_STEP INIT_PASSING (2026-08-03 ~01:42, DIAGNOSED — HARNESS gap)
+- i=74: the Ogre home_01 (ball carrier @12,6, has Bone-head + Throw Team-Mate, NOT the Pass skill) declares a
+  PASS. Both engines choose Activate(home_01,PASS). JAVA: sendPassAction picks coord=(5,10) [teammate h06],
+  logs JAVA_PASS, then the engine reaches step INIT_PASSING which ParityRunner has NO case for →
+  "UNHANDLED_STEP: INIT_PASSING turnMode=REGULAR" → the default injects ClientCommandEndTurn → away turn ends
+  with **0 dice** (rng stays 52). RUST executes the pass: pos53 d6=3 + pos54 d6=5 (bone-head + ?), then a
+  fumble scatter pos55-58 (4× d8) = **6 dice**, then NoReRoll → turnover. Both end at away's turn but the
+  6-die desync diverges the state at i=75.
+- WHY the Ogre reaches INIT_PASSING but a normal pass does not: ParityRunner handles a pass at INIT_SELECTING
+  phase-2 via sendConcreteAction→sendPassAction (sends the full CLIENT_PASS); the engine then runs the pass to
+  completion. For the Ogre the engine instead pauses at a separate INIT_PASSING step (likely because the Big
+  Guy / Bone-head path re-prompts), which ParityRunner (cases: INIT_SELECTING, INIT_MOVING,
+  INIT_THROW_TEAM_MATE only) doesn't handle → its default EndTurn. ParityRunner.java is co-editable but a
+  change needs a jar rebuild + re-verify lineman 100/100 (commit Rust first) — deferred (too risky near the
+  2 AM stop).
+- NEXT (needs the jar-rebuild path OR a Rust-only match): (1) determine WHY the Ogre's pass reaches
+  INIT_PASSING as a waiting step while a normal pass doesn't (diff the Rust/Java step sequence for the pass —
+  FFB_DRIVE_TRACE; is it bone-head, big-guy, or a stall?). (2) EITHER add an INIT_PASSING case to ParityRunner
+  that sends the correct pass command (so Java executes the pass, matching Rust — then verify Rust's 6-dice
+  resolution also matches), OR if the Ogre's pass genuinely should abort, make the RUST engine abort/EndTurn
+  the Ogre's pass with 0 dice to match ParityRunner's EndTurn. Prefer understanding the INIT_PASSING re-prompt
+  first. Ground truth = STOCK Java ENGINE; ParityRunner + random_agent co-editable.
