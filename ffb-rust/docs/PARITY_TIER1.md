@@ -695,3 +695,19 @@ GFI-prompt condition (when is the rush square offered) that differs, NOT a blank
 exact move-square set the Rust engine offers at (9,9) [(8,8),(8,9),(8,10),(9,10),(10,8),(10,10)] vs whether
 Java's engine offers any at (9,9) (it offered none → move ended). NO fix committed (diagnosis only). Fix the
 Rust ENGINE's rush/GFI move-square generation to match Java; add a Rust test; VERIFY seed 8 advances.
+
+## Iter 31 (2026-08-02) — FIX: ball-carrier stops at MA, no rush (c2625abd) — seeds 1-10 GREEN
+
+Resolved the Iter 29-30 diagnosis. ROOT was an AGENT mirror mismatch (both parity agents are the
+co-editable reference pair): Java ParityRunner INIT_MOVING (line 438) continues the mover only when
+`imCarrying && movesLeft`, movesLeft = currentMove < MA — so the ball carrier NEVER rushes (goes for it
+past MA); it stops at MA. The Rust agent's carrier-keeps-moving branch had NO movement-left check, so it
+rushed past MA (seed 8 i=76: away_01 runs 8 squares vs Java's 6=MA), rolling extra GFI/dodge dice → desync.
+FIX (crates/ffb-engine/src/agent/random_agent.rs Move handler): carrier-continue now also requires
+`current_move < movement_with_modifiers`; non-carriers still deselect after one square. +1 unit test
+(carrier_stops_at_ma_does_not_rush). Seeds 1-10: 10/10 match (was 1-7).
+
+Next: seed 11 first state_hash divergence i=238 (turn 7 half 2, home): home_03 MOVE, both chose Move, same
+pre-state, POST differs (Java 37a7be82 vs Rust dbb7bbed) — a STATE/positional divergence (rng still aligned
+through i=258; rng only diverges later at i=259 where the turn structure has desynced). Diff the i=238 state
+(RUST_STEP vs JSTEP) to find the single changed token.
