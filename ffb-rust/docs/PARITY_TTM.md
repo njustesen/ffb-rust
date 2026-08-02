@@ -265,3 +265,23 @@ ogre is green (TTM will then correctly deselect there — no throwable player).
   RUST_ACT_PICK / RUST_SMA / RUST_PICK per activation, compare vs JAVA_SMA/JAVA_PICK counts (they match
   through pick 31 (away_08), diverge at pick 32: Java=Away1→(14,6), Rust=Away6). Verify lineman stays
   100/100 (its moves must not regress).
+
+## FRONTIER (human) REFINED (2026-08-02 ~22:45) — prone-player Move consumes actionRng in Java only
+- Definitive: at i=37 away_01 (a00) is PRONE at (14,7). It activates for MOVE (= stand up). In BOTH
+  engines it STAYS PRONE (no-op, post==pre) — neither stands it up. But Java's ParityRunner.sendMoveAction
+  still computes adjacent-empty squares from (14,7) [7 targets], picks (14,6), and sends a CLIENT_MOVE
+  that the engine ignores (a prone player can't move via CLIENT_MOVE) — consuming 1 actionRng. Rust's
+  agent is prompt-driven: the prone stand-up move never reaches an AgentPrompt::Move (no RUST_SMA for
+  away_01 at i=37; there is NO RUST_SMA N=0 anywhere — the engine short-circuits), so it consumes 0
+  actionRng. Net: Java consumes 1 actionRng more than Rust at i=37 → every later action pick shifts →
+  first visible divergence at i=39 (away_09 move: same 6-target list, Java idx 2=(21,4) vs Rust idx
+  3=(22,4)).
+- NEXT (the fix — AGENT, random_agent.rs): make Rust consume a move-target actionRng for EVERY Move
+  activation, matching Java's sendMoveAction (which always computes adjacent-empty + picks, even when the
+  engine will ignore the move — prone stand-up, 0-MA, 0-legal-move). Cleanest: when the agent picks
+  MOVE at the ActivatePlayer action-choice, compute adjacent-empty on-pitch squares from
+  gs.game.field_model (sorted by (x,y), like Java's dx/dy loop + sort), pick_action(len) [1 actionRng],
+  remember it; at the follow-up AgentPrompt::Move, return the remembered square WITHOUT a second
+  pick_action. Verify lineman 100/100 (normal standing moves must be unchanged — same 1 actionRng, same
+  target, same order). Prone player + Move = the exercised case here; confirm the human roster's prone
+  players (players knocked down earlier) reproduce it.
