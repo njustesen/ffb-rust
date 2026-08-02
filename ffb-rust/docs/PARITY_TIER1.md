@@ -961,3 +961,29 @@ after editing ParityRunner (`cd C:/Users/Admin/niels/ffb/ffb && /c/Users/Admin/b
 package -DskipTests`), then REVERT the ParityRunner logging + rebuild clean. Findings 1+2 (option default +
 pathfinder wiring) are correct and should be re-applied once the away_03 false-positive is understood. This
 mechanic has now cost 3 turns (Iter 38-40) — if the next iteration can't crack it, consider surfacing to the user.
+
+## Iter 41 — STALLING BREAKTHROUGH + HARNESS-JAR INCIDENT (needs user input)
+
+STALLING (real progress): instrumented the co-editable ParityRunner to call StallingExtension.isConsideredStalling
+directly. RESULT: Java's isConsideredStalling(away_03)==TRUE in seed 19 (so the pathfinder wiring / findings 1+2
+are CORRECT — Java agrees the player is a staller), but Java's TeamResult.hasStalled() flag NEVER flips in seed 19
+(it never actually ROLLS handleStaller), while it DOES flip in seed 41 (turn 6, right after home_07's out-of-range
+pass ended the turn). So the remaining stalling bug is NOT detection — it is the ROLL GATING (whether
+FORGONE_STALLING actually executes-and-rolls at away's turn-end / the checkForgo value at that exact step). Next:
+figure out why Java's FORGONE_STALLING doesn't roll for the passive ball carrier away_03 (whose team's turn ended
+via a DIFFERENT player's action) but does for home_07 (whose OWN action ended the turn).
+
+HARNESS-JAR INCIDENT (must tell the user): to add the ParityRunner diagnostic I rebuilt the ffb-ai jar
+(`mvn -pl ffb-ai -am package`). After reverting the diagnostic (git checkout ParityRunner.java) and rebuilding,
+the jar does NOT reproduce the ORIGINAL harness jar's behavior: seed 19 now FAILS (Rust unchanged/correct;
+the REBUILT JAVA diverges). Proof it's the Java jar (not Rust): the git-COMMITTED ffb-rust/parity/.../seed_19_java.jsonl
+had i=82=96be5a16 which EQUALS Rust's i=82; the rebuilt jar produces i=82=af80edc. rng_calls match (26→27, same
+d6=6 dodge) at i=81→82, so it is a DETERMINISTIC move/dodge state difference, not a dice count. The original jar
+(~193883303 bytes) is ~1688 bytes LARGER than any rebuild I can produce from the current ffb working tree
+(193881615), i.e. it was built from a working-tree state with a Java-engine change that is NO LONGER PRESENT
+(apparently lost — cf. memory [[feedback-parity-alignment-discipline]] git-stash-wipe note). The ffb repo working
+tree still has 5 modified engine files (PassMechanic=behavioral Blizzard-removal; DiceRoller+StepGoForIt=debug
+logging gated on ffb.parityDebug; StepPass+StepDropFallingPlayers=whitespace) — reverting PassMechanic did NOT fix
+seed 19, so the LOST change is something else, not in the working tree. Seeds 1,5,40 still PASS (damage is narrow —
+only seed 19 of the sample). I could NOT recover the original jar. SURFACED TO THE USER for guidance (do they have
+a backup of the original ffb-ai-jar-with-dependencies.jar, or know the lost Java engine change?).
