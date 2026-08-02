@@ -594,44 +594,10 @@ impl InjuryTypeServer for InjuryTypeThrowARockImpl {
 }
 
 // ── InjuryTypeTTMLanding ─────────────────────────────────────────────────────
-
-/// Java: InjuryTypeTTMLanding — TTM landing roll, can use apo.
-pub struct InjuryTypeTtmLandingImpl {
-    ctx: InjuryContext,
-}
-
-impl InjuryTypeTtmLandingImpl {
-    fn new() -> Self {
-        Self { ctx: InjuryContext::new(ApothecaryMode::ThrownPlayer) }
-    }
-}
-
-impl InjuryTypeServer for InjuryTypeTtmLandingImpl {
-    fn handle_injury(
-        &mut self, game: &Game, rng: &mut GameRng,
-        attacker_id: Option<&str>, defender_id: &str,
-        coord: FieldCoordinate, _from_coord: Option<FieldCoordinate>,
-        _old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode,
-    ) {
-        self.ctx.defender_id = Some(defender_id.to_owned());
-        self.ctx.attacker_id = attacker_id.map(str::to_owned);
-        self.ctx.defender_coordinate = Some(coord);
-        self.ctx.apothecary_mode = apo_mode;
-
-        if !self.ctx.armor_broken {
-            do_armor_roll(game, rng, &mut self.ctx, defender_id);
-        }
-        if self.ctx.armor_broken {
-            do_injury_roll(rng, &mut self.ctx);
-        } else {
-            self.ctx.injury = Some(PlayerState::new(PS_PRONE));
-        }
-    }
-
-    fn injury_context(&self) -> &InjuryContext { &self.ctx }
-    fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn falling_down_causes_turnover(&self) -> bool { false }
-}
+// The proper translation lives in `injuryType::injury_type_ttm_landing::InjuryTypeTTMLanding`
+// (applies injury modifiers + Stunty via do_injury_roll_for_player). `make_injury_type` now
+// dispatches "InjuryTypeTTMLanding" there; the old player-less `do_injury_roll` duplicate that
+// dropped Stunty was removed.
 
 // ── InjuryTypeTTMHitPlayer ────────────────────────────────────────────────────
 
@@ -709,8 +675,14 @@ pub fn make_injury_type(name: &str) -> Box<dyn InjuryTypeServer> {
             Box::new(injuryType::injury_type_chainsaw_for_spp::InjuryTypeChainsawForSpp::new()),
         "InjuryTypeThrowARock" | "InjuryTypeThrowARockStalling" =>
             Box::new(InjuryTypeThrowARockImpl::new()),
+        // Use the full `injuryType::` translation (applies injury modifiers + Stunty via
+        // do_injury_roll_for_player, turnover=true, send-to-box=LandingFail), NOT the stale
+        // `InjuryTypeTtmLandingImpl` below which rolled the injury with the player-less
+        // `do_injury_roll` and so never applied Stunty. bb2016/bb2020 StepRightStuff construct the
+        // proper type directly; only bb2025 dispatches by name, so an Ogre-thrown Stunty Snotling
+        // landed Stunned on a 7 instead of KO (7+Stunty=8) — ogre seed 1 i=21 (away_06 → away_10).
         "InjuryTypeTTMLanding" | "InjuryTypeTtmLanding" =>
-            Box::new(InjuryTypeTtmLandingImpl::new()),
+            Box::new(injuryType::injury_type_ttm_landing::InjuryTypeTTMLanding::new()),
         "InjuryTypeTTMHitPlayer" | "InjuryTypeTtmHitPlayer" =>
             Box::new(InjuryTypeTtmHitPlayerImpl::new()),
         "InjuryTypeTTMHitPlayerForSpp" =>
@@ -1277,5 +1249,36 @@ mod tests {
         it.handle_injury(&game, &mut rng, Some("attacker"), "defender", FieldCoordinate::new(5, 5), None, None, ApothecaryMode::Defender);
         assert_eq!(it.injury_context().defender_id.as_deref(), Some("defender"));
         assert!(it.injury_context().injury.is_some());
+    }
+
+    /// Regression: `make_injury_type("InjuryTypeTTMLanding")` must route to the full translation
+    /// that applies Stunty (via do_injury_roll_for_player), NOT the old player-less duplicate that
+    /// dropped it. A Stunty thrown player landing on an injury total of 7 is KO'd (7+Stunty=8), not
+    /// Stunned (ogre seed 1 i=21: away_06 threw the Snotling away_10 → Java KO vs Rust Stunned).
+    #[test]
+    fn ttm_landing_by_name_applies_stunty_ko_on_seven() {
+        use ffb_model::enums::{SkillId, PS_KNOCKED_OUT, PS_STUNNED};
+        use ffb_model::model::SkillWithValue;
+        // Seed whose first two d6 sum to 7 — the injury roll once armour is pre-broken.
+        let seed = (0u64..10_000)
+            .find(|s| { let mut r = GameRng::new(*s); r.d6() + r.d6() == 7 })
+            .expect("some seed yields d6+d6==7");
+        let roll_landing = |stunty: bool| {
+            let mut game = make_game_with_players(&["p1"], &[]);
+            if stunty {
+                if let Some(p) = game.team_home.player_mut("p1") {
+                    p.starting_skills.push(SkillWithValue::new(SkillId::Stunty));
+                }
+            }
+            let mut t = make_injury_type("InjuryTypeTTMLanding");
+            t.injury_context_mut().armor_broken = true; // skip the armour roll → first 2 d6 = injury
+            let mut rng = GameRng::new(seed);
+            t.handle_injury(&game, &mut rng, None, "p1", FieldCoordinate::new(5, 5), None, None, ApothecaryMode::ThrownPlayer);
+            t.injury_context().injury.map(|s| s.base())
+        };
+        assert_eq!(roll_landing(true), Some(PS_KNOCKED_OUT),
+            "Stunty TTM-landing on a 7 must KO — regression: dispatch routed to a stale duplicate that dropped Stunty");
+        assert_eq!(roll_landing(false), Some(PS_STUNNED),
+            "non-Stunty TTM-landing on a 7 is Stunned");
     }
 }
