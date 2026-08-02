@@ -635,3 +635,18 @@ the turn PRONE). Seeds 1-7: 7/7. Updated 1 test + added the no-target suppressio
 
 Next: seed 8 first divergence i=9 (away_03 BLOCK) — Rust rolls 1 MORE game-die than Java (Rrng 15->20 vs
 Jrng 15->19). A block-resolution divergence (extra Rust roll); use FFB_DICE_TRACE Java caller= to pinpoint.
+
+## Iter 28 (2026-08-02) — Cheering Fans additional assist only cleared at a real (started) turn end (bee01cd7)
+
+Seed 8 i=9: away_03 BLOCK rolled 1 die (Rust) vs 2 (Java) — away had a Cheering Fans additional assist
+(kickoff rolled 4,4 tie → BOTH teams granted). ROOT: the iter25 end-of-turn assist clear also fired at the
+kickoff->turn-1 transition (StepEndTurn runs with turn_mode already Regular in Rust; Java's is Kickoff there,
+so removeAdditionalAssist is skipped) — clearing the KICKING team's (away) assist before away ever played.
+The premature clear had turn_started=false (no real turn); genuine turn-ends have turn_started=true. FIX:
+gate the clear on `game.turn_data().turn_started` in addition to turn_mode Regular/Blitz. Seed 8: step 9 -> 76.
+Seeds 1-7 still match. +2 tests. (Diagnosis path: first rng_calls divergence -> BlockRoll nr_of_dice=1 vs 2
+-> BS8 trace att_str=3 add=0 away_aa=0 -> AA_GRANT/AA_CLR_ET traces showed the premature clear at
+turn_started=false. FFB_DRIVE_TRACE correlates each die with its DRIVE step=.)
+
+Next: seed 8 first divergence i=76 (away_01 MOVE) — Rust rolls 3 MORE game-dice than Java (Rrng 39->44 vs
+Jrng 39->41). A movement divergence (GFI/dodge/injury); use FFB_DICE_TRACE Java caller= to pinpoint.
