@@ -928,3 +928,36 @@ NEXT ITER — reconcile (re-apply findings 1+2, then debug seed 19): hypotheses,
 (c) a guard difference (is_active / find_adjacent_players_with_tacklezones) for away_03.
 The Java engine is READ-ONLY (can't instrument); reason from its source. Repo is back to seeds 1-40 green +
 seed 41 = the frontier. Keep finding-1 (option default) regardless — it is a genuine faithful-translation fix.
+
+## Iter 40 — stalling reconciliation: pathfinder CONFIRMED correct; regression is NOT the pathfinder. Reverted again.
+
+Re-applied findings 1+2 and instrumented. HARD RESULT: the Rust pathfinder is CORRECT — for seed 19 away_03
+@(1,10)→ENDZONE_HOME it returns Some([(0,9)]) (a valid 1-step path), which a careful hand-trace of Java's
+PathFinderWithPassBlockSupport for that exact board ALSO yields (no home player/TZ near x=0-1; the ball-square-as-TZ
+and blockNode(start) handling for a carrier where ballCoord==start does NOT block the path). So Guard 4 agrees.
+
+Ruled OUT as the cause (all verified equal between the seed-41 staller that Java DOES roll and the seed-19 one
+it does NOT): (a) pathfinder result (both Some); (b) is_considered_stalling guards 1-3 (has_ball, no
+roll-at-activation skill, no adjacent tackler — all pass for away_03); (c) the ACTIVE bit — RUST_STALLCHK printed
+`active=Some(true) acting_player=None` for BOTH away_03 (s19) and home_07 (s41); (d) check_forgo — Java publishes
+CHECK_FORGO(true) on the agent's CLIENT_END_TURN (StepInitSelecting:319) and on a move that ends the turn
+(StepInitMoving:328), so it is true at away's turn-end too; (e) acting team — Java's EndTurn sequence runs
+FORGONE_STALLING BEFORE END_TURN (the flip), so getActingTeam()==away when it runs.
+
+So by EVERY readable condition Java's StepForgoneStalling should detect away_03 as stalling and roll — yet Java's
+rng_calls stays flat at 53 across i=175-180 (ZERO stalling dice in all of seed 19), while Rust rolls one at away's
+turn-2 end (rng 53→54 at i=179). The divergence is a Java-flow subtlety invisible in the individual conditions.
+Reverted (findings 1+2 both) to keep seeds 1-40 green + seed 41 = frontier.
+
+NEXT ITER — the decisive diagnostic (do this FIRST): determine whether Java's engine fires stalling in seed 19
+AT ALL. The Java ENGINE is read-only, but the ParityRunner HARNESS is CO-EDITABLE — temporarily add logging there
+to surface Java's stalling: after each step / at game end, log game.getGameResult().getTeamResultHome().isStalled()
+and getTeamResultAway().isStalled() (handleStaller sets these), and/or scan the report list for
+ReportThrowAtStallingPlayer / the "is stalling" ReportPlayerEvent. Run seed 19 vs seed 41: if Java shows a stalling
+report/flag in 41 but NONE in 19, then Java's StepForgoneStalling genuinely never detects a staller in 19 → the
+difference is structural (does FORGONE_STALLING even run at away's turn-end in seed 19? is checkForgo actually
+true? is the acting-team ball carrier found?). Add a matching Rust-side log and diff the two. Rebuild the jar
+after editing ParityRunner (`cd C:/Users/Admin/niels/ffb/ffb && /c/Users/Admin/bin/maven/bin/mvn -pl ffb-ai -am
+package -DskipTests`), then REVERT the ParityRunner logging + rebuild clean. Findings 1+2 (option default +
+pathfinder wiring) are correct and should be re-applied once the away_03 false-positive is understood. This
+mechanic has now cost 3 turns (Iter 38-40) — if the next iteration can't crack it, consider surfacing to the user.
