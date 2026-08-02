@@ -14,6 +14,7 @@ use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter};
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use crate::step::abstract_step_with_re_roll::find_skill_reroll_source;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.pass.StepPass.
 ///
@@ -325,6 +326,18 @@ impl StepPass {
             PassResult::FUMBLE => {
                 // Java: askForReRollIfAvailable before handling fumble
                 if !already_rerolled {
+                    // A FREE single-use SKILL re-roll (e.g. Pass) is offered by Java as a SKILL_USE
+                    // that ParityRunner ALWAYS uses — mirroring the engine's auto-use of Sure
+                    // Hands/Catch. Auto-use it here (no prompt): the pass die re-rolls once. Only a
+                    // TEAM re-roll is offered to the agent (which declines it deterministically).
+                    if let Some(source) = find_skill_reroll_source(game, "PASS") {
+                        self.re_rolled_action = Some("PASS".into());
+                        self.re_roll_source = Some(source.name.clone());
+                        // Re-enter: the top-of-function re-roll gate consumes the skill token via
+                        // use_reroll (marks it used), clears roll/result and re-rolls; already_rerolled
+                        // then blocks a second offer so the re-rolled result stands.
+                        return self.execute_step(game, rng);
+                    }
                     if let Some(prompt) = ask_for_reroll_if_available(game, "PASS", self.minimum_roll, true) {
                         self.re_rolled_action = Some("PASS".into());
                         self.re_roll_source = Some("TRR".into());
@@ -351,6 +364,12 @@ impl StepPass {
             PassResult::INACCURATE | PassResult::WILDLY_INACCURATE => {
                 // Java: askForReRollIfAvailable before routing to missed pass
                 if !already_rerolled {
+                    // Free single-use SKILL re-roll (Pass): auto-use it (see the FUMBLE branch).
+                    if let Some(source) = find_skill_reroll_source(game, "PASS") {
+                        self.re_rolled_action = Some("PASS".into());
+                        self.re_roll_source = Some(source.name.clone());
+                        return self.execute_step(game, rng);
+                    }
                     if let Some(prompt) = ask_for_reroll_if_available(game, "PASS", self.minimum_roll, false) {
                         self.re_rolled_action = Some("PASS".into());
                         self.re_roll_source = Some("TRR".into());
@@ -470,6 +489,35 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         let fumble = out.published.iter().find(|p| matches!(p, StepParameter::PassFumble(true)));
         assert!(fumble.is_some(), "expected PassFumble(true) on natural 1");
+    }
+
+    #[test]
+    fn fumble_auto_uses_free_pass_skill_reroll_without_prompt() {
+        // Regression (docs/PARITY_TTM.md "FRONTIER (human) — seed 4 step 174"): a thrower with the
+        // Pass skill that fumbles/misses has a FREE single-use skill re-roll. Java offers it as a
+        // SKILL_USE that ParityRunner ALWAYS uses (mirroring the engine's auto-use of Sure Hands /
+        // Catch), so the engine must AUTO-USE it — re-rolling the pass die once and marking the Pass
+        // skill used — WITHOUT emitting a decline-able ReRollOffer (which the agent would decline,
+        // skipping the re-roll die and desyncing from Java).
+        use ffb_model::enums::{SkillId, TurnMode};
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::prompts::AgentPrompt;
+        let mut game = make_game_with_thrower(3);
+        game.team_home.player_mut("t1").unwrap()
+            .starting_skills.push(SkillWithValue { skill_id: SkillId::Pass, value: None });
+        game.acting_player.player_id = Some("t1".into());
+        game.turn_mode = TurnMode::Regular;
+
+        let mut step = make_step();
+        step.roll = 1; // force the first pass roll to a natural 1 → FUMBLE
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(!matches!(out.prompt, Some(AgentPrompt::ReRollOffer { .. })),
+            "the free Pass skill re-roll must be auto-used, not offered as a decline-able ReRollOffer");
+        assert!(game.player("t1").unwrap().used_skills.contains(&SkillId::Pass),
+            "the Pass skill must be marked used after the auto re-roll");
+        assert_eq!(step.re_rolled_action.as_deref(), Some("PASS"),
+            "re_rolled_action records the single PASS re-roll (blocks a second offer)");
     }
 
     #[test]
