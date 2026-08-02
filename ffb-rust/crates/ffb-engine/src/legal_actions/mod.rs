@@ -475,6 +475,41 @@ pub fn legal_handoff_receivers(game: &Game, player_id: &str, side: TeamSide) -> 
     targets
 }
 
+/// Returns adjacent teammates the acting player may throw (Throw Team-Mate): standing teammates
+/// carrying the `canBeThrown` property (Right Stuff), coordinate-sorted. Mirrors the reference
+/// harness ParityRunner.sendThrowTeamMateAction's candidate set so both agents pick identically.
+pub fn legal_throw_team_mate_targets(game: &Game, player_id: &str, side: TeamSide) -> Vec<PlayerId> {
+    use ffb_model::enums::PS_STANDING;
+    use ffb_model::model::property::named_properties::NamedProperties;
+    let coord = match game.field_model.player_coordinate(player_id) {
+        Some(c) => c,
+        None => return vec![],
+    };
+    let team = match side {
+        TeamSide::Home => &game.team_home,
+        TeamSide::Away => &game.team_away,
+    };
+    let mut targets: Vec<PlayerId> = team.players.iter()
+        .filter(|p| p.id != player_id)
+        .filter(|p| p.has_skill_property(NamedProperties::CAN_BE_THROWN))
+        .filter(|p| {
+            game.field_model.player_coordinate(&p.id)
+                .map(|c| c.is_adjacent(coord))
+                .unwrap_or(false)
+                && game.field_model.player_state(&p.id)
+                    .map(|s| s.base() == PS_STANDING)
+                    .unwrap_or(false)
+        })
+        .map(|p| p.id.clone())
+        .collect();
+    targets.sort_by_key(|id| {
+        game.field_model.player_coordinate(id)
+            .map(|c| (c.x, c.y))
+            .unwrap_or((i32::MAX, i32::MAX))
+    });
+    targets
+}
+
 /// Returns all on-pitch teammates for the pass-target list (Java ParityRunner.sendPassAction).
 /// Matches Java: all teammates with a valid on-field coordinate, sorted by (x, y), 1 actionRng pick.
 pub fn legal_pass_receivers(game: &Game, player_id: &str, side: TeamSide) -> Vec<PlayerId> {
@@ -874,6 +909,30 @@ mod tests {
         game.field_model.ball_coordinate = Some(c(5, 5));
         let actions = legal_activate_player_actions(&game, TeamSide::Home);
         assert!(!has_action(&actions, "p1", PlayerActionChoice::HandOff));
+    }
+
+    #[test]
+    fn throw_team_mate_targets_are_adjacent_standing_right_stuff_teammates() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "ogre", c(5, 5), PS_STANDING, vec![SkillId::ThrowTeamMate]);
+        // Adjacent Right Stuff teammate → a target.
+        add_player(&mut game, true, "snot_ok", c(6, 5), PS_STANDING, vec![SkillId::RightStuff]);
+        // Right Stuff but NOT adjacent → excluded.
+        add_player(&mut game, true, "snot_far", c(9, 9), PS_STANDING, vec![SkillId::RightStuff]);
+        // Adjacent Right Stuff but PRONE → excluded (can't be picked up).
+        add_player(&mut game, true, "snot_prone", c(4, 5), PS_PRONE, vec![SkillId::RightStuff]);
+        // Adjacent teammate WITHOUT Right Stuff → excluded (not throwable).
+        add_player(&mut game, true, "lineman", c(5, 6), PS_STANDING, vec![]);
+        let targets = legal_throw_team_mate_targets(&game, "ogre", TeamSide::Home);
+        assert_eq!(targets, vec!["snot_ok".to_string()]);
+    }
+
+    #[test]
+    fn throw_team_mate_targets_empty_without_right_stuff_teammate() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "ogre", c(5, 5), PS_STANDING, vec![SkillId::ThrowTeamMate]);
+        add_player(&mut game, true, "lineman", c(6, 5), PS_STANDING, vec![]);
+        assert!(legal_throw_team_mate_targets(&game, "ogre", TeamSide::Home).is_empty());
     }
 
     #[test]

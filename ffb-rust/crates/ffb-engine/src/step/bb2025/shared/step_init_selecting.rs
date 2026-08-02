@@ -241,7 +241,13 @@ impl StepInitSelecting {
                 // this, StepInitPassing would run with no target coordinate, set no thrower, and
                 // return Continue with no prompt — the drive stalls and the game ends early (seed 22
                 // i=184: ball carrier away_04 whose only turn-start-adjacent teammate had moved off).
-                if matches!(dispatch, PlayerAction::HandOver | PlayerAction::Pass)
+                // Same no-target deselect for Throw/Kick Team-Mate: an activation whose thrown-player
+                // list is empty (no adjacent standing Right Stuff teammate) is deselected — the
+                // reference harness does the same, and StepInitThrowTeamMate would otherwise Continue
+                // with no player and stall.
+                if matches!(dispatch,
+                        PlayerAction::HandOver | PlayerAction::Pass
+                        | PlayerAction::ThrowTeamMate | PlayerAction::KickTeamMate)
                     && game.defender_id.is_none()
                 {
                     return StepOutcome::goto(label)
@@ -266,6 +272,16 @@ impl StepInitSelecting {
                             if let Some(coord) = game.field_model.player_coordinate(&def) {
                                 target_params.push(StepParameter::TargetCoordinate(coord));
                             }
+                        }
+                        // Throw/Kick Team-Mate: the agent chose the thrown player at activation time
+                        // (block_defender_id → game.defender_id). Hand it to StepInitThrowTeamMate,
+                        // which picks it up and then prompts for the target square.
+                        PlayerAction::ThrowTeamMate => {
+                            target_params.push(StepParameter::ThrownPlayerId(Some(def)));
+                        }
+                        PlayerAction::KickTeamMate => {
+                            target_params.push(StepParameter::ThrownPlayerId(Some(def)));
+                            target_params.push(StepParameter::IsKickedPlayer(true));
                         }
                         _ => {}
                     }

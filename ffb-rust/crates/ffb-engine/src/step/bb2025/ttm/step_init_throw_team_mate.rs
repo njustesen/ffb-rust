@@ -7,6 +7,7 @@ use ffb_mechanics::pass_mechanic::PassMechanic as PassMechanicTrait;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepAction, StepId, StepParameter};
+use ffb_model::prompts::agent_prompt::AgentPrompt;
 
 /// Initialises the throw-team-mate sequence.
 ///
@@ -199,7 +200,16 @@ impl StepInitThrowTeamMate {
             } else {
                 game.acting_player.player_action = Some(PlayerAction::ThrowTeamMate);
             }
+            // Headless parity bridge: the real GUI client picks the throw target itself; the
+            // deterministic agent needs a prompt to respond to, so surface one now that the thrown
+            // player is picked up. The engine still waits (Continue) for the resulting
+            // Action::ThrowTeamMate{coord}.
+            let thrower_id = game.acting_player.player_id.clone().unwrap_or_default();
             return StepOutcome::cont()
+                .with_prompt(AgentPrompt::ThrowTeamMateTarget {
+                    thrower_id,
+                    thrown_player_id: pid.clone(),
+                })
                 .publish(StepParameter::ThrownPlayerId(Some(pid.clone())))
                 .publish(StepParameter::ThrownPlayerState(thrown_state))
                 .publish(StepParameter::OldDefenderState(old_state))

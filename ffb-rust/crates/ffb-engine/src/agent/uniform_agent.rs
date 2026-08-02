@@ -336,6 +336,17 @@ impl Agent for UniformAgent {
                 self.mark_unhandled("ReRollForTargets");
                 Action::Acknowledge
             }
+            // Throw Team-Mate target: deterministic 3-square throw toward the opponent end zone
+            // (same rule as RandomAgent), sent in the acting client's view.
+            Some(AgentPrompt::ThrowTeamMateTarget { thrower_id, thrown_player_id }) => {
+                let is_home = gs.game.team_home.player(thrower_id).is_some();
+                let dir = if is_home { 1 } else { -1 };
+                let target = gs.game.field_model.player_coordinate(thrower_id)
+                    .map(|c| ffb_model::types::FieldCoordinate::new((c.x + dir * 3).clamp(0, 25), c.y.clamp(0, 14)))
+                    .unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
+                let cmd = if is_home { target } else { target.transform() };
+                Action::ThrowTeamMate { player_id: thrown_player_id.clone(), coord: cmd }
+            }
             None => Action::Acknowledge,
         }
     }

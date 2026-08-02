@@ -15,7 +15,7 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::enums::{PlayerAction, SkillId};
 
 use crate::action::{Action, PlayerActionChoice};
-use crate::legal_actions::{canonical_setup_action, legal_block_targets, legal_foul_targets, legal_handoff_receivers, legal_pass_receivers, TeamSide};
+use crate::legal_actions::{canonical_setup_action, legal_block_targets, legal_foul_targets, legal_handoff_receivers, legal_pass_receivers, legal_throw_team_mate_targets, TeamSide};
 use crate::step::GameState;
 
 use super::Agent;
@@ -276,6 +276,20 @@ impl Agent for RandomAgent {
                             Some(receivers[ridx].clone())
                         }
                     }
+                    // Throw/Kick Team-Mate: pick the thrown player (an adjacent standing Right Stuff
+                    // teammate), coordinate-sorted, 1 actionRng. Empty → None → StepInitSelecting
+                    // deselects (no valid throwable teammate). The target square is chosen later, on
+                    // the ThrowTeamMateTarget prompt. 1:1 with ParityRunner.sendThrowTeamMateAction.
+                    PlayerActionChoice::ThrowTeamMate => {
+                        let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
+                        let targets = legal_throw_team_mate_targets(&gs.game, player_id, side);
+                        if targets.is_empty() {
+                            None
+                        } else {
+                            let tidx = self.pick_action(targets.len());
+                            Some(targets[tidx].clone())
+                        }
+                    }
                     _ => None,
                 };
                 if std::env::var("FFB_TRACE").is_ok() {
@@ -349,6 +363,20 @@ impl Agent for RandomAgent {
             // The old code random-sampled (pick_bool) AND consumed a decision_rng call, which both
             // sometimes followed up into the pushed player's vacated square (wrong final position)
             // and desynced the decision stream.
+            // Throw Team-Mate target: the thrower has picked up the teammate; choose where to throw.
+            // Deterministic — 3 squares toward the opponent end zone (quick-pass range, always legal),
+            // clamped to the pitch, 0 actionRng. Sent in the acting client's view (canonical for home,
+            // mirrored for away) so StepInitThrowTeamMate's un-mirror yields the canonical target,
+            // matching ParityRunner.sendMoveAction's coordinate convention.
+            Some(AgentPrompt::ThrowTeamMateTarget { thrower_id, thrown_player_id }) => {
+                let is_home = gs.game.team_home.player(thrower_id).is_some();
+                let dir = if is_home { 1 } else { -1 };
+                let target = gs.game.field_model.player_coordinate(thrower_id)
+                    .map(|c| FieldCoordinate::new((c.x + dir * 3).clamp(0, 25), c.y.clamp(0, 14)))
+                    .unwrap_or(FieldCoordinate::new(0, 0));
+                let cmd_coord = if is_home { target } else { target.transform() };
+                Action::ThrowTeamMate { player_id: thrown_player_id.clone(), coord: cmd_coord }
+            }
             Some(AgentPrompt::FollowUp { .. }) => {
                 Action::FollowUp { follow_up: false }
             }

@@ -34,6 +34,12 @@ pub enum AgentPrompt {
         player_id: PlayerId,
         squares: Vec<FieldCoordinate>,
     },
+    /// Throw Team-Mate: the thrower has picked up `thrown_player_id` (now PICKED_UP) and must choose
+    /// the target square to throw it to. Emitted by StepInitThrowTeamMate after the pick-up.
+    ThrowTeamMateTarget {
+        thrower_id: PlayerId,
+        thrown_player_id: PlayerId,
+    },
     FollowUp {
         attacker_id: PlayerId,
         target_coord: FieldCoordinate,
