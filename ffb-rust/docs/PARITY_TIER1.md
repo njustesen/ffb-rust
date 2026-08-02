@@ -886,3 +886,45 @@ Dijkstra-to-endzone avoiding blocked squares + opponent tackle zones (cost 1000)
 crates/ffb-mechanics or ffb-model util; wire is_considered_stalling Guard 4 to it. VERIFY seeds 1-40 hold + seed
 41 advances. Add a Rust test (ball carrier with clear lane to endzone → is_considered_stalling true; blocked by a
 wall of TZ → false). This is a BIG mechanic — give it a full turn.
+
+## Iter 39 — seed 41 stalling fix ATTEMPTED then REVERTED (regressed seed 19). Two real findings; needs reconciliation.
+
+Correction to Iter 38: the pathfinder IS already ported — crates/ffb-model/src/util/pathfinding/
+path_finder_with_pass_block_support.rs exposes `get_shortest_path_for_player(game, end_coords, player,
+current_move)`, matching Java. The stalling_extension.rs Guard-4 stub comment ("not ported") is STALE.
+
+FINDING 1 (real bug, keep for the re-apply): Rust's `util_game_option::is_option_enabled` just calls
+`game.options.is_enabled(id)`, which returns FALSE for an option never explicitly set. Java's
+`UtilGameOption.isOptionEnabled` uses `getOptionWithDefault` → falls back to the GameOptionFactory DEFAULT.
+ENABLE_STALLING_CHECK is created with default=true but is NEVER added to the game (UtilServerStartGame line
+301 `setValue(false)` but the `addOption(...)` is commented out), so Java resolves it to its default TRUE.
+Rust reported it disabled → StepForgoneStalling/StepStallingPlayer were always skipped and is_considered_stalling
+was never even called. Fix: `is_option_enabled` should mirror Java via GameOptions::get_option_with_default
+(already exists): `GameOptionId::for_name(id).map(|e| game.options.get_option_with_default(e).get_value_as_string()=="true")`.
+Then point step_forgone_stalling.rs + step_stalling_player.rs at util_game_option::is_option_enabled.
+
+FINDING 2 (the wiring): replacing Guard 4 (stalling_extension.rs line 55-57 `false`) with
+`PathFinderWithPassBlockSupport::new().get_shortest_path_for_player(game, &endzone_coords, player, 0).is_some()`
+— endzone = ENDZONE_AWAY (x=25) if team_home.has_player else ENDZONE_HOME (x=0); endzone_coords =
+endzone.coordinates().collect() — makes seed 41 PASS (home_07 ball carrier at (24,13), 1 sq from x=25 → path →
+stalling → rolls the d6 Java rolls).
+
+REGRESSION that forced the revert: seed 19 (fixed back in Iter-34) FAILS with the change. First RNG divergence
+is i=178 (Rust rng 54 vs Java 53): at the END of away's turn (half 2, turn 1) Rust's StepForgoneStalling detects
+away_03 (a02, ball carrier at (1,10), 1 sq from ENDZONE_HOME x=0, no adjacent taggers) as stalling and rolls a
+d6; Java rolls ZERO stalling dice in ALL of seed 19. The state hashes still match at i=178/i=179 (the extra roll
+only flips game_result.stalled, not in the hash) but the rng desync surfaces as a state divergence at step ~197.
+So Rust's is_considered_stalling(away_03) == true where Java's == false, for a board where the pathfinder SHOULD
+find a clear 1-square path in both (no blockers/TZ near x=0). Yet Java rolled for home_07@(24,13) in seed 41 — so
+Java's stalling IS enabled; the two engines' stalling decisions diverge on away_03.
+
+NEXT ITER — reconcile (re-apply findings 1+2, then debug seed 19): hypotheses, in priority order —
+(a) check_forgo TIMING: Rust may fire StepForgoneStalling at away_03's turn-end when Java does NOT (verify where
+    CHECK_FORGO(true) is published in Rust vs Java — a MOVE-ended turn may not set it in Java; this was masked
+    while the option gate was off). Temp-log when StepForgoneStalling actually runs + which player.
+(b) pathfinder disagreement: temp-instrument the Rust pathfinder to print the path it returns for away_03@(1,10)
+    →ENDZONE_HOME and hand-trace Java's PathFinderWithPassBlockSupport for that exact board (ball-square-as-TZ
+    handling for a carrier where ballCoord==start; the player-blocking loop blockNode(start)).
+(c) a guard difference (is_active / find_adjacent_players_with_tacklezones) for away_03.
+The Java engine is READ-ONLY (can't instrument); reason from its source. Repo is back to seeds 1-40 green +
+seed 41 = the frontier. Keep finding-1 (option default) regardless — it is a genuine faithful-translation fix.
