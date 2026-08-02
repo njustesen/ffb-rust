@@ -109,3 +109,19 @@ ogre is green (TTM will then correctly deselect there — no throwable player).
   ENDS (java=None) but Rust continues (away_02 Move) — a turnover Rust lacks, or a game/turn-end
   difference in the second throw's resolution. Root-cause next: compare the away_06 throw dice +
   outcome; likely the thrown player hits an own-team player (turnover) or lands differently.
+
+## Iter 3 (2026-08-02) — fix second-throw infinite loop (Throw Team-Mate is once per turn)
+- **Frontier was ogre seed 1 step 6:** Java's ParityRunner LOOPED forever on a SECOND throw (away_06
+  after away_05 already threw) — repeated `JAVA_TTM pid=away_06` with alternating idx; the engine
+  rejects a 2nd throw (`ttm_used` set) so sendConcreteAction re-fired endlessly and the harness aborted
+  (java=None). Rust deselected it (1 die) but the turnover/flow still diverged.
+- **Root cause:** Throw/Kick Team-Mate are once-per-team-turn (`ttm_used`/`ktm_used`), but the agents'
+  turn-start eligibility snapshot still offered a second one, and `filterStaleActions` didn't drop it
+  (only Blitz/Pass/HandOver/Foul were filtered).
+- **Fix (both agents):** `random_agent.rs` + ParityRunner `filterStaleActions` now drop `ThrowTeamMate`
+  when `ttm_used` and `KickTeamMate` when `ktm_used`. Jar rebuilt; lineman tier still green.
+- **NEW FRONTIER = ogre seed 1 step 7 (i=8):** away_02 (an Ogre) BLITZes — identical dice both engines
+  (Bone-head pos28-29, block dice 6,4, armour), but Rust TURNS OVER (blitzer a01 + defender h00 both
+  fall Prone → "both down") while Java continues (no turnover). A block-result / Bone-head logic diff
+  in the Ogre blitz, NOT dice. NEXT: compare the block die[0] result + Bone-head handling (Rust vs Java
+  StepBlock/StepInitBlocking + BoneHeadBehaviour); why does the same die give both-down in Rust only.
