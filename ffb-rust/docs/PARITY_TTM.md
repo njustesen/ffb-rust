@@ -73,3 +73,21 @@ itself — scatter direction, landing square, land/catch roll, crash injury — 
 The other Ogre/Snotling skills (Bone-head, Dodge, Stunty, Titchy, Side Step, Mighty Blow, Thick Skull)
 are a normal tier campaign; log each fix here. Return to the human tier ([[parity-tier-human]]) once
 ogre is green (TTM will then correctly deselect there — no throwable player).
+
+## Iter 1 (2026-08-02) — TTM machinery implemented (both engines drive the throw)
+- **Rust (committed):** `legal_throw_team_mate_targets` helper; `random_agent` picks the thrown player
+  on a TTM activation (+1 actionRng) and answers the new `AgentPrompt::ThrowTeamMateTarget` with a
+  deterministic 3-square-toward-endzone throw (0 actionRng, mirrored for away); `StepInitSelecting`
+  dispatch threads `ThrownPlayerId` (+ no-target deselect for TTM/KTM); `StepInitThrowTeamMate` emits
+  the target prompt after pick-up; `uniform_agent` handles it; tests added. Verified: Rust now drives
+  a TTM end-to-end (pick up → prompt → `ThrowTeamMate` step) with NO stall/panic.
+- **Java (ParityRunner committed in ffb repo; jar rebuilt):** `sendThrowTeamMateAction` (pick thrown
+  player, 1 actionRng, empty→deselect) + `INIT_THROW_TEAM_MATE` case → `sendThrowTeamMateTarget` (same
+  deterministic target). ffb ENGINE still stock (only DiceRoller + StepGoForIt gated logging).
+- **Regression guard PASSED:** lineman tier still green after the jar rebuild (spot-checked 1/7/22/46/57).
+- **NEW FRONTIER = ogre seed 1, i=3** (active team differs: Java away / Rust home) — a NON-TTM ogre
+  mechanic, reached BEFORE any throw. Almost certainly **Bone-head** (the Ogre's activation roll, like
+  Really Stupid) or an early turnover; my TTM changes only touch TTM activations so this is pre-existing
+  roster work. NEXT: isolate ogre seed 1 i=3, root-cause the Bone-head/turn divergence, then keep
+  advancing — a TTM will eventually be reached and its resolution (scatter/land/catch-or-crash/injury)
+  must then be verified to parity (that's still the point; not yet confirmed end-to-end).
