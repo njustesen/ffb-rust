@@ -97,6 +97,12 @@ impl Step for StepInitSelecting {
                 util_server_steps::change_player_action(game, player_id, pa, false);
                 if let Some(def_id) = block_defender_id {
                     game.defender_id = Some(def_id.clone());
+                } else {
+                    // No target chosen this activation (e.g. a HandOver/Pass whose receiver list is
+                    // empty, or a no-defender block). Clear any stale defender from an earlier
+                    // activation so the dispatch below sees a reliable "no target" signal instead of
+                    // publishing a stale coordinate/defender.
+                    game.defender_id = None;
                 }
                 // Block/Blitz variants: go directly to label (forceGotoOnDispatch)
                 self.force_goto_on_dispatch = matches!(
@@ -227,6 +233,20 @@ impl StepInitSelecting {
         }
         if let Some(dispatch) = self.dispatch_player_action {
             if game.acting_player.player_id.is_some() {
+                // Java ParityRunner Phase 2 (sendHandOverAction / sendPassAction): a PASS or
+                // HAND_OVER activation whose target list is empty is deselected at the passing step
+                // (ClientCommandActingPlayer(null,null,false)) — the player is activated but does
+                // nothing, and the turn continues with the next player. Rust chooses the target at
+                // activation time, so a no-receiver hand-over arrives here with no defender; without
+                // this, StepInitPassing would run with no target coordinate, set no thrower, and
+                // return Continue with no prompt — the drive stalls and the game ends early (seed 22
+                // i=184: ball carrier away_04 whose only turn-start-adjacent teammate had moved off).
+                if matches!(dispatch, PlayerAction::HandOver | PlayerAction::Pass)
+                    && game.defender_id.is_none()
+                {
+                    return StepOutcome::goto(label)
+                        .publish(StepParameter::EndPlayerAction(true));
+                }
                 let standing_up = game.acting_player.standing_up;
                 // Rust bridging: the agent chose its target at activation time
                 // (Action::ActivatePlayer.block_defender_id → game.defender_id), whereas Java's
@@ -377,6 +397,33 @@ mod tests {
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("end_label"));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(_))));
+    }
+
+    #[test]
+    fn hand_over_activation_without_receiver_deselects() {
+        use ffb_model::enums::PlayerAction;
+        // Java ParityRunner.sendHandOverAction: a HAND_OVER whose adjacent-teammate list is empty is
+        // deselected (ClientCommandActingPlayer(null,null,false)). Rust picks the receiver at
+        // activation time, so a no-receiver hand-off arrives with block_defender_id == None; the
+        // dispatch must EndPlayerAction rather than push a passing sequence StepInitPassing can
+        // never complete (it would stall with no target coordinate — seed 22 i=184).
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        // A stale defender from an earlier activation must not resurrect the hand-over.
+        game.defender_id = Some("stale".into());
+        let mut step = StepInitSelecting::new("end_label".into());
+        let action = Action::ActivatePlayer {
+            player_id: "p1".into(),
+            player_action: PlayerActionChoice::HandOff,
+            block_defender_id: None,
+        };
+        let out = step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(out.goto_label.as_deref(), Some("end_label"));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))),
+            "no-receiver hand-over must deselect");
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(Some(PlayerAction::HandOver)))),
+            "no-receiver hand-over must NOT dispatch a passing sequence");
     }
 
     #[test]
