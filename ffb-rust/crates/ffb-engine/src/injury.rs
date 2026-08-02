@@ -398,7 +398,12 @@ pub fn do_armor_roll(game: &Game, rng: &mut GameRng, ctx: &mut InjuryContext, de
     let d1 = rng.d6();
     let d2 = rng.d6();
     ctx.armor_roll = Some([d1, d2]);
-    let armor_value = game.player(defender_id).map(|p| p.armour).unwrap_or(7);
+    // Java DiceInterpreter.isArmourBroken uses `defender.getArmourWithModifiers()` — the effective
+    // armour including temporary enhancements (e.g. Dodgy Snack's -AV for the drive) and stat
+    // changes, NOT the base AV. Using base p.armour let a snacked AV8→7 lineman survive an armour
+    // roll of 7 that Java breaks (7 >= 7), diverging the injury (seed 46 i=176: home_02 Prone in
+    // Rust vs Stunned in Java).
+    let armor_value = game.player(defender_id).map(|p| p.armour_with_modifiers()).unwrap_or(7);
     ctx.armor_broken = mech_armor_broken(armor_value, [d1, d2], &ctx.armor_modifiers);
 }
 
@@ -406,7 +411,8 @@ pub fn do_armor_roll(game: &Game, rng: &mut GameRng, ctx: &mut InjuryContext, de
 /// Java: DiceInterpreter.isArmourBroken(gameState, injuryContext)
 pub fn recalc_armor_broken(game: &Game, ctx: &mut InjuryContext, defender_id: &str) {
     if let Some([d1, d2]) = ctx.armor_roll {
-        let armor_value = game.player(defender_id).map(|p| p.armour).unwrap_or(7);
+        // Match Java DiceInterpreter.isArmourBroken → getArmourWithModifiers (see do_armor_roll).
+        let armor_value = game.player(defender_id).map(|p| p.armour_with_modifiers()).unwrap_or(7);
         ctx.armor_broken = mech_armor_broken(armor_value, [d1, d2], &ctx.armor_modifiers);
     }
 }
@@ -1039,6 +1045,24 @@ mod tests {
         p.armour = armour;
         p.starting_skills.push(ffb_model::model::SkillWithValue::new(skill));
         p
+    }
+
+    #[test]
+    fn armor_roll_uses_modified_armour_not_base() {
+        use ffb_model::model::player::STAT_AV;
+        // Java DiceInterpreter.isArmourBroken uses getArmourWithModifiers. A base-AV8 defender with
+        // a -1 AV enhancement (Dodgy Snack's -MA/-AV for the drive) breaks on an armour roll of 7
+        // (7 >= AV7) where base AV8 would hold — the seed-46 divergence.
+        let mut game = make_game_with_players(&["attacker"], &["defender"]);
+        game.team_away.players[0].armour = 8;
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        ctx.armor_roll = Some([3, 4]); // total 7
+        recalc_armor_broken(&game, &mut ctx, "defender");
+        assert!(!ctx.armor_broken, "base AV8 holds an armour roll of 7");
+        // Apply the Dodgy Snack -1 AV temporary enhancement.
+        game.player_mut("defender").unwrap().add_temporary_stat_mod("Dodgy Snack", STAT_AV, -1);
+        recalc_armor_broken(&game, &mut ctx, "defender");
+        assert!(ctx.armor_broken, "AV7 (base 8 minus Dodgy Snack) breaks on an armour roll of 7");
     }
 
     #[test]
