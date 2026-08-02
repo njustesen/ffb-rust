@@ -858,4 +858,14 @@ just not chosen yet), keep waiting (cont()) for the GUI path. Tests: no_defender
 player_action, no_defender_blitz_ends_the_turn, and no_defender_id_with_adjacent_target_stays_cont (GUI wait
 preserved). Seeds 1-40 now fully match (was 1-29).
 
-Next: run seeds 1-50+ to find the next divergence (frontier now ≥41).
+Next: seed 41 first state_hash divergence at i=225's PRE-state (both 41ff157a Java / 0530c881 Rust) — i.e.
+i=224 Activate(home_07, MOVE) (turn 7 half 2, active=home) produced divergent post-states from a SHARED
+pre-state (81866d22), NO dice → a deterministic MOVE/positional divergence (like the Iter-31/32 carrier/
+stand-up ones), NOT a dice-count one. Both engines then Activate(away_01, BLOCK) at i=225 on the now-divergent
+pre-state. METHOD next iter: isolate `--seeds 41-41`; the Rust JSONL (seed_41_rust.jsonl) DOES carry a `state`
+field per step under FFB_TRACE — read i=224 and i=225 Rust states directly from it; get Java's i=225 state from
+the JSTEP trace but CORRELATE BY HASH/CONTENT, not by trace-i (the FFB_TRACE i= counter does NOT match the
+JSONL/comparator i= — this bit me repeatedly). Find the single changed token (a home player coord/base or the
+ball) at i=225 and trace home_07's move resolution (RUST_SMA/RUST_PICK, LOOP applied=) vs Java (JAVA_SMA/
+JAVA_PICK). Likely a move-continuation / pickup / carrier heuristic or a knockdown-placement difference. Fix
+the Rust engine (or the agent if it's a move-heuristic mirror mismatch). VERIFY seeds 1-40 hold.
