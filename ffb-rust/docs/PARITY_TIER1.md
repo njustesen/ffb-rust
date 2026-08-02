@@ -650,3 +650,25 @@ turn_started=false. FFB_DRIVE_TRACE correlates each die with its DRIVE step=.)
 
 Next: seed 8 first divergence i=76 (away_01 MOVE) — Rust rolls 3 MORE game-dice than Java (Rrng 39->44 vs
 Jrng 39->41). A movement divergence (GFI/dodge/injury); use FFB_DICE_TRACE Java caller= to pinpoint.
+
+## Iter 29 (2026-08-02) — DIAGNOSIS ONLY: seed 8 i=76 carrier-move square-pool mismatch (no fix yet)
+
+Seed 8 i=76 (away_01 MOVE): Rust rolls 3 more game-dice than Java. away_01 (at (14,8), loose ball at
+(14,9)) moves onto the ball, picks it up (pos40, both), and runs as carrier. The move PICKS match through
+(9,9): (14,9)idx4,(13,9)idx1,(12,8)idx0,(11,8)idx1,(10,8)idx1,(9,9)idx1 — same idx/arc both. DIVERGENCE at
+the NEXT (going-for-it) move FROM (9,9): Rust pool N=3, Java pool N=8 → different actionRng modulo →
+Rust picks (8,10), Java picks (8,9) → different dodge/GFI dice downstream.
+- Rust engine Move `squares` from (9,9) = [(8,8),(8,9),(8,10),(9,10),(10,8),(10,10)] (N=6; excludes the
+  occupied (9,8)=h07 and (10,9)=away_02). Carrier advancing-filter (x<9 for away) keeps (8,8),(8,9),(8,10)
+  → N=3.
+- Java ParityRunner.sendMoveAction computes its OWN targets (8-neighborhood minus occupied), sorts (x,y),
+  then the SAME advancing filter; JAVA_PICK N=8 means its advancing list was EMPTY (used all 8) — i.e.
+  Java's targets did NOT contain the advancing (8,x) squares that Rust's engine `squares` DID.
+ROOT (to confirm): the Rust agent picks from the ENGINE's `AgentPrompt::Move { squares }`, while Java
+computes adjacent-free targets independently — the two disagree on the (9,9) square set (differ by exactly
+the advancing (8,x) squares, and by whether (9,8)/(10,9) are counted). NEXT: instrument Java ParityRunner
+sendMoveAction to print the actual `targets` LIST (not just count) at away_01's (9,9) move (rebuild jar),
+and dump Rust's engine move-squares at the same point; find why Java's targets lack (8,x) (occupancy check
+vs engine SMA, or a board diff from a mid-move dodge/fall — pos39 Java caller=InjuryTypeDropDodge.handleInjury,
+so a dodge failed & someone fell during the move). Align the move-square set (engine SMA vs ParityRunner
+targets) so both agents see the same pool. NO fix committed this iter (diagnosis only).
