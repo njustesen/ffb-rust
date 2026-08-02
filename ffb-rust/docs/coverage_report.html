@@ -1,0 +1,361 @@
+<title>Parity Tier 1 — Mechanic Coverage</title>
+<style>
+  :root{
+    --bg:#ecefe9; --panel:#ffffff; --panel2:#f6f8f3; --ink:#15211a; --muted:#5a655e;
+    --border:#dbe0d8; --accent:#1f7a4d; --accent-ink:#125334; --accent-soft:#d8ecdf;
+    --amber:#8f6410; --amber-soft:#f0e4c8; --track:#e6e9e2; --shadow:rgba(20,40,28,.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0e130f; --panel:#161d17; --panel2:#1b231c; --ink:#e7ede7; --muted:#95a29a;
+      --border:#28311f; --accent:#4cbd7c; --accent-ink:#a6e3c0; --accent-soft:#173021;
+      --amber:#d5a556; --amber-soft:#2c2413; --track:#222a22; --shadow:rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e130f; --panel:#161d17; --panel2:#1b231c; --ink:#e7ede7; --muted:#95a29a;
+    --border:#28311f; --accent:#4cbd7c; --accent-ink:#a6e3c0; --accent-soft:#173021;
+    --amber:#d5a556; --amber-soft:#2c2413; --track:#222a22; --shadow:rgba(0,0,0,.3);
+  }
+  :root[data-theme="light"]{
+    --bg:#ecefe9; --panel:#ffffff; --panel2:#f6f8f3; --ink:#15211a; --muted:#5a655e;
+    --border:#dbe0d8; --accent:#1f7a4d; --accent-ink:#125334; --accent-soft:#d8ecdf;
+    --amber:#8f6410; --amber-soft:#f0e4c8; --track:#e6e9e2; --shadow:rgba(20,40,28,.06);
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5; letter-spacing:-.005em;
+  }
+  .mono{font-family:ui-monospace,"Cascadia Code","SF Mono",Menlo,Consolas,monospace}
+  .wrap{max-width:1060px; margin:0 auto; padding:clamp(20px,4vw,52px) clamp(16px,4vw,40px) 80px}
+
+  /* ---- Masthead ---- */
+  header.mast{border-bottom:2px solid var(--ink); padding-bottom:22px; margin-bottom:30px}
+  .eyebrow{
+    font-family:ui-monospace,monospace; font-size:12px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--accent-ink); display:flex; align-items:center; gap:10px; margin-bottom:14px;
+  }
+  .eyebrow::before{content:""; width:26px; height:2px; background:var(--accent)}
+  h1{
+    font-size:clamp(28px,5vw,44px); line-height:1.04; margin:0 0 10px; font-weight:680;
+    text-wrap:balance; letter-spacing:-.02em;
+  }
+  .sub{color:var(--muted); font-size:16px; max-width:64ch; margin:0}
+  .sub code{font-family:ui-monospace,monospace; font-size:.86em; background:var(--panel2); padding:1px 6px; border-radius:5px; border:1px solid var(--border); color:var(--ink)}
+
+  /* ---- Summary strip ---- */
+  .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px; background:var(--border);
+    border:1px solid var(--border); border-radius:12px; overflow:hidden; margin:26px 0 8px; box-shadow:0 1px 0 var(--shadow)}
+  .stat{background:var(--panel); padding:16px 18px; display:flex; flex-direction:column; gap:3px}
+  .stat .k{font-family:ui-monospace,monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted)}
+  .stat .v{font-family:ui-monospace,monospace; font-size:26px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.01em}
+  .stat.hero .v{color:var(--accent)}
+  .stat .v small{font-size:13px; color:var(--muted); font-weight:500}
+
+  .note{display:flex; gap:10px; align-items:flex-start; background:var(--accent-soft); border:1px solid color-mix(in srgb,var(--accent) 30%, transparent);
+    color:var(--accent-ink); border-radius:10px; padding:12px 15px; font-size:13.5px; margin:18px 0 2px}
+  .note b{font-weight:650}
+  .note .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);margin-top:5px;flex:none}
+
+  /* ---- Sections ---- */
+  section{margin-top:44px}
+  .sec-head{display:flex; align-items:baseline; gap:14px; margin-bottom:6px; flex-wrap:wrap}
+  h2{font-size:19px; margin:0; font-weight:640; letter-spacing:-.01em}
+  .sec-head .idx{font-family:ui-monospace,monospace; font-size:12px; color:var(--accent); font-weight:600}
+  .sec-desc{color:var(--muted); font-size:13.5px; margin:2px 0 16px; max-width:70ch}
+
+  /* ---- Tables ---- */
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:12px; overflow:hidden; box-shadow:0 1px 2px var(--shadow)}
+  .scroll{overflow-x:auto}
+  table{width:100%; border-collapse:collapse; font-size:14px}
+  thead th{
+    font-family:ui-monospace,monospace; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+    text-align:left; padding:11px 16px; border-bottom:1px solid var(--border); background:var(--panel2); font-weight:600; white-space:nowrap;
+  }
+  th.num,td.num{text-align:right; font-variant-numeric:tabular-nums}
+  tbody td{padding:9px 16px; border-bottom:1px solid var(--border); vertical-align:middle}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:var(--panel2)}
+  .name{font-weight:560}
+  .name .mono{font-weight:600}
+  td.count{font-family:ui-monospace,monospace; font-variant-numeric:tabular-nums; font-weight:600; font-size:14.5px; white-space:nowrap}
+  .desc-cell{color:var(--muted); font-size:13px}
+
+  /* bar */
+  .barcell{width:34%; min-width:120px}
+  .bar{position:relative; height:8px; background:var(--track); border-radius:5px; overflow:hidden}
+  .bar > span{position:absolute; inset:0 auto 0 0; width:var(--w,0%); background:var(--accent); border-radius:5px; transition:width .6s cubic-bezier(.2,.7,.2,1)}
+  .bar.amber > span{background:var(--amber)}
+
+  /* split pass/fail bar */
+  .split{display:flex; height:8px; border-radius:5px; overflow:hidden; background:var(--track); min-width:130px}
+  .split .p{background:var(--accent)}
+  .split .f{background:var(--amber)}
+  .legend{display:flex; gap:16px; font-family:ui-monospace,monospace; font-size:11px; color:var(--muted); margin:12px 2px 0; flex-wrap:wrap}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+  .sw-p{background:var(--accent)} .sw-f{background:var(--amber)}
+
+  /* status chip */
+  .chip{font-family:ui-monospace,monospace; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; padding:2px 8px; border-radius:999px; font-weight:600; white-space:nowrap; display:inline-block}
+  .chip.core{background:var(--accent);color:#fff}
+  .chip.cov{background:var(--accent-soft);color:var(--accent-ink);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent)}
+  .chip.rare{background:var(--amber-soft);color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 34%,transparent)}
+  :root[data-theme="dark"] .chip.core, :root:not([data-theme="light"]) .chip.core{color:#0e130f}
+  @media (prefers-color-scheme:dark){.chip.core{color:#0e130f}}
+
+  /* two-up grid for smaller tables */
+  .grid2{display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:18px}
+
+  .sub-th{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+
+  footer{margin-top:56px; padding-top:20px; border-top:1px solid var(--border); color:var(--muted); font-size:12.5px; font-family:ui-monospace,monospace; line-height:1.7}
+  footer b{color:var(--ink);font-weight:600}
+
+  .toggle{position:fixed; top:14px; right:14px; z-index:10; font-family:ui-monospace,monospace; font-size:12px;
+    background:var(--panel); color:var(--muted); border:1px solid var(--border); border-radius:8px; padding:7px 11px; cursor:pointer}
+  .toggle:hover{color:var(--ink); border-color:var(--accent)}
+  .toggle:focus-visible,a:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<button class="toggle" id="tog" aria-label="Toggle colour theme">◐ theme</button>
+
+<div class="wrap">
+  <header class="mast">
+    <div class="eyebrow">Parity Tier 1 · coverage audit</div>
+    <h1>Game-mechanic coverage across 100 matches</h1>
+    <p class="sub">Every action and event emitted by the Rust engine over the 100-seed parity suite —
+      human lineman vs lineman, <code>bb2025</code>, tier-3 deterministic random agent. All 100 games
+      reproduce stock Java's per-step state hashes exactly, so these tallies are the mechanics that
+      parity has actually been proven on.</p>
+  </header>
+
+  <div class="stats">
+    <div class="stat hero"><span class="k">Parity</span><span class="v">100<small> / 100</small></span></div>
+    <div class="stat"><span class="k">Matches</span><span class="v">100</span></div>
+    <div class="stat"><span class="k">Total events</span><span class="v">61,896</span></div>
+    <div class="stat"><span class="k">Activations</span><span class="v">27,713</span></div>
+    <div class="stat"><span class="k">Event types</span><span class="v">30</span></div>
+  </div>
+  <div class="note"><span class="dot"></span><div><b>Reading the counts.</b> Bars are scaled within each
+    table (largest row = full width); the number is the ground truth. The <span class="chip rare" style="padding:1px 7px">rare</span>
+    chip flags mechanics exercised only a handful of times — the thin spots worth more seeds if you
+    want them hardened.</div></div>
+
+  <!-- PLAYER ACTIONS -->
+  <section>
+    <div class="sec-head"><span class="idx">01</span><h2>Player actions declared</h2></div>
+    <p class="sec-desc">What the agent chose on each activation. One <span class="mono">playerAction</span> event per activation (27,713 total).</p>
+    <div class="card scroll">
+      <table data-max="26297">
+        <thead><tr><th>Action</th><th class="num">Count</th><th class="barcell">Share</th><th>Coverage</th></tr></thead>
+        <tbody>
+          <tr><td class="name">Move</td><td class="count" data-c="26297">26,297</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip core">core</span></td></tr>
+          <tr><td class="name">Blitz</td><td class="count" data-c="607">607</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip cov">covered</span></td></tr>
+          <tr><td class="name">Block</td><td class="count" data-c="448">448</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip cov">covered</span></td></tr>
+          <tr><td class="name">Foul</td><td class="count" data-c="232">232</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip cov">covered</span></td></tr>
+          <tr><td class="name">Pass</td><td class="count" data-c="90">90</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip cov">covered</span></td></tr>
+          <tr><td class="name">Hand-over</td><td class="count" data-c="39">39</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip cov">covered</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- DICE ROLLS -->
+  <section>
+    <div class="sec-head"><span class="idx">02</span><h2>Agility &amp; skill rolls, with outcomes</h2></div>
+    <p class="sec-desc">Every dice check the mechanics resolved, split by result. Green = pass, amber = fail.
+      No re-rolls appear — the parity agent always declines them, so every roll below stands on its first result.</p>
+    <div class="card scroll">
+      <table>
+        <thead><tr><th>Roll</th><th class="num">Rolls</th><th class="num">Pass</th><th class="num">Fail</th><th class="barcell">Pass / fail</th></tr></thead>
+        <tbody>
+          <tr><td class="name">Dodge</td><td class="count">778</td><td class="num mono">422</td><td class="num mono">356</td><td class="barcell"><div class="split"><span class="p" style="width:54.2%"></span><span class="f" style="width:45.8%"></span></div></td></tr>
+          <tr><td class="name">Pick-up</td><td class="count">94</td><td class="num mono">63</td><td class="num mono">31</td><td class="barcell"><div class="split"><span class="p" style="width:67%"></span><span class="f" style="width:33%"></span></div></td></tr>
+          <tr><td class="name">Catch</td><td class="count">109</td><td class="num mono">53</td><td class="num mono">56</td><td class="barcell"><div class="split"><span class="p" style="width:48.6%"></span><span class="f" style="width:51.4%"></span></div></td></tr>
+          <tr><td class="name">Pass</td><td class="count">89</td><td class="num mono">25</td><td class="num mono">64</td><td class="barcell"><div class="split"><span class="p" style="width:28.1%"></span><span class="f" style="width:71.9%"></span></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="legend"><span><i class="sw-p"></i>pass / complete</span><span><i class="sw-f"></i>fail (inaccurate + fumble for passes)</span></div>
+
+    <div class="grid2" style="margin-top:18px">
+      <div class="card scroll">
+        <table data-max="41">
+          <thead><tr><th>Pass result</th><th class="num">Count</th><th class="barcell">·</th></tr></thead>
+          <tbody>
+            <tr><td class="name">Fumble</td><td class="count" data-c="41">41</td><td class="barcell"><div class="bar amber"><span></span></div></td></tr>
+            <tr><td class="name">Complete</td><td class="count" data-c="25">25</td><td class="barcell"><div class="bar"><span></span></div></td></tr>
+            <tr><td class="name">Inaccurate</td><td class="count" data-c="23">23</td><td class="barcell"><div class="bar amber"><span></span></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card scroll">
+        <table data-max="34">
+          <thead><tr><th>Pass range thrown</th><th class="num">Count</th><th class="barcell">·</th></tr></thead>
+          <tbody>
+            <tr><td class="name">Short pass</td><td class="count" data-c="34">34</td><td class="barcell"><div class="bar"><span></span></div></td></tr>
+            <tr><td class="name">Long pass</td><td class="count" data-c="32">32</td><td class="barcell"><div class="bar"><span></span></div></td></tr>
+            <tr><td class="name">Quick pass</td><td class="count" data-c="20">20</td><td class="barcell"><div class="bar"><span></span></div></td></tr>
+            <tr><td class="name">Long bomb</td><td class="count" data-c="3">3</td><td class="barcell"><div class="bar amber"><span></span></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- BLOCKS -->
+  <section>
+    <div class="sec-head"><span class="idx">03</span><h2>Blocks &amp; the push chain</h2></div>
+    <p class="sec-desc">1,042 block dice rolled. Negative dice counts are uphill blocks (defender stronger → attacker picks worst of two).</p>
+    <div class="grid2">
+      <div class="card scroll">
+        <table data-max="790">
+          <thead><tr><th>Block dice</th><th class="num">Count</th><th class="barcell">·</th></tr></thead>
+          <tbody>
+            <tr><td class="name">1 die <span class="desc-cell">(even strength)</span></td><td class="count" data-c="790">790</td><td class="barcell"><div class="bar"><span></span></div></td></tr>
+            <tr><td class="name">2 dice <span class="desc-cell">(attacker stronger)</span></td><td class="count" data-c="170">170</td><td class="barcell"><div class="bar"><span></span></div></td></tr>
+            <tr><td class="name">−2 dice <span class="desc-cell">(uphill)</span></td><td class="count" data-c="82">82</td><td class="barcell"><div class="bar"><span></span></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card scroll">
+        <table data-max="1042">
+          <thead><tr><th>Follow-on event</th><th class="num">Count</th><th class="barcell">·</th></tr></thead>
+          <tbody>
+            <tr><td class="name">Block resolved</td><td class="count" data-c="1042">1,042</td><td class="barcell"><div class="bar"><span></span></div></td></tr>
+            <tr><td class="name">Push-back</td><td class="count" data-c="687">687</td><td class="barcell"><div class="bar"><span></span></div></td></tr>
+            <tr><td class="name">Pass-block interference</td><td class="count" data-c="89">89</td><td class="barcell"><div class="bar"><span></span></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- INJURIES -->
+  <section>
+    <div class="sec-head"><span class="idx">04</span><h2>Knock-downs &amp; injuries</h2></div>
+    <p class="sec-desc">1,436 armour/injury rolls resolved across the suite. Most break to a stun; the table isolates the harsher outcomes.</p>
+    <div class="card scroll">
+      <table data-max="1436">
+        <thead><tr><th>Outcome</th><th class="num">Count</th><th class="barcell">Relative</th><th>Coverage</th></tr></thead>
+        <tbody>
+          <tr><td class="name">Injury rolls (armour resolved)</td><td class="count" data-c="1436">1,436</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip core">core</span></td></tr>
+          <tr><td class="name">Player fell down</td><td class="count" data-c="849">849</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip cov">covered</span></td></tr>
+          <tr><td class="name">Knocked out</td><td class="count" data-c="151">151</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip cov">covered</span></td></tr>
+          <tr><td class="name">Casualty</td><td class="count" data-c="98">98</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip cov">covered</span></td></tr>
+          <tr><td class="name">Player ejected <span class="desc-cell">(both-down / foul)</span></td><td class="count" data-c="39">39</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip cov">covered</span></td></tr>
+          <tr><td class="name">Serious injury (lasting)</td><td class="count" data-c="35">35</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip cov">covered</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- FOULS -->
+  <section>
+    <div class="sec-head"><span class="idx">05</span><h2>Fouls &amp; the referee</h2></div>
+    <p class="sec-desc">The foul loop end-to-end: declare, get spotted, argue the ejection.</p>
+    <div class="card scroll">
+      <table data-max="232">
+        <thead><tr><th>Event</th><th class="num">Count</th><th class="barcell">Relative</th></tr></thead>
+        <tbody>
+          <tr><td class="name">Foul committed</td><td class="count" data-c="232">232</td><td class="barcell"><div class="bar"><span></span></div></td></tr>
+          <tr><td class="name">Referee spots the foul</td><td class="count" data-c="232">232</td><td class="barcell"><div class="bar"><span></span></div></td></tr>
+          <tr><td class="name">Argue the call</td><td class="count" data-c="43">43</td><td class="barcell"><div class="bar"><span></span></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- KICKOFF EVENTS -->
+  <section>
+    <div class="sec-head"><span class="idx">06</span><h2>Kick-off events rolled</h2></div>
+    <p class="sec-desc">200 kick-offs (one per drive). The full 2d6 event table came up — every result on the bb2025 chart is represented, down to the 5-of-each tail.</p>
+    <div class="card scroll">
+      <table data-max="33">
+        <thead><tr><th>Result</th><th class="num">Count</th><th class="barcell">Frequency</th><th>Coverage</th></tr></thead>
+        <tbody>
+          <tr><td class="name">Quick Snap</td><td class="count" data-c="33">33</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip cov">covered</span></td></tr>
+          <tr><td class="name">Brilliant Coaching</td><td class="count" data-c="33">33</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip cov">covered</span></td></tr>
+          <tr><td class="name">Changing Weather</td><td class="count" data-c="26">26</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip cov">covered</span></td></tr>
+          <tr><td class="name">Cheering Fans</td><td class="count" data-c="26">26</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip cov">covered</span></td></tr>
+          <tr><td class="name">High Kick</td><td class="count" data-c="23">23</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip cov">covered</span></td></tr>
+          <tr><td class="name">Charge <span class="desc-cell">(Blitz!)</span></td><td class="count" data-c="20">20</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip cov">covered</span></td></tr>
+          <tr><td class="name">Solid Defence</td><td class="count" data-c="15">15</td><td class="barcell"><div class="bar"><span></span></div></td><td><span class="chip cov">covered</span></td></tr>
+          <tr><td class="name">Time-out</td><td class="count" data-c="9">9</td><td class="barcell"><div class="bar amber"><span></span></div></td><td><span class="chip rare">rare</span></td></tr>
+          <tr><td class="name">Pitch Invasion</td><td class="count" data-c="5">5</td><td class="barcell"><div class="bar amber"><span></span></div></td><td><span class="chip rare">rare</span></td></tr>
+          <tr><td class="name">Get the Ref</td><td class="count" data-c="5">5</td><td class="barcell"><div class="bar amber"><span></span></div></td><td><span class="chip rare">rare</span></td></tr>
+          <tr><td class="name">Dodgy Snack</td><td class="count" data-c="5">5</td><td class="barcell"><div class="bar amber"><span></span></div></td><td><span class="chip rare">rare</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- FULL CATALOG -->
+  <section>
+    <div class="sec-head"><span class="idx">07</span><h2>Full event catalog</h2><span class="sub-th">all 30 emitted types</span></div>
+    <p class="sec-desc">Every distinct <span class="mono">GameEvent</span> the engine emitted, most to least frequent — the complete surface these matches touched.</p>
+    <div class="card scroll">
+      <table data-max="27713">
+        <thead><tr><th>Event type</th><th class="num">Count</th><th class="barcell">Relative (√-scaled)</th><th>Coverage</th></tr></thead>
+        <tbody id="catalog"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <b>Source:</b> parity/lineman_vs_lineman/seed_1…100_rust_events.jsonl · 61,896 events · generated post-Iter48.<br>
+    <b>Note on re-rolls:</b> the deterministic agent declines every re-roll offer, so no <span class="mono">rerolled:true</span> appears — team-reroll paths are exercised at the offer, not the consumption.<br>
+    <b>Not yet seen here:</b> star players, most named skills, weather beyond Sweltering Heat's fainting, and team-reroll consumption — none occur in a sk-less lineman-vs-lineman tier and await a richer roster tier.
+  </footer>
+</div>
+
+<script>
+  // Theme toggle
+  const root=document.documentElement, tog=document.getElementById('tog');
+  tog.addEventListener('click',()=>{
+    const cur=root.getAttribute('data-theme')
+      || (matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
+    root.setAttribute('data-theme', cur==='dark'?'light':'dark');
+  });
+
+  // Linear bars, per-table max
+  document.querySelectorAll('table[data-max]').forEach(t=>{
+    const max=+t.getAttribute('data-max');
+    t.querySelectorAll('td.count[data-c]').forEach(td=>{
+      const c=+td.getAttribute('data-c');
+      const bar=td.parentElement.querySelector('.bar > span');
+      if(bar) bar.style.setProperty('--w', Math.max(2, c/max*100)+'%');
+    });
+  });
+
+  // Full catalog — sqrt-scaled so the long tail stays visible
+  const catalog=[
+    ['playerAction',27713,'core'],['playerMoved',26297,'core'],['injury',1436,'core'],
+    ['blockRoll',1042,'core'],['block',1042,'core'],['playerFellDown',849,'cov'],
+    ['dodgeRoll',778,'cov'],['pushback',687,'cov'],['scatterBall',326,'cov'],
+    ['refereeSpotsFoul',232,'cov'],['foul',232,'cov'],['startHalf',200,'cov'],
+    ['kickoffScatter',200,'cov'],['kickoffResultEvent',200,'cov'],['catchRoll',109,'cov'],
+    ['pickupRoll',94,'cov'],['passRoll',89,'cov'],['passBlock',89,'cov'],
+    ['argueTheCall',43,'cov'],['playerEjected',39,'cov'],['kickoffExtraReRoll',37,'cov'],
+    ['handOver',36,'cov'],['quickSnapRoll',33,'cov'],['weatherChange',26,'cov'],
+    ['cheeringFans',26,'cov'],['solidDefenceRoll',15,'cov'],['kickoffTimeout',9,'rare'],
+    ['kickoffPitchInvasion',5,'rare'],['kickoffDodgySnack',5,'rare'],['dodgySnackRoll',5,'rare'],
+    ['throwIn',2,'rare'],
+  ];
+  const cmax=Math.sqrt(27713);
+  const tb=document.getElementById('catalog');
+  const chipLabel={core:'core',cov:'covered',rare:'rare'};
+  tb.innerHTML=catalog.map(([n,c,s])=>{
+    const w=Math.max(1.5, Math.sqrt(c)/cmax*100);
+    const amber=s==='rare'?' amber':'';
+    return `<tr><td class="name"><span class="mono">${n}</span></td>`+
+      `<td class="count">${c.toLocaleString()}</td>`+
+      `<td class="barcell"><div class="bar${amber}"><span style="--w:${w}%"></span></div></td>`+
+      `<td><span class="chip ${s}">${chipLabel[s]}</span></td></tr>`;
+  }).join('');
+</script>

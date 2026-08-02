@@ -98,3 +98,7 @@ cargo test --workspace
 ```
 
 All tests must pass before marking a file `✓` in TRANSLATION_TRACKER.md. Do **not** patch `engine.rs` as a workaround — if tests fail, the translation is incorrect.
+
+## Parity & coverage
+
+`ffb-parity` runs both engines headless and diffs per-step state hashes (see `docs/PARITY_TIER1.md` for the campaign log). To inspect which game mechanics a parity suite actually exercised — actions, dice rolls, injuries, kickoff events, the full `GameEvent` catalog — follow `docs/COVERAGE_REPORT.md` (aggregation commands + the reusable report template at `docs/coverage_report.html`).
