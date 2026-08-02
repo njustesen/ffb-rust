@@ -91,3 +91,21 @@ ogre is green (TTM will then correctly deselect there — no throwable player).
   roster work. NEXT: isolate ogre seed 1 i=3, root-cause the Bone-head/turn divergence, then keep
   advancing — a TTM will eventually be reached and its resolution (scatter/land/catch-or-crash/injury)
   must then be verified to parity (that's still the point; not yet confirmed end-to-end).
+
+## Iter 2 (2026-08-02) — FIRST THROW RESOLVES TO PARITY: fix double-scatter
+- **Frontier was ogre seed 1 i=2** (the throw): Java scatters the thrown player once (3 d8) then does
+  the Right Stuff landing d6; Rust scattered SIX times. Root cause: Rust's `StepThrowTeamMate`
+  (bb2025) pushed a `ScatterPlayer` sequence on a successful throw AND the sequence's separate
+  `StepDispatchScatterPlayer` pushed ANOTHER — two throw-scatters. Java's `StepThrowTeamMate` only
+  rolls the throw (the "pushes scatterPlayerSequence" comment is stale); `DISPATCH_SCATTER_PLAYER` in
+  the generator does the scatter. The extra Rust scatter consumed the correct dice, so the real
+  dispatch scattered from fresh (wrong) dice, hit a bystander, and turned the turn over.
+- **Fix (`step_throw_team_mate.rs`):** on a successful throw, publish `PassResultParam` + `UsingBullseye`
+  and advance — do NOT push a ScatterPlayer sequence (matches the else/unsuccessful branch, which
+  already relied on DispatchScatterPlayer). Test `successful_throw_does_not_push_scatter_sequence`.
+- **Result:** the first TTM throw now resolves to parity (ogre seed 1: i=3 rng aligned 26/26 both;
+  scatter → Right Stuff landing → armour/injury all match). ffb-engine 7009/0.
+- **NEW FRONTIER = ogre seed 1 step 6 (i=7):** a SECOND throw (away_06, i=6) after which Java's game
+  ENDS (java=None) but Rust continues (away_02 Move) — a turnover Rust lacks, or a game/turn-end
+  difference in the second throw's resolution. Root-cause next: compare the away_06 throw dice +
+  outcome; likely the thrown player hits an own-team player (turnover) or lands differently.

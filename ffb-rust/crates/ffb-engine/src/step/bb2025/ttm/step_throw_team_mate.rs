@@ -168,23 +168,13 @@ impl StepThrowTeamMate {
                     self.using_bullseye = Some(false);
                 }
 
-                // Push ScatterPlayer sequence
-                let scatters_single = self.thrown_player_id.as_deref()
-                    .and_then(|id| game.player(id))
-                    .map(|p| p.has_skill_property(NamedProperties::TTM_SCATTERS_IN_SINGLE_DIRECTION))
-                    .unwrap_or(false);
-
-                let scatter_params = ScatterPlayerParams {
-                    thrown_player_id: self.thrown_player_id.clone(),
-                    thrown_player_state: self.thrown_player_state,
-                    thrown_player_has_ball: self.thrown_player_has_ball,
-                    thrown_player_coordinate: thrower_coord,
-                    throw_scatter: pass_result == PassOutcome::Complete && self.using_bullseye != Some(true),
-                    has_swoop: scatters_single,
-                    ..Default::default()
-                };
-                let seq = ScatterPlayer::build_sequence(&scatter_params);
-                return self.handle_pass_result().push_seq(seq);
+                // Java StepThrowTeamMate only rolls the throw here and advances — the scatter itself
+                // is pushed by the following StepDispatchScatterPlayer (which reads PASS_RESULT +
+                // USING_BULLSEYE). Rust previously ALSO pushed a ScatterPlayer sequence here, so the
+                // thrown player scattered TWICE (the first from the correct dice, the second an extra
+                // that desynced the whole throw — ogre seed 1 i=2). Just publish the result params.
+                return self.handle_pass_result()
+                    .publish(StepParameter::UsingBullseye(self.using_bullseye.unwrap_or(false)));
             } else {
                 if self.re_rolled_action.is_none() && player_can_pass {
                     let is_fumble = pass_result == PassOutcome::Fumble;
@@ -569,6 +559,30 @@ mod tests {
         step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
         step.start(&mut game, &mut GameRng::new(42));
         assert!(game.report_list.has_report(ReportId::THROW_TEAM_MATE_ROLL));
+    }
+
+    #[test]
+    fn successful_throw_does_not_push_scatter_sequence() {
+        // Regression (ogre seed 1 i=2): the scatter is pushed by the FOLLOWING
+        // StepDispatchScatterPlayer, not here. Rust used to push a ScatterPlayer sequence on a
+        // successful throw too, so the thrown player scattered TWICE and the throw desynced.
+        // A successful throw must only publish the pass result (+ bullseye) and advance.
+        let mut seed = 0u64;
+        loop { if GameRng::new(seed).d6() == 6 { break; } seed += 1; } // roll 6 → always Complete
+        let mut game = make_game();
+        game.home_playing = true;
+        add_thrower(&mut game, "thrower", FieldCoordinate::new(10, 7), 4);
+        game.acting_player.player_id = Some("thrower".into());
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+        let mut step = StepThrowTeamMate::new();
+        step.thrown_player_id = Some("tp1".into());
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        assert_eq!(step.pass_result, Some(PassOutcome::Complete));
+        assert!(out.pushes.is_empty(),
+            "successful throw must NOT push a scatter sequence — DispatchScatterPlayer does");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassResultParam(_))),
+            "must publish PassResultParam for DispatchScatterPlayer to read");
     }
 
     #[test]
