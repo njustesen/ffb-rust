@@ -216,6 +216,12 @@ impl Agent for RandomAgent {
                     PlayerAction::Pass => !td.pass_used,
                     PlayerAction::HandOver => !td.hand_over_used,
                     PlayerAction::Foul => !td.foul_used,
+                    // Throw/Kick Team-Mate are once per team turn (set ttm_used/ktm_used). The
+                    // turn-start snapshot can still offer a second one after the first Ogre throws;
+                    // filter it out as stale, or the engine rejects the second throw and the harness
+                    // loops (ogre seed 1: away_06's throw after away_05 already threw).
+                    PlayerAction::ThrowTeamMate => !td.ttm_used,
+                    PlayerAction::KickTeamMate => !td.ktm_used,
                     _ => true,
                 }).cloned().collect();
                 let action_idx = self.pick_action(live_actions.len());
