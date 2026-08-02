@@ -293,18 +293,21 @@ impl Agent for RandomAgent {
                 Action::ActivatePlayer { player_id: player_id.clone(), player_action, block_defender_id }
             }
             // Move prompt: pick destination from legal squares using actionRng.
+            // 1:1 mirror of the reference harness ParityRunner.sendMoveAction + its INIT_MOVING
+            // handler: pick ONE square uniformly from all unoccupied on-pitch neighbours (already
+            // sorted by (x,y)), then ALWAYS deselect on the follow-up prompt. There is no
+            // carrier-advance bias and no multi-square carrier-continue — those were mirrored
+            // against an older modified ParityRunner and diverge from the stock harness (seed 7
+            // i=11: away_03 dodge picked idx=0 of a 2-square advancing subset instead of idx=2
+            // of the full 6-square list). See ParityRunner.sendMoveAction (no bias) + the
+            // INIT_MOVING case (always injects ClientCommandActingPlayer(null,null,false)).
             Some(AgentPrompt::Move { player_id, squares }) => {
                 if std::env::var("FFB_TRACE").is_ok() {
                     eprintln!("RUST_SMA pid={} N={}", player_id, squares.len());
                 }
-                // After the blitz block the Java sequence enters INIT_MOVING, where the SAME
-                // carrier-continue rule applies as any move: `imCarrying && movesLeft` → keep moving,
-                // otherwise deselect (ParityRunner INIT_MOVING, lines 435-445). The block is not a
-                // move, but it reaches that continue-decision point, so treat the blitzer as having
-                // "moved" and fall through to the carrier logic below: a NON-carrier deselects (as
-                // before), a ball-carrying blitzer with movement left keeps advancing. Without this
-                // a blitzing carrier stopped dead after the block while Java ran it on toward the
-                // endzone (seed 12 i=31: away_03 carrier ended (13,9) in Rust vs (8,11) in Java).
+                // A blitz block reaches the follow-up Move/INIT_MOVING prompt; the stock harness
+                // always deselects there, so mark the blitzer as already moved and fall through
+                // to the always-deselect check below.
                 if self.current_activation_is_blitz {
                     self.current_activation_is_blitz = false;
                     self.moved_this_activation = true;
@@ -316,46 +319,19 @@ impl Agent for RandomAgent {
                     // looping forever.) 0 RNG consumed on either side.
                     return Action::EndPlayerAction;
                 }
-                // Carrier-advance bias (mirrored 1:1 in Java ParityRunner.sendMoveAction): when
-                // the mover holds the ball, restrict the pick to squares that advance toward the
-                // opponent endzone when any exist. A pure 1-square random walk never covers the
-                // ~15 squares to the endzone in 8 turns, so touchdowns were unreachable for both
-                // reference agents; the bias makes them reachable without changing anything for
-                // non-carriers. Still 1 actionRng pick either way.
-                let carrying = !gs.game.field_model.ball_moving
-                    && gs.game.field_model.ball_coordinate.is_some()
-                    && gs.game.field_model.ball_coordinate
-                        == gs.game.field_model.player_coordinate(player_id);
-                // Java ParityRunner INIT_MOVING (`imCarrying && movesLeft`): after the first square, only
-                // the ball carrier keeps moving, and ONLY while it still has movement left
-                // (currentMove < MA) — the carrier NEVER rushes (goes for it past MA). Every other
-                // player deselects after one square; the carrier deselects at MA. `moved_this_activation`
-                // is false on the FIRST Move prompt (reset in ActivatePlayer) so the first square always
-                // happens. Without the movesLeft check the Rust carrier rushed past MA, rolling extra
-                // GFI/dodge dice and desyncing the game-die stream (seed 8 i=76). 0 rng either way.
-                let moves_left = gs.game.player(player_id)
-                    .map(|p| gs.game.acting_player.current_move < p.movement_with_modifiers())
-                    .unwrap_or(false);
-                if self.moved_this_activation && !(carrying && moves_left) {
+                // Java ParityRunner INIT_MOVING always deselects after the first square — one move
+                // per activation, then the activation ends. No carrier keeps moving.
+                if self.moved_this_activation {
                     return Action::EndPlayerAction;
                 }
-                let pool: Vec<FieldCoordinate> = if carrying {
-                    let cur_x = gs.game.field_model.player_coordinate(player_id).map(|c| c.x).unwrap_or(0);
-                    let dir = if gs.game.home_playing { 1 } else { -1 };
-                    let advancing: Vec<FieldCoordinate> = squares.iter()
-                        .filter(|c| (c.x - cur_x) * dir > 0)
-                        .copied()
-                        .collect();
-                    if advancing.is_empty() { squares.clone() } else { advancing }
-                } else {
-                    squares.clone()
-                };
-                let idx = self.pick_action(pool.len());
+                // ParityRunner.sendMoveAction picks uniformly from ALL unoccupied on-pitch
+                // neighbours (sorted by (x,y)); no carrier-advance filtering.
+                let idx = self.pick_action(squares.len());
                 if std::env::var("FFB_TRACE").is_ok() {
-                    eprintln!("RUST_PICK pid={} N={} idx={} t=({},{})", player_id, pool.len(), idx, pool[idx].x, pool[idx].y);
+                    eprintln!("RUST_PICK pid={} N={} idx={} t=({},{})", player_id, squares.len(), idx, squares[idx].x, squares[idx].y);
                 }
                 self.moved_this_activation = true;
-                Action::Move { path: vec![pool[idx]] }
+                Action::Move { path: vec![squares[idx]] }
             }
             // Pushback: AGENT_CONTRACT §7 — choose the min-(x,y) on-pitch square, DETERMINISTICALLY.
             // Java ParityRunner.sendPushback iterates the non-locked pushback squares and keeps the one
@@ -643,7 +619,10 @@ mod tests {
     }
 
     #[test]
-    fn carrier_stops_at_ma_does_not_rush() {
+    fn any_player_deselects_after_first_move() {
+        // Stock ParityRunner INIT_MOVING always deselects after the first square — even a ball
+        // carrier below MA does not keep moving (the old carrier-continue rule was mirrored
+        // against a modified harness and is gone).
         use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_STANDING};
         use ffb_model::model::player::Player;
         let mut gs = new_game(1);
@@ -667,54 +646,52 @@ mod tests {
         let mut agent = RandomAgent::new_parity(1);
         agent.moved_this_activation = true; // 2nd+ Move prompt of the activation
 
-        // At MA (current_move == 6 == movement) the carrier must NOT rush → deselect (Java movesLeft=false).
-        gs.game.acting_player.current_move = 6;
-        gs.pending_prompt = Some(AgentPrompt::Move { player_id: "carrier".into(), squares: squares.clone() });
-        assert!(matches!(agent.act(&gs), Action::EndPlayerAction), "carrier at MA must not rush");
-
-        // Below MA (current_move == 5 < movement) the carrier keeps moving (Java movesLeft=true).
+        // Below MA the carrier STILL deselects (no carrier-continue in the stock harness).
         gs.game.acting_player.current_move = 5;
         gs.pending_prompt = Some(AgentPrompt::Move { player_id: "carrier".into(), squares });
-        assert!(matches!(agent.act(&gs), Action::Move { .. }), "carrier below MA keeps moving");
+        assert!(matches!(agent.act(&gs), Action::EndPlayerAction), "one move per activation, then deselect");
     }
 
     #[test]
-    fn blitzing_carrier_continues_after_block_non_carrier_stops() {
+    fn move_pick_uses_full_neighbour_list_no_carrier_bias() {
+        // A ball carrier's first move picks from ALL sorted neighbours (no advance filter). With a
+        // fixed action_rng the chosen index is (draw % squares.len()) over the full list, mirroring
+        // ParityRunner.sendMoveAction.
         use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_STANDING};
         use ffb_model::model::player::Player;
-        // After a blitz block the Java sequence enters INIT_MOVING, where the carrier-continue rule
-        // applies: a ball-carrying blitzer with movement left keeps advancing; a non-carrier deselects.
         let mut gs = new_game(1);
         gs.game.team_home.players.push(Player {
-            id: "blitzer".into(), name: "blitzer".into(), nr: 1, position_id: "lineman".into(),
+            id: "carrier".into(), name: "carrier".into(), nr: 1, position_id: "lineman".into(),
             player_type: PlayerType::Regular, gender: PlayerGender::Male,
             movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
             ..Default::default()
         });
-        let coord = FieldCoordinate::new(9, 9);
-        gs.game.field_model.set_player_coordinate("blitzer", coord);
-        gs.game.field_model.set_player_state("blitzer", PlayerState::new(PS_STANDING));
-        gs.game.home_playing = true;
-        gs.game.acting_player.set_player("blitzer".into(), PlayerAction::Move);
-        gs.game.acting_player.current_move = 0; // block spent no movement
-        let squares = vec![FieldCoordinate::new(8, 8), FieldCoordinate::new(8, 9)];
-
-        // Carrier (holds the ball) with movement left → continue moving after the block.
-        gs.game.field_model.ball_coordinate = Some(coord);
+        let coord = FieldCoordinate::new(13, 8);
+        gs.game.field_model.set_player_coordinate("carrier", coord);
+        gs.game.field_model.set_player_state("carrier", PlayerState::new(PS_STANDING));
+        gs.game.field_model.ball_coordinate = Some(coord); // holds the ball
         gs.game.field_model.ball_moving = false;
-        let mut agent = RandomAgent::new_parity(1);
-        agent.current_activation_is_blitz = true;
-        agent.moved_this_activation = false; // fresh post-block Move prompt
-        gs.pending_prompt = Some(AgentPrompt::Move { player_id: "blitzer".into(), squares: squares.clone() });
-        assert!(matches!(agent.act(&gs), Action::Move { .. }), "blitzing carrier keeps moving after the block");
+        gs.game.home_playing = false; // away carrier — old bias would have filtered to x<13
+        gs.game.acting_player.set_player("carrier".into(), PlayerAction::Move);
 
-        // Non-carrier (ball elsewhere) → deselect after the block.
-        gs.game.field_model.ball_coordinate = Some(FieldCoordinate::new(1, 1));
-        let mut agent2 = RandomAgent::new_parity(1);
-        agent2.current_activation_is_blitz = true;
-        agent2.moved_this_activation = false;
-        gs.pending_prompt = Some(AgentPrompt::Move { player_id: "blitzer".into(), squares });
-        assert!(matches!(agent2.act(&gs), Action::EndPlayerAction), "non-carrier blitzer stops after the block");
+        // Full sorted neighbour set including non-advancing (x>=13) squares.
+        let squares = vec![
+            FieldCoordinate::new(12, 7), FieldCoordinate::new(12, 9),
+            FieldCoordinate::new(13, 9), FieldCoordinate::new(14, 7),
+            FieldCoordinate::new(14, 8), FieldCoordinate::new(14, 9),
+        ];
+        let mut agent = RandomAgent::new_parity(1);
+        agent.moved_this_activation = false; // first Move prompt
+        gs.pending_prompt = Some(AgentPrompt::Move { player_id: "carrier".into(), squares: squares.clone() });
+        // The pick must be able to land on a non-advancing square: it indexes the full 6-list,
+        // not a 2-element advancing subset. Assert the chosen target comes from the full list.
+        match agent.act(&gs) {
+            Action::Move { path } => {
+                assert_eq!(path.len(), 1);
+                assert!(squares.contains(&path[0]), "target must come from the full neighbour list");
+            }
+            other => panic!("expected a Move, got {other:?}"),
+        }
     }
 
     #[test]

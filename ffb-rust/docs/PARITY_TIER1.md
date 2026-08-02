@@ -1016,3 +1016,10 @@ Java (fouls/the lost change) will now diverge.
 
 Next: seed 7 i=11 — trace the FOUL resolution (armour/injury outcome, player-drop/knockdown placement, ball) in
 Rust vs STOCK Java; fix the Rust engine to match stock. Then re-run 1-100 and continue the frontier.
+
+## Iter 43 — seed 7 FIXED: remove carrier move-bias to match stock ParityRunner
+- **Symptom:** seed 7 diverged at i=12 (pre-state = i=11 post). away_03 (ball carrier at 13,8, adjacent to h02→TZ) dodged: Java→(13,9), Rust→(12,7); ball bounced same offset (−1,+1) from each prone origin.
+- **Root cause:** Rust `random_agent.rs` Move handler applied a **carrier-advance bias** (filter move pool to squares with x advancing toward endzone) + **carrier-continue** (multi-square movement while `carrying && moves_left`). Both were mirrored against an OLD MODIFIED ParityRunner. The stock harness `ParityRunner.sendMoveAction` picks uniformly from ALL unoccupied on-pitch neighbours (sorted x,y, no bias) and `INIT_MOVING` ALWAYS deselects after one square. Trace: `JAVA_PICK N=6 idx=2 t=(13,9)` vs `RUST_PICK N=2 idx=0 t=(12,7)` — Rust filtered 6→2 advancing subset.
+- **Fix:** rewrote the Move handler to mirror stock ParityRunner: pick one square from the full sorted `squares` (`pick_action(squares.len())`), no advance filter; after the first move always deselect (`if moved_this_activation → EndPlayerAction`). Blitz path unchanged (still deselects post-block via the always-deselect check).
+- **Tests:** replaced `carrier_stops_at_ma_does_not_rush` + `blitzing_carrier_continues_after_block_non_carrier_stops` (asserted the removed behavior) with `any_player_deselects_after_first_move` + `move_pick_uses_full_neighbour_list_no_carrier_bias`.
+- **Result:** PARITY 7/7 (seeds 1-7 green). Frontier advances past the first foul. NOTE: removing the advance bias means neither agent biases toward the endzone — touchdowns are rarer but parity is exact, which is the requirement.
