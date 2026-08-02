@@ -147,3 +147,28 @@ ogre is green (TTM will then correctly deselect there — no throwable player).
   sub-sequence that a plain Block goes through; the fix wires the negatrait steps into the adjacent-blitz path.
   Verify: away_02's block then rolls at pos 30,31 = [6,4] → Defender Down, no turnover; seed 1 advances; lineman
   stays green (linemen have no Bone-head so unaffected).
+
+## Iter 5 (2026-08-02) — FIX: Ogre blitz now rolls Bone-head before the block (SelectBlitzTarget activation restored)
+- **Root cause (confirmed the Iter4 diagnosis):** Java resolves a blitz in two commands — CLIENT_ACTING_PLAYER(BLITZ_MOVE)
+  dispatches BLITZ_SELECT → the `SelectBlitzTarget` sequence, which runs `ActivationSequenceBuilder`
+  (the negatrait sub-sequence: Bone Head, Really Stupid, Take Root, Unchannelled Fury, Blood Lust,
+  Animal Savagery) BEFORE any move/block; then CLIENT_BLOCK dispatches BLITZ → the `BlitzBlock`
+  sequence, which faithfully has NO activation of its own. `PlayerAction.forceDispatch()` is true only
+  for FURIOUS_OUTPBURST/FORGO/PUNT — NOT blitz. Rust's random agent picks the blitz + target in one
+  Action::ActivatePlayer, so StepInitSelecting `force_goto_on_dispatch` jumps straight to StepEndSelecting
+  and SelectBlitzTarget (with its activation) is skipped. For a plain Block the Block sequence re-adds the
+  activation, so Bone-head still rolled; for a Blitz nothing did → the blitzer never rolled Bone-head and
+  every later die shifted one position.
+- **Fix (StepEndSelecting `dispatch_player_action`, PlayerAction::Blitz):** prepend the same plain
+  `ActivationSequenceBuilder` (failure → END_BLOCKING) SelectBlitzTarget would have run, ahead of the
+  BlitzBlock steps, in one pushed sequence. Bone-head now rolls immediately before the block, matching
+  Java's dice order. Test `dispatch_player_action_blitz_prepends_activation_then_blitz_block`.
+- **Result:** ogre seed 1 advanced step 7 → step 10 (i=7,8,9,10 hashes now identical). ffb-engine
+  7010/0; lineman tier re-verified 100/100 (linemen have no negatraits → activation is dice-neutral).
+- **New frontier = ogre seed 1 step 10 (i=11):** away's turn — Java ends it after 4 activations
+  (away2 BLITZ, away10, away1, away8 → home), Rust activates a 5th (away_09) then home. away_09 is the
+  Right Stuff player THROWN by away_05's TTM at i=2 (landed (18,3), armour held → standing). Java treats
+  a thrown player as having used its activation (not re-activatable this turn); Rust re-activates it.
+  Engine landing steps don't mark it moved, so this is an AGENT eligibility/snapshot difference
+  (ParityRunner.computeEligiblePlayers/filterStaleActions vs random_agent). NEXT: make a thrown player
+  ineligible for its own later activation in the same team turn, matching Java.

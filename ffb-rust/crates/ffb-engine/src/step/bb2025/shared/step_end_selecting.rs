@@ -28,7 +28,8 @@ use crate::step::generator::bb2025::then_i_started_blastin::ThenIStartedBlastin 
 use crate::step::generator::bb2025::throw_keg::{ThrowKeg, ThrowKegParams};
 use crate::step::generator::bb2025::throw_team_mate::{ThrowTeamMate, ThrowTeamMateParams};
 use crate::step::generator::bb2025::treacherous::{Treacherous, TreacherousParams};
-use crate::step::generator::sequence::labels;
+use crate::step::generator::bb2025::activation_sequence_builder::ActivationSequenceBuilder;
+use crate::step::generator::sequence::{Sequence, labels};
 #[cfg(test)]
 use crate::step::framework::StepAction;
 
@@ -359,7 +360,25 @@ impl StepEndSelecting {
                 } else {
                     BlitzBlockParams::default()
                 };
-                let seq = BlitzBlock::build_sequence(&params);
+                // Rust bridging: Java resolves a blitz in two commands — CLIENT_ACTING_PLAYER
+                // (BLITZ_MOVE) dispatches BLITZ_SELECT → the SelectBlitzTarget sequence, which runs
+                // `ActivationSequenceBuilder` (the negatrait sub-sequence: Bone Head, Really Stupid,
+                // Take Root, Unchannelled Fury, Blood Lust, Animal Savagery) BEFORE any movement or
+                // block — then a later CLIENT_BLOCK dispatches BLITZ → the BlitzBlock sequence, which
+                // (faithfully) has NO activation of its own. Rust's random agent picks the blitz and
+                // its target in a single Action::ActivatePlayer, so StepInitSelecting force-gotos
+                // straight here and SelectBlitzTarget is skipped. Without restoring its activation the
+                // blitzer never rolls Bone Head, shifting every subsequent die by one (ogre seed 1
+                // step 7: away_02's block rolled the wrong dice → wrong turnover). Prepend the same
+                // plain activation SelectBlitzTarget would have run (failure → END_BLOCKING ends the
+                // block, mirroring END_BLITZING ending the blitz) so the negatrait roll lands at the
+                // Java dice position, immediately before the block.
+                let mut activation = Sequence::new();
+                ActivationSequenceBuilder::new()
+                    .with_failure_label(labels::END_BLOCKING)
+                    .add_to(&mut activation);
+                let mut seq = activation.build();
+                seq.extend(BlitzBlock::build_sequence(&params));
                 StepOutcome::next().push_seq(seq)
             }
 
@@ -742,7 +761,7 @@ mod tests {
     }
 
     #[test]
-    fn dispatch_player_action_blitz_pushes_blitz_block_sequence() {
+    fn dispatch_player_action_blitz_prepends_activation_then_blitz_block() {
         let mut game = make_game();
         let mut step = StepEndSelecting::new();
         step.dispatch_player_action = Some(PlayerAction::Blitz);
@@ -750,8 +769,21 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert!(!out.pushes.is_empty());
-        // BlitzBlock sequence starts with InitBlocking
-        assert_eq!(out.pushes[0][0].step_id, StepId::InitBlocking);
+        let seq = &out.pushes[0];
+        // Rust collapses Java's SelectBlitzTarget (which carries the negatrait activation) into the
+        // blitz dispatch, so the pushed sequence must lead with the activation sub-sequence
+        // (InitActivation … BoneHead) BEFORE the BlitzBlock's InitBlocking — otherwise an Ogre's
+        // Bone Head is never rolled and every subsequent die shifts (ogre seed 1 step 7).
+        assert_eq!(seq[0].step_id, StepId::InitActivation,
+            "blitz dispatch must lead with the activation sub-sequence");
+        let bone_head_idx = seq.iter().position(|s| s.step_id == StepId::BoneHead)
+            .expect("blitz dispatch must include a BoneHead negatrait step");
+        let init_blocking_idx = seq.iter().position(|s| s.step_id == StepId::InitBlocking)
+            .expect("blitz dispatch must still contain the BlitzBlock InitBlocking");
+        assert!(bone_head_idx < init_blocking_idx,
+            "BoneHead must roll before the block (matching Java's SelectBlitzTarget-then-block order)");
+        // The block dice still resolve at the end of the same sequence.
+        assert!(seq.iter().any(|s| s.step_id == StepId::BlockRoll));
     }
 
     #[test]
