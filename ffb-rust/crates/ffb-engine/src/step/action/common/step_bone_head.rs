@@ -279,7 +279,10 @@ mod tests {
         let mut step = StepBoneHead::new();
         let mut rng = GameRng::new(seed);
         step.start(&mut game, &mut rng);
-        assert!(game.team_home.player(&player_id).unwrap().used_skills.contains(&SkillId::BoneHead));
+        // Bone Head is marked used on the per-activation ActingPlayer (Java `fUsedSkills`),
+        // not the persistent Player, so it rolls fresh on the player's next activation.
+        let _ = player_id;
+        assert!(game.acting_player.used_skills.contains(&SkillId::BoneHead));
     }
 
     #[test]

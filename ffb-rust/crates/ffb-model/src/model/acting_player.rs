@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 use crate::enums::{PlayerAction, SkillId};
 use crate::model::player::PlayerId;
@@ -63,6 +63,12 @@ pub struct ActingPlayer {
     /// Dwarf), the list of player IDs that received it (keyed by skill instead of Java's
     /// `skill.getName()` since Rust identifies skills by `SkillId`).
     pub skills_granted_by: HashMap<SkillId, Vec<PlayerId>>,
+    /// Java: `ActingPlayer.fUsedSkills` — per-activation skill-use tracking, CLEARED by
+    /// `setPlayerId` when a different player is activated. Holds skills whose
+    /// `SkillUsageType` is not "track outside activation" (e.g. Bone Head, Really Stupid):
+    /// they may fire once per activation and reset for the next. Skills tracked across the
+    /// whole turn live on `Player.used_skills` instead.
+    pub used_skills: HashSet<SkillId>,
 }
 
 impl ActingPlayer {
@@ -105,6 +111,9 @@ impl ActingPlayer {
             self.fell_from_rush = false;
             self.has_triggered_effect = false;
             self.forgone = false;
+            // Java setPlayerId: fUsedSkills.clear() — per-activation skill-use resets so
+            // negatraits like Bone Head roll fresh for each new activation.
+            self.used_skills.clear();
         }
         // Java setPlayerAction: always (re)assign the action.
         self.player_action = Some(action);

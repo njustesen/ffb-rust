@@ -93,9 +93,13 @@ impl StepModifierTrait for BoneHeadStepModifier {
             // Java: doRoll = UtilCards.hasUnusedSkill(actingPlayer, skill) — guards against
             // re-firing the roll when StepBoneHead is re-entered later in the same player
             // action (e.g. Blitz's move phase and block phase both push StepId::BoneHead).
-            let already_used = game.player(&player_id)
-                .map(|p| p.used_skills.contains(&SkillId::BoneHead))
-                .unwrap_or(false);
+            // Java tracks Bone Head use on the ACTING PLAYER (`fUsedSkills`, cleared each
+            // activation by setPlayerId), NOT the persistent Player — so a player who rolled
+            // Bone Head on one turn's activation must roll fresh on its next activation. Using
+            // Player.used_skills here left the skill marked forever, skipping every later roll
+            // (ogre seed 1 i=21: away_06 rolled Bone Head in turn 1 and then silently skipped it
+            // in turn 2, shifting every subsequent die).
+            let already_used = game.acting_player.used_skills.contains(&SkillId::BoneHead);
             do_roll = !already_used;
         }
 
@@ -124,15 +128,10 @@ impl StepModifierTrait for BoneHeadStepModifier {
         let min_roll = minimum_roll_confusion(true);
         let successful = roll >= min_roll;
 
-        // Java: actingPlayer.markSkillUsed(skill)
-        let is_home = game.team_home.player(&player_id).is_some();
-        if is_home {
-            if let Some(p) = game.team_home.player_mut(&player_id) {
-                p.used_skills.insert(SkillId::BoneHead);
-            }
-        } else if let Some(p) = game.team_away.player_mut(&player_id) {
-            p.used_skills.insert(SkillId::BoneHead);
-        }
+        // Java: actingPlayer.markSkillUsed(skill) — Bone Head's SkillUsageType is not
+        // "track outside activation", so it is recorded ONLY on the acting player (reset each
+        // activation), not on the persistent Player.
+        game.acting_player.used_skills.insert(SkillId::BoneHead);
 
         let re_rolled = state.re_rolled_action.as_deref() == Some("BONE_HEAD")
             && state.re_roll_source.is_some();
@@ -242,9 +241,10 @@ mod tests {
             starting_skills: vec![SkillWithValue { skill_id: SkillId::BoneHead, value: None }],
             ..Default::default()
         };
-        p.used_skills.insert(SkillId::BoneHead);
         game.team_home.players.push(p);
         game.acting_player.player_id = Some("p1".into());
+        // Bone Head already used THIS activation (acting-player tracking, per Java's fUsedSkills).
+        game.acting_player.used_skills.insert(SkillId::BoneHead);
 
         let m = BoneHeadStepModifier;
         let mut hook = StepBoneHeadHookState {
