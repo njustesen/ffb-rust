@@ -285,3 +285,23 @@ ogre is green (TTM will then correctly deselect there — no throwable player).
   pick_action. Verify lineman 100/100 (normal standing moves must be unchanged — same 1 actionRng, same
   target, same order). Prone player + Move = the exercised case here; confirm the human roster's prone
   players (players knocked down earlier) reproduce it.
+
+## FRONTIER (human) — Iter attempt (2026-08-02 ~23:20): first fix REVERTED, deeper root isolated
+- Tried: Rust agent consumes 1 actionRng for a prone player's Move (compute adjacent-empty count,
+  pick_action if >=1, set moved_this_activation). REGRESSED step 39 -> step 29 — because it also
+  consumed for prone players that DO stand up + move (already aligned via the Move prompt), and the
+  moved_this_activation guard then made them stand-but-not-move (state divergence). Reverted.
+- DRIVE-trace of away_01's i=37 activation (FFB_TRACE + FFB_DRIVE_TRACE, extract between RUST_STEP i=37
+  and i=38): away_01 (PRONE at 14,7) → InitSelecting → ResetFumblerooskie → EndSelecting → EndPlayerAction
+  (InitFeeding/StallingPlayer/.../EndFeeding) — it DESELECTS, never reaching InitActivation / StandUp /
+  InitMoving / a Move prompt. Contrast away_06 (i=38, STANDING) → InitSelecting → EndSelecting → InitMoving
+  (dispatches Move). So the Rust ENGINE deselects away_01's prone Move at StepInitSelecting/StepEndSelecting,
+  consuming 0 actionRng; Java's ParityRunner.sendMoveAction still computes 7 adjacent-empty + picks (14,6)
+  [1 actionRng], sends CLIENT_MOVE which the engine ignores (stays prone). Net: Java +1 actionRng at i=37.
+- So NOT all prone Moves diverge — only the ones the Rust engine DESELECTS (away_01) vs DISPATCHES
+  (step-28 player stands up + moves, both pick, aligned). NEXT: instrument StepInitSelecting to see WHY
+  away_01's prone Move takes the deselect (goto END_SELECTING + EndPlayerAction) path while another prone
+  player's dispatches — is standing_up not set? update_move_squares 0? a no-target/prone deselect branch?
+  Then reconcile: EITHER make the Rust engine dispatch (reach the Move prompt so the agent picks, matching
+  Java — but must keep the player prone to match state), OR make the agent consume 1 actionRng ONLY for the
+  prone-Move-that-will-deselect case. Verify lineman 100/100. 0 game dice consumed at i=37 (no stand-up roll).
