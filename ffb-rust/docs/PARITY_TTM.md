@@ -125,3 +125,25 @@ ogre is green (TTM will then correctly deselect there — no throwable player).
   fall Prone → "both down") while Java continues (no turnover). A block-result / Bone-head logic diff
   in the Ogre blitz, NOT dice. NEXT: compare the block die[0] result + Bone-head handling (Rust vs Java
   StepBlock/StepInitBlocking + BoneHeadBehaviour); why does the same die give both-down in Rust only.
+
+## Iter 4 (2026-08-02, DIAGNOSIS ONLY — no code change) — Ogre blitz skips Bone-head before the block
+- **Frontier: ogre seed 1 step 7 (i=8):** away_02 (Ogre a01) blitzes home_01. Precisely root-caused (deep trace):
+  - Both engines share the same dice stream (pos 28-35 = 1,2,6,4,1,2,4,3).
+  - JAVA rolls away_02's Bone-head at pos 29 (=2), THEN the block at pos 30,31 = raw [6,4] → [Pow, Pushback];
+    picks die[0]=Pow (Defender Down): home_01 pushed to (11,8)+Prone, blitzer stays up, NO turnover.
+  - RUST does NOT roll away_02's Bone-head before the block, so the block rolls one die EARLIER at pos 29,30 =
+    raw [2,6] → [BothDown, Pow]; picks die[0]=BothDown → blitzer AND defender fall in place → TURNOVER.
+  - The `used_skills` double-push guard is INNOCENT (traced `do_roll=true` correctly; the rolling Bone-head for
+    away_02 is a LATER turn ~600 lines on). The real issue is the STEP SEQUENCE: the Ogre blitz's block
+    sub-sequence `InitBlocking → GoForIt → SteadyFooting → FoulAppearance → DumpOff → BlockStatistics → Dauntless
+    → Horns → Trickster → PickUp → CatchScatterThrowIn → Stab → BlockChainsaw → … → BlockRoll` contains **NO
+    BoneHead step**. The adjacent blitz dispatches (force_goto, block_defender_id set) EndSelecting → InitBlocking
+    directly, skipping the move/negatrait phase where Bone-head lives. Java runs the Bone-head negatrait check
+    before the block regardless.
+- **NEXT (the fix):** make the Blitz run the Bone-head / negatrait check BEFORE the block even when the blitzer
+  is adjacent (no movement). Compare the Rust vs Java bb2025 Blitz/Block sequence: where does Java put the
+  negatrait/Bone-head step for a Blitz, and why does a plain Block (away_03) DO roll Bone-head in Rust but the
+  adjacent Blitz does not. Likely: the Blitz's `force_goto_on_dispatch`/EndSelecting path skips the negatrait
+  sub-sequence that a plain Block goes through; the fix wires the negatrait steps into the adjacent-blitz path.
+  Verify: away_02's block then rolls at pos 30,31 = [6,4] → Defender Down, no turnover; seed 1 advances; lineman
+  stays green (linemen have no Bone-head so unaffected).
