@@ -89,49 +89,76 @@ impl StepInitPassing {
                 .with_published(outcome.published);
         }
 
-        // Java: pass/hand-over setup (range ruler, hasPassed, concessionPossible, etc.)
-        // These mutations are on game state — perform them then advance.
-        // client-only: full range ruler logic — RangeRuler is client-side display
+        // Java mixed StepInitPassing: it only advances to the pass roll when the throw is IN RANGE
+        // (findPassingDistance != null) and thrower==actingPlayer; an out-of-range target leaves the
+        // step WAITING, and the parity agent then ends the turn (turnover) with the ball unmoved.
+        // The Rust translation was missing this gate and always advanced, so StepPass auto-fumbled the
+        // out-of-range throw AND scattered the ball (an extra d8) where Java rolls nothing (seed 23
+        // i=264: away_08 at (8,11) throwing to out-of-range (18,2) — Java keeps the ball at (8,11),
+        // Rust bounced it to (8,10)). Use the SAME range function StepPass uses so the two steps agree.
+        // client-only: full range ruler logic — RangeRuler is client-side display.
         use ffb_model::enums::PlayerAction;
         let thrower_action = game.thrower_action;
-        match thrower_action {
-            Some(PlayerAction::HandOver) => {
-                if thrower_is_acting {
-                    game.acting_player.has_passed = true;
-                    game.concession_possible = false;
-                    game.turn_data_mut().hand_over_used = true;
-                    game.turn_data_mut().turn_started = true;
-                }
+        let thrower_coordinate = game.thrower_id.as_deref()
+            .and_then(|id| game.field_model.player_coordinate(id));
+        let passing_distance_valid = match (thrower_coordinate, game.pass_coordinate) {
+            (Some(tc), Some(pc)) => ffb_model::util::passing::passing_distance(tc, pc).is_some(),
+            _ => false,
+        };
+        let catcher_exists = self.catcher_id.as_deref()
+            .map(|id| game.player(id).is_some())
+            .unwrap_or(false);
+
+        // Java: HAND_OVER — thrower==actingPlayer && catcher != null (no range check).
+        if thrower_action == Some(PlayerAction::HandOver) && thrower_is_acting && catcher_exists {
+            game.acting_player.has_passed = true;
+            game.concession_possible = false;
+            game.turn_data_mut().hand_over_used = true;
+            game.turn_data_mut().turn_started = true;
+            return outcome;
+        }
+        // Java: THROW_BOMB (thrower==actingPlayer) / HAIL_MARY_BOMB — range-gated.
+        if (passing_distance_valid && thrower_is_acting && thrower_action == Some(PlayerAction::ThrowBomb))
+            || thrower_action == Some(PlayerAction::HailMaryBomb)
+        {
+            if thrower_is_acting {
+                game.acting_player.has_passed = true;
             }
-            Some(PlayerAction::Pass) => {
-                if thrower_is_acting {
-                    game.acting_player.has_passed = true;
-                    game.turn_data_mut().turn_started = true;
-                    game.concession_possible = false;
-                    game.turn_data_mut().pass_used = true;
-                }
+            game.turn_data_mut().turn_started = true;
+            game.concession_possible = false;
+            return outcome;
+        }
+        // Java: PASS (thrower==actingPlayer) / HAIL_MARY_PASS — range-gated.
+        if (passing_distance_valid && thrower_is_acting && thrower_action == Some(PlayerAction::Pass))
+            || thrower_action == Some(PlayerAction::HailMaryPass)
+        {
+            game.acting_player.has_passed = true;
+            game.turn_data_mut().turn_started = true;
+            game.concession_possible = false;
+            game.turn_data_mut().pass_used = true;
+            return outcome;
+        }
+        // Java: (THROW_BOMB || DUMP_OFF) / HAIL_MARY_BOMB — no thrower==actingPlayer requirement.
+        if (passing_distance_valid
+            && matches!(thrower_action, Some(PlayerAction::ThrowBomb) | Some(PlayerAction::DumpOff)))
+            || thrower_action == Some(PlayerAction::HailMaryBomb)
+        {
+            if thrower_is_acting {
+                game.acting_player.has_passed = true;
             }
-            Some(PlayerAction::ThrowBomb) | Some(PlayerAction::DumpOff) => {
-                if thrower_is_acting {
-                    game.acting_player.has_passed = true;
-                    game.turn_data_mut().turn_started = true;
-                    game.concession_possible = false;
-                }
-            }
-            Some(PlayerAction::HailMaryBomb) | Some(PlayerAction::HailMaryPass) => {
-                if thrower_is_acting {
-                    game.acting_player.has_passed = true;
-                }
-                game.turn_data_mut().turn_started = true;
-                game.concession_possible = false;
-                if thrower_action == Some(PlayerAction::HailMaryPass) {
-                    game.turn_data_mut().pass_used = true;
-                }
-            }
-            _ => {}
+            return outcome;
         }
 
-        outcome
+        // No branch matched (the throw is out of range). Java's StepInitPassing leaves the step
+        // WAITING and the parity agent (ParityRunner INIT_PASSING handler) unconditionally injects
+        // ClientCommandEndTurn — a turnover with the ball unmoved and no roll. Both reference agents
+        // always end the turn here, so end it directly (goto the end label + publish EndTurn) rather
+        // than waiting for a prompt the headless runner cannot surface. This produces the identical
+        // observable result: turnover, ball stays at the thrower, zero dice (seed 23 i=264).
+        outcome = outcome.publish(StepParameter::EndTurn(true));
+        StepOutcome::goto(&self.goto_label_on_end.clone())
+            .with_events(outcome.events)
+            .with_published(outcome.published)
     }
 }
 
@@ -211,6 +238,15 @@ mod tests {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
     }
 
+    /// Add a player to the home roster and place it on the field, so `game.player(id)` and
+    /// `field_model.player_coordinate(id)` both resolve (needed for the range/catcher checks).
+    fn add_field_player(game: &mut Game, id: &str, x: i32, y: i32) {
+        let mut p = ffb_model::model::player::Player::default();
+        p.id = id.into();
+        game.team_home.players.push(p);
+        game.field_model.set_player_coordinate(id, FieldCoordinate::new(x, y));
+    }
+
     #[test]
     fn no_thrower_waits_for_command() {
         let mut step = StepInitPassing::new();
@@ -259,8 +295,11 @@ mod tests {
         let mut step = StepInitPassing::new();
         step.goto_label_on_end = "end".into();
         let mut game = make_game();
+        add_field_player(&mut game, "p1", 5, 5);
         game.thrower_id = Some("p1".into());
+        game.acting_player.player_id = Some("p1".into());
         game.thrower_action = Some(PlayerAction::Pass);
+        game.pass_coordinate = Some(FieldCoordinate::new(6, 6)); // in range (QuickPass)
         let mut rng = GameRng::new(0);
         let out = step.start(&mut game, &mut rng);
         assert_eq!(out.action, StepAction::NextStep);
@@ -275,9 +314,11 @@ mod tests {
         let mut step = StepInitPassing::new();
         step.goto_label_on_end = "end".into();
         let mut game = make_game();
+        add_field_player(&mut game, "p1", 5, 5);
         game.thrower_id = Some("p1".into());
         game.acting_player.player_id = Some("p1".into());
         game.thrower_action = Some(PlayerAction::Pass);
+        game.pass_coordinate = Some(FieldCoordinate::new(6, 6)); // in range (QuickPass)
         game.concession_possible = true;
         let mut rng = GameRng::new(0);
         let out = step.start(&mut game, &mut rng);
@@ -294,6 +335,9 @@ mod tests {
         let mut step = StepInitPassing::new();
         step.goto_label_on_end = "end".into();
         let mut game = make_game();
+        add_field_player(&mut game, "p1", 5, 5);
+        add_field_player(&mut game, "c1", 6, 6);
+        step.catcher_id = Some("c1".into()); // hand-over requires a catcher (no range check)
         game.thrower_id = Some("p1".into());
         game.acting_player.player_id = Some("p1".into());
         game.thrower_action = Some(PlayerAction::HandOver);
@@ -316,8 +360,10 @@ mod tests {
         step.goto_label_on_end = "end".into();
         let mut game = make_game();
         // Thrower is the defender (dump-off scenario); acting player is someone else.
+        add_field_player(&mut game, "defender", 5, 5);
         game.thrower_id = Some("defender".into());
         game.thrower_action = Some(PlayerAction::DumpOff);
+        game.pass_coordinate = Some(FieldCoordinate::new(6, 6)); // in range (DumpOff advances)
         game.acting_player.player_id = Some("p1".into());
         game.acting_player.suffering_blood_lust = true;
         game.acting_player.has_fed = false;
@@ -343,12 +389,37 @@ mod tests {
     }
 
     #[test]
+    fn out_of_range_pass_ends_the_turn_without_advancing() {
+        // Java's mixed StepInitPassing only advances when findPassingDistance != null; an out-of-range
+        // target leaves it waiting and the parity agent ends the turn (turnover, ball unmoved, 0 dice).
+        // Rust ends the turn directly here (goto end label + EndTurn) rather than auto-fumbling and
+        // bouncing the ball in StepPass (seed 23 i=264).
+        let mut step = StepInitPassing::new();
+        step.goto_label_on_end = "end".into();
+        let mut game = make_game();
+        add_field_player(&mut game, "p1", 8, 11);
+        game.thrower_id = Some("p1".into());
+        game.acting_player.player_id = Some("p1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.pass_coordinate = Some(FieldCoordinate::new(18, 2)); // dx=10 dy=9 → out of range
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::GotoLabel, "out-of-range pass gotos the end label");
+        assert_eq!(out.goto_label.as_deref(), Some("end"));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "out-of-range pass ends the turn (turnover)");
+        assert!(!game.turn_data().pass_used, "no pass was actually thrown");
+    }
+
+    #[test]
     fn blood_lust_thrower_is_acting_and_fed_continues() {
         let mut step = StepInitPassing::new();
         step.goto_label_on_end = "end".into();
         let mut game = make_game();
+        add_field_player(&mut game, "p1", 5, 5);
         game.thrower_id = Some("p1".into());
         game.thrower_action = Some(PlayerAction::Pass);
+        game.pass_coordinate = Some(FieldCoordinate::new(6, 6)); // in range (QuickPass)
         game.acting_player.player_id = Some("p1".into());
         game.acting_player.suffering_blood_lust = true;
         game.acting_player.has_fed = true;

@@ -605,9 +605,6 @@
 {"type":"playerAction","player_id":"away_03","action":"Move"}
 {"type":"playerMoved","player_id":"away_03","coord":{"x":17,"y":7}}
 {"type":"playerAction","player_id":"away_08","action":"Pass"}
-{"type":"passBlock","player_id":null}
-{"type":"passRoll","player_id":"away_08","target":0,"distance":"LongBomb","roll":0,"result":"Fumble","rerolled":false}
-{"type":"scatterBall","from":{"x":8,"y":11},"directions":[1]}
 {"type":"playerAction","player_id":"home_09","action":"Move"}
 {"type":"playerMoved","player_id":"home_09","coord":{"x":8,"y":7}}
 {"type":"playerAction","player_id":"home_05","action":"Move"}

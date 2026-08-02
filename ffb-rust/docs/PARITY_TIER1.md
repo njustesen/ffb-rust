@@ -814,17 +814,34 @@ Tests: `forced_accurate_roll_goes_to_end_label` (now asserts PassAccurate(true))
 `accurate_pass_falls_back_to_player_at_pass_coordinate_when_catcher_id_missing`. Seeds 1-22 unchanged; seed
 23 now advances to i=264.
 
-Next: seed 23 i=264 (turn 8 half 2) — Activate(away_08, PASS), a SECOND pass divergence exposed once the
-i=158 pass no longer turned over. away_08 (a07) is the ball carrier at (8,11); it throws a very long pass to
-(18,2) (dx10/dy9). Pass accuracy roll d6=4 (rng 80) FAILS in both engines → turnover (both flip to home at
-i=265). The divergence: on the FAILED pass Rust rolls an EXTRA d8=1 bounce (pos 81) that scatters the ball
-(8,11)→(8,10); Java rolls NO d8 — its ball stays at the thrower (8,11) and it proceeds straight to the next
-rolls (rng 81+ randomPlayerId). So Rust bounces the fumbled/failed pass ball where Java leaves it at the
-thrower. METHOD next iter: determine the exact PassResult (FUMBLE vs INACCURATE vs WILDLY_INACCURATE vs
-out-of-range) for this long pass in BOTH engines — Java StepPass.handleFailedPass sets ball=throwerCoord and
-publishes CATCH_SCATTER_THROW_IN_MODE=SCATTER_BALL for a FUMBLE (which WOULD bounce), so Java NOT bouncing
-here means its result is NOT a plain FUMBLE (maybe the target is out of Long-Bomb range → a distinct no-scatter
-path, or WILDLY_INACCURATE handled differently). Compare Rust step_pass.rs FUMBLE/INACCURATE/out-of-range
-branches + the passing_distance/range computation (thrower (8,11) → (18,2)) against Java bb2025 StepPass +
-PassMechanic.findPassingDistance. Isolate with `--seeds 23-23`. This is UNRELATED to the Iter-35 accurate-pass
-fix (that pass was accurate; this one fails). Fix the Rust engine only. VERIFY seeds 1-22 + seed 23≤264 hold.
+## Iter 36 — seed 23 i=264 FIXED (out-of-range pass ends the turn, no bounce); seeds 1-29 green
+
+Root cause (seed 23 i=264, Activate(away_08, PASS)): away_08 (a07, ball carrier at (8,11)) throws to (18,2),
+which is OUT OF RANGE (dx10/dy9 → the throwing-range table has no entry). Java: the pass never rolls — its
+mixed StepInitPassing only advances when findPassingDistance != null, so an out-of-range target leaves the
+step WAITING and the ParityRunner INIT_PASSING handler injects EndTurn (turnover, ball stays at (8,11), 0
+dice). Rust: its mixed StepInitPassing (step/mixed/pass/, the one bb2025 uses via make_step — NOT the bb2016
+sibling which HAD the range check) always advanced to StepPass, which saw dist=None → auto-FUMBLE → scattered
+the ball one square via a d8 bounce (8,11)→(8,10), consuming 1 extra die and desyncing the stream.
+
+Diagnosis path: `--seeds 23-23` isolates the game (clean trace). rng_calls flat at 80 in Java across i=263-266
+(0 dice) vs Rust 80→81 (1 die). Instrumented StepPass (RUST_PASS, reverted): dist=None, roll=0, result=FUMBLE.
+Two Rust range functions existed and could disagree: StepInitPassing(bb2016) uses mechanic.find_passing_distance,
+StepPass uses util::passing::passing_distance — but the bb2025 flow uses the MIXED StepInitPassing which had NO
+range check at all.
+
+Fix (crates/ffb-engine/src/step/mixed/pass/step_init_passing.rs): port the bb2016 sibling's range gate — compute
+passing_distance_valid via the SAME util::passing::passing_distance StepPass uses, gate the PASS/THROW_BOMB/
+DUMP_OFF branches on it (HAND_OVER gates on catcher, HAIL_MARY always advances), and when no branch matches
+(out of range) end the turn directly (goto end label + publish EndTurn) — mirroring the ParityRunner's
+unconditional EndTurn abort. Both reference agents always EndTurn here, so ending it in the step yields the
+identical observable result (turnover, ball unmoved, 0 dice) without needing a prompt the headless runner
+can't surface. Updated 5 existing unit tests to use in-range setups + added out_of_range_pass_ends_the_turn.
+Seeds 1-29 now fully match.
+
+Next: seed 30 i=154 (turn 2 half 2) — Activate(away_02, BLOCK) STALLS in Rust (prompt_after=None, finished=false;
+Rust log truncates at 156 vs Java 278). Both agree on the i=154 pre-state (9fcf6429). This is a BLOCK stall,
+UNRELATED to the pass fix (a block never enters StepInitPassing; seeds 1-29 incl. all their passes pass). The
+block activation produced no BlockChoice prompt. Investigate StepInitBlocking for away_02 (a01 at (13,6)) —
+likely a no-target/one-die-block or dice-decoration path that fails to surface a prompt. Isolate `--seeds 30-30`,
+FFB_DRIVE_TRACE the InitBlocking sequence.
