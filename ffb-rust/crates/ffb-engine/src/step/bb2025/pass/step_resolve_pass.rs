@@ -96,8 +96,18 @@ impl StepResolvePass {
         // Java: else if (state.getResult() == PassResult.ACCURATE)
         if self.pass_accurate {
             let pass_coord = game.pass_coordinate;
+            // Java shares one PassState across every pass step, so StepResolvePass reads the
+            // catcherId set back in StepInitPassing. Rust delivers CatcherId as a step parameter, but
+            // delivery STOPS at the first consumer (StepDispatchPassing), so it never reaches here and
+            // self.catcher_id stays None. For an ACCURATE pass the ball lands on pass_coordinate, so
+            // the catcher is exactly the player standing there — fall back to that. Without this a
+            // present receiver was treated as an empty square → CatchScatter (+1 "Inaccurate Pass or
+            // Scatter") instead of CatchAccuratePass, so a catchable accurate pass failed and turned
+            // over (seed 23 i=158: away_04 at (21,4) needed a 4+ catch instead of 3+ and missed d6=3).
+            let effective_catcher_id = self.catcher_id.clone()
+                .or_else(|| pass_coord.and_then(|pc| game.field_model.player_at(pc).cloned()));
             // Java: check catcher state (tacklezones) — simplified: assume catcher present and standing
-            if let Some(ref catcher_id) = self.catcher_id {
+            if let Some(ref catcher_id) = effective_catcher_id {
                 // Java: PlayerState catcherState = getPlayerState(catcher)
                 // Java: if catcher==null || catcherState==null || !catcherState.hasTacklezones()
                 //          → CATCH_ACCURATE_PASS_EMPTY_SQUARE or CATCH_MISSED_PASS
@@ -224,6 +234,27 @@ mod tests {
             matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::CatchAccuratePass))
         });
         assert!(mode.is_some());
+    }
+
+    #[test]
+    fn accurate_pass_falls_back_to_player_at_pass_coordinate_when_catcher_id_missing() {
+        // The CatcherId parameter is consumed by StepDispatchPassing before it reaches StepResolvePass,
+        // so catcher_id stays None. For an accurate pass the receiver stands on pass_coordinate, so the
+        // step must fall back to that player and route CatchAccuratePass — NOT the empty-square path
+        // (which the catch step turns into CatchScatter, +1 to catch, failing catchable passes).
+        let mut game = make_game();
+        game.thrower_action = Some(PlayerAction::Pass);
+        let target = FieldCoordinate::new(21, 4);
+        game.pass_coordinate = Some(target);
+        game.field_model.set_player_coordinate("recv", target);
+        game.field_model.set_player_state("recv", PlayerState::new(PS_STANDING));
+        let mut step = StepResolvePass::new();
+        step.pass_accurate = true;
+        step.catcher_id = None; // parameter never arrived
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p,
+            StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::CatchAccuratePass))),
+            "falls back to the standing player at pass_coordinate → CatchAccuratePass");
     }
 
     #[test]

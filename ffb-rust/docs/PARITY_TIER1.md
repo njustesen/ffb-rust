@@ -788,3 +788,33 @@ distance modifiers / deviation / catch). METHOD for next iter: isolate seed 23 (
 seeds ≤N — filter or run a single seed), compare the away_10 pass accuracy d6 + range + deviation + catch
 resolution between Rust StepPass/StepThrow and Java bb2025 pass steps; the Rust engine likely mis-scores the
 pass as inaccurate (or wrong passing distance/target) where Java scores it accurate/complete. Fix Rust engine.
+
+## Iter 35 — seed 23 PASS FIXED (accurate pass now catches); seed 23 advanced i=158 → i=264
+
+Root cause (seed 23 i=158, Activate(away_10, PASS)): away_10 (a09) at (15,7) makes an ACCURATE ShortPass to
+(21,4) where away_04 (a03) stands. Java: accurate → CatchAccuratePass, catch d6=3 vs target 3 → CAUGHT, away
+continues. Rust: same accuracy roll (d6=5, min_roll 5 → ACCURATE) but the receiver caught in CatchScatter
+mode (target 4, +1 "Inaccurate Pass or Scatter") → d6=3 failed → ball bounced (d8) to an empty square →
+TURNOVER (flip to home). Diagnosed by isolating the seed (`--seeds 23-23`) and instrumenting StepPass +
+the catch (temp RUST_PASS/RUST_CATCH, reverted): pass=ACCURATE but catch mode=CatchScatter.
+
+TWO linked bugs, both from Rust translating Java's shared PassState into per-step parameters that don't
+propagate the way the shared object did:
+  1. StepPass's ACCURATE branch published only PassResultParam(Complete), NOT PassAccurate(true). So
+     StepResolvePass.pass_accurate stayed false and EVERY accurate pass fell through to the missed/inaccurate
+     branch → CatchScatter (+1 to catch). Java keys off the shared PassState.result==ACCURATE. FIX
+     (step_pass.rs): publish PassAccurate(!is_bomb) alongside PassResultParam(Complete).
+  2. Even with pass_accurate=true, StepResolvePass.catcher_id was None: the CatcherId parameter published by
+     StepInitPassing is consumed by StepDispatchPassing (Rust's publish() stops at the first consumer),
+     so it never reaches StepResolvePass — whereas Java shares one PassState across all pass steps. A None
+     catcher takes the empty-square path → CatchScatter. FIX (step_resolve_pass.rs): for an accurate pass the
+     ball lands on pass_coordinate, so fall back to player_at(pass_coordinate) when catcher_id is None.
+
+Tests: `forced_accurate_roll_goes_to_end_label` (now asserts PassAccurate(true)), and
+`accurate_pass_falls_back_to_player_at_pass_coordinate_when_catcher_id_missing`. Seeds 1-22 unchanged; seed
+23 now advances to i=264.
+
+Next: seed 23 i=264 (turn 8 half 2, home): Activate(home_09, MOVE), pre-state differs already (Java 99ff1b30 /
+Rust f25cfd08) — find the first differing index ≤264 in seed_23 (likely a downstream effect that shifted once
+the pass no longer turned over, i.e. away kept the ball / continued its turn 3; re-run the first-divergence
+finder fresh).

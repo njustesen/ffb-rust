@@ -448,7 +448,7 @@
 {"type":"playerAction","player_id":"away_03","action":"Pass"}
 {"type":"passBlock","player_id":null}
 {"type":"passRoll","player_id":"away_03","target":6,"distance":"LongPass","roll":6,"result":"Complete","rerolled":false}
-{"type":"catchRoll","player_id":"away_09","target":4,"roll":1,"success":false,"rerolled":false}
+{"type":"catchRoll","player_id":"away_09","target":3,"roll":1,"success":false,"rerolled":false}
 {"type":"scatterBall","from":{"x":20,"y":4},"directions":[6]}
 {"type":"playerAction","player_id":"home_04","action":"Move"}
 {"type":"playerMoved","player_id":"home_04","coord":{"x":7,"y":4}}

@@ -293,8 +293,16 @@ impl StepPass {
                     }
                 }
                 let label = self.goto_label_on_end.clone();
+                // Java StepResolvePass keys the accurate-catch routing off the shared PassState.result
+                // (== ACCURATE). Rust's StepResolvePass instead reads a `PassAccurate` bool it expects
+                // StepPass to publish — but StepPass only published PassResultParam, so pass_accurate
+                // stayed false and every accurate pass fell through to the missed/inaccurate branch
+                // (CatchScatter, +1 to catch). Publish PassAccurate(true) so the receiver actually
+                // catches an accurate pass (seed 23 i=158). Bombs route through their own accurate
+                // branch, which does not read PassAccurate, so only publish it for a real ball pass.
                 StepOutcome::goto(&label)
                     .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Complete))
+                    .publish(StepParameter::PassAccurate(!is_bomb))
             }
             PassResult::SAVED_FUMBLE => {
                 // Java: handleSafePass → usingSafePass dialog / goto goToLabelOnSavedFumble
@@ -474,6 +482,10 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("end"));
+        // Must publish PassAccurate(true) so StepResolvePass routes the accurate catch
+        // (CatchAccuratePass) instead of falling through to the missed/scatter branch.
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassAccurate(true))),
+            "accurate ball pass publishes PassAccurate(true)");
     }
 
     #[test]
