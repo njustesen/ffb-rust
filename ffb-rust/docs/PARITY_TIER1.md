@@ -672,3 +672,26 @@ and dump Rust's engine move-squares at the same point; find why Java's targets l
 vs engine SMA, or a board diff from a mid-move dodge/fall — pos39 Java caller=InjuryTypeDropDodge.handleInjury,
 so a dodge failed & someone fell during the move). Align the move-square set (engine SMA vs ParityRunner
 targets) so both agents see the same pool. NO fix committed this iter (diagnosis only).
+
+## Iter 30 (2026-08-02) — DIAGNOSIS refined: seed 8 i=76 carrier RUSHES past MA in Rust, stops in Java
+
+Instrumented Java ParityRunner.sendMoveAction (JAVA_TGT: handlerCoord, N, carrying, ball) — reverted +
+jar rebuilt clean, seeds 1-7 still 7/7. away_01 picks up the loose ball at (14,9) and carries it:
+(14,9)carry,(13,9)carry,(12,8)carry,(11,8)carry,(10,8)carry — Java's JAVA_TGT matches Rust's RUST_PICK
+EXACTLY through (10,8) (6 squares = MA 6). Then: RUST continues — away_01 at (9,9) gets ANOTHER Move
+prompt and RUSHES (GFI pos42=GoForIt) to (8,10),(7,10)... still carrying. JAVA STOPS at MA: there is NO
+JAVA_TGT at coord=(9,9) — the Java engine did not prompt a further (rush) move, so away_01's move ended at
+its 6th square; pos42 in Java is already the NEXT activation's rollBlockDice. Downstream the ball ends at
+(7,11) MOVING in Java (a later fumble) with away_01 no longer carrying — a CONSEQUENCE, not the cause.
+ROOT: the carrier's move continuation past MA differs — the Rust engine offers a rush/GFI Move prompt at
+MA-exhaustion (agent's carrier-keeps-moving logic then takes it), while the Java engine ends the move at MA
+(no further prompt). Same shared dodge at pos41 (both result 6) then divergence.
+NEXT: determine the correct behavior. Either (a) the Rust ENGINE should NOT offer a rush Move prompt here
+(match Java ending the move at MA) — inspect StepInitMoving/StepMove/move-square generation + StepGoForIt
+for when a rush square is offered to the agent; or (b) the AGENT's carrier-keeps-moving should stop at MA.
+Confirm via Java: does the ParityRunner EVER rush a carrier (grep JAVA_GFI runGfi=true goingForIt=true — it
+appears for away_10 at currentMove=6, so Java DOES rush sometimes)? So it's likely an ENGINE move-square /
+GFI-prompt condition (when is the rush square offered) that differs, NOT a blanket "never rush". Compare the
+exact move-square set the Rust engine offers at (9,9) [(8,8),(8,9),(8,10),(9,10),(10,8),(10,10)] vs whether
+Java's engine offers any at (9,9) (it offered none → move ended). NO fix committed (diagnosis only). Fix the
+Rust ENGINE's rush/GFI move-square generation to match Java; add a Rust test; VERIFY seed 8 advances.
