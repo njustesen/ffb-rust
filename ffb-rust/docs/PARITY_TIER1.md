@@ -858,14 +858,31 @@ just not chosen yet), keep waiting (cont()) for the GUI path. Tests: no_defender
 player_action, no_defender_blitz_ends_the_turn, and no_defender_id_with_adjacent_target_stays_cont (GUI wait
 preserved). Seeds 1-40 now fully match (was 1-29).
 
-Next: seed 41 first state_hash divergence at i=225's PRE-state (both 41ff157a Java / 0530c881 Rust) — i.e.
-i=224 Activate(home_07, MOVE) (turn 7 half 2, active=home) produced divergent post-states from a SHARED
-pre-state (81866d22), NO dice → a deterministic MOVE/positional divergence (like the Iter-31/32 carrier/
-stand-up ones), NOT a dice-count one. Both engines then Activate(away_01, BLOCK) at i=225 on the now-divergent
-pre-state. METHOD next iter: isolate `--seeds 41-41`; the Rust JSONL (seed_41_rust.jsonl) DOES carry a `state`
-field per step under FFB_TRACE — read i=224 and i=225 Rust states directly from it; get Java's i=225 state from
-the JSTEP trace but CORRELATE BY HASH/CONTENT, not by trace-i (the FFB_TRACE i= counter does NOT match the
-JSONL/comparator i= — this bit me repeatedly). Find the single changed token (a home player coord/base or the
-ball) at i=225 and trace home_07's move resolution (RUST_SMA/RUST_PICK, LOOP applied=) vs Java (JAVA_SMA/
-JAVA_PICK). Likely a move-continuation / pickup / carrier heuristic or a knockdown-placement difference. Fix
-the Rust engine (or the agent if it's a move-heuristic mirror mismatch). VERIFY seeds 1-40 hold.
+## Iter 38 — seed 41 diagnosed: STALLING pathfinder stub (is_considered_stalling always false). NOT yet fixed — large port.
+
+Seed 41 first STATE_HASH divergence is i=225, but the first RNG divergence is EARLIER at i=214 (Java rng 127 /
+Rust 126): during i=213 Activate(home_07, PASS), Java rolls ONE extra d6 (rng 127=4) that Rust does not — and
+the state hash stayed identical (the classic rng-desync-before-state-desync). The extra Java die's caller is
+`StallingExtension.handleStaller:73`, NOT a pass roll. home_07 is the BALL CARRIER at (24,13) (h06, one square
+from the away endzone x=25); it declares an out-of-range PASS to (6,8) (dx18 → out of range, correctly no pass
+roll in either engine) instead of scoring → it is a STALLER. Java's StepForgoneStalling sees isConsideredStalling
+== true → handleStaller rolls a d6 (success = roll >= turnNr). Rust's `is_considered_stalling`
+(crates/ffb-engine/src/step/bb2025/shared/stalling_extension.rs) is a STUB whose Guard 4 (open path to endzone)
+always returns false (line 55-57, "PathFinderWithPassBlockSupport not ported"), so Rust never rolls. The 1-die
+offset then desyncs the post-TD KO-recovery roll at i=224 (home_07 scores at i=224 → score 0,0→1,0 → end-of-drive
+KO recovery): Java's home_03 (h02) recovers from KO (rng 130=5 → 12,8 standing), Rust's stays KO — diverging the
+whole board at i=225 (first STATE divergence).
+
+The entire stalling machinery is already wired in Rust (StepForgoneStalling + StepStallingPlayer both call
+is_considered_stalling → handle_staller, and handle_staller correctly rolls the d6). The ONLY missing piece is
+Guard 4: `hasOpenPathToEndzone` via Java `PathFinderWithPassBlockSupport.getShortestPath(game, endzoneCoords,
+player, 0)` (returns non-null iff a path to the enemy endzone exists). NEXT ITER — port the pathfinder (a fresh,
+focused task): Java `ffb-common/.../util/pathfinding/PathFinderWithPassBlockSupport.java` (~312 lines) + its
+PathFindNode/PathFindData/PathFindContext. It is Dijkstra over the field: blocks squares with players (closedSet),
+marks opponent tackle-zone squares + the ball square + trapdoors as cost-1000 nodes, returns null if an opponent
+TZ is adjacent to the start (but Guard 3 already excludes that), maxDistance=0 (verify its meaning — likely
+"unlimited" for the reachability query). For lineman-vs-lineman there are no skills/pass-block, so a faithful
+Dijkstra-to-endzone avoiding blocked squares + opponent tackle zones (cost 1000) should match. Put it in
+crates/ffb-mechanics or ffb-model util; wire is_considered_stalling Guard 4 to it. VERIFY seeds 1-40 hold + seed
+41 advances. Add a Rust test (ball carrier with clear lane to endzone → is_considered_stalling true; blocked by a
+wall of TZ → false). This is a BIG mechanic — give it a full turn.
