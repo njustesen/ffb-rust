@@ -62,6 +62,15 @@ pub struct RandomAgent {
     /// INIT_MOVING: after the first square, only the BALL CARRIER keeps moving (until MA is spent);
     /// every other player deselects. Reset at the start of every activation (ActivatePlayer).
     moved_this_activation: bool,
+    /// Move target pre-drawn at activation for a PRONE (standing-up) Move — mirrors Java
+    /// ParityRunner.sendMoveAction, which picks the move target at phase-2 (right after the
+    /// activation) BEFORE the Select-sequence negatrait rolls (Bone Head, Really Stupid, ...). A
+    /// prone player whose negatrait FAILS never reaches the Move sequence's StepInitMoving (and so
+    /// never receives an AgentPrompt::Move), yet Java has already drawn that move-target actionRng.
+    /// Pre-drawing here keeps the action_rng stream aligned in that case; when the Move prompt does
+    /// arrive (negatrait passed / none), the square is reused without a second draw. Reset at each
+    /// activation. See docs/PARITY_TTM.md "FRONTIER (human)" — the Ogre Bone-head case.
+    pending_move: Option<FieldCoordinate>,
 }
 
 impl RandomAgent {
@@ -77,6 +86,7 @@ impl RandomAgent {
             decision_rng_count: 0,
             current_activation_is_blitz: false,
             moved_this_activation: false,
+            pending_move: None,
         }
     }
 
@@ -93,6 +103,7 @@ impl RandomAgent {
             decision_rng_count: 0,
             current_activation_is_blitz: false,
             moved_this_activation: false,
+            pending_move: None,
         }
     }
 
@@ -314,6 +325,31 @@ impl Agent for RandomAgent {
                 );
                 // New activation → reset the "moved one square" tracker (Java INIT_MOVING policy).
                 self.moved_this_activation = false;
+                self.pending_move = None;
+                // Prone (standing-up) Move: mirror Java ParityRunner.sendMoveAction, which draws the
+                // move target at phase-2 — BEFORE the Select-sequence negatrait rolls. The Rust engine
+                // emits AgentPrompt::Move only from the Move sequence's StepInitMoving, which a prone
+                // player never reaches when its negatrait (Bone Head, Really Stupid, ...) FAILS in the
+                // Select sequence. Pre-drawing the move-target actionRng here keeps the stream aligned
+                // in that case; the AgentPrompt::Move handler reuses this square with no second draw.
+                // (Standing players already draw at StepInitMoving BEFORE their Move-sequence negatrait,
+                // so they need no pre-draw.) legal_move_targets is coordinate-based, so the pre-activation
+                // list equals the post-stand-up list the engine would offer — same list, same pick.
+                if matches!(player_action, PlayerActionChoice::Move)
+                    && gs.game.field_model.player_state(player_id).map(|s| s.is_prone()).unwrap_or(false)
+                {
+                    let targets = crate::legal_actions::legal_move_targets(&gs.game, player_id);
+                    // Java sendMoveAction deselects with 0 actionRng when there is no adjacent empty
+                    // square; only draw when the candidate list is non-empty.
+                    if !targets.is_empty() {
+                        let idx = self.pick_action(targets.len());
+                        self.pending_move = Some(targets[idx]);
+                        if std::env::var("FFB_TRACE").is_ok() {
+                            eprintln!("RUST_SMA pid={} N={} prone_predraw", player_id, targets.len());
+                            eprintln!("RUST_PICK pid={} N={} idx={} t=({},{}) prone_predraw", player_id, targets.len(), idx, targets[idx].x, targets[idx].y);
+                        }
+                    }
+                }
                 Action::ActivatePlayer { player_id: player_id.clone(), player_action, block_defender_id }
             }
             // Move prompt: pick destination from legal squares using actionRng.
@@ -335,6 +371,19 @@ impl Agent for RandomAgent {
                 if self.current_activation_is_blitz {
                     self.current_activation_is_blitz = false;
                     self.moved_this_activation = true;
+                }
+                // Prone (standing-up) Move: the target was pre-drawn at activation (mirroring Java's
+                // phase-2 sendMoveAction). Reuse it here — no second actionRng draw — then the
+                // follow-up prompt deselects via moved_this_activation, one move per activation.
+                if let Some(sq) = self.pending_move.take() {
+                    if self.moved_this_activation {
+                        return Action::EndPlayerAction;
+                    }
+                    self.moved_this_activation = true;
+                    if std::env::var("FFB_TRACE").is_ok() {
+                        eprintln!("RUST_MOVE_PRE pid={} t=({},{})", player_id, sq.x, sq.y);
+                    }
+                    return Action::Move { path: vec![sq] };
                 }
                 if squares.is_empty() {
                     // No adjacent empty square: deselect, ending the activation — 1:1 with Java
@@ -730,6 +779,37 @@ mod tests {
             }
             other => panic!("expected a Move, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn prone_move_predraw_is_reused_without_second_action_rng_draw() {
+        // Regression (docs/PARITY_TTM.md "FRONTIER (human)", the Ogre Bone-head case): a prone
+        // (standing-up) player activated for Move pre-draws its move target at activation — mirroring
+        // Java ParityRunner.sendMoveAction, which draws the move-target actionRng at phase-2, BEFORE
+        // the Select-sequence negatrait roll. A Bone-head failure ends the activation before
+        // StepInitMoving emits AgentPrompt::Move, yet Java has already drawn. Pre-drawing keeps the
+        // stream aligned; when the Move prompt DOES arrive, the square is reused with NO second draw.
+        let mut gs = new_game(1);
+        let mut agent = RandomAgent::new_parity(1);
+        let sq = FieldCoordinate::new(14, 6);
+        agent.pending_move = Some(sq);
+        agent.moved_this_activation = false;
+        let arc_before = agent.action_rng_count;
+        gs.pending_prompt = Some(AgentPrompt::Move {
+            player_id: "away_01".into(),
+            squares: vec![FieldCoordinate::new(13, 6), sq, FieldCoordinate::new(15, 6)],
+        });
+        match agent.act(&gs) {
+            Action::Move { path } => assert_eq!(path, vec![sq], "reuses the pre-drawn square"),
+            other => panic!("expected Move to the pre-drawn square, got {other:?}"),
+        }
+        assert_eq!(agent.action_rng_count, arc_before,
+            "reusing the pre-drawn square must NOT draw a second action_rng");
+        assert!(agent.pending_move.is_none(), "pending_move is consumed after reuse");
+        // The follow-up Move prompt (same activation) deselects: one move per activation.
+        gs.pending_prompt = Some(AgentPrompt::Move { player_id: "away_01".into(), squares: vec![sq] });
+        assert!(matches!(agent.act(&gs), Action::EndPlayerAction),
+            "the second Move prompt of the activation deselects");
     }
 
     #[test]

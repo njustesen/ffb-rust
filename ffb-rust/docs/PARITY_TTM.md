@@ -305,3 +305,32 @@ ogre is green (TTM will then correctly deselect there — no throwable player).
   Then reconcile: EITHER make the Rust engine dispatch (reach the Move prompt so the agent picks, matching
   Java — but must keep the player prone to match state), OR make the agent consume 1 actionRng ONLY for the
   prone-Move-that-will-deselect case. Verify lineman 100/100. 0 game dice consumed at i=37 (no stand-up roll).
+
+## FRONTIER (human) — SOLVED (2026-08-02 ~23:34): the Ogre Bone-head, NOT a "no-op prone move"
+- CORRECTION to the prior characterization: away_01 is the human team's **OGRE** (Big Guy — Bone Head,
+  Throw Team-Mate; it did THROW_TEAM_MATE at i=9). The prior "prone no-op Move / engine deselects with
+  0 dice" reading was WRONG: a game die IS rolled (rng_calls 31->32) and it is the **Bone-head roll**
+  (JAVA_DIE d6=1 from DiceRoller.rollSkill), which FAILS — the Ogre stays PRONE+confused (a00:14,7,Prone
+  through i=37/38/39). Both engines roll Bone-head and fail (dice match). The ONLY divergence is a
+  1-actionRng difference in when/whether the move target is drawn.
+- ROOT CAUSE (move-prompt vs Bone-head ORDER). Both engines set standing_up=true for the prone Ogre's
+  MOVE (changeActingPlayer: standingUp = was_prone). The Select sequence is InitSelecting -> ACTIVATION
+  (InitActivation..**BONE_HEAD**..BloodLust) -> JumpUp -> StandUp -> EndSelecting -> dispatch Move seq
+  (InitMoving emits the Move prompt). For a standing_up player Rust does next() INTO the Select ACTIVATION,
+  so BONE_HEAD rolls, FAILS, and ends the activation BEFORE StepInitMoving ever emits AgentPrompt::Move ->
+  0 actionRng. Java's ParityRunner draws the move target at **phase-2** (sendMoveAction, right after the
+  ACTIVATE, BEFORE the Select ACTIVATION) -> JAVA_PICK (14,6) = 1 actionRng, THEN Bone-head fails. Net
+  Java +1 actionRng. (Standing players skip the Select ACTIVATION via goto END_SELECTING and pick at
+  StepInitMoving, which is BEFORE the Move-sequence Bone-head — so they stay aligned. The ONLY divergent
+  case is a standing_up player whose Select-ACTIVATION negatrait FAILS.)
+- FIX (AGENT — random_agent.rs, mirrors ParityRunner.sendMoveAction exactly; engine-threading of MoveStack
+  was rejected because StepBloodLust inside the Select ACTIVATION also consumes MoveStack and would eat a
+  published value before StepEndSelecting): when the agent activates a **prone** player for Move, pre-draw
+  the move target at activation via legal_move_targets (coordinate-based -> pre-activation list == post-
+  stand-up list, (x,y)-sorted, same pick), 1 actionRng, iff non-empty (Java deselects with 0 rng when no
+  adjacent-empty). Stored in RandomAgent.pending_move; the AgentPrompt::Move handler reuses it with NO
+  second draw. Restricted to prone players so standing moves are untouched.
+- RESULT: human seed 1 GREEN (was step 39). Human seeds 1-3 GREEN; seed 4 now advances step 39 -> **step
+  174** (next frontier: i=175 turn1 half2 away Activate(away_02,MOVE), post-hash mismatch). Lineman tier
+  **100/100** (no regression), ffb-engine **7014/0** (added prone_move_predraw_is_reused_without_second_
+  action_rng_draw). Committed. NEXT: drive human seed 4 step 174.
