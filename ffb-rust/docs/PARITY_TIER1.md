@@ -814,7 +814,17 @@ Tests: `forced_accurate_roll_goes_to_end_label` (now asserts PassAccurate(true))
 `accurate_pass_falls_back_to_player_at_pass_coordinate_when_catcher_id_missing`. Seeds 1-22 unchanged; seed
 23 now advances to i=264.
 
-Next: seed 23 i=264 (turn 8 half 2, home): Activate(home_09, MOVE), pre-state differs already (Java 99ff1b30 /
-Rust f25cfd08) — find the first differing index ≤264 in seed_23 (likely a downstream effect that shifted once
-the pass no longer turned over, i.e. away kept the ball / continued its turn 3; re-run the first-divergence
-finder fresh).
+Next: seed 23 i=264 (turn 8 half 2) — Activate(away_08, PASS), a SECOND pass divergence exposed once the
+i=158 pass no longer turned over. away_08 (a07) is the ball carrier at (8,11); it throws a very long pass to
+(18,2) (dx10/dy9). Pass accuracy roll d6=4 (rng 80) FAILS in both engines → turnover (both flip to home at
+i=265). The divergence: on the FAILED pass Rust rolls an EXTRA d8=1 bounce (pos 81) that scatters the ball
+(8,11)→(8,10); Java rolls NO d8 — its ball stays at the thrower (8,11) and it proceeds straight to the next
+rolls (rng 81+ randomPlayerId). So Rust bounces the fumbled/failed pass ball where Java leaves it at the
+thrower. METHOD next iter: determine the exact PassResult (FUMBLE vs INACCURATE vs WILDLY_INACCURATE vs
+out-of-range) for this long pass in BOTH engines — Java StepPass.handleFailedPass sets ball=throwerCoord and
+publishes CATCH_SCATTER_THROW_IN_MODE=SCATTER_BALL for a FUMBLE (which WOULD bounce), so Java NOT bouncing
+here means its result is NOT a plain FUMBLE (maybe the target is out of Long-Bomb range → a distinct no-scatter
+path, or WILDLY_INACCURATE handled differently). Compare Rust step_pass.rs FUMBLE/INACCURATE/out-of-range
+branches + the passing_distance/range computation (thrower (8,11) → (18,2)) against Java bb2025 StepPass +
+PassMechanic.findPassingDistance. Isolate with `--seeds 23-23`. This is UNRELATED to the Iter-35 accurate-pass
+fix (that pass was accurate; this one fails). Fix the Rust engine only. VERIFY seeds 1-22 + seed 23≤264 hold.
