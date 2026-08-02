@@ -30,6 +30,23 @@ impl Step for NoOpStep {
     }
 }
 
+#[cfg(test)]
+/// Test-only step that rolls one d6 in `start()` — a detectable side effect used to prove the
+/// driver does NOT run leftover stack steps after the game is Finished.
+struct RngStep;
+
+#[cfg(test)]
+impl Step for RngStep {
+    fn id(&self) -> StepId { StepId::NoOp }
+    fn start(&mut self, _game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        rng.d6();
+        StepOutcome::next()
+    }
+    fn handle_command(&mut self, _action: &Action, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        StepOutcome::next()
+    }
+}
+
 // ── make_step ────────────────────────────────────────────────────────────────
 
 /// Dispatch a `StepId` to the concrete BB2025 step struct that implements it.
@@ -572,6 +589,19 @@ impl DriverGameState {
 
     fn drive(&mut self) {
         loop {
+            // Java: once StepEndGame flips the game to FINISHED the server tears the match down —
+            // no further steps run. Rust pushes end_game_sequence ON TOP of whatever turn/kickoff
+            // sequence was already queued for the (never-played) next turn, so without this guard the
+            // driver kept popping those leftover steps after the game ended — a phantom EndTurn cycle
+            // that re-ran KO recovery / PlayerLoss and corrupted the final state (seed 19: home_04
+            // wrongly recovered from KO and the active team flipped to away). Halt and drop the stack.
+            if self.game.is_finished() {
+                self.stack.clear();
+                self.current = None;
+                self.pending_prompt = None;
+                self.waiting_for_command = false;
+                return;
+            }
             if self.current.is_some() && (self.pending_prompt.is_some() || self.waiting_for_command) { return; }
             if self.current.is_none() {
                 match self.stack.pop() {
@@ -692,6 +722,27 @@ mod tests {
         assert_eq!(gs.stack.len(), 7);
         gs.run_until_prompt();
         assert!(gs.is_finished());
+    }
+
+    #[test]
+    fn finished_game_drops_leftover_stack_without_running_it() {
+        // Java: a FINISHED game runs no further steps. Rust pushes end_game_sequence ON TOP of a
+        // leftover (never-played) next-turn sequence; once EndGame flips the game to Finished the
+        // driver must drop those leftover steps instead of popping them (a phantom cycle that
+        // re-ran KO recovery / PlayerLoss corrupted the final state — seed 19).
+        let mut gs = new_game(2);
+        gs.clear_step_stack();
+        // Leftover steps beneath the end-game push; each rolls a die if it ever runs.
+        gs.stack.push(DriverStepEntry::new(Box::new(RngStep)));
+        gs.stack.push(DriverStepEntry::new(Box::new(RngStep)));
+        gs.push_end_game_sequence(true);
+        let rng_before = gs.rng.call_count;
+        gs.run_until_prompt();
+        assert!(gs.is_finished(), "EndGame flipped the game to Finished");
+        assert!(gs.stack.is_empty(), "leftover steps were dropped once finished");
+        assert!(gs.current.is_none());
+        assert_eq!(gs.rng.call_count, rng_before,
+            "leftover RngSteps never ran — no dice rolled after the game ended");
     }
 
     /// Exhaustive replacement for the per-file `id_is_*` tests: every `StepId`

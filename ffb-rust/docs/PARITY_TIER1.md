@@ -757,3 +757,26 @@ blitzer with movement left keeps advancing. Test: `blitzing_carrier_continues_af
 Seeds 1-13 now fully match; frontier is seed 14.
 
 Next: run seeds 1-14+, find seed 14's first state_hash divergence.
+
+## Iter 34 — seed 19 FIXED (halt driver at game-over); seeds 1-22 green
+
+Root cause (seed 19 i=272, the final move before game_end): the game's END-OF-GAME hash diverged —
+Java 6e02c953 vs Rust c70540b6. Two concrete state diffs: (1) active team home (Java) vs away (Rust);
+(2) home_04 (h03) Ko (Java) vs Reserve/recovered (Rust). Rust also consumed 4 EXTRA RNG calls (107 vs 103).
+
+FFB_DRIVE_TRACE showed the smoking gun: after StepEndGame set the game FINISHED, the Rust driver kept
+popping the stack — a PHANTOM second cycle (InitInducement → … → EndTurn → InitEndGame → EndGame) that
+re-ran KO recovery and PlayerLoss, rolling 4 extra dice (pos 104-107) and flipping the active team. This
+happens because Rust pushes end_game_sequence ON TOP of the turn/kickoff sequence already queued for the
+never-to-be-played next turn; StepEndGame flips status=Finished but the driver's drive() loop had no
+finished-guard, so it drained the leftover steps. In seeds 1-18 the phantom cycle rolled no state-changing
+dice (no KO'd players / casualties to redo), so the final hash happened to match — seed 19 is the first
+game ENDING with KO'd players, exposing it.
+
+Fix (crates/ffb-engine/src/step/driver.rs drive()): at the top of the loop, if game.is_finished() clear the
+stack and return — mirroring Java, where a FINISHED game tears down and runs no further steps. Test:
+`finished_game_drops_leftover_stack_without_running_it` (leftover RngSteps under an end_game push never roll
+after EndGame flips Finished). Seeds 1-22 now fully match.
+
+Next: seed 23 first state_hash divergence i=159 (turn 3 half 2): pre-state already differs (Java cbef36bc /
+Rust 0df69b67) AND active differs (Java away / Rust home) — find the first differing index in seed_23.
