@@ -1056,3 +1056,9 @@ Rust vs STOCK Java; fix the Rust engine to match stock. Then re-run 1-100 and co
 - **Fix (`step_end_turn.rs`):** removed the per-player Sweltering-Heat d6 loop; after the KO-recovery loop, when weather==SwelteringHeat, roll `rng.d3()` then for `[home, away]` pick `d3` random on-pitch (non-box) players via `rng.range(on_pitch.len())`, knocking each EXHAUSTED into the box (1:1 with getFaintingCount). `rng.range(n)` == Java `rollDice(n)-1`.
 - **Test:** `sweltering_heat_faints_random_players_at_half_end` (step_end_turn.rs).
 - **Result:** PARITY 25/25 (1-25) + spot-checks 46/55/56/57/58 green. ffb-engine 7007/0. Frontier ≥ 59.
+
+## Iter 49 — 🎉 TIER 1 COMPLETE: seeds 1-100 GREEN
+- **All 100 seeds pass** Rust↔STOCK-Java per-step state-hash parity (human lineman vs human lineman, bb2025, tier-3 deterministic random agent doing all player-turn actions). Verified post-Iter48: seeds 1-25 via batch (25/25), seeds 26-54 individually, seeds 55-100 individually — every seed reports `✓ / PARITY 1/1 games match`.
+- **Verification state:** ffb-engine `cargo test` 7007/0. ffb-rust working tree clean (all fixes committed). ffb Java engine STOCK — only DiceRoller.java + StepGoForIt.java carry gated (`ffb.parityDebug`) logging, behavior-neutral. Jar not rebuilt.
+- **Fixes that got here (this campaign, vs stock Java):** Iter43 remove carrier move-bias/continue in random_agent; Iter44 no-receiver HandOver/Pass deselect + clear stale defender_id; Iter46 armour roll uses armour_with_modifiers (Dodgy Snack -AV); Iter48 implement Sweltering Heat fainting (getFaintingCount). (Iter42 ground-truth reset to stock Java preceded these.)
+- **Known deferred (not hit by any 1-100 lineman seed; fix when a future tier/roster exercises them):** other armour-break sites still read base p.armour (injury_type_block.rs:43, reroll_armour_modification.rs:46, old_pro_modification.rs, injury_context_modification.rs:230) — should use armour_with_modifiers like Iter46.
