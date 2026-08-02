@@ -253,6 +253,26 @@ impl StepInitSelecting {
                     return StepOutcome::goto(label)
                         .publish(StepParameter::EndPlayerAction(true));
                 }
+                // A STANDING player that declared a BLITZ but has NO adjacent target: Java's
+                // SelectBlitzTarget resolves the target (blockTarget == null → "BLITZ_TARGET_NONE")
+                // and ParityRunner ends the turn (ClientCommandEndTurn) BEFORE any block sequence — so
+                // NO Bone-head / negatrait is rolled. Rust otherwise dispatches the block sequence,
+                // whose ACTIVATION rolls Bone-head (an extra game die that desyncs the RNG stream:
+                // human seed 7 i=196 → surfaces at i=217). End the turn here to match. A PRONE
+                // no-target blitz KEEPS the block-sequence path below because Java DOES roll Bone-head
+                // there — during the free stand-up's Select ACTIVATION (checked on the player's ACTUAL
+                // PlayerState, since the prone-blitz path at the top already forced standing_up=false).
+                if matches!(dispatch, PlayerAction::Blitz)
+                    && game.defender_id.is_none()
+                    && game.acting_player.player_id.as_deref()
+                        .and_then(|id| game.field_model.player_state(id))
+                        .map(|s| !s.is_prone())
+                        .unwrap_or(true)
+                {
+                    return StepOutcome::goto(label)
+                        .publish(StepParameter::EndTurn(true))
+                        .publish(StepParameter::CheckForgo(true));
+                }
                 let standing_up = game.acting_player.standing_up;
                 // Rust bridging: the agent chose its target at activation time
                 // (Action::ActivatePlayer.block_defender_id → game.defender_id), whereas Java's
@@ -375,6 +395,41 @@ mod tests {
         let mut step = StepInitSelecting::new("end".into());
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(matches!(out.prompt, Some(AgentPrompt::ActivatePlayer { .. })));
+    }
+
+    #[test]
+    fn standing_blitz_with_no_target_ends_the_turn_without_dispatch() {
+        // Regression (human seed 7 i=196): a STANDING player that declares a Blitz with no adjacent
+        // target must END THE TURN before any block sequence — so no Bone-head/negatrait die is
+        // rolled — mirroring Java's SelectBlitzTarget → BLITZ_TARGET_NONE → EndTurn. Rust otherwise
+        // dispatched the block sequence whose ACTIVATION rolled an extra Bone-head, desyncing the RNG.
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_STANDING};
+        use ffb_model::model::player::Player;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.team_home.players.push(Player {
+            id: "h1".into(), name: "h1".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("h1", FieldCoordinate::new(12, 7));
+        game.field_model.set_player_state("h1", PlayerState::new(PS_STANDING));
+
+        let mut step = StepInitSelecting::new("end".into());
+        let action = Action::ActivatePlayer {
+            player_id: "h1".into(),
+            player_action: PlayerActionChoice::Blitz,
+            block_defender_id: None, // no adjacent target
+        };
+        let out = step.handle_command(&action, &mut game, &mut GameRng::new(0));
+
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "a standing no-target Blitz must publish EndTurn (no block sequence / Bone-head)");
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(_))),
+            "must NOT dispatch a block sequence for a standing no-target Blitz");
     }
 
     #[test]
