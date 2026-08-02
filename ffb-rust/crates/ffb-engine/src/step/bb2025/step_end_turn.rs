@@ -177,7 +177,13 @@ impl StepEndTurn {
             // this clear it leaked into later turns and inflated a block's dice count, rolling an extra
             // die and desyncing the game-die stream. Runs before any home_playing flip so it targets the
             // acting team.
-            if matches!(game.turn_mode, TurnMode::Regular | TurnMode::Blitz) {
+            // Only clear when a REAL turn is ending (the acting team actually played:
+            // turn_started). Java gates on turnMode==REGULAR/BLITZ, but the Rust kickoff->turn-1
+            // transition runs StepEndTurn with turn_mode already Regular (Java's is Kickoff there),
+            // which would clear the KICKING team's Cheering Fans assist before it ever plays its turn
+            // (seed 8: away kicked, away_aa granted at kickoff, cleared at the transition -> away_03's
+            // turn-1 block lost its +1 die). turn_started is false at that transition, true at a real end.
+            if matches!(game.turn_mode, TurnMode::Regular | TurnMode::Blitz) && game.turn_data().turn_started {
                 if game.home_playing {
                     game.home_additional_assists = 0;
                 } else {
@@ -532,6 +538,33 @@ mod tests {
         assert_eq!(game.game_result.away.score, 1);
         assert_eq!(game.game_result.home.score, 0);
         assert_eq!(game.turn_mode, TurnMode::Setup);
+    }
+
+    #[test]
+    fn additional_assist_not_cleared_when_turn_not_started() {
+        // The kickoff->turn-1 transition runs StepEndTurn with turn_mode=Regular but turn_started=false
+        // (the kicking team never played). It must NOT clear that team's Cheering Fans additional
+        // assist — the assist lasts until the team actually plays and ends its turn.
+        let mut game = make_game();
+        game.home_playing = false; // away = the "acting"/kicking team at the transition
+        game.turn_mode = TurnMode::Regular;
+        game.turn_data_away.turn_started = false;
+        game.away_additional_assists = 1;
+        let mut step = StepEndTurn::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.away_additional_assists, 1, "assist must survive a no-real-turn transition");
+    }
+
+    #[test]
+    fn additional_assist_cleared_at_real_turn_end() {
+        let mut game = make_game();
+        game.home_playing = false;
+        game.turn_mode = TurnMode::Regular;
+        game.turn_data_away.turn_started = true; // away actually played this turn
+        game.away_additional_assists = 1;
+        let mut step = StepEndTurn::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.away_additional_assists, 0, "assist cleared at a real (started) turn end");
     }
 
     #[test]
