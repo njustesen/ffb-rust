@@ -987,3 +987,32 @@ logging gated on ffb.parityDebug; StepPass+StepDropFallingPlayers=whitespace) �
 seed 19, so the LOST change is something else, not in the working tree. Seeds 1,5,40 still PASS (damage is narrow —
 only seed 19 of the sample). I could NOT recover the original jar. SURFACED TO THE USER for guidance (do they have
 a backup of the original ffb-ai-jar-with-dependencies.jar, or know the lost Java engine change?).
+
+## Iter 42 — GROUND-TRUTH CORRECTION: baseline was against a MODIFIED Java engine; reset to STOCK Java.
+
+Investigating Iter41's jar incident revealed the real problem: the ffb Java working tree carried behavioral
+engine modifications left by prior sessions (a violation of the discipline — ffb-common/ffb-server is READ-ONLY
+ground truth), AND the original harness jar was compiled with an ADDITIONAL uncommitted Java change that was lost
+(a git-stash-wipe; the only dangling commit e0109b71 just re-stashes the PassMechanic change, NOT the lost one).
+So the prior "seeds 1-40 green" was Rust matching a NON-STOCK Java. That lost change is UNRECOVERABLE.
+
+ACTION (correct per discipline): reverted the ffb engine to STOCK — PassMechanic.java (behavioral Blizzard-removal)
++ StepPass.java/StepDropFallingPlayers.java (whitespace) reverted to committed; kept ONLY DiceRoller.java +
+StepGoForIt.java gated diagnostic logging (System.getProperty("ffb.parityDebug"), behavior-neutral — "logging is
+fine"). Rebuilt jar (193881391 bytes) = stock bb2025 Java + logging. THIS is the true ground truth.
+
+NEW BASELINE (against stock Java): seeds 1-6 GREEN; seed 7 is the frontier — diverges at i=11 (turn 1, home_03 FOUL):
+SAME dice (rng aligned through i=12, both roll armour d6d6 + injury d6d6), but a DETERMINISTIC state difference in
+the foul resolution (Rust vs stock Java disagree on the outcome). So the lost Java change was foul-related (and
+broad — it also affected seed 19's move at i=81). The Rust engine was fixed across prior iters to match the
+MODIFIED Java; now it must be re-verified/re-fixed against STOCK Java.
+
+NOTE for all future work: the ffb Java engine MUST stay STOCK (committed) + only the two gated-logging files. Do
+NOT rebuild the jar unless you intend to; the jar is a build artifact and rebuilding drops any uncommitted
+working-tree state. The seeds 1-40 progress from Iter 32-40 was partly against modified Java — treat the stock-Java
+baseline (seeds 1-6) as the real starting point and re-establish forward. Many prior Rust "fixes" may still be
+correct (they matched real bb2025 behavior that stock Java also implements); only the ones matching the modified
+Java (fouls/the lost change) will now diverge.
+
+Next: seed 7 i=11 — trace the FOUL resolution (armour/injury outcome, player-drop/knockdown placement, ball) in
+Rust vs STOCK Java; fix the Rust engine to match stock. Then re-run 1-100 and continue the frontier.
