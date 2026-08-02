@@ -364,3 +364,13 @@ ogre is green (TTM will then correctly deselect there — no throwable player).
   (fumble + thrower with Pass skill → re-roll die consumed + skill marked used, no prompt). REVERT if regressed.
 - Alternative (riskier): agent uses skill-source ReRollOffers but declines TRR — rejected for now because it
   changes ALL skill re-rolls routed through ask_for_reroll_if_available, not just Pass.
+
+## seed 4 step 174 — FIXED (2026-08-03 ~00:12, commit 2244d941)
+StepPass now auto-uses a free single-use skill re-roll (find_skill_reroll_source(game,"PASS")) on FUMBLE/
+INACCURATE/WILDLY before the team-reroll offer — re-entering execute_step so the top gate consumes the skill
+token (use_reroll) and re-rolls the pass die once; already_rerolled blocks a 2nd offer. Only TEAM re-rolls
+are still offered to the agent (declined). Fixed the hardcoded re_roll_source="TRR". Result: human seeds 1-6
+GREEN; lineman 100/100; ffb-engine 7015/0 (+fumble_auto_uses_free_pass_skill_reroll_without_prompt).
+NEXT FRONTIER: human seed 7 step 81 (i=82 turn5 half1) — ACTIVE-TEAM divergence: Java away Activate(away_04,
+MOVE) vs Rust home Activate(home_03,Block); pre-step state_hash already differs (java bf89d517090d40b4 vs rust
+36b5190e4fcd91ca), so the real divergence is earlier — trace seed 7, find the first differing post_hash/dice.
