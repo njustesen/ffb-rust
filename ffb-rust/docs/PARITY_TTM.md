@@ -586,3 +586,22 @@ survives to INIT_PASSING (as it does for a normal pass), OR determine the correc
 ParityRunner-observed INIT_PASSING (why does executeStep not fire despite valid guards? — check
 super.handleCommand's return and MatchRunner.inject delivery timing within the ParityRunner while-loop). Keep
 Rust untouched (it is already correct); this is purely ParityRunner + jar-rebuild work.
+
+## seed 16 step 74 — FIXED (2026-08-03, commit e1f28183) → HUMAN TIER 100/100 COMPLETE
+ROOT (a RUST ENGINE bug, NOT the INIT_PASSING harness gap previously suspected): StepInitPassing's
+passing-distance gate (crates/ffb-engine/src/step/mixed/pass/step_init_passing.rs) used
+ffb_model::util::passing::passing_distance — a pure [dy][dx] table lookup with NO weather gate. Java's
+PassMechanic.findPassingDistance nulls out a Long Pass / Long Bomb in a BLIZZARD (only Quick/Short allowed),
+so the stock engine refuses the throw → turn ends, ball unmoved, 0 dice. Rust treated it as a valid LongPass
+and executed → auto-fumble + scatter (6 dice), ball moved. seed 16 i=74: Ogre home_01 at (12,6) throws to
+(5,10) [dx=7,dy=4 = LongPass] in a Blizzard.
+FIX: weather-gate the check — `Some(d) => !(weather==Blizzard && matches!(d, LongPass|LongBomb))`. Rust's
+existing out-of-range branch then ends the turn (matching Java). +2 regression tests (blizzard long-pass
+out-of-range; short-pass still-in-range). NO jar rebuild / NO ParityRunner change needed.
+INVESTIGATION NOTE: the earlier "ParityRunner INIT_PASSING handler" approach was a DEAD END (infinite loop —
+StepInitPassing.executeStep bails when getThrower()==null and the re-sent CLIENT_PASS couldn't advance a
+ParityRunner-observed INIT_PASSING; and even when the thrower was set, findPassingDistance==null blocked
+NEXT_STEP). Gated JCMD/JIP traces in GameState.java + mixed/StepInitPassing.java pinned it: JIP showed
+`dist=null` for a table-L entry with throwTeamMate=false → could only be the Blizzard gate. All stock-repo
+experiments (ParityRunner + the 2 gated-trace files) were REVERTED; the fix is Rust-only.
+**RESULT: Human vs Human parity 100/100 GREEN (bb2025 tier-3). lineman 100/100, ffb-engine 7023/0.**
