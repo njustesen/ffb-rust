@@ -620,44 +620,42 @@ impl StepApplyKickoffResult {
         let mut targeted_ids: Vec<String> = Vec::new();
         let mut pending_events: Vec<GameEvent> = Vec::new();
 
-        if roll_away >= roll_home {
-            if let Some(id) = self.random_player_on_field(game, rng, true) {
-                targeted_ids.push(id.clone());
-                let snack_roll = rng.d6();
-                pending_events.push(GameEvent::DodgySnackRoll { player_id: id.clone(), roll: snack_roll });
-                if snack_roll == 1 {
-                    if let Some(state) = game.field_model.player_state(&id) {
-                        game.field_model.set_player_state(&id, state.change_base(PS_RESERVE));
-                    }
-                    UtilBox::put_player_into_box(game, &id);
-                } else {
-                    // Java: FieldModel.addEnhancements(player, "Dodgy Snack") → -MA and -AV for the drive
-                    if let Some(p) = game.player_mut(&id) {
-                        p.add_temporary_stat_mod("Dodgy Snack", ffb_model::model::player::STAT_MA, -1);
-                        p.add_temporary_stat_mod("Dodgy Snack", ffb_model::model::player::STAT_AV, -1);
-                    }
+        // Java StepApplyKickoffResult.handleDodgySnack: FIRST pick BOTH random players (home then
+        // away), THEN roll each player's snack d6 (in handleDodgySnack's trailing insertSteps calls).
+        // Rust previously interleaved (pick-home, snack-home, pick-away, snack-away), which consumed
+        // the shared die stream in a different order — the home snack roll read the away-player's
+        // slot, so a would-be-benched player (snack roll of 1) was not sent to reserve (chaos seed 40
+        // i=142: home_05 stayed on the pitch instead of being benched, diverging the half-2 setup).
+        let player_home = if roll_away >= roll_home {
+            self.random_player_on_field(game, rng, true)
+        } else {
+            None
+        };
+        let player_away = if roll_home >= roll_away {
+            self.random_player_on_field(game, rng, false)
+        } else {
+            None
+        };
+
+        // Java insertSteps(player): roll d6 → 1 sends the player to RESERVE (benched for the drive);
+        // otherwise the player gets the Dodgy Snack -MA/-AV enhancement for the drive.
+        let mut apply_snack = |game: &mut Game, id: &str, rng: &mut GameRng, pending: &mut Vec<GameEvent>| {
+            let snack_roll = rng.d6();
+            pending.push(GameEvent::DodgySnackRoll { player_id: id.to_string(), roll: snack_roll });
+            if snack_roll == 1 {
+                if let Some(state) = game.field_model.player_state(id) {
+                    game.field_model.set_player_state(id, state.change_base(PS_RESERVE));
                 }
+                UtilBox::put_player_into_box(game, id);
+            } else if let Some(p) = game.player_mut(id) {
+                p.add_temporary_stat_mod("Dodgy Snack", ffb_model::model::player::STAT_MA, -1);
+                p.add_temporary_stat_mod("Dodgy Snack", ffb_model::model::player::STAT_AV, -1);
             }
-        }
-        if roll_home >= roll_away {
-            if let Some(id) = self.random_player_on_field(game, rng, false) {
-                targeted_ids.push(id.clone());
-                let snack_roll = rng.d6();
-                pending_events.push(GameEvent::DodgySnackRoll { player_id: id.clone(), roll: snack_roll });
-                if snack_roll == 1 {
-                    if let Some(state) = game.field_model.player_state(&id) {
-                        game.field_model.set_player_state(&id, state.change_base(PS_RESERVE));
-                    }
-                    UtilBox::put_player_into_box(game, &id);
-                } else {
-                    // Java: FieldModel.addEnhancements(player, "Dodgy Snack") → -MA and -AV for the drive
-                    if let Some(p) = game.player_mut(&id) {
-                        p.add_temporary_stat_mod("Dodgy Snack", ffb_model::model::player::STAT_MA, -1);
-                        p.add_temporary_stat_mod("Dodgy Snack", ffb_model::model::player::STAT_AV, -1);
-                    }
-                }
-            }
-        }
+        };
+        if let Some(id) = player_home.clone() { targeted_ids.push(id); }
+        if let Some(id) = player_away.clone() { targeted_ids.push(id); }
+        if let Some(id) = player_home { apply_snack(game, &id, rng, &mut pending_events); }
+        if let Some(id) = player_away { apply_snack(game, &id, rng, &mut pending_events); }
 
         // client-only: setAnimation(KICKOFF_DODGY_SNACK)
         let mut outcome = StepOutcome::next().with_event(GameEvent::KickoffDodgySnack {
@@ -983,6 +981,47 @@ mod tests {
                 "player should be sent to reserve or have -1 MA/-1 AV"
             );
         }
+    }
+
+    #[test]
+    fn dodgy_snack_rolls_both_players_then_both_snacks_and_benches_on_one() {
+        // Java handleDodgySnack consumes the die stream as: roll_home, roll_away, randomPlayer_home,
+        // randomPlayer_away, snack_home, snack_away — i.e. BOTH random players are picked before EITHER
+        // snack roll. The old Rust code interleaved (pick-home, snack-home, pick-away, snack-away), so a
+        // targeted player whose snack roll should be 1 was not benched (chaos seed 40 i=142). With one
+        // player per team on the field, find a seed whose home snack roll (the 5th die, after the two
+        // d6 team rolls + two random-player picks) is a 1 and assert the home player is benched to
+        // RESERVE — a wrong ordering reads a different die there and fails to bench.
+        use ffb_model::enums::{PS_STANDING, PS_RESERVE, PlayerState};
+        use ffb_model::types::FieldCoordinate;
+        let mut found = false;
+        for seed in 0u64..3000 {
+            let mut game = make_game();
+            let mut step = make_step();
+            game.team_home.players.push(make_min_player("hp"));
+            game.team_away.players.push(make_min_player("ap"));
+            game.field_model.set_player_coordinate("hp", FieldCoordinate::new(13, 7));
+            game.field_model.set_player_state("hp", PlayerState::new(PS_STANDING));
+            game.field_model.set_player_coordinate("ap", FieldCoordinate::new(12, 7));
+            game.field_model.set_player_state("ap", PlayerState::new(PS_STANDING));
+            // Predict the home snack roll under the CORRECT order: 5th d6-equivalent draw.
+            let mut probe = GameRng::new(seed);
+            let (rh, ra) = (probe.d6(), probe.d6());
+            let _ = probe.range(1); // randomPlayer home
+            if ra >= rh { /* home targeted */ } else { continue; }
+            if rh >= ra { let _ = probe.range(1); } // randomPlayer away (tie → also picked)
+            let snack_home = probe.d6();
+            if snack_home != 1 { continue; }
+            // Run the real step and assert the home player was benched.
+            step.kickoff_result = Some(KickoffResult::DodgySnack);
+            step.start(&mut game, &mut GameRng::new(seed));
+            let benched = game.field_model.player_state("hp")
+                .map(|s| s.base() == PS_RESERVE).unwrap_or(false);
+            assert!(benched, "seed {seed}: home player with snack roll 1 must be benched to RESERVE");
+            found = true;
+            break;
+        }
+        assert!(found, "no seed in 0..3000 produced a tie with home snack roll of 1");
     }
 
     // ── HighKick: skip when receiving team has no active players ─────────────
