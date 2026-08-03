@@ -273,8 +273,22 @@ impl StepEndPassing {
             //   || fPassFumble)
             let no_suffering = !game.acting_player.suffering_animosity
                 && !game.acting_player.suffering_blood_lust;
+            // Java: UtilPlayer.findOtherTeam(game, game.getThrower()).hasPlayer(catcher) — where
+            // `catcher` is the FINAL catcher (fCatcherId, updated as the ball scatters/settles). A
+            // pass/hand-off whose ball ends up with the thrower's OPPONENT is a turnover. This term
+            // was documented in the comment above but omitted from the code, so a hand-off dropped by
+            // the receiver that then bounced to an opponent (human seed 27 i=139: home_03 hands to the
+            // Ogre, who fumbles the catch; the ball bounces to away_03) never turned over in Rust.
+            let thrower_other_team_has_catcher = match (game.thrower_id.as_deref(), self.catcher_id.as_deref()) {
+                (Some(tid), Some(cid)) => {
+                    if game.team_home.has_player(tid) { game.team_away.has_player(cid) }
+                    else { game.team_home.has_player(cid) }
+                }
+                _ => false,
+            };
             self.end_turn |= check_touchdown(game)
                 || (self.catcher_id.is_none() && no_suffering && game.acting_player.has_passed)
+                || (thrower_other_team_has_catcher && !game.acting_player.suffering_blood_lust)
                 || self.pass_fumble;
             // Java: endGenerator.pushSequence(new EndPlayerAction.SequenceParams(gs, true, fEndPlayerAction, fEndTurn))
             let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
@@ -401,6 +415,49 @@ mod tests {
         let mut step = StepEndPassing::new();
         step.set_parameter(&StepParameter::PassFumble(true));
         assert!(step.pass_fumble);
+    }
+
+    #[test]
+    fn ball_ending_with_thrower_opponent_is_a_turnover() {
+        // Regression (human seed 27 i=139): a hand-off/pass whose ball ends with the thrower's
+        // OPPONENT (dropped by the receiver, bounced to an opponent) is a turnover —
+        // findOtherTeam(thrower).hasPlayer(catcher). A same-team catcher must NOT turn over.
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+        use ffb_model::util::rng::GameRng;
+        let mk = |id: &str| Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8, ..Default::default()
+        };
+
+        // Opponent recovers the ball → turnover.
+        let mut game = make_game();
+        game.home_playing = true;
+        game.team_home.players.push(mk("t1"));
+        game.team_away.players.push(mk("opp"));
+        game.thrower_id = Some("t1".into());
+        game.thrower_action = Some(PlayerAction::HandOver);
+        game.acting_player.set_player("t1".into(), PlayerAction::HandOver);
+        let mut step = StepEndPassing::new();
+        step.catcher_id = Some("opp".into());
+        step.end_player_action = true; // hand-off publishes EndPlayerAction
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(step.end_turn, "ball ending with the thrower's opponent must be a turnover");
+
+        // Same-team recovery → NOT a turnover from this term.
+        let mut game2 = make_game();
+        game2.home_playing = true;
+        game2.team_home.players.push(mk("t1"));
+        game2.team_home.players.push(mk("mate"));
+        game2.thrower_id = Some("t1".into());
+        game2.thrower_action = Some(PlayerAction::HandOver);
+        game2.acting_player.set_player("t1".into(), PlayerAction::HandOver);
+        let mut step2 = StepEndPassing::new();
+        step2.catcher_id = Some("mate".into());
+        step2.end_player_action = true;
+        step2.start(&mut game2, &mut GameRng::new(0));
+        assert!(!step2.end_turn, "a teammate recovering the ball is not a turnover from the opponent term");
     }
 
     #[test]
