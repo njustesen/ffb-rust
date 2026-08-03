@@ -102,7 +102,18 @@ impl StepInitPassing {
         let thrower_coordinate = game.thrower_id.as_deref()
             .and_then(|id| game.field_model.player_coordinate(id));
         let passing_distance_valid = match (thrower_coordinate, game.pass_coordinate) {
-            (Some(tc), Some(pc)) => ffb_model::util::passing::passing_distance(tc, pc).is_some(),
+            (Some(tc), Some(pc)) => match ffb_model::util::passing::passing_distance(tc, pc) {
+                // Java PassMechanic.findPassingDistance nulls out a Long Pass / Long Bomb in a
+                // Blizzard (a Throw Team-Mate is gated the same way, but that is a separate step).
+                // The pure table lookup here was missing that weather gate, so an out-of-range
+                // Long Pass thrown in a Blizzard was treated as valid and executed, whereas the
+                // stock engine refuses it and the turn ends with the ball unmoved (human seed 16
+                // i=74: an Ogre ball-carrier's Long Pass in a Blizzard).
+                Some(d) => !(game.field_model.weather == ffb_model::enums::Weather::Blizzard
+                    && matches!(d, ffb_model::enums::PassingDistance::LongPass
+                        | ffb_model::enums::PassingDistance::LongBomb)),
+                None => false,
+            },
             _ => false,
         };
         let catcher_exists = self.catcher_id.as_deref()
@@ -409,6 +420,48 @@ mod tests {
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
             "out-of-range pass ends the turn (turnover)");
         assert!(!game.turn_data().pass_used, "no pass was actually thrown");
+    }
+
+    #[test]
+    fn long_pass_in_a_blizzard_is_out_of_range_and_ends_the_turn() {
+        // Java PassMechanic.findPassingDistance nulls out a Long Pass / Long Bomb in a Blizzard, so
+        // the stock engine refuses the throw and the turn ends with the ball unmoved. The pure table
+        // lookup treats it as a valid Long Pass; the weather gate must override that (human seed 16
+        // i=74: an Ogre at (12,6) throwing a Long Pass to (5,10) — dx=7, dy=4 = LongPass, in a Blizzard).
+        use ffb_model::enums::Weather;
+        let mut step = StepInitPassing::new();
+        step.goto_label_on_end = "end".into();
+        let mut game = make_game();
+        game.field_model.weather = Weather::Blizzard;
+        add_field_player(&mut game, "p1", 12, 6);
+        game.thrower_id = Some("p1".into());
+        game.acting_player.player_id = Some("p1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.pass_coordinate = Some(FieldCoordinate::new(5, 10)); // dx=7 dy=4 → LongPass, blizzard → out of range
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::GotoLabel, "a Long Pass in a Blizzard gotos the end label");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "a Long Pass in a Blizzard is out of range → turn ends (turnover)");
+        assert!(!game.turn_data().pass_used, "no pass was actually thrown");
+    }
+
+    #[test]
+    fn short_pass_in_a_blizzard_is_still_in_range() {
+        // Only Long Pass / Long Bomb are gated by a Blizzard; a Quick/Short pass is unaffected.
+        use ffb_model::enums::Weather;
+        let mut step = StepInitPassing::new();
+        step.goto_label_on_end = "end".into();
+        let mut game = make_game();
+        game.field_model.weather = Weather::Blizzard;
+        add_field_player(&mut game, "p1", 5, 5);
+        game.thrower_id = Some("p1".into());
+        game.acting_player.player_id = Some("p1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.pass_coordinate = Some(FieldCoordinate::new(6, 6)); // QuickPass — allowed in a Blizzard
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::NextStep, "a Quick/Short pass is unaffected by a Blizzard");
     }
 
     #[test]
