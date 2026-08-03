@@ -498,3 +498,11 @@ kept home's turn. human seeds 1-15 + 17-35 GREEN (16 deferred). lineman 100/100,
 NEXT FRONTIER: human seed 36 step 249 (i=250 turn7/6 half2 — active-team divergence again: Java away t7 vs
 Rust home t6; another turnover/turn-count divergence — diff per-step chosen + rng_calls to the first divergent
 step). Run `--seeds 36-36`.
+
+## seed 36 step 249 — FIXED (2026-08-03, commit d22e3cd5) + next = seed 85
+FIX: dropped the standing-only guard on the no-target-Blitz EndTurn — a PRONE no-target Blitz also ends the
+turn with 0 dice (Java's SELECT_BLITZ_TARGET→EndTurn precedes the stand-up ACTIVATION in both cases). Root:
+seed 36 i=170 a PRONE away Ogre's no-target blitz rolled a stray Bone-head in Rust (block-sequence ACTIVATION),
++1 RNG desync surfacing at i=250. human seeds 36-84 GREEN. lineman 100/100, ffb-engine 7019/0.
+NEXT FRONTIER: human seed 85 step 207 (i=208 turn3 half2, active=home both — Activate(home_01,MOVE); state_hash
+already differs so root is earlier; diff chosen+rng_calls). Run `--seeds 85-85`.
