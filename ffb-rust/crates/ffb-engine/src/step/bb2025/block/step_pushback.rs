@@ -94,6 +94,12 @@ pub struct StepPushback {
     /// Java: pushbackStack — (playerId, coordinate) pairs (LIFO).
     /// Java Pushback.playerId + Pushback.coordinate.
     pub pushback_stack: Vec<(String, FieldCoordinate)>,
+    /// The player currently being pushed. For a CHAIN pushback (a player pushed into an occupied
+    /// square), this becomes the OCCUPANT so the next `PushTo` moves the occupant — Java's
+    /// `state.defender = fieldModel.getPlayer(defenderCoordinate)`. `None` → the original
+    /// `game.defender_id`. The Rust `Action::PushTo` carries only a coordinate (Java's `Pushback`
+    /// carries the player id), so the step must remember whom it is pushing across chain re-prompts.
+    pub chain_pushed_player: Option<String>,
 }
 
 impl StepPushback {
@@ -105,6 +111,7 @@ impl StepPushback {
             side_stepping: HashMap::new(),
             standing_firm: HashMap::new(),
             pushback_stack: Vec::new(),
+            chain_pushed_player: None,
         }
     }
 }
@@ -126,10 +133,14 @@ impl Step for StepPushback {
                 // Java: CLIENT_PUSHBACK —
                 //   if (checkCommandIsFromHomePlayer) pushbackStack.push(pushback)
                 //   else pushbackStack.push(pushback.transform())
-                // We only have coord here; the player being pushed is the current defender.
-                // For chain pushbacks the player pushed might differ — TODO when chain pushback added.
-                if let Some(defender_id) = game.defender_id.clone() {
-                    self.pushback_stack.push((defender_id, *coord));
+                // The player being pushed is the current chain defender (the occupant of the square
+                // a previous push chose), falling back to the original game defender for the first
+                // push. Java's Pushback command carries the player id explicitly; ours carries only
+                // the coord, so `chain_pushed_player` tracks whom we are pushing (chaos seed 51 i=166:
+                // away_01 pushed into home_04's square must chain-push home_04, not re-push away_01).
+                let pushed = self.chain_pushed_player.clone().or_else(|| game.defender_id.clone());
+                if let Some(pushed_id) = pushed {
+                    self.pushback_stack.push((pushed_id, *coord));
                 }
             }
             _ => {}
@@ -172,6 +183,12 @@ impl StepPushback {
                 }
                 // Java: doPush = (fieldModel.getPlayer(lastPushback.getCoordinate()) == null)
                 do_push = game.field_model.player_at(chosen_coord).is_none();
+                // Chain pushback: the chosen square is occupied → that occupant is pushed next.
+                // Java: state.defender = fieldModel.getPlayer(defenderCoordinate). Remember it so the
+                // occupant's follow-up PushTo moves the occupant (not the original defender again).
+                if !do_push {
+                    self.chain_pushed_player = game.field_model.player_at(chosen_coord).map(|s| s.to_owned());
+                }
             }
         }
 
@@ -330,8 +347,10 @@ impl StepPushback {
                 .map(|sq| sq.coordinate)
                 .collect();
             // Java: publishParameter(StepParameterKey.DEFENDER_PUSHED, true)
-            // Java: while (!pushbackStack.isEmpty()) { pop + pushPlayer }
-            let pushes: Vec<(String, FieldCoordinate)> = self.pushback_stack.drain(..).collect();
+            // Java: while (!pushbackStack.isEmpty()) { pop + pushPlayer } — LIFO, so the last push
+            // (the chain occupant vacating its square) is applied FIRST, then the original defender
+            // moves into the freed square. Drain in reverse to match.
+            let pushes: Vec<(String, FieldCoordinate)> = self.pushback_stack.drain(..).rev().collect();
             let pushback_event = if pushes.is_empty() {
                 None
             } else {
@@ -700,6 +719,27 @@ mod tests {
         );
         assert_eq!(out.action, StepAction::NextStep);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::DefenderPushed(true))));
+    }
+
+    // ── chain pushback moves the occupant, not the original defender ─────────
+
+    #[test]
+    fn chain_pushback_pushes_the_occupant_not_the_original_defender() {
+        // A chain pushback is in progress: the current chain-pushed player is the occupant "p2"
+        // that a previous push displaced, NOT the original defender "p1". The PushTo must move p2
+        // (chaos seed 51 i=166: away_01 pushed into home_04's square must chain-push home_04, not
+        // re-push away_01 — the old code always used game.defender_id and swapped their positions).
+        let mut step = StepPushback::new();
+        let mut game = make_game();
+        game.defender_id = Some("p1".into());
+        step.chain_pushed_player = Some("p2".into());
+        let coord = FieldCoordinate::new(5, 5);
+        game.field_model.pushback_squares.push(PushbackSquare::new(coord, Direction::North, false));
+        step.handle_command(&Action::PushTo { coord }, &mut game, &mut GameRng::new(0));
+        assert_eq!(game.field_model.player_coordinate("p2"), Some(coord),
+            "chain push must move the occupant p2 to the chosen square");
+        assert_ne!(game.field_model.player_coordinate("p1"), Some(coord),
+            "the original defender p1 must NOT be moved by the chain push");
     }
 
     // ── StepPushbackHookState ────────────────────────────────────────────────
