@@ -639,3 +639,12 @@ HERRING). FIX: in StepBlockRoll block-dice calc, mirror Java RollMechanic.getAtt
 attacker BASE strength (pre-assists) when acting player has addStrengthOnBlitz and action is Blitz/BlitzMove;
 -1 when the blitzer moved and the defender has weakenOpposingBlitzer. +regression test. **chaos seeds 1-39
 GREEN**; lineman/human/amazon 100/100, ffb-engine 7024/0. NEXT: chaos seed 40 i=142.
+
+### chaos seed 40 i=142 — FIXED (2026-08-03, commit abe8636c): Dodgy Snack roll order
+Kickoff event "Dodgy Snack" (bb2025): Java handleDodgySnack picks BOTH random players (home then away)
+BEFORE rolling either player's snack d6 (the snack rolls happen in the trailing insertSteps calls). Rust
+interleaved (pick-home, snack-home, pick-away, snack-away), so the home snack roll consumed the away
+random-player's die slot → a player whose snack roll should be 1 was NOT benched to RESERVE → half-2 setup
+diverged (home_05 stayed on the pitch in Rust, benched in Java). FIX: pick player_home + player_away first,
+then roll+apply each snack (roll 1 → RESERVE+box; else -MA/-AV). +regression test. **chaos seeds 1-50 GREEN**;
+lineman/human/amazon 100/100, ffb-engine 7025/0. NEXT: chaos seed 51 i=166 (again a half-2 state-only diverge).
