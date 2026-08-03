@@ -648,3 +648,16 @@ random-player's die slot → a player whose snack roll should be 1 was NOT bench
 diverged (home_05 stayed on the pitch in Rust, benched in Java). FIX: pick player_home + player_away first,
 then roll+apply each snack (roll 1 → RESERVE+box; else -MA/-AV). +regression test. **chaos seeds 1-50 GREEN**;
 lineman/human/amazon 100/100, ffb-engine 7025/0. NEXT: chaos seed 51 i=166 (again a half-2 state-only diverge).
+
+### chaos seed 51 i=166 — FIXED (2026-08-03, commit 7a18ceff): chain pushback → CHAOS 100/100 COMPLETE
+Chain pushback (a player shoved into an OCCUPIED square → the occupant is chain-pushed) was unimplemented:
+Rust's Action::PushTo carries only a coord and always attributed the push to game.defender_id, so the chain
+PushTo re-pushed the ORIGINAL defender instead of the occupant (Java's Pushback carries the player id +
+updates state.defender to the occupant). seed 51 i=166: home_01 blitzes away_01 into home_04's square → Java
+away_01@(12,8), home_04→(11,9); Rust swapped them (away_01@(11,9), home_04@(12,8)), which later diverged a
+dodge. FIX: track chain_pushed_player (occupant of a chosen-but-occupied square) and push it on the follow-up
+PushTo; drain the stack LIFO (Java pops last-first). +regression test. **CHAOS vs CHAOS 100/100 GREEN.**
+Gates: lineman 100/100, human 100/100, amazon 100/100, ffb-engine 7026/0.
+
+## ✅ CHAOS TIER COMPLETE (2026-08-03) — 100/100. Three fixes: Horns block-dice (25c5292c), Dodgy Snack roll
+order (abe8636c), chain pushback (7a18ceff). User said "stop after fixing chaos" → loop stops here.
