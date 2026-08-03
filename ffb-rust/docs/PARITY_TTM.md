@@ -546,3 +546,43 @@ reroll_but_keeps_once_per_game. lineman 100/100, human 17-100 84/84, ffb-engine 
 STATUS: human seeds 1-15 + 17-100 GREEN (99/100). ONLY seed 16 remains (DEFERRED — Ogre PASS reaches
 ParityRunner INIT_PASSING with no handler; needs a ParityRunner INIT_PASSING case + jar rebuild, see "seed 16
 step 74" above).
+
+## seed 16 step 74 — INIT_PASSING harness gap: attempted ParityRunner fix FAILED, REVERTED (2026-08-03)
+STATUS: human parity is 99/100 GREEN (seeds 1-15 + 17-100). Seed 16 is the sole holdout and is a HARNESS
+limitation, NOT a Rust engine bug — the Rust engine correctly EXECUTES the Ogre's pass exactly as the stock
+engine would (the stock engine reaches INIT_PASSING and waits for the pass command).
+
+RECAP: i=74 home_01 (Ogre: Bone-head + Throw Team-Mate, Thick Skull, Mighty Blow, Loner; NO Pass skill) is the
+ball carrier and declares PASS to (5,10). RUST executes: bone-head + pass roll + d8 fumble-scatters (6 dice,
+rng 52→58), ball→(6,9), turnover. JAVA (stock engine + stock ParityRunner): sendPassAction picks (5,10) [1
+actionRng, aligned with Rust's random_agent pick_action] and injects ClientCommandPass at INIT_SELECTING
+phase-2, BUT the engine then WAITS at INIT_PASSING (ParityRunner has no case) → default injects EndTurn →
+pass NEVER executes (0 dice, ball stays (12,6)). The two pre-existing injuries (a02,h02) predate the pass and
+match; the ONLY divergence is the ball (Java 12,6 vs Rust 6,9).
+
+WHY the Ogre differs from a normal pass (home_03 seeds 4/27/98 all GREEN): a normal pass's phase-2
+ClientCommandPass is consumed AT INIT_PASSING within the same MatchRunner cycle, so ParityRunner never
+observes INIT_PASSING as a waiting step. The Ogre's pass goes through an extra move-phase auto-advance (the
+drive trace shows InitActivation→…→BoneHead→…→Move→…→InitMoving→EndMoving before the pass sequence) that
+consumes/discards the phase-2 ClientCommandPass, so INIT_PASSING is then reached as a genuine WAITING step.
+
+ATTEMPTED FIX (REVERTED): added a ParityRunner `case INIT_PASSING` that re-sends the stored pass target
+(lastPassPlayerId/lastPassCoord saved in sendPassAction, NO new actionRng). Rebuilt the jar
+(/c/Users/Admin/bin/maven/bin/mvn.cmd -q -pl ffb-ai -am install -DskipTests -o). RESULT: INFINITE LOOP —
+1,999,762 resends of ClientCommandPass(home_01,(5,10)); the step never advances (ball stays (12,6), rng stays
+52). Diagnostics confirmed actingPlayer=home_01, action=PASS, homePlaying=true, turnMode=REGULAR at
+INIT_PASSING — so StepInitPassing's CLIENT_PASS guards (checkCommandIsFromCurrentPlayer +
+checkCommandWithActingPlayer) LOOK satisfied, yet the injected command does not drive executeStep. So a
+ParityRunner-OBSERVED INIT_PASSING step cannot be advanced by re-injecting ClientCommandPass the way a
+phase-2 injection is — the inject/command-delivery model differs between the two contexts. Reverted
+ParityRunner.java (git checkout) + rebuilt the CLEAN jar; verified seed 16 fails at step 74 as before, seeds
+14-15 + 17-19 GREEN, lineman 1-6 GREEN — baseline 99/100 fully intact.
+
+NEXT (for a future focused effort): the re-inject-at-INIT_PASSING approach is a dead end. Instead investigate
+(a) WHY the Ogre's phase-2 ClientCommandPass is consumed before INIT_PASSING (instrument the stock engine's
+step transitions between phase-2 and INIT_PASSING for the Ogre vs home_03 — likely StepInitMoving/EndMoving in
+the PASS_MOVE sub-sequence swallows it), then EITHER prevent that early consumption so the phase-2 command
+survives to INIT_PASSING (as it does for a normal pass), OR determine the correct command/sequence to drive a
+ParityRunner-observed INIT_PASSING (why does executeStep not fire despite valid guards? — check
+super.handleCommand's return and MatchRunner.inject delivery timing within the ParityRunner while-loop). Keep
+Rust untouched (it is already correct); this is purely ParityRunner + jar-rebuild work.
