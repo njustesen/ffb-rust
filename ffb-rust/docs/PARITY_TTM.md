@@ -489,3 +489,12 @@ with no roll). Run `--seeds 16-16` FFB_TRACE+FFB_DICE_TRACE.
   Rust-side seeds (27, …) — a focused jar-rebuild effort.
 - STRATEGY: drive the Rust-side frontiers (27 next) to green first; return to seed 16 (harness/jar) last.
   To keep 17-26 verified while skipping 16, run ranges that exclude 16 (e.g. --seeds 17-100).
+
+## seed 27 step 139 — FIXED (2026-08-03, commit ca52794f) + next = seed 36
+FIX: StepEndPassing now sets end_turn when the ball's FINAL catcher is on the thrower's opponent team
+(Java findOtherTeam(thrower).hasPlayer(catcher) — the term was in the comment but not the code). Root: home_03
+hands off to the Ogre, who fumbles the catch; the ball bounces to away_03 (opponent) → Java turnover, Rust
+kept home's turn. human seeds 1-15 + 17-35 GREEN (16 deferred). lineman 100/100, ffb-engine 7019/0.
+NEXT FRONTIER: human seed 36 step 249 (i=250 turn7/6 half2 — active-team divergence again: Java away t7 vs
+Rust home t6; another turnover/turn-count divergence — diff per-step chosen + rng_calls to the first divergent
+step). Run `--seeds 36-36`.
