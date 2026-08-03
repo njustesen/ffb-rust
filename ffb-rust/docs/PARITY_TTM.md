@@ -514,3 +514,15 @@ InjuryTypeDropFall. Root: seed 85 i=207 an Ogre (Thick Skull) failed a dodge, fe
 Rust vs Java's Thick-Skull Stunned. human seeds 1-15 + 17-97 GREEN (96/100; seed 16 deferred). lineman 100/100,
 ffb-engine 7020/0. NEXT: human seed 98 step 124 (i=125 turn7 half1 away — Activate(away_08,MOVE), state_hash
 already differs → root earlier). Run `--seeds 98-98`.
+
+## FRONTIER (human) — seed 98 step 124: pass re-roll used by Java, declined by Rust (2026-08-03, DIAGNOSED)
+96/100 green (1-15, 17-97; seed 16 deferred). Seed 98 i=124: home_03 PASS to (6,9). JAVA: pos59 d6=2 (pass,
+StepPass) → pos60 d6=5 (2nd StepPass roll = RE-ROLL used) → pos61 d6=2 + pos62 d6=1 (catch attempts,
+StepCatchScatterThrowIn) → pos63 d8=1 (bounce); ball ends (6,8). RUST: pos59 d6=2 (pass fail) → emits
+ReRollOffer{source:"TRR"} → agent NoReRoll (declines) → pos60 d8=5 (bounce); ball ends (12,10). So Java uses a
+re-roll at the pass; Rust offers a TEAM re-roll (TRR) and declines. KEY QUESTION: does home_03 have the Pass
+skill? If yes, Rust's find_skill_reroll_source(game,"PASS") should have returned Some (→ auto-use per commit
+2244d941) but returned None (→ TRR offer) — so investigate why (Pass already used? not detected? wrong
+player?). If home_03 lacks Pass, Java's pos60 must be a team/Pro re-roll that ParityRunner uses — reconcile the
+agent's re-roll policy. NEXT: --seeds 98-98 with FFB_TRACE+FFB_DICE_TRACE; check home_03's skills + the
+ReRollOffer source; get the FULL caller of Java pos60 (StepPass.start vs handleCommand → skill vs team).
