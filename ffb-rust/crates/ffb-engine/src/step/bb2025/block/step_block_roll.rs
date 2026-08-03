@@ -319,6 +319,34 @@ impl StepBlockRoll {
                 .and_then(|id| game.player(id))
                 .map(|p| p.strength_with_modifiers())
                 .unwrap_or(3);
+            // Java RollMechanic.getAttackerBaseStrength: a blitzing player with the
+            // `addStrengthOnBlitz` property (Horns) gets +1 ST, and if the DEFENDER has
+            // `weakenOpposingBlitzer` and the blitzer has moved the attacker gets -1. These apply to
+            // the BASE strength (before assists). Rust's StepHorns hook only set a display flag and
+            // never fed the +1 into the block-dice count, so an equal-ST blitz (Minotaur vs Minotaur,
+            // chaos seed 1 i=100) rolled 1 die instead of Java's 2 and desynced the whole die stream.
+            let attacker_str = {
+                use ffb_model::enums::PlayerAction;
+                use ffb_model::model::property::named_properties::NamedProperties;
+                let is_blitz = matches!(game.acting_player.player_action,
+                    Some(PlayerAction::Blitz) | Some(PlayerAction::BlitzMove));
+                let mut s = attacker_str;
+                if is_blitz {
+                    let atk_horns = game.acting_player.player_id.as_deref()
+                        .and_then(|id| game.player(id))
+                        .map(|p| p.has_skill_property(NamedProperties::ADD_STRENGTH_ON_BLITZ))
+                        .unwrap_or(false);
+                    if atk_horns { s += 1; }
+                    if game.acting_player.has_moved {
+                        let def_weakens = game.defender_id.as_deref()
+                            .and_then(|id| game.player(id))
+                            .map(|p| p.has_skill_property(NamedProperties::WEAKEN_OPPOSING_BLITZER))
+                            .unwrap_or(false);
+                        if def_weakens { s -= 1; }
+                    }
+                }
+                s
+            };
             // Java: blockStrengthAttacker = RollMechanic.getTotalAttackerStrength(...) and
             // blockStrengthDefender = ServerUtilPlayer.findBlockStrength(...) — BOTH sides
             // add their assists (teammates with tackle zones adjacent to the opponent and
@@ -481,6 +509,40 @@ mod tests {
             let mut step = StepBlockRoll::new();
             step.start(&mut game, &mut GameRng::new(1));
             assert_eq!(step.nr_of_dice, expected, "extra additional assists = {}", extra);
+        }
+    }
+
+    #[test]
+    fn horns_adds_a_block_die_on_a_blitz_but_not_a_block() {
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerAction, PlayerState, PS_STANDING, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        fn add(game: &mut Game, home: bool, id: &str, c: FieldCoordinate, skills: &[SkillId]) {
+            let team = if home { &mut game.team_home } else { &mut game.team_away };
+            team.players.push(Player {
+                id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+                player_type: PlayerType::Regular, gender: PlayerGender::Male,
+                movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+                starting_skills: skills.iter().map(|&s| SkillWithValue { skill_id: s, value: None }).collect(),
+                extra_skills: vec![], temporary_skills: vec![],
+                used_skills: HashSet::new(), niggling_injuries: 0, stat_injuries: vec![],
+                current_spps: 0, career_spps: 0, race: None, is_big_guy: false, ..Default::default()
+            });
+            game.field_model.set_player_coordinate(id, c);
+            game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+        }
+        // Equal ST=3, no assists. Java getAttackerBaseStrength adds +1 ST for the Horns
+        // (addStrengthOnBlitz) skill on a BLITZ → 2 dice; a plain BLOCK stays 1 die
+        // (chaos seed 1 i=100: Minotaur-vs-Minotaur blitz rolled 1 die instead of 2).
+        for (action, expected) in [(PlayerAction::Blitz, 2), (PlayerAction::Block, 1)] {
+            let mut game = make_game();
+            add(&mut game, true, "att", FieldCoordinate::new(5, 5), &[SkillId::Horns]);
+            add(&mut game, false, "def", FieldCoordinate::new(6, 5), &[]);
+            game.home_playing = true;
+            game.acting_player.set_player("att".into(), action);
+            game.defender_id = Some("def".into());
+            let mut step = StepBlockRoll::new();
+            step.start(&mut game, &mut GameRng::new(1));
+            assert_eq!(step.nr_of_dice, expected, "Horns on action {:?}", action);
         }
     }
 
