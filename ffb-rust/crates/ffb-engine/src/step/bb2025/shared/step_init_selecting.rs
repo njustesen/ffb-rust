@@ -253,22 +253,18 @@ impl StepInitSelecting {
                     return StepOutcome::goto(label)
                         .publish(StepParameter::EndPlayerAction(true));
                 }
-                // A STANDING player that declared a BLITZ but has NO adjacent target: Java's
-                // SelectBlitzTarget resolves the target (blockTarget == null → "BLITZ_TARGET_NONE")
-                // and ParityRunner ends the turn (ClientCommandEndTurn) BEFORE any block sequence — so
-                // NO Bone-head / negatrait is rolled. Rust otherwise dispatches the block sequence,
-                // whose ACTIVATION rolls Bone-head (an extra game die that desyncs the RNG stream:
-                // human seed 7 i=196 → surfaces at i=217). End the turn here to match. A PRONE
-                // no-target blitz KEEPS the block-sequence path below because Java DOES roll Bone-head
-                // there — during the free stand-up's Select ACTIVATION (checked on the player's ACTUAL
-                // PlayerState, since the prone-blitz path at the top already forced standing_up=false).
-                if matches!(dispatch, PlayerAction::Blitz)
-                    && game.defender_id.is_none()
-                    && game.acting_player.player_id.as_deref()
-                        .and_then(|id| game.field_model.player_state(id))
-                        .map(|s| !s.is_prone())
-                        .unwrap_or(true)
-                {
+                // A player that declared a BLITZ but has NO adjacent target: Java's SelectBlitzTarget
+                // resolves the target (blockTarget == null → "BLITZ_TARGET_NONE") and ParityRunner ends
+                // the turn (ClientCommandEndTurn) BEFORE any block sequence — so NO Bone-head / negatrait
+                // is rolled, whether the blitzer is STANDING or PRONE (the EndTurn happens at target
+                // selection, before the stand-up ACTIVATION either way). Rust otherwise dispatches the
+                // block sequence, whose ACTIVATION rolls Bone-head — an extra game die that desyncs the
+                // RNG stream for a negatrait carrier (human seed 7 i=196 standing Ogre → surfaced i=217;
+                // human seed 36 i=170 PRONE Ogre → surfaced i=250). A skill-less lineman's ACTIVATION
+                // rolls nothing here so this only ever removes a stray negatrait die. (Earlier this was
+                // guarded to standing-only on the mistaken assumption a prone no-target blitz rolls
+                // Bone-head during stand-up; seed 36 disproved it — Java rolls 0 dice in both cases.)
+                if matches!(dispatch, PlayerAction::Blitz) && game.defender_id.is_none() {
                     return StepOutcome::goto(label)
                         .publish(StepParameter::EndTurn(true))
                         .publish(StepParameter::CheckForgo(true));
@@ -430,6 +426,30 @@ mod tests {
             "a standing no-target Blitz must publish EndTurn (no block sequence / Bone-head)");
         assert!(!out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(_))),
             "must NOT dispatch a block sequence for a standing no-target Blitz");
+
+        // Regression (human seed 36 i=170): a PRONE no-target Blitz must ALSO EndTurn before the block
+        // sequence — Java rolls 0 dice in both cases (the earlier standing-only guard was wrong; a
+        // prone Ogre otherwise rolled a stray Bone-head that desynced the RNG at i=250).
+        use ffb_model::enums::PS_PRONE;
+        let mut game2 = make_game();
+        game2.home_playing = true;
+        game2.team_home.players.push(Player {
+            id: "h1".into(), name: "h1".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            ..Default::default()
+        });
+        game2.field_model.set_player_coordinate("h1", FieldCoordinate::new(12, 7));
+        game2.field_model.set_player_state("h1", PlayerState::new(PS_PRONE));
+        let mut step2 = StepInitSelecting::new("end".into());
+        let out2 = step2.handle_command(&Action::ActivatePlayer {
+            player_id: "h1".into(), player_action: PlayerActionChoice::Blitz, block_defender_id: None,
+        }, &mut game2, &mut GameRng::new(0));
+        assert_eq!(out2.action, StepAction::GotoLabel);
+        assert!(out2.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "a PRONE no-target Blitz must also publish EndTurn (no stand-up / Bone-head)");
+        assert!(!out2.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(_))),
+            "must NOT dispatch a block sequence for a prone no-target Blitz");
     }
 
     #[test]
