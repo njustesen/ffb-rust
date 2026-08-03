@@ -68,6 +68,21 @@ pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerActi
         game.acting_player.set_player(player_id.to_owned(), action);
         game.acting_player.standing_up = was_prone;
         game.acting_player.jumping = jumping;
+        // Java clears per-activation skill re-roll usage when the acting player changes (legacy
+        // engine.rs StepInitSelecting did `used_skills.clear()`). Rust stores skill-reroll "used"
+        // flags on Player.used_skills (util_server_re_roll::use_reroll), so reset the activated
+        // player's Regular-usage skills here — a Regular skill (Pass, Sure Hands, Catch, …) re-roll
+        // is available again on the player's next activation. SkillUsageType::Regular is precisely
+        // the set NOT tracked outside the player's own activation (track_outside_activation == false);
+        // OncePer{Turn,Half,Drive,Game} usage skills reset at their own boundaries and stay intact.
+        // (Human seed 98 i=124: home_03 used its Pass re-roll at i=92 turn 5; without this reset it
+        // stayed marked used through turn 7, so find_skill_reroll_source returned None and the pass
+        // fell to a declined TRR offer instead of Java's auto-used Pass re-roll.)
+        if let Some(p) = game.team_home.player_mut(player_id)
+            .or_else(|| game.team_away.player_mut(player_id))
+        {
+            p.reset_used_skills(ffb_model::enums::SkillUsageType::Regular);
+        }
         // Java UtilActingPlayer.changeActingPlayer (`if (changed)` block): resets transient
         // BLOCKED/MOVING states whenever the acting player changes. A block declared then cancelled
         // (e.g. failed Bone Head) leaves the defender BLOCKED until this runs (human seed 16 i=11).
@@ -200,6 +215,31 @@ mod tests {
         assert_eq!(game.field_model.player_state("mov").unwrap().base(), PS_STANDING, "stray MOVING → STANDING");
         assert_eq!(game.field_model.player_state("thr").unwrap().base(), PS_MOVING, "thrower MOVING preserved");
         assert_eq!(game.field_model.player_state("act").unwrap().base(), PS_MOVING, "acting-player MOVING preserved");
+    }
+
+    #[test]
+    fn change_player_action_resets_regular_skill_reroll_but_keeps_once_per_game() {
+        // Human seed 98 i=124: a Thrower used its Pass (Regular) re-roll on an earlier turn's pass;
+        // the "used" flag stayed set, so its next pass fell to a declined TRR offer instead of the
+        // auto-used Pass re-roll. Activating the player must clear Regular-usage skills (Pass) while
+        // leaving OncePerGame usage intact.
+        use ffb_model::enums::{PlayerType, PlayerGender, SkillId};
+        use ffb_model::model::player::Player;
+        let mut game = make_game();
+        let mut p = Player {
+            id: "thr".into(), name: "thr".into(), nr: 1, position_id: "thrower".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8, ..Default::default()
+        };
+        p.used_skills.insert(SkillId::Pass);        // Regular  → should clear on activation
+        p.used_skills.insert(SkillId::OldPro);      // OncePerGame → should persist
+        game.team_home.players.push(p);
+
+        change_player_action(&mut game, "thr", PlayerAction::Pass, false);
+
+        let after = game.team_home.player("thr").unwrap();
+        assert!(!after.used_skills.contains(&SkillId::Pass), "Regular Pass re-roll reset on activation");
+        assert!(after.used_skills.contains(&SkillId::OldPro), "OncePerGame usage preserved");
     }
 
     #[test]

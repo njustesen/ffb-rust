@@ -526,3 +526,23 @@ skill? If yes, Rust's find_skill_reroll_source(game,"PASS") should have returned
 player?). If home_03 lacks Pass, Java's pos60 must be a team/Pro re-roll that ParityRunner uses — reconcile the
 agent's re-roll policy. NEXT: --seeds 98-98 with FFB_TRACE+FFB_DICE_TRACE; check home_03's skills + the
 ReRollOffer source; get the FULL caller of Java pos60 (StepPass.start vs handleCommand → skill vs team).
+
+## seed 98 step 124 — FIXED (2026-08-03, commit pending) — 99/100 human seeds GREEN
+ROOT: home_03 (Thrower, Pass skill) passes twice — i=92 turn 5 and i=124 turn 7. At i=92 both engines
+auto-use the Pass re-roll (dice match). Rust's use_reroll marks SkillId::Pass in the PERSISTENT
+Player.used_skills; the live activation path (change_player_action → set_player clears only
+ActingPlayer.used_skills, the Bone-head field) NEVER cleared Player.used_skills. So at i=124
+find_skill_reroll_source(game,"PASS") saw Pass still "used" → returned None → the pass fell to a declined
+TRR ReRollOffer (Rust 2 dice: pos59 d6=2 fail → decline → pos60 d8=5 bounce, ball→(12,10)) instead of
+Java's auto-used Pass re-roll (5 dice: pos59 d6=2 → pos60 d6=5 reroll via StepPass.handleCommand → pos61-62
+catch → pos63 d8 bounce, ball→(6,8)). The legacy step/engine.rs:2214 StepInitSelecting did
+used_skills.clear() at activation, but that's dead code — driver.rs is live.
+FIX (crates/ffb-engine/src/step/util_server_steps.rs change_player_action): after set_player, reset the
+activated player's SkillUsageType::Regular skills via reset_used_skills(Regular) — precisely the set NOT
+tracked outside the player's own activation (track_outside_activation==false); OncePer{Turn,Half,Drive,Game}
+reset at their own boundaries and stay intact. So a Regular skill re-roll (Pass, Sure Hands, Catch, …) is
+available again each activation, matching Java. +regression test change_player_action_resets_regular_skill_
+reroll_but_keeps_once_per_game. lineman 100/100, human 17-100 84/84, ffb-engine 7021/0.
+STATUS: human seeds 1-15 + 17-100 GREEN (99/100). ONLY seed 16 remains (DEFERRED — Ogre PASS reaches
+ParityRunner INIT_PASSING with no handler; needs a ParityRunner INIT_PASSING case + jar rebuild, see "seed 16
+step 74" above).
