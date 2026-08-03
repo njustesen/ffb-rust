@@ -605,3 +605,27 @@ NEXT_STEP). Gated JCMD/JIP traces in GameState.java + mixed/StepInitPassing.java
 `dist=null` for a table-L entry with throwTeamMate=false → could only be the Blizzard gate. All stock-repo
 experiments (ParityRunner + the 2 gated-trace files) were REVERTED; the fix is Rust-only.
 **RESULT: Human vs Human parity 100/100 GREEN (bb2025 tier-3). lineman 100/100, ffb-engine 7023/0.**
+
+## ROSTER PROGRESSION (2026-08-03): amazon ✅ 100/100, chaos ▶ FRONTIER seed 1 step 100 (DIAGNOSED, unfixed)
+User directed: after human 100/100, drive per-roster mirror parity ALPHABETICALLY (amazon first); OGRE
+DEFERRED. amazon vs amazon = 100/100 (no fix). CHAOS vs chaos: seed 1 diverges at step 100.
+ROOT (block DICE COUNT, not the MB red herring): i=100 away_01 (away Minotaur: Horns, Mighty Blow, Thick
+Skull) BLITZes home_01 (home Minotaur). Agent picks Both Down → both fall. **Java rolls 2 block dice
+(JAVA_BLOCKROLL nDice=2); Rust rolls 1.** That 1-die shift reassigns every downstream die, so the both-down
+attacker away_01 ends Prone in Java vs Stunned in Rust (looked like a Mighty-Blow-on-both-down armour bug —
+that was DOWNSTREAM NOISE from the shift; confirmed via instrumented do_armor_roll/recalc/injury + Java
+JAV_ARMOURROLL, all since reverted).
+WHY 2 vs 1: Horns = +1 ST on a Blitz → att 6 > def 5 → 2 dice (Java). Rust's blitz nr_of_dice = 1 (att 5 =
+def 5) — Horns's +1 ST NOT reflected. In Rust, Horns is a StepHorns hook (+1 ST) that runs DURING the block
+sequence (drive order: InitBlocking → BlockStatistics → **Horns** → BlockRoll), but the block dice count was
+already fixed before it. Instrumentation proved: `find_nr_of_block_dice` is called only 3× the whole game
+(NONE at step 100) and step_block_roll's `block_dice_count` path (`if nr_of_dice==0`) was skipped (nr_of_dice
+already non-zero) — so the blitz count comes from a PRE-SET value (a DiceDecoration from
+ServerUtilBlock::update_dice_decorations, which uses base `strength_with_modifiers()` with NO Horns, OR from
+StepSelectBlitzTarget/StepInitBlocking).
+NEXT: find exactly where the blitz's nr_of_dice is set (grep StepSelectBlitzTarget / StepInitBlocking /
+DiceDecoration reads in the bb2025 block path) and ensure it's (re)computed AFTER StepHorns applies +1 ST — or
+include Horns's blitz +1 in the strength used. Check WHY Beastman (also Horns) blitzes matched in steps 1-99
+(likely their ST/assist gap gave the right count independent of the exact +1, so only an exactly-equal-ST
+blitz like Minotaur-vs-Minotaur exposes it). Verify att/def strengths at the set point. Rust-engine fix only;
+NO jar change (Java is correct). Baseline at pause: chaos seed 1 FAIL step 100, lineman/amazon/human all green.
