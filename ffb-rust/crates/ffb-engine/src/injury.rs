@@ -645,14 +645,19 @@ impl InjuryTypeServer for InjuryTypeTtmHitPlayerImpl {
 /// Used by steps that receive `StepParameter::InjuryTypeName(name)`.
 pub fn make_injury_type(name: &str) -> Box<dyn InjuryTypeServer> {
     match name {
+        // Use the full `injuryType::` translations — they roll the injury with
+        // do_injury_roll_for_player (applies Stunty + Thick Skull), unlike the stale player-less
+        // `InjuryTypeDropFall` below whose `do_injury_roll` dropped both. Without this an Ogre's
+        // failed-dodge fall rolled injury 8 → KO instead of Thick-Skull's Stunned (human seed 85 i=207,
+        // away_01). Same class of bug as the TTM-landing fix above.
         "InjuryTypeDropGFI" | "InjuryTypeDropGfi" =>
-            Box::new(InjuryTypeDropFall::new(true)),
+            Box::new(injuryType::injury_type_drop_gfi::InjuryTypeDropGFI::new()),
         "InjuryTypeDropDodge" =>
-            Box::new(InjuryTypeDropFall::new(true)),
+            Box::new(injuryType::injury_type_drop_dodge::InjuryTypeDropDodge::new()),
         "InjuryTypeDropDodgeForSpp" =>
-            Box::new(InjuryTypeDropFall::new(true)),
+            Box::new(injuryType::injury_type_drop_dodge_for_spp::InjuryTypeDropDodgeForSpp::new()),
         "InjuryTypeDropJump" =>
-            Box::new(InjuryTypeDropFall::new(true)),
+            Box::new(injuryType::injury_type_drop_jump::InjuryTypeDropJump::new()),
         // Java: `new InjuryTypeBlock()` — Mode.REGULAR, rollArmour=true, allowAttackerChainsaw=true.
         "InjuryTypeBlock" =>
             Box::new(injuryType::injury_type_block::InjuryTypeBlock::new(
@@ -933,6 +938,35 @@ mod tests {
                 assert_eq!(ctx.injury.map(|s| s.base()), Some(PS_STUNNED), "ThickSkull total 8 must be Stunned");
             }
         }
+    }
+
+    #[test]
+    fn make_injury_type_drop_dodge_applies_thick_skull() {
+        use ffb_model::enums::SkillId;
+        // Regression (human seed 85 i=207): make_injury_type("InjuryTypeDropDodge") must route to the
+        // proper impl (rolls injury via do_injury_roll_for_player → applies Thick Skull), NOT the stale
+        // player-less InjuryTypeDropFall. A Thick-Skull player whose fall injury totals 8 → Stunned,
+        // not KO (an Ogre otherwise KO'd on an 8 instead of Thick-Skull's Stunned).
+        let mut home = crate::step::framework::test_team("home", 0);
+        let mut p = make_player_with_skills("p1", vec![SkillId::ThickSkull]);
+        p.armour = 2; // always breaks → reach the injury roll
+        home.players.push(p);
+        let game = Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2025);
+        for seed in 0u64..3000 {
+            let mut ty = make_injury_type("InjuryTypeDropDodge");
+            let mut rng = GameRng::new(seed);
+            ty.handle_injury(&game, &mut rng, None, "p1",
+                FieldCoordinate::new(5, 5), None, None, ffb_model::enums::ApothecaryMode::Attacker);
+            let ctx = ty.injury_context();
+            if let Some([d1, d2]) = ctx.injury_roll {
+                if d1 + d2 == 8 {
+                    assert_eq!(ctx.injury.map(|s| s.base()), Some(PS_STUNNED),
+                        "DropDodge injury total 8 with Thick Skull must be Stunned (proper impl), not KO");
+                    return;
+                }
+            }
+        }
+        panic!("no seed produced a broken-armour injury total of 8 within 3000 tries");
     }
 
     #[test]
