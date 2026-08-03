@@ -471,3 +471,21 @@ with no roll). Run `--seeds 16-16` FFB_TRACE+FFB_DICE_TRACE.
   resolution also matches), OR if the Ogre's pass genuinely should abort, make the RUST engine abort/EndTurn
   the Ogre's pass with 0 dice to match ParityRunner's EndTurn. Prefer understanding the INIT_PASSING re-prompt
   first. Ground truth = STOCK Java ENGINE; ParityRunner + random_agent co-editable.
+
+## Loop resumed (post-push) — landscape + seed 16 refinement (2026-08-03)
+- Survey: human seeds 1-15 GREEN, 16 FAILS (Ogre pass), 17-26 GREEN, next failure = seed 27 step 139
+  (i=140 turn1 half2 — active-team divergence: Java away Activate(away_07,MOVE) vs Rust home
+  Activate(home_11,Move); pre-step state_hash differs → real divergence earlier; likely a Rust-side
+  turn/RNG issue, NOT the Ogre pass). So seed 16's Ogre-pass gap is ISOLATED (doesn't block 17-26).
+- seed 16 refinement: confirmed the flow — StepInitSelecting DOES handle CLIENT_PASS (publishes
+  TARGET_COORDINATE, changePlayerAction(PASS), dispatch=PASS) at INIT_SELECTING phase-2, and JAVA_PASS
+  coord=(5,10) is logged. But StepInitPassing.executeStep only proceeds (NEXT_STEP) when
+  passCoordinate!=null && thrower==actingPlayer && findPassingDistance!=null; for the Ogre one of those
+  is unset by the time StepInitPassing runs (so it waits → ParityRunner's missing INIT_PASSING case →
+  ClientCommandEndTurn → 0 dice). Pinning WHICH (passCoordinate vs thrower vs distance) and WHY (Big-Guy /
+  Bone-head dispatch path) needs Java-side instrumentation = a jar rebuild. Fix = add an INIT_PASSING
+  handler to ParityRunner (co-editable) so Java executes the pass, then verify Rust's 6-dice resolution
+  matches; rebuild jar, re-verify lineman 100/100 (commit Rust first). DEFERRED behind the tractable
+  Rust-side seeds (27, …) — a focused jar-rebuild effort.
+- STRATEGY: drive the Rust-side frontiers (27 next) to green first; return to seed 16 (harness/jar) last.
+  To keep 17-26 verified while skipping 16, run ranges that exclude 16 (e.g. --seeds 17-100).
