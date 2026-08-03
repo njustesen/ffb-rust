@@ -506,3 +506,11 @@ seed 36 i=170 a PRONE away Ogre's no-target blitz rolled a stray Bone-head in Ru
 +1 RNG desync surfacing at i=250. human seeds 36-84 GREEN. lineman 100/100, ffb-engine 7019/0.
 NEXT FRONTIER: human seed 85 step 207 (i=208 turn3 half2, active=home both — Activate(home_01,MOVE); state_hash
 already differs so root is earlier; diff chosen+rng_calls). Run `--seeds 85-85`.
+
+## seed 85 step 207 — FIXED (2026-08-03, commit aaa844ba) + next = seed 98
+FIX: make_injury_type now routes InjuryTypeDrop{GFI,Dodge,DodgeForSpp,Jump} to the proper injuryType::
+injury_type_drop_* impls (do_injury_roll_for_player → Stunty + Thick Skull), not the stale player-less
+InjuryTypeDropFall. Root: seed 85 i=207 an Ogre (Thick Skull) failed a dodge, fell, rolled injury 8 → KO in
+Rust vs Java's Thick-Skull Stunned. human seeds 1-15 + 17-97 GREEN (96/100; seed 16 deferred). lineman 100/100,
+ffb-engine 7020/0. NEXT: human seed 98 step 124 (i=125 turn7 half1 away — Activate(away_08,MOVE), state_hash
+already differs → root earlier). Run `--seeds 98-98`.
