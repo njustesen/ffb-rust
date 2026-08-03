@@ -629,3 +629,13 @@ include Horns's blitz +1 in the strength used. Check WHY Beastman (also Horns) b
 (likely their ST/assist gap gave the right count independent of the exact +1, so only an exactly-equal-ST
 blitz like Minotaur-vs-Minotaur exposes it). Verify att/def strengths at the set point. Rust-engine fix only;
 NO jar change (Java is correct). Baseline at pause: chaos seed 1 FAIL step 100, lineman/amazon/human all green.
+
+### chaos seed 1 i=100 — FIXED (2026-08-03, commit 25c5292c): Horns +1 ST feeds block-dice count
+Rust StepHorns only set a display flag (using_horns) + emitted SkillUse; the +1 ST was never applied to the
+block-dice count (apply_add_block_die had no production caller). A Horns blitz got the wrong die count when the
++1 crossed a boundary: Minotaur(ST5,Horns) blitz Minotaur(ST5) → Java 2 dice (6>5), Rust 1 (5==5). The 1-die
+shift desynced the whole stream (surfaced downstream as a fake Mighty-Blow-on-both-down armour diff — RED
+HERRING). FIX: in StepBlockRoll block-dice calc, mirror Java RollMechanic.getAttackerBaseStrength — +1 to the
+attacker BASE strength (pre-assists) when acting player has addStrengthOnBlitz and action is Blitz/BlitzMove;
+-1 when the blitzer moved and the defender has weakenOpposingBlitzer. +regression test. **chaos seeds 1-39
+GREEN**; lineman/human/amazon 100/100, ffb-engine 7024/0. NEXT: chaos seed 40 i=142.
