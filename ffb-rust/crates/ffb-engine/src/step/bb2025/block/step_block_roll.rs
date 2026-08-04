@@ -319,6 +319,20 @@ impl StepBlockRoll {
                 .and_then(|id| game.player(id))
                 .map(|p| p.strength_with_modifiers())
                 .unwrap_or(3);
+            // Java RollMechanic.getTotalAttackerStrength: a SUCCESSFUL Dauntless roll raises the
+            // attacker's block strength to at least the defender's base strength (doubled when
+            // doubleTargetStrength). This is applied to the base strength BEFORE the Horns +1 and
+            // before assists — `blockStrengthAttacker = max(base, doubleTargetStrength ? 2*defST : defST)`.
+            // Rust set the `successful_dauntless` flag but never fed it into the die count, so a
+            // weaker Dauntless attacker (e.g. a Dwarf blitzer vs a stronger target, dwarf seed 1
+            // i=101) rolled the "attacker much weaker" 3-dice defender-choice block instead of Java's
+            // 1 die, rolling extra dice and desyncing the game-die stream.
+            let attacker_str = if self.successful_dauntless {
+                let target = if self.double_target_strength { 2 * defender_str } else { defender_str };
+                attacker_str.max(target)
+            } else {
+                attacker_str
+            };
             // Java RollMechanic.getAttackerBaseStrength: a blitzing player with the
             // `addStrengthOnBlitz` property (Horns) gets +1 ST, and if the DEFENDER has
             // `weakenOpposingBlitzer` and the blitzer has moved the attacker gets -1. These apply to
@@ -543,6 +557,42 @@ mod tests {
             let mut step = StepBlockRoll::new();
             step.start(&mut game, &mut GameRng::new(1));
             assert_eq!(step.nr_of_dice, expected, "Horns on action {:?}", action);
+        }
+    }
+
+    /// Regression: a SUCCESSFUL Dauntless roll must raise the attacker's block strength to at least
+    /// the defender's for the die count (Java RollMechanic.getTotalAttackerStrength:
+    /// `blockStrengthAttacker = max(base, defenderStrength)`). A weaker ST-3 attacker vs an ST-5
+    /// defender rolls the 2-dice defender-choice block (-2) WITHOUT Dauntless, but a matched 1-die
+    /// block WITH it. Rust set the successful_dauntless flag but never fed it into the count, so a
+    /// Dauntless blitz (dwarf seed 1 i=101) rolled extra dice and desynced the game-die stream.
+    #[test]
+    fn successful_dauntless_matches_defender_strength_for_die_count() {
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerAction, PlayerState, PS_STANDING};
+        fn add(game: &mut Game, home: bool, id: &str, c: FieldCoordinate, strength: i32) {
+            let team = if home { &mut game.team_home } else { &mut game.team_away };
+            team.players.push(Player {
+                id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+                player_type: PlayerType::Regular, gender: PlayerGender::Male,
+                movement: 6, strength, agility: 3, passing: 4, armour: 8,
+                starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+                used_skills: HashSet::new(), niggling_injuries: 0, stat_injuries: vec![],
+                current_spps: 0, career_spps: 0, race: None, is_big_guy: false, ..Default::default()
+            });
+            game.field_model.set_player_coordinate(id, c);
+            game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+        }
+        for (dauntless, expected) in [(false, -2), (true, 1)] {
+            let mut game = make_game();
+            add(&mut game, true, "att", FieldCoordinate::new(5, 5), 3);
+            add(&mut game, false, "def", FieldCoordinate::new(6, 5), 5);
+            game.home_playing = true;
+            game.acting_player.set_player("att".into(), PlayerAction::Blitz);
+            game.defender_id = Some("def".into());
+            let mut step = StepBlockRoll::new();
+            step.successful_dauntless = dauntless;
+            step.start(&mut game, &mut GameRng::new(1));
+            assert_eq!(step.nr_of_dice, expected, "successful_dauntless={}", dauntless);
         }
     }
 
