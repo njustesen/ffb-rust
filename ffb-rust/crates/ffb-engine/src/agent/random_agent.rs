@@ -505,14 +505,15 @@ impl Agent for RandomAgent {
                 Action::ArgueTheCall { argue: true },
             // Player choice: pick uniformly from eligible sorted by PlayerId — 1 decision_rng call.
             // Synced with Java ParityRunner PLAYER_CHOICE dialog case.
-            Some(AgentPrompt::PlayerChoice { eligible_players, .. }) => {
-                if eligible_players.is_empty() {
-                    return Action::Acknowledge;
-                }
-                let mut sorted = eligible_players.clone();
-                sorted.sort();
-                let idx = self.pick(sorted.len());
-                Action::SelectPlayer { player_id: sorted[idx].clone() }
+            // Java ParityRunner (PLAYER_CHOICE handler) declines EVERY PlayerChoiceMode dialog with
+            // an empty selection — sending `new Player[0]` and drawing NO rng — the sole exception
+            // being MVP, which reaches the agent through a separate SelectPlayer prompt, not here.
+            // So every `AgentPrompt::PlayerChoice` (Shadowing, Tentacles, Diving Tackle, Animal
+            // Savagery, Pile Driver, Wisdom, …) must decline: an empty `player_id`, and crucially
+            // no `pick()` — the previous code both selected a player AND consumed a decision_rng draw
+            // Java never makes, desyncing the stream (e.g. a Shadowing roll that Java skips entirely).
+            Some(AgentPrompt::PlayerChoice { .. }) => {
+                Action::SelectPlayer { player_id: String::new() }
             }
             // Blood Lust (vampire failed the roll): keep the declared action rather than switching to
             // feed — deterministic, NO rng. Java's RandomStrategy uses an unseeded Random here, so
