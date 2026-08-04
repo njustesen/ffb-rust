@@ -661,3 +661,29 @@ Gates: lineman 100/100, human 100/100, amazon 100/100, ffb-engine 7026/0.
 
 ## ✅ CHAOS TIER COMPLETE (2026-08-03) — 100/100. Three fixes: Horns block-dice (25c5292c), Dodgy Snack roll
 order (abe8636c), chain pushback (7a18ceff). User said "stop after fixing chaos" → loop stops here.
+
+## underworld seed 1 step 41 — Animal Savagery lash-out must end the foul (option factory default)
+
+**Symptom:** underworld (Underworld Denizens) seed 1 diverged at step 41. Away Animal
+Savagery player declared FOUL on a non-adjacent Home player; savagery roll (pos53) failed →
+lashed out at an adjacent teammate (InjuryTypeBlock armour[6,3]+injury[5,2], pos54-57). Java
+ended the activation there (5 dice, rng 52→57, foul aborted). Rust rolled the foul too
+(StepFoul armour pos58-59), arriving at the next activation 2 rng ahead → every later step desynced.
+
+**Root cause:** `UtilGameOption::is_option_enabled` consulted only the explicitly-stored option
+value; Java's `isOptionEnabled` uses `getOptionWithDefault(id).isEnabled()`, which materializes
+the `GameOptionFactory` default. `animalSavageryLashOutEndsActivation` has factory default `true`.
+With it wrongly `false` in Rust, the lash-out branch (StepAnimalSavagery, line ~368) that
+publishes END_PLAYER_ACTION + USE_ALTERNATE_LABEL — making the activation's GotoLabel jump to the
+failure label END_FOULING and skip FoulChainsaw/StepFoul — was never taken.
+
+**Fix (`crates/ffb-model/src/option/util_game_option.rs`):** `is_option_enabled` now resolves the
+id via `GameOptionId::for_name`, builds the option through `get_option_with_default`, and reads its
+value — 1:1 with Java. Side effect: other unset true-default booleans now read correctly
+(clawDoesNotStack, inducements, pettyCash, forceTreasuryToPettyCash, divingTackleLeavingTzOnly,
+inducementPrayersAvailableForUnderdog, pilingOnUsesATeamReroll, …). Six unit-test files that
+assumed unset==false now set the option explicitly to keep their intended scenario.
+
+**Verified:** underworld seed 1 GREEN (advances to seed 2 step 1, a pre-existing divergence).
+No regression: lineman/human/amazon 1-100 = 100/100; ffb-engine 7026/0, ffb-model 2773/0.
+Commit e56fb06b.
