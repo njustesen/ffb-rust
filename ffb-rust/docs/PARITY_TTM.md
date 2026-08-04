@@ -687,3 +687,24 @@ assumed unset==false now set the option explicitly to keep their intended scenar
 **Verified:** underworld seed 1 GREEN (advances to seed 2 step 1, a pre-existing divergence).
 No regression: lineman/human/amazon 1-100 = 100/100; ffb-engine 7026/0, ffb-model 2773/0.
 Commit e56fb06b.
+
+## renegades seed 1 step 93 — JSON string skill values must be stored unquoted (Animosity)
+
+**Symptom:** renegades (Chaos Renegades) seed 1 diverged at step 93. Renegade Away8 declared a
+PASS to the teammate at (14,6); both engines picked the same target square, but Java refused the
+pass via an **Animosity** roll (pos84, no throw, no turnover) while Rust skipped Animosity, threw
+(accuracy pos84 → d8 scatter pos85) and turned the ball over → active team flipped a step early.
+
+**Root cause:** `com.fumbbl...SkillMechanic.animosityExists` builds a pattern set of the catcher's
+position keywords + the Animosity "allValue" (`all`) and tests whether any of the thrower's
+lowercased Animosity values is in it. Renegade Animosity is configured `value="All"`. The Rust
+roster loader (`skill_entry_to_skill_with_value`) stored the value via `serde_json::Value::to_string()`,
+which re-serializes a JSON string WITH quotes (`All` → `"All"`). The quoted `"all"` never matched
+the unquoted `all`, so `animosity_exists` returned false, `do_roll` was false, and Animosity never
+fired for ANY Renegade pass.
+
+**Fix (`crates/ffb-model/src/data/loader.rs`):** unwrap `serde_json::Value::String(s)` to its inner
+text; numeric/other values keep `to_string()`. +2 loader regression tests.
+
+**Verified:** renegades seed 1 GREEN (advances to seed 2 step 1). No regression:
+lineman/human/amazon 1-100 = 100/100; ffb-engine 7026/0, ffb-model 2775/0. Commit 403b8482.
