@@ -77,6 +77,7 @@ pub fn run_java_headless(seed: u64, home_team_id: &str, away_team_id: &str, home
     });
 
     let mut args: Vec<String> = vec!["-cp".into(), cp.clone()];
+    if let Some(opt) = jvm_core_opt() { args.push(opt); }
     // Mirror the Rust-side trace env vars onto the Java process.
     if std::env::var_os("FFB_DICE_TRACE").is_some() {
         args.push("-Dffb.diceTrace=true".into());
@@ -104,6 +105,16 @@ pub fn run_java_headless(seed: u64, home_team_id: &str, away_team_id: &str, home
         Ok(s) => log::warn!("Java parity runner exited with status {s} for seed {seed}"),
         Err(e) => log::warn!("Could not launch Java parity runner for seed {seed}: {e}"),
     }
+}
+
+/// When many JVMs run concurrently (parallel matrix), each one otherwise sizes its parallel-GC
+/// and JIT-compiler thread pools to ALL visible cores, so N JVMs spawn ~N×cores threads and
+/// thrash. `PARITY_JVM_CORES=k` passes `-XX:ActiveProcessorCount=k` so each JVM only sees k cores.
+/// Unset (solo runs) → no flag, JVM uses all cores at full speed.
+fn jvm_core_opt() -> Option<String> {
+    let n = std::env::var("PARITY_JVM_CORES").ok()?;
+    let n = n.trim();
+    n.parse::<u32>().ok().filter(|&k| k >= 1).map(|k| format!("-XX:ActiveProcessorCount={k}"))
 }
 
 /// Resolve the Java classpath (fat jar) — env `PARITY_CP` or the first existing candidate.
@@ -157,6 +168,7 @@ pub fn run_java_headless_range(
     let server_dir = resolve_server_dir();
 
     let mut args: Vec<String> = vec!["-cp".into(), cp];
+    if let Some(opt) = jvm_core_opt() { args.push(opt); }
     if std::env::var_os("FFB_DICE_TRACE").is_some() { args.push("-Dffb.diceTrace=true".into()); }
     if std::env::var_os("FFB_TRACE").is_some() { args.push("-Dffb.parityDebug=true".into()); }
     args.extend([
