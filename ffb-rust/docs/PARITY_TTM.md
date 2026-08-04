@@ -708,3 +708,24 @@ text; numeric/other values keep `to_string()`. +2 loader regression tests.
 
 **Verified:** renegades seed 1 GREEN (advances to seed 2 step 1). No regression:
 lineman/human/amazon 1-100 = 100/100; ffb-engine 7026/0, ffb-model 2775/0. Commit 403b8482.
+
+## dark_elf seed 1 step 36 — decline all PlayerChoice modes (Shadowing), no rng draw
+
+**Symptom:** dark_elf seed 1 diverged at step 36. A Dark Elf (Away1) dodged out of a Shadowing
+opponent's (Home3) tackle zone; Rust selected the shadower via the SHADOWING PlayerChoice, offered a
+reroll, and rolled the bb2025 Shadowing skill die (pos37) — an extra game die. Java rolled nothing
+(rng 34→36 vs Rust 34→37), so the shared RNG desynced for the rest of the game.
+
+**Root cause:** the random agent's `AgentPrompt::PlayerChoice` handler picked a player (sorted +
+`pick()`, consuming a decision_rng draw) for EVERY mode. Java's ParityRunner PLAYER_CHOICE handler
+declines every `PlayerChoiceMode` dialog with an empty `Player[0]` selection and draws no rng — the
+only exception is MVP, which reaches the Rust agent through a separate SelectPlayer prompt, not this
+one. So selecting a player made the Rust engine roll Shadowing (and, for other rosters,
+Tentacles/Diving Tackle/Animal Savagery/Pile Driver/Wisdom) skill dice Java never rolls.
+
+**Fix (`crates/ffb-engine/src/agent/random_agent.rs`):** the handler returns
+`SelectPlayer { player_id: "" }` (decline) with no `pick()`. Every consuming step already treats an
+empty selection as "don't use the skill", matching ParityRunner exactly.
+
+**Verified:** dark_elf seed 1 → seed 55. No regression — all 9 green rosters still 100/100;
+underworld/renegades unchanged at seed 2; ffb-engine 7026/0, ffb-model 2775/0. Commit 58abe2b4.
