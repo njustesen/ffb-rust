@@ -729,3 +729,22 @@ empty selection as "don't use the skill", matching ParityRunner exactly.
 
 **Verified:** dark_elf seed 1 → seed 55. No regression — all 9 green rosters still 100/100;
 underworld/renegades unchanged at seed 2; ffb-engine 7026/0, ffb-model 2775/0. Commit 58abe2b4.
+
+## dwarf seed 1 step 101 (part 1) — apply successful Dauntless to block-dice strength
+
+**Symptom:** dwarf seed 1 diverged at step 101. A Dwarf blitzer (Away3) with Dauntless blocked a
+stronger target; Rust rolled 3 block dice (defender-choice, `nr_of_dice: -3`) where Java rolled 1
+(`nDice=1`). Both rolled the Dauntless d6 (pos45), but Rust ignored its success → +2 extra dice →
+game-die stream desynced.
+
+**Root cause:** bb2025 StepBlockRoll set `successful_dauntless` (from StepDauntless) but never used it
+in the strength calc. Java RollMechanic.getTotalAttackerStrength does
+`blockStrengthAttacker = max(base, doubleTargetStrength ? 2*defenderStrength : defenderStrength)` on a
+successful Dauntless — applied to the base BEFORE the Horns +1 and before assists.
+
+**Fix (`crates/ffb-engine/src/step/bb2025/block/step_block_roll.rs`):** insert the Dauntless max using
+the defender's BASE strength, in Java's order (base → Dauntless → Horns → assists). +1 regression test.
+
+**Verified:** i=101 blitz RNG now aligns (1 die, armour [1,2]). Advances **norse seed 2 → seed 74**
+(Dauntless blitz there too). No regression: 9 green rosters 100/100; ffb-engine 7027/0. Commit 2c0621cf.
+Residual: dwarf step 101 still has a state-only pushback/chain-push divergence (part 2, next).
