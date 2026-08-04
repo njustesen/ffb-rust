@@ -3,8 +3,7 @@
 Mirror matchups (`--home X --away X`), `--edition bb2025 --tier 3 --seeds 1-100`, per-step
 state-hash parity Rust vs stock Java. Run in PARALLEL (`xargs -P 10`, each JVM capped to 2 cores).
 The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-1) passed and
-`seed` is the first miss. "harness gap" = ParityRunner can't drive that step (not a Rust engine bug);
-"Rust panic" = a Rust agent prompt with no handler yet. "first divergence" = a real per-step engine mismatch.
+`seed` is the first miss. "harness gap" = ParityRunner can't drive that step (not a Rust engine bug).
 
 | # | Roster (X vs X) | Result | First divergence / cause |
 |---|---|---|---|
@@ -36,9 +35,9 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 26 | slann_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
 | 27 | undead | FAIL 0/100 | seed 1, step 84 — first divergence |
 | 28 | underworld | FAIL 0/100 | seed 1, step 42 — harness gap (STUCK_STEP: ANIMAL_SAVAGERY) |
-| 29 | vampire | ERROR (Rust panic) | random_agent: no handler for BloodlustAction prompt |
+| 29 | vampire | FAIL 0/100 | seed 1, step 7 — first divergence |
 | 30 | wood_elf | FAIL 0/100 | seed 1, step 49 — first divergence |
 
-**Summary:** 9 green, 21 not green (of 30 matchups). Matrix ran in 242.6s wall (10-way parallel, JVMs capped to 2 cores; no hangs).
+**Summary:** 9 green, 21 not green (of 30 matchups). Whole matrix ran in 222.2s wall (parallel).
 
-Not-green breakdown: **2 harness gaps** (renegades, underworld — ParityRunner can't drive ANIMAL_SAVAGERY; now bounded by a stuck-step breaker instead of spinning to MAX_ITERATIONS), **1 Rust agent gap** (vampire — no BloodlustAction handler), and **18 real per-step engine divergences** to root-cause per roster (elf/high_elf/khemri/norse/skaven/slann survive many seeds first; the others miss early).
+Not-green breakdown: **18 real per-step engine divergences** (dark_elf, dark_elf_league, dwarf, elf, goblin, halfling, high_elf, khemri, khemri_fumbbl, necromantic, norse, nurgle, ogre, skaven, slann, slann_fumbbl, undead, vampire, wood_elf), and **2 harness gaps** (renegades, underworld — ParityRunner can't yet drive ANIMAL_SAVAGERY; bounded by the stuck-step breaker so they no longer spin). vampire and all others now produce a definitive parity result (no panics, no hangs).
