@@ -249,11 +249,21 @@ fn main() {
     // the per-activation hashes match).
     let mut t3_cov = (args.tier >= 3).then(coverage_report::CoverageReport::default);
 
+    // Amortize JVM start-up + fat-jar class-loading + server construction (perf reasons #1/#2/#4):
+    // run EVERY Java game in ONE JVM via ParityRunner's batch mode, instead of a fresh JVM per seed.
+    // Then run the Rust engine per seed. Report per-engine wall-clock at the end.
+    let java_t0 = std::time::Instant::now();
+    runner::run_java_headless_range(args.seed_start, args.seed_end, &args.home_java, &args.away_java, &args.home, &args.away, args.tier);
+    let java_total = java_t0.elapsed();
+    println!("TIMING java_total={:.3}s (batched JVM, {total} seeds)", java_total.as_secs_f64());
+    let mut rust_total = std::time::Duration::ZERO;
+
     for seed in args.seed_start..=args.seed_end {
         println!("Seed {seed}: {} vs {} ({})", args.home, args.away, args.edition);
 
-        runner::run_java_headless(seed, &args.home_java, &args.away_java, &args.home, &args.away, args.tier);
+        let rust_t0 = std::time::Instant::now();
         let (_, events, _home_score, _away_score) = runner::run_rust_headless(seed, &args.home, &args.away, &args.edition, args.verbose, args.tier);
+        rust_total += rust_t0.elapsed();
         if let Some(cov) = t3_cov.as_mut() {
             for ev in &events { cov.tally(ev); }
             cov.games += 1;
@@ -276,11 +286,16 @@ fn main() {
             eprintln!("  java_hash={}", result.java_hash);
             eprintln!("  rust_hash={}", result.rust_hash);
             if !args.no_abort {
+                println!("TIMING java_total={:.3}s rust_total={:.3}s (aborted at seed {seed})",
+                    java_total.as_secs_f64(), rust_total.as_secs_f64());
                 eprintln!("→ Enter TDD loop: write Java test, Rust test, fix, restart from seed 1");
                 std::process::exit(1);
             }
         }
     }
+
+    println!("TIMING java_total={:.3}s rust_total={:.3}s ({total} seeds; batched JVM)",
+        java_total.as_secs_f64(), rust_total.as_secs_f64());
 
     // Tier-3 coverage checklist: write T3_COVERAGE.md + t3_coverage.html and print
     // the verdict. A missing required item fails the run even when parity passes.

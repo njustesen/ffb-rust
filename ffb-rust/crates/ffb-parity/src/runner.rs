@@ -106,6 +106,80 @@ pub fn run_java_headless(seed: u64, home_team_id: &str, away_team_id: &str, home
     }
 }
 
+/// Resolve the Java classpath (fat jar) — env `PARITY_CP` or the first existing candidate.
+fn resolve_parity_cp() -> String {
+    std::env::var("PARITY_CP").unwrap_or_else(|_| {
+        let candidates = [
+            r"C:\Users\Admin\niels\ffb\ffb\ffb-ai\target\ffb-ai-jar-with-dependencies.jar",
+            "../../ffb/ffb/ffb-ai/target/ffb-ai-jar-with-dependencies.jar",
+            "../../ffb/ffb-ai/target/ffb-ai-jar-with-dependencies.jar",
+            "../ffb/ffb-ai/target/ffb-ai-jar-with-dependencies.jar",
+            "ffb-ai/target/ffb-ai-jar-with-dependencies.jar",
+        ];
+        for c in &candidates {
+            if std::path::Path::new(c).exists() { return c.to_string(); }
+        }
+        "ffb-ai-jar-with-dependencies.jar".to_string()
+    })
+}
+
+/// Resolve the ffb-server directory — env `FFB_SERVER_DIR` or the first existing candidate.
+fn resolve_server_dir() -> String {
+    std::env::var("FFB_SERVER_DIR").unwrap_or_else(|_| {
+        let candidates = [
+            r"C:\Users\Admin\niels\ffb\ffb\ffb-server",
+            "../../ffb/ffb/ffb-server",
+            "../../ffb/ffb-server",
+            "../ffb/ffb-server",
+            "ffb-server",
+        ];
+        for c in &candidates {
+            if std::path::Path::new(c).exists() { return c.to_string(); }
+        }
+        "ffb-server".to_string()
+    })
+}
+
+/// BATCH variant of [`run_java_headless`]: run the whole seed range `[seed_start, seed_end]` in a
+/// SINGLE JVM invocation via ParityRunner's `--seed-end` batch mode, writing one JSONL per seed to
+/// the same paths [`java_log_path_for`] produces. This amortizes JVM start-up, fat-jar
+/// class-loading and server construction across every seed (they were paid per-seed before).
+pub fn run_java_headless_range(
+    seed_start: u64, seed_end: u64,
+    home_team_id: &str, away_team_id: &str, home_race: &str, away_race: &str, tier: u8,
+) {
+    let dir = format!("parity/{home_race}_vs_{away_race}");
+    std::fs::create_dir_all(&dir).ok();
+    // Path template: ParityRunner substitutes {seed} per seed → matches java_log_path_for exactly.
+    let output_template = format!("parity/{home_race}_vs_{away_race}/seed_{{seed}}_java.jsonl");
+
+    let cp = resolve_parity_cp();
+    let server_dir = resolve_server_dir();
+
+    let mut args: Vec<String> = vec!["-cp".into(), cp];
+    if std::env::var_os("FFB_DICE_TRACE").is_some() { args.push("-Dffb.diceTrace=true".into()); }
+    if std::env::var_os("FFB_TRACE").is_some() { args.push("-Dffb.parityDebug=true".into()); }
+    args.extend([
+        "com.fumbbl.ffb.ai.parity.ParityRunner".into(),
+        server_dir,
+        home_team_id.into(),
+        away_team_id.into(),
+        seed_start.to_string(),
+        output_template,
+    ]);
+    // Batch always implies the tier-3 CLI shape (matrix runs are tier 3).
+    args.push("--tier".into());
+    args.push(tier.to_string());
+    args.push("--seed-end".into());
+    args.push(seed_end.to_string());
+
+    match Command::new("java").args(&args).status() {
+        Ok(s) if s.success() => {}
+        Ok(s) => log::warn!("Java parity runner (batch {seed_start}-{seed_end}) exited with status {s}"),
+        Err(e) => log::warn!("Could not launch Java parity runner (batch {seed_start}-{seed_end}): {e}"),
+    }
+}
+
 /// Run the Rust headless engine and write a JSONL parity log. Returns the log lines plus
 /// all GameEvents emitted during the run (for coverage analysis).
 ///
