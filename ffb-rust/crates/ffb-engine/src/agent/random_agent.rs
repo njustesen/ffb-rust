@@ -514,6 +514,11 @@ impl Agent for RandomAgent {
                 let idx = self.pick(sorted.len());
                 Action::SelectPlayer { player_id: sorted[idx].clone() }
             }
+            // Blood Lust (vampire failed the roll): keep the declared action rather than switching to
+            // feed — deterministic, NO rng. Java's RandomStrategy uses an unseeded Random here, so
+            // ParityRunner is given a matching deterministic BLOODLUST_ACTION handler (change=false).
+            Some(AgentPrompt::BloodlustAction { .. }) =>
+                Action::BloodlustAction { change: false },
             // Select weather: pick uniformly from options — 1 decision_rng call.
             Some(AgentPrompt::SelectWeather { options }) => {
                 if options.is_empty() {
