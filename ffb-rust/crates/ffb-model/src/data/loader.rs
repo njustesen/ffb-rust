@@ -292,6 +292,11 @@ pub fn position_json_to_roster_position(pos: &PositionJson, roster_id: &str, is_
 fn skill_entry_to_skill_with_value(entry: &SkillEntry) -> Option<SkillWithValue> {
     let skill_id = SkillId::from_class_name(entry.name())?;
     let value = match entry {
+        // A JSON string value must be unwrapped to its inner text — `serde_json::Value::to_string()`
+        // re-serializes it WITH surrounding quotes (`"All"` → `"\"All\""`), which then never matches
+        // the unquoted patterns consumers compare against (e.g. Animosity's `all`/keyword matching).
+        // Non-string values (numbers, etc.) keep their canonical `to_string()` form.
+        SkillEntry::WithValue { value: serde_json::Value::String(s), .. } => Some(s.clone()),
         SkillEntry::WithValue { value, .. } => Some(value.to_string()),
         SkillEntry::Simple(_) => None,
     };
@@ -332,6 +337,32 @@ mod tests {
     fn skills_load() {
         let _ = &*BB2020_SKILLS;
         let _ = &*COMMON_SKILLS;
+    }
+
+    /// Regression: a JSON string skill value must be stored unquoted. `serde_json::Value::to_string()`
+    /// re-serializes a string WITH surrounding quotes (`All` → `"All"`), which broke Animosity's
+    /// value matching (the quoted `"all"` never matched the unquoted `all`/keyword pattern), so a
+    /// Renegade pass to a different-position teammate skipped its Animosity roll and diverged from Java.
+    #[test]
+    fn skill_string_value_is_unquoted() {
+        let entry = SkillEntry::WithValue {
+            name: "Animosity".to_string(),
+            value: serde_json::Value::String("All".to_string()),
+        };
+        let swv = skill_entry_to_skill_with_value(&entry).expect("Animosity is a known skill");
+        assert_eq!(swv.value.as_deref(), Some("All"), "string value must not carry JSON quotes");
+    }
+
+    /// A non-string (numeric) skill value keeps its canonical text form.
+    #[test]
+    fn skill_numeric_value_uses_plain_to_string() {
+        let entry = SkillEntry::WithValue {
+            name: "Loner".to_string(),
+            value: serde_json::json!(4),
+        };
+        if let Some(swv) = skill_entry_to_skill_with_value(&entry) {
+            assert_eq!(swv.value.as_deref(), Some("4"));
+        }
     }
 
     #[test]
