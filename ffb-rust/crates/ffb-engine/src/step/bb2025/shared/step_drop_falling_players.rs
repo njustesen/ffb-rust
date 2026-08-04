@@ -731,6 +731,9 @@ mod tests {
     #[test]
     fn bb2020_defender_falling_piling_on_eligible_returns_continue() {
         let mut game = make_game_with_rules(Rules::Bb2020);
+        // PILING_ON_USES_A_TEAM_REROLL factory default is `true` (reroll variant); disable it to
+        // exercise the classic bb2020 piling-on where the attacker is dropped prone.
+        game.options.set(PILING_ON_USES_A_TEAM_REROLL, "false");
         add_player(&mut game, "home", "atk", FieldCoordinate::new(5, 5), PS_STANDING);
         add_player(&mut game, "away", "def", FieldCoordinate::new(6, 5), PS_FALLING);
         add_piling_on_skill(&mut game, "atk");
@@ -783,6 +786,9 @@ mod tests {
     #[test]
     fn bb2020_piling_on_accepted_marks_skill_used_and_drops_attacker() {
         let mut game = make_game_with_rules(Rules::Bb2020);
+        // PILING_ON_USES_A_TEAM_REROLL factory default is `true` (reroll variant); disable it to
+        // exercise the classic bb2020 piling-on where the attacker is dropped prone.
+        game.options.set(PILING_ON_USES_A_TEAM_REROLL, "false");
         let coord = FieldCoordinate::new(5, 5);
         add_player(&mut game, "home", "atk", coord, PS_STANDING);
         add_player(&mut game, "away", "def", coord, PS_FALLING);

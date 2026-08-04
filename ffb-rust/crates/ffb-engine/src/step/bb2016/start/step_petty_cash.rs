@@ -190,7 +190,8 @@ mod tests {
     #[test]
     fn petty_cash_option_disabled_skips_immediately() {
         let mut game = make_game();
-        // PETTY_CASH not set → disabled → NEXT_STEP
+        // PETTY_CASH factory default is `true`, so disable it explicitly to exercise the skip path.
+        game.options.set(PETTY_CASH, "false");
         game.team_home.treasury = 200_000;
         game.team_away.treasury = 200_000;
         let mut step = StepPettyCash::new();
@@ -267,6 +268,9 @@ mod tests {
     #[test]
     fn petty_cash_command_home_sets_transferred() {
         let mut game = make_game();
+        // FORCE_TREASURY_TO_PETTY_CASH factory default is `true`, which would auto-fill petty cash
+        // from treasury and overwrite the manual command; disable it to exercise the command path.
+        game.options.set(FORCE_TREASURY_TO_PETTY_CASH, "false");
         game.team_home.treasury = 100_000;
         let mut step = StepPettyCash::new();
         step.handle_command(
@@ -280,6 +284,9 @@ mod tests {
     #[test]
     fn petty_cash_command_away_sets_transferred() {
         let mut game = make_game();
+        // FORCE_TREASURY_TO_PETTY_CASH factory default is `true`, which would auto-fill petty cash
+        // from treasury and overwrite the manual command; disable it to exercise the command path.
+        game.options.set(FORCE_TREASURY_TO_PETTY_CASH, "false");
         game.team_away.treasury = 80_000;
         let mut step = StepPettyCash::new();
         step.handle_command(
@@ -306,7 +313,8 @@ mod tests {
     fn report_petty_cash_not_added_when_option_disabled() {
         use ffb_model::report::report_id::ReportId;
         let mut game = make_game();
-        // PETTY_CASH option disabled → NEXT_STEP immediately, no report
+        // PETTY_CASH factory default is `true`, so disable it explicitly: expect NEXT_STEP, no report.
+        game.options.set(PETTY_CASH, "false");
         let mut step = StepPettyCash::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.report_list.has_report(ReportId::PETTY_CASH));

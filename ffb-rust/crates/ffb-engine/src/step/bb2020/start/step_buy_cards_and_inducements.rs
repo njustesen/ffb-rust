@@ -771,8 +771,10 @@ mod tests {
         let mut game = make_game();
         let mut step = StepBuyCardsAndInducements::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
-        // Expect: 1 × Kickoff + 2 × Inducement(AFTER_INDUCEMENTS_PURCHASED) + 1 × RiotousRookies = 4 sequences.
-        assert_eq!(out.pushes.len(), 4, "expected Kickoff + 2 Inducement + 1 RiotousRookies sequences");
+        // Expect: 1 × Kickoff + 2 × Inducement(AFTER_INDUCEMENTS_PURCHASED) + 1 × RiotousRookies +
+        // 1 × Prayers = 5 sequences. The Prayers sequence is pushed because
+        // INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG has factory default `true`.
+        assert_eq!(out.pushes.len(), 5, "expected Kickoff + 2 Inducement + RiotousRookies + Prayers sequences");
     }
 
     #[test]
@@ -807,7 +809,8 @@ mod tests {
     #[test]
     fn inducements_disabled_skips_to_done() {
         let mut game = make_game_with_petty_cash(100_000, 0);
-        // INDUCEMENTS not set → disabled → skip immediately.
+        // INDUCEMENTS factory default is `true`, so disable it explicitly to exercise the skip path.
+        game.options.set(INDUCEMENTS, "false");
         let mut step = StepBuyCardsAndInducements::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
@@ -1027,8 +1030,9 @@ mod tests {
             &mut game,
             &mut GameRng::new(0),
         );
-        // Kickoff + 2×Inducement + RiotousRookies = 4 sequences.
-        assert_eq!(out.pushes.len(), 4);
+        // Kickoff + 2×Inducement + RiotousRookies + Prayers = 5 sequences (Prayers pushed because
+        // INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG has factory default `true`).
+        assert_eq!(out.pushes.len(), 5);
     }
 
     // ── add_star_players tests ─────────────────────────────────────────────────

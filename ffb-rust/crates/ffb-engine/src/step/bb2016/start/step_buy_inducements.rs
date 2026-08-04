@@ -502,7 +502,8 @@ mod tests {
     #[test]
     fn inducements_disabled_skips_to_next_step() {
         let mut game = make_game();
-        // INDUCEMENTS not set → disabled → skip to leaveStep immediately
+        // INDUCEMENTS factory default is `true`, so disable it explicitly to exercise the skip path.
+        game.options.set(INDUCEMENTS, "false");
         let mut step = StepBuyInducements::new();
         step.inducement_gold_home = 150_000;
         step.inducement_gold_away = 150_000;

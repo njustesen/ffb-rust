@@ -389,7 +389,8 @@ mod tests {
     #[test]
     fn inducements_disabled_skips_to_next_step() {
         let mut game = make_game_with_petty_cash(100_000, 0);
-        // INDUCEMENTS option not set → disabled → skip immediately.
+        // INDUCEMENTS factory default is `true`, so disable it explicitly to exercise the skip path.
+        game.options.set(INDUCEMENTS, "false");
         let mut step = StepBuyInducements::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);

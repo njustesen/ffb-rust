@@ -674,9 +674,9 @@ mod tests {
     fn bb2025_leaving_tz_only_scenario(leaving_tz_only: bool) -> StepOutcome {
         let mut game = make_game(Rules::Bb2025);
         game.acting_player.player_id = Some("home1".into());
-        if leaving_tz_only {
-            game.options.set(DIVING_TACKLE_LEAVING_TZ_ONLY, "true");
-        }
+        // DIVING_TACKLE_LEAVING_TZ_ONLY has factory default `true`, so the disabled
+        // scenario must set it explicitly to "false" (matching a real game's option map).
+        game.options.set(DIVING_TACKLE_LEAVING_TZ_ONLY, if leaving_tz_only { "true" } else { "false" });
         add_player(&mut game, true, "home1", FieldCoordinate::new(10, 10), 3, 3, &[]);
         // away1 is adjacent to both from(5,5) and to(5,6) — excluded only when leaving_tz_only.
         add_player(&mut game, false, "away1", FieldCoordinate::new(6, 6), 3, 3, &[SkillId::DivingTackle]);
