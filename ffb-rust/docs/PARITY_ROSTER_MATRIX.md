@@ -1,10 +1,10 @@
 # Roster Parity Matrix — bb2025, tier 3
 
-Mirror matchups (`--home X --away X`), `--edition bb2025 --tier 3 --seeds 1-100`, per-step state-hash parity Rust vs stock Java.
-Pass/fail and the first-fail seed/step are exact. The parenthetical `UNHANDLED_STEP` is the FIRST such
-tag seen in the run and is only a hint — it may not be the actual fail cause (e.g. vampire's true cause
-is a Rust agent panic, not INIT_PASSING). Timings omitted here — this batch ran 10-way parallel so they
-were contention-inflated 3-8x; see the perf notes.
+Mirror matchups (`--home X --away X`), `--edition bb2025 --tier 3 --seeds 1-100`, per-step
+state-hash parity Rust vs stock Java. Run in PARALLEL (`xargs -P 10`, each JVM capped to 2 cores).
+The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-1) passed and
+`seed` is the first miss. "harness gap" = ParityRunner can't drive that step (not a Rust engine bug);
+"Rust panic" = a Rust agent prompt with no handler yet. "first divergence" = a real per-step engine mismatch.
 
 | # | Roster (X vs X) | Result | First divergence / cause |
 |---|---|---|---|
@@ -13,32 +13,32 @@ were contention-inflated 3-8x; see the perf notes.
 | 3 | chaos | GREEN 100/100 | — |
 | 4 | chaos_dwarf | GREEN 100/100 | — |
 | 5 | chaos_pact | GREEN 100/100 | — |
-| 6 | dark_elf | FAIL 0/100 | seed 1, step 36 (UNHANDLED_STEP: INIT_PASSING) |
-| 7 | dark_elf_league_fumbbl | FAIL 0/100 | seed 1, step 9 (UNHANDLED_STEP: INIT_PASSING) |
-| 8 | dwarf | FAIL 0/100 | seed 1, step 101 (UNHANDLED_STEP: INIT_PASSING) |
-| 9 | elf | FAIL 37/100 | seed 38, step 265 |
-| 10 | goblin | FAIL 0/100 | seed 1, step 9 (UNHANDLED_STEP: INIT_PASSING) |
-| 11 | halfling | FAIL 0/100 | seed 1, step 20 (UNHANDLED_STEP: INIT_PASSING) |
-| 12 | high_elf | FAIL 13/100 | seed 14, step 138 |
+| 6 | dark_elf | FAIL 0/100 | seed 1, step 36 — first divergence |
+| 7 | dark_elf_league_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
+| 8 | dwarf | FAIL 0/100 | seed 1, step 101 — first divergence |
+| 9 | elf | FAIL 37/100 | seed 38, step 265 — first divergence |
+| 10 | goblin | FAIL 0/100 | seed 1, step 9 — first divergence |
+| 11 | halfling | FAIL 0/100 | seed 1, step 20 — first divergence |
+| 12 | high_elf | FAIL 13/100 | seed 14, step 138 — first divergence |
 | 13 | human | GREEN 100/100 | — |
-| 14 | khemri | FAIL 39/100 | seed 40, step 185 (UNHANDLED_STEP: INIT_PASSING) |
-| 15 | khemri_fumbbl | FAIL 0/100 | seed 1, step 9 (UNHANDLED_STEP: INIT_PASSING) |
+| 14 | khemri | FAIL 39/100 | seed 40, step 185 — first divergence |
+| 15 | khemri_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
 | 16 | lizardman | GREEN 100/100 | — |
-| 17 | necromantic | FAIL 0/100 | seed 1, step 1 (UNHANDLED_STEP: INIT_PASSING) |
+| 17 | necromantic | FAIL 0/100 | seed 1, step 1 — first divergence |
 | 18 | nippon | GREEN 100/100 | — |
-| 19 | norse | FAIL 1/100 | seed 2, step 151 (UNHANDLED_STEP: INIT_PASSING) |
-| 20 | nurgle | FAIL 0/100 | seed 1, step 1 (UNHANDLED_STEP: INIT_PASSING) |
-| 21 | ogre | FAIL 0/100 | seed 1, step 143 (UNHANDLED_STEP: INIT_PASSING) |
+| 19 | norse | FAIL 1/100 | seed 2, step 151 — first divergence |
+| 20 | nurgle | FAIL 0/100 | seed 1, step 1 — first divergence |
+| 21 | ogre | FAIL 0/100 | seed 1, step 143 — first divergence |
 | 22 | orc | GREEN 100/100 | — |
-| 23 | renegades | FAIL 0/100 | seed 1, step 93 (UNHANDLED_STEP: ANIMAL_SAVAGERY) |
-| 24 | skaven | FAIL 87/100 | seed 88, step 62 (UNHANDLED_STEP: INIT_PASSING) |
-| 25 | slann | FAIL 2/100 | seed 3, step 112 (UNHANDLED_STEP: INIT_PASSING) |
-| 26 | slann_fumbbl | FAIL 0/100 | seed 1, step 9 (UNHANDLED_STEP: INIT_PASSING) |
-| 27 | undead | FAIL 0/100 | seed 1, step 84 (UNHANDLED_STEP: INIT_PASSING) |
-| 28 | underworld | FAIL 0/100 | seed 1, step 42 (UNHANDLED_STEP: ANIMAL_SAVAGERY) |
-| 29 | vampire | FAIL (crash) | Rust random_agent panic: no handler for BloodlustAction prompt |
-| 30 | wood_elf | FAIL 0/100 | seed 1, step 49 (UNHANDLED_STEP: INIT_PASSING) |
+| 23 | renegades | FAIL 0/100 | seed 1, step 93 — harness gap (STUCK_STEP: ANIMAL_SAVAGERY) |
+| 24 | skaven | FAIL 87/100 | seed 88, step 62 — first divergence |
+| 25 | slann | FAIL 2/100 | seed 3, step 112 — first divergence |
+| 26 | slann_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
+| 27 | undead | FAIL 0/100 | seed 1, step 84 — first divergence |
+| 28 | underworld | FAIL 0/100 | seed 1, step 42 — harness gap (STUCK_STEP: ANIMAL_SAVAGERY) |
+| 29 | vampire | ERROR (Rust panic) | random_agent: no handler for BloodlustAction prompt |
+| 30 | wood_elf | FAIL 0/100 | seed 1, step 49 — first divergence |
 
-**Summary:** 9 green, 21 failing (of 30 matchups).
+**Summary:** 9 green, 21 not green (of 30 matchups). Matrix ran in 242.6s wall (10-way parallel, JVMs capped to 2 cores; no hangs).
 
-Failure clusters: most are `UNHANDLED_STEP: INIT_PASSING` (ParityRunner has no handler when a pass reaches the engine's INIT_PASSING wait — a harness gap, not a Rust engine bug; same as human seed 16). Two are `ANIMAL_SAVAGERY` (another missing ParityRunner handler: renegades, underworld). elf/high_elf are real per-step engine divergences. vampire is a Rust random_agent gap (BloodlustAction).
+Not-green breakdown: **2 harness gaps** (renegades, underworld — ParityRunner can't drive ANIMAL_SAVAGERY; now bounded by a stuck-step breaker instead of spinning to MAX_ITERATIONS), **1 Rust agent gap** (vampire — no BloodlustAction handler), and **18 real per-step engine divergences** to root-cause per roster (elf/high_elf/khemri/norse/skaven/slann survive many seeds first; the others miss early).
