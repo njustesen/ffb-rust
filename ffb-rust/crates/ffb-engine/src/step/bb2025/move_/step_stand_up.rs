@@ -164,6 +164,19 @@ impl StepStandUp {
         if successful {
             game.acting_player.has_moved = true;
             game.acting_player.standing_up = false;
+            // Mirror the free stand-up path (above): a successful stand-up leaves the
+            // player STANDING. Java reaches STANDING via the standing-up flow and only
+            // reverts to PRONE on FAILURE (fail_stand_up / Java line 131 changeBase(PRONE));
+            // it never re-sets STANDING here because the player is already standing by
+            // this point. The Rust roll path had no such earlier set, so without this a
+            // low-MA (<3) player who SUCCEEDS the stand-up roll stayed PRONE in the field
+            // model (undead seed 4 i=160: away_02 stood up + rushed but stayed Prone,
+            // diverging from Java's Standing at the next activation's state hash).
+            if let Some(pid) = game.acting_player.player_id.clone() {
+                if let Some(ps) = game.field_model.player_state(&pid) {
+                    game.field_model.set_player_state(&pid, ps.change_base(ffb_model::enums::PS_STANDING));
+                }
+            }
             // Java: only checked in the `successful` branch, and — unlike the failure
             // path — does NOT publish END_PLAYER_ACTION when redirecting to the failure
             // label (`getResult().setNextAction(GOTO_LABEL, ...)` with no publishParameter call).

@@ -1008,3 +1008,31 @@ standing-up (`!can_stand_up_for_free`) branch, before `update_move_squares`, mat
 **Verified:** necromantic 100/100 GREEN. ffb-engine 7032/0, ffb-model 2777/0. 16-green regression clean.
 Diagnostic method: gated AMS/SIM_READ/UMS_EARLY eprintln traces (reverted) showed the populate→clear→read
 ordering at i=116. Likely also relevant to undead s1 step84 (same stand-up rush+dodge class).
+
+## Parity(undead): roll-to-stand-up success must set STANDING (seed 4 i=160)
+
+**Roster greened:** undead 100/100 (was FAIL 0/100, first divergence had advanced to seed 4
+step 160 after the necromantic stand-up fix).
+
+**Symptom:** seed 4, away_02 (effective MA < 3, e.g. a stat-reduced player) is PRONE, gets
+activated for a Move, SUCCEEDS its stand-up roll (d6=4, 4+ needed), then rushes 1 square to
+(12,5). Java ends the player STANDING; Rust ended it PRONE at the same square — dice and RNG
+stream identical, pure state divergence caught at the next activation's state hash (i=161).
+
+**Root cause:** `StepStandUp` has two paths. The FREE path (MA>=3 or canStandUpForFree) explicitly
+sets `change_base(STANDING)`. The ROLL path (MA<3), on a SUCCESSFUL roll, set only
+`has_moved`/`standing_up` flags and never changed the field-model PlayerState — so a low-MA player
+who succeeded the stand-up roll stayed PRONE. Java's StepStandUp likewise doesn't re-set STANDING
+in the success branch (the player is already standing by then via the standing-up flow) and only
+reverts to PRONE on FAILURE (Java line 131 `changeBase(PRONE)`). Rust's roll path had no earlier
+STANDING set to rely on, so it needs the explicit set on success, mirroring its own free path.
+
+**Fix (Rust engine only):** `crates/ffb-engine/src/step/bb2025/move_/step_stand_up.rs` — in the
+`successful` branch add `set_player_state(pid, ps.change_base(PS_STANDING))`, mirroring the free
+stand-up path. Failure path already sets PRONE via fail_stand_up.
+
+**Verified:** undead 100/100 GREEN. ffb-engine 7032/0, ffb-model 2777/0. Regression clean across all
+17 prior-green rosters (lineman amazon chaos chaos_dwarf chaos_pact dwarf elf high_elf human khemri
+lizardman nippon norse nurgle orc skaven necromantic). Diagnostic: FFB_TRACE state-string diff at
+i=161 (a01 Prone vs Standing) + Java DICE_TRACE caller stacks (StepStandUp roll pos=102) + a reverted
+FFB_GFI_TRACE that ruled out the rush (GFI roll=2 succeeded in both).
