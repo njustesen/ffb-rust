@@ -748,3 +748,24 @@ the defender's BASE strength, in Java's order (base → Dauntless → Horns → 
 **Verified:** i=101 blitz RNG now aligns (1 die, armour [1,2]). Advances **norse seed 2 → seed 74**
 (Dauntless blitz there too). No regression: 9 green rosters 100/100; ffb-engine 7027/0. Commit 2c0621cf.
 Residual: dwarf step 101 still has a state-only pushback/chain-push divergence (part 2, next).
+
+## dwarf seed 1 step 101 (part 2) — Stand Firm auto-use + suppress follow-up
+
+**Symptom:** after the Dauntless fix, dwarf seed 1 still diverged at step 101 (state-only). A Dwarf
+Deathroller (Stand Firm) was blitzed; Java kept it in place (push avoided), Rust pushed it to (10,7)
+and the blitzer followed up. Java's StepPushback hook returned stopProcessing=true (Stand Firm used).
+
+**Root cause (two bugs in bb2025 StandFirmBehaviour):** (1) with no skill-use dialog answer, the hook
+auto-DECLINED Stand Firm → defender pushed. Java shows a DialogSkillUseParameter and ParityRunner's
+SKILL_USE handler ALWAYS uses the skill → headless must auto-USE. (2) Java also publishes
+FOLLOWUP_CHOICE=false when the push is avoided; the Rust hook had no way to publish step params, so the
+blitzer still followed up into the (still-occupied) defender square.
+
+**Fix:** default undecided Stand Firm to USE (cancel push); add a `published: Vec<StepParameter>`
+channel to StepPushbackHookState that StepPushback drains into its output, and emit FOLLOWUP_CHOICE(false)
+from the Stand Firm hook. Updated the unit test.
+
+**Verified:** dwarf seed 1 step 101 → step 166. No regression: 9 green rosters 100/100; ffb-engine
+7027/0, ffb-model 2775/0. Commit 4ee41b16.
+Residual: dwarf step 166 — half-1→half-2 transition, away player 0 in Reserve (Java) vs on-field (Rust);
+suspected missing Secret Weapon end-of-drive send-off (Deathroller has Secret Weapon). Next.
