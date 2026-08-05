@@ -222,13 +222,14 @@ pub fn find_roster(roster_id: &str, rules: Rules) -> Option<Roster> {
     };
     rosters.into_iter()
         .find(|r| r.id == roster_id)
-        .map(|r| roster_json_to_roster(&r))
+        .map(|r| roster_json_to_roster(&r, rules == Rules::Bb2025))
 }
 
 /// Converts a `RosterJson` (deserialized from data/) into a `Roster` model struct.
-pub fn roster_json_to_roster(rj: &RosterJson) -> Roster {
+/// `is_bb2025` gates edition-specific skill resolution (see `position_json_to_roster_position`).
+pub fn roster_json_to_roster(rj: &RosterJson, is_bb2025: bool) -> Roster {
     let positions = rj.positions.iter()
-        .map(|p| position_json_to_roster_position(p, &rj.id, rj.undead))
+        .map(|p| position_json_to_roster_position(p, &rj.id, rj.undead, is_bb2025))
         .collect();
     Roster {
         id: rj.id.clone(),
@@ -245,10 +246,23 @@ pub fn roster_json_to_roster(rj: &RosterJson) -> Roster {
 }
 
 /// Converts a `PositionJson` to a `RosterPosition`.
-pub fn position_json_to_roster_position(pos: &PositionJson, roster_id: &str, is_undead: bool) -> RosterPosition {
+///
+/// `is_bb2025` gates the No Hands drop below.
+pub fn position_json_to_roster_position(pos: &PositionJson, roster_id: &str, is_undead: bool, is_bb2025: bool) -> RosterPosition {
     let skills: Vec<SkillWithValue> = pos.skills.iter()
         .filter_map(skill_entry_to_skill_with_value)
         .collect();
+    // Java: bb2025's SkillFactory has NO NoHands skill class (only bb2016/bb2020 define it, both
+    // registering preventCatch + preventHoldBall + preventRegular{Pass,HandOver}Action). So a bb2025
+    // roster's "No Hands" resolves to null and is NOT applied — the player has none of those
+    // properties. Rust's `SkillId::NoHands` is edition-agnostic, so drop it for bb2025 to match
+    // (dwarf seed 8 step 5: a hand-off to the Deathroller was CAUGHT in Java, not scattered — the
+    // Deathroller's "No Hands" was inert). bb2025's ball-denial skill is `NoBall` (kept, still valid).
+    let skills: Vec<SkillWithValue> = if is_bb2025 {
+        skills.into_iter().filter(|s| s.skill_id != SkillId::NoHands).collect()
+    } else {
+        skills
+    };
     let cats_normal: Vec<SkillCategory> = pos.skill_categories.normal.iter()
         .filter_map(|s| SkillCategory::from_name(s))
         .collect();
@@ -337,6 +351,24 @@ mod tests {
     fn skills_load() {
         let _ = &*BB2020_SKILLS;
         let _ = &*COMMON_SKILLS;
+    }
+
+    /// Regression: bb2025 has NO NoHands skill class (only bb2016/bb2020 define it), so a bb2025
+    /// roster's "No Hands" resolves to null in Java and is NOT applied. Rust must drop it for bb2025
+    /// (else a No-Hands player wrongly gains preventCatch etc. — dwarf seed 8: a hand-off to the
+    /// Deathroller scattered instead of being caught). Non-bb2025 editions keep No Hands.
+    #[test]
+    fn bb2025_drops_no_hands_other_editions_keep_it() {
+        use crate::enums::SkillId;
+        let pos: crate::data::roster_json::PositionJson = serde_json::from_str(
+            r#"{"id":"p","name":"Deathroller","type":"Regular","quantity":1,"cost":0,
+                "ma":4,"st":7,"ag":1,"pa":6,"av":11,"skills":["No Hands","Stand Firm"]}"#,
+        ).unwrap();
+        let rp_2025 = position_json_to_roster_position(&pos, "dwarf", false, true);
+        assert!(!rp_2025.skills.iter().any(|s| s.skill_id == SkillId::NoHands), "bb2025 must drop No Hands");
+        assert!(rp_2025.skills.iter().any(|s| s.skill_id == SkillId::StandFirm), "other skills kept");
+        let rp_2020 = position_json_to_roster_position(&pos, "dwarf", false, false);
+        assert!(rp_2020.skills.iter().any(|s| s.skill_id == SkillId::NoHands), "non-bb2025 keeps No Hands");
     }
 
     /// Regression: a JSON string skill value must be stored unquoted. `serde_json::Value::to_string()`
