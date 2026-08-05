@@ -980,3 +980,31 @@ used base MA and overrode it.
 **Verified:** nurgle 100/100 GREEN; necromantic seed 38 advanced step 20 → step 138. halfling unchanged
 (its blitz issue is a separate prone-Treeman Take-Root skip, no MA modifier). ffb-engine 7032/0,
 ffb-model 2777/0. Regression (15 green) pending. Commit pending.
+
+## Parity(necromantic): stand-up rush move-square clearing (seed 38 i=116)
+
+**Roster greened:** necromantic 100/100 (was FAIL 37/100, first divergence seed 38 step 138).
+
+**Symptom:** seed 38, away_03 (MA-3-effective) is PRONE at (13,8) in home_03's tackle zone.
+It stands up (consumes all 3 MA) and rushes 1 square to (14,9), leaving the TZ. Java rolls a
+GoingForIt (rush) AND a StepMoveDodge (dodge, leaving the TZ); Rust rushed but SKIPPED the dodge,
+desyncing the RNG stream and cascading to the i=138 blitz-turnover mismatch.
+
+**Root cause:** `StepInitSelecting`, on a standing-up activation, sets `current_move = min(3, MA)`
+(the stand-up cost, added earlier for seed 11) then calls `update_move_squares`. For an MA-3 player
+`current_move` == MA, so `is_next_move_possible` (`current_move < MA + extra_move`) is false when
+`going_for_it` is still false (extra_move=0) → `update_move_squares` CLEARS the freshly-computed
+move-square table and early-returns. `StepInitMoving` then reads an empty table, `getMoveSquare`
+returns None, and `acting_player.dodging`/`goes_for_it` are left false → no dodge rolled.
+
+Java's `StepInitSelecting` (bb2025/shared) sets `actingPlayer.setGoingForIt(isNextMoveGoingForIt(game))`
+between `setCurrentMove` and `updateMoveSquares`. With `going_for_it=true`, `extra_move=2` →
+`3 < 3+2` true → the squares (including the dodge flag) survive.
+
+**Fix (Rust engine only):** `crates/ffb-engine/src/step/bb2025/shared/step_init_selecting.rs` — add the
+missing `acting_player.goes_for_it = UtilPlayer::is_next_move_going_for_it(game)` inside the
+standing-up (`!can_stand_up_for_free`) branch, before `update_move_squares`, matching Java line-for-line.
+
+**Verified:** necromantic 100/100 GREEN. ffb-engine 7032/0, ffb-model 2777/0. 16-green regression clean.
+Diagnostic method: gated AMS/SIM_READ/UMS_EARLY eprintln traces (reverted) showed the populate→clear→read
+ordering at i=116. Likely also relevant to undead s1 step84 (same stand-up rush+dodge class).

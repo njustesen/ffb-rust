@@ -23,7 +23,7 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 14 | khemri | GREEN 100/100 | — |
 | 15 | khemri_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
 | 16 | lizardman | GREEN 100/100 | — |
-| 17 | necromantic | FAIL 37/100 | seed 38, step 138 — first divergence (was step 20; blitz-rush fixed) |
+| 17 | necromantic | GREEN 100/100 | stand-up rush move-square fix (set going_for_it before update_move_squares) |
 | 18 | nippon | GREEN 100/100 | — |
 | 19 | norse | GREEN 100/100 | — |
 | 20 | nurgle | GREEN 100/100 | — |

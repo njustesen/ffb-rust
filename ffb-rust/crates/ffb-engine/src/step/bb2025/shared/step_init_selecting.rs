@@ -136,6 +136,15 @@ impl Step for StepInitSelecting {
                         if !has_free {
                             let ma = game.player(player_id).map(|p| p.movement_with_modifiers()).unwrap_or(0);
                             game.acting_player.current_move = 3.min(ma);
+                            // Java: actingPlayer.setGoingForIt(UtilPlayer.isNextMoveGoingForIt(game)).
+                            // When standing up consumes all remaining MA (e.g. MA-3 player), the next
+                            // move is a rush; without this flag update_move_squares' is_next_move_possible
+                            // returns false (extra_move=0 → current_move < MA) and CLEARS the freshly
+                            // computed move squares — so StepInitMoving reads an empty table and never
+                            // sets dodging/going_for_it (necromantic seed 38 i=116: away_03's stand-up
+                            // rush+dodge was skipped, desyncing the RNG stream).
+                            game.acting_player.goes_for_it =
+                                ffb_model::util::util_player::UtilPlayer::is_next_move_going_for_it(game);
                         }
                     }
                     crate::util::UtilServerPlayerMove::update_move_squares(game, game.acting_player.jumping);
