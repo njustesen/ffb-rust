@@ -132,17 +132,27 @@ impl StepModifierTrait for StandFirmStepModifier {
             return false;
         }
 
-        // Java: if (!state.standingFirm.containsKey(id)) show dialog → headless: auto-decline
+        // Java shows a Stand Firm skill-use dialog here (`DialogSkillUseParameter`). The parity
+        // harness (ParityRunner SKILL_USE handler) ALWAYS uses the skill, so for headless parity we
+        // auto-ACCEPT — record `true` and fall through to cancel the push. Previously this
+        // auto-DECLINED, so a Stand Firm defender who was never prompted (e.g. the dwarf Deathroller
+        // blitzed at dwarf seed 1 step 101) was wrongly pushed instead of holding its square,
+        // desyncing the field state for the rest of the game.
         if !state.standing_firm.contains_key(&defender_id) {
-            // Headless: auto-decline (false = do not use stand firm)
-            state.standing_firm.insert(defender_id.clone(), false);
-            return false;
+            state.standing_firm.insert(defender_id.clone(), true);
         }
 
-        // Java: state.doPush = true; pushbackStack.clear(); publish StartingPushbackSquare(null); etc.
+        // Java: state.doPush = true; pushbackStack.clear(); publish StartingPushbackSquare(null);
+        //       publish FOLLOWUP_CHOICE(false); publish BALL_KNOCKED_LOSE(false); addReport(AVOID_PUSH)
         state.do_push = true;
         state.pushback_squares.clear();
         state.starting_pushback_square = None;
+        // Java: `publishParameter(FOLLOWUP_CHOICE, false)` — the push was avoided, so the attacker
+        // must NOT follow up (there is no vacated square). Without this the attacker wrongly
+        // followed into the defender's still-occupied square (dwarf seed 1 step 101: the Deathroller
+        // stood firm but the blitzer still "followed up").
+        use crate::step::framework::StepParameter;
+        state.published.push(StepParameter::FollowupChoice(false));
 
         // Java: addReport(ReportSkillUse(id, skill, true, AVOID_PUSH))
         game.report_list.add(ReportSkillUse::new(
@@ -274,8 +284,11 @@ mod tests {
     }
 
     #[test]
-    fn stand_firm_not_decided_headless_auto_declines() {
-        // Defender has StandFirm, no pre-populated standing_firm map → auto-decline
+    fn stand_firm_not_decided_headless_auto_uses() {
+        // Defender has StandFirm, no pre-populated standing_firm map. Java shows a skill-use dialog
+        // and the parity harness (ParityRunner SKILL_USE) ALWAYS uses the skill, so headless must
+        // auto-USE Stand Firm: cancel the push (do_push=true, return true) and suppress the
+        // attacker's follow-up via a published FOLLOWUP_CHOICE(false).
         let mut game = make_game();
         game.team_away.players.push(player_with_skills("def1", vec![SkillId::StandFirm]));
         game.field_model.set_player_coordinate("def1", FieldCoordinate::new(5, 5));
@@ -283,11 +296,15 @@ mod tests {
 
         let m = StandFirmStepModifier;
         let mut hs = default_hook_state("def1");
-        // standing_firm map is empty → auto-decline
+        // standing_firm map is empty → auto-use
         let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
-        // Should return false (declined) and have inserted false
-        assert!(!result);
-        assert_eq!(hs.standing_firm.get("def1"), Some(&false));
+        assert!(result, "stand firm should be used (push cancelled)");
+        assert_eq!(hs.standing_firm.get("def1"), Some(&true));
+        assert!(hs.do_push, "do_push should be set (push resolved without moving the defender)");
+        assert!(
+            hs.published.iter().any(|p| matches!(p, crate::step::framework::StepParameter::FollowupChoice(false))),
+            "must publish FOLLOWUP_CHOICE(false) to suppress the follow-up"
+        );
     }
 
     #[test]

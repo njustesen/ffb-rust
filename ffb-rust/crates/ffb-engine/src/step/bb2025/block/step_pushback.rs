@@ -41,6 +41,10 @@ pub struct StepPushbackHookState {
     pub pushback_squares: Vec<PushbackSquare>,
     /// Java: state.pushbackMode
     pub pushback_mode: PushbackMode,
+    /// Step parameters a hook wants published to the stack (Java `step.publishParameter(...)` from
+    /// inside a behaviour hook, e.g. Stand Firm publishing FOLLOWUP_CHOICE=false). Drained by
+    /// `StepPushback` into its own published output after the hooks run.
+    pub published: Vec<StepParameter>,
 }
 
 impl StepPushbackHookState {
@@ -67,6 +71,7 @@ impl StepPushbackHookState {
             free_square_around_defender,
             pushback_squares,
             pushback_mode: PushbackMode::REGULAR,
+            published: Vec::new(),
         }
     }
 }
@@ -237,6 +242,9 @@ impl StepPushback {
                 self.grabbing = hook_state.grabbing;
                 self.starting_pushback_square = hook_state.starting_pushback_square;
                 do_push = hook_state.do_push;
+                // Java: behaviour hooks may `step.publishParameter(...)` (e.g. Stand Firm publishing
+                // FOLLOWUP_CHOICE=false to suppress the attacker's follow-up when the push is avoided).
+                extra_params.append(&mut hook_state.published);
                 let final_pushback_squares = hook_state.pushback_squares;
 
                 let pushback_squares_found = !final_pushback_squares.is_empty() || stop_processing;
