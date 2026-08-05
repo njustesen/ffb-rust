@@ -958,3 +958,25 @@ a Foul-Appearance defender.
 
 **Verified:** nurgle seed 1 → seed 24 (seeds 1-23 GREEN). No regression: 15 green rosters 100/100;
 ffb-engine 7032/0, ffb-model 2777/0. Commit pending. Next nurgle frontier: seed 24 step 197.
+
+## blitz-rush: StepGoForIt used base MA instead of effective MA → nurgle 100/100, necromantic advanced
+
+**The systemic "block-ordering" symptom** (necromantic s38, nurgle s24: Rust knocks a blitz defender down
+where Java pushes, same block dice) was root-caused across several sessions to a MISSING blitz rush:
+Rust's blitz skipped a Go-For-It that Java rolls, shifting the FoulAppearance + block dice by one so the
+index-0 block choice picked the knockdown die instead of the push.
+
+**Root cause:** `StepGoForIt::execute_step`'s guard `if !going_for_it || current_move <= ma` computed `ma`
+from the BASE `p.movement`, not `p.movement_with_modifiers()`. Java uses `getMovementWithModifiers()`. A
+Beast of Nurgle with base MA 4 but an active -1 MA (effective 3, e.g. Dodgy Snack) at current_move 3 → +1
+= 4: base check `4 <= 4` returned NEXT (no rush), while Java (effective MA 3) rushed on `4 > 3`. Diagnosed
+via a step-tag DICE_TRACE (aligned Rust/Java dice by originating step: pos107 was rush in Java, FoulAppearance
+in Rust) + FFB_GFI_TRACE (Rust ma=4 vs Java JAVA_GFI MA=3). `is_next_move_going_for_it` already used
+`movement_with_modifiers()`, so `going_for_it` was correct — only the redundant `current_move <= ma` guard
+used base MA and overrode it.
+
+**Fix (`step_go_for_it.rs`):** compute `ma` from `p.movement_with_modifiers()`.
+
+**Verified:** nurgle 100/100 GREEN; necromantic seed 38 advanced step 20 → step 138. halfling unchanged
+(its blitz issue is a separate prone-Treeman Take-Root skip, no MA modifier). ffb-engine 7032/0,
+ffb-model 2777/0. Regression (15 green) pending. Commit pending.

@@ -23,10 +23,10 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 14 | khemri | GREEN 100/100 | — |
 | 15 | khemri_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
 | 16 | lizardman | GREEN 100/100 | — |
-| 17 | necromantic | FAIL 37/100 | seed 38, step 20 — block-result POW-vs-Push (strengths ruled out; DEFERRED) |
+| 17 | necromantic | FAIL 37/100 | seed 38, step 138 — first divergence (was step 20; blitz-rush fixed) |
 | 18 | nippon | GREEN 100/100 | — |
 | 19 | norse | GREEN 100/100 | — |
-| 20 | nurgle | FAIL 23/100 | seed 24, step 197 — first divergence (was seed 1; Foul Appearance attacker_cancels fixed) |
+| 20 | nurgle | GREEN 100/100 | — |
 | 21 | ogre | FAIL 0/100 | seed 1, step 143 — first divergence |
 | 22 | orc | GREEN 100/100 | — |
 | 23 | renegades | FAIL 1/100 | seed 2, step 1 — harness gap (STUCK_STEP: ANIMAL_SAVAGERY) |
@@ -38,4 +38,4 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 29 | vampire | FAIL 0/100 | seed 1, step 7 — first divergence |
 | 30 | wood_elf | FAIL 0/100 | seed 1, step 49 — first divergence |
 
-**Summary:** 15 green, 15 not green (of 30 matchups). Whole matrix ran in 222.9s wall (parallel).
+**Summary:** 16 green, 14 not green (of 30 matchups). Whole matrix ran in 222.9s wall (parallel).

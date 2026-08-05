@@ -117,9 +117,16 @@ impl StepGoForIt {
 
         let going_for_it = game.acting_player.goes_for_it;
         let current_move = game.acting_player.current_move;
+        // Java StepGoForIt uses `actingPlayer.getPlayer().getMovementWithModifiers()` — the EFFECTIVE
+        // MA including temporary stat modifiers (e.g. Dodgy Snack's -1 MA), NOT the base MA. Using base
+        // `p.movement` let a player with a -1 MA modifier skip a rush Java rolls: a Beast of Nurgle with
+        // MA 4 but an active -1 MA (effective 3), current_move 3 → +1 = 4, base check `4 <= 4` returned
+        // NEXT (no rush) while Java (effective 3) rushed on `4 > 3`. Missing that into-contact rush
+        // shifted every later blitz die (FoulAppearance, block dice), flipping the block result from a
+        // push to a knockdown (nurgle seed 24 i=197; necromantic seed 38 same class).
         let ma = player_id.as_deref()
             .and_then(|id| game.player(id))
-            .map(|p| p.movement as i32)
+            .map(|p| p.movement_with_modifiers())
             .unwrap_or(4);
 
         if !going_for_it || current_move <= ma {
