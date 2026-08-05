@@ -788,3 +788,18 @@ before the kickoff dice, matching Java.
 
 **Verified:** dwarf seed 1 step 166 → **seed 4 step 294** (seeds 1-3 GREEN). No regression: 9 green rosters
 100/100; ffb-engine 7028/0, ffb-model 2775/0 (+1 test). Commit 62005506.
+
+## dwarf seed 4 step 294 — no Secret Weapon send-off at end of game
+
+**Symptom:** seed 4 diverged at step 294 (final move, turn 8 half 2): all 294 step lines matched but the
+game_end state_hash differed (Java dd91d433 vs Rust c5093c7e = each engine's i=294 post_hash). Rust ran the
+Secret Weapon send-off at the END OF HALF 2 (game end), banning a played Deathroller; Java gates argue/remove
+by `!fEndGame` and keeps it.
+
+**Fix (`step_end_turn.rs`):** `self.end_game` is never set, so the `!self.end_game` resolve gate never fired.
+Compute the end-of-game condition at the gate (game.half not yet incremented): `(new_half && game.half > 1)
+|| (touchdown && both teams turn_nr>=8)`. Run `resolve_secret_weapons` only when it's a drive end that is NOT
+the game end.
+
+**Verified:** dwarf seed 4 → seed 8 (seeds 4-7 GREEN). No regression: 9 green rosters 100/100; ffb-engine
+7028/0. Commit ea5dfcf4.
