@@ -870,3 +870,25 @@ player: `for p in home.iter_mut().chain(away.iter_mut()) { p.remove_temporary_st
 
 **Verified:** elf 100/100 GREEN. No regression: 10 green rosters (incl. dwarf) 100/100; ffb-engine
 7031/0, ffb-model 2776/0. Commit pending. **11 green total.**
+
+## high_elf seed 14 step 138 — Safe Throw is bb2016-only (inert in bb2025)
+
+**Symptom (RNG desync on a PASS):** home_03 (High Elf Thrower: Pass + Safe Throw) passes. Both roll
+pickup, pass=2 (modified FUMBLE), then a Pass-skill re-roll = natural 1. Java FUMBLES the re-rolled 1
+→ ball bounces (d8 scatter at thrower) → TURNOVER. Rust evaluates the re-rolled 1 as SAVED_FUMBLE (ball
+stays with the thrower) → home keeps its turn. Traced with FFB_PASS_TRACE: Rust `result=SAVED_FUMBLE`
+because the thrower had the `dontDropFumbles` property.
+
+**Root cause:** `SafeThrow` has only a bb2016 skill class (`@RulesCollection(Rules.BB2016)`,
+canCancelInterceptions + dontDropFumbles). bb2020/bb2025's equivalent is the mixed `SafePass`
+(`@RulesCollection` BB2020+BB2025, dontDropFumbles only). So a bb2025 roster's "Safe Throw" resolves to
+null in Java's SkillFactory and grants NOTHING. Rust's `SkillId::SafeThrow` is edition-agnostic and
+always returns `[canCancelInterceptions, dontDropFumbles]`, so it wrongly saved the fumble. Same class
+as the dwarf NoHands bug.
+
+**Fix (`loader.rs`):** extend the existing bb2025 bb2016-only-skill drop (was NoHands) to also drop
+`SafeThrow`: `filter(|s| s.skill_id != NoHands && s.skill_id != SafeThrow)`. +1 regression test.
+
+**Verified:** high_elf 100/100 GREEN. No regression: 12 green rosters (lineman amazon chaos chaos_dwarf
+chaos_pact dwarf elf human lizardman nippon orc + high_elf) 100/100; ffb-engine 7031/0, ffb-model
+2777/0. **12 green total.** Commit pending.

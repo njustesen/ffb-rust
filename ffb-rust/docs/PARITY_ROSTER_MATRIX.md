@@ -18,7 +18,7 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 9 | elf | GREEN 100/100 | — |
 | 10 | goblin | FAIL 0/100 | seed 1, step 9 — first divergence |
 | 11 | halfling | FAIL 0/100 | seed 1, step 20 — first divergence |
-| 12 | high_elf | FAIL 13/100 | seed 14, step 138 — first divergence |
+| 12 | high_elf | GREEN 100/100 | — |
 | 13 | human | GREEN 100/100 | — |
 | 14 | khemri | FAIL 39/100 | seed 40, step 185 — first divergence |
 | 15 | khemri_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
@@ -38,4 +38,4 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 29 | vampire | FAIL 0/100 | seed 1, step 7 — first divergence |
 | 30 | wood_elf | FAIL 0/100 | seed 1, step 49 — first divergence |
 
-**Summary:** 11 green, 19 not green (of 30 matchups). Whole matrix ran in 222.9s wall (parallel).
+**Summary:** 12 green, 18 not green (of 30 matchups). Whole matrix ran in 222.9s wall (parallel).

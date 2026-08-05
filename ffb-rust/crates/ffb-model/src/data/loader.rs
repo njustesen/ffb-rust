@@ -252,14 +252,20 @@ pub fn position_json_to_roster_position(pos: &PositionJson, roster_id: &str, is_
     let skills: Vec<SkillWithValue> = pos.skills.iter()
         .filter_map(skill_entry_to_skill_with_value)
         .collect();
-    // Java: bb2025's SkillFactory has NO NoHands skill class (only bb2016/bb2020 define it, both
-    // registering preventCatch + preventHoldBall + preventRegular{Pass,HandOver}Action). So a bb2025
-    // roster's "No Hands" resolves to null and is NOT applied — the player has none of those
-    // properties. Rust's `SkillId::NoHands` is edition-agnostic, so drop it for bb2025 to match
-    // (dwarf seed 8 step 5: a hand-off to the Deathroller was CAUGHT in Java, not scattered — the
-    // Deathroller's "No Hands" was inert). bb2025's ball-denial skill is `NoBall` (kept, still valid).
+    // Java: some skills are bb2016-only (no @RulesCollection(BB2025) class), so bb2025's SkillFactory
+    // resolves them to null and applies NONE of their properties. Rust's `SkillId` is edition-agnostic,
+    // so drop these bb2016-only skills for bb2025 to match Java:
+    //   - NoHands: only bb2016/bb2020 define it (preventCatch + preventHoldBall + preventRegular{Pass,
+    //     HandOver}Action). dwarf seed 8 step 5: a hand-off to the "No Hands" Deathroller was CAUGHT in
+    //     Java, not scattered. bb2025's ball-denial skill is `NoBall` (kept, still valid).
+    //   - SafeThrow: only bb2016 defines it (canCancelInterceptions + dontDropFumbles). bb2025's
+    //     equivalent is `SafePass` (mixed, @RulesCollection BB2020+BB2025). high_elf seed 14 step 138:
+    //     a bb2025 High Elf Thrower with "Safe Throw" FUMBLED a re-rolled natural-1 pass in Java (ball
+    //     bounced → turnover); Rust's SafeThrow granted dontDropFumbles → SAVED_FUMBLE (kept the ball).
     let skills: Vec<SkillWithValue> = if is_bb2025 {
-        skills.into_iter().filter(|s| s.skill_id != SkillId::NoHands).collect()
+        skills.into_iter()
+            .filter(|s| s.skill_id != SkillId::NoHands && s.skill_id != SkillId::SafeThrow)
+            .collect()
     } else {
         skills
     };
@@ -369,6 +375,24 @@ mod tests {
         assert!(rp_2025.skills.iter().any(|s| s.skill_id == SkillId::StandFirm), "other skills kept");
         let rp_2020 = position_json_to_roster_position(&pos, "dwarf", false, false);
         assert!(rp_2020.skills.iter().any(|s| s.skill_id == SkillId::NoHands), "non-bb2025 keeps No Hands");
+    }
+
+    /// Regression: SafeThrow is a bb2016-only skill (bb2025's equivalent is the mixed SafePass), so a
+    /// bb2025 roster's "Safe Throw" resolves to null in Java and grants NO dontDropFumbles. Rust must
+    /// drop it for bb2025 (else a re-rolled natural-1 pass is wrongly SAVED instead of fumbling —
+    /// high_elf seed 14 step 138: Java bounced the ball → turnover, Rust kept it). Other editions keep it.
+    #[test]
+    fn bb2025_drops_safe_throw_other_editions_keep_it() {
+        use crate::enums::SkillId;
+        let pos: crate::data::roster_json::PositionJson = serde_json::from_str(
+            r#"{"id":"t","name":"Thrower","type":"Regular","quantity":1,"cost":0,
+                "ma":6,"st":3,"ag":4,"pa":2,"av":8,"skills":["Pass","Safe Throw"]}"#,
+        ).unwrap();
+        let rp_2025 = position_json_to_roster_position(&pos, "high_elf", false, true);
+        assert!(!rp_2025.skills.iter().any(|s| s.skill_id == SkillId::SafeThrow), "bb2025 must drop Safe Throw");
+        assert!(rp_2025.skills.iter().any(|s| s.skill_id == SkillId::Pass), "other skills kept");
+        let rp_2020 = position_json_to_roster_position(&pos, "high_elf", false, false);
+        assert!(rp_2020.skills.iter().any(|s| s.skill_id == SkillId::SafeThrow), "non-bb2025 keeps Safe Throw");
     }
 
     /// Regression: a JSON string skill value must be stored unquoted. `serde_json::Value::to_string()`
