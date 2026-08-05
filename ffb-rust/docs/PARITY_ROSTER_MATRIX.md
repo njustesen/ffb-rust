@@ -23,14 +23,14 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 14 | khemri | GREEN 100/100 | — |
 | 15 | khemri_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
 | 16 | lizardman | GREEN 100/100 | — |
-| 17 | necromantic | FAIL 0/100 | seed 1, step 1 — first divergence |
+| 17 | necromantic | FAIL 37/100 | seed 38, step 20 — block-result POW-vs-Push (strengths ruled out; DEFERRED) |
 | 18 | nippon | GREEN 100/100 | — |
-| 19 | norse | FAIL 73/100 | seed 74, step 144 — first divergence |
+| 19 | norse | GREEN 100/100 | — |
 | 20 | nurgle | FAIL 0/100 | seed 1, step 1 — first divergence |
 | 21 | ogre | FAIL 0/100 | seed 1, step 143 — first divergence |
 | 22 | orc | GREEN 100/100 | — |
 | 23 | renegades | FAIL 1/100 | seed 2, step 1 — harness gap (STUCK_STEP: ANIMAL_SAVAGERY) |
-| 24 | skaven | FAIL 87/100 | seed 88, step 62 — first divergence |
+| 24 | skaven | GREEN 100/100 | — |
 | 25 | slann | FAIL 2/100 | seed 3, step 112 — first divergence |
 | 26 | slann_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
 | 27 | undead | FAIL 0/100 | seed 1, step 84 — first divergence |
@@ -38,4 +38,4 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 29 | vampire | FAIL 0/100 | seed 1, step 7 — first divergence |
 | 30 | wood_elf | FAIL 0/100 | seed 1, step 49 — first divergence |
 
-**Summary:** 13 green, 17 not green (of 30 matchups). Whole matrix ran in 222.9s wall (parallel).
+**Summary:** 15 green, 15 not green (of 30 matchups). Whole matrix ran in 222.9s wall (parallel).
