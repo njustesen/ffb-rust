@@ -769,3 +769,22 @@ from the Stand Firm hook. Updated the unit test.
 7027/0, ffb-model 2775/0. Commit 4ee41b16.
 Residual: dwarf step 166 — half-1→half-2 transition, away player 0 in Reserve (Java) vs on-field (Rust);
 suspected missing Secret Weapon end-of-drive send-off (Deathroller has Secret Weapon). Next.
+
+## dwarf seed 1 step 166 — Secret Weapon send-off + argue-the-call (end of drive)
+
+**Symptom:** dwarf seed 1 diverged at the half-1→half-2 transition. Rust STUBBED the Secret Weapon
+send-off, so a played Deathroller (Secret Weapon) stayed on the pitch into half 2 where Java sent it off.
+Java also rolls TWO `rollArgueTheCall` d6 at the transition (pos53 away argue=fail→away Deathroller banned,
+pos54 home argue=6 success→home Deathroller kept) BEFORE the half-2 kickoff dice; Rust rolled neither, so
+its kickoff RNG was shifted → half-2 state diverged. Found by instrumenting Java PlayerResult
+.setHasUsedSecretWeapon (home1's flag was cleared by argueTheCall, not a ban).
+
+**Fix (`crates/ffb-engine/src/step/bb2025/step_end_turn.rs`):** new `resolve_secret_weapons`, run once at
+end of drive (new_half||touchdown, not end_game) before KO recovery/kickoff — report (Stunty 2d6 / penalty-0
+auto-ban) → argue-the-call AWAY then HOME (ParityRunner always argues first-eligible, looping; 6=keep,
+1=coach banned, else banned; +1 friendsWithTheRef) → remove still-flagged (PS_BANNED + off-pitch,
+SendToBoxReason::SecretWeaponBan → state "-1,-1,Reserve"). The 2 argue dice enter the stream away→home
+before the kickoff dice, matching Java.
+
+**Verified:** dwarf seed 1 step 166 → **seed 4 step 294** (seeds 1-3 GREEN). No regression: 9 green rosters
+100/100; ffb-engine 7028/0, ffb-model 2775/0 (+1 test). Commit 62005506.
