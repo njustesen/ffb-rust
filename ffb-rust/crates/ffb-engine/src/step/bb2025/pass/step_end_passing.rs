@@ -328,11 +328,27 @@ impl StepEndPassing {
             return StepOutcome::next();
         }
 
-        // Java path 7: thrower is acting player — determine move continuation
-        // Java: fEndTurn |= checkTouchdown || (catcher==null) || otherTeam.hasPlayer(catcher) || (fPassFumble && !dontDropFumble)
-        // Simplified: check catcher presence and fumble
+        // Java path 7: thrower is acting player — determine move continuation.
+        // Java recomputes `catcher` here as the player UNDER THE BALL (field.getPlayer(ballCoordinate)),
+        // NOT the stored fCatcherId, then:
+        //   fEndTurn |= checkTouchdown || (catcher == null) || otherTeam.hasPlayer(catcher)
+        //              || (fPassFumble && !dontDropFumble)
+        // The `otherTeam.hasPlayer(catcher)` term was previously omitted (and `catcher==null` was read
+        // off the stored catcher_id), so an accurate pass that bounced to and was CAUGHT BY AN OPPONENT
+        // never turned over (khemri seed 40 i=185: home_04's pass bounced to away_02, who caught it;
+        // Java turned the ball over, Rust let home keep its turn).
+        let ball_catcher_id: Option<String> = game.field_model.ball_coordinate
+            .and_then(|c| game.field_model.player_at(c).cloned());
+        let ball_catcher_is_opponent = match (game.thrower_id.as_deref(), ball_catcher_id.as_deref()) {
+            (Some(tid), Some(cid)) => {
+                if game.team_home.has_player(tid) { game.team_away.has_player(cid) }
+                else { game.team_home.has_player(cid) }
+            }
+            _ => false,
+        };
         self.end_turn |= check_touchdown(game)
-            || self.catcher_id.is_none()
+            || ball_catcher_id.is_none()
+            || ball_catcher_is_opponent
             || (self.pass_fumble && !self.dont_drop_fumble);
 
         // Java: fEndPlayerAction |= !((allowMoveAfterPass || allowMoveAfterHandOff) && UtilPlayer.isNextMovePossible(game, false))
@@ -649,6 +665,16 @@ mod tests {
         game.acting_player.player_id = Some("t1".into());
         game.acting_player.player_action = Some(PlayerAction::Pass);
         game.thrower_id = Some("t1".into());
+        // Place the catcher c1 (a home TEAMMATE) on the field UNDER THE BALL — Java's path-7 turnover
+        // check recomputes the catcher as the player under the ball, and a same-team catcher (not null,
+        // not an opponent) is NOT a turnover, so the thrower may continue moving (GiveAndGo).
+        let mut catcher = Player::default();
+        catcher.id = "c1".into();
+        game.team_home.players.push(catcher);
+        let ball_coord = ffb_model::types::FieldCoordinate::new(10, 7);
+        game.field_model.set_player_coordinate("c1", ball_coord);
+        game.field_model.set_player_state("c1", PlayerState::new(PS_MOVING).change_active(true));
+        game.field_model.ball_coordinate = Some(ball_coord);
         let mut step = StepEndPassing::new();
         // quick pass accurate: passing_distance=QuickPass, pass_fumble=false
         step.passing_distance = Some(PassingDistance::QuickPass);

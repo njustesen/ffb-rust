@@ -892,3 +892,28 @@ as the dwarf NoHands bug.
 **Verified:** high_elf 100/100 GREEN. No regression: 12 green rosters (lineman amazon chaos chaos_dwarf
 chaos_pact dwarf elf human lizardman nippon orc + high_elf) 100/100; ffb-engine 7031/0, ffb-model
 2777/0. **12 green total.** Commit pending.
+
+## khemri seed 40 step 185 — pass caught by an opponent must be a turnover (StepEndPassing path 7)
+
+**Symptom (state-only, dice match):** home_04 (Khemri Thro-Ra) passes; the accurate pass bounces
+(pos75 d8) and is caught by an OPPONENT (away_02) at (13,6). Java turns the ball over (i=186 active→away,
+FOUL); Rust lets home keep its turn. Same 3 dice (pass=6, scatter, catch=5), identical ball landing and
+player positions — only the active team / turn count diverge (an invisible turnover flag).
+
+**Root cause:** Java `StepEndPassing` has an `else` branch (when `fEndTurn || fEndPlayerAction ||
+bloodlust` is false and the thrower IS the acting player) that RECOMPUTES the catcher as the player under
+the ball (`field.getPlayer(field.getBallCoordinate())`) and sets `fEndTurn |= checkTouchdown ||
+(catcher == null) || findOtherTeam(thrower).hasPlayer(catcher) || (fPassFumble && !dontDropFumble)`. Rust's
+path 7 computed `end_turn |= check_touchdown || catcher_id.is_none() || (pass_fumble && !dont_drop)` — it
+read the stored `catcher_id` (set to the opponent away_02, so `is_none()` was false) and OMITTED the
+`otherTeam.hasPlayer(catcher)` term, so an opponent-caught pass never turned over.
+
+**Fix (`step_end_passing.rs`):** in path 7, recompute the catcher as the player under the ball
+(`field_model.player_at(ball_coordinate)`) and add the opponent-catcher term:
+`end_turn |= check_touchdown || ball_catcher.is_none() || ball_catcher_is_opponent || (pass_fumble &&
+!dont_drop)`. Updated the `quick_pass_accurate_allows_move_continuation` unit test to place the catcher
+(a teammate) under the ball (the test previously only set `catcher_id`).
+
+**Verified:** khemri seed 40 → seed 99 (seeds 40-98 GREEN). No regression: 12 green rosters 100/100;
+ffb-engine 7031/0, ffb-model 2777/0. Commit pending. Next khemri frontier: seed 99 step 157 (home_08
+MOVE, unrelated).
