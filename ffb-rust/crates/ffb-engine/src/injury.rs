@@ -467,7 +467,14 @@ fn do_injury_roll_for_player_impl(rng: &mut GameRng, ctx: &mut InjuryContext, ga
     // Java: InjuryTypeServer.setInjury() lines 96-98 — Decay skill (requiresSecondCasualtyRoll):
     // after a Casualty result, roll a second, genuinely independent casualty pair and interpret
     // it the same way, storing the result separately rather than replacing the primary roll.
-    if ctx.casualty_roll.is_some() {
+    // Decay's `requiresSecondCasualtyRoll` is a BB2016-only property: `bb2016/Decay` registers it,
+    // but `mixed/Decay` (@RulesCollection BB2020+BB2025) registers only cancelsAllowsRaisingLineman.
+    // Rust's `SkillId::Decay.properties()` is edition-agnostic and returns it for all editions, so gate
+    // the second casualty roll to BB2016 — else a bb2025 Decay player (e.g. a Khemri Tomb Guardian)
+    // rolls an extra d16 casualty Java never rolls, desyncing the shared dice stream (khemri seed 99
+    // i=128: home_02's blitz casualty'd a Tomb Guardian; Rust rolled a 2nd casualty where Java rolled
+    // the Regeneration die, shifting every later roll by 2 → half-2 kickoff diverged).
+    if ctx.casualty_roll.is_some() && game.rules == ffb_model::enums::Rules::Bb2016 {
         let requires_decay = game.player(defender_id)
             .map(|d| d.has_skill_property(NamedProperties::REQUIRES_SECOND_CASUALTY_ROLL))
             .unwrap_or(false);
@@ -988,9 +995,11 @@ mod tests {
         // Force a Casualty result regardless of dice via a large injury modifier sum, then
         // verify a Decay-skilled defender gets a genuinely independent second casualty roll
         // (Java: InjuryTypeServer.setInjury() lines 96-98).
+        // Decay's second casualty roll (requiresSecondCasualtyRoll) is BB2016-only — mixed/Decay
+        // (BB2020/BB2025) does not register it. Use BB2016 so the second roll is expected.
         let mut home = crate::step::framework::test_team("home", 0);
         home.players.push(make_player_with_skills("p1", vec![SkillId::Decay]));
-        let game = Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2020);
+        let game = Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2016);
         let mut ctx = InjuryContext::new(ffb_model::enums::ApothecaryMode::Defender);
         ctx.injury_modifiers.push(Modifier::new("Test", 20, Rules::Common));
         let mut rng = GameRng::new(42);
@@ -1000,6 +1009,21 @@ mod tests {
         assert!(ctx.casualty_roll_decay.is_some(), "Decay must roll a fresh second casualty pair");
         assert_ne!(ctx.casualty_roll, ctx.casualty_roll_decay, "the decay roll must be independent dice, not a copy");
         assert!(ctx.injury_decay.is_some(), "Decay's second roll must be interpreted into an injury_decay outcome");
+    }
+
+    /// bb2025 Decay must NOT roll a second casualty (mixed/Decay lacks requiresSecondCasualtyRoll).
+    #[test]
+    fn do_injury_roll_for_player_bb2025_decay_no_second_casualty() {
+        use ffb_model::enums::SkillId;
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(make_player_with_skills("p1", vec![SkillId::Decay]));
+        let game = Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2025);
+        let mut ctx = InjuryContext::new(ffb_model::enums::ApothecaryMode::Defender);
+        ctx.injury_modifiers.push(Modifier::new("Test", 20, Rules::Common));
+        let mut rng = GameRng::new(42);
+        do_injury_roll_for_player(&mut rng, &mut ctx, &game, "p1");
+        assert!(ctx.casualty_roll.is_some(), "large modifier sum must force a Casualty result");
+        assert!(ctx.casualty_roll_decay.is_none(), "bb2025 Decay must NOT roll a second casualty");
     }
 
     #[test]

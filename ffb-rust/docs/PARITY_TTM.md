@@ -917,3 +917,25 @@ read the stored `catcher_id` (set to the opponent away_02, so `is_none()` was fa
 **Verified:** khemri seed 40 → seed 99 (seeds 40-98 GREEN). No regression: 12 green rosters 100/100;
 ffb-engine 7031/0, ffb-model 2777/0. Commit pending. Next khemri frontier: seed 99 step 157 (home_08
 MOVE, unrelated).
+
+## khemri seed 99 step 157 — Decay's second casualty roll is BB2016-only → khemri 100/100
+
+**Symptom (latent RNG desync surfacing at the half break):** at i=128 home_02 BLITZes and casualties a
+Khemri Tomb Guardian (Decay + Regeneration). Rust consumed 11 dice for the blitz (rng 39→50), Java 9
+(39→48) — Rust rolled 2 EXTRA. The desync then "parked" through a run of dice-less MOVEs (rng constant
+50/48) until the half-1→half-2 kickoff, whose dice landed 2 positions off → state diverged at i=157/158.
+Dice trace: after the casualty (d16+d6, pos46-47) Java rolled the **Regeneration** die (d6 pos48); Rust
+rolled a **second casualty** (d16 pos48) then a d6 — i.e. Decay's second casualty roll.
+
+**Root cause:** Decay's `requiresSecondCasualtyRoll` is BB2016-only — `bb2016/Decay` registers it, but
+`mixed/Decay` (@RulesCollection BB2020+BB2025) registers only cancelsAllowsRaisingLineman. Rust's
+`SkillId::Decay.properties()` is edition-agnostic and returned it for all editions, so a bb2025 Decay
+player rolled a second casualty Java never rolls. Same edition-property class as NoHands/SafeThrow, but
+here Decay is still valid in bb2025 — only the one property is edition-gated, so the fix gates the roll
+rather than dropping the skill.
+
+**Fix (`injury.rs`):** gate the second casualty roll to `game.rules == Rules::Bb2016`. +2 tests (bb2016
+still rolls it; bb2025 does not). Also fixed the existing Decay test which used Bb2020 (wrong edition).
+
+**Verified:** khemri 100/100 GREEN (combined with the earlier opponent-catch turnover fix c0ce1d75). No
+regression: 12 green rosters 100/100; ffb-engine 7032/0, ffb-model 2777/0. **13 green total.** Commit pending.
