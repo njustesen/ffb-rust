@@ -9,6 +9,7 @@ use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
 use ffb_model::model::game::Game;
 use ffb_mechanics::modifiers::{foul_assist_armor_modifier, ARMOR_CHAINSAW_3, ARMOR_DIRTY_PLAYER_1, ARMOR_FOUL};
+use ffb_mechanics::mechanics::armor_broken;
 use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
 use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
 use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury, leak_injury_modifier};
@@ -54,14 +55,6 @@ impl ModificationAwareInjuryType for InjuryTypeFoul {
                 self.ctx.add_armor_modifier(ARMOR_FOUL);
             }
         }
-        // DirtyPlayer: +1 to armor roll for fouls
-        if let Some(aid) = attacker_id {
-            if let Some(attacker) = game.player(aid) {
-                if attacker.has_skill(SkillId::DirtyPlayer) {
-                    self.ctx.add_armor_modifier(ARMOR_DIRTY_PLAYER_1);
-                }
-            }
-        }
         // Java: if (game.isActive(foulBreaksArmourWithoutRoll)) { setArmorBroken(true); }
         //       if (!isArmorBroken()) { rollArmour(); ... setArmorBroken(interpreter.isArmourBroken(...)); }
         if game.is_active(NamedProperties::FOUL_BREAKS_ARMOUR_WITHOUT_ROLL) {
@@ -84,7 +77,28 @@ impl ModificationAwareInjuryType for InjuryTypeFoul {
                     }
                 }
             }
+            // Java InjuryTypeFoul.armourRoll rolls with the foul-assist (+chainsaw) modifiers and
+            // checks `isArmourBroken` FIRST; only `if (!injuryContext.isArmorBroken())` does it then
+            // add the general skill-based armour modifiers (Dirty Player) and re-check.
             do_armor_roll(game, rng, &mut self.ctx, defender_id);
+            // Dirty Player (registered to affectsEitherArmourOrInjuryOnFoul): spend its +1 on the
+            // ARMOUR roll only when the base roll did not already break armour. If it IS spent here it
+            // is mutually excluded from the injury roll (see injury_roll); if the base roll already
+            // broke armour, Dirty Player is left free to boost the injury roll instead. (dwarf seed
+            // 60: base 7 < AV8 -> DP breaks armour, injury 8 stays Thick-Skull Stunned. seed 8: base
+            // roll already breaks AV -> DP boosts the injury roll.)
+            if !self.ctx.armor_broken {
+                if let Some(aid) = attacker_id {
+                    if game.player(aid).map(|p| p.has_skill(SkillId::DirtyPlayer)).unwrap_or(false) {
+                        self.ctx.add_armor_modifier(ARMOR_DIRTY_PLAYER_1);
+                        if let Some(roll) = self.ctx.armor_roll {
+                            let av = game.player(defender_id)
+                                .map(|p| p.armour_with_modifiers()).unwrap_or(7);
+                            self.ctx.armor_broken = armor_broken(av, roll, &self.ctx.armor_modifiers);
+                        }
+                    }
+                }
+            }
         }
     }
     fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str) {
@@ -95,8 +109,17 @@ impl ModificationAwareInjuryType for InjuryTypeFoul {
         if let Some(defender) = game.player(defender_id) {
             let attacker = attacker_id.and_then(|aid| game.player(aid));
             let factory = InjuryModifierFactory::new(game.rules);
+            // Java DirtyPlayer injury modifier `appliesToContext`: applies only if the armour
+            // modifiers contain nothing registered to affectsEitherArmourOrInjuryOnFoul. Our only
+            // such modifier is Dirty Player's armour +1 — if it was spent on the armour roll, exclude
+            // the Dirty Player injury +1 (mutual exclusion).
+            let dirty_player_on_armour = self.ctx.armor_modifiers.contains(&ARMOR_DIRTY_PLAYER_1);
             for m in factory.find_injury_modifiers(game, attacker, defender, false, true, false) {
-                self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), attacker, defender, game.rules));
+                let leaked = leak_injury_modifier(m.as_ref(), attacker, defender, game.rules);
+                if dirty_player_on_armour && leaked.name == "Dirty Player" {
+                    continue;
+                }
+                self.ctx.add_injury_modifier(leaked);
             }
         }
         do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
@@ -171,11 +194,38 @@ mod tests {
     }
     #[test]
     fn dirty_player_adds_armor_modifier() {
-        let game = game_with_attacker_and_defender(vec![SkillId::DirtyPlayer], 2);
+        // AV 13 is never broken by the base 2d6 roll, so Java's `if (!isArmorBroken())` gate lets
+        // Dirty Player's armour modifier be applied. (With a low AV the base roll already breaks
+        // armour and Dirty Player is instead reserved for the injury roll — see
+        // dirty_player_on_armour_excludes_injury_modifier.)
+        let game = game_with_attacker_and_defender(vec![SkillId::DirtyPlayer], 13);
         let mut t = InjuryTypeFoul::new();
         let mut rng = GameRng::new(1);
         t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
         assert!(t.ctx.armor_modifiers.contains(&ARMOR_DIRTY_PLAYER_1));
+    }
+    #[test]
+    fn dirty_player_not_added_to_armor_when_base_roll_breaks() {
+        // AV 2 is always broken by the base roll; Java does NOT then apply Dirty Player to armour
+        // (the `if (!isArmorBroken())` gate) — it is left free for the injury roll.
+        let game = game_with_attacker_and_defender(vec![SkillId::DirtyPlayer], 2);
+        let mut t = InjuryTypeFoul::new();
+        let mut rng = GameRng::new(1);
+        t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
+        assert!(t.ctx.armor_broken);
+        assert!(!t.ctx.armor_modifiers.contains(&ARMOR_DIRTY_PLAYER_1));
+    }
+    #[test]
+    fn dirty_player_on_armour_excludes_injury_modifier() {
+        // Mutual exclusion: when Dirty Player's +1 was spent on the armour roll it must NOT also
+        // boost the injury roll (Java DirtyPlayer injury modifier `noneMatch(affectsEither...Foul)`).
+        let game = game_with_attacker_and_defender(vec![SkillId::DirtyPlayer], 2);
+        let mut t = InjuryTypeFoul::new();
+        let mut rng = GameRng::new(1);
+        t.ctx.armor_broken = true;
+        t.ctx.add_armor_modifier(ARMOR_DIRTY_PLAYER_1);
+        t.injury_roll(&game, &mut rng, Some("attacker"), "defender");
+        assert!(!t.ctx.injury_modifiers.contains(&dirty_player_injury_modifier(game.rules)));
     }
     #[test]
     fn no_dirty_player_no_armor_modifier() {

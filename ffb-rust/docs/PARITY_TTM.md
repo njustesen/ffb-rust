@@ -821,3 +821,29 @@ roster_json_to_roster and the parity runner. +1 regression test.
 
 **Verified:** dwarf seed 8 → seed 60 (seeds 8-59 GREEN). No regression: 9 green rosters 100/100 (incl.
 chaos_dwarf, also a Deathroller team); ffb-engine 7028/0, ffb-model 2776/0. Commit d941b8f4.
+
+## dwarf seed 60 step 36 — Dirty Player armour-OR-injury mutual exclusion (foul)
+
+**Symptom (state-only, dice matched):** Home1 (Deathroller: Dirty Player) fouls Away2 (dwarf, Thick
+Skull). Armour [4,3]=7, injury [6,2]=8. Java: `a01` Prone (Stunned); Rust: `a01` Ko.
+
+**Root cause:** Rust applied Dirty Player's +1 to BOTH the armour AND the injury roll. Java's
+`InjuryTypeFoul.armourRoll` rolls with the foul-assist modifiers and checks `isArmourBroken` FIRST,
+then `if (!isArmorBroken())` applies the general skill-based armour modifiers (Dirty Player) and
+re-checks. Because Dirty Player registers `affectsEitherArmourOrInjuryOnFoul`, its injury modifier's
+`appliesToContext` excludes itself when an armour modifier with that property was used. Net: Dirty
+Player's +1 goes to ARMOUR when the base roll didn't break AV (else it stays free for INJURY). Here
+base 7 < AV8 → DP breaks armour (7+1=8), injury stays 8 → Thick Skull → Stunned. Rust's extra injury
++1 made 9, bypassing Thick Skull → KO.
+
+**False start:** first cut made Dirty Player unconditionally armour-only (never injury). That
+REGRESSED seed 8, where the base armour roll already breaks AV so Java DOES spend Dirty Player on the
+injury roll. Reverted; implemented the conditional instead.
+
+**Fix (`injury_type_foul.rs`):** restructured `armour_roll` to Java's order — roll + foul assists
+first, and add `ARMOR_DIRTY_PLAYER_1` (recomputing `armor_broken`) only `if (!armor_broken)`. In
+`injury_roll`, skip the "Dirty Player" injury modifier when `ctx.armor_modifiers` already contains the
+Dirty Player armour +1 (mutual exclusion). +3 regression tests.
+
+**Verified:** dwarf 100/100 GREEN (seed 8 and seed 60 both pass). No regression: 9 green rosters
+100/100; ffb-engine 7030/0, ffb-model 2776/0. Commit pending.

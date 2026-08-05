@@ -12,9 +12,9 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 3 | chaos | GREEN 100/100 | — |
 | 4 | chaos_dwarf | GREEN 100/100 | — |
 | 5 | chaos_pact | GREEN 100/100 | — |
-| 6 | dark_elf | FAIL 0/100 | seed 1, step 36 — first divergence |
+| 6 | dark_elf | FAIL 54/100 | seed 55, step 0 — first divergence |
 | 7 | dark_elf_league_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
-| 8 | dwarf | FAIL 0/100 | seed 1, step 101 — first divergence |
+| 8 | dwarf | GREEN 100/100 | — |
 | 9 | elf | FAIL 37/100 | seed 38, step 265 — first divergence |
 | 10 | goblin | FAIL 0/100 | seed 1, step 9 — first divergence |
 | 11 | halfling | FAIL 0/100 | seed 1, step 20 — first divergence |
@@ -25,19 +25,17 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 16 | lizardman | GREEN 100/100 | — |
 | 17 | necromantic | FAIL 0/100 | seed 1, step 1 — first divergence |
 | 18 | nippon | GREEN 100/100 | — |
-| 19 | norse | FAIL 1/100 | seed 2, step 151 — first divergence |
+| 19 | norse | FAIL 73/100 | seed 74, step 144 — first divergence |
 | 20 | nurgle | FAIL 0/100 | seed 1, step 1 — first divergence |
 | 21 | ogre | FAIL 0/100 | seed 1, step 143 — first divergence |
 | 22 | orc | GREEN 100/100 | — |
-| 23 | renegades | FAIL 0/100 | seed 1, step 93 — harness gap (STUCK_STEP: ANIMAL_SAVAGERY) |
+| 23 | renegades | FAIL 1/100 | seed 2, step 1 — harness gap (STUCK_STEP: ANIMAL_SAVAGERY) |
 | 24 | skaven | FAIL 87/100 | seed 88, step 62 — first divergence |
 | 25 | slann | FAIL 2/100 | seed 3, step 112 — first divergence |
 | 26 | slann_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
 | 27 | undead | FAIL 0/100 | seed 1, step 84 — first divergence |
-| 28 | underworld | FAIL 0/100 | seed 1, step 42 — harness gap (STUCK_STEP: ANIMAL_SAVAGERY) |
+| 28 | underworld | FAIL 1/100 | seed 2, step 1 — harness gap (STUCK_STEP: ANIMAL_SAVAGERY) |
 | 29 | vampire | FAIL 0/100 | seed 1, step 7 — first divergence |
 | 30 | wood_elf | FAIL 0/100 | seed 1, step 49 — first divergence |
 
-**Summary:** 9 green, 21 not green (of 30 matchups). Whole matrix ran in 222.2s wall (parallel).
-
-Not-green breakdown: **18 real per-step engine divergences** (dark_elf, dark_elf_league, dwarf, elf, goblin, halfling, high_elf, khemri, khemri_fumbbl, necromantic, norse, nurgle, ogre, skaven, slann, slann_fumbbl, undead, vampire, wood_elf), and **2 harness gaps** (renegades, underworld — ParityRunner can't yet drive ANIMAL_SAVAGERY; bounded by the stuck-step breaker so they no longer spin). vampire and all others now produce a definitive parity result (no panics, no hangs).
+**Summary:** 10 green, 20 not green (of 30 matchups). Whole matrix ran in 222.9s wall (parallel).
