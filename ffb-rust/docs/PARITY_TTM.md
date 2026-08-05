@@ -939,3 +939,22 @@ still rolls it; bb2025 does not). Also fixed the existing Decay test which used 
 
 **Verified:** khemri 100/100 GREEN (combined with the earlier opponent-catch turnover fix c0ce1d75). No
 regression: 12 green rosters 100/100; ffb-engine 7032/0, ffb-model 2777/0. **13 green total.** Commit pending.
+
+## nurgle seed 1 step 1 — Foul Appearance attacker_cancels used the wrong check → nurgle 1→24
+
+**Symptom (RNG desync, first activation):** away_03 BLITZes a Foul-Appearance Nurgle target. Java rolls
+the Foul Appearance d6 (pos13, FoulAppearanceBehaviour) before the block; Rust skips it (1 die vs Java's
+4), so the block reads Java's Foul-Appearance die and the whole dice stream desyncs.
+
+**Root cause:** `StepFoulAppearance` computed `attacker_cancels` as
+`attacker.has_skill_property(FORCE_ROLL_BEFORE_BEING_BLOCKED)` — i.e. it skipped the roll when the ATTACKER
+merely HAS Foul Appearance. Java's condition is `!UtilCards.hasSkillToCancelProperty(attacker,
+forceRollBeforeBeingBlocked)` — skip only if the attacker has a skill that CANCELS the property. In a
+Nurgle-vs-Nurgle game the blitzer itself has Foul Appearance, so it wrongly cancelled its own roll against
+a Foul-Appearance defender.
+
+**Fix (`step_foul_appearance.rs`):** compute `attacker_cancels` via
+`UtilCards::has_skill_to_cancel_property(attacker, FORCE_ROLL_BEFORE_BEING_BLOCKED)`, matching Java.
+
+**Verified:** nurgle seed 1 → seed 24 (seeds 1-23 GREEN). No regression: 15 green rosters 100/100;
+ffb-engine 7032/0, ffb-model 2777/0. Commit pending. Next nurgle frontier: seed 24 step 197.

@@ -54,9 +54,16 @@ impl StepFoulAppearance {
             .and_then(|id| game.player(id))
             .map(|p| p.has_skill(SkillId::FoulAppearance))
             .unwrap_or(false);
+        // Java: `!UtilCards.hasSkillToCancelProperty(actingPlayer.getPlayer(),
+        // NamedProperties.forceRollBeforeBeingBlocked)` — the attacker skips the Foul Appearance roll
+        // only if it has a skill that CANCELS the property (e.g. Nerves of Steel), NOT if it merely
+        // HAS the property itself. The old code tested `has_skill_property(FORCE_ROLL_BEFORE_BEING_
+        // BLOCKED)` — so a Foul-Appearance attacker (e.g. any Nurgle player) wrongly cancelled its own
+        // Foul Appearance roll against a Foul-Appearance defender, skipping the d6 Java always rolls
+        // and desyncing the dice stream (nurgle seed 1 i=1: away_03 blitz).
         let attacker_cancels = game.acting_player.player_id.as_deref()
             .and_then(|id| game.player(id))
-            .map(|p| p.has_skill_property(NamedProperties::FORCE_ROLL_BEFORE_BEING_BLOCKED))
+            .map(|p| ffb_model::util::util_cards::UtilCards::has_skill_to_cancel_property(p, NamedProperties::FORCE_ROLL_BEFORE_BEING_BLOCKED))
             .unwrap_or(false);
 
         if !defender_has_fa || attacker_cancels {
