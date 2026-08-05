@@ -377,8 +377,16 @@ impl StepEndTurn {
         // Java's `!fEndGame && (fNewHalf || fTouchdown)` argue gate — so its argue d6 dice land in the
         // shared stream BEFORE the half-2 kickoff dice. Non-end-of-drive turns skip it. Bribes remain
         // stubbed (declined). The `argue_the_call_choice_*` flags are then set so `all_choices_done` proceeds.
+        // Java gates the argue/remove by `!fEndGame`: Secret Weapons are sent off at a drive end that
+        // is NOT the end of the game (end of half 1, or a mid-game touchdown), but NOT when the final
+        // half ends. `self.end_game` is never set here, so compute the end-of-game condition directly
+        // (game.half is not yet incremented at this point): the final half ending, or a game-ending TD.
+        // Without this Rust banned a played Secret Weapon at the end of half 2 (game end) where Java
+        // keeps it — a final-state (game_end hash) divergence, dwarf seed 4 step 294.
+        let is_end_of_game = (self.new_half && game.half > 1)
+            || (touchdown && game.turn_data_home.turn_nr >= 8 && game.turn_data_away.turn_nr >= 8);
         if self.argue_the_call_choice_away.is_none() {
-            if !self.end_game && (self.new_half || touchdown) {
+            if !is_end_of_game && (self.new_half || touchdown) {
                 self.resolve_secret_weapons(game, rng);
             }
             self.argue_the_call_choice_away = Some(false);
