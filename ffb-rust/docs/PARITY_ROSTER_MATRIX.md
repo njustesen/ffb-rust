@@ -31,7 +31,7 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 22 | orc | GREEN 100/100 | — |
 | 23 | renegades | FAIL 1/100 | seed 2, step 1 — harness gap (STUCK_STEP: ANIMAL_SAVAGERY) |
 | 24 | skaven | GREEN 100/100 | — |
-| 25 | slann | FAIL 2/100 | seed 3, step 112 — first divergence |
+| 25 | slann | FAIL 2/100 | seed 3, step 112 — Solid Defence kickoff no-complete-on-decline (DEFERRED) |
 | 26 | slann_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
 | 27 | undead | FAIL 0/100 | seed 1, step 84 — first divergence |
 | 28 | underworld | FAIL 1/100 | seed 2, step 1 — harness gap (STUCK_STEP: ANIMAL_SAVAGERY) |
