@@ -803,3 +803,21 @@ the game end.
 
 **Verified:** dwarf seed 4 → seed 8 (seeds 4-7 GREEN). No regression: 9 green rosters 100/100; ffb-engine
 7028/0. Commit ea5dfcf4.
+
+## dwarf seed 8 step 5 — bb2025 has no NoHands skill (drop it at roster load)
+
+**Symptom:** a hand-off to the Deathroller (No Hands) — Rust scattered the ball (NoHands→preventCatch→
+catch_ball SCATTER_BALL) → turnover; Java caught it (no turnover). Proven: `JAVA_CATCHBALL catcher=Home1
+preventCatch=FALSE` in bb2025.
+
+**Root cause:** bb2025's SkillFactory has NO NoHands class (only bb2016/bb2020 define NoHands with
+preventCatch + preventHoldBall + preventRegular{Pass,HandOver}Action). So bb2025 "No Hands" resolves to
+null and is not applied. Rust's SkillId::NoHands is edition-agnostic → a bb2025 No-Hands player wrongly
+gained preventCatch. (bb2025's ball-denial skill is NoBall, kept.)
+
+**Fix (`loader.rs` + `runner.rs`):** `position_json_to_roster_position` takes `is_bb2025` and drops the
+NoHands skill for bb2025 rosters (matching Java's unresolved skill); threaded through find_roster/
+roster_json_to_roster and the parity runner. +1 regression test.
+
+**Verified:** dwarf seed 8 → seed 60 (seeds 8-59 GREEN). No regression: 9 green rosters 100/100 (incl.
+chaos_dwarf, also a Deathroller team); ffb-engine 7028/0, ffb-model 2776/0. Commit d941b8f4.
