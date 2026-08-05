@@ -129,6 +129,115 @@ impl StepEndTurn {
         game.turn_data_home.turn_nr >= 8 && game.turn_data_away.turn_nr >= 8
     }
 
+    /// Java: reportSecretWeaponsUsed(415) → argueTheCall AWAY(422) then HOME(437) → removeUsedSecretWeapons(471).
+    /// The end-of-drive Secret Weapon send-off. A played Secret Weapon (getsSentOffAtEndOfDrive, marked by
+    /// `mark_played_and_secret_weapons`) is sent off UNLESS its coach argues the call successfully. The parity
+    /// harness (ParityRunner ARGUE_THE_CALL) ALWAYS argues the first eligible player per team, looping until
+    /// none remain — AWAY team first, then HOME. Each argue rolls one `rollArgueTheCall` d6: success (6) keeps
+    /// the player, 1 bans the coach (no more argues for that team), otherwise the player is banned. These argue
+    /// dice enter the shared stream BEFORE the half-2 kickoff dice (dwarf seed 1: pos53 away=fail, pos54 home=success).
+    fn resolve_secret_weapons(&mut self, game: &mut Game, rng: &mut GameRng) {
+        use ffb_model::enums::{PS_BANNED, PlayerState, SendToBoxReason};
+        use ffb_model::model::property::named_properties::NamedProperties;
+        use ffb_model::report::mixed::report_argue_the_call_roll::ReportArgueTheCallRoll;
+
+        // Phase A — reportSecretWeaponsUsed: a Stunty-Leeg secret weapon (skill int value > 0) rolls 2d6 and
+        // is banned on total >= penalty; a standard secret weapon (penalty 0, e.g. the dwarf Deathroller) is
+        // auto-banned with no die (flag left set). Java iterates game.getPlayers() = home then away.
+        for is_home in [true, false] {
+            let ids: Vec<String> = {
+                let t = if is_home { &game.team_home } else { &game.team_away };
+                t.players.iter().map(|p| p.id.clone()).collect()
+            };
+            for pid in ids {
+                if !game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon {
+                    continue;
+                }
+                let (has_skill, penalty) = game.player(&pid)
+                    .map(|p| (
+                        p.has_skill_property(NamedProperties::GETS_SENT_OFF_AT_END_OF_DRIVE),
+                        p.get_skill_int_value(NamedProperties::GETS_SENT_OFF_AT_END_OF_DRIVE),
+                    ))
+                    .unwrap_or((false, 0));
+                if has_skill && penalty > 0 {
+                    let total = rng.d6() + rng.d6();
+                    let banned = total >= penalty;
+                    game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon = banned;
+                }
+            }
+        }
+
+        // Phase B — argueTheCall: AWAY team first, then HOME. ParityRunner argues each flagged SW player.
+        for is_home in [false, true] {
+            let team_id = { let t = if is_home { &game.team_home } else { &game.team_away }; t.id.clone() };
+            let friends = game.prayer_state.is_friends_with_ref(&team_id);
+            let ids: Vec<String> = {
+                let t = if is_home { &game.team_home } else { &game.team_away };
+                t.players.iter().map(|p| p.id.clone()).collect()
+            };
+            for pid in ids {
+                let coach_banned = if is_home { game.turn_data_home.coach_banned } else { game.turn_data_away.coach_banned };
+                if coach_banned { break; }
+                if !game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon {
+                    continue;
+                }
+                let removed = game.field_model.player_state(&pid)
+                    .map(|s| s.is_casualty() || s.base() == PS_BANNED)
+                    .unwrap_or(true);
+                if removed { continue; }
+                // Java getPlayerIds: IllBeBack (ignoreFirstSecretWeaponSentOff) clears the flag and is NOT argued.
+                let ignore = game.player(&pid)
+                    .map(|p| p.has_skill_property(NamedProperties::IGNORE_FIRST_SECRET_WEAPON_SENT_OFF))
+                    .unwrap_or(false);
+                if ignore {
+                    game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon = false;
+                    continue;
+                }
+                // Argue (ParityRunner always argues). rollArgueTheCall d6; +1 if friendsWithTheRef and roll>1.
+                let roll = rng.d6();
+                let modified = if friends && roll > 1 { roll + 1 } else { roll };
+                let successful = DiceInterpreter::is_argue_the_call_successful(modified);
+                let coach_ban = DiceInterpreter::is_coach_banned(modified);
+                game.report_list.add(ReportArgueTheCallRoll::new(
+                    Some(pid.clone()), successful, coach_ban, roll, false, friends, 0,
+                ));
+                if successful {
+                    game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon = false;
+                }
+                if coach_ban {
+                    if is_home { game.turn_data_home.coach_banned = true; } else { game.turn_data_away.coach_banned = true; }
+                }
+            }
+        }
+
+        // Phase C — removeUsedSecretWeapons: ban the still-flagged players (set BANNED + off the pitch).
+        for is_home in [true, false] {
+            let ids: Vec<String> = {
+                let t = if is_home { &game.team_home } else { &game.team_away };
+                t.players.iter().map(|p| p.id.clone()).collect()
+            };
+            for pid in ids {
+                if !game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon {
+                    continue;
+                }
+                game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon = false;
+                let removed = game.field_model.player_state(&pid)
+                    .map(|s| s.is_casualty() || s.base() == PS_BANNED)
+                    .unwrap_or(true);
+                if removed { continue; }
+                // Java removeUsedSecretWeapon: setPlayerState(BANNED) + putPlayerIntoBox. remove_player clears
+                // the field coordinate + state; set BANNED so setup skips it and the state reads "-1,-1,Reserve"
+                // (PS_BANNED maps to the default "Reserve", off-pitch → -1,-1), matching Java.
+                game.field_model.remove_player(&pid);
+                game.field_model.set_player_state(&pid, PlayerState::new(PS_BANNED));
+                let pr = game.game_result.team_result_mut(is_home).player_result_mut(&pid);
+                pr.send_to_box_reason = Some(SendToBoxReason::SecretWeaponBan);
+                pr.send_to_box_turn = self.turn_nr;
+                pr.send_to_box_half = self.half;
+            }
+        }
+    }
+
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: if (turnNr == 0) capture turnNr + half for later send-to-box use
         if self.turn_nr == 0 {
@@ -262,8 +371,16 @@ impl StepEndTurn {
             // Java: reportSecretWeaponsUsed → stub
         }
 
-        // ArgueTheCall / Bribes dialogs — not translated, resolve immediately to false
+        // Secret Weapon end-of-drive send-off: reportSecretWeaponsUsed → argueTheCall (away then home) →
+        // removeUsedSecretWeapons, all resolved deterministically (ParityRunner always argues; bribes
+        // declined). Runs ONCE, only at end of drive (new_half||touchdown) and not end_game — matching
+        // Java's `!fEndGame && (fNewHalf || fTouchdown)` argue gate — so its argue d6 dice land in the
+        // shared stream BEFORE the half-2 kickoff dice. Non-end-of-drive turns skip it. Bribes remain
+        // stubbed (declined). The `argue_the_call_choice_*` flags are then set so `all_choices_done` proceeds.
         if self.argue_the_call_choice_away.is_none() {
+            if !self.end_game && (self.new_half || touchdown) {
+                self.resolve_secret_weapons(game, rng);
+            }
             self.argue_the_call_choice_away = Some(false);
         }
         if self.argue_the_call_choice_home.is_none() && self.argue_the_call_choice_away.is_some() {
@@ -483,6 +600,45 @@ mod tests {
         game.turn_data_home.turn_nr = 1;
         game.turn_data_away.turn_nr = 1;
         game
+    }
+
+    /// Regression: end-of-drive Secret Weapon send-off with argue-the-call. A played Secret Weapon
+    /// (getsSentOffAtEndOfDrive) is banned unless its coach argues successfully (roll 6). On a failed
+    /// argue the player is removed to the box (PS_BANNED, off-field → state string "-1,-1,Reserve");
+    /// on success it stays on the pitch. The argue roll consumes one game die (dwarf seed 1 step 166:
+    /// Java rolled away+home argue dice before the half-2 kickoff; Rust used to roll neither).
+    #[test]
+    fn secret_weapon_argue_bans_on_failure_and_keeps_on_success() {
+        use ffb_model::enums::{SkillId, PS_BANNED};
+        fn setup() -> (Game, StepEndTurn) {
+            let mut game = make_game();
+            let mut p = make_player("sw");
+            p.starting_skills = vec![SkillWithValue { skill_id: SkillId::SecretWeapon, value: None }];
+            game.team_home.players.push(p);
+            game.field_model.set_player_coordinate("sw", FieldCoordinate::new(5, 5));
+            game.field_model.set_player_state("sw", PlayerState::new(PS_STANDING));
+            game.game_result.team_result_mut(true).player_result_mut("sw").has_used_secret_weapon = true;
+            (game, StepEndTurn::new())
+        }
+        // Find seeds whose first d6 is 6 (argue success) and 2 (argue failure).
+        let mut seed_ok = 0u64;
+        while GameRng::new(seed_ok).d6() != 6 { seed_ok += 1; assert!(seed_ok < 200); }
+        let mut seed_fail = 0u64;
+        while GameRng::new(seed_fail).d6() != 2 { seed_fail += 1; assert!(seed_fail < 200); }
+
+        // Success: stays on the pitch, flag cleared.
+        let (mut game, mut step) = setup();
+        step.resolve_secret_weapons(&mut game, &mut GameRng::new(seed_ok));
+        assert!(game.field_model.player_coordinate("sw").is_some(), "argued (6) → stays on pitch");
+        assert_ne!(game.field_model.player_state("sw").unwrap().base(), PS_BANNED);
+        assert!(!game.game_result.team_result_mut(true).player_result_mut("sw").has_used_secret_weapon);
+
+        // Failure: banned to the box (off-field, PS_BANNED).
+        let (mut game, mut step) = setup();
+        step.resolve_secret_weapons(&mut game, &mut GameRng::new(seed_fail));
+        assert!(game.field_model.player_coordinate("sw").is_none(), "failed argue → removed from pitch");
+        assert_eq!(game.field_model.player_state("sw").unwrap().base(), PS_BANNED);
+        assert!(!game.game_result.team_result_mut(true).player_result_mut("sw").has_used_secret_weapon);
     }
 
     #[test]
