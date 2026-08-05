@@ -424,6 +424,17 @@ impl StepEndTurn {
                 if self.new_half || touchdown {
                     UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfDrive, is_home);
                     UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfHalf, is_home);
+                    // Java StepEndTurn (fNewHalf || fTouchdown): remove the Dodgy Snack kickoff
+                    // enhancement from every player — it lasts UNTIL_END_OF_DRIVE. Rust stores it as a
+                    // "Dodgy Snack" temporary stat-mod (-1 MA / -1 AV); without this the -AV persisted
+                    // across drives, so a player snacked in an earlier drive kept AV-1 forever and its
+                    // armour broke on a roll Java's (restored) AV survives (elf seed 38 i=265: away_03
+                    // eff_av 6 vs Java 7 → Rust breaks armour 6 & casualties where Java stays Prone).
+                    for p in game.team_home.players.iter_mut()
+                        .chain(game.team_away.players.iter_mut())
+                    {
+                        p.remove_temporary_stat_mods("Dodgy Snack");
+                    }
                 }
             }
             // Java: getFaintingCount / heatExhaustions / KO recovery — only on new half or touchdown
@@ -683,6 +694,33 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(game.turn_mode, TurnMode::Setup);
+    }
+
+    #[test]
+    fn dodgy_snack_enhancement_cleared_at_end_of_drive() {
+        use ffb_model::model::player::{STAT_MA, STAT_AV};
+        // Java StepEndTurn (fNewHalf || fTouchdown) removes the Dodgy Snack enhancement (lasts
+        // UNTIL_END_OF_DRIVE). A player snacked in an earlier drive must have base AV/MA restored at
+        // the drive break — else the -AV lingers and its armour breaks on a roll Java survives
+        // (elf seed 38 i=265). turn_nr 8 makes this end-of-turn a new half (end of drive).
+        let mut game = make_game();
+        game.team_home.players.push(make_player("snacked"));
+        game.field_model.set_player_coordinate("snacked", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("snacked", PlayerState::new(PS_STANDING));
+        {
+            let p = game.player_mut("snacked").unwrap();
+            p.add_temporary_stat_mod("Dodgy Snack", STAT_MA, -1);
+            p.add_temporary_stat_mod("Dodgy Snack", STAT_AV, -1);
+            assert_eq!(p.armour_with_modifiers(), p.armour - 1);
+        }
+        game.turn_data_home.turn_nr = 8;
+        game.turn_data_away.turn_nr = 8;
+        let mut step = StepEndTurn::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        let p = game.player("snacked").unwrap();
+        assert_eq!(p.armour_with_modifiers(), p.armour, "Dodgy Snack -AV must be cleared at drive end");
+        assert!(p.temporary_stat_mods.iter().all(|(s, _, _)| s != "Dodgy Snack"),
+            "Dodgy Snack stat-mods must be removed at drive end");
     }
 
     #[test]

@@ -847,3 +847,26 @@ Dirty Player armour +1 (mutual exclusion). +3 regression tests.
 
 **Verified:** dwarf 100/100 GREEN (seed 8 and seed 60 both pass). No regression: 9 green rosters
 100/100; ffb-engine 7030/0, ffb-model 2776/0. Commit pending.
+
+## elf seed 38 step 265 — Dodgy Snack enhancement not cleared at end of drive
+
+**Symptom (state-only after a block, RNG desync):** home_01 blocks away_03 at i=265. Both roll the same
+block dice [3,2,1] and armour [5,1]=6, but Rust consumes 8 dice vs Java's 4 (rng 73→81 vs 73→77): Rust
+BREAKS armour and rolls an injury+casualty (d16) → away_03 Injured (off-pitch); Java's armour HOLDS →
+away_03 Prone. `FFB_ARMOUR_TRACE` showed away_03 base_av=7 but eff_av=6 (a "Dodgy Snack" -1 AV temp
+stat-mod), so armour 6 ≥ 6 breaks in Rust while Java uses AV 7 (6 < 7 holds).
+
+**Root cause:** Dodgy Snack (kickoff event) gives a random player -1 MA / -1 AV **for the drive**. Java
+`StepEndTurn` clears it at end of drive: `if (fNewHalf || fTouchdown) { … players with active
+DODGY_SNACK enhancement → removeSkillEnhancements(DODGY_SNACK); }` (alongside the UNTIL_END_OF_DRIVE
+effect/prayer/reroll cleanup). Rust's bb2025 StepEndTurn never removed the "Dodgy Snack" temporary
+stat-mods, so a player snacked in an earlier drive kept -1 AV for the rest of the game. away_03 was
+snacked in half 1; Java restored AV 7 at the half transition, Rust kept AV 6 into half 2 turn 6.
+
+**Fix (`step_end_turn.rs`):** in the `if self.new_half || touchdown` drive-end block (next to the
+UntilEndOfDrive/UntilEndOfHalf card deactivation) remove `"Dodgy Snack"` temp stat-mods from every
+player: `for p in home.iter_mut().chain(away.iter_mut()) { p.remove_temporary_stat_mods("Dodgy Snack") }`.
++1 regression test.
+
+**Verified:** elf 100/100 GREEN. No regression: 10 green rosters (incl. dwarf) 100/100; ffb-engine
+7031/0, ffb-model 2776/0. Commit pending. **11 green total.**
