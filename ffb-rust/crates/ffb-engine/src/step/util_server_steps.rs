@@ -70,11 +70,21 @@ pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerActi
         // Java UtilActingPlayer.changeActingPlayer: standingUp = (oldState.base == PRONE). A prone
         // player being activated is "standing up" this activation, which lets StepStandUp resolve the
         // stand-up. set_player resets standing_up=false, so set it AFTER, from the pre-activation base.
-        let was_prone = game.field_model.player_state(player_id)
+        let pre_state = game.field_model.player_state(player_id);
+        let was_prone = pre_state
             .map(|s| s.base() == ffb_model::enums::PS_PRONE).unwrap_or(false);
         game.acting_player.set_player(player_id.to_owned(), action);
         game.acting_player.standing_up = was_prone;
         game.acting_player.jumping = jumping;
+        // Java UtilActingPlayer.changeActingPlayer: actingPlayer.setOldPlayerState(oldState) — the
+        // player's pre-activation PlayerState, STICKY (set_player cleared it on a genuine change; a
+        // same-player re-dispatch keeps the earlier value). TakeRootBehaviour uses this to only roll
+        // Take Root when the Treeman STARTED the activation standing — a prone Treeman blitzing (wood_elf
+        // seed 1 i=49) must NOT roll Take Root, but Rust was defaulting old_player_state=None→STANDING
+        // and rolling it (twice), shifting the block dice.
+        if game.acting_player.old_player_state.is_none() {
+            game.acting_player.old_player_state = pre_state;
+        }
         // Java clears per-activation skill re-roll usage when the acting player changes (legacy
         // engine.rs StepInitSelecting did `used_skills.clear()`). Rust stores skill-reroll "used"
         // flags on Player.used_skills (util_server_re_roll::use_reroll), so reset the activated

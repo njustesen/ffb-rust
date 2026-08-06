@@ -1129,3 +1129,29 @@ No regression: 18 prior-green rosters still 100/100; ffb-engine 7032/0, ffb-mode
 Diagnostic chain (gated Java instrumentation JMOVE/JBL reverted + jar rebuilt clean; gated Rust traces
 BLENTRY/REACT reverted): Java rolls Bloodlust ONCE per activation and turns over; Rust rolled it twice
 (re-activation reset) and didn't turn over (suffering unset).
+
+## Parity(wood_elf): capture old_player_state at activation so Take Root skips a prone Treeman (seed 1 step 49 → 206)
+
+**Progress (NOT yet green):** wood_elf seed 1 first divergence advanced step 49 → step 206. No regression
+(19 green rosters 100/100 incl. big-guy Take Root teams chaos/chaos_dwarf/orc/lizardman/nurgle;
+ffb-engine 7032/0, ffb-model 2777/0).
+
+Step 49: home_01 is a prone TREEMAN (MA2) activated for a BLITZ. Java rolls Take Root ZERO times (the
+Treeman started the activation PRONE, and TakeRootBehaviour only rolls when
+`actingPlayer.getOldPlayerState().getBase() == STANDING`). Rust rolled Take Root TWICE (per-die
+step-tagging on GameRng showed tag=TakeRoot at pos30 and pos32), because `StepTakeRoot` read
+`self.old_player_state` — a StepParameter that the activation path never publishes — defaulting to
+STANDING. Those 2 spurious dice shifted the block die from Skull(1, attacker knocked down → home_01
+PRONE) to Pushback(4, attacker stays up → home_01 STANDING); i=50 h00:12,7 Standing[Rust] vs Prone[Java].
+
+Fix (mirrors Java UtilActingPlayer.changeActingPlayer line 79-81):
+- `ActingPlayer.old_player_state: Option<PlayerState>` — new field, reset to None on a genuine player
+  change in `set_player`.
+- `change_player_action` (util_server_steps.rs): capture the player's pre-activation PlayerState into
+  `acting_player.old_player_state` (sticky — only when None, so a same-player blitz re-dispatch keeps
+  the original), right where `standing_up = was_prone` is set.
+- `StepTakeRoot` (bb2025) reads `game.acting_player.old_player_state` (then the step-param, then the
+  STANDING default). A prone Treeman → old=PRONE → started_standing=false → no Take Root roll.
+Note: the live path is the StepTakeRoot Step, not the (dead-for-bb2025) TakeRootBehaviour hook.
+
+FRONTIER: wood_elf seed 1 step 206 (active-team/turnover divergence: Java away EndTurn vs Rust home continues).

@@ -112,9 +112,13 @@ impl StepTakeRoot {
             None => return StepOutcome::next(),
         };
 
-        // Java: actingPlayer.getOldPlayerState().getBase() == PlayerState.STANDING
-        // If old_player_state is unknown (not yet set), conservatively assume STANDING.
-        let started_standing = self.old_player_state
+        // Java: actingPlayer.getOldPlayerState().getBase() == PlayerState.STANDING. Read it from the
+        // ActingPlayer (captured at activation in change_player_action), falling back to the
+        // step-parameter copy, then the conservative STANDING default. A prone Treeman blitzing has
+        // old_player_state=PRONE → started_standing=false → NO Take Root roll (matching Java; wood_elf
+        // seed 1 i=49: Rust was defaulting to STANDING and rolling Take Root twice, shifting block dice).
+        let started_standing = game.acting_player.old_player_state
+            .or(self.old_player_state)
             .map(|s| s.base() == PS_STANDING)
             .unwrap_or(true);
 

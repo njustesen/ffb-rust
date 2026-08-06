@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
-use crate::enums::{PlayerAction, SkillId};
+use crate::enums::{PlayerAction, PlayerState, SkillId};
 use crate::model::player::PlayerId;
 
 /// Tracks the currently-acting player during a turn.
@@ -13,6 +13,11 @@ pub struct ActingPlayer {
     pub current_move: i32,
     pub goes_for_it: bool,
     pub standing_up: bool,
+    /// Java: ActingPlayer.fOldPlayerState — the player's PlayerState captured at the moment of
+    /// activation (UtilActingPlayer.changeActingPlayer), STICKY (set once per activation, reset on
+    /// player change). TakeRootBehaviour reads `getOldPlayerState().getBase() == STANDING` to decide
+    /// whether a Treeman started the activation standing (only then does it roll Take Root).
+    pub old_player_state: Option<PlayerState>,
     pub jumping: bool,
     pub has_acted: bool,
     pub has_fouled: bool,
@@ -102,6 +107,9 @@ impl ActingPlayer {
             self.has_fed = false;
             self.has_acted = false;
             self.standing_up = false;
+            // Java UtilActingPlayer.changeActingPlayer resets oldPlayerState on a genuine player
+            // change; change_player_action re-captures it (sticky) right after this.
+            self.old_player_state = None;
             self.jumping = false;
             self.suffering_blood_lust = false;
             self.suffering_animosity = false;
