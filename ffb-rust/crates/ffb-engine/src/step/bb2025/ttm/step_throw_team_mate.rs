@@ -19,6 +19,8 @@ use ffb_model::report::mixed::report_throw_team_mate_roll::ReportThrowTeamMateRo
 use ffb_mechanics::bb2025::pass_mechanic::PassMechanic as Bb2025PassMechanic;
 use ffb_mechanics::bb2025::ttm_mechanic::TtmMechanic as Bb2025TtmMechanic;
 use ffb_mechanics::modifiers::pass_modifier::PassModifier;
+use ffb_mechanics::modifiers::pass_context::PassContext;
+use ffb_mechanics::modifiers::pass_modifier_factory::PassModifierFactory;
 use ffb_mechanics::pass_mechanic::PassMechanic as PassMechanicTrait;
 use ffb_mechanics::ttm_mechanic::TtmMechanic as TtmMechanicTrait;
 use crate::action::Action;
@@ -117,10 +119,27 @@ impl StepThrowTeamMate {
                 None => return StepOutcome::next(),
             };
 
-            let modifiers: HashSet<PassModifier> = HashSet::new();
             let ttm_mechanic = Bb2025TtmMechanic::new();
-            self.minimum_roll = ttm_mechanic.minimum_roll(passing_distance, &modifiers);
-            let modifier_sum = ttm_mechanic.modifier_sum(passing_distance, &modifiers);
+            // Java: passModifiers = PassModifierFactory.findModifiers(new PassContext(game, thrower,
+            //       passingDistance, true)); minimumRoll = ttmMechanic.minimumRoll(distance, passModifiers).
+            // Rust previously passed an EMPTY modifier set, so a thrower standing in an opposing tackle
+            // zone (e.g. a Treeman at the line of scrimmage) got NO +1 modifier — a roll of 2 evaluated
+            // as Inaccurate (throw-scatter 3×d8) instead of Java's Fumble (1×d8 bounce), desyncing the
+            // whole TTM (halfling seed 2 i=1). The empty-set minimum_roll/modifier_sum already add the
+            // distance modifier; add the factory modifiers (tackle zones, skills, cards) on top, with the
+            // PassContext ttm flag = true (so TTM-specific modifier applicability matches Java).
+            let factory_total: i32 = {
+                let factory = PassModifierFactory::for_rules(game.rules);
+                if let Some(thrower) = game.player(&thrower_id) {
+                    let ctx = PassContext::new(game, thrower, passing_distance, true);
+                    factory.find_modifiers(&ctx).iter().map(|m| m.get_modifier()).sum::<i32>()
+                        + factory.find_skill_modifiers(&ctx).iter().map(|m| m.get_modifier()).sum::<i32>()
+                        + factory.find_card_modifiers(&ctx).iter().map(|m| m.get_modifier()).sum::<i32>()
+                } else { 0 }
+            };
+            let empty: HashSet<PassModifier> = HashSet::new();
+            self.minimum_roll = ttm_mechanic.minimum_roll(passing_distance, &empty) + factory_total;
+            let modifier_sum = ttm_mechanic.modifier_sum(passing_distance, &empty) + factory_total;
 
             let roll = rng.d6();
 

@@ -1220,3 +1220,28 @@ prone/rooted pre-draw (mirrors ParityRunner.sendMoveAction's 1-step-neighbour li
 and kept 1-24. No regression: 19 prior-green rosters 100/100, ffb-engine 7032/0, ffb-model 2777/0.
 
 WOOD_ELF DONE. (bb2025 tier-3 mirror parity, seeds 1-100.)
+
+## Parity(halfling): TTM pass roll must apply pass modifiers (seed 2 → seed 3)
+
+**Progress (halfling NOT yet green):** seed 1 already green (wood_elf Take Root work); seed 2 now green; frontier seed 3.
+
+Frontier was halfling seed 2 step 1 (i=1 Activate(home_01, ThrowTeamMate) — a Treeman throwing a halfling at
+the line of scrimmage). RNG desync in the TTM: Rust 6 dice (rng 12→18), Java 10 (12→22). Java caller stacks:
+pos13 Take Root, pos14 ThrowTeamMate pass roll (d6=2), pos15 scatterPlayer d8, pos16-17 InjuryTypeTTMHitPlayer
+armour, pos18 scatterPlayer d8, pos19-22 InjuryTypeTTMLanding armour+injury. Rust rolled pos15-17 = THREE d8
+(a `throw_scatter=true` 3-d8 scatter) then a landing d6 — no hit-player. Root cause: `StepDispatchScatterPlayer`
+picks the scatter mode from the pass result — FUMBLE → throw_scatter=false (1-d8 bounce, per-square hit-player
+handling); INACCURATE/COMPLETE → throw_scatter=true (3-d8). Java's pass result was FUMBLE, Rust's was
+INACCURATE, for the SAME roll (2). `StepThrowTeamMate.execute_step` built the pass evaluation with an EMPTY
+`HashSet<PassModifier>` (modifier_sum=0), so a thrower in opposing tackle zones got no +modifier: 2-0=2 →
+Inaccurate. Java collects `PassModifierFactory.findModifiers(new PassContext(game, thrower, distance, true))`;
+the Treeman at the LOS has 3 opposing tackle zones → modifier_sum=3 → 2-3=-1 ≤ 1 → Fumble.
+
+Fix (step_throw_team_mate.rs bb2025): compute the factory pass-modifier total via
+`PassModifierFactory::for_rules(game.rules)` + `PassContext::new(game, thrower, distance, /*ttm*/ true)`
+(collection + skill + card modifiers) and add it to `minimum_roll`/`modifier_sum` (the empty-set call already
+contributes the distance modifier). Now roll=2 at the LOS Fumbles like Java → 1-d8 bounce + hit-player path.
+Advanced seed 2 → seed 3. No regression: 20 green rosters 100/100, ffb-engine 7032/0, ffb-model 2777/0.
+
+FRONTIER: halfling seed 3 step 31 (i=32, turn 3 half 1, home; Java Home6 MOVE vs Rust home_03 BLOCK — another
+early divergence, likely another TTM or action-selection issue; investigate next).
