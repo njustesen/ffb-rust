@@ -110,12 +110,16 @@ impl Step for StepInitSelecting {
                     PlayerActionChoice::Block | PlayerActionChoice::Blitz
                 );
                 self.dispatch_player_action = Some(pa);
-                // A prone Blitz declared with NO target: Java's SelectBlitzTarget resolves the target
-                // BEFORE the stand-up, so a null-target blitz (BLITZ_TARGET_NONE) ends the turn with the
-                // player still PRONE. Rust stands up in the Select sequence first, so suppress the
-                // stand-up here — StepInitBlocking's no-defender branch then ends the turn, leaving the
-                // blitzer prone to match Java (seed 7 i=39: away_01 stayed Prone in Java, stood up in Rust).
-                if matches!(player_action, PlayerActionChoice::Blitz) && block_defender_id.is_none() {
+                // A prone Blitz/Block declared with NO target: Java resolves the target BEFORE the
+                // stand-up (Blitz via SelectBlitzTarget; a plain Block reaches StepInitBlocking's
+                // no-defender branch), so a null-target block/blitz ends the turn with the player still
+                // PRONE. Rust stands up in the Select sequence first, so suppress the stand-up here —
+                // the no-defender branch then ends the turn, leaving the player prone to match Java
+                // (Blitz: seed 7 i=39 away_01; Block: halfling seed 5 i=25 — a thrown prone Treeman
+                // home_03 at (17,8) with no adjacent opponent stayed Prone in Java, stood up in Rust).
+                if matches!(player_action, PlayerActionChoice::Blitz | PlayerActionChoice::Block)
+                    && block_defender_id.is_none()
+                {
                     game.acting_player.standing_up = false;
                 }
                 // Java: if (playerAction.isMoving() || playerAction.isStandingUp())

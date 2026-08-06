@@ -1269,3 +1269,25 @@ verify mixed Accurate/Cannoneer etc. if a future divergence points at them.)
 
 FRONTIER: halfling seed 5 step 25 (i=26, turn 2 half 1, away; Java Away2 MOVE vs Rust away_02 MOVE — both
 MOVE but post-hash differs; likely another upstream TTM/action divergence).
+
+## Parity(halfling): null-target Block by a prone player must not stand up (seed 5 → seed 7)
+
+**Progress (halfling NOT yet green):** seeds 1-6 green; frontier seed 7.
+
+Frontier was halfling seed 5 — first divergence at i=26 (a hidden-field state-hash mismatch masked by the
+position-sorted state string). Traced: a thrown Treeman home_03 (thrown by home_01's TTM at i=18, landed
+prone at (17,8)) was activated for a plain BLOCK at step 25 with NO adjacent opponent (null target). Rust
+STOOD IT UP (StepInitSelecting stand-up: base 3→1), Java left it PRONE (StepInitBlocking's no-defender branch
+ends the turn without standing up). 0 dice; then EndTurn. This is the exact analog of the already-fixed
+null-target BLITZ case (step_init_selecting.rs:118 suppresses the stand-up for a Blitz with no defender).
+
+Fix (step_init_selecting.rs): extend the null-target stand-up suppression from `Blitz` to
+`Blitz | Block` — a prone player declaring a Block with `block_defender_id.is_none()` keeps
+`standing_up=false`, so the no-defender branch ends the turn leaving it prone, matching Java. Advanced seed
+5 → seed 7. No regression: 20 green rosters 100/100, ffb-engine 7032/0, ffb-mechanics 1148/0, ffb-model
+2777/0. (Diagnosis note: the visible state= string is position-sorted and omits hidden fields; the harness
+state_hash caught the prone/standing divergence before the string did. Tracked the thrown player by ID
+home_03 — NOT the position-sorted slot h02 — via a gated set_player_state trace, removed after.)
+
+FRONTIER: halfling seed 7 step 9 (i=10, turn 1 half 1; Java active=home Activate(Home3, BLOCK) vs Rust
+active=away Activate(away_06, MOVE) — a turnover/active-team divergence, another early Block-related case).
