@@ -147,6 +147,15 @@ impl PassModifierFactory {
                         result.push(PassModifier::new("Strong Arm", -1, ModifierType::REGULAR));
                     }
                 }
+                SkillId::StrongArm => {
+                    // Java: mixed.StrongArm (bb2020/bb2025) registers PassModifier("Strong Arm", -1,
+                    // REGULAR) with predicate: context.isTtm(). Without this a Treeman throwing a
+                    // team-mate got no -1, so a roll of 2 with one opposing tackle zone (net +1) Fumbled
+                    // instead of Java's net-0 Inaccurate (halfling seed 3 i=31).
+                    if context.ttm {
+                        result.push(PassModifier::new("Strong Arm", -1, ModifierType::REGULAR));
+                    }
+                }
                 SkillId::ThrowTeamMate if rules == Rules::Bb2016 => {
                     // Java: bb2016.ThrowTeamMate registers PassModifier("Throw Team-Mate", +1, REGULAR)
                     // with predicate: context.isTtm().

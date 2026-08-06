@@ -17,7 +17,7 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 8 | dwarf | GREEN 100/100 | — |
 | 9 | elf | GREEN 100/100 | — |
 | 10 | goblin | FAIL 0/100 | seed 1, step 9 — first divergence |
-| 11 | halfling | FAIL 2/100 | seed 3, step 31 — first divergence (seeds 1-2 green; wood_elf Take Root + TTM pass-modifier fixes) |
+| 11 | halfling | FAIL 4/100 | seed 5, step 25 — first divergence (seeds 1-4 green; +Strong Arm TTM pass modifier) |
 | 12 | high_elf | GREEN 100/100 | — |
 | 13 | human | GREEN 100/100 | — |
 | 14 | khemri | GREEN 100/100 | — |

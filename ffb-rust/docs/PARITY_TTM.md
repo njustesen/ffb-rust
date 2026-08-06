@@ -1245,3 +1245,27 @@ Advanced seed 2 → seed 3. No regression: 20 green rosters 100/100, ffb-engine 
 
 FRONTIER: halfling seed 3 step 31 (i=32, turn 3 half 1, home; Java Home6 MOVE vs Rust home_03 BLOCK — another
 early divergence, likely another TTM or action-selection issue; investigate next).
+
+## Parity(halfling): Strong Arm TTM pass modifier missing for mixed editions (seed 3 → seed 5)
+
+**Progress (halfling NOT yet green):** seeds 1-4 green; frontier seed 5.
+
+Frontier was halfling seed 3 step 31 (i=31 Activate(home_02, ThrowTeamMate) — Treeman, roll=2). Rust evaluated
+Fumble (1×d8 bounce) where Java evaluated Inaccurate (3×d8 throw-scatter + Right Stuff landing). Cracked with
+gated Java instrumentation (ThrowTeamMateBehaviour, reverted + jar rebuilt clean; only DiceRoller.java +
+StepGoForIt.java remain modified): JAVA_TTMDBG showed Java's pass modifiers = [Strong Arm:-1, 1 Tacklezone:1]
+→ modSum=0 → Inaccurate; RUST_TTMDBG showed [1 Tacklezone:1], skill=[] → mod_sum=1 → Fumble. Rust was MISSING
+the Treeman's Strong Arm modifier. Root cause: `PassModifierFactory::find_skill_modifiers` gated EVERY skill
+pass modifier (Accurate, StrongArm, ThrowTeamMate, Stunty) on `rules == Rules::Bb2016`, so bb2025 (mixed
+skills) got none. Java's mixed.StrongArm registers `PassModifier("Strong Arm", -1)` with predicate
+`context.isTtm()`.
+
+Fix (pass_modifier_factory.rs): add a `SkillId::StrongArm` arm (non-bb2016) that pushes Strong Arm:-1 when
+`context.ttm`. Advanced seed 3 → seed 5. No regression: 20 green rosters 100/100, ffb-engine 7032/0,
+ffb-mechanics 1148/0, ffb-model 2777/0. (NOTE: other mixed skill pass modifiers may still be missing for
+bb2025 — the bb2016 gate on Accurate/ThrowTeamMate/Stunty is suspicious; only Strong Arm was needed here.
+mixed ThrowTeamMate/Stunty register NO pass modifier in Java, so those bb2016 arms are correctly bb2016-only;
+verify mixed Accurate/Cannoneer etc. if a future divergence points at them.)
+
+FRONTIER: halfling seed 5 step 25 (i=26, turn 2 half 1, away; Java Away2 MOVE vs Rust away_02 MOVE — both
+MOVE but post-hash differs; likely another upstream TTM/action divergence).
