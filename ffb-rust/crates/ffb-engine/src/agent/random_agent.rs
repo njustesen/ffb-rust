@@ -335,18 +335,33 @@ impl Agent for RandomAgent {
                 // (Standing players already draw at StepInitMoving BEFORE their Move-sequence negatrait,
                 // so they need no pre-draw.) legal_move_targets is coordinate-based, so the pre-activation
                 // list equals the post-stand-up list the engine would offer — same list, same pick.
-                if matches!(player_action, PlayerActionChoice::Move)
-                    && gs.game.field_model.player_state(player_id).map(|s| s.is_prone()).unwrap_or(false)
-                {
-                    let targets = crate::legal_actions::legal_move_targets(&gs.game, player_id);
-                    // Java sendMoveAction deselects with 0 actionRng when there is no adjacent empty
-                    // square; only draw when the candidate list is non-empty.
-                    if !targets.is_empty() {
-                        let idx = self.pick_action(targets.len());
-                        self.pending_move = Some(targets[idx]);
-                        if std::env::var("FFB_TRACE").is_ok() {
-                            eprintln!("RUST_SMA pid={} N={} prone_predraw", player_id, targets.len());
-                            eprintln!("RUST_PICK pid={} N={} idx={} t=({},{}) prone_predraw", player_id, targets.len(), idx, targets[idx].x, targets[idx].y);
+                // A PRONE or ROOTED player's Move activation never reaches StepInitMoving's Move prompt
+                // in Rust (a prone player's negatrait can fail in the Select sequence; a rooted player
+                // cannot leave its square), yet Java's ParityRunner.sendMoveAction ALWAYS pre-draws the
+                // move target at phase-2 when it commits to a MOVE activation. Mirror that draw here so
+                // the action-RNG stream stays aligned. PRONE: store the target — StepInitMoving DOES
+                // prompt after the stand-up, and reuses it (no 2nd draw). ROOTED: the target is drawn
+                // and DISCARDED — there is no follow-up Move prompt to consume it (wood_elf seed 1 i=207:
+                // rooted away_01 Treeman; Java drew a target, Rust drew nothing → arc desync shifted the
+                // next mover's square pick). Standing (non-rooted) players draw at StepInitMoving as usual.
+                if matches!(player_action, PlayerActionChoice::Move) {
+                    let st = gs.game.field_model.player_state(player_id);
+                    let is_prone = st.map(|s| s.is_prone()).unwrap_or(false);
+                    let is_rooted = st.map(|s| s.is_rooted()).unwrap_or(false);
+                    if is_prone || is_rooted {
+                        let targets = crate::legal_actions::legal_move_targets(&gs.game, player_id);
+                        // Java sendMoveAction deselects with 0 actionRng when there is no adjacent empty
+                        // square; only draw when the candidate list is non-empty.
+                        if !targets.is_empty() {
+                            let idx = self.pick_action(targets.len());
+                            if is_prone {
+                                self.pending_move = Some(targets[idx]);
+                            }
+                            if std::env::var("FFB_TRACE").is_ok() {
+                                let tag = if is_prone { "prone_predraw" } else { "rooted_predraw" };
+                                eprintln!("RUST_SMA pid={} N={} {}", player_id, targets.len(), tag);
+                                eprintln!("RUST_PICK pid={} N={} idx={} t=({},{}) {}", player_id, targets.len(), idx, targets[idx].x, targets[idx].y, tag);
+                            }
                         }
                     }
                 }

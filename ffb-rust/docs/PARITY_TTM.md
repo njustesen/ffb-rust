@@ -1180,3 +1180,26 @@ Fix (1 line, mirrors Java StepTakeRoot.cancelPlayerAction):
 
 FRONTIER: wood_elf seed 1 step 208 (away_08 MOVE — state-hash divergence, both engines active=away turn=3;
 step-206 blitz turnover now resolves in parity).
+
+## Parity(wood_elf): agent pre-draws the phase-2 move target for a ROOTED mover too (seed 1 → seeds 1-24 green)
+
+**Progress:** wood_elf seed 1 GREEN (frontier was step 208); full-run frontier advanced seed 1 → seed 25.
+
+Step 208 (away_06 MOVE) was a pure ACTION-RNG (arc) divergence — no dice (rng 96 both), identical board,
+but Rust's agent picked move-square idx=0=(17,7) vs Java idx=2=(17,9) from an identical 6-square list. The
+misalignment originated one activation earlier at step 207 (away_01, a STANDING-but-ROOTED Treeman at
+(13,8)): Java's ParityRunner.sendMoveAction ALWAYS pre-draws a move target at phase-2 when it commits to a
+MOVE activation (`JAVA_PICK N=7 idx=3 t=(13,9)`, 1 actionRng) even though the engine then aborts the move
+(rooted → no `JAVA_IM`). Rust's random_agent pre-drew the phase-2 target only for `is_prone()` movers (the
+human-tier stand-up fix), NOT for rooted-standing movers, and a rooted player never reaches StepInitMoving's
+Move prompt in Rust (no `RUST_SMA`), so Rust consumed 0 actionRng there. That 1-draw gap shifted every later
+move-square pick in the away turn.
+
+Fix (random_agent.rs, agent-harness parity — mirrors ParityRunner phase-2): extend the phase-2 move-target
+pre-draw to fire for `is_prone() || is_rooted()`. PRONE keeps storing `pending_move` (StepInitMoving prompts
+after the stand-up and reuses it). ROOTED draws-and-DISCARDS the target (there is no follow-up Move prompt to
+consume it). Same N as Java (legal_move_targets = 7), so the stream realigns. Advanced seed 1 to GREEN and
+seeds 1-24 all green.
+
+FRONTIER: wood_elf seed 25 step 48 (away_04 MOVE, turn 4 half 1, NO dice, post-hash divergence — likely the
+same action-RNG-pick class or a fresh no-dice divergence; investigate next).
