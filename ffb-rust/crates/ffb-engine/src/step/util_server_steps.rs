@@ -60,6 +60,13 @@ pub fn check_command_with_acting_player(game: &Game, acting_player_id: &str) -> 
 /// actingPlayer.dodging and dodge rolls never fired.
 pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerAction, jumping: bool) {
     if !player_id.is_empty() {
+        // Java UtilActingPlayer.changeActingPlayer gates the used-skills / blocked-moving resets on
+        // `if (changed)` — i.e. only when the acting player actually CHANGES. Capture that before
+        // set_player overwrites the id: re-dispatching the SAME player (e.g. a Blitz whose block
+        // sub-activation re-invokes changePlayerAction on the blitzer) must NOT reset its per-activation
+        // skill usage, or a once-per-activation negatrait like Bloodlust re-rolls (vampire seed 2 i=11:
+        // home_03's failed-Bloodlust blitz re-rolled Bloodlust in the block sub-activation → extra dice).
+        let changed = game.acting_player.player_id.as_deref() != Some(player_id);
         // Java UtilActingPlayer.changeActingPlayer: standingUp = (oldState.base == PRONE). A prone
         // player being activated is "standing up" this activation, which lets StepStandUp resolve the
         // stand-up. set_player resets standing_up=false, so set it AFTER, from the pre-activation base.
@@ -78,10 +85,12 @@ pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerActi
         // (Human seed 98 i=124: home_03 used its Pass re-roll at i=92 turn 5; without this reset it
         // stayed marked used through turn 7, so find_skill_reroll_source returned None and the pass
         // fell to a declined TRR offer instead of Java's auto-used Pass re-roll.)
-        if let Some(p) = game.team_home.player_mut(player_id)
-            .or_else(|| game.team_away.player_mut(player_id))
-        {
-            p.reset_used_skills(ffb_model::enums::SkillUsageType::Regular);
+        if changed {
+            if let Some(p) = game.team_home.player_mut(player_id)
+                .or_else(|| game.team_away.player_mut(player_id))
+            {
+                p.reset_used_skills(ffb_model::enums::SkillUsageType::Regular);
+            }
         }
         // Java UtilActingPlayer.changeActingPlayer (`if (changed)` block): resets transient
         // BLOCKED/MOVING states whenever the acting player changes. A block declared then cancelled

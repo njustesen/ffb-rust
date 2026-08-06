@@ -156,9 +156,11 @@ impl StepBloodLust {
                 if use_reroll(game, &source, &acting_id) {
                     do_roll = true;
                 } else {
+                    game.acting_player.suffering_blood_lust = true;
                     return self.fail_blood_lust_for_action(game, &acting_id);
                 }
             } else {
+                game.acting_player.suffering_blood_lust = true;
                 return self.fail_blood_lust_for_action(game, &acting_id);
             }
         } else {

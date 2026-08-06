@@ -1101,3 +1101,31 @@ stands the vampire up BEFORE the negatrait roll).
    prone (seed 1 i=43: Java STANDING at (12,7) vs Rust PRONE). MA<3 players still roll in StepStandUp.
 
 **FRONTIER:** vampire seed 2 step 11 (next iteration).
+
+## Parity(vampire): suffering-on-reroll-decline + guard used-skills reset on genuine player change → VAMPIRE 100/100 GREEN
+
+**Roster GREEN:** vampire 100/100 (final two fixes; combined with earlier commits 38407c73 + afe2fa7f).
+No regression: 18 prior-green rosters still 100/100; ffb-engine 7032/0, ffb-model 2777/0.
+
+1. **Bloodlust suffering set on re-roll decline** (step_blood_lust.rs): the re-roll-decline path
+   (`if re_rolled { if source {use_reroll} else {FAIL} } else {FAIL} }`) did not set
+   suffering_blood_lust; Java BloodLustBehaviour sets `setSufferingBloodLust(true)` when the re-roll is
+   declined/unusable. Without it a blitz/block vampire that failed Bloodlust and declined the re-roll
+   was not marked suffering, so StepInitFeeding early-returned and the "failed to bite → turnover" never
+   fired (vampire seed 2 i=11: home_03's failed-Bloodlust blitz didn't turn over). Set suffering in both
+   decline sub-paths.
+
+2. **Guard used-skills reset on a genuine acting-player change** (util_server_steps.rs
+   change_player_action): the reset of Regular-usage skills ran UNCONDITIONALLY, but Java
+   UtilActingPlayer.changeActingPlayer gates it on `if (changed)` — only when the acting player actually
+   changes. A Blitz whose block sub-activation re-invokes changePlayerAction on the SAME blitzer was
+   wrongly resetting its per-activation skill usage, so once-per-activation Bloodlust RE-ROLLED in the
+   block sub-activation (seed 2 i=11: a spurious 2nd Bloodlust die shifted the block roll one stream
+   position, flipping [6,2]=Pow into [2,2]=BothDown → both fall → 3 extra armour/injury dice). Fix:
+   compute `changed = acting_player.player_id != player_id` before set_player and only reset used_skills
+   when `changed`. Java-faithful; the reset still fires on real activation changes (human seed 98 Pass
+   re-roll case preserved).
+
+Diagnostic chain (gated Java instrumentation JMOVE/JBL reverted + jar rebuilt clean; gated Rust traces
+BLENTRY/REACT reverted): Java rolls Bloodlust ONCE per activation and turns over; Rust rolled it twice
+(re-activation reset) and didn't turn over (suffering unset).
