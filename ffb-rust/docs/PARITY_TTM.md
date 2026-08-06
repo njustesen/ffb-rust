@@ -1155,3 +1155,28 @@ Fix (mirrors Java UtilActingPlayer.changeActingPlayer line 79-81):
 Note: the live path is the StepTakeRoot Step, not the (dead-for-bb2025) TakeRootBehaviour hook.
 
 FRONTIER: wood_elf seed 1 step 206 (active-team/turnover divergence: Java away EndTurn vs Rust home continues).
+
+## Parity(wood_elf): clear ActingPlayer.dodging when Take Root roots a player (seed 1 step 206 → 208)
+
+**Progress (NOT yet green):** wood_elf seed 1 first divergence advanced step 206 → step 208. No regression
+(19 green rosters 100/100; ffb-engine 7032/0, ffb-model 2777/0).
+
+Step 193 (away_01, a standing wood-elf TREEMAN, MOVE): both engines pick a dodge-square destination at
+`StepInitMoving` (which runs BEFORE the activation's `StepTakeRoot`), so `StepInitMoving` sets
+`actingPlayer.dodging = true`. Then Take Root FAILS (d6=1) and roots the player. Java's
+`StepTakeRoot.cancelPlayerAction()` does `actingPlayer.setGoingForIt(true); actingPlayer.setDodging(false)`,
+so the queued move is abandoned: `StepMove` skips (isPinned) and `StepMoveDodge` early-returns on
+`if (!isDodging()) NEXT_STEP` — ZERO further dice. Rust's `cancel_take_root_player_action` set
+`goes_for_it=true` but had a stale no-op comment ("Dodging flag not currently tracked on ActingPlayer")
+and never cleared `dodging`. `dodging` IS a field now (set in `StepInitMoving`), so the rooted Treeman
+still reached `StepMoveDodge` and rolled a spurious MoveDodge die (per-die tag=MoveDodge at pos88 Rust;
+Java had no such die). That 1 extra die shifted the whole RNG stream: by step 206 (home_03 BLITZ) the 3
+block dice + armour/injury were misaligned, so Rust's blitzer avoided the Skull knock-down that in Java
+stunned it and caused a turnover (i=207 Java away/EndTurn vs Rust home continues).
+
+Fix (1 line, mirrors Java StepTakeRoot.cancelPlayerAction):
+- `cancel_take_root_player_action` (step_take_root.rs): add `game.acting_player.dodging = false;` alongside
+  the existing `goes_for_it = true`. Now a rooted mover's StepMoveDodge is correctly skipped.
+
+FRONTIER: wood_elf seed 1 step 208 (away_08 MOVE — state-hash divergence, both engines active=away turn=3;
+step-206 blitz turnover now resolves in parity).

@@ -203,7 +203,13 @@ impl StepTakeRoot {
 fn cancel_take_root_player_action(game: &mut Game, player_id: &str) -> StepOutcome {
     // Java: actingPlayer.setGoingForIt(true); actingPlayer.setDodging(false);
     game.acting_player.goes_for_it = true;
-    // (Dodging flag not currently tracked on ActingPlayer in Rust; no-op.)
+    // Clearing `dodging` is essential: StepInitMoving runs BEFORE StepTakeRoot in the move sequence
+    // and may already have set dodging=true for the queued destination (a tackle-zone square). Without
+    // this, the rooted player — whose StepMove is skipped via isPinned — would still reach
+    // StepMoveDodge, whose only guard is `if (!isDodging()) NEXT_STEP`, and roll a spurious dodge die
+    // (wood_elf seed 1 i=193: rooted away_01 Treeman rolled a MoveDodge Java never rolled, shifting the
+    // whole RNG stream). Java's cancelPlayerAction clears it here.
+    game.acting_player.dodging = false;
 
     // Java: switch on playerAction → change to base action
     match game.acting_player.player_action {
