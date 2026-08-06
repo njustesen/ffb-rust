@@ -1036,3 +1036,40 @@ stand-up path. Failure path already sets PRONE via fail_stand_up.
 lizardman nippon norse nurgle orc skaven necromantic). Diagnostic: FFB_TRACE state-string diff at
 i=161 (a01 Prone vs Standing) + Java DICE_TRACE caller stacks (StepStandUp roll pos=102) + a reverted
 FFB_GFI_TRACE that ruled out the rush (GFI roll=2 succeeded in both).
+
+## Parity(vampire): Bloodlust min-roll + failed-action routing + feed prompt (seed 1 step 7 → 43)
+
+**Progress (NOT yet green):** vampire seed 1 first divergence advanced step 7 → step 43. Three
+Java-faithful Bloodlust fixes (all vampire-isolated — only the vampire roster has Bloodlust/feeding,
+so no other roster is affected). ffb-engine 7032/0, ffb-model 2777/0.
+
+1. **Bloodlust minimum roll (step 7).** Rust hardcoded `minimum_roll_blood_lust() -> 2`. Java (bb2020/
+   bb2025 BloodLustBehaviour) uses `max(2, getSkillIntValue(Bloodlust) - (goodConditions ? 1 : 0))`,
+   where goodConditions = blitz/block/kicking-downed/multiple-block/stand-up-blitz. The vampire roster's
+   Bloodlust value is 3, so a MOVE needs 3+ (a Block needs 2+). Rust's 2+ passed a roll of 2 that Java
+   fails → turnover missed. Added `minimum_roll_blood_lust_with(skill_value, good_conditions)` (bb2016
+   keeps the fixed constant — its Java uses `DiceInterpreter.minimumRollBloodLust()`), a
+   `Player::get_skill_value_int(skill, default)` accessor, and wired the bb2025 step + bb2025 behaviour
+   + bb2020 step to compute skill_value/good_conditions.
+
+2. **Failed-Bloodlust action still executes (step 23).** On a failed Bloodlust for a BLOCK (and other
+   dialog actions), Java sets `setSufferingBloodLust(true)` then routes WAIT_FOR_ACTION_CHANGE to
+   NEXT_STEP (the declared action STILL executes while suffering; feed afterwards) unless
+   `goToLabelOnFailure && (bloodlustAction != null || isPassing)`. Rust always jumped to the failure
+   label, dropping the block. Rewrote the WaitForActionChange handler to mirror Java's routing
+   (NEXT_STEP / DISPATCH_PLAYER_ACTION|MOVE_STACK / BLOOD_LUST_ACTION) and set suffering at the failure
+   point. Updated 2 unit tests that encoded the old (Java-incorrect) behaviour.
+
+3. **Feed uses a PlayerChoice prompt (feeding).** `StepInitFeeding` returned a bare `cont()` with no
+   prompt when adjacent thralls existed. Java shows `DialogPlayerChoiceParameter(FEED)`, which
+   ParityRunner (and the Rust random agent) DECLINE with an empty selection → no bite. Emit
+   `AgentPrompt::PlayerChoice { reason: "FEED", … }` so the agent declines consistently.
+
+**FRONTIER (vampire seed 1 step 43 — DEFERRED, deeper layer):** a PRONE vampire doing a MOVE rolls
+Bloodlust in the SELECT/activation sequence (goto label `END_SELECTING`, confirmed via a gated FBL
+trace), not the MOVE sequence (`END_MOVING`). On failure Rust gotos END_SELECTING, which ends selection
+but does NOT suppress the subsequent MOVE sequence → the vampire stands up AND moves (rolls a dodge)
+where Java suppresses the movement (stands, stays put). Same family as the halfling prone-negatrait
+deferral (negatrait rolled in the select phase vs move phase). Needs the failed-Bloodlust move
+suppression to propagate across the prone stand-up select→move sequence boundary (Java publishes
+MOVE_STACK null; Rust's move sequence re-derives the path from the agent). Fresh focused session.

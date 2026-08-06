@@ -76,6 +76,16 @@ pub fn minimum_roll_resisting_foul_appearance() -> i32 { 2 }
 /// Minimum roll for Blood Lust to not trigger (always 2+).
 pub fn minimum_roll_blood_lust() -> i32 { 2 }
 
+/// BB2020/BB2025 blood-lust minimum roll.
+/// Java (bb2020/bb2025 BloodLustBehaviour):
+/// `minimumRoll = Math.max(2, player.getSkillIntValue(Bloodlust) - (goodConditions ? 1 : 0))`.
+/// `good_conditions` is true when the action is a blitz/block/kicking-downed/multiple-block/
+/// stand-up-blitz (a blitzing/blocking activation is more forgiving). BB2016 uses the fixed
+/// `minimum_roll_blood_lust()` instead.
+pub fn minimum_roll_blood_lust_with(skill_value: i32, good_conditions: bool) -> i32 {
+    i32::max(2, skill_value - if good_conditions { 1 } else { 0 })
+}
+
 /// Minimum roll so Animosity does not trigger (always 2+).
 pub fn minimum_roll_animosity() -> i32 { 2 }
 

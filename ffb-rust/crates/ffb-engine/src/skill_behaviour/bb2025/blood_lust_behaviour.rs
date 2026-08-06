@@ -9,7 +9,7 @@ use ffb_model::enums::{PlayerAction, ReRollSource, SkillId};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
-use ffb_mechanics::mechanics::minimum_roll_blood_lust;
+use ffb_mechanics::mechanics::minimum_roll_blood_lust_with;
 use ffb_model::report::report_blood_lust_roll::ReportBloodLustRoll;
 use ffb_model::prompts::agent_prompt::AgentPrompt;
 use crate::step::framework::{StepOutcome, StepParameter};
@@ -96,8 +96,21 @@ impl StepModifierTrait for BloodLustStepModifier {
             return false;
         }
 
+        // Java: goodConditions = BLITZ_MOVE | isKickingDowned | BLITZ | isBlockAction | MULTIPLE_BLOCK | STAND_UP_BLITZ
+        let good_conditions = game.acting_player.player_action.map(|a|
+            a == PlayerAction::BlitzMove
+                || a.is_kicking_downed()
+                || a == PlayerAction::Blitz
+                || a.is_block_action()
+                || a == PlayerAction::MultipleBlock
+                || a == PlayerAction::StandUpBlitz
+        ).unwrap_or(false);
+        // Java: minimumRoll = max(2, getSkillIntValue(Bloodlust) - (goodConditions ? 1 : 0)).
+        let skill_value = game.player(&acting_id)
+            .map(|p| p.get_skill_value_int(SkillId::BloodLust, 2))
+            .unwrap_or(2);
         let roll = rng.d6();
-        let min_roll = minimum_roll_blood_lust();
+        let min_roll = minimum_roll_blood_lust_with(skill_value, good_conditions);
         let successful = roll >= min_roll;
 
         if let Some(player) = game.player_mut(&acting_id) {

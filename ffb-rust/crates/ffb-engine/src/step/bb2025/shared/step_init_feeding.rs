@@ -128,7 +128,16 @@ impl StepInitFeeding {
             }
 
             if !all_victims.is_empty() {
-                return StepOutcome::cont();
+                // Java: UtilServerDialog.showDialog(DialogPlayerChoiceParameter(FEED, victims,…)).
+                // Emit the PlayerChoice prompt so the agent can respond; the random agent (and Java's
+                // ParityRunner) DECLINE every PlayerChoice with an empty selection → no feed/bite. The
+                // previous bare cont() carried no prompt, so the feed choice was resolved another way and
+                // Rust bit a thrall Java never bit (vampire seed 1 i=43: an extra InjuryTypeBitten roll).
+                return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::PlayerChoice {
+                    eligible_players: all_victims,
+                    reason: "FEED".to_string(),
+                    descriptions: vec![],
+                });
             } else {
                 self.feed_on_player_choice = Some(false);
             }

@@ -1,4 +1,4 @@
-use ffb_mechanics::mechanics::minimum_roll_blood_lust;
+use ffb_mechanics::mechanics::minimum_roll_blood_lust_with;
 use ffb_model::enums::{PlayerAction, ReRollSource, SkillId};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
@@ -111,8 +111,31 @@ impl Step for StepBloodLust {
 
 impl StepBloodLust {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: state.status == WAIT_FOR_ACTION_CHANGE branch (after the action-change dialog response).
+        // The player is already suffering blood lust; route the sequence. Crucially, unless a failure
+        // label applies, Java returns NEXT_STEP so the declared action (e.g. a Block) STILL EXECUTES
+        // while suffering — the vampire feeds afterwards. The previous Rust code always jumped to the
+        // failure label, silently dropping the block (vampire seed 1 i=23: a failed-bloodlust BLOCK was
+        // skipped, so no block dice / armour / knockdowns and the RNG desynced from Java).
         if self.status == BloodLustStatus::WaitForActionChange {
-            return self.fail_blood_lust(game);
+            let player_action = game.acting_player.player_action;
+            let is_standing_up = player_action.map(|a| a.is_standing_up()).unwrap_or(false);
+            let is_passing = player_action.map(|a| a.is_passing()).unwrap_or(false);
+            let has_label = self.goto_label_on_failure.as_deref().map(|l| !l.is_empty()).unwrap_or(false);
+            // Java: goToLabel iff (label provided) && (bloodlustAction != null || playerAction.isPassing())
+            let mut out = if has_label && (self.bloodlust_action.is_some() || is_passing) {
+                StepOutcome::goto(self.goto_label_on_failure.as_deref().unwrap())
+            } else {
+                StepOutcome::next()
+            };
+            // Java: if playerAction.isStandingUp() → DISPATCH_PLAYER_ACTION(playerAction); else MOVE_STACK null
+            if is_standing_up {
+                out = out.publish(StepParameter::DispatchPlayerAction(player_action));
+            } else {
+                out = out.publish(StepParameter::MoveStack(vec![]));
+            }
+            out = out.publish(StepParameter::BloodLustAction(self.bloodlust_action));
+            return out;
         }
 
         if !game.turn_mode.check_negatraits() {
@@ -148,8 +171,22 @@ impl StepBloodLust {
             return StepOutcome::next();
         }
 
+        // Java: goodConditions = BLITZ_MOVE | isKickingDowned | BLITZ | isBlockAction | MULTIPLE_BLOCK | STAND_UP_BLITZ
+        let good_conditions = game.acting_player.player_action.map(|a|
+            a == PlayerAction::BlitzMove
+                || a.is_kicking_downed()
+                || a == PlayerAction::Blitz
+                || a.is_block_action()
+                || a == PlayerAction::MultipleBlock
+                || a == PlayerAction::StandUpBlitz
+        ).unwrap_or(false);
+        // Java: minimumRoll = max(2, getSkillIntValue(Bloodlust) - (goodConditions ? 1 : 0)).
+        // Bloodlust's default skill value is 2 (Java Bloodlust ctor); the vampire roster overrides to 3.
+        let skill_value = game.player(&acting_id)
+            .map(|p| p.get_skill_value_int(SkillId::BloodLust, 2))
+            .unwrap_or(2);
         let roll = rng.d6();
-        let min_roll = minimum_roll_blood_lust();
+        let min_roll = minimum_roll_blood_lust_with(skill_value, good_conditions);
         let successful = roll >= min_roll;
 
         if let Some(player) = game.player_mut(&acting_id) {
@@ -167,6 +204,9 @@ impl StepBloodLust {
                     return StepOutcome::cont().with_event(event).with_prompt(prompt);
                 }
             }
+            // Java: setSufferingBloodLust(true) at failure when no re-roll is taken (set before the
+            // action-change dialog for BLOCK/etc, so the flag holds through WAIT_FOR_ACTION_CHANGE).
+            game.acting_player.suffering_blood_lust = true;
             return self.fail_blood_lust_for_action(game, &acting_id).with_event(event);
         }
 
@@ -297,7 +337,8 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(seed));
         assert_eq!(out.action, StepAction::Continue);
         assert!(matches!(out.prompt, Some(AgentPrompt::BloodlustAction { .. })));
-        assert!(!game.acting_player.suffering_blood_lust);
+        // Java sets setSufferingBloodLust(true) at the failure, BEFORE showing the action-change dialog.
+        assert!(game.acting_player.suffering_blood_lust);
     }
 
     #[test]
@@ -324,13 +365,15 @@ mod tests {
     }
 
     #[test]
-    fn bloodlust_dialog_no_goes_to_failure() {
+    fn bloodlust_dialog_no_proceeds_to_action() {
+        // Java WAIT_FOR_ACTION_CHANGE: keeping a BLOCK (bloodlustAction == null, not passing) routes to
+        // NEXT_STEP so the declared action still executes while suffering blood lust — NOT the failure label.
         let seed = seed_for_d6(1);
         let mut game = make_game(vec![SkillId::BloodLust], Some(PlayerAction::Block));
         let mut step = StepBloodLust::new("fail");
         step.start(&mut game, &mut GameRng::new(seed));
         let out = step.handle_command(&Action::BloodlustAction { change: false }, &mut game, &mut GameRng::new(0));
-        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(out.action, StepAction::NextStep);
         assert!(game.acting_player.suffering_blood_lust);
         assert!(!out.published.iter().any(|p| matches!(p, StepParameter::BloodLustAction(Some(_)))));
     }

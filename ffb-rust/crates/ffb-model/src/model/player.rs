@@ -300,6 +300,20 @@ impl Player {
         0
     }
 
+    /// Java: Player.getSkillIntValue(Skill) — the numeric value attached to a specific skill on this
+    /// player (e.g. Bloodlust's roll rating), falling back to the skill's default when the roster
+    /// provides no value. Reads the SkillWithValue across starting/extra/temporary skills; the stored
+    /// value string may be a bare number or a roll like "3+" (the trailing '+' is stripped).
+    pub fn get_skill_value_int(&self, skill_id: SkillId, default: i32) -> i32 {
+        self.starting_skills.iter()
+            .chain(self.extra_skills.iter())
+            .chain(self.temporary_skills.iter())
+            .find(|sw| sw.skill_id == skill_id)
+            .and_then(|sw| sw.value.as_deref())
+            .and_then(|v| v.trim().trim_end_matches('+').parse::<i32>().ok())
+            .unwrap_or(default)
+    }
+
     /// 1:1 translation of canBeThrown — true if player has canBeThrown property, or canBeThrownIfStrengthIs3orLess and ST<=3.
     pub fn can_be_thrown(&self) -> bool {
         self.has_skill_property(NamedProperties::CAN_BE_THROWN)
