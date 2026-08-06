@@ -313,6 +313,25 @@ pub fn legal_move_targets(game: &Game, player_id: &str) -> Vec<FieldCoordinate> 
     targets
 }
 
+/// Adjacent empty on-pitch squares of `player_id`, sorted by (x, y) — like `legal_move_targets`
+/// but WITHOUT the MA+GFI cap. The agent's phase-2 move-target PRE-DRAW (prone/rooted movers) runs
+/// while `acting_player` is still the PREVIOUS activator, so `acting_player.current_move` (read by
+/// `legal_move_targets`'s cap) is STALE and can wrongly zero the list (wood_elf seed 25 i=47: prone
+/// home_01's list was capped to 0 because home_03 had current_move=4). A fresh activation hasn't spent
+/// any MA, so the cap doesn't apply — mirror Java ParityRunner.sendMoveAction, which lists the 1-step
+/// neighbours regardless of MA.
+pub fn adjacent_empty_move_targets(game: &Game, player_id: &str) -> Vec<FieldCoordinate> {
+    let start = match game.field_model.player_coordinate(player_id) {
+        Some(c) => c,
+        None => return vec![],
+    };
+    let mut targets: Vec<FieldCoordinate> = start.neighbours().into_iter()
+        .filter(|n| n.is_on_pitch() && game.field_model.player_at(*n).is_none())
+        .collect();
+    targets.sort_by_key(|c| (c.x, c.y));
+    targets
+}
+
 /// Returns all squares the blitzing player can legally move to for a BLITZ action:
 /// empty squares within MA moves that are adjacent to `defender_id`, plus the player's
 /// current square if it is already adjacent to the defender (0-move BLITZ).

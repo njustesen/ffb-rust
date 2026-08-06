@@ -1203,3 +1203,20 @@ seeds 1-24 all green.
 
 FRONTIER: wood_elf seed 25 step 48 (away_04 MOVE, turn 4 half 1, NO dice, post-hash divergence — likely the
 same action-RNG-pick class or a fresh no-dice divergence; investigate next).
+
+## Parity(wood_elf): pre-draw uses uncapped neighbour list → WOOD_ELF 100/100 GREEN
+
+**wood_elf 100/100 GREEN** (20 rosters green). Frontier was seed 25 step 49 (away_04 MOVE, no-dice
+action-RNG divergence). Root: the phase-2 move-target PRE-DRAW (prone/rooted movers) called
+`legal_move_targets`, whose MA+GFI cap reads `game.acting_player.current_move`. But the pre-draw runs while
+`acting_player` is still the PREVIOUS activator, so that current_move is STALE (wood_elf seed 25 i=47: prone
+Treeman home_01's list was capped to 0 because the prior mover home_03 had current_move=4; Java's
+ParityRunner computed N=4 fresh → Rust drew 0 actionRng, Java drew 1 → arc desync shifted a later move pick).
+The cap only ever misfires in the pre-draw (a fresh activation hasn't spent MA; the normal StepInitMoving
+prompt has current_move=0 on the first move so the cap never triggers there).
+
+Fix: added `adjacent_empty_move_targets` (legal_move_targets minus the MA cap) and used it in the
+prone/rooted pre-draw (mirrors ParityRunner.sendMoveAction's 1-step-neighbour list). Greened seeds 25-100
+and kept 1-24. No regression: 19 prior-green rosters 100/100, ffb-engine 7032/0, ffb-model 2777/0.
+
+WOOD_ELF DONE. (bb2025 tier-3 mirror parity, seeds 1-100.)

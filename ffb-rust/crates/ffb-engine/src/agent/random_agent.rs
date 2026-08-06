@@ -349,7 +349,10 @@ impl Agent for RandomAgent {
                     let is_prone = st.map(|s| s.is_prone()).unwrap_or(false);
                     let is_rooted = st.map(|s| s.is_rooted()).unwrap_or(false);
                     if is_prone || is_rooted {
-                        let targets = crate::legal_actions::legal_move_targets(&gs.game, player_id);
+                        // NO-CAP neighbour list: at pre-draw time acting_player is still the PREVIOUS
+                        // activator, so legal_move_targets's MA cap reads a stale current_move and can
+                        // wrongly zero the list. A fresh activation hasn't spent MA — mirror ParityRunner.
+                        let targets = crate::legal_actions::adjacent_empty_move_targets(&gs.game, player_id);
                         // Java sendMoveAction deselects with 0 actionRng when there is no adjacent empty
                         // square; only draw when the candidate list is non-empty.
                         if !targets.is_empty() {
