@@ -321,6 +321,19 @@ impl StepInitMoving {
                 clear_stack: false,
             };
         }
+        // A Vampire overcome by Blood Lust (failed the roll this activation) takes NO move: Java's
+        // server reaches StepInitMoving with an EMPTY move stack (the client is never asked for a move)
+        // and just proceeds — the vampire stays put, rolling only the Bloodlust die, then feeds
+        // (turnover if no adjacent thrall). Confirmed via gated Java instrumentation (JMOVE_EXEC
+        // suffering=true fMoveStackProvided=false). Rust's harness instead PROMPTS the agent on an
+        // empty stack (below), which supplies a path and moves the vampire (seed 1 i=43: prone home_01
+        // moved to (11,8)+dodge vs Java staying at (12,7)). Skip straight to END_MOVING so the move
+        // steps (Move/GoForIt/MoveDodge) are bypassed and the sequence proceeds to feeding.
+        if game.acting_player.suffering_blood_lust {
+            let label = self.goto_label_on_end.clone();
+            return StepOutcome::goto(&label)
+                .publish(StepParameter::EndPlayerAction(true));
+        }
         // Empty move stack — compute legal move targets and prompt the agent for a destination.
         // The live driver.rs/step architecture never carried this over from the pre-driver.rs
         // engine.rs (`Step::InitMoving` there did exactly this via the same `legal_move_targets`/

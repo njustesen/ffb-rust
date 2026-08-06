@@ -133,8 +133,20 @@ impl Step for StepInitSelecting {
                         let has_free = game.player(player_id)
                             .map(|p| p.has_skill_property(NamedProperties::CAN_STAND_UP_FOR_FREE))
                             .unwrap_or(false);
+                        let ma = game.player(player_id).map(|p| p.movement_with_modifiers()).unwrap_or(0);
+                        // A free stand-up (MA >= MINIMUM_MOVE_TO_STAND_UP=3, or canStandUpForFree) always
+                        // succeeds — apply STANDING now, BEFORE the activation's negatrait rolls (Bloodlust
+                        // etc.), so a failed negatrait that gotos the failure label and skips StepStandUp does
+                        // not leave the player prone. Java rolls the negatrait with the player already standing
+                        // (Bloodlust prone=false for a MA6 Vampire; vampire seed 1 i=43: a prone Vampire failing
+                        // Bloodlust ends STANDING in Java but stayed PRONE in Rust). MA<3 players still roll to
+                        // stand up in StepStandUp, so they are not pre-stood here.
+                        if has_free || ma >= 3 {
+                            if let Some(ps) = game.field_model.player_state(player_id) {
+                                game.field_model.set_player_state(player_id, ps.change_base(ffb_model::enums::PS_STANDING));
+                            }
+                        }
                         if !has_free {
-                            let ma = game.player(player_id).map(|p| p.movement_with_modifiers()).unwrap_or(0);
                             game.acting_player.current_move = 3.min(ma);
                             // Java: actingPlayer.setGoingForIt(UtilPlayer.isNextMoveGoingForIt(game)).
                             // When standing up consumes all remaining MA (e.g. MA-3 player), the next

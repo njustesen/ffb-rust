@@ -1073,3 +1073,31 @@ where Java suppresses the movement (stands, stays put). Same family as the halfl
 deferral (negatrait rolled in the select phase vs move phase). Needs the failed-Bloodlust move
 suppression to propagate across the prone stand-up select→move sequence boundary (Java publishes
 MOVE_STACK null; Rust's move sequence re-derives the path from the agent). Fresh focused session.
+
+## Parity(vampire): suffering-vampire move suppression + free-stand-up-before-negatraits (seed 1 GREEN)
+
+**Progress:** vampire SEED 1 now 100/100 (was first divergence step 43); frontier advanced to seed 2
+step 11. Two fixes, both driven by a failed-Bloodlust PRONE vampire's MOVE. No regression (18 green
+rosters 100/100; ffb-engine 7032/0, ffb-model 2777/0). Diagnosed via gated Java instrumentation
+(reverted + jar rebuilt clean afterward): JMOVE_EXEC showed a suffering vampire reaches StepInitMoving
+with fMoveStackProvided=false (Java never moves it); JBL showed Bloodlust rolls with prone=false (Java
+stands the vampire up BEFORE the negatrait roll).
+
+1. **Suffering vampire takes no move** (step_init_moving.rs): a Vampire that failed Blood Lust this
+   activation must not move — Java reaches StepInitMoving with an empty move stack and proceeds without
+   prompting the client; the vampire stays put, rolls only the Bloodlust die, then feeds (turnover if no
+   adjacent thrall). Rust instead PROMPTS the agent on an empty stack, which supplied a path and moved
+   the vampire (+ a dodge), desyncing the RNG. Fix: when `acting_player.suffering_blood_lust`, skip the
+   move prompt and `goto GOTO_LABEL_ON_END` + publish END_PLAYER_ACTION so StepEndMoving routes to the
+   feed (a bare next()/goto looped: StepEndMoving Branch 5 re-dispatches Move while is_next_move_possible
+   is true).
+
+2. **Free stand-up applied before the activation negatraits** (step_init_selecting.rs): a prone player
+   with a free stand-up (MA >= MINIMUM_MOVE_TO_STAND_UP=3, or canStandUpForFree) is now set to STANDING
+   in StepInitSelecting, BEFORE the activation sequence rolls Bloodlust/Bone-head/etc. A free stand-up
+   always succeeds, so a failed negatrait that gotos the failure label and skips StepStandUp must not
+   leave the player prone. Java rolls the negatrait with the player already standing (Bloodlust
+   prone=false). Rust previously rolled Bloodlust while prone → on failure skipped StepStandUp → stayed
+   prone (seed 1 i=43: Java STANDING at (12,7) vs Rust PRONE). MA<3 players still roll in StepStandUp.
+
+**FRONTIER:** vampire seed 2 step 11 (next iteration).
