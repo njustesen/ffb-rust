@@ -1291,3 +1291,23 @@ home_03 — NOT the position-sorted slot h02 — via a gated set_player_state tr
 
 FRONTIER: halfling seed 7 step 9 (i=10, turn 1 half 1; Java active=home Activate(Home3, BLOCK) vs Rust
 active=away Activate(away_06, MOVE) — a turnover/active-team divergence, another early Block-related case).
+
+## Parity(halfling): fumbled-TTM ball-carrier fail-landing attaches RightStuffCommand → HALFLING 100/100 GREEN
+
+**halfling 100/100 GREEN** (21 rosters green). Frontier was seed 7 i=9: a fumbled Throw Team-Mate of a
+ball-carrier (thrown away_03, pass roll=1). On the FAILED Right Stuff landing, Java attaches
+`RightStuffCommand(thrownPlayer, fThrownPlayerHasBall)` to the SteadyFootingContext (StepRightStuff.java);
+that command (run on StepSteadyFooting's fail path) drops the thrown player — bouncing the loose ball that
+StepRightStuff already moved onto the player's landing square — and turns the drive over if the player
+carried the ball. Rust's fail path built the context with `from_injury_result` (NO command), so a fumbled
+TTM of a ball-carrier neither rolled the ball-bounce d8 (Java pos25 StepCatchScatterThrowIn.bounceBall) nor
+turned over (Java i=10 flipped to the other team; Rust continued).
+
+Fix (step_right_stuff.rs fail path): build the SteadyFootingContext with
+`from_injury_result_with_commands(injury_result, [RightStuffCommand::new(player_id, thrown_player_has_ball)])`,
+mirroring Java. Greened seed 7 and all remaining seeds → halfling 100/100. No regression: 20 prior-green
+rosters 100/100, ffb-engine 7032/0, ffb-mechanics 1148/0, ffb-model 2777/0.
+
+HALFLING DONE. The deferred prone-Treeman blitz-negatrait class (old seed-1 step-20) was retired for free by
+wood_elf's Take Root fixes; the roster's real blockers were all TTM sub-cases (pass modifiers, Strong Arm,
+null-target Block stand-up, fumbled-carrier ball-bounce/turnover). (bb2025 tier-3 mirror parity, seeds 1-100.)

@@ -14,7 +14,9 @@ use crate::drop_player_context::SteadyFootingContext;
 use crate::mechanic::spp_calc::SppCalc;
 use crate::step::abstract_step_with_re_roll::{ReRollState, find_skill_reroll_source};
 use crate::step::framework::{Step, StepOutcome, CatchScatterThrowInMode};
-use crate::step::framework::{StepId, StepParameter};
+use crate::step::framework::{DeferredCommand, StepId, StepParameter};
+use crate::step::bb2025::command::RightStuffCommand;
+use std::sync::Arc;
 use crate::step::util_server_injury::handle_injury_by_name;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 use crate::step::util_server_steps::check_touchdown;
@@ -374,7 +376,17 @@ impl StepRightStuff {
             attacker_id.as_deref(), &player_id,
             coord, None, None, ApothecaryMode::ThrownPlayer,
         );
-        let ctx = SteadyFootingContext::from_injury_result(injury_result);
+        // Java: RightStuffCommand command = new RightStuffCommand(thrownPlayer.getId(), fThrownPlayerHasBall);
+        //       publishParameter(STEADY_FOOTING_CONTEXT, new SteadyFootingContext(injuryResult, [command]));
+        // The command runs on StepSteadyFooting's fail path: it drops the thrown player (which bounces a
+        // loose ball already moved onto the player's landing square above) and, if the player carried the
+        // ball, turns the drive over. Rust previously built the context with NO command, so a fumbled TTM
+        // of a ball-carrier neither bounced the ball nor turned over (halfling seed 7 i=9: Java rolled a
+        // ball-bounce d8 + flipped to the other team; Rust did neither).
+        let has_ball = self.thrown_player_has_ball.unwrap_or(false);
+        let commands: Vec<Arc<dyn DeferredCommand>> =
+            vec![Arc::new(RightStuffCommand::new(player_id.clone(), has_ball))];
+        let ctx = SteadyFootingContext::from_injury_result_with_commands(injury_result, commands);
         StepOutcome::next()
             .publish(StepParameter::SteadyFootingContext(Box::new(ctx)))
             .publish(StepParameter::ThrownPlayerCoordinate(None))
