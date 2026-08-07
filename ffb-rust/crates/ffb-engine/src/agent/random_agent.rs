@@ -476,6 +476,14 @@ impl Agent for RandomAgent {
             // decision_rng call desyncing later picks.
             Some(AgentPrompt::ReRollOffer { .. }) =>
                 Action::UseReRoll { use_reroll: false },
+            // Dump Off is OPTIONAL and DECLINED by the parity harness: a blocked/blitzed ball-carrier
+            // does NOT throw a Quick Pass. Java's ParityRunner sends no "use" for the DEFENDER_ACTION
+            // dump-off dialog (RandomStrategy no-op), so the carrier keeps the ball and the block
+            // proceeds. Rust previously answered every SkillUse with use_skill:true → it "used" dump-off
+            // but then stalled (the dump-off pass was never driven; dark_elf seed 55 i=139: no i=140,
+            // rust=None). Decline dump-off (use_skill:false) so the block proceeds like Java.
+            Some(AgentPrompt::SkillUse { skill_name, .. }) if skill_name == "DumpOff" =>
+                Action::UseSkill { skill_id: SkillId::DumpOff, use_skill: false },
             // Skill use: AGENT_CONTRACT §7 — ALWAYS use, deterministically, 0 rng. Java ParityRunner
             // SKILL_USE = `sendUseSkill(skill, true, playerId)` (no decisionRng). The old code
             // random-sampled via pick_bool (spurious draw + wrong choice → decision-stream desync).

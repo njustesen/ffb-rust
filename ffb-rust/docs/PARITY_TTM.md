@@ -1337,3 +1337,29 @@ misleading because a dead (never-instantiated) step's code is eliminated — ver
 in the binary (`strings`) before concluding "the step didn't run".
 
 SLANN DONE. (bb2025 tier-3 mirror parity, seeds 1-100.)
+
+## Parity(dark_elf): decline Dump Off on both engines → DARK_ELF 100/100 GREEN
+
+**dark_elf 100/100 GREEN** (23 rosters green). Frontier was seed 55 java=None (Java crashed). A blocked/
+blitzed ball-carrier with Dump Off (harness i=139, away_04 blitzes the carrier) is offered a SKILL_USE
+"use Dump Off?" dialog. BOTH agents blindly "always use" skills, so both tried to dump off — and both
+mishandled it: Rust used it then STALLED (dump-off pass never driven → no i=140, rust=None); Java used it →
+TurnMode.DUMP_OFF → DEFENDER_ACTION dialog → INIT_PASSING(DUMP_OFF) (undriven by ParityRunner) → stock-engine
+NPE in StepBlockStatistics → java=None. Dump Off is OPTIONAL, so the correct parity behavior is to DECLINE it
+(keep the ball, let the block proceed) — which both engines' harness AIs should do.
+
+Fix (both sides, symmetric):
+- Rust (random_agent.rs): special-case `AgentPrompt::SkillUse { skill_name == "DumpOff" }` → `UseSkill{ use_skill:
+  false }` (decline). All other SkillUse prompts keep use_skill:true.
+- Java harness (ffb-ai ParityRunner.java SKILL_USE dialog case): decline when the skill class is `DumpOff`
+  (`sendUseSkill(skill, false, ...)`); use everything else. (Jar rebuilt; a ParityRunner harness change is
+  expected/kept in the ffb repo alongside the pre-existing DiceRoller.java + StepGoForIt.java.)
+
+Both decline → neither enters DUMP_OFF/INIT_PASSING → Java no longer NPEs, Rust no longer stalls → the block
+proceeds identically. Greened seed 55 and all remaining → dark_elf 100/100. No regression: 22 prior-green
+rosters 100/100, ffb-engine 7032/0, ffb-mechanics 1148/0, ffb-model 2777/0. (No green roster hit Dump Off
+before — they'd have crashed Java otherwise — so the decline change is regression-safe.)
+
+DARK_ELF DONE (first HARNESS-GAP roster resolved). NOTE: this deliberately DECLINES dump-off rather than
+implementing the dump-off pass on both engines; if full dump-off coverage is ever wanted, that's a separate
+(larger) task. (bb2025 tier-3 mirror parity, seeds 1-100.)

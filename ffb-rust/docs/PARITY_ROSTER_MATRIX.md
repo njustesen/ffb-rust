@@ -12,7 +12,7 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 3 | chaos | GREEN 100/100 | — |
 | 4 | chaos_dwarf | GREEN 100/100 | — |
 | 5 | chaos_pact | GREEN 100/100 | — |
-| 6 | dark_elf | FAIL 54/100 | seed 55, step 0 — first divergence |
+| 6 | dark_elf | GREEN 100/100 | both agents DECLINE Dump Off (Rust random_agent SkillUse{DumpOff}→use=false; Java ParityRunner SKILL_USE declines DumpOff) → no DUMP_OFF/INIT_PASSING → no Java NPE / Rust stall |
 | 7 | dark_elf_league_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
 | 8 | dwarf | GREEN 100/100 | — |
 | 9 | elf | GREEN 100/100 | — |
