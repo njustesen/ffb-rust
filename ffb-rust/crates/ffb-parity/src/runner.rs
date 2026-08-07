@@ -13,7 +13,7 @@ use ffb_model::model::player::Player;
 use ffb_model::model::roster_position::RosterPosition;
 use ffb_model::model::team::Team;
 use ffb_model::prompts::AgentPrompt;
-use ffb_model::option::game_option_id::{INDUCEMENTS, MAX_PLAYERS_ON_FIELD, MIN_PLAYERS_ON_LOS, MAX_PLAYERS_IN_WIDE_ZONE};
+use ffb_model::option::game_option_id::{INDUCEMENTS, MAX_PLAYERS_ON_FIELD, MIN_PLAYERS_ON_LOS, MAX_PLAYERS_IN_WIDE_ZONE, MB_STACKS_AGAINST_CHAINSAW};
 use crate::log_format::{GameLog, LogLine, java_log_path_for, rust_log_path_for, rust_events_path_for};
 use crate::state_hash::state_hash;
 use ffb_model::util::state_hash::state_string;
@@ -28,6 +28,12 @@ pub const BASELINE_SETUP_OPTIONS: &[(&str, &str)] = &[
     (MAX_PLAYERS_ON_FIELD, "11"),
     (MIN_PLAYERS_ON_LOS, "3"),
     (MAX_PLAYERS_IN_WIDE_ZONE, "2"),
+    // Java's parity game runs with mbStacksAgainstChainsaw enabled (confirmed via JAVA_AVBROKE:
+    // a knocked-down Chainsaw wielder's own chainsaw AND the opponent's Mighty Blow both apply to
+    // its fall armour). The factory default is false in both engines, so Rust must set it to match
+    // Java — otherwise a fallen Looney's armour holds (chainsaw-only +3) where Java breaks it
+    // (chainsaw +3 + Mighty Blow +2), diverging the dice (goblin seed 99).
+    (MB_STACKS_AGAINST_CHAINSAW, "true"),
 ];
 
 /// Invoke the Java parity runner as a subprocess.
@@ -872,4 +878,22 @@ pub fn run_uniform_game(
     let score_home = engine.game.game_result.home.score;
     let score_away = engine.game.game_result.away.score;
     (all_events, score_home, score_away, unhandled_prompts)
+}
+
+#[cfg(test)]
+mod baseline_option_tests {
+    use super::BASELINE_SETUP_OPTIONS;
+    use ffb_model::option::game_option_id::MB_STACKS_AGAINST_CHAINSAW;
+
+    /// Regression (goblin seed 99): the parity game must enable mbStacksAgainstChainsaw to match
+    /// Java's runtime (a knocked-down Chainsaw wielder's own chainsaw AND the opponent's Mighty Blow
+    /// both apply to its fall armour). Dropping this reverts a fallen Looney's KO to a prone-only
+    /// result and desyncs the shared dice stream.
+    #[test]
+    fn baseline_enables_mb_stacks_against_chainsaw() {
+        assert!(
+            BASELINE_SETUP_OPTIONS.iter().any(|(k, v)| *k == MB_STACKS_AGAINST_CHAINSAW && *v == "true"),
+            "BASELINE_SETUP_OPTIONS must set mbStacksAgainstChainsaw=true to match Java parity",
+        );
+    }
 }

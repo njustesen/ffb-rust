@@ -16,7 +16,7 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 7 | dark_elf_league_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
 | 8 | dwarf | GREEN 100/100 | — |
 | 9 | elf | GREEN 100/100 | — |
-| 10 | goblin | FAIL (in progress) | seeds 1-98 GREEN. Fixes: GettingEven push+keywords; end-of-game secret-weapon ban roll; Mighty Blow variable value; eaten-player canUseApo skips Regeneration; Pitch-Invasion stun of a Ball&Chain player rolls (but discards) InjuryTypeBallAndChain. Next: seed 99 step 159 |
+| 10 | goblin | **GREEN 100/100** | Ball&Chain/secret-weapon/TTM/chainsaw: 6 fixes — GettingEven push+roster keywords; end-of-game secret-weapon ban roll; variable Mighty Blow value; eaten-player canUseApo skips Regeneration; Pitch-Invasion B&C stun rolls-but-discards chain injury; mbStacksAgainstChainsaw baseline option (fallen Looney's chainsaw+MB armour break) |
 | 11 | halfling | GREEN 100/100 | TTM fixes: pass modifiers + Strong Arm + null-target Block no-stand-up + fumbled-carrier ball-bounce/turnover (wood_elf Take Root retired the old blitz-negatrait deferral) |
 | 12 | high_elf | GREEN 100/100 | — |
 | 13 | human | GREEN 100/100 | — |

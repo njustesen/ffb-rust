@@ -1662,3 +1662,23 @@ attempt that applied the result inline KO'd the Fanatic off-field where Java kee
 never applies the pitch-invasion B&C injury. Advanced goblin seeds 28→98 GREEN. Regression test
 `stun_player_rng_ball_and_chain_rolls_injury_dice_but_leaves_state`. cargo 7039/2778/1150; 24-roster regression 0 FAIL.
 NEXT frontier: goblin seed 99 step 159 (turn 1 half 2, away_09 activation — state_hash differs at i=160).
+
+### GOBLIN 100/100 GREEN ✅ — seed 99: mbStacksAgainstChainsaw parity option (fallen Looney chainsaw+MB armour break)
+
+goblin seed 99 step 159 (final failing seed): home_04 (LOONEY, Chainsaw) blitzes away_05 (Troll); the 3-dice
+block applies Skull (fBlockRoll[0]=1) → the LOONEY (attacker) falls in both engines. On its attacker-fall injury
+(InjuryTypeBlock, attacker-of-injury=Troll, defender-of-injury=Looney), Java breaks the Looney's armour and KO's it;
+Rust's armour held → no injury → 2-dice desync. A LOCAL Java trace (JAVA_AVBROKE in mixed StatsMechanic.armourIsBroken)
+proved Java's modTotal=5 = Chainsaw(+3) + Mighty Blow(+2): the fallen chainsaw wielder's OWN chainsaw AND the
+opponent Troll's Mighty Blow both apply → 3+5=8 ≥ AV7 → breaks. Both engines' GameOptionFactory default
+mbStacksAgainstChainsaw=false, but Java's parity game runs with it TRUE (so armourRoll takes the stacking else-if
+branch). Rust's parity harness used factory defaults → false → chainsaw-only (+3) → 6 < 7 → held. FIX: add
+`(MB_STACKS_AGAINST_CHAINSAW, "true")` to `BASELINE_SETUP_OPTIONS` in ffb-parity/src/runner.rs — Rust's
+injury_type_block armour_roll already stacks chainsaw+MB correctly once the option is enabled (the chainsaw-only
+early-return is gated on `!skills_stack_against_chainsaw`). goblin seeds 1-100 → **100/100 GREEN**. Guard test
+`baseline_enables_mb_stacks_against_chainsaw`; cargo 7039/2778/1150; 24-roster regression 0 FAIL (the baseline option
+affects all rosters — none regressed). Diagnosis took 6 iterations (chainsaw-flag / block-die / MB-stacks static
+theories all disproven before the empirical JAVA_AVBROKE trace closed it). Reliable-tools note: rng_calls + JIDSTATE +
+FFB_DRIVE_TRACE + JAVA_BLOCKROLL/JAVA_AVBROKE — NOT DICE_TRACE global pos.
+
+**GOBLIN COMPLETE: 6 fixes this campaign session → seeds 1-100 all GREEN.**
