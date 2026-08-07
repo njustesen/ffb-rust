@@ -29,12 +29,12 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 20 | nurgle | GREEN 100/100 | — |
 | 21 | ogre | FAIL 0/100 | seed 1, step 143 — first divergence |
 | 22 | orc | GREEN 100/100 | — |
-| 23 | renegades | FAIL 10/100 | AS mandatory lash-out FIXED (seed 2 ✓); now seed 11 step 188 — AS-victim prone/stand-up snapshot divergence |
+| 23 | renegades | FAIL 80/100 | AS lash-out + prone-TTM stand-up FIXED; now seed 81 java=None (ParityRunner STUCK harness gap) |
 | 24 | skaven | GREEN 100/100 | — |
 | 25 | slann | GREEN 100/100 | agent declines the diving-catch declaration prompt (mislabeled AgentPrompt::SwarmingPlayers from StepCatchScatterThrowIn) via SelectPlayer{empty} |
 | 26 | slann_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
 | 27 | undead | GREEN 100/100 | roll-to-stand-up success now sets STANDING state (was left PRONE) |
-| 28 | underworld | FAIL 6/100 | AS mandatory lash-out FIXED (seed 2 ✓); now seed 7 step 220 — AS-victim prone/stand-up snapshot divergence |
+| 28 | underworld | FAIL 25/100 | AS lash-out + prone-TTM stand-up FIXED; now seed 26 step 13 turn 3 h1 — state-hash divergence |
 | 29 | vampire | GREEN 100/100 | Bloodlust (min-roll, failed-action routing, feed, suffering-move, free-stand-up, reroll-decline suffering) + guard used-skills reset on genuine player change |
 | 30 | wood_elf | GREEN 100/100 | Take Root (old_player_state + dodging-clear) + agent phase-2 pre-draw for prone/rooted movers w/ uncapped neighbour list |
 

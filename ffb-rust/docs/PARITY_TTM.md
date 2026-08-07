@@ -1404,3 +1404,27 @@ divergences where an AS-lash-out VICTIM (knocked prone) is later re-activated fo
 phase StandUp runs BEFORE the per-activation state snapshot (a02 logged Standing) while Java logs it still
 Prone at the activation-decision point. Hypothesis: the confused/prone victim's SELECTING sequence differs
 (confusion re-roll vs immediate stand-up), or a snapshot-point mismatch specific to confused players.
+
+### Follow-up: prone TTM/KTM activation must NOT stand up (renegades 11→81, underworld 7→26)
+
+After the AS lash-out fix, the new frontier (renegades seed 11 i=188 / underworld seed 7 i=220) was a
+NO-DICE state divergence: an AS-lash-out VICTIM (a prone player, e.g. away_03 at (13,8)) was later
+activated for `ThrowTeamMate` (the parity agents pick TTM even for a prone player). During that dice-free
+activation `StepInitSelecting` stood the player up in Rust (Prone→Standing) while Java left it Prone.
+
+Root cause: Java's `StepInitSelecting` gates its whole stand-up block on
+`playerAction.isMoving() || playerAction.isStandingUp()`. `THROW_TEAM_MATE` / `KICK_TEAM_MATE` are neither
+(only the `*_MOVE` variants are "moving"; `isStandingUp()` is only STAND_UP/STAND_UP_BLITZ), so Java never
+pre-stands a TTM/KTM activation. Rust's gate instead used the `acting_player.standing_up` FLAG (true for
+ANY prone activation) and pre-committed STANDING (an accommodation for negatrait-failure gotos that skip
+StepStandUp). A prone player cannot legally TTM, so the action deselects (empty-target ThrowTeamMate branch)
+and must stay PRONE.
+
+Fix (`step/bb2025/shared/step_init_selecting.rs`, mirroring the existing Blitz/Block-no-target suppression):
+for a `ThrowTeamMate | KickTeamMate` activation, set `acting_player.standing_up = false` before the stand-up
+block — no pre-stand, no current_move reduction. No-op for a legal (standing) thrower.
+
+Verified: renegades seed 11 + underworld seed 7 now match; frontiers advanced **renegades 11→81,
+underworld 7→26**. cargo ffb-engine 7032/0, ffb-model 2777/0, ffb-mechanics 1148/0; 23-roster regression
+clean. NEW frontiers: renegades seed 81 (java=None STUCK — a ParityRunner harness gap), underworld seed 26
+step 13 turn 3 half 1 (state-hash divergence).

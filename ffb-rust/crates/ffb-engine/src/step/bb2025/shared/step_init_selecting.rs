@@ -122,6 +122,19 @@ impl Step for StepInitSelecting {
                 {
                     game.acting_player.standing_up = false;
                 }
+                // A prone player activated for Throw/Kick Team-Mate must NOT stand up. Java's
+                // StepInitSelecting gates its whole stand-up block on
+                // `playerAction.isMoving() || playerAction.isStandingUp()`, and THROW_TEAM_MATE /
+                // KICK_TEAM_MATE are neither (only the *_MOVE variants count as "moving"), so Java
+                // never pre-stands here. A prone player cannot legally TTM, so the action deselects
+                // (see the empty-target ThrowTeamMate branch in execute_step) and the player stays
+                // PRONE. Rust otherwise pre-stands via the `standing_up` flag (renegades seed 11 i=188 /
+                // underworld seed 7: away_03, a prone Animal-Savagery lash-out victim, was activated for
+                // ThrowTeamMate → Rust stood it up while Java left it prone). For a legal (standing)
+                // thrower `standing_up` is already false, so this is a no-op.
+                if matches!(player_action, PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate) {
+                    game.acting_player.standing_up = false;
+                }
                 // Java: if (playerAction.isMoving() || playerAction.isStandingUp())
                 //   UtilServerPlayerMove.updateMoveSquares(getGameState(), actingPlayer.isJumping())
                 // — computes per-square dodging/GFI flags for the fresh activation. Without this
