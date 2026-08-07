@@ -1516,4 +1516,21 @@ produced a different direction/landing square (13,5 vs Java's 13,6). Fix: roll `
 `interpret_throw_in_direction` to Java's base-class d6 table. RNG position preserved (d6 and d8 each consume one
 draw). Advanced goblin seed 1 i=34 → i=57. Regression test: `interpret_throw_in_direction_matches_java_d6_table`
 (mixed) + rewrote the bb2016 OOB test (a north-biased scatter from y=0 always leaves the field). cargo 7034/0,
-2777/0, 1148/0. NEXT frontier: goblin seed 1 i=57 (turn 4, away Activate(away_08, MOVE); java has the step, rust=None).
+2777/0, 1148/0.
+
+### GOBLIN (in progress) — Bombardier THROW_BOMB deselects (harness can't drive a bomb)
+
+goblin seed 1 i=56: away_03 (Bombardier secret weapon) is activated for THROW_BOMB. The reference ParityRunner's
+acting-action dispatch switch has NO THROW_BOMB case → it hits `default:` and deselects
+(ClientCommandActingPlayer(null,null,false)): the activation is recorded (i=56) then the player does nothing —
+0 dice (rng 73→73), no state change, turn continues to i=57. Rust's random agent supplies no bomb target (a bomb
+targets an empty square, which the block_defender_id/player-id channel can't carry — random_agent's PlayerActionChoice
+match falls to `_ => None`), so the activation reaches StepInitSelecting with defender_id == None but then routed into
+Pass::build_sequence → StepInitPassing returned Continue with no target coordinate and NO prompt → STALL
+(prompt_after=None). Fix: extend StepInitSelecting's existing no-target deselect (which already covers HandOver /
+Pass / ThrowTeamMate / KickTeamMate when defender_id is None) to ThrowBomb / HailMaryBomb — EndPlayerAction + goto
+end instead of dispatching the pass sequence. Matches Java's deselect exactly (RNG already aligned: both consume
+only the activation pick). Advanced goblin seed 1 i=57 → **i=145** (into 2nd half). Regression test
+`throw_bomb_activation_without_target_deselects`. cargo 7035/0, 2777/0, 1148/0. NEXT frontier: goblin seed 1 i=146
+(half 2, turn 1, home) — a player-pick/state divergence at the 2nd-half start (Java Activate(home_10,MOVE) vs Rust
+Activate(home_11,Move); pre-state hashes differ → likely a 2nd-half kickoff/setup state divergence, NOT bomb-related).

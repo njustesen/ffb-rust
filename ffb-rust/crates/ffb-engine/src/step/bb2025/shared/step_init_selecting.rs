@@ -283,9 +283,19 @@ impl StepInitSelecting {
                 // list is empty (no adjacent standing Right Stuff teammate) is deselected — the
                 // reference harness does the same, and StepInitThrowTeamMate would otherwise Continue
                 // with no player and stall.
+                // Same for THROW_BOMB / HAIL_MARY_BOMB (Bombardier secret weapon): the reference
+                // ParityRunner has no THROW_BOMB dispatch case, so it hits its `default:` branch and
+                // deselects (ClientCommandActingPlayer(null,null,false)) — the player is activated
+                // (recorded as a step) then does nothing, 0 dice, turn continues. Rust's random agent
+                // likewise supplies no bomb target (a bomb targets an empty square, which the
+                // block_defender_id/player-id channel cannot carry), so a bomb always arrives here with
+                // no defender; without this it routes into the Pass sequence and StepInitPassing returns
+                // Continue with no target coordinate and no prompt → the drive stalls (goblin seed 1
+                // i=56: away_03 Bombardier ThrowBomb). Deselecting matches Java exactly.
                 if matches!(dispatch,
                         PlayerAction::HandOver | PlayerAction::Pass
-                        | PlayerAction::ThrowTeamMate | PlayerAction::KickTeamMate)
+                        | PlayerAction::ThrowTeamMate | PlayerAction::KickTeamMate
+                        | PlayerAction::ThrowBomb | PlayerAction::HailMaryBomb)
                     && game.defender_id.is_none()
                 {
                     return StepOutcome::goto(label)
@@ -553,6 +563,31 @@ mod tests {
             "no-receiver hand-over must deselect");
         assert!(!out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(Some(PlayerAction::HandOver)))),
             "no-receiver hand-over must NOT dispatch a passing sequence");
+    }
+
+    #[test]
+    fn throw_bomb_activation_without_target_deselects() {
+        use ffb_model::enums::PlayerAction;
+        // Bombardier THROW_BOMB: the reference ParityRunner has no THROW_BOMB dispatch case, so it
+        // deselects (default branch). Rust's random agent supplies no bomb target, so the activation
+        // arrives with block_defender_id == None; it must EndPlayerAction rather than route into the
+        // Pass sequence (StepInitPassing would stall with no target coordinate — goblin seed 1 i=56).
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.defender_id = Some("stale".into());
+        let mut step = StepInitSelecting::new("end_label".into());
+        let action = Action::ActivatePlayer {
+            player_id: "p1".into(),
+            player_action: PlayerActionChoice::ThrowBomb,
+            block_defender_id: None,
+        };
+        let out = step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(out.goto_label.as_deref(), Some("end_label"));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))),
+            "target-less ThrowBomb must deselect");
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(Some(PlayerAction::ThrowBomb)))),
+            "target-less ThrowBomb must NOT dispatch a passing sequence");
     }
 
     #[test]
