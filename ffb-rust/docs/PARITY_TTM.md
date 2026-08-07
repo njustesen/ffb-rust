@@ -1363,3 +1363,44 @@ before — they'd have crashed Java otherwise — so the decline change is regre
 DARK_ELF DONE (first HARNESS-GAP roster resolved). NOTE: this deliberately DECLINES dump-off rather than
 implementing the dump-off pass on both engines; if full dump-off coverage is ever wanted, that's a separate
 (larger) task. (bb2025 tier-3 mirror parity, seeds 1-100.)
+
+---
+
+## RENEGADES + UNDERWORLD — Animal Savagery mandatory lash-out (shared harness+agent gap)
+
+Both rosters failed at seed 2 with `java=None` (STUCK_STEP). Root cause (shared, both engines):
+when a player with **Animal Savagery** fails its confusion roll and has **≥2 adjacent team-mates**,
+the BB2025 `AnimalSavageryBehaviour` shows a MANDATORY `DialogPlayerChoiceParameter(ANIMAL_SAVAGERY,
+playerIds, null, /*min*/1, /*max*/1)` — the coach must pick exactly one team-mate to lash out at
+(size==1 auto-lashes; size 0 cancels/confused).
+
+- **Java harness:** `ParityRunner`'s PLAYER_CHOICE handler declined EVERY `PlayerChoiceMode` with an
+  empty selection (`new Player[0]`, only MVP special-cased). For ANIMAL_SAVAGERY that empty selection
+  is invalid → the server re-fires the dialog → STUCK_STEP → `java=None`.
+- **Rust:** the agent (`random_agent.rs`) answered ALL `AgentPrompt::PlayerChoice` with
+  `Action::SelectPlayer{ player_id: "" }` — a DIFFERENT enum variant than the AS step's
+  `Action::PlayerChoice{ player_id, mode }` arm, so `state.player_id` stayed `None` and Rust silently
+  SKIPPED the mandatory lash-out (a Rust-vs-Java behavioral mismatch, masked because Java stuck first).
+
+Fix (both sides lash out at the SAME team-mate so the shared GameRng block dice align):
+- **Rust `random_agent.rs`:** special-case `AgentPrompt::PlayerChoice { reason == "ANIMAL_SAVAGERY" }`
+  → pick the eligible team-mate with the MIN (x,y) board coordinate (via `field_model.player_coordinate`)
+  → return `Action::PlayerChoice { player_id: Some(that_id), player_ids, mode: "ANIMAL_SAVAGERY" }`
+  (NOT `SelectPlayer`). Also decline the optional lash-out-against-OPPONENTS offer
+  (`AgentPrompt::SkillUse { skill_name == "PrimalSavagery" }` → `UseSkill{ PrimalSavagery, false }`)
+  so both engines take the team-mate branch.
+- **Java `ParityRunner.java`:** PLAYER_CHOICE handler — for `PlayerChoiceMode.ANIMAL_SAVAGERY` pick the
+  MIN (x,y) eligible (`getFieldModel().getPlayerCoordinate`) → `ClientCommandPlayerChoice(mode,
+  new Player[]{ best })`. SKILL_USE handler — decline `PrimalSavagery` too (same pattern as DumpOff).
+
+Board coordinates are engine-agnostic (Rust ids `home_02` ≠ Java `teamRenegadesParityHome2`, but the
+positions match), so both engines lash out at the identical team-mate and the block/armour/injury dice
+stay in lock-step. Seed 2 now MATCHES on both rosters (verified block+injury). Both frontiers advanced:
+renegades seed 2 → **seed 11**, underworld seed 2 → **seed 7**. cargo: ffb-engine 7032/0,
+ffb-model 1148/0 (lib) / 2777/0, ffb-mechanics green. Jar rebuilt.
+
+NEW FRONTIERS (next): renegades seed 11 step 188 and underworld seed 7 step 220 — both state-hash
+divergences where an AS-lash-out VICTIM (knocked prone) is later re-activated for a Move: Rust's SELECTING-
+phase StandUp runs BEFORE the per-activation state snapshot (a02 logged Standing) while Java logs it still
+Prone at the activation-decision point. Hypothesis: the confused/prone victim's SELECTING sequence differs
+(confusion re-roll vs immediate stand-up), or a snapshot-point mismatch specific to confused players.

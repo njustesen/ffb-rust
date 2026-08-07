@@ -484,6 +484,15 @@ impl Agent for RandomAgent {
             // rust=None). Decline dump-off (use_skill:false) so the block proceeds like Java.
             Some(AgentPrompt::SkillUse { skill_name, .. }) if skill_name == "DumpOff" =>
                 Action::UseSkill { skill_id: SkillId::DumpOff, use_skill: false },
+            // Animal Savagery lash-out-against-opponents (Primal Savagery) is OPTIONAL: when the
+            // confusion roll fails and an opponent is adjacent, Java offers a SKILL_USE to lash out
+            // at that opponent instead of a team-mate. DECLINE it so both engines take the mandatory
+            // team-mate branch (handled by the ANIMAL_SAVAGERY PlayerChoice arm below). The generic
+            // "always use" arm would send skill_id=Block, which the AS step's PrimalSavagery-gated
+            // handler ignores → the step would end with no lash-out at all. Java's ParityRunner
+            // declines this SKILL_USE the same way it declines DumpOff.
+            Some(AgentPrompt::SkillUse { skill_name, .. }) if skill_name == "PrimalSavagery" =>
+                Action::UseSkill { skill_id: SkillId::PrimalSavagery, use_skill: false },
             // Skill use: AGENT_CONTRACT §7 — ALWAYS use, deterministically, 0 rng. Java ParityRunner
             // SKILL_USE = `sendUseSkill(skill, true, playerId)` (no decisionRng). The old code
             // random-sampled via pick_bool (spurious draw + wrong choice → decision-stream desync).
@@ -538,6 +547,34 @@ impl Agent for RandomAgent {
             // Savagery, Pile Driver, Wisdom, …) must decline: an empty `player_id`, and crucially
             // no `pick()` — the previous code both selected a player AND consumed a decision_rng draw
             // Java never makes, desyncing the stream (e.g. a Shadowing roll that Java skips entirely).
+            // ANIMAL_SAVAGERY is the ONE mandatory PlayerChoice: when the confusion roll fails and
+            // there are ≥2 adjacent team-mates, Java shows DialogPlayerChoiceParameter(ANIMAL_SAVAGERY,
+            // …, min=1, max=1) — the coach MUST pick exactly one team-mate to lash out at. Declining
+            // with an empty selection (the generic path below) is invalid → Java re-fires the dialog
+            // → STUCK_STEP, while Rust's AS step, never receiving Action::PlayerChoice, silently skips
+            // the mandatory block. Pick the eligible team-mate with the MIN (x,y) board coordinate —
+            // engine-agnostic (Rust ids `home_02` ≠ Java `teamRenegadesParityHome2`, but board coords
+            // match) so both engines lash out at the SAME team-mate and the shared block dice align.
+            // Java ParityRunner's PLAYER_CHOICE handler mirrors this exact min-(x,y) pick.
+            Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
+                if reason == "ANIMAL_SAVAGERY" =>
+            {
+                let best = eligible_players.iter().min_by_key(|pid| {
+                    gs.game
+                        .field_model
+                        .player_coordinate(pid)
+                        .map(|c| (c.x, c.y))
+                        .unwrap_or((i32::MAX, i32::MAX))
+                });
+                match best {
+                    Some(pid) => Action::PlayerChoice {
+                        player_id: Some(pid.clone()),
+                        player_ids: eligible_players.clone(),
+                        mode: "ANIMAL_SAVAGERY".into(),
+                    },
+                    None => Action::SelectPlayer { player_id: String::new() },
+                }
+            }
             Some(AgentPrompt::PlayerChoice { .. }) => {
                 Action::SelectPlayer { player_id: String::new() }
             }
