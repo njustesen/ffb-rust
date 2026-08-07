@@ -710,7 +710,10 @@ impl StepApplyKickoffResult {
             }
             let idx = rng.range(standing.len());
             let id = standing.remove(idx);
-            util_server_injury::stun_player(game, &id);
+            // Java stunPlayers → UtilServerInjury.stunPlayer(this, player, ApothecaryMode.HOME): a
+            // Ball & Chain player rolls InjuryTypeBallAndChain (2d6) — consumed for parity but its
+            // result is published unconsumed (not applied) — instead of being placed STUNNED.
+            util_server_injury::stun_player_rng(game, rng, &id, ffb_model::enums::ApothecaryMode::Home);
         }
     }
 

@@ -360,6 +360,38 @@ pub fn stun_player(game: &mut Game, player_id: &str) -> Vec<StepParameter> {
     drop_player_with_base(game, player_id, PS_STUNNED, false)
 }
 
+/// Java UtilServerInjury.dropPlayer(step, player, STUNNED, mode, false) — the rng-aware variant used
+/// where a Ball & Chain player may be stunned (e.g. a Pitch Invasion). Java's dropPlayer, for a
+/// `placedProneCausesInjuryRoll` player, rolls InjuryTypeBallAndChain (2d6) and *publishes* the
+/// InjuryResult instead of placing the player STUNNED. In the Pitch-Invasion path nothing consumes
+/// that published result, so the chain injury's dice are rolled but its outcome is NOT applied — the
+/// B&C player keeps its current (standing) state. The rng-less `stun_player` skipped the roll entirely,
+/// desyncing the stream (goblin seed 28 kickoff Pitch Invasion stuns the home Fanatic). A normal player
+/// is placed STUNNED as before.
+pub fn stun_player_rng(
+    game: &mut Game,
+    rng: &mut GameRng,
+    player_id: &str,
+    apothecary_mode: ApothecaryMode,
+) -> Vec<StepParameter> {
+    use crate::injury::injuryType::injury_type_ball_and_chain::InjuryTypeBallAndChain;
+    let placed_prone_causes_injury = game.player(player_id)
+        .map(|p| p.has_skill_property(NamedProperties::PLACED_PRONE_CAUSES_INJURY_ROLL))
+        .unwrap_or(false);
+    if placed_prone_causes_injury {
+        let coord = game.field_model.player_coordinate(player_id)
+            .unwrap_or(FieldCoordinate::new(0, 0));
+        let mut it = InjuryTypeBallAndChain::new();
+        // Roll the chain injury (consumes 2d6 to match Java); publish the result but do NOT apply it
+        // — Java's Pitch-Invasion stunPlayer publishes INJURY_RESULT with no consumer, so the outcome
+        // is discarded and the player stays as it was.
+        let res = handle_injury(game, rng, &mut it, None, player_id, coord, None, None, apothecary_mode);
+        vec![StepParameter::InjuryResult(Box::new(res))]
+    } else {
+        drop_player_with_base(game, player_id, PS_STUNNED, false)
+    }
+}
+
 /// Port of `UtilServerInjury.handleInjurySideEffects(IStep, InjuryResult)`.
 ///
 /// Called after injury resolution is finalised (apothecary done or declined).
@@ -579,6 +611,33 @@ mod tests {
         let p = game.team_home.players.iter_mut().find(|p| p.id == id).unwrap();
         p.starting_skills.push(SkillWithValue { skill_id: skill, value: None });
         pos
+    }
+
+    /// Regression (goblin seed 28 kickoff Pitch Invasion): `stun_player_rng` for a Ball & Chain
+    /// player rolls InjuryTypeBallAndChain (2d6) — Java's dropPlayer:341 — but the outcome is only
+    /// published (not applied), so the player keeps its state; the dice must still be consumed to
+    /// match Java's stream. A normal player is placed STUNNED with no roll.
+    #[test]
+    fn stun_player_rng_ball_and_chain_rolls_injury_dice_but_leaves_state() {
+        // Ball & Chain player: 2d6 rolled, state unchanged (still STANDING).
+        let mut game = make_game();
+        add_player_with_skill(&mut game, "bc", PS_STANDING, SkillId::BallAndChain);
+        let mut rng = GameRng::new(0);
+        let before = rng.call_count;
+        stun_player_rng(&mut game, &mut rng, "bc", ApothecaryMode::Home);
+        assert_eq!(rng.call_count - before, 2, "B&C stun must roll the chain injury's 2d6");
+        assert_eq!(game.field_model.player_state("bc").map(|s| s.base()), Some(PS_STANDING),
+            "the published chain injury is not applied — the B&C player keeps its state");
+
+        // Normal player: no dice rolled, placed STUNNED.
+        let mut game2 = make_game();
+        add_player(&mut game2, "n", PS_STANDING);
+        let mut rng2 = GameRng::new(0);
+        let before2 = rng2.call_count;
+        stun_player_rng(&mut game2, &mut rng2, "n", ApothecaryMode::Home);
+        assert_eq!(rng2.call_count - before2, 0, "a normal Pitch-Invasion stun rolls no dice");
+        assert_eq!(game2.field_model.player_state("n").map(|s| s.base()), Some(PS_STUNNED),
+            "a normal player is placed STUNNED");
     }
 
     // ── Stub injury type for deterministic tests ──────────────────────────────

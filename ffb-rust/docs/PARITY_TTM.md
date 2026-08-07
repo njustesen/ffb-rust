@@ -1643,3 +1643,22 @@ theory from the prior 2 iterations was a DICE_TRACE-pos-vs-rng_calls artifact; t
 single extra regeneration die.)
 NEXT frontier: goblin seed 28 step 0 (turn 1 half 1 — state_hash differs at i=1 already; a pre-first-activation
 setup/kickoff-placement divergence, home_05 first MOVE).
+
+### GOBLIN seeds 28-98 GREEN — Pitch-Invasion stun of a Ball & Chain player rolls (but discards) its chain injury
+
+goblin seed 28 step 0 (kickoff): kickoff roll 6+6=12 → PITCH INVASION. Java StepApplyKickoffResult.handlePitchInvasion
+stuns D3 players on the losing team(s) via `stunPlayer(player, HOME)` → `dropPlayer(player, STUNNED, ...)`. For a
+picked Ball & Chain player (placedProneCausesInjuryRoll), dropPlayer:341 rolls InjuryTypeBallAndChain (2d6) and
+*publishes* the InjuryResult instead of placing STUNNED. In the Pitch-Invasion path nothing consumes that published
+result, so the chain injury's 2d6 are rolled (dice) but the outcome is NOT applied — the B&C player keeps its standing
+state (JIDSTATE confirmed: the home Fanatic stays STANDING through i=1..3). Rust's `stun_random_standing_players`
+called the rng-LESS `stun_player` (drop_player_with_base → set STUNNED, no roll) for everyone → skipped the B&C 2d6
+→ desynced the whole shared stream from kickoff onward (seed 28: Rust 15 dice vs Java 17 by i=1). FIX: added
+`stun_player_rng(game, rng, pid, ApothecaryMode::Home)` to util_server_injury.rs mirroring Java dropPlayer — for a
+placedProneCausesInjuryRoll player it rolls InjuryTypeBallAndChain (consuming 2d6) and returns/publishes the
+InjuryResult WITHOUT applying it (no apply_to — the outcome is discarded, matching Java's unconsumed publish); a normal
+player is placed STUNNED as before. Called it from step_apply_kickoff_result.rs stun_random_standing_players. A first
+attempt that applied the result inline KO'd the Fanatic off-field where Java keeps it on-field — the key was that Java
+never applies the pitch-invasion B&C injury. Advanced goblin seeds 28→98 GREEN. Regression test
+`stun_player_rng_ball_and_chain_rolls_injury_dice_but_leaves_state`. cargo 7039/2778/1150; 24-roster regression 0 FAIL.
+NEXT frontier: goblin seed 99 step 159 (turn 1 half 2, away_09 activation — state_hash differs at i=160).
