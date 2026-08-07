@@ -1621,3 +1621,25 @@ rolling a d16 casualty + Regeneration where Rust rolled neither; temp AFDBG (att
 showed Rust applied Mighty Blow +1 vs Java +2.
 NEXT frontier: goblin seed 12 step 57 (turn 5 half 1, away_06 activation: Java MOVE vs Rust Move — pre-state
 hash differs at i=58, true split at/just before step 57).
+
+### GOBLIN seeds 12-27 GREEN — eaten player (canUseApo=false) must not roll Regeneration
+
+goblin seed 12 i=52 (home_05 Troll THROW_TEAM_MATE): Always Hungry failed (roll 1) + escape failed (roll 1)
+→ the thrown goblin is EATEN (InjuryTypeEatPlayer → RIP). Java rolled 3 game dice during the TTM (75→78),
+Rust rolled 4 (75→79) — Rust rolled an extra d6 Regeneration for the eaten goblin. ROOT: Java's
+StepApothecary gates its pre-regeneration handleRegeneration on `injuryType.canUseApo()` (StepApothecary.java:279),
+and `EatPlayer.canUseApo()==false` (an Always-Hungry-eaten player is removed, never regenerates). Rust's
+StepApothecary regen (the NoApothecary/`_` branch) rolled Regeneration gated only on `is_casualty` — it never
+consulted the injury type's canUseApo. The eaten goblin is a casualty (RIP) with the Regeneration skill →
+handle_regeneration rolled a d6 that Java never rolls, desyncing the shared stream (values coincidentally
+matched for ~24 dice, so the board only diverged later at i=57's move-target and the pos103 secret-weapon ban).
+FIX: persist the injury type's `can_use_apo` onto InjuryContext (new field, default true, set from
+`injury_type.can_use_apo()` in handle_injury) and gate StepApothecary's Regeneration roll on it
+(`if is_casualty && can_use_apo`). canRollToSaveFromInjury stays enforced inside handle_regeneration. Advanced
+goblin seeds 12→27 GREEN. Regression test `eaten_player_can_use_apo_false_skips_regeneration_roll`. cargo
+7038/2778/1150; 24-roster regression 0 FAIL. (The earlier "pos79 MoveBallAndChain vs Apothecary reorder"
+theory from the prior 2 iterations was a DICE_TRACE-pos-vs-rng_calls artifact; the reliable rng_calls counter
++ the FFB_DRIVE_TRACE step list showed the TTM sequence order actually matches Java and the real bug was this
+single extra regeneration die.)
+NEXT frontier: goblin seed 28 step 0 (turn 1 half 1 — state_hash differs at i=1 already; a pre-first-activation
+setup/kickoff-placement divergence, home_05 first MOVE).

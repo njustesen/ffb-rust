@@ -52,6 +52,10 @@ pub fn handle_injury(
     let is_worth_spps = injury_type.is_worth_spps();
     injury_type.injury_context_mut().is_caused_by_opponent = is_caused_by_opponent;
     injury_type.injury_context_mut().is_worth_spps = is_worth_spps;
+    // Java: StepApothecary gates its pre-regeneration handleRegeneration on injuryType.canUseApo();
+    // persist it on the context so the step can honour it (false for EatPlayer et al.).
+    let can_use_apo_flag = injury_type.can_use_apo();
+    injury_type.injury_context_mut().can_use_apo = can_use_apo_flag;
 
     // Capture flags before any mutable borrow of the context
     let flags = InjuryTypeFlags {

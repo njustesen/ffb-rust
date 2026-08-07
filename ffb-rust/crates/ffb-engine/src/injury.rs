@@ -81,6 +81,11 @@ pub struct InjuryContext {
     pub is_caused_by_opponent: bool,
     /// Java: InjuryType.isWorthSpps() — whether the attacker earns a casualty SPP for this injury.
     pub is_worth_spps: bool,
+    /// Java: InjuryType.canUseApo() — whether an apothecary/regeneration may act on this injury.
+    /// False for InjuryTypeEatPlayer (an Always-Hungry-eaten player is removed, never regenerates)
+    /// and PilingOnKnockedOut/Saboteur. StepApothecary gates its Regeneration roll on this — Java's
+    /// `injuryType.canUseApo()` guard on the pre-regeneration handleRegeneration call.
+    pub can_use_apo: bool,
     // ── ModifiedInjuryContext extra fields (Java: ModifiedInjuryContext extends InjuryContext) ──
     /// Java: ModifiedInjuryContext.modification — which phase was modified.
     pub modification: InjuryModification,
@@ -120,6 +125,7 @@ impl InjuryContext {
             injury_type_name: None,
             is_caused_by_opponent: false,
             is_worth_spps: false,
+            can_use_apo: true,
             modification: InjuryModification::NONE,
             used_skill_id: None,
             skill_use_modification: None,

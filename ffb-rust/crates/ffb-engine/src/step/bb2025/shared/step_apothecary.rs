@@ -168,13 +168,21 @@ impl StepApothecary {
                         ir.apply_to(game);
                     }
                     // Java: if (playerState.isCasualty() && canRollToSaveFromInjury && canUseApo())
+                    // canRollToSaveFromInjury is enforced inside handle_regeneration (it only rolls for
+                    // a player with the Regeneration/Decay skill); canUseApo() is the injury-type gate —
+                    // false for an Always-Hungry-eaten player (InjuryTypeEatPlayer), which must NOT roll
+                    // Regeneration. Omitting it rolled an extra d6 for the eaten goblin, desyncing the
+                    // whole stream (goblin seed 12 i=52 TTM: Troll eats the thrown goblin).
+                    let can_use_apo = self.injury_result.as_ref()
+                        .map(|ir| ir.injury_context.can_use_apo)
+                        .unwrap_or(true);
                     if let Some(defender_id) = self.injury_result.as_ref()
                         .and_then(|ir| ir.injury_context.defender_id.clone())
                     {
                         let is_casualty = game.field_model.player_state(&defender_id)
                             .map(|s| s.is_casualty())
                             .unwrap_or(false);
-                        if is_casualty {
+                        if is_casualty && can_use_apo {
                             let regenerated = crate::step::util_server_injury::handle_regeneration(
                                 game, rng, &defender_id,
                             );
@@ -457,6 +465,45 @@ mod tests {
     fn new_sets_show_report_true() {
         let step = StepApothecary::new();
         assert!(step.show_report);
+    }
+
+    /// Regression (goblin seed 12 i=52): an Always-Hungry-eaten player (InjuryTypeEatPlayer,
+    /// can_use_apo == false) must NOT roll a Regeneration die in StepApothecary, even though it is a
+    /// casualty (RIP) and has the Regeneration skill — Java gates the pre-regeneration handleRegeneration
+    /// on injuryType.canUseApo(). Rolling it desynced the shared dice stream.
+    #[test]
+    fn eaten_player_can_use_apo_false_skips_regeneration_roll() {
+        use ffb_model::enums::{SkillId, PS_RIP};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+
+        fn run(can_use_apo: bool) -> u64 {
+            let mut game = make_game();
+            let mut p = Player { id: "d1".into(), ..Default::default() };
+            p.starting_skills = vec![SkillWithValue::new(SkillId::Regeneration)];
+            game.team_home.players.push(p);
+            game.field_model.set_player_coordinate("d1", FieldCoordinate::new(5, 5));
+            game.field_model.set_player_state("d1", PlayerState::new(PS_RIP));
+
+            let mut step = StepApothecary::default();
+            step.apothecary_mode = Some(ApothecaryMode::Defender);
+            let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+            ir.injury_context.defender_id = Some("d1".into());
+            ir.injury_context.set_injury(PlayerState::new(PS_RIP));
+            ir.injury_context.apothecary_status = ApothecaryStatus::NoApothecary;
+            ir.injury_context.can_use_apo = can_use_apo;
+            step.injury_result = Some(ir);
+
+            let mut rng = GameRng::new(0);
+            step.start(&mut game, &mut rng);
+            rng.call_count
+        }
+
+        // can_use_apo == false (eaten): no regeneration die rolled.
+        assert_eq!(run(false), 0, "eaten player (can_use_apo=false) must not roll Regeneration");
+        // can_use_apo == true (normal casualty): the Regeneration die IS rolled.
+        assert_eq!(run(true), 1, "a regenerating casualty with can_use_apo=true rolls one Regeneration d6");
     }
 
     #[test]
