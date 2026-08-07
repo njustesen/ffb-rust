@@ -1311,3 +1311,29 @@ rosters 100/100, ffb-engine 7032/0, ffb-mechanics 1148/0, ffb-model 2777/0.
 HALFLING DONE. The deferred prone-Treeman blitz-negatrait class (old seed-1 step-20) was retired for free by
 wood_elf's Take Root fixes; the roster's real blockers were all TTM sub-cases (pass modifiers, Strong Arm,
 null-target Block stand-up, fumbled-carrier ball-bounce/turnover). (bb2025 tier-3 mirror parity, seeds 1-100.)
+
+## Parity(slann): decline the diving-catch declaration prompt → SLANN 100/100 GREEN
+
+**slann 100/100 GREEN** (22 rosters green). Frontier was seed 3 rust=None at step 112 — Rust hung at the
+half-2 kickoff on a `SwarmingPlayers` prompt (NO_PROGRESS abort after 50 unchanged iterations). RED HERRING:
+the prompt is NAMED `AgentPrompt::SwarmingPlayers` but in the LIVE engine it is emitted ONLY by
+`StepCatchScatterThrowIn::diving_catch` (bb2025/shared, lines 746/760) as the DIVING CATCH declaration dialog
+(Java `DialogParameterDivingCatch`) — NOT by StepSwarming (both StepSwarming files never run; the mixed one is
+dead-code-eliminated). The step advances its `DivingCatchPhase` (AskHome→AskAway→Process) only on
+`Action::SelectPlayer` (empty player_id = decline, still advances). The random_agent answered
+`Action::Acknowledge` (grouped with confirm-only prompts), which the step ignores → the prompt re-fired
+forever.
+
+Fix (random_agent.rs): answer `AgentPrompt::SwarmingPlayers` with `Action::SelectPlayer { player_id:
+String::new() }` (decline the diving catch), mirroring Java's ParityRunner decline — same pattern as the
+dark_elf PlayerChoice decline (58abe2b4). Greened seed 3 and all remaining → slann 100/100. No regression: 21
+prior-green rosters 100/100, ffb-engine 7032/0, ffb-mechanics 1148/0, ffb-model 2777/0.
+
+DIAGNOSIS LESSON (cost ~3 wasted iterations): do NOT assume a prompt's NAME identifies its emitter. Two prior
+fix attempts targeting StepSwarming were wrong. The comprehensive `grep "SwarmingPlayers"` for the actual
+`self.pending_prompt = Some(AgentPrompt::…)` construction site (not just `AgentPrompt::X {`) revealed the real
+emitter; `FFB_DRIVE_TRACE` confirmed the looping step was CatchScatterThrowIn. Marker-in-step experiments were
+misleading because a dead (never-instantiated) step's code is eliminated — verify a marker string is actually
+in the binary (`strings`) before concluding "the step didn't run".
+
+SLANN DONE. (bb2025 tier-3 mirror parity, seeds 1-100.)

@@ -585,12 +585,19 @@ impl Agent for RandomAgent {
                 Action::BuyInducements { home: *team_id == gs.game.team_home.id, purchases: vec![] },
             Some(AgentPrompt::BuyPrayersAndInducements { team_id, .. }) =>
                 Action::BuyInducements { home: *team_id == gs.game.team_home.id, purchases: vec![] },
+            // AgentPrompt::SwarmingPlayers is (mis)named — in the live engine it is emitted ONLY by
+            // StepCatchScatterThrowIn::diving_catch as the DIVING CATCH declaration dialog (Java
+            // DialogParameterDivingCatch), NOT by StepSwarming. The step advances its DivingCatchPhase
+            // (AskHome→AskAway→Process) on Action::SelectPlayer; an EMPTY player_id declines (no catcher)
+            // and still advances. The agent previously answered Acknowledge (and EndTurn) which the step
+            // ignores → the prompt re-fired forever (slann seed 3 half-2 kickoff: NO_PROGRESS → rust=None).
+            // Decline like Java's ParityRunner (same pattern as the dark_elf PlayerChoice decline).
+            Some(AgentPrompt::SwarmingPlayers { .. }) => Action::SelectPlayer { player_id: String::new() },
             // Confirm-only and informational prompts: single valid response, 0 RNG consumed.
             Some(AgentPrompt::KickoffReturn { .. })
             | Some(AgentPrompt::SetupError { .. })
             | Some(AgentPrompt::ConfirmEndAction { .. })
             | Some(AgentPrompt::InformationOkay { .. })
-            | Some(AgentPrompt::SwarmingPlayers { .. })
             | Some(AgentPrompt::StartGame)
             | Some(AgentPrompt::GameStatistics)
             | Some(AgentPrompt::DefenderAction { .. })

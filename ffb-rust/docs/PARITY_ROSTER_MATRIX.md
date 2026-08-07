@@ -31,7 +31,7 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 22 | orc | GREEN 100/100 | — |
 | 23 | renegades | FAIL 1/100 | seed 2, step 1 — harness gap (STUCK_STEP: ANIMAL_SAVAGERY) |
 | 24 | skaven | GREEN 100/100 | — |
-| 25 | slann | FAIL 2/100 | seed 3, step 112 — Solid Defence kickoff no-complete-on-decline (DEFERRED) |
+| 25 | slann | GREEN 100/100 | agent declines the diving-catch declaration prompt (mislabeled AgentPrompt::SwarmingPlayers from StepCatchScatterThrowIn) via SelectPlayer{empty} |
 | 26 | slann_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
 | 27 | undead | GREEN 100/100 | roll-to-stand-up success now sets STANDING state (was left PRONE) |
 | 28 | underworld | FAIL 1/100 | seed 2, step 1 — harness gap (STUCK_STEP: ANIMAL_SAVAGERY) |
