@@ -261,7 +261,7 @@ impl StepAnimalSavagery {
             // Java: cancelPlayerAction(step, false) [bb2020] / new AnimalSavageryCancelActionCommand()
             // .execute(step) + manual player-state change [bb2025]
             if is_bb2025 {
-                AnimalSavageryCancelActionCommand.execute(game);
+                AnimalSavageryCancelActionCommand.execute(game, rng);
                 if let Some(state) = game.field_model.player_state(&acting_player_id) {
                     let base = if game.acting_player.standing_up { PS_PRONE } else { PS_STANDING };
                     let new_state = state.change_base(base).change_active(false).change_confused(true);
@@ -366,7 +366,7 @@ impl StepAnimalSavagery {
                     .publish(StepParameter::ThrownPlayerCoordinate(None));
             }
         } else if is_bb2025 && is_option_enabled(game, ANIMAL_SAVAGERY_LASH_OUT_ENDS_ACTIVATION) {
-            AnimalSavageryCancelActionCommand.execute(game);
+            AnimalSavageryCancelActionCommand.execute(game, rng);
             outcome = outcome
                 .publish(StepParameter::EndPlayerAction(true))
                 .publish(StepParameter::UseAlternateLabel(true));

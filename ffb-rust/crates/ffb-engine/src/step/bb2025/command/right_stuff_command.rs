@@ -19,7 +19,7 @@ impl RightStuffCommand {
 impl DeferredCommand for RightStuffCommand {
     fn id(&self) -> DeferredCommandId { DeferredCommandId::RightStuff }
 
-    fn execute(&self, game: &mut Game) -> Vec<StepParameter> {
+    fn execute(&self, game: &mut Game, _rng: &mut ffb_model::util::rng::GameRng) -> Vec<StepParameter> {
         // Java: UtilServerInjury.dropPlayer(step, thrownPlayer, ApothecaryMode.THROWN_PLAYER)
         // Then: remove END_TURN from the result set; re-add it only if has_ball.
         let mut params = drop_player_no_sph(game, &self.player_id);
@@ -48,7 +48,7 @@ mod tests {
     fn with_ball_publishes_end_turn() {
         let mut game = make_game();
         let cmd = RightStuffCommand::new("p1".into(), true);
-        let params = cmd.execute(&mut game);
+        let params = cmd.execute(&mut game, &mut ffb_model::util::rng::GameRng::new(0));
         assert!(params.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
         assert!(params.iter().any(|p| matches!(p, StepParameter::ThrownPlayerCoordinate(None))));
     }
@@ -57,7 +57,7 @@ mod tests {
     fn without_ball_no_end_turn() {
         let mut game = make_game();
         let cmd = RightStuffCommand::new("p1".into(), false);
-        let params = cmd.execute(&mut game);
+        let params = cmd.execute(&mut game, &mut ffb_model::util::rng::GameRng::new(0));
         assert!(!params.iter().any(|p| matches!(p, StepParameter::EndTurn(_))));
         assert!(params.iter().any(|p| matches!(p, StepParameter::ThrownPlayerCoordinate(None))));
     }
@@ -74,7 +74,7 @@ mod tests {
         // Test both has_ball=true and has_ball=false always clear coordinate
         for has_ball in [true, false] {
             let cmd = RightStuffCommand::new("p1".into(), has_ball);
-            let params = cmd.execute(&mut game);
+            let params = cmd.execute(&mut game, &mut ffb_model::util::rng::GameRng::new(0));
             assert!(
                 params.iter().any(|p| matches!(p, StepParameter::ThrownPlayerCoordinate(None))),
                 "ThrownPlayerCoordinate(None) missing when has_ball={has_ball}"

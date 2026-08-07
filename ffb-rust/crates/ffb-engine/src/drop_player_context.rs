@@ -160,10 +160,10 @@ impl SteadyFootingContext {
 
     /// Executes all deferred commands and returns the resulting parameters.
     /// Java: `context.getDeferredCommands().forEach(cmd -> cmd.execute(step))`
-    pub fn execute_deferred_commands(&self, game: &mut Game) -> Vec<StepParameter> {
+    pub fn execute_deferred_commands(&self, game: &mut Game, rng: &mut ffb_model::util::rng::GameRng) -> Vec<StepParameter> {
         let mut params = Vec::new();
         for cmd in &self.deferred_commands {
-            params.extend(cmd.execute(game));
+            params.extend(cmd.execute(game, rng));
         }
         params
     }

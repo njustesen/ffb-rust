@@ -1546,5 +1546,22 @@ mismatch, and Rust was 1 die short (skipped that player's KO-recovery). Fix: imp
 the skill (across starting/extra/temporary) whose `properties()` contains `property`, return its parsed roster value
 else 0. Dice-safe for the other callers (Loner's min-roll is a threshold on an already-rolled die; Dirty Player /
 variable armour+injury modifiers are additive, no extra dice). Advanced goblin seed 1 → **GREEN (100%)**. Regression
-test `get_skill_int_value_reads_property_skill_value`. cargo 7035/2778/1148. NEXT frontier: goblin seed 2 i=17
-(turn 2, away Activate(away_07,MOVE) — new divergence).
+test `get_skill_int_value_reads_property_skill_value`. cargo 7035/2778/1148.
+
+### GOBLIN (in progress) — DeferredCommand rng-threading → B&C attacker's deferred drop rolls its chain injury
+
+goblin seed 2 i=16: the away Ball & Chain FANATIC blitzes an opponent; on a Skull (attacker down) the Fanatic
+falls, and Java rolls an additional `InjuryTypeBallAndChain` (2d6) on it. Java's `StepDropFallingPlayers` defers a
+`DropPlayerCommand(attacker, ATTACKER)` into the attacker's `SteadyFootingContext`; `StepSteadyFooting.fail`
+executes it → `UtilServerInjury.dropPlayer:341` → for a `placedProneCausesInjuryRoll` (Ball & Chain) player it rolls
+`InjuryTypeBallAndChain`. Rust's `StepDropFallingPlayers` applied the attacker drop INLINE via the rng-less
+`drop_player` (comment: "DeferredCommand mechanism isn't ported"), so a B&C attacker never rolled its 2 chain dice
+→ 2-die desync at i=16 (surfaced i=17). Fix: thread `rng` through `DeferredCommand::execute` (trait + 7 impls +
+`SteadyFootingContext::execute_deferred_commands` + `StepSteadyFooting::fail` + the two `AnimalSavageryCancelActionCommand`
+call sites), give `DropPlayerCommand::execute` the B&C branch (mirror `dropPlayer:341` / fix #2), and make
+`StepDropFallingPlayers`' bb2025 attacker-fall path DEFER a `DropPlayerCommand` (1:1 with Java) instead of dropping
+inline — so `StepSteadyFooting.fail` executes it with rng and a B&C attacker rolls its chain injury. Advanced goblin
+seed 2 i=16 → **i=200**. Regression test `bb2025_falling_attacker_defers_drop_command` (+ updated command tests).
+cargo 7035/2778/1148. Diagnosis tooling (LOCAL ffb harness): FFB_IDSTATE per-id state dump + widened dice-trace
+stack (Xoshiro256StarStar printed<12) pinned the trigger to `StepSteadyFooting.lambda$fail$0 → DropPlayerCommand`.
+NEXT frontier: goblin seed 2 i=201 (turn 5 half 2 — active-team divergence: Java away / Rust home).

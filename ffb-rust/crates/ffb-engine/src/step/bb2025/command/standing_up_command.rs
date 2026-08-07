@@ -8,7 +8,7 @@ pub struct StandingUpCommand;
 impl DeferredCommand for StandingUpCommand {
     fn id(&self) -> DeferredCommandId { DeferredCommandId::StandUp }
 
-    fn execute(&self, game: &mut Game) -> Vec<StepParameter> {
+    fn execute(&self, game: &mut Game, _rng: &mut ffb_model::util::rng::GameRng) -> Vec<StepParameter> {
         game.acting_player.standing_up = false;
         vec![]
     }
@@ -31,7 +31,7 @@ mod tests {
         let mut game = make_game();
         game.acting_player.standing_up = true;
         let cmd = StandingUpCommand;
-        let params = cmd.execute(&mut game);
+        let params = cmd.execute(&mut game, &mut ffb_model::util::rng::GameRng::new(0));
         assert!(!game.acting_player.standing_up);
         assert!(params.is_empty());
     }
@@ -40,7 +40,7 @@ mod tests {
     fn noop_when_already_not_standing_up() {
         let mut game = make_game();
         game.acting_player.standing_up = false;
-        StandingUpCommand.execute(&mut game);
+        StandingUpCommand.execute(&mut game, &mut ffb_model::util::rng::GameRng::new(0));
         assert!(!game.acting_player.standing_up);
     }
 
@@ -53,7 +53,7 @@ mod tests {
     fn execute_returns_empty_params() {
         let mut game = make_game();
         game.acting_player.standing_up = true;
-        let params = StandingUpCommand.execute(&mut game);
+        let params = StandingUpCommand.execute(&mut game, &mut ffb_model::util::rng::GameRng::new(0));
         assert!(params.is_empty());
     }
 }

@@ -174,7 +174,7 @@ impl StepSteadyFooting {
 
         let player_id = match &self.player_id {
             Some(id) => id.clone(),
-            None => return self.fail(game),
+            None => return self.fail(game, rng),
         };
 
         // Java: Player player = game.getPlayerById(playerId)
@@ -196,7 +196,7 @@ impl StepSteadyFooting {
             || player_state.is_confused()
             || player_state.base() == PS_HIT_ON_GROUND
         {
-            return self.fail(game);
+            return self.fail(game, rng);
         }
 
         // Java: if (useSkill == null) → show dialog, CONTINUE
@@ -222,7 +222,7 @@ impl StepSteadyFooting {
 
         // Java: if (!useSkill) → fail()
         if !self.use_skill.unwrap_or(false) {
-            return self.fail(game);
+            return self.fail(game, rng);
         }
 
         // Java: if (STEADY_FOOTING == reRolledAction) { if (source == null || !useReRoll) → fail() }
@@ -230,10 +230,10 @@ impl StepSteadyFooting {
             if let Some(ref source_name) = self.re_roll_source.clone() {
                 let source = ReRollSource::new(source_name.as_str());
                 if !use_reroll(game, &source, &player_id) {
-                    return self.fail(game);
+                    return self.fail(game, rng);
                 }
             } else {
-                return self.fail(game); // player declined
+                return self.fail(game, rng); // player declined
             }
         }
 
@@ -253,7 +253,7 @@ impl StepSteadyFooting {
             }
         }
 
-        self.fail(game)
+        self.fail(game, rng)
     }
 
     /// Java: success path — undoes fall, adjusts player state, routes to success label.
@@ -302,7 +302,7 @@ impl StepSteadyFooting {
     }
 
     /// Java: fail() — routes to failure label, republishes context-derived parameters.
-    fn fail(&self, game: &mut Game) -> StepOutcome {
+    fn fail(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let mut out = if !self.goto_label_on_failure.is_empty() {
             StepOutcome::goto(&self.goto_label_on_failure)
         } else {
@@ -311,7 +311,7 @@ impl StepSteadyFooting {
 
         // Java: context.getDeferredCommands().forEach(cmd → cmd.execute(this))
         if let Some(ctx) = &self.context {
-            for param in ctx.execute_deferred_commands(game) {
+            for param in ctx.execute_deferred_commands(game, rng) {
                 out = out.publish(param);
             }
         }

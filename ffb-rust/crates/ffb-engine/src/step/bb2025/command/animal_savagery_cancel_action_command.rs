@@ -10,7 +10,7 @@ pub struct AnimalSavageryCancelActionCommand;
 impl DeferredCommand for AnimalSavageryCancelActionCommand {
     fn id(&self) -> DeferredCommandId { DeferredCommandId::AnimalSavageryCancelAction }
 
-    fn execute(&self, game: &mut Game) -> Vec<StepParameter> {
+    fn execute(&self, game: &mut Game, _rng: &mut ffb_model::util::rng::GameRng) -> Vec<StepParameter> {
         if let Some(action) = game.acting_player.player_action {
             match action {
                 PlayerAction::Blitz | PlayerAction::BlitzMove | PlayerAction::KickEmBlitz => {
@@ -73,7 +73,7 @@ mod tests {
         let mut game = make_game();
         game.acting_player.player_action = Some(PlayerAction::Blitz);
         let cmd = AnimalSavageryCancelActionCommand;
-        cmd.execute(&mut game);
+        cmd.execute(&mut game, &mut ffb_model::util::rng::GameRng::new(0));
         assert!(game.turn_data().blitz_used);
     }
 
@@ -82,7 +82,7 @@ mod tests {
         let mut game = make_game();
         game.acting_player.player_action = Some(PlayerAction::Pass);
         let cmd = AnimalSavageryCancelActionCommand;
-        cmd.execute(&mut game);
+        cmd.execute(&mut game, &mut ffb_model::util::rng::GameRng::new(0));
         assert!(game.turn_data().pass_used);
     }
 
@@ -91,7 +91,7 @@ mod tests {
         let mut game = make_game();
         game.pass_coordinate = Some(FieldCoordinate::new(5, 5));
         let cmd = AnimalSavageryCancelActionCommand;
-        cmd.execute(&mut game);
+        cmd.execute(&mut game, &mut ffb_model::util::rng::GameRng::new(0));
         assert!(game.pass_coordinate.is_none());
     }
 
@@ -99,7 +99,7 @@ mod tests {
     fn returns_empty_params() {
         let mut game = make_game();
         let cmd = AnimalSavageryCancelActionCommand;
-        let params = cmd.execute(&mut game);
+        let params = cmd.execute(&mut game, &mut ffb_model::util::rng::GameRng::new(0));
         assert!(params.is_empty());
     }
 }

@@ -8,7 +8,7 @@ pub struct AnimalSavageryControlCommand;
 impl DeferredCommand for AnimalSavageryControlCommand {
     fn id(&self) -> DeferredCommandId { DeferredCommandId::AnimalSavageryControl }
 
-    fn execute(&self, _game: &mut Game) -> Vec<StepParameter> {
+    fn execute(&self, _game: &mut Game, _rng: &mut ffb_model::util::rng::GameRng) -> Vec<StepParameter> {
         vec![
             StepParameter::UseAlternateLabel(true),
             StepParameter::ThrownPlayerCoordinate(None),
@@ -32,7 +32,7 @@ mod tests {
     fn publishes_use_alternate_label_and_thrown_player_coord() {
         let mut game = make_game();
         let cmd = AnimalSavageryControlCommand;
-        let params = cmd.execute(&mut game);
+        let params = cmd.execute(&mut game, &mut ffb_model::util::rng::GameRng::new(0));
         assert!(params.iter().any(|p| matches!(p, StepParameter::UseAlternateLabel(true))));
         assert!(params.iter().any(|p| matches!(p, StepParameter::ThrownPlayerCoordinate(None))));
     }
@@ -40,7 +40,7 @@ mod tests {
     #[test]
     fn publishes_exactly_two_params() {
         let mut game = make_game();
-        let params = AnimalSavageryControlCommand.execute(&mut game);
+        let params = AnimalSavageryControlCommand.execute(&mut game, &mut ffb_model::util::rng::GameRng::new(0));
         assert_eq!(params.len(), 2);
     }
 
@@ -52,7 +52,7 @@ mod tests {
     #[test]
     fn thrown_player_coordinate_is_none() {
         let mut game = make_game();
-        let params = AnimalSavageryControlCommand.execute(&mut game);
+        let params = AnimalSavageryControlCommand.execute(&mut game, &mut ffb_model::util::rng::GameRng::new(0));
         let coord = params.iter().find(|p| matches!(p, StepParameter::ThrownPlayerCoordinate(_)));
         assert!(matches!(coord, Some(StepParameter::ThrownPlayerCoordinate(None))));
     }

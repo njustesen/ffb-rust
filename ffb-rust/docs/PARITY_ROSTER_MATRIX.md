@@ -16,7 +16,7 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 7 | dark_elf_league_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
 | 8 | dwarf | GREEN 100/100 | — |
 | 9 | elf | GREEN 100/100 | — |
-| 10 | goblin | FAIL (in progress) | blitz_used + B&C drop injury + B&C move d6 dir + Bombardier deselect + get_skill_int_value (Bombardier SW penalty 5 not 0) — **seed 1 GREEN**; next: seed 2 i=17 |
+| 10 | goblin | FAIL (in progress) | seed 1 GREEN (5 fixes) + seed 2: DeferredCommand rng-threading → B&C attacker's deferred drop rolls InjuryTypeBallAndChain (seed 2 i16→i200); next: seed 2 i=201 active-team divergence |
 | 11 | halfling | GREEN 100/100 | TTM fixes: pass modifiers + Strong Arm + null-target Block no-stand-up + fumbled-carrier ball-bounce/turnover (wood_elf Take Root retired the old blitz-negatrait deferral) |
 | 12 | high_elf | GREEN 100/100 | — |
 | 13 | human | GREEN 100/100 | — |

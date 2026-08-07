@@ -8,7 +8,7 @@ pub struct HitPlayerTurnOverCommand;
 impl DeferredCommand for HitPlayerTurnOverCommand {
     fn id(&self) -> DeferredCommandId { DeferredCommandId::HitPlayer }
 
-    fn execute(&self, _game: &mut Game) -> Vec<StepParameter> {
+    fn execute(&self, _game: &mut Game, _rng: &mut ffb_model::util::rng::GameRng) -> Vec<StepParameter> {
         vec![StepParameter::EndTurn(true)]
     }
 }
@@ -29,14 +29,14 @@ mod tests {
     fn publishes_end_turn_true() {
         let mut game = make_game();
         let cmd = HitPlayerTurnOverCommand;
-        let params = cmd.execute(&mut game);
+        let params = cmd.execute(&mut game, &mut ffb_model::util::rng::GameRng::new(0));
         assert!(params.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
     }
 
     #[test]
     fn publishes_exactly_one_param() {
         let mut game = make_game();
-        let params = HitPlayerTurnOverCommand.execute(&mut game);
+        let params = HitPlayerTurnOverCommand.execute(&mut game, &mut ffb_model::util::rng::GameRng::new(0));
         assert_eq!(params.len(), 1);
     }
 
@@ -48,7 +48,7 @@ mod tests {
     #[test]
     fn end_turn_value_is_true() {
         let mut game = make_game();
-        let params = HitPlayerTurnOverCommand.execute(&mut game);
+        let params = HitPlayerTurnOverCommand.execute(&mut game, &mut ffb_model::util::rng::GameRng::new(0));
         let end_turn = params.iter().find(|p| matches!(p, StepParameter::EndTurn(_)));
         assert!(matches!(end_turn, Some(StepParameter::EndTurn(true))));
     }

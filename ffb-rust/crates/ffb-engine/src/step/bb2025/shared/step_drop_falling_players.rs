@@ -488,19 +488,23 @@ impl StepDropFallingPlayers {
             } else {
                 // Java: new SteadyFootingContext(injuryResultAttacker, deferredCommands) where
                 // deferredCommands holds a DropPlayerCommand(attacker, ATTACKER, true) for the normal
-                // (non-fell-from-rush) block fall. The DeferredCommand mechanism isn't ported, so apply
-                // the attacker drop directly here — it converts FALLING→PRONE and, when the attacker
-                // was the ball carrier, sets the ball scattering (the bounce d8 is rolled later in
-                // StepCatchScatterThrowIn). For bb2016/bb2020 the drop already happened above under the
-                // PilingOn branch, so restrict this to the editions that skipped it (bb2025). The
-                // fell-from-rush and saboteur cases are handled by their own branches.
+                // (non-fell-from-rush) block fall. The drop is DEFERRED and executed later by
+                // StepSteadyFooting.fail (which now has rng), so a Ball & Chain attacker rolls its
+                // InjuryTypeBallAndChain there — applying drop_player directly here (rng-less) skipped
+                // that roll (goblin seed 2 i=16: the away Fanatic blitzes, Skull → its chain injury was
+                // never rolled → 2-die desync). For bb2016/bb2020 the attacker drop already happened
+                // above under the PilingOn branch, so keep the plain (command-less) context there.
                 if !piling_on_supported && !fell_from_rush {
-                    for p in drop_player(game, &attacker_id, true) {
-                        out = out.publish(p);
-                    }
+                    let cmd: std::sync::Arc<dyn crate::step::framework::DeferredCommand> =
+                        std::sync::Arc::new(crate::step::bb2025::command::drop_player_command::DropPlayerCommand::new(
+                            attacker_id.clone(), ApothecaryMode::Attacker, true));
+                    let ctx = SteadyFootingContext::from_injury_result_with_commands(
+                        injury_result_attacker, vec![cmd]);
+                    out = out.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
+                } else {
+                    let ctx = SteadyFootingContext::from_injury_result(injury_result_attacker);
+                    out = out.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
                 }
-                let ctx = SteadyFootingContext::from_injury_result(injury_result_attacker);
-                out = out.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
             }
         }
 
@@ -618,10 +622,12 @@ mod tests {
     }
 
     #[test]
-    fn bb2025_falling_attacker_with_ball_scatters_it() {
-        // bb2025 Both Down: a ball-carrying attacker knocked down drops the ball. Java defers a
-        // DropPlayerCommand(attacker); Rust applies the drop here (DeferredCommand not ported). Without
-        // it the ball stayed put and the game-die stream desynced (seed 5 i=159).
+    fn bb2025_falling_attacker_defers_drop_command() {
+        // bb2025: a knocked-down attacker's drop is DEFERRED via a DropPlayerCommand in the published
+        // SteadyFootingContext (1:1 with Java); StepSteadyFooting.fail executes it (with rng, so a Ball
+        // & Chain attacker rolls its InjuryTypeBallAndChain there). The drop + ball scatter therefore
+        // happen when the command runs, not inline here. Verify the context carries exactly one
+        // deferred command, then run that command and confirm it drops the ball-carrier (ball scatters).
         let mut game = make_game();
         let coord = FieldCoordinate::new(5, 5);
         add_player(&mut game, "home", "atk", coord, PS_FALLING);
@@ -632,9 +638,16 @@ mod tests {
         game.field_model.ball_in_play = true;
         let mut step = StepDropFallingPlayers::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
-        assert!(game.field_model.ball_moving, "ball carried by a knocked-down attacker must be set moving");
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(_))),
-            "expected a ball scatter for the falling ball-carrying attacker");
+        // The drop is deferred (not inline), so the ball is not yet moving.
+        assert!(!game.field_model.ball_moving, "attacker drop is deferred — ball must not move inline");
+        let ctx = out.published.iter().find_map(|p| match p {
+            StepParameter::SteadyFootingContext(c) => Some(c.clone()),
+            _ => None,
+        }).expect("a SteadyFootingContext must be published for the falling attacker");
+        assert_eq!(ctx.deferred_commands.len(), 1, "attacker drop must be a single deferred command");
+        // Executing the deferred command performs the drop → ball-carrier drops → ball scatters.
+        let _ = ctx.execute_deferred_commands(&mut game, &mut GameRng::new(0));
+        assert!(game.field_model.ball_moving, "executing the deferred drop must set the carried ball moving");
     }
 
     #[test]

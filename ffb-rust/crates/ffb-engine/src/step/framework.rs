@@ -599,7 +599,9 @@ impl SequenceStep {
 /// Commands queued on a step to be executed when the step is revisited.
 pub trait DeferredCommand: Send + Sync {
     fn id(&self) -> DeferredCommandId;
-    fn execute(&self, game: &mut ffb_model::model::game::Game) -> Vec<StepParameter>;
+    /// `rng` is threaded so a command can roll dice (e.g. a Ball & Chain player dropped via
+    /// `DropPlayerCommand` must roll its `InjuryTypeBallAndChain` — the Java `dropPlayer` does).
+    fn execute(&self, game: &mut ffb_model::model::game::Game, rng: &mut ffb_model::util::rng::GameRng) -> Vec<StepParameter>;
 }
 
 /// Identifier for a DeferredCommand (mirrors Java `DeferredCommandId` enum).
