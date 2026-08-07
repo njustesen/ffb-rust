@@ -286,13 +286,31 @@ impl StepEndTurn {
             // this clear it leaked into later turns and inflated a block's dice count, rolling an extra
             // die and desyncing the game-die stream. Runs before any home_playing flip so it targets the
             // acting team.
-            // Only clear when a REAL turn is ending (the acting team actually played:
-            // turn_started). Java gates on turnMode==REGULAR/BLITZ, but the Rust kickoff->turn-1
-            // transition runs StepEndTurn with turn_mode already Regular (Java's is Kickoff there),
-            // which would clear the KICKING team's Cheering Fans assist before it ever plays its turn
-            // (seed 8: away kicked, away_aa granted at kickoff, cleared at the transition -> away_03's
-            // turn-1 block lost its +1 die). turn_started is false at that transition, true at a real end.
-            if matches!(game.turn_mode, TurnMode::Regular | TurnMode::Blitz) && game.turn_data().turn_started {
+            // Java StepEndTurn:236-237 clears the ACTING team's additional assist at every
+            // REGULAR/BLITZ turn end, with NO turn_started guard. The clear runs BEFORE the
+            // transition block below, so at the kickoff->turn-1 handoff turn_mode is still Kickoff
+            // (line ~340 flips it to Regular only afterward) → the handoff is naturally skipped,
+            // matching Java (whose kickoff handoff is turnMode=KICKOFF). A prior `turn_started`
+            // guard was WRONG: a turn played only via a deselecting ThrowTeamMate leaves
+            // turn_started=false (it's set only by InitMoving/InitPassing/InitFouling/StandUp/
+            // BlockStatistics), so the acting team's assist was never cleared and leaked into its
+            // next turn (underworld seed 26: home_02's turn-2 blitz got a stale +1 → a 2-dice block
+            // where Java rolled 1 die → wrong both-down injury). Clear on turn_mode alone, like Java.
+            // Clear the ACTING team's Cheering-Fans additional assist at its turn end (it lasts only
+            // for the turn granted). Java (StepEndTurn.java:236-237) clears at every REGULAR/BLITZ
+            // turn end with no extra guard, relying on the kickoff→turn-1 handoff being turnMode=KICKOFF.
+            // Rust's handoff can arrive here with turn_mode already Regular (Java's is Kickoff there),
+            // so a bare turn_mode check would clear the RECEIVING team's assist before it ever plays
+            // (seed 8: away_aa cleared at the pre-turn-1 handoff → away's turn-1 block lost its +1 die).
+            // A `turn_started` guard was also wrong: a turn played only via a deselecting ThrowTeamMate
+            // never sets turn_started (it's set by InitMoving/InitPassing/InitFouling/StandUp/
+            // BlockStatistics), so the acting team's assist leaked into its next turn (underworld seed 26:
+            // home turn 1 was a lone deselecting TTM → home_02's turn-2 blitz kept a stale +1 → a 2-dice
+            // block where Java rolled 1). The correct discriminator is the ACTING team's turn_nr: it is 0
+            // at the pre-turn-1 handoff (preserve) and ≥1 once that team has actually taken a turn (clear).
+            if matches!(game.turn_mode, TurnMode::Regular | TurnMode::Blitz)
+                && game.turn_data().turn_nr >= 1
+            {
                 if game.home_playing {
                     game.home_additional_assists = 0;
                 } else {
@@ -792,18 +810,36 @@ mod tests {
     }
 
     #[test]
-    fn additional_assist_not_cleared_when_turn_not_started() {
-        // The kickoff->turn-1 transition runs StepEndTurn with turn_mode=Regular but turn_started=false
-        // (the kicking team never played). It must NOT clear that team's Cheering Fans additional
-        // assist — the assist lasts until the team actually plays and ends its turn.
+    fn additional_assist_not_cleared_before_team_plays_a_turn() {
+        // The kickoff->turn-1 transition can run StepEndTurn with turn_mode=Regular but the acting
+        // team's turn_nr still 0 (it never took a turn). It must NOT clear that team's Cheering Fans
+        // additional assist — the assist lasts until the team actually plays and ends its turn.
+        // (Discriminator is the acting team's turn_nr, not turn_started: a turn played only via a
+        // deselecting ThrowTeamMate leaves turn_started=false yet must still clear at its end.)
         let mut game = make_game();
         game.home_playing = false; // away = the "acting"/kicking team at the transition
         game.turn_mode = TurnMode::Regular;
-        game.turn_data_away.turn_started = false;
+        game.turn_data_away.turn_nr = 0; // away has not taken a turn yet
         game.away_additional_assists = 1;
         let mut step = StepEndTurn::new();
         step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(game.away_additional_assists, 1, "assist must survive a no-real-turn transition");
+        assert_eq!(game.away_additional_assists, 1, "assist must survive before the team plays a turn");
+    }
+
+    #[test]
+    fn additional_assist_cleared_at_real_turn_end_even_without_turn_started() {
+        // A turn played only via a deselecting ThrowTeamMate never sets turn_started, but the acting
+        // team's turn_nr is >= 1, so its Cheering Fans assist MUST be cleared at that turn's end
+        // (underworld seed 26 regression: else a stale +1 inflated a later block's dice count).
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_mode = TurnMode::Regular;
+        game.turn_data_home.turn_nr = 1;
+        game.turn_data_home.turn_started = false; // deselecting-TTM turn: never set true
+        game.home_additional_assists = 1;
+        let mut step = StepEndTurn::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.home_additional_assists, 0, "assist must clear at a real turn end (turn_nr>=1)");
     }
 
     #[test]

@@ -1448,3 +1448,27 @@ ParityRunner committed LOCAL-only (jar rebuilt); no Rust engine change.
 
 RENEGADES DONE. Remaining red: underworld (seed 26 — fully root-caused Cheering-Fans additional-assist
 turn-lifecycle leak; deferred to a dedicated session, see [[parity-roster-progression]] ITER 11).
+
+### UNDERWORLD seed 26 — Cheering-Fans additional-assist turn-lifecycle leak (underworld → 100/100 GREEN)
+
+Final frontier. i=13 (home turn 2): Rust rolled a 2-dice block for home_02 (ST5) vs away_01 (ST5) where Java
+rolled 1-die, diverging the both-down fall injury (home_02 Stunned in Java, Prone in Rust). Root cause: a
+Cheering-Fans additional block assist (+1), granted to home at the opening kickoff (home won 4v3), LEAKED into
+home's turn 2 — Rust's StepEndTurn (bb2025) failed to clear it at the end of home's turn 1.
+
+The clear was gated `turn_mode∈{Regular,Blitz} && turn_data().turn_started`. But home's turn 1 consisted of a
+single deselecting ThrowTeamMate activation, which never sets `turn_started` (that flag is set only by
+InitMoving / InitPassing / InitFouling / StandUp / BlockStatistics). So the guard skipped the clear and the +1
+survived into turn 2. Java (StepEndTurn.java:236-237) clears at every REGULAR/BLITZ turn end with no such guard.
+Naively dropping the guard regressed seed 8 (the kickoff→turn-1 handoff arrives here with turn_mode already
+Regular in Rust — Java's is KICKOFF — so a bare turn_mode check clears the receiving team's assist before it
+ever plays). AA_TRACE across seeds 8 and 26 showed the correct discriminator: the ACTING team's `turn_nr` — 0 at
+the pre-turn-1 handoff (preserve), ≥1 once the team has actually taken a turn (clear).
+
+Fix (step/bb2025/step_end_turn.rs): clear the acting team's additional assist when
+`turn_mode∈{Regular,Blitz} && turn_data().turn_nr >= 1` (replacing the `turn_started` guard). Verified: seed 8
+(away_aa preserved → its turn-1 block keeps 2 dice) AND seed 26 (home_aa cleared → 1-die block → home_02 Stunned)
+both pass; underworld 100/100. cargo ffb-engine 7033/0 (+2 regression tests), ffb-model 2777/0, ffb-mechanics
+1148/0. 24-roster regression clean. **underworld 100/100 GREEN.**
+
+RENEGADES + UNDERWORLD BOTH GREEN — campaign target for this pair complete.

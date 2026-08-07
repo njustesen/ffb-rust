@@ -34,7 +34,7 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 25 | slann | GREEN 100/100 | agent declines the diving-catch declaration prompt (mislabeled AgentPrompt::SwarmingPlayers from StepCatchScatterThrowIn) via SelectPlayer{empty} |
 | 26 | slann_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
 | 27 | undead | GREEN 100/100 | roll-to-stand-up success now sets STANDING state (was left PRONE) |
-| 28 | underworld | FAIL 25/100 | AS lash-out + prone-TTM stand-up FIXED; now seed 26 step 13 turn 3 h1 — state-hash divergence |
+| 28 | underworld | **GREEN 100/100** | Cheering-Fans additional-assist turn-lifecycle clear (acting-team turn_nr>=1, not turn_started) |
 | 29 | vampire | GREEN 100/100 | Bloodlust (min-roll, failed-action routing, feed, suffering-move, free-stand-up, reroll-decline suffering) + guard used-skills reset on genuine player change |
 | 30 | wood_elf | GREEN 100/100 | Take Root (old_player_state + dodging-clear) + agent phase-2 pre-draw for prone/rooted movers w/ uncapped neighbour list |
 
