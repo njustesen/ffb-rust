@@ -1428,3 +1428,23 @@ Verified: renegades seed 11 + underworld seed 7 now match; frontiers advanced **
 underworld 7→26**. cargo ffb-engine 7032/0, ffb-model 2777/0, ffb-mechanics 1148/0; 23-roster regression
 clean. NEW frontiers: renegades seed 81 (java=None STUCK — a ParityRunner harness gap), underworld seed 26
 step 13 turn 3 half 1 (state-hash divergence).
+
+### RENEGADES seed 81 — Safe Pair of Hands PLACE_BALL harness gap (renegades → 100/100 GREEN)
+
+After the AS + prone-TTM fixes advanced renegades to seed 81, the frontier was `java=None` (STUCK):
+`STUCK_STEP: PLACE_BALL unadvanced for 501 iters, turnMode=SAFE_PAIR_OF_HANDS`. A knocked-down
+ball-carrier with **Safe Pair of Hands** may place the ball in an adjacent square instead of it
+scattering — Java's stock engine shows a DialogSkillUseParameter (offer), and when used, enters
+`TurnMode.SAFE_PAIR_OF_HANDS` with a PLACE_BALL coach dialog. The ParityRunner's SKILL_USE handler
+used the skill (its default "use everything") but could not drive the subsequent placement dialog →
+STUCK → `java=None`. Rust's `StepPlaceBall` (bb2025/shared) auto-declines Safe Pair of Hands (the
+placement dialog is a documented not-yet-ported gap), so it never entered that turn mode.
+
+Fix (harness, mirrors DumpOff/PrimalSavagery): ParityRunner SKILL_USE handler now also DECLINES
+`SafePairOfHands` (`!"SafePairOfHands".equals(skillName)`), so Java skips the skill and the ball
+scatters — matching Rust. No PLACE_BALL dialog is entered → no STUCK. **renegades 100/100 GREEN.**
+No regression: 23 prior-green rosters 100/100; cargo unchanged (Rust tree untouched this fix). ffb
+ParityRunner committed LOCAL-only (jar rebuilt); no Rust engine change.
+
+RENEGADES DONE. Remaining red: underworld (seed 26 — fully root-caused Cheering-Fans additional-assist
+turn-lifecycle leak; deferred to a dedicated session, see [[parity-roster-progression]] ITER 11).

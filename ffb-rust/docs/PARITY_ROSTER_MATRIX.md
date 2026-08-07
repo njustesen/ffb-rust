@@ -29,7 +29,7 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 20 | nurgle | GREEN 100/100 | — |
 | 21 | ogre | FAIL 0/100 | seed 1, step 143 — first divergence |
 | 22 | orc | GREEN 100/100 | — |
-| 23 | renegades | FAIL 80/100 | AS lash-out + prone-TTM stand-up FIXED; now seed 81 java=None (ParityRunner STUCK harness gap) |
+| 23 | renegades | **GREEN 100/100** | AS lash-out + prone-TTM stand-up + SafePairOfHands PLACE_BALL harness decline |
 | 24 | skaven | GREEN 100/100 | — |
 | 25 | slann | GREEN 100/100 | agent declines the diving-catch declaration prompt (mislabeled AgentPrompt::SwarmingPlayers from StepCatchScatterThrowIn) via SelectPlayer{empty} |
 | 26 | slann_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
