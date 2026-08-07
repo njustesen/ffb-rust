@@ -1531,6 +1531,20 @@ Pass::build_sequence → StepInitPassing returned Continue with no target coordi
 Pass / ThrowTeamMate / KickTeamMate when defender_id is None) to ThrowBomb / HailMaryBomb — EndPlayerAction + goto
 end instead of dispatching the pass sequence. Matches Java's deselect exactly (RNG already aligned: both consume
 only the activation pick). Advanced goblin seed 1 i=57 → **i=145** (into 2nd half). Regression test
-`throw_bomb_activation_without_target_deselects`. cargo 7035/0, 2777/0, 1148/0. NEXT frontier: goblin seed 1 i=146
-(half 2, turn 1, home) — a player-pick/state divergence at the 2nd-half start (Java Activate(home_10,MOVE) vs Rust
-Activate(home_11,Move); pre-state hashes differ → likely a 2nd-half kickoff/setup state divergence, NOT bomb-related).
+`throw_bomb_activation_without_target_deselects`. cargo 7035/0, 2777/0, 1148/0.
+
+### GOBLIN (in progress) — get_skill_int_value stub returned 0 (Bombardier Secret Weapon penalty)
+
+goblin seed 1 i=146 (halftime → 2nd-half): the away Bombardier (Secret Weapon value=5) was auto-banned at the H1
+drive-end instead of rolling 2d6, because `Player::get_skill_int_value(property)` was a STUB returning 0 for every
+property. Java `getSkillIntValue(ISkillProperty)` = `getSkillIntValue(getSkillWithProperty(property))` → finds the
+skill registering the property and returns its roster value (5 = the Bombardier send-off penalty). With penalty 0
+Rust took the auto-ban branch (0 dice) where Java rolls `rollSecretWeapon` (2d6, pos128-130), so every downstream
+secret-weapon / argue / KO-recovery die misaligned: the away Chainsaw's argue roll became a losing 4 instead of
+Java's winning 6 → Rust banned it where Java kept+recovered it → Rust placed 8 away vs Java 9 → i=146 state/pick
+mismatch, and Rust was 1 die short (skipped that player's KO-recovery). Fix: implement `get_skill_int_value` — find
+the skill (across starting/extra/temporary) whose `properties()` contains `property`, return its parsed roster value
+else 0. Dice-safe for the other callers (Loner's min-roll is a threshold on an already-rolled die; Dirty Player /
+variable armour+injury modifiers are additive, no extra dice). Advanced goblin seed 1 → **GREEN (100%)**. Regression
+test `get_skill_int_value_reads_property_skill_value`. cargo 7035/2778/1148. NEXT frontier: goblin seed 2 i=17
+(turn 2, away Activate(away_07,MOVE) — new divergence).

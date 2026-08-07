@@ -294,10 +294,20 @@ impl Player {
             .collect()
     }
 
-    /// 1:1 translation of getSkillIntValue — returns the integer value for a skill with a numeric property.
-    /// TODO: requires full Skill property lookup to be implemented.
-    pub fn get_skill_int_value(&self, _property: &str) -> i32 {
-        0
+    /// 1:1 translation of `Player.getSkillIntValue(ISkillProperty)` =
+    /// `getSkillIntValue(getSkillWithProperty(property))`: find the skill on this player that
+    /// registers `property` and return its integer value (roster-assigned value across
+    /// starting/extra/temporary skills, e.g. Secret Weapon's send-off penalty, Loner's roll,
+    /// Dirty Player's armour bonus). Falls back to 0 when no such skill or no numeric value —
+    /// the same result the previous stub gave for the no-value case.
+    pub fn get_skill_int_value(&self, property: &str) -> i32 {
+        self.starting_skills.iter()
+            .chain(self.extra_skills.iter())
+            .chain(self.temporary_skills.iter())
+            .filter(|sw| sw.skill_id.properties().contains(&property))
+            .find_map(|sw| sw.value.as_deref()
+                .and_then(|v| v.trim().trim_end_matches('+').parse::<i32>().ok()))
+            .unwrap_or(0)
     }
 
     /// Java: Player.getSkillIntValue(Skill) — the numeric value attached to a specific skill on this
@@ -614,6 +624,27 @@ mod tests {
         let back: Player = serde_json::from_str(&json).unwrap();
         assert_eq!(p.id, back.id);
         assert_eq!(p.movement, back.movement);
+    }
+
+    #[test]
+    fn get_skill_int_value_reads_property_skill_value() {
+        use crate::model::skill_def::SkillWithValue;
+        use crate::model::property::named_properties::NamedProperties;
+        // A goblin Bombardier's Secret Weapon carries a send-off penalty value (5). getsSentOffAtEndOfDrive
+        // is registered by SecretWeapon, so get_skill_int_value(getsSentOffAtEndOfDrive) must return 5 — a
+        // penalty > 0 makes the end-of-drive send-off ROLL 2d6 instead of auto-banning (the previous stub
+        // returned 0 → auto-ban → wrong dice + wrong ban, goblin seed 1 i=146).
+        let mut p = test_player();
+        p.starting_skills = vec![SkillWithValue::with_value(SkillId::SecretWeapon, "5")];
+        assert_eq!(p.get_skill_int_value(NamedProperties::GETS_SENT_OFF_AT_END_OF_DRIVE), 5);
+
+        // A penalty-less Secret Weapon (no roster value, e.g. Chainsaw/Ball & Chain) → 0 (auto-ban).
+        let mut q = test_player();
+        q.starting_skills = vec![SkillWithValue::new(SkillId::SecretWeapon)];
+        assert_eq!(q.get_skill_int_value(NamedProperties::GETS_SENT_OFF_AT_END_OF_DRIVE), 0);
+
+        // A player without the property → 0.
+        assert_eq!(test_player().get_skill_int_value(NamedProperties::GETS_SENT_OFF_AT_END_OF_DRIVE), 0);
     }
 
     #[test]

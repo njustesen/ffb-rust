@@ -16,7 +16,7 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 7 | dark_elf_league_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
 | 8 | dwarf | GREEN 100/100 | — |
 | 9 | elf | GREEN 100/100 | — |
-| 10 | goblin | FAIL (in progress) | blitz_used@dispatch + B&C drop injury + B&C move d6 dir + Bombardier THROW_BOMB deselect (seed 1 i9→i34→i57→i145); next: i146 half-2 home player-pick divergence (java home_10 / rust home_11) |
+| 10 | goblin | FAIL (in progress) | blitz_used + B&C drop injury + B&C move d6 dir + Bombardier deselect + get_skill_int_value (Bombardier SW penalty 5 not 0) — **seed 1 GREEN**; next: seed 2 i=17 |
 | 11 | halfling | GREEN 100/100 | TTM fixes: pass modifiers + Strong Arm + null-target Block no-stand-up + fumbled-carrier ball-bounce/turnover (wood_elf Take Root retired the old blitz-negatrait deferral) |
 | 12 | high_elf | GREEN 100/100 | — |
 | 13 | human | GREEN 100/100 | — |
