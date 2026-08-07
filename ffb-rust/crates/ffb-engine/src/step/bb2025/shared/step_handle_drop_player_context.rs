@@ -83,7 +83,7 @@ impl Step for StepHandleDropPlayerContext {
 }
 
 impl StepHandleDropPlayerContext {
-    fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    fn execute_step(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let ctx = match &self.drop_player_context {
             Some(c) => c,
             None => return StepOutcome::next(),
@@ -114,7 +114,28 @@ impl StepHandleDropPlayerContext {
                 .map(|s| !s.is_prone_or_stunned())
                 .unwrap_or(false);
             let fell_coord = game.field_model.player_coordinate(&player_id);
-            let drop_params = drop_player(game, &player_id, ctx.eligible_for_safe_pair_of_hands);
+            // Java UtilServerInjury.dropPlayer: a player with placedProneCausesInjuryRoll (Ball &
+            // Chain) is NOT placed prone — the chain injures it: handleInjury(new
+            // InjuryTypeBallAndChain(), null, player, coord, ..., mode) → publish INJURY_RESULT.
+            // Rust's drop_player only implements the else (placement) branch and can't roll (no rng),
+            // so a dropped B&C player never rolled its 2 InjuryTypeBallAndChain dice (goblin seed 1
+            // i=14: home_01's both-down blitz drops the away B&C fanatic → Java rolls it, Rust omitted
+            // it → rng desync). This step HAS rng, so roll it here for a B&C player.
+            let placed_prone_causes_injury = game.player(&player_id)
+                .map(|p| p.has_skill_property(ffb_model::model::property::named_properties::NamedProperties::PLACED_PRONE_CAUSES_INJURY_ROLL))
+                .unwrap_or(false);
+            let drop_params = if placed_prone_causes_injury {
+                let bc_coord = fell_coord.unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
+                let mut it = crate::injury::injuryType::injury_type_ball_and_chain::InjuryTypeBallAndChain::new();
+                let res = crate::step::util_server_injury::handle_injury(
+                    game, rng, &mut it, None, &player_id, bc_coord, None, None,
+                    ffb_model::enums::ApothecaryMode::Defender,
+                );
+                out = out.publish(StepParameter::InjuryResult(Box::new(res)));
+                Vec::new()
+            } else {
+                drop_player(game, &player_id, ctx.eligible_for_safe_pair_of_hands)
+            };
             if was_upright {
                 if let Some(coord) = fell_coord {
                     out = out.with_event(ffb_model::events::GameEvent::PlayerFellDown {

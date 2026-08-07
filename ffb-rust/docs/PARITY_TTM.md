@@ -1489,3 +1489,17 @@ Fix (step/bb2025/shared/step_end_selecting.rs, `PlayerAction::Blitz` dispatch): 
 skipped BLITZ_MOVE phase (mirrors the adjacent StandUpBlitz case). Advanced goblin seed 1 i=9 → i=18. cargo
 7033/0, 2777/0, 1148/0; 24-roster regression clean. NEXT frontier: seed 1 i=14 — home_01's blitz consumes 2 fewer
 dice in Rust (a gfab after-block go-for-it continuation Rust's in-place path skips).
+
+### GOBLIN (in progress) — Ball & Chain drop injury (InjuryTypeBallAndChain) on knock-down
+
+goblin seed 1 i=14: home_01's both-down blitz drops the away Ball & Chain fanatic. Java's
+UtilServerInjury.dropPlayer, for a player with `placedProneCausesInjuryRoll` (Ball & Chain), does NOT place it
+prone — instead the chain injures it: `handleInjury(new InjuryTypeBallAndChain(), null, player, coord, ...)` →
+publish INJURY_RESULT (2 injury dice, Java DICE_TRACE pos 35,36). Rust's `drop_player` only implements the else
+(placement) branch and can't roll (no rng in its signature; several drop sites are DeferredCommands with no rng —
+a generic fix would need a core trait change). Narrow fix: `StepHandleDropPlayerContext` (bb2025/shared) already
+has rng and is where the both-down faller is dropped — roll InjuryTypeBallAndChain there for a
+placedProneCausesInjuryRoll player (publish INJURY_RESULT, skip the prone placement), matching Java's dropPlayer.
+Advanced goblin seed 1 i=18 → i=34. cargo 7033/0, 2777/0, 1148/0. (Ball-carrier B&C drop still routes ball
+handling through the normal path — a documented gap for the rare case; DeferredCommand drop sites likewise still
+lack the B&C roll — to be addressed if a later seed needs them.) NEXT frontier: goblin seed 1 i=34.
