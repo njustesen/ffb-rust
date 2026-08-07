@@ -84,7 +84,9 @@ impl StepMoveBallAndChain {
 
         if do_roll {
             // Java: int scatterRoll = getGameState().getDiceRoller().rollThrowInDirection()
-            let scatter_roll = rng.d8();
+            // — rollThrowInDirection() is rollDice(6), a d6 (NOT a d8 scatter): the B&C player
+            // scatters ONE square in a throw-in direction biased toward the intended move.
+            let scatter_roll = rng.d6();
 
             // Determine base direction from coordinate delta (East/West/South/North)
             let base_dir = if coord_from.x < original_coord_to.x {
@@ -254,34 +256,31 @@ impl Step for StepMoveBallAndChain {
 /// Maps a d8 roll (1-8) to a scatter direction based on the facing direction.
 /// The Java implementation uses a fixed lookup table per facing.
 fn interpret_throw_in_direction(base: Direction, roll: i32) -> Direction {
-    // Each array: roll 1..=8 → Direction (1-indexed: idx = roll-1).
-    // Mirrors Java ThrowInMechanic's directional scatter tables.
-    let dirs_east: [Direction; 8] = [
-        Direction::Northeast, Direction::North, Direction::Northwest,
-        Direction::East, Direction::East,
-        Direction::Southeast, Direction::South, Direction::Southwest,
-    ];
-    let dirs_west: [Direction; 8] = [
-        Direction::Southwest, Direction::South, Direction::Southeast,
-        Direction::West, Direction::West,
-        Direction::Northwest, Direction::North, Direction::Northeast,
-    ];
-    let dirs_south: [Direction; 8] = [
-        Direction::Southeast, Direction::East, Direction::Northeast,
-        Direction::South, Direction::South,
-        Direction::Southwest, Direction::West, Direction::Northwest,
-    ];
-    let dirs_north: [Direction; 8] = [
-        Direction::Northwest, Direction::West, Direction::Southwest,
-        Direction::North, Direction::North,
-        Direction::Northeast, Direction::East, Direction::Southeast,
-    ];
-    let idx = ((roll - 1).max(0).min(7)) as usize;
+    // Mirrors Java ThrowInMechanic.interpretThrowInDirectionRoll(Direction, int) — a d6
+    // (roll 1..=6) mapping to a 3-way spread centred on the template direction:
+    //   1-2 → left-of-centre, 3-4 → centre, 5-6 → right-of-centre.
+    // The B&C step only ever passes EAST/WEST/NORTH/SOUTH as the base.
     match base {
-        Direction::East | Direction::Northeast | Direction::Southeast => dirs_east[idx],
-        Direction::West | Direction::Northwest | Direction::Southwest => dirs_west[idx],
-        Direction::South => dirs_south[idx],
-        Direction::North => dirs_north[idx],
+        Direction::East | Direction::Northeast | Direction::Southeast => match roll {
+            1 | 2 => Direction::Northeast,
+            5 | 6 => Direction::Southeast,
+            _ => Direction::East,
+        },
+        Direction::West | Direction::Northwest | Direction::Southwest => match roll {
+            1 | 2 => Direction::Southwest,
+            5 | 6 => Direction::Northwest,
+            _ => Direction::West,
+        },
+        Direction::North => match roll {
+            1 | 2 => Direction::Northwest,
+            5 | 6 => Direction::Northeast,
+            _ => Direction::North,
+        },
+        Direction::South => match roll {
+            1 | 2 => Direction::Southeast,
+            5 | 6 => Direction::Southwest,
+            _ => Direction::South,
+        },
     }
 }
 
@@ -389,6 +388,28 @@ mod tests {
     fn add_ball_and_chain_acting_player(game: &mut Game) {
         use ffb_model::model::skill_def::SkillWithValue;
         add_acting_player_with_skills(game, vec![SkillWithValue::new(SkillId::BallAndChain)]);
+    }
+
+    #[test]
+    fn interpret_throw_in_direction_matches_java_d6_table() {
+        // Java ThrowInMechanic.interpretThrowInDirectionRoll(Direction, int): a d6 mapping,
+        // 1-2 left-of-centre, 3-4 centre, 5-6 right-of-centre. Regression guard against the
+        // old d8 scatter table (which let e.g. an EAST bias scatter NW/W).
+        use Direction::*;
+        let cases = [
+            (East,  [Northeast, Northeast, East, East, Southeast, Southeast]),
+            (West,  [Southwest, Southwest, West, West, Northwest, Northwest]),
+            (North, [Northwest, Northwest, North, North, Northeast, Northeast]),
+            (South, [Southeast, Southeast, South, South, Southwest, Southwest]),
+        ];
+        for (base, expected) in cases {
+            for roll in 1..=6i32 {
+                assert_eq!(
+                    interpret_throw_in_direction(base, roll), expected[(roll - 1) as usize],
+                    "base={base:?} roll={roll}"
+                );
+            }
+        }
     }
 
     #[test]

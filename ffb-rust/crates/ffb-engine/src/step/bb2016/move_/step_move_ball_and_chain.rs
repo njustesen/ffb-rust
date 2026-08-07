@@ -113,7 +113,8 @@ impl StepMoveBallAndChain {
         // Java: int scatterRoll = getGameState().getDiceRoller().rollThrowInDirection();
         // Always rolled — the scatter is unconditional, never skipped because coordinateTo
         // was pre-supplied by the caller (that value only biases the direction below).
-        let scatter_roll = rng.d8();
+        // rollThrowInDirection() is rollDice(6), a d6 (NOT a d8 scatter).
+        let scatter_roll = rng.d6();
 
         // Java: compare fCoordinateFrom to fCoordinateTo (pre-scatter) to pick a base direction
         let base_dir = if coordinate_from.x < bias_coordinate_to.x {
@@ -174,34 +175,30 @@ impl StepMoveBallAndChain {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /// Java: ThrowInMechanic.interpretThrowInDirectionRoll(baseDir, roll).
-/// Maps a d8 roll (1-8) to a scatter direction based on the base (facing) direction.
+/// Maps a d6 roll (1-6) to a 3-way spread centred on the base (facing) direction:
+/// 1-2 → left-of-centre, 3-4 → centre, 5-6 → right-of-centre.
 fn interpret_throw_in_direction(base: Direction, roll: i32) -> Direction {
-    let dirs_east: [Direction; 8] = [
-        Direction::Northeast, Direction::North, Direction::Northwest,
-        Direction::East, Direction::East,
-        Direction::Southeast, Direction::South, Direction::Southwest,
-    ];
-    let dirs_west: [Direction; 8] = [
-        Direction::Southwest, Direction::South, Direction::Southeast,
-        Direction::West, Direction::West,
-        Direction::Northwest, Direction::North, Direction::Northeast,
-    ];
-    let dirs_south: [Direction; 8] = [
-        Direction::Southeast, Direction::East, Direction::Northeast,
-        Direction::South, Direction::South,
-        Direction::Southwest, Direction::West, Direction::Northwest,
-    ];
-    let dirs_north: [Direction; 8] = [
-        Direction::Northwest, Direction::West, Direction::Southwest,
-        Direction::North, Direction::North,
-        Direction::Northeast, Direction::East, Direction::Southeast,
-    ];
-    let idx = ((roll - 1).max(0).min(7)) as usize;
     match base {
-        Direction::East | Direction::Northeast | Direction::Southeast => dirs_east[idx],
-        Direction::West | Direction::Northwest | Direction::Southwest => dirs_west[idx],
-        Direction::South => dirs_south[idx],
-        Direction::North => dirs_north[idx],
+        Direction::East | Direction::Northeast | Direction::Southeast => match roll {
+            1 | 2 => Direction::Northeast,
+            5 | 6 => Direction::Southeast,
+            _ => Direction::East,
+        },
+        Direction::West | Direction::Northwest | Direction::Southwest => match roll {
+            1 | 2 => Direction::Southwest,
+            5 | 6 => Direction::Northwest,
+            _ => Direction::West,
+        },
+        Direction::North => match roll {
+            1 | 2 => Direction::Northwest,
+            5 | 6 => Direction::Northeast,
+            _ => Direction::North,
+        },
+        Direction::South => match roll {
+            1 | 2 => Direction::Southeast,
+            5 | 6 => Direction::Southwest,
+            _ => Direction::South,
+        },
     }
 }
 
@@ -299,28 +296,26 @@ mod tests {
 
     #[test]
     fn out_of_bounds_target_gotos_fall_down_label() {
-        // Center-field carrier scattering toward the near edge with a seed that rolls
-        // a direction driving it off the board.
+        // Carrier on the top sideline (y=0) with a NORTH bias: the d6 throw-in mechanic
+        // maps a NORTH base to {NW, N, NE} for every roll, all of which decrement y to -1
+        // and drive the carrier off the top edge. So every seed must goto the fall label.
         let mut game = make_game();
-        let from = FieldCoordinate::new(0, 5);
-        let bias_to = FieldCoordinate::new(1, 5); // east bias
+        let from = FieldCoordinate::new(5, 0);
+        let bias_to = FieldCoordinate::new(5, -1); // north bias (from.y > to.y)
         add_ball_and_chain_player(&mut game, "carrier", from);
         let mut step = StepMoveBallAndChain::new("end".into(), "fall".into());
         step.coordinate_from = Some(from);
         step.coordinate_to = Some(bias_to);
-        // Try a handful of seeds to find one that scatters west/off the left edge.
-        let mut found_oob = false;
-        for seed in 0..64u64 {
+        // Every roll (1-6) under a NORTH bias lands off the top edge.
+        for seed in 0..16u64 {
             let mut s = StepMoveBallAndChain::new("end".into(), "fall".into());
             s.coordinate_from = Some(from);
             s.coordinate_to = Some(bias_to);
             let out = s.start(&mut game, &mut GameRng::new(seed));
-            if out.action == StepAction::GotoLabel && out.goto_label.as_deref() == Some("fall") {
-                found_oob = true;
-                break;
-            }
+            assert_eq!(out.action, StepAction::GotoLabel);
+            assert_eq!(out.goto_label.as_deref(), Some("fall"),
+                "north-biased scatter from y=0 must always go out of bounds (seed {seed})");
         }
-        assert!(found_oob, "expected at least one seed to scatter the carrier out of bounds from x=0");
     }
 
     #[test]

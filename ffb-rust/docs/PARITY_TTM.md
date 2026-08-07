@@ -1502,4 +1502,18 @@ has rng and is where the both-down faller is dropped — roll InjuryTypeBallAndC
 placedProneCausesInjuryRoll player (publish INJURY_RESULT, skip the prone placement), matching Java's dropPlayer.
 Advanced goblin seed 1 i=18 → i=34. cargo 7033/0, 2777/0, 1148/0. (Ball-carrier B&C drop still routes ball
 handling through the normal path — a documented gap for the rare case; DeferredCommand drop sites likewise still
-lack the B&C roll — to be addressed if a later seed needs them.) NEXT frontier: goblin seed 1 i=34.
+lack the B&C roll — to be addressed if a later seed needs them.)
+
+### GOBLIN (in progress) — Ball & Chain move: d6 throw-in direction (was wrongly a d8 scatter)
+
+goblin seed 1 i=34: the home B&C fanatic's Move scatters one square in a throw-in direction. Java's
+`StepMoveBallAndChain.executeStep` (movesRandomly branch) rolls `rollThrowInDirection()` = **rollDice(6)** (a d6,
+DICE_TRACE pos=58 sides=6), then `ThrowInMechanic.interpretThrowInDirectionRoll(baseDir, roll)` maps it to a 3-way
+spread centred on the intended direction (baseDir = EAST/WEST/NORTH/SOUTH from coord_from vs originalCoordinateTo):
+1-2 left-of-centre, 3-4 centre, 5-6 right-of-centre. Rust's `step_move_ball_and_chain` (mixed AND bb2016) instead
+rolled `rng.d8()` and used a local 8-entry scatter table — wrong die AND wrong 8-way mapping, so the same RNG draw
+produced a different direction/landing square (13,5 vs Java's 13,6). Fix: roll `rng.d6()` and rewrite
+`interpret_throw_in_direction` to Java's base-class d6 table. RNG position preserved (d6 and d8 each consume one
+draw). Advanced goblin seed 1 i=34 → i=57. Regression test: `interpret_throw_in_direction_matches_java_d6_table`
+(mixed) + rewrote the bb2016 OOB test (a north-biased scatter from y=0 always leaves the field). cargo 7034/0,
+2777/0, 1148/0. NEXT frontier: goblin seed 1 i=57 (turn 4, away Activate(away_08, MOVE); java has the step, rust=None).
