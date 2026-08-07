@@ -136,14 +136,18 @@ impl StepEndTurn {
     /// none remain — AWAY team first, then HOME. Each argue rolls one `rollArgueTheCall` d6: success (6) keeps
     /// the player, 1 bans the coach (no more argues for that team), otherwise the player is banned. These argue
     /// dice enter the shared stream BEFORE the half-2 kickoff dice (dwarf seed 1: pos53 away=fail, pos54 home=success).
-    fn resolve_secret_weapons(&mut self, game: &mut Game, rng: &mut GameRng) {
-        use ffb_model::enums::{PS_BANNED, PlayerState, SendToBoxReason};
+    /// Java StepEndTurn.reportSecretWeaponsUsed — Phase A of the Secret Weapon send-off. Runs at
+    /// EVERY drive end (fNewHalf || fTouchdown), INCLUDING the end of the game — Java gates only the
+    /// argue/remove phases by `!fEndGame`, never this ban roll. Each played Stunty-Leeg secret weapon
+    /// (skill int value > 0) rolls 2d6 and its has_used_secret_weapon flag is set to `banned`
+    /// (total >= penalty). Because it consumes dice even at game end, skipping it there desynced the
+    /// shared stream from the end-of-game KO-recovery / MVP rolls (goblin seed 2 step 250: both teams'
+    /// Bombardiers rolled in Java but not Rust). Java iterates game.getPlayers() = home then away.
+    fn report_secret_weapons_used(&mut self, game: &mut Game, rng: &mut GameRng) {
         use ffb_model::model::property::named_properties::NamedProperties;
-        use ffb_model::report::mixed::report_argue_the_call_roll::ReportArgueTheCallRoll;
 
-        // Phase A — reportSecretWeaponsUsed: a Stunty-Leeg secret weapon (skill int value > 0) rolls 2d6 and
-        // is banned on total >= penalty; a standard secret weapon (penalty 0, e.g. the dwarf Deathroller) is
-        // auto-banned with no die (flag left set). Java iterates game.getPlayers() = home then away.
+        // A standard secret weapon (penalty 0, e.g. the dwarf Deathroller) is auto-banned with no die
+        // (flag left set); a Stunty-Leeg secret weapon (penalty > 0) rolls 2d6 and is banned on total >= penalty.
         for is_home in [true, false] {
             let ids: Vec<String> = {
                 let t = if is_home { &game.team_home } else { &game.team_away };
@@ -166,6 +170,16 @@ impl StepEndTurn {
                 }
             }
         }
+    }
+
+    /// Java StepEndTurn argueTheCall (AWAY then HOME) + removeUsedSecretWeapons — Phases B & C of the
+    /// Secret Weapon send-off. The caller runs this only when NOT end-of-game (Java's `!fEndGame` guard
+    /// on askForArgueTheCall / removeUsedSecretWeapons): a Secret Weapon is physically banned at a
+    /// drive end that is not the end of the game, but the final half ending keeps it on the pitch.
+    fn argue_and_remove_secret_weapons(&mut self, game: &mut Game, rng: &mut GameRng) {
+        use ffb_model::enums::{PS_BANNED, PlayerState, SendToBoxReason};
+        use ffb_model::model::property::named_properties::NamedProperties;
+        use ffb_model::report::mixed::report_argue_the_call_roll::ReportArgueTheCallRoll;
 
         // Phase B — argueTheCall: AWAY team first, then HOME. ParityRunner argues each flagged SW player.
         for is_home in [false, true] {
@@ -404,8 +418,14 @@ impl StepEndTurn {
         let is_end_of_game = (self.new_half && game.half > 1)
             || (touchdown && game.turn_data_home.turn_nr >= 8 && game.turn_data_away.turn_nr >= 8);
         if self.argue_the_call_choice_away.is_none() {
-            if !is_end_of_game && (self.new_half || touchdown) {
-                self.resolve_secret_weapons(game, rng);
+            if self.new_half || touchdown {
+                // Java reportSecretWeaponsUsed: the 2d6 ban roll runs at every drive end, even the
+                // final one — it consumes dice before the end-of-game KO-recovery / MVP rolls.
+                self.report_secret_weapons_used(game, rng);
+                // Java gates only argueTheCall / removeUsedSecretWeapons by !fEndGame.
+                if !is_end_of_game {
+                    self.argue_and_remove_secret_weapons(game, rng);
+                }
             }
             self.argue_the_call_choice_away = Some(false);
         }
@@ -663,19 +683,48 @@ mod tests {
         let mut seed_fail = 0u64;
         while GameRng::new(seed_fail).d6() != 2 { seed_fail += 1; assert!(seed_fail < 200); }
 
-        // Success: stays on the pitch, flag cleared.
+        // Success: stays on the pitch, flag cleared. (penalty-0 SW → Phase A rolls no die, so the
+        // argue die in Phase B is the first d6.)
         let (mut game, mut step) = setup();
-        step.resolve_secret_weapons(&mut game, &mut GameRng::new(seed_ok));
+        let mut rng_ok = GameRng::new(seed_ok);
+        step.report_secret_weapons_used(&mut game, &mut rng_ok);
+        step.argue_and_remove_secret_weapons(&mut game, &mut rng_ok);
         assert!(game.field_model.player_coordinate("sw").is_some(), "argued (6) → stays on pitch");
         assert_ne!(game.field_model.player_state("sw").unwrap().base(), PS_BANNED);
         assert!(!game.game_result.team_result_mut(true).player_result_mut("sw").has_used_secret_weapon);
 
         // Failure: banned to the box (off-field, PS_BANNED).
         let (mut game, mut step) = setup();
-        step.resolve_secret_weapons(&mut game, &mut GameRng::new(seed_fail));
+        let mut rng_fail = GameRng::new(seed_fail);
+        step.report_secret_weapons_used(&mut game, &mut rng_fail);
+        step.argue_and_remove_secret_weapons(&mut game, &mut rng_fail);
         assert!(game.field_model.player_coordinate("sw").is_none(), "failed argue → removed from pitch");
         assert_eq!(game.field_model.player_state("sw").unwrap().base(), PS_BANNED);
         assert!(!game.game_result.team_result_mut(true).player_result_mut("sw").has_used_secret_weapon);
+    }
+
+    /// Regression (goblin seed 2 step 250): a Stunty-Leeg Secret Weapon (penalty > 0) must roll its
+    /// 2d6 ban die at the end of the game too — Java's reportSecretWeaponsUsed runs on every drive end,
+    /// only the argue/remove phases are gated by !fEndGame. `report_secret_weapons_used` therefore rolls
+    /// even at end-of-game; skipping it desynced the shared stream from the end-of-game KO/MVP rolls.
+    #[test]
+    fn end_of_game_secret_weapon_ban_roll_still_consumes_dice() {
+        use ffb_model::enums::SkillId;
+        let mut game = make_game();
+        let mut p = make_player("sw");
+        // A Secret Weapon carrying a penalty value (Stunty-Leeg send-off number, like the goblin Bombardier's 5).
+        p.starting_skills = vec![SkillWithValue { skill_id: SkillId::SecretWeapon, value: Some("5".into()) }];
+        game.team_home.players.push(p);
+        game.field_model.set_player_coordinate("sw", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("sw", PlayerState::new(PS_STANDING));
+        game.game_result.team_result_mut(true).player_result_mut("sw").has_used_secret_weapon = true;
+
+        let mut step = StepEndTurn::new();
+        let mut rng = GameRng::new(0);
+        let before = rng.call_count;
+        step.report_secret_weapons_used(&mut game, &mut rng);
+        // 2d6 rolled for the penalty-5 Secret Weapon.
+        assert_eq!(rng.call_count - before, 2, "penalty>0 Secret Weapon must roll 2d6 even at game end");
     }
 
     #[test]

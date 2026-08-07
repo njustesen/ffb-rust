@@ -8,7 +8,7 @@
 ///   CLIENT_USE_APOTHECARY(false) → DO_NOT_USE_APOTHECARY → applyTo + sideEffects → NextStep
 ///   NO_APOTHECARY → applyTo + sideEffects → NextStep
 use ffb_model::enums::{
-    ApothecaryMode, ApothecaryStatus, ApothecaryType,
+    ApothecaryMode, ApothecaryStatus, ApothecaryType, Keyword,
     PlayerState, PS_BADLY_HURT, PS_KNOCKED_OUT, PS_RESERVE, PS_SERIOUS_INJURY, PS_STUNNED,
     SeriousInjuryKind,
 };
@@ -21,7 +21,7 @@ use ffb_model::util::rng::GameRng;
 use ffb_model::prompts::AgentPrompt;
 use crate::action::Action;
 use crate::injury::InjuryResult;
-use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::step::framework::{SequenceStep, Step, StepOutcome, StepId, StepParameter};
 
 pub struct StepApothecary {
     /// Java: fApothecaryMode (mandatory init param)
@@ -190,6 +190,38 @@ impl StepApothecary {
         }
 
         if do_next_step {
+            // Java StepApothecary.java:231-372 — Getting Even (Hatred). After the injury is
+            // applied, if the defender's final state is a Serious Injury caused by an attacker
+            // whose position carries a can-get-even-with keyword, Java pushes StepId.GETTING_EVEN
+            // (which rolls a d6). When >1 keyword qualifies it first shows a SELECT_KEYWORD dialog,
+            // but the chosen keyword only feeds the report / addHatred (client/model-only) and the
+            // parity harness answers that dialog via non-seeded RandomStrategy — consuming no seeded
+            // dice. So the d6 in StepGettingEven is the only game die, and we push the step directly.
+            let getting_even: Option<Vec<SequenceStep>> = self.injury_result.as_ref().and_then(|ir| {
+                let defender_id = ir.injury_context.defender_id.clone()?;
+                let attacker_id = ir.injury_context.attacker_id.clone()?;
+                let is_si = game.field_model.player_state(&defender_id)
+                    .map(|s| s.is_si())
+                    .unwrap_or(false);
+                if !is_si {
+                    return None;
+                }
+                // Java: attacker.getPosition().getKeywords().filter(Keyword::isCanGetEvenWith)
+                // (minus the defender's canRerollSingleSkull keywords — no goblin position has
+                // that skill, so the subtraction is a no-op for the only roster carrying keywords).
+                let has_keyword = game.player(&attacker_id)
+                    .map(|attacker| attacker.keywords.iter()
+                        .any(|k| Keyword::for_name(k).is_can_get_even_with()))
+                    .unwrap_or(false);
+                if !has_keyword {
+                    return None;
+                }
+                Some(vec![SequenceStep::with_params(
+                    StepId::GettingEven,
+                    vec![StepParameter::PlayerId(defender_id)],
+                )])
+            });
+
             // Java: UtilServerInjury.handleInjurySideEffects(this, fInjuryResult)
             let side_events = if let Some(ir) = &self.injury_result {
                 crate::step::util_server_injury::handle_injury_side_effects(game, ir)
@@ -199,6 +231,7 @@ impl StepApothecary {
             let mut out = StepOutcome::next();
             for ev in pending_events { out = out.with_event(ev); }
             for ev in side_events { out = out.with_event(ev); }
+            if let Some(seq) = getting_even { out = out.push_seq(seq); }
             out
         } else {
             StepOutcome::cont()
@@ -613,6 +646,56 @@ mod tests {
         step.roll_apothecary(&mut game, &mut GameRng::new(0));
         let result = step.injury_result.as_ref().unwrap().injury_context.injury.unwrap().base();
         assert_eq!(result, PS_STUNNED);
+    }
+
+    /// Regression (goblin seed 2 step ~165): a Serious Injury inflicted by an attacker whose position
+    /// carries a can-get-even-with keyword must push StepGettingEven (Java StepApothecary.java:231-372).
+    /// StepGettingEven rolls a d6, so omitting the push desynced the shared dice stream.
+    #[test]
+    fn serious_injury_with_hated_attacker_pushes_getting_even() {
+        use ffb_model::model::player::Player;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        game.team_home.players.push(Player { id: "d1".into(), ..Default::default() });
+        // Attacker on the away team with the "goblin" keyword (is_can_get_even_with == true).
+        game.team_away.players.push(Player { id: "a1".into(), keywords: vec!["goblin".into()], ..Default::default() });
+        game.field_model.set_player_coordinate("d1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("d1", PlayerState::new(PS_SERIOUS_INJURY));
+
+        let mut step = StepApothecary::default();
+        step.apothecary_mode = Some(ApothecaryMode::Defender);
+        let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+        ir.injury_context.defender_id = Some("d1".into());
+        ir.injury_context.attacker_id = Some("a1".into());
+        ir.injury_context.set_injury(PlayerState::new(PS_SERIOUS_INJURY));
+        ir.injury_context.apothecary_status = ApothecaryStatus::NoApothecary;
+        step.injury_result = Some(ir);
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            out.pushes.iter().flatten().any(|s| s.step_id == StepId::GettingEven),
+            "SI caused by a hated-keyword attacker must push StepGettingEven",
+        );
+
+        // A plain attacker (no can-get-even-with keyword) must NOT push it.
+        let mut game2 = make_game();
+        game2.team_home.players.push(Player { id: "d1".into(), ..Default::default() });
+        game2.team_away.players.push(Player { id: "a1".into(), keywords: vec!["Lineman".into()], ..Default::default() });
+        game2.field_model.set_player_coordinate("d1", FieldCoordinate::new(5, 5));
+        game2.field_model.set_player_state("d1", PlayerState::new(PS_SERIOUS_INJURY));
+        let mut step2 = StepApothecary::default();
+        step2.apothecary_mode = Some(ApothecaryMode::Defender);
+        let mut ir2 = InjuryResult::new(ApothecaryMode::Defender);
+        ir2.injury_context.defender_id = Some("d1".into());
+        ir2.injury_context.attacker_id = Some("a1".into());
+        ir2.injury_context.set_injury(PlayerState::new(PS_SERIOUS_INJURY));
+        ir2.injury_context.apothecary_status = ApothecaryStatus::NoApothecary;
+        step2.injury_result = Some(ir2);
+        let out2 = step2.start(&mut game2, &mut GameRng::new(0));
+        assert!(
+            !out2.pushes.iter().flatten().any(|s| s.step_id == StepId::GettingEven),
+            "an attacker with only the Lineman keyword must not push StepGettingEven",
+        );
     }
 
     #[test]

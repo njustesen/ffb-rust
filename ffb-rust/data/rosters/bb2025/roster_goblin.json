@@ -42,7 +42,12 @@
           "Strength",
           "Passing"
         ]
-      }
+      },
+      "keywords": [
+        "Dwarf",
+        "goblin",
+        "Lineman"
+      ]
     },
     {
       "id": "goblin.troll",
@@ -79,7 +84,12 @@
           "Agility",
           "Passing"
         ]
-      }
+      },
+      "keywords": [
+        "Undead",
+        "human",
+        "Lineman"
+      ]
     },
     {
       "id": "goblin.bombardier",

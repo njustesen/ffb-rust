@@ -1565,3 +1565,36 @@ seed 2 i=16 → **i=200**. Regression test `bb2025_falling_attacker_defers_drop_
 cargo 7035/2778/1148. Diagnosis tooling (LOCAL ffb harness): FFB_IDSTATE per-id state dump + widened dice-trace
 stack (Xoshiro256StarStar printed<12) pinned the trigger to `StepSteadyFooting.lambda$fail$0 → DropPlayerCommand`.
 NEXT frontier: goblin seed 2 i=201 (turn 5 half 2 — active-team divergence: Java away / Rust home).
+
+### GOBLIN seeds 1-2 GREEN — Getting Even push (i≈165) + end-of-game secret-weapon ban roll (i=250)
+
+goblin seed 2 needed TWO more root causes past the DeferredCommand fix (i=200):
+
+**(1) i≈165 StepApothecary Getting Even (Hatred).** After a blitz Serious Injury, Java `StepApothecary.java:231-372`
+pushes `StepId.GETTING_EVEN` (rolls one d6) when the injury `isSi()` and the ATTACKER's position has a keyword with
+`Keyword.isCanGetEvenWith` (minus the defender's canRerollSingleSkull keywords). If >1 keyword qualifies it first
+shows a SELECT_KEYWORD dialog — but ParityRunner answers that via non-seeded RandomStrategy (no seeded dice) and the
+chosen keyword only feeds addHatred (client/model-only), so exactly one d6 is rolled either way. Rust's `StepApothecary`
+omitted the push entirely → the pos165 d6 never rolled → whole stream shifted (pos168 d8 bounce vs Java d6 pickup)
+→ FAIL at i=201. TWO-part fix: (a) DATA — Rust's `data/rosters/bb2025/roster_goblin.json` had NO keywords; Java's
+`roster_goblin.xml` gives the Goblin position `{Dwarf, goblin, Lineman}` and the Troll `{Undead, human, Lineman}`.
+Added those to the JSON (both have 2 can-get-even-with keywords, Lineman excluded → the SELECT_KEYWORD path). (b)
+ENGINE — in `step_apothecary.rs`, after the injury applies and `do_next_step`, if the defender's final field state
+`is_si()` and `game.player(attacker).keywords` has any `Keyword::for_name(k).is_can_get_even_with()`, push a
+`StepGettingEven` sub-sequence with `PlayerId(defender)`. Advanced seed 2 i=201 → i=250. Regression test
+`serious_injury_with_hated_attacker_pushes_getting_even`.
+
+**(2) i=250 StepEndTurn secret-weapon ban roll at end-of-game.** At end of half 2 (game end) Java `StepEndTurn`
+still calls `reportSecretWeaponsUsed()` — the 2d6 send-off ban roll — for EVERY played Stunty-Leeg secret weapon
+(penalty>0). Both teams' goblin Bombardiers (Secret Weapon value 5) rolled → 4 d6 (rng 197-200) BEFORE the
+end-of-game KO-recovery (201-202) and MVP (203-204) rolls. Rust bundled the ban roll into `resolve_secret_weapons`
+and gated the WHOLE thing by `!is_end_of_game` (an over-correction of the earlier dwarf-seed-4 fix, which only needed
+the ARGUE/REMOVE phases gated) → Rust rolled 0 ban dice at game end → desync from pos199 (Rust d11 MVP vs Java d6
+ban). Fix: split `resolve_secret_weapons` into `report_secret_weapons_used` (Phase A ban roll — runs on every
+`new_half||touchdown`, incl. end-game, matching Java) and `argue_and_remove_secret_weapons` (Phases B+C — still gated
+by `!is_end_of_game`). Advanced seed 2 → **GREEN**. Regression test `end_of_game_secret_weapon_ban_roll_still_consumes_dice`.
+Diagnosis: Java per-die stack (`FFB_DICE_TRACE`) at rng 197-204 named `StepEndTurn.reportSecretWeaponsUsed:706`,
+`rollKnockoutRecovery:208`, `StepMvp...randomPlayerId:278`; Rust SWDBG traces (reverted) showed the ban roll only
+fired at end of half 1, skipped at half 2. cargo 7037/2778/1148, 24-roster regression 0 FAIL.
+NEXT frontier: goblin seed 3 step 158/159 (turn 3 half 2 — away_05 activation: Java THROW_TEAM_MATE vs Rust Move;
+pre-state hash already diverges at i=159 so the true split is at/just before step 158).
