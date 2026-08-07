@@ -235,7 +235,18 @@ fn skill_to_armor_modifier(
                         .map_or(false, |s| s.is_distracted()) { return None; }
                 }
             }
-            Some(Box::new(StaticArmourModifier::new("Mighty Blow", 1, false)))
+            // Java: bb2016 MightyBlow registers a StaticArmourModifier(+1); bb2020/bb2025 register a
+            // VariableArmourModifier whose value is attacker.getSkillIntValue(MightyBlow) — i.e. the
+            // player's Mighty Blow value (default 1, but 2 for a goblin/ogre Troll's "Mighty Blow (2)").
+            // Using a fixed +1 let a Troll's Both-Down fall survive an armour roll Java breaks with +2
+            // (goblin seed 3 i=158: home Troll falls, armour 5 → Rust 5+1=6 holds/Prone vs Java 5+2=7
+            // breaks → casualty).
+            if context.game.rules == Rules::Bb2016 {
+                Some(Box::new(StaticArmourModifier::new("Mighty Blow", 1, false)))
+            } else {
+                Some(Box::new(VariableArmourModifier::new("Mighty Blow", false)
+                    .with_modifier_fn(|a, _d| a.map(|p| p.get_skill_value_int(SkillId::MightyBlow, 1)).unwrap_or(1))))
+            }
         }
         SkillId::DirtyPlayer => {
             if context.is_foul {
@@ -430,6 +441,42 @@ mod tests {
         assert_eq!(mods.len(), 1);
         assert_eq!(mods[0].get_name(), "Mighty Blow");
         assert_eq!(mods[0].get_modifier(Some(&attacker), &defender), 1);
+    }
+
+    /// Regression (goblin seed 3 i=158): bb2020/bb2025 Mighty Blow is a VariableArmourModifier whose
+    /// value is the attacker's Mighty Blow skill value (default 1, but 2 for a Troll's "Mighty Blow (2)").
+    /// A fixed +1 let a Troll's Both-Down fall survive an armour roll Java breaks with +2.
+    #[test]
+    fn find_armor_modifiers_mighty_blow_reads_skill_value_bb2025() {
+        use ffb_model::model::skill_def::SkillWithValue;
+        let f = ArmorModifierFactory::new(Rules::Bb2025);
+        let game = make_game(Rules::Bb2025);
+        let defender = dummy_player("d");
+
+        // Troll: Mighty Blow (2) → +2.
+        let mut troll = dummy_player("a");
+        troll.starting_skills = vec![SkillWithValue::with_value(SkillId::MightyBlow, "2")];
+        let mods = f.find_armor_modifiers(&game, Some(&troll), &defender, false, false);
+        assert_eq!(mods.len(), 1);
+        assert_eq!(mods[0].get_modifier(Some(&troll), &defender), 2, "Mighty Blow (2) must apply +2");
+
+        // Valueless Mighty Blow → default +1.
+        let plain = player_with_skill("b", SkillId::MightyBlow);
+        let mods = f.find_armor_modifiers(&game, Some(&plain), &defender, false, false);
+        assert_eq!(mods[0].get_modifier(Some(&plain), &defender), 1, "valueless Mighty Blow defaults to +1");
+    }
+
+    /// bb2016 keeps the fixed +1 StaticArmourModifier even when the skill carries a value.
+    #[test]
+    fn find_armor_modifiers_mighty_blow_bb2016_stays_static_one() {
+        use ffb_model::model::skill_def::SkillWithValue;
+        let f = ArmorModifierFactory::new(Rules::Bb2016);
+        let game = make_game(Rules::Bb2016);
+        let defender = dummy_player("d");
+        let mut troll = dummy_player("a");
+        troll.starting_skills = vec![SkillWithValue::with_value(SkillId::MightyBlow, "2")];
+        let mods = f.find_armor_modifiers(&game, Some(&troll), &defender, false, false);
+        assert_eq!(mods[0].get_modifier(Some(&troll), &defender), 1, "bb2016 Mighty Blow is always +1");
     }
 
     #[test]

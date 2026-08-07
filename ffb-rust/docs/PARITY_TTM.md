@@ -1598,3 +1598,26 @@ Diagnosis: Java per-die stack (`FFB_DICE_TRACE`) at rng 197-204 named `StepEndTu
 fired at end of half 1, skipped at half 2. cargo 7037/2778/1148, 24-roster regression 0 FAIL.
 NEXT frontier: goblin seed 3 step 158/159 (turn 3 half 2 — away_05 activation: Java THROW_TEAM_MATE vs Rust Move;
 pre-state hash already diverges at i=159 so the true split is at/just before step 158).
+
+### GOBLIN seeds 3-11 GREEN — Mighty Blow value is variable (skill int value) in bb2020/bb2025
+
+goblin seed 3 i=158 (turn 3 half 2): a home Troll's block got Both Down and the Troll fell. On the
+attacker's own fall StepDropFallingPlayers rolls its armour with the DEFENDER as the injury's attacker,
+so the defender Troll's Mighty Blow applies. Java broke the fallen Troll's armour (roll 5 + MB 2 = 7 ≥ AV7
+→ casualty → Regeneration), Rust held it (5 + 1 = 6 → Prone) and skipped the injury/casualty/regen dice,
+desyncing 5 rolls and flipping the whole activation order (Java away_05 THROW_TEAM_MATE vs Rust away_05 Move).
+ROOT: Rust's ArmorModifierFactory/InjuryModifierFactory registered Mighty Blow as a StaticArmourModifier /
+StaticInjuryModifierAttacker with a hardcoded +1. Java's `skill/bb2016/MightyBlow` uses Static(+1) but
+`skill/bb2020/MightyBlow` and `skill/bb2025/MightyBlow` use a VariableArmourModifier /
+VariableInjuryModifierAttacker whose value is `attacker.getSkillIntValue(MightyBlow)` — the player's Mighty
+Blow value (default 1 via getDefaultSkillValue, but 2 for a Troll's "Mighty Blow (2)"). FIX: for bb2020/bb2025
+register a `VariableArmourModifier`/`VariableInjuryModifierAttacker` with
+`.with_modifier_fn(|a,_| a.get_skill_value_int(SkillId::MightyBlow, 1))`; bb2016 keeps the Static(+1). Advanced
+goblin seeds 3→11 GREEN. Regression tests `find_armor_modifiers_mighty_blow_reads_skill_value_bb2025` +
+`find_armor_modifiers_mighty_blow_bb2016_stays_static_one`. cargo 7037/2778/1148; 24-roster regression 0 FAIL
+(broad change — every bb2020/bb2025 Mighty Blow — but only MB>1 players, i.e. Trolls/big guys, actually differ).
+Diagnosis: FFB_TRACE JSTEP/RUST_STEP pinned the split to the i=158 block; per-die FFB_DICE_TRACE showed Java
+rolling a d16 casualty + Regeneration where Rust rolled neither; temp AFDBG (attacker-fall injury dump, reverted)
+showed Rust applied Mighty Blow +1 vs Java +2.
+NEXT frontier: goblin seed 12 step 57 (turn 5 half 1, away_06 activation: Java MOVE vs Rust Move — pre-state
+hash differs at i=58, true split at/just before step 57).

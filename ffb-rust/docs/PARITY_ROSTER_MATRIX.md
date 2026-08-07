@@ -16,7 +16,7 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 7 | dark_elf_league_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
 | 8 | dwarf | GREEN 100/100 | — |
 | 9 | elf | GREEN 100/100 | — |
-| 10 | goblin | FAIL (in progress) | seeds 1-2 GREEN. seed 2 needed: (a) StepApothecary pushes StepGettingEven on a Serious Injury by an attacker whose position has a can-get-even-with keyword (+goblin roster Goblin/Troll keyword data), (b) StepEndTurn secret-weapon ban roll (reportSecretWeaponsUsed) runs at end-of-game too, only argue/remove gated by !endgame. Next: seed 3 step 158 (TTM vs Move activation divergence) |
+| 10 | goblin | FAIL (in progress) | seeds 1-11 GREEN. Fixes: (a) StepApothecary pushes StepGettingEven on SI by an attacker with a can-get-even-with keyword (+goblin roster Goblin/Troll keyword data); (b) StepEndTurn secret-weapon ban roll runs at end-of-game too (only argue/remove gated by !endgame); (c) Mighty Blow value is variable (attacker's MB skill int value, 2 for a Troll) in bb2020/bb2025, not a fixed +1. Next: seed 12 step 57 |
 | 11 | halfling | GREEN 100/100 | TTM fixes: pass modifiers + Strong Arm + null-target Block no-stand-up + fumbled-carrier ball-bounce/turnover (wood_elf Take Root retired the old blitz-negatrait deferral) |
 | 12 | high_elf | GREEN 100/100 | — |
 | 13 | human | GREEN 100/100 | — |

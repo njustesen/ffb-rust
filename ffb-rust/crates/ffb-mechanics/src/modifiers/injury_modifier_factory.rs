@@ -173,7 +173,15 @@ fn skill_to_injury_modifier_untagged(
                         .map_or(false, |s| s.is_distracted()) { return None; }
                 }
             }
-            Some(Box::new(StaticInjuryModifierAttacker::new("Mighty Blow", 1, false)))
+            // Java: bb2016 registers a StaticInjuryModifierAttacker(+1); bb2020/bb2025 register a
+            // VariableInjuryModifierAttacker = attacker.getSkillIntValue(MightyBlow) (default 1, 2 for a
+            // Troll). Mirrors the armour-side fix — Mighty Blow's value must track the skill, not a fixed 1.
+            if context.game.rules == Rules::Bb2016 {
+                Some(Box::new(StaticInjuryModifierAttacker::new("Mighty Blow", 1, false)))
+            } else {
+                Some(Box::new(VariableInjuryModifierAttacker::new("Mighty Blow", false)
+                    .with_modifier_fn(|a, _d| a.map(|p| p.get_skill_value_int(SkillId::MightyBlow, 1)).unwrap_or(1))))
+            }
         }
         SkillId::DirtyPlayer => {
             if context.is_foul {
