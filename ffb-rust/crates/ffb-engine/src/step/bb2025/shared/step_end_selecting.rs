@@ -347,6 +347,16 @@ impl StepEndSelecting {
 
             // ── BLITZ ─────────────────────────────────────────────────────────
             PlayerAction::Blitz => {
+                // Java sets blitzUsed during the BLITZ_MOVE phase (StepInitMoving) that precedes the
+                // block. Rust's single-command blitz (agent picks blitz+target at once) force-gotos
+                // straight here and SKIPS that BLITZ_MOVE/InitMoving phase (see the note below), so the
+                // team's blitz would only get marked used by the BlitzBlock sequence's GO_FOR_IT — and
+                // that GO_FOR_IT is skipped for a goForItAfterBlock player (Ball & Chain / secret weapon:
+                // its run_gfi = (gfab == ball_and_chain_gfi=false) is false). Result: a gfab player's
+                // blitz left blitz_used=false, letting the team blitz AGAIN the same turn (goblin seed 1
+                // i=9: away_01 offered a 2nd Blitz where Java offers only Move). A blitz always consumes
+                // the team's blitz, so mark it here at dispatch (mirrors the StandUpBlitz case below).
+                game.turn_data_mut().blitz_used = true;
                 let params = if with_param {
                     BlitzBlockParams {
                         block_defender_id: self.block_defender_id.clone(),

@@ -1472,3 +1472,20 @@ both pass; underworld 100/100. cargo ffb-engine 7033/0 (+2 regression tests), ff
 1148/0. 24-roster regression clean. **underworld 100/100 GREEN.**
 
 RENEGADES + UNDERWORLD BOTH GREEN — campaign target for this pair complete.
+
+### GOBLIN (in progress) — blitz_used not set for a gfab (Ball&Chain/secret-weapon) in-place blitz
+
+goblin seed 1 i=9: Rust let the away team take a SECOND Blitz in one turn (away_01 offered Blitz where Java
+offers only Move), rolling an extra block that injured a home player and diverged the state hash. Root cause:
+`turn_data.blitz_used` was never set after away_02's blitz at i=7. Java resolves a blitz via BLITZ_MOVE →
+StepInitMoving (which sets blitzUsed); Rust's random agent picks blitz+target in one Action so StepInitSelecting
+force-gotos straight to the `PlayerAction::Blitz` → BlitzBlock case, skipping the BLITZ_MOVE/InitMoving phase. The
+BlitzBlock sequence's GO_FOR_IT only sets blitzUsed for a non-gfab player (its run_gfi = (goForItAfterBlock ==
+ball_and_chain_gfi=false)); away_02 has goForItAfterBlock=true (a goblin secret-weapon skill), so run_gfi=false →
+GoForIt returns early → blitzUsed stayed false.
+
+Fix (step/bb2025/shared/step_end_selecting.rs, `PlayerAction::Blitz` dispatch): set
+`turn_data.blitz_used = true` at dispatch — a blitz always consumes the team's blitz, and this compensates for the
+skipped BLITZ_MOVE phase (mirrors the adjacent StandUpBlitz case). Advanced goblin seed 1 i=9 → i=18. cargo
+7033/0, 2777/0, 1148/0; 24-roster regression clean. NEXT frontier: seed 1 i=14 — home_01's blitz consumes 2 fewer
+dice in Rust (a gfab after-block go-for-it continuation Rust's in-place path skips).
