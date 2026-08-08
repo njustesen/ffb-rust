@@ -495,6 +495,15 @@ pub fn make_team_from_roster(roster_name: &str, side: &str, edition: &str) -> Re
     let roster_name = match roster_name.to_ascii_lowercase().as_str() {
         "renegades" => "chaos renegade",
         "chaos_chosen" => "chaos",
+        // FUMBBL league-import rosters carry a numeric FUMBBL roster `id` (e.g. "4959") and a
+        // generic race `name` ("Dark Elf") that collides with the standard roster's name, so
+        // neither matches the CLI key by name. Alias each to its unique numeric roster id so the
+        // find() below matches on `norm(id)`. Without this, make_team_from_roster returned Err and
+        // make_team() silently fell back to an all-generic-lineman team (AG3, no skills), diverging
+        // from Java's real roster at the first dodge (dark_elf_league_fumbbl seed 1 step 9).
+        "dark_elf_league_fumbbl" => "4959",
+        "khemri_fumbbl" => "55051",
+        "slann_fumbbl" => "744258",
         _ => roster_name,
     };
     // Normalize: lowercase, strip non-alphanumeric (collapses "Chaos Dwarf" = "chaos_dwarf" = "chaosdwarf")
@@ -895,5 +904,42 @@ mod baseline_option_tests {
             BASELINE_SETUP_OPTIONS.iter().any(|(k, v)| *k == MB_STACKS_AGAINST_CHAINSAW && *v == "true"),
             "BASELINE_SETUP_OPTIONS must set mbStacksAgainstChainsaw=true to match Java parity",
         );
+    }
+}
+
+#[cfg(test)]
+mod fumbbl_roster_tests {
+    use super::make_team;
+    use ffb_model::enums::SkillId;
+
+    /// Regression (dark_elf_league_fumbbl seed 1 step 9): the FUMBBL league-import rosters have a
+    /// numeric FUMBBL `id` and a generic race `name` that collides with the standard roster, so the
+    /// CLI key ("dark_elf_league_fumbbl") matched neither. make_team_from_roster returned Err and
+    /// make_team fell back to an all-generic-lineman team (AG3, no skills), diverging from Java's
+    /// real roster at the first dodge. The id alias must build the real roster: the away team's
+    /// first player is a Witch Elf (AG2, Dodge/Frenzy/Jump Up), never a bare AG3 lineman.
+    #[test]
+    fn fumbbl_dark_elf_builds_real_roster_not_lineman_fallback() {
+        let team = make_team("dark_elf_league_fumbbl", "away", "bb2025");
+        let p = &team.players[0];
+        assert_eq!(p.agility, 2, "first fumbbl player must be the AG2 Witch Elf, not the AG3 lineman fallback");
+        assert!(
+            p.starting_skills.iter().any(|s| s.skill_id == SkillId::Dodge),
+            "first fumbbl player must carry the Witch Elf's Dodge skill (fallback lineman has none)",
+        );
+        assert_eq!(team.players.len(), 11);
+    }
+
+    #[test]
+    fn fumbbl_khemri_and_slann_build_real_rosters() {
+        // Both share the same numeric-id lookup gap; a fallback would make every player an
+        // identical AG3 lineman, so assert the built teams are not uniformly the lineman default.
+        for roster in ["khemri_fumbbl", "slann_fumbbl"] {
+            let team = make_team(roster, "home", "bb2025");
+            assert_eq!(team.players.len(), 11, "{roster} must build 11 players");
+            let all_bare_linemen = team.players.iter()
+                .all(|p| p.agility == 3 && p.movement == 6 && p.armour == 8 && p.starting_skills.is_empty());
+            assert!(!all_bare_linemen, "{roster} must not fall back to a uniform generic-lineman team");
+        }
     }
 }

@@ -13,7 +13,7 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 4 | chaos_dwarf | GREEN 100/100 | — |
 | 5 | chaos_pact | GREEN 100/100 | — |
 | 6 | dark_elf | GREEN 100/100 | both agents DECLINE Dump Off (Rust random_agent SkillUse{DumpOff}→use=false; Java ParityRunner SKILL_USE declines DumpOff) → no DUMP_OFF/INIT_PASSING → no Java NPE / Rust stall |
-| 7 | dark_elf_league_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
+| 7 | dark_elf_league_fumbbl | **GREEN 100/100** | FUMBBL roster-id lookup: id "4959"/name "Dark Elf" matched neither CLI key → make_team fell back to an all-generic-lineman team (AG3, no skills) → first dodge diverged (Witch Elf AG2 vs fallback AG3). Fix: alias fumbbl CLI names to numeric roster ids in make_team_from_roster |
 | 8 | dwarf | GREEN 100/100 | — |
 | 9 | elf | GREEN 100/100 | — |
 | 10 | goblin | **GREEN 100/100** | Ball&Chain/secret-weapon/TTM/chainsaw: 6 fixes — GettingEven push+roster keywords; end-of-game secret-weapon ban roll; variable Mighty Blow value; eaten-player canUseApo skips Regeneration; Pitch-Invasion B&C stun rolls-but-discards chain injury; mbStacksAgainstChainsaw baseline option (fallen Looney's chainsaw+MB armour break) |
@@ -38,4 +38,7 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 29 | vampire | GREEN 100/100 | Bloodlust (min-roll, failed-action routing, feed, suffering-move, free-stand-up, reroll-decline suffering) + guard used-skills reset on genuine player change |
 | 30 | wood_elf | GREEN 100/100 | Take Root (old_player_state + dodging-clear) + agent phase-2 pre-draw for prone/rooted movers w/ uncapped neighbour list |
 
-**Summary:** 16 green, 14 not green (of 30 matchups). Whole matrix ran in 222.9s wall (parallel).
+**Summary:** 28 green, 2 not green (of 30 matchups) — only khemri_fumbbl / slann_fumbbl remain.
+Note: both remaining fails shared dark_elf_league_fumbbl's now-fixed FUMBBL roster-id lookup gap
+(numeric `id` + generic `name` → all-lineman fallback), so they are now aliased to their numeric
+roster ids too; full 1-100 re-verification of those two is pending.
