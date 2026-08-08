@@ -249,7 +249,20 @@ pub fn roster_json_to_roster(rj: &RosterJson, is_bb2025: bool) -> Roster {
 ///
 /// `is_bb2025` gates the No Hands drop below.
 pub fn position_json_to_roster_position(pos: &PositionJson, roster_id: &str, is_undead: bool, is_bb2025: bool) -> RosterPosition {
+    // Java parity: `SkillFactory.forName` does an EXACT case-insensitive lookup against each skill's
+    // canonical name (the map is keyed by `skill.getName().toLowerCase()`); it does NOT normalize
+    // hyphens vs spaces (only "Ball & Chain" is special-cased). The bb2020/bb2025 Bone Head skill's
+    // canonical name is "Bone Head" (a SPACE), whereas the bb2016 class is "Bone-Head" (a HYPHEN).
+    // The FUMBBL slann roster (id 744258) spells the Kroxigor's trait "Bone-head" (hyphen), so under
+    // bb2025 Java's `forName("bone-head")` misses "bone head" and returns null — the Kroxigor gets
+    // NO Bone Head at all. Rust's `SkillId::from_class_name` is lenient (strips the hyphen) and would
+    // resolve it, giving the Kroxigor a per-activation Bone Head negatrait test Java never rolls. That
+    // extra d6 desynced the shared dice stream (slann_fumbbl seed 1 step 9: the Kroxigor's dodge then
+    // consumed the following die, failed, fell → turnover, ending the away turn two activations early).
+    // Drop the hyphen-spelled "bone-head" for bb2025 only — bb2016's canonical IS "Bone-Head", so the
+    // hyphen spelling correctly resolves there and must be kept.
     let skills: Vec<SkillWithValue> = pos.skills.iter()
+        .filter(|entry| !(is_bb2025 && entry.name().eq_ignore_ascii_case("bone-head")))
         .filter_map(skill_entry_to_skill_with_value)
         .collect();
     // Java: some skills are bb2016-only (no @RulesCollection(BB2025) class), so bb2025's SkillFactory

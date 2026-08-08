@@ -942,4 +942,27 @@ mod fumbbl_roster_tests {
             assert!(!all_bare_linemen, "{roster} must not fall back to a uniform generic-lineman team");
         }
     }
+
+    /// Regression (slann_fumbbl seed 1 step 9): the FUMBBL slann roster (744258) spells the Kroxigor's
+    /// trait "Bone-head" (hyphen). Java's bb2025 SkillFactory keys the skill by its canonical name
+    /// "Bone Head" (space) and `forName` does an exact case-insensitive match — so "bone-head" resolves
+    /// to null and the Kroxigor gets NO Bone Head. Rust's lenient resolver used to keep it, adding a
+    /// per-activation negatrait d6 Java never rolled, desyncing the dice stream (the Kroxigor's dodge
+    /// then failed → turnover). bb2025 must therefore build the Kroxigor WITHOUT Bone Head to match Java.
+    #[test]
+    fn fumbbl_slann_kroxigor_has_no_bonehead_in_bb2025() {
+        let team = make_team("slann_fumbbl", "away", "bb2025");
+        let kroxigor = &team.players[0];
+        assert_eq!(kroxigor.strength, 5, "first slann_fumbbl player must be the ST5 Kroxigor");
+        assert!(
+            !kroxigor.starting_skills.iter().any(|s| s.skill_id == SkillId::BoneHead),
+            "bb2025 Kroxigor must NOT carry Bone Head — the roster's hyphen spelling \"Bone-head\" \
+             does not resolve against Java's canonical \"Bone Head\"",
+        );
+        // Sanity: the rest of the Kroxigor's traits (spelled with spaces) still resolve.
+        assert!(
+            kroxigor.starting_skills.iter().any(|s| s.skill_id == SkillId::PrehensileTail),
+            "Kroxigor's other traits (Prehensile Tail etc.) must still be present",
+        );
+    }
 }

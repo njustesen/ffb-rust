@@ -21,7 +21,7 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 12 | high_elf | GREEN 100/100 | — |
 | 13 | human | GREEN 100/100 | — |
 | 14 | khemri | GREEN 100/100 | — |
-| 15 | khemri_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
+| 15 | khemri_fumbbl | **GREEN 100/100** | fixed once the FUMBBL numeric-id alias built the real roster (shared with dark_elf_league_fumbbl); re-verified 100/100 |
 | 16 | lizardman | GREEN 100/100 | — |
 | 17 | necromantic | GREEN 100/100 | stand-up rush move-square fix (set going_for_it before update_move_squares) |
 | 18 | nippon | GREEN 100/100 | — |
@@ -32,13 +32,15 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 23 | renegades | **GREEN 100/100** | AS lash-out + prone-TTM stand-up + SafePairOfHands PLACE_BALL harness decline |
 | 24 | skaven | GREEN 100/100 | — |
 | 25 | slann | GREEN 100/100 | agent declines the diving-catch declaration prompt (mislabeled AgentPrompt::SwarmingPlayers from StepCatchScatterThrowIn) via SelectPlayer{empty} |
-| 26 | slann_fumbbl | FAIL 0/100 | seed 1, step 9 — first divergence |
+| 26 | slann_fumbbl | **GREEN 100/100** | Kroxigor's trait is spelled "Bone-head" (hyphen) in FUMBBL roster 744258, but Java's bb2025 SkillFactory keys the skill by its canonical "Bone Head" (space) and `forName` does an exact case-insensitive match → the hyphen spelling resolves to null, so Java's Kroxigor has NO Bone Head. Rust's lenient resolver kept it, rolling a per-activation negatrait d6 Java never rolled → dice-stream desync (seed 1 step 9: the Kroxigor's dodge failed → turnover). Fix: bb2025 drops the hyphen-spelled "bone-head" during roster build (bb2016's canonical IS "Bone-Head", so kept there) |
 | 27 | undead | GREEN 100/100 | roll-to-stand-up success now sets STANDING state (was left PRONE) |
 | 28 | underworld | **GREEN 100/100** | Cheering-Fans additional-assist turn-lifecycle clear (acting-team turn_nr>=1, not turn_started) |
 | 29 | vampire | GREEN 100/100 | Bloodlust (min-roll, failed-action routing, feed, suffering-move, free-stand-up, reroll-decline suffering) + guard used-skills reset on genuine player change |
 | 30 | wood_elf | GREEN 100/100 | Take Root (old_player_state + dodging-clear) + agent phase-2 pre-draw for prone/rooted movers w/ uncapped neighbour list |
 
-**Summary:** 28 green, 2 not green (of 30 matchups) — only khemri_fumbbl / slann_fumbbl remain.
-Note: both remaining fails shared dark_elf_league_fumbbl's now-fixed FUMBBL roster-id lookup gap
-(numeric `id` + generic `name` → all-lineman fallback), so they are now aliased to their numeric
-roster ids too; full 1-100 re-verification of those two is pending.
+**Summary:** 30 green, 0 not green (of 30 matchups) — ALL rosters GREEN.
+Both former fails (khemri_fumbbl / slann_fumbbl) first needed dark_elf_league_fumbbl's FUMBBL
+roster-id alias fix (numeric `id` + generic `name` → all-lineman fallback). khemri_fumbbl then
+verified 100/100; slann_fumbbl needed one more fix — Java's bb2025 SkillFactory drops the FUMBBL
+Kroxigor's hyphen-spelled "Bone-head" (canonical is "Bone Head"), which Rust's lenient resolver
+had kept (extra negatrait d6 → dice desync). Both now re-verified 100/100.

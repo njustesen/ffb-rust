@@ -1709,3 +1709,34 @@ goblin 100/100. Diagnosis: rng_calls first diverged at i=144 (Java 164 vs Rust 1
 (immediate half-end), and ParityRunner.sendFoulAction's empty-target deselect was the reference.
 
 **OGRE COMPLETE: seeds 1-100 all GREEN.**
+
+---
+
+## slann_fumbbl (slann_fumbbl vs slann_fumbbl, bb2025 tier-3) — COMPLETE 100/100
+
+Frontier was seed 1 step 9: Java stayed on the AWAY turn (Activate away8, MOVE) while Rust had
+already switched to HOME (Activate home_01, Blitz). Single-player state diff: away_01 (the Kroxigor,
+a00) was Stunned in Rust but Standing in Java. The dice VALUES matched through pos 42 (shared seed),
+but the CALLERS diverged at pos 15: Java = StepMoveDodge (the Kroxigor's dodge, d6=4 → success),
+Rust = a Bone Head negatrait d6 (=4) that pushed the Kroxigor's dodge onto pos 16 (d6=2 → fail →
+fall → armour/injury → turnover, ending the away turn two activations early).
+
+ROOT CAUSE: the FUMBBL slann roster (id 744258) spells the Kroxigor's trait **"Bone-head"**
+(hyphen). Java's `SkillFactory.forName` (ffb-common) does an EXACT case-insensitive lookup against
+the map keyed by `skill.getName().toLowerCase()` — it never normalizes hyphens vs spaces (only
+"Ball & Chain" is special-cased). The bb2020/bb2025 `BoneHead` class is named **"Bone Head"**
+(space); the bb2016 class is "Bone-Head" (hyphen). So under bb2025 `forName("bone-head")` misses
+"bone head" → returns null → the Kroxigor gets NO Bone Head. Rust's `SkillId::from_class_name`
+strips the hyphen ("bone-head" → "bonehead" → BoneHead) and kept it, giving the Kroxigor a
+per-activation Bone Head test Java never rolls → the extra d6 desynced the shared dice stream.
+
+FIX (crates/ffb-model/src/data/loader.rs, `position_json_to_roster_position`): during bb2025 roster
+build, drop any skill whose raw roster name is the hyphen-spelled "bone-head" — mirroring Java's
+strict `forName` miss. Gated on `is_bb2025` so bb2016 (whose canonical IS "Bone-Head") keeps it.
+Standard rosters spell it "bone head"/"Bone Head"/"Bone head" (space) so they resolve in both engines
+and are unaffected (lizardman/ogre/renegades/human Kroxigor/Ogre bone-head all still green).
+Regression test `fumbbl_slann_kroxigor_has_no_bonehead_in_bb2025` (crates/ffb-parity runner tests).
+VERIFIED: slann_fumbbl 100/100; cargo ffb-engine 7040/0, ffb-model 1150/0, ffb-mechanics 2778/0;
+24-roster regression 0 FAIL; goblin/ogre/dark_elf_league_fumbbl/khemri_fumbbl all 100/100.
+
+**ALL 30 ROSTER MATCHUPS NOW GREEN.**
