@@ -45,7 +45,7 @@ pub const BASELINE_SETUP_OPTIONS: &[(&str, &str)] = &[
 /// Writes `parity/seed_{seed}_java.jsonl`.
 /// `home_team_id` / `away_team_id` are Java server team IDs (e.g. "teamHumanKalimar").
 /// `home_race` / `away_race` are the Rust race names used for the output directory.
-pub fn run_java_headless(seed: u64, home_team_id: &str, away_team_id: &str, home_race: &str, away_race: &str, tier: u8) {
+pub fn run_java_headless(seed: u64, home_team_id: &str, away_team_id: &str, home_race: &str, away_race: &str, tier: u8, edition: &str) {
     let output_path = java_log_path_for(seed, home_race, away_race);
     let dir = std::path::Path::new(&output_path).parent().unwrap_or(std::path::Path::new("parity"));
     std::fs::create_dir_all(dir).ok();
@@ -104,12 +104,27 @@ pub fn run_java_headless(seed: u64, home_team_id: &str, away_team_id: &str, home
         args.push("--tier".into());
         args.push(tier.to_string());
     }
+    if let Some(rs) = java_ruleset_arg(edition) {
+        args.push("--ruleset".into());
+        args.push(rs.into());
+    }
     let status = Command::new("java").args(&args).status();
 
     match status {
         Ok(s) if s.success() => {}
         Ok(s) => log::warn!("Java parity runner exited with status {s} for seed {seed}"),
         Err(e) => log::warn!("Could not launch Java parity runner for seed {seed}: {e}"),
+    }
+}
+
+/// Java ruleset override for non-default editions. The Java side hardcodes RULESVERSION=BB2025
+/// (UtilServerStartGame.addDefaultGameOptions), so bb2025 passes nothing (older jars keep
+/// working) and other editions send `--ruleset <RULES>` for ParityRunner/HeadlessGameSetup.
+fn java_ruleset_arg(edition: &str) -> Option<&'static str> {
+    match edition {
+        "bb2016" => Some("BB2016"),
+        "bb2020" => Some("BB2020"),
+        _ => None,
     }
 }
 
@@ -164,6 +179,7 @@ fn resolve_server_dir() -> String {
 pub fn run_java_headless_range(
     seed_start: u64, seed_end: u64,
     home_team_id: &str, away_team_id: &str, home_race: &str, away_race: &str, tier: u8,
+    edition: &str,
 ) {
     let dir = format!("parity/{home_race}_vs_{away_race}");
     std::fs::create_dir_all(&dir).ok();
@@ -190,6 +206,10 @@ pub fn run_java_headless_range(
     args.push(tier.to_string());
     args.push("--seed-end".into());
     args.push(seed_end.to_string());
+    if let Some(rs) = java_ruleset_arg(edition) {
+        args.push("--ruleset".into());
+        args.push(rs.into());
+    }
 
     match Command::new("java").args(&args).status() {
         Ok(s) if s.success() => {}
@@ -419,6 +439,11 @@ struct PendingStep {
 
 /// Build a team. `roster_name` is "lineman" (generic) or a race name like "human".
 /// `side` is "home" or "away" (used for player IDs). `edition` is "bb2016"/"bb2020"/"bb2025".
+///
+/// Preference order:
+///   1. the hand-drafted team spec `data/teams/<edition>/team_<race>.json` (rule-legal
+///      drafts, see docs/TEAM_DRAFTS_*.md) — mirrored to Java by gen_java_parity_data.py
+///   2. the legacy first-11-by-(quantity,cost) builder (kept for bb2020 and ad-hoc rosters)
 pub(crate) fn make_team(roster_name: &str, side: &str, edition: &str) -> Team {
     if roster_name == "lineman"
         || roster_name == "teamLinemanParityHome"
@@ -426,11 +451,112 @@ pub(crate) fn make_team(roster_name: &str, side: &str, edition: &str) -> Team {
     {
         return make_lineman_team(side, roster_name);
     }
+    match make_team_from_file(roster_name, side, edition) {
+        Ok(team) => return team,
+        Err(e) => log::debug!("No team file for '{roster_name}' ({edition}): {e}; using legacy builder"),
+    }
     make_team_from_roster(roster_name, side, edition)
         .unwrap_or_else(|e| {
             log::warn!("Could not load roster '{roster_name}': {e}; falling back to lineman");
             make_lineman_team(side, roster_name)
         })
+}
+
+/// Deserialized `data/teams/<edition>/team_<race>.json` (hand-drafted team spec).
+#[derive(serde::Deserialize)]
+pub(crate) struct TeamFileJson {
+    pub race: String,
+    pub roster_id: String,
+    pub rerolls: i32,
+    pub apothecaries: i32,
+    pub dedicated_fans: i32,
+    pub fan_factor: i32,
+    pub treasury: i32,
+    pub team_value: i32,
+    #[serde(default)]
+    pub special_rules: Vec<String>,
+    pub players: Vec<TeamFilePlayer>,
+}
+
+#[derive(serde::Deserialize)]
+pub(crate) struct TeamFilePlayer {
+    pub nr: i32,
+    pub position_id: String,
+}
+
+/// Locate `data/teams/<edition>/team_<race>.json` (env `FFB_TEAMS_DIR` overrides the root).
+fn team_file_path(roster_name: &str, edition: &str) -> Option<std::path::PathBuf> {
+    let file = format!("{edition}/team_{roster_name}.json");
+    if let Ok(root) = std::env::var("FFB_TEAMS_DIR") {
+        let p = std::path::Path::new(&root).join(&file);
+        return p.exists().then_some(p);
+    }
+    let candidates = [
+        "data/teams",
+        "../data/teams",
+        "../../data/teams",
+        r"C:\Users\Admin\niels\ffb-rust\ffb-rust\data\teams",
+    ];
+    candidates.iter()
+        .map(|c| std::path::Path::new(c).join(&file))
+        .find(|p| p.exists())
+}
+
+/// Build a team from its hand-drafted spec file. The Java engine loads the XML mirror of
+/// the SAME spec (team<Race>Parity{25,16}{Home,Away} referencing roster `<race>.<edition>`),
+/// so both engines see an identical team.
+pub fn make_team_from_file(roster_name: &str, side: &str, edition: &str) -> Result<Team, String> {
+    let path = team_file_path(roster_name, edition)
+        .ok_or_else(|| format!("no team file data/teams/{edition}/team_{roster_name}.json"))?;
+    let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let spec: TeamFileJson = serde_json::from_str(&text)
+        .map_err(|e| format!("{}: {e}", path.display()))?;
+
+    let rosters = match edition {
+        "bb2016" => bb2016_rosters(),
+        "bb2020" => bb2020_rosters(),
+        "bb2025" | _ => bb2025_rosters(),
+    };
+    let roster_json = rosters.into_iter()
+        .find(|r| r.id == spec.roster_id)
+        .ok_or_else(|| format!("roster id '{}' not found in edition '{}'", spec.roster_id, edition))?;
+
+    let mut players: Vec<Player> = Vec::new();
+    for pl in &spec.players {
+        let pos_json = roster_json.positions.iter()
+            .find(|p| p.id == pl.position_id)
+            .ok_or_else(|| format!("position '{}' not in roster '{}'", pl.position_id, spec.roster_id))?;
+        let rp = position_json_to_roster_position(pos_json, &roster_json.id, roster_json.undead, edition == "bb2025");
+        players.push(Player::from_position(
+            format!("{side}_{:02}", pl.nr),
+            format!("{} {} {}", side, rp.name, pl.nr),
+            pl.nr,
+            &rp,
+        ));
+    }
+
+    Ok(Team {
+        id: format!("{side}_{}", roster_json.id),
+        name: format!("{} {}", side, roster_json.name),
+        race: roster_json.name.clone(),
+        roster_id: roster_json.id.clone(),
+        coach: format!("Coach_{side}"),
+        rerolls: spec.rerolls,
+        apothecaries: spec.apothecaries,
+        bribes: 0,
+        master_chefs: 0,
+        prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+        cheerleaders: 0,
+        assistant_coaches: 0,
+        fan_factor: spec.fan_factor,
+        dedicated_fans: spec.dedicated_fans,
+        team_value: spec.team_value,
+        treasury: spec.treasury,
+        special_rules: spec.special_rules.clone(),
+        players,
+        vampire_lord: roster_json.has_vampire_lord(),
+        necromancer: roster_json.has_necromancer(),
+    })
 }
 
 fn make_lineman_team(side: &str, roster_id: &str) -> Team {
@@ -601,11 +727,23 @@ pub fn roster_names_for_edition(edition: &str) -> Vec<String> {
     rosters.into_iter().map(|r| r.name).collect()
 }
 
-/// Map a snake_case race name + side to the Java server parity team ID.
-/// Uses PascalCase conversion matching gen_java_teams.py exactly.
-/// e.g. "dark_elf_league_fumbbl" + "home" → "teamDarkElfLeagueFumbblParityHome"
-pub fn java_team_id(race_name: &str, side: &str) -> String {
-    let suffix = if side == "away" { "Away" } else { "Home" };
+/// Map a snake_case race name + side + edition to the Java server parity team ID.
+/// Uses PascalCase conversion matching gen_java_parity_data.py exactly.
+/// e.g. "dark_elf" + "home" + "bb2025" → "teamDarkElfParity25Home".
+/// The synthetic "lineman" fixture and bb2020 keep the legacy "Parity" ids
+/// (team_<race>_parity_<side>.xml, generated by the old gen_java_teams.py).
+pub fn java_team_id(race_name: &str, side: &str, edition: &str) -> String {
+    let side_suffix = if side == "away" { "Away" } else { "Home" };
+    let parity = if race_name == "lineman" {
+        "Parity"
+    } else {
+        match edition {
+            "bb2025" => "Parity25",
+            "bb2016" => "Parity16",
+            _ => "Parity",
+        }
+    };
+    let suffix = format!("{parity}{side_suffix}");
     let pascal: String = race_name
         .split('_')
         .map(|part| {
@@ -616,7 +754,7 @@ pub fn java_team_id(race_name: &str, side: &str) -> String {
             }
         })
         .collect();
-    format!("team{pascal}Parity{suffix}")
+    format!("team{pascal}{suffix}")
 }
 
 

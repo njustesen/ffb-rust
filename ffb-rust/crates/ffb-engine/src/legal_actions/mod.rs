@@ -693,9 +693,22 @@ pub fn canonical_setup_action(game: &Game, team_id: &str) -> Action {
     let home = team_id == game.team_home.id;
     let team = if home { &game.team_home } else { &game.team_away };
 
+    // Cap at 11 fielded players. The cap counts players ON PITCH, not "first 11 jerseys":
+    // with 12+-man drafted teams (data/teams/), KO'd/injured players among jerseys 1-11 must
+    // be replaced from the reserves (jersey 12+). Taking the first 11 jerseys and THEN
+    // filtering out the unavailable ones fielded fewer than min(11, available) players, which
+    // Java's setup validation rejects (endless SETUP_ERROR at the half-2 setup, human seed 2).
+    // Java ParityRunner.placeReserves applies the same available-first rule.
+    let on_pitch = team.players.iter()
+        .filter(|p| game.field_model.player_coordinate(&p.id)
+            .map(|c| c.is_on_pitch())
+            .unwrap_or(false))
+        .count();
+    if on_pitch >= 11 {
+        return Action::ConfirmSetup;
+    }
     let mut players: Vec<(PlayerId, i32)> = team.players.iter().map(|p| (p.id.clone(), p.nr)).collect();
     players.sort_by_key(|&(_, nr)| nr);
-    players.truncate(11);
     let candidates: Vec<PlayerId> = players.into_iter()
         .filter(|(pid, _)| game.field_model.player_state(pid)
             .map(|s| s.base() == PS_RESERVE)

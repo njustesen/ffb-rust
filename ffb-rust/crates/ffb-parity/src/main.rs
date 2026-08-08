@@ -87,8 +87,8 @@ impl ParityArgs {
             i += 1;
         }
 
-        let home_java = runner::java_team_id(&home, "home");
-        let away_java = runner::java_team_id(&away, "away");
+        let home_java = runner::java_team_id(&home, "home", &edition);
+        let away_java = runner::java_team_id(&away, "away", &edition);
 
         ParityArgs { network, coverage, uniform, all_rosters, all_editions, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize, tier }
     }
@@ -253,7 +253,7 @@ fn main() {
     // run EVERY Java game in ONE JVM via ParityRunner's batch mode, instead of a fresh JVM per seed.
     // Then run the Rust engine per seed. Report per-engine wall-clock at the end.
     let java_t0 = std::time::Instant::now();
-    runner::run_java_headless_range(args.seed_start, args.seed_end, &args.home_java, &args.away_java, &args.home, &args.away, args.tier);
+    runner::run_java_headless_range(args.seed_start, args.seed_end, &args.home_java, &args.away_java, &args.home, &args.away, args.tier, &args.edition);
     let java_total = java_t0.elapsed();
     println!("TIMING java_total={:.3}s (batched JVM, {total} seeds)", java_total.as_secs_f64());
     let mut rust_total = std::time::Duration::ZERO;

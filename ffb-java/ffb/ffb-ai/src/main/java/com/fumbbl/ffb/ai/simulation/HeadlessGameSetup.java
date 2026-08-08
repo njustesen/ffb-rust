@@ -1,8 +1,12 @@
 package com.fumbbl.ffb.ai.simulation;
 
+import com.fumbbl.ffb.RulesCollection;
 import com.fumbbl.ffb.TeamSetup;
 import com.fumbbl.ffb.TurnMode;
 import com.fumbbl.ffb.Weather;
+import com.fumbbl.ffb.factory.GameOptionFactory;
+import com.fumbbl.ffb.option.GameOptionId;
+import com.fumbbl.ffb.option.GameOptionString;
 import com.fumbbl.ffb.model.Game;
 import com.fumbbl.ffb.model.Team;
 import com.fumbbl.ffb.server.GameState;
@@ -47,11 +51,32 @@ public class HeadlessGameSetup {
             String homeTeamId,
             String awayTeamId,
             File serverDir) throws IOException {
+        return create(server, homeTeamId, awayTeamId, serverDir, null);
+    }
+
+    /**
+     * Variant with an explicit ruleset override (e.g. {@code "BB2016"}).
+     * {@code addDefaultGameOptions} hardcodes RULESVERSION=BB2025; the override is applied
+     * after it and BEFORE {@code initRulesDependentMembers()}/{@code initializeRules()},
+     * which is the point where the ruleset takes effect. {@code null} keeps BB2025.
+     */
+    public static GameState create(
+            HeadlessFantasyFootballServer server,
+            String homeTeamId,
+            String awayTeamId,
+            File serverDir,
+            String ruleset) throws IOException {
 
         GameState gameState = new GameState(server);
 
         // 1. Default game options (BB2025 ruleset, etc.)
         UtilServerStartGame.addDefaultGameOptions(gameState);
+        if (ruleset != null) {
+            GameOptionFactory optionFactory = new GameOptionFactory();
+            GameOptionString ruleSet = (GameOptionString) optionFactory.createGameOption(GameOptionId.RULESVERSION);
+            ruleSet.setValue(RulesCollection.Rules.valueOf(ruleset).name());
+            gameState.getGame().getOptions().addOption(ruleSet);
+        }
 
         // 2. Initialize rule-dependent members and rules
         Game game = gameState.getGame();
