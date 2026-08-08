@@ -10,7 +10,7 @@
     {
       "id": "goblin.goblin",
       "name": "Goblin",
-      "display_name": "Goblin",
+      "display_name": "Goblin Lineman",
       "type": "Regular",
       "quantity": 16,
       "cost": 40000,
@@ -18,149 +18,27 @@
       "st": 2,
       "ag": 3,
       "pa": 4,
-      "av": 7,
-      "shorthand": "G",
+      "av": 8,
       "skills": [
         "Dodge",
         "Right Stuff",
-        "Stunty",
-        "Thick Skull",
-        {
-          "name": "Animosity",
-          "value": "all"
-        },
-        "Plague Ridden",
-        "Regeneration",
-        "Multiple Block"
+        "Stunty"
       ],
       "skill_categories": {
         "normal": [
-          "Agility"
-        ],
-        "double": [
-          "General",
-          "Strength",
-          "Passing"
-        ]
-      },
-      "keywords": [
-        "Dwarf",
-        "goblin",
-        "Lineman"
-      ]
-    },
-    {
-      "id": "goblin.troll",
-      "name": "Troll",
-      "display_name": "Troll",
-      "type": "Big Guy",
-      "quantity": 2,
-      "cost": 110000,
-      "ma": 4,
-      "st": 5,
-      "ag": 1,
-      "pa": 5,
-      "av": 9,
-      "shorthand": "T",
-      "skills": [
-        "Always Hungry",
-        "Loner",
-        {
-          "name": "Mighty Blow",
-          "value": 2
-        },
-        "Really Stupid",
-        "Regeneration",
-        "Throw Team-Mate",
-        "Regeneration",
-        "Multiple Block"
-      ],
-      "skill_categories": {
-        "normal": [
-          "Strength"
-        ],
-        "double": [
-          "General",
           "Agility",
-          "Passing"
+          "Devious"
+        ],
+        "double": [
+          "General",
+          "Passing",
+          "Strength"
         ]
       },
       "keywords": [
-        "Undead",
-        "human",
+        "Goblin",
         "Lineman"
       ]
-    },
-    {
-      "id": "goblin.bombardier",
-      "name": "Bombardier",
-      "display_name": "Bombardier",
-      "type": "Regular",
-      "quantity": 1,
-      "cost": 40000,
-      "ma": 6,
-      "st": 2,
-      "ag": 3,
-      "pa": 4,
-      "av": 7,
-      "shorthand": "B",
-      "skills": [
-        "Bombardier",
-        "Dodge",
-        {
-          "name": "Secret Weapon",
-          "value": 5
-        },
-        "Stunty",
-        "Regeneration",
-        "Multiple Block"
-      ],
-      "skill_categories": {
-        "normal": [
-          "Agility"
-        ],
-        "double": [
-          "General",
-          "Strength",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "goblin.pogoer",
-      "name": "Pogoer",
-      "display_name": "Pogoer",
-      "type": "Regular",
-      "quantity": 1,
-      "cost": 70000,
-      "ma": 7,
-      "st": 2,
-      "ag": 3,
-      "pa": 5,
-      "av": 7,
-      "shorthand": "P",
-      "skills": [
-        "Dodge",
-        "Leap",
-        "Stunty",
-        "Very Long Legs",
-        {
-          "name": "Animosity",
-          "value": "goblin"
-        },
-        "Regeneration",
-        "Multiple Block"
-      ],
-      "skill_categories": {
-        "normal": [
-          "Agility"
-        ],
-        "double": [
-          "General",
-          "Strength",
-          "Passing"
-        ]
-      }
     },
     {
       "id": "goblin.looney",
@@ -173,26 +51,132 @@
       "st": 2,
       "ag": 3,
       "pa": 0,
-      "av": 7,
-      "shorthand": "L",
+      "av": 8,
       "skills": [
         "Chainsaw",
+        "No Ball",
         "Secret Weapon",
+        "Stunty"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Devious"
+        ],
+        "double": [
+          "Agility",
+          "General",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Goblin",
+        "Special"
+      ]
+    },
+    {
+      "id": "goblin.bombardier",
+      "name": "Bombardier",
+      "display_name": "Bomma",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 45000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "skills": [
+        "Bombardier",
+        "Dodge",
+        "Secret Weapon",
+        "Stunty"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Devious",
+          "Passing"
+        ],
+        "double": [
+          "Agility",
+          "General",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Goblin",
+        "Special"
+      ]
+    },
+    {
+      "id": "goblin.ooligan",
+      "name": "'Ooligan",
+      "display_name": "'Ooligan",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 60000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 5,
+      "av": 8,
+      "skills": [
+        {
+          "name": "Dirty Player",
+          "value": 1
+        },
+        "Disturbing Presence",
+        "Dodge",
+        "Right Stuff",
         "Stunty",
-        "Animosity",
-        "Regeneration",
-        "Multiple Block"
+        "Taunt"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "Devious"
+        ],
+        "double": [
+          "General",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Goblin",
+        "Special"
+      ]
+    },
+    {
+      "id": "goblin.doom_diver",
+      "name": "Doom Diver",
+      "display_name": "Doom Diver",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 65000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 6,
+      "av": 8,
+      "skills": [
+        "Dodge",
+        "Right Stuff",
+        "Stunty",
+        "Swoop"
       ],
       "skill_categories": {
         "normal": [
           "Agility"
         ],
         "double": [
+          "Devious",
           "General",
-          "Strength",
-          "Passing"
+          "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Goblin",
+        "Special"
+      ]
     },
     {
       "id": "goblin.fanatic",
@@ -205,24 +189,94 @@
       "st": 7,
       "ag": 3,
       "pa": 0,
-      "av": 7,
-      "shorthand": "F",
+      "av": 8,
       "skills": [
         "Ball and Chain",
-        "No Hands",
+        "No Ball",
         "Secret Weapon",
         "Stunty"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Devious",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General"
+        ]
+      },
+      "keywords": [
+        "Goblin",
+        "Special"
+      ]
+    },
+    {
+      "id": "goblin.pogoer",
+      "name": "Pogoer",
+      "display_name": "Pogoer",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 75000,
+      "ma": 7,
+      "st": 2,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "skills": [
+        "Dodge",
+        "Pogo",
+        "Stunty"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility"
+        ],
+        "double": [
+          "Devious",
+          "General",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Goblin",
+        "Special"
+      ]
+    },
+    {
+      "id": "goblin.troll",
+      "name": "Troll",
+      "display_name": "Trained Troll",
+      "type": "Big Guy",
+      "quantity": 2,
+      "cost": 115000,
+      "ma": 4,
+      "st": 5,
+      "ag": 5,
+      "pa": 5,
+      "av": 10,
+      "skills": [
+        "Always Hungry",
+        "Mighty Blow",
+        "Projectile Vomit",
+        "Really Stupid",
+        "Regeneration",
+        "Throw Team-mate"
       ],
       "skill_categories": {
         "normal": [
           "Strength"
         ],
         "double": [
-          "General",
           "Agility",
+          "General",
           "Passing"
         ]
-      }
+      },
+      "keywords": [
+        "Big Guy",
+        "Troll"
+      ]
     }
   ],
   "name_generator": "default",
@@ -277,5 +331,8 @@
         "Wrestle"
       ]
     }
+  ],
+  "special_rules": [
+    "Bribery and Corruption"
   ]
 }

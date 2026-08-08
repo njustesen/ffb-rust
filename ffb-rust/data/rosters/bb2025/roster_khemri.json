@@ -1,106 +1,24 @@
 {
   "id": "khemri.lrb6",
   "name": "Khemri",
-  "reroll_cost": 70000,
+  "reroll_cost": 60000,
   "max_rerolls": 8,
   "apothecary": false,
   "undead": true,
   "necromancer": false,
   "positions": [
     {
-      "id": "khemri.tombguardian",
-      "name": "Tomb Guardian",
-      "display_name": "Tomb Guardian",
-      "type": "Regular",
-      "quantity": 4,
-      "cost": 100000,
-      "ma": 4,
-      "st": 5,
-      "ag": 1,
-      "pa": 0,
-      "av": 9,
-      "skills": [
-        "Decay",
-        "Regeneration"
-      ],
-      "skill_categories": {
-        "normal": [
-          "Strength"
-        ],
-        "double": [
-          "General",
-          "Agility",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "khemri.blitzra",
-      "name": "Blitz-Ra",
-      "display_name": "Blitz-Ra",
-      "type": "Regular",
-      "quantity": 2,
-      "cost": 90000,
-      "ma": 6,
-      "st": 3,
-      "ag": 2,
-      "pa": 6,
-      "av": 8,
-      "skills": [
-        "Block",
-        "Regeneration"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Strength"
-        ],
-        "double": [
-          "Agility",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "khemri.throra",
-      "name": "Thro-Ra",
-      "display_name": "Thro-Ra",
-      "type": "Regular",
-      "quantity": 2,
-      "cost": 70000,
-      "ma": 6,
-      "st": 3,
-      "ag": 2,
-      "pa": 3,
-      "av": 7,
-      "skills": [
-        "Pass",
-        "Regeneration",
-        "Sure Hands"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Passing"
-        ],
-        "double": [
-          "Agility",
-          "Strength"
-        ]
-      }
-    },
-    {
       "id": "khemri.skeleton",
       "name": "Skeleton",
-      "display_name": "Skeleton",
+      "display_name": "Skeleton Lineman",
       "type": "Regular",
       "quantity": 16,
       "cost": 40000,
       "ma": 5,
       "st": 3,
-      "ag": 2,
+      "ag": 4,
       "pa": 6,
-      "av": 7,
+      "av": 8,
       "skills": [
         "Regeneration",
         "Thick Skull"
@@ -111,10 +29,122 @@
         ],
         "double": [
           "Agility",
-          "Strength",
-          "Passing"
+          "Devious",
+          "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Human",
+        "Lineman",
+        "Skeleton",
+        "Undead"
+      ]
+    },
+    {
+      "id": "khemri.throra",
+      "name": "Thro-Ra",
+      "display_name": "Tomb Kings Thrower",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 65000,
+      "ma": 6,
+      "st": 3,
+      "ag": 4,
+      "pa": 3,
+      "av": 9,
+      "skills": [
+        "Pass",
+        "Regeneration",
+        "Sure Hands",
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Passing"
+        ],
+        "double": [
+          "Agility",
+          "Devious",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Human",
+        "Skeleton",
+        "Thrower",
+        "Undead"
+      ]
+    },
+    {
+      "id": "khemri.blitzra",
+      "name": "Blitz-Ra",
+      "display_name": "Tomb Kings Blitzer",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 85000,
+      "ma": 6,
+      "st": 3,
+      "ag": 4,
+      "pa": 5,
+      "av": 9,
+      "skills": [
+        "Block",
+        "Regeneration",
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Devious"
+        ]
+      },
+      "keywords": [
+        "Blitzer",
+        "Human",
+        "Skeleton",
+        "Undead"
+      ]
+    },
+    {
+      "id": "khemri.tombguardian",
+      "name": "Tomb Guardian",
+      "display_name": "Tomb Guardian",
+      "type": "Big Guy",
+      "quantity": 4,
+      "cost": 115000,
+      "ma": 4,
+      "st": 5,
+      "ag": 5,
+      "pa": 6,
+      "av": 10,
+      "skills": [
+        "Brawler",
+        "Decay",
+        "Regeneration"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General"
+        ]
+      },
+      "keywords": [
+        "Big Guy",
+        "Blocker",
+        "Human",
+        "Undead"
+      ]
     }
+  ],
+  "special_rules": [
+    "Masters of Undeath"
   ]
 }

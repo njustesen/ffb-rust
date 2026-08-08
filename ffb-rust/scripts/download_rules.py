@@ -122,11 +122,60 @@ def download_star_players():
         time.sleep(0.5)
 
 
+def get_team_slugs() -> list[str]:
+    """Team page slugs, parsed from the already-downloaded the_teams chapter."""
+    teams_md = OUT_DIR / "core_rules" / "10_the_teams.md"
+    slugs: list[str] = []
+    if teams_md.exists():
+        text = teams_md.read_text(encoding="utf-8")
+        for m in re.finditer(r"\.\./\.\./teams/([A-Za-z0-9_]+)/", text):
+            slug = m.group(1)
+            if slug not in slugs:
+                slugs.append(slug)
+    if not slugs:
+        # Fallback: scrape the teams index page
+        soup = fetch(f"{BASE_URL}teams/")
+        for a in soup.find_all("a", href=True):
+            m = re.search(r"teams/([A-Za-z0-9_]+)/?$", a["href"])
+            if m and m.group(1) not in slugs:
+                slugs.append(m.group(1))
+    return sorted(slugs)
+
+
+def download_teams():
+    dest = OUT_DIR / "teams"
+    dest.mkdir(parents=True, exist_ok=True)
+    slugs = get_team_slugs()
+    print(f"  Found {len(slugs)} team pages")
+    for slug in slugs:
+        url = f"{BASE_URL}teams/{slug}/"
+        print(f"  Fetching {url}")
+        try:
+            soup = fetch(url)
+            html = extract_main(soup)
+            md = to_markdown(html, url)
+            outfile = dest / f"{slug}.md"
+            outfile.write_text(md, encoding="utf-8")
+            print(f"    -> {outfile} ({len(md):,} chars)")
+        except Exception as e:
+            print(f"    ERROR: {e}")
+        time.sleep(0.5)
+
+
 def main():
+    import sys
+
+    if "--teams-only" in sys.argv:
+        print("=== Downloading BB2025 Team Rosters ===")
+        download_teams()
+        print("\nDone.")
+        return
     print("=== Downloading BB2025 Core Rules ===")
     download_core_rules()
     print("\n=== Downloading Star Players ===")
     download_star_players()
+    print("\n=== Downloading BB2025 Team Rosters ===")
+    download_teams()
     print("\nDone.")
 
 

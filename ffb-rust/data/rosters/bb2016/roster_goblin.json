@@ -25,13 +25,8 @@
         "Right Stuff",
         "Stunty",
         "Thick Skull",
-        {
-          "name": "Animosity",
-          "value": "all"
-        },
-        "Plague Ridden",
-        "Regeneration",
-        "Multiple Block"
+        "Animosity",
+        "Regeneration"
       ],
       "skill_categories": {
         "normal": [
@@ -60,15 +55,11 @@
       "skills": [
         "Always Hungry",
         "Loner",
-        {
-          "name": "Mighty Blow",
-          "value": 2
-        },
+        "Mighty Blow",
         "Really Stupid",
         "Regeneration",
         "Throw Team-Mate",
-        "Regeneration",
-        "Multiple Block"
+        "Regeneration"
       ],
       "skill_categories": {
         "normal": [
@@ -97,13 +88,9 @@
       "skills": [
         "Bombardier",
         "Dodge",
-        {
-          "name": "Secret Weapon",
-          "value": 5
-        },
+        "Secret Weapon",
         "Stunty",
-        "Regeneration",
-        "Multiple Block"
+        "Regeneration"
       ],
       "skill_categories": {
         "normal": [
@@ -134,12 +121,8 @@
         "Leap",
         "Stunty",
         "Very Long Legs",
-        {
-          "name": "Animosity",
-          "value": "goblin"
-        },
-        "Regeneration",
-        "Multiple Block"
+        "Animosity",
+        "Regeneration"
       ],
       "skill_categories": {
         "normal": [
@@ -170,8 +153,7 @@
         "Secret Weapon",
         "Stunty",
         "Animosity",
-        "Regeneration",
-        "Multiple Block"
+        "Regeneration"
       ],
       "skill_categories": {
         "normal": [

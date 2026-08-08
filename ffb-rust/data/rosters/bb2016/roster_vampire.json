@@ -21,10 +21,7 @@
       "av": 8,
       "shorthand": "V",
       "skills": [
-        {
-          "name": "Bloodlust",
-          "value": 3
-        },
+        "Blood Lust",
         "Hypnotic Gaze",
         "Regeneration"
       ],
@@ -62,7 +59,8 @@
           "Agility",
           "Passing"
         ]
-      }
+      },
+      "skills": []
     }
   ],
   "name_generator": "vampire",

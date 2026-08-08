@@ -26,8 +26,7 @@
         "Strong Arm",
         "Take Root",
         "Thick Skull",
-        "Throw Team-Mate",
-        "Multiple Block"
+        "Throw Team-Mate"
       ],
       "skill_categories": {
         "normal": [
@@ -54,12 +53,7 @@
       "av": 6,
       "skills": [
         "Dodge",
-        "Right Stuff",
-        {
-          "name": "Hatred",
-          "value": "goblin;troll"
-        },
-        "Multiple Block"
+        "Right Stuff"
       ],
       "skill_categories": {
         "normal": [

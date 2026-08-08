@@ -29,7 +29,8 @@
           "Strength",
           "Passing"
         ]
-      }
+      },
+      "skills": []
     },
     {
       "id": "43572",
@@ -72,7 +73,7 @@
       "av": 8,
       "shorthand": "WM",
       "skills": [
-        "Claws"
+        "Claw"
       ],
       "skill_categories": {
         "normal": [

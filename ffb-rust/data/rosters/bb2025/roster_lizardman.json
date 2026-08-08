@@ -1,70 +1,16 @@
 {
   "id": "lizardman.lrb6",
   "name": "Lizardman",
-  "reroll_cost": 60000,
+  "reroll_cost": 70000,
   "max_rerolls": 8,
   "apothecary": true,
   "undead": false,
   "necromancer": false,
   "positions": [
     {
-      "id": "lizardman.kroxigor",
-      "name": "Kroxigor",
-      "display_name": "Kroxigor",
-      "type": "Big Guy",
-      "quantity": 1,
-      "cost": 140000,
-      "ma": 6,
-      "st": 5,
-      "ag": 1,
-      "pa": 0,
-      "av": 9,
-      "skills": [
-        "Loner",
-        "bone head",
-        "Mighty Blow",
-        "Prehensile Tail",
-        "Thick Skull"
-      ],
-      "skill_categories": {
-        "normal": [
-          "Strength"
-        ],
-        "double": [
-          "General",
-          "Agility",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "lizardman.saurus",
-      "name": "Saurus",
-      "display_name": "Saurus",
-      "type": "Regular",
-      "quantity": 6,
-      "cost": 80000,
-      "ma": 6,
-      "st": 4,
-      "ag": 1,
-      "pa": 6,
-      "av": 9,
-      "shorthand": "S",
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Strength"
-        ],
-        "double": [
-          "Agility",
-          "Passing"
-        ]
-      }
-    },
-    {
       "id": "lizardman.skink",
       "name": "Skink",
-      "display_name": "Skink",
+      "display_name": "Skink Lineman",
       "type": "Regular",
       "quantity": 16,
       "cost": 60000,
@@ -72,8 +18,7 @@
       "st": 2,
       "ag": 3,
       "pa": 4,
-      "av": 7,
-      "shorthand": "L",
+      "av": 8,
       "skills": [
         "Dodge",
         "Stunty"
@@ -84,10 +29,116 @@
         ],
         "double": [
           "General",
+          "Passing",
           "Strength",
-          "Passing"
+          "Devious"
         ]
-      }
+      },
+      "keywords": [
+        "Lineman",
+        "Lizardman"
+      ]
+    },
+    {
+      "id": "lizardman.skink",
+      "name": "Skink",
+      "display_name": "Chameleon Skink",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 70000,
+      "ma": 7,
+      "st": 2,
+      "ag": 3,
+      "pa": 3,
+      "av": 8,
+      "skills": [
+        "Dodge",
+        "On the Ball",
+        "Shadowing",
+        "Stunty"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "Passing"
+        ],
+        "double": [
+          "General",
+          "Strength",
+          "Devious"
+        ]
+      },
+      "keywords": [
+        "Thrower",
+        "Lizardman"
+      ]
+    },
+    {
+      "id": "lizardman.saurus",
+      "name": "Saurus",
+      "display_name": "Saurus Blocker",
+      "type": "Regular",
+      "quantity": 6,
+      "cost": 90000,
+      "ma": 6,
+      "st": 4,
+      "ag": 5,
+      "pa": 6,
+      "av": 10,
+      "skills": [
+        "Juggernaut",
+        "Unsteady"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility"
+        ]
+      },
+      "keywords": [
+        "Blocker",
+        "Lizardman"
+      ]
+    },
+    {
+      "id": "lizardman.kroxigor",
+      "name": "Kroxigor",
+      "display_name": "Kroxigor",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 140000,
+      "ma": 6,
+      "st": 5,
+      "ag": 5,
+      "pa": 6,
+      "av": 10,
+      "skills": [
+        "Bone Head",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Mighty Blow",
+        "Prehensile Tail",
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General"
+        ]
+      },
+      "keywords": [
+        "Big Guy",
+        "Lizardman"
+      ]
     }
-  ]
+  ],
+  "special_rules": []
 }

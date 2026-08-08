@@ -30,7 +30,8 @@
         "double": [
           "Agility"
         ]
-      }
+      },
+      "skills": []
     },
     {
       "id": "chaospact.goblin.renegade",
@@ -166,7 +167,7 @@
       "av": 9,
       "shorthand": "O",
       "skills": [
-        "bone head",
+        "Bone-Head",
         "Loner",
         "Mighty Blow",
         "Thick Skull",

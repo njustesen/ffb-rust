@@ -10,52 +10,53 @@
     {
       "id": "ogre.snotling",
       "name": "Snotling",
-      "display_name": "Snotling",
+      "display_name": "Gnoblar Lineman",
       "type": "Regular",
       "quantity": 16,
-      "cost": 20000,
+      "cost": 15000,
       "ma": 5,
       "st": 1,
       "ag": 3,
-      "pa": 5,
-      "av": 5,
-      "shorthand": "S",
+      "pa": 4,
+      "av": 6,
       "skills": [
         "Dodge",
         "Right Stuff",
-        "Side Step",
+        "Sidestep",
         "Stunty",
         "Titchy"
       ],
       "skill_categories": {
         "normal": [
-          "Agility"
+          "Agility",
+          "Devious"
         ],
         "double": [
-          "General",
-          "Strength",
-          "Passing"
+          "General"
         ]
-      }
+      },
+      "keywords": [
+        "Gnoblar",
+        "Lineman"
+      ]
     },
     {
       "id": "ogre.ogre",
       "name": "Ogre",
-      "display_name": "Ogre",
-      "type": "Regular",
-      "quantity": 6,
+      "display_name": "Ogre Blocker",
+      "type": "Big Guy",
+      "quantity": 5,
       "cost": 140000,
       "ma": 5,
       "st": 5,
-      "ag": 2,
+      "ag": 4,
       "pa": 5,
-      "av": 9,
-      "shorthand": "O",
+      "av": 10,
       "skills": [
-        "bone head",
+        "Bone Head",
         "Mighty Blow",
         "Thick Skull",
-        "Throw Team-Mate"
+        "Throw Team-mate"
       ],
       "skill_categories": {
         "normal": [
@@ -63,10 +64,55 @@
         ],
         "double": [
           "Agility",
+          "Devious",
           "General",
           "Passing"
         ]
-      }
+      },
+      "keywords": [
+        "Big Guy",
+        "Blocker",
+        "Ogre"
+      ]
+    },
+    {
+      "id": "ogre.ogre_runt_punter",
+      "name": "Ogre Runt Punter",
+      "display_name": "Ogre Runt Punter",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 145000,
+      "ma": 5,
+      "st": 5,
+      "ag": 4,
+      "pa": 4,
+      "av": 10,
+      "skills": [
+        "Bone Head",
+        "Kick Team-mate",
+        "Mighty Blow",
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Passing",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Devious",
+          "General"
+        ]
+      },
+      "keywords": [
+        "Big Guy",
+        "Ogre",
+        "Thrower"
+      ]
     }
+  ],
+  "special_rules": [
+    "Brawlin' Brutes",
+    "Low Cost Linemen"
   ]
 }

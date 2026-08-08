@@ -8,87 +8,65 @@
   "necromancer": false,
   "positions": [
     {
-      "id": "orc.troll",
-      "name": "Troll",
-      "display_name": "Troll",
-      "type": "Big Guy",
-      "quantity": 1,
-      "cost": 110000,
-      "ma": 4,
-      "st": 5,
-      "ag": 1,
-      "pa": 5,
-      "av": 9,
-      "shorthand": "T",
-      "skills": [
-        "Loner",
-        "Always Hungry",
-        "Mighty Blow",
-        "Really Stupid",
-        "Regeneration",
-        "Throw Team-Mate"
-      ],
-      "skill_categories": {
-        "normal": [
-          "Strength"
-        ],
-        "double": [
-          "General",
-          "Agility",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "orc.blitzer",
-      "name": "Blitzer",
-      "display_name": "Orc Blitzer",
+      "id": "orc.lineman",
+      "name": "Lineman",
+      "display_name": "Orc Lineman",
       "type": "Regular",
-      "quantity": 4,
-      "cost": 80000,
-      "ma": 6,
+      "quantity": 16,
+      "cost": 50000,
+      "ma": 5,
       "st": 3,
       "ag": 3,
       "pa": 4,
-      "av": 9,
-      "shorthand": "B",
+      "av": 10,
+      "skills": [],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Devious"
+        ]
+      },
+      "keywords": [
+        "Lineman",
+        "Orc"
+      ]
+    },
+    {
+      "id": "orc.lineman",
+      "name": "Lineman",
+      "display_name": "Goblin Lineman",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 40000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
       "skills": [
-        "Block"
+        "Dodge",
+        "Right Stuff",
+        "Stunty"
       ],
       "skill_categories": {
         "normal": [
-          "General",
-          "Strength"
+          "Agility",
+          "Devious"
         ],
         "double": [
-          "Agility",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "orc.blackorc",
-      "name": "Black Orc Blocker",
-      "display_name": "Black Orc Blocker",
-      "type": "Regular",
-      "quantity": 4,
-      "cost": 80000,
-      "ma": 4,
-      "st": 4,
-      "ag": 2,
-      "pa": 0,
-      "av": 9,
-      "shorthand": "Bo",
-      "skill_categories": {
-        "normal": [
           "General",
+          "Passing",
           "Strength"
-        ],
-        "double": [
-          "Agility",
-          "Passing"
         ]
-      }
+      },
+      "keywords": [
+        "Lineman",
+        "Goblin"
+      ]
     },
     {
       "id": "orc.thrower",
@@ -96,13 +74,12 @@
       "display_name": "Orc Thrower",
       "type": "Regular",
       "quantity": 2,
-      "cost": 70000,
-      "ma": 5,
+      "cost": 75000,
+      "ma": 6,
       "st": 3,
       "ag": 3,
       "pa": 3,
-      "av": 8,
-      "shorthand": "T",
+      "av": 9,
       "skills": [
         "Pass",
         "Sure Hands"
@@ -114,62 +91,121 @@
         ],
         "double": [
           "Agility",
-          "Strength"
-        ]
-      }
-    },
-    {
-      "id": "orc.goblin",
-      "name": "Goblin",
-      "display_name": "Goblin",
-      "type": "Regular",
-      "quantity": 4,
-      "cost": 40000,
-      "ma": 6,
-      "st": 2,
-      "ag": 3,
-      "pa": 4,
-      "av": 7,
-      "shorthand": "G",
-      "skills": [
-        "Right Stuff",
-        "Dodge",
-        "Stunty"
-      ],
-      "skill_categories": {
-        "normal": [
-          "Agility"
-        ],
-        "double": [
-          "General",
           "Strength",
-          "Passing"
+          "Devious"
         ]
-      }
+      },
+      "keywords": [
+        "Thrower",
+        "Orc"
+      ]
     },
     {
-      "id": "orc.lineman",
-      "name": "Lineman",
-      "display_name": "Orc Lineman",
+      "id": "orc.blitzer",
+      "name": "Blitzer",
+      "display_name": "Orc Blitzer",
       "type": "Regular",
-      "quantity": 16,
-      "cost": 50000,
-      "ma": 5,
+      "quantity": 2,
+      "cost": 85000,
+      "ma": 6,
       "st": 3,
       "ag": 3,
       "pa": 4,
-      "av": 9,
-      "shorthand": "L",
+      "av": 10,
+      "skills": [
+        "Block",
+        "Break Tackle"
+      ],
       "skill_categories": {
         "normal": [
-          "General"
+          "General",
+          "Strength"
         ],
         "double": [
           "Agility",
-          "Strength",
+          "Devious"
+        ]
+      },
+      "keywords": [
+        "Blitzer",
+        "Orc"
+      ]
+    },
+    {
+      "id": "orc.big_un_blocker",
+      "name": "Big Un Blocker",
+      "display_name": "Big Un Blocker",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 95000,
+      "ma": 5,
+      "st": 4,
+      "ag": 4,
+      "pa": 6,
+      "av": 10,
+      "skills": [
+        "Mighty Blow",
+        "Taunt",
+        "Thick Skull",
+        "Unsteady"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Devious"
+        ]
+      },
+      "keywords": [
+        "Blocker",
+        "Orc"
+      ]
+    },
+    {
+      "id": "orc.troll",
+      "name": "Troll",
+      "display_name": "Troll",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 115000,
+      "ma": 4,
+      "st": 5,
+      "ag": 5,
+      "pa": 5,
+      "av": 10,
+      "skills": [
+        "Always Hungry",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Mighty Blow",
+        "Projectile Vomit",
+        "Really Stupid",
+        "Regeneration",
+        "Throw Team-mate"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General",
           "Passing"
         ]
-      }
+      },
+      "keywords": [
+        "Big Guy",
+        "Troll"
+      ]
     }
+  ],
+  "special_rules": [
+    "Brawlin' Brutes",
+    "Team Captain"
   ]
 }

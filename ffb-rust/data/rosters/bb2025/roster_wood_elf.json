@@ -8,36 +8,94 @@
   "necromancer": false,
   "positions": [
     {
-      "id": "woodelf.treeman",
-      "name": "Treeman",
-      "display_name": "Treeman",
-      "type": "Big Guy",
-      "quantity": 1,
-      "cost": 120000,
-      "ma": 2,
-      "st": 6,
-      "ag": 1,
-      "pa": 5,
-      "av": 10,
+      "id": "woodelf.lineman",
+      "name": "Lineman",
+      "display_name": "Wood Elf Lineman",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 65000,
+      "ma": 7,
+      "st": 3,
+      "ag": 2,
+      "pa": 3,
+      "av": 8,
+      "skills": [],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General"
+        ],
+        "double": [
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Lineman",
+        "Elf"
+      ]
+    },
+    {
+      "id": "woodelf.thrower",
+      "name": "Thrower",
+      "display_name": "Wood Elf Thrower",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 85000,
+      "ma": 7,
+      "st": 3,
+      "ag": 2,
+      "pa": 2,
+      "av": 8,
       "skills": [
-        "Loner",
-        "Mighty Blow",
-        "Stand Firm",
-        "Strong Arm",
-        "Take Root",
-        "Thick Skull",
-        "Throw Team-Mate"
+        "Pass",
+        "Safe Pair of Hands"
       ],
       "skill_categories": {
         "normal": [
-          "Strength"
+          "Agility",
+          "General",
+          "Passing"
         ],
         "double": [
-          "General",
-          "Agility",
-          "Passing"
+          "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Thrower",
+        "Elf"
+      ]
+    },
+    {
+      "id": "woodelf.catcher",
+      "name": "Catcher",
+      "display_name": "Wood Elf Catcher",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 90000,
+      "ma": 8,
+      "st": 2,
+      "ag": 2,
+      "pa": 3,
+      "av": 8,
+      "skills": [
+        "Catch",
+        "Dodge",
+        "Sprint"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General"
+        ],
+        "double": [
+          "Passing",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Catcher",
+        "Elf"
+      ]
     },
     {
       "id": "woodelf.wardancer",
@@ -45,12 +103,12 @@
       "display_name": "Wardancer",
       "type": "Regular",
       "quantity": 2,
-      "cost": 120000,
+      "cost": 130000,
       "ma": 8,
       "st": 3,
-      "ag": 4,
-      "pa": 4,
-      "av": 7,
+      "ag": 2,
+      "pa": 3,
+      "av": 8,
       "skills": [
         "Block",
         "Dodge",
@@ -58,90 +116,56 @@
       ],
       "skill_categories": {
         "normal": [
-          "General",
-          "Agility"
-        ],
-        "double": [
-          "Strength",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "woodelf.thrower",
-      "name": "Thrower",
-      "display_name": "Thrower",
-      "type": "Regular",
-      "quantity": 2,
-      "cost": 90000,
-      "ma": 7,
-      "st": 3,
-      "ag": 4,
-      "pa": 2,
-      "av": 7,
-      "skills": [
-        "Pass"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
           "Agility",
-          "Passing"
+          "General"
         ],
         "double": [
+          "Passing",
           "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Blitzer",
+        "Elf"
+      ]
     },
     {
-      "id": "woodelf.catcher",
-      "name": "Catcher",
-      "display_name": "Catcher",
-      "type": "Regular",
-      "quantity": 4,
-      "cost": 90000,
-      "ma": 9,
-      "st": 2,
-      "ag": 4,
-      "pa": 4,
-      "av": 7,
+      "id": "woodelf.treeman",
+      "name": "Treeman",
+      "display_name": "Loren Forest Treeman",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 120000,
+      "ma": 2,
+      "st": 6,
+      "ag": 5,
+      "pa": 5,
+      "av": 11,
       "skills": [
-        "Catch",
-        "Dodge"
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Mighty Blow",
+        "Stand Firm",
+        "Strong Arm",
+        "Take Root",
+        "Thick Skull",
+        "Throw Team-mate"
       ],
       "skill_categories": {
         "normal": [
-          "General",
-          "Agility"
+          "Strength"
         ],
         "double": [
-          "Strength",
-          "Passing"
+          "Agility",
+          "General"
         ]
-      }
-    },
-    {
-      "id": "woodelf.lineman",
-      "name": "Lineman",
-      "display_name": "Lineman",
-      "type": "Regular",
-      "quantity": 16,
-      "cost": 70000,
-      "ma": 7,
-      "st": 3,
-      "ag": 4,
-      "pa": 4,
-      "av": 7,
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Agility"
-        ],
-        "double": [
-          "Strength",
-          "Passing"
-        ]
-      }
+      },
+      "keywords": [
+        "Big Guy",
+        "Treeman"
+      ]
     }
   ],
   "infamous_staff": [
@@ -170,5 +194,6 @@
         "Wrestle"
       ]
     }
-  ]
+  ],
+  "special_rules": []
 }

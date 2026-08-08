@@ -1,97 +1,16 @@
 {
   "id": "amazon.lrb6",
   "name": "Amazon",
-  "reroll_cost": 50000,
+  "reroll_cost": 60000,
   "max_rerolls": 8,
   "apothecary": true,
   "undead": false,
   "necromancer": false,
   "positions": [
     {
-      "id": "amazon.blitzer",
-      "name": "Blitzer",
-      "display_name": "Blitzer",
-      "type": "Regular",
-      "quantity": 4,
-      "cost": 90000,
-      "ma": 6,
-      "st": 3,
-      "ag": 3,
-      "pa": 5,
-      "av": 7,
-      "skills": [
-        "Dodge",
-        "Block"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Strength"
-        ],
-        "double": [
-          "Agility",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "amazon.catcher",
-      "name": "Catcher",
-      "display_name": "Catcher",
-      "type": "Regular",
-      "quantity": 2,
-      "cost": 70000,
-      "ma": 6,
-      "st": 3,
-      "ag": 3,
-      "pa": 5,
-      "av": 7,
-      "skills": [
-        "Dodge",
-        "Catch"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Agility"
-        ],
-        "double": [
-          "Strength",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "amazon.thrower",
-      "name": "Thrower",
-      "display_name": "Thrower",
-      "type": "Regular",
-      "quantity": 2,
-      "cost": 70000,
-      "ma": 6,
-      "st": 3,
-      "ag": 3,
-      "pa": 5,
-      "av": 7,
-      "skills": [
-        "Dodge",
-        "Pass"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Passing"
-        ],
-        "double": [
-          "Agility",
-          "Strength"
-        ]
-      }
-    },
-    {
       "id": "amazon.linewoman",
       "name": "Linewoman",
-      "display_name": "Linewoman",
+      "display_name": "Eagle Warrior",
       "type": "Regular",
       "quantity": 16,
       "cost": 50000,
@@ -99,7 +18,7 @@
       "st": 3,
       "ag": 3,
       "pa": 4,
-      "av": 7,
+      "av": 8,
       "skills": [
         "Dodge"
       ],
@@ -109,11 +28,109 @@
         ],
         "double": [
           "Agility",
-          "Strength",
-          "Passing"
+          "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Lineman",
+        "Human"
+      ]
+    },
+    {
+      "id": "amazon.thrower",
+      "name": "Thrower",
+      "display_name": "Python Warrior",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 80000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 3,
+      "av": 8,
+      "skills": [
+        "Dodge",
+        "On the Ball",
+        "Pass",
+        "Safe Pass"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Passing"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Thrower",
+        "Human"
+      ]
+    },
+    {
+      "id": "amazon.blitzer",
+      "name": "Blitzer",
+      "display_name": "Piranha Warrior",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 90000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "skills": [
+        "Dodge",
+        "Hit and Run",
+        "Jump Up"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General"
+        ],
+        "double": [
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Blitzer",
+        "Human"
+      ]
+    },
+    {
+      "id": "amazon.catcher",
+      "name": "Catcher",
+      "display_name": "Jaguar Warrior",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 110000,
+      "ma": 6,
+      "st": 4,
+      "ag": 3,
+      "pa": 4,
+      "av": 9,
+      "skills": [
+        "Defensive",
+        "Dodge"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility"
+        ]
+      },
+      "keywords": [
+        "Blocker",
+        "Human"
+      ]
     }
   ],
-  "name_generator": "amazon"
+  "name_generator": "amazon",
+  "special_rules": []
 }

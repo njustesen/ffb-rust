@@ -28,7 +28,8 @@
           "Strength",
           "Passing"
         ]
-      }
+      },
+      "skills": []
     },
     {
       "id": "human.blitzer",
@@ -111,33 +112,6 @@
       }
     },
     {
-      "id": "human.catcher.old",
-      "name": "Catcher",
-      "display_name": "Human Catcher",
-      "type": "Regular",
-      "quantity": 0,
-      "cost": 70000,
-      "ma": 8,
-      "st": 2,
-      "ag": 3,
-      "pa": 5,
-      "av": 7,
-      "skills": [
-        "Catch",
-        "Dodge"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Agility"
-        ],
-        "double": [
-          "Passing",
-          "Strength"
-        ]
-      }
-    },
-    {
       "id": "human.ogre",
       "name": "Ogre",
       "display_name": "Ogre",
@@ -151,8 +125,7 @@
       "av": 9,
       "skills": [
         "Loner",
-        "bone head",
-        "bone-head",
+        "Bone-Head",
         "Mighty Blow",
         "Thick Skull",
         "Throw Team-Mate"

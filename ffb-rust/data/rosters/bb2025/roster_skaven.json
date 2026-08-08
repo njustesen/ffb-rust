@@ -1,109 +1,53 @@
 {
   "id": "skaven.lrb6",
   "name": "Skaven",
-  "reroll_cost": 60000,
+  "reroll_cost": 50000,
   "max_rerolls": 8,
   "apothecary": true,
   "undead": false,
   "necromancer": false,
   "positions": [
     {
-      "id": "skaven.ratogre",
-      "name": "Rat Ogre",
-      "display_name": "Rat Ogre",
-      "type": "Big Guy",
-      "quantity": 1,
-      "cost": 160000,
-      "ma": 6,
-      "st": 5,
-      "ag": 2,
-      "pa": 0,
-      "av": 8,
-      "skills": [
-        "Loner",
-        "Frenzy",
-        "Mighty Blow",
-        "Prehensile Tail",
-        "Wild Animal"
-      ],
-      "skill_categories": {
-        "normal": [
-          "Strength"
-        ],
-        "double": [
-          "General",
-          "Agility",
-          "Passing",
-          "Mutation"
-        ]
-      }
-    },
-    {
-      "id": "skaven.blitzer",
-      "name": "Blitzer",
-      "display_name": "Blitzer",
+      "id": "skaven.lineman",
+      "name": "Lineman",
+      "display_name": "Skaven Clanrat",
       "type": "Regular",
-      "quantity": 2,
-      "cost": 90000,
+      "quantity": 16,
+      "cost": 50000,
       "ma": 7,
       "st": 3,
       "ag": 3,
-      "pa": 5,
+      "pa": 4,
       "av": 8,
-      "skills": [
-        "Block"
-      ],
+      "skills": [],
       "skill_categories": {
         "normal": [
           "General",
-          "Strength"
+          "Devious"
         ],
         "double": [
           "Agility",
-          "Passing",
-          "Mutation"
+          "Mutation",
+          "Strength"
         ]
-      }
-    },
-    {
-      "id": "skaven.gutterrunner",
-      "name": "Gutter Runner",
-      "display_name": "Gutter Runner",
-      "type": "Regular",
-      "quantity": 4,
-      "cost": 80000,
-      "ma": 9,
-      "st": 2,
-      "ag": 4,
-      "pa": 4,
-      "av": 7,
-      "skills": [
-        "Dodge"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Agility"
-        ],
-        "double": [
-          "Passing",
-          "Strength",
-          "Mutation"
-        ]
-      }
+      },
+      "keywords": [
+        "Lineman",
+        "Skaven"
+      ]
     },
     {
       "id": "skaven.thrower",
       "name": "Thrower",
-      "display_name": "Thrower",
+      "display_name": "Skaven Thrower",
       "type": "Regular",
       "quantity": 2,
-      "cost": 70000,
+      "cost": 80000,
       "ma": 7,
       "st": 3,
       "ag": 3,
       "pa": 2,
-      "av": 7,
+      "av": 8,
       "skills": [
         "Pass",
         "Sure Hands"
@@ -115,34 +59,117 @@
         ],
         "double": [
           "Agility",
-          "Strength",
-          "Mutation"
+          "Devious",
+          "Mutation",
+          "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Thrower",
+        "Skaven"
+      ]
     },
     {
-      "id": "skaven.lineman",
-      "name": "Lineman",
-      "display_name": "Lineman",
+      "id": "skaven.gutterrunner",
+      "name": "Gutter Runner",
+      "display_name": "Gutter Runner",
       "type": "Regular",
-      "quantity": 16,
-      "cost": 50000,
-      "ma": 7,
+      "quantity": 2,
+      "cost": 85000,
+      "ma": 9,
+      "st": 2,
+      "ag": 2,
+      "pa": 4,
+      "av": 8,
+      "skills": [
+        "Dodge",
+        "Stab"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General",
+          "Devious"
+        ],
+        "double": [
+          "Mutation",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Runner",
+        "Skaven"
+      ]
+    },
+    {
+      "id": "skaven.blitzer",
+      "name": "Blitzer",
+      "display_name": "Skaven Blitzer",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 90000,
+      "ma": 8,
       "st": 3,
       "ag": 3,
       "pa": 4,
-      "av": 7,
+      "av": 9,
+      "skills": [
+        "Block",
+        "Strip Ball"
+      ],
       "skill_categories": {
         "normal": [
-          "General"
+          "General",
+          "Strength"
         ],
         "double": [
           "Agility",
-          "Strength",
-          "Passing",
+          "Devious",
           "Mutation"
         ]
-      }
+      },
+      "keywords": [
+        "Blitzer",
+        "Skaven"
+      ]
+    },
+    {
+      "id": "skaven.ratogre",
+      "name": "Rat Ogre",
+      "display_name": "Rat Ogre",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 6,
+      "st": 5,
+      "ag": 4,
+      "pa": 6,
+      "av": 9,
+      "skills": [
+        "Animal Savagery",
+        "Frenzy",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Mighty Blow",
+        "Prehensile Tail"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General",
+          "Mutation"
+        ]
+      },
+      "keywords": [
+        "Big Guy",
+        "Skaven"
+      ]
     }
-  ]
+  ],
+  "special_rules": []
 }

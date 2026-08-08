@@ -10,7 +10,7 @@
     {
       "id": "norse.lineman",
       "name": "Lineman",
-      "display_name": "Lineman",
+      "display_name": "Norse Raider",
       "type": "Regular",
       "quantity": 16,
       "cost": 50000,
@@ -18,10 +18,12 @@
       "st": 3,
       "ag": 3,
       "pa": 4,
-      "av": 7,
-      "shorthand": "L",
+      "av": 8,
       "skills": [
-        "Block"
+        "Block",
+        "Drunkard",
+        "Thick Skull",
+        "Unsteady"
       ],
       "skill_categories": {
         "normal": [
@@ -32,68 +34,46 @@
           "Passing",
           "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Lineman",
+        "Human"
+      ]
     },
     {
-      "id": "norse.thrower",
-      "name": "Thrower",
-      "display_name": "Thrower",
+      "id": "norse.beer_boar",
+      "name": "Beer Boar",
+      "display_name": "Beer Boar",
       "type": "Regular",
       "quantity": 2,
-      "cost": 70000,
-      "ma": 6,
-      "st": 3,
+      "cost": 20000,
+      "ma": 5,
+      "st": 1,
       "ag": 3,
-      "pa": 3,
-      "av": 7,
-      "shorthand": "T",
+      "pa": 0,
+      "av": 6,
       "skills": [
-        "Block",
-        "Pass"
+        "Dodge",
+        "No Ball",
+        "Pick-me-up",
+        "Stunty",
+        "Titchy"
       ],
       "skill_categories": {
-        "normal": [
-          "General",
-          "Passing"
-        ],
+        "normal": [],
         "double": [
-          "Agility",
-          "Strength"
-        ]
-      }
-    },
-    {
-      "id": "norse.runner",
-      "name": "Runner",
-      "display_name": "Runner",
-      "type": "Regular",
-      "quantity": 2,
-      "cost": 90000,
-      "ma": 7,
-      "st": 3,
-      "ag": 3,
-      "pa": 5,
-      "av": 7,
-      "shorthand": "R",
-      "skills": [
-        "Block",
-        "Dauntless"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
           "Agility"
-        ],
-        "double": [
-          "Strength",
-          "Passing"
         ]
-      }
+      },
+      "keywords": [
+        "Special",
+        "Animal"
+      ]
     },
     {
       "id": "norse.berserker",
       "name": "Berserker",
-      "display_name": "Berserker",
+      "display_name": "Norse Berserker",
       "type": "Regular",
       "quantity": 2,
       "cost": 90000,
@@ -101,8 +81,7 @@
       "st": 3,
       "ag": 3,
       "pa": 5,
-      "av": 7,
-      "shorthand": "B",
+      "av": 8,
       "skills": [
         "Block",
         "Frenzy",
@@ -117,7 +96,45 @@
           "Agility",
           "Passing"
         ]
-      }
+      },
+      "keywords": [
+        "Blitzer",
+        "Human"
+      ]
+    },
+    {
+      "id": "norse.thrower",
+      "name": "Thrower",
+      "display_name": "Valkyrie",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 95000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 3,
+      "av": 8,
+      "skills": [
+        "Catch",
+        "Dauntless",
+        "Pass",
+        "Strip Ball"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General",
+          "Passing"
+        ],
+        "double": [
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Catcher",
+        "Human",
+        "Thrower"
+      ]
     },
     {
       "id": "norse.ulfwerener",
@@ -125,15 +142,15 @@
       "display_name": "Ulfwerener",
       "type": "Regular",
       "quantity": 2,
-      "cost": 110000,
+      "cost": 105000,
       "ma": 6,
       "st": 4,
-      "ag": 2,
-      "pa": 0,
-      "av": 8,
-      "shorthand": "U",
+      "ag": 4,
+      "pa": 6,
+      "av": 9,
       "skills": [
-        "Frenzy"
+        "Frenzy",
+        "Unsteady"
       ],
       "skill_categories": {
         "normal": [
@@ -141,31 +158,35 @@
           "Strength"
         ],
         "double": [
-          "Agility",
-          "Passing"
+          "Agility"
         ]
-      }
+      },
+      "keywords": [
+        "Blocker",
+        "Human"
+      ]
     },
     {
       "id": "norse.troll.snow",
       "name": "Snow Troll",
-      "display_name": "Snow Troll",
+      "display_name": "Yhetee",
       "type": "Big Guy",
       "quantity": 1,
       "cost": 140000,
       "ma": 5,
       "st": 5,
-      "ag": 1,
-      "pa": 0,
-      "av": 8,
-      "shorthand": "S",
+      "ag": 4,
+      "pa": 6,
+      "av": 9,
       "skills": [
-        "Claw",
         "Claws",
         "Disturbing Presence",
         "Frenzy",
-        "Loner",
-        "Wild Animal"
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Unchannelled Fury"
       ],
       "skill_categories": {
         "normal": [
@@ -173,10 +194,13 @@
         ],
         "double": [
           "Agility",
-          "General",
-          "Passing"
+          "General"
         ]
-      }
+      },
+      "keywords": [
+        "Big Guy",
+        "Yhetee"
+      ]
     }
   ],
   "infamous_staff": [
@@ -205,5 +229,8 @@
         "Wrestle"
       ]
     }
+  ],
+  "special_rules": [
+    "Favoured of Khorne"
   ]
 }

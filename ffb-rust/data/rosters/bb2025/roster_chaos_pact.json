@@ -30,7 +30,8 @@
         "double": [
           "Agility"
         ]
-      }
+      },
+      "skills": []
     },
     {
       "id": "chaospact.goblin.renegade",
@@ -202,8 +203,7 @@
         "Horns",
         "Loner",
         "Mighty Blow",
-        "Thick Skull",
-        "Wild Animal"
+        "Thick Skull"
       ],
       "skill_categories": {
         "normal": [

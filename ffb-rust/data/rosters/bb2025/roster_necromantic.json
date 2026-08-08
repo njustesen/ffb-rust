@@ -8,33 +8,106 @@
   "necromancer": true,
   "positions": [
     {
-      "id": "necromantic.werewolf",
-      "name": "Werewolf",
-      "display_name": "Werewolf",
+      "id": "necromantic.zombie",
+      "name": "Zombie",
+      "display_name": "Zombie Lineman",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 40000,
+      "ma": 4,
+      "st": 3,
+      "ag": 4,
+      "pa": 6,
+      "av": 9,
+      "skills": [
+        "Eye Gouge",
+        "Regeneration",
+        "Unsteady"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Devious",
+          "General"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Human",
+        "Lineman",
+        "Undead",
+        "Zombie"
+      ]
+    },
+    {
+      "id": "necromantic.ghoul",
+      "name": "Ghoul",
+      "display_name": "Ghoul Runner",
       "type": "Regular",
       "quantity": 2,
-      "cost": 120000,
-      "ma": 8,
+      "cost": 75000,
+      "ma": 7,
       "st": 3,
       "ag": 3,
-      "pa": 4,
+      "pa": 3,
       "av": 8,
       "skills": [
-        "Claw",
-        "Claws",
-        "Frenzy",
+        "Dodge",
         "Regeneration"
       ],
       "skill_categories": {
         "normal": [
-          "General",
-          "Agility"
+          "Agility",
+          "General"
         ],
         "double": [
-          "Strength",
-          "Passing"
+          "Devious",
+          "Passing",
+          "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Ghoul",
+        "Runner",
+        "Undead"
+      ]
+    },
+    {
+      "id": "necromantic.wraith",
+      "name": "Wraith",
+      "display_name": "Wraith",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 85000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+        "Block",
+        "Foul Appearance",
+        "No Ball",
+        "Regeneration",
+        "Sidestep"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Devious"
+        ]
+      },
+      "keywords": [
+        "Blocker",
+        "Undead",
+        "Wraith"
+      ]
     },
     {
       "id": "necromantic.fleshgolem",
@@ -45,13 +118,14 @@
       "cost": 110000,
       "ma": 4,
       "st": 4,
-      "ag": 2,
-      "pa": 0,
-      "av": 9,
+      "ag": 4,
+      "pa": 6,
+      "av": 10,
       "skills": [
         "Regeneration",
         "Stand Firm",
-        "Thick Skull"
+        "Thick Skull",
+        "Unsteady"
       ],
       "skill_categories": {
         "normal": [
@@ -60,90 +134,53 @@
         ],
         "double": [
           "Agility",
-          "Passing"
+          "Devious"
         ]
-      }
+      },
+      "keywords": [
+        "Blocker",
+        "Construct",
+        "Undead"
+      ]
     },
     {
-      "id": "necromantic.wight",
-      "name": "Wight",
-      "display_name": "Wight",
+      "id": "necromantic.werewolf",
+      "name": "Werewolf",
+      "display_name": "Werewolf",
       "type": "Regular",
       "quantity": 2,
-      "cost": 90000,
-      "ma": 6,
+      "cost": 120000,
+      "ma": 8,
       "st": 3,
       "ag": 3,
-      "pa": 0,
-      "av": 8,
+      "pa": 3,
+      "av": 9,
       "skills": [
-        "Block",
+        "Claws",
+        "Frenzy",
         "Regeneration"
       ],
       "skill_categories": {
         "normal": [
-          "General",
-          "Strength"
-        ],
-        "double": [
           "Agility",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "necromantic.ghoul",
-      "name": "Ghoul",
-      "display_name": "Ghoul",
-      "type": "Regular",
-      "quantity": 2,
-      "cost": 70000,
-      "ma": 7,
-      "st": 3,
-      "ag": 3,
-      "pa": 4,
-      "av": 7,
-      "skills": [
-        "Dodge"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Agility"
-        ],
-        "double": [
-          "Strength",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "necromantic.zombie",
-      "name": "Zombie",
-      "display_name": "Zombie",
-      "type": "Regular",
-      "quantity": 16,
-      "cost": 30000,
-      "ma": 4,
-      "st": 3,
-      "ag": 2,
-      "pa": 0,
-      "av": 8,
-      "skills": [
-        "Regeneration"
-      ],
-      "skill_categories": {
-        "normal": [
           "General"
         ],
         "double": [
-          "Agility",
-          "Strength",
-          "Passing"
+          "Devious",
+          "Passing",
+          "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Blitzer",
+        "Undead",
+        "Werewolf"
+      ]
     }
   ],
   "name_generator": "default",
-  "raised_position_id": "necromantic.zombie"
+  "raised_position_id": "necromantic.zombie",
+  "special_rules": [
+    "Masters of Undeath"
+  ]
 }

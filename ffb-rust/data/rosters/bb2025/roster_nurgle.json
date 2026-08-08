@@ -1,7 +1,7 @@
 {
   "id": "nurgle.lrb6",
   "name": "Nurgle",
-  "reroll_cost": 70000,
+  "reroll_cost": 60000,
   "max_rerolls": 8,
   "apothecary": false,
   "undead": false,
@@ -16,106 +16,123 @@
       "cost": 40000,
       "ma": 5,
       "st": 3,
-      "ag": 3,
+      "ag": 4,
       "pa": 6,
-      "av": 8,
-      "shorthand": "R",
+      "av": 9,
       "skills": [
         "Decay",
-        "Nurgle's Rot"
+        "Plague Ridden"
       ],
       "skill_categories": {
         "normal": [
           "General",
-          "Mutation"
+          "Mutation",
+          "Devious"
         ],
         "double": [
           "Agility",
-          "Strength",
-          "Passing"
+          "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Lineman",
+        "Human"
+      ]
     },
     {
       "id": "nurgle.pestigor",
       "name": "Pestigor",
       "display_name": "Pestigor",
       "type": "Regular",
-      "quantity": 4,
-      "cost": 80000,
+      "quantity": 2,
+      "cost": 70000,
       "ma": 6,
       "st": 3,
       "ag": 3,
       "pa": 4,
-      "av": 8,
-      "shorthand": "P",
+      "av": 9,
       "skills": [
         "Horns",
-        "Nurgle's Rot",
-        "Regeneration"
+        "Plague Ridden",
+        "Regeneration",
+        "Steady Footing",
+        "Thick Skull"
       ],
       "skill_categories": {
         "normal": [
           "General",
-          "Strength",
-          "Mutation"
+          "Mutation",
+          "Strength"
         ],
         "double": [
           "Agility",
-          "Passing"
+          "Passing",
+          "Devious"
         ]
-      }
+      },
+      "keywords": [
+        "Runner",
+        "Beastman"
+      ]
     },
     {
       "id": "nurgle.warrior",
       "name": "Nurgle Warrior",
-      "display_name": "Nurgle Warrior",
+      "display_name": "Bloater",
       "type": "Regular",
       "quantity": 4,
       "cost": 110000,
       "ma": 4,
       "st": 4,
-      "ag": 2,
+      "ag": 4,
       "pa": 6,
-      "av": 9,
-      "shorthand": "W",
+      "av": 10,
       "skills": [
         "Disturbing Presence",
         "Foul Appearance",
-        "Nurgle's Rot",
-        "Regeneration"
+        "Plague Ridden",
+        "Regeneration",
+        "Stand Firm",
+        "Unsteady"
       ],
       "skill_categories": {
         "normal": [
           "General",
-          "Strength",
-          "Mutation"
+          "Mutation",
+          "Strength"
         ],
         "double": [
           "Agility",
-          "Passing"
+          "Devious"
         ]
-      }
+      },
+      "keywords": [
+        "Blocker",
+        "Human"
+      ]
     },
     {
       "id": "nurgle.beast",
       "name": "Beast of Nurgle",
-      "display_name": "Beast of Nurgle",
+      "display_name": "Rotspawn",
       "type": "Big Guy",
       "quantity": 1,
       "cost": 140000,
       "ma": 4,
       "st": 5,
-      "ag": 1,
-      "pa": 0,
-      "av": 9,
-      "shorthand": "B",
+      "ag": 5,
+      "pa": 6,
+      "av": 10,
       "skills": [
         "Disturbing Presence",
         "Foul Appearance",
-        "Loner",
+        {
+          "name": "Loner",
+          "value": 4
+        },
         "Mighty Blow",
-        "Nurgle's Rot",
+        "Pick-me-up",
+        "Plague Ridden",
         "Really Stupid",
         "Regeneration",
         "Tentacles"
@@ -126,11 +143,14 @@
         ],
         "double": [
           "General",
-          "Agility",
-          "Passing",
-          "Mutation"
+          "Mutation",
+          "Devious"
         ]
-      }
+      },
+      "keywords": [
+        "Big Guy",
+        "Spawn"
+      ]
     }
   ],
   "raised_position_id": "nurgle.beast",
@@ -160,5 +180,9 @@
         "Wrestle"
       ]
     }
+  ],
+  "special_rules": [
+    "Favoured of Nurgle",
+    "Brawlin' Brutes"
   ]
 }

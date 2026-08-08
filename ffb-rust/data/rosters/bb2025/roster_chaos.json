@@ -1,7 +1,7 @@
 {
   "id": "chaos.lrb6",
   "name": "Chaos",
-  "reroll_cost": 60000,
+  "reroll_cost": 50000,
   "max_rerolls": 8,
   "apothecary": true,
   "undead": false,
@@ -10,35 +10,40 @@
     {
       "id": "chaos.beastman",
       "name": "Chaos Beastman",
-      "display_name": "Chaos Beastman",
+      "display_name": "Beastman Lineman",
       "type": "Regular",
-      "quantity": 12,
-      "cost": 60000,
+      "quantity": 16,
+      "cost": 55000,
       "ma": 6,
       "st": 3,
       "ag": 3,
-      "pa": 4,
-      "av": 8,
-      "shorthand": "B",
+      "pa": 3,
+      "av": 9,
       "skills": [
-        "Horns"
+        "Horns",
+        "Thick Skull"
       ],
       "skill_categories": {
         "normal": [
           "General",
-          "Strength",
           "Mutation"
         ],
         "double": [
           "Agility",
-          "Passing"
+          "Passing",
+          "Strength",
+          "Devious"
         ]
-      }
+      },
+      "keywords": [
+        "Lineman",
+        "Beastman"
+      ]
     },
     {
       "id": "chaos.warrior",
       "name": "Chaos Warrior",
-      "display_name": "Chaos Warrior",
+      "display_name": "Chaos Chosen",
       "type": "Regular",
       "quantity": 4,
       "cost": 100000,
@@ -46,19 +51,102 @@
       "st": 4,
       "ag": 3,
       "pa": 5,
-      "av": 9,
-      "shorthand": "W",
+      "av": 10,
+      "skills": [
+        "Arm Bar"
+      ],
       "skill_categories": {
         "normal": [
           "General",
-          "Strength",
-          "Mutation"
+          "Mutation",
+          "Strength"
         ],
         "double": [
           "Agility",
+          "Devious"
+        ]
+      },
+      "keywords": [
+        "Blocker",
+        "Human"
+      ]
+    },
+    {
+      "id": "chaos.troll",
+      "name": "Troll",
+      "display_name": "Troll",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 115000,
+      "ma": 4,
+      "st": 5,
+      "ag": 5,
+      "pa": 5,
+      "av": 10,
+      "skills": [
+        "Always Hungry",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Mighty Blow",
+        "Projectile Vomit",
+        "Really Stupid",
+        "Regeneration",
+        "Throw Team-mate"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Mutation",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General",
           "Passing"
         ]
-      }
+      },
+      "keywords": [
+        "Big Guy",
+        "Troll"
+      ]
+    },
+    {
+      "id": "chaos.ogre",
+      "name": "Ogre",
+      "display_name": "Ogre",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 140000,
+      "ma": 5,
+      "st": 5,
+      "ag": 4,
+      "pa": 5,
+      "av": 10,
+      "skills": [
+        "Bone Head",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-mate"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Mutation",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General"
+        ]
+      },
+      "keywords": [
+        "Big Guy",
+        "Ogre"
+      ]
     },
     {
       "id": "chaos.minotaur",
@@ -69,29 +157,38 @@
       "cost": 150000,
       "ma": 5,
       "st": 5,
-      "ag": 2,
-      "pa": 0,
-      "av": 8,
+      "ag": 4,
+      "pa": 6,
+      "av": 9,
       "skills": [
-        "Loner",
         "Frenzy",
         "Horns",
+        {
+          "name": "Loner",
+          "value": 4
+        },
         "Mighty Blow",
         "Thick Skull",
-        "Wild Animal"
+        "Unchannelled Fury"
       ],
       "skill_categories": {
         "normal": [
-          "Strength",
-          "Mutation"
+          "Mutation",
+          "Strength"
         ],
         "double": [
-          "General",
           "Agility",
-          "Passing"
+          "General"
         ]
-      }
+      },
+      "keywords": [
+        "Big Guy",
+        "Minotaur"
+      ]
     }
   ],
-  "name_generator": "default"
+  "name_generator": "default",
+  "special_rules": [
+    "Favoured of..."
+  ]
 }

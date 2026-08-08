@@ -8,42 +8,9 @@
   "necromancer": false,
   "positions": [
     {
-      "id": "halfling.treeman",
-      "name": "Treeman",
-      "display_name": "Treeman",
-      "type": "Big Guy",
-      "quantity": 2,
-      "cost": 120000,
-      "ma": 2,
-      "st": 6,
-      "ag": 1,
-      "pa": 5,
-      "av": 11,
-      "skills": [
-        "Loner",
-        "Mighty Blow",
-        "Stand Firm",
-        "Strong Arm",
-        "Take Root",
-        "Thick Skull",
-        "Throw Team-Mate",
-        "Multiple Block"
-      ],
-      "skill_categories": {
-        "normal": [
-          "Strength"
-        ],
-        "double": [
-          "General",
-          "Agility",
-          "Passing"
-        ]
-      }
-    },
-    {
       "id": "halfling.halfling",
       "name": "Halfling",
-      "display_name": "Halfling",
+      "display_name": "Halfling Hopeful",
       "type": "Regular",
       "quantity": 16,
       "cost": 30000,
@@ -51,15 +18,11 @@
       "st": 2,
       "ag": 3,
       "pa": 4,
-      "av": 6,
+      "av": 7,
       "skills": [
         "Dodge",
         "Right Stuff",
-        {
-          "name": "Hatred",
-          "value": "goblin;troll"
-        },
-        "Multiple Block"
+        "Stunty"
       ],
       "skill_categories": {
         "normal": [
@@ -68,9 +31,117 @@
         "double": [
           "General",
           "Strength",
-          "Passing"
+          "Devious"
         ]
-      }
+      },
+      "keywords": [
+        "Lineman",
+        "Halfling"
+      ]
+    },
+    {
+      "id": "halfling.halfling_hefty",
+      "name": "Halfling Hefty",
+      "display_name": "Halfling Hefty",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 50000,
+      "ma": 5,
+      "st": 2,
+      "ag": 3,
+      "pa": 3,
+      "av": 8,
+      "skills": [
+        "Dodge",
+        "Fend",
+        "Stunty"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "Passing"
+        ],
+        "double": [
+          "General",
+          "Strength",
+          "Devious"
+        ]
+      },
+      "keywords": [
+        "Blocker",
+        "Halfling"
+      ]
+    },
+    {
+      "id": "halfling.halfling_catcher",
+      "name": "Halfling Catcher",
+      "display_name": "Halfling Catcher",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 55000,
+      "ma": 5,
+      "st": 2,
+      "ag": 3,
+      "pa": 4,
+      "av": 7,
+      "skills": [
+        "Catch",
+        "Dodge",
+        "Right Stuff",
+        "Sprint",
+        "Stunty"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility"
+        ],
+        "double": [
+          "General",
+          "Strength",
+          "Devious"
+        ]
+      },
+      "keywords": [
+        "Catcher",
+        "Halfling"
+      ]
+    },
+    {
+      "id": "halfling.treeman",
+      "name": "Treeman",
+      "display_name": "Athel Forest Treeman",
+      "type": "Big Guy",
+      "quantity": 2,
+      "cost": 120000,
+      "ma": 2,
+      "st": 6,
+      "ag": 5,
+      "pa": 5,
+      "av": 11,
+      "skills": [
+        "Mighty Blow",
+        "Stand Firm",
+        "Strong Arm",
+        "Take Root",
+        "Thick Skull",
+        "Throw Team-mate",
+        "Timmm-ber!"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General",
+          "Passing",
+          "Devious"
+        ]
+      },
+      "keywords": [
+        "Big Guy",
+        "Treeman"
+      ]
     }
   ],
   "name_generator": "default",
@@ -103,5 +174,6 @@
         "Wrestle"
       ]
     }
-  ]
+  ],
+  "special_rules": []
 }

@@ -388,6 +388,8 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
             Some(WireDialog::StartGame),
         AgentPrompt::GameStatistics =>
             Some(WireDialog::GameStatistics),
+        // Parity-harness-only prompt (Phase TTM); no client dialog exists yet.
+        AgentPrompt::ThrowTeamMateTarget { .. } => None,
     }
 }
 

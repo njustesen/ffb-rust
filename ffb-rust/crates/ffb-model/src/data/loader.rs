@@ -372,6 +372,37 @@ mod tests {
         let _ = &*COMMON_SKILLS;
     }
 
+    /// Every starting skill in every per-edition roster JSON must resolve to a SkillId.
+    /// Both engines silently drop unresolvable skill names (Java SkillFactory.forName -> null,
+    /// Rust filter_map), which is how past parity bugs slipped in (Bone-head hyphen, No Hands).
+    /// The audited data (scripts/audit_rosters.py, 2026-08-08) must never contain a name the
+    /// engine cannot resolve. bb2016-only intentional drops for bb2025 are covered by the two
+    /// dedicated tests below; audited bb2025 rosters no longer contain those spellings at all.
+    #[test]
+    fn all_roster_starting_skills_resolve() {
+        use crate::enums::SkillId;
+        for (edition, rosters) in [
+            ("bb2016", bb2016_rosters()),
+            ("bb2020", bb2020_rosters()),
+            ("bb2025", bb2025_rosters()),
+        ] {
+            for roster in &rosters {
+                for pos in &roster.positions {
+                    if pos.player_type == "Star" || pos.player_type == "Infamous Staff" {
+                        continue;
+                    }
+                    for entry in &pos.skills {
+                        assert!(
+                            SkillId::from_class_name(entry.name()).is_some(),
+                            "{edition}/{}/{}: unresolvable skill {:?}",
+                            roster.name, pos.id, entry.name()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     /// Regression: bb2025 has NO NoHands skill class (only bb2016/bb2020 define it), so a bb2025
     /// roster's "No Hands" resolves to null in Java and is NOT applied. Rust must drop it for bb2025
     /// (else a No-Hands player wrongly gains preventCatch etc. — dwarf seed 8: a hand-off to the

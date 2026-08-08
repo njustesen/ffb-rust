@@ -10,7 +10,7 @@
     {
       "id": "chaosdwarf.hobgoblin",
       "name": "Hobgoblin",
-      "display_name": "Hobgoblin",
+      "display_name": "Hobgoblin Lineman",
       "type": "Regular",
       "quantity": 16,
       "cost": 40000,
@@ -18,33 +18,69 @@
       "st": 3,
       "ag": 3,
       "pa": 4,
-      "av": 7,
+      "av": 8,
+      "skills": [],
       "skill_categories": {
         "normal": [
+          "Devious"
+        ],
+        "double": [
+          "Agility",
+          "General",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Lineman",
+        "Goblin"
+      ]
+    },
+    {
+      "id": "chaosdwarf.sneaky_stabba",
+      "name": "Sneaky Stabba",
+      "display_name": "Sneaky Stabba",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 60000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 5,
+      "av": 8,
+      "skills": [
+        "Shadowing",
+        "Stab"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Devious",
           "General"
         ],
         "double": [
           "Agility",
-          "Strength",
-          "Passing"
+          "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Special",
+        "Goblin"
+      ]
     },
     {
       "id": "chaosdwarf.blocker",
       "name": "Chaos Dwarf Blocker",
       "display_name": "Chaos Dwarf Blocker",
       "type": "Regular",
-      "quantity": 6,
+      "quantity": 4,
       "cost": 70000,
       "ma": 4,
       "st": 3,
-      "ag": 2,
+      "ag": 4,
       "pa": 6,
-      "av": 9,
+      "av": 10,
       "skills": [
         "Block",
-        "Tackle",
+        "Iron Hard Skin",
         "Thick Skull"
       ],
       "skill_categories": {
@@ -54,10 +90,48 @@
         ],
         "double": [
           "Agility",
-          "Passing",
+          "Devious",
           "Mutation"
         ]
-      }
+      },
+      "keywords": [
+        "Blocker",
+        "Dwarf"
+      ]
+    },
+    {
+      "id": "chaosdwarf.flamesmith",
+      "name": "Flamesmith",
+      "display_name": "Flamesmith",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 80000,
+      "ma": 5,
+      "st": 3,
+      "ag": 4,
+      "pa": 6,
+      "av": 10,
+      "skills": [
+        "Brawler",
+        "Breathe Fire",
+        "Disturbing Presence",
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Devious",
+          "Mutation"
+        ]
+      },
+      "keywords": [
+        "Special",
+        "Dwarf"
+      ]
     },
     {
       "id": "chaosdwarf.bullcentaur",
@@ -68,13 +142,14 @@
       "cost": 130000,
       "ma": 6,
       "st": 4,
-      "ag": 2,
+      "ag": 4,
       "pa": 6,
-      "av": 9,
+      "av": 10,
       "skills": [
         "Sprint",
         "Sure Feet",
-        "Thick Skull"
+        "Thick Skull",
+        "Unsteady"
       ],
       "skill_categories": {
         "normal": [
@@ -83,9 +158,14 @@
         ],
         "double": [
           "Agility",
-          "Passing"
+          "Devious",
+          "Mutation"
         ]
-      }
+      },
+      "keywords": [
+        "Blitzer",
+        "Dwarf"
+      ]
     },
     {
       "id": "chaosdwarf.minotaur",
@@ -96,29 +176,38 @@
       "cost": 150000,
       "ma": 5,
       "st": 5,
-      "ag": 2,
-      "pa": 0,
-      "av": 8,
+      "ag": 4,
+      "pa": 6,
+      "av": 9,
       "skills": [
-        "Loner",
         "Frenzy",
         "Horns",
+        {
+          "name": "Loner",
+          "value": 4
+        },
         "Mighty Blow",
         "Thick Skull",
-        "Wild Animal"
+        "Unchannelled Fury"
       ],
       "skill_categories": {
         "normal": [
+          "Mutation",
           "Strength"
         ],
         "double": [
-          "General",
           "Agility",
-          "Passing",
-          "Mutation"
+          "General"
         ]
-      }
+      },
+      "keywords": [
+        "Big Guy",
+        "Minotaur"
+      ]
     }
   ],
-  "name_generator": "default"
+  "name_generator": "default",
+  "special_rules": [
+    "Favoured of Hashut"
+  ]
 }

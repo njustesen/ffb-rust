@@ -21,16 +21,9 @@
       "av": 9,
       "shorthand": "RO",
       "skills": [
-        "Animal Savagery",
         "Frenzy",
-        {
-          "name": "Loner",
-          "value": 4
-        },
-        {
-          "name": "Mighty Blow",
-          "value": 1
-        },
+        "Loner",
+        "Mighty Blow",
         "Prehensile Tail"
       ],
       "skill_categories": {
@@ -61,10 +54,7 @@
         "Dodge",
         "Right Stuff",
         "Stunty",
-        {
-          "name": "Animosity",
-          "value": "Skaven"
-        }
+        "Animosity"
       ],
       "skill_categories": {
         "normal": [
@@ -92,10 +82,7 @@
       "av": 7,
       "shorthand": "L",
       "skills": [
-        {
-          "name": "Animosity",
-          "value": "underworld.skaven.thrower;underworld.troll.warpstone"
-        }
+        "Animosity"
       ],
       "skill_categories": {
         "normal": [
@@ -123,10 +110,7 @@
       "av": 7,
       "shorthand": "T",
       "skills": [
-        {
-          "name": "Animosity",
-          "value": "All"
-        },
+        "Animosity",
         "Pass",
         "Sure Hands"
       ],

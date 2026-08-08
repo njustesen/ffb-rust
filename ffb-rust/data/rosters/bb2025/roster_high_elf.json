@@ -10,104 +10,124 @@
     {
       "id": "highelf.lineman",
       "name": "Lineman",
-      "display_name": "Lineman",
+      "display_name": "High Elf Lineman",
       "type": "Regular",
       "quantity": 16,
-      "cost": 70000,
+      "cost": 65000,
       "ma": 6,
       "st": 3,
-      "ag": 4,
-      "pa": 4,
-      "av": 8,
+      "ag": 2,
+      "pa": 3,
+      "av": 9,
+      "skills": [],
       "skill_categories": {
         "normal": [
-          "General",
-          "Agility"
+          "Agility",
+          "General"
         ],
         "double": [
-          "Strength",
-          "Passing"
+          "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Lineman",
+        "Elf"
+      ]
     },
     {
-      "id": "highelf.thrower",
-      "name": "Thrower",
-      "display_name": "Thrower",
+      "id": "highelf.phoenix_warrior",
+      "name": "Phoenix Warrior",
+      "display_name": "Phoenix Warrior",
       "type": "Regular",
       "quantity": 2,
       "cost": 90000,
       "ma": 6,
       "st": 3,
-      "ag": 4,
+      "ag": 2,
       "pa": 2,
-      "av": 8,
+      "av": 9,
       "skills": [
+        "Cloud Burster",
         "Pass",
-        "Safe Throw"
+        "Safe Pass"
       ],
       "skill_categories": {
         "normal": [
-          "General",
           "Agility",
+          "General",
           "Passing"
         ],
         "double": [
           "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Thrower",
+        "Elf"
+      ]
     },
     {
-      "id": "highelf.blitzer",
-      "name": "Blitzer",
-      "display_name": "Blitzer",
+      "id": "highelf.dragon_prince",
+      "name": "Dragon Prince",
+      "display_name": "Dragon Prince",
       "type": "Regular",
       "quantity": 2,
-      "cost": 100000,
-      "ma": 7,
-      "st": 3,
-      "ag": 4,
-      "pa": 4,
-      "av": 8,
-      "skills": [
-        "Block"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Agility"
-        ],
-        "double": [
-          "Strength",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "highelf.catcher",
-      "name": "Catcher",
-      "display_name": "Catcher",
-      "type": "Regular",
-      "quantity": 4,
-      "cost": 90000,
+      "cost": 110000,
       "ma": 8,
       "st": 3,
-      "ag": 4,
-      "pa": 5,
-      "av": 7,
+      "ag": 2,
+      "pa": 4,
+      "av": 9,
       "skills": [
-        "Catch"
+        "Block",
+        "My Ball",
+        "Steady Footing"
       ],
       "skill_categories": {
         "normal": [
-          "General",
-          "Agility"
+          "Agility",
+          "General"
         ],
         "double": [
-          "Strength",
-          "Passing"
+          "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Blitzer",
+        "Elf",
+        "Runner"
+      ]
+    },
+    {
+      "id": "highelf.white_lion",
+      "name": "White Lion",
+      "display_name": "White Lion",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 110000,
+      "ma": 7,
+      "st": 3,
+      "ag": 2,
+      "pa": 3,
+      "av": 9,
+      "skills": [
+        "Claws",
+        "Wrestle"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General"
+        ],
+        "double": [
+          "Passing",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Blitzer",
+        "Elf"
+      ]
     }
   ],
   "infamous_staff": [
@@ -136,5 +156,6 @@
         "Wrestle"
       ]
     }
-  ]
+  ],
+  "special_rules": []
 }

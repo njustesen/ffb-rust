@@ -8,124 +8,124 @@
   "necromancer": false,
   "positions": [
     {
-      "id": "37844",
-      "name": "Mutant Rat Ogre",
-      "display_name": "Mutant Rat Ogre",
-      "type": "Big Guy",
-      "quantity": 2,
-      "cost": 150000,
-      "ma": 6,
-      "st": 5,
-      "ag": 4,
-      "pa": 0,
-      "av": 9,
-      "shorthand": "RO",
-      "skills": [
-        "Animal Savagery",
-        "Frenzy",
-        {
-          "name": "Loner",
-          "value": 4
-        },
-        {
-          "name": "Mighty Blow",
-          "value": 1
-        },
-        "Prehensile Tail"
-      ],
-      "skill_categories": {
-        "normal": [
-          "Strength",
-          "Mutation"
-        ],
-        "double": [
-          "General",
-          "Agility"
-        ]
-      }
-    },
-    {
       "id": "underworld.goblin",
       "name": "Underworld Goblin",
-      "display_name": "Underworld Goblin",
+      "display_name": "Goblin Lineman",
       "type": "Regular",
-      "quantity": 12,
+      "quantity": 16,
       "cost": 40000,
       "ma": 6,
       "st": 2,
       "ag": 3,
       "pa": 4,
-      "av": 7,
-      "shorthand": "G",
+      "av": 8,
       "skills": [
         "Dodge",
         "Right Stuff",
-        "Stunty",
-        {
-          "name": "Animosity",
-          "value": "Skaven"
-        }
+        "Stunty"
       ],
       "skill_categories": {
         "normal": [
           "Agility",
+          "Devious",
           "Mutation"
         ],
         "double": [
           "General",
-          "Strength",
-          "Passing"
+          "Passing",
+          "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Goblin",
+        "Lineman"
+      ]
+    },
+    {
+      "id": "underworld.snotling_lineman",
+      "name": "Snotling Lineman",
+      "display_name": "Snotling Lineman",
+      "type": "Regular",
+      "quantity": 6,
+      "cost": 15000,
+      "ma": 5,
+      "st": 1,
+      "ag": 3,
+      "pa": 4,
+      "av": 6,
+      "skills": [
+        "Dodge",
+        "Insignificant",
+        "Right Stuff",
+        "Sidestep",
+        "Stunty",
+        "Titchy"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "Devious",
+          "Mutation"
+        ],
+        "double": [
+          "General"
+        ]
+      },
+      "keywords": [
+        "Lineman",
+        "Snotling"
+      ]
     },
     {
       "id": "underworld.skaven.lineman",
       "name": "Skaven Lineman",
-      "display_name": "Skaven Lineman",
+      "display_name": "Skaven Clanrat",
       "type": "Regular",
-      "quantity": 16,
+      "quantity": 3,
       "cost": 50000,
       "ma": 7,
       "st": 3,
       "ag": 3,
       "pa": 4,
-      "av": 7,
-      "shorthand": "L",
+      "av": 8,
       "skills": [
         {
           "name": "Animosity",
-          "value": "underworld.skaven.thrower;underworld.troll.warpstone"
+          "value": "goblin"
         }
       ],
       "skill_categories": {
         "normal": [
           "General",
-          "Mutation"
+          "Mutation",
+          "Devious"
         ],
         "double": [
           "Agility",
-          "Strength",
-          "Passing"
+          "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Lineman",
+        "Skaven"
+      ]
     },
     {
       "id": "underworld.skaven.thrower",
       "name": "Skaven Thrower",
       "display_name": "Skaven Thrower",
       "type": "Regular",
-      "quantity": 2,
-      "cost": 70000,
+      "quantity": 1,
+      "cost": 80000,
       "ma": 7,
       "st": 3,
       "ag": 3,
       "pa": 2,
-      "av": 7,
-      "shorthand": "T",
+      "av": 8,
       "skills": [
         {
           "name": "Animosity",
-          "value": "All"
+          "value": "goblin"
         },
         "Pass",
         "Sure Hands"
@@ -133,77 +133,172 @@
       "skill_categories": {
         "normal": [
           "General",
-          "Passing",
-          "Mutation"
+          "Mutation",
+          "Passing"
         ],
         "double": [
           "Agility",
+          "Devious",
           "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Skaven",
+        "Thrower"
+      ]
+    },
+    {
+      "id": "underworld.gutter_runner",
+      "name": "Gutter Runner",
+      "display_name": "Gutter Runner",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 85000,
+      "ma": 9,
+      "st": 2,
+      "ag": 2,
+      "pa": 4,
+      "av": 8,
+      "skills": [
+        {
+          "name": "Animosity",
+          "value": "goblin"
+        },
+        "Dodge",
+        "Stab"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General",
+          "Mutation",
+          "Devious"
+        ],
+        "double": [
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Runner",
+        "Skaven"
+      ]
     },
     {
       "id": "underworld.skaven.blitzer",
       "name": "Skaven Blitzer",
       "display_name": "Skaven Blitzer",
       "type": "Regular",
-      "quantity": 2,
+      "quantity": 1,
       "cost": 90000,
-      "ma": 7,
+      "ma": 8,
       "st": 3,
       "ag": 3,
-      "pa": 5,
-      "av": 8,
-      "shorthand": "B",
+      "pa": 4,
+      "av": 9,
       "skills": [
-        "Animosity",
-        "Block"
+        {
+          "name": "Animosity",
+          "value": "goblin"
+        },
+        "Block",
+        "Strip Ball"
       ],
       "skill_categories": {
         "normal": [
           "General",
-          "Strength",
-          "Mutation"
+          "Mutation",
+          "Strength"
         ],
         "double": [
           "Agility",
           "Passing"
         ]
-      }
+      },
+      "keywords": [
+        "Blitzer",
+        "Skaven"
+      ]
     },
     {
       "id": "underworld.troll.warpstone",
       "name": "Warpstone Troll",
-      "display_name": "Warpstone Troll",
+      "display_name": "Troll",
       "type": "Big Guy",
-      "quantity": 2,
-      "cost": 110000,
+      "quantity": 1,
+      "cost": 115000,
       "ma": 4,
       "st": 5,
-      "ag": 1,
+      "ag": 5,
       "pa": 5,
-      "av": 9,
-      "shorthand": "WT",
+      "av": 10,
       "skills": [
         "Always Hungry",
-        "Loner",
+        {
+          "name": "Loner",
+          "value": 4
+        },
         "Mighty Blow",
+        "Projectile Vomit",
         "Really Stupid",
         "Regeneration",
-        "Throw Team-Mate"
+        "Throw Team-mate"
       ],
       "skill_categories": {
         "normal": [
-          "Strength",
-          "Mutation"
+          "Mutation",
+          "Strength"
         ],
         "double": [
-          "General",
           "Agility",
+          "General",
           "Passing"
         ]
-      }
+      },
+      "keywords": [
+        "Big Guy",
+        "Troll"
+      ]
+    },
+    {
+      "id": "37844",
+      "name": "Mutant Rat Ogre",
+      "display_name": "Rat Ogre",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 6,
+      "st": 5,
+      "ag": 4,
+      "pa": 6,
+      "av": 9,
+      "skills": [
+        "Animal Savagery",
+        "Frenzy",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Mighty Blow",
+        "Prehensile Tail"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Mutation",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General"
+        ]
+      },
+      "keywords": [
+        "Big Guy",
+        "Skaven"
+      ]
     }
   ],
-  "max_big_guys": 2
+  "max_big_guys": 2,
+  "special_rules": [
+    "Bribery and Corruption"
+  ]
 }

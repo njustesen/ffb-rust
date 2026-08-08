@@ -21,7 +21,7 @@
       "av": 9,
       "skills": [
         "Loner",
-        "bone head",
+        "Bone-Head",
         "Mighty Blow",
         "Prehensile Tail",
         "Thick Skull"
@@ -59,7 +59,8 @@
           "Agility",
           "Passing"
         ]
-      }
+      },
+      "skills": []
     },
     {
       "id": "lizardman.skink",

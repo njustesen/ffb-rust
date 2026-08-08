@@ -21,16 +21,9 @@
       "av": 9,
       "shorthand": "RO",
       "skills": [
-        "Animal Savagery",
         "Frenzy",
-        {
-          "name": "Loner",
-          "value": 4
-        },
-        {
-          "name": "Mighty Blow",
-          "value": 1
-        },
+        "Loner",
+        "Mighty Blow",
         "Prehensile Tail"
       ],
       "skill_categories": {
@@ -58,15 +51,9 @@
       "av": 10,
       "shorthand": "O",
       "skills": [
-        "Bone Head",
-        {
-          "name": "Loner",
-          "value": 4
-        },
-        {
-          "name": "Mighty Blow",
-          "value": 1
-        },
+        "Bone-Head",
+        "Loner",
+        "Mighty Blow",
         "Thick Skull",
         "Throw Team-mate"
       ],
@@ -96,15 +83,8 @@
       "shorthand": "T",
       "skills": [
         "Always Hungry",
-        {
-          "name": "Loner",
-          "value": 4
-        },
-        {
-          "name": "Mighty Blow",
-          "value": 1
-        },
-        "Projectile Vomit",
+        "Loner",
+        "Mighty Blow",
         "Really Stupid",
         "Regeneration",
         "Throw Team-mate"
@@ -134,10 +114,7 @@
       "av": 9,
       "shorthand": "DE",
       "skills": [
-        {
-          "name": "Animosity",
-          "value": "All"
-        }
+        "Animosity"
       ],
       "skill_categories": {
         "normal": [
@@ -165,12 +142,8 @@
       "av": 9,
       "shorthand": "T",
       "skills": [
-        {
-          "name": "Animosity",
-          "value": "All"
-        },
-        "Pass",
-        "Safe Pair of Hands"
+        "Animosity",
+        "Pass"
       ],
       "skill_categories": {
         "normal": [
@@ -198,10 +171,7 @@
       "av": 10,
       "shorthand": "O",
       "skills": [
-        {
-          "name": "Animosity",
-          "value": "All"
-        }
+        "Animosity"
       ],
       "skill_categories": {
         "normal": [
@@ -228,10 +198,7 @@
       "av": 8,
       "shorthand": "S",
       "skills": [
-        {
-          "name": "Animosity",
-          "value": "All"
-        }
+        "Animosity"
       ],
       "skill_categories": {
         "normal": [
@@ -258,10 +225,7 @@
       "av": 8,
       "shorthand": "G",
       "skills": [
-        {
-          "name": "Animosity",
-          "value": "All"
-        },
+        "Animosity",
         "Dodge",
         "Right Stuff",
         "Stunty"
@@ -299,7 +263,8 @@
           "Agility",
           "Strength"
         ]
-      }
+      },
+      "skills": []
     },
     {
       "id": "37732",
@@ -317,16 +282,9 @@
       "skills": [
         "Frenzy",
         "Horns",
-        {
-          "name": "Loner",
-          "value": 4
-        },
-        {
-          "name": "Mighty Blow",
-          "value": 1
-        },
-        "Thick Skull",
-        "Unchannelled Fury"
+        "Loner",
+        "Mighty Blow",
+        "Thick Skull"
       ],
       "skill_categories": {
         "normal": [

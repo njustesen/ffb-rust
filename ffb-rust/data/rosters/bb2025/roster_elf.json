@@ -10,105 +10,125 @@
     {
       "id": "elf.lineman",
       "name": "Lineman",
-      "display_name": "Lineman",
+      "display_name": "Elf Lineman",
       "type": "Regular",
       "quantity": 16,
-      "cost": 60000,
+      "cost": 65000,
       "ma": 6,
       "st": 3,
-      "ag": 4,
-      "pa": 4,
-      "av": 7,
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Agility"
-        ],
-        "double": [
-          "Strength",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "elf.catcher",
-      "name": "Catcher",
-      "display_name": "Catcher",
-      "type": "Regular",
-      "quantity": 4,
-      "cost": 100000,
-      "ma": 8,
-      "st": 3,
-      "ag": 4,
-      "pa": 4,
-      "av": 7,
+      "ag": 2,
+      "pa": 3,
+      "av": 8,
       "skills": [
-        "Catch",
-        "Nerves of Steel"
+        "Fumblerooski"
       ],
       "skill_categories": {
         "normal": [
-          "General",
-          "Agility"
+          "Agility",
+          "General"
         ],
         "double": [
-          "Strength",
-          "Passing"
+          "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Lineman",
+        "Elf"
+      ]
     },
     {
       "id": "elf.thrower",
       "name": "Thrower",
-      "display_name": "Thrower",
+      "display_name": "Elf Thrower",
       "type": "Regular",
       "quantity": 2,
-      "cost": 70000,
+      "cost": 75000,
       "ma": 6,
       "st": 3,
-      "ag": 4,
+      "ag": 2,
       "pa": 2,
-      "av": 7,
+      "av": 8,
       "skills": [
+        "Hail Mary Pass",
         "Pass"
       ],
       "skill_categories": {
         "normal": [
-          "General",
           "Agility",
+          "General",
           "Passing"
         ],
         "double": [
           "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Thrower",
+        "Elf"
+      ]
+    },
+    {
+      "id": "elf.catcher",
+      "name": "Catcher",
+      "display_name": "Elf Catcher",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 100000,
+      "ma": 8,
+      "st": 3,
+      "ag": 2,
+      "pa": 4,
+      "av": 8,
+      "skills": [
+        "Catch",
+        "Diving Catch",
+        "Nerves of Steel"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General"
+        ],
+        "double": [
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Catcher",
+        "Elf"
+      ]
     },
     {
       "id": "elf.blitzer",
       "name": "Blitzer",
-      "display_name": "Blitzer",
+      "display_name": "Elf Blitzer",
       "type": "Regular",
       "quantity": 2,
-      "cost": 110000,
+      "cost": 115000,
       "ma": 7,
       "st": 3,
-      "ag": 4,
+      "ag": 2,
       "pa": 3,
-      "av": 8,
+      "av": 9,
       "skills": [
         "Block",
-        "Side Step"
+        "Sidestep"
       ],
       "skill_categories": {
         "normal": [
-          "General",
-          "Agility"
+          "Agility",
+          "General"
         ],
         "double": [
-          "Strength",
-          "Passing"
+          "Passing",
+          "Strength"
         ]
-      }
+      },
+      "keywords": [
+        "Blitzer",
+        "Elf"
+      ]
     }
-  ]
+  ],
+  "special_rules": []
 }
