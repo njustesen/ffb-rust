@@ -106,7 +106,16 @@ impl StepHitAndRun {
                 for c in &eligible_squares {
                     game.field_model.add_move_square(MoveSquare::new(*c, 0, 0));
                 }
-                return StepOutcome::cont();
+                // Java: waits for CLIENT_MOVE / CLIENT_END_TURN in HIT_AND_RUN mode. Surface the
+                // wait as an AgentPrompt so a headless agent has a signal (a bare cont() with no
+                // prompt reads as a stall to the parity harness).
+                let player_id = game.acting_player.player_id.clone().unwrap_or_default();
+                return StepOutcome::cont().with_prompt(
+                    ffb_model::prompts::AgentPrompt::HitAndRun {
+                        player_id,
+                        squares: eligible_squares,
+                    },
+                );
             } else {
                 // Move the player
                 let mut hit_and_run_event: Option<GameEvent> = None;

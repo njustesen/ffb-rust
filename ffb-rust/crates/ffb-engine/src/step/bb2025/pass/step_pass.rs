@@ -191,6 +191,10 @@ impl StepPass {
             vec![]
         };
 
+        if std::env::var("FFB_TRACE").is_ok() {
+            eprintln!("RUST_STEPPASS thrower={:?} action={:?} pass_coord={:?} thrower_coord={:?} dist={:?} roll={}",
+                game.thrower_id, game.thrower_action, game.pass_coordinate, thrower_coord, passing_dist, self.roll);
+        }
         // Roll if not yet rolled (roll=0 means fresh)
         if self.roll == 0 {
             // Java: publishParameter(from(PASSING_DISTANCE, passingDistance))
@@ -306,8 +310,27 @@ impl StepPass {
                     .publish(StepParameter::PassAccurate(!is_bomb))
             }
             PassResult::SAVED_FUMBLE => {
-                // Java: handleSafePass → usingSafePass dialog / goto goToLabelOnSavedFumble
-                // client-only: Safe Pass (dontDropFumbles) dialog — headless auto-skips, ball stays with thrower
+                // Java: SAVED_FUMBLE routes through the SAME re-roll offers as FUMBLE — the
+                // reroll block precedes handleFailedPass/handleSafePass, so a Pass-skill
+                // re-roll can roll the fumble away entirely before Safe Pass is consulted
+                // (amazon seed 34 i=45: roll 1 → auto Pass re-roll 5 → ACCURATE → catch).
+                if !already_rerolled {
+                    if let Some(source) = find_skill_reroll_source(game, "PASS") {
+                        self.re_rolled_action = Some("PASS".into());
+                        self.re_roll_source = Some(source.name.clone());
+                        return self.execute_step(game, rng);
+                    }
+                    if let Some(prompt) = ask_for_reroll_if_available(game, "PASS", self.minimum_roll, true) {
+                        self.re_rolled_action = Some("PASS".into());
+                        self.re_roll_source = Some("TRR".into());
+                        let mut out = StepOutcome::cont().with_prompt(prompt);
+                        if let Some(ev) = roll_event { out = out.with_event(ev); }
+                        return out;
+                    }
+                }
+                // Java: handleSafePass → usingSafePass dialog (ParityRunner SKILL_USE =
+                // always use, 0 rng) → markSkillUsed(safePass), ball stays with the
+                // thrower, goto goToLabelOnSavedFumble.
                 if is_bomb {
                     game.field_model.bomb_coordinate = None;
                     game.field_model.bomb_moving = false;

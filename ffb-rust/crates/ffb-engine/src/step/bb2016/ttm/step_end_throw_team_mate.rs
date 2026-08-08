@@ -99,7 +99,7 @@ impl Step for StepEndThrowTeamMate {
                     pushes: vec![select_seq],
                     events: vec![],
                     prompt: None,
-                    clear_stack: false,
+                    clear_stack: false, push_self: false
                 };
             }
             _ => {}

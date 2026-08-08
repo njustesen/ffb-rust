@@ -381,6 +381,9 @@ impl DriverStepStack {
         for s in seq.into_iter().rev() { self.steps.push(seq_step_to_driver_entry(s)); }
     }
     pub fn pop(&mut self) -> Option<DriverStepEntry> { self.steps.pop() }
+    /// Insert an entry at an absolute stack position (0 = bottom). Used by the driver's
+    /// `push_self` handling to slot the current instance BELOW freshly pushed sequences.
+    pub fn insert(&mut self, index: usize, entry: DriverStepEntry) { self.steps.insert(index, entry); }
     pub fn peek(&self) -> Option<&DriverStepEntry> { self.steps.last() }
     pub fn len(&self) -> usize { self.steps.len() }
     pub fn is_empty(&self) -> bool { self.steps.is_empty() }
@@ -576,12 +579,27 @@ impl DriverGameState {
         }
     }
 
+    /// Java `pushCurrentStepOnStack()` (StepOutcome::push_self): re-insert the CURRENT step
+    /// instance (fields intact) BELOW the sequences the same outcome pushed, so it resumes
+    /// after they finish. `apply_effects` has already pushed `outcome.pushes` on top of the
+    /// stack, so the instance is inserted underneath those freshly pushed entries.
+    fn apply_push_self(&mut self, entry: DriverStepEntry, pushed_len: usize) {
+        let insert_at = self.stack.len().saturating_sub(pushed_len);
+        self.stack.insert(insert_at, entry);
+    }
+
     pub fn apply_action(&mut self, action: Action) {
         let mut entry = self.current.take().expect("apply_action() with no waiting step");
         let mut outcome = entry.step.handle_command(&action, &mut self.game, &mut self.rng);
+        let pushed_len: usize = outcome.pushes.iter().map(|s| s.len()).sum();
         self.apply_effects(&mut entry, &mut outcome);
         self.pending_prompt = None;
-        self.dispatch(entry, action, outcome);
+        if outcome.push_self {
+            self.apply_push_self(entry, pushed_len);
+            self.waiting_for_command = false;
+        } else {
+            self.dispatch(entry, action, outcome);
+        }
         self.drive();
     }
 
@@ -622,15 +640,27 @@ impl DriverGameState {
                     // Same as apply_action: a forwarded command's outcome carries events, pushed
                     // sequences, and published parameters too — dropping them silently diverged
                     // from every other dispatch path.
+                    let pushed_len: usize = o.pushes.iter().map(|s| s.len()).sum();
                     self.apply_effects(&mut entry, &mut o);
-                    self.dispatch(entry, cmd, o);
+                    if o.push_self {
+                        self.apply_push_self(entry, pushed_len);
+                        self.waiting_for_command = false;
+                    } else {
+                        self.dispatch(entry, cmd, o);
+                    }
                     if self.pending_prompt.is_some() || self.waiting_for_command { return; }
                     continue;
                 }
                 None => entry.step.start(&mut self.game, &mut self.rng),
             };
+            let pushed_len: usize = outcome.pushes.iter().map(|s| s.len()).sum();
             self.apply_effects(&mut entry, &mut outcome);
-            self.dispatch_after_start(entry, outcome);
+            if outcome.push_self {
+                self.apply_push_self(entry, pushed_len);
+                self.waiting_for_command = false;
+            } else {
+                self.dispatch_after_start(entry, outcome);
+            }
             if self.pending_prompt.is_some() || self.waiting_for_command { return; }
         }
     }

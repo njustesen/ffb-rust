@@ -318,7 +318,7 @@ impl StepInitMoving {
                     StepParameter::CoordinateFrom(coordinate_from),
                     StepParameter::CoordinateTo(coordinate_to),
                 ],
-                clear_stack: false,
+                clear_stack: false, push_self: false
             };
         }
         // A Vampire overcome by Blood Lust (failed the roll this activation) takes NO move: Java's

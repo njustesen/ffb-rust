@@ -39,6 +39,11 @@ pub struct RandomAgent {
     /// Players skipped this turn because they are inactive (just recovered from STUNNED).
     /// Mirrors Java ParityRunner's `usedThisTurn` for rejected-inactive picks.
     used_this_turn: HashSet<String>,
+    /// Mirrors Java ParityRunner's `justDeselected`: set when a non-Regular mini-turn
+    /// (PASS_BLOCK, kickoff Blitz, …) hits its one-activation limit; the NEXT phase-1
+    /// activation prompt then EndTurns immediately (consuming no picks) and clears the
+    /// used-set — Java `while(true) { if (remaining.isEmpty() || justDeselected) … }`.
+    just_deselected: bool,
     /// Turn key (half, turn_nr, home_playing) — detects when a new turn starts so we can
     /// clear `used_this_turn`.
     last_turn_key: Option<(i32, i32, bool)>,
@@ -80,6 +85,7 @@ impl RandomAgent {
             decision_rng: Xoshiro256StarStar::seed_from_u64(game_seed ^ 0xDEAD_BEEF_CAFE_0001),
             action_rng: Xoshiro256StarStar::seed_from_u64(game_seed ^ 0xC0FFEE_ACE0_0001),
             used_this_turn: HashSet::new(),
+            just_deselected: false,
             last_turn_key: None,
             eligible_this_turn: Vec::new(),
             action_rng_count: 0,
@@ -97,6 +103,7 @@ impl RandomAgent {
             decision_rng: Xoshiro256StarStar::seed_from_u64(seed),
             action_rng: Xoshiro256StarStar::seed_from_u64(seed ^ 0xC0FFEE_ACE0_0001),
             used_this_turn: HashSet::new(),
+            just_deselected: false,
             last_turn_key: None,
             eligible_this_turn: Vec::new(),
             action_rng_count: 0,
@@ -177,12 +184,28 @@ impl Agent for RandomAgent {
                 } else {
                     gs.game.turn_data_away.turn_nr
                 };
+                // Java ParityRunner: `if (turn < 1) { inject EndTurn; break; }` — BEFORE the
+                // turn-key update. Fires when a pass-block window opens for a team that has
+                // not started a turn this half yet (counter still 0): the window closes with
+                // zero movers and zero rng draws (amazon seed 1 i=173, home10's pass while
+                // away's half-2 counter was 0).
+                if turn_nr < 1 {
+                    return Action::EndTurn;
+                }
                 let turn_key = (gs.game.half, turn_nr, gs.game.home_playing);
                 if self.last_turn_key != Some(turn_key) {
                     self.last_turn_key = Some(turn_key);
                     self.used_this_turn.clear();
                     // Java: eligibleThisTurn = computeEligiblePlayers(game) — snapshot once at turn start.
                     self.eligible_this_turn = eligible_players.clone();
+                }
+                // Java ParityRunner: non-Regular modes (PASS_BLOCK, kickoff Blitz!, QuickSnap)
+                // allow ONE activation, then EndTurn with justDeselected set.
+                if gs.game.turn_mode != ffb_model::enums::TurnMode::Regular
+                    && !self.used_this_turn.is_empty()
+                {
+                    self.just_deselected = true;
+                    return Action::EndTurn;
                 }
                 // Pick from the turn-start snapshot (Java `eligibleThisTurn`), NOT the engine's live
                 // per-activation list, so an action offered at turn start (e.g. BLITZ) survives even if
@@ -200,7 +223,13 @@ impl Agent for RandomAgent {
 
                 // Inactive-skip loop (mirrors Java ParityRunner while(true) pick loop).
                 let (player_id, actions) = loop {
-                    if remaining.is_empty() {
+                    // Java: `if (remaining.isEmpty() || justDeselected) { justDeselected = false;
+                    // usedThisTurn.clear(); inject EndTurn; }` — the justDeselected follow-on
+                    // also ends the ORIGINAL team's turn right after a pass-block window closes
+                    // (the pass was that turn's last processed activation in Java).
+                    if remaining.is_empty() || self.just_deselected {
+                        self.just_deselected = false;
+                        self.used_this_turn.clear();
                         return Action::EndTurn;
                     }
                     let pick = self.pick(remaining.len()); // consumes 1 decisionRng
@@ -402,6 +431,13 @@ impl Agent for RandomAgent {
                 if std::env::var("FFB_TRACE").is_ok() {
                     eprintln!("RUST_SMA pid={} N={}", player_id, squares.len());
                 }
+                // Pass-block window (On The Ball): Java's engine flow never re-presents
+                // INIT_SELECTING phase 2 for the window mover, so ParityRunner's INIT_MOVING
+                // handler deselects immediately — the mover activates but never moves and no
+                // target is drawn (amazon seeds 8/11: the OTB defender stays put in Java).
+                if gs.game.turn_mode == ffb_model::enums::TurnMode::PassBlock {
+                    return Action::EndPlayerAction;
+                }
                 // A blitz block reaches the follow-up Move/INIT_MOVING prompt; the stock harness
                 // always deselects there, so mark the blitzer as already moved and fall through
                 // to the always-deselect check below.
@@ -512,6 +548,12 @@ impl Agent for RandomAgent {
             // declines this SKILL_USE the same way it declines DumpOff.
             Some(AgentPrompt::SkillUse { skill_name, .. }) if skill_name == "PrimalSavagery" =>
                 Action::UseSkill { skill_id: SkillId::PrimalSavagery, use_skill: false },
+            // Hit And Run (BB2025): Java ParityRunner answers the SKILL_USE dialog with
+            // always-use (contract §7). StepEndBlocking dispatches by the SENT skill's
+            // canMoveAfterBlock property, so the generic Block placeholder would be ignored
+            // and the dialog would refire forever — echo the real skill.
+            Some(AgentPrompt::SkillUse { skill_name, .. }) if skill_name == "HitAndRun" =>
+                Action::UseSkill { skill_id: SkillId::HitAndRun, use_skill: true },
             // Skill use: AGENT_CONTRACT §7 — ALWAYS use, deterministically, 0 rng. Java ParityRunner
             // SKILL_USE = `sendUseSkill(skill, true, playerId)` (no decisionRng). The old code
             // random-sampled via pick_bool (spurious draw + wrong choice → decision-stream desync).
@@ -610,14 +652,11 @@ impl Agent for RandomAgent {
                 let idx = self.pick(options.len());
                 Action::SelectWeather { weather: options[idx] }
             }
-            // Hit-and-run / trickster: pick square using actionRng (movement diversity).
-            Some(AgentPrompt::HitAndRun { squares, .. }) => {
-                if squares.is_empty() {
-                    return Action::HitAndRun { coord: None };
-                }
-                let idx = self.pick_action(squares.len());
-                Action::HitAndRun { coord: Some(squares[idx]) }
-            }
+            // Hit And Run move window: Java ParityRunner has NO handler for the HIT_AND_RUN
+            // step (UNHANDLED_STEP) — its default injects ClientCommandEndTurn(turnMode) with
+            // ZERO rng draws, aborting the move (StepHitAndRun end_turn → resetState). Mirror
+            // that exactly; picking a square here would desync the action stream.
+            Some(AgentPrompt::HitAndRun { .. }) => Action::EndTurn,
             Some(AgentPrompt::TricksterMove { squares, .. }) => {
                 if squares.is_empty() {
                     return Action::Acknowledge;
@@ -990,6 +1029,11 @@ mod tests {
         for seed in 0u64..16 {
             let mut gs = new_game(seed);
             gs.game.home_playing = true;
+            // Mid-turn fixture: the agent's turn<1 guard (Java ParityRunner `if (turn < 1)
+            // EndTurn`, added for pass-block windows) must not fire here.
+            gs.game.turn_data_home.turn_nr = 1;
+            gs.game.turn_data_away.turn_nr = 1;
+            gs.game.turn_mode = ffb_model::enums::TurnMode::Regular;
             gs.game.team_home.players.push(mk("fouler"));
             gs.game.team_home.players.push(mk("mover"));
             gs.game.team_away.players.push(mk("victim"));

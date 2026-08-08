@@ -76,6 +76,21 @@ pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerActi
         game.acting_player.set_player(player_id.to_owned(), action);
         game.acting_player.standing_up = was_prone;
         game.acting_player.jumping = jumping;
+        // Java UtilActingPlayer.changeActingPlayer: "// show acting player as moving" —
+        // fieldModel.setPlayerState(newPlayer, oldState.changeBase(PlayerState.MOVING)).
+        // The base stays MOVING for the whole activation (Java's `isStanding()` treats
+        // MOVING as standing) and is restored by the NEXT changeActingPlayer / the
+        // activation-end changePlayerAction(null). Without it, a pass-block window's
+        // mid-activation state snapshot shows the suspended thrower as Standing while
+        // Java shows Moving (amazon seed 11 i=106).
+        if changed {
+            if let Some(pre) = game.field_model.player_state(player_id) {
+                game.field_model.set_player_state(
+                    player_id,
+                    pre.change_base(ffb_model::enums::PS_MOVING),
+                );
+            }
+        }
         // Java UtilActingPlayer.changeActingPlayer: actingPlayer.setOldPlayerState(oldState) — the
         // player's pre-activation PlayerState, STICKY (set_player cleared it on a genuine change; a
         // same-player re-dispatch keeps the earlier value). TakeRootBehaviour uses this to only roll

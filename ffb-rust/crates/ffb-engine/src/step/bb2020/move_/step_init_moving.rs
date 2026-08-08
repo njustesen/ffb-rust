@@ -287,7 +287,7 @@ impl StepInitMoving {
                     StepParameter::CoordinateFrom(coordinate_from),
                     StepParameter::CoordinateTo(coordinate_to),
                 ],
-                clear_stack: false,
+                clear_stack: false, push_self: false
             };
         }
         // Empty move stack — compute legal move targets and prompt the agent for a destination.

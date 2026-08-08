@@ -74,8 +74,10 @@ impl StepEndFeeding {
                     return StepOutcome::next().push_seq(seq);
                 }
                 TurnMode::Regular => {
-                    // Java: changePlayerAction(null, null, false) → clear acting player
-                    game.acting_player.player_id = None;
+                    // Java: changePlayerAction(null, null, false) → clear acting player,
+                    // restoring its MOVING base (STANDING+inactive when acted, PRONE when
+                    // standing up) — full null-path semantics, not just the id clear.
+                    crate::step::util_server_steps::change_player_action_to_none(game);
                     // Java: Inducement(EndOfOpponentTurn, !home, checkForgo)
                     // Java: Inducement(EndOfOwnTurn, home)
                     // Java: push PickMeUp step
@@ -133,7 +135,7 @@ impl StepEndFeeding {
         }
 
         // Java: else → changePlayerAction(null, null, false); Select.pushSequence(false)
-        game.acting_player.player_id = None;
+        crate::step::util_server_steps::change_player_action_to_none(game);
         let seq = Select::build_sequence(&SelectParams { update_persistence: false, is_blitz_move: false, ..Default::default() });
         StepOutcome::next().push_seq(seq)
     }

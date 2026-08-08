@@ -271,7 +271,7 @@ impl StepInitMoving {
             pushes: vec![],
             events: vec![],
             prompt: None,
-            clear_stack: false,
+            clear_stack: false, push_self: false
         }
     }
 }

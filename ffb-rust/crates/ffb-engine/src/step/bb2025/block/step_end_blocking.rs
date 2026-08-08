@@ -560,12 +560,13 @@ impl StepEndBlocking {
         }
 
         if self.use_hit_and_run == Some(true) {
-            // Java: useHitAndRun = false; getGameState().pushCurrentStepOnStack()
-            // Java: stack.push(StepId.HIT_AND_RUN)
+            // Java: useHitAndRun = false; getGameState().pushCurrentStepOnStack();
+            // stack.push(StepId.HIT_AND_RUN) — this instance RESUMES (usePileDriver
+            // dialog etc.) once the hit-and-run move finishes, fields intact.
             self.use_hit_and_run = Some(false);
             use crate::step::framework::SequenceStep;
             let seq = vec![SequenceStep::new(StepId::HitAndRun)];
-            return StepOutcome::next().push_seq(seq);
+            return StepOutcome::next().push_self().push_seq(seq);
         }
 
         if self.use_pile_driver.is_none() {

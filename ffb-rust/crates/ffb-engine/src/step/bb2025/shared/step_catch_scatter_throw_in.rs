@@ -341,7 +341,7 @@ impl StepCatchScatterThrowIn {
                 pushes: vec![],
                 published,
                 prompt: None,
-                clear_stack: false,
+                clear_stack: false, push_self: false
             };
         }
 
@@ -371,7 +371,7 @@ impl StepCatchScatterThrowIn {
                 pushes: vec![],
                 published,
                 prompt: None,
-                clear_stack: false,
+                clear_stack: false, push_self: false
             };
         }
 

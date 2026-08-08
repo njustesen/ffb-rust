@@ -447,25 +447,36 @@ pub struct StepOutcome {
     /// `pushes`. Mirrors Java `GameState.getStepStack().clear()` called from within
     /// a step (e.g. `StepResetToMove`, `StepSelectGazeTarget`).
     pub clear_stack: bool,
+    /// When true, the driver re-pushes the CURRENT step instance (state intact) onto the
+    /// stack BELOW the sequences in `pushes`. Mirrors Java `pushCurrentStepOnStack()`
+    /// followed by pushing a sub-sequence — the step re-runs after the sequence finishes.
+    /// Only meaningful with `StepAction::NextStep`.
+    pub push_self: bool,
 }
 
 impl StepOutcome {
     pub fn next() -> Self {
-        StepOutcome { action: StepAction::NextStep, goto_label: None, published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None, clear_stack: false }
+        StepOutcome { action: StepAction::NextStep, goto_label: None, published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None, clear_stack: false, push_self: false }
     }
     pub fn cont() -> Self {
-        StepOutcome { action: StepAction::Continue, goto_label: None, published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None, clear_stack: false }
+        StepOutcome { action: StepAction::Continue, goto_label: None, published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None, clear_stack: false, push_self: false }
     }
     pub fn goto(label: &str) -> Self {
-        StepOutcome { action: StepAction::GotoLabel, goto_label: Some(label.to_owned()), published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None, clear_stack: false }
+        StepOutcome { action: StepAction::GotoLabel, goto_label: Some(label.to_owned()), published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None, clear_stack: false, push_self: false }
     }
     pub fn repeat() -> Self {
-        StepOutcome { action: StepAction::Repeat, goto_label: None, published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None, clear_stack: false }
+        StepOutcome { action: StepAction::Repeat, goto_label: None, published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None, clear_stack: false, push_self: false }
     }
     /// Mark this outcome to clear the entire step stack before pushing sub-sequences.
     /// Java: `getGameState().getStepStack().clear()`.
     pub fn with_clear_stack(mut self) -> Self {
         self.clear_stack = true;
+        self
+    }
+    /// Java `pushCurrentStepOnStack()`: re-push the current step INSTANCE below the
+    /// sequences added via `push_seq`, so it resumes (fields intact) after they finish.
+    pub fn push_self(mut self) -> Self {
+        self.push_self = true;
         self
     }
     pub fn publish(mut self, p: StepParameter) -> Self {
