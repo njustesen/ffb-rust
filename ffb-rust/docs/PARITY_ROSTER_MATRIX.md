@@ -27,7 +27,7 @@ The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-
 | 18 | nippon | GREEN 100/100 | — |
 | 19 | norse | GREEN 100/100 | — |
 | 20 | nurgle | GREEN 100/100 | — |
-| 21 | ogre | FAIL 0/100 | seed 1, step 143 — first divergence |
+| 21 | ogre | **GREEN 100/100** | no-target FOUL deselects (agent mirrors ParityRunner.sendFoulAction) instead of ending the turn |
 | 22 | orc | GREEN 100/100 | — |
 | 23 | renegades | **GREEN 100/100** | AS lash-out + prone-TTM stand-up + SafePairOfHands PLACE_BALL harness decline |
 | 24 | skaven | GREEN 100/100 | — |

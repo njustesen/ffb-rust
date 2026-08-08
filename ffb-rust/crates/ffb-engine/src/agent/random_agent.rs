@@ -190,6 +190,10 @@ impl Agent for RandomAgent {
                 let eligible_players = self.eligible_this_turn.clone();
 
                 // Build `remaining` as indices into the snapshot, excluding already-skipped.
+                // Wrapped in 'reselect so a committed-but-untargetable action (e.g. a FOUL whose
+                // victim moved away since the turn-start snapshot) can DESELECT and pick another
+                // player without ending the turn — mirroring ParityRunner's deselect commands.
+                'reselect: loop {
                 let mut remaining: Vec<usize> = (0..eligible_players.len())
                     .filter(|&i| !self.used_this_turn.contains(&eligible_players[i].0))
                     .collect();
@@ -316,6 +320,20 @@ impl Agent for RandomAgent {
                 if std::env::var("FFB_TRACE").is_ok() {
                     eprintln!("RUST_ACT_END arc={}", self.action_rng_count);
                 }
+                // Mirror ParityRunner.sendFoulAction: the turn-start eligible snapshot may still
+                // offer FOUL for a player whose only adjacent prone/stunned victim has since moved
+                // or stood up. When that leaves NO legal foul target, Java does NOT commit the
+                // foul — it injects ClientCommandActingPlayer(null,null,false), a DESELECT that
+                // leaves the team's turn going (unlike a no-target BLITZ, handled in StepInitSelecting,
+                // which ends the turn). The player-pick decisionRng and the action-pick actionRng are
+                // already consumed (Java picks player+action before sendFoulAction deselects), and the
+                // player is already in `used_this_turn`, so re-picking chooses a different player.
+                if matches!(player_action, PlayerActionChoice::Foul) && block_defender_id.is_none() {
+                    if std::env::var("FFB_TRACE").is_ok() {
+                        eprintln!("RUST_FOUL_DESELECT pid={player_id} (no legal foul target)");
+                    }
+                    continue 'reselect;
+                }
                 // Java ParityRunner: a Blitz blocks immediately then ends the activation (no MA
                 // spent moving). Remember this so the follow-up Move prompt deselects instead of
                 // wandering with remaining movement.
@@ -368,7 +386,8 @@ impl Agent for RandomAgent {
                         }
                     }
                 }
-                Action::ActivatePlayer { player_id: player_id.clone(), player_action, block_defender_id }
+                break 'reselect Action::ActivatePlayer { player_id: player_id.clone(), player_action, block_defender_id };
+                }
             }
             // Move prompt: pick destination from legal squares using actionRng.
             // 1:1 mirror of the reference harness ParityRunner.sendMoveAction + its INIT_MOVING
@@ -945,6 +964,61 @@ mod tests {
         let a = RandomAgent::new(1);
         assert!(a.used_this_turn.is_empty());
         assert!(a.last_turn_key.is_none());
+    }
+
+    #[test]
+    fn no_target_foul_deselects_and_activates_another_player() {
+        // Regression (ogre seed 1, step 143): the turn-start eligible snapshot offered FOUL for a
+        // player whose only adjacent prone/stunned victim had since moved away, so by activation the
+        // foul had no legal target. Java's ParityRunner.sendFoulAction injects
+        // ClientCommandActingPlayer(null,null,false) — a DESELECT that leaves the turn going — instead
+        // of committing the foul. Rust used to commit Action::ActivatePlayer{Foul} with a null
+        // defender, which StepInitSelecting's foul dispatch turned into an EndTurn (the half then
+        // ended a full activation early vs Java). The agent must now deselect a no-target foul and
+        // pick another player. Here "fouler" can ONLY foul (no legal victim) so it can never be
+        // committed — the agent must fall through to "mover" for EVERY seed, and never EndTurn/Foul.
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_STANDING};
+        use ffb_model::model::player::Player;
+        fn mk(id: &str) -> Player {
+            Player {
+                id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+                player_type: PlayerType::Regular, gender: PlayerGender::Male,
+                movement: 6, strength: 3, agility: 3, passing: 3, armour: 8,
+                ..Default::default()
+            }
+        }
+        for seed in 0u64..16 {
+            let mut gs = new_game(seed);
+            gs.game.home_playing = true;
+            gs.game.team_home.players.push(mk("fouler"));
+            gs.game.team_home.players.push(mk("mover"));
+            gs.game.team_away.players.push(mk("victim"));
+            gs.game.field_model.set_player_coordinate("fouler", FieldCoordinate::new(10, 8));
+            gs.game.field_model.set_player_state("fouler", PlayerState::new(PS_STANDING).change_active(true));
+            gs.game.field_model.set_player_coordinate("mover", FieldCoordinate::new(5, 5));
+            gs.game.field_model.set_player_state("mover", PlayerState::new(PS_STANDING).change_active(true));
+            // victim is STANDING (not prone/stunned) → no legal foul target anywhere on the pitch.
+            gs.game.field_model.set_player_coordinate("victim", FieldCoordinate::new(20, 1));
+            gs.game.field_model.set_player_state("victim", PlayerState::new(PS_STANDING).change_active(true));
+
+            let eligible = vec![
+                ("fouler".to_string(), vec![PlayerAction::Foul]),
+                ("mover".to_string(), vec![PlayerAction::Move]),
+            ];
+            gs.pending_prompt = Some(AgentPrompt::ActivatePlayer { eligible_players: eligible });
+
+            let mut agent = RandomAgent::new_parity(seed);
+            match agent.act(&gs) {
+                Action::ActivatePlayer { player_id, player_action, .. } => {
+                    assert_ne!(player_action, PlayerActionChoice::Foul,
+                        "seed {seed}: a foul with no legal target must never be committed");
+                    assert_eq!(player_id, "mover",
+                        "seed {seed}: after deselecting the no-target foul the agent activates the mover");
+                    assert_eq!(player_action, PlayerActionChoice::Move);
+                }
+                other => panic!("seed {seed}: expected the turn to continue with the mover, got {other:?}"),
+            }
+        }
     }
 }
 

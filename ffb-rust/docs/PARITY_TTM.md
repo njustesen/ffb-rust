@@ -1682,3 +1682,30 @@ theories all disproven before the empirical JAVA_AVBROKE trace closed it). Relia
 FFB_DRIVE_TRACE + JAVA_BLOCKROLL/JAVA_AVBROKE — NOT DICE_TRACE global pos.
 
 **GOBLIN COMPLETE: 6 fixes this campaign session → seeds 1-100 all GREEN.**
+
+### OGRE 100/100 GREEN ✅ — no-target FOUL must deselect (not end the turn)
+
+ogre seed 1 step 143 (turn 8 half 1, the last turn): the random agent activated home_07 for a
+FOUL. At turn start home_07 had an adjacent prone victim, so FOUL was in its turn-start eligible
+snapshot; by activation the victim had moved/stood, leaving NO legal foul target. Java's
+`ParityRunner.sendFoulAction` finds the adjacent prone/stunned list empty and injects
+`ClientCommandActingPlayer(null,null,false)` — a DESELECT that leaves the team's turn going
+(home_02 then MOVEd in the same turn, 0 dice). Rust instead emitted
+`Action::ActivatePlayer{Foul, defender=None}`; StepInitSelecting's foul dispatch (no Blitz-style
+no-target guard) drove the sequence to an EndTurn — so half 1 ended a full activation early vs
+Java (Rust i=144 already h2t10, Java still h1t88), rolling 9 kickoff dice out of step. ROOT: the
+Rust agent committed an untargetable foul; Java never sends one. FIX (crates/ffb-engine agent,
+random_agent.rs): wrap the ActivatePlayer pick body in a `'reselect` loop and, after resolving the
+foul target, if `player_action==Foul && block_defender_id.is_none()`, `continue 'reselect` — the
+player-pick decisionRng and action-pick actionRng are already consumed (matching Java, which picks
+player+action before deselecting) and the fouler is already in `used_this_turn`, so re-picking
+chooses a different player. This mirrors sendFoulAction exactly (a no-target BLITZ still ends the
+turn via the existing StepInitSelecting guard; only FOUL deselects). Advanced ogre seed 1 → whole
+roster **100/100 GREEN**. Regression test `no_target_foul_deselects_and_activates_another_player`
+(a fouler that can ONLY foul with no victim is never committed; the turn continues to the mover).
+cargo ffb-engine 7040/0, ffb-model 1150/0, ffb-mechanics 2778/0; 24-roster regression 0 FAIL +
+goblin 100/100. Diagnosis: rng_calls first diverged at i=144 (Java 164 vs Rust 173) inside step
+143's resolution; the Rust LOOP trace showed `Activate(home_07,Foul)` → `prompt_after=TeamSetup`
+(immediate half-end), and ParityRunner.sendFoulAction's empty-target deselect was the reference.
+
+**OGRE COMPLETE: seeds 1-100 all GREEN.**
