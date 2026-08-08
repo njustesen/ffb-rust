@@ -1046,6 +1046,90 @@ mod baseline_option_tests {
 }
 
 #[cfg(test)]
+mod team_file_tests {
+    use super::*;
+
+    fn teams_root() -> std::path::PathBuf {
+        for c in ["data/teams", "../data/teams", "../../data/teams"] {
+            let p = std::path::Path::new(c);
+            if p.exists() { return p.to_path_buf(); }
+        }
+        panic!("data/teams not found from test cwd");
+    }
+
+    /// Validate every hand-drafted team spec (data/teams/) against the drafting rules and
+    /// heuristics documented in docs/TEAM_DRAFTS_*.md: 11-16 players within position quantity
+    /// caps, >=2 rerolls <= roster max, spend <= 1,100,000, team_value per UtilTeamValue, and
+    /// both sides materialize through make_team_from_file.
+    #[test]
+    fn all_hand_drafted_team_files_are_legal() {
+        for edition in ["bb2016", "bb2025"] {
+            let rosters = match edition {
+                "bb2016" => bb2016_rosters(),
+                _ => bb2025_rosters(),
+            };
+            let dir = teams_root().join(edition);
+            let mut checked = 0;
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.extension().and_then(|e| e.to_str()) != Some("json") { continue; }
+                let race = path.file_stem().unwrap().to_str().unwrap()
+                    .strip_prefix("team_").unwrap().to_string();
+                let spec: TeamFileJson = serde_json::from_str(
+                    &std::fs::read_to_string(&path).unwrap()).unwrap();
+                let roster = rosters.iter().find(|r| r.id == spec.roster_id)
+                    .unwrap_or_else(|| panic!("{edition}/{race}: roster id {} missing", spec.roster_id));
+
+                let n = spec.players.len();
+                assert!((11..=16).contains(&n), "{edition}/{race}: {n} players");
+                assert!(spec.rerolls >= 2, "{edition}/{race}: fewer than 2 rerolls");
+                assert!(spec.rerolls <= roster.max_rerolls, "{edition}/{race}: rerolls over roster max");
+
+                let mut players_cost = 0i32;
+                let mut counts: std::collections::HashMap<&str, i32> = Default::default();
+                for pl in &spec.players {
+                    let pos = roster.positions.iter().find(|p| p.id == pl.position_id)
+                        .unwrap_or_else(|| panic!("{edition}/{race}: unknown position {}", pl.position_id));
+                    players_cost += pos.cost;
+                    *counts.entry(pos.id.as_str()).or_default() += 1;
+                }
+                for (pid, cnt) in &counts {
+                    let q = roster.positions.iter().find(|p| p.id == *pid).unwrap().quantity;
+                    assert!(*cnt <= q, "{edition}/{race}: {cnt}x {pid} exceeds quantity cap {q}");
+                }
+
+                let apo_cost = spec.apothecaries * 50_000;
+                let fans_cost = if edition == "bb2025" {
+                    (spec.dedicated_fans - 1).max(0) * 5_000
+                } else {
+                    spec.fan_factor * 10_000
+                };
+                let spend = players_cost + spec.rerolls * roster.reroll_cost + apo_cost + fans_cost;
+                assert!(spend <= 1_100_000, "{edition}/{race}: spend {spend} over 1.1M budget");
+                assert_eq!(spend + spec.treasury, 1_100_000,
+                    "{edition}/{race}: spend {spend} + treasury {} != 1.1M", spec.treasury);
+
+                // Java UtilTeamValue: rerolls*rrCost + fanFactor*10k + coaches/cheerleaders (0)
+                // + apo*50k + player position costs. Dedicated Fans are NOT part of TV.
+                let tv = spec.rerolls * roster.reroll_cost + spec.fan_factor * 10_000
+                    + apo_cost + players_cost;
+                assert_eq!(spec.team_value, tv, "{edition}/{race}: team_value mismatch");
+
+                for side in ["home", "away"] {
+                    let team = make_team_from_file(&race, side, edition)
+                        .unwrap_or_else(|e| panic!("{edition}/{race}/{side}: {e}"));
+                    assert_eq!(team.players.len(), n, "{edition}/{race}/{side}: player count");
+                    assert_eq!(team.rerolls, spec.rerolls);
+                    assert_eq!(team.dedicated_fans, spec.dedicated_fans);
+                }
+                checked += 1;
+            }
+            assert_eq!(checked, 29, "{edition}: expected 29 team files, found {checked}");
+        }
+    }
+}
+
+#[cfg(test)]
 mod fumbbl_roster_tests {
     use super::make_team;
     use ffb_model::enums::SkillId;
@@ -1074,7 +1158,9 @@ mod fumbbl_roster_tests {
         // identical AG3 lineman, so assert the built teams are not uniformly the lineman default.
         for roster in ["khemri_fumbbl", "slann_fumbbl"] {
             let team = make_team(roster, "home", "bb2025");
-            assert_eq!(team.players.len(), 11, "{roster} must build 11 players");
+            // Hand-drafted specs (data/teams/) field 11-16 players; the point here is only
+            // that the REAL roster loaded (not the generic-lineman fallback).
+            assert!((11..=16).contains(&team.players.len()), "{roster} must build a full team");
             let all_bare_linemen = team.players.iter()
                 .all(|p| p.agility == 3 && p.movement == 6 && p.armour == 8 && p.starting_skills.is_empty());
             assert!(!all_bare_linemen, "{roster} must not fall back to a uniform generic-lineman team");

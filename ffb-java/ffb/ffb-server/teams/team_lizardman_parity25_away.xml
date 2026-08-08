@@ -69,26 +69,26 @@
 	<player nr="8" id="teamLizardmanParity25Away8">
 		<name>Chameleon Skink 8</name>
 		<gender>male</gender>
-		<positionId>lizardman.skink</positionId>
+		<positionId>lizardman.chameleon_skink</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="9" id="teamLizardmanParity25Away9">
 		<name>Chameleon Skink 9</name>
 		<gender>male</gender>
-		<positionId>lizardman.skink</positionId>
+		<positionId>lizardman.chameleon_skink</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="10" id="teamLizardmanParity25Away10">
-		<name>Chameleon Skink 10</name>
+		<name>Skink Lineman 10</name>
 		<gender>male</gender>
 		<positionId>lizardman.skink</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="11" id="teamLizardmanParity25Away11">
-		<name>Chameleon Skink 11</name>
+		<name>Skink Lineman 11</name>
 		<gender>male</gender>
 		<positionId>lizardman.skink</positionId>
 		<skillList/>

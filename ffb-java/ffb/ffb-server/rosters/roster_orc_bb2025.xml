@@ -28,7 +28,7 @@
 			<keyword>Orc</keyword>
 		</keywords>
 	</position>
-	<position id="orc.lineman">
+	<position id="orc.goblin">
 		<quantity>4</quantity>
 		<name>Lineman</name>
 		<displayName>Goblin Lineman</displayName>

@@ -1,5 +1,10 @@
 # Roster Parity Matrix — bb2025, tier 3
 
+> **SUPERSEDED (2026-08-08).** This matrix ran on the legacy first-11-by-(quantity,cost)
+> teams. The current matrices use hand-drafted rule-legal teams and audited per-edition
+> roster data: see `docs/TEAM_MATRIX_BB2025.md` and `docs/TEAM_MATRIX_BB2016.md`
+> (teams in `data/teams/`, drafting docs `docs/TEAM_DRAFTS_*.md`). Kept for history.
+
 Mirror matchups (`--home X --away X`), `--edition bb2025 --tier 3 --seeds 1-100`, per-step
 state-hash parity Rust vs stock Java. Run in PARALLEL (`xargs -P 10`, each JVM capped to 2 cores).
 The harness stops at the first failing seed, so a FAIL row means seeds 1..(seed-1) passed and

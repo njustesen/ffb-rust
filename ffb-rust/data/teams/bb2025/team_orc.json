@@ -45,19 +45,19 @@
     },
     {
       "nr": 9,
-      "position_id": "orc.lineman"
+      "position_id": "orc.goblin"
     },
     {
       "nr": 10,
-      "position_id": "orc.lineman"
+      "position_id": "orc.goblin"
     },
     {
       "nr": 11,
-      "position_id": "orc.lineman"
+      "position_id": "orc.goblin"
     },
     {
       "nr": 12,
-      "position_id": "orc.lineman"
+      "position_id": "orc.goblin"
     }
   ],
   "special_rules": [

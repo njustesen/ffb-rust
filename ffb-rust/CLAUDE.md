@@ -86,7 +86,17 @@ To refresh: `python scripts/download_rules.py`
 ## Data
 
 `data/` contains JSON configs loaded at runtime by `ffb-model/src/data/loader.rs`:
-- `rosters/` — Team definitions per edition (positions, stats, starting skills)
+- `rosters/` — Team definitions per edition (positions, stats, starting skills).
+  **bb2025 is audited against the official team pages** (`rules/teams/*.md`, fetched by
+  `scripts/download_rules.py`; reconcile with `scripts/audit_rosters.py`); **bb2016 is
+  cleaned FUMBBL LRB6/CRP data** (`docs/BB2016_DRAFTING_AND_ROSTERS.md`). Every roster
+  skill name must resolve in BOTH engines (`scripts/check_skill_names.py` + the
+  `all_roster_starting_skills_resolve` test).
+- `teams/` — Hand-drafted, rule-legal parity teams per edition (one spec per race;
+  drafted ONCE 2026-08-08, spend breakdowns in `docs/TEAM_DRAFTS_BB2025.md`/`_BB2016.md`).
+  `scripts/gen_java_parity_data.py` converts them (plus the rosters) into the Java-side
+  `roster_<race>_<edition>.xml` / `team_<race>_parity{25,16}_*.xml` files — rerun it after
+  ANY roster or team data change, or the engines will disagree.
 - `skills/`, `inducements/`, `injuries/`, `prayers/`, `cards/`, `star_players/`
 
 ## Testing

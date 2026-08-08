@@ -82,6 +82,8 @@ POSITION_ID_ALIASES = {
     ("khemri", "Skeleton Lineman"): "khemri.skeleton",
     ("lizardman", "Saurus Blocker"): "lizardman.saurus",
     ("lizardman", "Skink Lineman"): "lizardman.skink",
+    ("lizardman", "Chameleon Skink"): "lizardman.chameleon_skink",
+    ("orc", "Goblin Lineman"): "orc.goblin",
     ("necromantic", "Zombie Lineman"): "necromantic.zombie",
     ("necromantic", "Ghoul Runner"): "necromantic.ghoul",
     ("norse", "Norse Raider"): "norse.lineman",
@@ -260,9 +262,14 @@ def official_to_json(race: str, page: dict, current: dict) -> dict:
     existing = current["positions"]
     stars = [p for p in existing if p.get("type") in ("Star", "Infamous Staff")]
     new_positions = []
+    used_ids: set[str] = set()
     for op in page["positions"]:
         pid = match_position_id(race, op["display_name"], existing) or \
             gen_position_id(prefix, op["display_name"])
+        if pid in used_ids:  # fuzzy match collided with an earlier row
+            pid = gen_position_id(prefix, op["display_name"])
+        assert pid not in used_ids, f"{race}: duplicate position id {pid}"
+        used_ids.add(pid)
         old = next((p for p in existing if p["id"] == pid), None)
         is_big = "Big Guy" in op["keywords"]
         pos = {

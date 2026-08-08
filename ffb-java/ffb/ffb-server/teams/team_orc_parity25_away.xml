@@ -69,7 +69,7 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamOrcParity25Away8">
-		<name>Goblin Lineman 8</name>
+		<name>Orc Lineman 8</name>
 		<gender>male</gender>
 		<positionId>orc.lineman</positionId>
 		<skillList/>
@@ -78,28 +78,28 @@
 	<player nr="9" id="teamOrcParity25Away9">
 		<name>Goblin Lineman 9</name>
 		<gender>male</gender>
-		<positionId>orc.lineman</positionId>
+		<positionId>orc.goblin</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="10" id="teamOrcParity25Away10">
 		<name>Goblin Lineman 10</name>
 		<gender>male</gender>
-		<positionId>orc.lineman</positionId>
+		<positionId>orc.goblin</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="11" id="teamOrcParity25Away11">
 		<name>Goblin Lineman 11</name>
 		<gender>male</gender>
-		<positionId>orc.lineman</positionId>
+		<positionId>orc.goblin</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="12" id="teamOrcParity25Away12">
 		<name>Goblin Lineman 12</name>
 		<gender>male</gender>
-		<positionId>orc.lineman</positionId>
+		<positionId>orc.goblin</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

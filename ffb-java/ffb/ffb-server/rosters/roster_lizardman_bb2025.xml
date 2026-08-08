@@ -32,7 +32,7 @@
 			<keyword>Lizardman</keyword>
 		</keywords>
 	</position>
-	<position id="lizardman.skink">
+	<position id="lizardman.chameleon_skink">
 		<quantity>2</quantity>
 		<name>Skink</name>
 		<displayName>Chameleon Skink</displayName>
