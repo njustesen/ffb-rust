@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="halfling.bb2016">
+	<name>Halfling</name>
+	<reRollCost>60000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="halfling.treeman">
+		<quantity>2</quantity>
+		<name>Treeman</name>
+		<displayName>Treeman</displayName>
+		<type>Big Guy</type>
+		<cost>120000</cost>
+		<movement>2</movement>
+		<strength>6</strength>
+		<agility>1</agility>
+		<passing>5</passing>
+		<armour>11</armour>
+		<skillList>
+			<skill>Loner</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Stand Firm</skill>
+			<skill>Strong Arm</skill>
+			<skill>Take Root</skill>
+			<skill>Thick Skull</skill>
+			<skill>Throw Team-Mate</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>General</double>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="halfling.halfling">
+		<quantity>16</quantity>
+		<name>Halfling</name>
+		<displayName>Halfling</displayName>
+		<type>Regular</type>
+		<cost>30000</cost>
+		<movement>5</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>6</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>General</double>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+</roster>

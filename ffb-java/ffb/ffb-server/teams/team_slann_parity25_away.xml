@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamSlannParity25Away">
+
+	<coach>Away</coach>
+	<name>Slann Parity25 Away</name>
+	<race>Slann</race>
+	<rosterId>slann.bb2025</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>1</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamSlannParity25Away1">
+		<name>Kroxigor 1</name>
+		<gender>male</gender>
+		<positionId>slann.kroxigor</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamSlannParity25Away2">
+		<name>Blitzer 2</name>
+		<gender>male</gender>
+		<positionId>slann.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamSlannParity25Away3">
+		<name>Blitzer 3</name>
+		<gender>male</gender>
+		<positionId>slann.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamSlannParity25Away4">
+		<name>Blitzer 4</name>
+		<gender>male</gender>
+		<positionId>slann.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamSlannParity25Away5">
+		<name>Blitzer 5</name>
+		<gender>male</gender>
+		<positionId>slann.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamSlannParity25Away6">
+		<name>Catcher 6</name>
+		<gender>male</gender>
+		<positionId>slann.catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamSlannParity25Away7">
+		<name>Catcher 7</name>
+		<gender>male</gender>
+		<positionId>slann.catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamSlannParity25Away8">
+		<name>Catcher 8</name>
+		<gender>male</gender>
+		<positionId>slann.catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamSlannParity25Away9">
+		<name>Lineman 9</name>
+		<gender>male</gender>
+		<positionId>slann.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamSlannParity25Away10">
+		<name>Lineman 10</name>
+		<gender>male</gender>
+		<positionId>slann.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamSlannParity25Away11">
+		<name>Lineman 11</name>
+		<gender>male</gender>
+		<positionId>slann.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

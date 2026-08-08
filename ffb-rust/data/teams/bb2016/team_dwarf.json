@@ -1,0 +1,64 @@
+{
+  "edition": "bb2016",
+  "race": "dwarf",
+  "roster_id": "dwarf.lrb6",
+  "rerolls": 2,
+  "reroll_cost": 40000,
+  "apothecaries": 0,
+  "dedicated_fans": 0,
+  "fan_factor": 1,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1100000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "dwarf.deathroller"
+    },
+    {
+      "nr": 2,
+      "position_id": "dwarf.trollslayer"
+    },
+    {
+      "nr": 3,
+      "position_id": "dwarf.trollslayer"
+    },
+    {
+      "nr": 4,
+      "position_id": "dwarf.blitzer"
+    },
+    {
+      "nr": 5,
+      "position_id": "dwarf.blitzer"
+    },
+    {
+      "nr": 6,
+      "position_id": "dwarf.runner"
+    },
+    {
+      "nr": 7,
+      "position_id": "dwarf.runner"
+    },
+    {
+      "nr": 8,
+      "position_id": "dwarf.blocker"
+    },
+    {
+      "nr": 9,
+      "position_id": "dwarf.blocker"
+    },
+    {
+      "nr": 10,
+      "position_id": "dwarf.blocker"
+    },
+    {
+      "nr": 11,
+      "position_id": "dwarf.blocker"
+    },
+    {
+      "nr": 12,
+      "position_id": "dwarf.blocker"
+    }
+  ],
+  "special_rules": []
+}

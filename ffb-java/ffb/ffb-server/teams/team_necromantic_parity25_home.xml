@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamNecromanticParity25Home">
+
+	<coach>Home</coach>
+	<name>Necromantic Parity25 Home</name>
+	<race>Necromantic</race>
+	<rosterId>necromantic.bb2025</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1080000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>10000</treasury>
+	<specialRules>
+		<rule>Masters of Undeath</rule>
+	</specialRules>
+
+	<player nr="1" id="teamNecromanticParity25Home1">
+		<name>Werewolf 1</name>
+		<gender>male</gender>
+		<positionId>necromantic.werewolf</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamNecromanticParity25Home2">
+		<name>Werewolf 2</name>
+		<gender>male</gender>
+		<positionId>necromantic.werewolf</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamNecromanticParity25Home3">
+		<name>Flesh Golem 3</name>
+		<gender>male</gender>
+		<positionId>necromantic.fleshgolem</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamNecromanticParity25Home4">
+		<name>Flesh Golem 4</name>
+		<gender>male</gender>
+		<positionId>necromantic.fleshgolem</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamNecromanticParity25Home5">
+		<name>Wraith 5</name>
+		<gender>male</gender>
+		<positionId>necromantic.wraith</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamNecromanticParity25Home6">
+		<name>Wraith 6</name>
+		<gender>male</gender>
+		<positionId>necromantic.wraith</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamNecromanticParity25Home7">
+		<name>Ghoul Runner 7</name>
+		<gender>male</gender>
+		<positionId>necromantic.ghoul</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamNecromanticParity25Home8">
+		<name>Ghoul Runner 8</name>
+		<gender>male</gender>
+		<positionId>necromantic.ghoul</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamNecromanticParity25Home9">
+		<name>Zombie Lineman 9</name>
+		<gender>male</gender>
+		<positionId>necromantic.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamNecromanticParity25Home10">
+		<name>Zombie Lineman 10</name>
+		<gender>male</gender>
+		<positionId>necromantic.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamNecromanticParity25Home11">
+		<name>Zombie Lineman 11</name>
+		<gender>male</gender>
+		<positionId>necromantic.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamNecromanticParity25Home12">
+		<name>Zombie Lineman 12</name>
+		<gender>male</gender>
+		<positionId>necromantic.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

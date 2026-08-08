@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamLizardmanParity25Home">
+
+	<coach>Home</coach>
+	<name>Lizardman Parity25 Home</name>
+	<race>Lizardman</race>
+	<rosterId>lizardman.bb2025</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1080000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>10000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamLizardmanParity25Home1">
+		<name>Kroxigor 1</name>
+		<gender>male</gender>
+		<positionId>lizardman.kroxigor</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamLizardmanParity25Home2">
+		<name>Saurus Blocker 2</name>
+		<gender>male</gender>
+		<positionId>lizardman.saurus</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamLizardmanParity25Home3">
+		<name>Saurus Blocker 3</name>
+		<gender>male</gender>
+		<positionId>lizardman.saurus</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamLizardmanParity25Home4">
+		<name>Saurus Blocker 4</name>
+		<gender>male</gender>
+		<positionId>lizardman.saurus</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamLizardmanParity25Home5">
+		<name>Saurus Blocker 5</name>
+		<gender>male</gender>
+		<positionId>lizardman.saurus</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamLizardmanParity25Home6">
+		<name>Saurus Blocker 6</name>
+		<gender>male</gender>
+		<positionId>lizardman.saurus</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamLizardmanParity25Home7">
+		<name>Saurus Blocker 7</name>
+		<gender>male</gender>
+		<positionId>lizardman.saurus</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamLizardmanParity25Home8">
+		<name>Chameleon Skink 8</name>
+		<gender>male</gender>
+		<positionId>lizardman.skink</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamLizardmanParity25Home9">
+		<name>Chameleon Skink 9</name>
+		<gender>male</gender>
+		<positionId>lizardman.skink</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamLizardmanParity25Home10">
+		<name>Chameleon Skink 10</name>
+		<gender>male</gender>
+		<positionId>lizardman.skink</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamLizardmanParity25Home11">
+		<name>Chameleon Skink 11</name>
+		<gender>male</gender>
+		<positionId>lizardman.skink</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

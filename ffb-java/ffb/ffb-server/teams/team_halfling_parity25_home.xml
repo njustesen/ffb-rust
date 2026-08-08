@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamHalflingParity25Home">
+
+	<coach>Home</coach>
+	<name>Halfling Parity25 Home</name>
+	<race>Halfling</race>
+	<rosterId>halfling.bb2025</rosterId>
+	<reRolls>4</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>980000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>110000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamHalflingParity25Home1">
+		<name>Athel Forest Treeman 1</name>
+		<gender>male</gender>
+		<positionId>halfling.treeman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamHalflingParity25Home2">
+		<name>Athel Forest Treeman 2</name>
+		<gender>male</gender>
+		<positionId>halfling.treeman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamHalflingParity25Home3">
+		<name>Halfling Catcher 3</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling_catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamHalflingParity25Home4">
+		<name>Halfling Catcher 4</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling_catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamHalflingParity25Home5">
+		<name>Halfling Hefty 5</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling_hefty</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamHalflingParity25Home6">
+		<name>Halfling Hefty 6</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling_hefty</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamHalflingParity25Home7">
+		<name>Halfling Hopeful 7</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamHalflingParity25Home8">
+		<name>Halfling Hopeful 8</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamHalflingParity25Home9">
+		<name>Halfling Hopeful 9</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamHalflingParity25Home10">
+		<name>Halfling Hopeful 10</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamHalflingParity25Home11">
+		<name>Halfling Hopeful 11</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamHalflingParity25Home12">
+		<name>Halfling Hopeful 12</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamHalflingParity25Home13">
+		<name>Halfling Hopeful 13</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="14" id="teamHalflingParity25Home14">
+		<name>Halfling Hopeful 14</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

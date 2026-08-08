@@ -1,0 +1,60 @@
+{
+  "edition": "bb2025",
+  "race": "lizardman",
+  "roster_id": "lizardman.lrb6",
+  "rerolls": 2,
+  "reroll_cost": 70000,
+  "apothecaries": 0,
+  "dedicated_fans": 3,
+  "fan_factor": 0,
+  "treasury": 10000,
+  "spent": 1090000,
+  "team_value": 1080000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "lizardman.kroxigor"
+    },
+    {
+      "nr": 2,
+      "position_id": "lizardman.saurus"
+    },
+    {
+      "nr": 3,
+      "position_id": "lizardman.saurus"
+    },
+    {
+      "nr": 4,
+      "position_id": "lizardman.saurus"
+    },
+    {
+      "nr": 5,
+      "position_id": "lizardman.saurus"
+    },
+    {
+      "nr": 6,
+      "position_id": "lizardman.saurus"
+    },
+    {
+      "nr": 7,
+      "position_id": "lizardman.saurus"
+    },
+    {
+      "nr": 8,
+      "position_id": "lizardman.skink"
+    },
+    {
+      "nr": 9,
+      "position_id": "lizardman.skink"
+    },
+    {
+      "nr": 10,
+      "position_id": "lizardman.skink"
+    },
+    {
+      "nr": 11,
+      "position_id": "lizardman.skink"
+    }
+  ],
+  "special_rules": []
+}

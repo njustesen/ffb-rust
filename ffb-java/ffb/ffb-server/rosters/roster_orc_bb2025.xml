@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="orc.bb2025">
+	<name>Orc</name>
+	<reRollCost>60000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="orc.lineman">
+		<quantity>16</quantity>
+		<name>Lineman</name>
+		<displayName>Orc Lineman</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>5</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>10</armour>
+		<skillList/>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Lineman</keyword>
+			<keyword>Orc</keyword>
+		</keywords>
+	</position>
+	<position id="orc.lineman">
+		<quantity>4</quantity>
+		<name>Lineman</name>
+		<displayName>Goblin Lineman</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>6</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>Devious</normal>
+			<double>General</double>
+			<double>Passing</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Lineman</keyword>
+			<keyword>Goblin</keyword>
+		</keywords>
+	</position>
+	<position id="orc.thrower">
+		<quantity>2</quantity>
+		<name>Thrower</name>
+		<displayName>Orc Thrower</displayName>
+		<type>Regular</type>
+		<cost>75000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>3</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Pass</skill>
+			<skill>Sure Hands</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Passing</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Thrower</keyword>
+			<keyword>Orc</keyword>
+		</keywords>
+	</position>
+	<position id="orc.blitzer">
+		<quantity>2</quantity>
+		<name>Blitzer</name>
+		<displayName>Orc Blitzer</displayName>
+		<type>Regular</type>
+		<cost>85000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Break Tackle</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blitzer</keyword>
+			<keyword>Orc</keyword>
+		</keywords>
+	</position>
+	<position id="orc.big_un_blocker">
+		<quantity>2</quantity>
+		<name>Big Un Blocker</name>
+		<displayName>Big Un Blocker</displayName>
+		<type>Regular</type>
+		<cost>95000</cost>
+		<movement>5</movement>
+		<strength>4</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Mighty Blow</skill>
+			<skill>Taunt</skill>
+			<skill>Thick Skull</skill>
+			<skill>Unsteady</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blocker</keyword>
+			<keyword>Orc</keyword>
+		</keywords>
+	</position>
+	<position id="orc.troll">
+		<quantity>1</quantity>
+		<name>Troll</name>
+		<displayName>Troll</displayName>
+		<type>Big Guy</type>
+		<cost>115000</cost>
+		<movement>4</movement>
+		<strength>5</strength>
+		<agility>5</agility>
+		<passing>5</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Always Hungry</skill>
+			<skill value="4">Loner</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Projectile Vomit</skill>
+			<skill>Really Stupid</skill>
+			<skill>Regeneration</skill>
+			<skill>Throw Team-mate</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Passing</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Big Guy</keyword>
+			<keyword>Troll</keyword>
+		</keywords>
+	</position>
+</roster>

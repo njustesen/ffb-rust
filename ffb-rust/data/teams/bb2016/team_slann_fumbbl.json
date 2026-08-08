@@ -1,0 +1,60 @@
+{
+  "edition": "bb2016",
+  "race": "slann_fumbbl",
+  "roster_id": "744258",
+  "rerolls": 2,
+  "reroll_cost": 50000,
+  "apothecaries": 0,
+  "dedicated_fans": 0,
+  "fan_factor": 0,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1100000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "2996"
+    },
+    {
+      "nr": 2,
+      "position_id": "2995"
+    },
+    {
+      "nr": 3,
+      "position_id": "2995"
+    },
+    {
+      "nr": 4,
+      "position_id": "2995"
+    },
+    {
+      "nr": 5,
+      "position_id": "2995"
+    },
+    {
+      "nr": 6,
+      "position_id": "2994"
+    },
+    {
+      "nr": 7,
+      "position_id": "2994"
+    },
+    {
+      "nr": 8,
+      "position_id": "2994"
+    },
+    {
+      "nr": 9,
+      "position_id": "2993"
+    },
+    {
+      "nr": 10,
+      "position_id": "2993"
+    },
+    {
+      "nr": 11,
+      "position_id": "2993"
+    }
+  ],
+  "special_rules": []
+}

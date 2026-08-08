@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="chaos_pact.bb2025">
+	<name>Chaos Pact</name>
+	<reRollCost>70000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="chaospact.marauder">
+		<quantity>12</quantity>
+		<name>Marauder</name>
+		<displayName>Marauder</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList/>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<normal>General</normal>
+			<normal>Passing</normal>
+			<normal>Mutation</normal>
+			<double>Agility</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaospact.goblin.renegade">
+		<quantity>1</quantity>
+		<name>Goblin Renegade</name>
+		<displayName>Goblin Renegade</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>6</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Animosity</skill>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>Mutation</normal>
+			<double>General</double>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaospact.skaven.renegade">
+		<quantity>1</quantity>
+		<name>Skaven Renegade</name>
+		<displayName>Skaven Renegade</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Animosity</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaospact.darkelf.renegade">
+		<quantity>1</quantity>
+		<name>Dark Elf Renegade</name>
+		<displayName>Dark Elf Renegade</displayName>
+		<type>Regular</type>
+		<cost>70000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>3</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Animosity</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Agility</normal>
+			<normal>Mutation</normal>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaospact.troll.chaos">
+		<quantity>1</quantity>
+		<name>Chaos Troll</name>
+		<displayName>Chaos Troll</displayName>
+		<type>Regular</type>
+		<cost>110000</cost>
+		<movement>4</movement>
+		<strength>5</strength>
+		<agility>1</agility>
+		<passing>5</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Always Hungry</skill>
+			<skill>Loner</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Really Stupid</skill>
+			<skill>Regeneration</skill>
+			<skill>Throw Team-Mate</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>General</double>
+			<double>Agility</double>
+			<double>Passing</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaospact.ogre.chaos">
+		<quantity>1</quantity>
+		<name>Chaos Ogre</name>
+		<displayName>Chaos Ogre</displayName>
+		<type>Regular</type>
+		<cost>140000</cost>
+		<movement>5</movement>
+		<strength>5</strength>
+		<agility>2</agility>
+		<passing>5</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>bone head</skill>
+			<skill>Loner</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Thick Skull</skill>
+			<skill>Throw Team-Mate</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>General</double>
+			<double>Agility</double>
+			<double>Passing</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaospact.minotaur">
+		<quantity>1</quantity>
+		<name>Minotaur</name>
+		<displayName>Minotaur</displayName>
+		<type>Regular</type>
+		<cost>150000</cost>
+		<movement>5</movement>
+		<strength>5</strength>
+		<agility>2</agility>
+		<passing>0</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Frenzy</skill>
+			<skill>Horns</skill>
+			<skill>Loner</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>General</double>
+			<double>Agility</double>
+			<double>Passing</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+</roster>

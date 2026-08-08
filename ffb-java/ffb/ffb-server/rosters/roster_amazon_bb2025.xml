@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="amazon.bb2025">
+	<name>Amazon</name>
+	<reRollCost>60000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="amazon.linewoman">
+		<quantity>16</quantity>
+		<name>Linewoman</name>
+		<displayName>Eagle Warrior</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dodge</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Lineman</keyword>
+			<keyword>Human</keyword>
+		</keywords>
+	</position>
+	<position id="amazon.thrower">
+		<quantity>2</quantity>
+		<name>Thrower</name>
+		<displayName>Python Warrior</displayName>
+		<type>Regular</type>
+		<cost>80000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>3</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>On the Ball</skill>
+			<skill>Pass</skill>
+			<skill>Safe Pass</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Passing</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Thrower</keyword>
+			<keyword>Human</keyword>
+		</keywords>
+	</position>
+	<position id="amazon.blitzer">
+		<quantity>2</quantity>
+		<name>Blitzer</name>
+		<displayName>Piranha Warrior</displayName>
+		<type>Regular</type>
+		<cost>90000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Hit and Run</skill>
+			<skill>Jump Up</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blitzer</keyword>
+			<keyword>Human</keyword>
+		</keywords>
+	</position>
+	<position id="amazon.catcher">
+		<quantity>2</quantity>
+		<name>Catcher</name>
+		<displayName>Jaguar Warrior</displayName>
+		<type>Regular</type>
+		<cost>110000</cost>
+		<movement>6</movement>
+		<strength>4</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Defensive</skill>
+			<skill>Dodge</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blocker</keyword>
+			<keyword>Human</keyword>
+		</keywords>
+	</position>
+</roster>

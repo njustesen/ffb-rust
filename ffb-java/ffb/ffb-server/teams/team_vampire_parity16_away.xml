@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamVampireParity16Away">
+
+	<coach>Away</coach>
+	<name>Vampire Parity16 Away</name>
+	<race>Vampire</race>
+	<rosterId>vampire.bb2016</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>2</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamVampireParity16Away1">
+		<name>Vampire 1</name>
+		<gender>male</gender>
+		<positionId>vampire.vampire</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamVampireParity16Away2">
+		<name>Vampire 2</name>
+		<gender>male</gender>
+		<positionId>vampire.vampire</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamVampireParity16Away3">
+		<name>Vampire 3</name>
+		<gender>male</gender>
+		<positionId>vampire.vampire</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamVampireParity16Away4">
+		<name>Vampire 4</name>
+		<gender>male</gender>
+		<positionId>vampire.vampire</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamVampireParity16Away5">
+		<name>Vampire 5</name>
+		<gender>male</gender>
+		<positionId>vampire.vampire</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamVampireParity16Away6">
+		<name>Vampire 6</name>
+		<gender>male</gender>
+		<positionId>vampire.vampire</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamVampireParity16Away7">
+		<name>Thrall 7</name>
+		<gender>male</gender>
+		<positionId>vampire.thrall</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamVampireParity16Away8">
+		<name>Thrall 8</name>
+		<gender>male</gender>
+		<positionId>vampire.thrall</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamVampireParity16Away9">
+		<name>Thrall 9</name>
+		<gender>male</gender>
+		<positionId>vampire.thrall</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamVampireParity16Away10">
+		<name>Thrall 10</name>
+		<gender>male</gender>
+		<positionId>vampire.thrall</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamVampireParity16Away11">
+		<name>Thrall 11</name>
+		<gender>male</gender>
+		<positionId>vampire.thrall</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamVampireParity16Away12">
+		<name>Thrall 12</name>
+		<gender>male</gender>
+		<positionId>vampire.thrall</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamVampireParity16Away13">
+		<name>Thrall 13</name>
+		<gender>male</gender>
+		<positionId>vampire.thrall</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

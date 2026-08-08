@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamKhemriFumbblParity25Home">
+
+	<coach>Home</coach>
+	<name>Tomb Kings Parity25 Home</name>
+	<race>Tomb Kings</race>
+	<rosterId>khemri_fumbbl.bb2025</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1090000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamKhemriFumbblParity25Home1">
+		<name>Tomb Guardian 1</name>
+		<gender>male</gender>
+		<positionId>2895</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamKhemriFumbblParity25Home2">
+		<name>Tomb Guardian 2</name>
+		<gender>male</gender>
+		<positionId>2895</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamKhemriFumbblParity25Home3">
+		<name>Tomb Guardian 3</name>
+		<gender>male</gender>
+		<positionId>2895</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamKhemriFumbblParity25Home4">
+		<name>Tomb Guardian 4</name>
+		<gender>male</gender>
+		<positionId>2895</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamKhemriFumbblParity25Home5">
+		<name>Anointed Blitzer 5</name>
+		<gender>male</gender>
+		<positionId>2894</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamKhemriFumbblParity25Home6">
+		<name>Anointed Blitzer 6</name>
+		<gender>male</gender>
+		<positionId>2894</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamKhemriFumbblParity25Home7">
+		<name>Anointed Thrower 7</name>
+		<gender>male</gender>
+		<positionId>2893</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamKhemriFumbblParity25Home8">
+		<name>Anointed Thrower 8</name>
+		<gender>male</gender>
+		<positionId>2893</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamKhemriFumbblParity25Home9">
+		<name>Skeleton Lineman 9</name>
+		<gender>male</gender>
+		<positionId>2892</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamKhemriFumbblParity25Home10">
+		<name>Skeleton Lineman 10</name>
+		<gender>male</gender>
+		<positionId>2892</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamKhemriFumbblParity25Home11">
+		<name>Skeleton Lineman 11</name>
+		<gender>male</gender>
+		<positionId>2892</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamKhemriFumbblParity25Home12">
+		<name>Skeleton Lineman 12</name>
+		<gender>male</gender>
+		<positionId>2892</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

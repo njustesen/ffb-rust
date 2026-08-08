@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamDarkElfLeagueFumbblParity16Home">
+
+	<coach>Home</coach>
+	<name>Dark Elf Parity16 Home</name>
+	<race>Dark Elf</race>
+	<rosterId>dark_elf_league_fumbbl.bb2016</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1095000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>5000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamDarkElfLeagueFumbblParity16Home1">
+		<name>Witch Elf 1</name>
+		<gender>male</gender>
+		<positionId>37738</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamDarkElfLeagueFumbblParity16Home2">
+		<name>Witch Elf 2</name>
+		<gender>male</gender>
+		<positionId>37738</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamDarkElfLeagueFumbblParity16Home3">
+		<name>Blitzer 3</name>
+		<gender>male</gender>
+		<positionId>37736</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamDarkElfLeagueFumbblParity16Home4">
+		<name>Blitzer 4</name>
+		<gender>male</gender>
+		<positionId>37736</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamDarkElfLeagueFumbblParity16Home5">
+		<name>Blitzer 5</name>
+		<gender>male</gender>
+		<positionId>37736</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamDarkElfLeagueFumbblParity16Home6">
+		<name>Blitzer 6</name>
+		<gender>male</gender>
+		<positionId>37736</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamDarkElfLeagueFumbblParity16Home7">
+		<name>Assassin 7</name>
+		<gender>male</gender>
+		<positionId>37737</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamDarkElfLeagueFumbblParity16Home8">
+		<name>Runner 8</name>
+		<gender>male</gender>
+		<positionId>37735</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamDarkElfLeagueFumbblParity16Home9">
+		<name>Dark Elf Lineman 9</name>
+		<gender>male</gender>
+		<positionId>37734</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamDarkElfLeagueFumbblParity16Home10">
+		<name>Dark Elf Lineman 10</name>
+		<gender>male</gender>
+		<positionId>37734</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamDarkElfLeagueFumbblParity16Home11">
+		<name>Dark Elf Lineman 11</name>
+		<gender>male</gender>
+		<positionId>37734</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="goblin.bb2016">
+	<name>Goblin</name>
+	<reRollCost>60000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="goblin.goblin">
+		<quantity>16</quantity>
+		<name>Goblin</name>
+		<displayName>Goblin</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>6</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+			<skill>Stunty</skill>
+			<skill>Thick Skull</skill>
+			<skill>Animosity</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>General</double>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="goblin.troll">
+		<quantity>2</quantity>
+		<name>Troll</name>
+		<displayName>Troll</displayName>
+		<type>Big Guy</type>
+		<cost>110000</cost>
+		<movement>4</movement>
+		<strength>5</strength>
+		<agility>1</agility>
+		<passing>5</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Always Hungry</skill>
+			<skill>Loner</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Really Stupid</skill>
+			<skill>Regeneration</skill>
+			<skill>Throw Team-Mate</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>General</double>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="goblin.bombardier">
+		<quantity>1</quantity>
+		<name>Bombardier</name>
+		<displayName>Bombardier</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>6</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Bombardier</skill>
+			<skill>Dodge</skill>
+			<skill>Secret Weapon</skill>
+			<skill>Stunty</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>General</double>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="goblin.pogoer">
+		<quantity>1</quantity>
+		<name>Pogoer</name>
+		<displayName>Pogoer</displayName>
+		<type>Regular</type>
+		<cost>70000</cost>
+		<movement>7</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Leap</skill>
+			<skill>Stunty</skill>
+			<skill>Very Long Legs</skill>
+			<skill>Animosity</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>General</double>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="goblin.looney">
+		<quantity>1</quantity>
+		<name>Looney</name>
+		<displayName>Looney</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>6</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>0</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Chainsaw</skill>
+			<skill>Secret Weapon</skill>
+			<skill>Stunty</skill>
+			<skill>Animosity</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>General</double>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="goblin.fanatic">
+		<quantity>1</quantity>
+		<name>Fanatic</name>
+		<displayName>Fanatic</displayName>
+		<type>Regular</type>
+		<cost>70000</cost>
+		<movement>3</movement>
+		<strength>7</strength>
+		<agility>3</agility>
+		<passing>0</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Ball and Chain</skill>
+			<skill>No Hands</skill>
+			<skill>Secret Weapon</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>General</double>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+</roster>

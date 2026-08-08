@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="high_elf.bb2025">
+	<name>High Elf</name>
+	<reRollCost>50000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="highelf.lineman">
+		<quantity>16</quantity>
+		<name>Lineman</name>
+		<displayName>High Elf Lineman</displayName>
+		<type>Regular</type>
+		<cost>65000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>3</passing>
+		<armour>9</armour>
+		<skillList/>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Lineman</keyword>
+			<keyword>Elf</keyword>
+		</keywords>
+	</position>
+	<position id="highelf.phoenix_warrior">
+		<quantity>2</quantity>
+		<name>Phoenix Warrior</name>
+		<displayName>Phoenix Warrior</displayName>
+		<type>Regular</type>
+		<cost>90000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>2</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Cloud Burster</skill>
+			<skill>Pass</skill>
+			<skill>Safe Pass</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<normal>Passing</normal>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Thrower</keyword>
+			<keyword>Elf</keyword>
+		</keywords>
+	</position>
+	<position id="highelf.dragon_prince">
+		<quantity>2</quantity>
+		<name>Dragon Prince</name>
+		<displayName>Dragon Prince</displayName>
+		<type>Regular</type>
+		<cost>110000</cost>
+		<movement>8</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>My Ball</skill>
+			<skill>Steady Footing</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blitzer</keyword>
+			<keyword>Elf</keyword>
+			<keyword>Runner</keyword>
+		</keywords>
+	</position>
+	<position id="highelf.white_lion">
+		<quantity>2</quantity>
+		<name>White Lion</name>
+		<displayName>White Lion</displayName>
+		<type>Regular</type>
+		<cost>110000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>3</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Claws</skill>
+			<skill>Wrestle</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Passing</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blitzer</keyword>
+			<keyword>Elf</keyword>
+		</keywords>
+	</position>
+</roster>

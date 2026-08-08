@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="necromantic.bb2025">
+	<name>Necromantic</name>
+	<reRollCost>70000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>false</apothecary>
+	<undead>true</undead>
+	<necromancer>true</necromancer>
+	<raisedPositionId>necromantic.zombie</raisedPositionId>
+	<position id="necromantic.zombie">
+		<quantity>16</quantity>
+		<name>Zombie</name>
+		<displayName>Zombie Lineman</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>4</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Eye Gouge</skill>
+			<skill>Regeneration</skill>
+			<skill>Unsteady</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Devious</normal>
+			<normal>General</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Human</keyword>
+			<keyword>Lineman</keyword>
+			<keyword>Undead</keyword>
+			<keyword>Zombie</keyword>
+		</keywords>
+	</position>
+	<position id="necromantic.ghoul">
+		<quantity>2</quantity>
+		<name>Ghoul</name>
+		<displayName>Ghoul Runner</displayName>
+		<type>Regular</type>
+		<cost>75000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>3</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Devious</double>
+			<double>Passing</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Ghoul</keyword>
+			<keyword>Runner</keyword>
+			<keyword>Undead</keyword>
+		</keywords>
+	</position>
+	<position id="necromantic.wraith">
+		<quantity>2</quantity>
+		<name>Wraith</name>
+		<displayName>Wraith</displayName>
+		<type>Regular</type>
+		<cost>85000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>0</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Foul Appearance</skill>
+			<skill>No Ball</skill>
+			<skill>Regeneration</skill>
+			<skill>Sidestep</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blocker</keyword>
+			<keyword>Undead</keyword>
+			<keyword>Wraith</keyword>
+		</keywords>
+	</position>
+	<position id="necromantic.fleshgolem">
+		<quantity>2</quantity>
+		<name>Flesh Golem</name>
+		<displayName>Flesh Golem</displayName>
+		<type>Regular</type>
+		<cost>110000</cost>
+		<movement>4</movement>
+		<strength>4</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Regeneration</skill>
+			<skill>Stand Firm</skill>
+			<skill>Thick Skull</skill>
+			<skill>Unsteady</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blocker</keyword>
+			<keyword>Construct</keyword>
+			<keyword>Undead</keyword>
+		</keywords>
+	</position>
+	<position id="necromantic.werewolf">
+		<quantity>2</quantity>
+		<name>Werewolf</name>
+		<displayName>Werewolf</displayName>
+		<type>Regular</type>
+		<cost>120000</cost>
+		<movement>8</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>3</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Claws</skill>
+			<skill>Frenzy</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Devious</double>
+			<double>Passing</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blitzer</keyword>
+			<keyword>Undead</keyword>
+			<keyword>Werewolf</keyword>
+		</keywords>
+	</position>
+</roster>

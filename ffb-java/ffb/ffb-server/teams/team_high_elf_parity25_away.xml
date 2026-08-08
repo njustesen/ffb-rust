@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamHighElfParity25Away">
+
+	<coach>Away</coach>
+	<name>High Elf Parity25 Away</name>
+	<race>High Elf</race>
+	<rosterId>high_elf.bb2025</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>2</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1095000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamHighElfParity25Away1">
+		<name>Dragon Prince 1</name>
+		<gender>male</gender>
+		<positionId>highelf.dragon_prince</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamHighElfParity25Away2">
+		<name>Dragon Prince 2</name>
+		<gender>male</gender>
+		<positionId>highelf.dragon_prince</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamHighElfParity25Away3">
+		<name>White Lion 3</name>
+		<gender>male</gender>
+		<positionId>highelf.white_lion</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamHighElfParity25Away4">
+		<name>White Lion 4</name>
+		<gender>male</gender>
+		<positionId>highelf.white_lion</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamHighElfParity25Away5">
+		<name>Phoenix Warrior 5</name>
+		<gender>male</gender>
+		<positionId>highelf.phoenix_warrior</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamHighElfParity25Away6">
+		<name>Phoenix Warrior 6</name>
+		<gender>male</gender>
+		<positionId>highelf.phoenix_warrior</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamHighElfParity25Away7">
+		<name>High Elf Lineman 7</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamHighElfParity25Away8">
+		<name>High Elf Lineman 8</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamHighElfParity25Away9">
+		<name>High Elf Lineman 9</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamHighElfParity25Away10">
+		<name>High Elf Lineman 10</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamHighElfParity25Away11">
+		<name>High Elf Lineman 11</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

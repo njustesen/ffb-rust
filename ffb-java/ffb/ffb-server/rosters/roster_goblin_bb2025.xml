@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="goblin.bb2025">
+	<name>Goblin</name>
+	<reRollCost>60000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="goblin.goblin">
+		<quantity>16</quantity>
+		<name>Goblin</name>
+		<displayName>Goblin Lineman</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>6</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>Devious</normal>
+			<double>General</double>
+			<double>Passing</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Goblin</keyword>
+			<keyword>Lineman</keyword>
+		</keywords>
+	</position>
+	<position id="goblin.looney">
+		<quantity>1</quantity>
+		<name>Looney</name>
+		<displayName>Looney</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>6</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>0</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Chainsaw</skill>
+			<skill>No Ball</skill>
+			<skill>Secret Weapon</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Devious</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Goblin</keyword>
+			<keyword>Special</keyword>
+		</keywords>
+	</position>
+	<position id="goblin.bombardier">
+		<quantity>1</quantity>
+		<name>Bombardier</name>
+		<displayName>Bomma</displayName>
+		<type>Regular</type>
+		<cost>45000</cost>
+		<movement>6</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Bombardier</skill>
+			<skill>Dodge</skill>
+			<skill>Secret Weapon</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Devious</normal>
+			<normal>Passing</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Goblin</keyword>
+			<keyword>Special</keyword>
+		</keywords>
+	</position>
+	<position id="goblin.ooligan">
+		<quantity>1</quantity>
+		<name>'Ooligan</name>
+		<displayName>'Ooligan</displayName>
+		<type>Regular</type>
+		<cost>60000</cost>
+		<movement>6</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill value="1">Dirty Player</skill>
+			<skill>Disturbing Presence</skill>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+			<skill>Stunty</skill>
+			<skill>Taunt</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>Devious</normal>
+			<double>General</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Goblin</keyword>
+			<keyword>Special</keyword>
+		</keywords>
+	</position>
+	<position id="goblin.doom_diver">
+		<quantity>1</quantity>
+		<name>Doom Diver</name>
+		<displayName>Doom Diver</displayName>
+		<type>Regular</type>
+		<cost>65000</cost>
+		<movement>6</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>6</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+			<skill>Stunty</skill>
+			<skill>Swoop</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>Devious</double>
+			<double>General</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Goblin</keyword>
+			<keyword>Special</keyword>
+		</keywords>
+	</position>
+	<position id="goblin.fanatic">
+		<quantity>1</quantity>
+		<name>Fanatic</name>
+		<displayName>Fanatic</displayName>
+		<type>Regular</type>
+		<cost>70000</cost>
+		<movement>3</movement>
+		<strength>7</strength>
+		<agility>3</agility>
+		<passing>0</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Ball and Chain</skill>
+			<skill>No Ball</skill>
+			<skill>Secret Weapon</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Devious</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Goblin</keyword>
+			<keyword>Special</keyword>
+		</keywords>
+	</position>
+	<position id="goblin.pogoer">
+		<quantity>1</quantity>
+		<name>Pogoer</name>
+		<displayName>Pogoer</displayName>
+		<type>Regular</type>
+		<cost>75000</cost>
+		<movement>7</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Pogo</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>Devious</double>
+			<double>General</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Goblin</keyword>
+			<keyword>Special</keyword>
+		</keywords>
+	</position>
+	<position id="goblin.troll">
+		<quantity>2</quantity>
+		<name>Troll</name>
+		<displayName>Trained Troll</displayName>
+		<type>Big Guy</type>
+		<cost>115000</cost>
+		<movement>4</movement>
+		<strength>5</strength>
+		<agility>5</agility>
+		<passing>5</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Always Hungry</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Projectile Vomit</skill>
+			<skill>Really Stupid</skill>
+			<skill>Regeneration</skill>
+			<skill>Throw Team-mate</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Passing</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Big Guy</keyword>
+			<keyword>Troll</keyword>
+		</keywords>
+	</position>
+</roster>

@@ -1,0 +1,60 @@
+{
+  "edition": "bb2016",
+  "race": "nurgle",
+  "roster_id": "nurgle.lrb6",
+  "rerolls": 2,
+  "reroll_cost": 70000,
+  "apothecaries": 0,
+  "dedicated_fans": 0,
+  "fan_factor": 2,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1100000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "nurgle.beast"
+    },
+    {
+      "nr": 2,
+      "position_id": "nurgle.warrior"
+    },
+    {
+      "nr": 3,
+      "position_id": "nurgle.warrior"
+    },
+    {
+      "nr": 4,
+      "position_id": "nurgle.warrior"
+    },
+    {
+      "nr": 5,
+      "position_id": "nurgle.warrior"
+    },
+    {
+      "nr": 6,
+      "position_id": "nurgle.pestigor"
+    },
+    {
+      "nr": 7,
+      "position_id": "nurgle.pestigor"
+    },
+    {
+      "nr": 8,
+      "position_id": "nurgle.pestigor"
+    },
+    {
+      "nr": 9,
+      "position_id": "nurgle.rotter"
+    },
+    {
+      "nr": 10,
+      "position_id": "nurgle.rotter"
+    },
+    {
+      "nr": 11,
+      "position_id": "nurgle.rotter"
+    }
+  ],
+  "special_rules": []
+}

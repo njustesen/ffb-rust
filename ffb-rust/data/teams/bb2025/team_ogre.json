@@ -1,0 +1,71 @@
+{
+  "edition": "bb2025",
+  "race": "ogre",
+  "roster_id": "ogre.lrb6",
+  "rerolls": 2,
+  "reroll_cost": 70000,
+  "apothecaries": 0,
+  "dedicated_fans": 3,
+  "fan_factor": 0,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1090000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "ogre.ogre_runt_punter"
+    },
+    {
+      "nr": 2,
+      "position_id": "ogre.ogre"
+    },
+    {
+      "nr": 3,
+      "position_id": "ogre.ogre"
+    },
+    {
+      "nr": 4,
+      "position_id": "ogre.ogre"
+    },
+    {
+      "nr": 5,
+      "position_id": "ogre.ogre"
+    },
+    {
+      "nr": 6,
+      "position_id": "ogre.ogre"
+    },
+    {
+      "nr": 7,
+      "position_id": "ogre.snotling"
+    },
+    {
+      "nr": 8,
+      "position_id": "ogre.snotling"
+    },
+    {
+      "nr": 9,
+      "position_id": "ogre.snotling"
+    },
+    {
+      "nr": 10,
+      "position_id": "ogre.snotling"
+    },
+    {
+      "nr": 11,
+      "position_id": "ogre.snotling"
+    },
+    {
+      "nr": 12,
+      "position_id": "ogre.snotling"
+    },
+    {
+      "nr": 13,
+      "position_id": "ogre.snotling"
+    }
+  ],
+  "special_rules": [
+    "Brawlin' Brutes",
+    "Low Cost Linemen"
+  ]
+}

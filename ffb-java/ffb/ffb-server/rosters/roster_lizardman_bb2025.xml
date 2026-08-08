@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="lizardman.bb2025">
+	<name>Lizardman</name>
+	<reRollCost>70000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="lizardman.skink">
+		<quantity>16</quantity>
+		<name>Skink</name>
+		<displayName>Skink Lineman</displayName>
+		<type>Regular</type>
+		<cost>60000</cost>
+		<movement>8</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>General</double>
+			<double>Passing</double>
+			<double>Strength</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Lineman</keyword>
+			<keyword>Lizardman</keyword>
+		</keywords>
+	</position>
+	<position id="lizardman.skink">
+		<quantity>2</quantity>
+		<name>Skink</name>
+		<displayName>Chameleon Skink</displayName>
+		<type>Regular</type>
+		<cost>70000</cost>
+		<movement>7</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>3</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>On the Ball</skill>
+			<skill>Shadowing</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>Passing</normal>
+			<double>General</double>
+			<double>Strength</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Thrower</keyword>
+			<keyword>Lizardman</keyword>
+		</keywords>
+	</position>
+	<position id="lizardman.saurus">
+		<quantity>6</quantity>
+		<name>Saurus</name>
+		<displayName>Saurus Blocker</displayName>
+		<type>Regular</type>
+		<cost>90000</cost>
+		<movement>6</movement>
+		<strength>4</strength>
+		<agility>5</agility>
+		<passing>6</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Juggernaut</skill>
+			<skill>Unsteady</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blocker</keyword>
+			<keyword>Lizardman</keyword>
+		</keywords>
+	</position>
+	<position id="lizardman.kroxigor">
+		<quantity>1</quantity>
+		<name>Kroxigor</name>
+		<displayName>Kroxigor</displayName>
+		<type>Big Guy</type>
+		<cost>140000</cost>
+		<movement>6</movement>
+		<strength>5</strength>
+		<agility>5</agility>
+		<passing>6</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Bone Head</skill>
+			<skill value="4">Loner</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Prehensile Tail</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Big Guy</keyword>
+			<keyword>Lizardman</keyword>
+		</keywords>
+	</position>
+</roster>

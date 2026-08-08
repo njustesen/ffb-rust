@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="nurgle.bb2025">
+	<name>Nurgle</name>
+	<reRollCost>60000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>false</apothecary>
+	<raisedPositionId>nurgle.beast</raisedPositionId>
+	<position id="nurgle.rotter">
+		<quantity>16</quantity>
+		<name>Rotter</name>
+		<displayName>Rotter</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>5</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Decay</skill>
+			<skill>Plague Ridden</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<normal>Devious</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Lineman</keyword>
+			<keyword>Human</keyword>
+		</keywords>
+	</position>
+	<position id="nurgle.pestigor">
+		<quantity>2</quantity>
+		<name>Pestigor</name>
+		<displayName>Pestigor</displayName>
+		<type>Regular</type>
+		<cost>70000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Horns</skill>
+			<skill>Plague Ridden</skill>
+			<skill>Regeneration</skill>
+			<skill>Steady Footing</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Runner</keyword>
+			<keyword>Beastman</keyword>
+		</keywords>
+	</position>
+	<position id="nurgle.warrior">
+		<quantity>4</quantity>
+		<name>Nurgle Warrior</name>
+		<displayName>Bloater</displayName>
+		<type>Regular</type>
+		<cost>110000</cost>
+		<movement>4</movement>
+		<strength>4</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Disturbing Presence</skill>
+			<skill>Foul Appearance</skill>
+			<skill>Plague Ridden</skill>
+			<skill>Regeneration</skill>
+			<skill>Stand Firm</skill>
+			<skill>Unsteady</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blocker</keyword>
+			<keyword>Human</keyword>
+		</keywords>
+	</position>
+	<position id="nurgle.beast">
+		<quantity>1</quantity>
+		<name>Beast of Nurgle</name>
+		<displayName>Rotspawn</displayName>
+		<type>Big Guy</type>
+		<cost>140000</cost>
+		<movement>4</movement>
+		<strength>5</strength>
+		<agility>5</agility>
+		<passing>6</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Disturbing Presence</skill>
+			<skill>Foul Appearance</skill>
+			<skill value="4">Loner</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Pick-me-up</skill>
+			<skill>Plague Ridden</skill>
+			<skill>Really Stupid</skill>
+			<skill>Regeneration</skill>
+			<skill>Tentacles</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>General</double>
+			<double>Mutation</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Big Guy</keyword>
+			<keyword>Spawn</keyword>
+		</keywords>
+	</position>
+</roster>

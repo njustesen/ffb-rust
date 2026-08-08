@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="elf.bb2016">
+	<name>Elf</name>
+	<reRollCost>50000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="elf.lineman">
+		<quantity>16</quantity>
+		<name>Lineman</name>
+		<displayName>Lineman</displayName>
+		<type>Regular</type>
+		<cost>60000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>4</passing>
+		<armour>7</armour>
+		<skillList/>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Agility</normal>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="elf.catcher">
+		<quantity>4</quantity>
+		<name>Catcher</name>
+		<displayName>Catcher</displayName>
+		<type>Regular</type>
+		<cost>100000</cost>
+		<movement>8</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>4</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Catch</skill>
+			<skill>Nerves of Steel</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Agility</normal>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="elf.thrower">
+		<quantity>2</quantity>
+		<name>Thrower</name>
+		<displayName>Thrower</displayName>
+		<type>Regular</type>
+		<cost>70000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>2</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Pass</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Agility</normal>
+			<normal>Passing</normal>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="elf.blitzer">
+		<quantity>2</quantity>
+		<name>Blitzer</name>
+		<displayName>Blitzer</displayName>
+		<type>Regular</type>
+		<cost>110000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>3</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Side Step</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Agility</normal>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+</roster>

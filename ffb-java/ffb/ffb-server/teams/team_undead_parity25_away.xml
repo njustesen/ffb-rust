@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamUndeadParity25Away">
+
+	<coach>Away</coach>
+	<name>Undead Parity25 Away</name>
+	<race>Undead</race>
+	<rosterId>undead.bb2025</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1080000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>10000</treasury>
+	<specialRules>
+		<rule>Masters of Undeath</rule>
+	</specialRules>
+
+	<player nr="1" id="teamUndeadParity25Away1">
+		<name>Mummy 1</name>
+		<gender>male</gender>
+		<positionId>undead.mummy</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamUndeadParity25Away2">
+		<name>Mummy 2</name>
+		<gender>male</gender>
+		<positionId>undead.mummy</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamUndeadParity25Away3">
+		<name>Wight Blitzer 3</name>
+		<gender>male</gender>
+		<positionId>undead.wight</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamUndeadParity25Away4">
+		<name>Wight Blitzer 4</name>
+		<gender>male</gender>
+		<positionId>undead.wight</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamUndeadParity25Away5">
+		<name>Ghoul Runner 5</name>
+		<gender>male</gender>
+		<positionId>undead.ghoul</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamUndeadParity25Away6">
+		<name>Ghoul Runner 6</name>
+		<gender>male</gender>
+		<positionId>undead.ghoul</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamUndeadParity25Away7">
+		<name>Skeleton Lineman 7</name>
+		<gender>male</gender>
+		<positionId>undead.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamUndeadParity25Away8">
+		<name>Skeleton Lineman 8</name>
+		<gender>male</gender>
+		<positionId>undead.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamUndeadParity25Away9">
+		<name>Skeleton Lineman 9</name>
+		<gender>male</gender>
+		<positionId>undead.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamUndeadParity25Away10">
+		<name>Skeleton Lineman 10</name>
+		<gender>male</gender>
+		<positionId>undead.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamUndeadParity25Away11">
+		<name>Skeleton Lineman 11</name>
+		<gender>male</gender>
+		<positionId>undead.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamUndeadParity25Away12">
+		<name>Skeleton Lineman 12</name>
+		<gender>male</gender>
+		<positionId>undead.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamUndeadParity25Away13">
+		<name>Zombie Lineman 13</name>
+		<gender>male</gender>
+		<positionId>undead.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

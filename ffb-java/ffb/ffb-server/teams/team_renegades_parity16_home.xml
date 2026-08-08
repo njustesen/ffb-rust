@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamRenegadesParity16Home">
+
+	<coach>Home</coach>
+	<name>Chaos Renegade Parity16 Home</name>
+	<race>Chaos Renegade</race>
+	<rosterId>renegades.bb2016</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>1</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1095000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>5000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamRenegadesParity16Home1">
+		<name>Renegade Minotaur 1</name>
+		<gender>male</gender>
+		<positionId>37732</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamRenegadesParity16Home2">
+		<name>Renegade Rat Ogre 2</name>
+		<gender>male</gender>
+		<positionId>37733</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamRenegadesParity16Home3">
+		<name>Renegade Ogre 3</name>
+		<gender>male</gender>
+		<positionId>37731</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamRenegadesParity16Home4">
+		<name>Renegade Troll 4</name>
+		<gender>male</gender>
+		<positionId>37730</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamRenegadesParity16Home5">
+		<name>Renegade Human Thrower 5</name>
+		<gender>male</gender>
+		<positionId>37725</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamRenegadesParity16Home6">
+		<name>Renegade Dark Elf 6</name>
+		<gender>male</gender>
+		<positionId>37729</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamRenegadesParity16Home7">
+		<name>Renegade Human Lineman 7</name>
+		<gender>male</gender>
+		<positionId>37724</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamRenegadesParity16Home8">
+		<name>Renegade Human Lineman 8</name>
+		<gender>male</gender>
+		<positionId>37724</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamRenegadesParity16Home9">
+		<name>Renegade Orc 9</name>
+		<gender>male</gender>
+		<positionId>37727</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamRenegadesParity16Home10">
+		<name>Renegade Skaven 10</name>
+		<gender>male</gender>
+		<positionId>37728</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamRenegadesParity16Home11">
+		<name>Renegade Goblin 11</name>
+		<gender>male</gender>
+		<positionId>37726</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="underworld.bb2025">
+	<name>Underworld</name>
+	<reRollCost>70000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="underworld.goblin">
+		<quantity>16</quantity>
+		<name>Underworld Goblin</name>
+		<displayName>Goblin Lineman</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>6</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>Devious</normal>
+			<normal>Mutation</normal>
+			<double>General</double>
+			<double>Passing</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Goblin</keyword>
+			<keyword>Lineman</keyword>
+		</keywords>
+	</position>
+	<position id="underworld.snotling_lineman">
+		<quantity>6</quantity>
+		<name>Snotling Lineman</name>
+		<displayName>Snotling Lineman</displayName>
+		<type>Regular</type>
+		<cost>15000</cost>
+		<movement>5</movement>
+		<strength>1</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>6</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Insignificant</skill>
+			<skill>Right Stuff</skill>
+			<skill>Sidestep</skill>
+			<skill>Stunty</skill>
+			<skill>Titchy</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>Devious</normal>
+			<normal>Mutation</normal>
+			<double>General</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Lineman</keyword>
+			<keyword>Snotling</keyword>
+		</keywords>
+	</position>
+	<position id="underworld.skaven.lineman">
+		<quantity>3</quantity>
+		<name>Skaven Lineman</name>
+		<displayName>Skaven Clanrat</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill value="goblin">Animosity</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<normal>Devious</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Lineman</keyword>
+			<keyword>Skaven</keyword>
+		</keywords>
+	</position>
+	<position id="underworld.skaven.thrower">
+		<quantity>1</quantity>
+		<name>Skaven Thrower</name>
+		<displayName>Skaven Thrower</displayName>
+		<type>Regular</type>
+		<cost>80000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>2</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill value="goblin">Animosity</skill>
+			<skill>Pass</skill>
+			<skill>Sure Hands</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<normal>Passing</normal>
+			<double>Agility</double>
+			<double>Devious</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Skaven</keyword>
+			<keyword>Thrower</keyword>
+		</keywords>
+	</position>
+	<position id="underworld.gutter_runner">
+		<quantity>1</quantity>
+		<name>Gutter Runner</name>
+		<displayName>Gutter Runner</displayName>
+		<type>Regular</type>
+		<cost>85000</cost>
+		<movement>9</movement>
+		<strength>2</strength>
+		<agility>2</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill value="goblin">Animosity</skill>
+			<skill>Dodge</skill>
+			<skill>Stab</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<normal>Devious</normal>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Runner</keyword>
+			<keyword>Skaven</keyword>
+		</keywords>
+	</position>
+	<position id="underworld.skaven.blitzer">
+		<quantity>1</quantity>
+		<name>Skaven Blitzer</name>
+		<displayName>Skaven Blitzer</displayName>
+		<type>Regular</type>
+		<cost>90000</cost>
+		<movement>8</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill value="goblin">Animosity</skill>
+			<skill>Block</skill>
+			<skill>Strip Ball</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blitzer</keyword>
+			<keyword>Skaven</keyword>
+		</keywords>
+	</position>
+	<position id="underworld.troll.warpstone">
+		<quantity>1</quantity>
+		<name>Warpstone Troll</name>
+		<displayName>Troll</displayName>
+		<type>Big Guy</type>
+		<cost>115000</cost>
+		<movement>4</movement>
+		<strength>5</strength>
+		<agility>5</agility>
+		<passing>5</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Always Hungry</skill>
+			<skill value="4">Loner</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Projectile Vomit</skill>
+			<skill>Really Stupid</skill>
+			<skill>Regeneration</skill>
+			<skill>Throw Team-mate</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Mutation</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Passing</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Big Guy</keyword>
+			<keyword>Troll</keyword>
+		</keywords>
+	</position>
+	<position id="37844">
+		<quantity>1</quantity>
+		<name>Mutant Rat Ogre</name>
+		<displayName>Rat Ogre</displayName>
+		<type>Big Guy</type>
+		<cost>150000</cost>
+		<movement>6</movement>
+		<strength>5</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Animal Savagery</skill>
+			<skill>Frenzy</skill>
+			<skill value="4">Loner</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Prehensile Tail</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Mutation</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Big Guy</keyword>
+			<keyword>Skaven</keyword>
+		</keywords>
+	</position>
+</roster>

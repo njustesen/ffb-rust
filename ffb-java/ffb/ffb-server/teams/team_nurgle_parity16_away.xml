@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamNurgleParity16Away">
+
+	<coach>Away</coach>
+	<name>Nurgle Parity16 Away</name>
+	<race>Nurgle</race>
+	<rosterId>nurgle.bb2016</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>2</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamNurgleParity16Away1">
+		<name>Beast of Nurgle 1</name>
+		<gender>male</gender>
+		<positionId>nurgle.beast</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamNurgleParity16Away2">
+		<name>Nurgle Warrior 2</name>
+		<gender>male</gender>
+		<positionId>nurgle.warrior</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamNurgleParity16Away3">
+		<name>Nurgle Warrior 3</name>
+		<gender>male</gender>
+		<positionId>nurgle.warrior</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamNurgleParity16Away4">
+		<name>Nurgle Warrior 4</name>
+		<gender>male</gender>
+		<positionId>nurgle.warrior</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamNurgleParity16Away5">
+		<name>Nurgle Warrior 5</name>
+		<gender>male</gender>
+		<positionId>nurgle.warrior</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamNurgleParity16Away6">
+		<name>Pestigor 6</name>
+		<gender>male</gender>
+		<positionId>nurgle.pestigor</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamNurgleParity16Away7">
+		<name>Pestigor 7</name>
+		<gender>male</gender>
+		<positionId>nurgle.pestigor</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamNurgleParity16Away8">
+		<name>Pestigor 8</name>
+		<gender>male</gender>
+		<positionId>nurgle.pestigor</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamNurgleParity16Away9">
+		<name>Rotter 9</name>
+		<gender>male</gender>
+		<positionId>nurgle.rotter</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamNurgleParity16Away10">
+		<name>Rotter 10</name>
+		<gender>male</gender>
+		<positionId>nurgle.rotter</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamNurgleParity16Away11">
+		<name>Rotter 11</name>
+		<gender>male</gender>
+		<positionId>nurgle.rotter</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

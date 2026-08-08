@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="human.bb2025">
+	<name>Human</name>
+	<reRollCost>50000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="human.lineman">
+		<quantity>16</quantity>
+		<name>Lineman</name>
+		<displayName>Human Lineman</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList/>
+		<skillCategoryList>
+			<normal>General</normal>
+			<double>Agility</double>
+			<double>Devious</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Lineman</keyword>
+			<keyword>Human</keyword>
+		</keywords>
+	</position>
+	<position id="human.halfling_hopeful">
+		<quantity>3</quantity>
+		<name>Halfling Hopeful</name>
+		<displayName>Halfling Hopeful</displayName>
+		<type>Regular</type>
+		<cost>30000</cost>
+		<movement>5</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>Devious</double>
+			<double>General</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Lineman</keyword>
+			<keyword>Halfling</keyword>
+		</keywords>
+	</position>
+	<position id="human.catcher">
+		<quantity>2</quantity>
+		<name>Catcher</name>
+		<displayName>Human Catcher</displayName>
+		<type>Regular</type>
+		<cost>75000</cost>
+		<movement>8</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Catch</skill>
+			<skill>Dodge</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Devious</double>
+			<double>Passing</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Catcher</keyword>
+			<keyword>Human</keyword>
+		</keywords>
+	</position>
+	<position id="human.thrower">
+		<quantity>2</quantity>
+		<name>Thrower</name>
+		<displayName>Human Thrower</displayName>
+		<type>Regular</type>
+		<cost>75000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>3</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Pass</skill>
+			<skill>Sure Hands</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Passing</normal>
+			<double>Agility</double>
+			<double>Devious</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Thrower</keyword>
+			<keyword>Human</keyword>
+		</keywords>
+	</position>
+	<position id="human.blitzer">
+		<quantity>2</quantity>
+		<name>Blitzer</name>
+		<displayName>Human Blitzer</displayName>
+		<type>Regular</type>
+		<cost>85000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Tackle</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blitzer</keyword>
+			<keyword>Human</keyword>
+		</keywords>
+	</position>
+	<position id="human.ogre">
+		<quantity>1</quantity>
+		<name>Ogre</name>
+		<displayName>Ogre</displayName>
+		<type>Big Guy</type>
+		<cost>140000</cost>
+		<movement>5</movement>
+		<strength>5</strength>
+		<agility>4</agility>
+		<passing>5</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Bone Head</skill>
+			<skill value="3">Loner</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Thick Skull</skill>
+			<skill>Throw Team-mate</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Big Guy</keyword>
+			<keyword>Ogre</keyword>
+		</keywords>
+	</position>
+</roster>

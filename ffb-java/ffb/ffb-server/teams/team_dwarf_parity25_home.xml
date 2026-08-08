@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamDwarfParity25Home">
+
+	<coach>Home</coach>
+	<name>Dwarf Parity25 Home</name>
+	<race>Dwarf</race>
+	<rosterId>dwarf.bb2025</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>2</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1095000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules>
+		<rule>Brawlin' Brutes</rule>
+		<rule>Bribery and Corruption</rule>
+	</specialRules>
+
+	<player nr="1" id="teamDwarfParity25Home1">
+		<name>Deathroller 1</name>
+		<gender>male</gender>
+		<positionId>dwarf.deathroller</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamDwarfParity25Home2">
+		<name>Dwarf Blitzer 2</name>
+		<gender>male</gender>
+		<positionId>dwarf.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamDwarfParity25Home3">
+		<name>Dwarf Blitzer 3</name>
+		<gender>male</gender>
+		<positionId>dwarf.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamDwarfParity25Home4">
+		<name>Troll Slayer 4</name>
+		<gender>male</gender>
+		<positionId>dwarf.trollslayer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamDwarfParity25Home5">
+		<name>Dwarf Runner 5</name>
+		<gender>male</gender>
+		<positionId>dwarf.runner</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamDwarfParity25Home6">
+		<name>Dwarf Runner 6</name>
+		<gender>male</gender>
+		<positionId>dwarf.runner</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamDwarfParity25Home7">
+		<name>Dwarf Lineman 7</name>
+		<gender>male</gender>
+		<positionId>dwarf.blocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamDwarfParity25Home8">
+		<name>Dwarf Lineman 8</name>
+		<gender>male</gender>
+		<positionId>dwarf.blocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamDwarfParity25Home9">
+		<name>Dwarf Lineman 9</name>
+		<gender>male</gender>
+		<positionId>dwarf.blocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamDwarfParity25Home10">
+		<name>Dwarf Lineman 10</name>
+		<gender>male</gender>
+		<positionId>dwarf.blocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamDwarfParity25Home11">
+		<name>Dwarf Lineman 11</name>
+		<gender>male</gender>
+		<positionId>dwarf.blocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

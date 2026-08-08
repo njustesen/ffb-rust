@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="skaven.bb2016">
+	<name>Skaven</name>
+	<reRollCost>60000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="skaven.ratogre">
+		<quantity>1</quantity>
+		<name>Rat Ogre</name>
+		<displayName>Rat Ogre</displayName>
+		<type>Big Guy</type>
+		<cost>160000</cost>
+		<movement>6</movement>
+		<strength>5</strength>
+		<agility>2</agility>
+		<passing>0</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Loner</skill>
+			<skill>Frenzy</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Prehensile Tail</skill>
+			<skill>Wild Animal</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>General</double>
+			<double>Agility</double>
+			<double>Passing</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+	<position id="skaven.blitzer">
+		<quantity>2</quantity>
+		<name>Blitzer</name>
+		<displayName>Blitzer</displayName>
+		<type>Regular</type>
+		<cost>90000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Block</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+	<position id="skaven.gutterrunner">
+		<quantity>4</quantity>
+		<name>Gutter Runner</name>
+		<displayName>Gutter Runner</displayName>
+		<type>Regular</type>
+		<cost>80000</cost>
+		<movement>9</movement>
+		<strength>2</strength>
+		<agility>4</agility>
+		<passing>4</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Dodge</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Agility</normal>
+			<double>Passing</double>
+			<double>Strength</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+	<position id="skaven.thrower">
+		<quantity>2</quantity>
+		<name>Thrower</name>
+		<displayName>Thrower</displayName>
+		<type>Regular</type>
+		<cost>70000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>2</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Pass</skill>
+			<skill>Sure Hands</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Passing</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+	<position id="skaven.lineman">
+		<quantity>16</quantity>
+		<name>Lineman</name>
+		<displayName>Lineman</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>7</armour>
+		<skillList/>
+		<skillCategoryList>
+			<normal>General</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+			<double>Passing</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+</roster>

@@ -1,0 +1,60 @@
+{
+  "edition": "bb2016",
+  "race": "norse",
+  "roster_id": "norse.lrb6",
+  "rerolls": 2,
+  "reroll_cost": 60000,
+  "apothecaries": 0,
+  "dedicated_fans": 0,
+  "fan_factor": 2,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1100000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "norse.troll.snow"
+    },
+    {
+      "nr": 2,
+      "position_id": "norse.ulfwerener"
+    },
+    {
+      "nr": 3,
+      "position_id": "norse.ulfwerener"
+    },
+    {
+      "nr": 4,
+      "position_id": "norse.berserker"
+    },
+    {
+      "nr": 5,
+      "position_id": "norse.berserker"
+    },
+    {
+      "nr": 6,
+      "position_id": "norse.runner"
+    },
+    {
+      "nr": 7,
+      "position_id": "norse.runner"
+    },
+    {
+      "nr": 8,
+      "position_id": "norse.thrower"
+    },
+    {
+      "nr": 9,
+      "position_id": "norse.thrower"
+    },
+    {
+      "nr": 10,
+      "position_id": "norse.lineman"
+    },
+    {
+      "nr": 11,
+      "position_id": "norse.lineman"
+    }
+  ],
+  "special_rules": []
+}

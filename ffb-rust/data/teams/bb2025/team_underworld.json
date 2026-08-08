@@ -1,0 +1,74 @@
+{
+  "edition": "bb2025",
+  "race": "underworld",
+  "roster_id": "underworld.lrb6",
+  "rerolls": 4,
+  "reroll_cost": 70000,
+  "apothecaries": 1,
+  "dedicated_fans": 3,
+  "fan_factor": 0,
+  "treasury": 110000,
+  "spent": 990000,
+  "team_value": 980000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "underworld.troll.warpstone"
+    },
+    {
+      "nr": 2,
+      "position_id": "underworld.skaven.blitzer"
+    },
+    {
+      "nr": 3,
+      "position_id": "underworld.gutter_runner"
+    },
+    {
+      "nr": 4,
+      "position_id": "underworld.skaven.thrower"
+    },
+    {
+      "nr": 5,
+      "position_id": "underworld.skaven.lineman"
+    },
+    {
+      "nr": 6,
+      "position_id": "underworld.skaven.lineman"
+    },
+    {
+      "nr": 7,
+      "position_id": "underworld.skaven.lineman"
+    },
+    {
+      "nr": 8,
+      "position_id": "underworld.goblin"
+    },
+    {
+      "nr": 9,
+      "position_id": "underworld.snotling_lineman"
+    },
+    {
+      "nr": 10,
+      "position_id": "underworld.snotling_lineman"
+    },
+    {
+      "nr": 11,
+      "position_id": "underworld.snotling_lineman"
+    },
+    {
+      "nr": 12,
+      "position_id": "underworld.snotling_lineman"
+    },
+    {
+      "nr": 13,
+      "position_id": "underworld.snotling_lineman"
+    },
+    {
+      "nr": 14,
+      "position_id": "underworld.snotling_lineman"
+    }
+  ],
+  "special_rules": [
+    "Bribery and Corruption"
+  ]
+}

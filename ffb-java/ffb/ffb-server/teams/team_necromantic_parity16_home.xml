@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamNecromanticParity16Home">
+
+	<coach>Home</coach>
+	<name>Necromantic Parity16 Home</name>
+	<race>Necromantic</race>
+	<rosterId>necromantic.bb2016</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamNecromanticParity16Home1">
+		<name>Werewolf 1</name>
+		<gender>male</gender>
+		<positionId>necromantic.werewolf</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamNecromanticParity16Home2">
+		<name>Werewolf 2</name>
+		<gender>male</gender>
+		<positionId>necromantic.werewolf</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamNecromanticParity16Home3">
+		<name>Flesh Golem 3</name>
+		<gender>male</gender>
+		<positionId>necromantic.fleshgolem</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamNecromanticParity16Home4">
+		<name>Flesh Golem 4</name>
+		<gender>male</gender>
+		<positionId>necromantic.fleshgolem</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamNecromanticParity16Home5">
+		<name>Wight 5</name>
+		<gender>male</gender>
+		<positionId>necromantic.wight</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamNecromanticParity16Home6">
+		<name>Wight 6</name>
+		<gender>male</gender>
+		<positionId>necromantic.wight</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamNecromanticParity16Home7">
+		<name>Ghoul 7</name>
+		<gender>male</gender>
+		<positionId>necromantic.ghoul</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamNecromanticParity16Home8">
+		<name>Ghoul 8</name>
+		<gender>male</gender>
+		<positionId>necromantic.ghoul</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamNecromanticParity16Home9">
+		<name>Zombie 9</name>
+		<gender>male</gender>
+		<positionId>necromantic.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamNecromanticParity16Home10">
+		<name>Zombie 10</name>
+		<gender>male</gender>
+		<positionId>necromantic.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamNecromanticParity16Home11">
+		<name>Zombie 11</name>
+		<gender>male</gender>
+		<positionId>necromantic.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamNecromanticParity16Home12">
+		<name>Zombie 12</name>
+		<gender>male</gender>
+		<positionId>necromantic.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamNecromanticParity16Home13">
+		<name>Zombie 13</name>
+		<gender>male</gender>
+		<positionId>necromantic.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="14" id="teamNecromanticParity16Home14">
+		<name>Zombie 14</name>
+		<gender>male</gender>
+		<positionId>necromantic.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

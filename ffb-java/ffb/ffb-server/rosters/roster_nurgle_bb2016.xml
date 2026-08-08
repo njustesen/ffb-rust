@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="nurgle.bb2016">
+	<name>Nurgle</name>
+	<reRollCost>70000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>false</apothecary>
+	<raisedPositionId>nurgle.beast</raisedPositionId>
+	<position id="nurgle.rotter">
+		<quantity>16</quantity>
+		<name>Rotter</name>
+		<displayName>Rotter</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>5</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>6</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Decay</skill>
+			<skill>Nurgle's Rot</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="nurgle.pestigor">
+		<quantity>4</quantity>
+		<name>Pestigor</name>
+		<displayName>Pestigor</displayName>
+		<type>Regular</type>
+		<cost>80000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Horns</skill>
+			<skill>Nurgle's Rot</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<normal>Mutation</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="nurgle.warrior">
+		<quantity>4</quantity>
+		<name>Nurgle Warrior</name>
+		<displayName>Nurgle Warrior</displayName>
+		<type>Regular</type>
+		<cost>110000</cost>
+		<movement>4</movement>
+		<strength>4</strength>
+		<agility>2</agility>
+		<passing>6</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Disturbing Presence</skill>
+			<skill>Foul Appearance</skill>
+			<skill>Nurgle's Rot</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<normal>Mutation</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="nurgle.beast">
+		<quantity>1</quantity>
+		<name>Beast of Nurgle</name>
+		<displayName>Beast of Nurgle</displayName>
+		<type>Big Guy</type>
+		<cost>140000</cost>
+		<movement>4</movement>
+		<strength>5</strength>
+		<agility>1</agility>
+		<passing>0</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Disturbing Presence</skill>
+			<skill>Foul Appearance</skill>
+			<skill>Loner</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Nurgle's Rot</skill>
+			<skill>Really Stupid</skill>
+			<skill>Regeneration</skill>
+			<skill>Tentacles</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>General</double>
+			<double>Agility</double>
+			<double>Passing</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+</roster>

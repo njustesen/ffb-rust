@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="vampire.bb2016">
+	<name>Vampire</name>
+	<reRollCost>70000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>false</apothecary>
+	<undead>true</undead>
+	<raisedPositionId>vampire.thrall</raisedPositionId>
+	<position id="vampire.vampire">
+		<quantity>6</quantity>
+		<name>Vampire</name>
+		<displayName>Vampire</displayName>
+		<type>Regular</type>
+		<cost>110000</cost>
+		<movement>6</movement>
+		<strength>4</strength>
+		<agility>4</agility>
+		<passing>3</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Blood Lust</skill>
+			<skill>Hypnotic Gaze</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Agility</normal>
+			<normal>Strength</normal>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="vampire.thrall">
+		<quantity>16</quantity>
+		<name>Thrall</name>
+		<displayName>Thrall</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>7</armour>
+		<skillList/>
+		<skillCategoryList>
+			<normal>General</normal>
+			<double>Strength</double>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+</roster>

@@ -1,0 +1,72 @@
+{
+  "edition": "bb2016",
+  "race": "undead",
+  "roster_id": "undead.lrb6",
+  "rerolls": 3,
+  "reroll_cost": 70000,
+  "apothecaries": 0,
+  "dedicated_fans": 0,
+  "fan_factor": 2,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1100000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "undead.mummy"
+    },
+    {
+      "nr": 2,
+      "position_id": "undead.mummy"
+    },
+    {
+      "nr": 3,
+      "position_id": "undead.wight"
+    },
+    {
+      "nr": 4,
+      "position_id": "undead.wight"
+    },
+    {
+      "nr": 5,
+      "position_id": "undead.ghoul"
+    },
+    {
+      "nr": 6,
+      "position_id": "undead.ghoul"
+    },
+    {
+      "nr": 7,
+      "position_id": "undead.ghoul"
+    },
+    {
+      "nr": 8,
+      "position_id": "undead.ghoul"
+    },
+    {
+      "nr": 9,
+      "position_id": "undead.zombie"
+    },
+    {
+      "nr": 10,
+      "position_id": "undead.skeleton"
+    },
+    {
+      "nr": 11,
+      "position_id": "undead.skeleton"
+    },
+    {
+      "nr": 12,
+      "position_id": "undead.skeleton"
+    },
+    {
+      "nr": 13,
+      "position_id": "undead.skeleton"
+    },
+    {
+      "nr": 14,
+      "position_id": "undead.skeleton"
+    }
+  ],
+  "special_rules": []
+}

@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamUndeadParity16Away">
+
+	<coach>Away</coach>
+	<name>Undead Parity16 Away</name>
+	<race>Undead</race>
+	<rosterId>undead.bb2016</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>2</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamUndeadParity16Away1">
+		<name>Mummy 1</name>
+		<gender>male</gender>
+		<positionId>undead.mummy</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamUndeadParity16Away2">
+		<name>Mummy 2</name>
+		<gender>male</gender>
+		<positionId>undead.mummy</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamUndeadParity16Away3">
+		<name>Wight 3</name>
+		<gender>male</gender>
+		<positionId>undead.wight</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamUndeadParity16Away4">
+		<name>Wight 4</name>
+		<gender>male</gender>
+		<positionId>undead.wight</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamUndeadParity16Away5">
+		<name>Ghoul 5</name>
+		<gender>male</gender>
+		<positionId>undead.ghoul</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamUndeadParity16Away6">
+		<name>Ghoul 6</name>
+		<gender>male</gender>
+		<positionId>undead.ghoul</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamUndeadParity16Away7">
+		<name>Ghoul 7</name>
+		<gender>male</gender>
+		<positionId>undead.ghoul</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamUndeadParity16Away8">
+		<name>Ghoul 8</name>
+		<gender>male</gender>
+		<positionId>undead.ghoul</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamUndeadParity16Away9">
+		<name>Zombie 9</name>
+		<gender>male</gender>
+		<positionId>undead.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamUndeadParity16Away10">
+		<name>Skeleton 10</name>
+		<gender>male</gender>
+		<positionId>undead.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamUndeadParity16Away11">
+		<name>Skeleton 11</name>
+		<gender>male</gender>
+		<positionId>undead.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamUndeadParity16Away12">
+		<name>Skeleton 12</name>
+		<gender>male</gender>
+		<positionId>undead.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamUndeadParity16Away13">
+		<name>Skeleton 13</name>
+		<gender>male</gender>
+		<positionId>undead.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="14" id="teamUndeadParity16Away14">
+		<name>Skeleton 14</name>
+		<gender>male</gender>
+		<positionId>undead.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

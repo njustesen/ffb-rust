@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamDwarfParity16Home">
+
+	<coach>Home</coach>
+	<name>Dwarf Parity16 Home</name>
+	<race>Dwarf</race>
+	<rosterId>dwarf.bb2016</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>1</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamDwarfParity16Home1">
+		<name>Deathroller 1</name>
+		<gender>male</gender>
+		<positionId>dwarf.deathroller</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamDwarfParity16Home2">
+		<name>Troll Slayer 2</name>
+		<gender>male</gender>
+		<positionId>dwarf.trollslayer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamDwarfParity16Home3">
+		<name>Troll Slayer 3</name>
+		<gender>male</gender>
+		<positionId>dwarf.trollslayer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamDwarfParity16Home4">
+		<name>Blitzer 4</name>
+		<gender>male</gender>
+		<positionId>dwarf.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamDwarfParity16Home5">
+		<name>Blitzer 5</name>
+		<gender>male</gender>
+		<positionId>dwarf.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamDwarfParity16Home6">
+		<name>Runner 6</name>
+		<gender>male</gender>
+		<positionId>dwarf.runner</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamDwarfParity16Home7">
+		<name>Runner 7</name>
+		<gender>male</gender>
+		<positionId>dwarf.runner</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamDwarfParity16Home8">
+		<name>Blocker 8</name>
+		<gender>male</gender>
+		<positionId>dwarf.blocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamDwarfParity16Home9">
+		<name>Blocker 9</name>
+		<gender>male</gender>
+		<positionId>dwarf.blocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamDwarfParity16Home10">
+		<name>Blocker 10</name>
+		<gender>male</gender>
+		<positionId>dwarf.blocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamDwarfParity16Home11">
+		<name>Blocker 11</name>
+		<gender>male</gender>
+		<positionId>dwarf.blocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamDwarfParity16Home12">
+		<name>Blocker 12</name>
+		<gender>male</gender>
+		<positionId>dwarf.blocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

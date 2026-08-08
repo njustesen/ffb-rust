@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="dwarf.bb2016">
+	<name>Dwarf</name>
+	<reRollCost>40000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="dwarf.blocker">
+		<quantity>12</quantity>
+		<name>Blocker</name>
+		<displayName>Blocker</displayName>
+		<type>Regular</type>
+		<cost>70000</cost>
+		<movement>4</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>5</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Tackle</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="dwarf.blitzer">
+		<quantity>2</quantity>
+		<name>Blitzer</name>
+		<displayName>Blitzer</displayName>
+		<type>Regular</type>
+		<cost>80000</cost>
+		<movement>5</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="dwarf.runner">
+		<quantity>2</quantity>
+		<name>Runner</name>
+		<displayName>Runner</displayName>
+		<type>Regular</type>
+		<cost>80000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Sure Hands</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Passing</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="dwarf.trollslayer">
+		<quantity>2</quantity>
+		<name>Troll Slayer</name>
+		<displayName>Troll Slayer</displayName>
+		<type>Regular</type>
+		<cost>90000</cost>
+		<movement>5</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>0</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Dauntless</skill>
+			<skill>Frenzy</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="dwarf.deathroller">
+		<quantity>1</quantity>
+		<name>Deathroller</name>
+		<displayName>Deathroller</displayName>
+		<type>Big Guy</type>
+		<cost>160000</cost>
+		<movement>4</movement>
+		<strength>7</strength>
+		<agility>1</agility>
+		<passing>0</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Break Tackle</skill>
+			<skill>Dirty Player</skill>
+			<skill>Juggernaut</skill>
+			<skill>Mighty Blow</skill>
+			<skill>No Hands</skill>
+			<skill>Secret Weapon</skill>
+			<skill>Stand Firm</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>General</double>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+</roster>

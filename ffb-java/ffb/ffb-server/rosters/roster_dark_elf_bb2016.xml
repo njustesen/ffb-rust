@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="dark_elf.bb2016">
+	<name>Dark Elf</name>
+	<reRollCost>50000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="darkelf.lineman">
+		<quantity>16</quantity>
+		<name>Lineman</name>
+		<displayName>Lineman</displayName>
+		<type>Regular</type>
+		<cost>70000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList/>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Agility</normal>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="darkelf.blitzer">
+		<quantity>4</quantity>
+		<name>Blitzer</name>
+		<displayName>Blitzer</displayName>
+		<type>Regular</type>
+		<cost>100000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Block</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="darkelf.runner">
+		<quantity>2</quantity>
+		<name>Runner</name>
+		<displayName>Runner</displayName>
+		<type>Regular</type>
+		<cost>80000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>3</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Dump-Off</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Agility</normal>
+			<normal>Passing</normal>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="darkelf.assassin">
+		<quantity>2</quantity>
+		<name>Assassin</name>
+		<displayName>Assassin</displayName>
+		<type>Regular</type>
+		<cost>90000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>5</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Shadowing</skill>
+			<skill>Stab</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Agility</normal>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="darkelf.witchelf">
+		<quantity>2</quantity>
+		<name>Witch Elf</name>
+		<displayName>Witch Elf</displayName>
+		<type>Regular</type>
+		<cost>110000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>5</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Frenzy</skill>
+			<skill>Jump Up</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+</roster>

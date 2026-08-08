@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamKhemriParity25Home">
+
+	<coach>Home</coach>
+	<name>Khemri Parity25 Home</name>
+	<race>Khemri</race>
+	<rosterId>khemri.bb2025</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>1</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules>
+		<rule>Masters of Undeath</rule>
+	</specialRules>
+
+	<player nr="1" id="teamKhemriParity25Home1">
+		<name>Tomb Guardian 1</name>
+		<gender>male</gender>
+		<positionId>khemri.tombguardian</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamKhemriParity25Home2">
+		<name>Tomb Guardian 2</name>
+		<gender>male</gender>
+		<positionId>khemri.tombguardian</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamKhemriParity25Home3">
+		<name>Tomb Guardian 3</name>
+		<gender>male</gender>
+		<positionId>khemri.tombguardian</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamKhemriParity25Home4">
+		<name>Tomb Guardian 4</name>
+		<gender>male</gender>
+		<positionId>khemri.tombguardian</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamKhemriParity25Home5">
+		<name>Tomb Kings Blitzer 5</name>
+		<gender>male</gender>
+		<positionId>khemri.blitzra</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamKhemriParity25Home6">
+		<name>Tomb Kings Blitzer 6</name>
+		<gender>male</gender>
+		<positionId>khemri.blitzra</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamKhemriParity25Home7">
+		<name>Tomb Kings Thrower 7</name>
+		<gender>male</gender>
+		<positionId>khemri.throra</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamKhemriParity25Home8">
+		<name>Tomb Kings Thrower 8</name>
+		<gender>male</gender>
+		<positionId>khemri.throra</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamKhemriParity25Home9">
+		<name>Skeleton Lineman 9</name>
+		<gender>male</gender>
+		<positionId>khemri.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamKhemriParity25Home10">
+		<name>Skeleton Lineman 10</name>
+		<gender>male</gender>
+		<positionId>khemri.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamKhemriParity25Home11">
+		<name>Skeleton Lineman 11</name>
+		<gender>male</gender>
+		<positionId>khemri.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamKhemriParity25Home12">
+		<name>Skeleton Lineman 12</name>
+		<gender>male</gender>
+		<positionId>khemri.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

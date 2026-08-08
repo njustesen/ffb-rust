@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="vampire.bb2025">
+	<name>Vampire</name>
+	<reRollCost>60000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<undead>true</undead>
+	<raisedPositionId>vampire.thrall</raisedPositionId>
+	<position id="vampire.thrall">
+		<quantity>16</quantity>
+		<name>Thrall</name>
+		<displayName>Thrall Lineman</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList/>
+		<skillCategoryList>
+			<normal>General</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Human</keyword>
+			<keyword>Lineman</keyword>
+			<keyword>Thrall</keyword>
+		</keywords>
+	</position>
+	<position id="vampire.vampire_runner">
+		<quantity>2</quantity>
+		<name>Vampire Runner</name>
+		<displayName>Vampire Runner</displayName>
+		<type>Regular</type>
+		<cost>100000</cost>
+		<movement>8</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>3</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill value="2">Bloodlust</skill>
+			<skill>Hypnotic Gaze</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Passing</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Runner</keyword>
+			<keyword>Undead</keyword>
+			<keyword>Vampire</keyword>
+		</keywords>
+	</position>
+	<position id="vampire.vampire_thrower">
+		<quantity>2</quantity>
+		<name>Vampire Thrower</name>
+		<displayName>Vampire Thrower</displayName>
+		<type>Regular</type>
+		<cost>110000</cost>
+		<movement>6</movement>
+		<strength>4</strength>
+		<agility>2</agility>
+		<passing>2</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill value="2">Bloodlust</skill>
+			<skill>Hypnotic Gaze</skill>
+			<skill>Pass</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<normal>Passing</normal>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Thrower</keyword>
+			<keyword>Undead</keyword>
+			<keyword>Vampire</keyword>
+		</keywords>
+	</position>
+	<position id="vampire.vampire_blitzer">
+		<quantity>2</quantity>
+		<name>Vampire Blitzer</name>
+		<displayName>Vampire Blitzer</displayName>
+		<type>Regular</type>
+		<cost>110000</cost>
+		<movement>6</movement>
+		<strength>4</strength>
+		<agility>2</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill value="3">Bloodlust</skill>
+			<skill>Hypnotic Gaze</skill>
+			<skill>Juggernaut</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<normal>Strength</normal>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blitzer</keyword>
+			<keyword>Undead</keyword>
+			<keyword>Vampire</keyword>
+		</keywords>
+	</position>
+	<position id="vampire.vargheist">
+		<quantity>1</quantity>
+		<name>Vargheist</name>
+		<displayName>Vargheist</displayName>
+		<type>Big Guy</type>
+		<cost>150000</cost>
+		<movement>5</movement>
+		<strength>5</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill value="3">Bloodlust</skill>
+			<skill>Claws</skill>
+			<skill>Frenzy</skill>
+			<skill value="4">Loner</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Big Guy</keyword>
+			<keyword>Undead</keyword>
+			<keyword>Vampire</keyword>
+		</keywords>
+	</position>
+</roster>

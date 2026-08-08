@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="halfling.bb2025">
+	<name>Halfling</name>
+	<reRollCost>60000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="halfling.halfling">
+		<quantity>16</quantity>
+		<name>Halfling</name>
+		<displayName>Halfling Hopeful</displayName>
+		<type>Regular</type>
+		<cost>30000</cost>
+		<movement>5</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>General</double>
+			<double>Strength</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Lineman</keyword>
+			<keyword>Halfling</keyword>
+		</keywords>
+	</position>
+	<position id="halfling.halfling_hefty">
+		<quantity>2</quantity>
+		<name>Halfling Hefty</name>
+		<displayName>Halfling Hefty</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>5</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>3</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Fend</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>Passing</normal>
+			<double>General</double>
+			<double>Strength</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blocker</keyword>
+			<keyword>Halfling</keyword>
+		</keywords>
+	</position>
+	<position id="halfling.halfling_catcher">
+		<quantity>2</quantity>
+		<name>Halfling Catcher</name>
+		<displayName>Halfling Catcher</displayName>
+		<type>Regular</type>
+		<cost>55000</cost>
+		<movement>5</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Catch</skill>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+			<skill>Sprint</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>General</double>
+			<double>Strength</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Catcher</keyword>
+			<keyword>Halfling</keyword>
+		</keywords>
+	</position>
+	<position id="halfling.treeman">
+		<quantity>2</quantity>
+		<name>Treeman</name>
+		<displayName>Athel Forest Treeman</displayName>
+		<type>Big Guy</type>
+		<cost>120000</cost>
+		<movement>2</movement>
+		<strength>6</strength>
+		<agility>5</agility>
+		<passing>5</passing>
+		<armour>11</armour>
+		<skillList>
+			<skill>Mighty Blow</skill>
+			<skill>Stand Firm</skill>
+			<skill>Strong Arm</skill>
+			<skill>Take Root</skill>
+			<skill>Thick Skull</skill>
+			<skill>Throw Team-mate</skill>
+			<skill>Timmm-ber!</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Passing</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Big Guy</keyword>
+			<keyword>Treeman</keyword>
+		</keywords>
+	</position>
+</roster>

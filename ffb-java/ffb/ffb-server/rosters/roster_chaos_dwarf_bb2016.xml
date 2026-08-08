@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="chaos_dwarf.bb2016">
+	<name>Chaos Dwarf</name>
+	<reRollCost>70000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="chaosdwarf.hobgoblin">
+		<quantity>16</quantity>
+		<name>Hobgoblin</name>
+		<displayName>Hobgoblin</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>7</armour>
+		<skillList/>
+		<skillCategoryList>
+			<normal>General</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaosdwarf.blocker">
+		<quantity>6</quantity>
+		<name>Chaos Dwarf Blocker</name>
+		<displayName>Chaos Dwarf Blocker</displayName>
+		<type>Regular</type>
+		<cost>70000</cost>
+		<movement>4</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>6</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Tackle</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaosdwarf.bullcentaur">
+		<quantity>2</quantity>
+		<name>Bull Centaur</name>
+		<displayName>Bull Centaur</displayName>
+		<type>Regular</type>
+		<cost>130000</cost>
+		<movement>6</movement>
+		<strength>4</strength>
+		<agility>2</agility>
+		<passing>6</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Sprint</skill>
+			<skill>Sure Feet</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaosdwarf.minotaur">
+		<quantity>1</quantity>
+		<name>Minotaur</name>
+		<displayName>Minotaur</displayName>
+		<type>Big Guy</type>
+		<cost>150000</cost>
+		<movement>5</movement>
+		<strength>5</strength>
+		<agility>2</agility>
+		<passing>0</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Loner</skill>
+			<skill>Frenzy</skill>
+			<skill>Horns</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Thick Skull</skill>
+			<skill>Wild Animal</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>General</double>
+			<double>Agility</double>
+			<double>Passing</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+</roster>

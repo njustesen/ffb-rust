@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamHumanParity25Away">
+
+	<coach>Away</coach>
+	<name>Human Parity25 Away</name>
+	<race>Human</race>
+	<rosterId>human.bb2025</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1000000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>90000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamHumanParity25Away1">
+		<name>Ogre 1</name>
+		<gender>male</gender>
+		<positionId>human.ogre</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamHumanParity25Away2">
+		<name>Human Blitzer 2</name>
+		<gender>male</gender>
+		<positionId>human.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamHumanParity25Away3">
+		<name>Human Blitzer 3</name>
+		<gender>male</gender>
+		<positionId>human.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamHumanParity25Away4">
+		<name>Human Catcher 4</name>
+		<gender>male</gender>
+		<positionId>human.catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamHumanParity25Away5">
+		<name>Human Catcher 5</name>
+		<gender>male</gender>
+		<positionId>human.catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamHumanParity25Away6">
+		<name>Human Thrower 6</name>
+		<gender>male</gender>
+		<positionId>human.thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamHumanParity25Away7">
+		<name>Human Thrower 7</name>
+		<gender>male</gender>
+		<positionId>human.thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamHumanParity25Away8">
+		<name>Human Lineman 8</name>
+		<gender>male</gender>
+		<positionId>human.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamHumanParity25Away9">
+		<name>Human Lineman 9</name>
+		<gender>male</gender>
+		<positionId>human.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamHumanParity25Away10">
+		<name>Halfling Hopeful 10</name>
+		<gender>male</gender>
+		<positionId>human.halfling_hopeful</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamHumanParity25Away11">
+		<name>Halfling Hopeful 11</name>
+		<gender>male</gender>
+		<positionId>human.halfling_hopeful</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamHumanParity25Away12">
+		<name>Halfling Hopeful 12</name>
+		<gender>male</gender>
+		<positionId>human.halfling_hopeful</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

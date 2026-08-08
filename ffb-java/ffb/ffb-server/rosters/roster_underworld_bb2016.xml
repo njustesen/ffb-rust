@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="underworld.bb2016">
+	<name>Underworld</name>
+	<reRollCost>70000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="37844">
+		<quantity>2</quantity>
+		<name>Mutant Rat Ogre</name>
+		<displayName>Mutant Rat Ogre</displayName>
+		<type>Big Guy</type>
+		<cost>150000</cost>
+		<movement>6</movement>
+		<strength>5</strength>
+		<agility>4</agility>
+		<passing>0</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Frenzy</skill>
+			<skill>Loner</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Prehensile Tail</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<normal>Mutation</normal>
+			<double>General</double>
+			<double>Agility</double>
+		</skillCategoryList>
+	</position>
+	<position id="underworld.goblin">
+		<quantity>12</quantity>
+		<name>Underworld Goblin</name>
+		<displayName>Underworld Goblin</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>6</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+			<skill>Stunty</skill>
+			<skill>Animosity</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>Mutation</normal>
+			<double>General</double>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="underworld.skaven.lineman">
+		<quantity>16</quantity>
+		<name>Skaven Lineman</name>
+		<displayName>Skaven Lineman</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Animosity</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="underworld.skaven.thrower">
+		<quantity>2</quantity>
+		<name>Skaven Thrower</name>
+		<displayName>Skaven Thrower</displayName>
+		<type>Regular</type>
+		<cost>70000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>2</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Animosity</skill>
+			<skill>Pass</skill>
+			<skill>Sure Hands</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Passing</normal>
+			<normal>Mutation</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="underworld.skaven.blitzer">
+		<quantity>2</quantity>
+		<name>Skaven Blitzer</name>
+		<displayName>Skaven Blitzer</displayName>
+		<type>Regular</type>
+		<cost>90000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Animosity</skill>
+			<skill>Block</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<normal>Mutation</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="underworld.troll.warpstone">
+		<quantity>2</quantity>
+		<name>Warpstone Troll</name>
+		<displayName>Warpstone Troll</displayName>
+		<type>Big Guy</type>
+		<cost>110000</cost>
+		<movement>4</movement>
+		<strength>5</strength>
+		<agility>1</agility>
+		<passing>5</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Always Hungry</skill>
+			<skill>Loner</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Really Stupid</skill>
+			<skill>Regeneration</skill>
+			<skill>Throw Team-Mate</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<normal>Mutation</normal>
+			<double>General</double>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+</roster>

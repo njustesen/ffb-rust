@@ -1,0 +1,68 @@
+{
+  "edition": "bb2016",
+  "race": "orc",
+  "roster_id": "orc.lrb6",
+  "rerolls": 2,
+  "reroll_cost": 60000,
+  "apothecaries": 0,
+  "dedicated_fans": 0,
+  "fan_factor": 1,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1100000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "orc.troll"
+    },
+    {
+      "nr": 2,
+      "position_id": "orc.blackorc"
+    },
+    {
+      "nr": 3,
+      "position_id": "orc.blackorc"
+    },
+    {
+      "nr": 4,
+      "position_id": "orc.blackorc"
+    },
+    {
+      "nr": 5,
+      "position_id": "orc.blackorc"
+    },
+    {
+      "nr": 6,
+      "position_id": "orc.blitzer"
+    },
+    {
+      "nr": 7,
+      "position_id": "orc.blitzer"
+    },
+    {
+      "nr": 8,
+      "position_id": "orc.blitzer"
+    },
+    {
+      "nr": 9,
+      "position_id": "orc.blitzer"
+    },
+    {
+      "nr": 10,
+      "position_id": "orc.thrower"
+    },
+    {
+      "nr": 11,
+      "position_id": "orc.thrower"
+    },
+    {
+      "nr": 12,
+      "position_id": "orc.goblin"
+    },
+    {
+      "nr": 13,
+      "position_id": "orc.goblin"
+    }
+  ],
+  "special_rules": []
+}

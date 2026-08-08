@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamRenegadesParity25Away">
+
+	<coach>Away</coach>
+	<name>Chaos Renegade Parity25 Away</name>
+	<race>Chaos Renegade</race>
+	<rosterId>renegades.bb2025</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1075000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>15000</treasury>
+	<specialRules>
+		<rule>Favoured of Khorne</rule>
+		<rule>Favoured of Nurgle</rule>
+		<rule>Favoured of Slaanesh</rule>
+		<rule>Favoured of Tzeentch</rule>
+	</specialRules>
+
+	<player nr="1" id="teamRenegadesParity25Away1">
+		<name>Minotaur 1</name>
+		<gender>male</gender>
+		<positionId>37732</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamRenegadesParity25Away2">
+		<name>Ogre 2</name>
+		<gender>male</gender>
+		<positionId>37731</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamRenegadesParity25Away3">
+		<name>Troll 3</name>
+		<gender>male</gender>
+		<positionId>37730</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamRenegadesParity25Away4">
+		<name>Renegade Human Thrower 4</name>
+		<gender>male</gender>
+		<positionId>37725</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamRenegadesParity25Away5">
+		<name>Renegade Dark Elf 5</name>
+		<gender>male</gender>
+		<positionId>37729</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamRenegadesParity25Away6">
+		<name>Renegade Human 6</name>
+		<gender>male</gender>
+		<positionId>37724</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamRenegadesParity25Away7">
+		<name>Renegade Human 7</name>
+		<gender>male</gender>
+		<positionId>37724</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamRenegadesParity25Away8">
+		<name>Renegade Human 8</name>
+		<gender>male</gender>
+		<positionId>37724</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamRenegadesParity25Away9">
+		<name>Renegade Human 9</name>
+		<gender>male</gender>
+		<positionId>37724</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamRenegadesParity25Away10">
+		<name>Renegade Orc 10</name>
+		<gender>male</gender>
+		<positionId>37727</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamRenegadesParity25Away11">
+		<name>Renegade Skaven 11</name>
+		<gender>male</gender>
+		<positionId>37728</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamRenegadesParity25Away12">
+		<name>Renegade Goblin 12</name>
+		<gender>male</gender>
+		<positionId>37726</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

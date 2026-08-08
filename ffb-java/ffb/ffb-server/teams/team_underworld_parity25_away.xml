@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamUnderworldParity25Away">
+
+	<coach>Away</coach>
+	<name>Underworld Parity25 Away</name>
+	<race>Underworld</race>
+	<rosterId>underworld.bb2025</rosterId>
+	<reRolls>4</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>980000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>110000</treasury>
+	<specialRules>
+		<rule>Bribery and Corruption</rule>
+	</specialRules>
+
+	<player nr="1" id="teamUnderworldParity25Away1">
+		<name>Troll 1</name>
+		<gender>male</gender>
+		<positionId>underworld.troll.warpstone</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamUnderworldParity25Away2">
+		<name>Skaven Blitzer 2</name>
+		<gender>male</gender>
+		<positionId>underworld.skaven.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamUnderworldParity25Away3">
+		<name>Gutter Runner 3</name>
+		<gender>male</gender>
+		<positionId>underworld.gutter_runner</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamUnderworldParity25Away4">
+		<name>Skaven Thrower 4</name>
+		<gender>male</gender>
+		<positionId>underworld.skaven.thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamUnderworldParity25Away5">
+		<name>Skaven Clanrat 5</name>
+		<gender>male</gender>
+		<positionId>underworld.skaven.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamUnderworldParity25Away6">
+		<name>Skaven Clanrat 6</name>
+		<gender>male</gender>
+		<positionId>underworld.skaven.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamUnderworldParity25Away7">
+		<name>Skaven Clanrat 7</name>
+		<gender>male</gender>
+		<positionId>underworld.skaven.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamUnderworldParity25Away8">
+		<name>Goblin Lineman 8</name>
+		<gender>male</gender>
+		<positionId>underworld.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamUnderworldParity25Away9">
+		<name>Snotling Lineman 9</name>
+		<gender>male</gender>
+		<positionId>underworld.snotling_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamUnderworldParity25Away10">
+		<name>Snotling Lineman 10</name>
+		<gender>male</gender>
+		<positionId>underworld.snotling_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamUnderworldParity25Away11">
+		<name>Snotling Lineman 11</name>
+		<gender>male</gender>
+		<positionId>underworld.snotling_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamUnderworldParity25Away12">
+		<name>Snotling Lineman 12</name>
+		<gender>male</gender>
+		<positionId>underworld.snotling_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamUnderworldParity25Away13">
+		<name>Snotling Lineman 13</name>
+		<gender>male</gender>
+		<positionId>underworld.snotling_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="14" id="teamUnderworldParity25Away14">
+		<name>Snotling Lineman 14</name>
+		<gender>male</gender>
+		<positionId>underworld.snotling_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

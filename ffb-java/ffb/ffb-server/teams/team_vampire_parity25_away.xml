@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamVampireParity25Away">
+
+	<coach>Away</coach>
+	<name>Vampire Parity25 Away</name>
+	<race>Vampire</race>
+	<rosterId>vampire.bb2025</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1070000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>20000</treasury>
+	<specialRules>
+		<rule>Masters of Undeath</rule>
+	</specialRules>
+
+	<player nr="1" id="teamVampireParity25Away1">
+		<name>Vargheist 1</name>
+		<gender>male</gender>
+		<positionId>vampire.vargheist</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamVampireParity25Away2">
+		<name>Vampire Blitzer 2</name>
+		<gender>male</gender>
+		<positionId>vampire.vampire_blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamVampireParity25Away3">
+		<name>Vampire Blitzer 3</name>
+		<gender>male</gender>
+		<positionId>vampire.vampire_blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamVampireParity25Away4">
+		<name>Vampire Thrower 4</name>
+		<gender>male</gender>
+		<positionId>vampire.vampire_thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamVampireParity25Away5">
+		<name>Vampire Thrower 5</name>
+		<gender>male</gender>
+		<positionId>vampire.vampire_thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamVampireParity25Away6">
+		<name>Vampire Runner 6</name>
+		<gender>male</gender>
+		<positionId>vampire.vampire_runner</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamVampireParity25Away7">
+		<name>Vampire Runner 7</name>
+		<gender>male</gender>
+		<positionId>vampire.vampire_runner</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamVampireParity25Away8">
+		<name>Thrall Lineman 8</name>
+		<gender>male</gender>
+		<positionId>vampire.thrall</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamVampireParity25Away9">
+		<name>Thrall Lineman 9</name>
+		<gender>male</gender>
+		<positionId>vampire.thrall</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamVampireParity25Away10">
+		<name>Thrall Lineman 10</name>
+		<gender>male</gender>
+		<positionId>vampire.thrall</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamVampireParity25Away11">
+		<name>Thrall Lineman 11</name>
+		<gender>male</gender>
+		<positionId>vampire.thrall</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

@@ -1,0 +1,60 @@
+{
+  "edition": "bb2016",
+  "race": "renegades",
+  "roster_id": "1050157",
+  "rerolls": 2,
+  "reroll_cost": 70000,
+  "apothecaries": 0,
+  "dedicated_fans": 0,
+  "fan_factor": 1,
+  "treasury": 5000,
+  "spent": 1095000,
+  "team_value": 1095000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "37732"
+    },
+    {
+      "nr": 2,
+      "position_id": "37733"
+    },
+    {
+      "nr": 3,
+      "position_id": "37731"
+    },
+    {
+      "nr": 4,
+      "position_id": "37730"
+    },
+    {
+      "nr": 5,
+      "position_id": "37725"
+    },
+    {
+      "nr": 6,
+      "position_id": "37729"
+    },
+    {
+      "nr": 7,
+      "position_id": "37724"
+    },
+    {
+      "nr": 8,
+      "position_id": "37724"
+    },
+    {
+      "nr": 9,
+      "position_id": "37727"
+    },
+    {
+      "nr": 10,
+      "position_id": "37728"
+    },
+    {
+      "nr": 11,
+      "position_id": "37726"
+    }
+  ],
+  "special_rules": []
+}

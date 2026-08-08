@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="elf.bb2025">
+	<name>Elf</name>
+	<reRollCost>50000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="elf.lineman">
+		<quantity>16</quantity>
+		<name>Lineman</name>
+		<displayName>Elf Lineman</displayName>
+		<type>Regular</type>
+		<cost>65000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>3</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Fumblerooski</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Lineman</keyword>
+			<keyword>Elf</keyword>
+		</keywords>
+	</position>
+	<position id="elf.thrower">
+		<quantity>2</quantity>
+		<name>Thrower</name>
+		<displayName>Elf Thrower</displayName>
+		<type>Regular</type>
+		<cost>75000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>2</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Hail Mary Pass</skill>
+			<skill>Pass</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<normal>Passing</normal>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Thrower</keyword>
+			<keyword>Elf</keyword>
+		</keywords>
+	</position>
+	<position id="elf.catcher">
+		<quantity>2</quantity>
+		<name>Catcher</name>
+		<displayName>Elf Catcher</displayName>
+		<type>Regular</type>
+		<cost>100000</cost>
+		<movement>8</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Catch</skill>
+			<skill>Diving Catch</skill>
+			<skill>Nerves of Steel</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Catcher</keyword>
+			<keyword>Elf</keyword>
+		</keywords>
+	</position>
+	<position id="elf.blitzer">
+		<quantity>2</quantity>
+		<name>Blitzer</name>
+		<displayName>Elf Blitzer</displayName>
+		<type>Regular</type>
+		<cost>115000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>3</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Sidestep</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Passing</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blitzer</keyword>
+			<keyword>Elf</keyword>
+		</keywords>
+	</position>
+</roster>

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamUnderworldParity16Away">
+
+	<coach>Away</coach>
+	<name>Underworld Parity16 Away</name>
+	<race>Underworld</race>
+	<rosterId>underworld.bb2016</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamUnderworldParity16Away1">
+		<name>Mutant Rat Ogre 1</name>
+		<gender>male</gender>
+		<positionId>37844</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamUnderworldParity16Away2">
+		<name>Mutant Rat Ogre 2</name>
+		<gender>male</gender>
+		<positionId>37844</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamUnderworldParity16Away3">
+		<name>Warpstone Troll 3</name>
+		<gender>male</gender>
+		<positionId>underworld.troll.warpstone</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamUnderworldParity16Away4">
+		<name>Warpstone Troll 4</name>
+		<gender>male</gender>
+		<positionId>underworld.troll.warpstone</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamUnderworldParity16Away5">
+		<name>Skaven Blitzer 5</name>
+		<gender>male</gender>
+		<positionId>underworld.skaven.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamUnderworldParity16Away6">
+		<name>Skaven Blitzer 6</name>
+		<gender>male</gender>
+		<positionId>underworld.skaven.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamUnderworldParity16Away7">
+		<name>Skaven Thrower 7</name>
+		<gender>male</gender>
+		<positionId>underworld.skaven.thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamUnderworldParity16Away8">
+		<name>Skaven Lineman 8</name>
+		<gender>male</gender>
+		<positionId>underworld.skaven.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamUnderworldParity16Away9">
+		<name>Skaven Lineman 9</name>
+		<gender>male</gender>
+		<positionId>underworld.skaven.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamUnderworldParity16Away10">
+		<name>Skaven Lineman 10</name>
+		<gender>male</gender>
+		<positionId>underworld.skaven.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamUnderworldParity16Away11">
+		<name>Underworld Goblin 11</name>
+		<gender>male</gender>
+		<positionId>underworld.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

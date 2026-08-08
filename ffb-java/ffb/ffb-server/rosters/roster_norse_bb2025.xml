@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="norse.bb2025">
+	<name>Norse</name>
+	<reRollCost>60000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="norse.lineman">
+		<quantity>16</quantity>
+		<name>Lineman</name>
+		<displayName>Norse Raider</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Drunkard</skill>
+			<skill>Thick Skull</skill>
+			<skill>Unsteady</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Lineman</keyword>
+			<keyword>Human</keyword>
+		</keywords>
+	</position>
+	<position id="norse.beer_boar">
+		<quantity>2</quantity>
+		<name>Beer Boar</name>
+		<displayName>Beer Boar</displayName>
+		<type>Regular</type>
+		<cost>20000</cost>
+		<movement>5</movement>
+		<strength>1</strength>
+		<agility>3</agility>
+		<passing>0</passing>
+		<armour>6</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>No Ball</skill>
+			<skill>Pick-me-up</skill>
+			<skill>Stunty</skill>
+			<skill>Titchy</skill>
+		</skillList>
+		<skillCategoryList>
+			<double>Agility</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Special</keyword>
+			<keyword>Animal</keyword>
+		</keywords>
+	</position>
+	<position id="norse.berserker">
+		<quantity>2</quantity>
+		<name>Berserker</name>
+		<displayName>Norse Berserker</displayName>
+		<type>Regular</type>
+		<cost>90000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Frenzy</skill>
+			<skill>Jump Up</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blitzer</keyword>
+			<keyword>Human</keyword>
+		</keywords>
+	</position>
+	<position id="norse.thrower">
+		<quantity>2</quantity>
+		<name>Thrower</name>
+		<displayName>Valkyrie</displayName>
+		<type>Regular</type>
+		<cost>95000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>3</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Catch</skill>
+			<skill>Dauntless</skill>
+			<skill>Pass</skill>
+			<skill>Strip Ball</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<normal>Passing</normal>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Catcher</keyword>
+			<keyword>Human</keyword>
+			<keyword>Thrower</keyword>
+		</keywords>
+	</position>
+	<position id="norse.ulfwerener">
+		<quantity>2</quantity>
+		<name>Ulfwerener</name>
+		<displayName>Ulfwerener</displayName>
+		<type>Regular</type>
+		<cost>105000</cost>
+		<movement>6</movement>
+		<strength>4</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Frenzy</skill>
+			<skill>Unsteady</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blocker</keyword>
+			<keyword>Human</keyword>
+		</keywords>
+	</position>
+	<position id="norse.troll.snow">
+		<quantity>1</quantity>
+		<name>Snow Troll</name>
+		<displayName>Yhetee</displayName>
+		<type>Big Guy</type>
+		<cost>140000</cost>
+		<movement>5</movement>
+		<strength>5</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Claws</skill>
+			<skill>Disturbing Presence</skill>
+			<skill>Frenzy</skill>
+			<skill value="4">Loner</skill>
+			<skill>Unchannelled Fury</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Big Guy</keyword>
+			<keyword>Yhetee</keyword>
+		</keywords>
+	</position>
+</roster>

@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamGoblinParity25Away">
+
+	<coach>Away</coach>
+	<name>Goblin Parity25 Away</name>
+	<race>Goblin</race>
+	<rosterId>goblin.bb2025</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1055000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>35000</treasury>
+	<specialRules>
+		<rule>Bribery and Corruption</rule>
+	</specialRules>
+
+	<player nr="1" id="teamGoblinParity25Away1">
+		<name>Trained Troll 1</name>
+		<gender>male</gender>
+		<positionId>goblin.troll</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamGoblinParity25Away2">
+		<name>Trained Troll 2</name>
+		<gender>male</gender>
+		<positionId>goblin.troll</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamGoblinParity25Away3">
+		<name>Pogoer 3</name>
+		<gender>male</gender>
+		<positionId>goblin.pogoer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamGoblinParity25Away4">
+		<name>Fanatic 4</name>
+		<gender>male</gender>
+		<positionId>goblin.fanatic</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamGoblinParity25Away5">
+		<name>Doom Diver 5</name>
+		<gender>male</gender>
+		<positionId>goblin.doom_diver</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamGoblinParity25Away6">
+		<name>'Ooligan 6</name>
+		<gender>male</gender>
+		<positionId>goblin.ooligan</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamGoblinParity25Away7">
+		<name>Bomma 7</name>
+		<gender>male</gender>
+		<positionId>goblin.bombardier</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamGoblinParity25Away8">
+		<name>Goblin Lineman 8</name>
+		<gender>male</gender>
+		<positionId>goblin.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamGoblinParity25Away9">
+		<name>Goblin Lineman 9</name>
+		<gender>male</gender>
+		<positionId>goblin.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamGoblinParity25Away10">
+		<name>Goblin Lineman 10</name>
+		<gender>male</gender>
+		<positionId>goblin.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamGoblinParity25Away11">
+		<name>Goblin Lineman 11</name>
+		<gender>male</gender>
+		<positionId>goblin.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamGoblinParity25Away12">
+		<name>Goblin Lineman 12</name>
+		<gender>male</gender>
+		<positionId>goblin.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamGoblinParity25Away13">
+		<name>Goblin Lineman 13</name>
+		<gender>male</gender>
+		<positionId>goblin.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="14" id="teamGoblinParity25Away14">
+		<name>Looney 14</name>
+		<gender>male</gender>
+		<positionId>goblin.looney</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

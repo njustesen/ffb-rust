@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="slann_fumbbl.bb2025">
+	<name>Slann</name>
+	<reRollCost>50000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="2995">
+		<quantity>4</quantity>
+		<name>Blitzer</name>
+		<displayName>Blitzer</displayName>
+		<type>Regular</type>
+		<cost>110000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>-1</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Diving Tackle</skill>
+			<skill>Jump Up</skill>
+			<skill>Leap</skill>
+			<skill>Very Long Legs</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Agility</normal>
+			<normal>Strength</normal>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="2994">
+		<quantity>4</quantity>
+		<name>Catcher</name>
+		<displayName>Catcher</displayName>
+		<type>Regular</type>
+		<cost>80000</cost>
+		<movement>7</movement>
+		<strength>2</strength>
+		<agility>4</agility>
+		<passing>-1</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Diving Catch</skill>
+			<skill>Leap</skill>
+			<skill>Very Long Legs</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Agility</normal>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="2996">
+		<quantity>1</quantity>
+		<name>Kroxigor</name>
+		<displayName>Kroxigor</displayName>
+		<type>Big Guy</type>
+		<cost>140000</cost>
+		<movement>6</movement>
+		<strength>5</strength>
+		<agility>1</agility>
+		<passing>-1</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Loner</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Prehensile Tail</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>General</double>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="2993">
+		<quantity>16</quantity>
+		<name>Lineman</name>
+		<displayName>Lineman</displayName>
+		<type>Regular</type>
+		<cost>60000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>-1</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Leap</skill>
+			<skill>Very Long Legs</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+</roster>

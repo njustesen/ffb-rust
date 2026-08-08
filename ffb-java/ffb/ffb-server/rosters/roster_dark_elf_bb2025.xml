@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="dark_elf.bb2025">
+	<name>Dark Elf</name>
+	<reRollCost>50000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="darkelf.lineman">
+		<quantity>16</quantity>
+		<name>Lineman</name>
+		<displayName>Dark Elf Lineman</displayName>
+		<type>Regular</type>
+		<cost>65000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>3</passing>
+		<armour>9</armour>
+		<skillList/>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Strength</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Lineman</keyword>
+			<keyword>Elf</keyword>
+		</keywords>
+	</position>
+	<position id="darkelf.runner">
+		<quantity>2</quantity>
+		<name>Runner</name>
+		<displayName>Dark Elf Runner</displayName>
+		<type>Regular</type>
+		<cost>80000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>3</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dump-off</skill>
+			<skill>Punt</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<normal>Passing</normal>
+			<double>Strength</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Runner</keyword>
+			<keyword>Elf</keyword>
+		</keywords>
+	</position>
+	<position id="darkelf.assassin">
+		<quantity>2</quantity>
+		<name>Assassin</name>
+		<displayName>Dark Elf Assassin</displayName>
+		<type>Regular</type>
+		<cost>90000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Hit and Run</skill>
+			<skill>Shadowing</skill>
+			<skill>Stab</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>Devious</normal>
+			<double>General</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Special</keyword>
+			<keyword>Elf</keyword>
+		</keywords>
+	</position>
+	<position id="darkelf.blitzer">
+		<quantity>2</quantity>
+		<name>Blitzer</name>
+		<displayName>Dark Elf Blitzer</displayName>
+		<type>Regular</type>
+		<cost>105000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>3</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Block</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Passing</double>
+			<double>Strength</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blitzer</keyword>
+			<keyword>Elf</keyword>
+		</keywords>
+	</position>
+	<position id="darkelf.witchelf">
+		<quantity>2</quantity>
+		<name>Witch Elf</name>
+		<displayName>Witch Elf</displayName>
+		<type>Regular</type>
+		<cost>110000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Frenzy</skill>
+			<skill>Jump Up</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Strength</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Special</keyword>
+			<keyword>Elf</keyword>
+		</keywords>
+	</position>
+</roster>

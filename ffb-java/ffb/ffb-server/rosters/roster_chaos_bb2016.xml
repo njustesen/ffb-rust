@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="chaos.bb2016">
+	<name>Chaos</name>
+	<reRollCost>60000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="chaos.beastman">
+		<quantity>12</quantity>
+		<name>Chaos Beastman</name>
+		<displayName>Chaos Beastman</displayName>
+		<type>Regular</type>
+		<cost>60000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Horns</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<normal>Mutation</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaos.warrior">
+		<quantity>4</quantity>
+		<name>Chaos Warrior</name>
+		<displayName>Chaos Warrior</displayName>
+		<type>Regular</type>
+		<cost>100000</cost>
+		<movement>5</movement>
+		<strength>4</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>9</armour>
+		<skillList/>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<normal>Mutation</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaos.minotaur">
+		<quantity>1</quantity>
+		<name>Minotaur</name>
+		<displayName>Minotaur</displayName>
+		<type>Big Guy</type>
+		<cost>150000</cost>
+		<movement>5</movement>
+		<strength>5</strength>
+		<agility>2</agility>
+		<passing>0</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Loner</skill>
+			<skill>Frenzy</skill>
+			<skill>Horns</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Thick Skull</skill>
+			<skill>Wild Animal</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<normal>Mutation</normal>
+			<double>General</double>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+</roster>

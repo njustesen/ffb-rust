@@ -1,0 +1,72 @@
+{
+  "edition": "bb2016",
+  "race": "halfling",
+  "roster_id": "halfling.lrb6",
+  "rerolls": 4,
+  "reroll_cost": 60000,
+  "apothecaries": 1,
+  "dedicated_fans": 0,
+  "fan_factor": 3,
+  "treasury": 180000,
+  "spent": 920000,
+  "team_value": 920000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "halfling.treeman"
+    },
+    {
+      "nr": 2,
+      "position_id": "halfling.treeman"
+    },
+    {
+      "nr": 3,
+      "position_id": "halfling.halfling"
+    },
+    {
+      "nr": 4,
+      "position_id": "halfling.halfling"
+    },
+    {
+      "nr": 5,
+      "position_id": "halfling.halfling"
+    },
+    {
+      "nr": 6,
+      "position_id": "halfling.halfling"
+    },
+    {
+      "nr": 7,
+      "position_id": "halfling.halfling"
+    },
+    {
+      "nr": 8,
+      "position_id": "halfling.halfling"
+    },
+    {
+      "nr": 9,
+      "position_id": "halfling.halfling"
+    },
+    {
+      "nr": 10,
+      "position_id": "halfling.halfling"
+    },
+    {
+      "nr": 11,
+      "position_id": "halfling.halfling"
+    },
+    {
+      "nr": 12,
+      "position_id": "halfling.halfling"
+    },
+    {
+      "nr": 13,
+      "position_id": "halfling.halfling"
+    },
+    {
+      "nr": 14,
+      "position_id": "halfling.halfling"
+    }
+  ],
+  "special_rules": []
+}

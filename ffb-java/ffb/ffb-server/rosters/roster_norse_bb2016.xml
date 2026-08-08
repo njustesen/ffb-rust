@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="norse.bb2016">
+	<name>Norse</name>
+	<reRollCost>60000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="norse.lineman">
+		<quantity>16</quantity>
+		<name>Lineman</name>
+		<displayName>Lineman</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Block</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="norse.thrower">
+		<quantity>2</quantity>
+		<name>Thrower</name>
+		<displayName>Thrower</displayName>
+		<type>Regular</type>
+		<cost>70000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>3</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Pass</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Passing</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="norse.runner">
+		<quantity>2</quantity>
+		<name>Runner</name>
+		<displayName>Runner</displayName>
+		<type>Regular</type>
+		<cost>90000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Dauntless</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Agility</normal>
+			<double>Strength</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="norse.berserker">
+		<quantity>2</quantity>
+		<name>Berserker</name>
+		<displayName>Berserker</displayName>
+		<type>Regular</type>
+		<cost>90000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Frenzy</skill>
+			<skill>Jump Up</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="norse.ulfwerener">
+		<quantity>2</quantity>
+		<name>Ulfwerener</name>
+		<displayName>Ulfwerener</displayName>
+		<type>Regular</type>
+		<cost>110000</cost>
+		<movement>6</movement>
+		<strength>4</strength>
+		<agility>2</agility>
+		<passing>0</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Frenzy</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="norse.troll.snow">
+		<quantity>1</quantity>
+		<name>Snow Troll</name>
+		<displayName>Snow Troll</displayName>
+		<type>Big Guy</type>
+		<cost>140000</cost>
+		<movement>5</movement>
+		<strength>5</strength>
+		<agility>1</agility>
+		<passing>0</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Claw</skill>
+			<skill>Disturbing Presence</skill>
+			<skill>Frenzy</skill>
+			<skill>Loner</skill>
+			<skill>Wild Animal</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+</roster>

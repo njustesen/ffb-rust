@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="undead.bb2025">
+	<name>Undead</name>
+	<reRollCost>70000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>false</apothecary>
+	<undead>true</undead>
+	<necromancer>true</necromancer>
+	<raisedPositionId>undead.zombie</raisedPositionId>
+	<position id="undead.skeleton">
+		<quantity>16</quantity>
+		<name>Skeleton</name>
+		<displayName>Skeleton Lineman</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>5</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Regeneration</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<double>Agility</double>
+			<double>Devious</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Human</keyword>
+			<keyword>Lineman</keyword>
+			<keyword>Skeleton</keyword>
+			<keyword>Undead</keyword>
+		</keywords>
+	</position>
+	<position id="undead.zombie">
+		<quantity>16</quantity>
+		<name>Zombie</name>
+		<displayName>Zombie Lineman</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>4</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Eye Gouge</skill>
+			<skill>Regeneration</skill>
+			<skill>Unsteady</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Devious</normal>
+			<normal>General</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Human</keyword>
+			<keyword>Lineman</keyword>
+			<keyword>Undead</keyword>
+			<keyword>Zombie</keyword>
+		</keywords>
+	</position>
+	<position id="undead.ghoul">
+		<quantity>2</quantity>
+		<name>Ghoul</name>
+		<displayName>Ghoul Runner</displayName>
+		<type>Regular</type>
+		<cost>75000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>3</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Devious</double>
+			<double>Passing</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Ghoul</keyword>
+			<keyword>Runner</keyword>
+			<keyword>Undead</keyword>
+		</keywords>
+	</position>
+	<position id="undead.wight">
+		<quantity>2</quantity>
+		<name>Wight</name>
+		<displayName>Wight Blitzer</displayName>
+		<type>Regular</type>
+		<cost>95000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Regeneration</skill>
+			<skill>Tackle</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blitzer</keyword>
+			<keyword>Human</keyword>
+			<keyword>Skeleton</keyword>
+			<keyword>Undead</keyword>
+		</keywords>
+	</position>
+	<position id="undead.mummy">
+		<quantity>2</quantity>
+		<name>Mummy</name>
+		<displayName>Mummy</displayName>
+		<type>Big Guy</type>
+		<cost>125000</cost>
+		<movement>3</movement>
+		<strength>5</strength>
+		<agility>5</agility>
+		<passing>6</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Mighty Blow</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Big Guy</keyword>
+			<keyword>Blocker</keyword>
+			<keyword>Human</keyword>
+			<keyword>Undead</keyword>
+		</keywords>
+	</position>
+</roster>

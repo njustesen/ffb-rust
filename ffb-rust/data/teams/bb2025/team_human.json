@@ -1,0 +1,64 @@
+{
+  "edition": "bb2025",
+  "race": "human",
+  "roster_id": "human.lrb6",
+  "rerolls": 3,
+  "reroll_cost": 50000,
+  "apothecaries": 1,
+  "dedicated_fans": 3,
+  "fan_factor": 0,
+  "treasury": 90000,
+  "spent": 1010000,
+  "team_value": 1000000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "human.ogre"
+    },
+    {
+      "nr": 2,
+      "position_id": "human.blitzer"
+    },
+    {
+      "nr": 3,
+      "position_id": "human.blitzer"
+    },
+    {
+      "nr": 4,
+      "position_id": "human.catcher"
+    },
+    {
+      "nr": 5,
+      "position_id": "human.catcher"
+    },
+    {
+      "nr": 6,
+      "position_id": "human.thrower"
+    },
+    {
+      "nr": 7,
+      "position_id": "human.thrower"
+    },
+    {
+      "nr": 8,
+      "position_id": "human.lineman"
+    },
+    {
+      "nr": 9,
+      "position_id": "human.lineman"
+    },
+    {
+      "nr": 10,
+      "position_id": "human.halfling_hopeful"
+    },
+    {
+      "nr": 11,
+      "position_id": "human.halfling_hopeful"
+    },
+    {
+      "nr": 12,
+      "position_id": "human.halfling_hopeful"
+    }
+  ],
+  "special_rules": []
+}

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="khemri.bb2025">
+	<name>Khemri</name>
+	<reRollCost>60000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>false</apothecary>
+	<undead>true</undead>
+	<position id="khemri.skeleton">
+		<quantity>16</quantity>
+		<name>Skeleton</name>
+		<displayName>Skeleton Lineman</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>5</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Regeneration</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<double>Agility</double>
+			<double>Devious</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Human</keyword>
+			<keyword>Lineman</keyword>
+			<keyword>Skeleton</keyword>
+			<keyword>Undead</keyword>
+		</keywords>
+	</position>
+	<position id="khemri.throra">
+		<quantity>2</quantity>
+		<name>Thro-Ra</name>
+		<displayName>Tomb Kings Thrower</displayName>
+		<type>Regular</type>
+		<cost>65000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>3</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Pass</skill>
+			<skill>Regeneration</skill>
+			<skill>Sure Hands</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Passing</normal>
+			<double>Agility</double>
+			<double>Devious</double>
+			<double>Strength</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Human</keyword>
+			<keyword>Skeleton</keyword>
+			<keyword>Thrower</keyword>
+			<keyword>Undead</keyword>
+		</keywords>
+	</position>
+	<position id="khemri.blitzra">
+		<quantity>2</quantity>
+		<name>Blitz-Ra</name>
+		<displayName>Tomb Kings Blitzer</displayName>
+		<type>Regular</type>
+		<cost>85000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>5</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Regeneration</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blitzer</keyword>
+			<keyword>Human</keyword>
+			<keyword>Skeleton</keyword>
+			<keyword>Undead</keyword>
+		</keywords>
+	</position>
+	<position id="khemri.tombguardian">
+		<quantity>4</quantity>
+		<name>Tomb Guardian</name>
+		<displayName>Tomb Guardian</displayName>
+		<type>Big Guy</type>
+		<cost>115000</cost>
+		<movement>4</movement>
+		<strength>5</strength>
+		<agility>5</agility>
+		<passing>6</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Brawler</skill>
+			<skill>Decay</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Big Guy</keyword>
+			<keyword>Blocker</keyword>
+			<keyword>Human</keyword>
+			<keyword>Undead</keyword>
+		</keywords>
+	</position>
+</roster>
