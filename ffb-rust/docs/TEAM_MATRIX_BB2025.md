@@ -7,7 +7,7 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | Roster | Result | First divergence | Notes |
 |---|---|---|---|
 | `lineman` | 🟢 100/100 |  | FUMBBL-legacy roster |
-| `amazon` | 🔴 57/100 | seed 8, step 215, java c027ff298893d7ce vs rust bceae826bc1b3b77 |  |
+| `amazon` | 🟢 100/100 | fixed 2026-08-09: StepPassBlock port + agent window mirroring (commits b8aa79e8, 90f6f0cb) ||
 | `chaos` | 🔴 76/100 | seed 3, step 15, java 0e3bdd96e4142cba vs rust 62c6c52ed8b07d0e |  |
 | `chaos_dwarf` | 🟢 100/100 |  |  |
 | `chaos_pact` | 🟢 100/100 |  | FUMBBL-legacy roster |
@@ -37,4 +37,4 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `vampire` | 🟢 100/100 |  |  |
 | `wood_elf` | 🟢 100/100 |  |  |
 
-**12 green / 18 red of 30.**
+**13 green / 17 red of 30.** (amazon driven green 2026-08-09)
