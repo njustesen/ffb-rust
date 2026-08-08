@@ -1,23 +1,37 @@
 /// 1:1 translation of `com.fumbbl.ffb.server.step.mixed.pass.StepPassBlock`.
 ///
-/// Handles the PASS_BLOCK skill: before a pass is resolved, opponents with
-/// Pass Block may move up to 2 squares to attempt to intercept the ball.
+/// Handles the BB2020/BB2025 pass-interference window ("On The Ball",
+/// `canMoveWhenOpponentPasses`): when a pass action is announced, the opposing
+/// team's eligible players may each move up to 3 squares before the pass
+/// resolves. Java switches the game into `TurnMode::PassBlock`, flips
+/// `homePlaying` to the defending team, marks only the eligible pass blockers
+/// ACTIVE (saving every on-pitch defender's state), and runs Select sequences
+/// until no blocker is active — then restores the saved states, hands control
+/// back to the thrower and continues the pass sequence.
 ///
-/// When there are eligible Pass Blockers the step switches the turn to
-/// `TurnMode::PassBlock` so the opposing team can move those players.  After the
-/// pass-block turn is over (fEndTurn / fEndPlayerAction) the step restores the
-/// original game state and hands control back to the passing team.
+/// Java keeps the SAME step instance on the stack (`pushCurrentStepOnStack()`);
+/// the Rust stack re-creates steps from `SequenceStep` descriptors, so the
+/// instance state (`fOldTurnMode`/`fOldPlayerStates`/`currentMove`/
+/// `isGoingForIt`) travels via `StepParameter::PassBlockResume` on the
+/// re-pushed descriptor instead.
 ///
 /// Init parameters (mandatory): GOTO_LABEL_ON_END.
-/// Incoming parameters: END_PLAYER_ACTION (consumed in PassBlock mode), END_TURN
-///                       (consumed in PassBlock mode).
+/// Incoming parameters: END_PLAYER_ACTION, END_TURN — consumed while the
+/// pass-block mini-turn runs (Java consumes on `TurnMode == PASS_BLOCK`; the
+/// Rust re-pushed continuation instance is exactly the one carrying
+/// `PassBlockResume`, so it consumes and the fresh instance in the pass
+/// sequence does not).
 ///
 /// Java: `@RulesCollection(BB2020, BB2025)`, extends `AbstractStep`.
+use ffb_model::enums::{PlayerAction, TurnMode};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::report_pass_block::ReportPassBlock;
 use crate::action::Action;
-use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::step::framework::{
+    PassBlockResumeState, SequenceStep, Step, StepId, StepOutcome, StepParameter,
+};
+use crate::step::generator::bb2025::select::{Select, SelectParams};
 
 /// Java: `StepPassBlock` (mixed/pass, BB2020 + BB2025).
 #[derive(Debug, Default)]
@@ -28,31 +42,45 @@ pub struct StepPassBlock {
     pub end_turn: bool,
     /// Java: `fEndPlayerAction`
     pub end_player_action: bool,
-    /// Java: `isGoingForIt` — saved actingPlayer.isGoingForIt before pass-block mode.
-    pub is_going_for_it: bool,
-    /// Java: `currentMove` — saved actingPlayer.currentMove (-1 = not set).
-    pub current_move: i32,
-    /// Java: `fOldTurnMode` — turn mode before entering PassBlock mode.
-    pub old_turn_mode: Option<ffb_model::enums::TurnMode>,
+    /// Java: `fOldTurnMode`/`fOldPlayerStates`/`currentMove`/`isGoingForIt` — present on the
+    /// re-pushed continuation instance only (`Some` ⇔ Java `fOldTurnMode != null`).
+    pub resume: Option<PassBlockResumeState>,
 }
 
 impl StepPassBlock {
     pub fn new() -> Self {
-        Self { current_move: -1, ..Default::default() }
+        Self::default()
+    }
+
+    /// Java `pushCurrentStepOnStack()` equivalent: descriptor re-pushing this step with
+    /// its label + resume state, so the continuation instance is reconstructed intact.
+    fn self_seq(&self, resume: &PassBlockResumeState) -> Vec<SequenceStep> {
+        vec![SequenceStep::with_params(StepId::PassBlock, vec![
+            StepParameter::GotoLabelOnEnd(self.goto_label_on_end.clone()),
+            StepParameter::PassBlockResume(resume.clone()),
+        ])]
+    }
+
+    /// Java: `Select.pushSequence(new Select.SequenceParams(getGameState(), false))`.
+    fn select_seq() -> Vec<SequenceStep> {
+        Select::build_sequence(&SelectParams {
+            update_persistence: false,
+            is_blitz_move: false,
+            ..Default::default()
+        })
     }
 
     fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
         if game.thrower_id.is_none() {
+            // Java: if (game.getThrower() == null) return;  (no next-action → NEXT via result default)
             return StepOutcome::next();
         }
 
-        // Java: // no pass block for bombs or hand over or dump off (atm)
-        // Java: if (game.getTurnMode().isBombTurn() || ...) { nextStep; return; }
+        // Java: no pass block for bombs or hand over or dump off (atm)
         if game.turn_mode.is_bomb_turn() {
             return StepOutcome::next();
         }
         if let Some(ta) = game.thrower_action {
-            use ffb_model::enums::PlayerAction;
             if ta == PlayerAction::DumpOff
                 || ta == PlayerAction::HandOver
                 || ta == PlayerAction::HandOverMove
@@ -61,78 +89,174 @@ impl StepPassBlock {
             }
         }
 
-        // Java: find pass blockers on opposing team
-        // Simplified: in the absence of the full OnTheBallMechanic, check if
-        // we're already in pass-block mode and if so, restore state.
-        use ffb_model::enums::TurnMode;
+        let opposing_is_home = {
+            let thrower_id = game.thrower_id.clone().unwrap_or_default();
+            !game.team_home.players.iter().any(|p| p.id == thrower_id)
+        };
+        let opposing_team = if opposing_is_home { game.team_home.clone() } else { game.team_away.clone() };
+
+        // Java: Set<Player> passBlockers = mechanic.findPassBlockers(game, opposingTeam, false);
+        //       if (passBlockers.size() == 0 && fOldTurnMode == null) { NEXT_STEP; return; }
+        let pass_blockers = Self::find_pass_blockers(game, &opposing_team, false);
+        if pass_blockers.is_empty() && self.resume.is_none() {
+            return StepOutcome::next();
+        }
 
         if game.turn_mode == TurnMode::PassBlock {
-            // Java: came back here after pass block movement
-
-            // Check if acting player dropped (failed dodge)
-            if let Some(ref pid) = game.acting_player.player_id.clone() {
-                if let Some(state) = game.field_model.player_state(pid) {
+            // ── Re-entry: the pass-block mini-turn is running ────────────────────────
+            // Java: check if actingPlayer has dropped (failed dodge)
+            if let Some(pid) = game.acting_player.player_id.clone() {
+                if let Some(state) = game.field_model.player_state(&pid) {
                     if !state.has_tacklezones() {
-                        // Player dropped — end turn
-                        game.acting_player.player_id = None;
-                        game.acting_player.player_action = None;
+                        crate::step::util_server_steps::change_player_action_to_none(game);
                         self.end_turn = true;
                         self.end_player_action = false;
                     }
                 }
             }
 
-            if self.end_turn {
-                // Java: restore old player states, reset turn mode, flip home_playing
-                if let Some(old_mode) = self.old_turn_mode {
-                    game.turn_mode = old_mode;
+            if self.end_player_action {
+                if game.acting_player.has_acted {
+                    crate::step::util_server_steps::change_player_action_to_none(game);
+                    if Self::check_no_player_active(game, &pass_blockers) {
+                        self.end_turn = true;
+                    } else {
+                        self.end_player_action = false;
+                        let resume = self.resume.clone().expect("pass-block re-entry without resume state");
+                        return StepOutcome::next()
+                            .push_seq(self.self_seq(&resume))
+                            .push_seq(Self::select_seq());
+                    }
+                } else {
+                    crate::step::util_server_steps::change_player_action_to_none(game);
+                    self.end_player_action = false;
+                    let resume = self.resume.clone().expect("pass-block re-entry without resume state");
+                    return StepOutcome::next()
+                        .push_seq(self.self_seq(&resume))
+                        .push_seq(Self::select_seq());
                 }
-                if self.old_turn_mode.map_or(true, |m| m != TurnMode::DumpOff) {
-                    game.home_playing = !game.home_playing;
-                }
-                // Restore actingPlayer
-                game.acting_player.player_id = game.thrower_id.clone();
-                game.acting_player.player_action = game.thrower_action;
-                if self.current_move >= 0 {
-                    game.acting_player.current_move = self.current_move;
-                    game.acting_player.goes_for_it = self.is_going_for_it;
-                }
-            } else if self.end_player_action {
-                // Player finished — switch to next pass blocker or end
-                // no-op: PassBlock move/select sequences not ported — headless skips PassBlock sequence dispatch
-                self.end_player_action = false;
             }
 
-        } else {
-            // Java: Set<Player<?>> availablePassBlockers = mechanic.findPassBlockers(game, opposingTeam, true);
-            //       if (availablePassBlockers.size() == 0) { report PassBlock(false); } else { ... }
-            // headless(PassBlock-turnMode): full TurnMode::PassBlock switch + homePlaying flip +
-            // player-state save/select-sequence push not yet ported (mirrors bb2016 sibling).
-            let (opposing_team_id, opposing_team_clone) = if game.home_playing {
-                (game.team_away.id.clone(), game.team_away.clone())
-            } else {
-                (game.team_home.id.clone(), game.team_home.clone())
-            };
-            let has_blockers = Self::has_available_pass_blockers(game, &opposing_team_clone);
-            game.report_list.add(ReportPassBlock::new(opposing_team_id, has_blockers));
-            let outcome = StepOutcome::next()
-                .with_event(ffb_model::events::GameEvent::PassBlock {
-                    player_id: None,
-                });
-            return outcome;
-        }
+            if self.end_turn {
+                let resume = self.resume.clone().expect("pass-block end without resume state");
+                // Java: restore saved states for on-pitch defenders that still have tacklezones.
+                for (pid, old_state) in &resume.old_player_states {
+                    let on_pitch = game.field_model.player_coordinate(pid)
+                        .map(|c| !c.is_box_coordinate())
+                        .unwrap_or(false);
+                    let has_tz = game.field_model.player_state(pid)
+                        .map(|s| s.has_tacklezones())
+                        .unwrap_or(false);
+                    if on_pitch && has_tz {
+                        game.field_model.set_player_state(pid, *old_state);
+                    }
+                }
 
-        StepOutcome::next()
+                // Java: actingPlayer.setPlayer(thrower); setPlayerAction(throwerAction); setHasPassed(true)
+                game.acting_player.player_id = game.thrower_id.clone();
+                game.acting_player.player_action = game.thrower_action;
+                game.acting_player.has_passed = true;
+                if resume.current_move >= 0 {
+                    game.acting_player.current_move = resume.current_move;
+                    game.acting_player.goes_for_it = resume.going_for_it;
+                }
+
+                game.turn_mode = resume.old_turn_mode;
+                if resume.old_turn_mode != TurnMode::DumpOff {
+                    game.home_playing = !game.home_playing;
+                }
+
+                let thrower_coordinate = game.thrower_id.as_ref()
+                    .and_then(|id| game.field_model.player_coordinate(id));
+                if game.thrower_action == Some(PlayerAction::HailMaryPass) {
+                    // Java: reset ball
+                    game.field_model.ball_in_play = true;
+                    game.field_model.ball_coordinate = thrower_coordinate;
+                    game.field_model.ball_moving = false;
+                } else if game.thrower_action == Some(PlayerAction::HailMaryBomb) {
+                    game.field_model.bomb_coordinate = None;
+                }
+                // else: Java forces a rangeRuler redraw — client-only, no headless state.
+            }
+
+            StepOutcome::next()
+        } else {
+            // ── First entry: open the pass-block window if any blocker is available ──
+            // Java: Set<Player> availablePassBlockers = mechanic.findPassBlockers(game, opposingTeam, true);
+            let available = Self::find_pass_blockers(game, &opposing_team, true);
+            if available.is_empty() {
+                game.report_list.add(ReportPassBlock::new(opposing_team.id.clone(), false));
+                return StepOutcome::next()
+                    .with_event(ffb_model::events::GameEvent::PassBlock { player_id: None });
+            }
+
+            let mut old_player_states: Vec<(String, ffb_model::enums::PlayerState)> = Vec::new();
+            let resume = PassBlockResumeState {
+                old_turn_mode: game.turn_mode,
+                old_player_states: Vec::new(), // filled below
+                current_move: game.acting_player.current_move,
+                going_for_it: game.acting_player.goes_for_it,
+            };
+
+            game.turn_mode = TurnMode::PassBlock;
+            game.home_playing = !game.home_playing;
+            // Java: game.getActingPlayer().setPlayerId(null) — raw id clear, NOT changeActingPlayer.
+            game.acting_player.player_id = None;
+
+            // Java: save every on-pitch defender's state, then activate exactly the available blockers.
+            for player in &opposing_team.players {
+                let on_pitch = game.field_model.player_coordinate(&player.id)
+                    .map(|c| !c.is_box_coordinate())
+                    .unwrap_or(false);
+                if on_pitch {
+                    if let Some(state) = game.field_model.player_state(&player.id) {
+                        old_player_states.push((player.id.clone(), state));
+                        game.field_model.set_player_state(
+                            &player.id,
+                            state.change_active(available.contains(&player.id)),
+                        );
+                    }
+                }
+            }
+            let resume = PassBlockResumeState { old_player_states, ..resume };
+
+            // Java: Hail Mary marks the pass coordinate with a faded ball / bomb.
+            if game.thrower_action == Some(PlayerAction::HailMaryPass) {
+                game.field_model.ball_in_play = false;
+                game.field_model.ball_coordinate = game.pass_coordinate;
+                game.field_model.ball_moving = true;
+            }
+            if game.thrower_action == Some(PlayerAction::HailMaryBomb) {
+                game.field_model.bomb_coordinate = game.pass_coordinate;
+            }
+
+            // Java: game.setDialogParameter(new DialogPassBlockParameter()) — headless: the
+            // pushed Select sequence emits the ActivatePlayer prompt that drives the window.
+            StepOutcome::next()
+                .with_event(ffb_model::events::GameEvent::PassBlock { player_id: None })
+                .push_seq(self.self_seq(&resume))
+                .push_seq(Self::select_seq())
+        }
     }
 
-    /// Java: `mechanic.findPassBlockers(game, opposingTeam, true).size() != 0`.
-    /// Extracted so tests can assert on the exact predicate used to decide
-    /// `ReportPassBlock`'s availability flag, without needing to downcast the
-    /// boxed `IReport` trait object stored in `game.report_list`.
-    fn has_available_pass_blockers(game: &Game, opposing_team: &ffb_model::model::Team) -> bool {
+    /// Java: `mechanic.findPassBlockers(game, team, checkCanReach)` (mixed OnTheBallMechanic
+    /// ignores `checkCanReach` — both calls use the same predicate).
+    fn find_pass_blockers(game: &Game, opposing_team: &ffb_model::model::Team, check_can_reach: bool) -> std::collections::HashSet<String> {
         use ffb_mechanics::on_the_ball_mechanic::OnTheBallMechanic as OnTheBallMechanicTrait;
         let mechanic = ffb_mechanics::mixed::on_the_ball_mechanic::OnTheBallMechanic::new();
-        !mechanic.find_pass_blockers(game, opposing_team, true).is_empty()
+        mechanic.find_pass_blockers(game, opposing_team, check_can_reach)
+    }
+
+    /// Java: `checkNoPlayerActive(Set<Player>)`.
+    fn check_no_player_active(game: &Game, pass_blockers: &std::collections::HashSet<String>) -> bool {
+        for pid in pass_blockers {
+            if let Some(state) = game.field_model.player_state(pid) {
+                if state.is_active() {
+                    return false;
+                }
+            }
+        }
+        true
     }
 }
 
@@ -150,30 +274,22 @@ impl Step for StepPassBlock {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             StepParameter::GotoLabelOnEnd(v) => { self.goto_label_on_end = v.clone(); true }
-            StepParameter::EndTurn(v) => {
-                self.end_turn = *v;
-                // Java: if in PassBlock mode, consume the parameter (don't propagate)
-                // (consume semantics handled by the driver via Published.consumed)
-                true
-            }
-            StepParameter::EndPlayerAction(v) => {
-                self.end_player_action = *v;
-                true
-            }
+            StepParameter::PassBlockResume(state) => { self.resume = Some(state.clone()); true }
+            StepParameter::EndTurn(v) => { self.end_turn = *v; true }
+            StepParameter::EndPlayerAction(v) => { self.end_player_action = *v; true }
             _ => false,
         }
     }
 
-    // Java: setParameter consume()s these keys — but ONLY when
-    // game.getTurnMode() == TurnMode.PASS_BLOCK. That guard is not expressible here
-    // (consumes_parameter has no game access). This step sits in EVERY pass sequence,
-    // where the mode is Regular and Java does NOT consume — consuming unconditionally
-    // would eat the END_TURN/END_PLAYER_ACTION meant for StepEndPassing below it (the
-    // exact clobber bug class this mechanism fixes). The headless port never enters
-    // PASS_BLOCK mode, so never-consume is the Java-equivalent runtime behavior; revisit
-    // if pass-block interactions are ever ported.
-    fn consumes_parameter(&self, _param: &StepParameter) -> bool {
-        false
+    // Java consumes END_TURN/END_PLAYER_ACTION only when game.getTurnMode() == PASS_BLOCK.
+    // consumes_parameter has no game access, but the continuation instance (the one queued
+    // beneath the mini-turn's Select sequence) is exactly the instance carrying the resume
+    // state — and it exists if and only if the mode is PASS_BLOCK. The fresh instance inside
+    // the ordinary pass sequence has `resume == None` and must NOT consume (it would eat the
+    // END_TURN/END_PLAYER_ACTION meant for StepEndPassing below it).
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param, StepParameter::EndTurn(_) | StepParameter::EndPlayerAction(_))
+            && self.resume.is_some()
     }
 }
 
@@ -193,17 +309,48 @@ mod tests {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
     }
 
+    fn add_player(game: &mut Game, home: bool, id: &str, skills: Vec<ffb_model::model::skill_def::SkillWithValue>) {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerGender, PlayerType};
+        let player = Player {
+            id: id.into(),
+            name: id.into(),
+            nr: 1,
+            position_id: "lineman".into(),
+            player_type: PlayerType::Regular,
+            gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: skills,
+            extra_skills: vec![],
+            temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0,
+            stat_injuries: vec![],
+            current_spps: 0,
+            career_spps: 0,
+            race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        if home { game.team_home.players.push(player); } else { game.team_away.players.push(player); }
+    }
+
+    /// Java: `passBlockers.size() == 0 && fOldTurnMode == null` → plain NEXT_STEP with no
+    /// report at all (the ReportPassBlock(false) branch needs declared-but-unavailable
+    /// blockers, which the mixed OnTheBallMechanic — ignoring checkCanReach — never yields).
     #[test]
-    fn pass_block_report_added_when_no_pass_blockers() {
+    fn no_report_when_no_pass_blockers_at_all() {
         let mut step = StepPassBlock::new();
         let mut game = make_game();
+        add_player(&mut game, true, "p1", vec![]);
         game.thrower_id = Some("p1".into());
         game.thrower_action = Some(PlayerAction::Pass);
         let mut rng = GameRng::new(0);
-        step.start(&mut game, &mut rng);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::NextStep);
         assert!(
-            game.report_list.has_report(ReportId::PASS_BLOCK),
-            "should add ReportPassBlock(available=false) when no eligible pass blockers"
+            !game.report_list.has_report(ReportId::PASS_BLOCK),
+            "Java early-exits before the report when no defender has the skill"
         );
     }
 
@@ -241,16 +388,16 @@ mod tests {
     }
 
     #[test]
-    fn regular_pass_emits_pass_block_event() {
+    fn regular_pass_without_blockers_is_a_plain_next_step() {
         let mut step = StepPassBlock::new();
         let mut game = make_game();
+        add_player(&mut game, true, "p1", vec![]);
         game.thrower_id = Some("p1".into());
         game.thrower_action = Some(PlayerAction::Pass);
         let mut rng = GameRng::new(0);
         let out = step.start(&mut game, &mut rng);
-        let has_pb = out.events.iter().any(|e| matches!(e, ffb_model::events::GameEvent::PassBlock { .. }));
-        assert!(has_pb);
         assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.pushes.is_empty(), "no pass-block window without eligible blockers");
     }
 
     #[test]
@@ -271,71 +418,91 @@ mod tests {
         assert_eq!(step.goto_label_on_end, "lbl");
     }
 
-    /// Regression: the mixed StepPassBlock previously never called
-    /// `OnTheBallMechanic::find_pass_blockers` and always reported
-    /// `ReportPassBlock(available=false)`, even when the opposing team had an
-    /// eligible Pass-Block player standing with tacklezones. Java:
-    /// `Set<Player<?>> availablePassBlockers = mechanic.findPassBlockers(game, opposingTeam, true);
-    ///  if (availablePassBlockers.size() == 0) { report(false) } else { report ... }`
-    #[test]
-    fn eligible_pass_blocker_is_detected_as_available() {
-        use ffb_model::model::player::Player;
-        use ffb_model::enums::{PlayerGender, PlayerType, SkillId, PlayerState};
+    fn game_with_on_the_ball_defender() -> Game {
+        use ffb_model::enums::{SkillId, PlayerState, PS_STANDING};
         use ffb_model::model::skill_def::SkillWithValue;
         use ffb_model::types::FieldCoordinate;
-
         let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        add_player(&mut game, true, "p1", vec![]);
         game.thrower_id = Some("p1".into());
         game.thrower_action = Some(PlayerAction::Pass);
-        // Thrower is on the home team; opposing team (away) has a Pass Block player.
         game.home_playing = true;
+        game.field_model.set_player_coordinate("p1", FieldCoordinate::new(10, 7));
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+        // Defender with On The Ball (canMoveWhenOpponentPasses) + a plain defender.
+        add_player(&mut game, false, "otb1", vec![SkillWithValue::new(SkillId::OnTheBall)]);
+        add_player(&mut game, false, "plain1", vec![]);
+        for id in ["otb1", "plain1"] {
+            game.field_model.set_player_coordinate(id, FieldCoordinate::new(15, 7 + (id.len() as i32 % 3)));
+            // Standing AND active — matches a mid-turn defender (turn start sets the ACTIVE bit).
+            game.field_model.set_player_state(id, PlayerState::new(PS_STANDING).change_active(true));
+        }
+        game
+    }
 
-        let blocker = Player {
-            id: "blocker1".into(),
-            name: "blocker1".into(),
-            nr: 1,
-            position_id: "lineman".into(),
-            player_type: PlayerType::Regular,
-            gender: PlayerGender::Male,
-            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
-            starting_skills: vec![SkillWithValue::new(SkillId::PassBlock)],
-            extra_skills: vec![],
-            temporary_skills: vec![],
-            used_skills: Default::default(),
-            niggling_injuries: 0,
-            stat_injuries: vec![],
-            current_spps: 0,
-            career_spps: 0,
-            race: None,
-            is_big_guy: false,
-            ..Default::default()
-        };
-        game.team_away.players.push(blocker);
-        game.field_model.set_player_coordinate("blocker1", FieldCoordinate::new(3, 3));
-        game.field_model.set_player_state("blocker1", PlayerState::new(0x1)); // PS_STANDING → has_tacklezones
-
-        // This is the exact predicate the (fixed) step now uses to decide the
-        // ReportPassBlock availability flag; before the fix, the step never
-        // invoked find_pass_blockers at all and hard-coded `false`.
-        let available = StepPassBlock::has_available_pass_blockers(&game, &game.team_away);
-        assert!(available, "expected an eligible Pass-Block player standing with tacklezones to be detected as an available pass blocker");
-
-        // End-to-end: running the step with this setup must produce a
-        // ReportPassBlock (existence already covered by other tests); here we
-        // additionally confirm the step doesn't panic and completes normally.
+    /// Java: first entry with an available blocker → PASS_BLOCK mode, homePlaying flip,
+    /// only the eligible blockers stay ACTIVE, self + Select sequences pushed.
+    #[test]
+    fn available_blocker_opens_pass_block_window() {
+        let mut game = game_with_on_the_ball_defender();
         let mut step = StepPassBlock::new();
+        step.set_parameter(&StepParameter::GotoLabelOnEnd("endPassing".into()));
         let mut rng = GameRng::new(0);
         let out = step.start(&mut game, &mut rng);
         assert_eq!(out.action, StepAction::NextStep);
-        assert!(game.report_list.has_report(ReportId::PASS_BLOCK));
+        assert_eq!(out.pushes.len(), 2, "must push self-descriptor + Select sequence");
+        assert_eq!(out.pushes[0][0].step_id, StepId::PassBlock);
+        assert_eq!(game.turn_mode, TurnMode::PassBlock);
+        assert!(!game.home_playing, "homePlaying must flip to the defending team");
+        assert!(game.acting_player.player_id.is_none());
+        assert!(game.field_model.player_state("otb1").unwrap().is_active(),
+            "On The Ball defender stays active");
+        assert!(!game.field_model.player_state("plain1").unwrap().is_active(),
+            "non-blocker defenders are deactivated");
+        // The re-pushed descriptor carries the resume state.
+        assert!(out.pushes[0][0].params.iter().any(|p| matches!(p, StepParameter::PassBlockResume(_))));
     }
 
+    /// Java: END_TURN in PASS_BLOCK mode → restore saved states, thrower becomes acting
+    /// player again with hasPassed, turn mode + homePlaying restored.
     #[test]
-    fn no_eligible_pass_blockers_when_opposing_team_has_no_pass_block_players() {
-        let mut game = make_game();
-        game.thrower_id = Some("p1".into());
-        game.thrower_action = Some(PlayerAction::Pass);
-        game.home_playing = true;
-        assert!(!StepPassBlock::has_available_pass_blockers(&game, &game.team_away));
+    fn end_turn_restores_state_and_returns_control_to_thrower() {
+        let mut game = game_with_on_the_ball_defender();
+        // Enter the window first.
+        let mut entry_step = StepPassBlock::new();
+        entry_step.set_parameter(&StepParameter::GotoLabelOnEnd("endPassing".into()));
+        let mut rng = GameRng::new(0);
+        let out = entry_step.start(&mut game, &mut rng);
+        let resume = out.pushes[0][0].params.iter().find_map(|p| match p {
+            StepParameter::PassBlockResume(s) => Some(s.clone()),
+            _ => None,
+        }).expect("resume state on the re-pushed descriptor");
+
+        // Continuation instance (as reconstructed from the descriptor) receives END_TURN.
+        let mut cont = StepPassBlock::new();
+        cont.set_parameter(&StepParameter::GotoLabelOnEnd("endPassing".into()));
+        cont.set_parameter(&StepParameter::PassBlockResume(resume));
+        cont.set_parameter(&StepParameter::EndTurn(true));
+        assert!(cont.consumes_parameter(&StepParameter::EndTurn(true)),
+            "continuation instance must consume END_TURN (Java: mode == PASS_BLOCK)");
+        let out2 = cont.start(&mut game, &mut rng);
+        assert_eq!(out2.action, StepAction::NextStep);
+        assert_eq!(game.turn_mode, TurnMode::Regular, "old turn mode restored");
+        assert!(game.home_playing, "homePlaying flipped back to the throwing team");
+        assert_eq!(game.acting_player.player_id.as_deref(), Some("p1"));
+        assert!(game.acting_player.has_passed);
+        assert!(game.field_model.player_state("plain1").unwrap().is_active(),
+            "saved (active) state restored for non-blocker defenders");
+    }
+
+    /// The fresh instance inside the ordinary pass sequence must NOT consume
+    /// END_TURN/END_PLAYER_ACTION (Java only consumes when mode == PASS_BLOCK) —
+    /// consuming would starve StepEndPassing below it.
+    #[test]
+    fn fresh_instance_does_not_consume_end_turn() {
+        let step = StepPassBlock::new();
+        assert!(!step.consumes_parameter(&StepParameter::EndTurn(true)));
+        assert!(!step.consumes_parameter(&StepParameter::EndPlayerAction(true)));
     }
 }

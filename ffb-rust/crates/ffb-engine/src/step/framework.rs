@@ -399,7 +399,27 @@ pub enum StepParameter {
     /// sets `DeflectionSuccessful` and still requires a catch roll. Published by
     /// `bb2020::pass::StepIntercept`, consumed by `bb2020::pass::StepResolvePass`.
     InterceptionSuccessful(bool),
+    /// Resume state for the pass-block mini-turn (Java `StepPassBlock`'s instance fields
+    /// `fOldTurnMode`/`fOldPlayerStates`/`currentMove`/`isGoingForIt`). Java keeps the SAME
+    /// step instance on the stack via `pushCurrentStepOnStack()`; the Rust stack re-creates
+    /// steps from `SequenceStep` descriptors, so the state travels as a construction param
+    /// on the re-pushed PASS_BLOCK descriptor instead.
+    PassBlockResume(PassBlockResumeState),
     // … grow per 20_steps entries as steps are ported.
+}
+
+/// Saved state carried across the pass-block mini-turn (see `StepParameter::PassBlockResume`).
+#[derive(Debug, Clone)]
+pub struct PassBlockResumeState {
+    /// Java: `fOldTurnMode` — turn mode before entering PASS_BLOCK.
+    pub old_turn_mode: ffb_model::enums::TurnMode,
+    /// Java: `fOldPlayerStates` — pre-pass-block states of the pass-blocking team's
+    /// on-pitch players (player id → saved state).
+    pub old_player_states: Vec<(String, ffb_model::enums::PlayerState)>,
+    /// Java: `currentMove` — thrower's saved actingPlayer.currentMove (-1 = not set).
+    pub current_move: i32,
+    /// Java: `isGoingForIt` — thrower's saved actingPlayer.isGoingForIt.
+    pub going_for_it: bool,
 }
 
 /// A published parameter carries the consume flag used while walking the stack top→bottom.

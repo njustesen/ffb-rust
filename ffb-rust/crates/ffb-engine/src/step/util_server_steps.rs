@@ -113,6 +113,55 @@ pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerActi
     }
 }
 
+/// Java `UtilServerSteps.changePlayerAction(step, null, null, false)` — clear the acting
+/// player. Mirrors `UtilActingPlayer.changeActingPlayer(game, null, null, false)`:
+/// the OLD acting player (if any) leaves its transient MOVING base — a player who has
+/// acted becomes STANDING **and inactive** (this is what retires a finished pass-block
+/// mover so `checkNoPlayerActive` sees it used), a standing-up/was-prone player drops
+/// back PRONE, anyone else becomes STANDING — then the acting player is reset.
+/// (The Java bomb-action exception on the hasActed branch is not modelled: it only
+/// matters for Bombardiers keeping their throw after moving.)
+pub fn change_player_action_to_none(game: &mut Game) {
+    use ffb_model::enums::{PS_MOVING, PS_PRONE, PS_STANDING};
+    if let Some(old_id) = game.acting_player.player_id.clone() {
+        if let Some(state) = game.field_model.player_state(&old_id) {
+            if state.base() == PS_MOVING {
+                // Java wasProne(): oldPlayerState base was PRONE.
+                let was_prone = game.acting_player.old_player_state
+                    .map(|s| s.base() == PS_PRONE)
+                    .unwrap_or(false);
+                let new_state = if game.acting_player.has_acted {
+                    state.change_base(PS_STANDING).change_active(false)
+                } else if game.acting_player.standing_up || was_prone {
+                    state.change_base(PS_PRONE)
+                } else {
+                    state.change_base(PS_STANDING)
+                };
+                game.field_model.set_player_state(&old_id, new_state);
+            }
+        }
+        // Java UtilActingPlayer.changeActingPlayer `if (changed)` block: reset transient
+        // BLOCKED/MOVING states (same as the non-null path in change_player_action).
+        reset_blocked_and_moving_players(game);
+    }
+    // Java ActingPlayer.setPlayer(null): full field reset (mirrors set_player's reset list).
+    let ap = &mut game.acting_player;
+    ap.player_id = None;
+    ap.player_action = None;
+    ap.defender_id = None;
+    ap.current_move = 0;
+    ap.goes_for_it = false;
+    ap.dodging = false;
+    ap.has_blocked = false;
+    ap.has_fouled = false;
+    ap.has_passed = false;
+    ap.has_moved = false;
+    ap.has_fed = false;
+    ap.has_acted = false;
+    ap.standing_up = false;
+    ap.old_player_state = None;
+}
+
 /// Java `checkTouchdown(GameState)`.
 /// Returns true if there is a touchdown condition: a standing ball carrier is in the enemy
 /// end zone and the ball is in play and not moving.
