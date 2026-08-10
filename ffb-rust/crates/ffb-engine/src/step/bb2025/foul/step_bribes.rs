@@ -91,29 +91,65 @@ impl StepBribes {
 
         if self.argue_the_call_choice == Some(true) && self.argue_the_call_successful.is_none() {
             if !game.turn_data().coach_banned {
-                let roll = rng.d6();
-                let successful = roll > 5;
-                let coach_banned_by_argue = roll < 2;
-                self.argue_the_call_successful = Some(successful);
-                if coach_banned_by_argue {
-                    game.turn_data_mut().coach_banned = true;
+                // Java rollArgue (StepBribes): rollArgueTheCall d6; +1 if friendsWithTheRef and roll>1;
+                // + biasedRefBonus (Usage.ADD_TO_ARGUE_ROLL). On a natural 1 that bans the coach, if the
+                // team holds a Bribery-and-Corruption (REROLL_ARGUE) inducement with uses left, consume a
+                // use, report USED, and re-roll the argue (Java `couldReRoll && coachBanned` →
+                // useBriberyReRoll + recursive rollArgue(..., Optional.empty())). The ParityRunner path
+                // never hits the `else if couldReRoll` dialog branch: isCoachBanned(roll) is roll<2, so a
+                // natural 1 is ALWAYS coach-banned → the auto-reroll branch. (dwarf seed 7 i=133: away_03's
+                // foul-ejection argue rolled 1 → B&C re-roll 5 → success; Rust rolled once and banned the
+                // coach, running a die behind and desyncing the whole game.)
+                use ffb_model::inducement::usage::Usage;
+                // Java getActingTeam() = the team currently playing (turn_data() selects by home_playing).
+                let team_id = if game.home_playing { game.team_home.id.clone() } else { game.team_away.id.clone() };
+                let friends = game.prayer_state.is_friends_with_ref(&team_id);
+                let mut argue_event: Option<GameEvent> = None;
+                loop {
+                    let roll = rng.d6();
+                    let mut modified = if friends && roll > 1 { roll + 1 } else { roll };
+                    let biased_ref_bonus = game.turn_data().inducement_set.value(Usage::ADD_TO_ARGUE_ROLL);
+                    modified += biased_ref_bonus;
+                    let successful = crate::dice_interpreter::DiceInterpreter::is_argue_the_call_successful(modified);
+                    let coach_banned_by_argue = crate::dice_interpreter::DiceInterpreter::is_coach_banned(roll);
+                    self.argue_the_call_successful = Some(successful);
+                    game.report_list.add(ReportArgueTheCallRoll::new(
+                        game.acting_player.player_id.clone(),
+                        successful,
+                        coach_banned_by_argue,
+                        roll,
+                        true,
+                        friends,
+                        biased_ref_bonus,
+                    ));
+                    // One ArgueTheCall coverage event per roll (initial + any B&C re-roll).
+                    argue_event = Some(GameEvent::ArgueTheCall {
+                        player_id: fouler_id.clone(),
+                        roll,
+                        success: successful,
+                    });
+                    // Java `couldReRoll = roll==1 && reRollSource != BRIBERY && briberyReRoll present && hasUsesLeft`.
+                    let bribery_type: Option<String> = game.turn_data().inducement_set
+                        .for_usage(Usage::REROLL_ARGUE)
+                        .filter(|t| game.turn_data().inducement_set.has_uses_left(t))
+                        .map(str::to_owned);
+                    let could_re_roll = roll == 1 && bribery_type.is_some();
+                    if could_re_roll && coach_banned_by_argue {
+                        // Java useBriberyReRoll: consume a use, report USED, re-roll.
+                        let type_id = bribery_type.unwrap();
+                        game.turn_data_mut().inducement_set.use_one_of(&type_id);
+                        game.report_list.add(
+                            ffb_model::report::mixed::report_bribery_and_corruption_re_roll::ReportBriberyAndCorruptionReRoll::new(
+                                Some(team_id.clone()), "USED".into()));
+                        continue;
+                    }
+                    if coach_banned_by_argue {
+                        game.turn_data_mut().coach_banned = true;
+                    }
+                    break;
                 }
-                // Java: getResult().addReport(new ReportArgueTheCallRoll(actingPlayer.getPlayerId(), fArgueTheCallSuccessful, coachBanned, roll, true, friendsWithTheRef, biasedRefBonus))
-                game.report_list.add(ReportArgueTheCallRoll::new(
-                    game.acting_player.player_id.clone(),
-                    successful,
-                    coach_banned_by_argue,
-                    roll,
-                    true,
-                    false,
-                    0,
-                ));
-                // Coverage: one ArgueTheCall event per argue roll (success + failure).
-                let argue_event = GameEvent::ArgueTheCall {
-                    player_id: fouler_id.clone(),
-                    roll,
-                    success: successful,
-                };
+                let successful = self.argue_the_call_successful == Some(true);
+                let argue_event = argue_event.expect("argue rolled at least once");
                 if successful {
                     self.bribes_choice = Some(false);
                     let label = self.goto_label_on_end.clone();
@@ -239,6 +275,42 @@ mod tests {
             !game.report_list.has_report(ReportId::ARGUE_THE_CALL),
             "No ReportArgueTheCallRoll should be emitted when coach is already banned"
         );
+    }
+
+    /// Regression (dwarf seed 7 i=133): a foul-ejection argue that rolls a natural 1 (coach-banned)
+    /// must be re-rolled when the fouling team holds a Bribery and Corruption (REROLL_ARGUE)
+    /// inducement — Java StepBribes.rollArgue: `couldReRoll = roll==1 && REROLL_ARGUE present &&
+    /// hasUsesLeft; if (couldReRoll && coachBanned) useBriberyReRoll + recursive rollArgue`. Without
+    /// it Rust rolled once, banned the coach, and consumed one fewer die than Java — desyncing the
+    /// shared stream for the rest of the game. First two d6 = 1 (natural one) then 6 (successful
+    /// re-roll) → argue succeeds, coach not banned, one B&C use consumed.
+    #[test]
+    fn seed7_foul_ejection_bribery_reroll_of_natural_one() {
+        use ffb_model::inducement::inducement::Inducement as InducementModel;
+        use ffb_model::inducement::usage::Usage;
+        // Seed whose first two d6 are 1 then 6.
+        let mut seed = 0u64;
+        loop {
+            let mut r = GameRng::new(seed);
+            if r.d6() == 1 && r.d6() == 6 { break; }
+            seed += 1;
+            assert!(seed < 100_000, "no seed with d6 sequence 1,6 found");
+        }
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("p1".into());
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(5, 5));
+        // Grant the fouling team its Bribery and Corruption argue re-roll (Java leaveStep grant).
+        game.turn_data_home.inducement_set.add_inducement(
+            InducementModel::new("briberyAndCorruption", 1, vec![Usage::REROLL_ARGUE]));
+
+        let mut step = StepBribes::new("end".into());
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        assert_eq!(out.action, StepAction::GotoLabel, "re-rolled argue (6) → success → goto end label");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::ArgueTheCallSuccessful(true))));
+        assert!(!game.turn_data_home.coach_banned, "successful re-roll → coach not banned");
+        assert!(!game.turn_data_home.inducement_set.has_uses_left("briberyAndCorruption"),
+            "the B&C re-roll charge was consumed");
     }
 
     // 5. UseBribe action sets bribes_choice flag
