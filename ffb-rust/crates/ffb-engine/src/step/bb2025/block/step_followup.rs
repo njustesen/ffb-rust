@@ -52,12 +52,14 @@ impl Step for StepFollowup {
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
             Action::UseSkill { skill_id, use_skill } => {
-                // Fend skill: defender uses it to prevent follow-up
-                if *skill_id == SkillId::Fend {
+                // Java handleCommand keys off the command skill's property (preventOpponentFollowingUp
+                // → Fend decision; forceOpponentToFollowUp → Taunt decision). The parity agent answers
+                // a generic SkillUse with a PLACEHOLDER skill_id (no reliable u16→SkillId map), so also
+                // disambiguate by which decision is still pending: the Fend dialog is shown before the
+                // Taunt dialog, so the first UseSkill answers Fend, the next answers Taunt.
+                if *skill_id == SkillId::Fend || self.using_skill_preventing_follow_up.is_none() {
                     self.using_skill_preventing_follow_up = Some(*use_skill);
-                }
-                // Taunt skill: defender uses it to force follow-up
-                if *skill_id == SkillId::Taunt {
+                } else if *skill_id == SkillId::Taunt || self.using_skill_forcing_follow_up.is_none() {
                     self.using_skill_forcing_follow_up = Some(*use_skill);
                 }
             }
@@ -177,8 +179,22 @@ impl StepFollowup {
                             game.report_list.add(ReportSkillUse::new(Some(did.clone()), fsid, false, SkillUse::NO_TACKLEZONE));
                         }
                     } else {
-                        // Would show DialogSkillUse for Fend — stub: wait for response
-                        return build_outcome(out_params, StepOutcome::cont());
+                        // Java: UtilServerDialog.showDialog(DialogSkillUseParameter(defenderId,
+                        // skillPreventingFollowUp)). Surface it as AgentPrompt::SkillUse so the agent
+                        // can answer — a bare cont() with no prompt stalls the headless driver (its
+                        // loop breaks on current_prompt().is_none()), abandoning the whole game
+                        // (goblin seed 21 i=99: a Fend-carrying defender). The parity agent + Parity
+                        // Runner answer use=true (Fend is not in the SKILL_USE decline list) → Fend
+                        // is used → follow-up prevented.
+                        let (sk_id, sk_name) = fend_skill_id
+                            .map(|s| (s as u16, s.class_name().to_string()))
+                            .unwrap_or((SkillId::Fend as u16, "Fend".to_string()));
+                        let prompt = ffb_model::prompts::AgentPrompt::SkillUse {
+                            player_id: game.defender_id.clone().unwrap_or_default(),
+                            skill_id: sk_id,
+                            skill_name: sk_name,
+                        };
+                        return build_outcome(out_params, StepOutcome::cont().with_prompt(prompt));
                     }
                 } else {
                     if let Some(true) = self.using_skill_preventing_follow_up {
@@ -229,8 +245,21 @@ impl StepFollowup {
                 && !cannot_follow
             {
                 if self.using_skill_forcing_follow_up.is_none() {
-                    // Would show DialogSkillUse for Taunt — stub: wait for response
-                    return build_outcome(out_params, StepOutcome::cont());
+                    // Java: UtilServerDialog.showDialog(DialogSkillUseParameter(defenderId,
+                    // skillForcesFollowup)). Surface it as AgentPrompt::SkillUse — a bare cont() with
+                    // no prompt stalls the headless driver, abandoning the game (goblin seed 21 i=99:
+                    // a Taunt-carrying defender forcing the blitzer to follow up). The parity agent +
+                    // ParityRunner answer use=true (Taunt is not in the SKILL_USE decline list) → the
+                    // attacker is forced to follow up.
+                    let (sk_id, sk_name) = taunt_skill_id
+                        .map(|s| (s as u16, s.class_name().to_string()))
+                        .unwrap_or((SkillId::Taunt as u16, "Taunt".to_string()));
+                    let prompt = ffb_model::prompts::AgentPrompt::SkillUse {
+                        player_id: game.defender_id.clone().unwrap_or_default(),
+                        skill_id: sk_id,
+                        skill_name: sk_name,
+                    };
+                    return build_outcome(out_params, StepOutcome::cont().with_prompt(prompt));
                 }
                 if let Some(true) = self.using_skill_forcing_follow_up {
                     effective_choice = Some(true);
@@ -328,6 +357,50 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2025)
+    }
+
+    #[test]
+    fn seed21_taunt_defender_emits_skill_use_prompt_then_forces_followup() {
+        // goblin seed 21 i=99: a Taunt (forceOpponentToFollowUp) defender. Java shows a
+        // DialogSkillUseParameter; Rust must surface it as AgentPrompt::SkillUse — the old bare
+        // cont() stub had NO prompt and stalled the headless driver (game abandoned). The parity
+        // agent + ParityRunner answer use=true (Taunt not in the SKILL_USE decline list) → the
+        // blitzer is forced to follow up.
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, SkillId, PlayerState};
+        let mut game = make_game();
+        let mk = |id: &str, skills: Vec<SkillId>| {
+            let mut p = Player {
+                id: id.into(), name: id.into(), nr: 1, position_id: "pos".into(),
+                player_type: PlayerType::Regular, gender: PlayerGender::Male,
+                movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+                ..Default::default()
+            };
+            for s in skills { p.starting_skills.push(ffb_model::model::skill_def::SkillWithValue::new(s)); }
+            p
+        };
+        game.team_home.players.push(mk("att", vec![]));
+        game.team_away.players.push(mk("def", vec![SkillId::Taunt]));
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        game.acting_player.set_player("att".into(), PlayerAction::Blitz);
+        game.defender_id = Some("def".into());
+
+        let mut step = StepFollowup::new();
+        step.old_defender_state = Some(PlayerState::new(PS_STANDING));
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::SkillUse { ref skill_name, .. }) if skill_name == "Taunt"),
+            "Taunt defender must surface a SkillUse(Taunt) prompt, got {:?}", out.prompt);
+
+        // use=true → attacker forced to follow up (moves to defender's square).
+        let out2 = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Taunt, use_skill: true },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert_eq!(out2.action, StepAction::NextStep);
     }
 
     #[test]
