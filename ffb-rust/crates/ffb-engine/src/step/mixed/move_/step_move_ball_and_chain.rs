@@ -161,7 +161,13 @@ impl StepMoveBallAndChain {
             if !is_in_bounds(new_coord) {
                 // Java: publishParameter(INJURY_TYPE, new InjuryTypeCrowdPush())
                 // Java: setNextAction(GOTO_LABEL, fGotoLabelOnFallDown)
-                return StepOutcome::goto(&self.goto_label_on_fall_down.clone());
+                // The INJURY_TYPE publish was MISSING — StepFallDown then defaulted to
+                // InjuryTypeDropGFI (fallingDownCausesTurnover=TRUE), so a Ball & Chain Fanatic
+                // wandering off the pitch on its own compulsory move wrongly ended the team's turn
+                // (and took the wrong injury) — InjuryTypeCrowdPush.fallingDownCausesTurnover=false,
+                // so it is NOT a turnover (goblin seed 27 i=105).
+                return StepOutcome::goto(&self.goto_label_on_fall_down.clone())
+                    .publish(StepParameter::InjuryTypeName("InjuryTypeCrowdPush".into()));
             }
 
             // Java: publishParameter(COORDINATE_TO, fCoordinateTo)

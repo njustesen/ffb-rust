@@ -1,12 +1,14 @@
 use ffb_model::enums::{ApothecaryMode, TurnMode};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
+use crate::injury::injuryType::injury_type_ball_and_chain::InjuryTypeBallAndChain;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::util_server_injury::{
-    drop_player, handle_injury_by_name, injury_type_causes_turnover,
+    drop_player, handle_injury, handle_injury_by_name, injury_type_causes_turnover,
 };
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.move.StepFallDown.
@@ -74,8 +76,25 @@ impl StepFallDown {
             None, ApothecaryMode::Attacker,
         );
 
-        // Java: publishParameters(UtilServerInjury.dropPlayer(this, actingPlayer, ATTACKER, true))
-        let drop_params = drop_player(game, &player_id, true);
+        // Java: publishParameters(UtilServerInjury.dropPlayer(this, actingPlayer, ATTACKER, true)).
+        // dropPlayer, for a placedProneCausesInjuryRoll (Ball & Chain) player, does NOT place it
+        // prone/scatter the ball — it rolls InjuryTypeBallAndChain and publishes INJURY_RESULT
+        // (Java UtilServerInjury.dropPlayer:339-342). The plain drop_player() util skips that chain
+        // injury (documented TODO), so a falling Ball & Chain Fanatic never rolled its 2d6 armour +
+        // injury (+ casualty) — desyncing the dice stream (goblin seed 27 i=105: the home Fanatic
+        // pushed into the crowd). Mirror Java: roll InjuryTypeBallAndChain here for such players.
+        let placed_prone_causes_injury = game.player(&player_id)
+            .map(|p| p.has_skill_property(NamedProperties::PLACED_PRONE_CAUSES_INJURY_ROLL))
+            .unwrap_or(false);
+        let (drop_params, bc_injury) = if placed_prone_causes_injury {
+            let mut it = InjuryTypeBallAndChain::new();
+            let res = handle_injury(
+                game, rng, &mut it, None, &player_id, coord, None, None, ApothecaryMode::Attacker,
+            );
+            (Vec::new(), Some(res))
+        } else {
+            (drop_player(game, &player_id, true), None)
+        };
 
         // Java: if (fInjuryType.fallingDownCausesTurnover() && getTurnMode() != PASS_BLOCK)
         let causes_turnover = injury_type_causes_turnover(injury_type_name);
@@ -89,6 +108,11 @@ impl StepFallDown {
         });
         for p in drop_params {
             outcome = outcome.publish(p);
+        }
+        // Java line 88: dropPlayer publishes the Ball & Chain INJURY_RESULT (for a B&C player)
+        // BEFORE line 89's fInjuryType result.
+        if let Some(res) = bc_injury {
+            outcome = outcome.publish(StepParameter::InjuryResult(Box::new(res)));
         }
         outcome = outcome.publish(StepParameter::InjuryResult(Box::new(injury_result)));
         if causes_turnover && !is_pass_block {
@@ -158,6 +182,39 @@ mod tests {
         step.injury_type_name = Some("InjuryTypeDropGFI".into());
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
+    }
+
+    #[test]
+    fn seed27_ball_and_chain_crowd_push_no_turnover_and_rolls_bc_injury() {
+        // goblin seed 27 i=105: a Ball & Chain Fanatic (placedProneCausesInjuryRoll) wanders off the
+        // pitch on its compulsory move → InjuryTypeCrowdPush. Two requirements matching Java:
+        //  (1) InjuryTypeCrowdPush does NOT cause a turnover (fallingDownCausesTurnover=false), so
+        //      StepFallDown must NOT publish END_TURN — the Fanatic's own wander is not a turnover.
+        //      (Regression: the injury type wasn't propagated, StepFallDown defaulted to
+        //      InjuryTypeDropGFI which DOES turn over.)
+        //  (2) dropPlayer for a B&C player rolls InjuryTypeBallAndChain (Java dropPlayer:339-342) —
+        //      an InjuryResult must be published (the chain injury), not a plain prone-drop.
+        use ffb_model::enums::SkillId;
+        let mut game = make_game();
+        let mut p = Player {
+            id: "fanatic".into(), name: "fanatic".into(), nr: 1, position_id: "fanatic".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 4, strength: 7, agility: 1, passing: 0, armour: 8,
+            ..Default::default()
+        };
+        p.starting_skills.push(ffb_model::model::skill_def::SkillWithValue::new(SkillId::BallAndChain));
+        game.team_home.players.push(p);
+        game.field_model.set_player_coordinate("fanatic", FieldCoordinate::new(0, 3));
+        game.field_model.set_player_state("fanatic", ffb_model::enums::PlayerState::new(PS_STANDING));
+        game.acting_player.player_id = Some("fanatic".into());
+
+        let mut step = StepFallDown::new();
+        step.injury_type_name = Some("InjuryTypeCrowdPush".into());
+        let out = step.start(&mut game, &mut GameRng::new(1));
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "a Ball & Chain crowd-push fall must NOT publish END_TURN (InjuryTypeCrowdPush is not a turnover)");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))),
+            "a Ball & Chain player's fall must roll and publish an InjuryResult (InjuryTypeBallAndChain)");
     }
 
     #[test]
