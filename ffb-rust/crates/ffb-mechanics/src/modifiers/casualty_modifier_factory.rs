@@ -1,4 +1,4 @@
-use ffb_model::enums::Rules;
+use ffb_model::enums::{Rules, SkillId};
 use ffb_model::model::Player;
 use crate::modifiers::modifiers::Modifier;
 
@@ -23,10 +23,25 @@ impl CasualtyModifierFactory {
         Self
     }
 
-    /// Java: findModifiers(Player) — skill scan + niggling count. The skill scan here only
-    /// covers the niggling-injury count; see the struct doc for the real, deferred Decay gap.
+    /// Java: findModifiers(Player) —
+    /// `player.getSkillsIncludingTemporaryOnes().flatMap(s -> s.getCasualtyModifiers())` plus the
+    /// niggling-injury count. The only skill that registers a casualty modifier is `mixed/Decay`
+    /// (bb2020/bb2025): `CasualtyModifier("Decay", 1)` — a numeric +1 to the casualty roll (its
+    /// bb2016 "roll twice" `requiresSecondCasualtyRoll` effect is gated to bb2016 elsewhere, so
+    /// there is no double-count here). Without this, a Decay player (e.g. a Khemri Tomb Guardian)
+    /// suffering a casualty had the +1 dropped, so a d16 of 8 mapped to Badly Hurt instead of Java's
+    /// Serious Injury (8+1=9), which in turn skipped the bb2025 Getting Even roll (khemri seed 21).
     pub fn find_modifiers(&self, player: &Player) -> Vec<Modifier> {
-        self.for_number(player.niggling_injuries).into_iter().collect()
+        let mut modifiers: Vec<Modifier> = Vec::new();
+        // Java: skill casualty modifiers. Only Decay registers one (+1).
+        if player.has_skill(SkillId::Decay) {
+            modifiers.push(Modifier::new("Decay", 1, Rules::Common));
+        }
+        // Java: nigglings
+        if let Some(m) = self.for_number(player.niggling_injuries) {
+            modifiers.push(m);
+        }
+        modifiers
     }
 
     /// Java: `ModifierAggregator.getCasualtyModifiers()`'s skill half. This factory (per its
@@ -109,6 +124,27 @@ mod tests {
         let f = CasualtyModifierFactory::new();
         let p = player_with_nigglings(0);
         assert!(f.find_modifiers(&p).is_empty());
+    }
+
+    /// Java: mixed/Decay registers CasualtyModifier("Decay", 1) — a player with the Decay skill
+    /// (e.g. a Khemri Tomb Guardian) adds +1 to its casualty roll (khemri seed 21: a d16 of 8 must
+    /// map to Serious Injury (8+1=9), not Badly Hurt, so the bb2025 Getting Even roll fires).
+    #[test]
+    fn find_modifiers_includes_decay_casualty_modifier() {
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::SkillWithValue;
+        let f = CasualtyModifierFactory::new();
+        let mut p = player_with_nigglings(0);
+        p.starting_skills = vec![SkillWithValue::new(SkillId::Decay)];
+        let mods = f.find_modifiers(&p);
+        assert_eq!(mods.len(), 1, "Decay player with no nigglings → exactly the Decay modifier");
+        assert_eq!(mods[0].name, "Decay");
+        assert_eq!(mods[0].value, 1);
+
+        // Decay + a niggling → both modifiers (total +2).
+        p.niggling_injuries = 1;
+        let mods2 = f.find_modifiers(&p);
+        assert_eq!(mods2.iter().map(|m| m.value).sum::<i32>(), 2);
     }
 
     #[test]

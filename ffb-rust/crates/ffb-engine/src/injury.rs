@@ -425,12 +425,12 @@ pub fn recalc_armor_broken(game: &Game, ctx: &mut InjuryContext, defender_id: &s
 
 /// Roll 2d6 injury and, if Casualty, roll the BB2025 d16 casualty die.
 /// Applies any modifiers already stored in `ctx.injury_modifiers`.
-pub fn do_injury_roll(rng: &mut GameRng, ctx: &mut InjuryContext) {
+pub fn do_injury_roll(rng: &mut GameRng, ctx: &mut InjuryContext, game: &Game, defender_id: &str) {
     let d1 = rng.d6();
     let d2 = rng.d6();
     ctx.injury_roll = Some([d1, d2]);
     let outcome = injury_result([d1, d2], &ctx.injury_modifiers);
-    ctx.injury = Some(outcome_to_player_state(rng, ctx, outcome));
+    ctx.injury = Some(outcome_to_player_state(rng, ctx, outcome, game, defender_id));
 }
 
 /// Edition-aware variant of `do_injury_roll` that applies Stunty and ThickSkull rules.
@@ -468,7 +468,7 @@ fn do_injury_roll_for_player_impl(rng: &mut GameRng, ctx: &mut InjuryContext, ga
     } else {
         injury_result([d1, d2], &ctx.injury_modifiers)
     };
-    ctx.injury = Some(outcome_to_player_state(rng, ctx, outcome));
+    ctx.injury = Some(outcome_to_player_state(rng, ctx, outcome, game, defender_id));
 
     // Java: InjuryTypeServer.setInjury() lines 96-98 — Decay skill (requiresSecondCasualtyRoll):
     // after a Casualty result, roll a second, genuinely independent casualty pair and interpret
@@ -505,7 +505,7 @@ fn casualty_tier_to_player_state(d16: i32) -> PlayerState {
     }
 }
 
-fn outcome_to_player_state(rng: &mut GameRng, ctx: &mut InjuryContext, outcome: InjuryOutcome) -> PlayerState {
+fn outcome_to_player_state(rng: &mut GameRng, ctx: &mut InjuryContext, outcome: InjuryOutcome, game: &Game, defender_id: &str) -> PlayerState {
     match outcome {
         InjuryOutcome::Stunned    => PlayerState::new(PS_STUNNED),
         InjuryOutcome::KnockedOut => PlayerState::new(PS_KNOCKED_OUT),
@@ -515,7 +515,16 @@ fn outcome_to_player_state(rng: &mut GameRng, ctx: &mut InjuryContext, outcome: 
             let d16 = rng.die(16);
             let d6 = rng.d6();
             ctx.casualty_roll = Some([d16, d6]);
-            casualty_tier_to_player_state(d16)
+            // Java InjuryTypeServer.setInjury → RollMechanic.interpretCasualtyRollAndAddModifiers:
+            // apply casualty modifiers (Decay skill's +1, niggling injuries) to the d16 BEFORE
+            // mapping the tier. Omitting them let a Decay player (Khemri Tomb Guardian) map a d16 of
+            // 8 to Badly Hurt where Java's 8+1=9 is a Serious Injury (khemri seed 21: the missing SI
+            // skipped the bb2025 Getting Even roll, shifting the shared dice stream by one).
+            if let Some(defender) = game.player(defender_id) {
+                let mods = ffb_mechanics::modifiers::CasualtyModifierFactory::new().find_modifiers(defender);
+                ctx.add_casualty_modifiers(mods);
+            }
+            casualty_tier_to_player_state(d16 + ctx.casualty_modifier_sum())
         }
     }
 }
@@ -555,7 +564,7 @@ impl InjuryTypeServer for InjuryTypeDropFall {
             do_armor_roll(game, rng, &mut self.ctx, defender_id);
         }
         if self.ctx.armor_broken {
-            do_injury_roll(rng, &mut self.ctx);
+            do_injury_roll(rng, &mut self.ctx, game, defender_id);
         } else {
             self.ctx.injury = Some(PlayerState::new(PS_PRONE));
         }
@@ -595,7 +604,7 @@ impl InjuryTypeServer for InjuryTypeThrowARockImpl {
             do_armor_roll(game, rng, &mut self.ctx, defender_id);
         }
         if self.ctx.armor_broken {
-            do_injury_roll(rng, &mut self.ctx);
+            do_injury_roll(rng, &mut self.ctx, game, defender_id);
         } else {
             self.ctx.injury = Some(PlayerState::new(PS_PRONE));
         }
@@ -641,7 +650,7 @@ impl InjuryTypeServer for InjuryTypeTtmHitPlayerImpl {
             do_armor_roll(game, rng, &mut self.ctx, defender_id);
         }
         if self.ctx.armor_broken {
-            do_injury_roll(rng, &mut self.ctx);
+            do_injury_roll(rng, &mut self.ctx, game, defender_id);
         } else {
             self.ctx.injury = Some(PlayerState::new(PS_PRONE));
         }
