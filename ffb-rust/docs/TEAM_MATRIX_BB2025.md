@@ -13,7 +13,7 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `chaos_pact` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `dark_elf` | 🟢 100/100 | fixed 2026-08-10: Punt wait prompt + harness EndTurn abort (commit 0d48c04a) ||
 | `dark_elf_league_fumbbl` | 🟢 100/100 |  | FUMBBL-legacy roster |
-| `dwarf` | 🔴 74/100 | seed 2, step 154, java 27a674af22d7f4ab vs rust 57464e41da46dafb |  |
+| `dwarf` | 🟢 100/100 | fixed 2026-08-10: Bribery-and-Corruption argue re-roll — secret-weapon (82dc503a) + foul-ejection (485183bc) ||
 | `elf` | 🔴 19/100 | seed 2, step 71, java 2d5efcb973581ce7 vs rust 2fc28391f6b5d205 |  |
 | `goblin` | 🔴 34/100 | seed 3, step 149, java 47203bf4bd16a61d vs rust 0146a2651766fe1f |  |
 | `halfling` | 🔴 88/100 | seed 6, step 218, java bb2815e6e646f5d3 vs rust e1af7418e782aba7 |  |
@@ -37,4 +37,4 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `vampire` | 🟢 100/100 |  |  |
 | `wood_elf` | 🟢 100/100 |  |  |
 
-**15 green / 15 red of 30.** (amazon 08-09; chaos, dark_elf 08-10)
+**16 green / 14 red of 30.** (amazon 08-09; chaos, dark_elf, dwarf 08-10)
