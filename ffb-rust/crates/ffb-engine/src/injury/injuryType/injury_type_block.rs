@@ -40,7 +40,13 @@ fn leak_modifier(m: &dyn ArmorModifier, attacker: Option<&Player>, defender: &Pl
 fn recalc_armor_broken_claws_aware(game: &Game, ctx: &mut InjuryContext, defender_id: &str) {
     let Some([d1, d2]) = ctx.armor_roll else { return };
     let has_claws = ctx.armor_modifiers.iter().any(|m| m.name == "Claws");
-    let armor_value = game.player(defender_id).map(|p| p.armour).unwrap_or(7);
+    // Java DiceInterpreter.isArmourBroken → `defender.getArmourWithModifiers()`: the EFFECTIVE
+    // armour including temporary stat modifiers (e.g. Dodgy Snack's -AV for the drive), NOT the
+    // base AV. `do_armor_roll`/`recalc_armor_broken` already read `armour_with_modifiers()`; this
+    // claws-aware recalc must too, or a snacked player whose armour is broken by a Claws/Mighty
+    // Blow/Chainsaw modifier is judged against the wrong (base) AV (halfling seed 38 i=63: away_03
+    // eff AV6 + Mighty Blow +1 vs roll 5 → 6>=6 breaks in Java, but Rust compared 6>=base 7 → survived).
+    let armor_value = game.player(defender_id).map(|p| p.armour_with_modifiers()).unwrap_or(7);
     let effective_armor = if has_claws { armor_value.min(8) } else { armor_value };
     let modifier_sum: i32 = ctx.armor_modifiers.iter().map(|m| m.value).sum();
     ctx.armor_broken = d1 + d2 + modifier_sum >= effective_armor;
@@ -371,6 +377,31 @@ mod tests {
 
         assert!(!run(true), "Mighty Blow already on the armour roll must NOT also apply to injury");
         assert!(run(false), "with no armour Mighty Blow, the injury roll DOES receive Mighty Blow");
+    }
+
+    /// Regression (halfling seed 38 i=63): a Dodgy-Snacked defender (base AV7, temporary -1 AV →
+    /// effective 6) blocked by a Mighty Blow attacker. Armour roll [1,4]=5 + Mighty Blow +1 = 6 >=
+    /// eff AV6 → breaks in Java (DiceInterpreter.isArmourBroken uses getArmourWithModifiers). The
+    /// claws-aware recalc previously read BASE p.armour (7), so 6 >= 7 was false and the snacked
+    /// player survived a break Java applies → away_03 stayed Prone in Rust vs Injured in Java.
+    #[test]
+    fn claws_aware_recalc_uses_armour_with_modifiers() {
+        let mut game = game_with_attacker_and_defender(vec![SkillId::MightyBlow], 7);
+        game.player_mut("defender").unwrap()
+            .add_temporary_stat_mod("Dodgy Snack", ffb_model::model::player::STAT_AV, -1);
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        ctx.armor_roll = Some([1, 4]);
+        ctx.add_armor_modifier(Modifier::new("Mighty Blow", 1, Rules::Bb2025));
+        recalc_armor_broken_claws_aware(&game, &mut ctx, "defender");
+        assert!(ctx.armor_broken, "eff AV6 + Mighty Blow +1 vs roll 5 must break (6>=6)");
+
+        // Control: with base AV7 and no Dodgy Snack, the same roll+MB (6) must NOT break (6<7).
+        let game2 = game_with_attacker_and_defender(vec![SkillId::MightyBlow], 7);
+        let mut ctx2 = InjuryContext::new(ApothecaryMode::Defender);
+        ctx2.armor_roll = Some([1, 4]);
+        ctx2.add_armor_modifier(Modifier::new("Mighty Blow", 1, Rules::Bb2025));
+        recalc_armor_broken_claws_aware(&game2, &mut ctx2, "defender");
+        assert!(!ctx2.armor_broken, "base AV7 vs roll 5 + Mighty Blow 1 = 6 must NOT break (6<7)");
     }
 
     #[test]
