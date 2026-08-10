@@ -17,7 +17,7 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `elf` | 🟢 100/100 | fixed 2026-08-10: auto-use Sidestep pushback (commit f44cecf0) ||
 | `goblin` | 🔴 34/100 | seed 3, step 149, java 47203bf4bd16a61d vs rust 0146a2651766fe1f |  |
 | `halfling` | 🔴 88/100 | seed 6, step 218, java bb2815e6e646f5d3 vs rust e1af7418e782aba7 |  |
-| `high_elf` | 🔴 19/100 | seed 3, step 165, java b984f4a0f8596bdc vs rust 0a69c723db8571a6 |  |
+| `high_elf` | 🟢 100/100 |  | 2026-08-10: Steady Footing faller-resolution + Wrestle Both-Down ball bounce + changeActingPlayer computed hasActed() + My Ball carrier PASS exclusion (ParityRunner harness) |
 | `human` | 🔴 95/100 | seed 13, step 255, java e5fe283217c0feed vs rust 25607a9b2b190492 |  |
 | `khemri` | 🔴 99/100 | seed 21, step 44, java 4c93a4d43e204750 vs rust c38d8eb4d2ded874 |  |
 | `khemri_fumbbl` | 🟢 100/100 |  | FUMBBL-legacy roster |
@@ -37,4 +37,4 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `vampire` | 🟢 100/100 |  |  |
 | `wood_elf` | 🟢 100/100 |  |  |
 
-**17 green / 13 red of 30.** (amazon 08-09; chaos, dark_elf, dwarf, elf 08-10)
+**18 green / 12 red of 30.** (amazon 08-09; chaos, dark_elf, dwarf, elf 08-10; high_elf 08-10)
