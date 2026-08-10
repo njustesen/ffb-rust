@@ -227,6 +227,23 @@ impl StepMoveDodge {
 
                 // Skill re-roll (Dodge property canRerollDodge) — auto-used
                 let skill_source = find_skill_reroll_source(game, "DODGE");
+                // Java StepMoveDodge (bb2020) lines 342-354: the Dodge skill re-roll source is
+                // CANCELLED when an adjacent opposing player (with tacklezones) at the FROM square
+                // cancels it — `UtilCards.cancelsSkill(opponent, dodgeSkill)`; Tackle registers
+                // CancelSkillProperty(canRerollDodge) (→ the cancelsCanRerollDodge property). Without
+                // this, a Dodge-skill player (e.g. a Catcher) dodging next to a Tackle Blitzer wrongly
+                // re-rolled its failed dodge — one extra die that broke the fall armour Java leaves
+                // unbroken (human seed 13 i=255: home_04 Stunned in Rust vs Prone in Java → turnover
+                // desync). Nulling the skill source falls through to the TRR offer, exactly as Java.
+                let skill_source = skill_source.filter(|_| {
+                    use ffb_model::util::util_player::UtilPlayer;
+                    use ffb_model::model::property::NamedProperties;
+                    let acting = game.acting_player.player_id.clone().unwrap_or_default();
+                    let from = self.coordinate_from.unwrap_or_else(|| FieldCoordinate::new(0, 0));
+                    UtilPlayer::find_adjacent_opposing_players_with_property(
+                        game, &acting, from, NamedProperties::CANCELS_CAN_REROLL_DODGE, false,
+                    ).is_empty()
+                });
                 if let Some(source) = skill_source {
                     let pid = player_id.as_deref().unwrap_or("").to_owned();
                     use_reroll(game, &source, &pid);
@@ -364,6 +381,63 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("fail"));
+    }
+
+    /// Regression (human seed 13): a Dodge-skill player's failed-dodge re-roll is CANCELLED by an
+    /// adjacent opposing Tackle player at the FROM square (Java StepMoveDodge lines 342-354 —
+    /// UtilCards.cancelsSkill via Tackle's CancelSkillProperty(canRerollDodge)). With the Tackle
+    /// opponent the skill re-roll must NOT fire (no fresh die rolled → the preset failing roll
+    /// stands → fall); without it, the Dodge skill re-roll fires (resets + rolls a fresh die).
+    #[test]
+    fn tackle_opponent_cancels_dodge_skill_reroll() {
+        use ffb_model::enums::{SkillId, PlayerState, PS_STANDING};
+        use ffb_model::model::skill_def::SkillWithValue;
+        let dodger_with_tackle_neighbour = |tackle: bool| -> u64 {
+            let mut game = make_game();
+            game.home_playing = true;
+            game.turn_mode = ffb_model::enums::TurnMode::Regular; // skill re-roll requires Regular
+            game.turn_data_home.rerolls = 0; // no TRR — isolate the skill re-roll
+            // Home dodger with the Dodge skill at (5,5).
+            game.team_home.players.push(Player {
+                id: "p1".into(), name: "p1".into(), nr: 1, position_id: "catcher".into(),
+                player_type: PlayerType::Regular, gender: PlayerGender::Male,
+                movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+                starting_skills: vec![SkillWithValue::new(SkillId::Dodge)],
+                extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
+                niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0,
+                race: None, is_big_guy: false, ..Default::default()
+            });
+            game.field_model.set_player_coordinate("p1", FieldCoordinate::new(5, 5));
+            game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+            game.acting_player.player_id = Some("p1".into());
+            game.acting_player.dodging = true;
+            // Opposing player adjacent to the FROM square (5,5), with/without Tackle.
+            game.team_away.players.push(Player {
+                id: "opp".into(), name: "opp".into(), nr: 2, position_id: "blitzer".into(),
+                player_type: PlayerType::Regular, gender: PlayerGender::Male,
+                movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+                starting_skills: if tackle { vec![SkillWithValue::new(SkillId::Tackle)] } else { vec![] },
+                extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
+                niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0,
+                race: None, is_big_guy: false, ..Default::default()
+            });
+            game.field_model.set_player_coordinate("opp", FieldCoordinate::new(5, 6));
+            game.field_model.set_player_state("opp", PlayerState::new(PS_STANDING));
+
+            let mut step = StepMoveDodge::new("fail".into());
+            step.coordinate_from = Some(FieldCoordinate::new(5, 5));
+            step.coordinate_to = Some(FieldCoordinate::new(6, 6));
+            step.dodge_roll = 1; // preset failing roll — start() rolls no initial die
+            let mut rng = GameRng::new(0);
+            step.start(&mut game, &mut rng);
+            rng.call_count
+        };
+        // Tackle adjacent → skill re-roll cancelled → no fresh die rolled.
+        assert_eq!(dodger_with_tackle_neighbour(true), 0,
+            "an adjacent Tackle opponent must cancel the Dodge skill re-roll (no re-roll die)");
+        // No Tackle → Dodge skill re-roll fires → one fresh die rolled.
+        assert_eq!(dodger_with_tackle_neighbour(false), 1,
+            "without Tackle the Dodge skill re-roll must fire (one fresh die)");
     }
 
     #[test]

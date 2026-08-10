@@ -114,6 +114,9 @@ impl NamedProperties {
     pub const CAN_RE_ROLL_ANY_NUMBER_OF_BLOCK_DICE: &'static str = "canReRollAnyNumberOfBlockDice";
     pub const CAN_REROLL_SINGLE_BOTH_DOWN: &'static str = "canRerollSingleBothDown";
     pub const CAN_REROLL_DODGE: &'static str = "canRerollDodge";
+    /// Java: Tackle.postConstruct → CancelSkillProperty(canRerollDodge). A player with this
+    /// property (Tackle) cancels an adjacent opponent's Dodge skill re-roll.
+    pub const CANCELS_CAN_REROLL_DODGE: &'static str = "cancelsCanRerollDodge";
     pub const CAN_RE_ROLL_HMP_SCATTER: &'static str = "canReRollHmpScatter";
     pub const CAN_RE_ROLL_ONES_ON_KO_RECOVERY: &'static str = "canReRollOnesOnKORecovery";
     pub const CAN_REROLL_ONCE_PER_TURN: &'static str = "canRerollOncePerTurn";
