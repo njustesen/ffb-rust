@@ -11,7 +11,7 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `chaos` | 🟢 100/100 | fixed 2026-08-10: Arm Bar armour-or-injury + ARM_BAR player choice (commits 0f15b607, 32ce6fb5) ||
 | `chaos_dwarf` | 🟢 100/100 |  |  |
 | `chaos_pact` | 🟢 100/100 |  | FUMBBL-legacy roster |
-| `dark_elf` | 🔴 92/100 | seed 16, step 261, java c5e09333b559b4a0 vs rust 7e970d39ca17b61d |  |
+| `dark_elf` | 🟢 100/100 | fixed 2026-08-10: Punt wait prompt + harness EndTurn abort (commit 0d48c04a) ||
 | `dark_elf_league_fumbbl` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `dwarf` | 🔴 74/100 | seed 2, step 154, java 27a674af22d7f4ab vs rust 57464e41da46dafb |  |
 | `elf` | 🔴 19/100 | seed 2, step 71, java 2d5efcb973581ce7 vs rust 2fc28391f6b5d205 |  |
@@ -37,4 +37,4 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `vampire` | 🟢 100/100 |  |  |
 | `wood_elf` | 🟢 100/100 |  |  |
 
-**14 green / 16 red of 30.** (amazon green 2026-08-09; chaos green 2026-08-10)
+**15 green / 15 red of 30.** (amazon 08-09; chaos, dark_elf 08-10)
