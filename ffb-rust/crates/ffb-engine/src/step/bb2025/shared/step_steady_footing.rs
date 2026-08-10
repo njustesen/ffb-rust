@@ -172,8 +172,21 @@ impl StepSteadyFooting {
             return StepOutcome::next();
         }
 
-        let player_id = match &self.player_id {
-            Some(id) => id.clone(),
+        // Java executeStep derives the player from the CONTEXT, not a standalone param:
+        //   if (dropPlayerContext != null) playerId = dropPlayerContext.getPlayerId();
+        //   else if (injuryResult != null) playerId = injuryResult.injuryContext().getDefenderId();
+        //   else playerId = game.getActingPlayer().getPlayerId();
+        // `context.get_player_id()` returns the DropPlayer/InjuryResult player (None for the
+        // InjuryTypeName case, which Java resolves to the acting player). Rust previously required
+        // a StepParameter::PlayerId that nothing publishes, so it always fail()'d without rolling —
+        // masked for fallers WITHOUT Steady Footing (they fail() anyway), but wrong for one WITH it:
+        // a GFI/dodge fall by a Steady Footing player (high_elf Dragon Prince, seed 48 i=1) skipped
+        // the d6 avoid-fall roll, consuming one fewer die than Java and desyncing the armour roll.
+        let player_id = self.player_id.clone()
+            .or_else(|| self.context.as_ref().and_then(|c| c.get_player_id().map(str::to_owned)))
+            .or_else(|| game.acting_player.player_id.clone());
+        let player_id = match player_id {
+            Some(id) => id,
             None => return self.fail(game, rng),
         };
 
@@ -609,6 +622,31 @@ mod tests {
             }
         }
         panic!("no seed rolls 6");
+    }
+
+    /// Regression (high_elf seed 48 i=1): an InjuryTypeName context (GFI/dodge fall) carries
+    /// NO player id, and nothing publishes StepParameter::PlayerId — Java resolves the faller to
+    /// the ACTING player. When that player has Steady Footing the d6 avoid-fall roll MUST happen;
+    /// Rust previously bailed to fail() with no roll, consuming one fewer die than Java (armour
+    /// roll then landed on the wrong dice). With the acting-player fallback the roll fires.
+    #[test]
+    fn seed48_injury_type_name_context_resolves_acting_player_and_rolls() {
+        // Seed whose first d6 is 6 (Steady Footing success) so we can assert a roll was consumed.
+        let mut seed = 0u64;
+        while GameRng::new(seed).d6() != 6 { seed += 1; assert!(seed < 1000); }
+        let mut g = make_game();
+        add_player_with_steady_footing(&mut g, "p1");
+        // Acting player = the faller; context is an InjuryTypeName (GFI fall) with NO player id.
+        g.acting_player.player_id = Some("p1".into());
+        let mut s = StepSteadyFooting::new(String::new(), String::new());
+        s.context = Some(Box::new(SteadyFootingContext::from_injury_type_name("InjuryTypeDropGFI".into())));
+        // player_id param intentionally NOT set (nothing publishes it for GFI/dodge falls).
+        s.use_skill = Some(true);
+        s.apothecary_mode = Some(ApothecaryMode::Attacker);
+        let mut rng = GameRng::new(seed);
+        let before = rng.call_count;
+        s.start(&mut g, &mut rng);
+        assert_eq!(rng.call_count - before, 1, "Steady Footing must roll one d6 for the acting-player faller");
     }
 
     /// Attacker apothecary mode: FALLING state gets corrected to MOVING on success.
