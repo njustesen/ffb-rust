@@ -390,6 +390,8 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
             Some(WireDialog::GameStatistics),
         // Parity-harness-only prompt (Phase TTM); no client dialog exists yet.
         AgentPrompt::ThrowTeamMateTarget { .. } => None,
+        // Parity-harness-only prompt (BB2025 Punt); no client dialog exists yet.
+        AgentPrompt::PuntTarget { .. } => None,
     }
 }
 

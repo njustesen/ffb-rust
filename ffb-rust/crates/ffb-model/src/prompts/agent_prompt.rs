@@ -40,6 +40,13 @@ pub enum AgentPrompt {
         thrower_id: PlayerId,
         thrown_player_id: PlayerId,
     },
+    /// Punt (BB2025): the punter must choose a target square (Java StepInitPunt waits for
+    /// CLIENT_PUNT / CLIENT_END_TURN with the punt squares as MoveSquares). The parity
+    /// harness has no INIT_PUNT handler and always aborts with EndTurn.
+    PuntTarget {
+        player_id: PlayerId,
+        squares: Vec<FieldCoordinate>,
+    },
     FollowUp {
         attacker_id: PlayerId,
         target_coord: FieldCoordinate,

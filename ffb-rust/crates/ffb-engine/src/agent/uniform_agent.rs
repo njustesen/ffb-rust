@@ -338,6 +338,15 @@ impl Agent for UniformAgent {
             }
             // Throw Team-Mate target: deterministic 3-square throw toward the opponent end zone
             // (same rule as RandomAgent), sent in the acting client's view.
+            // Punt target (BB2025): coverage agent punts to the first offered square
+            // (deterministic; punts are aborted by the parity agent, but the coverage
+            // agent exercises the punt sequence).
+            Some(AgentPrompt::PuntTarget { squares, .. }) => {
+                match squares.first() {
+                    Some(c) => Action::Punt { coord: *c },
+                    None => Action::EndTurn,
+                }
+            }
             Some(AgentPrompt::ThrowTeamMateTarget { thrower_id, thrown_player_id }) => {
                 let is_home = gs.game.team_home.player(thrower_id).is_some();
                 let dir = if is_home { 1 } else { -1 };

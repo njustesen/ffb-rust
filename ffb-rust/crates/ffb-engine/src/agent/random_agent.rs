@@ -657,6 +657,11 @@ impl Agent for RandomAgent {
             // ZERO rng draws, aborting the move (StepHitAndRun end_turn → resetState). Mirror
             // that exactly; picking a square here would desync the action stream.
             Some(AgentPrompt::HitAndRun { .. }) => Action::EndTurn,
+            // Punt target window: Java ParityRunner has NO handler for INIT_PUNT
+            // (UNHANDLED_STEP) — its default injects ClientCommandEndTurn(turnMode) with
+            // ZERO rng draws, aborting the punt (StepInitPunt endTurn -> publish
+            // END_TURN + CHECK_FORGO + goto label). Mirror that exactly.
+            Some(AgentPrompt::PuntTarget { .. }) => Action::EndTurn,
             Some(AgentPrompt::TricksterMove { squares, .. }) => {
                 if squares.is_empty() {
                     return Action::Acknowledge;

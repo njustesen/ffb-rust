@@ -119,8 +119,37 @@ impl StepInitPunt {
                 .publish(StepParameter::CoordinateFrom(from));
         }
 
-        // Wait for coordinate selection — TODO: show move squares (requires MoveSquare model).
-        StepOutcome::cont()
+        // Java: findPuntSquares(playerCoordinate).map(MoveSquare::new).forEach(fieldModel::add);
+        // CONTINUE — waits for CLIENT_PUNT (coordinate) or CLIENT_END_TURN. The punt targets
+        // are the 4 orthogonally adjacent on-pitch squares.
+        game.field_model.clear_move_squares();
+        let squares = Self::find_punt_squares(player_coord);
+        for c in &squares {
+            game.field_model.add_move_square(ffb_model::model::move_square::MoveSquare::new(*c, 0, 0));
+        }
+        // Surface the wait as a prompt (a bare cont() reads as a stall to the parity
+        // harness). Java's ParityRunner has NO handler for INIT_PUNT (UNHANDLED_STEP) —
+        // its default injects ClientCommandEndTurn with ZERO rng draws, aborting the punt
+        // (dark_elf seed 16 i=261: home8's PUNT ends home turn 8; the game plays on).
+        // The Rust agent's PuntTarget arm answers EndTurn to mirror that exactly.
+        StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::PuntTarget {
+            player_id: game.acting_player.player_id.clone().unwrap_or_default(),
+            squares,
+        })
+    }
+
+    /// Java: `findPuntSquares(playerCoordinate)` — the 4 orthogonal neighbours in FIELD bounds.
+    fn find_punt_squares(player_coord: ffb_model::types::FieldCoordinate) -> Vec<ffb_model::types::FieldCoordinate> {
+        let mut coordinates = Vec::new();
+        for delta in [1i32, -1] {
+            for (dx, dy) in [(delta, 0), (0, delta)] {
+                let c = ffb_model::types::FieldCoordinate::new(player_coord.x + dx, player_coord.y + dy);
+                if (0..=25).contains(&c.x) && (0..=14).contains(&c.y) {
+                    coordinates.push(c);
+                }
+            }
+        }
+        coordinates
     }
 }
 
@@ -158,6 +187,48 @@ mod tests {
         let mut step = StepInitPunt::new("endLabel".into());
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
+    }
+
+    /// Regression (dark_elf seed 16 i=261): the interior-square coordinate wait must
+    /// surface as an AgentPrompt::PuntTarget with the 4 orthogonal on-pitch squares —
+    /// a bare Continue with no prompt stalls the parity harness (NO_PROGRESS → the game
+    /// ended 9 steps early). Java: findPuntSquares(playerCoordinate) + CONTINUE; the
+    /// parity agents then answer EndTurn (ParityRunner UNHANDLED_STEP: INIT_PUNT).
+    #[test]
+    fn seed16_punt_wait_emits_punt_target_prompt_with_orthogonal_squares() {
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+        let mut game = make_game();
+        let player = Player {
+            id: "punter".into(), name: "punter".into(), nr: 1,
+            position_id: "runner".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male,
+            movement: 7, strength: 3, agility: 2, passing: 3, armour: 8,
+            starting_skills: vec![ffb_model::model::skill_def::SkillWithValue::new(ffb_model::enums::SkillId::Punt)],
+            ..Default::default()
+        };
+        game.team_home.players.push(player);
+        game.field_model.set_player_coordinate("punter", FieldCoordinate::new(10, 7));
+        game.acting_player.player_id = Some("punter".into());
+        game.acting_player.player_action = Some(PlayerAction::Punt);
+
+        let mut step = StepInitPunt::new("endLabel".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue);
+        match out.prompt {
+            Some(ffb_model::prompts::AgentPrompt::PuntTarget { ref player_id, ref squares }) => {
+                assert_eq!(player_id, "punter");
+                let mut sq: Vec<(i32, i32)> = squares.iter().map(|c| (c.x, c.y)).collect();
+                sq.sort();
+                assert_eq!(sq, vec![(9, 7), (10, 6), (10, 8), (11, 7)],
+                    "punt squares = the 4 orthogonal neighbours (Java findPuntSquares)");
+            }
+            ref other => panic!("expected PuntTarget prompt, got {other:?}"),
+        }
+        // The agent's EndTurn abort then routes to the end label with END_TURN published.
+        let out2 = step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
+        assert_eq!(out2.action, StepAction::GotoLabel);
+        assert!(out2.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
     }
 
     // 3. Punt action with player off-boundary → puntToCrowd auto-false, Continue waiting for coord
