@@ -208,18 +208,54 @@ impl StepEndTurn {
                     continue;
                 }
                 // Argue (ParityRunner always argues). rollArgueTheCall d6; +1 if friendsWithTheRef and roll>1.
-                let roll = rng.d6();
-                let modified = if friends && roll > 1 { roll + 1 } else { roll };
-                let successful = DiceInterpreter::is_argue_the_call_successful(modified);
-                let coach_ban = DiceInterpreter::is_coach_banned(modified);
-                game.report_list.add(ReportArgueTheCallRoll::new(
-                    Some(pid.clone()), successful, coach_ban, roll, false, friends, 0,
-                ));
-                if successful {
-                    game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon = false;
-                }
-                if coach_ban {
-                    if is_home { game.turn_data_home.coach_banned = true; } else { game.turn_data_away.coach_banned = true; }
+                // Java per-player block, incl. the Bribery-and-Corruption argue re-roll:
+                //   biasedRefBonus = inducementSet.value(ADD_TO_ARGUE_ROLL); modifiedRoll += bonus
+                //   canBeReRolled = roll == 1 && briberyReRoll present && hasUsesLeft
+                //   if (canBeReRolled && coachBanned) reRollArgue(...)   // consume use + report + re-argue
+                //   else if (coachBanned) setCoachBanned(true)
+                // Java's reRollArgue recursion is bounded by the inducement's uses; the loop below is
+                // its iterative equivalent. (dwarf seed 2 i=155: home Deathroller's argue rolled a
+                // natural 1 → B&C re-roll 6 → SW flag cleared, Deathroller plays half 2; Rust banned
+                // it and the halftime dice stream shifted.)
+                loop {
+                    let roll = rng.d6();
+                    let mut modified = if friends && roll > 1 { roll + 1 } else { roll };
+                    let biased_ref_bonus = {
+                        let td = if is_home { &game.turn_data_home } else { &game.turn_data_away };
+                        td.inducement_set.value(ffb_model::inducement::usage::Usage::ADD_TO_ARGUE_ROLL)
+                    };
+                    modified += biased_ref_bonus;
+                    let successful = DiceInterpreter::is_argue_the_call_successful(modified);
+                    let coach_ban = DiceInterpreter::is_coach_banned(modified);
+                    game.report_list.add(ReportArgueTheCallRoll::new(
+                        Some(pid.clone()), successful, coach_ban, roll, false, friends, biased_ref_bonus,
+                    ));
+                    if successful {
+                        game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon = false;
+                    }
+                    let bribery_type: Option<String> = {
+                        let td = if is_home { &game.turn_data_home } else { &game.turn_data_away };
+                        td.inducement_set.for_usage(ffb_model::inducement::usage::Usage::REROLL_ARGUE)
+                            .filter(|t| td.inducement_set.has_uses_left(t))
+                            .map(str::to_owned)
+                    };
+                    let can_be_rerolled = roll == 1 && bribery_type.is_some();
+                    if can_be_rerolled && coach_ban {
+                        // Java reRollArgue: consume a use, report USED, argue this player again.
+                        let type_id = bribery_type.unwrap();
+                        let td = if is_home { &mut game.turn_data_home } else { &mut game.turn_data_away };
+                        td.inducement_set.use_one_of(&type_id);
+                        game.report_list.add(
+                            ffb_model::report::mixed::report_bribery_and_corruption_re_roll::ReportBriberyAndCorruptionReRoll::new(
+                                Some(team_id.clone()), "USED".into(),
+                            ),
+                        );
+                        continue;
+                    }
+                    if coach_ban {
+                        if is_home { game.turn_data_home.coach_banned = true; } else { game.turn_data_away.coach_banned = true; }
+                    }
+                    break;
                 }
             }
         }
@@ -670,7 +706,7 @@ mod tests {
         fn setup() -> (Game, StepEndTurn) {
             let mut game = make_game();
             let mut p = make_player("sw");
-            p.starting_skills = vec![SkillWithValue { skill_id: SkillId::SecretWeapon, value: None }];
+            p.starting_skills = vec![SkillWithValue { skill_id: ffb_model::enums::SkillId::SecretWeapon, value: None }];
             game.team_home.players.push(p);
             game.field_model.set_player_coordinate("sw", FieldCoordinate::new(5, 5));
             game.field_model.set_player_state("sw", PlayerState::new(PS_STANDING));
@@ -725,6 +761,48 @@ mod tests {
         step.report_secret_weapons_used(&mut game, &mut rng);
         // 2d6 rolled for the penalty-5 Secret Weapon.
         assert_eq!(rng.call_count - before, 2, "penalty>0 Secret Weapon must roll 2d6 even at game end");
+    }
+
+    /// Regression (dwarf seed 2 i=155): a played Secret Weapon whose argue roll is a natural 1
+    /// (coach-banned) must be re-rolled when the team holds a Bribery and Corruption
+    /// (REROLL_ARGUE) inducement — Java StepEndTurn.argueTheCall: `canBeReRolled = roll==1 &&
+    /// briberyReRoll present && hasUsesLeft; if (canBeReRolled && coachBanned) reRollArgue(...)`.
+    /// The re-roll consumes the inducement use and rolls a fresh argue d6; a 6 keeps the player.
+    /// Without the inducement the coach is banned on the 1. Here the first two d6 are 1 (natural
+    /// one) then 6 (successful re-roll) → the SW stays on the pitch and the coach is not banned.
+    #[test]
+    fn seed2_bribery_and_corruption_rerolls_natural_one_argue() {
+        use ffb_model::inducement::inducement::Inducement as InducementModel;
+        use ffb_model::inducement::usage::Usage;
+        // Seed whose first two d6 are 1 then 6.
+        let mut seed = 0u64;
+        loop {
+            let mut r = GameRng::new(seed);
+            if r.d6() == 1 && r.d6() == 6 { break; }
+            seed += 1;
+            assert!(seed < 100_000, "no seed with d6 sequence 1,6 found");
+        }
+        let mut game = make_game();
+        let mut p = make_player("sw");
+        p.starting_skills = vec![SkillWithValue { skill_id: ffb_model::enums::SkillId::SecretWeapon, value: None }];
+        game.team_home.players.push(p);
+        game.field_model.set_player_coordinate("sw", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("sw", PlayerState::new(PS_STANDING));
+        game.game_result.team_result_mut(true).player_result_mut("sw").has_used_secret_weapon = true;
+        // Grant the team its Bribery and Corruption argue re-roll (Java StepBuyInducements.leaveStep).
+        game.turn_data_home.inducement_set.add_inducement(
+            InducementModel::new("briberyAndCorruption", 1, vec![Usage::REROLL_ARGUE]));
+
+        let mut step = StepEndTurn::new();
+        let mut rng = GameRng::new(seed);
+        step.report_secret_weapons_used(&mut game, &mut rng);       // penalty-0 SW: no die
+        step.argue_and_remove_secret_weapons(&mut game, &mut rng);  // argue 1 → B&C reroll 6
+        assert_eq!(rng.call_count, 2, "one natural-1 argue + one B&C re-roll = 2 d6");
+        assert!(game.field_model.player_coordinate("sw").is_some(), "re-rolled argue (6) keeps the SW on the pitch");
+        assert!(!game.turn_data_home.coach_banned, "successful re-roll → coach not banned");
+        assert!(!game.game_result.team_result_mut(true).player_result_mut("sw").has_used_secret_weapon);
+        assert!(!game.turn_data_home.inducement_set.has_uses_left("briberyAndCorruption"),
+            "the B&C re-roll charge was consumed");
     }
 
     #[test]

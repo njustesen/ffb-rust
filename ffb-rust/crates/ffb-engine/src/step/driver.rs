@@ -513,6 +513,14 @@ impl DriverGameState {
         for (key, value) in options { game.options.set(*key, *value); }
         let mut gs = DriverGameState::from_game(game, seed);
         gs.initial_hash = state_hash(&gs.game);
+        // Java StepBuyInducements.leaveStep grants the special-rule / skill inducements
+        // (Bribery and Corruption → REROLL_ARGUE, Bugman's XXXXXX → REROLL_ONES_ON_KOS) as a
+        // dice-free consequence of the drafted rosters. The parity `start_game_sequence()`
+        // omits the petty-cash/shopping steps, so apply that grant directly here — matching
+        // Java's headless start flow, which DOES run BuyInducements (dwarf Bribery and
+        // Corruption argue re-roll). Done before the start sequence runs so the inducement is
+        // present for the whole game, exactly as in Java.
+        crate::step::bb2025::start::step_buy_inducements::grant_special_rule_inducements(&mut gs.game);
         gs.stack.push_sequence(start_game_sequence());
         gs.run_until_prompt();
         // `start_game_sequence()` begins with `StepInitStartGame`, which (matching Java's

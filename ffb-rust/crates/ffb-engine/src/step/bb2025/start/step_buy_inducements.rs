@@ -55,6 +55,40 @@ use crate::step::generator::mixed::kickoff::{Kickoff, KickoffParams};
 use crate::step::game::start::util_inducement_catalog::{apply_purchases, available_list};
 use crate::step::game::start::util_inducement_sequence::UtilInducementSequence;
 
+/// Java `StepBuyInducements.leaveStep`: grant the special-rule / skill-derived inducements that
+/// exist regardless of any purchase — Bribery and Corruption (special rule → REROLL_ARGUE) and
+/// Bugman's XXXXXX (a canReRollOnesOnKORecovery player → REROLL_ONES_ON_KOS). Dice-free; a pure
+/// function of the drafted rosters. Extracted so the parity start sequence — which omits the
+/// petty-cash/shopping steps (see `sequences::start_game_sequence`) — can still apply the exact
+/// same grant Java's leaveStep does (dwarf seed 2: the Deathroller's argue natural-1 must be
+/// re-rollable via the team's Bribery and Corruption).
+pub fn grant_special_rule_inducements(game: &mut Game) {
+    // Java: allTypes filtered by Usage.REROLL_ARGUE → "briberyAndCorruption".
+    let bnc_name = SpecialRule::BRIBERY_AND_CORRUPTION.get_rule_name();
+    if game.team_home.special_rules.iter().any(|r| r == bnc_name) {
+        game.turn_data_home.inducement_set.add_inducement(
+            InducementModel::new("briberyAndCorruption", 1, vec![Usage::REROLL_ARGUE]));
+        game.report_list.add(ReportBriberyAndCorruptionReRoll::new(
+            Some(game.team_home.id.clone()), "ADDED".into()));
+    }
+    if game.team_away.special_rules.iter().any(|r| r == bnc_name) {
+        game.turn_data_away.inducement_set.add_inducement(
+            InducementModel::new("briberyAndCorruption", 1, vec![Usage::REROLL_ARGUE]));
+        game.report_list.add(ReportBriberyAndCorruptionReRoll::new(
+            Some(game.team_away.id.clone()), "ADDED".into()));
+    }
+    // Java: allTypes filtered by Usage.REROLL_ONES_ON_KOS → "bugmansXXXXXX".
+    let prop = NamedProperties::CAN_RE_ROLL_ONES_ON_KO_RECOVERY;
+    if game.team_home.players.iter().any(|p| p.has_skill_property(prop)) {
+        game.turn_data_home.inducement_set.add_inducement(
+            InducementModel::new("bugmansXXXXXX", 1, vec![Usage::REROLL_ONES_ON_KOS]));
+    }
+    if game.team_away.players.iter().any(|p| p.has_skill_property(prop)) {
+        game.turn_data_away.inducement_set.add_inducement(
+            InducementModel::new("bugmansXXXXXX", 1, vec![Usage::REROLL_ONES_ON_KOS]));
+    }
+}
+
 /// Handles pre-game inducement purchase dialogs for both coaches.
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.start.StepBuyInducements`.
 pub struct StepBuyInducements {
@@ -281,37 +315,7 @@ impl StepBuyInducements {
         game.game_result.home.petty_cash_used = UtilInducementSequence::calculate_inducement_gold(Some(game), true);
         game.game_result.away.petty_cash_used = UtilInducementSequence::calculate_inducement_gold(Some(game), false);
 
-        // Java: inducementTypeFactory.allTypes() filtered by Usage.REROLL_ARGUE → "briberyAndCorruption".
-        {
-            let bnc_name = SpecialRule::BRIBERY_AND_CORRUPTION.get_rule_name();
-            if game.team_home.special_rules.iter().any(|r| r == bnc_name) {
-                game.turn_data_home.inducement_set.add_inducement(
-                    InducementModel::new("briberyAndCorruption", 1, vec![Usage::REROLL_ARGUE]));
-                game.report_list.add(ReportBriberyAndCorruptionReRoll::new(
-                    Some(game.team_home.id.clone()), "ADDED".into(),
-                ));
-            }
-            if game.team_away.special_rules.iter().any(|r| r == bnc_name) {
-                game.turn_data_away.inducement_set.add_inducement(
-                    InducementModel::new("briberyAndCorruption", 1, vec![Usage::REROLL_ARGUE]));
-                game.report_list.add(ReportBriberyAndCorruptionReRoll::new(
-                    Some(game.team_away.id.clone()), "ADDED".into(),
-                ));
-            }
-        }
-
-        // Java: inducementTypeFactory.allTypes() filtered by Usage.REROLL_ONES_ON_KOS → "bugmansXXXXXX".
-        {
-            let prop = NamedProperties::CAN_RE_ROLL_ONES_ON_KO_RECOVERY;
-            if game.team_home.players.iter().any(|p| p.has_skill_property(prop)) {
-                game.turn_data_home.inducement_set.add_inducement(
-                    InducementModel::new("bugmansXXXXXX", 1, vec![Usage::REROLL_ONES_ON_KOS]));
-            }
-            if game.team_away.players.iter().any(|p| p.has_skill_property(prop)) {
-                game.turn_data_away.inducement_set.add_inducement(
-                    InducementModel::new("bugmansXXXXXX", 1, vec![Usage::REROLL_ONES_ON_KOS]));
-            }
-        }
+        grant_special_rule_inducements(game);
 
         self.phase_name = "DONE".into();
 
