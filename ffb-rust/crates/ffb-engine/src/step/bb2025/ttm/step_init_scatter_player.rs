@@ -233,7 +233,14 @@ impl StepInitScatterPlayer {
                     attacker_id.as_deref(), &hit_player_id, end_coord, None, None,
                     ApothecaryMode::HitPlayer,
                 );
-                result.apply_to(game);
+                // Java StepInitScatterPlayer.handleLanding does NOT apply the injury inline — it
+                // defers the drop via the SteadyFootingContext's DropPlayerCommand (→ dropPlayer),
+                // which sets the base AND clears the rooted flag (a rooted Take-Root player hit by a
+                // TTM must un-root when knocked down). Applying inline here pre-set the base to PRONE,
+                // so the deferred dropPlayer's rooted-clear (`base != PRONE`) was skipped and the
+                // player stayed wrongly rooted (halfling seed 34: a rooted Treeman hit by a scattered
+                // TTM player kept its root, so its next Move was treated as pinned → no move → the
+                // turn diverged). The state is set by the deferred DropPlayerCommand exactly as Java.
                 // Java: if (lethalSpp && violentSpp && injuryResultHitPlayer.injuryContext().isCasualty())
                 //         spp.addCasualty(prayerState.additionalCasSppTeams, playerResult(thrower))
                 if lethal_spp && violent_spp && result.injury_context().is_casualty() {
@@ -256,7 +263,8 @@ impl StepInitScatterPlayer {
                     None, &hit_player_id, end_coord, None, None,
                     ApothecaryMode::HitPlayer,
                 );
-                result.apply_to(game);
+                // No inline apply (see the SPP branch above): the deferred DropPlayerCommand sets the
+                // base and clears rooted, matching Java's handleLanding.
                 result
             };
 
@@ -531,6 +539,49 @@ mod tests {
         step.using_bullseye = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::OldDefenderState(_))));
+    }
+
+    /// Regression (halfling seed 34): a hit player must NOT have its injury applied INLINE in
+    /// handle_landing — Java StepInitScatterPlayer.handleLanding only publishes a SteadyFootingContext
+    /// whose deferred DropPlayerCommand (→ dropPlayer) sets the base AND clears the rooted flag. An
+    /// inline apply_to pre-set the base to PRONE, so the later dropPlayer's rooted-clear (`base !=
+    /// PRONE`) was skipped and a rooted Take-Root player stayed wrongly rooted (→ next Move treated as
+    /// pinned). After the fix the victim stays STANDING+rooted here (the deferred drop runs later in
+    /// StepSteadyFooting), and a SteadyFootingContext is published.
+    #[test]
+    fn hit_player_injury_is_deferred_not_applied_inline() {
+        let mut game = make_game();
+        let pass_coord = FieldCoordinate::new(10, 5);
+        game.pass_coordinate = Some(pass_coord);
+        // Thrown player on the home team.
+        add_player(&mut game, "thrown", FieldCoordinate::new(13, 7));
+        // Rooted victim (away team) standing on the landing square.
+        game.team_away.players.push(Player {
+            id: "victim".into(), name: "victim".into(), nr: 2,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 8, starting_skills: vec![], extra_skills: vec![],
+            temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0,
+            career_spps: 0, race: None, is_big_guy: false, ..Default::default()
+        });
+        game.field_model.set_player_coordinate("victim", pass_coord);
+        game.field_model.set_player_state("victim", PlayerState::new(PS_STANDING).change_rooted(true));
+
+        let mut step = StepInitScatterPlayer::new();
+        step.thrown_player_id = Some("thrown".into());
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        step.thrown_player_coordinate = Some(FieldCoordinate::new(13, 7));
+        step.using_bullseye = true; // lands exactly at pass_coord → hits the victim
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        let victim_state = game.field_model.player_state("victim").unwrap();
+        assert_eq!(victim_state.base(), PS_STANDING,
+            "hit player's injury must NOT be applied inline — Java defers it to the DropPlayerCommand");
+        assert!(victim_state.is_rooted(),
+            "rooted must still be set inline (it is cleared later by the deferred dropPlayer on a STANDING base)");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))),
+            "a SteadyFootingContext (carrying the deferred DropPlayerCommand) must be published");
     }
 
     #[test]
