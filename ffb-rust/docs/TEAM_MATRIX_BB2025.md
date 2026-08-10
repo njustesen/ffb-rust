@@ -8,7 +8,7 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 |---|---|---|---|
 | `lineman` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `amazon` | 🟢 100/100 | fixed 2026-08-09: StepPassBlock port + agent window mirroring (commits b8aa79e8, 90f6f0cb) ||
-| `chaos` | 🔴 76/100 | seed 3, step 15, java 0e3bdd96e4142cba vs rust 62c6c52ed8b07d0e |  |
+| `chaos` | 🟢 100/100 | fixed 2026-08-10: Arm Bar armour-or-injury + ARM_BAR player choice (commits 0f15b607, 32ce6fb5) ||
 | `chaos_dwarf` | 🟢 100/100 |  |  |
 | `chaos_pact` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `dark_elf` | 🔴 92/100 | seed 16, step 261, java c5e09333b559b4a0 vs rust 7e970d39ca17b61d |  |
@@ -37,4 +37,4 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `vampire` | 🟢 100/100 |  |  |
 | `wood_elf` | 🟢 100/100 |  |  |
 
-**13 green / 17 red of 30.** (amazon driven green 2026-08-09)
+**14 green / 16 red of 30.** (amazon green 2026-08-09; chaos green 2026-08-10)
