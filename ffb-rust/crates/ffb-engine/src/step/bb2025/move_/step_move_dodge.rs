@@ -101,7 +101,19 @@ impl Step for StepMoveDodge {
             }
             // client-only: CLIENT_USE_SKILL → canAddStrengthToDodge / canChooseToIgnoreDodgeModifierAfterRoll /
             //       canRerollDodge — headless auto-declines skill dialogs.
-            // client-only: CLIENT_PLAYER_CHOICE → ARM_BAR mode — dialog not shown in headless.
+            // Java: CLIENT_PLAYER_CHOICE (ARM_BAR mode) → armBarPlayerId = command.getPlayerId();
+            // armBarChoice = true; EXECUTE_STEP. The agent's generic PlayerChoice decline sends
+            // SelectPlayer with an empty id (no arm-bar player chosen).
+            Action::SelectPlayer { player_id } => {
+                self.arm_bar_player_id = Some(player_id.clone());
+                self.arm_bar_choice = true;
+                self.execute_step(game, rng)
+            }
+            Action::PlayerChoice { player_id, .. } => {
+                self.arm_bar_player_id = Some(player_id.clone().unwrap_or_default());
+                self.arm_bar_choice = true;
+                self.execute_step(game, rng)
+            }
             _ => self.execute_step(game, rng),
         }
     }
@@ -149,7 +161,7 @@ impl StepMoveDodge {
                 self.re_roll_used = true;
                 // Dodge roll was reset to 0 when the re-roll offer was issued; fresh d6 below
             } else {
-                return self.fail_dodge();
+                return self.fail_dodge(game);
             }
         }
 
@@ -240,17 +252,58 @@ impl StepMoveDodge {
                     .with_event(roll_event)
                     .publish(StepParameter::EndPlayerAction(true));
             }
-            self.fail_dodge().with_event(roll_event)
+            self.fail_dodge(game).with_event(roll_event)
         }
     }
 
-    fn fail_dodge(&self) -> StepOutcome {
-        // Java: failDodge → findAdjacentOpposingPlayersWithProperty(armBar), show dialog if multiple
-        // client-only: Arm-Bar dialog — client-side
+    fn fail_dodge(&mut self, game: &Game) -> StepOutcome {
+        use ffb_model::util::util_player::UtilPlayer;
+        use ffb_model::model::property::NamedProperties;
+        // Java: armBarPlayers = findAdjacentOpposingPlayersWithProperty(game, fCoordinateFrom,
+        //   affectsEitherArmourOrInjuryOnDodge, true); filterThrower(...)  — computed once.
+        if self.arm_bar_players.is_empty() {
+            if let (Some(from), Some(acting)) = (self.coordinate_from, game.acting_player.player_id.clone()) {
+                let found = UtilPlayer::find_adjacent_opposing_players_with_property(
+                    game, &acting, from, NamedProperties::AFFECTS_EITHER_ARMOUR_OR_INJURY_ON_DODGE, true,
+                );
+                self.arm_bar_players = UtilPlayer::filter_thrower(game, found)
+                    .into_iter().cloned().collect();
+            }
+        }
+
+        // Java: armBarPlayer resolution — explicit choice > single candidate > coach dialog.
+        let mut arm_bar_player: Option<String> = None;
+        if let Some(ref pid) = self.arm_bar_player_id {
+            if !pid.is_empty() {
+                arm_bar_player = Some(pid.clone());
+            }
+        } else if !self.arm_bar_choice && !self.arm_bar_players.is_empty() {
+            if self.arm_bar_players.len() == 1 {
+                arm_bar_player = Some(self.arm_bar_players[0].clone());
+            } else {
+                // Java: DialogPlayerChoiceParameter(otherTeam, ARM_BAR, armBarPlayers, null, 1) +
+                // CONTINUE. ParityRunner's PLAYER_CHOICE handler declines with an EMPTY selection
+                // (0 rng) — the Rust agent's generic PlayerChoice arm mirrors that, so a
+                // multi-candidate Arm Bar never applies in parity games (chaos seed 29 i=3: two
+                // adjacent Chosen → no Arm Bar; one adjacent → auto-applied, seed 3 i=15).
+                return StepOutcome::cont().with_prompt(
+                    ffb_model::prompts::AgentPrompt::PlayerChoice {
+                        eligible_players: self.arm_bar_players.clone(),
+                        reason: "ARM_BAR".into(),
+                        descriptions: vec![],
+                    },
+                );
+            }
+        }
+
         // Java: injuryType = (armBarPlayer != null) ? new InjuryTypeDropDodgeForSpp(armBarPlayer)
         //                                            : new InjuryTypeDropDodge(false)
-        // Stub: always InjuryTypeDropDodge (arm-bar path not wired in headless)
-        let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeDropDodge".into());
+        // (constructor args travel as a '#' suffix — see make_injury_type).
+        let injury_type_name = match arm_bar_player {
+            Some(pid) => format!("InjuryTypeDropDodgeForSpp#{pid}"),
+            None => "InjuryTypeDropDodge#noArmBar".to_string(),
+        };
+        let ctx = SteadyFootingContext::from_injury_type_name(injury_type_name);
         let label = self.goto_label_on_failure.clone();
         StepOutcome::goto(&label)
             .publish(StepParameter::SteadyFootingContext(Box::new(ctx)))
@@ -464,6 +517,67 @@ mod tests {
             }
             _ => None,
         });
-        assert_eq!(injury_type_name.as_deref(), Some("InjuryTypeDropDodge"));
+        // Java: new InjuryTypeDropDodge(false) — the useArmBarModifiers=false arg travels
+        // as the '#noArmBar' suffix (see make_injury_type).
+        assert_eq!(injury_type_name.as_deref(), Some("InjuryTypeDropDodge#noArmBar"));
+    }
+
+    /// Java failDodge: exactly ONE adjacent opposing Arm Bar player at the FROM square →
+    /// auto-selected, InjuryTypeDropDodgeForSpp(#pid); two or more → PlayerChoice dialog
+    /// (declined by the parity agents → no arm bar). chaos seeds 3 (single) / 29 (double).
+    #[test]
+    fn arm_bar_candidates_route_injury_type() {
+        use crate::drop_player_context::SteadyFootingContext as SFC;
+        use ffb_model::enums::{SkillId, PlayerState, PS_STANDING};
+        use ffb_model::model::SkillWithValue;
+        fn armbar_player(id: &str) -> Player {
+            Player {
+                id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+                player_type: PlayerType::Regular, gender: PlayerGender::Male,
+                movement: 4, strength: 3, agility: 3, passing: 4, armour: 8,
+                starting_skills: vec![SkillWithValue::new(SkillId::ArmBar)],
+                ..Default::default()
+            }
+        }
+        let injury_name = |out: &StepOutcome| out.published.iter().find_map(|p| match p {
+            StepParameter::SteadyFootingContext(ctx) => {
+                let ctx: &SFC = ctx;
+                ctx.injury_type_name().map(|s| s.to_string())
+            }
+            _ => None,
+        });
+
+        // Single candidate → ForSpp with that player.
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        add_player(&mut game, "p1");
+        game.team_away.players.push(armbar_player("ab1"));
+        game.field_model.set_player_coordinate("ab1", FieldCoordinate::new(4, 5)); // adjacent to FROM (5,5)... from set below
+        game.field_model.set_player_state("ab1", PlayerState::new(PS_STANDING).change_active(true));
+        let mut step = StepMoveDodge::new("fail".into());
+        step.coordinate_from = Some(FieldCoordinate::new(5, 5));
+        step.dodge_roll = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(injury_name(&out).as_deref(), Some("InjuryTypeDropDodgeForSpp#ab1"));
+
+        // Two candidates → PlayerChoice prompt; agent-style empty decline → noArmBar.
+        let mut game2 = make_game();
+        game2.home_playing = true;
+        game2.turn_data_home.rerolls = 0;
+        add_player(&mut game2, "p1");
+        for (id, coord) in [("ab1", FieldCoordinate::new(4, 5)), ("ab2", FieldCoordinate::new(4, 6))] {
+            game2.team_away.players.push(armbar_player(id));
+            game2.field_model.set_player_coordinate(id, coord);
+            game2.field_model.set_player_state(id, PlayerState::new(PS_STANDING).change_active(true));
+        }
+        let mut step2 = StepMoveDodge::new("fail".into());
+        step2.coordinate_from = Some(FieldCoordinate::new(5, 5));
+        step2.dodge_roll = 1;
+        let out2 = step2.start(&mut game2, &mut GameRng::new(0));
+        assert!(matches!(out2.prompt, Some(ffb_model::prompts::AgentPrompt::PlayerChoice { ref reason, .. }) if reason == "ARM_BAR"),
+            "two candidates must prompt the ARM_BAR player choice");
+        let out3 = step2.handle_command(&Action::SelectPlayer { player_id: String::new() }, &mut game2, &mut GameRng::new(0));
+        assert_eq!(injury_name(&out3).as_deref(), Some("InjuryTypeDropDodge#noArmBar"));
     }
 }

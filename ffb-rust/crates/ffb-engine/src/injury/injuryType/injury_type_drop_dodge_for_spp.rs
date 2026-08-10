@@ -45,8 +45,24 @@ impl InjuryTypeServer for InjuryTypeDropDodgeForSpp {
                     self.ctx.add_armor_modifier(ARMOR_CHAINSAW_3);
                 }
             }
-            // TODO: add affectsEitherArmourOrInjuryOnDodge modifier (diving tackle) — needs UtilPlayer.findAdjacentPlayersWithTacklezones
             do_armor_roll(game, rng, &mut self.ctx, defender_id);
+        }
+        // Java: avOrInjModifierSkill = armBarPlayer.getSkillWithProperty(affectsEitherArmourOrInjuryOnDodge)
+        // (no search here — the specific arm-bar/diving-tackle player was chosen by StepMoveDodge).
+        // Armour-OR-injury mutual exclusion: +1 breaks armour first; if the armour broke on its
+        // own, the +1 shifts to the injury roll instead.
+        let defender_ignores_mods = game.player(defender_id)
+            .map(|p| p.has_unused_skill_with_property(NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS))
+            .unwrap_or(false);
+        let mut has_av_or_inj_skill = !defender_ignores_mods
+            && self.arm_bar_player_id.as_deref()
+                .and_then(|pid| game.player(pid))
+                .map(|p| p.has_skill_property(NamedProperties::AFFECTS_EITHER_ARMOUR_OR_INJURY_ON_DODGE))
+                .unwrap_or(false);
+        if !self.ctx.armor_broken && has_av_or_inj_skill {
+            self.ctx.add_armor_modifier(ffb_mechanics::modifiers::Modifier::new("Arm Bar", 1, game.rules));
+            crate::injury::recalc_armor_broken(game, &mut self.ctx, defender_id);
+            has_av_or_inj_skill = false;
         }
         if self.ctx.armor_broken {
             // Java: `factory.findInjuryModifiers(game, injuryContext, pAttacker, pDefender,
@@ -58,6 +74,11 @@ impl InjuryTypeServer for InjuryTypeDropDodgeForSpp {
                 for m in factory.find_injury_modifiers(game, attacker, defender, false, false, false) {
                     self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), attacker, defender, game.rules));
                 }
+            }
+            // Java: if (avOrInjModifierSkill != null) — armour broke without the +1, so it
+            // applies to the injury roll instead.
+            if has_av_or_inj_skill {
+                self.ctx.add_injury_modifier(ffb_mechanics::modifiers::Modifier::new("Arm Bar", 1, game.rules));
             }
             do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
         }

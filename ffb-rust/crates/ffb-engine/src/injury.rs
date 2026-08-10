@@ -656,7 +656,19 @@ impl InjuryTypeServer for InjuryTypeTtmHitPlayerImpl {
 
 /// Create a boxed `InjuryTypeServer` from the Java class name string.
 /// Used by steps that receive `StepParameter::InjuryTypeName(name)`.
+///
+/// Java constructs some injury types with ARGUMENTS (`new InjuryTypeDropDodgeForSpp(armBarPlayer)`,
+/// `new InjuryTypeDropDodge(false)`); the Rust context threading is name-based, so those args are
+/// encoded as a `#` suffix:
+///   "InjuryTypeDropDodgeForSpp#<playerId>" → ForSpp with that arm-bar player
+///   "InjuryTypeDropDodge#noArmBar"          → DropDodge(useArmBarModifiers = false)
 pub fn make_injury_type(name: &str) -> Box<dyn InjuryTypeServer> {
+    if let Some(pid) = name.strip_prefix("InjuryTypeDropDodgeForSpp#") {
+        return Box::new(injuryType::injury_type_drop_dodge_for_spp::InjuryTypeDropDodgeForSpp::new_with_arm_bar(Some(pid.to_owned())));
+    }
+    if name == "InjuryTypeDropDodge#noArmBar" {
+        return Box::new(injuryType::injury_type_drop_dodge::InjuryTypeDropDodge::new_with_arm_bar(None, false));
+    }
     match name {
         // Use the full `injuryType::` translations — they roll the injury with
         // do_injury_roll_for_player (applies Stunty + Thick Skull), unlike the stale player-less
