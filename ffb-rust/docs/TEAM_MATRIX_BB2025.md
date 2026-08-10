@@ -16,7 +16,7 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `dwarf` | 🟢 100/100 | fixed 2026-08-10: Bribery-and-Corruption argue re-roll — secret-weapon (82dc503a) + foul-ejection (485183bc) ||
 | `elf` | 🟢 100/100 | fixed 2026-08-10: auto-use Sidestep pushback (commit f44cecf0) ||
 | `goblin` | 🟢 100/100 |  | 2026-08-10: Swoop TTM decline + StepFollowup Fend/Taunt dialogs + Ball&Chain Fanatic wander (InjuryTypeCrowdPush publish + B&C fall injury) |
-| `halfling` | 🔴 88/100 | seed 6, step 218, java bb2815e6e646f5d3 vs rust e1af7418e782aba7 |  |
+| `halfling` | 🔴 98/100 | seed 34, step 136 (turn/order) + seed 65 | 08-10: claws-aware armour recalc uses armour-with-modifiers (seed 38); remaining 34/65 = prone low-MA (Treeman MA2) Move doesn't GFI-move after stand-up |
 | `high_elf` | 🟢 100/100 |  | 2026-08-10: Steady Footing faller-resolution + Wrestle Both-Down ball bounce + changeActingPlayer computed hasActed() + My Ball carrier PASS exclusion (ParityRunner harness) |
 | `human` | 🔴 95/100 | seed 13, step 255, java e5fe283217c0feed vs rust 25607a9b2b190492 |  |
 | `khemri` | 🔴 99/100 | seed 21, step 44, java 4c93a4d43e204750 vs rust c38d8eb4d2ded874 |  |
