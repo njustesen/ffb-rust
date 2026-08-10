@@ -145,7 +145,7 @@ pub fn change_player_action_to_none(game: &mut Game) {
                 let was_prone = game.acting_player.old_player_state
                     .map(|s| s.base() == PS_PRONE)
                     .unwrap_or(false);
-                let new_state = if game.acting_player.has_acted {
+                let new_state = if game.acting_player.acted() {
                     state.change_base(PS_STANDING).change_active(false)
                 } else if game.acting_player.standing_up || was_prone {
                     state.change_base(PS_PRONE)
@@ -253,6 +253,33 @@ mod tests {
         assert!(check_command_with_acting_player(&game, "p01"));
         assert!(!check_command_with_acting_player(&game, "p02"));
         assert!(!check_command_with_acting_player(&game, ""));
+    }
+
+    #[test]
+    fn seed31_moving_blitzer_that_acted_ends_standing_not_prone() {
+        // high_elf seed 31 i=14: a Dragon Prince (Steady Footing) starts its blitz PRONE, stands up,
+        // moves, blocks (Both Down/Skull → FALLING), and Steady Footing saves it → MOVING. At end of
+        // activation changeActingPlayer restores the MOVING base: Java uses the COMPUTED hasActed()
+        // (has_moved||has_blocked||…), so an acted player becomes STANDING. Rust read the STALE stored
+        // `has_acted` flag (false here) and, since the player was_prone, dropped it back to PRONE →
+        // divergence vs Java's Standing. This asserts the computed `acted()` path keeps it STANDING.
+        use ffb_model::enums::PS_MOVING;
+        let mut game = make_game();
+        game.acting_player.set_player("home_01".into(), PlayerAction::Blitz);
+        game.acting_player.has_moved = true;   // moved during the blitz
+        game.acting_player.has_blocked = true; // blocked during the blitz
+        game.acting_player.has_acted = false;  // stale stored flag (the bug's trigger)
+        game.acting_player.old_player_state = Some(ffb_model::enums::PlayerState::new(PS_PRONE)); // was_prone
+        game.field_model.set_player_coordinate("home_01", FieldCoordinate::new(12, 7));
+        game.field_model.set_player_state("home_01", ffb_model::enums::PlayerState::new(PS_MOVING));
+
+        change_player_action_to_none(&mut game);
+
+        assert_eq!(
+            game.field_model.player_state("home_01").unwrap().base(),
+            PS_STANDING,
+            "a blitzer that moved+blocked has acted → MOVING must restore to STANDING, not PRONE"
+        );
     }
 
     #[test]

@@ -85,6 +85,27 @@ impl ActingPlayer {
         *self = Self::default();
     }
 
+    /// Java `ActingPlayer.hasActed()`:
+    ///   `hasMoved() || hasFouled() || hasBlocked() || hasPassed() || hasTriggeredEffect
+    ///    || !fUsedSkills.isEmpty() || isForgone()`
+    /// Java computes this on the fly from the sub-flags; Rust also carries a stored `has_acted`
+    /// flag that some steps (e.g. Hypnotic Gaze) set directly to represent `hasTriggeredEffect`,
+    /// so OR it in as well. Callers mirroring Java's `hasActed()` (e.g. changeActingPlayer's
+    /// MOVING-state restore) MUST use this, not the bare stored field — a blitzer that moved and
+    /// blocked has `has_moved`/`has_blocked` set but the stored `has_acted` stays false, so the
+    /// bare field wrongly reported "did not act" and dropped a saved (Steady Footing) attacker
+    /// back to PRONE instead of STANDING (high_elf seed 31 i=14).
+    pub fn acted(&self) -> bool {
+        self.has_moved
+            || self.has_fouled
+            || self.has_blocked
+            || self.has_passed
+            || self.has_triggered_effect
+            || !self.used_skills.is_empty()
+            || self.forgone
+            || self.has_acted
+    }
+
     /// Java `ActingPlayer.setPlayer(Player)` → `setPlayerId(id)` followed by `setPlayerAction(action)`.
     /// `setPlayerId` returns early when the id is unchanged (`StringTool.isEqual`), so the per-activation
     /// field reset only fires when a *different* player is set; the action is always (re)assigned.
