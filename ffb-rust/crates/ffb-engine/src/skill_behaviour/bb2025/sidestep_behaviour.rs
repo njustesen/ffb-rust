@@ -90,11 +90,17 @@ impl StepModifierTrait for SidestepStepModifier {
             && !(cancelling_skill.is_some() && !attacker_cancels)
             && in_tacklezone
         {
-            // Java: if (!state.sideStepping.containsKey(id)) show dialog → headless: auto-decline
+            // Java: if (!sideStepping.containsKey(id)) showDialog(DialogSkillUseParameter(Sidestep))
+            // and CONTINUE, waiting for the coach's answer; re-enters with the value populated.
+            // The parity harness (ParityRunner SKILL_USE handler) answers useSkill=TRUE for every
+            // skill except DumpOff/PrimalSavagery/SafePairOfHands — so Sidestep is always USED.
+            // Rust auto-decides inline (no dialog round-trip), so record that answer (true) and fall
+            // through to the SIDE_STEP mode switch below in the same pass. (Previously hardcoded
+            // false = decline, so Rust never used Sidestep and the attacker's 3-square pushback
+            // picked a different square than the defender's Sidestep choice — elf seed 11 i=1: a
+            // Sidestep blitzer pushed to (11,7) in Rust vs the defender's (11,6) in Java.)
             if !state.side_stepping.contains_key(&defender_id) {
-                // Headless: auto-decline (false = do not use side step)
-                state.side_stepping.insert(defender_id.clone(), false);
-                return true;
+                state.side_stepping.insert(defender_id.clone(), true);
             }
 
             // Java: if (state.sideStepping.get(id)) { switch to SIDE_STEP mode }
@@ -255,22 +261,29 @@ mod tests {
         assert!(!result, "SideStep should not fire when no free squares around defender");
     }
 
+    /// Regression (elf seed 11 i=1): a Sidestep defender's first (undecided) pushback must
+    /// AUTO-USE Sidestep — Java shows a DialogSkillUseParameter and the parity harness
+    /// (ParityRunner SKILL_USE handler) answers useSkill=true for every skill except
+    /// DumpOff/PrimalSavagery/SafePairOfHands. So the map records `true` and the pushback
+    /// switches to SIDE_STEP mode (defender chooses the square). Previously hardcoded false.
     #[test]
-    fn side_step_headless_auto_declines() {
-        // Defender has SideStep, no pre-populated side_stepping map → auto-decline
+    fn side_step_headless_auto_uses_and_switches_mode() {
+        use ffb_model::enums::Direction;
+        use ffb_model::types::PushbackSquare;
         let mut game = make_game();
         game.team_away.players.push(player_with_skills("def1", vec![SkillId::Sidestep]));
         game.defender_id = Some("def1".into());
-        game.field_model.set_player_coordinate("def1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_coordinate("def1", FieldCoordinate::new(10, 7));
         game.field_model.set_player_state("def1", PlayerState::new(PS_STANDING));
 
         let m = SidestepStepModifier;
         let mut hs = default_hook_state("def1", true);
-        // side_stepping map is empty → auto-decline
+        hs.starting_pushback_square = Some(PushbackSquare::new(FieldCoordinate::new(10, 7), Direction::North, true));
+        // side_stepping map empty → first decision → auto-USE (ParityRunner SKILL_USE default).
         let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
-        // Returns true (was handled) but set to false (declined)
-        assert!(result, "side step handled (declined) should return true");
-        assert_eq!(hs.side_stepping.get("def1"), Some(&false));
+        assert!(result, "side step handled (used) returns true");
+        assert_eq!(hs.side_stepping.get("def1"), Some(&true), "first decision auto-uses Sidestep");
+        assert_eq!(hs.pushback_mode, PushbackMode::SIDE_STEP, "using Sidestep switches to SIDE_STEP mode");
     }
 
     #[test]
