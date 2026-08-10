@@ -786,6 +786,30 @@ mod tests {
     // ── legal_activate_player_actions ─────────────────────────────────────────
 
     #[test]
+    fn seed14_my_ball_carrier_not_offered_pass() {
+        // high_elf seed 14: the Dragon Prince has My Ball (preventRegularPassAction +
+        // preventRegularHandOverAction), so a My Ball ball-carrier must NOT be offered PASS — the
+        // engine forbids a regular pass. This is the eligible-list contract the Java ParityRunner
+        // harness (computeEligiblePlayers) was fixed to match; a bare ball-carrier IS offered Pass.
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "carrier", c(5, 5), PS_STANDING, vec![SkillId::MyBall]);
+        game.field_model.ball_coordinate = Some(c(5, 5));
+        game.field_model.ball_in_play = true;
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&actions, "carrier", PlayerActionChoice::Pass),
+            "a My Ball carrier (preventRegularPassAction) must NOT be offered Pass");
+
+        // Control: a plain carrier (no My Ball) IS offered Pass.
+        let mut g2 = make_game(Rules::Bb2025);
+        add_player(&mut g2, true, "plain", c(5, 5), PS_STANDING, vec![]);
+        g2.field_model.ball_coordinate = Some(c(5, 5));
+        g2.field_model.ball_in_play = true;
+        let a2 = legal_activate_player_actions(&g2, TeamSide::Home);
+        assert!(has_action(&a2, "plain", PlayerActionChoice::Pass),
+            "a plain ball-carrier must be offered Pass");
+    }
+
+    #[test]
     fn already_acted_player_excluded() {
         let mut game = make_game(Rules::Bb2025);
         add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
