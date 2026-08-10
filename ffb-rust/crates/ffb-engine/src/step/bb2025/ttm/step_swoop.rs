@@ -2,6 +2,9 @@ use ffb_model::enums::{Direction, PlayerAction, PlayerState};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::prompts::agent_prompt::AgentPrompt;
+use ffb_model::util::util_cards::UtilCards;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepAction, StepId, StepParameter};
@@ -187,9 +190,25 @@ impl StepSwoop {
         // Java: if (state.usingSwoop == null):
         //   UtilServerDialog.showDialog(gameState, DialogSkillUseParameter(...))
         //   return  // wait for CLIENT_USE_SKILL
-        // client-only: UtilServerDialog.showDialog — dialog is client-side
+        // Surface the skill-use dialog as an AgentPrompt (a bare cont() with no prompt reads as a
+        // stall to the headless driver, which breaks its loop → the throw is abandoned, goblin
+        // seed 3 i=194). Java shows a DialogSkillUseParameter for the thrown player's
+        // ttmScattersInSingleDirection skill (Swoop); the parity agent (and ParityRunner) DECLINE
+        // it — using Swoop opens a CLIENT_SWOOP target dialog the harness can't drive (STUCK_STEP
+        // → force-ended game), so both engines decline and the thrown player lands normally.
         if self.using_swoop.is_none() {
-            return StepOutcome::cont();
+            // Java shows the dialog UNCONDITIONALLY (thrownPlayer.getSkillWithProperty(
+            // ttmScattersInSingleDirection)); the step is only pushed for Swoop players, so the
+            // property lookup normally succeeds — fall back to SkillId::Swoop so a synthetic
+            // no-skill case still WAITS (Continue) like Java rather than silently advancing.
+            let sk = game.player(&player_id)
+                .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::TTM_SCATTERS_IN_SINGLE_DIRECTION))
+                .unwrap_or(ffb_model::enums::SkillId::Swoop);
+            return StepOutcome::cont().with_prompt(AgentPrompt::SkillUse {
+                player_id: player_id.clone(),
+                skill_id: sk as u16,
+                skill_name: sk.class_name().to_string(),
+            });
         }
 
         // Java: if (!state.usingSwoop):
@@ -244,6 +263,10 @@ impl StepSwoop {
         //   [implicit wait for CLIENT_SWOOP]
         if self.coordinate_to.is_none() {
             UtilServerPlayerSwoop::update_swoop_squares(game, &player_id);
+            // Java: publishParameter(USING_SWOOP, true) then waits for CLIENT_SWOOP (a client
+            // coordinate dialog). Unreachable in the parity harness — both agents DECLINE Swoop
+            // above (usingSwoop=false → NEXT_STEP), so the throw_scatter/deflection path never
+            // runs. Kept 1:1 with Java for a real client; headless has no swoop-target dialog.
             return outcome.publish(StepParameter::UsingSwoop(true));
         }
 
@@ -288,6 +311,50 @@ mod tests {
             ..Default::default()
         });
         game.field_model.set_player_coordinate(id, FieldCoordinate { x: 3, y: 3 });
+    }
+
+    #[test]
+    fn seed3_swoop_wait_emits_skill_use_prompt_and_decline_advances() {
+        // goblin seed 3 i=194: a thrown Doom Diver (Swoop) reaches StepSwoop with using_swoop=None.
+        // Java shows a DialogSkillUseParameter; Rust must surface it as an AgentPrompt::SkillUse
+        // (a bare cont() with no prompt stalled the headless driver → the whole throw was
+        // abandoned). The parity agent + ParityRunner DECLINE Swoop (its CLIENT_SWOOP target dialog
+        // is undriveable → STUCK_STEP force-end), so use_skill=false → publish USING_SWOOP(false)
+        // + NEXT_STEP and the thrown player lands normally.
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, SkillId};
+        let mut game = make_game();
+        let mut p = Player {
+            id: "diver".into(), name: "diver".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 2, agility: 3, passing: 4, armour: 7,
+            ..Default::default()
+        };
+        p.starting_skills.push(ffb_model::model::skill_def::SkillWithValue::new(SkillId::Swoop));
+        game.team_home.players.push(p);
+        game.field_model.set_player_coordinate("diver", FieldCoordinate { x: 5, y: 5 });
+
+        // using_swoop == None → must surface a SkillUse{Swoop} prompt (Continue).
+        let mut step = StepSwoop::new("fall".into());
+        step.thrown_player_id = Some("diver".into());
+        step.thrown_player_coordinate = Some(FieldCoordinate { x: 5, y: 5 });
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue);
+        match out.prompt {
+            Some(AgentPrompt::SkillUse { ref player_id, ref skill_name, .. }) => {
+                assert_eq!(player_id, "diver");
+                assert_eq!(skill_name, "Swoop");
+            }
+            ref other => panic!("expected SkillUse(Swoop) prompt, got {other:?}"),
+        }
+
+        // Decline (use_skill=false) → publish USING_SWOOP(false) + NEXT_STEP (lands normally).
+        let out2 = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Swoop, use_skill: false },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert_eq!(out2.action, StepAction::NextStep);
+        assert!(out2.published.iter().any(|p| matches!(p, StepParameter::UsingSwoop(false))));
     }
 
     #[test]

@@ -554,6 +554,12 @@ impl Agent for RandomAgent {
             // and the dialog would refire forever — echo the real skill.
             Some(AgentPrompt::SkillUse { skill_name, .. }) if skill_name == "HitAndRun" =>
                 Action::UseSkill { skill_id: SkillId::HitAndRun, use_skill: true },
+            // Swoop (BB2025 TTM): DECLINE, like DumpOff/PrimalSavagery/SafePairOfHands. Using Swoop
+            // opens a CLIENT_SWOOP target dialog that the parity harness (ParityRunner) has no
+            // handler for → the SWOOP step gets STUCK and the game force-ends (goblin seed 3 i=194).
+            // Declining lands the thrown player normally; ParityRunner declines Swoop identically.
+            Some(AgentPrompt::SkillUse { skill_name, .. }) if skill_name == "Swoop" =>
+                Action::UseSkill { skill_id: SkillId::Swoop, use_skill: false },
             // Skill use: AGENT_CONTRACT §7 — ALWAYS use, deterministically, 0 rng. Java ParityRunner
             // SKILL_USE = `sendUseSkill(skill, true, playerId)` (no decisionRng). The old code
             // random-sampled via pick_bool (spurious draw + wrong choice → decision-stream desync).
