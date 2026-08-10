@@ -18,7 +18,7 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `goblin` | 🟢 100/100 |  | 2026-08-10: Swoop TTM decline + StepFollowup Fend/Taunt dialogs + Ball&Chain Fanatic wander (InjuryTypeCrowdPush publish + B&C fall injury) |
 | `halfling` | 🟢 100/100 |  | 08-10: claws-aware armour recalc uses armour-with-modifiers (seed 38, dbd21667); TTM hit-player injury deferred not applied inline → clears rooted (seeds 34/65, fb7ffaf8) |
 | `high_elf` | 🟢 100/100 |  | 2026-08-10: Steady Footing faller-resolution + Wrestle Both-Down ball bounce + changeActingPlayer computed hasActed() + My Ball carrier PASS exclusion (ParityRunner harness) |
-| `human` | 🔴 95/100 | seed 13, step 255, java e5fe283217c0feed vs rust 25607a9b2b190492 |  |
+| `human` | 🟢 100/100 |  | 08-10: Tackle cancels the Dodge skill re-roll on a failed dodge (seeds 13/33/56/62/65, dd12cf97) |
 | `khemri` | 🔴 99/100 | seed 21, step 44, java 4c93a4d43e204750 vs rust c38d8eb4d2ded874 |  |
 | `khemri_fumbbl` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `lizardman` | 🔴 0/100 | seed 1, step 22, java 7da84dba50abc1f5 vs rust 29081bc3e6ec4d48 |  |
@@ -37,4 +37,4 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `vampire` | 🟢 100/100 |  |  |
 | `wood_elf` | 🟢 100/100 |  |  |
 
-**20 green / 10 red of 30.** (amazon 08-09; chaos, dark_elf, dwarf, elf 08-10; high_elf, goblin, halfling 08-10)
+**21 green / 9 red of 30.** (amazon 08-09; chaos, dark_elf, dwarf, elf 08-10; high_elf, goblin, halfling, human 08-10)
