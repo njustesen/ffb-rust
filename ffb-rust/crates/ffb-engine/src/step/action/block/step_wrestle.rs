@@ -22,7 +22,7 @@
 ///   player is carrying the ball, since being knocked prone would otherwise fumble it.
 ///
 /// Expects OLD_DEFENDER_STATE parameter from a preceding step.
-use ffb_model::enums::{PlayerAction, Rules, SkillId, PS_PRONE};
+use ffb_model::enums::{ApothecaryMode, PlayerAction, Rules, SkillId};
 use ffb_model::enums::PlayerState;
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
@@ -90,7 +90,7 @@ impl Step for StepWrestle {
 impl StepWrestle {
     /// Java: WrestleBehaviour.handleExecuteStepHook — logic genuinely diverges bb2016 vs
     /// bb2020/bb2025 (see module doc comment for the differences).
-    fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let player_id = match game.acting_player.player_id.clone() {
             Some(id) => id,
             None => return StepOutcome::next(),
@@ -176,10 +176,10 @@ impl StepWrestle {
         }
 
         // Java: performWrestle
-        self.perform_wrestle(game, &player_id, is_bb2016)
+        self.perform_wrestle(game, rng, &player_id, is_bb2016)
     }
 
-    fn perform_wrestle(&self, game: &mut Game, player_id: &str, is_bb2016: bool) -> StepOutcome {
+    fn perform_wrestle(&self, game: &mut Game, rng: &mut GameRng, player_id: &str, is_bb2016: bool) -> StepOutcome {
         let using_attacker = self.using_wrestle_attacker.unwrap_or(false);
         let using_defender = self.using_wrestle_defender.unwrap_or(false);
         let defender_id = game.defender_id.clone();
@@ -238,16 +238,41 @@ impl StepWrestle {
             && game.rules == Rules::Bb2025
             && UtilPlayer::has_ball(game, player_id);
 
+        let mut drop_params: Vec<StepParameter> = Vec::new();
+        let mut defender_injury: Option<StepParameter> = None;
         if using_attacker || using_defender {
-            // Java: UtilServerInjury.dropPlayer → place both PRONE.
-            // Simplified stub: set both to PRONE, deactivate.
-            let attacker_state = game.field_model.player_state(player_id)
-                .unwrap_or_default();
-            game.field_model.set_player_state(player_id, attacker_state.change_base(PS_PRONE).change_active(false));
-
+            // Java (bb2025 WrestleBehaviour.performWrestle:88-89):
+            //   step.publishParameters(UtilServerInjury.dropPlayer(step, defender, DEFENDER, true));
+            //   step.publishParameters(UtilServerInjury.dropPlayer(step, actingPlayer, ATTACKER, true));
+            // dropPlayer places the player PRONE (acting player also deactivated) and, when the
+            // dropped player is standing ON the ball, sets ballMoving + publishes SCATTER_BALL (the
+            // d8 bounce) and, if that player is the ball CARRIER on the acting team, END_TURN. The
+            // old stub set both PRONE but skipped the ball scatter → a knocked-down ball-carrier
+            // never fumbled → the d8 bounce (and its turnover) went unrolled (high_elf seed 72).
+            // eligibleForSafePairOfHands = true (Java's literal 4th arg).
             if let Some(did) = &defender_id {
-                let defender_state = game.field_model.player_state(did).unwrap_or_default();
-                game.field_model.set_player_state(did, defender_state.change_base(PS_PRONE).change_active(false));
+                drop_params.extend(crate::step::util_server_injury::drop_player(game, did, true));
+            }
+            drop_params.extend(crate::step::util_server_injury::drop_player(game, player_id, true));
+
+            // Java (performWrestle:92-97): a Ball&Chain defender (placedProneCausesInjuryRoll) takes
+            // an InjuryTypeBallAndChain roll published as INJURY_RESULT, attacker = actingPlayer.
+            if let Some(did) = &defender_id {
+                let is_bc = game.player(did)
+                    .map(|p| p.has_skill_property(NamedProperties::PLACED_PRONE_CAUSES_INJURY_ROLL))
+                    .unwrap_or(false);
+                if is_bc {
+                    if let Some(defender_coord) = game.field_model.player_coordinate(did) {
+                        use crate::injury::injuryType::injury_type_ball_and_chain::InjuryTypeBallAndChain;
+                        let mut it = InjuryTypeBallAndChain::new();
+                        let injury = crate::step::util_server_injury::handle_injury(
+                            game, rng, &mut it,
+                            Some(player_id), did, defender_coord,
+                            None, None, ApothecaryMode::Defender,
+                        );
+                        defender_injury = Some(StepParameter::InjuryResult(Box::new(injury)));
+                    }
+                }
             }
         }
 
@@ -258,6 +283,12 @@ impl StepWrestle {
         if revert_end_turn {
             outcome = outcome.publish(StepParameter::RevertEndTurn(true));
         }
+        for p in drop_params {
+            outcome = outcome.publish(p);
+        }
+        if let Some(p) = defender_injury {
+            outcome = outcome.publish(p);
+        }
         outcome
     }
 }
@@ -267,7 +298,7 @@ mod tests {
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::StepAction;
-    use ffb_model::enums::{Rules, PS_STANDING};
+    use ffb_model::enums::{Rules, PS_PRONE, PS_STANDING};
     use ffb_model::model::skill_def::SkillWithValue;
     use ffb_model::types::FieldCoordinate;
 
@@ -465,6 +496,44 @@ mod tests {
         assert!(
             game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE),
             "defender using Wrestle should add ReportSkillUse"
+        );
+    }
+
+    #[test]
+    fn seed72_both_down_carrier_ball_bounce() {
+        // high_elf seed 72: the acting player (a White Lion carrying the ball) blitzes into a
+        // Both-Down and uses Wrestle to bring both players down. Java's performWrestle calls
+        // UtilServerInjury.dropPlayer for the attacker, who is STANDING ON THE BALL — dropPlayer
+        // sets ballMoving and publishes CATCH_SCATTER_THROW_IN_MODE=SCATTER_BALL (the d8 bounce)
+        // plus END_TURN (the carrier is on the acting/home team). The old "simplified drop stub"
+        // set both PRONE but skipped the scatter → the d8 was never rolled → the Rust stream ran
+        // one die behind Java and the turnover timing diverged. This asserts the scatter + end-turn
+        // + revert-end-turn params are now published when the ball carrier uses Wrestle.
+        let mut game = make_game(vec![SkillId::Wrestle], vec![]);
+        // Put the ball under the acting attacker → they are the carrier.
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(5, 5));
+        game.field_model.ball_in_play = true;
+        let mut step = StepWrestle::new();
+        step.using_wrestle_attacker = Some(true);
+        step.using_wrestle_defender = Some(false);
+        let outcome = step.start(&mut game, &mut GameRng::new(0));
+
+        assert_eq!(game.field_model.player_state("att").unwrap().base(), PS_PRONE);
+        assert!(game.field_model.ball_moving, "dropping the ball carrier sets the ball moving");
+        assert!(
+            outcome.published.iter().any(|p| matches!(
+                p,
+                StepParameter::CatchScatterThrowInMode(crate::step::framework::CatchScatterThrowInMode::ScatterBall)
+            )),
+            "dropping the ball carrier must publish SCATTER_BALL (the d8 bounce)"
+        );
+        assert!(
+            outcome.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "carrier on the acting team going down is a turnover → END_TURN"
+        );
+        assert!(
+            outcome.published.iter().any(|p| matches!(p, StepParameter::RevertEndTurn(true))),
+            "bb2025 publishes REVERT_END_TURN when the acting player carries the ball"
         );
     }
 
