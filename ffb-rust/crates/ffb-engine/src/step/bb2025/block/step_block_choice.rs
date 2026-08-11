@@ -232,74 +232,13 @@ impl StepBlockChoice {
         outcome
     }
 
-    /// Returns (starting_pushback_square, scatter_ball).
-    /// Java: UtilBlockSequence.initPushback(step) — clears pushback squares, finds direction.
-    /// Java: `UtilBlockSequence.initPushback(step)` (COMMON). Clears pushback squares, finds the
-    /// starting square, and — when the attacker has Strip Ball
-    /// (`forceOpponentToDropBallOnPushback`) and is pushing an opposing ball CARRIER — knocks the
-    /// ball loose (SCATTER_BALL + BALL_KNOCKED_LOSE), unless the carrier has a cancelling skill
-    /// (Sure Hands / Monstrous Mouth) AND still has tacklezones (bb2025
-    /// `SkillMechanic.canPreventStripBall(state) == state.hasTacklezones()`). Returns every
-    /// StepParameter the caller must publish; adds the STEAL_BALL / CANCEL_STRIP_BALL reports here.
+    /// Java: `UtilBlockSequence.initPushback(step)` (COMMON) — clears pushback squares, finds the
+    /// starting square, and applies Strip Ball (ball knocked loose on a pushback of an opposing
+    /// carrier). Delegates to the shared implementation so StepBlockChoice and StepBlockDodge (the
+    /// dodged-stumble path) behave identically, exactly as Java routes both through
+    /// UtilBlockSequence.initPushback.
     fn init_pushback(&self, game: &mut Game) -> Vec<StepParameter> {
-        use ffb_model::util::util_cards::UtilCards;
-        use ffb_model::model::skill_use::SkillUse;
-        use ffb_model::report::report_skill_use::ReportSkillUse;
-
-        game.field_model.pushback_squares.clear();
-        let attacker_id = game.acting_player.player_id.clone();
-        let defender_id = game.defender_id.clone();
-        let attacker_coord = attacker_id.as_deref()
-            .and_then(|id| game.field_model.player_coordinate(id));
-        let defender_coord = defender_id.as_deref()
-            .and_then(|id| game.field_model.player_coordinate(id));
-
-        let mut params: Vec<StepParameter> = Vec::new();
-        let starting_sq = attacker_coord.zip(defender_coord)
-            .and_then(|(ac, dc)| UtilServerPushback::find_starting_square(ac, dc, game.home_playing));
-        params.push(StepParameter::StartingPushbackSquare(starting_sq));
-
-        // Java: skillCanForceOpponentToDropBall = attacker.getSkillWithProperty(forceOpponentToDropBallOnPushback)
-        let strip_skill = attacker_id.as_deref()
-            .and_then(|id| game.player(id))
-            .and_then(|p| p.all_skill_ids()
-                .find(|s| s.properties().contains(&NamedProperties::FORCE_OPPONENT_TO_DROP_BALL_ON_PUSHBACK)));
-
-        // Java guard: skill != null && defenderCoordinate.equals(ballCoordinate) && defender is opponent.
-        let defender_is_carrier = defender_coord.is_some()
-            && defender_coord == game.field_model.ball_coordinate;
-        let opponents = match (attacker_id.as_deref(), defender_id.as_deref()) {
-            (Some(a), Some(d)) => game.player_team_id(a) != game.player_team_id(d),
-            _ => false,
-        };
-
-        if let (Some(strip), true, true) = (strip_skill, defender_is_carrier, opponents) {
-            // Java: skillCanCounterOpponentForcingDropBall = UtilCards.getSkillCancelling(defender, strip)
-            let cancel = defender_id.as_deref()
-                .and_then(|id| game.player(id))
-                .and_then(|p| UtilCards::get_skill_cancelling_property(p, NamedProperties::FORCE_OPPONENT_TO_DROP_BALL_ON_PUSHBACK));
-            // bb2025 SkillMechanic.canPreventStripBall(state) == state.hasTacklezones()
-            let can_prevent = defender_id.as_deref()
-                .and_then(|id| game.field_model.player_state(id))
-                .map(|s| s.has_tacklezones())
-                .unwrap_or(false);
-
-            if let (Some(cancel_skill), true) = (cancel, can_prevent) {
-                // Sure Hands / Monstrous Mouth cancels Strip Ball — ball is NOT dropped.
-                if let Some(did) = defender_id.clone() {
-                    game.report_list.add(ReportSkillUse::new(Some(did), cancel_skill, true, SkillUse::CANCEL_STRIP_BALL));
-                }
-            } else {
-                // Ball comes loose and scatters.
-                if let Some(aid) = attacker_id.clone() {
-                    game.report_list.add(ReportSkillUse::new(Some(aid), strip, true, SkillUse::STEAL_BALL));
-                }
-                params.push(StepParameter::CatchScatterThrowInMode(
-                    ffb_model::model::catch_scatter_throw_in_mode::CatchScatterThrowInMode::ScatterBall));
-                params.push(StepParameter::BallKnockedLoose(true));
-            }
-        }
-        params
+        crate::step::action::block::util_block_sequence::init_pushback(game)
     }
 }
 
