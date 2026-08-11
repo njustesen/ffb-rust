@@ -3,7 +3,9 @@
 /// Expects stepParameter TOUCHBACK to be set by a preceding step.
 ///
 /// When touchback is true: waits for CLIENT_TOUCHBACK (Action::Touchback), then places the
-/// ball at the chosen player's coordinate. Also sets TurnMode::REGULAR after placement.
+/// ball at the chosen player's coordinate. Also sets TurnMode::KICKOFF after placement
+/// (Java StepTouchback.java:123 — NOT REGULAR; the following CATCH_SCATTER_THROW_IN needs the
+/// KICKOFF turn mode so a bouncing ball uses the receiving-half scatter bounds).
 ///
 /// Sets stepParameter CATCH_SCATTER_THROW_IN_MODE when a player without PREVENT_HOLD_BALL
 /// receives the ball at a position with tackle zones.
@@ -95,9 +97,17 @@ impl StepTouchback {
                 // Java: game.getFieldModel().setBallCoordinate(fTouchbackCoordinate)
                 game.field_model.ball_coordinate = Some(coord);
                 // Java: Player<?> player = game.getFieldModel().getPlayer(fTouchbackCoordinate)
-                // Java always falls through to `game.setTurnMode(TurnMode.REGULAR)` after this
-                // block, regardless of which sub-branch ran — publishParameter() is a plain
-                // statement in Java, not an early return, so it must not skip the turn-mode set.
+                // Java falls through to `game.setTurnMode(TurnMode.KICKOFF)` after this block (NOT
+                // REGULAR — StepTouchback.java:123), regardless of which sub-branch ran;
+                // publishParameter() is a plain statement in Java, not an early return, so it must
+                // not skip the turn-mode set. Keeping KICKOFF here is essential: the following
+                // CATCH_SCATTER_THROW_IN resolves the ball with the receiving-half scatter bounds
+                // (StepCatchScatterThrowIn: turnMode==KICKOFF → HALF_AWAY/HOME), so a ball bouncing
+                // out of the receiving half correctly touchbacks. Wrongly setting REGULAR here made
+                // that step use FIELD bounds, so a Changing-Weather kickoff bounce kept bouncing
+                // (necromantic seed 37: 2 extra dice, ball settled on a kicking-half player instead
+                // of touching back). The turn-mode → REGULAR transition happens later (EndKickoff /
+                // the receiving team's turn start), not in StepTouchback.
                 let mut publish_catch_scatter = false;
                 if let Some(player_id) = game.field_model.player_at(coord).cloned() {
                     // Java: PlayerState playerState = game.getFieldModel().getPlayerState(player)
@@ -118,8 +128,8 @@ impl StepTouchback {
                         publish_catch_scatter = true;
                     }
                 }
-                // Java: game.setTurnMode(TurnMode.REGULAR)
-                game.turn_mode = TurnMode::Regular;
+                // Java: game.setTurnMode(TurnMode.KICKOFF)
+                game.turn_mode = TurnMode::Kickoff;
                 if publish_catch_scatter {
                     return StepOutcome::next().publish(StepParameter::CatchScatterThrowInMode(
                         CatchScatterThrowInMode::CatchKickoff,
@@ -183,8 +193,12 @@ mod tests {
         assert!(!step.set_parameter(&StepParameter::EndTurn(false)));
     }
 
+    /// Java StepTouchback.java:123 sets `TurnMode.KICKOFF` (NOT REGULAR) after placing the
+    /// touchback ball, so the following CATCH_SCATTER_THROW_IN resolves the ball with the
+    /// receiving-half scatter bounds (necromantic seed 37: a Changing-Weather kickoff bounce
+    /// must touchback the moment it leaves the receiving half, not keep bouncing under FIELD bounds).
     #[test]
-    fn touchback_with_coordinate_resolves_turn_mode_regular() {
+    fn touchback_with_coordinate_resolves_turn_mode_kickoff() {
         let mut game = make_game();
         let mut step = StepTouchback::new();
         step.set_parameter(&StepParameter::Touchback(true));
@@ -194,8 +208,8 @@ mod tests {
         game.field_model.out_of_bounds = true;
         let out = step.execute_step(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
-        // Java: game.setTurnMode(TurnMode.REGULAR)
-        assert_eq!(game.turn_mode, TurnMode::Regular);
+        // Java: game.setTurnMode(TurnMode.KICKOFF)
+        assert_eq!(game.turn_mode, TurnMode::Kickoff);
         // Java: game.getFieldModel().setOutOfBounds(false)
         assert!(!game.field_model.out_of_bounds);
         // Java: game.getFieldModel().setBallCoordinate(fTouchbackCoordinate)
@@ -203,11 +217,11 @@ mod tests {
     }
 
     /// Java: `publishParameter(CATCH_SCATTER_THROW_IN_MODE, ...)` is a plain statement,
-    /// followed unconditionally by `game.setTurnMode(TurnMode.REGULAR)` — the turn mode
-    /// must still be set to REGULAR even when the ball lands on a player without
+    /// followed unconditionally by `game.setTurnMode(TurnMode.KICKOFF)` — the turn mode
+    /// must still be set to KICKOFF even when the ball lands on a player without
     /// tacklezones (triggering the catch-scatter-throw-in branch instead of a catch).
     #[test]
-    fn touchback_catch_scatter_branch_still_sets_turn_mode_regular() {
+    fn touchback_catch_scatter_branch_still_sets_turn_mode_kickoff() {
         use ffb_model::enums::{PS_PRONE, PlayerState};
 
         let mut game = make_game();
@@ -232,8 +246,8 @@ mod tests {
             matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::CatchKickoff))
         });
         assert!(published_catch_scatter, "should publish CatchScatterThrowInMode::CatchKickoff");
-        // ...but turn mode must still become REGULAR (Java always runs this afterward).
-        assert_eq!(game.turn_mode, TurnMode::Regular, "turn mode must be REGULAR even on the catch-scatter branch");
+        // ...but turn mode must still become KICKOFF (Java always runs this afterward).
+        assert_eq!(game.turn_mode, TurnMode::Kickoff, "turn mode must be KICKOFF even on the catch-scatter branch");
     }
 
 }
