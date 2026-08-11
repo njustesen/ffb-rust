@@ -876,9 +876,15 @@ impl SkillId {
             // Java: Decay.postConstruct registers cancelsAllowsRaisingLineman + requiresSecondCasualtyRoll
             //   (mixed/Decay only has cancelsAllowsRaisingLineman, bb2016 also has requiresSecondCasualtyRoll)
             SkillId::Decay => &["cancelsAllowsRaisingLineman", "requiresSecondCasualtyRoll"],
-            // Java: Regeneration.postConstruct registers preventRaiseFromDead + canRollToSaveFromInjury + cancelsAllowsRaisingLineman
-            //   (BB2025 Regeneration does NOT have preventRaiseFromDead, but we include it for the union)
-            SkillId::Regeneration => &["preventRaiseFromDead", "canRollToSaveFromInjury", "cancelsAllowsRaisingLineman"],
+            // Java Regeneration.postConstruct: bb2016 + bb2020 register preventRaiseFromDead, but
+            // BB2025/Regeneration.java registers ONLY canRollToSaveFromInjury +
+            // CancelSkillProperty(allowsRaisingLineman) — it does NOT prevent raise-from-dead. Per this
+            // enum's "latest edition wins" convention, omit preventRaiseFromDead so a bb2025 Regeneration
+            // player (e.g. a Necromantic Flesh Golem) that dies CAN be raised as a Zombie
+            // (InjuryMechanic.canRaiseDead checks !preventRaiseFromDead — necromantic seed 89: Java raised
+            // the dead Flesh Golem, Rust wrongly blocked it because the unioned property was present).
+            // Stunty still carries preventRaiseFromDead (bb2016 + mixed/Stunty, all editions), unaffected.
+            SkillId::Regeneration => &["canRollToSaveFromInjury", "cancelsAllowsRaisingLineman"],
             SkillId::GiveAndGo => &["canMoveAfterQuickPass", "canMoveAfterHandOff"],
             SkillId::RunningPass => &["canMoveAfterQuickPass"],
             // Java: DivingCatch.postConstruct registers canAttemptCatchInAdjacentSquares + addBonusForAccuratePass
@@ -1661,6 +1667,21 @@ mod tests {
     #[test]
     fn properties_bounding_leap() {
         assert!(SkillId::BoundingLeap.properties().contains(&"canIgnoreJumpModifiers"));
+    }
+
+    /// BB2025/Regeneration.java registers only canRollToSaveFromInjury +
+    /// CancelSkillProperty(allowsRaisingLineman) — NOT preventRaiseFromDead (bb2016/bb2020 only).
+    /// A bb2025 Regeneration player (e.g. a Necromantic Flesh Golem) that dies must be raisable
+    /// (necromantic seed 89). Stunty separately keeps preventRaiseFromDead in all editions.
+    #[test]
+    fn regeneration_does_not_prevent_raise_from_dead_bb2025() {
+        let props = SkillId::Regeneration.properties();
+        assert!(!props.contains(&"preventRaiseFromDead"),
+            "bb2025 Regeneration must NOT prevent raise-from-dead");
+        assert!(props.contains(&"canRollToSaveFromInjury"));
+        assert!(props.contains(&"cancelsAllowsRaisingLineman"));
+        // Stunty still carries it (all editions).
+        assert!(SkillId::Stunty.properties().contains(&"preventRaiseFromDead"));
     }
 
     // ── reroll_sources(): exhaustive pin of the live table ────────────────────
