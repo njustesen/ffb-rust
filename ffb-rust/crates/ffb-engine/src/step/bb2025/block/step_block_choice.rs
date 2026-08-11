@@ -159,7 +159,7 @@ impl StepBlockChoice {
                                 let defender_state = game.field_model.player_state(did).unwrap_or_default();
                                 game.field_model.set_player_state(did, defender_state.change_base(PS_FALLING));
                             }
-                            let (sq, _) = self.init_pushback(game);
+                            let pushback_params = self.init_pushback(game);
                             let mut out = StepOutcome::goto(&pushback_label);
                             if let Some(ref aid) = acting_player_id {
                                 out = out.with_event(GameEvent::SkillUse { player_id: aid.clone(), skill_id: SkillId::Tackle as u16, used: true });
@@ -167,7 +167,7 @@ impl StepBlockChoice {
                             if let Some(ref did) = defender_id {
                                 out = out.with_event(GameEvent::SkillUse { player_id: did.clone(), skill_id: SkillId::Dodge as u16, used: false });
                             }
-                            out = out.publish(StepParameter::StartingPushbackSquare(sq));
+                            for p in pushback_params { out = out.publish(p); }
                             out
                         }
                     } else {
@@ -184,9 +184,9 @@ impl StepBlockChoice {
                         let defender_state = game.field_model.player_state(did).unwrap_or_default();
                         game.field_model.set_player_state(did, defender_state.change_base(PS_FALLING));
                     }
-                    let (sq, _) = self.init_pushback(game);
+                    let pushback_params = self.init_pushback(game);
                     let mut out = StepOutcome::goto(&pushback_label);
-                    out = out.publish(StepParameter::StartingPushbackSquare(sq));
+                    for p in pushback_params { out = out.publish(p); }
                     out
                 }
             }
@@ -195,9 +195,9 @@ impl StepBlockChoice {
                     let defender_state = game.field_model.player_state(&defender_id).unwrap_or_default();
                     game.field_model.set_player_state(&defender_id, defender_state.change_base(PS_FALLING));
                 }
-                let (sq, _) = self.init_pushback(game);
+                let pushback_params = self.init_pushback(game);
                 let mut out = StepOutcome::goto(&pushback_label);
-                out = out.publish(StepParameter::StartingPushbackSquare(sq));
+                for p in pushback_params { out = out.publish(p); }
                 out
             }
             BlockResult::Pushback => {
@@ -205,9 +205,9 @@ impl StepBlockChoice {
                 if let Some(defender_id) = game.defender_id.clone() {
                     game.field_model.set_player_state(&defender_id, old_defender_state);
                 }
-                let (sq, _) = self.init_pushback(game);
+                let pushback_params = self.init_pushback(game);
                 let mut out = StepOutcome::goto(&pushback_label);
-                out = out.publish(StepParameter::StartingPushbackSquare(sq));
+                for p in pushback_params { out = out.publish(p); }
                 out
             }
             _ => StepOutcome::next(),
@@ -234,21 +234,72 @@ impl StepBlockChoice {
 
     /// Returns (starting_pushback_square, scatter_ball).
     /// Java: UtilBlockSequence.initPushback(step) — clears pushback squares, finds direction.
-    fn init_pushback(&self, game: &mut Game) -> (Option<ffb_model::types::PushbackSquare>, bool) {
+    /// Java: `UtilBlockSequence.initPushback(step)` (COMMON). Clears pushback squares, finds the
+    /// starting square, and — when the attacker has Strip Ball
+    /// (`forceOpponentToDropBallOnPushback`) and is pushing an opposing ball CARRIER — knocks the
+    /// ball loose (SCATTER_BALL + BALL_KNOCKED_LOSE), unless the carrier has a cancelling skill
+    /// (Sure Hands / Monstrous Mouth) AND still has tacklezones (bb2025
+    /// `SkillMechanic.canPreventStripBall(state) == state.hasTacklezones()`). Returns every
+    /// StepParameter the caller must publish; adds the STEAL_BALL / CANCEL_STRIP_BALL reports here.
+    fn init_pushback(&self, game: &mut Game) -> Vec<StepParameter> {
+        use ffb_model::util::util_cards::UtilCards;
+        use ffb_model::model::skill_use::SkillUse;
+        use ffb_model::report::report_skill_use::ReportSkillUse;
+
         game.field_model.pushback_squares.clear();
-        let attacker_coord = game.acting_player.player_id.as_deref()
+        let attacker_id = game.acting_player.player_id.clone();
+        let defender_id = game.defender_id.clone();
+        let attacker_coord = attacker_id.as_deref()
             .and_then(|id| game.field_model.player_coordinate(id));
-        let defender_coord = game.defender_id.as_deref()
+        let defender_coord = defender_id.as_deref()
             .and_then(|id| game.field_model.player_coordinate(id));
+
+        let mut params: Vec<StepParameter> = Vec::new();
         let starting_sq = attacker_coord.zip(defender_coord)
-            .map(|(ac, dc)| UtilServerPushback::find_starting_square(ac, dc, game.home_playing))
-            .flatten();
-        // Java: scatter_ball = attacker.hasSkillProperty(forceOpponentToDropBallOnPushback)
-        let scatter_ball = game.acting_player.player_id.as_deref()
+            .and_then(|(ac, dc)| UtilServerPushback::find_starting_square(ac, dc, game.home_playing));
+        params.push(StepParameter::StartingPushbackSquare(starting_sq));
+
+        // Java: skillCanForceOpponentToDropBall = attacker.getSkillWithProperty(forceOpponentToDropBallOnPushback)
+        let strip_skill = attacker_id.as_deref()
             .and_then(|id| game.player(id))
-            .map(|p| p.has_skill_property(NamedProperties::FORCE_OPPONENT_TO_DROP_BALL_ON_PUSHBACK))
-            .unwrap_or(false);
-        (starting_sq, scatter_ball)
+            .and_then(|p| p.all_skill_ids()
+                .find(|s| s.properties().contains(&NamedProperties::FORCE_OPPONENT_TO_DROP_BALL_ON_PUSHBACK)));
+
+        // Java guard: skill != null && defenderCoordinate.equals(ballCoordinate) && defender is opponent.
+        let defender_is_carrier = defender_coord.is_some()
+            && defender_coord == game.field_model.ball_coordinate;
+        let opponents = match (attacker_id.as_deref(), defender_id.as_deref()) {
+            (Some(a), Some(d)) => game.player_team_id(a) != game.player_team_id(d),
+            _ => false,
+        };
+
+        if let (Some(strip), true, true) = (strip_skill, defender_is_carrier, opponents) {
+            // Java: skillCanCounterOpponentForcingDropBall = UtilCards.getSkillCancelling(defender, strip)
+            let cancel = defender_id.as_deref()
+                .and_then(|id| game.player(id))
+                .and_then(|p| UtilCards::get_skill_cancelling_property(p, NamedProperties::FORCE_OPPONENT_TO_DROP_BALL_ON_PUSHBACK));
+            // bb2025 SkillMechanic.canPreventStripBall(state) == state.hasTacklezones()
+            let can_prevent = defender_id.as_deref()
+                .and_then(|id| game.field_model.player_state(id))
+                .map(|s| s.has_tacklezones())
+                .unwrap_or(false);
+
+            if let (Some(cancel_skill), true) = (cancel, can_prevent) {
+                // Sure Hands / Monstrous Mouth cancels Strip Ball — ball is NOT dropped.
+                if let Some(did) = defender_id.clone() {
+                    game.report_list.add(ReportSkillUse::new(Some(did), cancel_skill, true, SkillUse::CANCEL_STRIP_BALL));
+                }
+            } else {
+                // Ball comes loose and scatters.
+                if let Some(aid) = attacker_id.clone() {
+                    game.report_list.add(ReportSkillUse::new(Some(aid), strip, true, SkillUse::STEAL_BALL));
+                }
+                params.push(StepParameter::CatchScatterThrowInMode(
+                    ffb_model::model::catch_scatter_throw_in_mode::CatchScatterThrowInMode::ScatterBall));
+                params.push(StepParameter::BallKnockedLoose(true));
+            }
+        }
+        params
     }
 }
 
@@ -303,6 +354,67 @@ mod tests {
         let mut game = make_game();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::Continue);
+    }
+
+    // ── Strip Ball (norse seed 30 i=137) ────────────────────────────────────────
+    // A Strip Ball attacker pushing an opposing ball CARRIER knocks the ball loose:
+    // init_pushback must publish SCATTER_BALL + BALL_KNOCKED_LOOSE (Java
+    // UtilBlockSequence.initPushback). Previously the scatter_ball bool was computed then
+    // discarded, so a pushed carrier kept the ball while Java scattered it — desyncing the
+    // dice stream at the next bounce.
+    fn strip_ball_setup(defender_skills: Vec<ffb_model::model::skill_def::SkillWithValue>, defender_standing: bool) -> (StepBlockChoice, Game) {
+        use ffb_model::model::skill_def::SkillWithValue;
+        let step = StepBlockChoice::new("dodge".into(), "jugger".into(), "push".into());
+        let mut game = make_game();
+        add_away_player(&mut game, "att"); // attacker at (6,5)
+        add_home_player(&mut game, "def"); // defender at (5,5)
+        // Attacker gets Strip Ball.
+        game.team_away.players.last_mut().unwrap().starting_skills = vec![SkillWithValue::new(SkillId::StripBall)];
+        game.team_home.players.last_mut().unwrap().starting_skills = defender_skills;
+        // Defender carries the ball (ball coord == defender coord).
+        let def_coord = game.field_model.player_coordinate("def").unwrap();
+        game.field_model.ball_coordinate = Some(def_coord);
+        game.field_model.ball_in_play = true;
+        if !defender_standing {
+            let st = game.field_model.player_state("def").unwrap();
+            game.field_model.set_player_state("def", st.change_base(PS_FALLING));
+        }
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("def".into());
+        (step, game)
+    }
+
+    #[test]
+    fn strip_ball_pushing_carrier_knocks_ball_loose() {
+        use ffb_model::model::catch_scatter_throw_in_mode::CatchScatterThrowInMode;
+        let (step, mut game) = strip_ball_setup(vec![], true);
+        let params = step.init_pushback(&mut game);
+        assert!(params.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall))),
+            "Strip Ball push of a carrier must publish SCATTER_BALL, got {:?}", params);
+        assert!(params.iter().any(|p| matches!(p, StepParameter::BallKnockedLoose(true))),
+            "Strip Ball push of a carrier must publish BALL_KNOCKED_LOOSE, got {:?}", params);
+    }
+
+    #[test]
+    fn strip_ball_cancelled_by_sure_hands_with_tacklezones() {
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::model::catch_scatter_throw_in_mode::CatchScatterThrowInMode;
+        // bb2025 canPreventStripBall == hasTacklezones(): a STANDING Sure Hands carrier keeps the ball.
+        let (step, mut game) = strip_ball_setup(vec![SkillWithValue::new(SkillId::SureHands)], true);
+        let params = step.init_pushback(&mut game);
+        assert!(!params.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall))),
+            "Sure Hands with tacklezones cancels Strip Ball — no SCATTER_BALL, got {:?}", params);
+    }
+
+    #[test]
+    fn strip_ball_not_cancelled_when_carrier_has_no_tacklezones() {
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::model::catch_scatter_throw_in_mode::CatchScatterThrowInMode;
+        // A Sure Hands carrier WITHOUT tacklezones (prone/falling) cannot prevent Strip Ball.
+        let (step, mut game) = strip_ball_setup(vec![SkillWithValue::new(SkillId::SureHands)], false);
+        let params = step.init_pushback(&mut game);
+        assert!(params.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall))),
+            "Sure Hands without tacklezones cannot cancel Strip Ball, got {:?}", params);
     }
 
     #[test]
