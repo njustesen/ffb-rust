@@ -21,8 +21,8 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `human` | 🟢 100/100 |  | 08-10: Tackle cancels the Dodge skill re-roll on a failed dodge (seeds 13/33/56/62/65, dd12cf97) |
 | `khemri` | 🟢 100/100 |  | 08-10: apply casualty modifiers (Decay +1 / nigglings) to the d16 tier → SI triggers Getting Even (seed 21, 3f4cc69d) |
 | `khemri_fumbbl` | 🟢 100/100 |  | FUMBBL-legacy roster |
-| `lizardman` | 🔴 0/100 | seed 1, step 22, java 7da84dba50abc1f5 vs rust 29081bc3e6ec4d48 |  |
-| `necromantic` | 🔴 97/100 | seed 37, step 152, java 1ebdc097bb1705f1 vs rust cdd55e7326275e0e |  |
+| `lizardman` | 🟢 100/100 |  | 08-11: cleared by the human Tackle-cancels-Dodge-reroll fix (dd12cf97) |
+| `necromantic` | 🟢 100/100 |  | 08-11: StepTouchback KICKOFF-not-REGULAR (seed 37, 7ffbcd2f); SecureTheBall Unsteady harness (seed 83, f9e0544ea); bb2025 Regeneration doesn't preventRaiseFromDead (seed 89, a4e68430) |
 | `nippon` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `norse` | 🔴 87/100 | seed 1, step 170, java a1e292cf8db01160 vs rust 1be574caceb260d5 |  |
 | `nurgle` | 🔴 5/100 | seed 1, step 11, java 482cd04ec2bf04ef vs rust ef202019fc3be926 |  |
@@ -37,4 +37,4 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `vampire` | 🟢 100/100 |  |  |
 | `wood_elf` | 🟢 100/100 |  |  |
 
-**22 green / 8 red of 30.** (amazon 08-09; chaos, dark_elf, dwarf, elf 08-10; high_elf, goblin, halfling, human, khemri 08-10)
+**24 green / 6 red of 30.** (amazon 08-09; chaos, dark_elf, dwarf, elf 08-10; high_elf, goblin, halfling, human, khemri 08-10; lizardman, necromantic 08-11)
