@@ -24,7 +24,7 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `lizardman` | 🟢 100/100 |  | 08-11: cleared by the human Tackle-cancels-Dodge-reroll fix (dd12cf97) |
 | `necromantic` | 🟢 100/100 |  | 08-11: StepTouchback KICKOFF-not-REGULAR (seed 37, 7ffbcd2f); SecureTheBall Unsteady harness (seed 83, f9e0544ea); bb2025 Regeneration doesn't preventRaiseFromDead (seed 89, a4e68430) |
 | `nippon` | 🟢 100/100 |  | FUMBBL-legacy roster |
-| `norse` | 🔴 87/100 | seed 1, step 170, java a1e292cf8db01160 vs rust 1be574caceb260d5 |  |
+| `norse` | 🟢 100/100 |  | 08-11: StepPickMeUp emits PICK_ME_UP dialog instead of stalling (Beer Boar, 11 seeds); Strip Ball drop-on-pushback in StepBlockChoice.initPushback (seeds 28/30) |
 | `nurgle` | 🔴 5/100 | seed 1, step 11, java 482cd04ec2bf04ef vs rust ef202019fc3be926 |  |
 | `ogre` | 🔴 94/100 | seed 12, step 75, java 98818cdc80d7791a vs rust 0b018aaab59832d3 |  |
 | `orc` | 🔴 0/100 | seed 1, step 1, java 9d04af23c3b5728d vs rust 9c55510376cb6887 |  |
@@ -37,4 +37,4 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `vampire` | 🟢 100/100 |  |  |
 | `wood_elf` | 🟢 100/100 |  |  |
 
-**24 green / 6 red of 30.** (amazon 08-09; chaos, dark_elf, dwarf, elf 08-10; high_elf, goblin, halfling, human, khemri 08-10; lizardman, necromantic 08-11)
+**25 green / 5 red of 30.** (amazon 08-09; chaos, dark_elf, dwarf, elf 08-10; high_elf, goblin, halfling, human, khemri 08-10; lizardman, necromantic, norse 08-11)
