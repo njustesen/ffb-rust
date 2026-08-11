@@ -121,9 +121,20 @@ impl StepPickMeUp {
             return StepOutcome::next();
         }
 
-        // Java: showDialog(DialogPlayerChoiceParameter(team, PICK_ME_UP, playerIds, null, size, 0))
-        // Not yet ported → wait for a PlayerChoice command.
-        StepOutcome::cont()
+        // Java: showDialog(DialogPlayerChoiceParameter(team, PICK_ME_UP, playerIds, null, size, 0)).
+        // Emit the PlayerChoice prompt so the agent can answer the dialog. Java's ParityRunner
+        // declines every PLAYER_CHOICE dialog with an empty selection (0 dice); the Rust random
+        // agent mirrors that (a non-ANIMAL_SAVAGERY AgentPrompt::PlayerChoice → the empty
+        // Action::SelectPlayer{""}), which this step's handle_command routes to NEXT_STEP. Without
+        // the prompt the drive STALLED (cont() with no prompt) whenever a Pick-me-up player sat
+        // within 3 squares of a prone team-mate at turn-end — norse seed 13 i=8: away_01's
+        // no-target blitz turnover left the home Beer Boar (Pick-me-up) beside prone home_00/01/02.
+        let prompt = ffb_model::prompts::AgentPrompt::PlayerChoice {
+            eligible_players: self.player_ids.clone(),
+            reason: "PICK_ME_UP".into(),
+            descriptions: vec![],
+        };
+        StepOutcome::cont().with_prompt(prompt)
     }
 }
 
@@ -223,6 +234,27 @@ mod tests {
         let mut rng = GameRng::new(0);
         step.start(&mut game, &mut rng);
         assert!(!step.first_run);
+    }
+
+    #[test]
+    fn eligible_players_emit_player_choice_prompt_not_bare_cont() {
+        // norse seed 13 i=8: a Pick-me-up player (Beer Boar) within 3 squares of a prone
+        // team-mate made StepPickMeUp find an eligible player. Java shows a PICK_ME_UP dialog
+        // that the harness declines (0 dice); Rust must EMIT the prompt (so the agent can decline
+        // via Action::SelectPlayer{""} → NEXT_STEP) rather than return a bare cont() with no
+        // prompt, which stalled the drive after a turnover.
+        use ffb_model::prompts::AgentPrompt;
+        let mut step = StepPickMeUp::new();
+        step.player_ids = vec!["prone_mate".into()];
+        step.first_run = false; // skip first-run scan; exercise the dialog branch directly
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        let out = step.execute_step(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::Continue, "must wait for the dialog response");
+        assert!(
+            matches!(out.prompt, Some(AgentPrompt::PlayerChoice { ref reason, .. }) if reason == "PICK_ME_UP"),
+            "must emit a PICK_ME_UP PlayerChoice prompt, got {:?}", out.prompt
+        );
     }
 
     #[test]
