@@ -25,16 +25,16 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `necromantic` | 🟢 100/100 |  | 08-11: StepTouchback KICKOFF-not-REGULAR (seed 37, 7ffbcd2f); SecureTheBall Unsteady harness (seed 83, f9e0544ea); bb2025 Regeneration doesn't preventRaiseFromDead (seed 89, a4e68430) |
 | `nippon` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `norse` | 🟢 100/100 |  | 08-11: StepPickMeUp emits PICK_ME_UP dialog instead of stalling (Beer Boar, 11 seeds); Strip Ball drop-on-pushback in StepBlockChoice.initPushback (seeds 28/30) |
-| `nurgle` | 🔴 5/100 | seed 1, step 11, java 482cd04ec2bf04ef vs rust ef202019fc3be926 |  |
+| `nurgle` | 🟢 100/100 |  | 08-11: cleared by earlier engine fixes (stale 08-08 red re-verified 100/100) |
 | `ogre` | 🔴 94/100 | seed 12, step 75, java 98818cdc80d7791a vs rust 0b018aaab59832d3 |  |
-| `orc` | 🔴 0/100 | seed 1, step 1, java 9d04af23c3b5728d vs rust 9c55510376cb6887 |  |
+| `orc` | 🟢 100/100 |  | 08-11: cleared by earlier engine fixes (stale 08-08 red re-verified 100/100) |
 | `renegades` | 🟢 100/100 |  |  |
-| `skaven` | 🔴 92/100 | seed 24, step 200, java 13ab375167193665 vs rust 63c555ead50ea9cc |  |
+| `skaven` | 🟢 100/100 |  | 08-11: Strip Ball drop-on-pushback on the dodged-stumble path (shared util_block_sequence.init_pushback; seed 52) |
 | `slann` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `slann_fumbbl` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `undead` | 🟢 100/100 |  |  |
-| `underworld` | 🔴 92/100 | seed 4, step 44, java 7571510943221c00 vs rust e57de2f1c09f2a64 |  |
+| `underworld` | 🟢 100/100 |  | 08-11: cleared by earlier engine fixes (stale 08-08 red re-verified 100/100) |
 | `vampire` | 🟢 100/100 |  |  |
 | `wood_elf` | 🟢 100/100 |  |  |
 
-**25 green / 5 red of 30.** (amazon 08-09; chaos, dark_elf, dwarf, elf 08-10; high_elf, goblin, halfling, human, khemri 08-10; lizardman, necromantic, norse 08-11)
+**29 green / 1 red of 30.** (amazon 08-09; chaos, dark_elf, dwarf, elf 08-10; high_elf, goblin, halfling, human, khemri 08-10; lizardman, necromantic, norse, nurgle, orc, skaven, underworld 08-11). Only `ogre` remains red (DEFERRED per campaign scope).
