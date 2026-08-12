@@ -242,11 +242,21 @@ impl Step for StepInitSelecting {
                 //   adjacent opponent remains — Java sends ClientCommandActingPlayer(null) (JAVA_P2
                 //   action=BLOCK, NO JAVA_BLOCK_PICK) and CONTINUES home's turn to Home9; Rust used to
                 //   end the turn here (the earlier BLOCK→end_turn was an untested guess), turning over a
-                //   full activation early. All three no-target action declarations deselect, never end
+                //   full activation early. All these no-target action declarations deselect, never end
                 //   the turn.
+                //   PASS / HAND-OVER with no legal RECEIVER behave the same way: Java's
+                //   sendPassAction / sendHandOverAction inject ClientCommandActingPlayer(null,null,false)
+                //   when the receiver list is empty (a snapshot-offered PASS/HAND-OVER whose only
+                //   adjacent teammate moved away, or a carrier with no reachable receiver). Without
+                //   deselecting, a no-receiver hand-over fell through to a bare execute_step that
+                //   emitted NO prompt, silently ending the team's turn early and desyncing the rest of
+                //   the game (amazon bb2016 seed23 i=210: away_01 HAND_OFF, no adjacent receiver — Java
+                //   deselects and continues away's turn to Away10, Rust stalled → 210 activations vs
+                //   Java's 295).
                 if block_defender_id.is_none() {
                     match pa {
-                        PlayerAction::Block | PlayerAction::Blitz | PlayerAction::Foul => {
+                        PlayerAction::Block | PlayerAction::Blitz | PlayerAction::Foul
+                        | PlayerAction::Pass | PlayerAction::HandOver => {
                             self.end_player_action = true;
                         }
                         _ => {}
@@ -478,15 +488,18 @@ mod tests {
     }
 
     #[test]
-    fn folded_no_target_block_blitz_foul_deselect_not_turn() {
-        // A BLOCK / BLITZ / FOUL declared with no currently-adjacent target (block_defender_id=None)
-        // must END THE PLAYER ACTION (deselect), NOT end the turn — matching Java's ParityRunner
-        // sendBlockAction/sendFoulAction/no-target BLITZ_MOVE, which all inject
-        // ClientCommandActingPlayer(null, null, false) (a bare deselect) when the target pick returns
-        // null, leaving the turn running. amazon seed7 i=19 (no-target BLITZ), amazon seed12 i=20
-        // (home_01 BLOCK whose turn-start-snapshot target moved away — Java continues to Home9, Rust
-        // used to turn over a full activation early because BLOCK wrongly ended the turn here).
-        for action in [PlayerActionChoice::Block, PlayerActionChoice::Blitz, PlayerActionChoice::Foul] {
+    fn folded_no_target_action_deselects_not_turn() {
+        // A BLOCK / BLITZ / FOUL / PASS / HAND-OVER declared with no currently-adjacent target or
+        // receiver (block_defender_id=None) must END THE PLAYER ACTION (deselect), NOT end the turn
+        // (and must not STALL) — matching Java's ParityRunner
+        // sendBlockAction/sendFoulAction/sendPassAction/sendHandOverAction/no-target BLITZ_MOVE, which
+        // all inject ClientCommandActingPlayer(null, null, false) (a bare deselect) when the
+        // target/receiver pick returns null, leaving the turn running. amazon seed7 i=19 (no-target
+        // BLITZ), seed12 i=20 (home_01 BLOCK whose snapshot target moved away → Java continues to
+        // Home9, Rust turned over early), seed23 i=210 (away_01 HAND_OFF no adjacent receiver → Java
+        // continues to Away10, Rust stalled with prompt_after=None → 210 activations vs Java's 295).
+        for action in [PlayerActionChoice::Block, PlayerActionChoice::Blitz, PlayerActionChoice::Foul,
+                       PlayerActionChoice::Pass, PlayerActionChoice::HandOff] {
             let mut game = make_game();
             game.home_playing = true;
             game.team_home.players.push(ffb_model::model::player::Player {
