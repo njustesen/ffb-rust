@@ -127,27 +127,50 @@ impl StepModifierTrait for BoneHeadStepModifier {
             return false;
         }
 
-        // Java: if (BONE_HEAD == reRolledAction && !useReRoll) doRoll = false
-        let mut skip_roll = false;
+        // Java: boolean doRoll = true;
+        //   if (reRolledAction == BONE_HEAD) { doRoll = useReRoll(...); if(!doRoll) cancelAsFailure }
+        //   else doRoll = UtilCards.hasUnusedSkill(actingPlayer, skill);
+        let mut do_roll = true;
+        let mut cancel_as_failure = false;
         if state.re_rolled_action.as_deref() == Some("BONE_HEAD") {
             if let Some(ref source_name) = state.re_roll_source.clone() {
                 let source = ReRollSource::new(source_name.as_str());
                 if !use_reroll(game, &source, &player_id) {
-                    skip_roll = true;
+                    do_roll = false;
+                    cancel_as_failure = true;
                 }
             } else {
-                skip_roll = true; // player declined
+                do_roll = false;
+                cancel_as_failure = true; // player declined
             }
+        } else {
+            // Java: doRoll = UtilCards.hasUnusedSkill(actingPlayer, skill) — Bone Head is rolled
+            // ONCE per activation. Java tracks it on the ACTING PLAYER (fUsedSkills, cleared each
+            // activation by setPlayerId), so a re-entry of StepBoneHead within the same activation
+            // (e.g. a stand-up move that pushes StepId::BoneHead in both the select and move
+            // sub-sequences) must NOT re-roll. This bb2016 behaviour previously rolled
+            // UNCONDITIONALLY (and marked only the persistent Player.used_skills, which it never
+            // checked), so a Big Guy re-rolled Bone Head an extra time per activation — human bb2016
+            // seed1 i=112: away_01 the human Ogre — Java rolled Bone Head once, Rust twice → a 1-die
+            // desync that broke the whole game hash. Mirror the bb2025 fix: gate on the acting
+            // player's per-activation used_skills.
+            do_roll = !game.acting_player.used_skills.contains(&SkillId::BoneHead);
         }
 
-        if skip_roll {
-            let confusion_event = GameEvent::ConfusionRoll { player_id: player_id.clone(), roll: 1, confused: true };
-            cancel_bb2016_negatrait(game, &player_id);
-            state.outcome = Some(
-                StepOutcome::goto(&state.goto_label_on_failure)
-                    .with_event(confusion_event)
-                    .publish(StepParameter::EndPlayerAction(true))
-            );
+        if !do_roll {
+            if cancel_as_failure {
+                let confusion_event = GameEvent::ConfusionRoll { player_id: player_id.clone(), roll: 1, confused: true };
+                cancel_bb2016_negatrait(game, &player_id);
+                state.outcome = Some(
+                    StepOutcome::goto(&state.goto_label_on_failure)
+                        .with_event(confusion_event)
+                        .publish(StepParameter::EndPlayerAction(true))
+                );
+            } else {
+                // Already rolled Bone Head this activation (hasUnusedSkill == false) → Java status
+                // stays SUCCESS → NEXT_STEP: no roll, no report, no cancellation.
+                state.outcome = Some(StepOutcome::next());
+            }
             return false;
         }
 
@@ -156,15 +179,11 @@ impl StepModifierTrait for BoneHeadStepModifier {
         let min_roll = minimum_roll_confusion(true);
         let successful = roll >= min_roll;
 
-        // Java: actingPlayer.markSkillUsed(skill)
-        let is_home = game.team_home.player(&player_id).is_some();
-        if is_home {
-            if let Some(p) = game.team_home.player_mut(&player_id) {
-                p.used_skills.insert(SkillId::BoneHead);
-            }
-        } else if let Some(p) = game.team_away.player_mut(&player_id) {
-            p.used_skills.insert(SkillId::BoneHead);
-        }
+        // Java: actingPlayer.markSkillUsed(skill) — recorded on the ACTING PLAYER (reset each
+        // activation by setPlayerId), NOT the persistent Player, so the hasUnusedSkill guard above
+        // fires per-activation. (Previously marked the persistent Player.used_skills, which was never
+        // checked — leaving the guard ineffective and re-rolling Bone Head within an activation.)
+        game.acting_player.used_skills.insert(SkillId::BoneHead);
 
         let re_rolled = state.re_rolled_action.as_deref() == Some("BONE_HEAD")
             && state.re_roll_source.is_some();
@@ -264,6 +283,42 @@ mod tests {
         cancel_bb2016_negatrait(&mut game, "nobody");
         assert!(game.turn_data_mut().blitz_used);
         assert!(!game.turn_data_mut().ktm_used);
+    }
+
+    /// BB2016: Bone Head is rolled ONCE per activation. A re-entry of StepBoneHead within the same
+    /// activation (Bone Head already in the acting player's per-activation used_skills) must NOT roll
+    /// again — NEXT_STEP, no dice consumed. Regression for the human Ogre double-roll (seed1 i=112).
+    #[test]
+    fn bone_head_not_re_rolled_within_same_activation() {
+        use ffb_model::enums::{TurnMode, PS_STANDING, PlayerState};
+        use ffb_model::util::rng::GameRng;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = test_game();
+        let mut p = ffb_model::model::player::Player::default();
+        p.id = "ogre".into();
+        p.starting_skills.push(SkillWithValue { skill_id: SkillId::BoneHead, value: None });
+        game.team_home.players.push(p);
+        game.field_model.set_player_coordinate("ogre", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("ogre", PlayerState::new(PS_STANDING));
+        game.home_playing = true;
+        game.turn_mode = TurnMode::Regular;
+        game.acting_player.player_id = Some("ogre".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        // Simulate Bone Head already rolled earlier THIS activation.
+        game.acting_player.used_skills.insert(SkillId::BoneHead);
+
+        let m = BoneHeadStepModifier;
+        let mut hook = StepBoneHeadHookState {
+            goto_label_on_failure: "FAIL".into(),
+            re_rolled_action: None, re_roll_source: None, outcome: None,
+            updated_re_rolled_action: None, updated_re_roll_source: None,
+        };
+        let mut rng = GameRng::new(0);
+        let before = rng.call_count;
+        m.handle_execute_step(&mut game, &mut rng, &mut hook);
+        assert_eq!(rng.call_count, before, "Bone Head already used this activation must NOT roll again");
+        assert_eq!(hook.outcome.as_ref().map(|o| o.action), Some(crate::step::framework::StepAction::NextStep));
     }
 
     /// BB2016: ThrowTeamMate action maps to pass_used (not ttm_used as in BB2025)
