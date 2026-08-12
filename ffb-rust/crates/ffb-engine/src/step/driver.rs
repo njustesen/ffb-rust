@@ -378,6 +378,19 @@ pub fn make_step_for(id: StepId, rules: Rules) -> Box<dyn Step> {
             // BB2016 StepSpectators rolls 2D6 per team (spectators + fame via ReportSpectators),
             // vs the mixed BB2020+ single-D3 fan-factor (bb2016 amazon seed 1 pregame divergence).
             StepId::Spectators => return Box::new(crate::step::bb2016::start::StepSpectators::new()),
+            // BB2016 has its own kickoff path: the "Changing Weather → Nice" gust scatters the ball
+            // exactly ONE square (bb2020+/bb2025 scatter up to three, with a different bounds check),
+            // and the kickoff bounds + catch/scatter/throw-in flow differ. Route the whole bb2016
+            // kickoff chain so it matches stock Java (bb2016 amazon seed 1 pos15: Java 1-square gust
+            // then scatterBall d8, vs the bb2025 step's 3-square gust that spuriously touchbacked).
+            StepId::KickoffScatterRoll =>
+                return Box::new(crate::step::bb2016::StepKickoffScatterRoll::new()),
+            StepId::KickoffResultRoll =>
+                return Box::new(crate::step::bb2016::StepKickoffResultRoll::new()),
+            StepId::ApplyKickoffResult =>
+                return Box::new(crate::step::bb2016::StepApplyKickoffResult::new(String::new(), String::new())),
+            StepId::CatchScatterThrowIn =>
+                return Box::new(crate::step::bb2016::StepCatchScatterThrowIn::new()),
             _ => {}
         }
     }
@@ -786,6 +799,11 @@ mod tests {
         // A non-overridden step is identical across editions (delegates to make_step).
         assert_eq!(make_step_for(StepId::Weather, Rules::Bb2016).id(), StepId::Weather);
         assert_eq!(make_step_for(StepId::Weather, Rules::Bb2025).id(), StepId::Weather);
+        // BB2016 kickoff chain (1-square gust etc.) is routed to the bb2016 impls; all round-trip.
+        for id in [StepId::KickoffScatterRoll, StepId::KickoffResultRoll, StepId::ApplyKickoffResult, StepId::CatchScatterThrowIn] {
+            assert_eq!(make_step_for(id, Rules::Bb2016).id(), id, "bb2016 routing of {id:?}");
+            assert_eq!(make_step_for(id, Rules::Bb2025).id(), id, "bb2025 passthrough of {id:?}");
+        }
     }
 
     #[test]
