@@ -155,6 +155,22 @@ mod tests {
     }
 
     #[test]
+    fn bb2016_range_table_shorter_than_bb2020_at_far_corner() {
+        // BB2016's throwing_range_table is shorter at the far corners than BB2020's: (dx=13, dy=2) is
+        // OUT OF RANGE in BB2016 (a trailing space) but LongBomb in BB2020. StepPass must classify a
+        // bb2016 pass this far via THIS table (find_passing_distance → None → thrown with no accuracy
+        // roll), NOT the shared BB2020 `passing_distance` util (which returns LongBomb → rolls the
+        // accuracy die). amazon bb2016 seed56 i=170: home_03's (14,7)->(1,9) pass [dx=13,dy=2] — Java
+        // out-of-range (0 dice), Rust rolled the accuracy die until StepPass used the edition table.
+        let m = PassMechanic::new();
+        let table = m.throwing_range_table();
+        let row = table[2].as_bytes();
+        let char_idx = 13 * 2; // dx=13, chars are space-separated
+        let c = if char_idx < row.len() { row[char_idx] as char } else { ' ' };
+        assert_eq!(c, ' ', "bb2016 (dx=13,dy=2) must be out-of-range (space in the range table), got '{c}'");
+    }
+
+    #[test]
     fn natural_one_without_safe_pass_is_fumble() {
         // Natural 1 always fumbles regardless of SafePass
         let m = PassMechanic::new();

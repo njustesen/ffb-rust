@@ -1,6 +1,5 @@
 use ffb_model::enums::{PassingDistance, PlayerAction, ReRollSource};
 use ffb_model::model::game::Game;
-use ffb_model::util::passing::passing_distance;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::mixed::report_pass_roll::ReportPassRoll;
 use ffb_mechanics::modifiers::modifier_type::ModifierType;
@@ -166,10 +165,17 @@ impl StepPass {
         let thrower_id = game.thrower_id.clone().unwrap();
         let thrower_coord = game.field_model.player_coordinate(&thrower_id);
 
-        // Java: PassMechanic.findPassingDistance(game, throwerCoord, passCoordinate, false)
-        let passing_dist: Option<PassingDistance> = thrower_coord.and_then(|tc| {
-            game.pass_coordinate.and_then(|pc| passing_distance(tc, pc))
-        });
+        // Java: PassMechanic.findPassingDistance(game, throwerCoord, passCoordinate, false) — use the
+        // EDITION's throwing_range_table (via the mechanic), NOT the hardcoded BB2020 `passing_distance`
+        // util. bb2016's range table is shorter at the far corners (e.g. dx=13,dy=2 is out-of-range in
+        // bb2016 but LongBomb in bb2020), so a long pass bb2020 would call LongBomb is OUT OF RANGE in
+        // bb2016 → findPassingDistance returns None → thrown with NO accuracy roll (StepPass rolls 0
+        // dice). amazon bb2016 seed56 i=170: home_03's (14,7)->(1,9) pass — Java (out of range) rolled
+        // 0 dice, Rust (shared bb2020 table said LongBomb) rolled the accuracy die → 2-die desync.
+        // find_passing_distance also applies the Blizzard/TTM Long(Bomb) out-of-range gate (1:1 Java).
+        let passing_dist: Option<PassingDistance> =
+            crate::mechanic::pass_mechanic_for(game.rules)
+                .find_passing_distance(game, thrower_coord, game.pass_coordinate, false);
 
         // Java: PassModifierFactory.findModifiers(new PassContext(game, thrower, passingDistance, false))
         let pass_modifier_total: i32 = {
