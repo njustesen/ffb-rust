@@ -113,7 +113,7 @@ impl StepApplyKickoffResult {
             Some(r) => r,
             None => return StepOutcome::next(),
         };
-        match result {
+        let outcome = match result {
             KickoffResult::GetTheRef => self.handle_get_the_ref(game, rng),
             KickoffResult::Riot => self.handle_riot(game, rng),
             KickoffResult::PerfectDefence => self.handle_perfect_defense(game, rng),
@@ -126,7 +126,23 @@ impl StepApplyKickoffResult {
             KickoffResult::ThrowARock => self.handle_throw_a_rock(game, rng),
             KickoffResult::PitchInvasion => self.handle_pitch_invasion(game, rng),
             _ => StepOutcome::next(),
+        };
+        Self::with_placement_prompt(outcome, game)
+    }
+
+    /// Interactive kickoff events (Quick Snap / Perfect Defence / High Kick / Blitz!) wait for the
+    /// coach with a bare Continue — Java models the interaction via TurnMode and the client reacts;
+    /// headless agents need a prompt. Emit AgentPrompt::KickoffEventPlacement so the agent can
+    /// answer (ParityRunner declines with EndTurn at APPLY_KICKOFF_RESULT). Same bridge as bb2025.
+    fn with_placement_prompt(outcome: StepOutcome, game: &Game) -> StepOutcome {
+        if outcome.action == crate::step::framework::StepAction::Continue && outcome.prompt.is_none() {
+            let mode = format!("{:?}", game.turn_mode);
+            return outcome.with_prompt(ffb_model::prompts::AgentPrompt::KickoffEventPlacement {
+                team_id: game.active_team().id.clone(),
+                mode,
+            });
         }
+        outcome
     }
 
     fn handle_get_the_ref(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
