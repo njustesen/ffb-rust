@@ -274,6 +274,25 @@ impl DodgeModifierFactory {
         let total: i32 = modifiers.iter().map(|m| m.get_modifier()).sum();
         (agility + total).max(2)
     }
+
+    /// Edition-aware dodge minimum. BB2020/BB2025 use the new AG-target scale
+    /// (`max(2, agility + total)`, agility being the target number). BB2016 uses the OLD scale:
+    /// `max(2, getAgilityRollBase(stat) - 1 + total)` where getAgilityRollBase(x) = 7 - min(x,6)
+    /// and `stat` = strength if any applicable modifier is `use_strength`, else agility — a 1:1
+    /// port of bb2016 AgilityMechanic.minimumRollDodge. The two scales coincide only at AG3; for the
+    /// Ogre (AG2) bb2016 gives 4 where the bb2025 formula gives 2, so a shared bb2025 dodge minimum
+    /// let a bb2016 Ogre dodge succeed on rolls Java fails (human bb2016 seed4 i=185: dodge d6=2 —
+    /// Rust min 2 succeeds, Java min 4 fails → fall+turnover).
+    pub fn minimum_roll_edition(strength: i32, agility: i32, modifiers: &[&DodgeModifier], rules: Rules) -> i32 {
+        let total: i32 = modifiers.iter().map(|m| m.get_modifier()).sum();
+        match rules {
+            Rules::Bb2016 => {
+                let stat = if modifiers.iter().any(|m| m.use_strength) { strength } else { agility };
+                ((7 - stat.min(6)) - 1 + total).max(2)
+            }
+            _ => (agility + total).max(2),
+        }
+    }
 }
 
 impl Default for DodgeModifierFactory {
@@ -436,6 +455,27 @@ mod tests {
     #[test]
     fn minimum_roll_never_below_two() {
         assert_eq!(DodgeModifierFactory::minimum_roll(1, &[]), 2);
+    }
+
+    #[test]
+    fn minimum_roll_edition_bb2016_old_scale() {
+        // bb2016 dodge = max(2, (7-min(stat,6)) - 1 + total), stat=strength if any use_strength mod
+        // else agility. Coincides with bb2025 (agility+total) only at AG3.
+        let none: &[&DodgeModifier] = &[];
+        // AG3, no mods: bb2016 (7-3)-1 = 3; bb2025 3 → both 3
+        assert_eq!(DodgeModifierFactory::minimum_roll_edition(5, 3, none, Rules::Bb2016), 3);
+        assert_eq!(DodgeModifierFactory::minimum_roll_edition(5, 3, none, Rules::Bb2025), 3);
+        // AG2 Ogre, no mods: bb2016 (7-2)-1 = 4; bb2025 = 2 (the seed4 divergence)
+        assert_eq!(DodgeModifierFactory::minimum_roll_edition(5, 2, none, Rules::Bb2016), 4);
+        assert_eq!(DodgeModifierFactory::minimum_roll_edition(5, 2, none, Rules::Bb2025), 2);
+        // AG4, no mods: bb2016 (7-4)-1 = 2; bb2025 = 4
+        assert_eq!(DodgeModifierFactory::minimum_roll_edition(3, 4, none, Rules::Bb2016), 2);
+        assert_eq!(DodgeModifierFactory::minimum_roll_edition(3, 4, none, Rules::Bb2025), 4);
+        // bb2016 with 1 tackle zone (AG2): (7-2)-1 + 1 = 5
+        let tz = DodgeModifier::new("1 Tacklezone", 1, ModifierType::TACKLEZONE);
+        assert_eq!(DodgeModifierFactory::minimum_roll_edition(5, 2, &[&tz], Rules::Bb2016), 5);
+        // never below 2 (bb2016 AG6): (7-6)-1 = 0 → max(2,..) = 2
+        assert_eq!(DodgeModifierFactory::minimum_roll_edition(3, 6, none, Rules::Bb2016), 2);
     }
 
     #[test]

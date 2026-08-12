@@ -206,7 +206,12 @@ impl StepMoveDodge {
             let skill_mods = factory.find_skill_modifiers(&ctx);
             let all: Vec<&ffb_mechanics::modifiers::dodge_modifier::DodgeModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
             let agility = game.player(pid).map(|p| p.agility as i32).unwrap_or(3);
-            let min = DodgeModifierFactory::minimum_roll(agility, &all);
+            // BB2016 uses the OLD AG scale for the dodge minimum ((7-stat)-1+total), NOT the shared
+            // bb2025 (agility+total) — see DodgeModifierFactory::minimum_roll_edition. The bb2025
+            // formula let a bb2016 Ogre (AG2) dodge succeed on a 2 (min 2) where Java's bb2016 min is
+            // 4 (human seed4 i=185: fall+turnover in Java, standing in Rust).
+            let strength = game.player(pid).map(|p| p.strength as i32).unwrap_or(3);
+            let min = DodgeModifierFactory::minimum_roll_edition(strength, agility, &all, game.rules);
             let names: Vec<String> = all.iter().map(|m| m.get_report_string().to_string()).collect();
             (min, names)
         } else {

@@ -239,7 +239,10 @@ impl UtilServerPlayerMove {
                 let skill_mods = factory.find_skill_modifiers(&ctx);
                 let all: Vec<&DodgeModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
                 let agility = game.player(&acting_id).map(|p| p.agility as i32).unwrap_or(3);
-                minimum_roll_dodge = DodgeModifierFactory::minimum_roll(agility, &all);
+                // Edition-aware: bb2016 uses the OLD AG scale ((7-stat)-1+total); bb2020/25 use
+                // agility+total. See DodgeModifierFactory::minimum_roll_edition.
+                let strength = game.player(&acting_id).map(|p| p.strength as i32).unwrap_or(3);
+                minimum_roll_dodge = DodgeModifierFactory::minimum_roll_edition(strength, agility, &all, game.rules);
             }
         }
 
