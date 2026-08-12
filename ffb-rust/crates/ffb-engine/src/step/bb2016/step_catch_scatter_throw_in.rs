@@ -577,7 +577,14 @@ impl StepCatchScatterThrowIn {
                 let mods = factory.find_applicable(&ctx);
                 let skill_mods = factory.find_skill_modifiers(&ctx);
                 let all: Vec<&ffb_mechanics::modifiers::catch_modifier::CatchModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
-                CatchModifierFactory::minimum_roll_catch(player, &all)
+                // Edition-aware catch minimum: CatchModifierFactory::minimum_roll_catch hardcodes the
+                // BB2020/BB2025 formula (agility target number, AG3 → 3+). BB2016 uses the OLD AG
+                // scale (7 - AG, AG3 → 4+). Using the bb2025 base made a bb2016 accurate-pass catch
+                // succeed on rolls Java fails (amazon seed8 i=180: catcher AG3, accurate pass -1 →
+                // Rust min 2 vs Java min 3; d6=2 → Rust caught, Java bounced → turnover desync).
+                let modifier_total: i32 = all.iter().map(|m| m.get_modifier()).sum();
+                ffb_mechanics::mechanics::minimum_roll_catch_edition(
+                    player.agility_with_modifiers(), modifier_total, game.rules)
             } else {
                 2
             };
