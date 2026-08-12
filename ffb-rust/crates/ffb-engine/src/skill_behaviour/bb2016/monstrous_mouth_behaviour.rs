@@ -9,7 +9,9 @@ use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
 use crate::skill_behaviour::registry::SkillRegistry;
-use crate::step::bb2025::shared::step_catch_scatter_throw_in::StepCatchHookState;
+// BB2016 routes StepId::CatchScatterThrowIn to the bb2016 StepCatchScatterThrowIn, which
+// dispatches its OWN StepCatchHookState — downcasting to the bb2025-shared type panics.
+use crate::step::bb2016::step_catch_scatter_throw_in::StepCatchHookState;
 use ffb_model::enums::{ReRollSource, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::model::re_rolled_action::ReRolledAction;
