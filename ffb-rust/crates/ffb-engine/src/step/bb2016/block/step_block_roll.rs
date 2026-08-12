@@ -112,16 +112,17 @@ impl StepBlockRoll {
                     GameEvent::Block { defender_id: did.clone() }
                 });
 
-                // Java: showBlockRollDialog(doRoll)
-                // → show dialog (CONTINUE) waiting for block choice
+                // Java: showBlockRollDialog(doRoll) — show the die-selection dialog. The Rust engine
+                // models the dialog as an AgentPrompt::BlockChoice so the agent can answer with
+                // Action::BlockChoice (a bare cont() waits forever — the bb2016 block-sequence stall).
                 self.show_block_roll_dialog(game, true);
-                let mut outcome = StepOutcome::cont();
+                let mut outcome = StepOutcome::cont().with_prompt(self.block_choice_prompt(game));
                 if let Some(ev) = block_event { outcome = outcome.with_event(ev); }
                 return outcome;
             } else {
-                // Java: showBlockRollDialog(doRoll) — re-roll path, show dialog
+                // Java: showBlockRollDialog(doRoll) — re-roll path, re-present the dice for selection.
                 self.show_block_roll_dialog(game, false);
-                return StepOutcome::cont();
+                return StepOutcome::cont().with_prompt(self.block_choice_prompt(game));
             }
         } else {
             // Java: publishParameter(NR_OF_DICE, fNrOfDice)
@@ -135,6 +136,19 @@ impl StepBlockRoll {
                 .publish(StepParameter::BlockRoll(self.block_roll.clone()))
                 .publish(StepParameter::DiceIndex(self.dice_index))
                 .publish(StepParameter::BlockResult(block_result));
+        }
+    }
+
+    /// The DialogBlockRollParameter presented to the coach, as an agent prompt (same bridge as
+    /// bb2025 StepBlockRoll.block_choice_prompt). `own_choice` = the attacking coach picks unless
+    /// the dice are "against" (negative die count → defender's choice).
+    fn block_choice_prompt(&self, game: &Game) -> ffb_model::prompts::AgentPrompt {
+        ffb_model::prompts::AgentPrompt::BlockChoice {
+            attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
+            defender_id: game.defender_id.clone().unwrap_or_default(),
+            dice: self.block_roll.clone(),
+            own_choice: self.nr_of_dice >= 0,
+            nr_of_dice: self.nr_of_dice,
         }
     }
 
