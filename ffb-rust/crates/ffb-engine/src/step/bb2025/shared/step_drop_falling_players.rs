@@ -384,7 +384,21 @@ impl StepDropFallingPlayers {
                 ..DropPlayerContext::new()
             };
 
-            if self.saboteur_triggered_defender {
+            if game.rules == Rules::Bb2016 {
+                // Java bb2016 PilingOnBehaviour: dropPlayer(defender) (line 104) then publish
+                // INJURY_RESULT (line 149) for StepApothecary(DEFENDER) to apply. bb2016 has no
+                // Steady Footing step, so a SteadyFootingContext here would never apply the injury.
+                // drop_player sets the defender PRONE and (if carrying) flags the ball moving; the
+                // ball scatter is a separate later CatchScatterThrowIn step (no RNG consumed here),
+                // so this ordering does not perturb the dice stream.
+                for p in drop_player(game, &defender_id, false) {
+                    out = out.publish(p);
+                }
+                out = out.publish(StepParameter::InjuryResult(injury_result.clone()));
+                if dropped_own_team {
+                    out = out.publish(StepParameter::EndTurn(true));
+                }
+            } else if self.saboteur_triggered_defender {
                 // Bypass Steady Footing — publish DROP_PLAYER_CONTEXT + INJURY_RESULT directly
                 out = out.publish(StepParameter::DropPlayerContext(Box::new(dpc)));
                 out = out.publish(StepParameter::InjuryResult(injury_result.clone()));
@@ -501,6 +515,14 @@ impl StepDropFallingPlayers {
                     let ctx = SteadyFootingContext::from_injury_result_with_commands(
                         injury_result_attacker, vec![cmd]);
                     out = out.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
+                } else if game.rules == Rules::Bb2016 {
+                    // Java bb2016 PilingOnBehaviour publishes INJURY_RESULT for the attacker's own
+                    // fall (line 174); StepApothecary(ATTACKER) applies the injury state. bb2016 has
+                    // no Steady Footing step to unwrap a SteadyFootingContext, so wrapping it there
+                    // left the attacker stuck at the drop_player PRONE state instead of the rolled
+                    // injury (amazon seed1 i=98: home_01 SKULL, armour 8>7 broken, injury 5 → Java
+                    // Stunned, Rust Prone).
+                    out = out.publish(StepParameter::InjuryResult(Box::new(injury_result_attacker)));
                 } else {
                     let ctx = SteadyFootingContext::from_injury_result(injury_result_attacker);
                     out = out.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
@@ -761,7 +783,9 @@ mod tests {
     }
 
     #[test]
-    fn bb2016_no_piling_on_skill_publishes_immediately() {
+    fn bb2016_no_piling_on_skill_publishes_injury_result_not_steady_footing() {
+        // bb2016 has no Steady Footing step; the injury must be published as INJURY_RESULT
+        // (StepApothecary applies it), mirroring Java bb2016 PilingOnBehaviour (line 149).
         let mut game = make_game_with_rules(Rules::Bb2016);
         let coord = FieldCoordinate::new(5, 5);
         add_player(&mut game, "home", "atk", coord, PS_STANDING);
@@ -772,7 +796,12 @@ mod tests {
         let mut step = StepDropFallingPlayers::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))),
+            "bb2016 must publish INJURY_RESULT for StepApothecary");
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))),
+            "bb2016 must NOT wrap the injury in a SteadyFootingContext (no Steady Footing step)");
+        // The defender must be dropped (PRONE) inline, as Java's dropPlayer(defender) does.
+        assert_eq!(game.field_model.player_state("def").unwrap().base(), ffb_model::enums::PS_PRONE);
     }
 
     #[test]
