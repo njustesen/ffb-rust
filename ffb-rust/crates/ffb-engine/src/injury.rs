@@ -576,44 +576,12 @@ impl InjuryTypeServer for InjuryTypeDropFall {
 }
 
 // ── InjuryTypeThrowARock ──────────────────────────────────────────────────────
-
-/// Java: InjuryTypeThrowARock — kickoff event, no turnover, can use apo.
-pub struct InjuryTypeThrowARockImpl {
-    ctx: InjuryContext,
-}
-
-impl InjuryTypeThrowARockImpl {
-    fn new() -> Self {
-        Self { ctx: InjuryContext::new(ApothecaryMode::HitPlayer) }
-    }
-}
-
-impl InjuryTypeServer for InjuryTypeThrowARockImpl {
-    fn handle_injury(
-        &mut self, game: &Game, rng: &mut GameRng,
-        attacker_id: Option<&str>, defender_id: &str,
-        coord: FieldCoordinate, _from_coord: Option<FieldCoordinate>,
-        _old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode,
-    ) {
-        self.ctx.defender_id = Some(defender_id.to_owned());
-        self.ctx.attacker_id = attacker_id.map(str::to_owned);
-        self.ctx.defender_coordinate = Some(coord);
-        self.ctx.apothecary_mode = apo_mode;
-
-        if !self.ctx.armor_broken {
-            do_armor_roll(game, rng, &mut self.ctx, defender_id);
-        }
-        if self.ctx.armor_broken {
-            do_injury_roll(rng, &mut self.ctx, game, defender_id);
-        } else {
-            self.ctx.injury = Some(PlayerState::new(PS_PRONE));
-        }
-    }
-
-    fn injury_context(&self) -> &InjuryContext { &self.ctx }
-    fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn falling_down_causes_turnover(&self) -> bool { false }
-}
+// The stale `InjuryTypeThrowARockImpl` that used to live here (rolled armour, fell to PRONE on a
+// held armour) was the STALLING variant's behaviour, not the kickoff event's, and was removed:
+// `make_injury_type` now dispatches "InjuryTypeThrowARock" to the proper
+// `injuryType::injury_type_throw_a_rock::InjuryTypeThrowARock` (forces armorBroken=true → always
+// rolls injury, matching Java) and "InjuryTypeThrowARockStalling" to
+// `injuryType::injury_type_throw_a_rock_stalling::InjuryTypeThrowARockStalling`.
 
 // ── InjuryTypeTTMLanding ─────────────────────────────────────────────────────
 // The proper translation lives in `injuryType::injury_type_ttm_landing::InjuryTypeTTMLanding`
@@ -712,8 +680,22 @@ pub fn make_injury_type(name: &str) -> Box<dyn InjuryTypeServer> {
             Box::new(injuryType::injury_type_chainsaw::InjuryTypeChainsaw::new()),
         "InjuryTypeChainsawForSpp" =>
             Box::new(injuryType::injury_type_chainsaw_for_spp::InjuryTypeChainsawForSpp::new()),
-        "InjuryTypeThrowARock" | "InjuryTypeThrowARockStalling" =>
-            Box::new(InjuryTypeThrowARockImpl::new()),
+        // Java `InjuryTypeThrowARock` (kickoff-table "Throw a Rock") FORCES armorBroken=true and
+        // always rolls injury (the rock always hurts → Stunned/KO/Cas). The stale
+        // `InjuryTypeThrowARockImpl` below instead ROLLED armour and fell to PRONE when it held —
+        // that's the STALLING variant's behaviour, not the kickoff event's. Same class of bug as the
+        // TTM-landing / DropFall fixes: the proper `injuryType::` translation forces the break and
+        // rolls injury with do_injury_roll_for_player (Stunty/Thick-Skull aware). Without this a
+        // rocked player stayed PRONE+active instead of Stunned (active cleared), so the parity agent
+        // wrongly re-activated it (amazon bb2016 seed9 i=5: Home6 rocked in pregame — Java Stunned→
+        // Prone+inactive, Rust Prone+active → Java skips it / Rust activates it → divergence).
+        "InjuryTypeThrowARock" =>
+            Box::new(injuryType::injury_type_throw_a_rock::InjuryTypeThrowARock::new()),
+        // Java `InjuryTypeThrowARockStalling` (the stalling prayer) genuinely rolls armour first and
+        // falls to PRONE when it holds — the proper translation does the same, but rolls the injury
+        // with do_injury_roll_for_player (Stunty/modifiers) instead of the player-less duplicate.
+        "InjuryTypeThrowARockStalling" =>
+            Box::new(injuryType::injury_type_throw_a_rock_stalling::InjuryTypeThrowARockStalling::new()),
         // Use the full `injuryType::` translation (applies injury modifiers + Stunty via
         // do_injury_roll_for_player, turnover=true, send-to-box=LandingFail), NOT the stale
         // `InjuryTypeTtmLandingImpl` below which rolled the injury with the player-less
@@ -1001,6 +983,32 @@ mod tests {
             }
         }
         panic!("no seed produced a broken-armour injury total of 8 within 3000 tries");
+    }
+
+    #[test]
+    fn make_injury_type_throw_a_rock_always_injures_never_prone() {
+        // Regression (amazon bb2016 seed9 i=5): make_injury_type("InjuryTypeThrowARock") — the
+        // KICKOFF-table "Throw a Rock" — must route to the proper impl that FORCES armorBroken=true
+        // and always rolls injury (Stunned/KO/Cas), matching Java's InjuryTypeThrowARock. The stale
+        // duplicate rolled armour and fell to PRONE when it held (that's the STALLING variant). A high
+        // armour value would never break on a normal roll, so if the result is ever PRONE the wrong
+        // impl is being used. A rocked player must end Stunned (active cleared), else the parity agent
+        // re-activates a player Java leaves inactive.
+        let mut home = crate::step::framework::test_team("home", 0);
+        let mut p = make_player_with_skills("p1", vec![]);
+        p.armour = 11; // a plain armour roll (max 12, needing >11) almost never breaks
+        home.players.push(p);
+        let game = Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2016);
+        for seed in 0u64..200 {
+            let mut ty = make_injury_type("InjuryTypeThrowARock");
+            let mut rng = GameRng::new(seed);
+            ty.handle_injury(&game, &mut rng, None, "p1",
+                FieldCoordinate::new(5, 5), None, None, ffb_model::enums::ApothecaryMode::Home);
+            let base = ty.injury_context().injury.map(|s| s.base());
+            assert_ne!(base, Some(PS_PRONE),
+                "seed {seed}: ThrowARock (kickoff) must force armour broken and roll injury, never PRONE");
+            assert!(base.is_some(), "seed {seed}: ThrowARock must set an injury");
+        }
     }
 
     #[test]
