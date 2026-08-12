@@ -230,14 +230,19 @@ impl Step for StepInitSelecting {
                         _ => {}
                     }
                 }
-                // No-target block/blitz/foul (folded agent found no legal target): mirror the bb2025
-                // harness — no-target BLOCK/BLITZ ends the turn (no extra dice), no-target FOUL
-                // deselects (turn continues). Without this the declare falls through to a bare cont()
-                // and the driver stalls.
+                // No-target block/blitz/foul (folded agent found no legal target).
+                // - BLOCK ends the turn (a bare block with no target is a wasted declaration).
+                // - BLITZ deselects (ends the player action, NO turnover): bb2016 drives a blitz as a
+                //   BLITZ_MOVE (a MOVE variant). When the folded agent has no currently-adjacent block
+                //   target, Java's ParityRunner sends CLIENT_BLITZ_MOVE with NO following CLIENT_BLOCK
+                //   (JAVA_P2 action=BLITZ_MOVE, no JAVA_BLOCK_PICK) — the player just moves/stands, no
+                //   block, and the turn CONTINUES. Rust used to end the turn here (amazon seed7 i=19:
+                //   away_02 BLITZ with no adjacent target — Java continues away's turn, Rust turned
+                //   over). A no-target FOUL likewise deselects.
                 if block_defender_id.is_none() {
                     match pa {
-                        PlayerAction::Block | PlayerAction::Blitz => { self.end_turn = true; }
-                        PlayerAction::Foul => { self.end_player_action = true; }
+                        PlayerAction::Block => { self.end_turn = true; }
+                        PlayerAction::Blitz | PlayerAction::Foul => { self.end_player_action = true; }
                         _ => {}
                     }
                 }
@@ -464,6 +469,35 @@ mod tests {
             "must publish the folded block target, got {:?}", out.published);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(Some(PlayerAction::Block)))),
             "must dispatch Block");
+    }
+
+    #[test]
+    fn folded_no_target_blitz_ends_player_action_not_turn() {
+        // A BLITZ declared with no currently-adjacent block target (block_defender_id=None) must
+        // END THE PLAYER ACTION (deselect), NOT end the turn: bb2016 drives a blitz as a BLITZ_MOVE,
+        // and Java's ParityRunner sends CLIENT_BLITZ_MOVE with no following CLIENT_BLOCK (no turnover)
+        // — amazon seed7 i=19. A no-target BLOCK, by contrast, ends the turn.
+        let mut game = make_game();
+        game.home_playing = true;
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: "blitzer".into(), name: "blitzer".into(), nr: 1, position_id: "lineman".into(),
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8, ..Default::default() });
+        game.field_model.set_player_coordinate("blitzer", ffb_model::types::FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("blitzer", ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING));
+        let mut step = StepInitSelecting::new("end".into());
+        let out = step.handle_command(
+            &Action::ActivatePlayer {
+                player_id: "blitzer".into(),
+                player_action: PlayerActionChoice::Blitz,
+                block_defender_id: None,
+            },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))),
+            "no-target blitz must publish END_PLAYER_ACTION (deselect), got {:?}", out.published);
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "no-target blitz must NOT end the turn");
     }
 
     #[test]
