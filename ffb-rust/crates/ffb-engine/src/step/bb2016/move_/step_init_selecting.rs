@@ -64,12 +64,33 @@ impl Default for StepInitSelecting {
 impl Step for StepInitSelecting {
     fn id(&self) -> StepId { StepId::InitSelecting }
 
-    fn start(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    fn start(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: if (fUpdatePersistence) { fUpdatePersistence=false; gameCache.queueDbUpdate(...); }
         // no-op: headless engine has no DB layer; gameCache.queueDbUpdate is skipped
         self.update_persistence = false;
-        // start() does NOT call executeStep — waits for a client command
+        // Java start() waits for a client CLIENT_ACTING_PLAYER. The Rust engine models that "wait"
+        // as an AgentPrompt (same bridge every bb2025 step uses — CLAUDE.md Engine output channels),
+        // so the agent can drive the bb2016 two-command activation. Mirror bb2025 StepInitSelecting:
+        // record the previous activation as "acted" (Java UtilActingPlayer.changeActingPlayer /
+        // hasActed()) so the eligible list shrinks, clear it, then emit the activation prompt.
+        if game.acting_player.player_id.is_some() {
+            let acted = game.acting_player.has_moved
+                || game.acting_player.has_fouled
+                || game.acting_player.has_blocked
+                || game.acting_player.has_passed
+                || game.acting_player.has_triggered_effect
+                || game.acting_player.forgone;
+            if acted {
+                if let Some(pid) = game.acting_player.player_id.clone() {
+                    let td = if game.home_playing { &mut game.turn_data_home } else { &mut game.turn_data_away };
+                    if !td.acted_player_ids.contains(&pid) { td.acted_player_ids.push(pid); }
+                }
+            }
+            game.acting_player.clear();
+        }
+        let eligible = crate::legal_actions::eligible_players_for_activation(game);
         StepOutcome::cont()
+            .with_prompt(ffb_model::prompts::AgentPrompt::ActivatePlayer { eligible_players: eligible })
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
@@ -190,6 +211,17 @@ impl Step for StepInitSelecting {
                             return self.execute_step(game, rng)
                                 .publish(StepParameter::FoulDefenderId(def.clone()));
                         }
+                        _ => {}
+                    }
+                }
+                // No-target block/blitz/foul (folded agent found no legal target): mirror the bb2025
+                // harness — no-target BLOCK/BLITZ ends the turn (no extra dice), no-target FOUL
+                // deselects (turn continues). Without this the declare falls through to a bare cont()
+                // and the driver stalls.
+                if block_defender_id.is_none() {
+                    match pa {
+                        PlayerAction::Block | PlayerAction::Blitz => { self.end_turn = true; }
+                        PlayerAction::Foul => { self.end_player_action = true; }
                         _ => {}
                     }
                 }

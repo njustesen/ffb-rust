@@ -391,6 +391,54 @@ pub fn make_step_for(id: StepId, rules: Rules) -> Box<dyn Step> {
                 return Box::new(crate::step::bb2016::StepApplyKickoffResult::new(String::new(), String::new())),
             StepId::CatchScatterThrowIn =>
                 return Box::new(crate::step::bb2016::StepCatchScatterThrowIn::new()),
+            // ── BB2016 activation / move / block / foul step-set (approach A: 1:1 bb2016 steps,
+            // completed with the AgentPrompt bridge) ─────────────────────────────────────────────
+            StepId::InitSelecting =>
+                return Box::new(crate::step::bb2016::move_::step_init_selecting::StepInitSelecting::new(String::new())),
+            StepId::InitMoving =>
+                return Box::new(crate::step::bb2016::move_::step_init_moving::StepInitMoving::new(String::new())),
+            StepId::Move =>
+                return Box::new(crate::step::bb2016::move_::step_move::StepMove::new()),
+            StepId::MoveDodge =>
+                return Box::new(crate::step::bb2016::move_::step_move_dodge::StepMoveDodge::new(String::new())),
+            StepId::GoForIt =>
+                return Box::new(crate::step::bb2016::move_::step_go_for_it::StepGoForIt::new(String::new())),
+            StepId::Jump =>
+                return Box::new(crate::step::bb2016::move_::step_jump::StepJump::new(String::new())),
+            StepId::HypnoticGaze =>
+                return Box::new(crate::step::bb2016::move_::step_hypnotic_gaze::StepHypnoticGaze::new(String::new())),
+            StepId::EndMoving =>
+                return Box::new(crate::step::bb2016::move_::step_end_moving::StepEndMoving::new()),
+            StepId::EndSelecting =>
+                return Box::new(crate::step::bb2016::move_::step_end_selecting::StepEndSelecting::new()),
+            StepId::InitBlocking =>
+                return Box::new(crate::step::bb2016::StepInitBlocking::new()),
+            StepId::BlockRoll =>
+                return Box::new(crate::step::bb2016::block::step_block_roll::StepBlockRoll::new()),
+            StepId::BlockChoice =>
+                return Box::new(crate::step::bb2016::block::step_block_choice::StepBlockChoice::new()),
+            StepId::BlockDodge =>
+                return Box::new(crate::step::bb2016::block::step_block_dodge::StepBlockDodge::new()),
+            StepId::BothDown =>
+                return Box::new(crate::step::bb2016::block::step_both_down::StepBothDown::new()),
+            StepId::Followup =>
+                return Box::new(crate::step::bb2016::block::step_followup::StepFollowup::new()),
+            StepId::EndBlocking =>
+                return Box::new(crate::step::bb2016::block::step_end_blocking::StepEndBlocking::new()),
+            StepId::Pushback =>
+                return Box::new(crate::step::bb2016::StepPushback::new()),
+            StepId::Foul =>
+                return Box::new(crate::step::bb2016::foul::step_foul::StepFoul::new()),
+            StepId::InitFouling =>
+                return Box::new(crate::step::bb2016::foul::step_init_fouling::StepInitFouling::new()),
+            StepId::EndFouling =>
+                return Box::new(crate::step::bb2016::foul::step_end_fouling::StepEndFouling::new()),
+            StepId::EjectPlayer =>
+                return Box::new(crate::step::bb2016::foul::step_eject_player::StepEjectPlayer::new()),
+            StepId::FallDown =>
+                return Box::new(crate::step::bb2016::StepFallDown::new()),
+            StepId::PickUp =>
+                return Box::new(crate::step::bb2016::step_pick_up::StepPickUp::new(String::new())),
             _ => {}
         }
     }
