@@ -6,9 +6,10 @@
 ///
 /// Java: executeStep() calls executeStepHooks(this, state) which dispatches to
 /// DodgeBehaviour (BB2016). The hook logic is inlined here for headless translation.
-use ffb_model::enums::{PlayerState, PS_FALLING};
+use ffb_model::enums::{PlayerState, SkillId, PS_FALLING};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::prompts::agent_prompt::AgentPrompt;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -28,44 +29,45 @@ pub struct StepState {
 /// Java: `StepBlockDodge` (bb2016/block).
 pub struct StepBlockDodge {
     pub state: StepState,
-    /// Java: `askForSkill` — None until computed; true = dodge dialog needed.
-    ask_for_skill: Option<bool>,
 }
 
 impl StepBlockDodge {
     pub fn new() -> Self {
         Self {
             state: StepState::default(),
-            ask_for_skill: None,
         }
     }
 
-    /// Java: DodgeBehaviour.findDodgeChoice() — returns true when a dodge-choice dialog is needed.
+    /// Java: `DodgeBehaviour.findDodgeChoice()` — decides `state.usingDodge` when it is still null.
     ///
-    /// True when any regular pushback square is occupied (chain-push risk),
-    /// any square is near a sideline/endzone, or would cross the midfield line on the
-    /// first turn after kickoff.
-    fn find_dodge_choice(game: &Game) -> bool {
+    /// Returns the tri-state that Java assigns to `usingDodge`:
+    /// * `Some(false)` when the starting pushback square cannot be computed
+    ///   (Java: `startingSquare == null` → `usingDodge = false`, "should not happen").
+    /// * `Some(true)` when there is no chain-push / sideline / attacker-half risk
+    ///   (Java: `usingDodge = true` — auto-use dodge, defender stays standing).
+    /// * `None` when a risk exists → Java leaves `usingDodge` null and shows the
+    ///   `DialogSkillUseParameter` dialog (headless: emit `AgentPrompt::SkillUse`).
+    fn find_dodge_choice(game: &Game) -> Option<bool> {
         let attacker_id = match &game.acting_player.player_id {
             Some(id) => id.clone(),
-            None => return false,
+            None => return Some(false),
         };
         let defender_id = match &game.defender_id {
             Some(id) => id.clone(),
-            None => return false,
+            None => return Some(false),
         };
         let attacker_coord = match game.field_model.player_coordinate(&attacker_id) {
             Some(c) => c,
-            None => return false,
+            None => return Some(false),
         };
         let defender_coord = match game.field_model.player_coordinate(&defender_id) {
             Some(c) => c,
-            None => return false,
+            None => return Some(false),
         };
 
         let starting_square = match UtilServerPushback::find_starting_square(attacker_coord, defender_coord, game.home_playing) {
             Some(sq) => sq,
-            None => return false,
+            None => return Some(false),
         };
 
         let home_choice = game.home_playing;
@@ -118,26 +120,41 @@ impl StepBlockDodge {
             }
         });
 
-        chain_push || sideline_push || attacker_half_push
+        // Java: `usingDodge = true` when no risk; otherwise leave null → dialog.
+        if !chain_push && !sideline_push && !attacker_half_push {
+            Some(true)
+        } else {
+            None
+        }
     }
 
     fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
-        // Java: DodgeBehaviour.handleExecuteStepHook step 1: lazy-compute ask_for_skill
-        if self.ask_for_skill.is_none() {
-            self.ask_for_skill = Some(Self::find_dodge_choice(game));
+        // Java: DodgeBehaviour.handleExecuteStepHook → findDodgeChoice(step, state).
+        // Only decides when usingDodge is still null (a command may already have set it).
+        if self.state.using_dodge.is_none() {
+            self.state.using_dodge = Self::find_dodge_choice(game);
         }
 
-        // Java: UtilServerDialog.hideDialog + check usingDodge.
-        // If usingDodge == null and ask_for_skill == true: show dialog (server-side: skip / auto-decide).
-        // Headless path: no dialog → using_dodge stays None → treated as false.
-        let using_dodge = self.state.using_dodge.unwrap_or_else(|| {
-            // Auto-decision when no dialog: if no risk, auto-use dodge (safe to keep standing).
-            !self.ask_for_skill.unwrap_or(false)
-        });
+        // Java: if usingDodge == null → UtilServerDialog.showDialog(DialogSkillUseParameter(defenderId, Dodge)).
+        // Headless: emit AgentPrompt::SkillUse so the agent answers (ParityRunner always USES Dodge;
+        // random_agent's SkillUse default is use_skill:true) → matches Java's dialog answer.
+        let using_dodge = match self.state.using_dodge {
+            Some(v) => v,
+            None => {
+                let defender_id = match game.defender_id.clone() {
+                    Some(id) => id,
+                    None => return StepOutcome::next(),
+                };
+                return StepOutcome::cont().with_prompt(AgentPrompt::SkillUse {
+                    player_id: defender_id,
+                    skill_id: SkillId::Dodge as u16,
+                    skill_name: format!("{:?}", SkillId::Dodge),
+                });
+            }
+        };
 
         // Java: addReport(ReportSkillUse(defenderId, Dodge, usingDodge, AVOID_FALLING))
         if let Some(ref defender_id) = game.defender_id {
-            use ffb_model::enums::SkillId;
             use ffb_model::model::skill_use::SkillUse;
             use ffb_model::report::report_skill_use::ReportSkillUse;
             game.report_list.add(ReportSkillUse::new(
@@ -309,8 +326,9 @@ mod tests {
     }
 
     #[test]
-    fn sideline_push_risk_auto_decides_no_dodge() {
-        // Defender near sideline → ask_for_skill = true → auto-decides false (risk path)
+    fn sideline_push_risk_emits_skill_use_prompt() {
+        // Defender near sideline → Java leaves usingDodge null → showDialog.
+        // Headless: emit AgentPrompt::SkillUse (agent answers use=true) — NOT auto-decide no-dodge.
         let mut step = StepBlockDodge::new();
 
         let mut game = make_game();
@@ -321,13 +339,17 @@ mod tests {
         game.acting_player.player_id = Some("att".into());
         game.defender_id = Some("def".into());
 
-        step.start(&mut game, &mut GameRng::new(0));
-        // ask_for_skill should be true (sideline risk detected)
-        assert_eq!(step.ask_for_skill, Some(true));
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            matches!(out.prompt, Some(AgentPrompt::SkillUse { ref skill_name, .. }) if skill_name == "Dodge"),
+            "sideline-push risk should emit a Dodge SkillUse prompt, got {:?}", out.prompt
+        );
+        // usingDodge must stay undecided until the agent answers.
+        assert_eq!(step.state.using_dodge, None);
     }
 
     #[test]
-    fn chain_push_risk_auto_decides_no_dodge() {
+    fn chain_push_risk_emits_skill_use_prompt() {
         let mut step = StepBlockDodge::new();
         let mut game = make_game();
         game.home_playing = true;
@@ -338,8 +360,43 @@ mod tests {
         game.acting_player.player_id = Some("att".into());
         game.defender_id = Some("def".into());
 
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            matches!(out.prompt, Some(AgentPrompt::SkillUse { ref skill_name, .. }) if skill_name == "Dodge"),
+            "chain-push risk should emit a Dodge SkillUse prompt, got {:?}", out.prompt
+        );
+        assert_eq!(step.state.using_dodge, None);
+    }
+
+    #[test]
+    fn chain_push_risk_then_agent_uses_dodge_restores_standing() {
+        // Full risk path: prompt emitted, agent answers use_skill=true (as ParityRunner does)
+        // → defender restored to its old (standing) state, not knocked down.
+        use ffb_mechanics::skills::SkillId as MechSkillId;
+        let mut step = StepBlockDodge::new();
+        step.state.old_defender_state = Some(PlayerState::new(PS_STANDING));
+        let mut game = make_game();
+        game.home_playing = true;
+        add_player(&mut game, true, "att", FieldCoordinate::new(10, 7), PS_STANDING);
+        add_player(&mut game, false, "def", FieldCoordinate::new(10, 8), PS_STANDING);
+        add_player(&mut game, false, "blocker", FieldCoordinate::new(10, 9), PS_STANDING);
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("def".into());
+
+        // Defender starts knocked-down (block result set FALLING before the dodge check).
+        game.field_model.set_player_state("def", PlayerState::new(PS_FALLING));
+
         step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(step.ask_for_skill, Some(true));
+        step.handle_command(
+            &Action::UseSkill { skill_id: MechSkillId::Dodge, use_skill: true },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert_eq!(
+            game.field_model.player_state("def").unwrap().base(),
+            PS_STANDING,
+            "agent-used Dodge on a risk push should restore the defender to standing"
+        );
     }
 
     #[test]
