@@ -113,6 +113,20 @@ impl PickupModifierFactory {
         let total: i32 = modifiers.iter().map(|m| m.get_modifier()).sum();
         (agility + total).max(2)
     }
+
+    /// Edition-aware pickup minimum. BB2020/BB2025: `max(2, agility + total)` (AG is the target).
+    /// BB2016 (AgilityMechanic.minimumRollPickup): `max(2, getAgilityRollBase(AG) - 1 + total)` with
+    /// getAgilityRollBase(x)=7-min(x,6). Same old-vs-new AG-scale split as dodge/catch — coincides
+    /// only at AG3; a bb2016 Ogre (AG2) picks up on 4+ (bb2016) vs 2+ (bb2025). Pickup has no
+    /// use_strength substitution. (human bb2016 seed5 i=152: the Ogre's pickup d6=4 — Rust min 2
+    /// succeeded and kept the ball, Java min 4 failed → ball scatters → turnover → new drive.)
+    pub fn minimum_roll_edition(agility: i32, modifiers: &[&PickupModifier], rules: Rules) -> i32 {
+        let total: i32 = modifiers.iter().map(|m| m.get_modifier()).sum();
+        match rules {
+            Rules::Bb2016 => ((7 - agility.min(6)) - 1 + total).max(2),
+            _ => (agility + total).max(2),
+        }
+    }
 }
 
 impl Default for PickupModifierFactory {
@@ -199,6 +213,21 @@ mod tests {
     fn minimum_roll_no_modifiers() {
         // agility 3, no modifiers → max(2, 3) = 3
         assert_eq!(PickupModifierFactory::minimum_roll(3, &[]), 3);
+    }
+
+    #[test]
+    fn minimum_roll_edition_bb2016_old_scale() {
+        use ffb_model::enums::Rules;
+        let none: &[&PickupModifier] = &[];
+        // AG3 coincides: bb2016 (7-3)-1=3, bb2025 3
+        assert_eq!(PickupModifierFactory::minimum_roll_edition(3, none, Rules::Bb2016), 3);
+        assert_eq!(PickupModifierFactory::minimum_roll_edition(3, none, Rules::Bb2025), 3);
+        // AG2 Ogre: bb2016 (7-2)-1=4 vs bb2025 2 (the seed5 divergence)
+        assert_eq!(PickupModifierFactory::minimum_roll_edition(2, none, Rules::Bb2016), 4);
+        assert_eq!(PickupModifierFactory::minimum_roll_edition(2, none, Rules::Bb2025), 2);
+        // AG4: bb2016 (7-4)-1=2 vs bb2025 4
+        assert_eq!(PickupModifierFactory::minimum_roll_edition(4, none, Rules::Bb2016), 2);
+        assert_eq!(PickupModifierFactory::minimum_roll_edition(4, none, Rules::Bb2025), 4);
     }
 
     #[test]

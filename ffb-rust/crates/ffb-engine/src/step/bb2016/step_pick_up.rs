@@ -142,7 +142,11 @@ impl StepPickUp {
                 let skill_mods = factory.find_skill_modifiers(&ctx);
                 let all: Vec<&ffb_mechanics::modifiers::pickup_modifier::PickupModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
                 let agility = player.agility as i32;
-                PickupModifierFactory::minimum_roll(agility, &all)
+                // BB2016 uses the OLD AG scale for the pickup minimum ((7-AG)-1+total), not the
+                // shared bb2025 (agility+total) — see PickupModifierFactory::minimum_roll_edition.
+                // (human seed5 i=152: the AG2 Ogre picked up on a 4 in Rust — min 2 — where Java's
+                // bb2016 min is 4 → failed pickup, ball scatters, turnover.)
+                PickupModifierFactory::minimum_roll_edition(agility, &all, game.rules)
             } else {
                 2
             }

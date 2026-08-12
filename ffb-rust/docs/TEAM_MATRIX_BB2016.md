@@ -23,7 +23,7 @@ steps/`make_injury_type`). Remaining rosters are being driven green next, in tur
 | `goblin` | 🔴 0/100 | seed 1, step 0, java 384ccaed1d572749 vs rust 25663191654d6a64 |  |
 | `halfling` | 🔴 0/100 | seed 1, step 0, java 384ccaed1d572749 vs rust 9849f4d5573e6c4c |  |
 | `high_elf` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust a589c17c4bbe3bb2 |  |
-| `human` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 1dfa1acf276f161c |  |
+| `human` | 🟢 100/100 | — | driven to full parity 2026-08-12 (Bone Head per-activation; bb2016 dodge & pickup old AG scale) |
 | `khemri` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust d30a52f6c35d68d7 |  |
 | `khemri_fumbbl` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust d30a52f6c35d68d7 | FUMBBL-legacy roster |
 | `lizardman` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 83476186efcafb2f |  |
