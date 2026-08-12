@@ -47,6 +47,13 @@ pub struct StepPushback {
     pub standing_firm: HashMap<String, bool>,
     /// Java: pushbackStack — (playerId, coordinate) pairs (LIFO).
     pub pushback_stack: Vec<(String, FieldCoordinate)>,
+    /// Java: state.defender — the player CURRENTLY being pushed. For a chain push (the previous
+    /// player was pushed onto an occupied square) this is the OCCUPANT of that square, recomputed
+    /// each iteration (StepPushback.java line 168: `state.defender = fieldModel.getPlayer(
+    /// defenderCoordinate)`). It is step-local, distinct from `game.defender_id` (the block's
+    /// defender / injury target), so the chain push moves the right occupant while the injury
+    /// still lands on the original defender.
+    pub defender_id: Option<String>,
 }
 
 impl StepPushback {
@@ -58,6 +65,7 @@ impl StepPushback {
             side_stepping: HashMap::new(),
             standing_firm: HashMap::new(),
             pushback_stack: Vec::new(),
+            defender_id: None,
         }
     }
 }
@@ -75,9 +83,12 @@ impl Step for StepPushback {
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         if let Action::PushTo { coord } = action {
-            // Java: CLIENT_PUSHBACK — pushbackStack.push(pushback [.transform()])
-            if let Some(defender_id) = game.defender_id.clone() {
-                self.pushback_stack.push((defender_id, *coord));
+            // Java: CLIENT_PUSHBACK — pushbackStack.push(pushback). The pushed player is the current
+            // step-local defender (the occupant computed in execute_step), NOT game.defender_id: a
+            // chain push moves the OCCUPANT of the square, not the block's original defender.
+            let pushed = self.defender_id.clone().or_else(|| game.defender_id.clone());
+            if let Some(pushed_id) = pushed {
+                self.pushback_stack.push((pushed_id, *coord));
             }
         }
         self.execute_step(game, rng)
@@ -118,7 +129,17 @@ impl StepPushback {
         if !do_push {
             if let Some(starting_sq) = self.starting_pushback_square {
                 let defender_coord = starting_sq.coordinate;
-                let defender_id = game.defender_id.clone().unwrap_or_default();
+                // Java: state.defender = fieldModel.getPlayer(defenderCoordinate). The player being
+                // pushed from this square is its OCCUPANT — the block's defender on the first push
+                // (it still sits on its own square), or the chain-push victim when a prior push
+                // landed on an occupied square. Using game.defender_id instead re-pushed the ORIGINAL
+                // defender a second time and never moved the occupant (norse bb2016 seed43 i=25:
+                // away_03 pushes home_03 onto home_02's square; Java chain-pushes home_02 to (11,5),
+                // Rust left home_02 put and pushed home_03 twice).
+                let defender_id = game.field_model.player_at(defender_coord)
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| game.defender_id.clone().unwrap_or_default());
+                self.defender_id = Some(defender_id.clone());
 
                 let home_choice = game.home_playing;
                 let occupied = |c: FieldCoordinate| game.field_model.player_at(c).is_some();
@@ -218,7 +239,9 @@ impl StepPushback {
                     .collect();
                 return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::Pushback {
                     attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
-                    defender_id: game.defender_id.clone().unwrap_or_default(),
+                    // The player being pushed is the step-local defender (occupant), not the block's
+                    // original defender — matters for a chain push.
+                    defender_id: self.defender_id.clone().unwrap_or_default(),
                     squares,
                 });
             }
@@ -226,7 +249,11 @@ impl StepPushback {
 
         // Java: if (state.doPush) { ... }
         if do_push {
-            let pushes: Vec<(String, FieldCoordinate)> = self.pushback_stack.drain(..).collect();
+            // Java: `while (pushbackStack.size() > 0) { pushback = pushbackStack.pop(); ... }` — LIFO.
+            // The chain is applied outermost-first (the last-pushed occupant vacates before the
+            // player pushed onto its square arrives), so drain in REVERSE push order.
+            let pushes: Vec<(String, FieldCoordinate)> =
+                self.pushback_stack.drain(..).rev().collect();
             let mut extra: Vec<StepParameter> = Vec::new();
             for (player_id, coord) in pushes {
                 extra.extend(push_player(game, &player_id, coord));
@@ -326,6 +353,30 @@ mod tests {
         );
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::DefenderPushed(true))));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    /// Chain push: a player pushed onto an occupied square chain-pushes the OCCUPANT, not the
+    /// block's original defender. handle_command records the step-local `defender_id` (occupant),
+    /// so the apply moves the occupant. Regression for norse bb2016 seed43 i=25 (away_03 pushes
+    /// home_03 onto home_02 → Java chain-pushes home_02 to (11,5), Rust had re-pushed home_03).
+    #[test]
+    fn chain_push_moves_step_local_occupant_not_block_defender() {
+        let mut step = StepPushback::new();
+        let target = FieldCoordinate::new(11, 5); // empty → do_push applies the stack
+        let mut game = make_game();
+        game.defender_id = Some("home_03".into());   // block's defender (injury target) — must NOT move
+        step.defender_id = Some("home_02".into());   // the occupant being chain-pushed
+        game.field_model.set_player_coordinate("home_02", FieldCoordinate::new(12, 6));
+        game.field_model.set_player_coordinate("home_03", FieldCoordinate::new(13, 7));
+        step.handle_command(
+            &crate::action::Action::PushTo { coord: target },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert_eq!(game.field_model.player_coordinate("home_02"), Some(target),
+            "the occupant (step-local defender) must be pushed to the chosen square");
+        assert_eq!(game.field_model.player_coordinate("home_03"), Some(FieldCoordinate::new(13, 7)),
+            "the block's original defender must NOT be moved by the chain push");
     }
 
     #[test]

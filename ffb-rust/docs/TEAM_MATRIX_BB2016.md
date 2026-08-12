@@ -29,7 +29,7 @@ steps/`make_injury_type`). Remaining rosters are being driven green next, in tur
 | `lizardman` | 🟢 100/100 | — | GREEN with no roster-specific fix — cleared by the shared amazon/human bb2016 fixes (AG-scale dodge/catch/pickup + Bone Head per-activation) |
 | `necromantic` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 10bfe73abb533f6e |  |
 | `nippon` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 96e1d188b6c11c4b | FUMBBL-legacy roster |
-| `norse` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 71716983c04ccfdb |  |
+| `norse` | 🟢 100/100 | — | driven to full parity 2026-08-12 (Snow Troll Wild Animal per-activation + prone-cancel via old_player_state; Claw armour cap bb2016=7 not 8; bb2016 chain-push moves the occupant not the block defender) |
 | `nurgle` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 5a30154de20c0ab7 |  |
 | `ogre` | 🔴 0/100 | seed 1, step 0, java f17d2e4bc0c146e5 vs rust d6ef3f4659806499 |  |
 | `orc` | 🟢 100/100 | — | driven to full parity 2026-08-12 (Really Stupid per-activation + bb2016 RightStuff routing) |
@@ -42,7 +42,7 @@ steps/`make_injury_type`). Remaining rosters are being driven green next, in tur
 | `vampire` | 🔴 0/100 | seed 1, step 0, java e752f3f1ca886d11 vs rust 475b6b600c40ec85 |  |
 | `wood_elf` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust fecd448eb2f10080 |  |
 
-**0 green / 30 red of 30.**
+**5 green / 25 red of 30** (as of 2026-08-12: amazon, human, lizardman, orc, norse driven to full parity; the remaining rows' "step 0 / seed 1" divergences are STALE pre-campaign snapshots).
 
 ## Analysis (recorded, not fixed — task scope)
 
