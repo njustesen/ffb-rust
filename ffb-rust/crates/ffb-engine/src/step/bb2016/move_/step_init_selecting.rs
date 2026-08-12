@@ -227,6 +227,26 @@ impl Step for StepInitSelecting {
                             }
                             return out;
                         }
+                        // THROW / KICK TEAM-MATE: the folded agent supplies the THROWN/KICKED teammate
+                        // (a player id) in block_defender_id (chosen from legal_throw/kick_team_mate_targets,
+                        // 1 actionRng — mirroring ParityRunner.sendThrowTeamMateAction). The TARGET SQUARE
+                        // is chosen later, on the ThrowTeamMateTarget prompt (StepInitThrowTeamMate emits
+                        // it). Dispatch here (goto END_SELECTING with DISPATCH_PLAYER_ACTION so
+                        // StepEndSelecting pushes the TTM/KTM sequence), publishing the thrown/kicked
+                        // player id — exactly like the Action::ThrowTeamMate/KickTeamMate command arms.
+                        // Without this arm a folded TTM fell through to a bare execute_step that emitted
+                        // NO prompt (prompt_after=None), stalling the game (human bb2016 seed1 i=9: the
+                        // Ogre home_01's THROW_TEAM_MATE — Java throws & continues, Rust stalled).
+                        PlayerAction::ThrowTeamMate => {
+                            self.dispatch_player_action = Some(PlayerAction::ThrowTeamMate);
+                            return self.execute_step(game, rng)
+                                .publish(StepParameter::ThrownPlayerId(Some(def.clone())));
+                        }
+                        PlayerAction::KickTeamMate => {
+                            self.dispatch_player_action = Some(PlayerAction::KickTeamMate);
+                            return self.execute_step(game, rng)
+                                .publish(StepParameter::KickedPlayerId(Some(def.clone())));
+                        }
                         _ => {}
                     }
                 }
@@ -253,10 +273,19 @@ impl Step for StepInitSelecting {
                 //   the game (amazon bb2016 seed23 i=210: away_01 HAND_OFF, no adjacent receiver — Java
                 //   deselects and continues away's turn to Away10, Rust stalled → 210 activations vs
                 //   Java's 295).
+                //   THROW / KICK TEAM-MATE with no legal thrown/kicked teammate deselect too: both the
+                //   eligible-list builder (hasAdjacentTeammate, no Right-Stuff filter) and Java's
+                //   sendThrowTeamMateAction can disagree — the action is OFFERED when any teammate is
+                //   adjacent, but the thrown-player list requires canBeThrown (Right Stuff). A team
+                //   with a Throw-Team-Mate Big Guy but no Right-Stuff teammate (e.g. a human Ogre)
+                //   offers TTM, finds no canBeThrown target, and Java injects
+                //   ClientCommandActingPlayer(null) (deselect, turn continues). human bb2016 seed1 i=9:
+                //   the Ogre home_01's THROW_TEAM_MATE — Java deselects and continues, Rust stalled.
                 if block_defender_id.is_none() {
                     match pa {
                         PlayerAction::Block | PlayerAction::Blitz | PlayerAction::Foul
-                        | PlayerAction::Pass | PlayerAction::HandOver => {
+                        | PlayerAction::Pass | PlayerAction::HandOver
+                        | PlayerAction::ThrowTeamMate | PlayerAction::KickTeamMate => {
                             self.end_player_action = true;
                         }
                         _ => {}
@@ -499,7 +528,8 @@ mod tests {
         // Home9, Rust turned over early), seed23 i=210 (away_01 HAND_OFF no adjacent receiver → Java
         // continues to Away10, Rust stalled with prompt_after=None → 210 activations vs Java's 295).
         for action in [PlayerActionChoice::Block, PlayerActionChoice::Blitz, PlayerActionChoice::Foul,
-                       PlayerActionChoice::Pass, PlayerActionChoice::HandOff] {
+                       PlayerActionChoice::Pass, PlayerActionChoice::HandOff,
+                       PlayerActionChoice::ThrowTeamMate, PlayerActionChoice::KickTeamMate] {
             let mut game = make_game();
             game.home_playing = true;
             game.team_home.players.push(ffb_model::model::player::Player {
