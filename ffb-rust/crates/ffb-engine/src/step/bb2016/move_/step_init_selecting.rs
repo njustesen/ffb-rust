@@ -228,10 +228,24 @@ impl StepInitSelecting {
         self.prepare_standing_up(game);
         let action = game.acting_player.player_action;
         if matches!(action, Some(PlayerAction::RemoveConfusion) | Some(PlayerAction::StandUp) | Some(PlayerAction::StandUpBlitz)) {
-            StepOutcome::next()
-        } else {
-            StepOutcome::cont()
+            return StepOutcome::next();
         }
+        // BB2016 two-command activation: a player has been DECLARED (acting_player + action set)
+        // but no DISPATCH command has arrived yet (dispatch_player_action == None). Java waits for a
+        // CLIENT_MOVE/CLIENT_BLOCK/… from the client; the Rust engine models that "waiting" by
+        // EMITTING a prompt so the agent can supply the 2nd command (the explicit move path / target).
+        // Without a prompt the driver stalls (Continue + no pending_prompt) — this was the STUCK_STEP
+        // on the first bb2016 activation. For a MOVE, emit AgentPrompt::Move with the legal one-step
+        // destinations (same list StepInitMoving uses); the agent builds the full path and replies
+        // Action::Move{path}. (BLOCK/BLITZ/FOUL dispatch prompts are wired in follow-up steps.)
+        if action == Some(PlayerAction::Move) {
+            if let Some(player_id) = game.acting_player.player_id.clone() {
+                let squares = crate::legal_actions::legal_move_targets(game, &player_id);
+                return StepOutcome::cont()
+                    .with_prompt(ffb_model::prompts::AgentPrompt::Move { player_id, squares });
+            }
+        }
+        StepOutcome::cont()
     }
 
     fn prepare_standing_up(&self, game: &mut Game) {
@@ -312,6 +326,36 @@ mod tests {
         let mut step = StepInitSelecting::new("end".into());
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::Continue);
+    }
+
+    #[test]
+    fn move_declare_emits_move_dispatch_prompt() {
+        // BB2016 two-command activation: after a MOVE is DECLARED (acting_player + action set,
+        // no dispatch yet), execute_step must EMIT AgentPrompt::Move so the agent can send the
+        // 2nd command (the move path). Without it the driver stalled (STUCK_STEP on the first
+        // bb2016 activation). Regression guard for the emit-prompt-after-declare piece.
+        use ffb_model::prompts::AgentPrompt;
+        use ffb_model::types::FieldCoordinate;
+        use ffb_model::enums::{PS_STANDING, PlayerState};
+        let mut game = make_game();
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: "mover".into(), name: "mover".into(), nr: 1, position_id: "lineman".into(),
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("mover", FieldCoordinate::new(13, 7));
+        game.field_model.set_player_state("mover", PlayerState::new(PS_STANDING));
+        game.home_playing = true;
+        game.acting_player.player_id = Some("mover".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        game.acting_player.standing_up = false;
+        let mut step = StepInitSelecting::new("end".into());
+        let out = step.execute_step(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue, "declare must wait for the dispatch command");
+        assert!(
+            matches!(out.prompt, Some(AgentPrompt::Move { ref player_id, .. }) if player_id == "mover"),
+            "MOVE declare must emit AgentPrompt::Move, got {:?}", out.prompt
+        );
     }
 
     #[test]
