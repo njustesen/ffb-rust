@@ -152,6 +152,21 @@ impl StepBribes {
                 let argue_event = argue_event.expect("argue rolled at least once");
                 if successful {
                     self.bribes_choice = Some(false);
+                    // BB2016 (bb2016 uses this shared StepBribes via make_step fall-through) treats a
+                    // SUCCESSFUL argue differently from BB2020+: the fouler is STILL ejected — but to
+                    // RESERVE (they can be set up next drive), not BANNED. Only an UNSUCCESSFUL argue
+                    // bans them. So bb2016 must proceed to EjectPlayer (which boxes the fouler as
+                    // RESERVE when ArgueTheCallSuccessful=true) instead of gotoing the end label and
+                    // leaving the fouler on the pitch. BB2020+ keep the on-pitch-stay behaviour.
+                    // (amazon bb2016 seed22 i=225: home_08 fouled on doubles armour, argued 6 (success)
+                    // — Java sent the fouler to Reserve, Rust left it Standing → state-hash divergence.)
+                    if game.rules == ffb_model::enums::Rules::Bb2016 {
+                        return StepOutcome::next()
+                            .with_event(argue_event)
+                            .publish(StepParameter::FoulerHasBall(fouler_has_ball))
+                            .publish(StepParameter::ArgueTheCallSuccessful(true))
+                            .publish(StepParameter::EndTurn(true));
+                    }
                     let label = self.goto_label_on_end.clone();
                     return StepOutcome::goto(&label)
                         .with_event(argue_event)
@@ -311,6 +326,32 @@ mod tests {
         assert!(!game.turn_data_home.coach_banned, "successful re-roll → coach not banned");
         assert!(!game.turn_data_home.inducement_set.has_uses_left("briberyAndCorruption"),
             "the B&C re-roll charge was consumed");
+    }
+
+    #[test]
+    fn bb2016_successful_argue_still_ejects_via_next_step() {
+        // BB2016: a SUCCESSFUL argue does NOT keep the fouler on the pitch (unlike BB2020+). The
+        // fouler is still ejected — to RESERVE — so bb2016 must return NEXT_STEP (proceed to
+        // EjectPlayer, which boxes the fouler as RESERVE when ArgueTheCallSuccessful=true), NOT
+        // GotoLabel (the BB2020+ on-pitch-stay path). amazon bb2016 seed22 i=225.
+        let mut seed = 0u64;
+        loop {
+            if GameRng::new(seed).d6() == 6 { break; }  // natural 6 → argue succeeds
+            seed += 1;
+            assert!(seed < 100_000, "no seed with first d6=6 found");
+        }
+        let home = test_team("home", 0);
+        let away = test_team("away", 0);
+        let mut game = Game::new(home, away, Rules::Bb2016);
+        game.home_playing = true;
+        game.acting_player.player_id = Some("p1".into());
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(5, 5));
+        let mut step = StepBribes::new("end".into());
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        assert_eq!(out.action, StepAction::NextStep,
+            "bb2016 successful argue must proceed to EjectPlayer (NextStep), not stay on pitch (GotoLabel)");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::ArgueTheCallSuccessful(true))),
+            "bb2016 successful argue must publish ArgueTheCallSuccessful(true) for EjectPlayer to box as RESERVE");
     }
 
     // 5. UseBribe action sets bribes_choice flag
