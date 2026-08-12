@@ -19,6 +19,7 @@ use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::abstract_step_with_re_roll::ReRollState;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 use crate::util::util_server_dialog::UtilServerDialog;
+use crate::util::server_util_player::ServerUtilPlayer;
 use crate::util::ServerUtilBlock;
 
 /// Java: `StepBlockRoll` (bb2016/block).
@@ -86,17 +87,51 @@ impl StepBlockRoll {
                 // is resolved internally by findNrOfBlockDice; the Rust helper takes it as an
                 // explicit parameter instead, so it must be computed here.
                 let is_multiple_block = player_action == Some(PlayerAction::MultipleBlock);
-                let attacker_str = game.acting_player.strength;
-                let defender_str = game.defender_id.as_deref()
-                    .and_then(|id| game.player(id))
-                    .map(|p| p.strength_with_modifiers())
-                    .unwrap_or(3);
                 let attacker_on_home = game.team_home.has_player(&acting_id);
                 let same_team = game.defender_id.as_deref()
                     .map(|id| game.team_home.has_player(id) == attacker_on_home)
                     .unwrap_or(false);
+
+                // Java (ServerUtilBlock.findNrOfBlockDice): the attacker/defender strengths compared
+                // for the die count include block ASSISTS (offensive assists via
+                // mechanic.getTotalAttackerStrength → ServerUtilPlayer.findBlockStrength, defensive
+                // assists via findBlockStrength(defender, ...)). The Rust find_nr_of_block_dice helper
+                // only compares pre-resolved totals, so the assists MUST be folded in here — the old
+                // code passed raw base strengths and so lost every assist (a 2-dice assisted block
+                // rolled as 1 die → RNG desync). Fold them via the edition RollMechanic exactly like
+                // Java, then compare with using_multi_block=false (multi-block modifiers are already
+                // folded into the totals below, so passing true would double-apply them).
+                let (attacker_total, defender_total) = {
+                    let mechanic = crate::mechanic::roll_mechanic_for(game.rules);
+                    let defender_id = game.defender_id.clone();
+                    match (game.player(&acting_id).cloned(), defender_id.as_deref().and_then(|id| game.player(id).cloned())) {
+                        (Some(attacker), Some(defender)) => {
+                            let def_id = defender_id.clone().unwrap_or_default();
+                            // Java: defenderStrength = defender.getStrengthWithModifiers()
+                            //   (+ mechanic.multiBlockDefenderModifier() when usingMultiBlock)
+                            let mut defender_strength = defender.strength_with_modifiers();
+                            if is_multiple_block {
+                                defender_strength += mechanic.multi_block_defender_modifier();
+                            }
+                            // Java: blockStrengthAttacker = mechanic.getTotalAttackerStrength(...)
+                            let block_strength_attacker = mechanic.get_total_attacker_strength(
+                                game, &attacker, &defender, is_multiple_block,
+                                self.successful_dauntless, false, defender_strength);
+                            // Java: blockStrengthDefender =
+                            //   ServerUtilPlayer.findBlockStrength(game, defender, defenderStrength, attacker, ...)
+                            let atk_coord = game.field_model.player_coordinates.get(&acting_id).copied();
+                            let def_coord = game.field_model.player_coordinates.get(&def_id).copied();
+                            let block_strength_defender = match (def_coord, atk_coord) {
+                                (Some(dc), Some(ac)) => ServerUtilPlayer::find_block_strength(game, dc, defender_strength, ac),
+                                _ => defender_strength,
+                            };
+                            (block_strength_attacker, block_strength_defender)
+                        }
+                        _ => (game.acting_player.strength, 3),
+                    }
+                };
                 self.nr_of_dice = ServerUtilBlock::find_nr_of_block_dice(
-                    attacker_str, defender_str, same_team, is_multiple_block, game.rules, false);
+                    attacker_total, defender_total, same_team, false, game.rules, false);
 
                 // Java: fBlockRoll = getGameState().getDiceRoller().rollBlockDice(fNrOfDice)
                 let n = self.nr_of_dice.unsigned_abs() as usize;
@@ -405,6 +440,39 @@ mod tests {
             "equal strength + multi-block should give defender the +1 modifier (nrOfDice = -2), \
              not force abs() as if same-team"
         );
+    }
+
+    #[test]
+    fn offensive_assist_gives_two_dice_for_equal_strength_block() {
+        // amazon bb2016 seed1 i=14: a01(ST3) blocks h02(ST3) with team-mate a02 adjacent to h02.
+        // The offensive assist makes it a 2-dice block in Java; the old code passed raw base
+        // strengths to find_nr_of_block_dice (no assists) → 1 die → one fewer d6 → RNG desync.
+        use ffb_model::enums::{PlayerAction, PlayerState, PS_STANDING};
+        use ffb_model::types::FieldCoordinate;
+        let mut step = StepBlockRoll::new();
+        let mut game = make_game();
+        add_player(&mut game, false, "att", 3);   // away attacker
+        add_player(&mut game, false, "ast", 3);   // away assister
+        add_player(&mut game, true, "def", 3);    // home defender
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(13, 7));
+        game.field_model.set_player_coordinate("ast", FieldCoordinate::new(13, 8));
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(12, 8));
+        game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
+        game.field_model.set_player_state("ast", PlayerState::new(PS_STANDING));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        game.home_playing = false;
+        game.acting_player.player_id = Some("att".into());
+        game.acting_player.strength = 3;
+        game.acting_player.player_action = Some(PlayerAction::Block);
+        game.defender_id = Some("def".into());
+
+        step.start(&mut game, &mut GameRng::new(1));
+        assert_eq!(
+            step.nr_of_dice, 2,
+            "equal ST3 v ST3 with one offensive assist must be a 2-dice block, got {}",
+            step.nr_of_dice
+        );
+        assert_eq!(step.block_roll.len(), 2, "a 2-dice block must roll 2 d6");
     }
 
     #[test]
