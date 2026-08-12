@@ -126,17 +126,46 @@ impl StepModifierTrait for ReallyStupidStepModifier {
             return false;
         }
 
-        // Java: if (REALLY_STUPID == reRolledAction && !useReRoll) doRoll = false
-        let mut skip_roll = false;
+        // Java: boolean doRoll = true;
+        //   if (reRolledAction == REALLY_STUPID) { doRoll = useReRoll(...); if(!doRoll) cancelAsFailure }
+        //   else doRoll = UtilCards.hasUnusedSkill(actingPlayer, skill);
+        // Really Stupid is rolled ONCE per activation (tracked on the ACTING PLAYER, cleared each
+        // activation), NOT every StepReallyStupid invocation — a Big Guy's stand-up move re-enters
+        // StepReallyStupid in both the select and move sub-sequences. This bb2016 behaviour previously
+        // rolled UNCONDITIONALLY and marked only the persistent Player.used_skills (never checked), so
+        // a Troll re-rolled Really Stupid an extra time per activation (orc bb2016 seed4 i=77: home_01
+        // the Troll — Java 1 roll, Rust 2 → 1-die desync). Same fix as bb2016 Bone Head (FIX26).
+        let mut do_roll = true;
+        let mut cancel_as_failure = false;
         if state.re_rolled_action.as_deref() == Some("REALLY_STUPID") {
             if let Some(ref source_name) = state.re_roll_source.clone() {
                 let source = ReRollSource::new(source_name.as_str());
                 if !use_reroll(game, &source, &player_id) {
-                    skip_roll = true;
+                    do_roll = false;
+                    cancel_as_failure = true;
                 }
             } else {
-                skip_roll = true; // player declined
+                do_roll = false;
+                cancel_as_failure = true; // player declined
             }
+        } else {
+            do_roll = !game.acting_player.used_skills.contains(&SkillId::ReallyStupid);
+        }
+
+        if !do_roll {
+            if cancel_as_failure {
+                let confusion_event = GameEvent::ConfusionRoll { player_id: player_id.clone(), roll: 1, confused: true };
+                cancel_bb2016_negatrait(game, &player_id);
+                state.outcome = Some(
+                    StepOutcome::goto(&state.goto_label_on_failure)
+                        .with_event(confusion_event)
+                        .publish(StepParameter::EndPlayerAction(true))
+                );
+            } else {
+                // Already rolled Really Stupid this activation → Java status SUCCESS → NEXT_STEP.
+                state.outcome = Some(StepOutcome::next());
+            }
+            return false;
         }
 
         // goodConditions: TTM/KTM actions get good conditions, or adjacent non-RS teammate present
@@ -149,31 +178,12 @@ impl StepModifierTrait for ReallyStupidStepModifier {
 
         let min_roll = minimum_roll_confusion(good_conditions);
 
-        if skip_roll {
-            let confusion_event = GameEvent::ConfusionRoll { player_id: player_id.clone(), roll: 1, confused: true };
-            // BB2016: no targetSelectionState.failed() call here
-            cancel_bb2016_negatrait(game, &player_id);
-            state.outcome = Some(
-                StepOutcome::goto(&state.goto_label_on_failure)
-                    .with_event(confusion_event)
-                    .publish(StepParameter::EndPlayerAction(true))
-            );
-            return false;
-        }
-
         // BB2016: no commitTargetSelection() call before roll
         let roll = rng.d6();
         let successful = roll >= min_roll;
 
-        // Java: actingPlayer.markSkillUsed(skill)
-        let is_home = game.team_home.player(&player_id).is_some();
-        if is_home {
-            if let Some(p) = game.team_home.player_mut(&player_id) {
-                p.used_skills.insert(SkillId::ReallyStupid);
-            }
-        } else if let Some(p) = game.team_away.player_mut(&player_id) {
-            p.used_skills.insert(SkillId::ReallyStupid);
-        }
+        // Java: actingPlayer.markSkillUsed(skill) — per-activation (acting player), NOT persistent.
+        game.acting_player.used_skills.insert(SkillId::ReallyStupid);
 
         let re_rolled = state.re_rolled_action.as_deref() == Some("REALLY_STUPID")
             && state.re_roll_source.is_some();
@@ -264,6 +274,40 @@ mod tests {
         };
         m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hook);
         assert!(hook.outcome.is_some());
+    }
+
+    /// BB2016: Really Stupid is rolled ONCE per activation. A re-entry of StepReallyStupid within the
+    /// same activation (skill already in the acting player's per-activation used_skills) must NOT roll
+    /// again — NEXT_STEP, no dice consumed. Regression for the Troll double-roll (orc seed4 i=77).
+    #[test]
+    fn really_stupid_not_re_rolled_within_same_activation() {
+        use ffb_model::enums::{TurnMode, PS_STANDING, PlayerState};
+        use ffb_model::util::rng::GameRng;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = test_game();
+        let mut p = ffb_model::model::player::Player::default();
+        p.id = "troll".into();
+        p.starting_skills.push(SkillWithValue { skill_id: SkillId::ReallyStupid, value: None });
+        game.team_home.players.push(p);
+        game.field_model.set_player_coordinate("troll", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("troll", PlayerState::new(PS_STANDING));
+        game.home_playing = true;
+        game.turn_mode = TurnMode::Regular;
+        game.acting_player.player_id = Some("troll".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        game.acting_player.used_skills.insert(SkillId::ReallyStupid); // already rolled this activation
+        let m = ReallyStupidStepModifier;
+        let mut hook = StepReallyStupidHookState {
+            goto_label_on_failure: "FAIL".into(),
+            re_rolled_action: None, re_roll_source: None, outcome: None,
+            updated_re_rolled_action: None, updated_re_roll_source: None,
+        };
+        let mut rng = GameRng::new(0);
+        let before = rng.call_count;
+        m.handle_execute_step(&mut game, &mut rng, &mut hook);
+        assert_eq!(rng.call_count, before, "Really Stupid already used this activation must NOT roll again");
+        assert_eq!(hook.outcome.as_ref().map(|o| o.action), Some(crate::step::framework::StepAction::NextStep));
     }
 
     /// BB2016: KickTeamMate maps to blitz_used (not ktm_used as in BB2025)
