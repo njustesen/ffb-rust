@@ -246,7 +246,22 @@ impl StepEndSelecting {
                 StepOutcome::next().push_seq(seq)
             }
             PlayerAction::Foul => {
-                StepOutcome::next().push_seq(Foul::build_sequence(&FoulParams::default()))
+                // Java StepEndSelecting.dispatch FOUL: when dispatching with parameters, push
+                // `new Foul.SequenceParams(gameState, fFoulDefenderId, false)` — the chosen foul
+                // target MUST be threaded into the Foul generator (usingChainsaw=false; the
+                // FoulChainsaw step decides chainsaw use at runtime). Passing FoulParams::default()
+                // dropped the target → StepInitFouling never set game.defender_id → StepFoul rolled
+                // no armour → StepReferee saw no injury → NEXT → EjectPlayer wrongly ejected the
+                // fouler (turnover). Mirror the BLOCK case's `with_parameter` gate.
+                let seq = if with_parameter {
+                    Foul::build_sequence(&FoulParams {
+                        fouled_defender_id: self.foul_defender_id.clone(),
+                        using_chainsaw: false,
+                    })
+                } else {
+                    Foul::build_sequence(&FoulParams::default())
+                };
+                StepOutcome::next().push_seq(seq)
             }
             PlayerAction::Move
             | PlayerAction::FoulMove
@@ -397,6 +412,25 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert!(!out.pushes.is_empty(), "FOUL should push Foul sequence");
+    }
+
+    #[test]
+    fn dispatch_foul_threads_foul_defender_id_into_init_fouling() {
+        // Regression: dispatching a FOUL with a chosen target must thread that target into the
+        // Foul generator so StepInitFouling sets game.defender_id (else StepFoul rolls no armour,
+        // StepReferee sees no injury and NEXTs → EjectPlayer wrongly ejects the fouler = turnover).
+        let mut game = make_game();
+        let mut step = StepEndSelecting::new();
+        step.dispatch_player_action = Some(PlayerAction::Foul);
+        step.foul_defender_id = Some("victim".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        let has_target = out.pushes.iter().flatten().any(|s| {
+            s.step_id == StepId::InitFouling
+                && s.params.iter().any(|p| matches!(p, StepParameter::FoulDefenderId(id) if id == "victim"))
+        });
+        assert!(has_target,
+            "dispatched FOUL must push an InitFouling carrying FoulDefenderId(\"victim\")");
     }
 
     #[test]
