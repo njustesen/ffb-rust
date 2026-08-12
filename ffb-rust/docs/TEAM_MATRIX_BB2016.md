@@ -32,7 +32,7 @@ steps/`make_injury_type`). Remaining rosters are being driven green next, in tur
 | `norse` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 71716983c04ccfdb |  |
 | `nurgle` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 5a30154de20c0ab7 |  |
 | `ogre` | 🔴 0/100 | seed 1, step 0, java f17d2e4bc0c146e5 vs rust d6ef3f4659806499 |  |
-| `orc` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 2456c4966b89b4d3 |  |
+| `orc` | 🟢 100/100 | — | driven to full parity 2026-08-12 (Really Stupid per-activation + bb2016 RightStuff routing) |
 | `renegades` | 🔴 0/100 | seed 1, step 0, java 36c2338c5a81ae43 vs rust 7de5fb2fda70c4fa | FUMBBL-legacy roster |
 | `skaven` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust ed317bbeaaaabc9f |  |
 | `slann` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 8b5bd002b4a05bb2 |  |

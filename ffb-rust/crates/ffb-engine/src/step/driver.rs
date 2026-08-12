@@ -447,6 +447,14 @@ pub fn make_step_for(id: StepId, rules: Rules) -> Box<dyn Step> {
                 return Box::new(crate::step::bb2016::StepFallDown::new()),
             StepId::PickUp =>
                 return Box::new(crate::step::bb2016::step_pick_up::StepPickUp::new(String::new())),
+            // BB2016 Throw-Team-Mate landing: the bb2016 ThrowTeamMate generator adds RIGHT_STUFF with
+            // NO params (matching Java bb2016 ThrowTeamMate.java), and the bb2016 StepRightStuff
+            // NEXT_STEPs to the generator's jump→APOTHECARY_THROWN_PLAYER. The shared bb2025
+            // StepRightStuff instead GOTOs its (unset) goto-label param → 'goto unknown label ""' →
+            // stack drained → game ends abnormally (orc bb2016 seed35 i=249: the Troll throws a Goblin
+            // → Rust bailed on the landing, Java continued). Route bb2016 to its own StepRightStuff.
+            StepId::RightStuff =>
+                return Box::new(crate::step::bb2016::ttm::step_right_stuff::StepRightStuff::new()),
             _ => {}
         }
     }
