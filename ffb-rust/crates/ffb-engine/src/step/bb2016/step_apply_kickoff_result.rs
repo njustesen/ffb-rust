@@ -407,6 +407,11 @@ impl StepApplyKickoffResult {
         if let Some(ref hit_id) = hit_home {
             let coord = game.field_model.player_coordinate(hit_id)
                 .unwrap_or(FieldCoordinate::new(0, 0));
+            // Java: startCoordinate = new FieldCoordinate(rollXCoordinate(), 0|14) for the
+            // THROW_A_ROCK animation (rollXCoordinate = rollDice(26)-1). Headless skips the
+            // animation, but the d26 roll MUST be consumed to keep the RNG stream aligned
+            // (amazon bb2016 seed9 pregame: Rust was 1 die short here → later pass desync).
+            let _ = rng.die(26);
             let drop_params = util_server_injury::drop_player(game, hit_id, false);
             for p in drop_params { outcome = outcome.publish(p); }
             let result = util_server_injury::handle_injury_by_name(
@@ -419,6 +424,8 @@ impl StepApplyKickoffResult {
         if let Some(ref hit_id) = hit_away {
             let coord = game.field_model.player_coordinate(hit_id)
                 .unwrap_or(FieldCoordinate::new(0, 0));
+            // Java: rollXCoordinate() for the THROW_A_ROCK animation start (see hit_home above).
+            let _ = rng.die(26);
             let drop_params = util_server_injury::drop_player(game, hit_id, false);
             for p in drop_params { outcome = outcome.publish(p); }
             let result = util_server_injury::handle_injury_by_name(
