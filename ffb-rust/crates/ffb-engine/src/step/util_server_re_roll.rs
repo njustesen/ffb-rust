@@ -48,9 +48,15 @@ pub fn ask_for_reroll_if_available(
         });
     }
 
-    // Team re-roll check
+    // Team re-roll check. Java RollMechanic.isTeamReRollAvailable additionally gates on
+    // allowsTeamReRoll(turnMode): KICKOFF / PASS_BLOCK / DUMP_OFF (edition-specific set) prohibit
+    // team re-rolls. Without this gate a failed catch of a scattered/bouncing ball DURING the
+    // kickoff wrongly consumed a team re-roll (bb2016 amazon seed2 i=149: a receiving-team catch
+    // on the kickoff — Java bounces the ball, Rust rerolled the catch → desync).
     let td = game.turn_data();
-    if td.rerolls > 0 && !td.reroll_used {
+    let team_re_roll_allowed = crate::mechanic::roll_mechanic_for(game.rules)
+        .allows_team_re_roll(game.turn_mode);
+    if td.rerolls > 0 && !td.reroll_used && team_re_roll_allowed {
         return Some(AgentPrompt::ReRollOffer {
             source: ReRollSource::new("TRR"),
             action: rerolled_action.to_owned(),
@@ -152,6 +158,23 @@ mod tests {
         game.turn_data_home.rerolls = 1;
         let result = ask_for_reroll_if_available(&game, "DODGE", 3, false);
         assert!(result.is_some());
+    }
+
+    #[test]
+    fn trr_not_offered_during_kickoff() {
+        // A team re-roll must NOT be offered while turn_mode prohibits it (KICKOFF): Java
+        // RollMechanic.isTeamReRollAvailable gates on allowsTeamReRoll(turnMode). Regression for
+        // bb2016 seed2 i=149: a receiving-team catch on the kickoff wrongly used a team re-roll.
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        game.turn_mode = TurnMode::Kickoff;
+        assert!(ask_for_reroll_if_available(&game, "CATCH", 3, false).is_none(),
+            "no team re-roll may be offered during KICKOFF");
+        // Sanity: the same TRR IS offered on a regular turn.
+        game.turn_mode = TurnMode::Regular;
+        assert!(ask_for_reroll_if_available(&game, "CATCH", 3, false).is_some(),
+            "a team re-roll IS available on a regular turn");
     }
 
     #[test]
