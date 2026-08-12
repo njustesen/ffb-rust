@@ -361,10 +361,27 @@ impl DriverStepEntry {
     pub fn id(&self) -> StepId { self.step.id() }
 }
 
-fn seq_step_to_driver_entry(s: SequenceStep) -> DriverStepEntry {
-    let mut step = make_step(s.step_id);
+fn seq_step_to_driver_entry(s: SequenceStep, rules: Rules) -> DriverStepEntry {
+    let mut step = make_step_for(s.step_id, rules);
     for param in &s.params { step.set_parameter(param); }
     DriverStepEntry { step, label: s.label }
+}
+
+/// Edition-aware `make_step`. BB2016 has its own step classes for a handful of steps whose
+/// dice/logic differ from the shared BB2020+ (`mixed`) implementations (Java routes these via the
+/// per-ruleset SequenceGenerator factory). Route those to the BB2016 impls when the game is BB2016;
+/// every other step — and every non-BB2016 edition — falls through to the shared `make_step`, so
+/// BB2020/BB2025 behaviour is byte-for-byte unchanged.
+pub fn make_step_for(id: StepId, rules: Rules) -> Box<dyn Step> {
+    if rules == Rules::Bb2016 {
+        match id {
+            // BB2016 StepSpectators rolls 2D6 per team (spectators + fame via ReportSpectators),
+            // vs the mixed BB2020+ single-D3 fan-factor (bb2016 amazon seed 1 pregame divergence).
+            StepId::Spectators => return Box::new(crate::step::bb2016::start::StepSpectators::new()),
+            _ => {}
+        }
+    }
+    make_step(id)
 }
 
 // ── DriverStepStack ──────────────────────────────────────────────────────────
@@ -372,13 +389,18 @@ fn seq_step_to_driver_entry(s: SequenceStep) -> DriverStepEntry {
 /// LIFO stack of `DriverStepEntry`. Top = last element.
 pub struct DriverStepStack {
     steps: Vec<DriverStepEntry>,
+    /// Edition of the game owning this stack — threaded into `make_step_for` so sequences pushed
+    /// at runtime (pregame, kickoff, block, …) build the correct per-ruleset step impls. Defaults
+    /// to BB2025; set from `game.rules` at construction.
+    rules: Rules,
 }
 
 impl DriverStepStack {
-    pub fn new() -> Self { DriverStepStack { steps: Vec::new() } }
+    pub fn new() -> Self { DriverStepStack { steps: Vec::new(), rules: Rules::Bb2025 } }
+    pub fn new_with_rules(rules: Rules) -> Self { DriverStepStack { steps: Vec::new(), rules } }
     pub fn push(&mut self, entry: DriverStepEntry) { self.steps.push(entry); }
     pub fn push_sequence(&mut self, seq: Vec<SequenceStep>) {
-        for s in seq.into_iter().rev() { self.steps.push(seq_step_to_driver_entry(s)); }
+        for s in seq.into_iter().rev() { self.steps.push(seq_step_to_driver_entry(s, self.rules)); }
     }
     pub fn pop(&mut self) -> Option<DriverStepEntry> { self.steps.pop() }
     /// Insert an entry at an absolute stack position (0 = bottom). Used by the driver's
@@ -455,8 +477,9 @@ pub struct DriverGameState {
 
 impl DriverGameState {
     pub fn from_game(game: Game, seed: u64) -> Self {
+        let rules = game.rules;
         DriverGameState {
-            game, rng: GameRng::new(seed), stack: DriverStepStack::new(),
+            game, rng: GameRng::new(seed), stack: DriverStepStack::new_with_rules(rules),
             current: None, forwarded: None, pending_prompt: None,
             waiting_for_command: false, events: Vec::new(),
             initial_hash: String::new(),
@@ -508,7 +531,7 @@ impl DriverGameState {
     /// enabled from the very first step (e.g. `INDUCEMENTS`, so `StepBuyInducements`
     /// actually fires) must set it before the pregame sequence runs, not after.
     pub fn new_with_options(home: Team, away: Team, rules: Rules, seed: u64, options: &[(&str, &str)]) -> Self {
-        use crate::step::sequences::start_game_sequence;
+        use crate::step::sequences::start_game_sequence_for;
         let mut game = Game::new(home, away, rules);
         for (key, value) in options { game.options.set(*key, *value); }
         let mut gs = DriverGameState::from_game(game, seed);
@@ -521,7 +544,7 @@ impl DriverGameState {
         // Corruption argue re-roll). Done before the start sequence runs so the inducement is
         // present for the whole game, exactly as in Java.
         crate::step::bb2025::start::step_buy_inducements::grant_special_rule_inducements(&mut gs.game);
-        gs.stack.push_sequence(start_game_sequence());
+        gs.stack.push_sequence(start_game_sequence_for(rules));
         gs.run_until_prompt();
         // `start_game_sequence()` begins with `StepInitStartGame`, which (matching Java's
         // `StepInitStartGame`) only proceeds once BOTH coaches have sent `CLIENT_START_GAME`
@@ -750,6 +773,19 @@ mod tests {
         assert!(gs.stack.is_empty());
         assert!(gs.current.is_none());
         assert!(gs.pending_prompt.is_none());
+    }
+
+    #[test]
+    fn make_step_for_routes_bb2016_spectators_but_not_bb2025() {
+        // bb2016 Spectators (2D6 + fame) is a different class from the mixed bb2020+ (1D3).
+        // make_step_for must route it for bb2016 only; every other edition uses make_step unchanged.
+        use ffb_model::enums::Rules;
+        // Round-trips its id in all editions (sanity).
+        assert_eq!(make_step_for(StepId::Spectators, Rules::Bb2016).id(), StepId::Spectators);
+        assert_eq!(make_step_for(StepId::Spectators, Rules::Bb2025).id(), StepId::Spectators);
+        // A non-overridden step is identical across editions (delegates to make_step).
+        assert_eq!(make_step_for(StepId::Weather, Rules::Bb2016).id(), StepId::Weather);
+        assert_eq!(make_step_for(StepId::Weather, Rules::Bb2025).id(), StepId::Weather);
     }
 
     #[test]
