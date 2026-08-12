@@ -47,7 +47,14 @@ fn recalc_armor_broken_claws_aware(game: &Game, ctx: &mut InjuryContext, defende
     // Blow/Chainsaw modifier is judged against the wrong (base) AV (halfling seed 38 i=63: away_03
     // eff AV6 + Mighty Blow +1 vs roll 5 → 6>=6 breaks in Java, but Rust compared 6>=base 7 → survived).
     let armor_value = game.player(defender_id).map(|p| p.armour_with_modifiers()).unwrap_or(7);
-    let effective_armor = if has_claws { armor_value.min(8) } else { armor_value };
+    // Java StatsMechanic.reduceArmour: Claws (reducesArmourToFixedValue) caps the effective armour
+    // to the edition's reductionValue — bb2016 uses 7 (armourIsBroken then breaks on `reduced < roll`,
+    // strict `>`), mixed bb2020/bb2025 uses 8 (breaks on `reduced <= roll`). Both yield "an armour
+    // roll of 8+ always breaks", but capping bb2016 to 8 (as this did unconditionally) made a Clawed
+    // AV8 defender need 9+ — norse bb2016 seed6 i=25: the home Snow Troll (Claw) blocks the away Snow
+    // Troll (AV8), armour roll 8 → Java breaks (7 < 8) → KO, Rust held (8 < 8 false) → Prone.
+    let claw_cap = if game.rules == ffb_model::enums::Rules::Bb2016 { 7 } else { 8 };
+    let effective_armor = if has_claws { armor_value.min(claw_cap) } else { armor_value };
     // Edition-aware: BB2016 breaks on total > armour, BB2020/BB2025 on total >= armour.
     ctx.armor_broken = ffb_mechanics::mechanics::armor_broken_for_rules(
         effective_armor, [d1, d2], &ctx.armor_modifiers, game.rules);
@@ -403,6 +410,37 @@ mod tests {
         ctx2.add_armor_modifier(Modifier::new("Mighty Blow", 1, Rules::Bb2025));
         recalc_armor_broken_claws_aware(&game2, &mut ctx2, "defender");
         assert!(!ctx2.armor_broken, "base AV7 vs roll 5 + Mighty Blow 1 = 6 must NOT break (6<7)");
+    }
+
+    /// BB2016 Claw caps the effective armour to 7 (Java StatsMechanic.reduceArmour(...,7) +
+    /// strict `<`), so a Clawed AV8 defender is broken on an armour roll of exactly 8 (7 < 8).
+    /// Regression for the cap that was hardcoded to 8 for all editions (norse bb2016 seed6 i=25:
+    /// home Snow Troll (Claw) vs away Snow Troll AV8, roll 8 — Java KO, Rust wrongly held → Prone).
+    #[test]
+    fn bb2016_claws_caps_armour_to_seven_breaks_on_eight() {
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(make_player("attacker", 7, vec![SkillId::Claw]));
+        let mut away = crate::step::framework::test_team("away", 0);
+        away.players.push(make_player("defender", 8, vec![]));
+        let game = Game::new(home, away, Rules::Bb2016);
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        ctx.armor_roll = Some([4, 4]); // total 8
+        ctx.add_armor_modifier(Modifier::new("Claws", 0, Rules::Bb2016));
+        recalc_armor_broken_claws_aware(&game, &mut ctx, "defender");
+        assert!(ctx.armor_broken, "bb2016 Claw caps AV8→7, so roll 8 breaks (7 < 8)");
+
+        // bb2025 control: cap is 8, break on `<=`, so roll 8 also breaks — but roll 7 does NOT,
+        // whereas the OLD bb2016 (wrong cap 8, strict `<`) needed 9. Assert the bb2016 boundary.
+        let mut home2 = crate::step::framework::test_team("home", 0);
+        home2.players.push(make_player("attacker", 7, vec![SkillId::Claw]));
+        let mut away2 = crate::step::framework::test_team("away", 0);
+        away2.players.push(make_player("defender", 8, vec![]));
+        let game2 = Game::new(home2, away2, Rules::Bb2016);
+        let mut ctx2 = InjuryContext::new(ApothecaryMode::Defender);
+        ctx2.armor_roll = Some([3, 4]); // total 7
+        ctx2.add_armor_modifier(Modifier::new("Claws", 0, Rules::Bb2016));
+        recalc_armor_broken_claws_aware(&game2, &mut ctx2, "defender");
+        assert!(!ctx2.armor_broken, "bb2016 Claw: roll 7 does NOT break (7 < 7 is false)");
     }
 
     #[test]
