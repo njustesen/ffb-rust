@@ -641,11 +641,25 @@ impl StepCatchScatterThrowIn {
                     return self.catch_ball(game, rng);
                 }
 
-                if let Some(prompt) = ask_for_reroll_if_available(game, "CATCH", min_roll, false) {
-                    self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("CATCH"));
-                    self.re_roll_state.re_roll_source = Some(ffb_model::enums::ReRollSource::new("TRR"));
-                    self.pending_prompt = Some(prompt);
-                    return self.catch_scatter_throw_in_mode;
+                // Java: UtilServerReRoll.askForReRollIfAvailable(gameState, state.catcher, CATCH, ...)
+                // — the re-roll availability is the CATCHER's. A team re-roll needs the catcher on
+                // the ACTING team (RollMechanic.isTeamReRollAvailable checks actingTeam.hasPlayer).
+                // A ball scattered/bounced onto an OPPONENT during your turn (e.g. a fumbled pass
+                // landing on a defender) gives that opponent NO team re-roll. The shared
+                // ask_for_reroll_if_available uses the ACTIVE team without a catcher check, so it
+                // wrongly offered the active team's re-roll to an opponent catcher (seed3 i=2:
+                // home_01 catches away's fumbled ball during away's turn; Java bounces, Rust
+                // rerolled the catch → RNG/ball desync). Gate on the catcher's own eligibility.
+                let catcher_can_team_re_roll = game.player(&cid)
+                    .map(|c| crate::util::util_server_re_roll::UtilServerReRoll::is_team_re_roll_available(game, c))
+                    .unwrap_or(false);
+                if catcher_can_team_re_roll {
+                    if let Some(prompt) = ask_for_reroll_if_available(game, "CATCH", min_roll, false) {
+                        self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("CATCH"));
+                        self.re_roll_state.re_roll_source = Some(ffb_model::enums::ReRollSource::new("TRR"));
+                        self.pending_prompt = Some(prompt);
+                        return self.catch_scatter_throw_in_mode;
+                    }
                 }
             }
         }
