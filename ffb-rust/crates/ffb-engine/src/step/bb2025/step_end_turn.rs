@@ -513,6 +513,19 @@ impl StepEndTurn {
             }
             // Java: getFaintingCount / heatExhaustions / KO recovery — only on new half or touchdown
             if self.new_half || touchdown {
+                // BB2016 and BB2020+ resolve Sweltering-Heat fainting DIFFERENTLY. BB2016
+                // (bb2016.StepEndTurn) rolls, PER on-pitch player, one rollKnockoutRecovery d6 and
+                // faints (EXHAUSTED) on isExhausted(roll) — interleaved with KO recovery in the same
+                // game.getPlayers() loop. BB2020+ (mixed/bb2025) instead roll a single d3 fainting
+                // COUNT and pick that many random on-pitch players per team. Rust shared this step
+                // (make_step routes EndTurn to bb2025's, make_step_for(bb2016) doesn't override) and
+                // applied the BB2020+ d3-count model to bb2016 too — so a bb2016 Sweltering-Heat drive
+                // end rolled a d3 where Java rolled one d6 per on-pitch player, missing ~1 die per
+                // on-pitch player (amazon bb2016 seed20: half-2 kickoff, Java rolled 22 heatExhaust
+                // d6s, Rust rolled 0 via the d3 path → 17-die desync at the transition). Edition-gate:
+                // bb2016 → per-player heatExhaust; bb2020+ → the d3-count block, unchanged.
+                let is_bb2016 = game.rules == ffb_model::enums::Rules::Bb2016;
+                let sweltering = game.field_model.weather == Weather::SwelteringHeat;
                 let all_player_ids: Vec<String> = game.team_home.players.iter()
                     .chain(game.team_away.players.iter())
                     .map(|p| p.id.clone())
@@ -524,6 +537,11 @@ impl StepEndTurn {
                         Some(s) => s,
                         None => continue,
                     };
+                    // Java captures playerCoordinate BEFORE KO recovery (recover→box); a player that
+                    // is not on-pitch here never rolls heatExhaust.
+                    let on_pitch_before = game.field_model.player_coordinate(player_id)
+                        .map(|c| !c.is_box_coordinate())
+                        .unwrap_or(false);
                     let base = player_state.base();
                     if base == PS_KNOCKED_OUT {
                         let is_home = game.team_home.has_player(player_id);
@@ -542,15 +560,23 @@ impl StepEndTurn {
                     if base == PS_EXHAUSTED {
                         game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));
                     }
+                    // BB2016: per on-pitch player, roll one rollKnockoutRecovery d6 → faint on
+                    // isExhausted (Java bb2016.StepEndTurn heatExhaust). Interleaved here to match the
+                    // Java per-player loop order exactly.
+                    if is_bb2016 && sweltering && on_pitch_before {
+                        let roll = rng.d6();
+                        let exhausted = DiceInterpreter::is_exhausted(roll);
+                        if exhausted {
+                            game.field_model.set_player_state(player_id, player_state.change_base(PS_EXHAUSTED));
+                            UtilBox::put_player_into_box(game, player_id);
+                        }
+                        heat_exhaustions.push(HeatExhaustion::new(player_id.clone(), roll));
+                    }
                 }
-                // Java StepEndTurn.getFaintingCount: AFTER KO recovery, if the weather is Sweltering
-                // Heat roll ONE d3 (the fainting count) and, for each team in [home, away] order,
-                // select that many random on-pitch players — one `rollDice(onPitch.size())` per faint,
-                // the candidate list shrinking as each is removed — knocking them EXHAUSTED into the
-                // box. The previous code rolled a d6 PER on-pitch player, consuming the wrong dice and
-                // desyncing the whole stream from the first faint on (seed 57: the shifted 2d6 kickoff
-                // result then produced a different kickoff event and an extra turn).
-                if game.field_model.weather == Weather::SwelteringHeat {
+                // BB2020+ (mixed/bb2025): AFTER KO recovery, roll ONE d3 fainting COUNT and pick that
+                // many random on-pitch players per team (one rollDice(onPitch.size()) per faint, the
+                // list shrinking as each is removed). NOT used for bb2016 (handled per-player above).
+                if !is_bb2016 && sweltering {
                     let fainting_count = rng.d3();
                     for is_home in [true, false] {
                         let team = if is_home { &game.team_home } else { &game.team_away };
@@ -914,6 +940,39 @@ mod tests {
             .filter(|p| game.field_model.player_state(&p.id).map(|s| s.base() == PS_EXHAUSTED).unwrap_or(false))
             .count();
         assert!(exhausted >= 2, "sweltering heat should faint at least one player per team, got {exhausted}");
+    }
+
+    #[test]
+    fn bb2016_sweltering_heat_rolls_one_die_per_on_pitch_player() {
+        use ffb_model::enums::{Weather, Rules};
+        // BB2016 (bb2016.StepEndTurn heatExhaust) rolls ONE rollKnockoutRecovery d6 PER on-pitch
+        // player at a drive end under Sweltering Heat — NOT the BB2020+ single d3 fainting count.
+        // With 12 on-pitch players and no KO'd players, exactly 12 dice must be consumed here (amazon
+        // bb2016 seed20: Rust rolled a d3 where Java rolled 12+ d6, desyncing the half-2 kickoff).
+        let home = test_team("home", 0);
+        let away = test_team("away", 0);
+        let mut game = Game::new(home, away, Rules::Bb2016);
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        game.field_model.weather = Weather::SwelteringHeat;
+        for i in 0..6 {
+            let hid = format!("hh{i}");
+            let aid = format!("aa{i}");
+            game.team_home.players.push(make_player(&hid));
+            game.team_away.players.push(make_player(&aid));
+            game.field_model.set_player_coordinate(&hid, FieldCoordinate::new(4 + i, 5));
+            game.field_model.set_player_state(&hid, PlayerState::new(PS_STANDING));
+            game.field_model.set_player_coordinate(&aid, FieldCoordinate::new(20 - i, 5));
+            game.field_model.set_player_state(&aid, PlayerState::new(PS_STANDING));
+        }
+        game.turn_data_home.turn_nr = 8;
+        game.turn_data_away.turn_nr = 8;
+        let mut step = StepEndTurn::new();
+        let mut rng = GameRng::new(3);
+        let before = rng.call_count;
+        step.start(&mut game, &mut rng);
+        let dice = rng.call_count - before;
+        assert_eq!(dice, 12, "bb2016 Sweltering Heat must roll one d6 per on-pitch player (12), got {dice}");
     }
 
     #[test]
