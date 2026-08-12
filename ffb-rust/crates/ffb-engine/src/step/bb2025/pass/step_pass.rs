@@ -249,6 +249,14 @@ impl StepPass {
 
         let result = self.pass_result.unwrap();
         let already_rerolled = self.re_rolled_action.is_some();
+        // An OUT-OF-RANGE pass (findPassingDistance → None) is never thrown: no accuracy roll (roll=0
+        // above) and — unlike a rolled FUMBLE — the ball is NOT scattered. Java's out-of-range pass
+        // leaves the ball on the thrower's square and simply turns the drive over (0 dice total).
+        // Rust classified None as PassResult::FUMBLE, which scattered the ball (1 extra d8) →
+        // amazon bb2016 seed56 i=170: home_03's (14,7)->(1,9) LongBomb was out of range in bb2016;
+        // Java kept the ball at (14,7), Rust scattered it to (15,6). Handle the None case as a
+        // no-scatter turnover before the FUMBLE scatter path.
+        let out_of_range = passing_dist.is_none();
 
         // Java: getResult().addReport(new ReportPassRoll(game.getThrowerId(), roll, minimumRoll, reRolled,
         //   passModifiers, passingDistance, isBomb, state.getResult(), false, statBasedRollModifier))
@@ -353,6 +361,24 @@ impl StepPass {
                 StepOutcome::goto(&label)
                     .publish(StepParameter::PassFumble(false))
                     .publish(StepParameter::DontDropFumble(true))
+                    .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Fumble))
+            }
+            // Out-of-range pass: never thrown. Ball stays on the thrower's square, NO scatter, NO
+            // re-roll (there was no roll), drive turns over. Matches Java's null-passingDistance path.
+            PassResult::FUMBLE if out_of_range => {
+                if let Some(tc) = thrower_coord {
+                    if is_bomb {
+                        game.field_model.bomb_coordinate = Some(tc);
+                        game.field_model.bomb_moving = false;
+                    } else {
+                        game.field_model.ball_coordinate = Some(tc);
+                        game.field_model.ball_moving = false;
+                    }
+                }
+                StepOutcome::next()
+                    .publish(StepParameter::PassFumble(true))
+                    .publish(StepParameter::DontDropFumble(false))
+                    .publish(StepParameter::CatcherId(None))
                     .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Fumble))
             }
             PassResult::FUMBLE => {
@@ -509,6 +535,37 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         let fumble = out.published.iter().find(|p| matches!(p, StepParameter::PassFumble(true)));
         assert!(fumble.is_some(), "expected PassFumble(true) published for PA=0");
+    }
+
+    #[test]
+    fn bb2016_out_of_range_pass_keeps_ball_and_does_not_scatter() {
+        // A bb2016 pass whose target is OUT OF RANGE (findPassingDistance → None) is never thrown:
+        // no accuracy roll AND no scatter — the ball stays on the thrower's square and the drive
+        // turns over. (14,7)->(1,9) is dx=13,dy=2 = out of range in the bb2016 range table (LongBomb
+        // in bb2020). amazon bb2016 seed56 i=170: Java kept the ball at (14,7); Rust used to FUMBLE +
+        // scatter it (1 extra d8).
+        let mut home = test_team("home", 0);
+        let away = test_team("away", 0);
+        let mut thrower = ffb_model::model::player::Player::default();
+        thrower.id = "t1".into();
+        thrower.passing = 3;
+        home.players.push(thrower);
+        let mut game = Game::new(home, away, Rules::Bb2016);
+        game.thrower_id = Some("t1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.field_model.set_player_coordinate("t1", FieldCoordinate::new(14, 7));
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(14, 7));
+        game.pass_coordinate = Some(FieldCoordinate::new(1, 9)); // dx=13, dy=2 → out of range (bb2016)
+        let mut step = make_step();
+        let mut rng = GameRng::new(0);
+        let start_calls = rng.call_count;
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(rng.call_count - start_calls, 0, "an out-of-range pass rolls NO dice (no accuracy, no scatter)");
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(_))),
+            "an out-of-range pass must NOT publish a ScatterBall mode (ball stays at the thrower)");
+        assert_eq!(game.field_model.ball_coordinate, Some(FieldCoordinate::new(14, 7)),
+            "the ball must remain on the thrower's square");
     }
 
     #[test]

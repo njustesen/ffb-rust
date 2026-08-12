@@ -4,10 +4,15 @@ Run 2026-08-08 — mirror matchups, tier 3, seeds 1-100,
 teams from `data/teams/bb2016/` (see docs/TEAM_DRAFTS_BB2016.md), Java XMLs from scripts/gen_java_parity_data.py.
 Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 
+**UPDATE 2026-08-12 — bb2016 full-parity campaign (ongoing):** the "step 0 / seed 1"
+divergences above are STALE (pre-campaign). `amazon` is now driven to **100/100** via
+23 engine fixes (ITER20-37; recurring class = bb2016 flows routed through shared bb2025
+steps/`make_injury_type`). Remaining rosters are being driven green next, in turn.
+
 | Roster | Result | First divergence | Notes |
 |---|---|---|---|
 | `lineman` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 17bdbe0e289c3afd | FUMBBL-legacy roster |
-| `amazon` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 41f962485e4905de |  |
+| `amazon` | 🟢 100/100 | — | driven to full parity 2026-08-12 (23 engine fixes, ITER20-37; see parity_roster_progression memory) |
 | `chaos` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust a646028152594c81 |  |
 | `chaos_dwarf` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 5f87359ecbe8d622 |  |
 | `chaos_pact` | 🔴 0/100 | seed 1, step 0, java c5d85980b8bb2c73 vs rust aa0748f996be2af7 |  |
