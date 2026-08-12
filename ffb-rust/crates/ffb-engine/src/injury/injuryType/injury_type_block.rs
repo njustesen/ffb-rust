@@ -48,8 +48,9 @@ fn recalc_armor_broken_claws_aware(game: &Game, ctx: &mut InjuryContext, defende
     // eff AV6 + Mighty Blow +1 vs roll 5 → 6>=6 breaks in Java, but Rust compared 6>=base 7 → survived).
     let armor_value = game.player(defender_id).map(|p| p.armour_with_modifiers()).unwrap_or(7);
     let effective_armor = if has_claws { armor_value.min(8) } else { armor_value };
-    let modifier_sum: i32 = ctx.armor_modifiers.iter().map(|m| m.value).sum();
-    ctx.armor_broken = d1 + d2 + modifier_sum >= effective_armor;
+    // Edition-aware: BB2016 breaks on total > armour, BB2020/BB2025 on total >= armour.
+    ctx.armor_broken = ffb_mechanics::mechanics::armor_broken_for_rules(
+        effective_armor, [d1, d2], &ctx.armor_modifiers, game.rules);
 }
 
 /// Java: InjuryTypeBlock.Mode enum (inner class).

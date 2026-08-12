@@ -19,7 +19,7 @@ use ffb_model::model::SoundId;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
-use ffb_mechanics::mechanics::{armor_broken as mech_armor_broken, injury_result, interpret_injury_total_bb2016, interpret_injury_total_bb2020, InjuryOutcome};
+use ffb_mechanics::mechanics::{armor_broken_for_rules, injury_result, interpret_injury_total_bb2016, interpret_injury_total_bb2020, InjuryOutcome};
 use ffb_mechanics::modifiers::Modifier;
 
 // ── InjuryContext ─────────────────────────────────────────────────────────────
@@ -410,7 +410,7 @@ pub fn do_armor_roll(game: &Game, rng: &mut GameRng, ctx: &mut InjuryContext, de
     // roll of 7 that Java breaks (7 >= 7), diverging the injury (seed 46 i=176: home_02 Prone in
     // Rust vs Stunned in Java).
     let armor_value = game.player(defender_id).map(|p| p.armour_with_modifiers()).unwrap_or(7);
-    ctx.armor_broken = mech_armor_broken(armor_value, [d1, d2], &ctx.armor_modifiers);
+    ctx.armor_broken = armor_broken_for_rules(armor_value, [d1, d2], &ctx.armor_modifiers, game.rules);
 }
 
 /// Recalculate `armor_broken` using the existing `armor_roll` and current modifiers.
@@ -419,7 +419,7 @@ pub fn recalc_armor_broken(game: &Game, ctx: &mut InjuryContext, defender_id: &s
     if let Some([d1, d2]) = ctx.armor_roll {
         // Match Java DiceInterpreter.isArmourBroken → getArmourWithModifiers (see do_armor_roll).
         let armor_value = game.player(defender_id).map(|p| p.armour_with_modifiers()).unwrap_or(7);
-        ctx.armor_broken = mech_armor_broken(armor_value, [d1, d2], &ctx.armor_modifiers);
+        ctx.armor_broken = armor_broken_for_rules(armor_value, [d1, d2], &ctx.armor_modifiers, game.rules);
     }
 }
 

@@ -9,7 +9,7 @@ use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
 use ffb_model::model::game::Game;
 use ffb_mechanics::modifiers::{foul_assist_armor_modifier, ARMOR_CHAINSAW_3, ARMOR_DIRTY_PLAYER_1, ARMOR_FOUL};
-use ffb_mechanics::mechanics::armor_broken;
+use ffb_mechanics::mechanics::armor_broken_for_rules;
 use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
 use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
 use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury, leak_injury_modifier};
@@ -94,7 +94,7 @@ impl ModificationAwareInjuryType for InjuryTypeFoul {
                         if let Some(roll) = self.ctx.armor_roll {
                             let av = game.player(defender_id)
                                 .map(|p| p.armour_with_modifiers()).unwrap_or(7);
-                            self.ctx.armor_broken = armor_broken(av, roll, &self.ctx.armor_modifiers);
+                            self.ctx.armor_broken = armor_broken_for_rules(av, roll, &self.ctx.armor_modifiers, game.rules);
                         }
                     }
                 }

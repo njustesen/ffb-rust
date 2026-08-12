@@ -12,13 +12,21 @@ pub enum InjuryOutcome {
     Casualty,
 }
 
-/// Outcome of an armor roll.
+/// Outcome of an armor roll (BB2020/BB2025 rule: `2d6 + modifiers >= armor_value`).
 ///
-/// Returns `true` when the armor is broken (roll > armor_value after modifiers).
-/// Formula: 2d6 + sum(modifiers) > armor_value
+/// NOTE: this uses the `>=` (equal-or-exceed) rule. BB2016 requires `2d6 + modifiers
+/// STRICTLY GREATER than armour` — for edition-correct armour breaks call
+/// [`armor_broken_for_rules`], which is what all live armour-roll sites use.
 pub fn armor_broken(armor_value: i32, roll: [i32; 2], modifiers: &[Modifier]) -> bool {
     let modifier_sum: i32 = modifiers.iter().map(|m| m.value).sum();
     roll[0] + roll[1] + modifier_sum >= armor_value
+}
+
+/// Edition-aware armour break: BB2016 breaks on `2d6 + modifiers > armour`, BB2020/BB2025
+/// on `>= armour`. Mirrors Java `DiceInterpreter.isArmourBroken` (per-edition subclass).
+pub fn armor_broken_for_rules(armor_value: i32, roll: [i32; 2], modifiers: &[Modifier], rules: Rules) -> bool {
+    let modifier_sum: i32 = modifiers.iter().map(|m| m.value).sum();
+    crate::mechanics::roll::is_armour_broken(armor_value, roll[0] + roll[1] + modifier_sum, rules)
 }
 
 /// Evaluate the injury table from a 2d6 roll (all editions share the same table).
@@ -291,6 +299,21 @@ mod tests {
         assert!(armor_broken(8, [4, 4], &[]));
         // armor 8, roll 3+4=7 → NOT broken
         assert!(!armor_broken(8, [3, 4], &[]));
+    }
+
+    #[test]
+    fn armor_broken_for_rules_bb2016_strict_greater() {
+        // At roll == AV, BB2016 does NOT break (strictly greater), BB2020/BB2025 DO break.
+        // amazon bb2016 seed1 i=168: armour 6+1=7 vs AV7 → Java Prone (not broken),
+        // Rust must match (was breaking via bare >= → Stunned).
+        assert!(!armor_broken_for_rules(7, [6, 1], &[], Rules::Bb2016), "bb2016: 7 vs AV7 not broken");
+        assert!(armor_broken_for_rules(7, [6, 1], &[], Rules::Bb2020), "bb2020: 7 vs AV7 broken");
+        assert!(armor_broken_for_rules(7, [6, 1], &[], Rules::Bb2025), "bb2025: 7 vs AV7 broken");
+        // Above the threshold both editions break.
+        assert!(armor_broken_for_rules(7, [6, 2], &[], Rules::Bb2016), "bb2016: 8 > AV7 broken");
+        // Below, neither breaks.
+        assert!(!armor_broken_for_rules(8, [3, 4], &[], Rules::Bb2016));
+        assert!(!armor_broken_for_rules(8, [3, 4], &[], Rules::Bb2025));
     }
 
     #[test]
