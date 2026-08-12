@@ -230,19 +230,25 @@ impl Step for StepInitSelecting {
                         _ => {}
                     }
                 }
-                // No-target block/blitz/foul (folded agent found no legal target).
-                // - BLOCK ends the turn (a bare block with no target is a wasted declaration).
-                // - BLITZ deselects (ends the player action, NO turnover): bb2016 drives a blitz as a
-                //   BLITZ_MOVE (a MOVE variant). When the folded agent has no currently-adjacent block
-                //   target, Java's ParityRunner sends CLIENT_BLITZ_MOVE with NO following CLIENT_BLOCK
-                //   (JAVA_P2 action=BLITZ_MOVE, no JAVA_BLOCK_PICK) — the player just moves/stands, no
-                //   block, and the turn CONTINUES. Rust used to end the turn here (amazon seed7 i=19:
-                //   away_02 BLITZ with no adjacent target — Java continues away's turn, Rust turned
-                //   over). A no-target FOUL likewise deselects.
+                // No-target block/blitz/foul (folded agent found no legal target) → DESELECT (end the
+                // player action, NO turnover), matching Java's ParityRunner:
+                //   sendBlockAction / sendFoulAction / a no-target BLITZ_MOVE all end with
+                //   `ClientCommandActingPlayer(null, null, false)` when pickBlockTarget/pickFoulTarget
+                //   returns null — a bare deselect that leaves the turn running so the runner picks the
+                //   next player. (BLITZ is driven as a BLITZ_MOVE, a MOVE variant, so a no-target blitz
+                //   likewise just moves/stands with no block.)
+                //   amazon seed7 i=19: away_02 BLITZ, no adjacent target — Java continues away's turn.
+                //   amazon seed12 i=20: home_01 BLOCK, its turn-start-snapshot target moved away so no
+                //   adjacent opponent remains — Java sends ClientCommandActingPlayer(null) (JAVA_P2
+                //   action=BLOCK, NO JAVA_BLOCK_PICK) and CONTINUES home's turn to Home9; Rust used to
+                //   end the turn here (the earlier BLOCK→end_turn was an untested guess), turning over a
+                //   full activation early. All three no-target action declarations deselect, never end
+                //   the turn.
                 if block_defender_id.is_none() {
                     match pa {
-                        PlayerAction::Block => { self.end_turn = true; }
-                        PlayerAction::Blitz | PlayerAction::Foul => { self.end_player_action = true; }
+                        PlayerAction::Block | PlayerAction::Blitz | PlayerAction::Foul => {
+                            self.end_player_action = true;
+                        }
                         _ => {}
                     }
                 }
@@ -472,32 +478,37 @@ mod tests {
     }
 
     #[test]
-    fn folded_no_target_blitz_ends_player_action_not_turn() {
-        // A BLITZ declared with no currently-adjacent block target (block_defender_id=None) must
-        // END THE PLAYER ACTION (deselect), NOT end the turn: bb2016 drives a blitz as a BLITZ_MOVE,
-        // and Java's ParityRunner sends CLIENT_BLITZ_MOVE with no following CLIENT_BLOCK (no turnover)
-        // — amazon seed7 i=19. A no-target BLOCK, by contrast, ends the turn.
-        let mut game = make_game();
-        game.home_playing = true;
-        game.team_home.players.push(ffb_model::model::player::Player {
-            id: "blitzer".into(), name: "blitzer".into(), nr: 1, position_id: "lineman".into(),
-            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8, ..Default::default() });
-        game.field_model.set_player_coordinate("blitzer", ffb_model::types::FieldCoordinate::new(5, 5));
-        game.field_model.set_player_state("blitzer", ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING));
-        let mut step = StepInitSelecting::new("end".into());
-        let out = step.handle_command(
-            &Action::ActivatePlayer {
-                player_id: "blitzer".into(),
-                player_action: PlayerActionChoice::Blitz,
-                block_defender_id: None,
-            },
-            &mut game,
-            &mut GameRng::new(0),
-        );
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))),
-            "no-target blitz must publish END_PLAYER_ACTION (deselect), got {:?}", out.published);
-        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
-            "no-target blitz must NOT end the turn");
+    fn folded_no_target_block_blitz_foul_deselect_not_turn() {
+        // A BLOCK / BLITZ / FOUL declared with no currently-adjacent target (block_defender_id=None)
+        // must END THE PLAYER ACTION (deselect), NOT end the turn — matching Java's ParityRunner
+        // sendBlockAction/sendFoulAction/no-target BLITZ_MOVE, which all inject
+        // ClientCommandActingPlayer(null, null, false) (a bare deselect) when the target pick returns
+        // null, leaving the turn running. amazon seed7 i=19 (no-target BLITZ), amazon seed12 i=20
+        // (home_01 BLOCK whose turn-start-snapshot target moved away — Java continues to Home9, Rust
+        // used to turn over a full activation early because BLOCK wrongly ended the turn here).
+        for action in [PlayerActionChoice::Block, PlayerActionChoice::Blitz, PlayerActionChoice::Foul] {
+            let mut game = make_game();
+            game.home_playing = true;
+            game.team_home.players.push(ffb_model::model::player::Player {
+                id: "actor".into(), name: "actor".into(), nr: 1, position_id: "lineman".into(),
+                movement: 6, strength: 3, agility: 3, passing: 4, armour: 8, ..Default::default() });
+            game.field_model.set_player_coordinate("actor", ffb_model::types::FieldCoordinate::new(5, 5));
+            game.field_model.set_player_state("actor", ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING));
+            let mut step = StepInitSelecting::new("end".into());
+            let out = step.handle_command(
+                &Action::ActivatePlayer {
+                    player_id: "actor".into(),
+                    player_action: action,
+                    block_defender_id: None,
+                },
+                &mut game,
+                &mut GameRng::new(0),
+            );
+            assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))),
+                "no-target {action:?} must publish END_PLAYER_ACTION (deselect), got {:?}", out.published);
+            assert!(!out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+                "no-target {action:?} must NOT end the turn");
+        }
     }
 
     #[test]
