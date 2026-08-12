@@ -60,11 +60,21 @@ impl Pass {
             StepParameter::GotoLabelOnFailure(fl.into()),
         ]);
         // 12 PASS [PASS]
+        // On an ACCURATE pass the shared StepPass does goto(GotoLabelOnEnd) after publishing
+        // PASS_ACCURATE. bb2020+ route that to StepResolvePass (which turns PASS_ACCURATE into
+        // CATCH_ACCURATE_PASS so the receiver rolls a catch); the bb2016 sequence sent it straight to
+        // END_PASSING, so an accurate pass never triggered the catch (amazon seed9 i=2: home_03's
+        // accurate pass — Java rolls the receiver catch d6, Rust skipped it → 1 die short → desync).
+        // Route the accurate branch through StepResolvePass (the missed/fumble branch still uses
+        // GotoLabelOnMissedPass → StepMissedPass, unchanged).
         seq.add_labelled(StepId::Pass, labels::PASS, vec![
-            StepParameter::GotoLabelOnEnd(fl.into()),
+            StepParameter::GotoLabelOnEnd(labels::RESOLVE_PASS.into()),
             StepParameter::GotoLabelOnMissedPass(labels::MISSED_PASS.into()),
         ]);
-        // 13 GOTO_LABEL → SCATTER_BALL
+        // 13 GOTO_LABEL → SCATTER_BALL (StepPass fall-through, e.g. a saved fumble)
+        seq.jump(labels::SCATTER_BALL);
+        // 13b RESOLVE_PASS: accurate pass → publish CATCH_ACCURATE_PASS, then resolve the catch.
+        seq.add_labelled(StepId::ResolvePass, labels::RESOLVE_PASS, vec![]);
         seq.jump(labels::SCATTER_BALL);
         // 14 HAIL_MARY_PASS [HAIL_MARY_PASS]
         seq.add_labelled(StepId::HailMaryPass, labels::HAIL_MARY_PASS, vec![
