@@ -239,7 +239,9 @@ mod tests {
         let seed = seed_for_d6(5); // success in good or bad conditions
         let mut game = make_game(vec![SkillId::WildAnimal], Some(PlayerAction::Block));
         StepWildAnimal::new("fail".into()).start(&mut game, &mut GameRng::new(seed));
-        assert!(game.player("beast").unwrap().used_skills.contains(&SkillId::WildAnimal));
+        // Java: actingPlayer.markSkillUsed(WildAnimal) — recorded on the ACTING PLAYER
+        // (per-activation, reset by setPlayerId), NOT the persistent Player. See FIX26/FIX29.
+        assert!(game.acting_player.used_skills.contains(&SkillId::WildAnimal));
     }
 
     #[test]
