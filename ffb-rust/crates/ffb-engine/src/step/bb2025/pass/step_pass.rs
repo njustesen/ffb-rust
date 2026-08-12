@@ -3,7 +3,6 @@ use ffb_model::model::game::Game;
 use ffb_model::util::passing::passing_distance;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::mixed::report_pass_roll::ReportPassRoll;
-use ffb_mechanics::bb2025::pass_mechanic::PassMechanic as Bb2025PassMechanic;
 use ffb_mechanics::modifiers::modifier_type::ModifierType;
 use ffb_mechanics::modifiers::pass_context::PassContext;
 use ffb_mechanics::modifiers::pass_modifier::PassModifier;
@@ -204,7 +203,11 @@ impl StepPass {
             }
 
             // Java: minimumRoll = mechanic.minimumRoll(thrower, passingDistance, passModifiers)
-            let mechanic = Bb2025PassMechanic::new();
+            // Edition-aware: BB2016 classifies the pass roll (accurate/inaccurate/fumble) by a
+            // different range/AG table than BB2020/BB2025 — a hardcoded Bb2025PassMechanic mis-graded
+            // BB2016 passes (amazon bb2016 seed4 i=136: pass d6=3 → Java INACCURATE, Rust FUMBLE →
+            // different scatter chain + die count).
+            let mechanic = crate::mechanic::pass_mechanic_for(game.rules);
             if let Some(thrower) = game.thrower() {
                 let minimum = passing_dist.and_then(|dist| {
                     mechanic.minimum_roll_simple(thrower, dist, &pass_modifiers)
@@ -226,7 +229,7 @@ impl StepPass {
         if self.pass_result.is_none() {
             let result = if let Some(thrower) = game.thrower() {
                 if let Some(dist) = passing_dist {
-                    let mechanic = Bb2025PassMechanic::new();
+                    let mechanic = crate::mechanic::pass_mechanic_for(game.rules);
                     mechanic.evaluate_pass_simple(thrower, self.roll, dist, &pass_modifiers, is_bomb)
                 } else {
                     // No passing distance → auto-fumble
