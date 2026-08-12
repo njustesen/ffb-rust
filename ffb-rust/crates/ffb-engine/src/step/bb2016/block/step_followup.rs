@@ -181,9 +181,15 @@ impl StepFollowup {
             }
 
             // Java: if ((followupChoice == null) && (usingSkillPreventingFollowUp != null))
-            //   UtilServerDialog.showDialog(... DialogFollowupChoiceParameter ...) → CONTINUE
+            //   UtilServerDialog.showDialog(DialogFollowupChoiceParameter) → CONTINUE. Emit the
+            //   AgentPrompt::FollowUp so the agent can answer with Action::FollowUp (same bridge as
+            //   bb2025; a bare cont() waited forever — bb2016 block-sequence stall).
             if self.followup_choice.is_none() && self.using_skill_preventing_follow_up.is_some() {
-                return build_outcome(out_params, StepOutcome::cont());
+                let prompt = ffb_model::prompts::AgentPrompt::FollowUp {
+                    attacker_id: acting_player_id.clone().unwrap_or_default(),
+                    target_coord: self.defender_position.unwrap_or(FieldCoordinate::new(0, 0)),
+                };
+                return build_outcome(out_params, StepOutcome::cont().with_prompt(prompt));
             }
         }
 

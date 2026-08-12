@@ -207,10 +207,20 @@ impl StepPushback {
                     ));
                 }
 
-                // Java: fieldModel.add(state.pushbackSquares)
+                // Java: fieldModel.add(state.pushbackSquares) — the client renders the choice and
+                // answers with CLIENT_PUSHBACK. Emit AgentPrompt::Pushback so the agent can reply
+                // (bare cont() waited forever — bb2016 block-sequence stall). Same bridge as bb2025.
                 game.field_model.pushback_squares.clear();
                 game.field_model.pushback_squares.extend(final_pushback_squares);
-                return StepOutcome::cont();
+                let squares: Vec<FieldCoordinate> = game.field_model.pushback_squares.iter()
+                    .filter(|sq| !sq.locked)
+                    .map(|sq| sq.coordinate)
+                    .collect();
+                return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::Pushback {
+                    attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
+                    defender_id: game.defender_id.clone().unwrap_or_default(),
+                    squares,
+                });
             }
         }
 
