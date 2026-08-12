@@ -163,12 +163,35 @@ impl Step for StepInitSelecting {
             }
             // Java: CLIENT_ACTING_PLAYER — changePlayerAction then executeStep (no dispatchPlayerAction)
             // This path fires for STAND_UP / STAND_UP_BLITZ / REMOVE_CONFUSION → NEXT_STEP in executeStep
-            Action::ActivatePlayer { player_id, player_action, .. } => {
+            Action::ActivatePlayer { player_id, player_action, block_defender_id } => {
                 let pa = pac_to_player_action(*player_action);
-                if game.is_active_team_player(player_id) {
-                    change_player_action(game, player_id, pa, false);
-                } else {
+                if !game.is_active_team_player(player_id) {
                     self.end_player_action = true;
+                    return self.execute_step(game, rng);
+                }
+                change_player_action(game, player_id, pa, false);
+                // BB2016 two-command activation, folded on the RUST harness side: the parity agent
+                // supplies the BLOCK/BLITZ/FOUL target folded into ActivatePlayer (identical RNG to
+                // bb2025 — player, action, target picked at activation). Dispatch it here so the
+                // bb2016 block/blitz/foul sequences run without needing a separate agent command,
+                // keeping the Rust agent unchanged. Java drives this as a real 2nd client command
+                // (CLIENT_BLOCK/CLIENT_FOUL) but produces identical state + dice. A MOVE has no folded
+                // target → falls through to execute_step which emits the Move dispatch prompt (the
+                // agent then supplies the path). A no-target block/blitz also falls through.
+                if let Some(def) = block_defender_id {
+                    match pa {
+                        PlayerAction::Block | PlayerAction::Blitz => {
+                            self.dispatch_player_action = Some(pa);
+                            return self.execute_step(game, rng)
+                                .publish(StepParameter::BlockDefenderId(def.clone()));
+                        }
+                        PlayerAction::Foul => {
+                            self.dispatch_player_action = Some(PlayerAction::Foul);
+                            return self.execute_step(game, rng)
+                                .publish(StepParameter::FoulDefenderId(def.clone()));
+                        }
+                        _ => {}
+                    }
                 }
                 return self.execute_step(game, rng);
             }
@@ -356,6 +379,43 @@ mod tests {
             matches!(out.prompt, Some(AgentPrompt::Move { ref player_id, .. }) if player_id == "mover"),
             "MOVE declare must emit AgentPrompt::Move, got {:?}", out.prompt
         );
+    }
+
+    #[test]
+    fn folded_block_activate_dispatches_with_target() {
+        // BB2016 harness fold: a BLOCK declared via ActivatePlayer with a folded block target
+        // (block_defender_id) must dispatch immediately (goto end label + publish BlockDefenderId +
+        // DispatchPlayerAction=Block) so the bb2016 block sequence runs — the Rust agent stays
+        // folded (same RNG as bb2025). Regression guard for the folded-dispatch piece.
+        use ffb_model::types::FieldCoordinate;
+        use ffb_model::enums::{PS_STANDING, PlayerState};
+        let mut game = make_game();
+        game.home_playing = true;
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: "att".into(), name: "att".into(), nr: 1, position_id: "lineman".into(),
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8, ..Default::default() });
+        game.team_away.players.push(ffb_model::model::player::Player {
+            id: "def".into(), name: "def".into(), nr: 2, position_id: "lineman".into(),
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8, ..Default::default() });
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(13, 7));
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(14, 7));
+        game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        let mut step = StepInitSelecting::new("end".into());
+        let out = step.handle_command(
+            &Action::ActivatePlayer {
+                player_id: "att".into(),
+                player_action: PlayerActionChoice::Block,
+                block_defender_id: Some("def".into()),
+            },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert_eq!(out.action, StepAction::GotoLabel, "folded block must dispatch (goto end)");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::BlockDefenderId(d) if d == "def")),
+            "must publish the folded block target, got {:?}", out.published);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(Some(PlayerAction::Block)))),
+            "must dispatch Block");
     }
 
     #[test]
