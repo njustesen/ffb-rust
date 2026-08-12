@@ -391,6 +391,14 @@ pub fn make_step_for(id: StepId, rules: Rules) -> Box<dyn Step> {
                 return Box::new(crate::step::bb2016::StepApplyKickoffResult::new(String::new(), String::new())),
             StepId::CatchScatterThrowIn =>
                 return Box::new(crate::step::bb2016::StepCatchScatterThrowIn::new()),
+            // BB2016 missed pass: 3× single-square scatter (d8 each) from the pass target, then
+            // publish CATCH_SCATTER_THROW_IN_MODE=CATCH_MISSED_PASS so the (bb2016) CatchScatterThrowIn
+            // resolves the catch/bounce. The shared bb2025 StepMissedPass publishes NOTHING when the
+            // ball lands in-bounds (bb2025 resolves the landing via a different downstream path), so
+            // an uncaught missed pass never bounced (amazon seed1 i=201: Java bounces the ball off the
+            // empty landing square, Rust left it put → 1 fewer d8 + wrong ball square).
+            StepId::MissedPass =>
+                return Box::new(crate::step::bb2016::pass::step_missed_pass::StepMissedPass::new()),
             // ── BB2016 activation / move / block / foul step-set (approach A: 1:1 bb2016 steps,
             // completed with the AgentPrompt bridge) ─────────────────────────────────────────────
             StepId::InitSelecting =>
