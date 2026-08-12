@@ -26,7 +26,7 @@ steps/`make_injury_type`). Remaining rosters are being driven green next, in tur
 | `human` | 🟢 100/100 | — | driven to full parity 2026-08-12 (Bone Head per-activation; bb2016 dodge & pickup old AG scale) |
 | `khemri` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust d30a52f6c35d68d7 |  |
 | `khemri_fumbbl` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust d30a52f6c35d68d7 | FUMBBL-legacy roster |
-| `lizardman` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 83476186efcafb2f |  |
+| `lizardman` | 🟢 100/100 | — | GREEN with no roster-specific fix — cleared by the shared amazon/human bb2016 fixes (AG-scale dodge/catch/pickup + Bone Head per-activation) |
 | `necromantic` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 10bfe73abb533f6e |  |
 | `nippon` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 96e1d188b6c11c4b | FUMBBL-legacy roster |
 | `norse` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 71716983c04ccfdb |  |
