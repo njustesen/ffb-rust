@@ -116,6 +116,21 @@ mod tests {
     }
 
     #[test]
+    fn apply_kickoff_result_carries_both_goto_labels() {
+        // The bb2016 StepApplyKickoffResult GOTOs GotoLabelOnEnd (turn>8 Riot) and GotoLabelOnBlitz
+        // (Blitz! result); both params MUST be threaded here (and the labelled END_KICKOFF/BLITZ_TURN
+        // steps must exist) or those gotos hit an empty label and drain the stack. The hand-rolled
+        // sequences::h2_kickoff_sequence omitted them, crashing bb2016 half-2/post-score kickoffs
+        // (amazon seed20) until StepEndTurn was switched to this generator for bb2016.
+        let steps = Kickoff::build_sequence(&KickoffParams::default());
+        let akr = steps.iter().find(|s| s.step_id == StepId::ApplyKickoffResult).unwrap();
+        assert!(akr.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnEnd(l) if l == labels::END_KICKOFF)),
+            "ApplyKickoffResult must carry GotoLabelOnEnd=END_KICKOFF");
+        assert!(akr.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnBlitz(l) if l == labels::BLITZ_TURN)),
+            "ApplyKickoffResult must carry GotoLabelOnBlitz=BLITZ_TURN");
+    }
+
+    #[test]
     fn kickoff_has_two_swarming_steps() {
         let steps = Kickoff::build_sequence(&KickoffParams::default());
         let count = steps.iter().filter(|s| s.step_id == StepId::Swarming).count();

@@ -592,6 +592,25 @@ impl StepEndTurn {
             // Java: endGenerator.pushSequence / kickoffGenerator
             use ffb_model::enums::InducementPhase;
             use crate::step::sequences::{inducement_sequence, h2_kickoff_sequence, end_game_sequence};
+            // BB2016 shares this StepEndTurn (make_step_for(bb2016) does not override EndTurn), but its
+            // ApplyKickoffResult (bb2016-routed) GOTOs GotoLabelOnEnd=END_KICKOFF / GotoLabelOnBlitz=
+            // BLITZ_TURN on a turn>8 Riot or a Blitz! result. The hand-rolled `h2_kickoff_sequence`
+            // adds a bare ApplyKickoffResult with NO goto params and no labelled END_KICKOFF/BLITZ_TURN
+            // targets, so under bb2016 those gotos hit an EMPTY label → the step stack drains and the
+            // game ends abnormally (amazon bb2016 seed20: half-2 post-score kickoff rolled Blitz! →
+            // Rust bailed after ~136 activations vs Java's ~291). Use the full `Kickoff` generator for
+            // bb2016 (the same one the bb2016 opening kickoff uses via StepSpectators — it threads the
+            // goto params and includes the labelled steps); bb2025's own ApplyKickoffResult never GOTOs
+            // those labels, so it keeps the lighter shared sequence unchanged. Coin/receive toss is
+            // game-start only → with_coin_choice=false.
+            let kickoff_seq = |game: &Game| {
+                if game.rules == ffb_model::enums::Rules::Bb2016 {
+                    crate::step::generator::mixed::kickoff::Kickoff::build_sequence(
+                        &crate::step::generator::mixed::kickoff::KickoffParams { with_coin_choice: false })
+                } else {
+                    h2_kickoff_sequence()
+                }
+            };
             let mut outcome = StepOutcome::next();
             for ev in pending_events { outcome = outcome.with_event(ev); }
             if self.new_half {
@@ -615,7 +634,7 @@ impl StepEndTurn {
                         outcome = outcome.with_event(GameEvent::StartHalf { half: game.half });
                     }
                     // End of first half → push H2 kickoff sequence
-                    outcome = outcome.push_seq(h2_kickoff_sequence());
+                    outcome = outcome.push_seq(kickoff_seq(game));
                 }
             } else if touchdown {
                 // Java: touchdownEndsGame check → end_game if last turn
@@ -623,11 +642,11 @@ impl StepEndTurn {
                 if td_ends_game {
                     outcome = outcome.push_seq(end_game_sequence(game.admin_mode));
                 } else {
-                    outcome = outcome.push_seq(h2_kickoff_sequence());
+                    outcome = outcome.push_seq(kickoff_seq(game));
                 }
             } else if game.turn_mode != TurnMode::Regular {
                 // Non-regular turn end (blitz turn etc.) → kickoff
-                outcome = outcome.push_seq(h2_kickoff_sequence());
+                outcome = outcome.push_seq(kickoff_seq(game));
             } else {
                 outcome = outcome.push_seq(inducement_sequence(InducementPhase::StartOfOwnTurn, game.home_playing));
             }
