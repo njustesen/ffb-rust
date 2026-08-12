@@ -123,6 +123,19 @@ impl Step for StepCatchScatterThrowIn {
             self.diving_catch_choice = Some(!player_id.is_empty());
             self.catcher_id = if player_id.is_empty() { None } else { Some(player_id.clone()) };
         }
+        // A team re-roll offer (ReRollOffer/TRR) is answered here. The catch pre-set
+        // re_roll_source=TRR + re_rolled_action=CATCH before emitting the prompt; on a DECLINE the
+        // source must be cleared so catch_ball's `already_rerolled` branch short-circuits to
+        // do_roll=false (no re-roll → the failed catch stands → bounce). Without this the decline
+        // was ignored and the pre-set TRR source was consumed, so Rust rerolled a catch that Java
+        // (ParityRunner sends UseReRoll with a null source = DECLINE) does not — amazon seed8 i=180:
+        // an extra catch re-roll die desynced the bounce/ball. Skill re-rolls (Catch) are auto-used
+        // via the hook, not this offer, so declining the TRR offer here matches Java exactly.
+        if let Action::UseReRoll { use_reroll } = action {
+            if !*use_reroll {
+                self.re_roll_state.re_roll_source = None;
+            }
+        }
         self.execute_step(game, rng)
     }
 
@@ -699,6 +712,24 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2016)
+    }
+
+    #[test]
+    fn declined_catch_team_reroll_clears_source() {
+        // The catch pre-sets re_roll_source=TRR + re_rolled_action=CATCH before the ReRollOffer
+        // prompt. A DECLINE (UseReRoll{use_reroll:false}, mirroring ParityRunner's null source) must
+        // clear the source so no re-roll is consumed (re_rolled_action stays CATCH so catch_ball's
+        // already_rerolled branch short-circuits to do_roll=false → bounce). Regression for seed8 i=180.
+        use ffb_model::enums::ReRollSource;
+        let mut step = StepCatchScatterThrowIn::new();
+        step.re_roll_state.re_rolled_action = Some(ReRolledAction::new("CATCH"));
+        step.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
+        let mut game = make_game();
+        step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut GameRng::new(0));
+        assert!(step.re_roll_state.re_roll_source.is_none(),
+            "declined team re-roll must clear re_roll_source");
+        assert!(step.re_roll_state.re_rolled_action.is_some(),
+            "re_rolled_action must stay set so already_rerolled short-circuits (no fresh re-roll)");
     }
 
     fn make_player(id: &str) -> Player {
