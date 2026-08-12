@@ -211,6 +211,22 @@ impl Step for StepInitSelecting {
                             return self.execute_step(game, rng)
                                 .publish(StepParameter::FoulDefenderId(def.clone()));
                         }
+                        // PASS / HAND-OVER: the folded agent supplies the RECEIVER (a player id) in
+                        // block_defender_id (chosen from legal_pass_receivers / legal_handoff_receivers,
+                        // 1 actionRng — mirroring ParityRunner.sendPassAction which picks a teammate
+                        // COORD). Java drives CLIENT_PASS(coord); here we resolve the receiver's
+                        // absolute coordinate and dispatch a Pass with TARGET_COORDINATE, exactly like
+                        // the Action::Pass command arm. Without this arm a Pass fell through to a bare
+                        // cont() and the bb2016 pass sequence never started (amazon seed1 i=201 stall).
+                        PlayerAction::Pass | PlayerAction::HandOver => {
+                            let coord_opt = game.field_model.player_coordinate(def);
+                            self.dispatch_player_action = Some(pa);
+                            let out = self.execute_step(game, rng);
+                            if let Some(coord) = coord_opt {
+                                return out.publish(StepParameter::TargetCoordinate(coord));
+                            }
+                            return out;
+                        }
                         _ => {}
                     }
                 }
@@ -448,6 +464,43 @@ mod tests {
             "must publish the folded block target, got {:?}", out.published);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(Some(PlayerAction::Block)))),
             "must dispatch Block");
+    }
+
+    #[test]
+    fn folded_pass_activate_dispatches_target_coordinate() {
+        // BB2016 harness fold: a PASS declared via ActivatePlayer carries the RECEIVER
+        // (block_defender_id). It must dispatch immediately, publishing the receiver's ABSOLUTE
+        // coordinate as TARGET_COORDINATE + DispatchPlayerAction=Pass, so the bb2016 pass sequence
+        // starts. Without this arm the Pass fell through to a bare cont() and stalled (i=201).
+        use ffb_model::types::FieldCoordinate;
+        use ffb_model::enums::{PS_STANDING, PlayerState};
+        let mut game = make_game();
+        game.home_playing = true;
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: "thrower".into(), name: "thrower".into(), nr: 1, position_id: "lineman".into(),
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8, ..Default::default() });
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: "rcv".into(), name: "rcv".into(), nr: 2, position_id: "lineman".into(),
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8, ..Default::default() });
+        game.field_model.set_player_coordinate("thrower", FieldCoordinate::new(13, 8));
+        game.field_model.set_player_coordinate("rcv", FieldCoordinate::new(16, 8));
+        game.field_model.set_player_state("thrower", PlayerState::new(PS_STANDING));
+        game.field_model.set_player_state("rcv", PlayerState::new(PS_STANDING));
+        let mut step = StepInitSelecting::new("end".into());
+        let out = step.handle_command(
+            &Action::ActivatePlayer {
+                player_id: "thrower".into(),
+                player_action: PlayerActionChoice::Pass,
+                block_defender_id: Some("rcv".into()),
+            },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert_eq!(out.action, StepAction::GotoLabel, "folded pass must dispatch (goto end)");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::TargetCoordinate(c) if c.x == 16 && c.y == 8)),
+            "must publish the receiver's absolute coordinate as TargetCoordinate, got {:?}", out.published);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(Some(PlayerAction::Pass)))),
+            "must dispatch Pass");
     }
 
     #[test]

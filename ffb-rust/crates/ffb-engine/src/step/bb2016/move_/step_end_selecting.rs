@@ -209,7 +209,13 @@ impl StepEndSelecting {
             PlayerAction::Pass
             | PlayerAction::HailMaryPass
             | PlayerAction::HandOver => {
-                StepOutcome::next().push_seq(Pass::build_sequence(&PassParams::default()))
+                // Thread the chosen target square into the Pass generator so StepInitPassing
+                // receives TARGET_COORDINATE — same bug class as the FOUL dispatch: building with
+                // PassParams::default() dropped the target, so the pass had no destination and the
+                // bb2016 pass sequence stalled (amazon seed1 i=201 rust=None).
+                StepOutcome::next().push_seq(Pass::build_sequence(&PassParams {
+                    target_coordinate: self.target_coordinate,
+                }))
             }
             PlayerAction::ThrowTeamMate => {
                 let seq = ThrowTeamMate::build_sequence(&ThrowTeamMateParams {
