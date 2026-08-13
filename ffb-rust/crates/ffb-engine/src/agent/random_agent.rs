@@ -78,6 +78,32 @@ pub struct RandomAgent {
     pending_move: Option<FieldCoordinate>,
 }
 
+/// Mirror of `ParityRunner.isHandledActingAction` — the `PlayerAction`s whose
+/// `sendConcreteAction` switch arm actually carries the action out. Everything else falls
+/// through to its `default:` arm, which logs `UNHANDLED_ACTING_ACTION` and injects
+/// `ClientCommandActingPlayer(null, null, false)` (a deselect) without touching game state.
+pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
+    matches!(
+        pa,
+        // MOVE / STAND_UP
+        PlayerActionChoice::Move
+            | PlayerActionChoice::StandUp
+            // BLOCK
+            | PlayerActionChoice::Block
+            // BLITZ / BLITZ_MOVE / BLITZ_SELECT / STAND_UP_BLITZ
+            | PlayerActionChoice::Blitz
+            | PlayerActionChoice::StandUpBlitz
+            // FOUL / FOUL_MOVE
+            | PlayerActionChoice::Foul
+            // PASS / PASS_MOVE
+            | PlayerActionChoice::Pass
+            // HAND_OVER / HAND_OVER_MOVE
+            | PlayerActionChoice::HandOff
+            // THROW_TEAM_MATE / THROW_TEAM_MATE_MOVE
+            | PlayerActionChoice::ThrowTeamMate
+    )
+}
+
 impl RandomAgent {
     /// Parity constructor: one shared agent for both sides, seeds matching Java byte-for-byte.
     pub fn new_parity(game_seed: u64) -> Self {
@@ -357,6 +383,26 @@ impl Agent for RandomAgent {
                 };
                 if std::env::var("FFB_TRACE").is_ok() {
                     eprintln!("RUST_ACT_END arc={}", self.action_rng_count);
+                }
+                // Mirror ParityRunner.sendConcreteAction's `default:` arm. Its switch handles only
+                //   MOVE, STAND_UP, BLOCK, BLITZ, BLITZ_MOVE, BLITZ_SELECT, STAND_UP_BLITZ,
+                //   FOUL(_MOVE), PASS(_MOVE), HAND_OVER(_MOVE), THROW_TEAM_MATE(_MOVE)
+                // and every other PlayerAction falls through to
+                //   `UNHANDLED_ACTING_ACTION: <pa> — deselecting`
+                //   MatchRunner.inject(new ClientCommandActingPlayer(null, null, false));
+                // i.e. the exact same deselect the no-target FOUL below uses: the player-pick
+                // decisionRng and action-pick actionRng are already spent, the player is already in
+                // `used_this_turn`, and the team's turn keeps going with a fresh pick.
+                //
+                // Rust instead CARRIED OUT the action. For the Goblin Bombardier's THROW_BOMB that
+                // meant Java burned a no-op step and re-activated while Rust threw the bomb — and
+                // then ended the game outright (goblin bb2016 seed 1: `game_end` at i=3 where Java
+                // plays on to i=901). Deselecting mirrors the harness exactly.
+                if !is_handled_acting_action(player_action) {
+                    if std::env::var("FFB_TRACE").is_ok() {
+                        eprintln!("RUST_UNHANDLED_ACTION_DESELECT pid={player_id} action={player_action:?}");
+                    }
+                    continue 'reselect;
                 }
                 // Mirror ParityRunner.sendFoulAction: the turn-start eligible snapshot may still
                 // offer FOUL for a player whose only adjacent prone/stunned victim has since moved
@@ -1166,5 +1212,41 @@ mod rng_trace_tests {
         eprintln!("(next) n=7: {} % 7 = {}", v2, v2 as usize % 7);
         
         assert!(true);
+    }
+
+    /// `ParityRunner.sendConcreteAction`'s switch handles only MOVE/STAND_UP/BLOCK/BLITZ*/FOUL*/
+    /// PASS*/HAND_OVER*/THROW_TEAM_MATE*; every other PlayerAction hits `default:` and is DESELECTED
+    /// with no state change. The Rust agent carried the action out instead — for the Goblin
+    /// Bombardier's THROW_BOMB that meant Java burned a no-op activation while Rust threw the bomb
+    /// and then ended the game outright (goblin bb2016 seed 1: `game_end` at i=3 vs Java's i=901).
+    #[test]
+    fn unhandled_acting_actions_mirror_the_parity_runner_deselect() {
+        for pa in [
+            PlayerActionChoice::Move,
+            PlayerActionChoice::StandUp,
+            PlayerActionChoice::Block,
+            PlayerActionChoice::Blitz,
+            PlayerActionChoice::StandUpBlitz,
+            PlayerActionChoice::Foul,
+            PlayerActionChoice::Pass,
+            PlayerActionChoice::HandOff,
+            PlayerActionChoice::ThrowTeamMate,
+        ] {
+            assert!(is_handled_acting_action(pa), "{pa:?} has a sendConcreteAction arm");
+        }
+        for pa in [
+            PlayerActionChoice::ThrowBomb,
+            PlayerActionChoice::Stab,
+            PlayerActionChoice::KickTeamMate,
+            PlayerActionChoice::HypnoticGaze,
+            PlayerActionChoice::Swoop,
+            PlayerActionChoice::Punt,
+            PlayerActionChoice::BreatheFire,
+            PlayerActionChoice::ProjectileVomit,
+            PlayerActionChoice::SecureTheBall,
+        ] {
+            assert!(!is_handled_acting_action(pa),
+                "{pa:?} falls through to ParityRunner's default: arm and must deselect");
+        }
     }
 }

@@ -47,7 +47,7 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | elf | **0** (was 84) | 🟢 100/100 GREEN (ITER66 Side Step auto-use) | GREEN |
 | ogre | **0** (was 98) | 🟢 100/100 GREEN (ITER69 bb2016 TTM spends the PASS; needed a jar rebuild) | GREEN |
 | wood_elf | **0** (98→81→19→0) | 🟢 100/100 GREEN (ITER71 startedStanding, ITER73 rooted pre-draw, ITER77 declined-re-roll edition gate) | GREEN |
-| goblin | 100 | ITER78 PETTY_CASH + casualty dice, ITER79 Ball & Chain drop injury; seed 1 now fails at i=2 on THROW_BOMB (harness gap) | in progress |
+| goblin | **99** (was 100) | ITER78 PETTY_CASH + casualty dice, ITER79 Ball & Chain drop, ITER80 unhandled-action deselect; seed 1 now fails at i=123 (half 2) | in progress |
 | halfling | 100 | same PETTY_CASH block as goblin (treasury 180k) — unblocked by ITER78, needs a re-scout | queued |
 | vampire | 100 | systematic — Bloodlust bb2016 | queued |
 
@@ -1014,3 +1014,48 @@ seed 1 i=2: the away Bombardier activates `THROW_BOMB`. `ParityRunner` has **no*
 Rust actually throws the bomb and then ends the game (`game_end` at i=3). Needs the bomb action
 ported into `ParityRunner` (deterministic target, jar rebuild) — the same shape as the earlier
 `sendThrowTeamMateTarget` work.
+
+---
+
+## ITER80 — goblin: an activation the harness abandons must not become a step
+
+seed 1 i=2: the away Bombardier is activated with `THROW_BOMB`.
+`ParityRunner.sendConcreteAction`'s switch handles only
+`MOVE, STAND_UP, BLOCK, BLITZ, BLITZ_MOVE, BLITZ_SELECT, STAND_UP_BLITZ, FOUL(_MOVE),
+PASS(_MOVE), HAND_OVER(_MOVE), THROW_TEAM_MATE(_MOVE)`; anything else reaches
+`default: UNHANDLED_ACTING_ACTION … MatchRunner.inject(new ClientCommandActingPlayer(null, null,
+false))` — a deselect that changes nothing and leaves the turn running.
+
+Rust **carried the action out**: it threw the bomb and then ended the game outright
+(`game_end` at i=3, where Java plays to i=901).
+
+**Two halves, one cause — the harness abandons the activation and Rust did not.**
+
+1. **Rust (`random_agent`)**: new `is_handled_acting_action`, a mirror of the Java switch, placed
+   next to the existing no-target-FOUL deselect. An unhandled action now `continue 'reselect`s:
+   the player-pick decisionRng and action-pick actionRng are already spent and the player is
+   already in `used_this_turn`, so the team's turn continues with a different player — exactly
+   what ParityRunner's deselect does. Test
+   `unhandled_acting_actions_mirror_the_parity_runner_deselect`.
+2. **Harness (`ParityRunner`)**: that alone left Rust one step SHORT, because Java calls
+   `recordStep` at phase 1 — *before* `sendConcreteAction` decides to abandon the action — so the
+   abandoned activation was logged as a phantom no-op step (identical pre/post hash) that Rust,
+   which re-picks inside its own loop, never produces. Every later step index was shifted by one.
+   Phase 1 now checks `isHandledActingAction` and `continue`s **without** recording, the same way
+   the existing inactive-player check does (`continue; // rejected pick — decisionRng call
+   consumed, no step logged`). The RNG draws still happen and the player is still marked used, so
+   only the *log* changes, not the game.
+
+**Verified:** goblin seed 1 advances i=2 → **i=123** (half 2), and the roster's fail count finally
+drops: **100 → 99**. Because the harness half is global, the regression sweep was widened: lineman
+bb2016 **0/100**, lineman bb2025 **0/100**, and **16** green bb2016 rosters re-verified at 0 —
+dark_elf, nurgle, slann, lizardman, ogre, underworld, elf, undead, dwarf, necromantic, renegades,
+wood_elf, amazon, human, orc, norse. `cargo test -p ffb-engine` **7103/0**.
+
+Note this closes the same latent hole for `Stab`, `KickTeamMate`, `HypnoticGaze`, `Swoop`, `Punt`,
+`BreatheFire`, `ProjectileVomit` and `SecureTheBall` — all of which ParityRunner also deselects.
+
+### FRONTIER for ITER81
+goblin seed 1 i=123, half 2, away_08 MOVE: state hashes already differ on entry
+(java `12db8b48…` vs rust `5d82c251…`), so the divergence is earlier in half 2 — bisect from the
+first mismatching step.
