@@ -455,6 +455,23 @@ pub fn make_step_for(id: StepId, rules: Rules) -> Box<dyn Step> {
             // → Rust bailed on the landing, Java continued). Route bb2016 to its own StepRightStuff.
             StepId::RightStuff =>
                 return Box::new(crate::step::bb2016::ttm::step_right_stuff::StepRightStuff::new()),
+            // BB2016 Throw-Team-Mate step-set. The bb2016 TTM generator pushes these StepIds; without
+            // routing they fall through to the bb2025 TTM impls, whose scatter differs (bb2016 scatters
+            // the thrown player 3× d8 via StepInitScatterPlayer/UtilThrowTeamMateSequence; bb2025 uses
+            // DispatchScatterPlayer). Route the whole set to bb2016 (edition-gated; bb2025 untouched).
+            // Gates renegades/ogre/goblin/underworld bb2016 (all Troll-TTM rosters).
+            StepId::ThrowTeamMate =>
+                return Box::new(crate::step::bb2016::ttm::step_throw_team_mate::StepThrowTeamMate::new()),
+            StepId::InitThrowTeamMate =>
+                return Box::new(crate::step::bb2016::ttm::step_init_throw_team_mate::StepInitThrowTeamMate::new()),
+            StepId::InitScatterPlayer =>
+                return Box::new(crate::step::bb2016::ttm::step_init_scatter_player::StepInitScatterPlayer::new()),
+            StepId::EndScatterPlayer =>
+                return Box::new(crate::step::bb2016::ttm::step_end_scatter_player::StepEndScatterPlayer::new()),
+            StepId::AlwaysHungry =>
+                return Box::new(crate::step::bb2016::ttm::step_always_hungry::StepAlwaysHungry::new()),
+            StepId::EndThrowTeamMate =>
+                return Box::new(crate::step::bb2016::ttm::step_end_throw_team_mate::StepEndThrowTeamMate::new()),
             _ => {}
         }
     }

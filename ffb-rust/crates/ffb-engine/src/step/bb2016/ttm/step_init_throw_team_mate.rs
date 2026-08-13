@@ -11,6 +11,9 @@ use ffb_model::enums::{PlayerAction, PS_PICKED_UP};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::prompts::agent_prompt::AgentPrompt;
+use ffb_mechanics::bb2016::pass_mechanic::PassMechanic as Bb2016PassMechanic;
+use ffb_mechanics::pass_mechanic::PassMechanic as PassMechanicTrait;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -51,12 +54,27 @@ impl StepInitThrowTeamMate {
 
         if let Some(thrown_id) = &self.thrown_player_id {
             if let Some(target) = self.target_coordinate {
-                // Phase 2: target chosen → set pass coordinate.
+                // Phase 2: target chosen → set pass coordinate. Java's createRangeRuler returns non-null
+                // only when the target is a legal TTM distance (findPassingDistance succeeds) → NEXT_STEP;
+                // else it waits (Continue). Mirror the bb2025 step's in-range gate.
                 game.pass_coordinate = Some(target);
-                // client-only: UtilRangeRuler.createRangeRuler — range ruler is client-side display only
-                return StepOutcome::next();
+                let thrower_coord = game.acting_player.player_id.as_deref()
+                    .and_then(|id| game.field_model.player_coordinate(id));
+                let in_range = Bb2016PassMechanic::new()
+                    .find_passing_distance(game, thrower_coord, Some(target), true)
+                    .is_some();
+                if in_range {
+                    return StepOutcome::next();
+                }
+                return StepOutcome::cont();
             } else {
-                // Phase 1: player chosen — set up defender, publish parameters.
+                // Phase 1: player chosen — set up defender, publish parameters, and EMIT the
+                // ThrowTeamMateTarget prompt so the (headless) agent supplies the target square.
+                // Without this AgentPrompt bridge the step returned NEXT with no target, so
+                // pass_coordinate stayed None and StepThrowTeamMate bailed at find_passing_distance →
+                // the thrown player never scattered/landed (renegades/underworld bb2016). Mirror the
+                // bb2025 StepInitThrowTeamMate bridge; the engine waits (Continue) for
+                // Action::ThrowTeamMate{coord}. The agent (random_agent) already answers this prompt.
                 let thrown_id = thrown_id.clone();
                 if game.player(&thrown_id).is_some() {
                     game.defender_id = Some(thrown_id.clone());
@@ -71,9 +89,15 @@ impl StepInitThrowTeamMate {
                     game.field_model.set_player_state(&thrown_id, state.change_base(PS_PICKED_UP));
                     game.acting_player.player_action = Some(PlayerAction::ThrowTeamMate);
 
-                    let mut outcome = StepOutcome::next()
+                    let thrower_id = game.acting_player.player_id.clone().unwrap_or_default();
+                    let mut outcome = StepOutcome::cont()
+                        .with_prompt(AgentPrompt::ThrowTeamMateTarget {
+                            thrower_id,
+                            thrown_player_id: thrown_id.clone(),
+                        })
                         .publish(StepParameter::ThrownPlayerId(Some(thrown_id)))
                         .publish(StepParameter::ThrownPlayerState(state))
+                        .publish(StepParameter::OldDefenderState(state))
                         .publish(StepParameter::ThrownPlayerHasBall(has_ball));
                     if let Some(c) = coord {
                         outcome = outcome.publish(StepParameter::ThrownPlayerCoordinate(Some(c)));
@@ -104,9 +128,14 @@ impl Step for StepInitThrowTeamMate {
                 self.execute_step(game)
             }
             Action::ThrowTeamMate { player_id, coord } => {
-                // Java: first call sets player_id; second call (with player already set) sets target
+                // Java: first call sets player_id; second call (with player already set) sets target.
+                // The parity agent sends the target in the ACTING team's mirrored client frame; Java's
+                // client→server path un-mirrors for the away team. Mirror the bb2025 StepInitThrowTeamMate:
+                // transform the coord when away is acting, else find_passing_distance sees an off-pitch/
+                // out-of-range square → phase-2 waits forever (renegades bb2016 seed2 stall on away_04's TTM).
                 if self.thrown_player_id.is_some() {
-                    self.target_coordinate = Some(*coord);
+                    let target = if game.home_playing { *coord } else { coord.transform() };
+                    self.target_coordinate = Some(target);
                 } else {
                     self.thrown_player_id = Some(player_id.clone());
                     self.target_coordinate = None;
@@ -180,7 +209,9 @@ mod tests {
         add_player(&mut game, "p1");
         let mut rng = GameRng::new(0);
         let outcome = step.start(&mut game, &mut rng);
-        assert!(matches!(outcome.action, StepAction::NextStep));
+        // Phase 1 (player selected, no target) now emits the ThrowTeamMateTarget prompt and WAITS.
+        assert!(matches!(outcome.action, StepAction::Continue));
+        assert!(matches!(outcome.prompt, Some(ffb_model::prompts::AgentPrompt::ThrowTeamMateTarget { .. })));
         let has_state = outcome.published.iter().any(|p| matches!(p, StepParameter::ThrownPlayerState(_)));
         assert!(has_state);
         assert_eq!(game.field_model.player_state("p1").unwrap().base(), PS_PICKED_UP);
@@ -209,8 +240,31 @@ mod tests {
             &Action::ThrowTeamMate { player_id: "p1".into(), coord: FieldCoordinate::new(10, 7) },
             &mut game, &mut rng,
         );
-        assert!(matches!(outcome.action, StepAction::NextStep));
+        // First ThrowTeamMate command selects the player (phase 1) → emits the target prompt + waits.
+        assert!(matches!(outcome.action, StepAction::Continue));
+        assert!(matches!(outcome.prompt, Some(ffb_model::prompts::AgentPrompt::ThrowTeamMateTarget { .. })));
         assert_eq!(game.defender_id.as_deref(), Some("p1"));
+    }
+
+    /// Phase 2: when the AWAY team is acting, the agent's mirrored target coord must be un-mirrored
+    /// (transform) into server-canonical space before it becomes pass_coordinate — else
+    /// find_passing_distance sees an out-of-range/off-pitch square and the step waits forever
+    /// (renegades bb2016 seed2 stall). Home acting = no transform.
+    #[test]
+    fn phase2_away_target_is_transformed() {
+        use ffb_model::types::FieldCoordinate;
+        let coord = FieldCoordinate::new(7, 5);
+        for (home_playing, expected) in [(true, coord), (false, coord.transform())] {
+            let mut step = StepInitThrowTeamMate::new();
+            step.set_parameter(&StepParameter::ThrownPlayerId(Some("p1".into())));
+            let mut game = make_game();
+            add_player(&mut game, "p1");
+            game.home_playing = home_playing;
+            let mut rng = GameRng::new(0);
+            step.handle_command(&Action::ThrowTeamMate { player_id: "p1".into(), coord }, &mut game, &mut rng);
+            assert_eq!(game.pass_coordinate, Some(expected),
+                "home_playing={home_playing}: target must be {} transformed", if home_playing {"NOT"} else {"IS"});
+        }
     }
 
     #[test]
