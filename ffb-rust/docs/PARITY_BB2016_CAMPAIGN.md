@@ -49,7 +49,7 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | wood_elf | **0** (98→81→19→0) | 🟢 100/100 GREEN (ITER71 startedStanding, ITER73 rooted pre-draw, ITER77 declined-re-roll edition gate) | GREEN |
 | goblin | **0** (100→99→5→4→3→2→0) | 🟢 100/100 GREEN (ITER78-87) | GREEN |
 | halfling | **0** (100→3→0) | 🟢 100/100 GREEN (ITER78-80 unblocked it to 3; ITER81 TTM-landing drop-before-apply) | GREEN |
-| vampire | **56** (was 100) | ITER88 (bb2016 GAZE action + failed-feed boxing); in progress |
+| vampire | **39** (100→56→39) | + ITER90 (bb2016 Blood-Lust failure cancels the action); in progress |
 
 Counts above re-scouted 2026-08-13 AFTER ITER56-58 with FULL 1-100 `--no-abort` runs (no timeout).
 The older `undead 44` / `necromantic 44` figures were unreliable (truncated triage) — the true
@@ -1428,3 +1428,42 @@ needs bb2016's "failure cancels the declared action" `GOTO_LABEL` branch, which 
 replace with the `failBloodLustForAction` conversion dialog.
 
 Baseline re-confirmed after reverting: vampire bb2016 **56**.
+
+---
+
+## ITER90 — vampire 56 → **39**: the live Blood Lust step, found by backtrace
+
+ITER89 edited three Blood Lust files with no effect. The technique that worked in ITER87 settled it
+in one run: a gated `Backtrace::force_capture()` in `GameRng::die`, firing on the exact call number
+(`FFB_RNG_BT=77`):
+
+```
+RNGBT call=77 sides=6
+   6: <ffb_engine::step::bb2025::shared::step_blood_lust::StepBloodLust as ...::Step>::start
+```
+
+The live path is `step/bb2025/shared/step_blood_lust.rs` — and it *does* roll the die (ITER89's
+"Rust never rolled" reading was wrong; both engines roll pos 77 = `d6 1`). The divergence is purely
+in the FAILURE handling.
+
+`failBloodLustForAction` — the dialog offering to convert the declared action into its Blood Lust
+alternate — is a **BB2020/BB2025 addition**. `bb2016/BloodLustBehaviour` has no such branch; a
+failed roll goes straight to the failure path:
+```java
+actingPlayer.setSufferingBloodLust(true);
+step.publishParameter(new StepParameter(StepParameterKey.MOVE_STACK, null));
+step.getResult().setNextAction(GOTO_LABEL, state.goToLabelOnFailure);   // = END_BLOCKING
+```
+so the declared Block is simply **cancelled**. Rust ran the bb2025 dialog for bb2016 too, so a
+Vampire that failed Blood Lust still threw its block — Java drew ONE die and passed the turn over,
+Rust drew thirteen.
+
+FIX: `needs_dialog` is now `rules != Bb2016 && …`. Test
+`bb2016_failure_cancels_the_declared_block_without_the_conversion_dialog`.
+
+**Verified:** vampire **56 → 39**. Gates: lineman bb2016 **0**, goblin **0**, halfling **0**,
+lineman bb2025 **0**, vampire bb2025 **0**. `cargo test -p ffb-engine` **7113/0**.
+
+**Still open** (found in ITER89, confirmed to live in this same file, not yet applied): Java's
+`doRoll`/`markSkillUsed` use the **ActingPlayer**'s used-set (cleared every activation), while this
+step reads and writes `Player.used_skills` (whole game). Try it next as its own change.

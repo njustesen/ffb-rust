@@ -217,10 +217,21 @@ impl StepBloodLust {
     }
 
     fn fail_blood_lust_for_action(&mut self, game: &mut Game, acting_id: &str) -> StepOutcome {
+        // EDITION-SPECIFIC. `failBloodLustForAction` — the dialog that offers to convert the declared
+        // action into its Blood Lust alternate — is a BB2020/BB2025 addition.
+        // `bb2016/BloodLustBehaviour` has NO such branch: a failed roll goes straight to the failure
+        // path, so the declared Block/Blitz is simply CANCELLED —
+        //     actingPlayer.setSufferingBloodLust(true);
+        //     step.publishParameter(new StepParameter(StepParameterKey.MOVE_STACK, null));
+        //     step.getResult().setNextAction(GOTO_LABEL, state.goToLabelOnFailure);  // END_BLOCKING
+        // Running the bb2025 dialog for bb2016 let a Vampire that failed Blood Lust still throw its
+        // block: Java drew ONE die and passed the turn over, Rust drew thirteen
+        // (vampire bb2016 seed 1 i=100 — Java 77 rng calls vs Rust 89).
         let current_action = game.acting_player.player_action;
-        let needs_dialog = current_action
-            .map(|a| a != PlayerAction::Move && Self::get_alternate_action(a) != a)
-            .unwrap_or(false);
+        let needs_dialog = game.rules != ffb_model::enums::Rules::Bb2016
+            && current_action
+                .map(|a| a != PlayerAction::Move && Self::get_alternate_action(a) != a)
+                .unwrap_or(false);
 
         if needs_dialog {
             self.status = BloodLustStatus::WaitForActionChange;
@@ -429,4 +440,27 @@ mod tests {
         assert_eq!(StepBloodLust::get_alternate_action(PlayerAction::Block), PlayerAction::Move);
     }
 
+    /// `failBloodLustForAction` — the dialog that offers to convert the declared action into its
+    /// Blood Lust alternate — is a BB2020/BB2025 addition. `bb2016/BloodLustBehaviour` has no such
+    /// branch: a failed roll goes straight to the failure path (`setSufferingBloodLust` +
+    /// `MOVE_STACK null` + `GOTO_LABEL goToLabelOnFailure`), so the declared Block is CANCELLED.
+    /// Running the bb2025 dialog for bb2016 let a Vampire that failed Blood Lust still throw its
+    /// block: Java drew ONE die and passed the turn over, Rust drew thirteen (vampire bb2016
+    /// seed 1 i=100 — Java 77 rng calls vs Rust 89).
+    #[test]
+    fn bb2016_failure_cancels_the_declared_block_without_the_conversion_dialog() {
+        let run = |rules: Rules| {
+            let mut game = make_game(vec![SkillId::BloodLust], Some(PlayerAction::Block));
+            game.rules = rules;
+            let mut step = StepBloodLust::new(String::new());
+            step.goto_label_on_failure = Some("endBlocking".into());
+            let out = step.fail_blood_lust_for_action(&mut game, "vamp");
+            out.action
+        };
+
+        assert_eq!(run(Rules::Bb2016), StepAction::GotoLabel,
+            "bb2016 jumps to the failure label, cancelling the declared Block");
+        assert_eq!(run(Rules::Bb2025), StepAction::Continue,
+            "bb2025 stops for the action-conversion dialog instead");
+    }
 }
