@@ -47,7 +47,7 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | elf | **0** (was 84) | 🟢 100/100 GREEN (ITER66 Side Step auto-use) | GREEN |
 | ogre | **0** (was 98) | 🟢 100/100 GREEN (ITER69 bb2016 TTM spends the PASS; needed a jar rebuild) | GREEN |
 | wood_elf | **0** (98→81→19→0) | 🟢 100/100 GREEN (ITER71 startedStanding, ITER73 rooted pre-draw, ITER77 declined-re-roll edition gate) | GREEN |
-| goblin | **99** (was 100) | ITER78 PETTY_CASH + casualty dice, ITER79 Ball & Chain drop, ITER80 unhandled-action deselect; seed 1 now fails at i=123 (half 2) | in progress |
+| goblin | **5** (100→99→5) | ITER78-80 + ITER82 (bb2016 argues ONCE per team); 5 seeds left | in progress |
 | halfling | **0** (100→3→0) | 🟢 100/100 GREEN (ITER78-80 unblocked it to 3; ITER81 TTM-landing drop-before-apply) | GREEN |
 | vampire | 100 | systematic — Bloodlust bb2016 | queued |
 
@@ -1100,3 +1100,40 @@ and every other TTM roster re-verified — renegades **0**, underworld **0**, og
 goblin unchanged at 99. `cargo test -p ffb-engine` **7104/0**.
 
 **bb2016 matrix: 28 🟢 / 2 🔴 — goblin 99, vampire 100.**
+
+---
+
+## ITER82 — goblin 99 → **5**: bb2016 argues the call ONCE per team, not once per weapon
+
+seed 1, first divergent step **i=124** — the half-time transition. Dice matched through rng 65
+(three KO recoveries at 61-63, two argue d6 at 64-65) and then split:
+
+| | Java | Rust |
+|---|---|---|
+| 66 | **d8** `StepKickoffScatterRoll` scatter direction | d6 |
+| 67 | d6 scatter distance | d6 |
+| … | 10 dice total for the halftime | **14** |
+
+Rust rolled **two extra argue d6** at 66-67, shifting the kickoff scatter, the kickoff result and
+the ball bounce (Java ball `21,7`, Rust `25,9`).
+
+The number of argue dice a team rolls is **edition-specific**:
+- **bb2025** `StepEndTurn` keeps a `playerIdsArgued` set, and `playersForArgue(team, game)`
+  excludes anyone already argued — so `askForArgueTheCall` **re-fires** the dialog until the team
+  has no un-argued secret weapon left. One d6 per eligible player.
+- **bb2016** `StepEndTurn` has **no such tracking**. `askForArgueTheCall` is guarded by
+  `fArgueTheCallChoice{Home,Away} == null`, so it fires **once per team**, and
+  `argueTheCall(team, pPlayerIds)` rolls only for the ids the *client* named — and
+  `ParityRunner`'s `ARGUE_THE_CALL` handler names exactly one (`playerIds[0]`).
+  **One d6 per TEAM.**
+
+Rust looped in both editions. A goblin mirror has two eligible weapons per team (Fanatic +
+Bombardier), so Rust drew 4 argue dice where Java drew 2.
+
+FIX: `break` out of the per-team loop after the first argued player under `Rules::Bb2016`. Test
+`bb2016_argues_once_per_team_bb2025_argues_every_secret_weapon` (two flagged weapons, a seed whose
+d6s are neither 6 nor 1 so nothing short-circuits: bb2016 rolls 1, bb2025 rolls 2).
+
+**Verified:** goblin **99 → 5**. Gates: lineman bb2016 **0**, dwarf bb2016 **0**, halfling bb2016
+**0**, lineman bb2025 **0**, goblin bb2025 **0**, dwarf bb2025 **0** (the other secret-weapon
+rosters, both editions). `cargo test -p ffb-engine` **7105/0**.

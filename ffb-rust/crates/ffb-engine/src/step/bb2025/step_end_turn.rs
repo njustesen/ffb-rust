@@ -387,6 +387,21 @@ impl StepEndTurn {
                     }
                     break;
                 }
+                // EDITION-SPECIFIC — how many players a team argues for.
+                //   bb2025 `StepEndTurn` keeps a `playerIdsArgued` set and `playersForArgue(team, game)`
+                //     excludes anyone already argued, so `askForArgueTheCall` RE-FIRES the dialog until
+                //     the team has no un-argued secret weapon left: one d6 per eligible player.
+                //   bb2016 `StepEndTurn` has NO such tracking. `askForArgueTheCall` is guarded by
+                //     `fArgueTheCallChoice{Home,Away} == null`, so it fires ONCE per team, and
+                //     `argueTheCall(team, playerIds)` rolls only for the ids the CLIENT named —
+                //     ParityRunner names exactly one (`playerIds[0]`). One d6 per TEAM, full stop.
+                // Looping in bb2016 rolled one argue die per eligible weapon: a goblin mirror has two
+                // per team (Fanatic + Bombardier), so Rust drew 4 argue d6 where Java drew 2 and the
+                // halftime kickoff read the wrong stream position (goblin bb2016 seed 1, i=124: Java
+                // ball 21,7 vs Rust 25,9).
+                if game.rules == ffb_model::enums::Rules::Bb2016 {
+                    break;
+                }
             }
         }
 
@@ -1288,5 +1303,54 @@ mod tests {
         assert!(!StepEndTurn::check_end_of_half(&game));
         game.turn_data_away.turn_nr = 8;
         assert!(StepEndTurn::check_end_of_half(&game));
+    }
+
+    /// How many argue dice a TEAM rolls is edition-specific.
+    /// bb2025 `StepEndTurn` keeps a `playerIdsArgued` set and `playersForArgue` excludes anyone
+    /// already argued, so `askForArgueTheCall` re-fires until the team has no un-argued secret
+    /// weapon left — one d6 per eligible player. bb2016 `StepEndTurn` has no such tracking:
+    /// `askForArgueTheCall` is guarded by `fArgueTheCallChoice{Home,Away} == null` so it fires ONCE
+    /// per team, and `argueTheCall(team, playerIds)` rolls only for the ids the CLIENT named —
+    /// ParityRunner names exactly one (`playerIds[0]`). Rust looped in both editions, so a goblin
+    /// mirror (Fanatic + Bombardier per team) drew 4 argue d6 where Java drew 2 and the halftime
+    /// kickoff read the wrong stream position (goblin bb2016 seed 1 i=124).
+    #[test]
+    fn bb2016_argues_once_per_team_bb2025_argues_every_secret_weapon() {
+        use ffb_model::enums::SkillId;
+
+        fn setup(rules: Rules) -> (Game, StepEndTurn) {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+            for (i, id) in ["sw1", "sw2"].iter().enumerate() {
+                let mut p = make_player(id);
+                p.starting_skills = vec![SkillWithValue { skill_id: SkillId::SecretWeapon, value: None }];
+                game.team_home.players.push(p);
+                game.field_model.set_player_coordinate(id, FieldCoordinate::new(5, 5 + i as i32));
+                game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+                game.game_result.team_result_mut(true).player_result_mut(id).has_used_secret_weapon = true;
+            }
+            (game, StepEndTurn::new())
+        }
+
+        // A seed whose first two d6 are neither 6 (success) nor 1 (coach ban), so nothing short-circuits.
+        let seed = (0u64..10_000)
+            .find(|s| {
+                let mut r = GameRng::new(*s);
+                matches!(r.d6(), 2..=5) && matches!(r.d6(), 2..=5)
+            })
+            .expect("some seed yields two mid d6");
+
+        let (mut game, mut step) = setup(Rules::Bb2016);
+        let mut rng = GameRng::new(seed);
+        let before = rng.call_count;
+        step.argue_and_remove_secret_weapons(&mut game, &mut rng);
+        assert_eq!(rng.call_count - before, 1,
+            "bb2016 argues ONCE per team, for the single player the client names");
+
+        let (mut game, mut step) = setup(Rules::Bb2025);
+        let mut rng = GameRng::new(seed);
+        let before = rng.call_count;
+        step.argue_and_remove_secret_weapons(&mut game, &mut rng);
+        assert_eq!(rng.call_count - before, 2,
+            "bb2025 re-fires the dialog until every eligible secret weapon has been argued");
     }
 }
