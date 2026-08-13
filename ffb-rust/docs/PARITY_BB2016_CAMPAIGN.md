@@ -457,3 +457,46 @@ Stand Firm `pushbackStack.clear()` noted in ITER60.
 
 Remaining reds: ogre 98 · wood_elf 98 · goblin 100 · halfling 100 · vampire 100.
 **ogre/wood_elf are the next targets.**
+
+### ITER67 (2026-08-13) — ogre: root-caused to a ParityRunner gap needing a JAR REBUILD (no fix landed)
+
+ogre seed 1 has **no rng divergence at all** and Java's log simply STOPS at i=6:
+`STUCK_STEP: INIT_SELECTING unadvanced for 501 iters — ending game`, then
+`END_REASON: finished iter=523 half=1 turnHome=1 turnAway=0`. Java never leaves home's first turn, so
+for this seed **there is no ground truth to match**.
+
+The Java tail shows the harness re-declaring the same action forever:
+
+    JAVA_TTM pid=…Home6 N=2 idx=1 thrown=…Home8
+    JAVA_P2 pid=…Home6 action=THROW_TEAM_MATE si=7      (repeated ~500×, actionRng consumed each time)
+
+ROOT CAUSE: Java's bb2016 `StepInitSelecting.handleCommand` gates `CLIENT_THROW_TEAM_MATE` on
+`checkCommandWithActingPlayer(...) && **!game.getTurnData().isPassUsed()**`, and a bb2016 TTM consumes
+the team's PASS (`ThrowTeamMateBehaviour` → `turnData.setPassUsed(true)`), NOT a separate ttm flag.
+Ogre seed 1 declares **two** TTMs in one turn (i=2 `Activate(Home5, THROW_TEAM_MATE)` and i=6
+`Activate(Home6, THROW_TEAM_MATE)`). The second is illegal: the engine rejects the command, the step
+stays UNHANDLED, and `ParityRunner.filterStaleActions` — which filters
+`case THROW_TEAM_MATE: keep = !td.isTtmUsed();` — does not know bb2016 spends `passUsed`, so it keeps
+re-offering TTM and spins.
+
+Rust meanwhile RESOLVED the second TTM. Its `Action::ThrowTeamMate` command arm does gate on
+`game.turn_data().pass_used` (step_init_selecting.rs:161), but the **folded-target dispatch arm**
+(`PlayerAction::ThrowTeamMate =>` ~line 240, the path the agent actually takes) does not.
+
+FIX REQUIRED (three parts, and the agent halves MUST land together or the action-pick `N` diverges):
+1. Rust `bb2016/move_/step_init_selecting.rs`: the folded TTM dispatch arm must honour `!pass_used`,
+   1:1 with Java's gate.
+2. Rust `random_agent.rs` `filter_stale_actions` (line ~271): under bb2016, filter
+   `PlayerAction::ThrowTeamMate` by `!td.pass_used` rather than `!td.ttm_used`.
+3. Java `ParityRunner.filterStaleActions`: same change — **this needs a JAR REBUILD.**
+
+NOT ATTEMPTED THIS ITERATION: a jar rebuild is a deliberate operation (per `docs/PARITY_PROCESS.md`:
+commit the Rust side first, rebuild, then re-verify the lineman tier before trusting any result), and
+starting it at the tail of a long iteration risks losing work. ogre stays at 98. Next iteration should
+run that sequence for parts 1-3 together.
+
+Also checked and RULED OUT this iteration: the "headless: auto-decline" sweep of
+`skill_behaviour/bb2016/` found a third instance — `grab_behaviour.rs:103` auto-declines a Grab that
+Java offers via `DialogSkillUseParameter` (so the harness would USE it). **No bb2016 roster has Grab**
+(verified across all 29 `data/rosters/bb2016/roster_*.json`), so it cannot explain any remaining red.
+Worth fixing for correctness, but it is not on the critical path.
