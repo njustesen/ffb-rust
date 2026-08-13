@@ -228,22 +228,30 @@ impl StepPushback {
                     ));
                 }
 
-                // Java: fieldModel.add(state.pushbackSquares) — the client renders the choice and
-                // answers with CLIENT_PUSHBACK. Emit AgentPrompt::Pushback so the agent can reply
-                // (bare cont() waited forever — bb2016 block-sequence stall). Same bridge as bb2025.
-                game.field_model.pushback_squares.clear();
-                game.field_model.pushback_squares.extend(final_pushback_squares);
-                let squares: Vec<FieldCoordinate> = game.field_model.pushback_squares.iter()
-                    .filter(|sq| !sq.locked)
-                    .map(|sq| sq.coordinate)
-                    .collect();
-                return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::Pushback {
-                    attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
-                    // The player being pushed is the step-local defender (occupant), not the block's
-                    // original defender — matters for a chain push.
-                    defender_id: self.defender_id.clone().unwrap_or_default(),
-                    squares,
-                });
+                // A skill hook (Stand Firm / Side Step / Grab) may have set do_push=true to CANCEL
+                // the push (Stand Firm avoids it entirely, clearing pushback_squares). In that case
+                // there is no square to choose — skip the prompt and fall through to the do_push
+                // application below (drains the now-empty stack → NEXT_STEP so the block sequence
+                // continues to the knockdown/injury). Emitting the Pushback prompt with an empty
+                // square list stalled the game (dwarf seed1 i=36: the Deathroller's Stand Firm).
+                if !do_push {
+                    // Java: fieldModel.add(state.pushbackSquares) — the client renders the choice and
+                    // answers with CLIENT_PUSHBACK. Emit AgentPrompt::Pushback so the agent can reply
+                    // (bare cont() waited forever — bb2016 block-sequence stall). Same bridge as bb2025.
+                    game.field_model.pushback_squares.clear();
+                    game.field_model.pushback_squares.extend(final_pushback_squares);
+                    let squares: Vec<FieldCoordinate> = game.field_model.pushback_squares.iter()
+                        .filter(|sq| !sq.locked)
+                        .map(|sq| sq.coordinate)
+                        .collect();
+                    return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::Pushback {
+                        attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
+                        // The player being pushed is the step-local defender (occupant), not the block's
+                        // original defender — matters for a chain push.
+                        defender_id: self.defender_id.clone().unwrap_or_default(),
+                        squares,
+                    });
+                }
             }
         }
 

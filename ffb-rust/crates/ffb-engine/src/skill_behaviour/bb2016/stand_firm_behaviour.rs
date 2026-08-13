@@ -103,11 +103,15 @@ impl StepModifierTrait for StandFirmStepModifier {
             return false;
         }
 
-        // Java: if (!standingFirm.containsKey(id)) show dialog → headless: auto-decline
-        // (established precedent: see StandFirmStepModifier in bb2025, Phase AAF Dodge convention)
+        // Java shows a DialogSkillUseParameter (use Stand Firm?). The parity harness
+        // (ParityRunner) auto-USES every offered skill except DumpOff/PrimalSavagery/
+        // SafePairOfHands/Swoop (comm.sendUseSkill(skill, true, ...)), so a Stand Firm defender
+        // AVOIDS the push. Mirror that: auto-ACCEPT when undecided (a prone/stunned defender was
+        // already forced to decline above, and a Juggernaut-blitz cancel likewise). Previously this
+        // auto-DECLINED, so a bb2016 Stand Firm player (dwarf Deathroller) was wrongly pushed +
+        // followed-up while Java left it prone in place (dwarf seed1 i=36).
         if !state.standing_firm.contains_key(&defender_id) {
-            state.standing_firm.insert(defender_id.clone(), false);
-            return false;
+            state.standing_firm.insert(defender_id.clone(), true);
         }
 
         // Java: state.doPush = true; pushbackStack.clear(); publish STARTING_PUSHBACK_SQUARE=null;
@@ -221,7 +225,9 @@ mod tests {
     }
 
     #[test]
-    fn stand_firm_not_decided_headless_auto_declines() {
+    fn stand_firm_not_decided_headless_auto_uses() {
+        // The parity harness auto-USES Stand Firm (ParityRunner sendUseSkill=true), so an undecided
+        // standing defender stands firm and the push is cancelled (do_push set, squares cleared).
         let mut game = make_game();
         game.team_away.players.push(player_with_skills("def1", vec![SkillId::StandFirm]));
         game.field_model.set_player_coordinate("def1", FieldCoordinate::new(5, 5));
@@ -230,8 +236,9 @@ mod tests {
         let m = StandFirmStepModifier;
         let mut hs = default_hook_state("def1");
         let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
-        assert!(!result);
-        assert_eq!(hs.standing_firm.get("def1"), Some(&false));
+        assert!(result, "undecided standing defender auto-uses Stand Firm → cancels push");
+        assert_eq!(hs.standing_firm.get("def1"), Some(&true));
+        assert!(hs.do_push, "do_push set so the (empty) pushback stack is applied without moving the defender");
     }
 
     #[test]
