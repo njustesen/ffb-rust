@@ -41,17 +41,21 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 |---|---:|---|---|
 | renegades | **0** (38→8→1→0) | 🟢 100/100 GREEN (ITER55 TTM routing, ITER56 declined-re-roll, ITER57 RightStuff dropPlayer) | GREEN |
 | underworld | **0** (44→8→1→0) | 🟢 100/100 GREEN (ITER55-56 TTM + ITER58 bb2016 InitPassing routing) | GREEN |
-| undead | 44 | stand-up-blitz-GFI (ITER51 diagnosis) | queued |
-| dwarf | 80 | Deathroller (ITER54 diagnosis), multi-layer | queued |
+| necromantic | 58 | untraced — **NEXT TARGET** (fewest fails) | queued |
+| undead | 76 | stand-up-blitz-GFI (ITER51 diagnosis) | queued |
+| dwarf | 79 | Deathroller (ITER54 diagnosis), multi-layer | queued |
 | elf | 84 | untraced (suspect AG / pass) | queued |
-| wood_elf | 99 | untraced | queued |
-| goblin | 100 | earlier non-TTM blocker masks the TTM win — retrace seed 1 | queued |
 | ogre | 98 | earlier non-TTM blocker | queued |
+| wood_elf | 98 | untraced | queued |
+| goblin | 100 | earlier non-TTM blocker masks the TTM win — retrace seed 1 | queued |
 | halfling | 100 | systematic (every seed) — likely a roster/skill-load or first-step gap | queued |
 | vampire | 100 | systematic — Bloodlust bb2016 | queued |
-| necromantic | 44* | *stale count, re-verify | queued |
 
-Green (19): lineman, amazon, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl,
+Counts above re-scouted 2026-08-13 AFTER ITER56-58 with FULL 1-100 `--no-abort` runs (no timeout).
+The older `undead 44` / `necromantic 44` figures were unreliable (truncated triage) — the true
+counts are 76 / 58. Green rosters re-verified 0 fails in the same sweep.
+
+Green (21): renegades, underworld, lineman, amazon, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl,
 high_elf, human, khemri, khemri_fumbbl, lizardman, nippon, norse, nurgle, orc, skaven, slann,
 slann_fumbbl.
 
