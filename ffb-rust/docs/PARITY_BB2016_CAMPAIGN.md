@@ -1269,3 +1269,51 @@ bb2025 **0**. `cargo test -p ffb-engine` **7108/0**.
 
 Known remaining deviation in this function (deliberately NOT changed here, no seed exercises it):
 Java guards the scatter with `&& game.getTurnMode() != TurnMode.BLITZ`; Rust has no such guard.
+
+---
+
+## ITER86 — goblin seed 46 traced; one 1:1 fix landed, roster still at 2
+
+seed 46's first divergence is **i=142**, the half-2 setup, with **identical dice** (84 both) and a
+state-only difference: Java has `h02` (the home Fanatic) **off the pitch**, Rust sets it up on the
+LOS.
+
+A gated `JSETUP` trace in the harness settled what Java's `h02` actually is —
+`Home3#3=13`, i.e. **BANNED**, not merely unplaced (the harness's `playerStateStr` renders BANNED
+through its `default:` arm as "Reserve", which is what made the state string ambiguous). A gated
+`JSWFLAG` trace then showed Java carrying `hasUsedSecretWeapon = true` on that Fanatic from **step
+1 onward**, while it sat KO'd (`s5`) for all of half 1.
+
+That flag cannot come from `markPlayedAndSecretWeapons` — its
+`canBeSetUpNextDrive() && base != RESERVE` guard excludes a KO'd player in both engines. It comes
+from **`InjuryResult.applyTo`**:
+
+```java
+public void applyTo(IStep pStep, boolean updateStats) {
+    ...
+    if (defender.hasSkillProperty(getsSentOffAtEndOfDrive)) playerResult.setHasUsedSecretWeapon(true);
+    ...
+    if (injuryContext.getPlayerState() != null) { ...apply the state... }
+```
+
+The flag is set **first**, before the PlayerState is even looked at. The Fanatic was KO'd by the
+kickoff Pitch-Invasion chain injury (ITER83), which flagged it as used; at the end of half 1 Java's
+single bb2016 argue (ITER82) therefore targeted the **Fanatic** (first flagged player in team
+order), failed, and banned it. Rust's Fanatic was never flagged, so Rust argued for the
+**Bombardier** instead and set the Fanatic up again in half 2.
+
+**Landed:** Rust's `apply_to` returned early when `ctx.injury` was `None` and only *then* set the
+flag. It now sets the flag first, exactly as Java does. Test
+`secret_weapon_flag_is_set_even_when_the_injury_has_no_player_state`.
+
+**This did NOT move seed 46** — honest reporting. Instrumenting `apply_to` showed it is **never
+called for a secret-weapon player** in this game, so the bb2016 Pitch-Invasion chain injury reaches
+its KO state by some other path and never runs `applyTo` at all. The fix is correct and faithful,
+but the flag still isn't set.
+
+### FRONTIER for ITER87
+Find what applies the ITER83-published `INJURY_RESULT` from the bb2016 Pitch Invasion. `h02`
+*does* end up KO in half 1 (matching Java at i=141), so the state is applied somewhere — but not
+through `InjuryResult::apply_to`, which is where Java sets `hasUsedSecretWeapon`. Route that path
+through `apply_to` (or find the Java step that does) and the flag, the argue target and the half-2
+setup should all fall into line. Remaining goblin seeds: **46, 56**.

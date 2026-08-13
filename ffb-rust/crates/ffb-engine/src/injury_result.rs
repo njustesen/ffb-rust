@@ -95,12 +95,15 @@ impl InjuryResult {
             Some(id) => id.to_owned(),
             None => return,
         };
-        let new_state = match ctx.injury {
-            Some(s) => s,
-            None => return,
-        };
-
-        // Java: if (NamedProperties.getsSentOffAtEndOfDrive) playerResult.setHasUsedSecretWeapon(true)
+        // Java: `if (NamedProperties.getsSentOffAtEndOfDrive) playerResult.setHasUsedSecretWeapon(true)`
+        // is the FIRST thing applyTo does — BEFORE `if (injuryContext.getPlayerState() != null)`.
+        // Rust returned early when `ctx.injury` was None and only then set the flag, so an injury
+        // that produces no PlayerState never marked its secret weapon as used. The bb2016
+        // Pitch-Invasion Ball & Chain chain injury is exactly that shape (its result is published
+        // for the apothecary step, not applied as a state), so the goblin Fanatic KO'd at the
+        // kickoff was never flagged: at the end of half 1 Java argued for it and BANNED it, while
+        // Rust argued for the Bombardier instead and set the Fanatic up again in half 2
+        // (goblin bb2016 seed 46 i=142: Java h02 BANNED/off-pitch vs Rust h02 on the LOS).
         let defender_has_secret_weapon = game.player(&defender_id)
             .map(|p| p.has_skill_property(NamedProperties::GETS_SENT_OFF_AT_END_OF_DRIVE))
             .unwrap_or(false);
@@ -109,6 +112,11 @@ impl InjuryResult {
             let tr = game.game_result.team_result_mut(defender_is_home);
             tr.player_result_mut(&defender_id).has_used_secret_weapon = true;
         }
+
+        let new_state = match ctx.injury {
+            Some(s) => s,
+            None => return,
+        };
 
         // Respect precedence: only apply if new_state is worse than existing.
         let current = game.field_model.player_state(&defender_id);
@@ -779,5 +787,44 @@ mod tests {
         let state = game.field_model.player_state("h1").unwrap();
         assert_eq!(state.base(), PS_STUNNED);
         assert!(state.is_active());
+    }
+
+    /// Java `InjuryResult.applyTo` sets the secret-weapon flag FIRST, before it looks at
+    /// `injuryContext.getPlayerState()`:
+    /// ```java
+    /// if (defender.hasSkillProperty(getsSentOffAtEndOfDrive)) playerResult.setHasUsedSecretWeapon(true);
+    /// ...
+    /// if (injuryContext.getPlayerState() != null) { ...apply the state... }
+    /// ```
+    /// Rust returned early when `ctx.injury` was None and only then set the flag, so an injury that
+    /// produces no PlayerState never marked its secret weapon as used.
+    #[test]
+    fn secret_weapon_flag_is_set_even_when_the_injury_has_no_player_state() {
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::skill_def::SkillWithValue;
+
+        use ffb_model::enums::{PlayerGender, PlayerType};
+        use ffb_model::model::player::Player;
+
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue::new(SkillId::SecretWeapon)],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0,
+            race: None, is_big_guy: false,
+            ..Default::default()
+        });
+        let mut ir = InjuryResult::new();
+        ir.injury_context.defender_id = Some("p1".into());
+        // No `injury` state at all — Java still flags the weapon.
+        assert!(ir.injury_context.injury.is_none());
+        ir.apply_to(&mut game);
+
+        assert!(game.game_result.team_result_mut(true).player_result_mut("p1").has_used_secret_weapon,
+            "the secret-weapon flag must be set before the no-PlayerState early return");
     }
 }
