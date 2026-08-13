@@ -1501,3 +1501,40 @@ The `DRIVE` trace shows the failing activation ending with
 `InitBlocking` — so the GOTO label resolves fine and the sequence continues; something *after* that
 terminates the game. Find what ends it (compare the two logs from i=100 forward, and check whether
 the away turn is being ended twice or the drive is being closed).
+
+---
+
+## ITER92 — the early `game_end` isolated to a Rust STALL (no fix; 39 unchanged)
+
+Traced the seed-1 truncation (101 Rust steps vs Java's 187) to its exact last moment. The Rust
+`DRIVE`/`LOOP` tail:
+
+```
+RUST_STEP i=100 ... chosen=Activate(away_03,Block)
+DRIVE step=EndBlocking  stack_len=14
+DRIVE step=InitBlocking stack_len=53
+LOOP applied=NoReRoll prompt_after=None finished=false     <-- STALL: no prompt, not finished
+```
+
+The harness ends the game when the engine returns no prompt and is not finished, so the
+`game_end` at i=101 is a **Rust stall**, not a rules difference.
+
+**Both engines take the same path up to that point.** `bb2016/RollMechanic.askForReRollIfAvailable`
+*does* show the re-roll dialog when a team re-roll is available, and `ParityRunner`'s `RE_ROLL`
+handler declines it with `sendUseReRoll(reRolledAction, null)` — zero dice. That matches Rust
+prompting `ReRollOffer{action:"BLOOD_LUST"}` and the agent answering `NoReRoll`. Java's step then
+fails and the turn ends (`JSTEP i=101` still reads `rng_calls=77`); Rust's stalls.
+
+So the defect is entirely Rust-side: after the declined re-roll, `handle_command` clears
+`re_roll_source`, re-enters `execute_step`, hits the `re_rolled && source == None` arm, and returns
+`fail_blood_lust_for_action` → (ITER90's bb2016 gate) → `fail_blood_lust`, i.e.
+`StepOutcome::goto(END_BLOCKING).publish(MOVE_STACK)`. Returning a **GotoLabel from
+`handle_command`** is what the driver does not carry through — a `GotoLabel` returned from `start`
+works (that is how Bone-head/Really Stupid failures behave).
+
+### FRONTIER for ITER93
+Compare how `DriverGameState::apply` handles a `StepAction::GotoLabel` returned from
+`handle_command` versus from `start`; that asymmetry is the bug. Fix it there (or make the declined
+re-roll path re-enter through the same route `start` uses), then re-run vampire.
+
+No code change committed this iteration — nothing was verified. Baseline: vampire bb2016 **39**.
