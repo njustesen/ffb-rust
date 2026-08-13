@@ -43,7 +43,7 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | underworld | **0** (44→8→1→0) | 🟢 100/100 GREEN (ITER55-56 TTM + ITER58 bb2016 InitPassing routing) | GREEN |
 | necromantic | **0** (58→1→0) | 🟢 100/100 GREEN (ITER59 + ITER60 Stand Firm) | GREEN |
 | undead | 76 | stand-up-blitz-GFI (ITER51 diagnosis) | queued |
-| dwarf | **35** (was 79) | halved by ITER59 Stand Firm (Deathroller) — **NEXT TARGET** | queued |
+| dwarf | **30** (79→35→30) | ITER59 Stand Firm + ITER61 bb2016 casualty-SW argue — **still NEXT TARGET** | queued |
 | elf | 84 | untraced (suspect AG / pass) | queued |
 | ogre | 98 | earlier non-TTM blocker | queued |
 | wood_elf | 98 | untraced | queued |
@@ -229,3 +229,47 @@ frontier ever appears.
 
 Remaining reds after ITER60: dwarf 35 · undead 76 · elf 84 · ogre 98 · wood_elf 98 ·
 goblin 100 · halfling 100 · vampire 100. **dwarf is the next target.**
+
+### ITER61 (2026-08-13) — Secret Weapon eligibility is edition-specific → dwarf 35 → 30
+
+dwarf seed 3: first `rng_calls` divergence at i=156 (Java 83 / Rust 85) — step 155 is the LAST turn
+of half 1, so this is the halftime Secret Weapon send-off. `FFB_DICE_TRACE` callers:
+Java pos 78 AND 79 are both `DiceRoller.rollArgueTheCall:141 StepEndTurn.argueTheCall:540`;
+Rust rolled only ONE d6 there, so its half-2 kickoff scatter d8 landed at pos 79 instead of 80 and
+read the wrong shared-stream position.
+
+State diff at the frontier: `pa00:-1,-1,Injured` — the AWAY Deathroller is a **casualty** at
+halftime. Java i=156 has it as `-1,-1,Reserve` (PS_BANNED renders as Reserve); Rust left it
+`Injured`. So Java argued for the casualty and banned it; Rust skipped it entirely.
+
+ROOT CAUSE: Java's `StepEndTurn.getPlayerIds` eligibility filter differs by edition —
+- bb2025: `!PlayerState.REMOVED_FROM_PLAY.contains(playerState.getBase())`, plus the IllBeBack
+  (`ignoreFirstSecretWeaponSentOff`) opt-out → a casualty secret weapon is neither argued nor banned.
+- bb2016: `playerResult.hasUsedSecretWeapon() && playerState.getBase() != PlayerState.BANNED` **only**
+  → a casualty secret weapon IS argued for (one d6) and IS set BANNED; bb2016 has no IllBeBack clause.
+
+bb2016 games run the SHARED (bb2025) `StepEndTurn`, which applied the bb2025 filter in both the argue
+phase and `removeUsedSecretWeapons`. FIX: edition-gate that filter (`game.rules == Rules::Bb2016`) in
+both phases of `step/bb2025/step_end_turn.rs`.
+
+Test: `casualty_secret_weapon_is_argued_and_banned_only_in_bb2016` (asserts exactly 1 argue d6 +
+BANNED under bb2016, and 0 dice + still-a-casualty under bb2025).
+Verified: dwarf 35 → **30**; no regression across all 28 swept bb2016 rosters; lineman bb2016
+100/100; lineman bb2025 100/100; **goblin bb2025 100/100** (the bb2025 secret-weapon roster);
+ffb-engine 7092/0.
+
+**FAILED APPROACH, REVERTED (record so it is not retried):** routing `StepId::EndTurn` to
+`step/bb2016/step_end_turn.rs` took lineman bb2016 from 0 → **100** fails. That file is an early
+translation whose own doc-comment lists ArgueTheCall / secret weapons / prayers / per-drive reroll
+removal / fainting as untranslated stubs — it is far LESS complete than the bb2025 step it would
+shadow. Porting bb2016's `reportSecretWeaponsUsed` / `argueTheCall` / `removeUsedSecretWeapons` into
+it first did not help, because the step is not routed. **The bb2016 end-turn/pass/block divergences
+must be fixed by edition-gating the SHARED bb2025 steps, not by routing the bb2016 files** — same
+lesson as ITER58's pass step-set. This now applies to: `StepEndTurn`, and the five bb2016 pass steps
+(`Pass`/`Intercept`/`HailMaryPass`/`EndPassing`/`PassBlock`).
+
+STILL OPEN for bb2016 secret weapons (not needed by this frontier, likely needed for goblin 100):
+Java bb2016 `argueTheCall` rolls one d6 **per player id in the client command**, and ParityRunner
+sends only the FIRST eligible player, once per team — so bb2016 should roll AT MOST ONE argue die per
+team. The shared step loops over every flagged player. Dwarf has one Deathroller per team so both
+readings agree; goblin bb2016 (Looney + Bombardier + Fanatic) will not.

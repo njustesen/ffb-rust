@@ -195,12 +195,21 @@ impl StepEndTurn {
                 if !game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon {
                     continue;
                 }
+                // Java getPlayerIds — the eligibility filter is EDITION-SPECIFIC:
+                //   bb2025: `!PlayerState.REMOVED_FROM_PLAY.contains(base)` (casualties/KO'd excluded)
+                //           plus the IllBeBack (ignoreFirstSecretWeaponSentOff) opt-out.
+                //   bb2016: `playerState.getBase() != PlayerState.BANNED` ONLY — a CASUALTY secret
+                //           weapon is still argued for and still banned, and bb2016 has no IllBeBack
+                //           clause at all (dwarf seed 3 step 155: the away Deathroller is a casualty
+                //           at halftime; Java still rolls its argue d6 and sets it BANNED, so Java
+                //           rolls TWO argue dice in a dwarf mirror where Rust rolled one — the
+                //           halftime kickoff scatter then read the wrong stream position).
+                let is_bb2016_sw = game.rules == ffb_model::enums::Rules::Bb2016;
                 let removed = game.field_model.player_state(&pid)
-                    .map(|s| s.is_casualty() || s.base() == PS_BANNED)
+                    .map(|s| if is_bb2016_sw { s.base() == PS_BANNED } else { s.is_casualty() || s.base() == PS_BANNED })
                     .unwrap_or(true);
                 if removed { continue; }
-                // Java getPlayerIds: IllBeBack (ignoreFirstSecretWeaponSentOff) clears the flag and is NOT argued.
-                let ignore = game.player(&pid)
+                let ignore = !is_bb2016_sw && game.player(&pid)
                     .map(|p| p.has_skill_property(NamedProperties::IGNORE_FIRST_SECRET_WEAPON_SENT_OFF))
                     .unwrap_or(false);
                 if ignore {
@@ -271,8 +280,12 @@ impl StepEndTurn {
                     continue;
                 }
                 game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon = false;
+                // Java removeUsedSecretWeapons: bb2016 sets BANNED for EVERY still-flagged player with
+                // no removed-from-play guard (a casualty secret weapon is banned too); bb2025 skips
+                // players already out of play.
+                let is_bb2016_sw = game.rules == ffb_model::enums::Rules::Bb2016;
                 let removed = game.field_model.player_state(&pid)
-                    .map(|s| s.is_casualty() || s.base() == PS_BANNED)
+                    .map(|s| if is_bb2016_sw { s.base() == PS_BANNED } else { s.is_casualty() || s.base() == PS_BANNED })
                     .unwrap_or(true);
                 if removed { continue; }
                 // Java removeUsedSecretWeapon: setPlayerState(BANNED) + putPlayerIntoBox. remove_player clears
@@ -782,6 +795,49 @@ mod tests {
         assert!(game.field_model.player_coordinate("sw").is_none(), "failed argue → removed from pitch");
         assert_eq!(game.field_model.player_state("sw").unwrap().base(), PS_BANNED);
         assert!(!game.game_result.team_result_mut(true).player_result_mut("sw").has_used_secret_weapon);
+    }
+
+    /// Java's `getPlayerIds` eligibility filter is EDITION-SPECIFIC, and this step is shared:
+    ///   bb2025 — `!PlayerState.REMOVED_FROM_PLAY.contains(base)`, so a CASUALTY secret weapon is
+    ///            neither argued for nor banned.
+    ///   bb2016 — `playerState.getBase() != PlayerState.BANNED` only, so a casualty secret weapon
+    ///            IS argued for (consuming a d6) and IS set BANNED.
+    /// dwarf bb2016 seed 3 step 155: the away Deathroller is a casualty at halftime; Java rolled its
+    /// argue die and banned it, Rust skipped it — one fewer d6 before the half-2 kickoff, so the
+    /// kickoff scatter d8 read the wrong shared-stream position.
+    #[test]
+    fn casualty_secret_weapon_is_argued_and_banned_only_in_bb2016() {
+        use ffb_model::enums::{PS_BANNED, PS_BADLY_HURT, Rules};
+
+        fn setup(rules: Rules) -> (Game, StepEndTurn) {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+            let mut p = make_player("sw");
+            p.starting_skills = vec![SkillWithValue { skill_id: ffb_model::enums::SkillId::SecretWeapon, value: None }];
+            game.team_home.players.push(p);
+            // A casualty: off the pitch, BADLY_HURT.
+            game.field_model.set_player_state("sw", PlayerState::new(PS_BADLY_HURT));
+            game.game_result.team_result_mut(true).player_result_mut("sw").has_used_secret_weapon = true;
+            (game, StepEndTurn::new())
+        }
+
+        // bb2016: the casualty is argued for — one d6 consumed — and then banned.
+        let (mut game, mut step) = setup(Rules::Bb2016);
+        let mut rng = GameRng::new(0);
+        let before = rng.call_count;
+        step.report_secret_weapons_used(&mut game, &mut rng);
+        step.argue_and_remove_secret_weapons(&mut game, &mut rng);
+        assert_eq!(rng.call_count - before, 1, "bb2016 rolls exactly one argue d6 for the casualty SW");
+        assert_eq!(game.field_model.player_state("sw").unwrap().base(), PS_BANNED,
+            "bb2016 removeUsedSecretWeapons has no removed-from-play guard");
+
+        // bb2025: the casualty is skipped entirely — no die, still a casualty.
+        let (mut game, mut step) = setup(Rules::Bb2025);
+        let mut rng = GameRng::new(0);
+        let before = rng.call_count;
+        step.report_secret_weapons_used(&mut game, &mut rng);
+        step.argue_and_remove_secret_weapons(&mut game, &mut rng);
+        assert_eq!(rng.call_count - before, 0, "bb2025 excludes REMOVED_FROM_PLAY from getPlayerIds");
+        assert_eq!(game.field_model.player_state("sw").unwrap().base(), PS_BADLY_HURT);
     }
 
     /// Regression (goblin seed 2 step 250): a Stunty-Leeg Secret Weapon (penalty > 0) must roll its
