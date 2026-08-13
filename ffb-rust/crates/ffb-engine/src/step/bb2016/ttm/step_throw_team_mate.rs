@@ -197,12 +197,17 @@ impl Step for StepThrowTeamMate {
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
+            // Declining the re-roll must KEEP re_rolled_action set (only clear the source) so
+            // execute_step's `re_rolled_action == THROW_TEAM_MATE && re_roll_source == None` branch
+            // takes the goto-failure path (fumble stands). Clearing re_rolled_action too made
+            // execute_step re-enter as a FRESH throw and roll the accuracy die AGAIN — an extra d6
+            // (often flipping the fumble to a spurious success + 3× scatter). The parity harness
+            // ALWAYS declines team re-rolls (ParityRunner sendUseReRoll(action, null)), so a fumbled
+            // bb2016 TTM must stay fumbled: renegades seed6 i=130 (home_04 Troll TTM accuracy 1).
             Action::UseSkill { use_skill: false, .. } => {
-                self.re_rolled_action = None;
                 self.re_roll_source = None;
             }
             Action::UseReRoll { use_reroll: false } => {
-                self.re_rolled_action = None;
                 self.re_roll_source = None;
             }
             _ => {}
@@ -459,7 +464,7 @@ mod tests {
     }
 
     #[test]
-    fn re_rolled_action_cleared_on_use_skill_false() {
+    fn declined_reroll_keeps_action_clears_source_and_gotos_failure() {
         let mut game = make_game();
         game.home_playing = true;
         add_player(&mut game, true, "thrower", FieldCoordinate::new(10, 7));
@@ -471,13 +476,19 @@ mod tests {
         step.re_rolled_action = Some("THROW_TEAM_MATE".into());
         step.re_roll_source = Some("TRR".into());
 
-        // UseSkill false → clear reroll state → no reroll → GOTO_FAILURE
+        // Declining the re-roll must KEEP re_rolled_action set (so execute_step's
+        // `re_rolled_action == THROW_TEAM_MATE && re_roll_source == None` branch gotos the failure
+        // label — the fumble stands, NO fresh accuracy roll) and clear only the source.
         use ffb_mechanics::skills::SkillId;
-        let _ = step.handle_command(
+        let out = step.handle_command(
             &Action::UseSkill { skill_id: SkillId::ThrowTeamMate, use_skill: false },
             &mut game,
             &mut GameRng::new(0),
         );
-        assert!(step.re_rolled_action.is_none());
+        assert_eq!(step.re_rolled_action.as_deref(), Some("THROW_TEAM_MATE"),
+            "declined re-roll keeps re_rolled_action so execute_step routes to failure");
+        assert!(step.re_roll_source.is_none(), "the re-roll source is cleared on decline");
+        assert!(matches!(out.action, StepAction::GotoLabel),
+            "a declined TTM re-roll gotos the failure label (fumble stands, no re-roll)");
     }
 }
