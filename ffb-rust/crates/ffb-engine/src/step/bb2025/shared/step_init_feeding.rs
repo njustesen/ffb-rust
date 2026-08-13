@@ -4,6 +4,9 @@ use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::report::mixed::report_player_event::ReportPlayerEvent;
+use ffb_model::report::report_bite_spectator::ReportBiteSpectator;
+use ffb_model::enums::Rules;
+use ffb_model::util::util_box::UtilBox;
 use ffb_model::report::report_id::ReportId;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
@@ -193,7 +196,25 @@ impl StepInitFeeding {
                     ));
                 }
 
-                if let Some(s) = player_state {
+                // EDITION-SPECIFIC. The vampire that fails to feed is punished differently:
+                //   bb2020/bb2025 `StepInitFeeding`: `changeConfused(true)` — it stays on the pitch.
+                //   bb2016 `StepInitFeeding`:
+                //       game.getFieldModel().setPlayerState(actingPlayer.getPlayer(),
+                //           playerState.changeBase(PlayerState.RESERVE));
+                //       UtilBox.putPlayerIntoBox(game, actingPlayer.getPlayer());
+                //       getResult().addReport(new ReportBiteSpectator(actingPlayer.getPlayerId()));
+                //   — it bites a spectator and leaves the pitch for the rest of the drive.
+                // The bb2016 file `step/bb2016/step_init_feeding.rs` has this branch but is dead
+                // code: `StepId::InitFeeding` resolves here through the driver's glob import. Rust
+                // therefore left every hungry bb2016 Vampire standing where Java boxed it
+                // (vampire bb2016 seed 1 i=8: Java `h00:-1,-1,Reserve` vs Rust `h00:12,7,Standing`).
+                if game.rules == Rules::Bb2016 {
+                    if let Some(s) = player_state {
+                        game.field_model.set_player_state(&acting_id, s.change_base(PS_RESERVE));
+                    }
+                    UtilBox::put_player_into_box(game, &acting_id);
+                    game.report_list.add(ReportBiteSpectator::new(acting_id.clone()));
+                } else if let Some(s) = player_state {
                     game.field_model.set_player_state(&acting_id, s.change_confused(true));
                 }
                 outcome = outcome.with_event(GameEvent::BiteSpectator { player_id: acting_id.clone() });
@@ -402,5 +423,41 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         assert!(!game.acting_player.suffering_blood_lust);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))));
+    }
+
+    /// A Vampire that fails to feed is punished differently per edition:
+    ///   bb2020/bb2025 `StepInitFeeding`: `changeConfused(true)` — it stays on the pitch.
+    ///   bb2016 `StepInitFeeding`: `changeBase(RESERVE)` + `UtilBox.putPlayerIntoBox` +
+    ///     `ReportBiteSpectator` — it bites a spectator and leaves the pitch for the drive.
+    /// The bb2016 file `step/bb2016/step_init_feeding.rs` has this branch but is DEAD CODE:
+    /// `StepId::InitFeeding` resolves to this shared step through the driver's glob import, so every
+    /// hungry bb2016 Vampire stayed standing where Java boxed it (vampire bb2016 seed 1 i=8).
+    #[test]
+    fn failed_feed_boxes_the_vampire_in_bb2016_and_only_confuses_it_later() {
+        let run = |rules: Rules| {
+            let mut game = make_game();
+            game.rules = rules;
+            add_player(&mut game, "v1", FieldCoordinate::new(5, 5), true);
+            game.field_model.set_player_state("v1", PlayerState::new(PS_STANDING));
+            game.home_playing = true;
+            game.acting_player.player_id = Some("v1".into());
+            game.acting_player.suffering_blood_lust = true;
+            let mut step = StepInitFeeding::new();
+            step.goto_label_on_end = Some("lbl".into());
+            step.feeding_allowed = Some(true);
+            // No adjacent team-mate to feed on → the failure branch.
+            step.feed_on_player_choice = Some(false);
+            let _ = step.start(&mut game, &mut GameRng::new(0));
+            let st = game.field_model.player_state("v1").unwrap();
+            (st.base(), st.is_confused())
+        };
+
+        let (base16, confused16) = run(Rules::Bb2016);
+        assert_eq!(base16, PS_RESERVE, "bb2016 boxes the vampire that failed to feed");
+        assert!(!confused16, "bb2016 does not confuse it — it leaves the pitch");
+
+        let (base25, confused25) = run(Rules::Bb2025);
+        assert_ne!(base25, PS_RESERVE, "bb2025 leaves the vampire on the pitch");
+        assert!(confused25, "bb2025 confuses it instead");
     }
 }

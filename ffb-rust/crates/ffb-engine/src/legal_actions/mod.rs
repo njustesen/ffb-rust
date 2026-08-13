@@ -258,6 +258,32 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
                 block_defender_id: None,
             });
         }
+
+        // HypnoticGaze — LAST in the list, matching ParityRunner.computeEligiblePlayers:
+        //     if (p.hasSkillProperty(NamedProperties.canGazeDuringMove)) actions.add(PlayerAction.GAZE);
+        // Offered to any standing player with the property, with no target/adjacency condition.
+        // Rust never offered it, so a Vampire's snapshot was one action SHORT of the harness's and
+        // the shared actionRng modulo picked a different action every time
+        // (vampire bb2016 seed 1 i=1: Java `[MOVE,BLOCK,BLITZ,GAZE] idx=1 -> BLOCK` vs Rust
+        // `[Move,Block,Blitz] idx=2 -> Blitz`). GAZE itself is one of the actions
+        // `sendConcreteAction` does NOT handle, so both agents immediately DESELECT it (ITER80) —
+        // it only has to be PRESENT so the two lists have the same length and order.
+        // GATED TO BB2016: `canGazeDuringMove` is registered ONLY by `skill/bb2016/HypnoticGaze` —
+        // bb2020's and bb2025's HypnoticGaze do not register it, so Java offers GAZE in bb2016 alone.
+        // Rust's `SkillId::HypnoticGaze.properties()` is edition-agnostic and always returns the
+        // property, so an ungated check added GAZE to every edition and regressed vampire bb2025 from
+        // 0 to 100 fails. (Same trap as Decay's BB2016-only `requiresSecondCasualtyRoll`.)
+        if game.rules == Rules::Bb2016
+            && player.has_skill_property(
+                ffb_model::model::property::named_properties::NamedProperties::CAN_GAZE_DURING_MOVE,
+            )
+        {
+            actions.push(Action::ActivatePlayer {
+                player_id: pid.clone(),
+                player_action: PlayerActionChoice::HypnoticGaze,
+                block_defender_id: None,
+            });
+        }
     }
 
     actions
@@ -290,6 +316,9 @@ pub fn eligible_players_for_activation(game: &Game) -> Vec<(PlayerId, Vec<ffb_mo
             PAC::ThrowBomb => PA::ThrowBomb,
             PAC::Punt => PA::Punt,
             PAC::SecureTheBall => PA::SecureTheBall,
+            // ParityRunner adds PlayerAction.GAZE for any canGazeDuringMove player; the two
+            // eligibility lists must match in LENGTH and ORDER or idx%N diverges.
+            PAC::HypnoticGaze => PA::Gaze,
             _ => continue,
         };
         match out.iter_mut().find(|(pid, _)| *pid == player_id) {
@@ -1318,5 +1347,38 @@ mod tests {
         g.field_model.ball_in_play = true;
         assert!(has_action(&legal_activate_player_actions(&g, TeamSide::Home), "plain", PlayerActionChoice::Pass),
             "a plain ball-carrier must be offered Pass");
+    }
+
+    /// `ParityRunner.computeEligiblePlayers` adds `PlayerAction.GAZE` for any player with
+    /// `canGazeDuringMove`, LAST in the list. Rust never offered it, so a Vampire's snapshot was one
+    /// action short of the harness's and the shared actionRng modulo picked a different action
+    /// (vampire bb2016 seed 1 i=1: Java `[MOVE,BLOCK,BLITZ,GAZE] idx=1 -> BLOCK` vs Rust
+    /// `[Move,Block,Blitz] idx=2 -> Blitz`).
+    ///
+    /// It is BB2016-ONLY: `canGazeDuringMove` is registered by `skill/bb2016/HypnoticGaze` alone,
+    /// while Rust's `SkillId::HypnoticGaze.properties()` is edition-agnostic. An ungated check
+    /// regressed vampire bb2025 from 0 to 100 fails.
+    #[test]
+    fn hypnotic_gaze_is_offered_last_and_only_in_bb2016() {
+        let build = |rules: Rules| {
+            let mut game = make_game(rules);
+            add_player(&mut game, true, "vamp", c(5, 5), PS_STANDING, vec![SkillId::HypnoticGaze]);
+            legal_activate_player_actions(&game, TeamSide::Home)
+        };
+
+        let bb2016 = build(Rules::Bb2016);
+        assert!(has_action(&bb2016, "vamp", PlayerActionChoice::HypnoticGaze),
+            "bb2016 offers GAZE for a canGazeDuringMove player");
+        // ...and LAST, so the two lists line up index-for-index.
+        let last = bb2016.iter().rev().find_map(|a| match a {
+            Action::ActivatePlayer { player_id, player_action, .. } if player_id == "vamp" => Some(*player_action),
+            _ => None,
+        });
+        assert_eq!(last, Some(PlayerActionChoice::HypnoticGaze), "GAZE must be last in the list");
+
+        for rules in [Rules::Bb2020, Rules::Bb2025] {
+            assert!(!has_action(&build(rules), "vamp", PlayerActionChoice::HypnoticGaze),
+                "{rules:?} HypnoticGaze does not register canGazeDuringMove, so no GAZE action");
+        }
     }
 }

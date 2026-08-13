@@ -49,7 +49,7 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | wood_elf | **0** (98→81→19→0) | 🟢 100/100 GREEN (ITER71 startedStanding, ITER73 rooted pre-draw, ITER77 declined-re-roll edition gate) | GREEN |
 | goblin | **0** (100→99→5→4→3→2→0) | 🟢 100/100 GREEN (ITER78-87) | GREEN |
 | halfling | **0** (100→3→0) | 🟢 100/100 GREEN (ITER78-80 unblocked it to 3; ITER81 TTM-landing drop-before-apply) | GREEN |
-| vampire | 100 | systematic — Bloodlust bb2016 | queued |
+| vampire | **56** (was 100) | ITER88 (bb2016 GAZE action + failed-feed boxing); in progress |
 
 Counts above re-scouted 2026-08-13 AFTER ITER56-58 with FULL 1-100 `--no-abort` runs (no timeout).
 The older `undead 44` / `necromantic 44` figures were unreliable (truncated triage) — the true
@@ -1351,3 +1351,39 @@ exactly where Java sets it. Test `apply_to_flags_the_secret_weapon_even_with_no_
 goblin bb2025 **0**, dwarf bb2025 **0**. `cargo test -p ffb-engine` **7110/0**.
 
 ## 🏁 bb2016 matrix: **29 🟢 / 1 🔴** — only `vampire` (100) remains.
+
+---
+
+## ITER88 — vampire 100 → **56**: two bb2016-only Vampire rules
+
+**(a) The GAZE action was never offered.** seed 1 i=1, identical states, different choice:
+`JAVA_ACT_PICK live=[MOVE,BLOCK,BLITZ,GAZE] idx=1 → BLOCK` vs Rust
+`[Move,Block,Blitz] idx=2 → Blitz`. `ParityRunner.computeEligiblePlayers` adds
+`PlayerAction.GAZE` **last** for any player with `canGazeDuringMove`, so a Vampire's snapshot was
+one action short and every `idx % N` landed differently.
+
+Added, last in the list — and **BB2016-gated**: `canGazeDuringMove` is registered by
+`skill/bb2016/HypnoticGaze` **alone**, while Rust's `SkillId::HypnoticGaze.properties()` is
+edition-agnostic. The first attempt was ungated and regressed **vampire bb2025 from 0 → 100**;
+caught by the bb2025 gate and fixed. (Exactly the Decay `requiresSecondCasualtyRoll` trap.)
+GAZE itself is one of the actions `sendConcreteAction` does not handle, so both agents deselect
+it (ITER80) — it only has to be *present* so the lists line up.
+
+**(b) A Vampire that fails to feed is boxed in bb2016.** seed 1 i=8, same dice, Java
+`h00:-1,-1,Reserve` vs Rust `h00:12,7,Standing`. Java bb2016 `StepInitFeeding`:
+```java
+game.getFieldModel().setPlayerState(actingPlayer.getPlayer(), playerState.changeBase(PlayerState.RESERVE));
+UtilBox.putPlayerIntoBox(game, actingPlayer.getPlayer());
+getResult().addReport(new ReportBiteSpectator(actingPlayer.getPlayerId()));
+```
+bb2020/bb2025 instead call `changeConfused(true)` and leave it on the pitch. `StepId::InitFeeding`
+resolves to the **shared bb2025 step** through the driver's glob import, so
+`step/bb2016/step_init_feeding.rs` — which *has* this branch — is dead code (the recurring trap).
+Edition-gated in the shared step rather than routing the bb2016 file.
+
+Tests `hypnotic_gaze_is_offered_last_and_only_in_bb2016` and
+`failed_feed_boxes_the_vampire_in_bb2016_and_only_confuses_it_later`.
+
+**Verified:** vampire bb2016 **100 → 56** (seed 1 advances i=1 → i=100). Gates: vampire bb2025
+**0** (the regression this caught), lineman bb2016 **0**, goblin bb2016 **0**, lineman bb2025 **0**.
+`cargo test -p ffb-engine` **7112/0**.
