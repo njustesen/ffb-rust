@@ -485,25 +485,22 @@ fn do_injury_roll_for_player_impl(rng: &mut GameRng, ctx: &mut InjuryContext, ga
             .map(|d| d.has_skill_property(NamedProperties::REQUIRES_SECOND_CASUALTY_ROLL))
             .unwrap_or(false);
         if requires_decay {
-            let d16 = rng.die(16);
-            let d6 = rng.d6();
-            ctx.casualty_roll_decay = Some([d16, d6]);
-            ctx.injury_decay = Some(casualty_tier_to_player_state(d16));
+            // Java: `injuryContext.setCasualtyRollDecay(mechanic.rollCasualty(diceRoller))` then
+            // `interpretCasualtyRollAndAddModifiers(..., true)` — BOTH go through the EDITION's
+            // RollMechanic, so BB2016 rolls d6+d8 and reads roll[0] off the bb2016 casualty table.
+            let mechanic = crate::mechanic::roll_mechanic_for(game.rules);
+            ctx.casualty_roll_decay = Some(mechanic.roll_casualty(rng));
+            if let Some(defender) = game.player(defender_id) {
+                ctx.injury_decay =
+                    mechanic.interpret_casualty_roll_and_add_modifiers(game, ctx, defender, true);
+            }
         }
     }
 }
 
-/// Java: the casualty-tier→PlayerState mapping shared by the primary and Decay rolls
-/// (`interpretCasualtyRollAndAddModifiers`'s tier selection).
-fn casualty_tier_to_player_state(d16: i32) -> PlayerState {
-    if d16 >= 15 {
-        PlayerState::new(PS_RIP)
-    } else if d16 >= 9 {
-        PlayerState::new(PS_SERIOUS_INJURY)
-    } else {
-        PlayerState::new(PS_BADLY_HURT)
-    }
-}
+// NOTE: the casualty-tier→PlayerState mapping used to live here as a hardcoded BB2020 table.
+// It now lives where Java keeps it — in each edition's `RollMechanic`
+// (`interpret_casualty_roll_and_add_modifiers`) — so BB2016 gets its own d6-based table.
 
 fn outcome_to_player_state(rng: &mut GameRng, ctx: &mut InjuryContext, outcome: InjuryOutcome, game: &Game, defender_id: &str) -> PlayerState {
     match outcome {
@@ -511,20 +508,27 @@ fn outcome_to_player_state(rng: &mut GameRng, ctx: &mut InjuryContext, outcome: 
         InjuryOutcome::KnockedOut => PlayerState::new(PS_KNOCKED_OUT),
         InjuryOutcome::BadlyHurt  => PlayerState::new(PS_BADLY_HURT),
         InjuryOutcome::Casualty   => {
-            // BB2020/2025: d16 for tier, d6 for SI sub-type. Store [d16, d6].
-            let d16 = rng.die(16);
-            let d6 = rng.d6();
-            ctx.casualty_roll = Some([d16, d6]);
-            // Java InjuryTypeServer.setInjury → RollMechanic.interpretCasualtyRollAndAddModifiers:
-            // apply casualty modifiers (Decay skill's +1, niggling injuries) to the d16 BEFORE
-            // mapping the tier. Omitting them let a Decay player (Khemri Tomb Guardian) map a d16 of
-            // 8 to Badly Hurt where Java's 8+1=9 is a Serious Injury (khemri seed 21: the missing SI
-            // skipped the bb2025 Getting Even roll, shifting the shared dice stream by one).
-            if let Some(defender) = game.player(defender_id) {
-                let mods = ffb_mechanics::modifiers::CasualtyModifierFactory::new().find_modifiers(defender);
-                ctx.add_casualty_modifiers(mods);
-            }
-            casualty_tier_to_player_state(d16 + ctx.casualty_modifier_sum())
+            // Java InjuryTypeServer.setInjury():
+            //     injuryContext.setCasualtyRoll(mechanic.rollCasualty(diceRoller));
+            //     injuryContext.setInjury(mechanic.interpretCasualtyRollAndAddModifiers(game, ctx, defender, false));
+            // BOTH halves are EDITION-SPECIFIC and must go through the game's RollMechanic:
+            //   BB2020/BB2025 `rollCasualty` = [d16, d6], tier = d16 + casualty modifiers
+            //     (Decay's +1, niggling injuries) mapped by casualty_tier_bb2020/bb2025.
+            //   BB2016 `rollCasualtyRenamed` = [d6, d8] and bb2016/RollMechanic reads roll[0]
+            //     ONLY (6 → RIP, 4-5 → Serious Injury, 1-3 → Badly Hurt) with NO modifiers.
+            // Hardcoding the BB2020 shape here made every BB2016 casualty roll ONE d16 where
+            // Java rolls a d6 AND a d8 — a 1-call/2-die desync of the shared dice stream on the
+            // very first casualty (goblin bb2016 seed 1 i=1: home_03's blitz casualty'd the
+            // away Fanatic; Java d6=5 → Serious Injury, Rust d16=1 → Badly Hurt, and every
+            // later roll was shifted).
+            let mechanic = crate::mechanic::roll_mechanic_for(game.rules);
+            ctx.casualty_roll = Some(mechanic.roll_casualty(rng));
+            let interpreted = game
+                .player(defender_id)
+                .and_then(|defender| {
+                    mechanic.interpret_casualty_roll_and_add_modifiers(game, ctx, defender, false)
+                });
+            interpreted.unwrap_or_else(|| PlayerState::new(PS_BADLY_HURT))
         }
     }
 }
@@ -1373,5 +1377,53 @@ mod tests {
             "Stunty TTM-landing on a 7 must KO — regression: dispatch routed to a stale duplicate that dropped Stunty");
         assert_eq!(roll_landing(false), Some(PS_STUNNED),
             "non-Stunty TTM-landing on a 7 is Stunned");
+    }
+
+    /// Java `InjuryTypeServer.setInjury()` takes BOTH the casualty ROLL and its INTERPRETATION from
+    /// the game's `RollMechanic`. BB2016's `rollCasualtyRenamed()` is `[d6, d8]` and
+    /// `bb2016/RollMechanic.interpretCasualtyRollAndAddModifiers` switches on `roll[0]` alone
+    /// (6 → RIP, 4-5 → Serious Injury, 1-3 → Badly Hurt); BB2020/BB2025 roll `[d16, d6]` and map
+    /// `d16 + casualty modifiers`. `injury.rs` used to hardcode the BB2020 shape, so a BB2016
+    /// casualty drew ONE d16 where Java draws a d6 AND a d8 — desyncing the shared dice stream
+    /// (goblin bb2016 seed 1 i=1).
+    #[test]
+    fn casualty_roll_uses_the_editions_roll_mechanic() {
+        use ffb_model::enums::{PS_BADLY_HURT, PS_SERIOUS_INJURY};
+
+        // Seed whose first two d6 are both 6 (injury total 12 = casualty) and whose NEXT d6 is a 4
+        // or 5 — a BB2016 Serious Injury, which the old BB2020 d16 table could not produce here.
+        let seed = (0u64..2_000_000)
+            .find(|s| {
+                let mut r = GameRng::new(*s);
+                r.d6() == 6 && r.d6() == 6 && matches!(r.d6(), 4 | 5)
+            })
+            .expect("some seed yields 6,6 then a 4/5");
+
+        let run = |rules: Rules| {
+            let mut game = make_game_with_players(&["p1"], &[]);
+            game.rules = rules;
+            let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+            let mut rng = GameRng::new(seed);
+            do_injury_roll_for_player(&mut rng, &mut ctx, &game, "p1");
+            (ctx.injury.map(|s| s.base()), ctx.casualty_roll, rng.call_count)
+        };
+
+        let (state16, roll16, calls16) = run(Rules::Bb2016);
+        // 2 injury d6 + d6 + d8 = 4 draws; roll[0] is the d6 (4 or 5) → Serious Injury.
+        assert_eq!(calls16, 4, "bb2016 casualty must draw a d6 AND a d8 after the 2d6 injury roll");
+        let roll16 = roll16.expect("bb2016 casualty roll stored");
+        assert!(matches!(roll16[0], 4 | 5), "first bb2016 casualty die is a d6, got {}", roll16[0]);
+        assert!((1..=8).contains(&roll16[1]), "second bb2016 casualty die is a d8, got {}", roll16[1]);
+        assert_eq!(state16, Some(PS_SERIOUS_INJURY), "bb2016 reads roll[0]: 4-5 = Serious Injury");
+
+        // BB2025 keeps its own shape: [d16, d6], tier from the d16.
+        let (state25, roll25, calls25) = run(Rules::Bb2025);
+        assert_eq!(calls25, 4, "bb2025 casualty draws a d16 AND a d6");
+        let roll25 = roll25.expect("bb2025 casualty roll stored");
+        assert!((1..=16).contains(&roll25[0]), "first bb2025 casualty die is a d16, got {}", roll25[0]);
+        assert!(
+            matches!(state25, Some(PS_BADLY_HURT) | Some(PS_SERIOUS_INJURY) | Some(PS_RIP)),
+            "bb2025 maps the d16 to a casualty tier"
+        );
     }
 }

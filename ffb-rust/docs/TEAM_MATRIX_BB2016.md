@@ -59,3 +59,5 @@ So the shared dice stream splits during the PREGAME (weather / coin toss / fan-f
 rolls / kickoff): Java's BB2016 start sequence consumes the RNG differently from Rust's
 bb2016 driver path. One root-cause likely gates the entire column — fixing the bb2016
 pregame sequence should un-gate all 30 matchups to their first real in-drive frontier.
+
+- ITER78 (goblin, still 100 fails): harness `PETTY_CASH` dialog routing (Java had been producing ZERO steps for goblin/halfling — treasury >= 50k) + `injury.rs` now takes the casualty roll AND its interpretation from the edition's `RollMechanic` (bb2016 = d6+d8 on roll[0], not d16+d6). Frontier: the bb2016 apothecary.

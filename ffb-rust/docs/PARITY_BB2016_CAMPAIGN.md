@@ -47,8 +47,8 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | elf | **0** (was 84) | 🟢 100/100 GREEN (ITER66 Side Step auto-use) | GREEN |
 | ogre | **0** (was 98) | 🟢 100/100 GREEN (ITER69 bb2016 TTM spends the PASS; needed a jar rebuild) | GREEN |
 | wood_elf | **0** (98→81→19→0) | 🟢 100/100 GREEN (ITER71 startedStanding, ITER73 rooted pre-draw, ITER77 declined-re-roll edition gate) | GREEN |
-| goblin | 100 | untraced — **NEXT TARGET** (systematic; likely one cause) | queued |
-| halfling | 100 | systematic (every seed) — likely a roster/skill-load or first-step gap | queued |
+| goblin | 100 | ITER78 unblocked the Java run (PETTY_CASH) + fixed the bb2016 casualty dice; now fails at seed 1 i=1 on the APOTHECARY | in progress |
+| halfling | 100 | same PETTY_CASH block as goblin (treasury 180k) — unblocked by ITER78, needs a re-scout | queued |
 | vampire | 100 | systematic — Bloodlust bb2016 | queued |
 
 Counts above re-scouted 2026-08-13 AFTER ITER56-58 with FULL 1-100 `--no-abort` runs (no timeout).
@@ -887,3 +887,81 @@ Verified: wood_elf bb2016 19 → **0 (100/100 GREEN)**; wood_elf bb2025 back to 
 **27 green**, no regression; lineman bb2016 100/100; lineman + dwarf bb2025 100/100; ffb-engine 7100/0.
 
 Remaining reds: goblin 100 · halfling 100 · vampire 100 — all untraced, each likely ONE systematic cause.
+
+---
+
+## ITER78 — goblin: the Java game never started (PETTY_CASH), and BB2016 casualties rolled the BB2020 dice
+
+**Two independent blockers, both root-caused against the Java source.**
+
+### (a) The Java side never played a single turn — `STUCK_STEP: PETTY_CASH`
+`ffb-parity --home goblin --away goblin --edition bb2016 --seeds 1-1` ended with
+`END_REASON: finished iter=1002 half=0 turnHome=0 turnAway=0` — Java produced **zero** steps, so all
+100 seeds "failed" at step 0 with nothing to compare.
+
+`bb2016/start/StepPettyCash` (the BB2016 step; BB2020/BB2025 use `mixed/start/StepPettyCash`, which
+never blocks) waits for a `ClientCommandPettyCash` whenever a team's treasury is **>= 50,000** and
+`FORCE_TREASURY_TO_PETTY_CASH` is off. A diagnostic print in the harness gave:
+`home tv=1020000 tr=80000 away tv=1020000 tr=80000 pettyCash=true force=false`.
+Only **two** bb2016 parity teams have that much left over — `team_goblin.json` (80k) and
+`team_halfling.json` (180k). Every other roster has < 50k and auto-selects, which is exactly why
+this never surfaced before and why it hits precisely two of the three remaining reds.
+
+`RandomStrategy.respondToDialog(PETTY_CASH)` already answers deterministically with
+`sendPettyCash(0)`, so the response was fine — the **routing** was not: `ParityRunner.getDialogTeamId`
+had no `DialogPettyCashParameter` arm, so the command was injected with `MatchRunner.inject` (home)
+no matter which team the dialog was raised for. `UtilServerSteps.checkCommandIsFromHomePlayer` then
+kept crediting the home team, the away team's dialog re-fired forever, the 500-iteration
+`DIALOG_LOOP_CLEARED` guard nulled it, and the step sat unadvanced until `STUCK_STEP`.
+
+FIX (harness only, `ParityRunner.java` + jar rebuild): a `DialogPettyCashParameter` arm in
+`getDialogTeamId`, plus an explicit `case PETTY_CASH:` that sends `ClientCommandPettyCash(0)` via
+`injectForTeam(..., teamId.equals(home))`. Java now plays the full match
+(`END_REASON: finished iter=901 half=2 turnHome=8 turnAway=8`).
+
+### (b) BB2016 casualties rolled ONE d16 where Java rolls a d6 AND a d8
+With Java running, seed 1 diverged at **i=1** — home_03 blitzes the away Fanatic (`a02`), both-down,
+armour broken, injury `6,6 = 12` → Casualty. Then:
+
+| | rng 19 | rng 20 |
+|---|---|---|
+| Java | `d6=5` (`DiceRoller.rollCasualtyRenamed:212`) | `d8=8` |
+| Rust | `d16=1` | *(d6 consumed as rng 20)* |
+
+`InjuryTypeServer.setInjury()` takes **both** the casualty roll and its interpretation from the
+game's `RollMechanic`:
+- `bb2016/RollMechanic.rollCasualty` → `rollCasualtyRenamed()` = `[d6, d8]`, and
+  `interpretCasualtyRollAndAddModifiers` switches on **`roll[0]` alone**: `6` → RIP, `4-5` → Serious
+  Injury, `1-3` → Badly Hurt — **no casualty modifiers at all**.
+- `bb2020`/`bb2025` roll `[d16, d6]` and map `d16 + casualty modifiers`.
+
+Rust's `injury.rs::outcome_to_player_state` hardcoded the BB2020 shape (`rng.die(16)`, `rng.d6()`,
+`CasualtyModifierFactory`, `casualty_tier_to_player_state`) for **every** edition, even though the
+correctly-ported per-edition `RollMechanic`s were sitting right there unused. So every BB2016
+casualty desynced the shared dice stream by one call/one die at the first casualty of the game.
+The Decay second-casualty block had the same hardcoding.
+
+FIX: `outcome_to_player_state`'s `Casualty` arm and the Decay block now call
+`roll_mechanic_for(game.rules).roll_casualty(rng)` and
+`.interpret_casualty_roll_and_add_modifiers(...)` — a literal transcription of
+`InjuryTypeServer.setInjury()`. The dead `casualty_tier_to_player_state` helper is gone (the tier
+tables live in the mechanics, where Java keeps them). BB2020/BB2025 behaviour is **bit-identical**:
+their mechanics already do exactly what the inline code did (`map_casualty_roll_bb2025` ==
+`casualty_tier_to_player_state`, and both apply `CasualtyModifierFactory`).
+
+Test `casualty_roll_uses_the_editions_roll_mechanic` (bb2016 draws d6+d8 and reads roll[0] → Serious
+Injury; bb2025 still draws d16+d6 and maps the d16).
+
+**Verified:** goblin seed 1 dice now match Java exactly through rng 22
+(`6,6 | d6=5, d8=8 | 4, 2`). Gates: lineman bb2016 **0/100**, lineman bb2025 **0/100**,
+dwarf bb2025 **0/100**, `cargo test -p ffb-engine` **7101/0**.
+
+**Fail count unchanged at 100** — honest reporting: seed 1 now survives to a *later*, different
+divergence instead of dying at step 0, but the seed still fails, so no seed flipped green yet.
+
+### FRONTIER for ITER79 — the apothecary
+seed 1 i=1 now diverges only on the aftermath of that casualty: `a02` is **Ko** in Java and
+**Injured** in Rust, and Java draws **4 more dice** (rng 23-26: `4,3,5,1`) that Rust does not.
+Rust's agent answers the `UseApothecary { player_id: away_03, apothecary_type: "team" }` prompt with
+a bare `Acknowledge` (= decline, 0 dice) where the Java side runs `bb2016/StepApothecary`. Next
+iteration: read `bb2016/StepApothecary` + `ParityRunner`'s `APOTHECARY_CHOICE` handling and port it.
