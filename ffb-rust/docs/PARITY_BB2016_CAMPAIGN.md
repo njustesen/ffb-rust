@@ -579,3 +579,40 @@ Test: `folded_throw_team_mate_is_rejected_once_the_pass_is_used`.
 
 Remaining reds: wood_elf 98 (the hash-invisible `rooted` flag — see ITER68) · goblin 100 ·
 halfling 100 · vampire 100.
+
+### ITER70 (2026-08-13) — wood_elf: ITER68's `rooted` theory DISPROVEN; frontier re-characterised (no fix)
+
+Probed wood_elf seed 1 step 46 with a temporary gated `FFB_ROOTDBG` trace on every `rooted`
+transition in `FieldModel::set_player_state` (added, used, then reverted — the tree is clean).
+
+**ITER68's stated next step was wrong and is retracted.** The `rooted` flag is NOT stuck: it toggles
+correctly (`away_01 false→true`, `true→false`, twice over the game). More importantly, the player at
+the frontier is **home_01, and its rooted flag never changes at all** — only `away_01`'s does. So a
+rooted-flag disagreement is not the cause.
+
+What IS established for wood_elf seed 1 step 46:
+- The activating player is **home_01 = `woodelf.treeman`** (team slot 1), and it is **PRONE**
+  (`RUST_PICK … prone_predraw`), doing a MOVE.
+- Java rolls TWO dice: pos 32 `TakeRootBehaviour$1.handleExecuteStepHook:56`, then pos 33
+  `StepStandUp.executeStep:103`. Rust rolls ONE — its pos 32 is the StandUp roll (the prompt right
+  after is `ReRollOffer{action: "STAND_UP"}`), so the **Take Root d6 is the missing die**.
+- Rust's SELECT-sequence `TakeRoot` step DOES run (`FFB_DRIVE_TRACE`: `TakeRoot` → … → `JumpUp` →
+  `StandUp`, die at StandUp) but rolls nothing.
+- home_01 is NOT rooted, so the step's `if is_rooted → next` early-out is not firing.
+- Both `Select` and `Move` sequences contain TAKE_ROOT (Java and Rust agree), and Java's pos-32 roll
+  is the SELECT one (it immediately precedes StandUp).
+
+By elimination the remaining candidate is the `do_roll` gate:
+`has_skill(TakeRoot) && !acting_player.used_skills.contains(TakeRoot)`. A Treeman has the skill, so
+`acting_player.used_skills` must still contain `TakeRoot` at activation start — i.e. the
+per-activation clear is not happening on the bb2016 prone-Move activation path.
+**This is a hypothesis, NOT verified** — `step_init_selecting.rs:193` does call
+`change_player_action`, whose `set_player` clears `used_skills` on a genuine player change, and the
+previous actor was home_06, so it *should* clear. Next iteration should instrument the gate directly
+(print `do_roll`, `has_skill`, and the `used_skills` set at entry) rather than reason about it.
+
+Note ITER68's Take Root change (per-activation `used_skills`, commit `0fea88a5`) is KEPT: it is a
+verified 1:1 correction, and reverting it would only restore an equally-wrong persistent
+`Player.used_skills` read. It remains parity-neutral.
+
+No code change this iteration. wood_elf stays 98; **26 🟢 / 4 🔴** unchanged.
