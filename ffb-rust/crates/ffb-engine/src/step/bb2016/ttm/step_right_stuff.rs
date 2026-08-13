@@ -219,13 +219,26 @@ impl StepRightStuff {
             None, player_id, coord, None, None,
             ApothecaryMode::ThrownPlayer,
         );
+        // Java order (StepRightStuff.executeStep, the `!doRoll` branch):
+        //     handleInjury(new InjuryTypeTTMLanding(), ...)   // rolls, does NOT move the player
+        //     publishParameter(INJURY_RESULT, ...)
+        //     StepParameterSet params = UtilServerInjury.dropPlayer(this, thrownPlayer, THROWN_PLAYER);
+        // `handleInjury` only ROLLS — the player is still standing on its landing square when
+        // `dropPlayer` runs, so `dropPlayer`'s "is the player on the ball square?" test can fire and
+        // publish the SCATTER_BALL bounce. Rust applied the injury FIRST, which sends a KO'd player
+        // to the box (coordinate -1,-1), so `drop_player_no_sph` found no coordinate, returned
+        // nothing, and the ball never bounced — one missing d8 (halfling bb2016 seed 19 i=11:
+        // Java rng 46 `StepCatchScatterThrowIn.scatterBall`). Compute the drop parameters against
+        // the pre-injury board, exactly as Java does, and apply the injury afterwards; the final
+        // state is unchanged because Java's apothecary step applies the same injury over the
+        // PRONE that dropPlayer set.
+        let mut drop_params = util_server_injury::drop_player_no_sph(game, player_id);
         ir.apply_to(game);
 
         let mut out = StepOutcome::next()
             .publish(StepParameter::InjuryResult(Box::new(ir)))
             .publish(StepParameter::ThrownPlayerCoordinate(None));
 
-        let mut drop_params = util_server_injury::drop_player_no_sph(game, player_id);
         if !has_ball {
             drop_params.retain(|p| !matches!(p, StepParameter::EndTurn(_)));
         }
@@ -336,6 +349,10 @@ mod tests {
         game.team_home.players.push(p);
         game.home_playing = true;
         game.field_model.set_player_coordinate("p1", coord);
+        // The thrown player is STANDING on its landing square when dropPlayer runs (Java applies
+        // the landing injury only later, in the apothecary step) — without a state, dropPlayer's
+        // `(playerCoordinate != null) && (playerState != null)` guard bails out.
+        game.field_model.set_player_state("p1", ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING));
         game.field_model.ball_coordinate = Some(coord);
         game.field_model.ball_in_play = true;
         game.field_model.ball_moving = false;
@@ -384,6 +401,10 @@ mod tests {
         game.team_home.players.push(p);
         game.home_playing = true;
         game.field_model.set_player_coordinate("p1", coord);
+        // The thrown player is STANDING on its landing square when dropPlayer runs (Java applies
+        // the landing injury only later, in the apothecary step) — without a state, dropPlayer's
+        // `(playerCoordinate != null) && (playerState != null)` guard bails out.
+        game.field_model.set_player_state("p1", ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING));
         game.field_model.ball_coordinate = Some(coord);
         game.field_model.ball_in_play = true;
 
@@ -556,5 +577,66 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep,
             "Swoop's -1 modifier should let a roll of 3 succeed (minimum roll 3), \
              not fall through to a re-roll offer as if the minimum were still 4");
+    }
+
+    /// Java's `!doRoll` block rolls the landing injury with `handleInjury` — which only ROLLS —
+    /// and only then calls `dropPlayer`, so the thrown player is still standing on its landing
+    /// square when `dropPlayer` tests whether it is on the ball. Rust applied the injury first, so
+    /// a landing that KO'd the player moved it to the box (-1,-1) and `drop_player_no_sph` bailed
+    /// out with no coordinate: no SCATTER_BALL, no bounce, one d8 short of Java (halfling bb2016
+    /// seed 19 i=11 — Java rng 46 `StepCatchScatterThrowIn.scatterBall`).
+    #[test]
+    fn landing_that_knocks_the_player_out_still_bounces_the_ball() {
+        use std::collections::HashSet;
+        use ffb_model::enums::{PlayerGender, PlayerType};
+        use ffb_model::model::player::Player;
+        use ffb_model::types::FieldCoordinate;
+
+        // AV1 always breaks, so the first 2d6 are the armour roll and the next 2d6 the injury.
+        // Pick a seed whose injury total is 8+ => KNOCKED_OUT => the player leaves the pitch.
+        let seed = (0u64..100_000)
+            .find(|s| {
+                let mut r = GameRng::new(*s);
+                let (_a1, _a2) = (r.d6(), r.d6());
+                r.d6() + r.d6() >= 8
+            })
+            .expect("some seed yields an 8+ injury");
+
+        let coord = FieldCoordinate::new(4, 6);
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 2, agility: 3, passing: 4, armour: 1,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.home_playing = true;
+        game.field_model.set_player_coordinate("p1", coord);
+        // The thrown player is STANDING on its landing square when dropPlayer runs (Java applies
+        // the landing injury only later, in the apothecary step) — without a state, dropPlayer's
+        // `(playerCoordinate != null) && (playerState != null)` guard bails out.
+        game.field_model.set_player_state("p1", ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING));
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = false;
+
+        let mut step = StepRightStuff::new();
+        step.thrown_player_id = Some("p1".into());
+        step.thrown_player_has_ball = Some(true);
+        step.drop_thrown_player = true;
+
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+
+        assert!(out.published.iter().any(|p| matches!(
+            p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall))),
+            "the ball must still bounce when the landing injury takes the player off the pitch");
+        assert!(game.field_model.ball_moving, "dropPlayer sets ballMoving on the ball square");
+        // ...and the injury is still applied afterwards, so the player really did leave the pitch.
+        assert!(game.field_model.player_coordinate("p1").map(|c| c.x < 0).unwrap_or(true),
+            "the KO'd player is off the pitch once the injury is applied");
     }
 }

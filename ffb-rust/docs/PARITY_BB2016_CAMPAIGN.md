@@ -48,7 +48,7 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | ogre | **0** (was 98) | 🟢 100/100 GREEN (ITER69 bb2016 TTM spends the PASS; needed a jar rebuild) | GREEN |
 | wood_elf | **0** (98→81→19→0) | 🟢 100/100 GREEN (ITER71 startedStanding, ITER73 rooted pre-draw, ITER77 declined-re-roll edition gate) | GREEN |
 | goblin | **99** (was 100) | ITER78 PETTY_CASH + casualty dice, ITER79 Ball & Chain drop, ITER80 unhandled-action deselect; seed 1 now fails at i=123 (half 2) | in progress |
-| halfling | 100 | same PETTY_CASH block as goblin (treasury 180k) — unblocked by ITER78, needs a re-scout | queued |
+| halfling | **0** (100→3→0) | 🟢 100/100 GREEN (ITER78-80 unblocked it to 3; ITER81 TTM-landing drop-before-apply) | GREEN |
 | vampire | 100 | systematic — Bloodlust bb2016 | queued |
 
 Counts above re-scouted 2026-08-13 AFTER ITER56-58 with FULL 1-100 `--no-abort` runs (no timeout).
@@ -1059,3 +1059,44 @@ Note this closes the same latent hole for `Stab`, `KickTeamMate`, `HypnoticGaze`
 goblin seed 1 i=123, half 2, away_08 MOVE: state hashes already differ on entry
 (java `12db8b48…` vs rust `5d82c251…`), so the divergence is earlier in half 2 — bisect from the
 first mismatching step.
+
+---
+
+## ITER81 — halfling 100/100 GREEN (**28/30**): the landing injury was applied before the drop
+
+Re-scouting after ITER78-80 (which were harness-level and global) collapsed halfling from **100 →
+3**: seeds 19, 81, 85. All three are the same bug.
+
+seed 19 i=11, a Throw-Team-Mate. Every die matched through rng 45 (Take Root, the TTM roll, three
+scatter d8s, the Right Stuff roll, then armour 2d6 + injury 2d6 for the landing) — and then Java
+rolled **one more**: rng 46, a d8 from `StepCatchScatterThrowIn.scatterBall`. Rust rolled nothing.
+
+Java `StepRightStuff.executeStep()`, the `if (!doRoll)` branch:
+```java
+InjuryResult injuryResultThrownPlayer = UtilServerInjury.handleInjury(this, new InjuryTypeTTMLanding(), ...);
+publishParameter(new StepParameter(StepParameterKey.INJURY_RESULT, injuryResultThrownPlayer));
+StepParameterSet params = UtilServerInjury.dropPlayer(this, thrownPlayer, ApothecaryMode.THROWN_PLAYER);
+```
+`handleInjury` only **rolls** — it does not move the player. So when `dropPlayer` runs, the thrown
+player is still standing on its landing square, its "am I on the ball square?" test fires, and it
+publishes `CATCH_SCATTER_THROW_IN_MODE = SCATTER_BALL` (the bounce).
+
+Rust called `ir.apply_to(game)` **first**. A landing that KO'd or casualty'd the player sent it to
+the box at `(-1,-1)`, so `drop_player_no_sph`'s
+`(playerCoordinate != null) && (playerState != null)` guard bailed out, returned nothing, and the
+ball never bounced. ITER57 had already added the `drop_player_no_sph` call — it just could never
+fire for the KO case.
+
+FIX: compute the drop parameters against the pre-injury board and apply the injury afterwards,
+exactly Java's order. The final state is unchanged, because Java's apothecary step applies the
+same injury over the PRONE that `dropPlayer` set.
+
+Test `landing_that_knocks_the_player_out_still_bounces_the_ball`. The two ITER57 tests needed
+`set_player_state(PS_STANDING)` added: they had no player state at all and only passed because the
+old code's `apply_to` set one before `dropPlayer` looked — the reorder exposed the fixture gap.
+
+**Verified:** halfling **0/100 GREEN**. Gates: lineman bb2016 **0/100**, lineman bb2025 **0/100**,
+and every other TTM roster re-verified — renegades **0**, underworld **0**, ogre **0**.
+goblin unchanged at 99. `cargo test -p ffb-engine` **7104/0**.
+
+**bb2016 matrix: 28 🟢 / 2 🔴 — goblin 99, vampire 100.**
