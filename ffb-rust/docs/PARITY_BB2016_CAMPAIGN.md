@@ -810,3 +810,44 @@ seed does not exercise it.
 Verified: no regression — 27-roster bb2016 sweep 26 green, wood_elf unchanged at 19; lineman bb2016
 100/100; ffb-engine 7099/0. All temporary instrumentation (Rust `FFB_BUDBG`, Java `blitzUsed` prints)
 reverted and the jar rebuilt clean.
+
+### ITER76 (2026-08-13) — wood_elf: narrowed to `ask_for_reroll_if_available("STAND_UP")`, with an open contradiction
+
+Instrumented the stand-up failure path with the acting player id and the re-roll decision (all
+temporary, all reverted — tree is clean at `3c6b0684`).
+
+ESTABLISHED:
+1. `already_rerolled` is **false on every entry**, for every failed stand-up in the seed, including
+   away_01's Blitz at i=34. So Rust NEVER reaches the declined-re-roll branch that ITER75 fixed —
+   which is exactly why that fix was parity-neutral here.
+2. `handle_failed_stand_up` (the used-flag switch) is therefore reached via the
+   `ask_for_reroll_if_available` returned-None path, and it is what sets `blitz_used`.
+3. **But every condition inside that function passes**:
+   `SUDBG rr-check pid=away_01 min=4 rr_left=2 rr_used=false tm=Regular allowed=true home_playing=false`
+   — i.e. `td.rerolls > 0 && !td.reroll_used && team_re_roll_allowed` is all true, and there is only ONE
+   definition of `ask_for_reroll_if_available` (`step/util_server_re_roll.rs:30`), which the step does
+   import. On that reading it must return `Some`, yet the very next trace line is
+   `handle_failed_stand_up` — i.e. the `if let Some(prompt)` did not take.
+
+**That contradiction is unresolved and I am not going to guess past it.** Two candidate explanations,
+both cheap to settle and neither yet tested:
+- The observed `fail-path → rr-check → handle_failed` triple is actually spanning TWO step entries and
+  my probe placement made it look like one. Fix: print a per-entry counter / the step's address, and
+  print immediately INSIDE both arms of the `if let`.
+- `find_skill_reroll_source` returns a Some that is then rejected downstream, or the prompt is emitted
+  and the agent's decline path re-enters a FRESH `StepStandUp` instance so `re_roll_state` is lost
+  (which would also explain `already_rerolled` never being true). Fix: log the step instance identity
+  across entries; if the driver rebuilds the step, that is the real bug and it is NOT specific to
+  stand-up.
+
+The second hypothesis is the more interesting one: if a re-entered step loses its `re_roll_state`, every
+`AbstractStepWithReRoll` translation is affected, and the ITER56 TTM fix (declined re-roll must keep
+`re_rolled_action`) only worked because it is checked within a single entry.
+
+COST NOTE: this is the 4th consecutive iteration on wood_elf, with ITER73 (98→19) the only numeric
+gain; ITER74/75/76 produced one parity-neutral fix plus this narrowing. wood_elf 19 is still the
+fewest-fails roster, so the protocol keeps pointing here, but if the next iteration does not resolve the
+contradiction it is worth deliberately switching to goblin/halfling/vampire (100 each, all untraced —
+likely a single systematic cause each) rather than continuing to pay down this one.
+
+No code change. wood_elf stays 19; **26 🟢 / 4 🔴** unchanged; ffb-engine 7099/0; tree clean.
