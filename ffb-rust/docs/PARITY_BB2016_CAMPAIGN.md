@@ -42,7 +42,7 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | renegades | **0** (38→8→1→0) | 🟢 100/100 GREEN (ITER55 TTM routing, ITER56 declined-re-roll, ITER57 RightStuff dropPlayer) | GREEN |
 | underworld | **0** (44→8→1→0) | 🟢 100/100 GREEN (ITER55-56 TTM + ITER58 bb2016 InitPassing routing) | GREEN |
 | necromantic | **0** (58→1→0) | 🟢 100/100 GREEN (ITER59 + ITER60 Stand Firm) | GREEN |
-| undead | 76 | stand-up-blitz-GFI (ITER51 diagnosis) — **NEXT TARGET** | queued |
+| undead | **2** (was 76) | ITER64 prone-Blitz going-for-it — **still NEXT TARGET** (2 seeds left) | queued |
 | dwarf | **0** (79→35→30→0) | 🟢 100/100 GREEN (ITER59 Stand Firm, ITER61 casualty-SW argue, ITER63 KO-vs-argue order) | GREEN |
 | elf | 84 | untraced (suspect AG / pass) | queued |
 | ogre | 98 | earlier non-TTM blocker | queued |
@@ -350,3 +350,39 @@ editions, because this step's phase order is not shared.
 
 Remaining reds: undead 76 · elf 84 · ogre 98 · wood_elf 98 · goblin 100 · halfling 100 ·
 vampire 100. **undead is the next target.**
+
+### ITER64 (2026-08-13) — a prone Blitz must set going-for-it (stand-up eats the move) → undead 76 → 2
+
+undead seed 1, step 187: `Activate(away_01, Blitz)` where away_01 is **PRONE** (`pa00:12,6,Prone`) —
+a stand-up Blitz by a Mummy (MA 3). Java spends 7 dice, Rust 4:
+
+| | Java | Rust |
+|---|---|---|
+| pos 93 | `rollGoingForIt / StepGoForIt.goForIt:163` | *(missing)* — Rust's 93 is already block die 1 |
+| 94-95 | block dice (`nDice=2`) | 94 = block die 2, 95 = armour die 1 |
+| 96-97 | armour 2d6 = 4+6 = 10 → BROKEN | 95+96 = 1+4 = 5 → held, so no injury at all |
+| 98-99 | injury 2d6 | — |
+
+ROOT CAUSE: Java's `StepInitSelecting.prepareStandingUp()` gates its stand-up branch on
+`actingPlayer.getPlayerAction().isMoving()`, and **both the GUI client and ParityRunner declare a
+Blitz as `BLITZ_MOVE`** (`declared = (action == BLITZ) ? BLITZ_MOVE : action`) — and `BLITZ_MOVE`
+IS moving while plain `BLITZ` is not (`PlayerAction.isMoving()`, ffb-common). That branch is what
+sets `currentMove = min(MINIMUM_MOVE_TO_STAND_UP, MA)` and
+`goingForIt = UtilPlayer.isNextMoveGoingForIt(game)`; for a standing-up player
+`isNextMoveGoingForIt` returns `3 >= MA`, so a Mummy (MA 3) must Rush to make its blitz block.
+Rust stores the declared action as `PlayerAction::Blitz`, whose `is_moving()` is false, so the whole
+branch was skipped: `goes_for_it` stayed false and `StepGoForIt` rolled nothing.
+
+FIX: accept `PlayerAction::Blitz` at that gate in `bb2016/move_/step_init_selecting.rs`
+(`if action.is_moving() || action == PlayerAction::Blitz`), documenting that Rust's `Blitz` IS
+Java's declared `BLITZ_MOVE`.
+
+**FAILED APPROACH, REVERTED:** renaming the mapping instead —
+`PlayerActionChoice::Blitz => PlayerAction::BlitzMove` in `pac_to_player_action` — is the more
+literal port but took lineman bb2016 from 0 → **99** fails: the rest of the bb2016 blitz path
+(dispatch arms, `is_blitzing` checks, StepEndSelecting routing) keys on `PlayerAction::Blitz`.
+Narrow the gate, don't rename the variant.
+
+Test: `prone_blitz_sets_going_for_it_when_standing_up_eats_the_move` (MA 3 → Rush; MA 6 → no Rush).
+Verified: undead 76 → **2**; no regression across all 28 swept bb2016 rosters (the 23 green ones at
+0 fails); lineman bb2016 100/100; lineman bb2025 100/100; ffb-engine 7094/0.

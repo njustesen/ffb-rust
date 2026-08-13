@@ -378,7 +378,18 @@ impl StepInitSelecting {
                 ServerUtilBlock::update_dice_decorations(game);
             }
 
-            if action.is_moving() {
+            // Java gates this on `actingPlayer.getPlayerAction().isMoving()`, evaluated against the
+            // action the CLIENT declared — and both the GUI client and ParityRunner declare a Blitz as
+            // **BLITZ_MOVE** (`declared = (action == BLITZ) ? BLITZ_MOVE : action`), which IS moving.
+            // Rust stores that same declared action as `PlayerAction::Blitz` (renaming the variant
+            // globally regresses the rest of the bb2016 blitz path), so `Blitz` must satisfy the gate
+            // here. Without it a PRONE player's stand-up Blitz skipped the branch below that sets
+            // `current_move = min(MINIMUM_MOVE_TO_STAND_UP, MA)` and
+            // `goes_for_it = is_next_move_going_for_it(...)`, so the Rush d6 was never rolled (undead
+            // bb2016 seed 1 step 187: a prone Mummy — MA 3, so standing up consumes the whole move —
+            // blitzes; Java rolls rollGoingForIt then the 2 block dice, Rust rolled only the block
+            // dice and every later die in the step shifted by one).
+            if action.is_moving() || action == PlayerAction::Blitz {
                 // Java: if (isStandingUp && !canStandUpForFree)
                 //           setCurrentMove(min(MINIMUM_MOVE_TO_STAND_UP, movementWithModifiers))
                 //           setGoingForIt(UtilPlayer.isNextMoveGoingForIt)
@@ -439,6 +450,60 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2016)
+    }
+
+    /// Java `StepInitSelecting.prepareStandingUp()` gates its stand-up branch on
+    /// `actingPlayer.getPlayerAction().isMoving()`, and both the GUI client and ParityRunner declare a
+    /// Blitz as **BLITZ_MOVE** — which IS moving. That branch is what sets
+    /// `currentMove = min(MINIMUM_MOVE_TO_STAND_UP, MA)` and
+    /// `goingForIt = UtilPlayer.isNextMoveGoingForIt(game)`; for a prone player whose stand-up eats
+    /// its whole movement (MA <= 3) the blitz's block then needs a Rush, so Java rolls a
+    /// `rollGoingForIt` d6 BEFORE the block dice.
+    ///
+    /// Rust stores that declared action as `PlayerAction::Blitz`, so the gate must accept it. undead
+    /// bb2016 seed 1 step 187: a prone Mummy (MA 3) blitzes — Java rolls GFI + 2 block dice + 2 armour
+    /// + 2 injury (7 dice); without this Rust rolled no GFI, so its armour read the block's leftover
+    /// die, held at 5 instead of breaking at 10, and no injury followed.
+    #[test]
+    fn prone_blitz_sets_going_for_it_when_standing_up_eats_the_move() {
+        use ffb_model::enums::{PlayerState, PS_PRONE};
+        use ffb_model::types::FieldCoordinate;
+
+        fn setup(movement: i32) -> (Game, StepInitSelecting) {
+            let mut game = make_game();
+            let mut p = ffb_model::model::player::Player {
+                id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+                movement, strength: 3, agility: 3, passing: 4, armour: 9,
+                ..Default::default()
+            };
+            p.starting_skills = vec![];
+            game.team_home.players.push(p);
+            game.home_playing = true;
+            game.field_model.set_player_coordinate("p1", FieldCoordinate::new(10, 7));
+            game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE));
+            game.acting_player.player_id = Some("p1".into());
+            game.acting_player.player_action = Some(PlayerAction::Blitz);
+            game.acting_player.standing_up = true;
+            game.acting_player.has_acted = false;
+            game.acting_player.current_move = 0;
+            game.acting_player.goes_for_it = false;
+            (game, StepInitSelecting::new("end".into()))
+        }
+
+        // MA 3 (Mummy): standing up costs the whole move → the blitz block is a Rush.
+        let (mut game, step) = setup(3);
+        step.prepare_standing_up(&mut game);
+        assert_eq!(game.acting_player.current_move, 3,
+            "the stand-up branch must charge MINIMUM_MOVE_TO_STAND_UP");
+        assert!(game.acting_player.goes_for_it,
+            "MA 3 stand-up leaves no movement, so the blitz block needs a Rush");
+
+        // MA 6 (a normal player): movement remains after standing up → no Rush.
+        let (mut game, step) = setup(6);
+        step.prepare_standing_up(&mut game);
+        assert_eq!(game.acting_player.current_move, 3);
+        assert!(!game.acting_player.goes_for_it,
+            "MA 6 stand-up still leaves movement, so the block is not a Rush");
     }
 
     #[test]
