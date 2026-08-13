@@ -18,7 +18,7 @@ steps/`make_injury_type`). Remaining rosters are being driven green next, in tur
 | `chaos_pact` | 🟢 100/100 | — | GREEN 2026-08-13, shared bb2016 fixes (FUMBBL-legacy roster) |
 | `dark_elf` | 🟢 100/100 | — | GREEN 2026-08-13, cleared by shared bb2016 fixes (AG-scale) |
 | `dark_elf_league_fumbbl` | 🟢 100/100 | — | GREEN 2026-08-13, shared bb2016 fixes (FUMBBL-legacy) |
-| `dwarf` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 4b038dcdfc33ba6e |  |
+| `dwarf` | 🟢 100/100 | — | GREEN 2026-08-13 (ITER59/61/63): Stand Firm follow-up suppression (Deathroller), bb2016 argues for a CASUALTY secret weapon, and bb2016 runs KO-recovery BEFORE the secret-weapon argue (bb2025 is the reverse) |
 | `elf` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust a589c17c4bbe3bb2 |  |
 | `goblin` | 🔴 0/100 | seed 1, step 0, java 384ccaed1d572749 vs rust 25663191654d6a64 |  |
 | `halfling` | 🔴 0/100 | seed 1, step 0, java 384ccaed1d572749 vs rust 9849f4d5573e6c4c |  |
@@ -42,7 +42,7 @@ steps/`make_injury_type`). Remaining rosters are being driven green next, in tur
 | `vampire` | 🔴 0/100 | seed 1, step 0, java e752f3f1ca886d11 vs rust 475b6b600c40ec85 |  |
 | `wood_elf` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust fecd448eb2f10080 |  |
 
-**22 green / 8 red of 30** (2026-08-12→13: amazon, human, lizardman, orc, norse driven to full parity via engine fixes; chaos, chaos_dwarf, dark_elf, high_elf, khemri, nurgle, skaven then verified 100/100 with NO roster-specific fix — cleared by the shared campaign fixes. The remaining rows' "step 0 / seed 1" divergences are STALE pre-campaign snapshots and must be re-scouted before assuming red).
+**23 green / 7 red of 30** (2026-08-12→13: amazon, human, lizardman, orc, norse driven to full parity via engine fixes; chaos, chaos_dwarf, dark_elf, high_elf, khemri, nurgle, skaven then verified 100/100 with NO roster-specific fix — cleared by the shared campaign fixes. The remaining rows' "step 0 / seed 1" divergences are STALE pre-campaign snapshots and must be re-scouted before assuming red).
 
 ## Analysis (recorded, not fixed — task scope)
 

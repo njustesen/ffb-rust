@@ -42,8 +42,8 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | renegades | **0** (38→8→1→0) | 🟢 100/100 GREEN (ITER55 TTM routing, ITER56 declined-re-roll, ITER57 RightStuff dropPlayer) | GREEN |
 | underworld | **0** (44→8→1→0) | 🟢 100/100 GREEN (ITER55-56 TTM + ITER58 bb2016 InitPassing routing) | GREEN |
 | necromantic | **0** (58→1→0) | 🟢 100/100 GREEN (ITER59 + ITER60 Stand Firm) | GREEN |
-| undead | 76 | stand-up-blitz-GFI (ITER51 diagnosis) | queued |
-| dwarf | **30** (79→35→30) | ITER59 Stand Firm + ITER61 bb2016 casualty-SW argue — **still NEXT TARGET** | queued |
+| undead | 76 | stand-up-blitz-GFI (ITER51 diagnosis) — **NEXT TARGET** | queued |
+| dwarf | **0** (79→35→30→0) | 🟢 100/100 GREEN (ITER59 Stand Firm, ITER61 casualty-SW argue, ITER63 KO-vs-argue order) | GREEN |
 | elf | 84 | untraced (suspect AG / pass) | queued |
 | ogre | 98 | earlier non-TTM blocker | queued |
 | wood_elf | 98 | untraced | queued |
@@ -55,7 +55,7 @@ Counts above re-scouted 2026-08-13 AFTER ITER56-58 with FULL 1-100 `--no-abort` 
 The older `undead 44` / `necromantic 44` figures were unreliable (truncated triage) — the true
 counts are 76 / 58. Green rosters re-verified 0 fails in the same sweep.
 
-Green (22): necromantic, renegades, underworld, lineman, amazon, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl,
+Green (23): dwarf, necromantic, renegades, underworld, lineman, amazon, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl,
 high_elf, human, khemri, khemri_fumbbl, lizardman, nippon, norse, nurgle, orc, skaven, slann,
 slann_fumbbl.
 
@@ -312,3 +312,41 @@ once per team, so bb2016 should roll AT MOST ONE argue die per team; the shared 
 over every flagged player.
 
 No code change; dwarf stays at 30. 22 🟢 / 8 🔴 unchanged.
+
+### ITER63 (2026-08-13) — KO-recovery vs Secret-Weapon-argue ORDER is edition-specific → **dwarf 100/100 GREEN**
+
+Continuing ITER62's dwarf seed 5 halftime (step 128, dice identical, state divergent). The three
+halftime dice are **4, 6, 3**. Java's `FFB_DICE_TRACE` callers: pos 71 = `rollKnockoutRecovery`
+(4 → recovers), pos 72 = `rollArgueTheCall` (6 → away keeps its Deathroller), pos 73 =
+`rollArgueTheCall` (3 → home's Deathroller banned).
+
+Rust's observed halftime state was exactly what you get by spending those same dice in the OTHER
+order: 4 and 6 on the two argues (away fails → banned, home succeeds → keeps) and 3 on the KO
+recovery (< 4 → stays down). That accounted for BOTH of ITER62's "layered" symptoms at once — the
+ban on the wrong team AND the leftover `Ko` — so it was one bug, not two.
+
+ROOT CAUSE (grep of both Java sources):
+- bb2016 `StepEndTurn`: `recoverKnockout` (line **281**) runs BEFORE `reportSecretWeaponsUsed`
+  (364) → `askForSecretWeaponBribes` (373/380) → `askForArgueTheCall` (387/395) →
+  `removeUsedSecretWeapons` (404).
+- bb2025 `StepEndTurn`: `reportSecretWeaponsUsed` (**415**) → argue (427/442) → bribes (454/462) →
+  `removeUsedSecretWeapons` (471) → **then** KO recovery/fainting via `getFaintingCount` (478 → 597).
+
+The two editions run these two rng-consuming blocks in **opposite order**, and bb2016 games use the
+shared bb2025 step. (The bribes/argue order also swaps, but bribes roll no dice without an AVOID_BAN
+inducement, so they do not shift the stream in parity.)
+
+FIX: extracted the KO-recovery/fainting block from `step/bb2025/step_end_turn.rs` into
+`recover_knockouts_and_fainting(...)` plus a `ko_recovery_done` guard, and call it BEFORE the Secret
+Weapon send-off when `game.rules == Rules::Bb2016`, leaving the bb2025 call site where it was.
+
+Test: `bb2016_recovers_knockouts_before_the_secret_weapon_argue`.
+Verified: dwarf 30 fails → **0 (100/100 GREEN)**; no regression across all 28 swept bb2016 rosters;
+lineman bb2016 100/100; lineman/goblin/dwarf bb2025 all 100/100; ffb-engine 7093/0. **23 🟢 / 7 🔴.**
+
+LESSON: when the dice VALUES match but the state diverges at a drive end, suspect the ORDER of two
+rng-consuming blocks rather than either block's logic — and check the Java line numbers in both
+editions, because this step's phase order is not shared.
+
+Remaining reds: undead 76 · elf 84 · ogre 98 · wood_elf 98 · goblin 100 · halfling 100 ·
+vampire 100. **undead is the next target.**

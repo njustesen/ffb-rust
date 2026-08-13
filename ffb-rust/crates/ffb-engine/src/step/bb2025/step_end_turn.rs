@@ -65,6 +65,9 @@ pub struct StepEndTurn {
     pub player_ids_failed_bribes: HashSet<String>,
     /// Java: playerIdsArgued
     pub player_ids_argued: HashSet<String>,
+    /// Guards the KO-recovery/fainting block against running twice — bb2016 runs it BEFORE the
+    /// Secret Weapon send-off, bb2025 after.
+    pub ko_recovery_done: bool,
     /// Java: touchdownPlayerId
     pub touchdown_player_id: Option<String>,
     /// Java: isHomeTurnEnding = game.isHomePlaying() — captured before home_playing is flipped.
@@ -90,6 +93,7 @@ impl StepEndTurn {
             player_ids_natural_ones: Vec::new(),
             player_ids_failed_bribes: HashSet::new(),
             player_ids_argued: HashSet::new(),
+            ko_recovery_done: false,
             touchdown_player_id: None,
             is_home_turn_ending: None,
         }
@@ -143,6 +147,123 @@ impl StepEndTurn {
     /// (total >= penalty). Because it consumes dice even at game end, skipping it there desynced the
     /// shared stream from the end-of-game KO-recovery / MVP rolls (goblin seed 2 step 250: both teams'
     /// Bombardiers rolled in Java but not Rust). Java iterates game.getPlayers() = home then away.
+    /// Java `StepEndTurn`: the end-of-drive KO-recovery / Sweltering-Heat fainting block
+    /// (`recoverKnockout` + `heatExhaust`, bb2025 via `getFaintingCount`).
+    ///
+    /// **The ORDER of this block relative to the Secret Weapon send-off is edition-specific**, and
+    /// both consume game rng:
+    ///   bb2016 `StepEndTurn`: `recoverKnockout` (line 281) runs BEFORE
+    ///     `reportSecretWeaponsUsed` (364) / `askForArgueTheCall` (387, 395) /
+    ///     `removeUsedSecretWeapons` (404).
+    ///   bb2025 `StepEndTurn`: `reportSecretWeaponsUsed` (415) / argue (427, 442) /
+    ///     `removeUsedSecretWeapons` (471) run FIRST, then the KO recovery via
+    ///     `getFaintingCount` (478 → 597).
+    /// So the two editions roll these dice in OPPOSITE order. Extracted into a method so the
+    /// caller can place it on either side of the send-off (dwarf bb2016 seed 5 step 128: the
+    /// three halftime dice are 4, 6, 3 — Java spends 4 on the KO recovery (recovers) then 6/3
+    /// on the away/home argues; the bb2025 order spent 4/6 on the argues and 3 on the KO
+    /// recovery, so the KO'd player stayed down and the wrong team's Deathroller was banned).
+    fn recover_knockouts_and_fainting(&mut self, game: &mut Game, rng: &mut GameRng, touchdown: bool) {
+        // Java: getFaintingCount / heatExhaustions / KO recovery — only on new half or touchdown
+        if self.new_half || touchdown {
+            // BB2016 and BB2020+ resolve Sweltering-Heat fainting DIFFERENTLY. BB2016
+            // (bb2016.StepEndTurn) rolls, PER on-pitch player, one rollKnockoutRecovery d6 and
+            // faints (EXHAUSTED) on isExhausted(roll) — interleaved with KO recovery in the same
+            // game.getPlayers() loop. BB2020+ (mixed/bb2025) instead roll a single d3 fainting
+            // COUNT and pick that many random on-pitch players per team. Rust shared this step
+            // (make_step routes EndTurn to bb2025's, make_step_for(bb2016) doesn't override) and
+            // applied the BB2020+ d3-count model to bb2016 too — so a bb2016 Sweltering-Heat drive
+            // end rolled a d3 where Java rolled one d6 per on-pitch player, missing ~1 die per
+            // on-pitch player (amazon bb2016 seed20: half-2 kickoff, Java rolled 22 heatExhaust
+            // d6s, Rust rolled 0 via the d3 path → 17-die desync at the transition). Edition-gate:
+            // bb2016 → per-player heatExhaust; bb2020+ → the d3-count block, unchanged.
+            let is_bb2016 = game.rules == ffb_model::enums::Rules::Bb2016;
+            let sweltering = game.field_model.weather == Weather::SwelteringHeat;
+            let all_player_ids: Vec<String> = game.team_home.players.iter()
+                .chain(game.team_away.players.iter())
+                .map(|p| p.id.clone())
+                .collect();
+            let mut ko_recoveries: Vec<KnockoutRecovery> = Vec::new();
+            let mut heat_exhaustions: Vec<HeatExhaustion> = Vec::new();
+            for player_id in &all_player_ids {
+                let player_state = match game.field_model.player_state(player_id) {
+                    Some(s) => s,
+                    None => continue,
+                };
+                // Java captures playerCoordinate BEFORE KO recovery (recover→box); a player that
+                // is not on-pitch here never rolls heatExhaust.
+                let on_pitch_before = game.field_model.player_coordinate(player_id)
+                    .map(|c| !c.is_box_coordinate())
+                    .unwrap_or(false);
+                let base = player_state.base();
+                if base == PS_KNOCKED_OUT {
+                    let is_home = game.team_home.has_player(player_id);
+                    let bloodweiser_keg = if is_home {
+                        game.turn_data_home.inducement_set.value(Usage::KNOCKOUT_RECOVERY)
+                    } else {
+                        game.turn_data_away.inducement_set.value(Usage::KNOCKOUT_RECOVERY)
+                    };
+                    let roll = rng.d6();
+                    let recovered = DiceInterpreter::is_recovering_from_knockout(roll, bloodweiser_keg);
+                    if recovered {
+                        game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));
+                    }
+                    ko_recoveries.push(KnockoutRecovery::new(player_id.clone(), recovered));
+                }
+                if base == PS_EXHAUSTED {
+                    game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));
+                }
+                // BB2016: per on-pitch player, roll one rollKnockoutRecovery d6 → faint on
+                // isExhausted (Java bb2016.StepEndTurn heatExhaust). Interleaved here to match the
+                // Java per-player loop order exactly.
+                if is_bb2016 && sweltering && on_pitch_before {
+                    let roll = rng.d6();
+                    let exhausted = DiceInterpreter::is_exhausted(roll);
+                    if exhausted {
+                        game.field_model.set_player_state(player_id, player_state.change_base(PS_EXHAUSTED));
+                        UtilBox::put_player_into_box(game, player_id);
+                    }
+                    heat_exhaustions.push(HeatExhaustion::new(player_id.clone(), roll));
+                }
+            }
+            // BB2020+ (mixed/bb2025): AFTER KO recovery, roll ONE d3 fainting COUNT and pick that
+            // many random on-pitch players per team (one rollDice(onPitch.size()) per faint, the
+            // list shrinking as each is removed). NOT used for bb2016 (handled per-player above).
+            if !is_bb2016 && sweltering {
+                let fainting_count = rng.d3();
+                for is_home in [true, false] {
+                    let team = if is_home { &game.team_home } else { &game.team_away };
+                    let mut on_pitch: Vec<String> = team.players.iter()
+                        .filter(|p| game.field_model.player_coordinate(&p.id)
+                            .map(|c| !c.is_box_coordinate())
+                            .unwrap_or(false))
+                        .map(|p| p.id.clone())
+                        .collect();
+                    let mut i = 0;
+                    while i < fainting_count && !on_pitch.is_empty() {
+                        let idx = rng.range(on_pitch.len());
+                        let pid = on_pitch.remove(idx);
+                        if let Some(cur) = game.field_model.player_state(&pid) {
+                            game.field_model.set_player_state(&pid, cur.change_base(PS_EXHAUSTED));
+                        }
+                        UtilBox::put_player_into_box(game, &pid);
+                        heat_exhaustions.push(HeatExhaustion::new(pid, 0));
+                        i += 1;
+                    }
+                }
+            }
+            let td_player_id = if touchdown { game.acting_player.player_id.clone() } else { None };
+            game.report_list.add(ReportTurnEnd::new(
+                td_player_id,
+                ko_recoveries,
+                heat_exhaustions,
+                vec![],
+                0,
+            ));
+            UtilBox::put_all_players_into_box(game);
+        }
+    }
+
     fn report_secret_weapons_used(&mut self, game: &mut Game, rng: &mut GameRng) {
         use ffb_model::model::property::named_properties::NamedProperties;
 
@@ -466,6 +587,16 @@ impl StepEndTurn {
         // keeps it — a final-state (game_end hash) divergence, dwarf seed 4 step 294.
         let is_end_of_game = (self.new_half && game.half > 1)
             || (touchdown && game.turn_data_home.turn_nr >= 8 && game.turn_data_away.turn_nr >= 8);
+        // bb2016 `StepEndTurn` calls `recoverKnockout` (line 281) BEFORE `reportSecretWeaponsUsed`
+        // (364) and the argue asks (387/395); bb2025 does the reverse. Both consume game rng, so the
+        // block must move with the edition.
+        if game.rules == ffb_model::enums::Rules::Bb2016
+            && !self.ko_recovery_done
+            && (self.new_half || touchdown)
+        {
+            self.ko_recovery_done = true;
+            self.recover_knockouts_and_fainting(game, rng, touchdown);
+        }
         if self.argue_the_call_choice_away.is_none() {
             if self.new_half || touchdown {
                 // Java reportSecretWeaponsUsed: the 2d6 ban roll runs at every drive end, even the
@@ -524,103 +655,12 @@ impl StepEndTurn {
                     }
                 }
             }
-            // Java: getFaintingCount / heatExhaustions / KO recovery — only on new half or touchdown
-            if self.new_half || touchdown {
-                // BB2016 and BB2020+ resolve Sweltering-Heat fainting DIFFERENTLY. BB2016
-                // (bb2016.StepEndTurn) rolls, PER on-pitch player, one rollKnockoutRecovery d6 and
-                // faints (EXHAUSTED) on isExhausted(roll) — interleaved with KO recovery in the same
-                // game.getPlayers() loop. BB2020+ (mixed/bb2025) instead roll a single d3 fainting
-                // COUNT and pick that many random on-pitch players per team. Rust shared this step
-                // (make_step routes EndTurn to bb2025's, make_step_for(bb2016) doesn't override) and
-                // applied the BB2020+ d3-count model to bb2016 too — so a bb2016 Sweltering-Heat drive
-                // end rolled a d3 where Java rolled one d6 per on-pitch player, missing ~1 die per
-                // on-pitch player (amazon bb2016 seed20: half-2 kickoff, Java rolled 22 heatExhaust
-                // d6s, Rust rolled 0 via the d3 path → 17-die desync at the transition). Edition-gate:
-                // bb2016 → per-player heatExhaust; bb2020+ → the d3-count block, unchanged.
-                let is_bb2016 = game.rules == ffb_model::enums::Rules::Bb2016;
-                let sweltering = game.field_model.weather == Weather::SwelteringHeat;
-                let all_player_ids: Vec<String> = game.team_home.players.iter()
-                    .chain(game.team_away.players.iter())
-                    .map(|p| p.id.clone())
-                    .collect();
-                let mut ko_recoveries: Vec<KnockoutRecovery> = Vec::new();
-                let mut heat_exhaustions: Vec<HeatExhaustion> = Vec::new();
-                for player_id in &all_player_ids {
-                    let player_state = match game.field_model.player_state(player_id) {
-                        Some(s) => s,
-                        None => continue,
-                    };
-                    // Java captures playerCoordinate BEFORE KO recovery (recover→box); a player that
-                    // is not on-pitch here never rolls heatExhaust.
-                    let on_pitch_before = game.field_model.player_coordinate(player_id)
-                        .map(|c| !c.is_box_coordinate())
-                        .unwrap_or(false);
-                    let base = player_state.base();
-                    if base == PS_KNOCKED_OUT {
-                        let is_home = game.team_home.has_player(player_id);
-                        let bloodweiser_keg = if is_home {
-                            game.turn_data_home.inducement_set.value(Usage::KNOCKOUT_RECOVERY)
-                        } else {
-                            game.turn_data_away.inducement_set.value(Usage::KNOCKOUT_RECOVERY)
-                        };
-                        let roll = rng.d6();
-                        let recovered = DiceInterpreter::is_recovering_from_knockout(roll, bloodweiser_keg);
-                        if recovered {
-                            game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));
-                        }
-                        ko_recoveries.push(KnockoutRecovery::new(player_id.clone(), recovered));
-                    }
-                    if base == PS_EXHAUSTED {
-                        game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));
-                    }
-                    // BB2016: per on-pitch player, roll one rollKnockoutRecovery d6 → faint on
-                    // isExhausted (Java bb2016.StepEndTurn heatExhaust). Interleaved here to match the
-                    // Java per-player loop order exactly.
-                    if is_bb2016 && sweltering && on_pitch_before {
-                        let roll = rng.d6();
-                        let exhausted = DiceInterpreter::is_exhausted(roll);
-                        if exhausted {
-                            game.field_model.set_player_state(player_id, player_state.change_base(PS_EXHAUSTED));
-                            UtilBox::put_player_into_box(game, player_id);
-                        }
-                        heat_exhaustions.push(HeatExhaustion::new(player_id.clone(), roll));
-                    }
-                }
-                // BB2020+ (mixed/bb2025): AFTER KO recovery, roll ONE d3 fainting COUNT and pick that
-                // many random on-pitch players per team (one rollDice(onPitch.size()) per faint, the
-                // list shrinking as each is removed). NOT used for bb2016 (handled per-player above).
-                if !is_bb2016 && sweltering {
-                    let fainting_count = rng.d3();
-                    for is_home in [true, false] {
-                        let team = if is_home { &game.team_home } else { &game.team_away };
-                        let mut on_pitch: Vec<String> = team.players.iter()
-                            .filter(|p| game.field_model.player_coordinate(&p.id)
-                                .map(|c| !c.is_box_coordinate())
-                                .unwrap_or(false))
-                            .map(|p| p.id.clone())
-                            .collect();
-                        let mut i = 0;
-                        while i < fainting_count && !on_pitch.is_empty() {
-                            let idx = rng.range(on_pitch.len());
-                            let pid = on_pitch.remove(idx);
-                            if let Some(cur) = game.field_model.player_state(&pid) {
-                                game.field_model.set_player_state(&pid, cur.change_base(PS_EXHAUSTED));
-                            }
-                            UtilBox::put_player_into_box(game, &pid);
-                            heat_exhaustions.push(HeatExhaustion::new(pid, 0));
-                            i += 1;
-                        }
-                    }
-                }
-                let td_player_id = if touchdown { game.acting_player.player_id.clone() } else { None };
-                game.report_list.add(ReportTurnEnd::new(
-                    td_player_id,
-                    ko_recoveries,
-                    heat_exhaustions,
-                    vec![],
-                    0,
-                ));
-                UtilBox::put_all_players_into_box(game);
+            // bb2025 order: the KO recovery / fainting block runs AFTER the Secret Weapon
+            // send-off. bb2016 runs it BEFORE (see recover_knockouts_and_fainting) and has
+            // already done so above, so skip it here.
+            if !self.ko_recovery_done {
+                self.ko_recovery_done = true;
+                self.recover_knockouts_and_fainting(game, rng, touchdown);
             }
 
             // Java: game.startTurn() — resets pass_coordinate, acting_player, thrower/defender
@@ -795,6 +835,71 @@ mod tests {
         assert!(game.field_model.player_coordinate("sw").is_none(), "failed argue → removed from pitch");
         assert_eq!(game.field_model.player_state("sw").unwrap().base(), PS_BANNED);
         assert!(!game.game_result.team_result_mut(true).player_result_mut("sw").has_used_secret_weapon);
+    }
+
+    /// The end-of-drive KO-recovery block and the Secret Weapon send-off BOTH consume game rng, and
+    /// Java runs them in OPPOSITE order per edition:
+    ///   bb2016 `StepEndTurn`: `recoverKnockout` (281) BEFORE `reportSecretWeaponsUsed` (364) /
+    ///                         `askForArgueTheCall` (387, 395) / `removeUsedSecretWeapons` (404).
+    ///   bb2025 `StepEndTurn`: report (415) / argue (427, 442) / remove (471) FIRST, then the KO
+    ///                         recovery via `getFaintingCount` (478 -> 597).
+    /// dwarf bb2016 seed 5 step 128: the three halftime dice are 4, 6, 3. Java spends 4 on the KO
+    /// recovery (the player recovers) and 6/3 on the away/home argues (away keeps its Deathroller,
+    /// home's is banned). Running the bb2025 order under bb2016 spent 4/6 on the argues and 3 on the
+    /// KO recovery — the KO'd player stayed down AND the other team's Deathroller was banned.
+    #[test]
+    fn bb2016_recovers_knockouts_before_the_secret_weapon_argue() {
+        use ffb_model::enums::{Rules, PS_KNOCKED_OUT};
+
+        fn setup(rules: Rules) -> (Game, StepEndTurn) {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+            // A KO'd away player (needs recovering) and a home Secret Weapon (needs arguing).
+            let ko = make_player("ko");
+            game.team_away.players.push(ko);
+            game.field_model.set_player_state("ko", PlayerState::new(PS_KNOCKED_OUT));
+            let mut sw = make_player("sw");
+            sw.starting_skills = vec![SkillWithValue { skill_id: ffb_model::enums::SkillId::SecretWeapon, value: None }];
+            game.team_home.players.push(sw);
+            game.field_model.set_player_coordinate("sw", FieldCoordinate::new(5, 5));
+            game.field_model.set_player_state("sw", PlayerState::new(PS_STANDING));
+            game.game_result.team_result_mut(true).player_result_mut("sw").has_used_secret_weapon = true;
+            let mut step = StepEndTurn::new();
+            step.new_half = true;
+            (game, step)
+        }
+
+        // Order is observable through which die each mechanic consumes: give the rng a sequence whose
+        // first d6 recovers a KO (4+) and whose second fails an argue (< 6). Under the bb2016 order the
+        // KO recovers and the SW is banned; under the bb2025 order the dice swap roles.
+        let mut seed = 0u64;
+        let found = loop {
+            let mut r = GameRng::new(seed);
+            let (a, b) = (r.d6(), r.d6());
+            if a >= 4 && b < 6 && !(b >= 4 && a < 6) { break (a, b); }
+            seed += 1;
+            assert!(seed < 5000, "no suitable seed");
+        };
+        let _ = found;
+
+        // bb2016: KO recovery takes the FIRST die.
+        let (mut game, mut step) = setup(Rules::Bb2016);
+        let first = GameRng::new(seed).d6();
+        let mut rng = GameRng::new(seed);
+        step.recover_knockouts_and_fainting(&mut game, &mut rng, false);
+        assert_eq!(rng.call_count, 1, "the KO recovery consumed exactly the first d6");
+        assert!(first >= 4, "chosen seed's first d6 recovers a KO");
+        assert_ne!(game.field_model.player_state("ko").unwrap().base(), PS_KNOCKED_OUT,
+            "bb2016 recovers the KO with the FIRST halftime die");
+
+        // bb2025 keeps the block AFTER the send-off, so under bb2025 the first two dice go to the
+        // argue and the KO recovery reads a later one — the ordering is what this guards.
+        let (mut game, mut step) = setup(Rules::Bb2025);
+        let mut rng = GameRng::new(seed);
+        step.report_secret_weapons_used(&mut game, &mut rng);
+        step.argue_and_remove_secret_weapons(&mut game, &mut rng);
+        assert!(rng.call_count >= 1, "bb2025 spends halftime dice on the argue FIRST");
+        assert_eq!(game.field_model.player_state("ko").unwrap().base(), PS_KNOCKED_OUT,
+            "bb2025 has not touched the KO'd player yet at this point in the step");
     }
 
     /// Java's `getPlayerIds` eligibility filter is EDITION-SPECIFIC, and this step is shared:
