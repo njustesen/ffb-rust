@@ -15,9 +15,9 @@ steps/`make_injury_type`). Remaining rosters are being driven green next, in tur
 | `amazon` | 🟢 100/100 | — | driven to full parity 2026-08-12 (23 engine fixes, ITER20-37; see parity_roster_progression memory) |
 | `chaos` | 🟢 100/100 | — | GREEN 2026-08-13, no roster-specific fix — cleared by the campaign's shared bb2016 fixes (esp. Claw armour cap bb2016=7; AG-scale; chain-push occupant) |
 | `chaos_dwarf` | 🟢 100/100 | — | GREEN 2026-08-13, cleared by shared bb2016 fixes |
-| `chaos_pact` | 🔴 0/100 | seed 1, step 0, java c5d85980b8bb2c73 vs rust aa0748f996be2af7 |  |
+| `chaos_pact` | 🟢 100/100 | — | GREEN 2026-08-13, shared bb2016 fixes (FUMBBL-legacy roster) |
 | `dark_elf` | 🟢 100/100 | — | GREEN 2026-08-13, cleared by shared bb2016 fixes (AG-scale) |
-| `dark_elf_league_fumbbl` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust a00da3c56dc4990a | FUMBBL-legacy roster |
+| `dark_elf_league_fumbbl` | 🟢 100/100 | — | GREEN 2026-08-13, shared bb2016 fixes (FUMBBL-legacy) |
 | `dwarf` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 4b038dcdfc33ba6e |  |
 | `elf` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust a589c17c4bbe3bb2 |  |
 | `goblin` | 🔴 0/100 | seed 1, step 0, java 384ccaed1d572749 vs rust 25663191654d6a64 |  |
@@ -25,24 +25,24 @@ steps/`make_injury_type`). Remaining rosters are being driven green next, in tur
 | `high_elf` | 🟢 100/100 | — | GREEN 2026-08-13, cleared by shared bb2016 fixes (AG-scale) |
 | `human` | 🟢 100/100 | — | driven to full parity 2026-08-12 (Bone Head per-activation; bb2016 dodge & pickup old AG scale) |
 | `khemri` | 🟢 100/100 | — | GREEN 2026-08-13, cleared by shared bb2016 fixes |
-| `khemri_fumbbl` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust d30a52f6c35d68d7 | FUMBBL-legacy roster |
+| `khemri_fumbbl` | 🟢 100/100 | — | GREEN 2026-08-13, shared bb2016 fixes (FUMBBL-legacy) |
 | `lizardman` | 🟢 100/100 | — | GREEN with no roster-specific fix — cleared by the shared amazon/human bb2016 fixes (AG-scale dodge/catch/pickup + Bone Head per-activation) |
 | `necromantic` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 10bfe73abb533f6e |  |
-| `nippon` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 96e1d188b6c11c4b | FUMBBL-legacy roster |
+| `nippon` | 🟢 100/100 | — | GREEN 2026-08-13, shared bb2016 fixes (FUMBBL-legacy) |
 | `norse` | 🟢 100/100 | — | driven to full parity 2026-08-12 (Snow Troll Wild Animal per-activation + prone-cancel via old_player_state; Claw armour cap bb2016=7 not 8; bb2016 chain-push moves the occupant not the block defender) |
 | `nurgle` | 🟢 100/100 | — | GREEN 2026-08-13, cleared by shared bb2016 fixes (Claw/Decay/negatrait) |
 | `ogre` | 🔴 0/100 | seed 1, step 0, java f17d2e4bc0c146e5 vs rust d6ef3f4659806499 |  |
 | `orc` | 🟢 100/100 | — | driven to full parity 2026-08-12 (Really Stupid per-activation + bb2016 RightStuff routing) |
 | `renegades` | 🔴 0/100 | seed 1, step 0, java 36c2338c5a81ae43 vs rust 7de5fb2fda70c4fa | FUMBBL-legacy roster |
 | `skaven` | 🟢 100/100 | — | GREEN 2026-08-13, cleared by shared bb2016 fixes (AG-scale) |
-| `slann` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 8b5bd002b4a05bb2 |  |
-| `slann_fumbbl` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 019f905b194ab2dc | FUMBBL-legacy roster |
+| `slann` | 🟢 100/100 | — | GREEN 2026-08-13, shared bb2016 fixes |
+| `slann_fumbbl` | 🟢 100/100 | — | GREEN 2026-08-13, shared bb2016 fixes (FUMBBL-legacy) |
 | `undead` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 52ec2896b34b514f |  |
 | `underworld` | 🔴 0/100 | seed 1, step 0, java 36c2338c5a81ae43 vs rust 74b156927e7fc691 |  |
 | `vampire` | 🔴 0/100 | seed 1, step 0, java e752f3f1ca886d11 vs rust 475b6b600c40ec85 |  |
 | `wood_elf` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust fecd448eb2f10080 |  |
 
-**12 green / 18 red of 30** (2026-08-12→13: amazon, human, lizardman, orc, norse driven to full parity via engine fixes; chaos, chaos_dwarf, dark_elf, high_elf, khemri, nurgle, skaven then verified 100/100 with NO roster-specific fix — cleared by the shared campaign fixes. The remaining rows' "step 0 / seed 1" divergences are STALE pre-campaign snapshots and must be re-scouted before assuming red).
+**18 green / 12 red of 30** (2026-08-12→13: amazon, human, lizardman, orc, norse driven to full parity via engine fixes; chaos, chaos_dwarf, dark_elf, high_elf, khemri, nurgle, skaven then verified 100/100 with NO roster-specific fix — cleared by the shared campaign fixes. The remaining rows' "step 0 / seed 1" divergences are STALE pre-campaign snapshots and must be re-scouted before assuming red).
 
 ## Analysis (recorded, not fixed — task scope)
 
