@@ -1467,3 +1467,37 @@ lineman bb2025 **0**, vampire bb2025 **0**. `cargo test -p ffb-engine` **7113/0*
 **Still open** (found in ITER89, confirmed to live in this same file, not yet applied): Java's
 `doRoll`/`markSkillUsed` use the **ActingPlayer**'s used-set (cleared every activation), while this
 step reads and writes `Player.used_skills` (whole game). Try it next as its own change.
+
+---
+
+## ITER91 — Blood Lust rolls once per ACTIVATION (fail count unchanged at 39)
+
+The divergence ITER89 found, now applied to the file ITER90's backtrace proved is live. Java, in
+**both** editions:
+```java
+doRoll = UtilCards.hasUnusedSkill(actingPlayer, skill);   // ACTING player's used-set
+...
+actingPlayer.markSkillUsed(skill);
+```
+`changeActingPlayer` clears that set at every activation, so a Vampire rolls Blood Lust **once per
+activation**. `step/bb2025/shared/step_blood_lust.rs` read and wrote `Player.used_skills`, which
+persists for the whole **game**, so a Vampire would roll Blood Lust exactly once ever.
+
+Test `blood_lust_is_rolled_once_per_activation_not_once_per_game` (rolls; marks the ACTING set and
+not the Player's; no second roll in the same activation; rolls again after the set is cleared).
+
+**Fail count unchanged: 39.** Reported plainly — this is a correct 1:1 port with a regression test,
+but it did not move any seed on its own. Gates: lineman bb2016 **0**, goblin **0**, halfling **0**,
+lineman bb2025 **0**, vampire bb2025 **0**, `cargo test -p ffb-engine` **7114/0**.
+
+### FRONTIER for ITER92 — Rust's game ends early after a failed Blood Lust
+seed 1 now produces **101** Rust steps against Java's **187**: the Rust log ends with
+`game_end` at i=101, immediately after the i=100 Blood Lust failure. Java consumes exactly one die
+there (rng 77) — `JSTEP i=101` still reads `rng_calls=77` — and plays on; die 78 belongs to a later
+activation.
+
+The `DRIVE` trace shows the failing activation ending with
+`prompt_after=Some(ReRollOffer { action: "BLOOD_LUST" })`, then `EndBlocking`, then a fresh
+`InitBlocking` — so the GOTO label resolves fine and the sequence continues; something *after* that
+terminates the game. Find what ends it (compare the two logs from i=100 forward, and check whether
+the away turn is being ended twice or the drive is being closed).

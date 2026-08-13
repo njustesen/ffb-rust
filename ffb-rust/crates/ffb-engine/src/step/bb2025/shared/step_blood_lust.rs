@@ -165,7 +165,14 @@ impl StepBloodLust {
             }
         } else {
             do_roll = game.player(&acting_id)
-                .map(|p| p.has_skill(SkillId::BloodLust) && !p.used_skills.contains(&SkillId::BloodLust))
+                // Java (BOTH editions' BloodLustBehaviour):
+                //     doRoll = UtilCards.hasUnusedSkill(actingPlayer, skill);
+                // The used-set is the ACTING PLAYER's, which `changeActingPlayer` clears at every
+                // activation, so a Vampire rolls Blood Lust ONCE PER ACTIVATION. Reading
+                // `Player.used_skills` (whole GAME) let a Vampire roll Blood Lust exactly once ever.
+                // Same per-activation shape as the Bone-head / Really Stupid fix.
+                .map(|p| p.has_skill(SkillId::BloodLust))
+                .map(|has| has && !game.acting_player.used_skills.contains(&SkillId::BloodLust))
                 .unwrap_or(false);
         }
 
@@ -191,9 +198,8 @@ impl StepBloodLust {
         let min_roll = minimum_roll_blood_lust_with(skill_value, good_conditions);
         let successful = roll >= min_roll;
 
-        if let Some(player) = game.player_mut(&acting_id) {
-            player.used_skills.insert(SkillId::BloodLust);
-        }
+        // Java: `actingPlayer.markSkillUsed(skill)` — per-ACTIVATION, not on the Player.
+        game.acting_player.used_skills.insert(SkillId::BloodLust);
 
         let event = GameEvent::BloodLustRoll { player_id: acting_id.clone(), roll, success: successful };
 
@@ -462,5 +468,36 @@ mod tests {
             "bb2016 jumps to the failure label, cancelling the declared Block");
         assert_eq!(run(Rules::Bb2025), StepAction::Continue,
             "bb2025 stops for the action-conversion dialog instead");
+    }
+
+    /// Java (BOTH editions): `doRoll = UtilCards.hasUnusedSkill(actingPlayer, skill)` and
+    /// `actingPlayer.markSkillUsed(skill)` — the used-set belongs to the ACTING PLAYER, which
+    /// `changeActingPlayer` clears at every activation, so a Vampire rolls Blood Lust ONCE PER
+    /// ACTIVATION. Reading/writing `Player.used_skills` (whole GAME) let a Vampire roll Blood Lust
+    /// exactly once ever. Same per-activation shape as the Bone-head / Really Stupid fix.
+    #[test]
+    fn blood_lust_is_rolled_once_per_activation_not_once_per_game() {
+        let mut game = make_game(vec![SkillId::BloodLust], Some(PlayerAction::Move));
+        game.rules = Rules::Bb2016;
+
+        let mut rng = GameRng::new(seed_for_d6(6));
+        let before = rng.call_count;
+        let _ = StepBloodLust::new(String::new()).start(&mut game, &mut rng);
+        assert_eq!(rng.call_count - before, 1, "the first activation rolls");
+        assert!(game.acting_player.used_skills.contains(&SkillId::BloodLust),
+            "the ACTING player's used-set is marked");
+        assert!(!game.player("vamp").unwrap().used_skills.contains(&SkillId::BloodLust),
+            "the Player's whole-game used-set must NOT be marked");
+
+        // Same activation → no second roll.
+        let before = rng.call_count;
+        let _ = StepBloodLust::new(String::new()).start(&mut game, &mut rng);
+        assert_eq!(rng.call_count - before, 0, "no second roll within the same activation");
+
+        // New activation (changeActingPlayer clears the set) → rolls again.
+        game.acting_player.used_skills.clear();
+        let before = rng.call_count;
+        let _ = StepBloodLust::new(String::new()).start(&mut game, &mut rng);
+        assert_eq!(rng.call_count - before, 1, "a fresh activation rolls Blood Lust again");
     }
 }
