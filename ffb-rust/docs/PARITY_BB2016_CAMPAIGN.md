@@ -1538,3 +1538,43 @@ Compare how `DriverGameState::apply` handles a `StepAction::GotoLabel` returned 
 re-roll path re-enter through the same route `start` uses), then re-run vampire.
 
 No code change committed this iteration — nothing was verified. Baseline: vampire bb2016 **39**.
+
+---
+
+## ITER93 — the stall pinned to `StepInitBlocking` (no fix; 39 unchanged)
+
+**Correction to ITER92's hypothesis.** There is *no* asymmetry between `dispatch` and
+`dispatch_after_start`: both handle `StepAction::GotoLabel` identically
+(`let _ = self.stack.goto_label(label)`), and the trace confirms the jump works — `EndBlocking`
+does run. That hypothesis was wrong.
+
+A gated probe in both dispatchers, printing whenever a step returns `Continue` with **no prompt**
+(the exact stall condition — `waiting_for_command = true`, `pending_prompt = None`), names the
+culprit in one line:
+
+```
+STALLDBG start step=InitBlocking Continue with NO prompt
+```
+
+Sequence inside the single `apply(NoReRoll)`:
+1. Blood Lust fails → `goto(END_BLOCKING)` → `StepEndBlocking` runs (`stack_len=14`).
+2. A **new block sequence is pushed** (`InitBlocking`, `stack_len=53`) — not from an agent
+   activation, since only one action was applied.
+3. That fresh `StepInitBlocking` has no `block_defender_id`, so it takes
+   `None => return StepOutcome::cont()` — Java's "no defender yet, wait for `CLIENT_BLOCK`" branch.
+   Java never hangs there because the harness's phase-2 `sendConcreteAction(BLOCK)` supplies a
+   target; Rust picks its block target at *activation* time, so a re-pushed sequence has none and
+   the engine waits for a command that will never come.
+
+`StepInitBlocking` already has a Blood Lust guard —
+`if is_blood_lust && action_is_move { return goto(goto_label_on_end) }` — but it only covers
+`Move`/`BlitzMove`; here the acting action is `Block`, so it falls through.
+
+### FRONTIER for ITER94
+Find **what re-pushes the block sequence** after `StepEndBlocking` on the Blood-Lust-failure path
+(a Frenzy/second-block push, or the selecting sequence re-dispatching an acting player whose action
+is still `Block`), and compare against Java, where the failed Blood Lust ends the activation and the
+turn simply continues. Check `bb2016/StepEndBlocking` and the end-of-activation path for an acting
+player still carrying `Block` while `sufferingBloodLust` is set.
+
+No code change committed — nothing verified. Baseline: vampire bb2016 **39**.
