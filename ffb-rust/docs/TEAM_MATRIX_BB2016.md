@@ -11,7 +11,7 @@ steps/`make_injury_type`). Remaining rosters are being driven green next, in tur
 
 | Roster | Result | First divergence | Notes |
 |---|---|---|---|
-| `lineman` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 17bdbe0e289c3afd | FUMBBL-legacy roster |
+| `lineman` | 🟢 100/100 | — | GREEN 2026-08-13, shared bb2016 fixes (synthetic FUMBBL-legacy roster) |
 | `amazon` | 🟢 100/100 | — | driven to full parity 2026-08-12 (23 engine fixes, ITER20-37; see parity_roster_progression memory) |
 | `chaos` | 🟢 100/100 | — | GREEN 2026-08-13, no roster-specific fix — cleared by the campaign's shared bb2016 fixes (esp. Claw armour cap bb2016=7; AG-scale; chain-push occupant) |
 | `chaos_dwarf` | 🟢 100/100 | — | GREEN 2026-08-13, cleared by shared bb2016 fixes |
@@ -42,7 +42,7 @@ steps/`make_injury_type`). Remaining rosters are being driven green next, in tur
 | `vampire` | 🔴 0/100 | seed 1, step 0, java e752f3f1ca886d11 vs rust 475b6b600c40ec85 |  |
 | `wood_elf` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust fecd448eb2f10080 |  |
 
-**18 green / 12 red of 30** (2026-08-12→13: amazon, human, lizardman, orc, norse driven to full parity via engine fixes; chaos, chaos_dwarf, dark_elf, high_elf, khemri, nurgle, skaven then verified 100/100 with NO roster-specific fix — cleared by the shared campaign fixes. The remaining rows' "step 0 / seed 1" divergences are STALE pre-campaign snapshots and must be re-scouted before assuming red).
+**19 green / 11 red of 30** (2026-08-12→13: amazon, human, lizardman, orc, norse driven to full parity via engine fixes; chaos, chaos_dwarf, dark_elf, high_elf, khemri, nurgle, skaven then verified 100/100 with NO roster-specific fix — cleared by the shared campaign fixes. The remaining rows' "step 0 / seed 1" divergences are STALE pre-campaign snapshots and must be re-scouted before assuming red).
 
 ## Analysis (recorded, not fixed — task scope)
 
