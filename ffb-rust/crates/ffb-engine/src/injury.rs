@@ -273,6 +273,27 @@ impl InjuryResult {
             Some(id) => id,
             None => return,
         };
+
+        // Java `InjuryResult.applyTo` — the FIRST thing it does, before it even looks at
+        // `injuryContext.getPlayerState()`:
+        //     if (defender.hasSkillProperty(getsSentOffAtEndOfDrive)) {
+        //         playerResult.setHasUsedSecretWeapon(true);
+        //     }
+        // This is how a secret weapon that never takes a turn still gets sent off: the goblin
+        // Fanatic KO'd by the kickoff Pitch-Invasion chain injury is flagged HERE, because
+        // `markPlayedAndSecretWeapons` can never flag it (its `canBeSetUpNextDrive()` guard excludes
+        // a KO'd player). Missing here, Rust left the Fanatic unflagged, so the single bb2016 argue
+        // targeted the Bombardier instead and the Fanatic was set up again in half 2 where Java had
+        // it BANNED (goblin bb2016 seed 46 i=142).
+        let defender_has_secret_weapon = game.player(defender_id)
+            .map(|p| p.has_skill_property(ffb_model::model::property::named_properties::NamedProperties::GETS_SENT_OFF_AT_END_OF_DRIVE))
+            .unwrap_or(false);
+        if defender_has_secret_weapon {
+            let is_home = game.team_home.player(defender_id).is_some();
+            let pid = defender_id.to_owned();
+            game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon = true;
+        }
+
         let new_state = match ctx.injury {
             Some(s) => s,
             None => return,
@@ -1425,5 +1446,38 @@ mod tests {
             matches!(state25, Some(PS_BADLY_HURT) | Some(PS_SERIOUS_INJURY) | Some(PS_RIP)),
             "bb2025 maps the d16 to a casualty tier"
         );
+    }
+
+    /// Java `InjuryResult.applyTo` sets the secret-weapon flag as its FIRST action, before it looks
+    /// at `injuryContext.getPlayerState()`. That is the ONLY way a secret weapon which never takes a
+    /// turn gets sent off: `markPlayedAndSecretWeapons` can't flag it, because its
+    /// `canBeSetUpNextDrive()` guard excludes a KO'd player. The live `injury::InjuryResult::apply_to`
+    /// did not set the flag at all (the copy in `injury_result.rs` is a stale duplicate that nothing
+    /// on this path calls), so the goblin Fanatic KO'd by the kickoff Pitch-Invasion chain injury
+    /// stayed unflagged: the single bb2016 argue targeted the Bombardier instead and the Fanatic was
+    /// set up again in half 2 where Java had it BANNED (goblin bb2016 seed 46 i=142).
+    #[test]
+    fn apply_to_flags_the_secret_weapon_even_with_no_player_state() {
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::SkillWithValue;
+
+        let make = |with_state: bool| {
+            let mut game = make_game_with_players(&["sw"], &[]);
+            if let Some(p) = game.team_home.player_mut("sw") {
+                p.starting_skills.push(SkillWithValue::new(SkillId::SecretWeapon));
+            }
+            let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+            ir.injury_context.defender_id = Some("sw".into());
+            if with_state {
+                ir.injury_context.injury = Some(PlayerState::new(PS_KNOCKED_OUT));
+            }
+            ir.apply_to(&mut game);
+            game.game_result.team_result_mut(true).player_result_mut("sw").has_used_secret_weapon
+        };
+
+        assert!(make(false),
+            "the flag is set BEFORE the no-PlayerState early return -- this is how a secret weapon \
+             that never took a turn still gets sent off");
+        assert!(make(true), "and of course when the injury does carry a state");
     }
 }

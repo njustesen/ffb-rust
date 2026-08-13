@@ -47,7 +47,7 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | elf | **0** (was 84) | 🟢 100/100 GREEN (ITER66 Side Step auto-use) | GREEN |
 | ogre | **0** (was 98) | 🟢 100/100 GREEN (ITER69 bb2016 TTM spends the PASS; needed a jar rebuild) | GREEN |
 | wood_elf | **0** (98→81→19→0) | 🟢 100/100 GREEN (ITER71 startedStanding, ITER73 rooted pre-draw, ITER77 declined-re-roll edition gate) | GREEN |
-| goblin | **2** (100→99→5→4→3→2) | + ITER85 (B&C drop still scatters the ball); seeds 46/56 left | in progress |
+| goblin | **0** (100→99→5→4→3→2→0) | 🟢 100/100 GREEN (ITER78-87) | GREEN |
 | halfling | **0** (100→3→0) | 🟢 100/100 GREEN (ITER78-80 unblocked it to 3; ITER81 TTM-landing drop-before-apply) | GREEN |
 | vampire | 100 | systematic — Bloodlust bb2016 | queued |
 
@@ -55,7 +55,7 @@ Counts above re-scouted 2026-08-13 AFTER ITER56-58 with FULL 1-100 `--no-abort` 
 The older `undead 44` / `necromantic 44` figures were unreliable (truncated triage) — the true
 counts are 76 / 58. Green rosters re-verified 0 fails in the same sweep.
 
-Green (27): wood_elf, ogre, elf, undead, dwarf, necromantic, renegades, underworld, lineman, amazon, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl,
+Green (29): goblin, halfling, wood_elf, ogre, elf, undead, dwarf, necromantic, renegades, underworld, lineman, amazon, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl,
 high_elf, human, khemri, khemri_fumbbl, lizardman, nippon, norse, nurgle, orc, skaven, slann,
 slann_fumbbl.
 
@@ -1317,3 +1317,37 @@ Find what applies the ITER83-published `INJURY_RESULT` from the bb2016 Pitch Inv
 through `InjuryResult::apply_to`, which is where Java sets `hasUsedSecretWeapon`. Route that path
 through `apply_to` (or find the Java step that does) and the flag, the argue target and the half-2
 setup should all fall into line. Remaining goblin seeds: **46, 56**.
+
+---
+
+## ITER87 — goblin 100/100 GREEN (**29/30**): `apply_to` never flagged the secret weapon
+
+ITER86 put the flag fix in `injury_result.rs`. A `Backtrace::force_capture()` on
+`FieldModel::set_player_state` showed why it changed nothing:
+
+```
+STATEDBG home_03 -> 5
+   5: ffb_engine::injury::InjuryResult::apply_to          <-- the LIVE one
+   7: ffb_engine::step::bb2025::shared::step_apothecary::StepApothecary::start
+```
+
+There are **two** `InjuryResult` types. The live path is `crate::injury::InjuryResult`;
+`crate::injury_result::InjuryResult` is a stale duplicate that nothing on this path calls. (Same
+trap as the earlier `make_injury_type` routing to a stale duplicate — a Rust backtrace on the state
+mutation is the reliable way to find the real one.)
+
+The live `apply_to` did not set `has_used_secret_weapon` **at all**. Java's does, as its first
+statement, before it even looks at `injuryContext.getPlayerState()` — and that is the ONLY way a
+secret weapon which never takes a turn gets sent off, since `markPlayedAndSecretWeapons`'
+`canBeSetUpNextDrive()` guard excludes a KO'd player. So the goblin Fanatic KO'd by the kickoff
+Pitch-Invasion chain injury (ITER83) went unflagged, the single bb2016 argue (ITER82) targeted the
+Bombardier instead, and the Fanatic was set up again in half 2 where Java had it BANNED.
+
+FIX: set the flag in `injury::InjuryResult::apply_to`, before the `ctx.injury == None` early return,
+exactly where Java sets it. Test `apply_to_flags_the_secret_weapon_even_with_no_player_state`.
+
+**Verified:** goblin **2 → 0**, seeds 46 and 56 both green in the same fix. Gates: lineman bb2016
+**0**, halfling **0**, dwarf **0**, ogre **0**, renegades **0**, undead **0**, lineman bb2025 **0**,
+goblin bb2025 **0**, dwarf bb2025 **0**. `cargo test -p ffb-engine` **7110/0**.
+
+## 🏁 bb2016 matrix: **29 🟢 / 1 🔴** — only `vampire` (100) remains.
