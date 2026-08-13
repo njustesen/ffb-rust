@@ -42,9 +42,9 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | renegades | **0** (38→8→1→0) | 🟢 100/100 GREEN (ITER55 TTM routing, ITER56 declined-re-roll, ITER57 RightStuff dropPlayer) | GREEN |
 | underworld | **0** (44→8→1→0) | 🟢 100/100 GREEN (ITER55-56 TTM + ITER58 bb2016 InitPassing routing) | GREEN |
 | necromantic | **0** (58→1→0) | 🟢 100/100 GREEN (ITER59 + ITER60 Stand Firm) | GREEN |
-| undead | **2** (was 76) | ITER64 prone-Blitz going-for-it — **still NEXT TARGET** (2 seeds left) | queued |
+| undead | **0** (76→2→0) | 🟢 100/100 GREEN (ITER64 prone-Blitz GFI + ITER65 Blizzard GFI modifier) | GREEN |
 | dwarf | **0** (79→35→30→0) | 🟢 100/100 GREEN (ITER59 Stand Firm, ITER61 casualty-SW argue, ITER63 KO-vs-argue order) | GREEN |
-| elf | 84 | untraced (suspect AG / pass) | queued |
+| elf | 84 | untraced (suspect AG / pass) — **NEXT TARGET** | queued |
 | ogre | 98 | earlier non-TTM blocker | queued |
 | wood_elf | 98 | untraced | queued |
 | goblin | 100 | earlier non-TTM blocker masks the TTM win — retrace seed 1 | queued |
@@ -55,7 +55,7 @@ Counts above re-scouted 2026-08-13 AFTER ITER56-58 with FULL 1-100 `--no-abort` 
 The older `undead 44` / `necromantic 44` figures were unreliable (truncated triage) — the true
 counts are 76 / 58. Green rosters re-verified 0 fails in the same sweep.
 
-Green (23): dwarf, necromantic, renegades, underworld, lineman, amazon, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl,
+Green (24): undead, dwarf, necromantic, renegades, underworld, lineman, amazon, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl,
 high_elf, human, khemri, khemri_fumbbl, lizardman, nippon, norse, nurgle, orc, skaven, slann,
 slann_fumbbl.
 
@@ -386,3 +386,37 @@ Narrow the gate, don't rename the variant.
 Test: `prone_blitz_sets_going_for_it_when_standing_up_eats_the_move` (MA 3 → Rush; MA 6 → no Rush).
 Verified: undead 76 → **2**; no regression across all 28 swept bb2016 rosters (the 23 green ones at
 0 fails); lineman bb2016 100/100; lineman bb2025 100/100; ffb-engine 7094/0.
+
+### ITER65 (2026-08-13) — bb2016/bb2020 had NO Going-For-It modifiers at all → **undead 100/100 GREEN**
+
+undead seed 21, step 5: away_01 (a PRONE Mummy at (13,7)) does a stand-up Move to (12,6). Java
+spends 3 dice, Rust 6:
+- Java: pos 21 `rollGoingForIt` = **2** → **FAILS** → pos 22-23 `InjuryTypeDropGFI` armour 2d6
+  (1+5=6, held) → the step ends (the fall is a turnover).
+- Rust: pos 21 GFI = 2 → treated as SUCCESS → carried on into the move's dodge (pos 22) and a block,
+  spending 3 dice Java spends in later steps.
+
+ROOT CAUSE: `DiceInterpreter.minimumRollGoingForIt = max(2, 2 + modifierTotal)`, and Java's
+`modifiers/mixed/GoForItModifierCollection` — annotated `@RulesCollection(BB2016)` **and**
+`@RulesCollection(BB2020)` — registers **Blizzard +1** (plus two Moles-under-the-Pitch entries). The
+weather here is a Blizzard, so the minimum roll is 3 and a Rush of 2 fails.
+
+Rust's `GoForItModifierFactory::for_rules` routed `Rules::Bb2025 | Common` to the bb2025 collection
+and **everything else to the BASE `GoForItModifierCollection`, which registers nothing** — so bb2016
+and bb2020 games applied NO GFI modifier ever and always rushed on 2+. A correct 1:1
+`modifiers/mixed/go_for_it_modifier_collection.rs` already existed in the tree (Blizzard +1 + both
+Moles variants, matching Java's per-team-id predicates) — it was simply never wired up.
+
+FIX: one arm of `for_rules` — route non-bb2025 to `MixedCollection` (plus its `GfiCollection` impl).
+
+Test: `every_edition_applies_the_blizzard_gfi_modifier` (asserts Blizzard is registered at +1 and
+yields a minimum roll of 3 for bb2016, bb2020 AND bb2025).
+Verified: undead 2 fails → **0 (100/100 GREEN)**; no regression across all 28 swept bb2016 rosters;
+lineman bb2016 100/100; lineman/human/wood_elf bb2025 100/100; ffb-engine 7094/0, ffb-mechanics
+1156/0, ffb-model 2780/0. **24 🟢 / 6 🔴.**
+
+NOTE: this also silently affected **bb2020**, which has no parity matrix — worth a look if bb2020 is
+ever exercised.
+
+Remaining reds: elf 84 · ogre 98 · wood_elf 98 · goblin 100 · halfling 100 · vampire 100.
+**elf is the next target.**

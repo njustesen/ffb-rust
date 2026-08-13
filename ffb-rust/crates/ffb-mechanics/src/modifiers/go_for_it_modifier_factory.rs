@@ -1,5 +1,6 @@
 use ffb_model::enums::Rules;
 use crate::modifiers::bb2025::go_for_it_modifier_collection::GoForItModifierCollection as Bb2025Collection;
+use crate::modifiers::mixed::go_for_it_modifier_collection::GoForItModifierCollection as MixedCollection;
 use crate::modifiers::go_for_it_context::GoForItContext;
 use crate::modifiers::go_for_it_modifier::GoForItModifier;
 use crate::modifiers::go_for_it_modifier_collection::GoForItModifierCollection;
@@ -11,6 +12,13 @@ trait GfiCollection: Send + Sync {
 }
 
 impl GfiCollection for GoForItModifierCollection {
+    fn find_applicable<'a>(&'a self, ctx: &GoForItContext<'_>) -> Vec<&'a GoForItModifier> {
+        self.find_applicable(ctx)
+    }
+    fn get_modifiers(&self) -> &[GoForItModifier] { self.get_modifiers() }
+}
+
+impl GfiCollection for MixedCollection {
     fn find_applicable<'a>(&'a self, ctx: &GoForItContext<'_>) -> Vec<&'a GoForItModifier> {
         self.find_applicable(ctx)
     }
@@ -36,9 +44,17 @@ pub struct GoForItModifierFactory {
 impl GoForItModifierFactory {
     /// Construct a factory for the given rules edition.
     pub fn for_rules(rules: Rules) -> Self {
+        // Java routes by @RulesCollection: `modifiers.bb2025.GoForItModifierCollection` for BB2025 and
+        // `modifiers.mixed.GoForItModifierCollection` (annotated BB2016 + BB2020) otherwise. The
+        // non-BB2025 arm used to build the BASE collection, which is EMPTY — so bb2016/bb2020 games got
+        // NO GFI modifiers at all and always rushed on 2+. Java's mixed collection registers
+        // Blizzard +1 (minimumRollGoingForIt = max(2, 2+1) = 3) plus the two Moles-under-the-Pitch
+        // entries, so in a Blizzard a Rush of 2 FAILS (undead bb2016 seed 21 step 5: a prone Mummy's
+        // stand-up Move rushes with a 2 — Java fails it and rolls the DropGFI armour 2d6, Rust let it
+        // through and rolled a dodge instead).
         let collection: Box<dyn GfiCollection> = match rules {
             Rules::Bb2025 | Rules::Common => Box::new(Bb2025Collection::new()),
-            _ => Box::new(GoForItModifierCollection::new()),
+            _ => Box::new(MixedCollection::new()),
         };
         Self { collection }
     }
@@ -145,6 +161,32 @@ mod tests {
             current_spps: 0, career_spps: 0, race: None,
             is_big_guy: false,
             ..Default::default()
+        }
+    }
+
+    /// Java routes the GFI modifier collection by `@RulesCollection`:
+    /// `modifiers.bb2025.GoForItModifierCollection` for BB2025 and `modifiers.mixed.*` (annotated
+    /// BB2016 **and** BB2020) otherwise. Both register a **Blizzard +1**, so
+    /// `minimumRollGoingForIt = max(2, 2 + 1) = 3` and a Rush of 2 FAILS in a Blizzard.
+    ///
+    /// The non-BB2025 arm of `for_rules` used to build the BASE collection, which registers nothing —
+    /// so bb2016/bb2020 games had NO GFI modifiers at all and always rushed on 2+ (undead bb2016
+    /// seed 21 step 5: a prone Mummy's stand-up Move rushes with a 2; Java fails it and rolls the
+    /// InjuryTypeDropGFI armour 2d6, Rust let the Rush through and rolled a dodge instead).
+    #[test]
+    fn every_edition_applies_the_blizzard_gfi_modifier() {
+        for rules in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            let factory = GoForItModifierFactory::for_rules(rules);
+            assert!(
+                factory.for_name("Blizzard").is_some(),
+                "{rules:?} must register the Blizzard GFI modifier"
+            );
+            let blizzard = factory.for_name("Blizzard").unwrap();
+            assert_eq!(blizzard.get_modifier(), 1, "{rules:?} Blizzard GFI modifier is +1");
+            assert_eq!(
+                GoForItModifierFactory::minimum_roll_going_for_it(&[blizzard]), 3,
+                "{rules:?}: a Rush in a Blizzard needs a 3+, so a 2 fails"
+            );
         }
     }
 
