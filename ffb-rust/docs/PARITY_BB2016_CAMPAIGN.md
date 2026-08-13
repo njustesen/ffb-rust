@@ -39,8 +39,8 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 
 | Roster | fails /100 | Diagnosis | State |
 |---|---:|---|---|
-| renegades | **1** (38→8→1) | ITER55 TTM routing + ITER56 declined-re-roll. Residual = seed 80 step 61 | ACTIVE |
-| underworld | **1** (44→8→1) | same two fixes. Residual = seed 72 | ACTIVE |
+| renegades | **0** (38→8→1→0) | 🟢 100/100 GREEN (ITER55 TTM routing, ITER56 declined-re-roll, ITER57 RightStuff dropPlayer) | GREEN |
+| underworld | **1** (44→8→1) | seed 72 i=77: same player home_03, Java picks MOVE / Rust picks Blitz → action-eligibility divergence | ACTIVE |
 | undead | 44 | stand-up-blitz-GFI (ITER51 diagnosis) | queued |
 | dwarf | 80 | Deathroller (ITER54 diagnosis), multi-layer | queued |
 | elf | 84 | untraced (suspect AG / pass) | queued |
@@ -87,3 +87,40 @@ fumbled. FIX: clear only `re_roll_source`. Test
 IMPACT (measured, much larger than expected): **renegades 8 fails → 1** (only seed 80 left),
 **underworld 8 → 1** (only seed 72). The spurious second accuracy die was the dominant residual
 TTM desync for both rosters.
+
+### ITER57 (2026-08-13) — bb2016 StepRightStuff failed landing must `dropPlayer` → **renegades 100/100 GREEN**
+
+renegades seed 80, first state mismatch i=62; the real divergence is step 61's resolution
+(home_04 Troll THROW_TEAM_MATE of the ball-carrying Goblin h10 at (4,6)). State-only + Rust one
+die SHORT. `FFB_DICE_TRACE` caller stacks pinned it exactly:
+
+| pos | Java caller | Rust |
+|---|---|---|
+| 57 | `ThrowTeamMateBehaviour$1.handleExecuteStepHook:78` accuracy d6=1 → FUMBLE | same |
+| 58 | `StepRightStuff.executeStep:135` landing d6=2 → fail, re-roll declined | same |
+| 59-60 | `InjuryTypeTTMLanding.handleInjury:34` armour 2d6 | same |
+| **61** | **`StepCatchScatterThrowIn.scatterBall:446` d8=1 — the ball bounce** | *(missing)* — Rust's pos 61 is already the next activation's Bone Head d6 |
+
+ROOT CAUSE: Java's `StepRightStuff.executeStep()` `if (!doRoll)` block publishes the injury result
+AND calls `UtilServerInjury.dropPlayer(this, thrownPlayer, THROWN_PLAYER)`, publishing its returned
+parameters. `dropPlayer` sets `fieldModel.ballMoving = true` and returns
+`CATCH_SCATTER_THROW_IN_MODE = SCATTER_BALL` whenever the dropped player's square equals the ball
+square — that parameter is what makes the sequence's following CATCH_SCATTER_THROW_IN step bounce
+the ball. It also returns `END_TURN` (turnover) for the acting team's own carrier, which Java keeps
+when `fThrownPlayerHasBall` and removes otherwise. Rust's `land_injury` published only
+`ThrownPlayerCoordinate(None)`, so the ball stayed under the prone Goblin and the bounce d8 was
+never rolled.
+
+FIX: port the block 1:1, mirroring the already-correct bb2020 translation. Also collapsed the
+duplicated `drop_thrown_player` injury branch into the same `land_injury` path — Java has ONE
+injury site (`doRoll = !fDropThrownPlayer` falls through to `if (!doRoll)`), not two.
+
+Tests: `failed_landing_of_ball_carrier_drops_player_and_requests_ball_scatter`,
+`failed_landing_without_ball_scatters_but_does_not_end_turn`.
+Verified: renegades 1 fail → **0 (100/100)**; lineman bb2016 100/100; lineman bb2025 100/100;
+`cargo test -p ffb-engine` green. Commit `a1db7893`. **20 🟢 / 10 🔴.**
+
+NOTE (latent, not hit yet): Rust `util_server_injury::drop_player_with_base` omits Java's
+`&& game.getTurnMode() != TurnMode.BLITZ` guard on the ball-scatter branch, and adds a
+`FieldCoordinateBounds::FIELD.is_in_bounds` early return Java does not have. Worth checking when a
+BLITZ-turn-mode drop shows up as a frontier.

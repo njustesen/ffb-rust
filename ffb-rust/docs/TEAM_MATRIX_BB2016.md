@@ -33,7 +33,7 @@ steps/`make_injury_type`). Remaining rosters are being driven green next, in tur
 | `nurgle` | 🟢 100/100 | — | GREEN 2026-08-13, cleared by shared bb2016 fixes (Claw/Decay/negatrait) |
 | `ogre` | 🔴 0/100 | seed 1, step 0, java f17d2e4bc0c146e5 vs rust d6ef3f4659806499 |  |
 | `orc` | 🟢 100/100 | — | driven to full parity 2026-08-12 (Really Stupid per-activation + bb2016 RightStuff routing) |
-| `renegades` | 🔴 0/100 | seed 1, step 0, java 36c2338c5a81ae43 vs rust 7de5fb2fda70c4fa | FUMBBL-legacy roster |
+| `renegades` | 🟢 100/100 | — | GREEN 2026-08-13 (FUMBBL-legacy roster). bb2016 TTM sub-project: step-set routing (ITER55) + declined-re-roll keeps re_rolled_action (ITER56) + StepRightStuff failed landing must dropPlayer → ball bounce + turnover (ITER57) |
 | `skaven` | 🟢 100/100 | — | GREEN 2026-08-13, cleared by shared bb2016 fixes (AG-scale) |
 | `slann` | 🟢 100/100 | — | GREEN 2026-08-13, shared bb2016 fixes |
 | `slann_fumbbl` | 🟢 100/100 | — | GREEN 2026-08-13, shared bb2016 fixes (FUMBBL-legacy) |
@@ -42,7 +42,7 @@ steps/`make_injury_type`). Remaining rosters are being driven green next, in tur
 | `vampire` | 🔴 0/100 | seed 1, step 0, java e752f3f1ca886d11 vs rust 475b6b600c40ec85 |  |
 | `wood_elf` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust fecd448eb2f10080 |  |
 
-**19 green / 11 red of 30** (2026-08-12→13: amazon, human, lizardman, orc, norse driven to full parity via engine fixes; chaos, chaos_dwarf, dark_elf, high_elf, khemri, nurgle, skaven then verified 100/100 with NO roster-specific fix — cleared by the shared campaign fixes. The remaining rows' "step 0 / seed 1" divergences are STALE pre-campaign snapshots and must be re-scouted before assuming red).
+**20 green / 10 red of 30** (2026-08-12→13: amazon, human, lizardman, orc, norse driven to full parity via engine fixes; chaos, chaos_dwarf, dark_elf, high_elf, khemri, nurgle, skaven then verified 100/100 with NO roster-specific fix — cleared by the shared campaign fixes. The remaining rows' "step 0 / seed 1" divergences are STALE pre-campaign snapshots and must be re-scouted before assuming red).
 
 ## Analysis (recorded, not fixed — task scope)
 
