@@ -88,10 +88,14 @@ impl StepTakeRoot {
                 return StepOutcome::next();
             }
         } else {
-            // Java: doRoll = UtilCards.hasUnusedSkill(actingPlayer, TakeRoot)
-            do_roll = game.player(&acting_id)
-                .map(|p| p.has_skill(SkillId::TakeRoot) && !p.used_skills.contains(&SkillId::TakeRoot))
-                .unwrap_or(false);
+            // Java: doRoll = UtilCards.hasUnusedSkill(**actingPlayer**, TakeRoot) — the used-skill set
+            // queried here is the ACTING PLAYER's (per-ACTIVATION, cleared by
+            // UtilActingPlayer.changeActingPlayer), not the Player's (which would persist for the whole
+            // game). Reading Player.used_skills made a Treeman roll Take Root only ONCE per game, so
+            // every later activation skipped its d6 (wood_elf bb2016 seed 1 step 46: Java rolls the
+            // Take Root d6 at pos 32 then the stand-up d6 at pos 33; Rust rolled only the stand-up).
+            do_roll = game.player(&acting_id).map(|p| p.has_skill(SkillId::TakeRoot)).unwrap_or(false)
+                && !game.acting_player.used_skills.contains(&SkillId::TakeRoot);
         }
 
         if !do_roll {
@@ -102,9 +106,8 @@ impl StepTakeRoot {
         let min_roll = DiceInterpreter::minimum_roll_confusion(true);
         let successful = roll >= min_roll;
 
-        if let Some(player) = game.player_mut(&acting_id) {
-            player.used_skills.insert(SkillId::TakeRoot);
-        }
+        // Java: actingPlayer.markSkillUsed(skill) — per-activation, matching hasUnusedSkill above.
+        game.acting_player.used_skills.insert(SkillId::TakeRoot);
 
         let event = GameEvent::ConfusionRoll {
             player_id: acting_id.clone(),
@@ -205,6 +208,26 @@ mod tests {
         panic!("no seed for d6={}", target);
     }
 
+    /// Java: `doRoll = UtilCards.hasUnusedSkill(**actingPlayer**, skill)` and
+    /// `actingPlayer.markSkillUsed(skill)` — the used-skill set is the ACTING PLAYER's, i.e.
+    /// per-ACTIVATION (cleared by `UtilActingPlayer.changeActingPlayer`), NOT the Player's, which
+    /// would persist for the whole game. Reading `Player.used_skills` let a Treeman roll Take Root
+    /// only ONCE per game.
+    #[test]
+    fn take_root_marks_the_acting_player_not_the_player() {
+        use ffb_model::enums::SkillId;
+        let mut game = make_game(vec![SkillId::TakeRoot]);
+        game.acting_player.player_id = Some("p1".into());
+
+        let mut step = StepTakeRoot::new();
+        let _ = step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(game.acting_player.used_skills.contains(&SkillId::TakeRoot),
+            "Take Root is marked used on the ACTING PLAYER (per activation)");
+        assert!(!game.player("p1").unwrap().used_skills.contains(&SkillId::TakeRoot),
+            "it must NOT be marked on the Player, which would persist for the whole game");
+    }
+
     #[test]
     fn negatraits_disabled_skips_roll() {
         let mut game = make_game(vec![SkillId::TakeRoot]);
@@ -271,11 +294,13 @@ mod tests {
         assert_eq!(game.acting_player.player_action, Some(PlayerAction::Blitz));
     }
 
+    /// Java `actingPlayer.markSkillUsed(skill)` — per-ACTIVATION, not on the Player (see
+    /// `take_root_marks_the_acting_player_not_the_player`).
     #[test]
     fn marks_skill_used_on_roll() {
         let seed = seed_for_d6(4);
         let mut game = make_game(vec![SkillId::TakeRoot]);
         StepTakeRoot::new().start(&mut game, &mut GameRng::new(seed));
-        assert!(game.player("p1").unwrap().used_skills.contains(&SkillId::TakeRoot));
+        assert!(game.acting_player.used_skills.contains(&SkillId::TakeRoot));
     }
 }

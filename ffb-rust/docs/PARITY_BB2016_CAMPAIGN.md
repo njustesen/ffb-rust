@@ -500,3 +500,39 @@ Also checked and RULED OUT this iteration: the "headless: auto-decline" sweep of
 Java offers via `DialogSkillUseParameter` (so the harness would USE it). **No bb2016 roster has Grab**
 (verified across all 29 `data/rosters/bb2016/roster_*.json`), so it cannot explain any remaining red.
 Worth fixing for correctness, but it is not on the critical path.
+
+### ITER68 (2026-08-13) — bb2016 Take Root marked its skill on the PLAYER, not the ACTING PLAYER
+
+wood_elf seed 1, step 46. Java rolls 2 dice, Rust 1. `FFB_DICE_TRACE` callers + `FFB_DRIVE_TRACE`:
+- Java: pos 32 = `TakeRootBehaviour$1.handleExecuteStepHook:56`, pos 33 = `StepStandUp.executeStep:103`.
+- Rust: its single die at pos 32 comes from **StandUp** (the DRIVE trace shows `TakeRoot` running and
+  rolling nothing). So the missing die is **Take Root**, not the stand-up.
+  (A prone Treeman has MA 2 < `MINIMUM_MOVE_TO_STAND_UP`, so the stand-up roll is correct in both.)
+
+Java `skillbehaviour/bb2016/TakeRootBehaviour`: `doRoll = UtilCards.hasUnusedSkill(**actingPlayer**,
+skill)` and `actingPlayer.markSkillUsed(skill)` — the used-skill set is the ACTING PLAYER's, i.e.
+per-ACTIVATION (cleared by `UtilActingPlayer.changeActingPlayer`). Rust's `bb2016/step_take_root.rs`
+read and wrote **`Player.used_skills`**, which persists for the whole game, so a Treeman rolled Take
+Root only ONCE per game and every later activation silently skipped its d6.
+
+FIXED (1:1, with tests `take_root_marks_the_acting_player_not_the_player` and the corrected
+`marks_skill_used_on_roll`). This is the same class as the bb2025 Bone Head per-activation fix, whose
+note already warned "bb2020/bb2016 BoneHeadBehaviour still use Player.used_skills" — Take Root was
+another instance.
+
+**HONEST RESULT: this did NOT move the parity needle — wood_elf is still 98.** The Treeman at this
+frontier is evidently ALREADY `rooted` in Rust, so `TakeRootBehaviour`'s outer guard
+(`if (!playerState.isRooted())`) short-circuits before `doRoll` is even consulted, leaving the fix
+untested by this seed. **`rooted` is a PlayerState FLAG that the parity state hash does not record**
+(the hash carries only `base`), so a rooted-flag divergence is HASH-INVISIBLE — exactly like the
+active-bit bug from the earlier bb2016 amazon work.
+
+NEXT (wood_elf): find where the two engines disagree on the `rooted` flag. Java clears it via
+`playerState.changeRooted(false)` (e.g. `UtilServerInjury.dropPlayer`) and bb2016 `StepTakeRoot`
+also does `actingPlayer.setGoingForIt(false)`; the bb2025 wood_elf fix was "Take Root
+(old_player_state + dodging-clear)", so compare the bb2016 rooted set/clear sites against bb2025's.
+A gated trace on `set_player_state` for the Treeman (like the old `FFB_H06DBG`) is the fastest probe,
+since the hash cannot see this.
+
+Verified no regression: all 28 swept bb2016 rosters unchanged (the 25 green ones at 0 fails);
+lineman bb2016 100/100; ffb-engine 7095/0.
