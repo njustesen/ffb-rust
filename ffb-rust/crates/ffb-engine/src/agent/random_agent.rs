@@ -413,9 +413,16 @@ impl Agent for RandomAgent {
                         // square; only draw when the candidate list is non-empty.
                         if !targets.is_empty() {
                             let idx = self.pick_action(targets.len());
-                            if is_prone {
-                                self.pending_move = Some(targets[idx]);
-                            }
+                            // Store the pre-drawn square for BOTH the prone and the rooted case.
+                            // ParityRunner.sendMoveAction draws exactly ONE actionRng target per
+                            // activation; the Move-prompt handler reuses `pending_move` with no second
+                            // draw. Storing it only for prone players meant a ROOTED player's pre-draw
+                            // was discarded and the Move prompt drew AGAIN — 3 actionRng calls where
+                            // Java makes 2, permanently shifting the agent stream (wood_elf bb2016
+                            // seed 2 step 64: the rooted Treeman home_01 pre-drew (13,6) — the square
+                            // Java uses — then re-drew (11,7); from there every later target pick was
+                            // off, first visible as home_10 moving to (3,7) instead of (5,7) at i=65).
+                            self.pending_move = Some(targets[idx]);
                             if std::env::var("FFB_TRACE").is_ok() {
                                 let tag = if is_prone { "prone_predraw" } else { "rooted_predraw" };
                                 eprintln!("RUST_SMA pid={} N={} {}", player_id, targets.len(), tag);
@@ -857,6 +864,44 @@ mod tests {
         }
         assert_eq!(game_dice, gs2.rng.call_count,
             "game-dice stream is deterministic — the agent's decision RNG never perturbs it");
+    }
+
+    /// `ParityRunner.sendMoveAction` draws exactly ONE actionRng move target per activation. Rust
+    /// pre-draws that target at activation for players that cannot use the normal StepInitMoving
+    /// prompt path (PRONE — its Select-sequence negatrait may fail first; ROOTED — its StepMove is a
+    /// no-op), storing it in `pending_move`; the Move-prompt handler must then reuse it and draw
+    /// NOTHING further. This test pins that reuse contract.
+    ///
+    /// The pre-draw used to be stored only for PRONE players, so a ROOTED player's pre-draw was
+    /// discarded and the Move prompt drew AGAIN — 3 actionRng calls where Java makes 2, permanently
+    /// shifting the agent stream (wood_elf bb2016 seed 2 step 64: the rooted Treeman pre-drew (13,6),
+    /// the square Java uses, then re-drew (11,7); first visible as home_10 moving to (3,7) rather
+    /// than (5,7) at i=65). The *storing* half is covered end-to-end by the wood_elf parity run
+    /// (81 -> 19 fails); this unit test guards the zero-extra-draw reuse.
+    #[test]
+    fn predrawn_move_square_is_reused_with_no_extra_draw() {
+        let mut gs = new_game(1);
+        gs.game.home_playing = true;
+        let mut agent = RandomAgent::new_parity(1);
+
+        let predrawn = FieldCoordinate::new(13, 6);
+        agent.pending_move = Some(predrawn);
+        let arc_before = agent.action_rng_count;
+
+        gs.pending_prompt = Some(AgentPrompt::Move {
+            player_id: "tree".into(),
+            // A DIFFERENT candidate list: if the handler re-drew it could not return `predrawn`.
+            squares: vec![FieldCoordinate::new(11, 6), FieldCoordinate::new(11, 7)],
+        });
+
+        match agent.act(&gs) {
+            Action::Move { path } => assert_eq!(path, vec![predrawn],
+                "the pre-drawn square is used verbatim, not re-picked from the prompt list"),
+            other => panic!("expected Move, got {other:?}"),
+        }
+        assert_eq!(agent.action_rng_count, arc_before,
+            "reusing the pre-drawn square must consume NO further actionRng");
+        assert!(agent.pending_move.is_none(), "the pre-drawn square is consumed exactly once");
     }
 
     #[test]

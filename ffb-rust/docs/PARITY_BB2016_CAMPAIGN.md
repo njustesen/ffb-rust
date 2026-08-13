@@ -46,7 +46,7 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | dwarf | **0** (79→35→30→0) | 🟢 100/100 GREEN (ITER59 Stand Firm, ITER61 casualty-SW argue, ITER63 KO-vs-argue order) | GREEN |
 | elf | **0** (was 84) | 🟢 100/100 GREEN (ITER66 Side Step auto-use) | GREEN |
 | ogre | **0** (was 98) | 🟢 100/100 GREEN (ITER69 bb2016 TTM spends the PASS; needed a jar rebuild) | GREEN |
-| wood_elf | **81** (was 98) | ITER71 bb2025-only `startedStanding` + hasUnusedSkill — **still NEXT TARGET** | queued |
+| wood_elf | **19** (98→81→19) | ITER71 startedStanding + ITER73 rooted move pre-draw reuse — **still NEXT TARGET** | queued |
 | goblin | 100 | earlier non-TTM blocker masks the TTM win — retrace seed 1 | queued |
 | halfling | 100 | systematic (every seed) — likely a roster/skill-load or first-step gap | queued |
 | vampire | 100 | systematic — Bloodlust bb2016 | queued |
@@ -692,3 +692,41 @@ Every actionRng consumer in the harness is a candidate: `sendMoveAction`, `sendB
 `sendFoulAction`, and the phase-1 action pick.
 
 No code change this iteration. wood_elf stays 81; **26 🟢 / 4 🔴** unchanged.
+
+### ITER73 (2026-08-13) — a ROOTED player's pre-drawn move square was discarded → wood_elf 98→81→**19**
+
+Built the tool ITER72 called for: a temporary counted wrapper around every
+`actionRng.nextLong()` in the LIVE `ParityRunner` plus `arc=` on the `JSTEP` line, jar rebuilt with the
+ITER69 recipe. Diffing **per-step actionRng counts** (not pick lists) found the first PERSISTENT
+divergence immediately:
+
+    i=61..64  J 120,122,124,126   R 120,122,124,126   (aligned, +2 per step)
+    i=65      J 128               R 129               (-1, never recovers)
+
+So Rust makes ONE EXTRA actionRng draw during step 64 — `Activate(home_01, Move)`, the **rooted**
+Treeman. Rust's own trace spells it out:
+
+    RUST_ACT_PICK pid=home_01 ... arc=126          (action pick)
+    RUST_SMA/RUST_PICK ... idx=4 t=(13,6) rooted_predraw   (arc 127 — the square JAVA uses)
+    RUST_SMA pid=home_01 N=7 / RUST_PICK ... idx=1 t=(11,7)  (arc 128 — a SECOND draw)
+
+ROOT CAUSE: `random_agent.rs` pre-draws a move target at activation for players that cannot use the
+normal `StepInitMoving` prompt path — PRONE (its Select-sequence negatrait may fail first) and ROOTED
+(its `StepMove` is a no-op) — but stored it in `pending_move` **only `if is_prone`**. For a rooted
+player the draw happened and was then thrown away, so the Move prompt drew again: 3 actionRng calls
+where `ParityRunner.sendMoveAction` makes 2. From that point the agent streams were permanently
+offset — first visible as home_10 moving to (3,7) instead of (5,7) at i=65.
+
+FIX: store `pending_move` for both cases (drop the `if is_prone`). One line.
+
+Test: `predrawn_move_square_is_reused_with_no_extra_draw` — pins the reuse contract (the prompt list
+deliberately excludes the pre-drawn square, so a re-draw could not return it, and the actionRng count
+must not move). The *storing* half is covered end-to-end by the parity result.
+Verified: wood_elf 81 → **19**; full 30-roster bb2016 sweep shows **26 green**, no regression;
+lineman bb2016 100/100; lineman + wood_elf bb2025 100/100; ffb-engine 7099/0.
+The temporary Java `arc=` instrumentation was reverted and the jar rebuilt clean.
+
+**TOOL LESSON: per-step actionRng call-count deltas are the right instrument for agent-stream
+divergences** — it found in one shot what two iterations of pick-list diffing got wrong. Rust already
+prints `arc=`; the Java counter is ~4 lines (`arcCount`/`arcNext()` wrapper + `JSTEP` field) and
+rebuilds in seconds.
