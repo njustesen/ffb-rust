@@ -656,3 +656,39 @@ before diagnosing it.** A one-line gated eprintln that prints nothing is the che
 of dead code, and would have saved two iterations of reasoning about the wrong file. Check
 `driver.rs`'s `make_step_for` / glob imports first — `bb2016/step_take_root.rs` is dead, and other
 `step/bb2016/*` files may be too.
+
+### ITER72 (2026-08-13) — wood_elf seed 2: narrowed to an **actionRng** (agent-stream) divergence; no fix
+
+New frontier after ITER71. wood_elf seed 2: first state mismatch i=66, and the diff is a single line:
+
+    h09 (home_10): J=5,7,Standing   R=3,7,Standing
+
+Both engines activate home_10 for a MOVE at i=65 and both offer the **same number of targets**:
+
+    JAVA_SMA pid=…Home10 coord=4,7 targets=6 → JAVA_PICK N=6 idx=4 t=(5,7)
+    RUST_SMA pid=home_10 N=6            → RUST_PICK N=6 idx=0 t=(3,7)
+
+Same `N`, different `idx` ⇒ the **actionRng draw differs**, while the shared GAME dice still match
+(first `rng_calls` divergence is later, i=72) and the state hash matched through i=65. So this is an
+**agent-stream (actionRng) misalignment**, not an engine-dice bug — a different class from every fix
+so far this campaign.
+
+**METHOD WARNING — do not repeat my mistake here.** I tried to locate the first divergence by
+diffing the ordered list of `JAVA_PICK` vs `RUST_PICK` lines and got two different, both-wrong
+answers. The lists are NOT 1:1 comparable: Rust emits `RUST_MOVE_PRE` for the prone pre-draw path
+(which reuses an already-drawn target) as well as `RUST_PICK`, and it also draws for
+`RUST_ACT_PICK` / `RUST_BLOCK_PICK`, so index alignment silently shifts. Any conclusion of the form
+"engine X picked twice for player P" from those lists is unreliable.
+
+CORRECT NEXT TOOL: compare actionRng **call counts per comparator step**, not pick lists.
+- Rust already prints its actionRng counter as `arc=` on `RUST_ACT_START` / `RUST_ACT_PICK` /
+  `RUST_BLOCK_PICK` / `RUST_ACT_END`.
+- Java has no equivalent counter in the trace — add a gated one (e.g. print an `actionRng` call count
+  alongside `JAVA_P2`) to `ParityRunner` in the LIVE tree `C:\Users\Admin\niels\ffb\ffb\`, rebuild the
+  jar with the ITER69 recipe, then diff the per-step deltas to find the first step where the two
+  agents consume a different NUMBER of actionRng draws.
+Every actionRng consumer in the harness is a candidate: `sendMoveAction`, `sendBlockAction` /
+`sendBlitzTargetSelection`, `sendPassAction`, `sendHandOverAction`, `sendThrowTeamMateAction`,
+`sendFoulAction`, and the phase-1 action pick.
+
+No code change this iteration. wood_elf stays 81; **26 🟢 / 4 🔴** unchanged.
