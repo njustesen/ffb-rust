@@ -46,8 +46,8 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | dwarf | **0** (79→35→30→0) | 🟢 100/100 GREEN (ITER59 Stand Firm, ITER61 casualty-SW argue, ITER63 KO-vs-argue order) | GREEN |
 | elf | **0** (was 84) | 🟢 100/100 GREEN (ITER66 Side Step auto-use) | GREEN |
 | ogre | **0** (was 98) | 🟢 100/100 GREEN (ITER69 bb2016 TTM spends the PASS; needed a jar rebuild) | GREEN |
-| wood_elf | **19** (98→81→19) | ITER71 startedStanding + ITER73 rooted move pre-draw reuse — **still NEXT TARGET** | queued |
-| goblin | 100 | earlier non-TTM blocker masks the TTM win — retrace seed 1 | queued |
+| wood_elf | **0** (98→81→19→0) | 🟢 100/100 GREEN (ITER71 startedStanding, ITER73 rooted pre-draw, ITER77 declined-re-roll edition gate) | GREEN |
+| goblin | 100 | untraced — **NEXT TARGET** (systematic; likely one cause) | queued |
 | halfling | 100 | systematic (every seed) — likely a roster/skill-load or first-step gap | queued |
 | vampire | 100 | systematic — Bloodlust bb2016 | queued |
 
@@ -55,7 +55,7 @@ Counts above re-scouted 2026-08-13 AFTER ITER56-58 with FULL 1-100 `--no-abort` 
 The older `undead 44` / `necromantic 44` figures were unreliable (truncated triage) — the true
 counts are 76 / 58. Green rosters re-verified 0 fails in the same sweep.
 
-Green (26): ogre, elf, undead, dwarf, necromantic, renegades, underworld, lineman, amazon, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl,
+Green (27): wood_elf, ogre, elf, undead, dwarf, necromantic, renegades, underworld, lineman, amazon, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl,
 high_elf, human, khemri, khemri_fumbbl, lizardman, nippon, norse, nurgle, orc, skaven, slann,
 slann_fumbbl.
 
@@ -851,3 +851,39 @@ contradiction it is worth deliberately switching to goblin/halfling/vampire (100
 likely a single systematic cause each) rather than continuing to pay down this one.
 
 No code change. wood_elf stays 19; **26 🟢 / 4 🔴** unchanged; ffb-engine 7099/0; tree clean.
+
+### ITER77 (2026-08-13) — the OTHER `already_rerolled` site; edition-gated → **wood_elf 100/100 GREEN (27/30)**
+
+**FIRST, A CORRECTION: commit `3c6b0684` (ITER75) contained NO code change.** Its message describes an
+`end_stand_up_without_flags` split that is not in the diff — a mid-iteration
+`git checkout -- crates/ffb-engine/src` (reverting blunt instrumentation) also reverted that edit, and
+the commit went in without re-checking the diff. The verification quoted there (sweep 26 green,
+wood_elf 19) was accurate, but it was measuring an unchanged tree. **Always `git show --stat` / grep the
+committed diff for the intended symbol before writing the message.**
+
+Resolving ITER76's contradiction: prints inside BOTH arms of the offer showed `some=true` every time —
+the re-roll IS always offered, so the post-roll `already_rerolled` branch I had been staring at is never
+the one that fires. bb2016 `StepStandUp` has **TWO** `reRolledAction == STAND_UP` sites and they behave
+differently:
+
+| site | Java bb2016 | Java bb2020/bb2025 |
+|---|---|---|
+| **PRE-roll** `if (STAND_UP == getReRolledAction()) { if (source == null \|\| !useReRoll) …` | `rollStandUp = false;` **only** → trailing block, NO flags | `rollStandUp = false;` **+ `handleFailedStandUp(...)`** |
+| **POST-roll** (rolled and failed again) | `rollStandUp = false;` + the inline used-flag switch | `handleFailedStandUp(...)` |
+
+The harness always declines team re-rolls, so the PRE-roll site is the hot path. Rust called
+`fail_stand_up` (which runs the flags switch) there for every edition, so under bb2016 a declined
+stand-up re-roll consumed the team's Blitz — leaving away_02 with only Move at i=39 where Java blitzes.
+
+FIX: `end_stand_up_without_flags` (Java's trailing block verbatim) at the PRE-roll site **gated on
+`rules == Bb2016`**; bb2020/bb2025 keep `fail_stand_up`. The gate is not cosmetic — applying the bb2016
+behaviour to bb2025 regressed **wood_elf bb2025 from 0 to 17 fails**, which is how the edition
+difference was caught.
+
+Test: `declined_stand_up_reroll_does_not_consume_the_action` — asserts bb2025 DOES consume the Blitz at
+that site and bb2016 does NOT, plus that a plain failed stand-up with no re-roll available still
+consumes it.
+Verified: wood_elf bb2016 19 → **0 (100/100 GREEN)**; wood_elf bb2025 back to 0; 30-roster bb2016 sweep
+**27 green**, no regression; lineman bb2016 100/100; lineman + dwarf bb2025 100/100; ffb-engine 7100/0.
+
+Remaining reds: goblin 100 · halfling 100 · vampire 100 — all untraced, each likely ONE systematic cause.

@@ -125,6 +125,26 @@ impl StepStandUp {
                 .map(|s| use_reroll(game, s, &pid))
                 .unwrap_or(false);
             if !consumed {
+                // Java: `if (STAND_UP == getReRolledAction()) { if (source == null ||
+                // !UtilServerReRoll.useReRoll(...)) rollStandUp = false; }` — clearing rollStandUp
+                // BEFORE the roll routes to the trailing
+                // `if (!rollStandUp) { setPlayerState(PRONE, inactive); publish END_PLAYER_ACTION;
+                // GOTO failure; }` block, which does NOT touch the per-action used flags. This is the
+                // path a DECLINED stand-up re-roll takes (the harness always declines team re-rolls),
+                // so a declined re-roll must NOT consume the team's Blitz/Pass/HandOver/Foul.
+                // wood_elf bb2016 seed 14: away_01's stand-up BLITZ re-roll is declined at i=34;
+                // Java keeps blitzUsed FALSE (verified with a gated blitzUsedA print — it only flips
+                // after away_02's own blitz reaches target selection at si=41), so away_02 can still
+                // blitz at i=39 where Rust offered it only Move.
+                // EDITION-SPECIFIC. bb2020/bb2025 `StepStandUp` call `handleFailedStandUp(...)` right
+                // here alongside `rollStandUp = false`; **bb2016 does NOT** — its pre-roll site only
+                // clears `rollStandUp`, so control falls to the trailing
+                // `if (!rollStandUp) { setPlayerState(PRONE, inactive); publish END_PLAYER_ACTION;
+                // GOTO failure; }` block and the per-action used-flag switch (which bb2016 keeps
+                // INLINE in the post-roll failure branch) never runs.
+                if game.rules == ffb_model::enums::Rules::Bb2016 {
+                    return self.end_stand_up_without_flags(game);
+                }
                 return self.fail_stand_up(game);
             }
             // Roll was reset to 0 when the re-roll offer was issued; a fresh d6 is rolled below
@@ -207,6 +227,20 @@ impl StepStandUp {
         }
     }
 
+    /// Java's trailing `if (!rollStandUp) { ... }` block ONLY: drop to PRONE + inactive, publish
+    /// END_PLAYER_ACTION, goto the failure label. Deliberately does NOT run `handle_failed_stand_up`
+    /// (the per-action used-flag switch), which in Java lives inside the ROLL's failure branch.
+    fn end_stand_up_without_flags(&self, game: &mut Game) -> StepOutcome {
+        if let Some(pid) = game.acting_player.player_id.clone() {
+            let current = game.field_model.player_state(&pid).unwrap_or_else(|| PlayerState::new(PS_PRONE));
+            let new_state = current.change_base(PS_PRONE).change_active(false);
+            game.field_model.set_player_state(&pid, new_state);
+        }
+        let label = self.goto_label_on_failure.clone();
+        StepOutcome::goto(&label)
+            .publish(StepParameter::EndPlayerAction(true))
+    }
+
     fn fail_stand_up(&self, game: &mut Game) -> StepOutcome {
         // Java: setPlayerState(playerState.changeBase(PRONE).changeActive(false)) — this
         // mutates the player's *existing* PlayerState (preserving flags such as confused,
@@ -285,6 +319,78 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2025)
+    }
+
+    /// Java bb2016 `StepStandUp` has TWO `reRolledAction == STAND_UP` sites and they differ:
+    ///
+    /// - **PRE-roll**: `if (STAND_UP == getReRolledAction()) { if (source == null ||
+    ///   !useReRoll(...)) rollStandUp = false; }` — a DECLINED re-roll clears `rollStandUp` BEFORE the
+    ///   roll, so control reaches only the trailing
+    ///   `if (!rollStandUp) { setPlayerState(PRONE, inactive); publish END_PLAYER_ACTION; GOTO failure }`
+    ///   block. The per-action used-flag switch is NOT run.
+    /// - **POST-roll**: `else { if ((getReRolledAction() == STAND_UP) || !askForReRollIfAvailable(...))
+    ///   { rollStandUp = false; switch (playerAction) { … setBlitzUsed(true) … } } }` — having already
+    ///   re-rolled and failed AGAIN, the flags ARE set.
+    ///
+    /// **and the pre-roll site is EDITION-SPECIFIC**: bb2020/bb2025 `StepStandUp` call
+    /// `handleFailedStandUp(...)` there alongside `rollStandUp = false`, while **bb2016 does not**.
+    ///
+    /// The parity harness always declines team re-rolls, so the pre-roll path is the common one: under
+    /// bb2016 a declined stand-up re-roll must NOT consume the team's Blitz. wood_elf bb2016 seed 14:
+    /// away_01's stand-up blitz re-roll is declined at i=34 and Java keeps `blitzUsed` false, so away_02
+    /// can still blitz at i=39 — Rust was consuming the blitz and offering away_02 only Move. Applying
+    /// the bb2016 behaviour to bb2025 regressed wood_elf bb2025 from 0 to 17 fails, hence the gate.
+    #[test]
+    fn declined_stand_up_reroll_does_not_consume_the_action() {
+        use ffb_model::enums::{PlayerAction, PS_PRONE};
+
+        fn setup() -> (Game, StepStandUp) {
+            let mut game = make_game();
+            game.home_playing = true;
+            game.turn_mode = ffb_model::enums::TurnMode::Regular;
+            game.team_home.players.push(ffb_model::model::player::Player {
+                id: "tree".into(), name: "tree".into(), nr: 1, position_id: "treeman".into(),
+                movement: 2, strength: 6, agility: 1, passing: 5, armour: 10, // MA < 3 → roll required
+                ..Default::default()
+            });
+            game.field_model.set_player_coordinate("tree", ffb_model::types::FieldCoordinate::new(5, 5));
+            game.field_model.set_player_state("tree", PlayerState::new(PS_PRONE));
+            game.acting_player.player_id = Some("tree".into());
+            game.acting_player.player_action = Some(PlayerAction::Blitz);
+            game.acting_player.standing_up = true;
+            game.turn_data_home.rerolls = 2;
+            game.turn_data_home.reroll_used = false;
+            (game, StepStandUp::new(String::new()))
+        }
+
+        // bb2025: a DECLINED re-roll DOES consume the action (handleFailedStandUp is called there).
+        let (mut game, mut step) = setup();
+        step.re_roll_state.re_rolled_action =
+            Some(ffb_model::model::re_rolled_action::ReRolledAction::new("STAND_UP"));
+        step.re_roll_state.re_roll_source = None;
+        let _ = step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.turn_data_home.blitz_used,
+            "bb2020/bb2025 call handleFailedStandUp at the pre-roll declined-re-roll site");
+
+        // bb2016: the same path must NOT consume the team's Blitz.
+        let (mut game, mut step) = setup();
+        game.rules = Rules::Bb2016;
+        step.re_roll_state.re_rolled_action =
+            Some(ffb_model::model::re_rolled_action::ReRolledAction::new("STAND_UP"));
+        step.re_roll_state.re_roll_source = None; // the harness declines
+        let _ = step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.turn_data_home.blitz_used,
+            "a DECLINED stand-up re-roll must not consume the team's Blitz");
+        assert_eq!(game.field_model.player_state("tree").unwrap().base(), PS_PRONE);
+
+        // No re-roll state at all → normal roll; on failure the flags DO get set (post-roll branch).
+        let (mut game, mut step) = setup();
+        game.turn_data_home.rerolls = 0; // no re-roll available → straight to the failure branch
+        let mut seed = 0u64;
+        while GameRng::new(seed).d6() >= 4 { seed += 1; assert!(seed < 500); }
+        let _ = step.start(&mut game, &mut GameRng::new(seed));
+        assert!(game.turn_data_home.blitz_used,
+            "a stand-up that simply FAILS with no re-roll available still consumes the Blitz");
     }
 
     #[test]
