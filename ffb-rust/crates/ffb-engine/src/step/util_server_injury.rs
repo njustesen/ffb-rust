@@ -302,22 +302,8 @@ pub fn drop_player_rng(
     eligible_for_safe_pair_of_hands: bool,
     apothecary_mode: ApothecaryMode,
 ) -> Vec<StepParameter> {
-    use crate::injury::injuryType::injury_type_ball_and_chain::InjuryTypeBallAndChain;
-    let placed_prone_causes_injury = game.player(player_id)
-        .map(|p| p.has_skill_property(NamedProperties::PLACED_PRONE_CAUSES_INJURY_ROLL))
-        .unwrap_or(false);
-    // Java guards the whole body with `(playerCoordinate != null) && (playerState != null)`.
-    let coord = match game.field_model.player_coordinate(player_id) {
-        Some(c) if game.field_model.player_state(player_id).is_some() => c,
-        _ => return Vec::new(),
-    };
-    if placed_prone_causes_injury {
-        let mut it = InjuryTypeBallAndChain::new();
-        let res = handle_injury(game, rng, &mut it, None, player_id, coord, None, None, apothecary_mode);
-        vec![StepParameter::InjuryResult(Box::new(res))]
-    } else {
-        drop_player_with_base(game, player_id, PS_PRONE, eligible_for_safe_pair_of_hands)
-    }
+    drop_player_with_base_rng(game, Some(rng), player_id, PS_PRONE,
+        eligible_for_safe_pair_of_hands, apothecary_mode)
 }
 
 /// Shared implementation of Java's private `UtilServerInjury.dropPlayer(step, player,
@@ -333,6 +319,27 @@ fn drop_player_with_base(
     target_base: u32,
     eligible_for_safe_pair_of_hands: bool,
 ) -> Vec<StepParameter> {
+    drop_player_with_base_rng(game, None, player_id, target_base, eligible_for_safe_pair_of_hands,
+        ApothecaryMode::Defender)
+}
+
+/// The full Java body, with the `placedProneCausesInjuryRoll` branch wired up when an rng is
+/// available. CRITICAL SHAPE DETAIL: in Java the Ball & Chain branch and the place-PRONE/STUNNED
+/// branch are an `if/else` over the STATE CHANGE ONLY — the ball handling below
+/// (`DROPPED_BALL_CARRIER`, `SCATTER_BALL`, the turnover) sits OUTSIDE that `if/else` and runs for a
+/// Ball & Chain player too. Returning early from the B&C branch cost the ball bounce whenever a
+/// Ball & Chain player was dropped on a loose ball (goblin bb2016 seed 19 i=3: the Fanatic blitzed
+/// while standing on the loose ball, went down, and Java rolled a d8
+/// `StepCatchScatterThrowIn.scatterBall` (rng 29) that Rust never rolled).
+fn drop_player_with_base_rng(
+    game: &mut Game,
+    rng: Option<&mut GameRng>,
+    player_id: &str,
+    target_base: u32,
+    eligible_for_safe_pair_of_hands: bool,
+    apothecary_mode: ApothecaryMode,
+) -> Vec<StepParameter> {
+    use crate::injury::injuryType::injury_type_ball_and_chain::InjuryTypeBallAndChain;
     let mut params: Vec<StepParameter> = Vec::new();
 
     let coord: Option<FieldCoordinate> = game.field_model.player_coordinate(player_id);
@@ -347,6 +354,20 @@ fn drop_player_with_base(
         return params;
     }
 
+    // Java: `if (hasSkillProperty(placedProneCausesInjuryRoll)) { publish INJURY_RESULT(
+    //        handleInjury(new InjuryTypeBallAndChain(), ...)) } else { ...place PRONE/STUNNED... }`
+    let placed_prone_causes_injury = game.player(player_id)
+        .map(|p| p.has_skill_property(NamedProperties::PLACED_PRONE_CAUSES_INJURY_ROLL))
+        .unwrap_or(false);
+    if placed_prone_causes_injury {
+        // Only the rng-aware entry points can roll it; the rng-less ones are used where no Ball &
+        // Chain player occurs and keep their historical behaviour (state change) to stay safe.
+        if let Some(rng) = rng {
+            let mut it = InjuryTypeBallAndChain::new();
+            let res = handle_injury(game, rng, &mut it, None, player_id, coord, None, None, apothecary_mode);
+            params.push(StepParameter::InjuryResult(Box::new(res)));
+        }
+    } else {
     // Java: !placedProneCausesInjuryRoll branch — place PRONE/STUNNED
     let base = state.base();
     if base != PS_PRONE && base != PS_STUNNED {
@@ -362,8 +383,9 @@ fn drop_player_with_base(
         }
         game.field_model.set_player_state(player_id, new_state);
     }
+    }
 
-    // Ball handling
+    // Ball handling — Java places this OUTSIDE the if/else above, so it runs for Ball & Chain too.
     let has_ball = game.field_model.ball_coordinate
         .map(|bc| game.field_model.player_at(bc).map(|id| id.as_str() == player_id).unwrap_or(false))
         .unwrap_or(false);
@@ -419,22 +441,7 @@ pub fn stun_player_rng(
     player_id: &str,
     apothecary_mode: ApothecaryMode,
 ) -> Vec<StepParameter> {
-    use crate::injury::injuryType::injury_type_ball_and_chain::InjuryTypeBallAndChain;
-    let placed_prone_causes_injury = game.player(player_id)
-        .map(|p| p.has_skill_property(NamedProperties::PLACED_PRONE_CAUSES_INJURY_ROLL))
-        .unwrap_or(false);
-    if placed_prone_causes_injury {
-        let coord = game.field_model.player_coordinate(player_id)
-            .unwrap_or(FieldCoordinate::new(0, 0));
-        let mut it = InjuryTypeBallAndChain::new();
-        // Roll the chain injury (consumes 2d6 to match Java); publish the result but do NOT apply it
-        // — Java's Pitch-Invasion stunPlayer publishes INJURY_RESULT with no consumer, so the outcome
-        // is discarded and the player stays as it was.
-        let res = handle_injury(game, rng, &mut it, None, player_id, coord, None, None, apothecary_mode);
-        vec![StepParameter::InjuryResult(Box::new(res))]
-    } else {
-        drop_player_with_base(game, player_id, PS_STUNNED, false)
-    }
+    drop_player_with_base_rng(game, Some(rng), player_id, PS_STUNNED, false, apothecary_mode)
 }
 
 /// Port of `UtilServerInjury.handleInjurySideEffects(IStep, InjuryResult)`.
@@ -1356,5 +1363,36 @@ mod tests {
         assert_eq!(calls_plain, 0, "a regular drop rolls nothing");
         assert!(!injury_plain, "a regular drop publishes no injury result");
         assert_eq!(state_plain, Some(PS_PRONE), "a regular player is placed prone");
+    }
+
+    /// Java's `dropPlayer` puts the Ball & Chain branch and the place-PRONE/STUNNED branch in an
+    /// `if/else` over the STATE CHANGE ONLY — the ball handling below it (`DROPPED_BALL_CARRIER`,
+    /// `SCATTER_BALL`, the turnover) sits OUTSIDE that `if/else`. Rust's B&C branch returned early,
+    /// so dropping a Ball & Chain player standing on a loose ball never bounced it: goblin bb2016
+    /// seed 19 i=3, the Fanatic blitzed off the ball square, went down, and Java rolled a d8
+    /// `StepCatchScatterThrowIn.scatterBall` (rng 29) that Rust never rolled.
+    #[test]
+    fn ball_and_chain_drop_on_the_ball_square_still_scatters_the_ball() {
+        let mut game = make_game();
+        game.rules = Rules::Bb2016;
+        add_player(&mut game, "bc", PS_STANDING);
+        if let Some(p) = game.team_home.player_mut("bc") {
+            p.starting_skills.push(SkillWithValue::new(SkillId::BallAndChain));
+        }
+        let coord = game.field_model.player_coordinate("bc").unwrap();
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = false;
+
+        let mut rng = GameRng::new(11);
+        let params = drop_player_rng(&mut game, &mut rng, "bc", false, ApothecaryMode::Defender);
+
+        assert!(params.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))),
+            "the Ball & Chain chain injury is still rolled and published");
+        assert!(params.iter().any(|p| matches!(
+            p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall))),
+            "the loose ball under a dropped Ball & Chain player must still scatter");
+        assert!(game.field_model.ball_moving, "dropPlayer sets ballMoving on the ball square");
+        assert!(rng.call_count >= 2, "the chain injury's 2d6 are drawn");
     }
 }

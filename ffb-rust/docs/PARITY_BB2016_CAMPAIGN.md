@@ -47,7 +47,7 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | elf | **0** (was 84) | 🟢 100/100 GREEN (ITER66 Side Step auto-use) | GREEN |
 | ogre | **0** (was 98) | 🟢 100/100 GREEN (ITER69 bb2016 TTM spends the PASS; needed a jar rebuild) | GREEN |
 | wood_elf | **0** (98→81→19→0) | 🟢 100/100 GREEN (ITER71 startedStanding, ITER73 rooted pre-draw, ITER77 declined-re-roll edition gate) | GREEN |
-| goblin | **3** (100→99→5→4→3) | + ITER84 (PASS gated on `preventRegularPassAction`); seeds 19/46/56 left | in progress |
+| goblin | **2** (100→99→5→4→3→2) | + ITER85 (B&C drop still scatters the ball); seeds 46/56 left | in progress |
 | halfling | **0** (100→3→0) | 🟢 100/100 GREEN (ITER78-80 unblocked it to 3; ITER81 TTM-landing drop-before-apply) | GREEN |
 | vampire | 100 | systematic — Bloodlust bb2016 | queued |
 
@@ -1227,3 +1227,45 @@ dropped by its own Ball & Chain chain injury — Java bounces the ball, Rust doe
 `dropPlayer`'s B&C branch returns *before* its ball-square/scatter logic in both engines, so the
 bounce is published from some other Java site — find it.
 Remaining goblin seeds: **19 (step 3), 46 (step 141), 56 (step 131)**.
+
+---
+
+## ITER85 — goblin 3 → **2**: the Ball & Chain drop branch skipped the ball handling
+
+seed 19 i=3 was down to a single missing die: Java's rng 29, a d8 from
+`StepCatchScatterThrowIn.scatterBall`, after the Fanatic blitzed off the loose-ball square and went
+down (`PilingOnBehaviour:164` → `dropPlayer` → the chain injury at rng 23-24, then its block injury
+and casualty at 25-28). Java's ball moved `12,8` → `11,9`; Rust's stayed put.
+
+Reading `UtilServerInjury.dropPlayer` to the end shows the shape:
+
+```java
+if (pPlayer.hasSkillProperty(placedProneCausesInjuryRoll)) {
+    publishParameter(INJURY_RESULT, handleInjury(new InjuryTypeBallAndChain(), ...));
+} else {
+    ...place the player PRONE/STUNNED...
+}
+boolean hasBall = UtilPlayer.hasBall(game, pPlayer);          // <-- OUTSIDE the if/else
+if (eligibleForSafePairOfHands && hasBall) { ...DROPPED_BALL_CARRIER... }
+if (playerCoordinate.equals(ballCoordinate) && turnMode != BLITZ) {
+    setBallMoving(true); ...SCATTER_BALL...; if (hasBall) { ...turnover... }
+}
+```
+
+The `if/else` covers **only the state change**. The ball handling below it runs for a Ball & Chain
+player too. ITER79's `drop_player_rng` returned early from the B&C branch, so a Ball & Chain player
+dropped on a loose ball never bounced it — and `stun_player_rng` had the same early return.
+
+FIX: one shared `drop_player_with_base_rng` carrying Java's full body, with the B&C branch as a
+genuine `if/else` over the state change only; `drop_player_rng` and `stun_player_rng` are now thin
+wrappers (PRONE / STUNNED). The rng-less `drop_player`/`stun_player` keep their historical
+behaviour by passing `None` — they are only used where no Ball & Chain player can occur.
+
+Test `ball_and_chain_drop_on_the_ball_square_still_scatters_the_ball`.
+
+**Verified:** goblin seed 19 **GREEN**; roster **3 → 2**. Gates: lineman bb2016 **0**, halfling
+**0**, ogre **0**, renegades **0**, underworld **0**, dwarf **0**, lineman bb2025 **0**, goblin
+bb2025 **0**. `cargo test -p ffb-engine` **7108/0**.
+
+Known remaining deviation in this function (deliberately NOT changed here, no seed exercises it):
+Java guards the scatter with `&& game.getTurnMode() != TurnMode.BLITZ`; Rust has no such guard.
