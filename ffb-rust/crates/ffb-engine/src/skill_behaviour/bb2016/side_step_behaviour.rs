@@ -76,10 +76,18 @@ impl StepModifierTrait for SideStepStepModifier {
             && !is_prone_or_stunned
             && !old_is_prone_or_stunned
         {
-            // Java: if (!sideStepping.containsKey(id)) show dialog → headless: auto-decline
+            // Java shows a DialogSkillUseParameter ("use Side Step?"). The parity harness
+            // (ParityRunner SKILL_USE) auto-USES every offered skill except DumpOff /
+            // PrimalSavagery / SafePairOfHands (`useSkill = !DumpOff && !PrimalSavagery &&
+            // !SafePairOfHands`), so a Side Step defender DOES pick its own square. Mirror that:
+            // auto-ACCEPT when undecided. This previously auto-DECLINED, so a Side Step player was
+            // pushed to a standard behind-the-defender square instead of choosing any square
+            // adjacent to itself (elf bb2016 seed 1 step 58: an Elf Blitzer — Block/Side Step — is
+            // Pow'd by home_03 at (13,8); Java pushes it to (13,7) with `homeChoice=false` (the
+            // DEFENDER's team chooses), Rust offered [(15,7),(15,8),(15,9)] and pushed to (15,7)).
+            // Same class as the bb2016 Stand Firm auto-use fix.
             if !state.side_stepping.contains_key(&defender_id) {
-                state.side_stepping.insert(defender_id.clone(), false);
-                return true;
+                state.side_stepping.insert(defender_id.clone(), true);
             }
 
             if *state.side_stepping.get(&defender_id).unwrap_or(&false) {
@@ -243,8 +251,17 @@ mod tests {
         assert!(!result, "SideStep should not fire when defender is prone/stunned");
     }
 
+    /// Java shows a DialogSkillUseParameter for Side Step, and the parity harness
+    /// (ParityRunner SKILL_USE) auto-USES every offered skill except DumpOff / PrimalSavagery /
+    /// SafePairOfHands — so an undecided Side Step must auto-ACCEPT, not decline. Accepting switches
+    /// the push to SIDE_STEP mode, where the squares are chosen around the DEFENDER (with
+    /// `home_choice` set to the defender's own team) instead of the standard squares behind it.
+    ///
+    /// elf bb2016 seed 1 step 58: an Elf Blitzer (Block/Side Step) is Pow'd by home_03 at (13,8);
+    /// Java pushes it to (13,7) with `homeChoice=false`, while the auto-decline offered only
+    /// [(15,7),(15,8),(15,9)] and pushed to (15,7). Same class as the bb2016 Stand Firm auto-use fix.
     #[test]
-    fn side_step_headless_auto_declines() {
+    fn side_step_headless_auto_uses() {
         let mut game = make_game();
         game.team_away.players.push(player_with_skills("def1", vec![SkillId::SideStep]));
         game.defender_id = Some("def1".into());
@@ -254,8 +271,13 @@ mod tests {
         let m = SideStepStepModifier;
         let mut hs = default_hook_state("def1", true);
         let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
-        assert!(result, "side step handled (declined) should return true");
-        assert_eq!(hs.side_stepping.get("def1"), Some(&false));
+        assert!(result, "side step handled should return true");
+        assert_eq!(hs.side_stepping.get("def1"), Some(&true),
+            "the harness uses the offered Side Step, so an undecided defender side-steps");
+        assert_eq!(hs.pushback_mode, PushbackMode::SIDE_STEP,
+            "accepting Side Step switches the push to SIDE_STEP mode");
+        assert!(hs.pushback_squares.iter().all(|sq| !sq.home_choice),
+            "an AWAY-team side-stepper chooses its own square (home_choice = false)");
     }
 
     #[test]

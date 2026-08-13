@@ -44,8 +44,8 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | necromantic | **0** (58→1→0) | 🟢 100/100 GREEN (ITER59 + ITER60 Stand Firm) | GREEN |
 | undead | **0** (76→2→0) | 🟢 100/100 GREEN (ITER64 prone-Blitz GFI + ITER65 Blizzard GFI modifier) | GREEN |
 | dwarf | **0** (79→35→30→0) | 🟢 100/100 GREEN (ITER59 Stand Firm, ITER61 casualty-SW argue, ITER63 KO-vs-argue order) | GREEN |
-| elf | 84 | untraced (suspect AG / pass) — **NEXT TARGET** | queued |
-| ogre | 98 | earlier non-TTM blocker | queued |
+| elf | **0** (was 84) | 🟢 100/100 GREEN (ITER66 Side Step auto-use) | GREEN |
+| ogre | 98 | earlier non-TTM blocker — **NEXT TARGET** | queued |
 | wood_elf | 98 | untraced | queued |
 | goblin | 100 | earlier non-TTM blocker masks the TTM win — retrace seed 1 | queued |
 | halfling | 100 | systematic (every seed) — likely a roster/skill-load or first-step gap | queued |
@@ -55,7 +55,7 @@ Counts above re-scouted 2026-08-13 AFTER ITER56-58 with FULL 1-100 `--no-abort` 
 The older `undead 44` / `necromantic 44` figures were unreliable (truncated triage) — the true
 counts are 76 / 58. Green rosters re-verified 0 fails in the same sweep.
 
-Green (24): undead, dwarf, necromantic, renegades, underworld, lineman, amazon, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl,
+Green (25): elf, undead, dwarf, necromantic, renegades, underworld, lineman, amazon, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl,
 high_elf, human, khemri, khemri_fumbbl, lizardman, nippon, norse, nurgle, orc, skaven, slann,
 slann_fumbbl.
 
@@ -420,3 +420,40 @@ ever exercised.
 
 Remaining reds: elf 84 · ogre 98 · wood_elf 98 · goblin 100 · halfling 100 · vampire 100.
 **elf is the next target.**
+
+### ITER66 (2026-08-13) — bb2016 Side Step must auto-USE (harness policy) → **elf 100/100 GREEN**
+
+elf seed 1, step 58. A textbook single-player state divergence with matching dice — the diff at i=59
+is exactly one line:
+
+    a00: J=13,7,Prone   R=15,7,Prone
+
+home_03 at (13,8) blitzes away_01 at (14,8); block die 6 = Pow. Java: `JAVA_PUSHBACK
+pushed=Away1 to=(13,7) homeChoice=false`. Rust offered the standard behind-the-defender squares
+`[(15,7),(15,8),(15,9)]` and pushed to (15,7). away_01 is an **Elf Blitzer — Block + Side Step**, and
+`homeChoice=false` is the giveaway: the DEFENDER's team chose the square, i.e. Side Step fired.
+
+ROOT CAUSE: Rust's `skill_behaviour/bb2016/side_step_behaviour.rs` auto-**DECLINED** the undecided
+Side Step (`side_stepping.insert(id, false); return true;`). Java shows a `DialogSkillUseParameter`
+and the parity harness (ParityRunner `SKILL_USE`) auto-**USES** every offered skill except
+`DumpOff` / `PrimalSavagery` / `SafePairOfHands` — Side Step is not excluded, so Java side-steps.
+Accepting switches the push to `PushbackMode::SIDE_STEP`, whose candidate squares are taken around
+the DEFENDER with `home_choice` set to the defender's own team.
+
+This is the **exact same trap as ITER59's bb2016 Stand Firm auto-use** — the pattern is now 2/2, so
+treat every "headless: auto-decline" comment in a bb2016 skill behaviour as suspect until checked
+against ParityRunner's SKILL_USE policy.
+
+FIX: auto-ACCEPT when undecided (one line + the early `return` removed). The pre-existing test
+`side_step_headless_auto_declines` pinned the wrong behaviour and was rewritten as
+`side_step_headless_auto_uses` (also asserting SIDE_STEP mode and `home_choice == false` for an
+away-team side-stepper).
+Verified: elf 84 fails → **0 (100/100 GREEN)**; no regression across all 28 swept bb2016 rosters;
+lineman bb2016 100/100; lineman + dark_elf bb2025 100/100; ffb-engine 7094/0. **25 🟢 / 5 🔴.**
+
+KNOWN GAP (latent, no bb2020 parity matrix): `skill_behaviour/bb2020/side_step_behaviour.rs` still
+auto-declines — its `side_step_headless_auto_declines` test is still green. Same for the bb2025
+Stand Firm `pushbackStack.clear()` noted in ITER60.
+
+Remaining reds: ogre 98 · wood_elf 98 · goblin 100 · halfling 100 · vampire 100.
+**ogre/wood_elf are the next targets.**
