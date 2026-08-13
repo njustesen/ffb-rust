@@ -273,3 +273,42 @@ Java bb2016 `argueTheCall` rolls one d6 **per player id in the client command**,
 sends only the FIRST eligible player, once per team — so bb2016 should roll AT MOST ONE argue die per
 team. The shared step loops over every flagged player. Dwarf has one Deathroller per team so both
 readings agree; goblin bb2016 (Looney + Bombardier + Fanatic) will not.
+
+### ITER62 (2026-08-13) — dwarf seed 5 halftime: DIAGNOSIS ONLY, no fix landed
+
+dwarf seed 5 (lowest of the remaining 30). First STATE mismatch i=129, first `rng_calls`
+divergence i=131. Step 128 is the last turn of half 1, so this is again the halftime transition —
+and **the dice match exactly through pos 81** (both engines roll the same 14 dice in step 128).
+It is a pure state divergence, then step 130 rolls 5 dice in Java and 0 in Rust.
+
+`FFB_DICE_TRACE` callers for the halftime dice (Java): pos 71 =
+`rollKnockoutRecovery / StepEndTurn.recoverKnockout:496`, pos 72 = `rollArgueTheCall` (**6** →
+success), pos 73 = `rollArgueTheCall` (**3** → fail). `FFB_DRIVE_TRACE` shows Rust rolling all
+three inside its `EndTurn` step too — so Rust IS rolling both argue dice now (ITER61 landed) and
+the KO-recovery die, in the same order.
+
+Order-independent state facts at i=129 (counting off-field entries, NOT trusting the label→player
+mapping):
+- Java: 1 off-field player total — one `-1,-1,Reserve` (a banned Deathroller) on ONE team; no `Ko`.
+- Rust: 2 off-field — one `-1,-1,Reserve` AND one `-1,-1,Ko`, both in the same team's window.
+
+So there are (at least) TWO layered divergences at this halftime:
+1. the argue success/failure appears to land on a different team's Deathroller, and
+2. Rust still has a KO'd player where Java has none — i.e. the single KO-recovery die produced a
+   different outcome, or the engines disagree on how many players were KO'd going into halftime.
+
+**METHOD WARNING (cost most of this iteration):** the `state=` string's `aN`/`hN` labels are
+**positional, not id-based**, and the two engines order the list differently once players are
+off-field — Java's window was `[banned, 10 on-pitch]` while Rust's was `[banned, Ko, 9 on-pitch]`
+with a different 11th player. Do NOT conclude "engine X banned team Y's player" from these labels.
+Next iteration should get the identity directly instead: read `ReportSecretWeaponBan` /
+`ReportArgueTheCallRoll` player ids from BOTH sides (the Rust `parity/*_rust_events.jsonl` argue
+entry for this seed is the FOUL argue after `refereeSpotsFoul` — a different mechanic — so a
+secret-weapon-specific trace is needed), or add a gated JAVA_ARGUE/JAVA_SWBAN eprintln pair.
+
+Also still open from ITER61 (probably the same root cause as (1) above): bb2016 `argueTheCall`
+rolls one d6 **per id in the client command** and ParityRunner sends only the FIRST eligible player
+once per team, so bb2016 should roll AT MOST ONE argue die per team; the shared bb2025 step loops
+over every flagged player.
+
+No code change; dwarf stays at 30. 22 🟢 / 8 🔴 unchanged.
