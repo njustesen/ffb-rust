@@ -399,6 +399,18 @@ pub fn make_step_for(id: StepId, rules: Rules) -> Box<dyn Step> {
             // empty landing square, Rust left it put → 1 fewer d8 + wrong ball square).
             StepId::MissedPass =>
                 return Box::new(crate::step::bb2016::pass::step_missed_pass::StepMissedPass::new()),
+            // ── BB2016 pass step-set ─────────────────────────────────────────────────────────────
+            // Java's per-ruleset SequenceGenerator factory builds the BB2016 Pass sequence out of
+            // `server.step.bb2016.pass.*`; `bb2016::move_::step_end_selecting` already pushes the
+            // bb2016 Pass SEQUENCE, but the driver was still instantiating the bb2025 step classes
+            // for every StepId in it. The editions differ materially: bb2016 uses the BB2016
+            // `PassMechanic` throwing-range table (via `find_passing_distance`) where the bb2025
+            // steps use the shared bb2020+ table, so an out-of-range bb2016 throw was executed
+            // instead of refused (underworld seed 72 i=74: Java's InitPassing refuses the
+            // 13-square throw and the turn ends with zero dice; Rust rolled the accuracy d6 and
+            // offered an interception, desyncing the shared stream).
+            StepId::InitPassing =>
+                return Box::new(crate::step::bb2016::pass::step_init_passing::StepInitPassing::new()),
             // ── BB2016 activation / move / block / foul step-set (approach A: 1:1 bb2016 steps,
             // completed with the AgentPrompt bridge) ─────────────────────────────────────────────
             StepId::InitSelecting =>

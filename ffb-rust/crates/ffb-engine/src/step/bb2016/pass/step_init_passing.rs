@@ -141,10 +141,18 @@ impl StepInitPassing {
             return out;
         }
 
-        // Java: no branch matched — falls through without setting a next action
-        // (the catcher publish above, if any, still happened).
-        out.action = crate::step::framework::StepAction::Continue;
-        out
+        // Java: no branch matched (the throw is out of range) — `executeStep()` returns without
+        // calling `setNextAction`, so StepInitPassing stays the current step, WAITING. Both
+        // reference agents then end the turn: ParityRunner's step dispatch has no INIT_PASSING
+        // case, so the stuck step falls to its `default:` branch and injects
+        // `ClientCommandEndTurn` (which StepInitPassing.handleCommand turns into
+        // `fEndTurn = true` → `publishParameter(END_TURN, true)` + `GOTO_LABEL(fGotoLabelOnEnd)`).
+        // Produce that same observable result directly — turnover, ball unmoved, zero dice —
+        // rather than waiting for a prompt the headless driver cannot surface. Identical to the
+        // shared `mixed::pass::step_init_passing` handling of this case.
+        out.action = crate::step::framework::StepAction::GotoLabel;
+        out.goto_label = Some(self.goto_label_on_end.clone());
+        out.publish(StepParameter::EndTurn(true))
     }
 }
 
@@ -254,6 +262,45 @@ mod tests {
         assert!(matches!(out.action, StepAction::Continue));
     }
 
+    /// Java `StepInitPassing.executeStep()` gates the PASS branch on
+    /// `mechanic.findPassingDistance(game, throwerCoordinate, game.getPassCoordinate(), false) != null`
+    /// using the **BB2016** `PassMechanic` throwing-range table. When the target is out of range no
+    /// branch matches, `executeStep` returns without `setNextAction`, and the step stays waiting —
+    /// at which point ParityRunner's `default:` dispatch injects `ClientCommandEndTurn`, so the
+    /// observable result is a turnover with the ball unmoved and ZERO dice rolled.
+    ///
+    /// bb2016 games used to be driven through the shared `mixed`/bb2025 pass steps, whose range
+    /// check reads the bb2020+ table — an out-of-range bb2016 throw was accepted there, rolling the
+    /// accuracy d6 and offering an interception that stock Java never rolls (underworld bb2016
+    /// seed 72 i=74: away_03 at (12,9) throwing to (25,7), 13 squares).
+    #[test]
+    fn out_of_range_pass_ends_the_turn_without_rolling() {
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        add_player(&mut game, "thrower", FieldCoordinate::new(12, 9));
+        game.home_playing = true;
+        game.acting_player.player_id = Some("thrower".into());
+        game.acting_player.player_action = Some(ffb_model::enums::PlayerAction::Pass);
+        game.thrower_id = Some("thrower".into());
+        game.thrower_action = Some(ffb_model::enums::PlayerAction::Pass);
+        // 13 squares along x, 2 along y — off the end of the bb2016 throwing-range table.
+        game.pass_coordinate = Some(FieldCoordinate::new(25, 7));
+
+        let mut step = StepInitPassing::new();
+        step.goto_label_on_end = "end".into();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(matches!(out.action, StepAction::GotoLabel),
+            "an out-of-range throw must not advance into the Pass step");
+        assert_eq!(out.goto_label.as_deref(), Some("end"));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "the stuck step is resolved by the agents' EndTurn injection → turnover");
+        assert!(!game.acting_player.has_passed,
+            "Java only sets hasPassed inside a matched branch");
+        assert!(!game.turn_data().pass_used,
+            "an out-of-range throw never consumes the team's pass action");
+    }
+
     #[test]
     fn end_turn_goto_label() {
         let mut game = make_game();
@@ -361,8 +408,13 @@ mod tests {
     fn hand_over_without_catcher_does_not_advance() {
         // Java: `(PlayerAction.HAND_OVER == throwerAction) && (thrower == actingPlayer.getPlayer())
         //         && (catcher != null)` — with no resolvable catcher, the HAND_OVER branch must NOT
-        // fire, and since no other branch matches HAND_OVER either, the step falls through without
-        // advancing (stays Continue) and hand_over_used must remain false.
+        // fire, and since no other branch matches HAND_OVER either, `executeStep()` returns without
+        // calling `setNextAction` and hand_over_used must remain false. Java's step then WAITS; both
+        // reference agents resolve that by injecting `ClientCommandEndTurn` (ParityRunner has no
+        // INIT_PASSING case), which handleCommand turns into END_TURN + GOTO_LABEL(gotoLabelOnEnd).
+        // The step reproduces that terminal result directly, so the assertion here is
+        // GotoLabel + EndTurn rather than Continue — the *engine-visible* effects Java has
+        // (no hand_over_used, no has_passed) are unchanged, which is what this test guards.
         let mut game = make_game();
         use ffb_model::types::FieldCoordinate;
         add_player(&mut game, "p1", FieldCoordinate::new(1, 7));
@@ -373,7 +425,9 @@ mod tests {
         step.goto_label_on_end = "end".into();
         step.catcher_id = None; // no catcher resolved
         let out = step.start(&mut game, &mut GameRng::new(0));
-        assert!(matches!(out.action, StepAction::Continue), "expected Continue, got {:?}", out.action);
+        assert!(matches!(out.action, StepAction::GotoLabel), "expected GotoLabel, got {:?}", out.action);
+        assert_eq!(out.goto_label.as_deref(), Some("end"));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
         assert!(!game.turn_data().hand_over_used);
         assert!(!game.acting_player.has_passed);
     }

@@ -40,7 +40,7 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | Roster | fails /100 | Diagnosis | State |
 |---|---:|---|---|
 | renegades | **0** (38→8→1→0) | 🟢 100/100 GREEN (ITER55 TTM routing, ITER56 declined-re-roll, ITER57 RightStuff dropPlayer) | GREEN |
-| underworld | **1** (44→8→1) | seed 72 i=77: same player home_03, Java picks MOVE / Rust picks Blitz → action-eligibility divergence | ACTIVE |
+| underworld | **0** (44→8→1→0) | 🟢 100/100 GREEN (ITER55-56 TTM + ITER58 bb2016 InitPassing routing) | GREEN |
 | undead | 44 | stand-up-blitz-GFI (ITER51 diagnosis) | queued |
 | dwarf | 80 | Deathroller (ITER54 diagnosis), multi-layer | queued |
 | elf | 84 | untraced (suspect AG / pass) | queued |
@@ -124,3 +124,41 @@ NOTE (latent, not hit yet): Rust `util_server_injury::drop_player_with_base` omi
 `&& game.getTurnMode() != TurnMode.BLITZ` guard on the ball-scatter branch, and adds a
 `FieldCoordinateBounds::FIELD.is_in_bounds` early return Java does not have. Worth checking when a
 BLITZ-turn-mode drop shows up as a frontier.
+
+### ITER58 (2026-08-13) — the bb2016 PASS step-set was routed to the bb2025 steps → **underworld 100/100 GREEN**
+
+underworld seed 72. First state mismatch i=78, but the first `rng_calls` divergence is i=75
+(Java 52 / Rust 53): step 74 (`Activate(away_03, PASS)`) rolled one die in Rust and none in Java.
+
+Java trace: `JAVA_PASS pid=…Away3 coord=(25,7)` then `UNHANDLED_STEP: INIT_PASSING`. The thrower is
+at (12,9) — 13 squares away — so Java's `StepInitPassing.executeStep()` finds
+`findPassingDistance(...) == null`, no branch matches, and it returns WITHOUT calling
+`setNextAction`. The step stays current; ParityRunner has no `INIT_PASSING` case, so the stuck step
+falls to its `default:` branch and injects `ClientCommandEndTurn` → turnover, ball unmoved, zero
+dice. **This is not a harness gap** — it is stock Java's behaviour for an out-of-range throw, and
+the runner's EndTurn is just how the contract resolves it.
+
+Rust trace: `RUST_STEPPASS thrower=away_03 … pass_coord=(25,7) dist=None` — emitted from
+`step/bb2025/pass/step_pass.rs`. ROOT CAUSE: `bb2016::move_::step_end_selecting` already pushes the
+**bb2016 Pass sequence**, but `make_step_for(id, Rules::Bb2016)` had no pass entries, so the driver
+instantiated the **bb2025** step classes for every StepId in it. The shared
+`mixed::pass::step_init_passing` range-checks with `ffb_model::util::passing::passing_distance`
+(the bb2020+ table), which accepts (dx 13, dy 2); the bb2016 `PassMechanic::find_passing_distance`
+throwing-range table rejects it. So Rust accepted the throw, rolled the accuracy d6 and offered an
+interception that stock Java never rolls.
+
+FIX (two parts):
+1. `bb2016/pass/step_init_passing.rs`: the no-branch-matched fall-through now produces the same
+   observable result as Java-plus-runner — `GOTO_LABEL(gotoLabelOnEnd)` + `END_TURN(true)` — instead
+   of `Continue`, which the headless driver cannot resolve (identical to how the already-verified
+   shared `mixed` step handles it).
+2. `driver.rs` `make_step_for`: route `StepId::InitPassing` to the bb2016 impl for bb2016 games.
+
+**Scope lesson — routing the WHOLE bb2016 pass step-set REGRESSED badly and was reverted.** Adding
+`Pass`/`Intercept`/`HailMaryPass`/`EndPassing`/`PassBlock` alongside `InitPassing` took lineman
+bb2016 from 0 → 38 fails and underworld from 1 → 33: those five bb2016 step files are less complete
+than the bb2025 ones they were shadowing. Only `InitPassing` is routed. The other five remain a
+known gap — port them individually, each verified on its own, not as a block.
+
+Tests: `out_of_range_pass_ends_the_turn_without_rolling` (bb2016 InitPassing).
+Verified: underworld 1 fail → **0 (100/100)**; lineman bb2016 100/100. **21 🟢 / 9 🔴.**

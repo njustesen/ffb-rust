@@ -38,11 +38,11 @@ steps/`make_injury_type`). Remaining rosters are being driven green next, in tur
 | `slann` | 🟢 100/100 | — | GREEN 2026-08-13, shared bb2016 fixes |
 | `slann_fumbbl` | 🟢 100/100 | — | GREEN 2026-08-13, shared bb2016 fixes (FUMBBL-legacy) |
 | `undead` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 52ec2896b34b514f |  |
-| `underworld` | 🔴 0/100 | seed 1, step 0, java 36c2338c5a81ae43 vs rust 74b156927e7fc691 |  |
+| `underworld` | 🟢 100/100 | — | GREEN 2026-08-13. bb2016 TTM step-set routing + declined-re-roll (ITER55-56) then ITER58: route StepId::InitPassing to the bb2016 impl (bb2016 PassMechanic range table) so an out-of-range throw is refused as in stock Java |
 | `vampire` | 🔴 0/100 | seed 1, step 0, java e752f3f1ca886d11 vs rust 475b6b600c40ec85 |  |
 | `wood_elf` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust fecd448eb2f10080 |  |
 
-**20 green / 10 red of 30** (2026-08-12→13: amazon, human, lizardman, orc, norse driven to full parity via engine fixes; chaos, chaos_dwarf, dark_elf, high_elf, khemri, nurgle, skaven then verified 100/100 with NO roster-specific fix — cleared by the shared campaign fixes. The remaining rows' "step 0 / seed 1" divergences are STALE pre-campaign snapshots and must be re-scouted before assuming red).
+**21 green / 9 red of 30** (2026-08-12→13: amazon, human, lizardman, orc, norse driven to full parity via engine fixes; chaos, chaos_dwarf, dark_elf, high_elf, khemri, nurgle, skaven then verified 100/100 with NO roster-specific fix — cleared by the shared campaign fixes. The remaining rows' "step 0 / seed 1" divergences are STALE pre-campaign snapshots and must be re-scouted before assuming red).
 
 ## Analysis (recorded, not fixed — task scope)
 
