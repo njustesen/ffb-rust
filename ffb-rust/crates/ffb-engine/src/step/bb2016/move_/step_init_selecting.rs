@@ -238,6 +238,16 @@ impl Step for StepInitSelecting {
                         // NO prompt (prompt_after=None), stalling the game (human bb2016 seed1 i=9: the
                         // Ogre home_01's THROW_TEAM_MATE — Java throws & continues, Rust stalled).
                         PlayerAction::ThrowTeamMate => {
+                            // Java bb2016 StepInitSelecting gates CLIENT_THROW_TEAM_MATE on
+                            // `checkCommandWithActingPlayer(...) && !game.getTurnData().isPassUsed()`
+                            // — a bb2016 TTM spends the team's PASS, so a SECOND TTM in one turn is
+                            // rejected and the step stays put. The `Action::ThrowTeamMate` command arm
+                            // above already honours this; this folded-target arm (the path the agent
+                            // actually takes) did not, so Rust resolved a second TTM that stock Java
+                            // refuses (ogre bb2016 seed 1: TTMs at i=2 and i=6).
+                            if game.turn_data().pass_used {
+                                return StepOutcome::cont();
+                            }
                             self.dispatch_player_action = Some(PlayerAction::ThrowTeamMate);
                             return self.execute_step(game, rng)
                                 .publish(StepParameter::ThrownPlayerId(Some(def.clone())));

@@ -268,7 +268,16 @@ impl Agent for RandomAgent {
                     // turn-start snapshot can still offer a second one after the first Ogre throws;
                     // filter it out as stale, or the engine rejects the second throw and the harness
                     // loops (ogre seed 1: away_06's throw after away_05 already threw).
-                    PlayerAction::ThrowTeamMate => !td.ttm_used,
+                    // BB2016 spends the team's PASS on a Throw Team-Mate (bb2016
+                    // ThrowTeamMateBehaviour sets passUsed), and bb2016 StepInitSelecting rejects the
+                    // command once the pass is gone. Mirrors ParityRunner.filterStaleActions.
+                    PlayerAction::ThrowTeamMate => {
+                        if gs.game.rules == ffb_model::enums::Rules::Bb2016 {
+                            !td.ttm_used && !td.pass_used
+                        } else {
+                            !td.ttm_used
+                        }
+                    }
                     PlayerAction::KickTeamMate => !td.ktm_used,
                     _ => true,
                 }).cloned().collect();
