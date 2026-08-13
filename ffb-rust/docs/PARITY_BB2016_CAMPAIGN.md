@@ -1387,3 +1387,44 @@ Tests `hypnotic_gaze_is_offered_last_and_only_in_bb2016` and
 **Verified:** vampire bb2016 **100 → 56** (seed 1 advances i=1 → i=100). Gates: vampire bb2025
 **0** (the regression this caught), lineman bb2016 **0**, goblin bb2016 **0**, lineman bb2025 **0**.
 `cargo test -p ffb-engine` **7112/0**.
+
+---
+
+## ITER89 — vampire seed 1 i=100 traced; NO fix landed (56 unchanged)
+
+**The divergence.** seed 1 i=100, away_03 (a Vampire) declares BLOCK. Java draws exactly **one**
+die — rng 77, `d6=1`, from `BloodLustBehaviour$1.handleExecuteStepHook` — and the failed Blood Lust
+roll **cancels the declared Block**:
+
+```java
+// bb2016/BloodLustBehaviour, on FAILURE
+actingPlayer.setSufferingBloodLust(true);
+step.publishParameter(new StepParameter(StepParameterKey.MOVE_STACK, null));
+step.getResult().setNextAction(GOTO_LABEL, state.goToLabelOnFailure);   // = END_BLOCKING
+```
+
+so the turn passes over. Rust draws **thirteen** (76 → 89) and throws the block.
+
+**A real Java-vs-Rust difference found, in three places.** Java's `doRoll` /
+`markSkillUsed` both go through the **ActingPlayer** (`UtilCards.hasUnusedSkill(actingPlayer, skill)`
+/ `actingPlayer.markSkillUsed(skill)`), which `changeActingPlayer` clears at every activation — a
+Vampire rolls Blood Lust **once per activation**. All three Rust Blood Lust implementations read and
+write `Player.used_skills`, which persists for the whole **game**, so a Vampire would roll Blood Lust
+exactly once ever. This is the same per-activation shape as the Bone-head / Really Stupid fix.
+
+**Why nothing was committed.** Applying that fix to
+`step/bb2016/step_blood_lust.rs`, then to `skill_behaviour/bb2025/blood_lust_behaviour.rs`, then to
+`step/bb2025/shared/step_blood_lust.rs` changed **nothing** — vampire stayed at 56 and seed 1 still
+diverged identically. Gated `eprintln!` probes in the first two **never fired**, even though
+`DRIVE step=BloodLust` appears 185× in the run. So none of the three is the live path, and all three
+edits were reverted rather than committed as dead code.
+
+### FRONTIER for ITER90
+Identify the live Blood Lust implementation the way ITER87 identified the live `InjuryResult`:
+put `std::backtrace::Backtrace::force_capture()` behind an env gate in `GameRng::d6` (or in
+`FieldModel` when `suffering_blood_lust` is set) and capture the frame that produces **pos 77** of
+vampire seed 1. Then apply the per-activation `used_skills` fix — and check whether that path also
+needs bb2016's "failure cancels the declared action" `GOTO_LABEL` branch, which bb2020/bb2025
+replace with the `failBloodLustForAction` conversion dialog.
+
+Baseline re-confirmed after reverting: vampire bb2016 **56**.
