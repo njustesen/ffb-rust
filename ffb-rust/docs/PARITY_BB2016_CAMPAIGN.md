@@ -1578,3 +1578,43 @@ turn simply continues. Check `bb2016/StepEndBlocking` and the end-of-activation 
 player still carrying `Block` while `sufferingBloodLust` is set.
 
 No code change committed — nothing verified. Baseline: vampire bb2016 **39**.
+
+---
+
+## ITER94 — the re-push is CORRECT; the gap is the missing block-target prompt (no fix; 39)
+
+Answering ITER93's question: **Java re-pushes the block sequence too.** `bb2016/StepEndBlocking`:
+
+```java
+// this may happen on a failed bloodlust roll
+} else if (actingPlayer.isSufferingBloodLust() && !actingPlayer.hasBlocked()) {
+    game.getFieldModel().setPlayerState(game.getDefender(), fOldDefenderState);
+    game.setDefenderId(null);
+    ServerUtilBlock.updateDiceDecorations(getGameState());
+    blockGenerator.pushSequence(new Block.Builder(getGameState()).build());   // NO defenderId
+}
+```
+
+and `crates/ffb-engine/src/step/bb2016/block/step_end_blocking.rs:263` is already a faithful port of
+exactly that branch. So the fresh no-defender `InitBlocking` is **correct in both engines** — the
+divergence is what happens next.
+
+- **Java**: `StepInitBlocking` falls through without `setNextAction`, keeping CONTINUE, and waits
+  for a `CLIENT_BLOCK`. The client supplies one: `ParityRunner`'s phase 2 sees the acting player
+  still selected with action `BLOCK` and calls `sendConcreteAction` → `sendBlockAction`, which picks
+  a target with one actionRng draw.
+- **Rust**: `StepInitBlocking`'s `block_defender_id == None` arm returns a bare
+  `StepOutcome::cont()` — **no prompt** — so `waiting_for_command = true` with
+  `pending_prompt = None`. The agent is never asked, no command ever arrives, and the harness ends
+  the game. Rust picks its block target at *activation* time, so a re-pushed sequence has nobody to
+  ask.
+
+### FIX for ITER95 (well-scoped)
+Give that arm a prompt so the agent can choose a block target mid-sequence — the Rust equivalent of
+Java's "wait for `CLIENT_BLOCK`" — and have `random_agent` answer it exactly as
+`ParityRunner.sendBlockAction` does (same candidate set, same coordinate ordering, one actionRng
+draw), so the two streams stay aligned. Then re-run vampire seed 1: the second Blood Lust roll is
+skipped (already marked used this activation, ITER91), and the flow should reach the feeding
+turnover that ends the away turn, matching Java's `rng_calls=77` at i=101.
+
+No code change committed — nothing verified. Baseline: vampire bb2016 **39**.
