@@ -46,7 +46,7 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | dwarf | **0** (79→35→30→0) | 🟢 100/100 GREEN (ITER59 Stand Firm, ITER61 casualty-SW argue, ITER63 KO-vs-argue order) | GREEN |
 | elf | **0** (was 84) | 🟢 100/100 GREEN (ITER66 Side Step auto-use) | GREEN |
 | ogre | **0** (was 98) | 🟢 100/100 GREEN (ITER69 bb2016 TTM spends the PASS; needed a jar rebuild) | GREEN |
-| wood_elf | 98 | hash-invisible `rooted` flag divergence (ITER68) — **NEXT TARGET** | queued |
+| wood_elf | **81** (was 98) | ITER71 bb2025-only `startedStanding` + hasUnusedSkill — **still NEXT TARGET** | queued |
 | goblin | 100 | earlier non-TTM blocker masks the TTM win — retrace seed 1 | queued |
 | halfling | 100 | systematic (every seed) — likely a roster/skill-load or first-step gap | queued |
 | vampire | 100 | systematic — Bloodlust bb2016 | queued |
@@ -616,3 +616,43 @@ verified 1:1 correction, and reverting it would only restore an equally-wrong pe
 `Player.used_skills` read. It remains parity-neutral.
 
 No code change this iteration. wood_elf stays 98; **26 🟢 / 4 🔴** unchanged.
+
+### ITER71 (2026-08-13) — `startedStanding` is BB2025-ONLY → wood_elf 98 → 81
+
+Instrumented the Take Root `do_roll` gate as ITER70 planned. The trace printed **ZERO** lines, which
+was the finding: **`crates/ffb-engine/src/step/bb2016/step_take_root.rs` is DEAD CODE.**
+`driver.rs:211` maps `StepId::TakeRoot` to `step_take_root::StepTakeRoot` resolved through
+`use crate::step::bb2025::shared::*`, and nothing anywhere references the bb2016 file.
+
+**This retracts ITER68's claim to have fixed anything.** That change edited the dead bb2016 file, which
+is exactly why it was parity-neutral — not the `rooted` short-circuit I hypothesised. (ITER70 already
+retracted the `rooted` theory; this retracts the file too.)
+
+The live gate is `step/bb2025/shared/step_take_root.rs`, and it applied bb2025's condition to every
+edition. Java's three behaviours differ:
+- bb2025 `TakeRootBehaviour`: `if (startedStanding && !playerState.isRooted())`
+- bb2020 `TakeRootBehaviour`: `if (!playerState.isRooted())`
+- bb2016 `TakeRootBehaviour`: `if (!playerState.isRooted())`
+
+`startedStanding` (`actingPlayer.getOldPlayerState().getBase() == STANDING`) is **BB2025-only**, so a
+PRONE player standing up STILL rolls Take Root in bb2016/bb2020. wood_elf seed 1 step 46: home_01 is
+the prone Treeman; Java rolls Take Root (pos 32) then the stand-up d6 (pos 33), Rust rolled only the
+stand-up.
+
+FIX (both halves are required together):
+1. Compute `started_standing` only when `rules == Bb2025`, else `true`.
+2. Add Java's `doRoll = UtilCards.hasUnusedSkill(actingPlayer, skill)` +
+   `actingPlayer.markSkillUsed(skill)`, which the shared step never had. TAKE_ROOT is in BOTH the
+   Select and Move sequences, so without that pairing one bb2016 activation would now roll it TWICE —
+   the bb2025 `startedStanding` short-circuit had been masking the omission.
+
+Tests: `prone_take_root_rolls_in_bb2016_but_not_bb2025` (1 die for bb2016 and bb2020, 0 for bb2025)
+and `take_root_rolls_once_per_activation` (Select rolls, Move does not).
+Verified: wood_elf 98 → **81**; no regression — 25 swept bb2016 rosters green + lineman = 26 🟢 / 4 🔴;
+lineman bb2016 100/100; lineman, **wood_elf** and halfling bb2025 all 100/100; ffb-engine 7098/0.
+
+**METHOD LESSON (cost ITER68 + ITER70): confirm the code you are about to "fix" is actually EXECUTED
+before diagnosing it.** A one-line gated eprintln that prints nothing is the cheapest possible proof
+of dead code, and would have saved two iterations of reasoning about the wrong file. Check
+`driver.rs`'s `make_step_for` / glob imports first — `bb2016/step_take_root.rs` is dead, and other
+`step/bb2016/*` files may be too.

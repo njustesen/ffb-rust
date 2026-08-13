@@ -117,10 +117,22 @@ impl StepTakeRoot {
         // step-parameter copy, then the conservative STANDING default. A prone Treeman blitzing has
         // old_player_state=PRONE → started_standing=false → NO Take Root roll (matching Java; wood_elf
         // seed 1 i=49: Rust was defaulting to STANDING and rolling Take Root twice, shifting block dice).
-        let started_standing = game.acting_player.old_player_state
-            .or(self.old_player_state)
-            .map(|s| s.base() == PS_STANDING)
-            .unwrap_or(true);
+        // `startedStanding` is a **BB2025-ONLY** condition. Java's three TakeRootBehaviours differ:
+        //   bb2025: `if (startedStanding && !playerState.isRooted())`
+        //   bb2020: `if (!playerState.isRooted())`
+        //   bb2016: `if (!playerState.isRooted())`
+        // So in bb2016/bb2020 a PRONE player standing up STILL rolls Take Root. Applying the bb2025
+        // condition to every edition silently dropped that d6 for a prone bb2016 Treeman (wood_elf
+        // bb2016 seed 1 step 46: Java rolls Take Root then the stand-up d6; Rust rolled only the
+        // stand-up, shifting every later die in the game).
+        let started_standing = if game.rules == ffb_model::enums::Rules::Bb2025 {
+            game.acting_player.old_player_state
+                .or(self.old_player_state)
+                .map(|s| s.base() == PS_STANDING)
+                .unwrap_or(true)
+        } else {
+            true
+        };
 
         let is_rooted = game.field_model.player_state(&player_id)
             .map(|s| s.is_rooted())
@@ -149,9 +161,14 @@ impl StepTakeRoot {
                 return cancel_take_root_player_action(game, &player_id);
             }
         } else {
+            // Java (ALL editions): `doRoll = UtilCards.hasUnusedSkill(actingPlayer, skill)` — the
+            // ACTING PLAYER's per-activation used-skill set. This matters now that bb2016/bb2020 no
+            // longer short-circuit on `startedStanding`: TAKE_ROOT appears in BOTH the Select and the
+            // Move sequence, so without the unused-skill check one activation would roll it TWICE.
             do_roll = game.player(&player_id)
                 .map(|p| p.has_skill(ffb_model::enums::SkillId::TakeRoot))
-                .unwrap_or(false);
+                .unwrap_or(false)
+                && !game.acting_player.used_skills.contains(&ffb_model::enums::SkillId::TakeRoot);
         }
 
         if !do_roll {
@@ -160,6 +177,8 @@ impl StepTakeRoot {
 
         // Java: int roll = rollSkill(); int minimumRoll = DiceInterpreter.minimumRollConfusion(true)
         let roll = rng.d6();
+        // Java: actingPlayer.markSkillUsed(skill) — per-activation, pairing with hasUnusedSkill above.
+        game.acting_player.used_skills.insert(ffb_model::enums::SkillId::TakeRoot);
         let minimum_roll = minimum_roll_confusion(true);
         let successful = is_skill_roll_successful(roll, minimum_roll);
 
@@ -287,6 +306,19 @@ mod tests {
         Game::new(home, away, Rules::Bb2025)
     }
 
+    /// A game whose acting player is a standing Take Root player, under the given ruleset.
+    fn make_game_with_rules(rules: Rules) -> Game {
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+        game.home_playing = true;
+        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        add_player_with_take_root(&mut game, "p1");
+        game.field_model.set_player_coordinate("p1", ffb_model::types::FieldCoordinate::new(5, 5));
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(ffb_model::enums::PlayerAction::Move);
+        game.acting_player.old_player_state = Some(PlayerState::new(PS_STANDING));
+        game
+    }
+
     fn bare_player(id: &str) -> Player {
         Player {
             id: id.into(), name: id.into(), nr: 0, position_id: "lineman".into(),
@@ -310,6 +342,61 @@ mod tests {
     }
 
     /// No acting player → NEXT_STEP, no crash.
+    /// Java's three `TakeRootBehaviour`s gate the roll differently, and this step is shared:
+    ///   bb2025: `if (startedStanding && !playerState.isRooted())`
+    ///   bb2020: `if (!playerState.isRooted())`
+    ///   bb2016: `if (!playerState.isRooted())`
+    /// So a PRONE player standing up STILL rolls Take Root under bb2016/bb2020 and must NOT under
+    /// bb2025. Applying the bb2025 condition everywhere dropped the d6 for every prone bb2016 Treeman
+    /// activation (wood_elf bb2016 seed 1 step 46: Java rolls Take Root then the stand-up d6; Rust
+    /// rolled only the stand-up).
+    #[test]
+    fn prone_take_root_rolls_in_bb2016_but_not_bb2025() {
+        use ffb_model::enums::{Rules, SkillId, PS_PRONE};
+
+        fn run(rules: Rules) -> u64 {
+            let mut game = make_game_with_rules(rules);
+            game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE));
+            // Activation captured a PRONE old state — i.e. the player is standing up this activation.
+            game.acting_player.old_player_state = Some(PlayerState::new(PS_PRONE));
+            game.acting_player.used_skills.clear();
+            let mut rng = GameRng::new(0);
+            let before = rng.call_count;
+            let _ = StepTakeRoot::new().start(&mut game, &mut rng);
+            let _ = SkillId::TakeRoot;
+            rng.call_count - before
+        }
+
+        assert_eq!(run(Rules::Bb2016), 1, "bb2016 rolls Take Root for a player standing up");
+        assert_eq!(run(Rules::Bb2020), 1, "bb2020 also has no startedStanding condition");
+        assert_eq!(run(Rules::Bb2025), 0, "bb2025 skips Take Root unless the player started standing");
+    }
+
+    /// Java (all editions) gates on `UtilCards.hasUnusedSkill(actingPlayer, skill)` and calls
+    /// `actingPlayer.markSkillUsed(skill)`. TAKE_ROOT is in BOTH the Select and Move sequences, so
+    /// without that pairing one activation would roll it twice — which is what previously kept
+    /// bb2016 accidentally correct via the bb2025 `startedStanding` short-circuit.
+    #[test]
+    fn take_root_rolls_once_per_activation() {
+        use ffb_model::enums::{Rules, SkillId};
+
+        let mut game = make_game_with_rules(Rules::Bb2016);
+        game.acting_player.used_skills.clear();
+        let mut rng = GameRng::new(0);
+
+        let before = rng.call_count;
+        let _ = StepTakeRoot::new().start(&mut game, &mut rng);
+        let first = rng.call_count - before;
+        assert_eq!(first, 1, "the Select-sequence Take Root rolls");
+        assert!(game.acting_player.used_skills.contains(&SkillId::TakeRoot),
+            "the roll marks the skill used on the ACTING PLAYER (per activation)");
+
+        let before = rng.call_count;
+        let _ = StepTakeRoot::new().start(&mut game, &mut rng);
+        assert_eq!(rng.call_count - before, 0,
+            "the Move-sequence Take Root in the SAME activation must not roll again");
+    }
+
     #[test]
     fn no_acting_player_returns_next() {
         let mut game = make_game();
