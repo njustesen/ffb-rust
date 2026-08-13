@@ -49,7 +49,7 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | wood_elf | **0** (98→81→19→0) | 🟢 100/100 GREEN (ITER71 startedStanding, ITER73 rooted pre-draw, ITER77 declined-re-roll edition gate) | GREEN |
 | goblin | **0** (100→99→5→4→3→2→0) | 🟢 100/100 GREEN (ITER78-87) | GREEN |
 | halfling | **0** (100→3→0) | 🟢 100/100 GREEN (ITER78-80 unblocked it to 3; ITER81 TTM-landing drop-before-apply) | GREEN |
-| vampire | **30** (100→56→39→30) | + ITER95 (mid-sequence block-target prompt); in progress |
+| vampire | **0** (100→56→39→30→0) | 🟢 100/100 GREEN (ITER88, 90, 95, 96) | GREEN |
 
 Counts above re-scouted 2026-08-13 AFTER ITER56-58 with FULL 1-100 `--no-abort` runs (no timeout).
 The older `undead 44` / `necromantic 44` figures were unreliable (truncated triage) — the true
@@ -1645,3 +1645,50 @@ Test `no_defender_asks_the_agent_for_a_block_target_instead_of_stalling`.
 
 **Verified:** vampire **39 → 30**. Gates: lineman bb2016 **0**, goblin **0**, halfling **0**,
 dwarf **0**, lineman bb2025 **0**, vampire bb2025 **0**. `cargo test -p ffb-engine` **7115/0**.
+
+---
+
+## ITER96 — vampire 100/100 GREEN · 🏁 **ALL 30 bb2016 MATCHUPS GREEN**
+
+ITER95 gave `StepInitBlocking` a `BlockTarget` prompt and had the agent *pick a target*. That was
+half right: the prompt was needed, the answer was not. Dice then matched through pos 83 and split at
+84 — Java a Blood Lust d6, Rust a d8 — with Rust consuming 13 dice in the i=100 step where Java
+consumed **one**.
+
+The harness log gave the answer in one line:
+
+```
+UNHANDLED_STEP: INIT_BLOCKING
+```
+
+`INIT_BLOCKING` has **no case** in `ParityRunner.handleStep`, so it falls to
+```java
+default:
+    System.err.println("UNHANDLED_STEP: " + stepId + ...);
+    MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
+```
+The turn simply **ENDS** — no actionRng draw, no block. Java's `JSTEP i=101` confirms it:
+`rng_calls=77`, one die since i=100, and play has passed to the other team.
+
+FIX: the agent answers `AgentPrompt::BlockTarget` with `Action::EndTurn`, mirroring that `default:`
+arm exactly (the ITER80 lesson again — when the harness abandons a step, Rust must abandon it the
+same way). Picking a target rolled block dice Java never rolls.
+
+**Verified:** vampire **30 → 0**, re-verified twice. vampire bb2025 **0**,
+`cargo test -p ffb-engine` **7115/0**.
+
+## 🏁 FULL bb2016 MATRIX — **30 🟢 / 0 🔴**
+
+Every roster re-run at 1-100, `--no-abort`, all **0** fails:
+
+| | | | | |
+|---|---|---|---|---|
+| lineman 0 | amazon 0 | chaos 0 | chaos_dwarf 0 | chaos_pact 0 |
+| dark_elf 0 | dark_elf_league_fumbbl 0 | dwarf 0 | elf 0 | goblin 0 |
+| halfling 0 | high_elf 0 | human 0 | khemri 0 | khemri_fumbbl 0 |
+| lizardman 0 | necromantic 0 | nippon 0 | norse 0 | nurgle 0 |
+| ogre 0 | orc 0 | renegades 0 | skaven 0 | slann 0 |
+| slann_fumbbl 0 | underworld 0 | undead 0 | **vampire 0** | wood_elf 0 |
+
+The campaign goal is met: **all 30 bb2016 mirror matchups at 100/100 per-step state-hash parity
+against stock Java.**
