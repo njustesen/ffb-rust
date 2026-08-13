@@ -179,6 +179,10 @@ impl StepPushback {
                 // publishes FOLLOWUP_CHOICE=false when it cancels the push). Drain them into this
                 // step's published output, exactly as the bb2025 StepPushback does.
                 hook_published.append(&mut hook_state.published);
+                // Java: a hook that cancels the push calls `state.pushbackStack.clear()`.
+                if hook_state.clear_pushback_stack {
+                    self.pushback_stack.clear();
+                }
                 let final_pushback_squares = hook_state.pushback_squares;
 
                 let pushback_squares_found = !final_pushback_squares.is_empty() || stop_processing;

@@ -45,6 +45,11 @@ pub struct StepPushbackHookState {
     /// inside a behaviour hook, e.g. Stand Firm publishing FOLLOWUP_CHOICE=false). Drained by
     /// `StepPushback` into its own published output after the hooks run.
     pub published: Vec<StepParameter>,
+    /// Java: `state.pushbackStack.clear()` — a hook that CANCELS the push (Stand Firm) must discard
+    /// the already-chosen push coordinates, not just the candidate squares. The stack itself lives
+    /// on the step (it survives the per-iteration hook state), so a hook signals the clear here and
+    /// `StepPushback` performs it.
+    pub clear_pushback_stack: bool,
 }
 
 impl StepPushbackHookState {
@@ -72,6 +77,7 @@ impl StepPushbackHookState {
             pushback_squares,
             pushback_mode: PushbackMode::REGULAR,
             published: Vec::new(),
+            clear_pushback_stack: false,
         }
     }
 }

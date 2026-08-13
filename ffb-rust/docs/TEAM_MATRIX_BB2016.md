@@ -27,7 +27,7 @@ steps/`make_injury_type`). Remaining rosters are being driven green next, in tur
 | `khemri` | 🟢 100/100 | — | GREEN 2026-08-13, cleared by shared bb2016 fixes |
 | `khemri_fumbbl` | 🟢 100/100 | — | GREEN 2026-08-13, shared bb2016 fixes (FUMBBL-legacy) |
 | `lizardman` | 🟢 100/100 | — | GREEN with no roster-specific fix — cleared by the shared amazon/human bb2016 fixes (AG-scale dodge/catch/pickup + Bone Head per-activation) |
-| `necromantic` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust 10bfe73abb533f6e |  |
+| `necromantic` | 🟢 100/100 | — | GREEN 2026-08-13 (ITER59-60): bb2016 Stand Firm must publish FOLLOWUP_CHOICE=false AND clear the pending pushback stack — without them the attacker followed up onto the un-pushed defender, stacking two players and silently disabling the Werewolf's Frenzy second block |
 | `nippon` | 🟢 100/100 | — | GREEN 2026-08-13, shared bb2016 fixes (FUMBBL-legacy) |
 | `norse` | 🟢 100/100 | — | driven to full parity 2026-08-12 (Snow Troll Wild Animal per-activation + prone-cancel via old_player_state; Claw armour cap bb2016=7 not 8; bb2016 chain-push moves the occupant not the block defender) |
 | `nurgle` | 🟢 100/100 | — | GREEN 2026-08-13, cleared by shared bb2016 fixes (Claw/Decay/negatrait) |
@@ -42,7 +42,7 @@ steps/`make_injury_type`). Remaining rosters are being driven green next, in tur
 | `vampire` | 🔴 0/100 | seed 1, step 0, java e752f3f1ca886d11 vs rust 475b6b600c40ec85 |  |
 | `wood_elf` | 🔴 0/100 | seed 1, step 0, java 1afc6f15af26536c vs rust fecd448eb2f10080 |  |
 
-**21 green / 9 red of 30** (2026-08-12→13: amazon, human, lizardman, orc, norse driven to full parity via engine fixes; chaos, chaos_dwarf, dark_elf, high_elf, khemri, nurgle, skaven then verified 100/100 with NO roster-specific fix — cleared by the shared campaign fixes. The remaining rows' "step 0 / seed 1" divergences are STALE pre-campaign snapshots and must be re-scouted before assuming red).
+**22 green / 8 red of 30** (2026-08-12→13: amazon, human, lizardman, orc, norse driven to full parity via engine fixes; chaos, chaos_dwarf, dark_elf, high_elf, khemri, nurgle, skaven then verified 100/100 with NO roster-specific fix — cleared by the shared campaign fixes. The remaining rows' "step 0 / seed 1" divergences are STALE pre-campaign snapshots and must be re-scouted before assuming red).
 
 ## Analysis (recorded, not fixed — task scope)
 

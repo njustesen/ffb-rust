@@ -119,6 +119,15 @@ impl StepModifierTrait for StandFirmStepModifier {
         state.do_push = true;
         state.pushback_squares.clear();
         state.starting_pushback_square = None;
+        // Java: `state.pushbackStack.clear()`. The stack holds push coordinates ALREADY chosen this
+        // block — for a CHAIN push (the first push landed on an occupied square) it still holds the
+        // original defender's pending move. Discarding the candidate squares alone left that pending
+        // push to be applied by the `do_push` branch, moving the original defender onto the square
+        // whose Stand Firm occupant had just refused to vacate — two players stacked on one square
+        // (necromantic bb2016 seed 70 step 27: a Werewolf blitzes away_02 onto home_03's square;
+        // home_03 is a Stand Firm Flesh Golem, so Java moves NOBODY, while Rust moved away_02 on top
+        // of it and then skipped the Frenzy re-block).
+        state.clear_pushback_stack = true;
         // Java publishes FOLLOWUP_CHOICE=false here: a defender that avoids the push stays put, so
         // the attacker must NOT follow up. Without it StepFollowup moved the attacker onto the
         // defender's (still occupied) square — two players on one square — and, because the
@@ -275,6 +284,31 @@ mod tests {
             hs.published.iter().any(|p| matches!(p, StepParameter::FollowupChoice(false))),
             "avoiding the push must publish FOLLOWUP_CHOICE=false so the attacker stays put"
         );
+    }
+
+    /// Java `StandFirmBehaviour` also calls `state.pushbackStack.clear()`. That stack holds push
+    /// coordinates already chosen for THIS block; on a chain push (the first push landed on an
+    /// occupied square) it still holds the original defender's pending move. Clearing only the
+    /// candidate squares left that pending push to be applied, moving the original defender onto
+    /// the square whose Stand Firm occupant had just refused to vacate — two players stacked on one
+    /// square (necromantic bb2016 seed 70 step 27).
+    #[test]
+    fn stand_firm_clears_the_pending_pushback_stack() {
+        let mut game = make_game();
+        game.team_away.players.push(player_with_skills("def1", vec![SkillId::StandFirm]));
+        game.field_model.set_player_coordinate("def1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("def1", PlayerState::new(PS_STANDING));
+
+        let m = StandFirmStepModifier;
+        let mut hs = default_hook_state("def1");
+        hs.standing_firm.insert("def1".into(), true);
+        assert!(!hs.clear_pushback_stack);
+
+        let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
+
+        assert!(result);
+        assert!(hs.clear_pushback_stack,
+            "avoiding the push must discard already-chosen push coordinates, not just the candidates");
     }
 
     #[test]

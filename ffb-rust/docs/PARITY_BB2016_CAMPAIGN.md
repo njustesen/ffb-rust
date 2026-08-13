@@ -41,9 +41,9 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 |---|---:|---|---|
 | renegades | **0** (38→8→1→0) | 🟢 100/100 GREEN (ITER55 TTM routing, ITER56 declined-re-roll, ITER57 RightStuff dropPlayer) | GREEN |
 | underworld | **0** (44→8→1→0) | 🟢 100/100 GREEN (ITER55-56 TTM + ITER58 bb2016 InitPassing routing) | GREEN |
-| necromantic | 58 | untraced — **NEXT TARGET** (fewest fails) | queued |
+| necromantic | **0** (58→1→0) | 🟢 100/100 GREEN (ITER59 + ITER60 Stand Firm) | GREEN |
 | undead | 76 | stand-up-blitz-GFI (ITER51 diagnosis) | queued |
-| dwarf | 79 | Deathroller (ITER54 diagnosis), multi-layer | queued |
+| dwarf | **35** (was 79) | halved by ITER59 Stand Firm (Deathroller) — **NEXT TARGET** | queued |
 | elf | 84 | untraced (suspect AG / pass) | queued |
 | ogre | 98 | earlier non-TTM blocker | queued |
 | wood_elf | 98 | untraced | queued |
@@ -55,7 +55,7 @@ Counts above re-scouted 2026-08-13 AFTER ITER56-58 with FULL 1-100 `--no-abort` 
 The older `undead 44` / `necromantic 44` figures were unreliable (truncated triage) — the true
 counts are 76 / 58. Green rosters re-verified 0 fails in the same sweep.
 
-Green (21): renegades, underworld, lineman, amazon, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl,
+Green (22): necromantic, renegades, underworld, lineman, amazon, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl,
 high_elf, human, khemri, khemri_fumbbl, lizardman, nippon, norse, nurgle, orc, skaven, slann,
 slann_fumbbl.
 
@@ -196,3 +196,36 @@ FIX: `skill_behaviour/bb2016/stand_firm_behaviour.rs` pushes `StepParameter::Fol
 Test: `stand_firm_suppresses_the_attackers_followup`.
 Verified: necromantic 58 → **1**; **dwarf 79 → 35** (shared win — the Deathroller has Stand Firm);
 no regression across all 28 swept bb2016 rosters; lineman bb2016 100/100; ffb-engine 7090/0.
+
+### ITER60 (2026-08-13) — bb2016 Stand Firm must also clear the pending pushback STACK → **necromantic 100/100 GREEN**
+
+necromantic seed 70 step 27 (the last necromantic failure after ITER59). home_02 (Werewolf,
+Frenzy) blitzes away_02 at (12,7). Java rolled 4 dice (two `JAVA_BLOCKROLL nDice=2`), Rust 2.
+Final states: **Java — nothing moved at all** (`a01:12,7`, `h01:11,6`, byte-identical hash);
+**Rust — `a01:12,8` AND `h02:12,8`**, two players stacked on one square, and no Frenzy re-block.
+
+The push square the harness chose, (12,8), was **already occupied by home_03 — a Flesh Golem,
+which has Stand Firm**. So this is a CHAIN push: Java's
+`doPush = (fieldModel.getPlayer(lastPushback.getCoordinate()) == null)` is false, the step
+re-enters to push the occupant first, the occupant stands firm, and Java's `StandFirmBehaviour`
+calls **`state.pushbackStack.clear()`** — discarding the original defender's already-chosen move.
+Nothing moves; the attacker (FOLLOWUP_CHOICE=false from ITER59) stays at (11,6), still adjacent to
+the un-pushed defender at (12,7), so `forceSecondBlock` (Frenzy) fires for the second block roll.
+
+Rust's hook cleared `pushback_squares` (the CANDIDATES) but the pushback STACK lives on the step,
+not the hook state, and was never cleared — so the `do_push` branch applied the pending push anyway.
+
+FIX: new `clear_pushback_stack` flag on the shared `StepPushbackHookState` (default false); the
+bb2016 `StandFirmBehaviour` sets it, and the bb2016 `StepPushback` clears `self.pushback_stack`
+when it is set. Scoped to bb2016 — the bb2025 behaviour is untouched.
+
+Test: `stand_firm_clears_the_pending_pushback_stack`.
+Verified: necromantic 1 → **0 (100/100)**; no regression across all 29 swept bb2016 rosters;
+lineman bb2016 100/100; lineman bb2025 100/100; ffb-engine 7091/0. **22 🟢 / 8 🔴.**
+
+KNOWN GAP (not fixed, bb2025 is green so it is latent there): the bb2025 `StandFirmBehaviour` has
+the same missing `pushbackStack.clear()`. Worth porting if a bb2025 chain-push-onto-Stand-Firm
+frontier ever appears.
+
+Remaining reds after ITER60: dwarf 35 · undead 76 · elf 84 · ogre 98 · wood_elf 98 ·
+goblin 100 · halfling 100 · vampire 100. **dwarf is the next target.**
