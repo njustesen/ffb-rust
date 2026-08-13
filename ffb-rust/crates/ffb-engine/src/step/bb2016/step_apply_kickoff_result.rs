@@ -452,6 +452,12 @@ impl StepApplyKickoffResult {
 
         // Home players are affected by away fame
         let home_ids: Vec<String> = on_field_player_ids(game, true);
+        // Java's dropPlayer publishes INJURY_RESULT immediately via pStep.publishParameter; collect
+        // the Ball & Chain chain-injury results here and publish them on this step's outcome so the
+        // Apothecary step that follows in the bb2016 kickoff sequence applies them (Java KOs the
+        // Fanatic; ignoring the returned parameters left it Standing — goblin bb2016 seed 46 i=1,
+        // Java h02 -1,-1 Ko vs Rust 12,8 Standing).
+        let mut chain_injury_params: Vec<StepParameter> = Vec::new();
         let mut rolls_home: Vec<i32> = Vec::new();
         let mut affected_home: Vec<bool> = Vec::new();
         for id in &home_ids {
@@ -460,7 +466,15 @@ impl StepApplyKickoffResult {
             rolls_home.push(roll);
             affected_home.push(affected);
             if affected {
-                util_server_injury::stun_player(game, id);
+                // Java: `UtilServerInjury.stunPlayer(this, playersHome[i], ApothecaryMode.HOME)`.
+                // stunPlayer → dropPlayer(..., STUNNED, ...), whose `placedProneCausesInjuryRoll`
+                // branch rolls a full InjuryTypeBallAndChain injury (2d6) for a Ball & Chain player
+                // instead of placing it STUNNED, and publishes the result. Nothing consumes that
+                // parameter here, so the outcome is discarded and the player keeps its state — but
+                // the two dice ARE drawn. The rng-less `stun_player` skipped them, so a goblin
+                // mirror whose Pitch Invasion catches a Fanatic fell two dice behind Java for the
+                // rest of the game (goblin bb2016 seed 46, rng 15-16).
+                chain_injury_params.extend(util_server_injury::stun_player_rng(game, rng, id, ApothecaryMode::Home));
             }
         }
 
@@ -474,7 +488,8 @@ impl StepApplyKickoffResult {
             rolls_away.push(roll);
             affected_away.push(affected);
             if affected {
-                util_server_injury::stun_player(game, id);
+                // Java: `UtilServerInjury.stunPlayer(this, playersAway[i], ApothecaryMode.DEFENDER)`.
+                chain_injury_params.extend(util_server_injury::stun_player_rng(game, rng, id, ApothecaryMode::Defender));
             }
         }
 
@@ -485,12 +500,16 @@ impl StepApplyKickoffResult {
             rolls_away.clone(),
             affected_away.clone(),
         ));
-        StepOutcome::next().with_event(GameEvent::KickoffPitchInvasionBb2016 {
+        let mut out = StepOutcome::next().with_event(GameEvent::KickoffPitchInvasionBb2016 {
             rolls_home,
             affected_home,
             rolls_away,
             affected_away,
-        })
+        });
+        for p in chain_injury_params {
+            out = out.publish(p);
+        }
+        out
     }
 }
 
@@ -812,5 +831,80 @@ mod tests {
             game.report_list.has_report(ReportId::KICKOFF_PITCH_INVASION),
             "PitchInvasion should add ReportKickoffPitchInvasion"
         );
+    }
+
+    /// Java bb2016 `StepApplyKickoffResult.handlePitchInvasion` stuns each affected player via
+    /// `UtilServerInjury.stunPlayer(this, player, ApothecaryMode.HOME/DEFENDER)`. `stunPlayer`
+    /// delegates to `dropPlayer(..., STUNNED, ...)`, whose `placedProneCausesInjuryRoll` branch
+    /// rolls a full `InjuryTypeBallAndChain` injury (2d6) for a Ball & Chain player rather than
+    /// placing it STUNNED, and publishes the result — which the Apothecary step later in the bb2016
+    /// kickoff sequence applies. Rust called the rng-less `stun_player`, so a Pitch Invasion that
+    /// caught a goblin Fanatic drew two dice fewer than Java and left the Fanatic standing where
+    /// Java KO'd it (goblin bb2016 seed 46: rng 15-16, and i=1 h02 `-1,-1,Ko` vs `12,8,Standing`).
+    #[test]
+    fn pitch_invasion_rolls_and_publishes_the_ball_and_chain_chain_injury() {
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_STANDING, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+
+        fn setup(ball_and_chain: bool) -> Game {
+            let mut game = Game::new(
+                crate::step::framework::test_team("home", 0),
+                crate::step::framework::test_team("away", 0),
+                Rules::Bb2016,
+            );
+            let mut p = Player {
+                id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+                player_type: PlayerType::Regular, gender: PlayerGender::Male,
+                movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+                starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+                used_skills: Default::default(),
+                niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0,
+                race: None, is_big_guy: false,
+                ..Default::default()
+            };
+            if ball_and_chain {
+                p.starting_skills.push(SkillWithValue { skill_id: SkillId::BallAndChain, value: None });
+            }
+            game.team_home.players.push(p);
+            game.field_model.set_player_coordinate("p1", FieldCoordinate::new(5, 5));
+            game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+            game
+        }
+
+        // Force "affected": fame high enough that any d6 stuns. isAffectedByPitchInvasion(roll, fame)
+        // is roll + fame >= 6, so a fame of 5 affects every roll.
+        let run = |ball_and_chain: bool| {
+            let mut game = setup(ball_and_chain);
+            game.game_result.away.fame = 5;
+            let step = StepApplyKickoffResult::new(String::new(), String::new());
+            // Dice order: the pitch-invasion d6, then the chain injury's 2d6. Pick a seed whose
+            // injury total is under 10 so no casualty roll follows and the count is exactly 3.
+            let seed = (0u64..10_000)
+                .find(|s| {
+                    let mut r = GameRng::new(*s);
+                    let _invasion = r.d6();
+                    r.d6() + r.d6() < 10
+                })
+                .expect("some seed yields an injury total under 10");
+            let mut rng = GameRng::new(seed);
+            let before = rng.call_count;
+            let out = step.handle_pitch_invasion(&mut game, &mut rng);
+            let injuries = out.published.iter()
+                .filter(|p| matches!(p, StepParameter::InjuryResult(_)))
+                .count();
+            // 1 pitch-invasion d6 for the single on-pitch player, plus the chain injury's 2d6.
+            (rng.call_count - before, injuries, game.field_model.player_state("p1").unwrap().base())
+        };
+
+        let (calls_bc, injuries_bc, _state_bc) = run(true);
+        assert_eq!(calls_bc, 3, "Ball & Chain: 1 pitch-invasion d6 + the 2d6 chain injury");
+        assert_eq!(injuries_bc, 1, "the chain injury result must be published for the Apothecary step");
+
+        let (calls_plain, injuries_plain, state_plain) = run(false);
+        assert_eq!(calls_plain, 1, "a regular player: just the pitch-invasion d6");
+        assert_eq!(injuries_plain, 0, "no chain injury for a regular player");
+        assert_eq!(state_plain, ffb_model::enums::PS_STUNNED, "a regular affected player is STUNNED");
     }
 }

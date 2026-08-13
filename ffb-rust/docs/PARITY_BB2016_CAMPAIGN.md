@@ -47,7 +47,7 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | elf | **0** (was 84) | 🟢 100/100 GREEN (ITER66 Side Step auto-use) | GREEN |
 | ogre | **0** (was 98) | 🟢 100/100 GREEN (ITER69 bb2016 TTM spends the PASS; needed a jar rebuild) | GREEN |
 | wood_elf | **0** (98→81→19→0) | 🟢 100/100 GREEN (ITER71 startedStanding, ITER73 rooted pre-draw, ITER77 declined-re-roll edition gate) | GREEN |
-| goblin | **5** (100→99→5) | ITER78-80 + ITER82 (bb2016 argues ONCE per team); 5 seeds left | in progress |
+| goblin | **4** (100→99→5→4) | + ITER83 (bb2016 Pitch-Invasion B&C chain injury); seeds 19/55/56/68 left | in progress |
 | halfling | **0** (100→3→0) | 🟢 100/100 GREEN (ITER78-80 unblocked it to 3; ITER81 TTM-landing drop-before-apply) | GREEN |
 | vampire | 100 | systematic — Bloodlust bb2016 | queued |
 
@@ -1137,3 +1137,45 @@ d6s are neither 6 nor 1 so nothing short-circuits: bb2016 rolls 1, bb2025 rolls 
 **Verified:** goblin **99 → 5**. Gates: lineman bb2016 **0**, dwarf bb2016 **0**, halfling bb2016
 **0**, lineman bb2025 **0**, goblin bb2025 **0**, dwarf bb2025 **0** (the other secret-weapon
 rosters, both editions). `cargo test -p ffb-engine` **7105/0**.
+
+---
+
+## ITER83 — goblin 5 → **4**: the bb2016 Pitch Invasion never rolled the Ball & Chain chain injury
+
+seed 46 diverged at **step 0** — before the first activation, i.e. inside the kickoff. Java had 36
+dice at i=1, Rust 34. The deep stack pinned Java's extra pair:
+
+```
+rng=15/16 d6  rollInjury <- InjuryTypeBallAndChain.handleInjury:28 <- UtilServerInjury.handleInjury:85
+              <- UtilServerInjury.dropPlayer:341 <- UtilServerInjury.stunPlayer:320
+              <- StepApplyKickoffResult.handlePitchInvasion:555
+```
+
+Java's `handlePitchInvasion` stuns each affected player with
+`UtilServerInjury.stunPlayer(this, player, ApothecaryMode.HOME/DEFENDER)`, and `stunPlayer` is just
+`dropPlayer(..., STUNNED, ...)` — whose `placedProneCausesInjuryRoll` branch rolls a full
+`InjuryTypeBallAndChain` injury for a Ball & Chain player instead of placing it STUNNED (the same
+branch ITER79 ported for the block path).
+
+The bb2016 step still called the **rng-less** `stun_player`. `stun_player_rng` had existed since the
+earlier goblin bb2025 work but only the bb2025 kickoff path used it.
+
+Two halves:
+1. `stun_player_rng` in both loops, with Java's ApothecaryMode per team (`HOME` for home players,
+   `DEFENDER` for away). That fixed the dice: Rust's stream now matches Java's through the kickoff
+   (rng 36 = the `scatterBall` d8 in both).
+2. The dice alone left a **state-only** divergence at i=1 — Java `h02 -1,-1 Ko`, Rust
+   `h02 12,8 Standing`. Java's `dropPlayer` publishes the chain injury via `publishParameter`, and
+   the Apothecary step later in the bb2016 kickoff sequence applies it. Rust **discarded**
+   `stun_player_rng`'s returned parameters, so the Fanatic stayed standing. They are now published
+   on the step's outcome.
+
+Note the bb2025 path is genuinely different — there nothing consumes the published result, so the
+outcome is discarded (documented on `stun_player_rng`). bb2016 consumes it.
+
+Test `pitch_invasion_rolls_and_publishes_the_ball_and_chain_chain_injury` (B&C: 1 invasion d6 +
+2d6 chain injury + a published `InjuryResult`; regular player: 1 d6, no injury, STUNNED).
+
+**Verified:** goblin **5 → 4** (seed 46 advanced from step 0 to step 141). Gates: lineman bb2016
+**0**, halfling bb2016 **0**, amazon bb2016 **0**, lineman bb2025 **0**, goblin bb2025 **0**.
+`cargo test -p ffb-engine` **7106/0**.
