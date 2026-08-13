@@ -768,3 +768,45 @@ deleting its `StandUpBlitz` blitz_used assignment — that arm is a correct 1:1 
 where Java's action is still BLITZ_MOVE).
 
 No code change. wood_elf stays 19; **26 🟢 / 4 🔴** unchanged.
+
+### ITER75 (2026-08-13) — Java's `blitzUsed` mechanism PINNED; declined-re-roll path split (parity-neutral)
+
+Ran ITER74's probe: gated `blitzUsedH`/`blitzUsedA` prints next to `JAVA_P2`, jar rebuilt. Java is
+unambiguous — the flag stays FALSE right through the failed stand-up blitz and only flips after the
+NEXT player's blitz reaches target selection:
+
+    si=35 Away1 action=BLITZ_MOVE  blitzUsedA=false     <- the prone Treeman's stand-up blitz (FAILS)
+    si=36..39 (away MOVEs)         blitzUsedA=false     <- still false
+    si=40 Away2 action=BLITZ_MOVE  blitzUsedA=false     <- away_02 blitzes
+    si=41 Away11 action=MOVE       blitzUsedA=true      <- set only now
+
+MECHANISM (Java bb2016 `StepStandUp`): the per-action used-flag switch
+(`case BLITZ: case BLITZ_MOVE: … setBlitzUsed(true)`) lives INSIDE the roll's failure branch. On the
+DECLINED-re-roll pass `rollStandUp` is set false BEFORE the roll
+(`if (STAND_UP == getReRolledAction()) { if (source == null || !useReRoll(...)) rollStandUp = false; }`),
+so control reaches only the trailing
+`if (!rollStandUp) { setPlayerState(PRONE, active=false); publish END_PLAYER_ACTION; GOTO failure; }`
+block — the flags are never touched. ITER74's hypothesis was right.
+
+FIXED that faithfully: the live `bb2025/move_/step_stand_up.rs` called `fail_stand_up` (which runs
+`handle_failed_stand_up`, the flags switch) on its `already_rerolled` path. Split out
+`end_stand_up_without_flags` — Java's trailing block verbatim — and call it there.
+
+**HONEST RESULT: parity-neutral. wood_elf is still 19.** Instrumenting every plausible
+`blitz_used = true` site showed the flag is set by `handle_failed_stand_up`'s Blitz arm reached via the
+OTHER call — the `ask_for_reroll_if_available` returned-None path (no team re-roll available), which
+fires 4× in seed 14. So for THIS seed the offer is not actually reaching the declined-re-roll branch,
+and the remaining question is why Rust takes the no-re-roll-available path (setting the flag, which
+Java's equivalent branch also does) while Java still ends with `blitzUsedA == false`.
+
+NEXT: instrument the two `fail_stand_up` / `end_stand_up_without_flags` call sites plus
+`ask_for_reroll_if_available`'s decision for away_01 at i=34, and compare against a Java-side gated
+print inside `StepStandUp`'s failure branch. The Java-side observable (flag stays false) is certain;
+the Rust-side path that sets it is now narrowed to one call.
+
+Landing the split anyway: it is a verified 1:1 correction of Java's control flow with a real behavioural
+difference (a declined stand-up re-roll must not consume the team's Blitz/Pass/Foul), even though this
+seed does not exercise it.
+Verified: no regression — 27-roster bb2016 sweep 26 green, wood_elf unchanged at 19; lineman bb2016
+100/100; ffb-engine 7099/0. All temporary instrumentation (Rust `FFB_BUDBG`, Java `blitzUsed` prints)
+reverted and the jar rebuilt clean.
