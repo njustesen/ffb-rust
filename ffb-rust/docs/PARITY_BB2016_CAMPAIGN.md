@@ -730,3 +730,41 @@ The temporary Java `arc=` instrumentation was reverted and the jar rebuilt clean
 divergences** — it found in one shot what two iterations of pick-list diffing got wrong. Rust already
 prints `arc=`; the Java counter is ~4 lines (`arcCount`/`arcNext()` wrapper + `JSTEP` field) and
 rebuilds in seconds.
+
+### ITER74 (2026-08-13) — wood_elf seed 14: `blitzUsed` after a FAILED stand-up blitz (diagnosis only)
+
+wood_elf seed 14 (lowest of the remaining 19). First state mismatch i=40, but the cause is at **i=39**,
+where the two engines pick a different ACTION for the same player:
+
+    J i=39: Activate(…Away2, BLITZ)   →  JAVA_P2 action=BLITZ_MOVE, JAVA_BLOCK_PICK, JAVA_BLOCKROLL nDice=1
+    R i=39: Activate(away_02, Move)   →  RUST_ACT_PICK pid=away_02 **N=1** idx=0 action=Move
+
+Rust offers only ONE action (Move) — Blitz was filtered out of its turn-start snapshot by
+`filter_stale_actions`, i.e. **Rust has `blitz_used = true` and Java has `blitzUsed == false`.**
+
+Origin is i=34: `Activate(away_01, Blitz)` — away_01 is the PRONE Treeman, so this is a stand-up
+blitz. Both engines roll the SAME two dice and `rng_calls` matches exactly (27 → 29 in both):
+pos 28 = `TakeRootBehaviour` d6 **5** (success), pos 29 = `StepStandUp` d6 **1** (FAIL). Both then
+offer a STAND_UP team re-roll, which both harnesses DECLINE. After that:
+- Rust's eligible list becomes `[("away_01",[Move]), ("away_02",[Move]), …]` — every player Move-only,
+  so `blitz_used` was set.
+- Java still offers BLITZ_MOVE to away_02 five steps later, so its `blitzUsed` is still false.
+
+**The observable is certain; the Java mechanism is NOT yet pinned, and the source reads the other way.**
+Java's bb2016 `StepStandUp` failure branch explicitly does
+`case BLITZ: case BLITZ_MOVE: … game.getTurnData().setBlitzUsed(true);` — and its bb2016
+`StepEndSelecting` `case STAND_UP_BLITZ:` also sets it (Rust mirrors that arm at
+`bb2016/move_/step_end_selecting.rs:349`), while `case BLITZ_MOVE:` does NOT. So on a plain reading
+Java should also end up with `blitzUsed == true`. It demonstrably does not.
+
+Most likely explanation to test next: the failure branch is guarded by
+`if ((getReRolledAction() == STAND_UP) || !UtilServerReRoll.askForReRollIfAvailable(...))`, so when a
+re-roll IS offered Java defers, and the ParityRunner's decline may never re-enter `StepStandUp`
+(it deselects instead) — leaving `blitzUsed` unset. NEXT STEP: add a gated print of
+`turnData.isBlitzUsed()` (both teams) next to `JAVA_P2` in the live `ParityRunner`, rebuild with the
+ITER69 recipe, and confirm exactly when Java sets it; only then port the guard. Do NOT "fix" Rust by
+deleting its `StandUpBlitz` blitz_used assignment — that arm is a correct 1:1 port of
+`StepEndSelecting`, so the wrong-path is elsewhere (most likely Rust reaching the StandUpBlitz arm
+where Java's action is still BLITZ_MOVE).
+
+No code change. wood_elf stays 19; **26 🟢 / 4 🔴** unchanged.
