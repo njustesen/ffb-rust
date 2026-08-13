@@ -45,8 +45,8 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | undead | **0** (76→2→0) | 🟢 100/100 GREEN (ITER64 prone-Blitz GFI + ITER65 Blizzard GFI modifier) | GREEN |
 | dwarf | **0** (79→35→30→0) | 🟢 100/100 GREEN (ITER59 Stand Firm, ITER61 casualty-SW argue, ITER63 KO-vs-argue order) | GREEN |
 | elf | **0** (was 84) | 🟢 100/100 GREEN (ITER66 Side Step auto-use) | GREEN |
-| ogre | 98 | earlier non-TTM blocker — **NEXT TARGET** | queued |
-| wood_elf | 98 | untraced | queued |
+| ogre | **0** (was 98) | 🟢 100/100 GREEN (ITER69 bb2016 TTM spends the PASS; needed a jar rebuild) | GREEN |
+| wood_elf | 98 | hash-invisible `rooted` flag divergence (ITER68) — **NEXT TARGET** | queued |
 | goblin | 100 | earlier non-TTM blocker masks the TTM win — retrace seed 1 | queued |
 | halfling | 100 | systematic (every seed) — likely a roster/skill-load or first-step gap | queued |
 | vampire | 100 | systematic — Bloodlust bb2016 | queued |
@@ -55,7 +55,7 @@ Counts above re-scouted 2026-08-13 AFTER ITER56-58 with FULL 1-100 `--no-abort` 
 The older `undead 44` / `necromantic 44` figures were unreliable (truncated triage) — the true
 counts are 76 / 58. Green rosters re-verified 0 fails in the same sweep.
 
-Green (25): elf, undead, dwarf, necromantic, renegades, underworld, lineman, amazon, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl,
+Green (26): ogre, elf, undead, dwarf, necromantic, renegades, underworld, lineman, amazon, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl,
 high_elf, human, khemri, khemri_fumbbl, lizardman, nippon, norse, nurgle, orc, skaven, slann,
 slann_fumbbl.
 
@@ -536,3 +536,46 @@ since the hash cannot see this.
 
 Verified no regression: all 28 swept bb2016 rosters unchanged (the 25 green ones at 0 fails);
 lineman bb2016 100/100; ffb-engine 7095/0.
+
+### ITER69 (2026-08-13) — the bb2016 TTM/passUsed fix landed WITH a jar rebuild → **ogre 100/100 GREEN**
+
+Executed ITER67's three-part plan. All three parts had to ship together, because two of them are the
+two agent halves and a mismatch shifts the action-pick `N`.
+
+1. Rust `bb2016/move_/step_init_selecting.rs` — the folded-target TTM dispatch arm now honours
+   `!turn_data().pass_used`, matching Java's `CLIENT_THROW_TEAM_MATE` gate.
+2. Rust `random_agent.rs` `filter_stale_actions` — under bb2016, `ThrowTeamMate` requires
+   `!ttm_used && !pass_used`.
+3. Java `ParityRunner.filterStaleActions` — `keep = isBb2016(game) ? (!isTtmUsed() && !isPassUsed())
+   : !isTtmUsed()`, using the file's existing `isBb2016(game)` helper.
+
+**IMPORTANT TOOLING DISCOVERY — the live Java tree is NOT `ffb-rust/ffb-java/`.**
+`crates/ffb-parity/src/runner.rs` resolves `PARITY_CP` to
+`C:\Users\Admin\niels\ffb\ffb\ffb-ai\target\ffb-ai-jar-with-dependencies.jar` (its first candidate).
+That jar was built from **`C:\Users\Admin\niels\ffb\ffb\`**, whose jar was current (Aug 13) while
+`ffb-rust/ffb-java/`'s was from Jun 21. Verified impact: `ParityRunner.java` DIFFERS between the two
+trees, but the ENGINE trees agree except for 6 `ffb-server` files + 1 `ffb-common` file — the local
+trace-instrumented copies (`DiceRoller`, `Fortuna`, bb2025 `StepGoForIt`/`StepPickUp`/
+`StepCatchScatterThrowIn`, `mixed StepPassBlock`). **None of the files cited by any campaign fix is in
+that differing set, so every earlier diagnosis stands.** Edit the harness at `niels/ffb/`, not
+`ffb-rust/ffb-java/`.
+
+**Jar rebuild method (no maven on PATH; a full `mvn` build is unnecessary):**
+```bash
+J=/c/Users/Admin/niels/ffb/ffb/ffb-ai/target/ffb-ai-jar-with-dependencies.jar
+cp "$J" "$J.bak-preTTM"                     # ALWAYS back up first
+cd /c/Users/Admin/niels/ffb/ffb/ffb-ai
+javac -nowarn -cp "$J" -d /tmp/pr_build src/main/java/com/fumbbl/ffb/ai/parity/ParityRunner.java
+cd /tmp/pr_build && jar uf "$J" com/fumbbl/ffb/ai/parity/ParityRunner*.class
+```
+JDK 17 (Eclipse Adoptium) is on PATH. Compiling the single class against the fat jar and `jar uf`-ing
+the result back in takes seconds and avoids a full module build. Remember the inner classes
+(`ParityRunner$1`, `ParityRunner$PendingStep`).
+
+Verified in the process-mandated order: lineman bb2016 **100/100** and lineman bb2025 **100/100**
+FIRST (the rebuilt harness is safe), then ogre 98 → **0 (100/100 GREEN)**. Full 28-roster bb2016
+sweep: no regression, 24 swept green + ogre + lineman = **26 🟢 / 4 🔴**. ffb-engine 7096/0.
+Test: `folded_throw_team_mate_is_rejected_once_the_pass_is_used`.
+
+Remaining reds: wood_elf 98 (the hash-invisible `rooted` flag — see ITER68) · goblin 100 ·
+halfling 100 · vampire 100.

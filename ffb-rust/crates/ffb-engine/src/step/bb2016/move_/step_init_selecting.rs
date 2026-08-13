@@ -516,6 +516,69 @@ mod tests {
             "MA 6 stand-up still leaves movement, so the block is not a Rush");
     }
 
+    /// Java bb2016 `ThrowTeamMateBehaviour` does `turnData.setPassUsed(true)`, and bb2016
+    /// `StepInitSelecting.handleCommand` gates `CLIENT_THROW_TEAM_MATE` on
+    /// `checkCommandWithActingPlayer(...) && !game.getTurnData().isPassUsed()` — so a SECOND Throw
+    /// Team-Mate in one team turn is rejected and the step does not advance.
+    ///
+    /// The folded-target dispatch arm (the path the random agent actually takes, since it picks the
+    /// thrown player at activation) skipped that gate, so Rust resolved a second TTM that stock Java
+    /// refuses. ogre bb2016 seed 1 declared TTMs at i=2 AND i=6; Java rejected the second and
+    /// ParityRunner re-declared it ~500× until `STUCK_STEP: INIT_SELECTING` killed the game.
+    #[test]
+    fn folded_throw_team_mate_is_rejected_once_the_pass_is_used() {
+        use ffb_model::types::FieldCoordinate;
+        use ffb_model::enums::{PlayerState, PS_STANDING};
+
+        fn setup(pass_used: bool) -> (Game, StepInitSelecting) {
+            let mut game = make_game();
+            for id in ["thrower", "thrown"] {
+                game.team_home.players.push(ffb_model::model::player::Player {
+                    id: id.into(), name: id.into(), nr: 1, position_id: "pos".into(),
+                    movement: 6, strength: 5, agility: 3, passing: 4, armour: 9,
+                    ..Default::default()
+                });
+            }
+            game.home_playing = true;
+            game.field_model.set_player_coordinate("thrower", FieldCoordinate::new(10, 7));
+            game.field_model.set_player_state("thrower", PlayerState::new(PS_STANDING));
+            game.field_model.set_player_coordinate("thrown", FieldCoordinate::new(11, 7));
+            game.field_model.set_player_state("thrown", PlayerState::new(PS_STANDING));
+            game.acting_player.player_id = Some("thrower".into());
+            game.acting_player.player_action = Some(PlayerAction::ThrowTeamMate);
+            game.turn_data_mut().pass_used = pass_used;
+            (game, StepInitSelecting::new("end".into()))
+        }
+
+        // Pass already spent (a TTM earlier this turn) → the folded TTM must NOT be dispatched.
+        let (mut game, mut step) = setup(true);
+        let out = step.handle_command(
+            &crate::action::Action::ActivatePlayer {
+                player_id: "thrower".into(),
+                player_action: PlayerActionChoice::ThrowTeamMate,
+                block_defender_id: Some("thrown".into()),
+            },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert!(matches!(out.action, StepAction::Continue),
+            "a second bb2016 TTM in one turn is rejected, exactly as stock Java rejects the command");
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::ThrownPlayerId(Some(_)))),
+            "no thrown player is published when the pass is already used");
+
+        // Pass still available → the TTM dispatches normally.
+        let (mut game, mut step) = setup(false);
+        let out = step.handle_command(
+            &crate::action::Action::ActivatePlayer {
+                player_id: "thrower".into(),
+                player_action: PlayerActionChoice::ThrowTeamMate,
+                block_defender_id: Some("thrown".into()),
+            },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::ThrownPlayerId(Some(_)))),
+            "the first TTM of the turn dispatches and publishes the thrown player");
+    }
+
     #[test]
     fn start_waits_for_command() {
         let mut game = make_game();
