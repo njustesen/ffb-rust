@@ -25,7 +25,7 @@ use crate::injury::injuryType::injury_type_piling_on_knocked_out::InjuryTypePili
 use crate::injury::InjuryResult;
 use crate::step::framework::{Step, StepOutcome, StepParameter};
 use crate::step::framework::StepId;
-use crate::step::util_server_injury::{drop_player, handle_injury, handle_injury_by_name};
+use crate::step::util_server_injury::{drop_player, drop_player_rng, handle_injury, handle_injury_by_name};
 use crate::step::util_server_re_roll::use_reroll;
 use crate::util::util_server_re_roll::UtilServerReRoll;
 
@@ -190,7 +190,20 @@ impl StepDropFallingPlayers {
         // BB2025+ step also stands in for since this crate has one step-dispatch table.
         let piling_on_supported = matches!(game.rules, Rules::Bb2016 | Rules::Bb2020);
 
+        // Java bb2016 `PilingOnBehaviour`:
+        //     step.publishParameters(UtilServerInjury.dropPlayer(step, game.getDefender(), DEFENDER));  // line 104
+        //     InjuryTypeServer<?> injuryType = new InjuryTypeBlock(); ...
+        //     state.injuryResultDefender = UtilServerInjury.handleInjury(step, injuryType, ...);        // line 115
+        // The drop comes FIRST, and for a Ball & Chain defender it rolls its own injury — so the two
+        // rolls must be emitted in that order. Rust used to drop the defender only at publish time,
+        // AFTER the block injury; the parameters are stashed here and published at the original site.
+        let mut defender_drop_params: Vec<StepParameter> = Vec::new();
+
         if defender_is_falling && self.injury_result_defender.is_none() {
+            if game.rules == Rules::Bb2016 {
+                defender_drop_params =
+                    drop_player_rng(game, rng, &defender_id, false, ApothecaryMode::Defender);
+            }
             // Java: pick injuryType based on oldDefenderState
             // Ball and Chain + Violent Innovator grantsSpp check — stub false (skill props not yet wired)
             let grants_spp = false;
@@ -391,7 +404,7 @@ impl StepDropFallingPlayers {
                 // drop_player sets the defender PRONE and (if carrying) flags the ball moving; the
                 // ball scatter is a separate later CatchScatterThrowIn step (no RNG consumed here),
                 // so this ordering does not perturb the dice stream.
-                for p in drop_player(game, &defender_id, false) {
+                for p in std::mem::take(&mut defender_drop_params) {
                     out = out.publish(p);
                 }
                 out = out.publish(StepParameter::InjuryResult(injury_result.clone()));
@@ -442,7 +455,11 @@ impl StepDropFallingPlayers {
             {
                 // BB2020: `dropPlayer(..., true)`; BB2016: `dropPlayer(...)` (no SPOH arg, i.e. false).
                 let eligible_for_safe_pair_of_hands = game.rules == Rules::Bb2020;
-                for p in drop_player(game, &attacker_id, eligible_for_safe_pair_of_hands) {
+                // Java line 164: `UtilServerInjury.dropPlayer(step, actingPlayer.getPlayer(), ATTACKER)`
+                // — a Ball & Chain attacker rolls its own injury here, before line 165's block injury.
+                for p in drop_player_rng(
+                    game, rng, &attacker_id, eligible_for_safe_pair_of_hands, ApothecaryMode::Attacker,
+                ) {
                     out = out.publish(p);
                 }
             }

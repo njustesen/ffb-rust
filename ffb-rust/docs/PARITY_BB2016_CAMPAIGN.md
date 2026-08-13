@@ -47,7 +47,7 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | elf | **0** (was 84) | 🟢 100/100 GREEN (ITER66 Side Step auto-use) | GREEN |
 | ogre | **0** (was 98) | 🟢 100/100 GREEN (ITER69 bb2016 TTM spends the PASS; needed a jar rebuild) | GREEN |
 | wood_elf | **0** (98→81→19→0) | 🟢 100/100 GREEN (ITER71 startedStanding, ITER73 rooted pre-draw, ITER77 declined-re-roll edition gate) | GREEN |
-| goblin | 100 | ITER78 unblocked the Java run (PETTY_CASH) + fixed the bb2016 casualty dice; now fails at seed 1 i=1 on the APOTHECARY | in progress |
+| goblin | 100 | ITER78 PETTY_CASH + casualty dice, ITER79 Ball & Chain drop injury; seed 1 now fails at i=2 on THROW_BOMB (harness gap) | in progress |
 | halfling | 100 | same PETTY_CASH block as goblin (treasury 180k) — unblocked by ITER78, needs a re-scout | queued |
 | vampire | 100 | systematic — Bloodlust bb2016 | queued |
 
@@ -965,3 +965,52 @@ seed 1 i=1 now diverges only on the aftermath of that casualty: `a02` is **Ko** 
 Rust's agent answers the `UseApothecary { player_id: away_03, apothecary_type: "team" }` prompt with
 a bare `Acknowledge` (= decline, 0 dice) where the Java side runs `bb2016/StepApothecary`. Next
 iteration: read `bb2016/StepApothecary` + `ParityRunner`'s `APOTHECARY_CHOICE` handling and port it.
+
+---
+
+## ITER79 — goblin: `dropPlayer` never rolled the Ball & Chain injury
+
+seed 1 i=1 (home_03 Fanatic blitzes the away Fanatic, both down). Rust drew **6** dice where Java
+drew **10**. Widening the Java dice trace to a full `com.fumbbl` stack (new `FFB_DICE_DEEP=1` →
+`-Dffb.parityDebugDeep`, gated logging in `DiceRoller`, no behaviour change) named every caller:
+
+| rng | Java caller | |
+|---|---|---|
+| 17,18 | `InjuryTypeBallAndChain.handleInjury` ← `UtilServerInjury.dropPlayer:341` ← `PilingOnBehaviour:104` | defender chain injury |
+| 19,20 | `rollCasualtyRenamed` ← that injury | its casualty |
+| 21,22 | `InjuryTypeBlock.injuryRoll` ← `PilingOnBehaviour:115` | defender block injury |
+| 23,24 | `InjuryTypeBallAndChain.handleInjury` ← `dropPlayer:341` ← `PilingOnBehaviour:164` | **attacker** chain injury |
+| 25,26 | `InjuryTypeBlock.injuryRoll` ← `PilingOnBehaviour:165` | **attacker** block injury |
+
+`UtilServerInjury.dropPlayer(step, player, PRONE, mode, spoh)` branches on
+`placedProneCausesInjuryRoll`: a Ball & Chain player is **not** placed prone — it takes a full
+`InjuryTypeBallAndChain` roll (2d6, plus a casualty roll on 10+) whose result is published for the
+apothecary step. Rust's `drop_player` had that branch documented as *"treated the same as regular
+drops here — the full injury roll is a TODO"*, so each Ball & Chain player dropped cost **2 missing
+d6**. Only the Goblin Fanatic carries the skill in the bb2016 matrix, which is why 27 rosters never
+noticed. (`stun_player_rng` already had the branch — same Java method with `pPlayerBase = STUNNED`,
+added earlier for the Pitch-Invasion path.)
+
+FIX: `drop_player_rng` — the full Java `dropPlayer` including the B&C branch — plus two call-site
+changes in `StepDropFallingPlayers`:
+- **attacker**: `drop_player` → `drop_player_rng`; it was already at Java's line-164 position.
+- **defender**: Java drops at line 104 and rolls the block injury at line 115, but Rust dropped the
+  defender only at publish time, i.e. AFTER the block injury. For a B&C defender that reverses the
+  two rolls. The bb2016 branch now drops (and stashes the parameters) before the injury roll and
+  publishes the stashed parameters at the original site. Reorder is bb2016-gated — bb2025 goes
+  through `SteadyFootingContext` and is untouched.
+
+Test `drop_player_rng_rolls_the_chain_injury_for_a_ball_and_chain_player`.
+
+**Verified:** goblin seed 1 advances i=1 → **i=2**. Gates: lineman bb2016 **0/100**, lineman bb2025
+**0/100**, goblin **bb2025 0/100** (the roster with the same Fanatic — proves the bb2016 gating
+held), `cargo test -p ffb-engine` **7102/0**.
+
+**Fail count still 100** — seed 1 now dies one step later, at the next distinct cause.
+
+### FRONTIER for ITER80 — `THROW_BOMB`
+seed 1 i=2: the away Bombardier activates `THROW_BOMB`. `ParityRunner` has **no** handler
+(`UNHANDLED_ACTING_ACTION: THROW_BOMB → deselecting`), so Java burns a no-op step and re-activates;
+Rust actually throws the bomb and then ends the game (`game_end` at i=3). Needs the bomb action
+ported into `ParityRunner` (deterministic target, jar rebuild) — the same shape as the earlier
+`sendThrowTeamMateTarget` work.

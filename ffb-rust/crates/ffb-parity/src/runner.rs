@@ -90,6 +90,7 @@ pub fn run_java_headless(seed: u64, home_team_id: &str, away_team_id: &str, home
     }
     if std::env::var_os("FFB_TRACE").is_some() {
         args.push("-Dffb.parityDebug=true".into());
+        if std::env::var_os("FFB_DICE_DEEP").is_some() { args.push("-Dffb.parityDebugDeep=true".into()); }
     }
     args.extend([
         "com.fumbbl.ffb.ai.parity.ParityRunner".into(),
@@ -193,6 +194,7 @@ pub fn run_java_headless_range(
     if let Some(opt) = jvm_core_opt() { args.push(opt); }
     if std::env::var_os("FFB_DICE_TRACE").is_some() { args.push("-Dffb.diceTrace=true".into()); }
     if std::env::var_os("FFB_TRACE").is_some() { args.push("-Dffb.parityDebug=true".into()); }
+    if std::env::var_os("FFB_DICE_DEEP").is_some() { args.push("-Dffb.parityDebugDeep=true".into()); }
     args.extend([
         "com.fumbbl.ffb.ai.parity.ParityRunner".into(),
         server_dir,

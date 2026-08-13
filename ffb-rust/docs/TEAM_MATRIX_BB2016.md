@@ -61,3 +61,4 @@ bb2016 driver path. One root-cause likely gates the entire column — fixing the
 pregame sequence should un-gate all 30 matchups to their first real in-drive frontier.
 
 - ITER78 (goblin, still 100 fails): harness `PETTY_CASH` dialog routing (Java had been producing ZERO steps for goblin/halfling — treasury >= 50k) + `injury.rs` now takes the casualty roll AND its interpretation from the edition's `RollMechanic` (bb2016 = d6+d8 on roll[0], not d16+d6). Frontier: the bb2016 apothecary.
+- ITER79 (goblin, still 100 fails): `UtilServerInjury.dropPlayer`'s `placedProneCausesInjuryRoll` branch ported (`drop_player_rng`) — a dropped Ball & Chain player rolls a full chain injury instead of going prone; 2 missing d6 per Fanatic. seed 1 i=1 -> i=2. Frontier: THROW_BOMB has no ParityRunner handler.

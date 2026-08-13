@@ -266,13 +266,58 @@ pub fn injury_type_causes_turnover(name: &str) -> bool {
 /// and, when the ball carrier is on the acting team, an `EndTurn(true)` flag.
 ///
 /// Ball-and-Chain players (Java: `placedProneCausesInjuryRoll`) are treated the same
-/// as regular drops here — the full injury roll is a TODO.
+/// as regular drops here — this rng-less variant is for the call sites where no
+/// Ball & Chain player can occur. Use `drop_player_rng` where one can.
 pub fn drop_player(
     game: &mut Game,
     player_id: &str,
     eligible_for_safe_pair_of_hands: bool,
 ) -> Vec<StepParameter> {
     drop_player_with_base(game, player_id, PS_PRONE, eligible_for_safe_pair_of_hands)
+}
+
+/// Full port of Java `UtilServerInjury.dropPlayer(step, player, PRONE, mode, spoh)` INCLUDING the
+/// `placedProneCausesInjuryRoll` branch that the rng-less `drop_player` above skips:
+///
+/// ```java
+/// if (pPlayer.hasSkillProperty(NamedProperties.placedProneCausesInjuryRoll)) {
+///   pStep.publishParameter(new StepParameter(StepParameterKey.INJURY_RESULT,
+///     UtilServerInjury.handleInjury(pStep, new InjuryTypeBallAndChain(), null, pPlayer,
+///       playerCoordinate, null, null, pApothecaryMode)));
+/// } else { ...place the player PRONE... }
+/// ```
+///
+/// A Ball & Chain player is NOT placed prone — it takes a full `InjuryTypeBallAndChain` injury roll
+/// (2d6, plus a casualty roll on a 10+) and the result is published for the apothecary step. Missing
+/// this branch cost TWO d6 per Ball & Chain player dropped, so a goblin-vs-goblin both-down between
+/// the two Fanatics desynced the shared dice stream by four calls (goblin bb2016 seed 1 i=1: Java
+/// rolls B&C-injury + block-injury for BOTH the defender and the attacker, rng 17-26; Rust rolled
+/// only the two block injuries).
+///
+/// This mirrors `stun_player_rng`, which is the same Java method with `pPlayerBase = STUNNED`.
+pub fn drop_player_rng(
+    game: &mut Game,
+    rng: &mut GameRng,
+    player_id: &str,
+    eligible_for_safe_pair_of_hands: bool,
+    apothecary_mode: ApothecaryMode,
+) -> Vec<StepParameter> {
+    use crate::injury::injuryType::injury_type_ball_and_chain::InjuryTypeBallAndChain;
+    let placed_prone_causes_injury = game.player(player_id)
+        .map(|p| p.has_skill_property(NamedProperties::PLACED_PRONE_CAUSES_INJURY_ROLL))
+        .unwrap_or(false);
+    // Java guards the whole body with `(playerCoordinate != null) && (playerState != null)`.
+    let coord = match game.field_model.player_coordinate(player_id) {
+        Some(c) if game.field_model.player_state(player_id).is_some() => c,
+        _ => return Vec::new(),
+    };
+    if placed_prone_causes_injury {
+        let mut it = InjuryTypeBallAndChain::new();
+        let res = handle_injury(game, rng, &mut it, None, player_id, coord, None, None, apothecary_mode);
+        vec![StepParameter::InjuryResult(Box::new(res))]
+    } else {
+        drop_player_with_base(game, player_id, PS_PRONE, eligible_for_safe_pair_of_hands)
+    }
 }
 
 /// Shared implementation of Java's private `UtilServerInjury.dropPlayer(step, player,
@@ -1277,5 +1322,39 @@ mod tests {
             let pr = game.game_result.home.player_result("attacker");
             assert!(pr.is_some() && pr.unwrap().casualties >= 1, "attacker casualty counter should increment");
         }
+    }
+
+    /// Java `UtilServerInjury.dropPlayer` rolls a full `InjuryTypeBallAndChain` injury for a
+    /// `placedProneCausesInjuryRoll` player instead of placing it PRONE. The rng-less `drop_player`
+    /// skips that, so each Ball & Chain player dropped cost 2 missing d6 (goblin bb2016 seed 1 i=1:
+    /// a Fanatic-vs-Fanatic both-down needs FOUR injury rolls — B&C + block for the defender AND
+    /// the attacker — where Rust rolled only the two block injuries).
+    #[test]
+    fn drop_player_rng_rolls_the_chain_injury_for_a_ball_and_chain_player() {
+        let roll = |ball_and_chain: bool| {
+            let mut game = make_game();
+            game.rules = Rules::Bb2016;
+            add_player(&mut game, "p1", PS_STANDING);
+            if ball_and_chain {
+                if let Some(p) = game.team_home.player_mut("p1") {
+                    p.starting_skills.push(SkillWithValue::new(SkillId::BallAndChain));
+                }
+            }
+            let mut rng = GameRng::new(7);
+            let params = drop_player_rng(&mut game, &mut rng, "p1", false, ApothecaryMode::Defender);
+            let published_injury = params.iter()
+                .any(|p| matches!(p, StepParameter::InjuryResult(_)));
+            (rng.call_count, published_injury, game.field_model.player_state("p1").map(|s| s.base()))
+        };
+
+        let (calls_bc, injury_bc, state_bc) = roll(true);
+        assert_eq!(calls_bc, 2, "a Ball & Chain drop must roll the 2d6 chain injury");
+        assert!(injury_bc, "the chain injury result must be published for the apothecary step");
+        assert_ne!(state_bc, Some(PS_PRONE), "a Ball & Chain player is NOT placed prone by dropPlayer");
+
+        let (calls_plain, injury_plain, state_plain) = roll(false);
+        assert_eq!(calls_plain, 0, "a regular drop rolls nothing");
+        assert!(!injury_plain, "a regular drop publishes no injury result");
+        assert_eq!(state_plain, Some(PS_PRONE), "a regular player is placed prone");
     }
 }
