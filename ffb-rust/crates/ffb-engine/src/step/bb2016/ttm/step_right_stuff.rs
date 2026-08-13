@@ -83,19 +83,10 @@ impl StepRightStuff {
             }
         }
 
+        // Java: `boolean doRoll = !fDropThrownPlayer;` — a dropped thrown player never rolls and
+        // falls straight through to the shared `if (!doRoll)` landing-injury block.
         if self.drop_thrown_player {
-            // Java: UtilServerInjury.handleInjury(InjuryTypeTTMLanding, actingPlayerId, playerId, coord, null, null, THROWN_PLAYER)
-            let coord = game.field_model.player_coordinate(&player_id)
-                .unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
-            let mut injury_type = InjuryTypeTTMLanding::new();
-            let ir = util_server_injury::handle_injury(
-                game, rng, &mut injury_type,
-                None, &player_id, coord, None, None,
-                ApothecaryMode::ThrownPlayer,
-            );
-            ir.apply_to(game);
-            return StepOutcome::next()
-                .publish(StepParameter::ThrownPlayerCoordinate(None));
+            return self.land_injury(game, rng, &player_id);
         }
 
         // Java: if (reRolledAction == RIGHT_STUFF) { if (source == null || !useReRoll) doRoll = false; }
@@ -203,7 +194,23 @@ impl StepRightStuff {
         self.land_injury(game, rng, &player_id)
     }
 
+    /// Java `StepRightStuff.executeStep()`, the `if (!doRoll)` block:
+    /// ```java
+    /// InjuryResult injuryResultThrownPlayer = UtilServerInjury.handleInjury(this,
+    ///     new InjuryTypeTTMLanding(), null, thrownPlayer, playerCoordinate, null, null,
+    ///     ApothecaryMode.THROWN_PLAYER);
+    /// publishParameter(new StepParameter(StepParameterKey.INJURY_RESULT, injuryResultThrownPlayer));
+    /// StepParameterSet params = UtilServerInjury.dropPlayer(this, thrownPlayer, ApothecaryMode.THROWN_PLAYER);
+    /// if (!fThrownPlayerHasBall) { params.remove(StepParameterKey.END_TURN); }
+    /// publishParameters(params);
+    /// if (fThrownPlayerHasBall) { publishParameter(new StepParameter(StepParameterKey.END_TURN, true)); }
+    /// publishParameter(new StepParameter(StepParameterKey.THROWN_PLAYER_COORDINATE, null));
+    /// ```
+    /// `dropPlayer` is what sets `ballMoving` and publishes
+    /// `CATCH_SCATTER_THROW_IN_MODE = SCATTER_BALL` when the landing player is on the ball square —
+    /// i.e. it is what makes the following CATCH_SCATTER_THROW_IN step bounce a dropped ball.
     fn land_injury(&self, game: &mut Game, rng: &mut GameRng, player_id: &str) -> StepOutcome {
+        let has_ball = self.thrown_player_has_ball.unwrap_or(false);
         let coord = game.field_model.player_coordinate(player_id)
             .unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
         let mut injury_type = InjuryTypeTTMLanding::new();
@@ -213,7 +220,22 @@ impl StepRightStuff {
             ApothecaryMode::ThrownPlayer,
         );
         ir.apply_to(game);
-        StepOutcome::next().publish(StepParameter::ThrownPlayerCoordinate(None))
+
+        let mut out = StepOutcome::next()
+            .publish(StepParameter::InjuryResult(Box::new(ir)))
+            .publish(StepParameter::ThrownPlayerCoordinate(None));
+
+        let mut drop_params = util_server_injury::drop_player_no_sph(game, player_id);
+        if !has_ball {
+            drop_params.retain(|p| !matches!(p, StepParameter::EndTurn(_)));
+        }
+        for p in drop_params {
+            out = out.publish(p);
+        }
+        if has_ball {
+            out = out.publish(StepParameter::EndTurn(true));
+        }
+        out
     }
 }
 
@@ -282,6 +304,100 @@ mod tests {
         step.drop_thrown_player = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::ThrownPlayerCoordinate(None))));
+    }
+
+    /// Java `StepRightStuff.executeStep()`'s `if (!doRoll)` block calls
+    /// `UtilServerInjury.dropPlayer(...)` and publishes its parameters. When the landing player
+    /// is standing on the ball square, `dropPlayer` sets `ballMoving` and returns
+    /// `CATCH_SCATTER_THROW_IN_MODE = SCATTER_BALL` (plus `END_TURN` for its own team's carrier),
+    /// which is what makes the following CATCH_SCATTER_THROW_IN step bounce the dropped ball.
+    /// Rust previously published only THROWN_PLAYER_COORDINATE(None), so a fumbled bb2016 TTM of a
+    /// ball carrier left the ball sitting under the prone player and never rolled the bounce d8 —
+    /// one die short of Java (renegades bb2016 seed 80, step 61).
+    #[test]
+    fn failed_landing_of_ball_carrier_drops_player_and_requests_ball_scatter() {
+        use std::collections::HashSet;
+        use ffb_model::enums::{PlayerGender, PlayerType};
+        use ffb_model::model::player::Player;
+        use ffb_model::types::FieldCoordinate;
+
+        let mut game = make_game();
+        let coord = FieldCoordinate::new(4, 6);
+        let p = Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 2, agility: 3, passing: 4, armour: 7,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(p);
+        game.home_playing = true;
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = false;
+
+        let mut step = StepRightStuff::new();
+        step.thrown_player_id = Some("p1".into());
+        step.thrown_player_has_ball = Some(true);
+        // drop_thrown_player == true is Java's `doRoll = !fDropThrownPlayer` → straight to the
+        // landing-injury block with no landing roll.
+        step.drop_thrown_player = true;
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.published.iter().any(|p| matches!(
+            p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall))),
+            "dropPlayer on the ball square must publish SCATTER_BALL so the ball bounces");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "dropping your own team's ball carrier is a turnover");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::ThrownPlayerCoordinate(None))));
+        assert!(game.field_model.ball_moving, "dropPlayer sets ballMoving on the ball square");
+    }
+
+    /// The `!fThrownPlayerHasBall` half of the same Java block:
+    /// `if (!fThrownPlayerHasBall) { params.remove(StepParameterKey.END_TURN); }` — landing on a
+    /// loose ball still scatters it, but is NOT a turnover.
+    #[test]
+    fn failed_landing_without_ball_scatters_but_does_not_end_turn() {
+        use std::collections::HashSet;
+        use ffb_model::enums::{PlayerGender, PlayerType};
+        use ffb_model::model::player::Player;
+        use ffb_model::types::FieldCoordinate;
+
+        let mut game = make_game();
+        let coord = FieldCoordinate::new(4, 6);
+        let p = Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 2, agility: 3, passing: 4, armour: 7,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(p);
+        game.home_playing = true;
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_in_play = true;
+
+        let mut step = StepRightStuff::new();
+        step.thrown_player_id = Some("p1".into());
+        step.thrown_player_has_ball = Some(false);
+        step.drop_thrown_player = true;
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(out.published.iter().any(|p| matches!(
+            p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall))));
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(_))),
+            "END_TURN is removed from the dropPlayer params when the thrown player had no ball");
     }
 
     #[test]
