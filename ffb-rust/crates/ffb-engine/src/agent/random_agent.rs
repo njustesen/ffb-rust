@@ -639,6 +639,30 @@ impl Agent for RandomAgent {
                 Action::UseApothecary { player_id: player_id.clone(), use_apothecary: false },
             Some(AgentPrompt::UseApothecary { .. }) =>
                 Action::Acknowledge,
+            // Block target asked for mid-sequence: `StepInitBlocking` reached with no
+            // `blockDefenderId`. Java waits for a CLIENT_BLOCK and `ParityRunner.sendBlockAction`
+            // supplies it: `pickBlockTarget` = adjacent opponents whose state base is STANDING or
+            // MOVING, coordinate-sorted, ONE actionRng pick; a null target injects
+            // `ClientCommandActingPlayer(null, null, false)` — a deselect. `legal_block_targets` is
+            // the same candidate computation the activation-time pick already uses, so the two
+            // engines draw the same die against the same list.
+            Some(AgentPrompt::BlockTarget { attacker_id }) => {
+                let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
+                let targets = legal_block_targets(&gs.game, attacker_id, side);
+                if targets.is_empty() {
+                    if std::env::var("FFB_TRACE").is_ok() {
+                        eprintln!("RUST_BLOCK_TARGET_DESELECT pid={attacker_id} (no legal target)");
+                    }
+                    Action::EndPlayerAction
+                } else {
+                    let idx = self.pick_action(targets.len());
+                    if std::env::var("FFB_TRACE").is_ok() {
+                        eprintln!("RUST_BLOCK_TARGET pid={attacker_id} N={} idx={idx} def={} arc={}",
+                            targets.len(), targets[idx], self.action_rng_count);
+                    }
+                    Action::Block { defender_id: targets[idx].clone() }
+                }
+            }
             // Interception: always decline — 0 RNG calls.
             // Java ParityRunner falls through to RandomStrategy which always sends sendInterceptorChoice(null,null).
             // Keeping both at 0 advances avoids RNG divergence.

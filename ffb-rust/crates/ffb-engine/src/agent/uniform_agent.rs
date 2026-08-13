@@ -80,6 +80,8 @@ impl Agent for UniformAgent {
     fn act(&mut self, gs: &GameState) -> Action {
         self.last_unhandled_prompt = None;
         match gs.current_prompt() {
+            // Mirrors random_agent: answer the mid-sequence block-target ask by deselecting.
+            Some(AgentPrompt::BlockTarget { .. }) => Action::EndPlayerAction,
             Some(AgentPrompt::CoinChoice { .. }) => Action::CoinChoice { heads: self.pick_bool() },
             Some(AgentPrompt::ReceiveChoice { .. }) => Action::ReceiveChoice { receive: self.pick_bool() },
             Some(AgentPrompt::KickBall) => {

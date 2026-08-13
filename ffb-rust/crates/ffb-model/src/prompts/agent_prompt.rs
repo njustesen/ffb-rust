@@ -11,6 +11,15 @@ use crate::types::FieldCoordinate;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum AgentPrompt {
+    /// Java: bb2016 `StepInitBlocking` with no `blockDefenderId` yet falls through `executeStep`
+    /// without calling `setNextAction`, so the step keeps CONTINUE and waits for a `CLIENT_BLOCK`.
+    /// Rust picks its block target at ACTIVATION time, so a block sequence the ENGINE pushes
+    /// (`StepEndBlocking`'s `isSufferingBloodLust() && !hasBlocked()` branch re-pushes one with NO
+    /// defender) had nobody to ask and stalled. This prompt is that ask — the agent answers it
+    /// exactly as `ParityRunner.sendBlockAction` answers Java's.
+    BlockTarget {
+        attacker_id: PlayerId,
+    },
     // ── Block ──────────────────────────────────────────────────────────────────
     BlockChoice {
         attacker_id: PlayerId,

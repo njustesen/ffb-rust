@@ -49,7 +49,7 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | wood_elf | **0** (98→81→19→0) | 🟢 100/100 GREEN (ITER71 startedStanding, ITER73 rooted pre-draw, ITER77 declined-re-roll edition gate) | GREEN |
 | goblin | **0** (100→99→5→4→3→2→0) | 🟢 100/100 GREEN (ITER78-87) | GREEN |
 | halfling | **0** (100→3→0) | 🟢 100/100 GREEN (ITER78-80 unblocked it to 3; ITER81 TTM-landing drop-before-apply) | GREEN |
-| vampire | **39** (100→56→39) | + ITER90 (bb2016 Blood-Lust failure cancels the action); in progress |
+| vampire | **30** (100→56→39→30) | + ITER95 (mid-sequence block-target prompt); in progress |
 
 Counts above re-scouted 2026-08-13 AFTER ITER56-58 with FULL 1-100 `--no-abort` runs (no timeout).
 The older `undead 44` / `necromantic 44` figures were unreliable (truncated triage) — the true
@@ -1618,3 +1618,30 @@ skipped (already marked used this activation, ITER91), and the flow should reach
 turnover that ends the away turn, matching Java's `rng_calls=77` at i=101.
 
 No code change committed — nothing verified. Baseline: vampire bb2016 **39**.
+
+---
+
+## ITER95 — vampire 39 → **30**: ask the agent for a block target instead of stalling
+
+The fix ITER94 scoped. Java's bb2016 `StepInitBlocking`, reached with no `blockDefenderId`, falls
+through `executeStep` without calling `setNextAction` — the step keeps CONTINUE and waits for a
+`CLIENT_BLOCK`, which the client supplies (`ParityRunner.sendBlockAction` → `pickBlockTarget`:
+adjacent opponents whose state base is STANDING or MOVING, coordinate-sorted, **one** actionRng
+pick; a null target injects a deselect).
+
+Rust chooses its block target at ACTIVATION time, so a sequence the ENGINE pushes — `StepEndBlocking`'s
+`isSufferingBloodLust() && !hasBlocked()` branch re-pushes a Block with **no** defender — had nobody
+to ask. A bare `StepOutcome::cont()` left the driver with `waiting_for_command = true` and
+`pending_prompt = None`: the stall that truncated seed 1 to 101 steps against Java's 187.
+
+FIX, three small pieces:
+- new `AgentPrompt::BlockTarget { attacker_id }` — the Rust equivalent of Java's wait-for-CLIENT_BLOCK;
+- `StepInitBlocking`'s `None` arm returns `cont().with_prompt(BlockTarget{..})`;
+- `random_agent` answers it exactly as `sendBlockAction` does, reusing the same
+  `legal_block_targets` helper the activation-time pick already uses (one actionRng draw, or
+  `EndPlayerAction` when there is no legal target). `uniform_agent` gets a matching arm.
+
+Test `no_defender_asks_the_agent_for_a_block_target_instead_of_stalling`.
+
+**Verified:** vampire **39 → 30**. Gates: lineman bb2016 **0**, goblin **0**, halfling **0**,
+dwarf **0**, lineman bb2025 **0**, vampire bb2025 **0**. `cargo test -p ffb-engine` **7115/0**.

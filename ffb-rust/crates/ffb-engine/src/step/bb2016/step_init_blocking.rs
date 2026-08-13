@@ -72,7 +72,18 @@ impl StepInitBlocking {
         // sibling BB2020/BB2025 translations of this same step already return `cont()` here.
         let defender_id = match &self.block_defender_id {
             Some(id) => id.clone(),
-            None => return StepOutcome::cont(),
+            // Java keeps CONTINUE here and waits for a CLIENT_BLOCK, which the client supplies.
+            // Rust chooses its block target at ACTIVATION time, so a sequence the ENGINE pushes
+            // (StepEndBlocking's `isSufferingBloodLust() && !hasBlocked()` branch re-pushes a Block
+            // with NO defender) had nobody to ask: a bare `cont()` left the driver with
+            // `waiting_for_command = true` and `pending_prompt = None`, and the game stalled
+            // (vampire bb2016 seed 1: 101 Rust steps against Java's 187). Ask the agent instead —
+            // the Rust equivalent of Java's wait-for-CLIENT_BLOCK.
+            None => {
+                let attacker_id = game.acting_player.player_id.clone().unwrap_or_default();
+                return StepOutcome::cont()
+                    .with_prompt(ffb_model::prompts::AgentPrompt::BlockTarget { attacker_id });
+            }
         };
 
         if game.player(&defender_id).is_none() {
@@ -305,5 +316,31 @@ mod tests {
         let mut rng = GameRng::new(0);
         let outcome = step.start(&mut game, &mut rng);
         assert_eq!(outcome.action, StepAction::Continue);
+    }
+
+    /// Java's bb2016 `StepInitBlocking` with no `blockDefenderId` falls through `executeStep`
+    /// without calling `setNextAction`, keeping CONTINUE while it waits for a `CLIENT_BLOCK` — and
+    /// the client supplies one. Rust picks its block target at ACTIVATION time, so a sequence the
+    /// ENGINE pushes (`StepEndBlocking`'s `isSufferingBloodLust() && !hasBlocked()` branch re-pushes
+    /// a Block with NO defender) had nobody to ask: a bare `cont()` left the driver with
+    /// `waiting_for_command = true` and `pending_prompt = None`, and the game stalled — vampire
+    /// bb2016 seed 1 produced 101 Rust steps against Java's 187.
+    #[test]
+    fn no_defender_asks_the_agent_for_a_block_target_instead_of_stalling() {
+        use ffb_model::prompts::AgentPrompt;
+
+        let mut game = make_game();
+        game.acting_player.player_id = Some("attacker".into());
+
+        let mut step = StepInitBlocking::new();
+        // No block_defender_id — exactly the re-pushed-sequence case.
+        assert!(step.block_defender_id.is_none());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        assert_eq!(out.action, StepAction::Continue, "Java keeps CONTINUE here");
+        assert!(
+            matches!(out.prompt, Some(AgentPrompt::BlockTarget { ref attacker_id }) if attacker_id == "attacker"),
+            "a CONTINUE with no prompt is a stall — the agent must be asked for a target"
+        );
     }
 }
