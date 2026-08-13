@@ -8,7 +8,7 @@
 /// adjacency (same as BB2020's, unlike BB2025's simplified team-check).
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
-use crate::step::framework::StepId;
+use crate::step::framework::{StepId, StepParameter};
 use crate::skill_behaviour::registry::SkillRegistry;
 use crate::step::bb2025::block::step_pushback::StepPushbackHookState;
 use ffb_model::enums::SkillId;
@@ -119,6 +119,15 @@ impl StepModifierTrait for StandFirmStepModifier {
         state.do_push = true;
         state.pushback_squares.clear();
         state.starting_pushback_square = None;
+        // Java publishes FOLLOWUP_CHOICE=false here: a defender that avoids the push stays put, so
+        // the attacker must NOT follow up. Without it StepFollowup moved the attacker onto the
+        // defender's (still occupied) square — two players on one square — and, because the
+        // attacker was then no longer *adjacent* to the defender, bb2016 StepEndBlocking's
+        // `forceSecondBlock` (Frenzy) branch stopped firing (necromantic bb2016 seed 3 step 3: a
+        // Werewolf blocks a Stand Firm Flesh Golem; Java pushes nobody, stays at (12,7) and rolls
+        // the Frenzy second block, Rust teleported to (13,8) and rolled nothing).
+        // The shared bb2025 StandFirmBehaviour already does this.
+        state.published.push(StepParameter::FollowupChoice(false));
 
         game.report_list.add(ReportSkillUse::new(
             Some(defender_id.clone()),
@@ -239,6 +248,33 @@ mod tests {
         assert!(result, "undecided standing defender auto-uses Stand Firm → cancels push");
         assert_eq!(hs.standing_firm.get("def1"), Some(&true));
         assert!(hs.do_push, "do_push set so the (empty) pushback stack is applied without moving the defender");
+    }
+
+    /// Java `StandFirmBehaviour` publishes BOTH `STARTING_PUSHBACK_SQUARE = null` and
+    /// `FOLLOWUP_CHOICE = false` when the push is avoided. The follow-up suppression is what keeps
+    /// the attacker on its own square; without it StepFollowup moved the attacker onto the
+    /// defender's (still occupied) square, stacking two players there and — because the attacker
+    /// was then no longer adjacent to the defender — silently disabling bb2016 StepEndBlocking's
+    /// `forceSecondBlock` (Frenzy) branch. necromantic bb2016 seed 3 step 3: a Werewolf (Frenzy)
+    /// blocks a Stand Firm Flesh Golem; Java rolls a second block, Rust rolled none.
+    #[test]
+    fn stand_firm_suppresses_the_attackers_followup() {
+        let mut game = make_game();
+        game.team_away.players.push(player_with_skills("def1", vec![SkillId::StandFirm]));
+        game.field_model.set_player_coordinate("def1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("def1", PlayerState::new(PS_STANDING));
+
+        let m = StandFirmStepModifier;
+        let mut hs = default_hook_state("def1");
+        hs.standing_firm.insert("def1".into(), true);
+
+        let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
+
+        assert!(result);
+        assert!(
+            hs.published.iter().any(|p| matches!(p, StepParameter::FollowupChoice(false))),
+            "avoiding the push must publish FOLLOWUP_CHOICE=false so the attacker stays put"
+        );
     }
 
     #[test]

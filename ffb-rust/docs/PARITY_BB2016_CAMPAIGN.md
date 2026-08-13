@@ -166,3 +166,33 @@ known gap — port them individually, each verified on its own, not as a block.
 
 Tests: `out_of_range_pass_ends_the_turn_without_rolling` (bb2016 InitPassing).
 Verified: underworld 1 fail → **0 (100/100)**; lineman bb2016 100/100. **21 🟢 / 9 🔴.**
+
+### ITER59 (2026-08-13) — bb2016 Stand Firm must publish `FOLLOWUP_CHOICE = false` → necromantic 58 → 1, dwarf 79 → 35
+
+necromantic seed 3 step 3: home_01 (Werewolf — Claw/**Frenzy**/Regeneration) blocks away_03
+(Flesh Golem — Regeneration/**Stand Firm**/Thick Skull). Java rolled 8 dice, Rust 2.
+
+Java (`JAVA_BLOCKROLL nDice=-2` twice): block dice 4,5 → defender picks 4 = Pushback → Stand Firm
+avoids the push → **Frenzy second block** (dice 2,6 → 2 = Both Down) → armour 2d6 for BOTH players
+→ turnover. End state: `a02:13,8,Prone` and `h00:12,7,Prone` — nobody moved.
+
+Rust: one block, no Frenzy, and end state `a02:13,8,Standing` **and `h00:13,8,Standing`** — two
+players stacked on one square, the attacker having followed up onto the defender it never pushed.
+
+ROOT CAUSE: Java's `skillbehaviour/bb2016/StandFirmBehaviour` publishes TWO parameters when the
+push is avoided — `STARTING_PUSHBACK_SQUARE = null` **and `FOLLOWUP_CHOICE = false`**. Rust's
+bb2016 hook set `do_push` / cleared the squares but never published `FollowupChoice(false)`, and
+the bb2016 `StepPushback` never drained `hook_state.published` at all. So `StepFollowup` moved the
+attacker onto the defender's square. The knock-on: bb2016 `StepEndBlocking`'s `forceSecondBlock`
+(Frenzy) branch requires `attackerPosition.isAdjacent(defenderPosition)`, and a co-located attacker
+is not *adjacent* — so Frenzy silently stopped firing. One missing publish, two visible symptoms.
+
+The shared bb2025 `StandFirmBehaviour` already did `state.published.push(FollowupChoice(false))`
+and the bb2025 `StepPushback` already drained `hook_state.published`; the bb2016 pair was the gap.
+
+FIX: `skill_behaviour/bb2016/stand_firm_behaviour.rs` pushes `StepParameter::FollowupChoice(false)`;
+`step/bb2016/step_pushback.rs` drains `hook_state.published` into its outcome (mirroring bb2025).
+
+Test: `stand_firm_suppresses_the_attackers_followup`.
+Verified: necromantic 58 → **1**; **dwarf 79 → 35** (shared win — the Deathroller has Stand Firm);
+no regression across all 28 swept bb2016 rosters; lineman bb2016 100/100; ffb-engine 7090/0.

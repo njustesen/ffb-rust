@@ -109,6 +109,8 @@ impl Step for StepPushback {
 impl StepPushback {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let mut do_push = false;
+        // Parameters published from inside a skill behaviour hook (Java `step.publishParameter(...)`).
+        let mut hook_published: Vec<StepParameter> = Vec::new();
 
         // Java: if (!state.pushbackStack.isEmpty())
         if !self.pushback_stack.is_empty() {
@@ -173,6 +175,10 @@ impl StepPushback {
                 self.grabbing = hook_state.grabbing;
                 self.starting_pushback_square = hook_state.starting_pushback_square;
                 do_push = hook_state.do_push;
+                // Java: behaviour hooks call `step.publishParameter(...)` directly (Stand Firm
+                // publishes FOLLOWUP_CHOICE=false when it cancels the push). Drain them into this
+                // step's published output, exactly as the bb2025 StepPushback does.
+                hook_published.append(&mut hook_state.published);
                 let final_pushback_squares = hook_state.pushback_squares;
 
                 let pushback_squares_found = !final_pushback_squares.is_empty() || stop_processing;
@@ -273,6 +279,7 @@ impl StepPushback {
                 .publish(StepParameter::DefenderPushed(true))
                 .publish(StepParameter::StartingPushbackSquare(None));
             for p in extra { outcome = outcome.publish(p); }
+            for p in hook_published { outcome = outcome.publish(p); }
             outcome
         } else {
             StepOutcome::cont()
