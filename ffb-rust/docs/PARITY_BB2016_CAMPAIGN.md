@@ -47,7 +47,7 @@ Baseline entering this run (post-commit `5e86d749`): **19 🟢 / 11 🔴**.
 | elf | **0** (was 84) | 🟢 100/100 GREEN (ITER66 Side Step auto-use) | GREEN |
 | ogre | **0** (was 98) | 🟢 100/100 GREEN (ITER69 bb2016 TTM spends the PASS; needed a jar rebuild) | GREEN |
 | wood_elf | **0** (98→81→19→0) | 🟢 100/100 GREEN (ITER71 startedStanding, ITER73 rooted pre-draw, ITER77 declined-re-roll edition gate) | GREEN |
-| goblin | **4** (100→99→5→4) | + ITER83 (bb2016 Pitch-Invasion B&C chain injury); seeds 19/55/56/68 left | in progress |
+| goblin | **3** (100→99→5→4→3) | + ITER84 (PASS gated on `preventRegularPassAction`); seeds 19/46/56 left | in progress |
 | halfling | **0** (100→3→0) | 🟢 100/100 GREEN (ITER78-80 unblocked it to 3; ITER81 TTM-landing drop-before-apply) | GREEN |
 | vampire | 100 | systematic — Bloodlust bb2016 | queued |
 
@@ -1179,3 +1179,51 @@ Test `pitch_invasion_rolls_and_publishes_the_ball_and_chain_chain_injury` (B&C: 
 **Verified:** goblin **5 → 4** (seed 46 advanced from step 0 to step 141). Gates: lineman bb2016
 **0**, halfling bb2016 **0**, amazon bb2016 **0**, lineman bb2025 **0**, goblin bb2025 **0**.
 `cargo test -p ffb-engine` **7106/0**.
+
+---
+
+## ITER84 — goblin 4 → **3**: PASS eligibility was a skill-id whitelist, not the property
+
+seed 19 first diverges at **i=3** with **identical states** but a different chosen action:
+Java `Activate(Home3, BLITZ)`, Rust `Activate(home_03, Move)` — the same player, different action.
+
+A new gated `JAVA_ACT_PICK` trace in `ParityRunner` (`FFB_ACT_TRACE=1`, prints the filtered live
+list, the index and the raw snapshot size) made it immediate:
+
+| | list | idx | action |
+|---|---|---:|---|
+| Java | `[MOVE, BLOCK, BLITZ, HAND_OVER]` (4) | 2 | BLITZ |
+| Rust | `[Move, Block, Blitz, Pass, HandOver]` (5) | 0 | Move |
+
+Same actionRng draw, different modulus. Java gates PASS on the **property**:
+`!p.hasSkillProperty(NamedProperties.preventRegularPassAction)`. Rust's
+`legal_activate_player_actions` hardcoded `!MyBall && !NoBall` — a whitelist of two skill ids that
+misses every other skill registering the property. `bb2016/NoHands` and `bb2016/BallAndChain` both
+do, and the goblin Fanatic carries **both**. Standing on the ball, it was offered Pass in Rust and
+not in Java.
+
+(Rust's own `SkillId::properties()` table already had `preventRegularPassAction` on both skills —
+only the eligibility check ignored it. This is the same shortcut that was fixed once before for
+`MyBall`, patched by adding a second skill id instead of switching to the property.)
+
+FIX: gate on `PREVENT_REGULAR_PASS_ACTION`. Test
+`every_prevent_regular_pass_skill_removes_pass_not_just_my_ball_and_no_ball` (all four skills, plus
+a plain carrier control).
+
+Note HAND_OVER is deliberately left as-is: `BallAndChain` also registers
+`preventRegularHandOverAction`, but `ParityRunner`'s HAND_OVER branch does not check it, so both
+sides offer it and the snapshots agree. Changing Rust here would *break* parity.
+
+**Verified:** goblin **4 → 3**; seed 19's action pick now matches Java exactly. Gates: lineman
+bb2016 **0**, lineman bb2025 **0**, high_elf bb2016 **0** (the My Ball roster), high_elf bb2025
+**0**, ogre **0**, halfling **0**, underworld **0**, renegades **0**.
+`cargo test -p ffb-engine` **7107/0**.
+
+### FRONTIER for ITER85
+seed 19 i=3 is now down to **one missing die**: Java rolls rng 29, a d8
+`StepCatchScatterThrowIn.scatterBall`, after the blitz resolves (ball `12,8` → `11,9`); Rust leaves
+the ball at `12,8`. The Fanatic (No Hands, `preventPickup`) was standing on the loose ball and was
+dropped by its own Ball & Chain chain injury — Java bounces the ball, Rust does not. Note
+`dropPlayer`'s B&C branch returns *before* its ball-square/scatter logic in both engines, so the
+bounce is published from some other Java site — find it.
+Remaining goblin seeds: **19 (step 3), 46 (step 141), 56 (step 131)**.

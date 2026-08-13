@@ -130,10 +130,20 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             }
         }
 
-        // Pass: only ball-carrier can pass; NoBall prevents it
-        let has_no_ball = player.has_skill(SkillId::NoBall);
-        let has_my_ball = player.has_skill(SkillId::MyBall);
-        if !turn_data.pass_used && !has_my_ball && !has_no_ball && ball_coord == Some(coord) {
+        // Pass: only the ball-carrier can pass, and only if no skill forbids a regular pass.
+        // Java gates this on the PROPERTY, not on a list of skill ids:
+        //   `!p.hasSkillProperty(NamedProperties.preventRegularPassAction)`
+        // (ParityRunner.computeEligiblePlayers, mirroring the engine). Rust hardcoded
+        // `!MyBall && !NoBall`, which misses every OTHER skill that registers the property —
+        // `bb2016/NoHands` and `bb2016/BallAndChain` both do. The goblin Fanatic carries both, so a
+        // Fanatic standing on the ball got a 5-action snapshot here against Java's 4, and the shared
+        // actionRng modulo picked a different action: goblin bb2016 seed 19 i=3, Java
+        // `live=[MOVE,BLOCK,BLITZ,HAND_OVER] idx=2 → BLITZ` vs Rust
+        // `[Move,Block,Blitz,Pass,HandOver] idx=0 → Move`.
+        let prevents_regular_pass = player.has_skill_property(
+            ffb_model::model::property::named_properties::NamedProperties::PREVENT_REGULAR_PASS_ACTION,
+        );
+        if !turn_data.pass_used && !prevents_regular_pass && ball_coord == Some(coord) {
             actions.push(Action::ActivatePlayer {
                 player_id: pid.clone(),
                 player_action: PlayerActionChoice::Pass,
@@ -1281,7 +1291,32 @@ mod tests {
         let available: Vec<(SkillCategory, Vec<u16>)> = vec![];
         assert!(legal_skill_choices(&available).is_empty());
     }
-}
 
-// Tests: legal_actions takes `&Game`, so its tests are rebuilt as `&Game` fixtures
-// (no engine dependency) when the first selection/action step consumes it in Phase D.
+    /// Java gates the PASS action on the PROPERTY, not on a list of skill ids:
+    /// `!p.hasSkillProperty(NamedProperties.preventRegularPassAction)`. Rust hardcoded
+    /// `!MyBall && !NoBall`, which misses `bb2016/NoHands` and `bb2016/BallAndChain` — both register
+    /// the same property. The goblin Fanatic carries both, so a Fanatic standing on the ball got a
+    /// 5-action snapshot against the harness's 4 and the shared actionRng modulo picked a different
+    /// action (goblin bb2016 seed 19 i=3: Java `[MOVE,BLOCK,BLITZ,HAND_OVER] idx=2 -> BLITZ` vs Rust
+    /// `[Move,Block,Blitz,Pass,HandOver] idx=0 -> Move`).
+    #[test]
+    fn every_prevent_regular_pass_skill_removes_pass_not_just_my_ball_and_no_ball() {
+        for skill in [SkillId::MyBall, SkillId::NoBall, SkillId::NoHands, SkillId::BallAndChain] {
+            let mut game = make_game(Rules::Bb2016);
+            add_player(&mut game, true, "carrier", c(5, 5), PS_STANDING, vec![skill]);
+            game.field_model.ball_coordinate = Some(c(5, 5));
+            game.field_model.ball_in_play = true;
+            let actions = legal_activate_player_actions(&game, TeamSide::Home);
+            assert!(!has_action(&actions, "carrier", PlayerActionChoice::Pass),
+                "{skill:?} registers preventRegularPassAction, so Pass must not be offered");
+        }
+
+        // Control: a plain carrier IS offered Pass.
+        let mut g = make_game(Rules::Bb2016);
+        add_player(&mut g, true, "plain", c(5, 5), PS_STANDING, vec![]);
+        g.field_model.ball_coordinate = Some(c(5, 5));
+        g.field_model.ball_in_play = true;
+        assert!(has_action(&legal_activate_player_actions(&g, TeamSide::Home), "plain", PlayerActionChoice::Pass),
+            "a plain ball-carrier must be offered Pass");
+    }
+}
