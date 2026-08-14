@@ -957,3 +957,50 @@ the next datum to get is Java's `BlockResult` itself: the report list carries `R
 gated dump of it from the harness after the dialog would settle what result Java actually applied.
 
 Baseline unchanged and re-confirmed: `PARITY: 99/100`. No engine changes this iteration.
+
+## ITER19 — seed 50: ITER18's hypothesis REFUTED; Java really does apply BOTH_DOWN
+
+Extended `FFB_BLOCK_DUMP` to print the dialog's own fields. For `home_02`'s block:
+
+```
+BLOCK_DUMP dice nrOfDice=1 blockRoll=[2]
+```
+
+and `bb2020/block/StepBlockRoll.handleCommand` shows exactly what the harness's answer means:
+
+```java
+case CLIENT_BLOCK_CHOICE:
+    fDiceIndex = blockChoiceCommand.getDiceIndex();
+    fBlockResult = ...getFactory(Factory.BLOCK_RESULT).forRoll(fBlockRoll[fDiceIndex]);
+```
+
+So index 0 means **use die 0**, not "re-roll die 0" — ITER18's hypothesis is dead. One die, value 2,
+mapped by the single `@RulesCollection(COMMON)` `BlockResultFactory` to **BOTH_DOWN**. Java genuinely
+resolves BOTH_DOWN and *still* leaves the attacker STANDING with no armour roll and no turnover.
+
+**Also newly mapped** (may or may not matter): the two Block sequence generators diverge AFTER
+`WRESTLE`. Both run `BLOCK_ROLL → BLOCK_CHOICE → JUGGERNAUT → BOTH_DOWN → WRESTLE`, but
+`generator/bb2020/Block` then inserts `BLOCK_DODGE, PUSHBACK, APOTHECARY, FOLLOWUP, TENTACLES,
+SHADOWING, PICK_UP, FALL_DOWN(label)` before `DROP_FALLING_PLAYERS`, where `generator/bb2025/Block`
+goes `… FOLLOWUP → DROP_FALLING_PLAYERS` directly. Rust's `FFB_DRIVE_TRACE` for this block shows
+`BlockChoice, Juggernaut, BothDown, Wrestle, GotoLabel, DropFallingPlayers, …` — i.e. the BB2025
+shape. Whether the extra BB2020 steps (particularly the labelled `FALL_DOWN`) are what spare the
+attacker is the next thing to test.
+
+**Instrumentation note for the next iteration.** `GameState.executeStep` already calls
+`getServer().getDebugLog().logCurrentStep(IServerLogLevel.DEBUG, this)` for EVERY step — exactly the
+per-step trace this needs — but `HeadlessFantasyFootballServer.getDebugLog()` (in `ffb-ai`, i.e.
+harness code, not the engine) hard-codes an anonymous `DebugLog` whose `isLogging` always returns
+false. It is now gated on `FFB_SERVER_DEBUG=1`, with `logCurrentStep` overridden to print
+`JSTEPALL step=<StepId> dice=<n>` to stderr. **That override currently emits nothing** — to be
+debugged first thing next iteration (most likely `getServer()` inside `GameState` is not returning
+the headless instance, or `FantasyFootballServer`'s direct `fDebugLog` field access bypasses the
+getter). Getting it working is worth the effort: it gives a full per-step Java trace to diff against
+`FFB_DRIVE_TRACE`, which is the instrument this whole class of bug needs.
+
+**Unrelated finding, recorded so it is not mistaken for drift:** `ffb-common/…/mixed/StatsMechanic`,
+`bb2025/move/StepGoForIt` and `mixed/pass/StepPassBlock` carry pre-existing local modifications that
+are **gated-logging only** (`-Dffb.parityDebug` → `JAVA_AVBROKE`, `JAVA_GFI`). They predate this
+campaign, change no behaviour, and match the documented `DiceRoller.java` precedent.
+
+Baseline unchanged and re-confirmed: `PARITY: 99/100`. No engine changes this iteration.
