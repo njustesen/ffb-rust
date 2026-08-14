@@ -1216,3 +1216,56 @@ then mirror the mismatch outcome in Rust's `StepInitSelecting` (activate, do not
 gated on the same condition Java uses, not on a special case for this seed.
 
 Baseline unchanged: `chaos_pact` 24/25, `human` 100/100. No engine changes kept this iteration.
+
+## ITER24 — ROOT CAUSE: Rust's skill properties are edition-agnostic (BB2020 Right Stuff)
+
+Measured the whole way down. A gated `FFB_TTM_DUMP` probe added to `ParityRunner.sendThrowTeamMateAction`
+prints every candidate teammate and why it was rejected:
+
+```
+TTM_DUMP thrower=…Home2 coord=(12,6) nTargets=0 cands=…Home1[thrownOk=false,state=1,…]
+         …Home6[thrownOk=false,…]   ← the Goblin Renegade, which HAS Right Stuff
+```
+
+**`thrownOk=false` for every player**, including the Goblin. Java's BB2020 has no throwable players at
+all on this team, so the harness deselects and the activation rolls no dice. Rust offers `home_06` and
+throws. That is the entire seed-22 divergence.
+
+**Why.** `NamedProperties` registered by `RightStuff.postConstruct` differ per edition:
+
+| edition | properties |
+|---|---|
+| `skill/bb2016/RightStuff` | `canBeThrown`, `canBeKicked`, `ignoreTackleWhenBlocked` |
+| **`skill/bb2020/RightStuff`** | **`canBeThrownIfStrengthIs3orLess`**, `ignoreTackleWhenBlocked` |
+| `skill/bb2025/RightStuff` | `canBeThrown`, `ignoreTackleWhenBlocked` |
+
+Rust's `SkillId::properties()` (`crates/ffb-model/src/enums/skill_id.rs:827`) is **edition-agnostic**
+and returns the UNION:
+
+```rust
+SkillId::RightStuff => &["canBeThrown", "canBeKicked", "ignoreTackleWhenBlocked",
+                         "canBeThrownIfStrengthIs3orLess"],
+```
+
+so a BB2020 Right Stuff player wrongly answers `true` to `canBeThrown` (and to `canBeKicked`, which
+only BB2016 grants). `legal_throw_team_mate_targets` checks exactly `CAN_BE_THROWN`, so Rust builds a
+non-empty target list where Java builds an empty one.
+
+**Scope — this is bigger than one seed.** The union is applied to every skill, and Right Stuff alone
+touches `chaos_pact`, `goblin`, `halfling`, `ogre`, `underworld` and `skaven` — most of the current
+heavy-failure list (`goblin` 14, `halfling` 25, `ogre` 25, `underworld` 3). Other skills whose
+property sets differ by edition will have the same problem.
+
+**Why it was not fixed in this iteration.** `properties()` has **172 call sites** and no `rules`
+parameter. Making it edition-aware is a deliberate refactor, not something to rush: the options are
+(a) `properties_for(rules)` plus a threaded `rules` at the call sites that matter, or (b) per-edition
+property tables selected once at skill-registry build time (the same shape as `SkillRegistry`, and
+probably the closer 1:1 to Java's per-edition skill classes). Option (b) looks right — Java's
+properties live on the per-edition skill class, exactly as its behaviours do.
+
+Recommended next iteration: implement (b) for `RightStuff` first, verify `chaos_pact` seed 22 and the
+`goblin`/`halfling`/`ogre`/`underworld` fail counts, then sweep the remaining skills whose Java
+`postConstruct` differs across editions (a mechanical diff of `skill/bb2016|bb2020|bb2025/*.java`).
+
+Harness keeps the gated `FFB_TTM_DUMP` probe. Baseline unchanged: `chaos_pact` 24/25, `human` 100/100.
+No Rust changes this iteration.
