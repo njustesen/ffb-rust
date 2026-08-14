@@ -1765,3 +1765,39 @@ as min-(x,y) rather than declining, because the dialog is min=1/max=1), so the n
 adjacent team-mates to lash out at.
 
 Baseline unchanged: `underworld` 22/25, `halfling` 2/25. No engine changes this iteration.
+
+## ITER37 — underworld seed 2: AS failure paths match; caller-diff heuristic needs care
+
+Read Java's `skillbehaviour/bb2020/AnimalSavageryBehaviour` failure path in full:
+
+```java
+if (players.isEmpty()) {                       // no adjacent team-mate to lash out at
+    cancelPlayerAction(step, false);
+    targetSelectionState.failed();
+    step.publishParameter(new StepParameter(END_PLAYER_ACTION, true));
+    step.getResult().setNextAction(GOTO_LABEL, state.goToLabelOnFailure);
+} else if (players.size() == 1) { lashOut(...); }
+  else { showDialog(DialogPlayerChoiceParameter(ANIMAL_SAVAGERY, ..., 1, 1)); }
+```
+
+Rust's `mixed/shared/step_animal_savagery.rs` lines 260-279 are the same shape — `players.is_empty()`
+→ `StepOutcome::goto(goto_label_on_failure).publish(EndPlayerAction(true))`. **The no-target failure
+path is NOT the divergence**; both end the ACTIVATION, not the turn.
+
+**Caution recorded about the tooling.** I extended the two-log join to flag the first CALLER mismatch
+via a Java-frame → Rust-step mapping table, and it reported die 14 (`InjuryTypeBlock.armourRoll` vs
+`AnimalSavagery`). That is a **false positive**: Rust resolves the Animal Savagery lash-out injury
+INSIDE the `AnimalSavagery` step, so the nearest-preceding-`DRIVE step=` attribution names the outer
+step while Java's stack names the inner injury type. The heuristic is only sound where the two step
+decompositions correspond one-to-one, which they do not in general. Use it to LOCATE candidates, then
+confirm each by hand — do not treat its first hit as the answer.
+
+**Where seed 2 actually stands.** First VALUE divergence is die 86. At die 84 both engines roll Animal
+Savagery and both fail; at 85 the value still matches but Java is in `StepMoveDodge.dodge` (a further
+activation) while Rust is in `EndTurn` — Rust has no activation left. That is the same
+"one fewer/more available player" shape as goblin seed 16 (ITER29-33), so the productive next step is
+to find which player Java still has available and Rust does not, by diffing the per-turn activation
+lists (`JAVA_ACT_PICK` vs `RUST_ACT_PICK`) for the turn ending at die 85 — the technique that cracked
+goblin.
+
+Baseline unchanged: `underworld` 22/25. No engine changes this iteration.
