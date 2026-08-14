@@ -1974,3 +1974,53 @@ iterations on stale duplicates. Test: an AS lash-out with armour 12 / injury 8 m
 `KNOCKED_OUT` and off the pitch, not `STANDING`.
 
 Baseline unchanged: `underworld` 22/25. No engine changes this iteration.
+
+## ITER42 — correction to ITER41, and the divergence narrowed to the BB2025 apothecary
+
+**ITER41's closing claim was wrong and is retracted.** "Every `apply_to` call site is inside
+`#[cfg(test)]`" came from a grep that excluded `injury.rs`/`injury_result.rs` by filename but was
+read as if it excluded only test blocks. `apply_to` has ~15 production callers (the apothecary steps,
+TTM scatter, trap door, …). The rest of ITER41 stands: both engines compute the lash-out at die 52,
+Java KOs `h02` at i=56, Rust never does.
+
+**A structural fact worth recording on its own: a BB2020 game runs the BB2025 Move sequence.**
+`FFB_DRIVE_TRACE` around the lash-out:
+
+```
+DRIVE step=InitActivation ... AnimalSavagery ... SteadyFooting ... HandleDropPlayerContext ... PlaceBall ... Apothecary
+```
+
+`SteadyFooting` is a BB2025-only step; Java's `generator/bb2020/Move.java` has
+ANIMAL_SAVAGERY → HANDLE_DROP_PLAYER_CONTEXT → PLACE_BALL → APOTHECARY(ANIMAL_SAVAGERY) with no such
+step. `step/driver.rs` opens with `use crate::step::bb2025::move_::*` and has a BB2016 override arm
+(line ~451) but **no BB2020 arm**, so `EndSelecting` (and hence the Move generator it invokes) and
+`HandleDropPlayerContext` both resolve to the BB2025 implementations. Rust's own
+`generator/bb2020/move_.rs` and `bb2020/step_handle_drop_player_context.rs` are dead code on this
+path — `generator/bb2020/move_.rs:160` even asserts the sequence contains no `SteadyFooting`.
+
+**But that is not what loses the KO.** Probing the BB2025 step that actually runs (all probes since
+reverted):
+
+```
+AS-PUBLISH:   target=home_03 injury=Some(5) ab=true      # 5 = PS_KNOCKED_OUT, armour broken
+HDPC25-ENTER: has_ctx=true   injury=Some(5)              # received intact
+```
+
+So the AS behaviour computes the KO correctly, and the BB2025 `StepHandleDropPlayerContext` receives
+the `DropPlayerContext` carrying it. Both hand-offs are sound; the state is lost strictly downstream.
+
+**Next iteration — one probe, then the fix.** Downstream of HDPC the only applier is
+`bb2025/shared/step_apothecary.rs` (the BB2020 one is not on this path, which is why ITER41's
+`APO-APPLY` probe printed nothing). Probe its `set_parameter` and `execute_step` for the
+`ANIMAL_SAVAGERY` mode: the prime suspect is the mode gate — `set_parameter` accepts an
+`InjuryResult` only when `self.apothecary_mode == ir.injury_context.apothecary_mode`, so if the
+BB2025 Move sequence's post-AS `Apothecary` step is instantiated with a different mode than
+`AnimalSavagery` (or the step never receives the published `INJURY_RESULT` at all), the result is
+silently dropped exactly as observed. Confirm which before editing.
+
+Note two further 1:1 gaps found while reading, to fix alongside (both engines' HDPC):
+Java uses `game.getDefender()` for the victim-state keys where Rust uses
+`game.acting_player.player_id`, and Java's `UtilServerInjury.dropPlayer` takes the
+`apothecaryMode` argument that Rust's `drop_player` does not pass.
+
+Baseline unchanged: `underworld` 22/25. No engine changes this iteration.
