@@ -2565,3 +2565,40 @@ committing behaviour changes with no measured effect. Both are recorded here for
 lands and they can be evaluated with a real signal.
 
 Baseline unchanged and tree clean: `nurgle` 21/25.
+
+## ITER53 — `nurgle` seed 2: the failing roll is FOUL APPEARANCE, not a negatrait
+
+Two more wrong assumptions eliminated, and the target is now a single step.
+
+**There is no goto.** ITER52 read the drive trace's `stack_len 47 -> 41` as a jump; it is not. My grep
+filtered the DRIVE lines to a handful of step ids, hiding the intermediate ones — those six steps are
+`ReallyStupid, TakeRoot, UnchannelledFury, BloodLust, FoulAppearance, DumpOff` running normally, one
+pop each, straight into `JumpUp`/`StandUp`. The failure label never fires. (Same lesson as ITER22:
+a filtered log is not a measurement of what did NOT happen.)
+
+**And the player is not the Beast of Nurgle.** `away_02` is `nurgle.warrior` in BOTH engines
+(`data/teams/bb2020/team_nurgle.json` nr=2 and `team_nurgle_parity20_away.xml` nr=2 agree), and a
+Nurgle Warrior has no negatrait at all — Disturbing Presence, Foul Appearance, Nurgle's Rot,
+Regeneration. So Java's `rollSkill:112` of 1 at die 30 is the blitzer's **Foul Appearance** roll
+against the target, and on a 1 Java cancels the action: `generator/bb2020/Block:45` gives
+`FOUL_APPEARANCE` `GOTO_LABEL_ON_FAILURE = END_BLOCKING`, which sits after `JUMP_UP`/`STAND_UP`
+(lines 47-48), so the blitzer never stands up and stays PRONE.
+
+Rust's sequence agrees exactly — `generator/bb2025/block.rs:60-62` places `FoulAppearance` with
+`GotoLabelOnFailure(END_BLOCKING)` at index 3, ahead of `JumpUp` (5) and `StandUp` (6). So the
+sequence is right and **Rust's Foul Appearance simply did not fail**: it either rolled and passed, or
+never rolled and the die went to another step.
+
+**Also attempted and REVERTED**: `bb2020/really_stupid_behaviour.rs` reads and writes the persistent
+`Player.used_skills` where Java's `UtilCards.hasUnusedSkill(actingPlayer, skill)` uses the
+per-activation `ActingPlayer` set (cleared by `setPlayer`) — a real 1:1 gap, and the same shape as the
+Bone-head fix recorded in the TTM tier. Moving it to `game.acting_player.used_skills` left `nurgle` at
+21/25, and a probe then showed the Really Stupid roll site never runs for this player at all — because
+he has no negatrait. Reverted; worth landing on its own merits with its own verification, since the
+memory note "bb2020/bb2016 BoneHeadBehaviour still use Player.used_skills" says the family is latent.
+
+**Next iteration**: probe `StepFoulAppearance` for this activation — whether it rolls at all, its
+roll, its threshold, and whether it returns `GotoLabel`. Java needs the blitzer's roll of 1 to fail
+and cancel. That is now a single step with a single die, so one instrumented run should settle it.
+
+Baseline unchanged and tree clean: `nurgle` 21/25.
