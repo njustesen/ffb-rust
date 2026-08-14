@@ -1932,3 +1932,45 @@ carrying `rng.call_count`) and compare; a timing/order difference in when the AS
 now the live hypothesis, not a missing computation.
 
 Baseline unchanged: `underworld` 22/25. No engine changes in ITER38, ITER39 or ITER40.
+
+## ITER41 — underworld seed 2 ROOT-CAUSED (correctly this time): the lash-out KO is never applied
+
+With the ITER40 mapping corrected, every claim below is measured.
+
+**Both engines compute the same lash-out injury, at the same die.** An `AS_TRACE` carrying
+`rng.call_count` (added, measured, reverted):
+
+```
+AS_TRACE die=52 victim=home_03 ko=true armour_broken=true
+```
+
+and Java's `JAVA_AVBROKE` for the same player: `def=…Home3 armour=8 roll=[6,6] broken=true`, with the
+injury at dice 51/52 = 3+5 = 8 = KO. Identical.
+
+**Only Java applies it.** Scanning every recorded step's state string for `h02` (= `home_03`):
+
+```
+JAVA: h02 first becomes Ko at i=56
+RUST: h02 never Ko; last seen at i=287 as '11,13,Standing'  ← back ON the pitch
+```
+
+**Where it is lost.** `mixed/shared/step_animal_savagery.rs` attaches the `InjuryResult` to a
+`DropPlayerContext`, and `bb2020/step_handle_drop_player_context.rs` consumes it — but its
+`execute_step` only calls `util_server_injury::drop_player(...)`, which sets the base to PRONE or
+STUNNED. **Nothing applies the injury result's KO/CAS outcome.** Confirmed by grep: `apply_to` is
+defined in BOTH `injury.rs:262` and `injury_result.rs:92` (a stale-duplicate pair, the recurring trap
+in this codebase) and **every call site of either is inside `#[cfg(test)]`** — no production code
+applies an `InjuryResult` at all.
+
+Blocks still KO correctly in the green rosters, so the state change on those paths must happen inside
+`handle_injury` itself; the Animal Savagery lash-out path is the one that relies on the unapplied
+context.
+
+**Next iteration — the fix.** Read Java's `UtilServerInjury.handleInjury` to see exactly where it sets
+the victim's `PlayerState` (Java applies at injury time, which is why its `h02` is KO by i=56), then
+make the Rust lash-out path do the same. Before editing, use the backtrace trick to confirm WHICH of
+the two `apply_to` definitions (and which `handle_injury`) is live — this codebase has burned several
+iterations on stale duplicates. Test: an AS lash-out with armour 12 / injury 8 must leave the victim
+`KNOCKED_OUT` and off the pitch, not `STANDING`.
+
+Baseline unchanged: `underworld` 22/25. No engine changes this iteration.
