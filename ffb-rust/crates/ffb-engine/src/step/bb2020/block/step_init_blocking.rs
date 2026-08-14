@@ -161,6 +161,9 @@ impl StepInitBlocking {
             }
         }
 
+        // Java `StepInitBlocking:214`: game.setDefenderId(defender.getId()). See the BB2025 copy
+        // for the divergence this omission caused.
+        game.defender_id = Some(defender_id.clone());
         game.acting_player.defender_id = Some(defender_id.clone());
 
         // Java: actingPlayer.setStrength(actingPlayer.getPlayer().getStrengthWithModifiers())

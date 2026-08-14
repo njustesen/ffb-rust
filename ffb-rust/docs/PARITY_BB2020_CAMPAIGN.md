@@ -2126,3 +2126,49 @@ edits to engine files have precedent in this campaign) and printing Java's defen
 `fOldDefenderState` at both sites, then joining against the Rust trace above.
 
 All probes reverted. Baseline unchanged: `underworld` 22/25 (seeds 2, 3, 19).
+
+### ITER44 (cont.) — ROOT CAUSE: `StepInitBlocking` never set the game's defender. **underworld 100/100.**
+
+Hypothesis 1 was right, and the measurement that settled it was cheap and Rust-side. Correlating the
+`InitBlocking` capture with the watched state transitions:
+
+```
+INITBLOCK: defender=home_01 old_state=1
+SETSTATE home_03 Some(1) -> 3        # AS lash-out drop
+SETSTATE home_03 Some(3) -> 5        # apothecary applies the KO
+INITBLOCK: defender=away_01 old_state=1     # ← the block AFTER the KO targets away_01
+SETSTATE home_03 Some(5) -> 1        # ← but BlockChoice restores home_03
+```
+
+The block's defender is `away_01`; the player `StepBlockChoice` restored is `home_03`. It was reading
+a **stale** `game.defender_id` — the Animal Savagery lash-out victim from earlier in the same
+activation.
+
+Java `bb2025/block/StepInitBlocking:220` (and `bb2020/…:214`):
+
+```java
+game.setDefenderId(defender.getId());
+```
+
+Rust set only `game.acting_player.defender_id` — and Java's `ActingPlayer` **has no `defenderId`
+field at all**, so that assignment is a Rust-only mirror (read by the legacy `step/engine.rs` path)
+and the actual Java line was simply never ported. `game.defender_id` therefore kept whatever the
+previous step left in it, and every later step reading the game's defender acted on the wrong player.
+
+**Fix**: port the missing line in both editions' `StepInitBlocking`, keeping the existing Rust-only
+mirror assignment so the legacy path is unaffected. Regression test
+`init_blocking_sets_the_game_defender_over_a_stale_one` seeds a stale `game.defender_id` and asserts
+the step overwrites it.
+
+**Result: `underworld` bb2020 1-100 → `PARITY: 100/100 games match`** (all three failing seeds — 2, 3
+and 19 — fell to this one fix). Gates: `lineman` bb2016 100/100, `lineman` bb2025 100/100, `human`
+bb2020 100/100, `cargo test --workspace` 14,437 passed / 0 failed.
+
+Note for the sweep bookkeeping: the 1-100 run prints `100/100 games match, but required coverage
+items are MISSING` — a coverage-catalog warning from the harness, not a parity failure.
+
+Since this bug corrupted the game's defender for any activation that resolved a lash-out, a foul, or
+a gaze before blocking, it is a strong candidate for other rosters' remaining reds — re-scout before
+diagnosing them individually. `step/bb2020/foul/step_init_fouling.rs` and
+`step/bb2025/foul/step_init_fouling.rs` set the same Rust-only mirror; check them against Java's
+`StepInitFouling` next.

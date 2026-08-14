@@ -210,6 +210,12 @@ impl StepInitBlocking {
             }
         }
 
+        // Java `StepInitBlocking:220`: game.setDefenderId(defender.getId()).
+        // This line was missing: only the Rust-only `actingPlayer.defenderId` mirror was set (Java's
+        // ActingPlayer has no such field), so `game.defenderId` kept whatever the previous step left
+        // there. Every later step that reads the game's defender - notably `StepBlockChoice`, which
+        // restores OLD_DEFENDER_STATE onto `game.getDefender()` - then acted on the wrong player.
+        game.defender_id = Some(defender_id.clone());
         game.acting_player.defender_id = Some(defender_id.clone());
 
         // Java: actingPlayer.setStrength(actingPlayer.getPlayer().getStrengthWithModifiers())
@@ -357,6 +363,26 @@ mod tests {
         );
         assert!(step.using_stab);
         assert_eq!(step.block_defender_id.as_deref(), Some("p3"));
+    }
+
+    /// Java `StepInitBlocking:220` calls `game.setDefenderId(defender.getId())`, so every later
+    /// step that reads `game.getDefender()` sees THIS block's defender. Rust only set the
+    /// Rust-only `actingPlayer.defenderId` mirror, leaving `game.defenderId` pointing at whatever
+    /// the previous step had put there - e.g. the victim of an Animal Savagery lash-out earlier in
+    /// the same activation. `StepBlockChoice` then restored OLD_DEFENDER_STATE onto that stale
+    /// player, resurrecting a knocked-out victim to Standing (underworld bb2020 seed 2: Java has
+    /// `h02:-1,-1,Ko` at i=56, Rust had `h02:-1,-1,Standing`).
+    #[test]
+    fn init_blocking_sets_the_game_defender_over_a_stale_one() {
+        let mut step = StepInitBlocking::new("end".into());
+        step.block_defender_id = Some("def1".into());
+        let mut game = make_game();
+        // A previous step in this activation left an unrelated player as the game's defender.
+        game.defender_id = Some("stale_victim".into());
+        game.field_model.set_player_state("def1", ffb_model::enums::PlayerState::new(PS_STANDING));
+        game.field_model.set_player_coordinate("def1", ffb_model::types::FieldCoordinate::new(5, 7));
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.defender_id.as_deref(), Some("def1"));
     }
 
     #[test]
