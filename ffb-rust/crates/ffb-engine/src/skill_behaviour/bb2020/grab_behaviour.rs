@@ -5,7 +5,21 @@ use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
 use crate::skill_behaviour::registry::SkillRegistry;
-use crate::step::bb2020::block::step_pushback::StepPushbackHookState;
+// NOTE ON THE HOOK STATE TYPE: this behaviour is a step modifier on `StepId::Pushback`, and the
+// step the driver actually runs for BB2020 is the SHARED `step::bb2025::block::StepPushback` (there
+// is no `Rules::Bb2020` arm in `make_step_for`, so bb2020 falls through the default arm's
+// `use crate::step::bb2025::block::*` glob). It therefore publishes
+// `bb2025::block::step_pushback::StepPushbackHookState`, NOT the bb2020 struct of the same name.
+// Downcasting to the bb2020 type returned None and `.expect()` aborted the process on the FIRST
+// pushback of every bb2020 game.
+//
+// Java genuinely has separate bb2020/bb2025 `StepPushback` classes, but they differ in exactly one
+// behavioural line (bb2025 publishes `PUSHED_ON_BALL`), while Rust's bb2020 translation is the
+// staler of the two (356 lines of code against 433, and its hook state predates the `published` /
+// `clear_pushback_stack` fields the Stand Firm fix needs). Per the bb2016 campaign's lesson —
+// edition-gate the shared step, never route to the staler edition file — this uses the live hook
+// state and keeps this file's BB2020-SPECIFIC LOGIC intact.
+use crate::step::bb2025::block::step_pushback::StepPushbackHookState;
 use crate::util::util_server_pushback::UtilServerPushback;
 use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
@@ -159,7 +173,9 @@ impl Default for GrabBehaviour {
 mod tests {
     use super::*;
     use crate::skill_behaviour::registry::SkillRegistry;
-    use crate::step::bb2020::block::step_pushback::StepPushbackHookState;
+    // Same type re-point as the behaviour above: these tests must build the hook state the
+    // LIVE shared step publishes, or the modifier's downcast fails at runtime.
+    use crate::step::bb2025::block::step_pushback::StepPushbackHookState;
     use crate::step::framework::test_team;
     use ffb_model::enums::{PlayerAction, PlayerState, PS_STANDING, Rules, SkillId};
     use ffb_model::model::game::Game;

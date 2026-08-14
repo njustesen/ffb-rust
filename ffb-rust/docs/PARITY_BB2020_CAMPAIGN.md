@@ -143,3 +143,48 @@ The Java-side bb2020 XML (29 rosters + 58 team files) lives in the `ffb` harness
 a local branch `t3-phase2-wip` with **no upstream configured** — those generated files are untracked
 there. Anyone reproducing this needs to re-run `python scripts/gen_java_parity_data.py` after
 checking out `ffb-rust`.
+
+
+---
+
+# CAMPAIGN LOG (restarted 2026-08-14 after the retraction)
+
+## ITER1 — the panics were ONE cause: duplicate hook-state types
+
+Every bb2020 roster aborted on game 1 with
+`StandFirmStepModifier: step_state must be StepPushbackHookState`. Root cause:
+
+`make_step_for` has a `Rules::Bb2016` override block routing ~40 step ids to `step/bb2016/*`, but
+**no `Rules::Bb2020` arm at all** — the only `Rules::Bb2020` reference in the driver is the
+start-game sequence generator. So bb2020 falls through the default arm, whose
+`use crate::step::bb2025::block::*` glob resolves to the **bb2025** step. That step publishes
+`bb2025::…::StepPushbackHookState`, while the bb2020 skill behaviours downcast to
+`bb2020::…::StepPushbackHookState` — a *different type with the same name*. `Any` cannot tell them
+apart, the downcast returns `None`, and `.expect()` aborted the process. It fired before the code
+even checks whether anyone has Stand Firm, hence on the first pushback of every game.
+
+**Why not route bb2020 to its own step files** (the obvious fix): Java's `bb2020` and `bb2025`
+`StepPushback` differ in exactly ONE behavioural line (bb2025 publishes `PUSHED_ON_BALL`), but
+Rust's bb2020 translation is the staler of the two — 356 lines of code against 433, and its hook
+state predates the `published` / `clear_pushback_stack` fields that the bb2016 campaign's Stand Firm
+fix needs. Routing to the staler file is exactly what regressed lineman during the bb2016 campaign.
+So: keep the shared step, fix the types.
+
+FIX (one root cause, five behaviours + one duplicate type):
+- `step/bb2020/block/step_pushback.rs` no longer defines its own `StepPushbackHookState` — it
+  **re-exports the bb2025 one**. Two structurally identical types with the same name are
+  indistinguishable to `Any`; deleting the duplicate makes this class of bug unrepresentable.
+- The five bb2020 behaviours that downcast a bb2020 hook state now use the live shared types, with
+  their BB2020-specific logic untouched: `stand_firm`, `side_step`, `grab` (Pushback) and `catch`,
+  `monstrous_mouth` (Catch — those two structs were already byte-identical).
+- The three Pushback behaviours' test modules build the shared hook state too.
+
+**Verified:** bb2020 human goes from *aborting on game 1* to **10/20 seeds passing** — the edition is
+measurable for the first time. No regressions: bb2016 and bb2025 lineman/human/norse all still
+`100/100 games match`; `cargo test -p ffb-engine` **7115/0**.
+
+### Next
+1. Java still dies on `UNHANDLED_STEP: PRAYER turnMode=KICKOFF` → `STUCK_STEP: PRAYER`
+   (`ParityRunner.handleStep` has no `PRAYER` case; BB2020 introduced Prayers to Nuffle). Until that
+   is handled the Java game ends in half 1, so a chunk of the remaining failures are harness-side.
+2. Then work rosters fewest-fails-first in the usual loop.

@@ -21,59 +21,15 @@ use crate::skill_behaviour::dispatch;
 /// `StepPushback` is already a separate struct from BB2025's, so its hook-state
 /// shape stays decoupled too (BB2016 is the special case that re-exports BB2025's
 /// `StepPushback` wholesale, and reuses BB2025's hook-state type accordingly).
-#[derive(Debug)]
-pub struct StepPushbackHookState {
-    /// Java: state.doPush
-    pub do_push: bool,
-    /// Java: state.sideStepping (Map<String, Boolean>)
-    pub side_stepping: HashMap<String, bool>,
-    /// Java: state.standingFirm (Map<String, Boolean>)
-    pub standing_firm: HashMap<String, bool>,
-    /// Java: state.grabbing (Boolean — tristate)
-    pub grabbing: Option<bool>,
-    /// Java: state.startingPushbackSquare
-    pub starting_pushback_square: Option<PushbackSquare>,
-    /// Java: state.defender (Player) — carried as a player id for headless
-    pub defender_id: String,
-    /// Java: state.oldDefenderState
-    pub old_defender_state: Option<PlayerState>,
-    /// Java: state.pushbackStack (non-empty means player already chose coords)
-    pub pushback_stack_len: usize,
-    /// Java: state.freeSquareAroundDefender
-    pub free_square_around_defender: bool,
-    /// Java: state.pushbackSquares — the current candidate squares
-    pub pushback_squares: Vec<PushbackSquare>,
-    /// Java: state.pushbackMode
-    pub pushback_mode: PushbackMode,
-}
+/// The Pushback hook state is SHARED, not per-edition. This file used to define its own
+/// `StepPushbackHookState` with the same name and (nearly) the same fields as the bb2025 one, which
+/// is how a whole class of panics arose: the driver has no `Rules::Bb2020` arm, so BB2020 runs the
+/// shared `bb2025::block::StepPushback`, which publishes the bb2025 struct — while the bb2020 skill
+/// behaviours downcast to THIS struct and aborted the process on the first pushback of every bb2020
+/// game. Two structurally identical types with the same name cannot be told apart by `Any`, so the
+/// duplicate is gone and both editions now use one type.
+pub use crate::step::bb2025::block::step_pushback::StepPushbackHookState;
 
-impl StepPushbackHookState {
-    pub fn new(
-        defender_id: String,
-        old_defender_state: Option<PlayerState>,
-        starting_pushback_square: Option<PushbackSquare>,
-        pushback_stack_len: usize,
-        free_square_around_defender: bool,
-        pushback_squares: Vec<PushbackSquare>,
-        side_stepping: HashMap<String, bool>,
-        standing_firm: HashMap<String, bool>,
-        grabbing: Option<bool>,
-    ) -> Self {
-        Self {
-            do_push: false,
-            side_stepping,
-            standing_firm,
-            grabbing,
-            starting_pushback_square,
-            defender_id,
-            old_defender_state,
-            pushback_stack_len,
-            free_square_around_defender,
-            pushback_squares,
-            pushback_mode: PushbackMode::REGULAR,
-        }
-    }
-}
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2020.block.StepPushback.
 /// Handles player pushback and crowd-push. The Java StepState fields are inlined here.

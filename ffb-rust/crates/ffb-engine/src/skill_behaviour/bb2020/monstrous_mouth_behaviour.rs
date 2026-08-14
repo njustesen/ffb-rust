@@ -9,7 +9,12 @@ use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
 use crate::skill_behaviour::registry::SkillRegistry;
-use crate::step::bb2020::shared::step_catch_scatter_throw_in::StepCatchHookState;
+// HOOK STATE TYPE: see the note in `stand_firm_behaviour.rs`. The driver has no `Rules::Bb2020` arm,
+// so BB2020 runs the SHARED `bb2025::shared::StepCatchScatterThrowIn`, which publishes the bb2025
+// `StepCatchHookState`. The two structs are byte-identical, so this is a pure type re-point; the
+// BB2020-specific logic in this file is unchanged. Downcasting to the bb2020 type aborted the
+// process on the first catch of a bb2020 game.
+use crate::step::bb2025::shared::step_catch_scatter_throw_in::StepCatchHookState;
 use ffb_model::enums::{ReRollSource, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::model::re_rolled_action::ReRolledAction;
