@@ -1153,3 +1153,66 @@ sequence, both roll the same failing die — and Rust still throws. So the diver
 `StepOutcome` it returns on failure) rather than reasoning about sequences again.
 
 Baseline unchanged: `chaos_pact` 24/25, `human` 100/100.
+
+## ITER23 — chaos_pact seed 22: measured, not guessed. Two theories killed, guard located.
+
+Applied ITER22's lesson: every claim below is a measurement, and each one killed a theory.
+
+**1. The negatrait-abort theory (ITER21/22) is dead.** A trace on `step_really_stupid.rs` printing
+the acting action, failure label and returned outcome shows *every* `ReallyStupid` execution in this
+game runs inside the MOVE sequence and behaves correctly:
+
+```
+RS_TRACE pid=Some("home_03") action=Some(Move) goto_fail='END_MOVING' outcome=Some((GotoLabel, Some("END_MOVING")))
+```
+
+The failing roll at dice pos 45 belongs to a Move activation that Rust ends correctly. It has nothing
+to do with the TTM.
+
+**2. Both agents declare the throw.** `FFB_ACT_TRACE` shows Java's own harness picking it:
+
+```
+JAVA_ACT_PICK pid=…Home2 N=2 idx=1 action=THROW_TEAM_MATE live=[MOVE,THROW_TEAM_MATE] snapshot=2
+```
+
+So the action lists agree, and this is why ITER21's attempt to filter TTM out of `legal_actions`
+regressed — removing an entry shifts every later pick index and desyncs the two agents. **The guard
+must live in the engine, not the action list.**
+
+**3. The `passUsed` half of the guard is NOT the reason.** Measured at Rust's TTM dispatch:
+
+```
+TTM_TRACE pid=Some("home_02") pass_used=false ttm_used=false defender=Some("home_06")
+```
+
+Adding the (correct, Java-sourced) `!isPassUsed()` rejection therefore changed nothing here; it was
+reverted rather than left in unverified.
+
+**4. Java never reaches `INIT_THROW_TEAM_MATE`.** That activation rolls ZERO dice in Java (rng 46 is
+already the next player's Bone Head), and ParityRunner's `INIT_THROW_TEAM_MATE` case would send a
+throw target — which would produce dice. So Java rejects the declaration at `StepInitSelecting`.
+
+**Conclusion — the remaining term.** `bb2020/shared/StepInitSelecting:273` guards on TWO conditions:
+
+```java
+if (UtilServerSteps.checkCommandWithActingPlayer(getGameState(), throwTeamMateCommand)
+    && (!game.getTurnData().isPassUsed() || throwTeamMateCommand.isKicked())) {
+```
+
+`passUsed` is out, so the rejection is `checkCommandWithActingPlayer`:
+
+```java
+return StringTool.isProvided(cmd.getActingPlayerId())
+    && cmd.getActingPlayerId().equals(actingPlayer.getPlayerId());
+```
+
+i.e. the TTM command's acting-player id does not match the current `ActingPlayer` — the declaration
+is addressed to a player who is not (yet) the acting player, so Java silently drops it and the
+activation does nothing. Rust has no such check and proceeds to throw.
+
+**Next iteration:** confirm with a harness probe what `actingPlayerId` ParityRunner puts on the
+phase-2 `ClientCommandThrowTeamMate` versus `game.getActingPlayer().getPlayerId()` at that moment,
+then mirror the mismatch outcome in Rust's `StepInitSelecting` (activate, do nothing, no dice) —
+gated on the same condition Java uses, not on a special case for this seed.
+
+Baseline unchanged: `chaos_pact` 24/25, `human` 100/100. No engine changes kept this iteration.
