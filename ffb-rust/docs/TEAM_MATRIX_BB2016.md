@@ -101,3 +101,13 @@ Every roster re-run 1-100 `--no-abort`, 0 fails: lineman, amazon, chaos, chaos_d
   skaven, wood_elf, undead, chaos, goblin, halfling), but no sweep has ever been run. A real bb2020
   campaign would start by drafting `data/teams/bb2020/team_<race>.json` and regenerating the
   Java-side XML with `scripts/gen_java_parity_data.py`.
+
+## Re-verified with the POSITIVE signal (2026-08-14, after the bb2020 retraction)
+Every roster in BOTH green editions re-run at 1-100 `--no-abort` and checked against
+`PARITY: N/N games match` (the count of games actually COMPARED) rather than the absence of
+`PARITY FAIL` lines:
+- **bb2016: 30/30 rosters each reporting `100/100 games match`.**
+- **bb2025: 30/30 rosters each reporting `100/100 games match`.**
+- bb2020: no `PARITY:` line at all — the process panics at exit 101 before comparing anything.
+
+So the bb2016/bb2025 results were real; only the bb2020 claim was vacuous.

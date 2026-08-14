@@ -118,8 +118,20 @@ harness dies before comparing anything. On 2026-08-14 a whole bb2020 matrix was 
 way: the Rust engine panicked on the first game of every roster
 (`bb2020/stand_firm_behaviour.rs:37`), the process exited 101, and every roster read "0 fails".
 
-Two cheap guards, use both:
-- **check the exit code** (`; echo "exit=$?"`) — a panic is 101, not 0;
-- **require the combined timing line** `TIMING java_total=… rust_total=… (N seeds; batched JVM)`.
-  A run that prints only the java-only `TIMING java_total=… (batched JVM, N seeds)` never finished
-  its Rust loop.
+**Use the POSITIVE signal the harness already prints — do not count the absence of failures.**
+
+    PARITY: 100/100 games match[, but required coverage items are MISSING]
+
+That line states how many games were actually COMPARED. Grep for it, and check the denominator is
+the seed count you asked for:
+
+    out=$(./target/release/ffb-parity --home R --away R --edition E --tier 3 --seeds 1-100 --no-abort 2>&1)
+    echo "$out" | grep -oE "PARITY: [0-9]+/[0-9]+ games match"   # empty => NOTHING RAN
+
+Supporting guards:
+- **exit code**: a panic is **101**. Note a clean parity run still exits **1** when the tier-3
+  coverage checklist has missing items, so exit != 0 does NOT mean parity failed — but 101 does mean
+  the process died.
+- **the combined timing line** `TIMING java_total=… rust_total=… (N seeds; batched JVM)`. A run that
+  prints only the java-only `TIMING java_total=… (batched JVM, N seeds)` never finished its Rust
+  loop.
