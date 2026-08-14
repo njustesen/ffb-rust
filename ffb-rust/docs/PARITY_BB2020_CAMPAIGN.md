@@ -2690,3 +2690,51 @@ squares Java's `PushbackSquare`/`UtilServerPushback` generates for the same geom
 run on seed 57 should show whether `(12,9)` is missing from Rust's set or an extra square displaces it.
 
 Baseline: `ogre` 99/100, `goblin` 95/100, `nurgle` 21/25. Tree clean; no engine change this iteration.
+
+## ITER56 — chain-push root cause found; and a RETRACTION: `ogre` is 95/100, not 99/100
+
+### The chain-push divergence, root-caused with a direct A/B
+
+A gated probe in the HARNESS (`ParityRunner.sendPushback`, since reverted and the jar rebuilt to
+stock) dumps the squares Java's dialog actually offers. Against Rust's own dump for the same push:
+
+```
+JAVA  all=[(14,7) (14,8) (14,9) (13,9) (12,9)]  best=(12,9)
+RUST  squares=[(14,8) (14,9) (13,9)]            best=(13,9)
+```
+
+Rust's three squares are geometrically CORRECT for that attacker/defender pair — the bug is that Java
+offers **five**. Java's `StepPushback:161` is `fieldModel.add(state.pushbackSquares)`: it ADDS to
+whatever is already on the field model and only clears after the push resolves (`:219`). During a
+CHAIN push the model accumulates every pushed player's squares, the dialog offers all of them at once,
+and the harness picks the global min-x/min-y then derives WHICH player moves from the chosen square's
+direction. Rust did `pushback_squares.clear()` first — its own comment even cites Java's `add` — so it
+could never offer, let alone choose, a chain square.
+
+Removing the clear was necessary but NOT sufficient: Rust still offered three. The reason is
+structural — Java re-enters `StepPushback` once per chain link, accumulating and re-asking each time,
+while Rust resolves the whole chain inside one invocation (`for (player_id, coord) in pushes`) and
+asks only once. Landing this properly means matching that per-link loop, which is a real port rather
+than a one-line fix. Change reverted pending that.
+
+### RETRACTION: the `ogre` 99/100 in ITER55 does not reproduce
+
+ITER55 recorded `ogre` at 99/100 with a single failing seed (57), which is what made it the
+fewest-fails target. It now measures **95/100 with five failing seeds — 26, 42, 57, 70, 81** — stable
+across three consecutive runs. The 99/100 figure is retracted; treat 95/100 as the baseline.
+
+Between the two measurements the Java jar was rebuilt twice (probe in, probe out). The `ffb` working
+tree carries six uncommitted files, and I checked every one: all are gated behind
+`System.getProperty("ffb.parityDebug")` or `System.getenv(...)` and return unchanged values when the
+gate is off (`StatsMechanic.armourIsBroken` now assigns to a local and returns it; `StepGoForIt` and
+`StepPassBlock` only add a println). So they do not explain a behaviour change — which means either
+the previously-built jar predated some of them, or the ITER55 reading was simply misread.
+
+**This matters more than the seed it came from**: fewest-fails targeting is only as good as the
+counts, so the next iteration should first pin the Java side — record the jar's build state, re-run
+the already-green rosters (`lineman`, `human`, `underworld`, `chaos_pact`, `renegades`) against the
+current jar, and confirm they are still green before trusting any new comparison. If any of them moved,
+the campaign's green list needs re-verification too.
+
+Current measured baselines: `ogre` 95/100, `goblin` 95/100, `nurgle` 21/25. Tree clean on both repos
+(the six `ffb` files are pre-existing gated-logging changes, not from this session).
