@@ -119,10 +119,21 @@ impl StepReferee {
             }
         }
 
-        // Java: underScrutiny = prayerState.isUnderScrutiny(actingPlayer.getPlayer().getTeam())
-        // Stub: prayer state not yet implemented → false.
-        let under_scrutiny = false;
-        referee_spots_foul |= under_scrutiny && ctx.is_armor_broken();
+        // Java `SneakyGitBehaviour`'s StepReferee hook:
+        //     boolean underScrutiny = step.getGameState().getPrayerState()
+        //         .isUnderScrutiny(actingPlayer.getPlayer().getTeam());
+        //     refereeSpotsFoul |= underScrutiny;
+        // Two bugs here before: the flag was hardcoded `false` even though `PrayerState` has
+        // tracked `under_scrutiny` all along, AND it was ANDed with `isArmorBroken()`, which Java
+        // does not do — Under Scrutiny means the ref is watching that team, so ANY foul is spotted
+        // whether or not the armour broke. With it stubbed off, Rust let a spotted fouler play on
+        // while Java banned him and rolled Argue the Call (renegades bb2020 seed 25, i=152: Java
+        // ends the away turn, Rust carried on with the same activation).
+        let under_scrutiny = game
+            .player_team_id(&player_id)
+            .map(|team_id| game.prayer_state.is_under_scrutiny(team_id))
+            .unwrap_or(false);
+        referee_spots_foul |= under_scrutiny;
 
         // Java: addReport(new ReportReferee(refereeSpotsFoul, underScrutiny))
         game.report_list.add(ReportReferee::new(referee_spots_foul, under_scrutiny));
@@ -214,6 +225,34 @@ mod tests {
         game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING).change_active(true));
         game.field_model.set_player_coordinate(&pid, FieldCoordinate::new(5, 7));
         (game, pid)
+    }
+
+    /// Java `SneakyGitBehaviour` StepReferee hook: `refereeSpotsFoul |= underScrutiny`.
+    /// The Under Scrutiny prayer means the ref is watching that team, so a foul is spotted even
+    /// when neither roll is a double. `under_scrutiny` used to be hardcoded `false`, so a spotted
+    /// fouler played on in Rust while Java banned him (renegades bb2020 seed 25).
+    #[test]
+    fn under_scrutiny_spots_a_foul_with_no_doubles() {
+        let (mut game, _pid) = make_game_with_player(vec![]);
+        let team_id = game.team_home.id.clone();
+        game.prayer_state.add_under_scrutiny(&team_id);
+
+        let mut step = StepReferee::new();
+        // No doubles anywhere, and the armour did not even break.
+        step.injury_result_defender = Some(make_injury_result(Some([6, 4]), false, None));
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep, "a spotted foul continues to the ban steps");
+    }
+
+    /// Java ORs `underScrutiny` in unconditionally — it is NOT gated on `isArmorBroken()`, which is
+    /// what the stubbed line used to do. Same setup as above minus the prayer: not spotted.
+    #[test]
+    fn without_under_scrutiny_a_no_doubles_foul_is_not_spotted() {
+        let (mut game, _pid) = make_game_with_player(vec![]);
+        let mut step = StepReferee::new();
+        step.injury_result_defender = Some(make_injury_result(Some([6, 4]), false, None));
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel, "an unspotted foul skips the ban steps");
     }
 
     #[test]

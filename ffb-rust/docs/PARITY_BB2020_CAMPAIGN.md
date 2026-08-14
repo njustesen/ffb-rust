@@ -2364,3 +2364,55 @@ Two notes for later:
 - Adding a `Player` field surfaced four test constructors that spell every field out instead of
   ending with `..Default::default()`; they were updated. A Java-side doc snippet also had to be
   fenced as ```text — an indented block in a doc comment is compiled as a doctest.
+
+## ITER49 — re-scout, then `renegades` 🟢 100/100: Under Scrutiny was stubbed off
+
+**Re-scout first** (ITER20's table predates several edition-wide fixes, so it was re-measured):
+
+| roster | 1-25 | note |
+|---|---|---|
+| `chaos_pact` | **100/100 on 1-100** | was 1 fail |
+| `goblin`, `ogre` | 25/25 | were 14 and 25 fails |
+| `renegades` | 24/25 | this iteration's target |
+| `nurgle` | 21/25 | |
+| `dwarf` 5/25, `necromantic` 4/25, `elf` 3/25, `wood_elf` 3/25, `halfling` 2/25, `slann_fumbbl` 0/25 | | the heavies |
+
+**`renegades` seed 25, step 152.** Both engines activate `away_01` for a FOUL and roll **identical
+dice values** (`3,6,4,5,1,2,5,6` at positions 102-109). The difference is what the last one is: Java's
+`JAVA_DIE rng=109 ... from=DiceRoller.rollArgueTheCall:152` — the fouler was BANNED and the away turn
+ended (`i=153` is `home` in Java, still `away` in Rust).
+
+The chain is `generator/bb2020/Foul:46 StepId.REFEREE` -> `StepReferee` -> the hook in
+`skillbehaviour/bb2020/SneakyGitBehaviour`, which ends:
+
+```java
+boolean underScrutiny = step.getGameState().getPrayerState().isUnderScrutiny(actingPlayer.getPlayer().getTeam());
+refereeSpotsFoul |= underScrutiny;
+```
+
+Rust's `step/action/foul/step_referee.rs` had **two** faults in the corresponding line:
+
+```rust
+// Stub: prayer state not yet implemented → false.
+let under_scrutiny = false;
+referee_spots_foul |= under_scrutiny && ctx.is_armor_broken();
+```
+
+The flag was hardcoded `false` even though `PrayerState::is_under_scrutiny` — and the whole
+`UnderScrutinyHandler` with its own passing tests — had been there all along; and it was ANDed with
+`isArmorBroken()`, which Java does not do. Under Scrutiny means the ref is watching that team, so ANY
+foul is spotted, doubles or not, armour broken or not. Fixed to read the prayer state and OR it in
+unconditionally, with two tests: a no-doubles unbroken-armour foul IS spotted under scrutiny, and the
+same foul is NOT spotted without it (pinning that the armour-broken gate is gone).
+
+**Result: `renegades` bb2020 1-100 → `PARITY: 100/100 games match`** (from 96/100-equivalent).
+Gates: `lineman` bb2016/bb2025/bb2020 100/100, `human` bb2020 100/100, `underworld` bb2020 100/100,
+`chaos_pact` bb2020 100/100, `cargo test --workspace` 14,447 passed / 0 failed.
+
+**Running total: 8 of 30 green** (`lineman`, `human`, `underworld`, `chaos_pact`, `renegades`, plus
+`goblin` and `ogre` clean on 1-25 and awaiting their 1-100 gate). Next by fewest fails: `nurgle` (4).
+
+Worth noting the pattern: this is the third fix in a row where the Rust engine had the machinery and
+simply never connected it (the apothecary answer, the Intensive Training grant, now Under Scrutiny).
+A grep for "Stub:" and "not yet implemented" in the step tree is probably the cheapest way to find
+the next few.
