@@ -87,10 +87,13 @@ Every roster re-run 1-100 `--no-abort`, 0 fails: lineman, amazon, chaos, chaos_d
 - **bb2016: 30/30 GREEN** (this doc).
 - **bb2025: 30/30 GREEN** — all 30 re-run 1-100 `--no-abort` at 0 fails. The long-standing `ogre`
   red recorded on 2026-08-08 was STALE: intervening fixes cleared it.
-- **bb2020: 30/30 GREEN (2026-08-14)** — see `docs/PARITY_BB2020_CAMPAIGN.md`. Once bb2020 ran
-  rule-legal drafted teams against matching `Parity20` XML, all 29 rosters + lineman passed 1-100 on
-  the first sweep with NO engine fixes; BB2020 shares Java's `mixed/` classes with BB2025, so the
-  earlier campaigns had already hardened its paths. Superseded note below:
+- **bb2020: NOT green — status unknown.** The "30/30 on the first sweep" claim was RETRACTED
+  (see the retraction at the top of `docs/PARITY_BB2020_CAMPAIGN.md`): the Rust engine panics on the
+  first game of every bb2020 roster (`bb2020/stand_firm_behaviour.rs:37`, "step_state must be
+  StepPushbackHookState"), so the process aborted with exit=101 before comparing anything and the
+  zero-fail counts were vacuous. Java also dies on `UNHANDLED_STEP: PRAYER` (no `PRAYER` case in
+  `ParityRunner.handleStep`). The drafted teams + `Parity20` XML are correct and still stand.
+  Superseded note below:
 - ~~**bb2020: not a matrix.**~~ Both engines support exactly three rulesets (BB2016/BB2020/BB2025);
   bb2020 runs in the harness and has 29 rosters, but there are no `data/teams/bb2020/` specs, so
   `make_team` falls back to the legacy first-11-by-(quantity,cost) builder rather than the audited

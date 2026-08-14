@@ -110,3 +110,16 @@ The campaign runs progressively richer rosters so each tier exercises new mechan
 `docs/COVERAGE_REPORT.md` (+ `coverage_report.html`) show which mechanics a parity run actually
 exercised — actions, dice, injuries, kickoff events, the `GameEvent` catalog. Coverage is a
 *breadth* check (did we touch mechanic X), separate from the per-step hash *correctness* check.
+
+## A sweep is only VALID if the run exits 0 and prints `rust_total`
+
+`grep -c "^PARITY FAIL"` counts the ABSENCE of failure lines, which is also what you get when the
+harness dies before comparing anything. On 2026-08-14 a whole bb2020 matrix was reported green this
+way: the Rust engine panicked on the first game of every roster
+(`bb2020/stand_firm_behaviour.rs:37`), the process exited 101, and every roster read "0 fails".
+
+Two cheap guards, use both:
+- **check the exit code** (`; echo "exit=$?"`) — a panic is 101, not 0;
+- **require the combined timing line** `TIMING java_total=… rust_total=… (N seeds; batched JVM)`.
+  A run that prints only the java-only `TIMING java_total=… (batched JVM, N seeds)` never finished
+  its Rust loop.

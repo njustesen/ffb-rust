@@ -71,6 +71,41 @@ Two drafting details worth knowing:
   (`37733` = Renegade Rat Ogre), so an id-based check silently missed them and the shared Big-Guy
   pool went unenforced.
 
+## ⚠️ RETRACTION — the "30/30 GREEN" claim below is FALSE (2026-08-14)
+
+**The bb2020 sweeps measured nothing.** The Rust engine **panics on the first game of every bb2020
+roster**:
+
+```
+thread 'main' panicked at crates/ffb-engine/src/skill_behaviour/bb2020/stand_firm_behaviour.rs:37:14:
+StandFirmStepModifier: step_state must be StepPushbackHookState
+```
+
+The process aborts (`exit=101`) before a single game is compared, so
+`grep -c "^PARITY FAIL"` returned **0 because nothing ran**, not because anything passed. Every
+bb2020 result recorded below — the 1-25 scout, the 1-100 gate, all 29 rosters — is void.
+
+**How this got past me:** I counted the *absence* of failure lines without checking the exit code or
+confirming a `rust_total` timing was printed. bb2016/bb2025 runs print
+`TIMING java_total=… rust_total=… (N seeds; batched JVM)`; the bb2020 runs printed only the
+java-only line, which was the tell that the Rust loop never completed. The lesson is now in
+`docs/PARITY_PROCESS.md`: **a sweep is only valid if the run exits 0 and prints `rust_total`.**
+
+Known real state of bb2020:
+- **Rust**: panics immediately in the bb2020 `StandFirmBehaviour` step modifier — a genuine porting
+  bug, and the first thing to fix.
+- **Java**: also has harness gaps for bb2020 — seed 1 logs
+  `UNHANDLED_STEP: PRAYER turnMode=KICKOFF` → `STUCK_STEP: PRAYER`, i.e. `ParityRunner.handleStep`
+  has no `PRAYER` case (BB2020 introduced Prayers to Nuffle), so the Java game dies at half 1 with
+  `turnHome=0`. That needs a harness case + jar rebuild before bb2020 can be graded at all.
+
+The drafting work above (teams, `Parity20` XML, `java_team_id`) is unaffected and still correct —
+`JSTEP` confirms Java loads `teamHumanParity20Away3`.
+
+---
+
+## VOID — original (incorrect) status, kept for the record
+
 ## Status — 🏁 **30/30 GREEN on the first sweep** (2026-08-14)
 
 **No engine fixes were needed.** Once bb2020 was running rule-legal drafted teams against the
