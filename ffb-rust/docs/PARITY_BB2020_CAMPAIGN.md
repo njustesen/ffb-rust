@@ -1730,3 +1730,38 @@ activation and the guard is being reset — if they are different players, Rust 
 third Treeman where Java moved the first.
 
 Baseline unchanged: `halfling` 2/25. No engine changes this iteration.
+
+## ITER36 — switched to the protocol-correct roster; underworld seed 2 localised
+
+**Process correction.** The protocol says pick the roster with the FEWEST fails. Among the non-green
+bb2020 rosters that is `underworld` (3 fails), not `halfling` (23) — I had been chasing halfling for
+two iterations. Switched.
+
+**Halfling, closing the open question first (measured, then dropped):** a `TR_TRACE` carrying the die
+counter shows Rust's dice 64/65/66 are Take Root for **three different players**
+(`away_01`, `away_02`, `home_01`), so the once-per-activation guard is NOT being reset. Rust simply
+activated three players in a row while Java's die-64 roller went on to move and dodge. The remaining
+question there is why Rust's `away_01` does not move after passing Take Root — an agent/legal-move
+difference, not a Take Root bug.
+
+**Underworld seed 2** (two-log join). Alignment is exact through die **84**:
+
+```
+  83 java d6=1  InjuryTypeDropDodge.handleInjury               rust d6=1  DropFallingPlayers
+  84 java d6=1  AnimalSavageryBehaviour$1.handleExecuteStepHook rust d6=1  AnimalSavagery
+  85 java d6=3  StepMoveDodge.dodge                            rust d6=3  EndTurn      <- sequences part
+  86 java d6=5  InjuryTypeDropDodge.handleInjury               rust d8=7  KickoffScatterRoll
+```
+
+Both engines roll Animal Savagery at 84 and both get **1** (a failure). Java then continues the
+activation — the player moves and dodges at 85. Rust instead ends the turn, and by 86 the drive is
+over and it is kicking off.
+
+So the divergence is **what a failed Animal Savagery does in BB2020**. Note the harness has a
+dedicated mandatory-choice path for this (ParityRunner's `PLAYER_CHOICE` arm treats `ANIMAL_SAVAGERY`
+as min-(x,y) rather than declining, because the dialog is min=1/max=1), so the next step is to read
+`skillbehaviour/bb2020/AnimalSavageryBehaviour.handleExecuteStepHook` against Rust's
+`step_animal_savagery.rs` — specifically what each does on failure when the player has fewer than two
+adjacent team-mates to lash out at.
+
+Baseline unchanged: `underworld` 22/25, `halfling` 2/25. No engine changes this iteration.
