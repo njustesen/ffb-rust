@@ -619,3 +619,50 @@ reports a pending dialog; `applySelection` grants the skill/AV to the chosen pla
 **Noted, not yet ported:** `IntensiveTrainingHandler extends DialogPrayerHandler` shows a *skill*
 dialog (`DialogSelectSkillParameter`) rather than a player choice; Rust still routes it through
 random selection. Prayer roll 16, so it will surface on a later seed.
+
+## ITER11 — root cause found, fix REVERTED (regressed 90→84): the BB2020 kickoff table
+
+**Seed 23, i=138.** Dice identical (`rng_calls=47` both), one field differed: `h08` Stunned in Java,
+Standing in Rust. Java's log showed the second-half kickoff resolving **Officious Ref**
+(`rollThrowARock` d6=1 home / d6=6 away → `randomPlayer` d11=9 → `insertSteps` d6=6 → stun).
+
+Rust rolled the *same four dice* but applied a different event. A `FFB_KICK_TRACE` probe on the
+shared step's dispatch showed `KickoffResult::DodgySnack`.
+
+**Root cause.** Java has one `KickoffResultMapping` per edition and BB2020's differs from BB2025's
+on exactly two rolls:
+
+| roll | `kickoff/bb2020/KickoffResultMapping` | `kickoff/bb2025/KickoffResultMapping` |
+|------|---------------------------------------|---------------------------------------|
+| 10   | `BLITZ`                               | `CHARGE`                              |
+| 11   | `OFFICIOUS_REF`                       | `DODGY_SNACK`                         |
+
+Rust's live `bb2025/kickoff/step_kickoff_result_roll.rs` hard-codes the BB2025 table, so every
+BB2020 game has run the wrong event on rolls 10 and 11 since the edition was added. Dodgy Snack
+happens to draw the same d6/d6/d11/d6 shape as Officious Ref, which is why the dice streams stayed
+aligned and only the board diverged — that coincidence is why this survived 10 iterations.
+
+**Why the fix was reverted.** Edition-gating the table (`kickoff_result_for_roll_in(rules, roll)`),
+porting `handleOfficiousRef` + its `insertSteps` into the shared apply step, and threading the
+`GOTO_LABEL_ON_BLITZ`/`ON_END` labels onto the harness's flattened `kickoff_tail()` all worked —
+seed 23's Officious Ref then matched — but the roll-10 → `BLITZ` result exposed a second, larger
+gap: **the BB2020 Blitz! kickoff (a free turn for the kicking team) is not wired up in the shared
+kickoff sequence.** The flattened `kickoff_tail()` / `h2_kickoff_sequence()` have no labelled
+`BLITZ_TURN` target and no `GotoLabel` jump around it, so the goto drained the step stack; adding
+them by hand changed the post-kickoff ball position (seed 23 step 1: Java `b12,8` vs Rust `b10,0`).
+Net effect on the roster was **90 → 84**, so the whole change was reverted per the campaign's
+revert-on-regression rule. Baseline re-confirmed at `PARITY: 90/100`.
+
+**Next iteration should land this properly**, in this order:
+1. Build the BB2020 kickoff sequence from `generator/mixed/Kickoff::build_sequence` (which already
+   threads both labels and includes the labelled `BlitzTurn` + `KickoffAnimation` steps) instead of
+   hand-patching `kickoff_tail()`, and reconcile the resulting step order against Java's
+   `generator/mixed/Kickoff` step-by-step — the ball-position drift above is an ordering bug in the
+   flattened tail, not in the Blitz handler.
+2. Then edition-gate `kickoff_result_for_roll`, and route `Blitz` → `goto_label_on_blitz` /
+   `OficiousRef` → the ported `handle_officious_ref` in the shared apply step.
+3. `handleOfficiousRef`'s `roll == 1` arm (eject instead of stun) needs the EJECT_PLAYER
+   sub-sequence; the BB2020-file port has it (`build_eject_seq`) and can be lifted with the rest.
+
+Kept from this iteration: nothing in the engine. The `FFB_UNHANDLED_DUMP` harness probe from ITER10
+and the `FFB_KICK_TRACE`-style dispatch probing technique are what made the diagnosis quick.
