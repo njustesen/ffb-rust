@@ -1585,3 +1585,56 @@ and dump its modifier list, rather than assuming a tackle-zone difference.
 Roster counts unchanged (`chaos_pact` 25/25, `ogre` 25/25, `goblin` 24/25) — expected, since only two
 consumers read `properties_for`. Gates: `human` bb2020 100/100, `lineman` bb2016 100/100, `lineman`
 bb2025 100/100, `cargo test --workspace` 14/14 suites (2788 ffb-model tests).
+
+## ITER33 — goblin 🟢 25/25: Rust ignored Java's skill-property CANCELLATION
+
+The dodge chase lands. Java's `DodgeModifierFactory`:
+
+```java
+protected boolean isAffectedByTackleZones(DodgeContext context) {
+    return !UtilCards.hasUncanceledSkillWithProperty(context.getPlayer(),
+        NamedProperties.ignoreTacklezonesWhenDodging);
+}
+```
+
+**`hasUncanceledSkillWithProperty`** — the player must have the property AND no skill of theirs may
+cancel it:
+
+```java
+return Arrays.stream(skills).anyMatch(s -> s.hasSkillProperty(property))
+    && Arrays.stream(skills).flatMap(s -> s.getSkillProperties().stream())
+       .noneMatch(sp -> sp instanceof CancelSkillProperty && sp.cancelsProperty(property));
+```
+
+Rust used a plain `has_skill_property`, so cancellation was never honoured anywhere.
+
+**The seed-16 dodger is `away_04` = `goblin.bombardier`.** Its Stunty grants
+`ignoreTacklezonesWhenDodging`; its own `skill/bb2020/Bombardier` registers
+`CancelSkillProperty(ignoreTacklezonesWhenDodging)`. Java therefore applies the tackle-zone modifier
+for the marking `home_04` — minimum **4**, and the rolled 3 fails, the player falls, and `a03` is
+KO'd. Rust skipped the modifier — minimum **3**, the 3 passes — which left Rust an extra available
+player, an extra activation, and everything that cascaded from it.
+
+**Fix.** `Player::has_uncanceled_skill_property_in(rules, prop)` — a 1:1 port; Rust already models
+`CancelSkillProperty(X)` as the pseudo-property `cancelsX` (the shape ITER32 taught the generator to
+capture), so the cancel test is a lookup for that name in the per-edition set. The dodge factory's
+`isAffectedByTackleZones` now uses it.
+
+**Results:**
+
+| roster | before | after |
+|---|---|---|
+| `goblin` | 24/25 | **25/25** 🟢 |
+| `chaos_pact`, `ogre` | 25/25 | 25/25 🟢 |
+| `halfling` | 2/25 | 2/25 |
+| `underworld` | 22/25 | 22/25 |
+
+Gates: `human` bb2020 100/100, `lineman` bb2016 100/100, `lineman` bb2025 100/100,
+`cargo test --workspace` 14/14 suites.
+
+Test `uncanceled_skill_property_respects_cancellation` pins all three cases, including the trap: the
+plain check still answers `true` for the Bombardier while the uncancelled one answers `false`.
+
+**Follow-up:** `hasUncanceledSkillWithProperty` and `hasSkillToCancelProperty` are used at other Java
+call sites too. Grep them and convert the matching Rust checks — every one is a latent version of
+this bug.

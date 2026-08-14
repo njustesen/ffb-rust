@@ -269,6 +269,30 @@ impl Player {
         self.all_skill_ids().any(|id| id.properties_for(rules).contains(&property))
     }
 
+    /// 1:1 translation of `UtilCards.hasUncanceledSkillWithProperty(Player, ISkillProperty)`:
+    ///
+    /// ```java
+    /// return Arrays.stream(skills).anyMatch(skill -> skill.hasSkillProperty(property))
+    ///     && Arrays.stream(skills).flatMap(skill -> skill.getSkillProperties().stream())
+    ///        .noneMatch(sp -> sp instanceof CancelSkillProperty && sp.cancelsProperty(property));
+    /// ```
+    ///
+    /// i.e. the player has the property AND no skill of theirs cancels it. Rust models Java's
+    /// `CancelSkillProperty(X)` as the pseudo-property `cancelsX`, so the cancel check is a lookup
+    /// for that name.
+    ///
+    /// This matters wherever Java calls the "uncanceled" variant: a BB2020 goblin Bombardier has
+    /// `ignoreTacklezonesWhenDodging` from Stunty but its own Bombardier skill registers
+    /// `CancelSkillProperty(ignoreTacklezonesWhenDodging)`, so it IS affected by tackle zones when
+    /// dodging (goblin bb2020 seed 16).
+    pub fn has_uncanceled_skill_property_in(&self, rules: crate::enums::Rules, property: &str) -> bool {
+        if !self.has_skill_property_in(rules, property) {
+            return false;
+        }
+        let cancel = format!("cancels{}{}", property[..1].to_uppercase(), &property[1..]);
+        !self.all_skill_ids().any(|id| id.properties_for(rules).contains(&cancel.as_str()))
+    }
+
     /// Java: getSkillWithProperty — returns the first SkillId that has the given property.
     pub fn skill_id_with_property(&self, property: &str) -> Option<SkillId> {
         self.all_skill_ids().find(|id| id.properties().contains(&property))
@@ -576,6 +600,37 @@ impl IXmlReadable for Player {
 
 #[cfg(test)]
 mod tests {
+
+    /// 1:1 of Java's `UtilCards.hasUncanceledSkillWithProperty`: the player must HAVE the property
+    /// and no skill of theirs may cancel it. A BB2020 goblin Bombardier gets
+    /// `ignoreTacklezonesWhenDodging` from Stunty, but `skill/bb2020/Bombardier` registers
+    /// `CancelSkillProperty(ignoreTacklezonesWhenDodging)` — so it IS affected by tackle zones when
+    /// dodging. Using the plain check dropped the tackle-zone modifier, turning a minimum of 4 into
+    /// 3 so a rolled 3 passed in Rust and failed in Java (goblin bb2020 seed 16).
+    #[test]
+    fn uncanceled_skill_property_respects_cancellation() {
+        use crate::enums::{Rules, SkillId};
+        use crate::model::skill_def::SkillWithValue;
+
+        let mut stunty_only = Player { id: "g".into(), name: "g".into(), nr: 1, ..Default::default() };
+        stunty_only.starting_skills = vec![SkillWithValue::new(SkillId::Stunty)];
+        assert!(stunty_only.has_uncanceled_skill_property_in(Rules::Bb2020, "ignoreTacklezonesWhenDodging"),
+            "Stunty alone grants it uncancelled");
+
+        let mut bombardier = Player { id: "b".into(), name: "b".into(), nr: 2, ..Default::default() };
+        bombardier.starting_skills = vec![
+            SkillWithValue::new(SkillId::Stunty),
+            SkillWithValue::new(SkillId::Bombardier),
+        ];
+        // The plain check still says true — that is exactly the trap.
+        assert!(bombardier.has_skill_property_in(Rules::Bb2020, "ignoreTacklezonesWhenDodging"));
+        assert!(!bombardier.has_uncanceled_skill_property_in(Rules::Bb2020, "ignoreTacklezonesWhenDodging"),
+            "bb2020 Bombardier cancels it, so the dodger IS affected by tackle zones");
+
+        // No property at all → false regardless of cancellation.
+        let plain = Player { id: "p".into(), name: "p".into(), nr: 3, ..Default::default() };
+        assert!(!plain.has_uncanceled_skill_property_in(Rules::Bb2020, "ignoreTacklezonesWhenDodging"));
+    }
 
     /// `has_skill_property_in` must answer with the PER-EDITION property set, not the union.
     /// Ball & Chain registers `grabOutsideBlock` only in `skill/bb2016/BallAndChain`, so a BB2020 or

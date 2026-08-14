@@ -60,11 +60,19 @@ impl DodgeModifierFactory {
             .filter(|m| m.get_type() == ModifierType::REGULAR && m.applies_to_context(context))
             .collect();
 
-        // Java: isAffectedByTackleZones → !player.hasSkillProperty(ignoreTacklezonesWhenDodging)
+        // Java `DodgeModifierFactory.isAffectedByTackleZones`:
+        //   return !UtilCards.hasUncanceledSkillWithProperty(player, ignoreTacklezonesWhenDodging);
+        // Note UNCANCELED, and note the per-edition property set. A BB2020 goblin Bombardier gets
+        // `ignoreTacklezonesWhenDodging` from Stunty but its own Bombardier skill registers
+        // `CancelSkillProperty(ignoreTacklezonesWhenDodging)`, so it IS affected by tackle zones.
+        // Using the plain (uncancelled, edition-agnostic) check let such a player dodge without the
+        // tackle-zone penalty — minimum 3 instead of 4, so a rolled 3 passed in Rust and failed in
+        // Java (goblin bb2020 seed 16, away_04 dodging (13,8)->(13,9) marked by home_04).
         let player = context.acting_player.player_id.as_deref()
             .and_then(|id| context.game.player(id));
         let affected_by_tackle_zones = player
-            .map(|p| !p.has_skill_property(NamedProperties::IGNORE_TACKLEZONES_WHEN_DODGING))
+            .map(|p| !p.has_uncanceled_skill_property_in(
+                context.game.rules, NamedProperties::IGNORE_TACKLEZONES_WHEN_DODGING))
             .unwrap_or(true);
 
         if affected_by_tackle_zones {
