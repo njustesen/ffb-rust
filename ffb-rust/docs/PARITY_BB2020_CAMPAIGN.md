@@ -1395,3 +1395,42 @@ before that ball handling.
 **Method note:** an earlier "0 consumers" count in this session was wrong because the shell `cd` had
 reset — always `cd` explicitly in each command before grepping, and re-check a zero result that
 contradicts an earlier grep.
+
+## ITER28 — goblin seed 16: the die-101 bounce is a SYMPTOM; the agents desync earlier
+
+Chased ITER27's lead and it dissolved under measurement — recording that so the next iteration does
+not re-chase it.
+
+**The lead:** at die 101 Java rolls `d8 rollScatterDirection <- StepCatchScatterThrowIn.bounceBall`
+and Rust does not. An `FFB_RNG_BT=101` backtrace shows Rust's 101 comes from
+`step::bb2025::block::step_block_roll` — Rust is rolling *another block die* there, not skipping a
+bounce.
+
+**Working backwards, the dice VALUES agree for 100 rolls but the CALLERS do not:**
+
+| die | Java | Rust |
+|---|---|---|
+| 93, 94, 95 | three `ReallyStupidBehaviour` rolls | 93 only; 94/95 are block dice |
+| 96 | ONE block die (`rollBlockDice`) | armour |
+| 101 | ball bounce | a new block die |
+
+Rust's own prompt at that block reads
+`BlockChoice { attacker_id: "away_01", defender_id: "home_02", dice: [6, 4], nr_of_dice: 2 }` —
+`away_01` is the `goblin.troll` (ST 5) and `home_02` the `goblin.pogoer` (ST 2). **Neither engine's
+count makes sense for that pairing** (ST 5 vs ST 2 should be three dice, and Java's single die even
+fewer), which is the tell that the two engines are no longer blocking the same pairing at all.
+
+**Confirmed:** comparing `JAVA_ACT_PICK` against `RUST_ACT_PICK` shows the activation streams desync
+well before the block — Java made 305 picks, Rust 296, and by pick 174 they are on different players
+entirely (`Home4` with `live=[MOVE,PASS,HAND_OVER,THROW_BOMB]` vs `home_01` with `N=2`). The
+identical dice VALUES through 100 are coincidence, not alignment.
+
+**Also eliminated:** `ignoreBlockAssists` (the BB2020/BB2025-only Ball & Chain property) has **zero
+consumers** in Rust, so it cannot explain a dice-count difference.
+
+**Next iteration:** find the first pick where the two agents' *action lists* differ (`N` and the
+`live=[…]` set), not the first where the chosen action differs — the list is what drives the index,
+and `THROW_BOMB` in Java's list at pick 174 suggests a Bombardier-related availability difference
+worth checking first. Compare `JAVA_ACT_PICK`/`RUST_ACT_PICK` pairwise on `N` from pick 0.
+
+Baseline unchanged: `goblin` 24/25, `chaos_pact` 25/25. No engine changes this iteration.
