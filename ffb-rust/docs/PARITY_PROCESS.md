@@ -118,6 +118,17 @@ harness dies before comparing anything. On 2026-08-14 a whole bb2020 matrix was 
 way: the Rust engine panicked on the first game of every roster
 (`bb2020/stand_firm_behaviour.rs:37`), the process exited 101, and every roster read "0 fails".
 
+### The harness now makes this failure mode impossible (2026-08-14)
+A Rust panic no longer aborts the process. Each game runs inside `catch_unwind`; a panic is recorded
+as a **parity FAILURE for that seed** (Java played the game, Rust could not — that *is* a divergence),
+the sweep continues, and the verdict line names it:
+
+    RUST PANIC seed=1 (human vs human): StandFirmStepModifier: step_state must be StepPushbackHookState
+    PARITY: 0/3 passed, 3 FAILED. [3 RUST PANIC(S) — counted as failures]
+
+So a dead engine now reports `0/N passed` instead of producing zero output for a
+`grep -c "PARITY FAIL"` to misread as success.
+
 **Use the POSITIVE signal the harness already prints — do not count the absence of failures.**
 
     PARITY: 100/100 games match[, but required coverage items are MISSING]

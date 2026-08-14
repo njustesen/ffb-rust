@@ -257,18 +257,46 @@ fn main() {
     let java_total = java_t0.elapsed();
     println!("TIMING java_total={:.3}s (batched JVM, {total} seeds)", java_total.as_secs_f64());
     let mut rust_total = std::time::Duration::ZERO;
+    let mut rust_panics = 0usize;
 
     for seed in args.seed_start..=args.seed_end {
         println!("Seed {seed}: {} vs {} ({})", args.home, args.away, args.edition);
 
         let rust_t0 = std::time::Instant::now();
-        let (_, events, _home_score, _away_score) = runner::run_rust_headless(seed, &args.home, &args.away, &args.edition, args.verbose, args.tier);
+        // A Rust panic IS a parity divergence — Java played the game, Rust could not. Catch it and
+        // record the seed as a FAILURE instead of letting the process abort.
+        //
+        // This guard exists because an aborting process is indistinguishable from a clean sweep to
+        // anything that counts "PARITY FAIL" lines: on 2026-08-14 a whole bb2020 matrix was reported
+        // green while the engine panicked on game 1 of every roster (exit 101, zero games compared,
+        // zero failure lines to count). Now the run keeps going, the seed is counted, and the
+        // summary reports the truth.
+        let home = args.home.clone();
+        let away = args.away.clone();
+        let edition = args.edition.clone();
+        let panic_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            runner::run_rust_headless(seed, &home, &away, &edition, args.verbose, args.tier)
+        }));
         rust_total += rust_t0.elapsed();
-        if let Some(cov) = t3_cov.as_mut() {
-            for ev in &events { cov.tally(ev); }
-            cov.games += 1;
-        }
-        let result = comparator::compare_logs(seed, &args.home, &args.away);
+
+        let result = match panic_result {
+            Ok((_, events, _home_score, _away_score)) => {
+                if let Some(cov) = t3_cov.as_mut() {
+                    for ev in &events { cov.tally(ev); }
+                    cov.games += 1;
+                }
+                comparator::compare_logs(seed, &args.home, &args.away)
+            }
+            Err(payload) => {
+                let msg = payload
+                    .downcast_ref::<&str>().map(|s| s.to_string())
+                    .or_else(|| payload.downcast_ref::<String>().cloned())
+                    .unwrap_or_else(|| "<non-string panic payload>".to_string());
+                rust_panics += 1;
+                eprintln!("RUST PANIC seed={seed} ({} vs {}): {msg}", args.home, args.away);
+                comparator::CompareResult::rust_panic(msg)
+            }
+        };
         update_progress::update(seed, &args.home, &args.away, &result);
 
         if result.matches {
@@ -314,13 +342,22 @@ fn main() {
         println!("Coverage written to T3_COVERAGE.md and t3_coverage.html");
     }
 
+    // ALWAYS emit a verdict line naming how many games were actually COMPARED, and always name
+    // panics separately. Counting the absence of "PARITY FAIL" lines cannot distinguish "all
+    // passed" from "nothing ran"; this line can, because `passed + failed` is the games compared.
+    let panic_note = if rust_panics > 0 {
+        format!(" [{rust_panics} RUST PANIC(S) — counted as failures]")
+    } else {
+        String::new()
+    };
+
     if failed == 0 && checklist_ok {
-        println!("PARITY: {passed}/{total} games match.");
+        println!("PARITY: {passed}/{total} games match.{panic_note}");
     } else if failed == 0 {
-        eprintln!("PARITY: {passed}/{total} games match, but required coverage items are MISSING.");
+        eprintln!("PARITY: {passed}/{total} games match, but required coverage items are MISSING.{panic_note}");
         std::process::exit(1);
     } else {
-        eprintln!("PARITY: {passed}/{total} passed, {failed} FAILED.");
+        eprintln!("PARITY: {passed}/{total} passed, {failed} FAILED.{panic_note}");
         std::process::exit(1);
     }
 }

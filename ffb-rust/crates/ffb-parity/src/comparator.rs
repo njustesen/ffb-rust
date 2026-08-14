@@ -14,6 +14,24 @@ pub struct CompareResult {
     pub rust_hash: String,
 }
 
+impl CompareResult {
+    /// A Rust panic is a parity divergence: Java played the game, Rust could not. `main` records the
+    /// seed with this so the sweep keeps running and the summary counts it, instead of the process
+    /// aborting and leaving a "PARITY FAIL"-counting caller to read zero failures as success.
+    pub fn rust_panic(msg: String) -> Self {
+        Self {
+            matches: false,
+            divergence_index: 0,
+            java_event: None,
+            rust_event: None,
+            java_event_count: 0,
+            rust_event_count: 0,
+            java_hash: String::new(),
+            rust_hash: format!("<rust panicked: {msg}>"),
+        }
+    }
+}
+
 /// Compare the Java and Rust parity JSONL logs for `seed` and a specific matchup.
 ///
 /// Reads both log files from disk. Returns a `CompareResult` describing the
