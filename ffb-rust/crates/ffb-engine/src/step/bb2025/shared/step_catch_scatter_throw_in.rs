@@ -686,7 +686,10 @@ impl StepCatchScatterThrowIn {
 
     /// Java: throwInBall() — corner/sideline roll, 2d6 distance, advance step-by-step.
     fn throw_in_ball(&mut self, game: &mut Game, rng: &mut GameRng) -> Option<CatchScatterThrowInMode> {
-        let mechanic = ThrowInMechanic::new();
+        // Java: `game.getMechanic(Mechanic.Type.THROW_IN)` — per-edition. BB2020 adds +1 to the
+        // distance and has no corner throw-in; hard-coding the BB2025 mechanic put every BB2020
+        // throw-in one square short.
+        let mechanic = crate::mechanic::throw_in_mechanic_for(game.rules);
         let start = self.throw_in_coordinate.unwrap_or(FieldCoordinate::new(0, 0));
         self.catcher_id = None;
 

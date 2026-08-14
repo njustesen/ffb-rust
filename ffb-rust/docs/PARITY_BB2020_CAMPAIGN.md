@@ -735,3 +735,42 @@ and BB2025 to the bare sequences.
 
 **Result:** human 96/100 → **99/100**. Gates: lineman bb2016 100/100, lineman bb2025 100/100,
 `cargo test --workspace` 14/14 suites ok. Remaining human fail: seed 43.
+
+## ITER14 — human 🟢 100/100: the BB2020 throw-in is one square longer
+
+**Seed 43, i=116.** Rust was exactly one die ahead (`rng_calls=77` vs Java's `76`) and the ball sat
+on a different square. Position-by-position dice comparison isolated it:
+
+```
+JAVA  73 d6=1 rollThrowInDirection | 74 d6=1 | 75 d6=4 (distance) | 76 d8=8 bounce
+RUST  73 d6=1                      | 74 d6=1 | 75 d6=4            | 76 d6=2  ← extra | 77 d8
+```
+
+An `FFB_RNG_BT=76` backtrace put the extra d6 inside `StepCatchScatterThrowIn`.
+
+**Root cause.** Java resolves `game.getMechanic(Mechanic.Type.THROW_IN)` per edition, and the three
+differ:
+
+| | `distance(roll)` | `isCornerThrowIn` |
+|---|---|---|
+| `mechanics/bb2016/ThrowInMechanic` | `d1 + d2` | always false |
+| `mechanics/bb2020/ThrowInMechanic` | **`d1 + d2 + 1`** | always false |
+| `mechanics/bb2025/ThrowInMechanic` | `d1 + d2` | **true in the four corners** (d3 direction) |
+
+Rust's shared `bb2025/shared/step_catch_scatter_throw_in.rs` hard-coded
+`ffb_mechanics::bb2025::throw_in_mechanic::ThrowInMechanic`, so every BB2020 throw-in landed one
+square short. The BB2020 mechanic was already ported and correct — just never routed. A short
+landing on an occupied square then adds a catch d6 Java never rolls, which is what put Rust
+permanently a die ahead.
+
+**Fix.** New `mechanic::throw_in_mechanic_for(rules)` alongside the existing `pass_mechanic_for` /
+`on_the_ball_mechanic_for`, and the shared step calls it. Tests
+`throw_in_mechanic_distance_is_edition_specific` and `corner_throw_ins_are_bb2025_only`.
+
+**Result: bb2020 `human` 🟢 100/100** (99 → 100). Gates: lineman bb2016 100/100, lineman bb2025
+100/100, `cargo test --workspace` 14/14 suites ok.
+
+**Status: 1 of 30 bb2020 matchups green.** `lineman` bb2020 is at 98/100 (2 fails) — next target,
+then the remaining 28 rosters. Note the five shared fixes so far (SneakyGit registration, wildly
+inaccurate pass, coach-choice prayers, kickoff table + Blitz!/Officious Ref + sequence labels,
+throw-in mechanic) are all edition-wide, so other rosters should benefit without roster-specific work.

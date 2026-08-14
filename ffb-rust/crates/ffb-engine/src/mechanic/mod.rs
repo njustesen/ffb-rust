@@ -88,6 +88,22 @@ pub fn pass_mechanic_for(rules: Rules) -> Box<dyn PassMechanicTrait> {
     }
 }
 
+/// Returns the edition-appropriate `ThrowInMechanic` for the given rules.
+/// Mirrors Java's `game.getMechanic(Mechanic.Type.THROW_IN)`.
+///
+/// The editions genuinely differ: BB2020's `distance` is `d1 + d2 + 1` where BB2016's and BB2025's
+/// are `d1 + d2`, and only BB2025 has corner throw-ins (`isCornerThrowIn`, a d3 direction instead
+/// of a d6). The shared BB2025 step hard-coded the BB2025 mechanic, so every BB2020 throw-in landed
+/// one square short — and a short landing that happens to hold a player adds a catch d6 Java never
+/// rolls (bb2020 human seed 43 pos 76).
+pub fn throw_in_mechanic_for(rules: Rules) -> Box<dyn ffb_mechanics::throw_in_mechanic::ThrowInMechanic> {
+    match rules {
+        Rules::Bb2025 | Rules::Common => Box::new(ffb_mechanics::bb2025::throw_in_mechanic::ThrowInMechanic::new()),
+        Rules::Bb2020 => Box::new(ffb_mechanics::bb2020::throw_in_mechanic::ThrowInMechanic::new()),
+        Rules::Bb2016 => Box::new(ffb_mechanics::bb2016::throw_in_mechanic::ThrowInMechanic::new()),
+    }
+}
+
 /// Returns the edition-appropriate `OnTheBallMechanic` for the given rules.
 /// Mirrors Java's `game.getFactory(MECHANIC).forName(Mechanic.Type.ON_THE_BALL.name())`.
 pub fn on_the_ball_mechanic_for(rules: Rules) -> Box<dyn OnTheBallMechanicTrait> {
@@ -101,6 +117,30 @@ pub fn on_the_ball_mechanic_for(rules: Rules) -> Box<dyn OnTheBallMechanicTrait>
 
 #[cfg(test)]
 mod tests {
+    use ffb_mechanics::throw_in_mechanic::ThrowInMechanic as _;
+
+    /// Java resolves the throw-in mechanic per edition and the three genuinely differ. BB2020 adds
+    /// +1 to the distance; only BB2025 has corner throw-ins (which roll a d3 direction, not a d6).
+    /// The shared BB2025 step hard-coded the BB2025 mechanic, so every BB2020 throw-in landed one
+    /// square short — and when the short square held a player, Rust rolled a catch d6 that Java
+    /// never rolls, putting it a die ahead for the rest of the game (human seed 43 pos 76).
+    #[test]
+    fn throw_in_mechanic_distance_is_edition_specific() {
+        assert_eq!(throw_in_mechanic_for(Rules::Bb2020).distance(&[3, 4]), 8, "bb2020 is d1+d2+1");
+        assert_eq!(throw_in_mechanic_for(Rules::Bb2025).distance(&[3, 4]), 7, "bb2025 is d1+d2");
+        assert_eq!(throw_in_mechanic_for(Rules::Bb2016).distance(&[3, 4]), 7, "bb2016 is d1+d2");
+    }
+
+    /// Corner throw-ins are BB2025-only; a BB2020/BB2016 corner must keep the plain d6 direction.
+    #[test]
+    fn corner_throw_ins_are_bb2025_only() {
+        use ffb_model::types::FieldCoordinate;
+        let corner = FieldCoordinate::new(0, 0);
+        assert!(throw_in_mechanic_for(Rules::Bb2025).is_corner_throw_in(corner));
+        assert!(!throw_in_mechanic_for(Rules::Bb2020).is_corner_throw_in(corner));
+        assert!(!throw_in_mechanic_for(Rules::Bb2016).is_corner_throw_in(corner));
+    }
+
     use super::*;
     use ffb_model::enums::{LeaderState, TurnMode};
 
