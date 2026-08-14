@@ -11,6 +11,15 @@ pub trait PlayerSelector: Send + Sync {
     /// Returns selected player IDs (up to `nr_of_players`).
     fn select_players(&self, game: &Game, team_id: &str, nr_of_players: i32, collections_rng: &mut JavaRandom, added_skills: &[SkillId]) -> Vec<String>;
 
+    /// Java: `eligiblePlayers(Team, Game, Set<Skill>)` — the filter half of `selectPlayers`,
+    /// WITHOUT the shuffle. `DialogPrayerHandler.initEffect` calls it directly and then puts the
+    /// whole list in a dialog for the coach to choose from, so it must consume NO randomness at
+    /// all — not the dice stream and not `java.util.Collections`' shared stream.
+    /// Default: empty (a selector with no eligibility rule offers nothing).
+    fn eligible_players(&self, _game: &Game, _team_id: &str, _added_skills: &[SkillId]) -> Vec<String> {
+        Vec::new()
+    }
+
     /// Java: `determineTeam(Team team, Game game)` — resolves which team is actually
     /// affected by this selector. Default: the praying team itself (identity).
     /// `OpponentPlayerSelector` overrides this to return the opposing team's id.

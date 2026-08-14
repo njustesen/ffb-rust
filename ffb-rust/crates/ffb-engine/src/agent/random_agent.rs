@@ -715,6 +715,30 @@ impl Agent for RandomAgent {
                     None => Action::SelectPlayer { player_id: String::new() },
                 }
             }
+            // The three BB2020 "Prayer to Nuffle" player choices (Iron Man, Knuckle Dusters,
+            // Blessed Statue of Nuffle) are MANDATORY: Java declares their PlayerChoiceMode
+            // non-declinable, `SelectPlayerPrayerHandler.applySelection` dereferences the chosen
+            // player, and StepPrayer re-runs until it gets one. Pick the eligible player with the
+            // LOWEST shirt number: `nr` comes from the same team data in both engines, and unlike
+            // a board coordinate it is also well-defined for the RESERVE players this dialog
+            // offers during START_GAME. ParityRunner's PLAYER_CHOICE arm mirrors this exact rule.
+            Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
+                if reason == "IRON_MAN"
+                    || reason == "KNUCKLE_DUSTERS"
+                    || reason == "BLESSED_STATUE_OF_NUFFLE" =>
+            {
+                let best = eligible_players
+                    .iter()
+                    .min_by_key(|pid| gs.game.player(pid).map(|p| p.nr).unwrap_or(i32::MAX));
+                match best {
+                    Some(pid) => Action::PlayerChoice {
+                        player_id: Some(pid.clone()),
+                        player_ids: eligible_players.clone(),
+                        mode: reason.clone(),
+                    },
+                    None => Action::SelectPlayer { player_id: String::new() },
+                }
+            }
             Some(AgentPrompt::PlayerChoice { .. }) => {
                 Action::SelectPlayer { player_id: String::new() }
             }

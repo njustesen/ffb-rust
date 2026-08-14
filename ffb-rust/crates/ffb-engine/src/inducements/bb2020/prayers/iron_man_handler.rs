@@ -5,6 +5,7 @@ use ffb_model::model::animation_type::AnimationType;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::inducements::bb2020::prayers::player_selector::PlayerSelector as BB2020PlayerSelector;
+use crate::inducements::mixed::prayers::select_player_prayer_handler as select_player_base;
 use crate::inducements::mixed::prayers::{iron_man_handler as base, prayer_handler::PrayerHandler};
 use crate::prayer_state::PrayerState;
 
@@ -22,8 +23,23 @@ impl PrayerHandler for IronManHandler {
     fn handled_prayer_name(&self) -> &'static str { "IRON_MAN" }
     fn animation_type(&self) -> AnimationType { base::animation_type() }
     fn get_name(&self) -> &'static str { "IronManHandler" }
-    fn init_effect(&self, prayer_state: &mut PrayerState, game: &mut Game, rng: &mut GameRng, team_id: &str) -> bool {
-        base::init_effect(prayer_state, game, rng, team_id, &BB2020PlayerSelector::new())
+    /// Java `DialogPrayerHandler.initEffect`: build the eligible list, report the prayer wasted
+    /// and advance if it is empty, otherwise SHOW A DIALOG and wait (`handled()` == false for
+    /// `SelectPlayerPrayerHandler`). The coach picks — there is NO shuffle on this path.
+    fn init_effect(&self, _prayer_state: &mut PrayerState, game: &mut Game, _rng: &mut GameRng, team_id: &str) -> bool {
+        // Java: reports.add(new ReportPrayerWasted(...)) on the empty branch (report infra deferred).
+        self.eligible_dialog_players(game, team_id).is_empty()
+    }
+
+    fn dialog_choice_mode(&self) -> Option<&'static str> { Some("IRON_MAN") }
+
+    fn eligible_dialog_players(&self, game: &Game, team_id: &str) -> Vec<String> {
+        select_player_base::eligible_players_for_dialog(
+            game, team_id, &[], &BB2020PlayerSelector::new())
+    }
+
+    fn apply_selection(&self, _prayer_state: &mut PrayerState, game: &mut Game, player_id: &str) {
+        select_player_base::apply_selection_select_player(game, player_id, "IRON_MAN");
     }
     fn remove_effect_internal(&self, _prayer_state: &mut PrayerState, game: &mut Game, team_id: &str) {
         base::remove_effect_internal(game, team_id, &BB2020PlayerSelector::new());
@@ -74,13 +90,26 @@ mod tests {
         assert!(h.init_effect(&mut state, &mut game, &mut GameRng::new(0), "home"));
     }
 
+    /// See KnuckleDustersHandler: `initEffect` only opens the dialog; the AV bonus is applied by
+    /// `applySelection` for the player the coach picked.
     #[test]
-    fn init_effect_grants_av_bonus() {
+    fn init_effect_opens_a_dialog_and_grants_nothing_yet() {
         let h = IronManHandler;
         let mut state = PrayerState::new();
         let mut game = make_game();
         add_reserve_player(&mut game, "h1", 8);
-        h.init_effect(&mut state, &mut game, &mut GameRng::new(0), "home");
+        assert!(!h.init_effect(&mut state, &mut game, &mut GameRng::new(0), "home"));
+        assert_eq!(h.dialog_choice_mode(), Some("IRON_MAN"));
+        assert_eq!(game.player("h1").unwrap().armour_with_modifiers(), 8);
+    }
+
+    #[test]
+    fn apply_selection_grants_av_bonus_to_the_chosen_player() {
+        let h = IronManHandler;
+        let mut state = PrayerState::new();
+        let mut game = make_game();
+        add_reserve_player(&mut game, "h1", 8);
+        h.apply_selection(&mut state, &mut game, "h1");
         assert_eq!(game.player("h1").unwrap().armour_with_modifiers(), 9);
     }
 

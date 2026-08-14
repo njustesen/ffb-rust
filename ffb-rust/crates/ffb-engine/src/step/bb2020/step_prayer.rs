@@ -47,6 +47,10 @@ impl Step for StepPrayer {
             Action::SelectPlayer { player_id } => {
                 self.player_id = Some(player_id.clone());
             }
+            // Java: CLIENT_PLAYER_CHOICE → `playerId = clientCommandPlayerChoice.getPlayerId()`.
+            Action::PlayerChoice { player_id, .. } => {
+                self.player_id = player_id.clone();
+            }
             Action::SelectSkill { skill_id: _ } => {}
             _ => {}
         }
@@ -99,7 +103,25 @@ impl StepPrayer {
                     let mut prayer_state = std::mem::take(&mut game.prayer_state);
                     let applied = h.init_effect(&mut prayer_state, game, rng, &team_id);
                     game.prayer_state = prayer_state;
-                    if applied { StepOutcome::next() } else { StepOutcome::cont() }
+                    if applied {
+                        StepOutcome::next()
+                    } else if let Some(mode) = h.dialog_choice_mode() {
+                        // Java: `SelectPlayerPrayerHandler.createDialog` →
+                        // `UtilServerDialog.showDialog(gameState, new DialogPlayerChoiceParameter(
+                        //      prayingTeam.getId(), choiceMode(), playerIds, …))`.
+                        // The mode is declared non-declinable, so the coach MUST answer; without
+                        // the prompt the step returned `Continue` with no dialog, which is the
+                        // engine's definition of a stall (and Java's ParityRunner reported
+                        // `UNHANDLED_STEP: PRAYER`, then NPE'd in applySelection on a null player).
+                        StepOutcome::cont().with_prompt(
+                            ffb_model::prompts::AgentPrompt::PlayerChoice {
+                                eligible_players: h.eligible_dialog_players(game, &team_id),
+                                reason: mode.to_string(),
+                                descriptions: Vec::new(),
+                            })
+                    } else {
+                        StepOutcome::cont()
+                    }
                 }
                 // Java: `else { getResult().setNextAction(NEXT_STEP); }`
                 None => StepOutcome::next(),
@@ -107,8 +129,11 @@ impl StepPrayer {
         } else {
             // Java: `prayerHandler.ifPresent(h -> h.applySelection(...)); setNextAction(NEXT_STEP);`
             if let Some(h) = handler {
+                // Java: `new PrayerDialogSelection(playerId, skill)` — the id the coach chose,
+                // NOT the praying team's id (which is what this passed before).
+                let player_id = self.player_id.clone().unwrap_or_default();
                 let mut prayer_state = std::mem::take(&mut game.prayer_state);
-                h.apply_selection(&mut prayer_state, game, &team_id);
+                h.apply_selection(&mut prayer_state, game, &player_id);
                 game.prayer_state = prayer_state;
             }
             StepOutcome::next()

@@ -35,9 +35,18 @@ pub trait PrayerHandler: Send + Sync {
         self.remove_effect_internal(prayer_state, game, team_id);
     }
 
-    /// Java: applySelection(Game, PrayerDialogSelection) — called after coach dialog.
-    /// Default: no-op (only dialog-based handlers override this).
-    fn apply_selection(&self, _prayer_state: &mut PrayerState, _game: &mut Game, _team_id: &str) {}
+    /// Java: applySelection(Game, PrayerDialogSelection) — called after the coach dialog with the
+    /// CHOSEN PLAYER's id. Default: no-op (only dialog-based handlers override this).
+    fn apply_selection(&self, _prayer_state: &mut PrayerState, _game: &mut Game, _player_id: &str) {}
+
+    /// Java: `SelectPlayerPrayerHandler.choiceMode()` — the `PlayerChoiceMode` its
+    /// `DialogPlayerChoiceParameter` carries. `None` for handlers that show no dialog
+    /// (`RandomSelectionPrayerHandler` and the plain `PrayerHandler` subclasses).
+    fn dialog_choice_mode(&self) -> Option<&'static str> { None }
+
+    /// Java: `DialogPrayerHandler.initEffect` -> `selector().eligiblePlayers(...)` — the players the
+    /// dialog offers. Only meaningful when `dialog_choice_mode()` is `Some`.
+    fn eligible_dialog_players(&self, _game: &Game, _team_id: &str) -> Vec<String> { Vec::new() }
 }
 
 #[cfg(test)]

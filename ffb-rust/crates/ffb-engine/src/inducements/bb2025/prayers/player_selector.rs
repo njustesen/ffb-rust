@@ -24,24 +24,21 @@ impl Default for PlayerSelector {
 impl PlayerSelectorTrait for PlayerSelector {
     /// Java: `eligiblePlayers` filtered via `selectPlayers`.
     /// Eligible: RESERVE state, not a Star, not already having all addedSkills.
-    fn select_players(&self, game: &Game, team_id: &str, nr_of_players: i32, collections_rng: &mut JavaRandom, added_skills: &[SkillId]) -> Vec<String> {
-        let team = if game.team_home.id == team_id {
-            &game.team_home
-        } else {
-            &game.team_away
-        };
-
-        let mut eligible: Vec<&str> = team.players.iter()
+    fn eligible_players(&self, game: &Game, team_id: &str, added_skills: &[SkillId]) -> Vec<String> {
+        let team = if game.team_home.id == team_id { &game.team_home } else { &game.team_away };
+        team.players.iter()
             .filter(|p| {
                 game.field_model.player_state(&p.id)
                     .map_or(false, |s| s.base() == PS_RESERVE)
             })
             .filter(|p| p.player_type != PlayerType::Star)
             .filter(|p| added_skills.is_empty() || !added_skills.iter().all(|s| p.has_skill(*s)))
-            .map(|p| p.id.as_str())
-            .collect();
+            .map(|p| p.id.clone())
+            .collect()
+    }
 
-        // Java: shuffle then remove first for each slot — Fisher-Yates shuffle.
+    fn select_players(&self, game: &Game, team_id: &str, nr_of_players: i32, collections_rng: &mut JavaRandom, added_skills: &[SkillId]) -> Vec<String> {
+        let mut eligible: Vec<String> = self.eligible_players(game, team_id, added_skills);
         // Java `PlayerSelector.selectPlayers`, exactly:
         //     for (int i = 0; i < Math.min(amount, available.size()); i++) {
         //         Collections.shuffle(available);
@@ -54,7 +51,7 @@ impl PlayerSelectorTrait for PlayerSelector {
         let picks = (nr_of_players as usize).min(eligible.len());
         for _ in 0..picks {
             ffb_model::util::java_random::collections_shuffle(&mut eligible, collections_rng);
-            selected.push(eligible.remove(0).to_string());
+            selected.push(eligible.remove(0));
         }
         selected
     }

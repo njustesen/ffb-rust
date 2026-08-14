@@ -562,3 +562,60 @@ start = thrower square not pass target, scatter loop untouched) and
 
 **Result:** human 62/100 → **85/100**. Gates: lineman bb2016 100/100, lineman bb2025 100/100,
 `cargo test --workspace` clean (14/14 suites ok).
+
+## ITER10 — human 85→90/100: the three coach-choice Prayers to Nuffle
+
+**Seed 20.** Java produced 137 steps, Rust 282 — Java's game ended early. Its stderr showed
+`UNHANDLED_STEP: PRAYER turnMode=KICKOFF` 500 times after the Cheering Fans rolls
+(`rng 74 d6=2` home vs `rng 75 d6=6` away → away gains a prayer).
+
+A new gated diagnostic in `ParityRunner` (`FFB_UNHANDLED_DUMP=1` dumps the stuck step's JSON)
+named the culprit in one run:
+
+```
+UNHANDLED_DUMP: PRAYER json={... "nextAction":"continue", "roll":5, "firstRun":false,
+                                 "teamId":"teamHumanParity20Away", "playerId":null ...}
+```
+
+Prayer roll 5 = **Knuckle Dusters**. `firstRun=false` with `playerId=null` means the harness had
+answered the dialog by DECLINING (its blanket "all PlayerChoice modes decline with an empty
+selection" rule), and `SelectPlayerPrayerHandler.applySelection` then NPE'd on
+`game.getPlayerById(null)` — skipping `setNextAction(NEXT_STEP)`, so the step spun forever.
+
+**Root cause (Rust).** Java has three prayers where **the coach chooses the player** —
+`IronManHandler`, `KnuckleDustersHandler`, `BlessedStatueOfNuffleHandler`, all
+`extends SelectPlayerPrayerHandler extends DialogPrayerHandler`. Their `initEffect` calls
+`selector().eligiblePlayers(...)`, shows a `DialogPlayerChoiceParameter`, and returns `false`
+(waiting). Rust routed all three through `RandomSelectionPrayerHandler` instead, which
+(a) picked its own player, and (b) drew from `java.util.Collections`' shared stream that Java
+never touches on this path — desyncing that stream for the rest of the game.
+
+**Fix.**
+* `mixed/prayers/player_selector.rs` — new trait method `eligible_players` (the filter half of
+  `selectPlayers`, no shuffle); the bb2020/bb2025 selectors now implement it and `select_players`
+  delegates to it.
+* `mixed/prayers/select_player_prayer_handler.rs` — real ports of `DialogPrayerHandler.initEffect`
+  (`eligible_players_for_dialog`) and `SelectPlayerPrayerHandler.applySelection`.
+* `mixed/prayers/prayer_handler.rs` — trait gains `dialog_choice_mode()` and
+  `eligible_dialog_players()`; `apply_selection`'s third argument is the CHOSEN PLAYER id.
+* The three bb2020 handlers implement the dialog contract (empty eligible list → `true`, i.e.
+  Java's "prayer wasted" arm; otherwise `false`).
+* `bb2020/step_prayer.rs` — emits `AgentPrompt::PlayerChoice` when the handler declares a mode,
+  and passes `self.player_id` (not the team id — a latent bug) into `apply_selection`.
+* `random_agent.rs` + `ParityRunner` PLAYER_CHOICE arm — both answer these three modes with the
+  eligible player of **lowest shirt number**. `nr` is shared team data in both engines and, unlike
+  a board coordinate (the rule ANIMAL_SAVAGERY uses), is well-defined for the RESERVE players this
+  dialog offers during START_GAME.
+
+Jar rebuilt. Tests: dialog-contract tests on all three handlers (`initEffect` grants nothing and
+reports a pending dialog; `applySelection` grants the skill/AV to the chosen player) plus
+`eligible_players_lists_every_on_pitch_player_without_randomness`,
+`eligible_players_is_empty_when_nobody_qualifies`, `apply_selection_marks_the_chosen_player`,
+`apply_selection_with_no_player_is_a_no_op`.
+
+**Result:** human 85/100 → **90/100**. Gates: lineman bb2016 100/100, lineman bb2025 100/100
+(re-run after the jar rebuild), `cargo test --workspace` 14/14 suites ok.
+
+**Noted, not yet ported:** `IntensiveTrainingHandler extends DialogPrayerHandler` shows a *skill*
+dialog (`DialogSelectSkillParameter`) rather than a player choice; Rust still routes it through
+random selection. Prayer roll 16, so it will surface on a later seed.
