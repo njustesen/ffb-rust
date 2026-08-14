@@ -1434,3 +1434,37 @@ and `THROW_BOMB` in Java's list at pick 174 suggests a Bombardier-related availa
 worth checking first. Compare `JAVA_ACT_PICK`/`RUST_ACT_PICK` pairwise on `N` from pick 0.
 
 Baseline unchanged: `goblin` 24/25, `chaos_pact` 25/25. No engine changes this iteration.
+
+## ITER29 — goblin seed 16: narrowed to a step-sequence divergence in dice 83–94
+
+Continued ITER28. Established, and each of these is a measurement:
+
+* **The activation streams do not desync until pick 171**, and both engines make the *same ten* away
+  activations in the turn before it (`[7,11,6,12,2,1,9,8,10,4]`). Java then ends the turn; Rust
+  activates an eleventh (`away_05`). Java simply had one fewer available player.
+* That traces to the earlier state diff — `a03` is **KO in Java, Standing in Rust** — so Rust is
+  missing an injury Java applies, which is what leaves Rust the extra activation.
+* **Dice VALUES are identical for 100 rolls** and first differ at 101. That is coincidence, not
+  alignment: by die 94 the two engines are demonstrably in *different steps*. Reading Java's raw
+  `from=` chains, dice 93/94/95 are three `ReallyStupidBehaviour` rolls; Rust's `FFB_DRIVE_TRACE`
+  shows 93 in `ReallyStupid` but 94/95 in `BlockRoll`.
+* Rust's own prompt at that block is
+  `BlockChoice { attacker_id: "away_01", defender_id: "home_02", dice: [6,4], nr_of_dice: 2 }` —
+  `goblin.troll` (ST 5) vs `goblin.pogoer` (ST 2), a pairing whose die count fits neither engine,
+  confirming they are not blocking the same pair.
+
+So the divergence is a **step-sequence difference somewhere in dice 83–94**, upstream of both the
+injury and the block. Java's dice in that window are a mix of `StepMoveDodge.dodge`,
+`InjuryTypeDropDodge` armour/injury and `ReallyStupidBehaviour`; Rust's steps there are
+`ReallyStupid`, `MoveDodge` and `BlockRoll` in a different order.
+
+**Tooling note for the next iteration.** I wrote a per-die caller comparison (nearest preceding
+`DRIVE step=` on the Rust side vs the Java `from=` chain) and it produced unusable output — the Java
+frame extractor kept falling back to `DiceRoller.rollDice:98` instead of the first meaningful
+`com.fumbbl.ffb.server.step.*` / `*Behaviour` frame, so almost every row flagged a false mismatch.
+**Fix that extractor first** (take the first frame in the chain that is neither `DiceRoller` nor
+`Fortuna`, and keep its class name), then re-run it over dice 80–100. With a correct extractor this
+comparison lands the exact step where the two sequences part, which is what this seed needs — the
+value stream is useless here because the values coincide across the divergence.
+
+Baseline unchanged: `goblin` 24/25. No engine changes this iteration.
