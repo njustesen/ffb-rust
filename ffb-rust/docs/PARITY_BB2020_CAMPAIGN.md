@@ -1004,3 +1004,58 @@ are **gated-logging only** (`-Dffb.parityDebug` → `JAVA_AVBROKE`, `JAVA_GFI`).
 campaign, change no behaviour, and match the documented `DiceRoller.java` precedent.
 
 Baseline unchanged and re-confirmed: `PARITY: 99/100`. No engine changes this iteration.
+
+## ITER20 — full roster scout (seeds 1-25): 18 of 30 already clean
+
+Seed 50 has now resisted three iterations and needs a per-step Java trace I cannot yet obtain
+(`StepBlockChoice`'s BOTH_DOWN routing — see below). It is 1 fail out of a 3,000-game target, so
+this iteration spent its time mapping the other 28 rosters instead. All six fixes so far are
+edition-wide rather than roster-specific, and it shows:
+
+| status | rosters |
+|---|---|
+| 🟢 **100/100** | `human`, and `lineman` at 99/100 |
+| 🟢 clean on 1-25 (16) | `amazon`, `chaos`, `chaos_dwarf`, `dark_elf`, `dark_elf_league_fumbbl`, `high_elf`, `khemri`, `khemri_fumbbl`, `lizardman`, `nippon`, `norse`, `orc`, `skaven`, `slann`, `undead`, `vampire` |
+| 1-4 fails / 25 | `chaos_pact` 1, `underworld` 3, `nurgle` 4, `renegades` 4 |
+| heavy | `goblin` 14, `dwarf` 20, `necromantic` 21, `elf` 22, `wood_elf` 22, `halfling` 25, `ogre` 25, `slann_fumbbl` 25 |
+
+(`slann_fumbbl`, `halfling` and `ogre` at 0/25 look like a single early systemic fault each, in the
+shape of the bb2025 `*_fumbbl` roster-alias bug — worth checking the roster actually builds before
+chasing dice.)
+
+Next targets in order: `chaos_pact` (1), `underworld` (3), `nurgle` (4), `renegades` (4), then the
+0/25 rosters (likely one fault each), then the heavies, then back to `lineman` seed 50.
+
+### Seed 50 — where the block investigation stands
+
+`generator/bb2020/Block`, read verbatim, is annotated by Java itself:
+
+```java
+sequence.add(StepId.BLOCK_ROLL);
+sequence.add(StepId.BLOCK_CHOICE, from(GOTO_LABEL_ON_DODGE, DODGE_BLOCK),
+    from(GOTO_LABEL_ON_JUGGERNAUT, JUGGERNAUT), from(GOTO_LABEL_ON_PUSHBACK, PUSHBACK));
+sequence.jump(DROP_FALLING_PLAYERS);          // ← default fall-through
+// on blockChoice = BOTH_DOWN
+sequence.add(StepId.JUGGERNAUT, IStepLabel.JUGGERNAUT, from(GOTO_LABEL_ON_SUCCESS, PUSHBACK));
+sequence.add(StepId.BOTH_DOWN);
+sequence.add(StepId.WRESTLE);
+```
+
+so `BOTH_DOWN` is reachable **only** through `GOTO_LABEL_ON_JUGGERNAUT`; if `StepBlockChoice` does
+not take that goto, the jump lands on `DROP_FALLING_PLAYERS` and both-down handling is skipped
+entirely — which matches every observation (defender already FALLING, attacker never FALLING, one
+armour roll, no turnover).
+
+Also newly established: **there are two `StepDropFallingPlayers`** —
+`step/action/block/StepDropFallingPlayers` is `@RulesCollection(COMMON)` (so BB2016 **and BB2020**
+use it) and its whole body is `getGameState().executeStepHooks(this, state)`, i.e. all the work is
+done by `PilingOnBehaviour`'s step hook. `step/bb2025/shared/StepDropFallingPlayers` is a much larger
+BB2025-only class that does the job itself. Rust has only the BB2025 port and uses it for every
+edition. That is the same "COMMON/BB2020 step vs BB2025 step, Rust wired to BB2025" shape as the last
+six fixes, and is the most likely home of the remaining difference.
+
+Instrument still needed: `GameState.startNextStep` already calls
+`logCurrentStep(IServerLogLevel.DEBUG, this)` per step, and `HeadlessFantasyFootballServer.getDebugLog()`
+is now gated on `FFB_SERVER_DEBUG=1` — the lazy creation fires (`JSTEPALL debugLog created` prints)
+but `logCurrentStep` never does, so the harness must be driving steps through a path that does not go
+via `startNextStep`. Finding that path is the unlock.
