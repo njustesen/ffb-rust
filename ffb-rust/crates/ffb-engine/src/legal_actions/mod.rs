@@ -549,7 +549,13 @@ pub fn legal_throw_team_mate_targets(game: &Game, player_id: &str, side: TeamSid
     };
     let mut targets: Vec<PlayerId> = team.players.iter()
         .filter(|p| p.id != player_id)
-        .filter(|p| p.has_skill_property(NamedProperties::CAN_BE_THROWN))
+        // Java ParityRunner.sendThrowTeamMateAction filters on
+        // `tp.hasSkillProperty(NamedProperties.canBeThrown)`, and that property is registered by the
+        // PER-EDITION skill class: bb2016 and bb2025 Right Stuff grant `canBeThrown`, but bb2020's
+        // grants `canBeThrownIfStrengthIs3orLess` instead — so BB2020 has no `canBeThrown` players
+        // at all and Java's target list comes back EMPTY. Asking the edition-agnostic union here
+        // built a non-empty list and threw a player Java never throws (chaos_pact bb2020 seed 22).
+        .filter(|p| p.has_skill_property_in(game.rules, NamedProperties::CAN_BE_THROWN))
         .filter(|p| {
             game.field_model.player_coordinate(&p.id)
                 .map(|c| c.is_adjacent(coord))

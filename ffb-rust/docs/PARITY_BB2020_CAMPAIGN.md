@@ -1269,3 +1269,46 @@ Recommended next iteration: implement (b) for `RightStuff` first, verify `chaos_
 
 Harness keeps the gated `FFB_TTM_DUMP` probe. Baseline unchanged: `chaos_pact` 24/25, `human` 100/100.
 No Rust changes this iteration.
+
+## ITER25 — per-edition skill properties: chaos_pact 🟢, ogre 🟢, goblin 11→24, halfling 0→2
+
+Implements ITER24's root cause. Java registers a skill's `NamedProperties` in the **per-edition**
+skill class' `postConstruct`, and `RightStuff` genuinely differs:
+
+| Java class | registered properties |
+|---|---|
+| `skill/bb2016/RightStuff` | `canBeThrown`, `canBeKicked`, `ignoreTackleWhenBlocked` |
+| **`skill/bb2020/RightStuff`** | **`canBeThrownIfStrengthIs3orLess`**, `ignoreTackleWhenBlocked` |
+| `skill/bb2025/RightStuff` | `canBeThrown`, `ignoreTackleWhenBlocked` |
+
+Rust's `SkillId::properties()` returned the edition-agnostic UNION, so a BB2020 Right Stuff player
+answered `true` to `canBeThrown` — and `ParityRunner.sendThrowTeamMateAction` filters on exactly that
+property, so **BB2020 has no throwable players at all** while Rust built a non-empty list.
+
+**Changes** (deliberately narrow — `properties()` has 172 call sites, so it keeps the union):
+* `SkillId::properties_for(rules)` — per-edition arms, everything else falls through to the union.
+  One arm per skill whose Java `postConstruct` diverges; `RightStuff` is the first.
+* `Player::has_skill_property_in(rules, prop)` — the edition-aware `hasSkillProperty`, for callers
+  that hold a `Game`.
+* `legal_throw_team_mate_targets` uses it for the `CAN_BE_THROWN` filter.
+
+**Results:**
+
+| roster | before | after |
+|---|---|---|
+| `chaos_pact` | 24/25 | **25/25** 🟢 |
+| `ogre` | 0/25 | **25/25** 🟢 |
+| `goblin` | 11/25 | **24/25** |
+| `halfling` | 0/25 | 2/25 |
+| `underworld` | 22/25 | 22/25 (unchanged) |
+
+Gates: `human` bb2020 100/100, `lineman` bb2016 100/100, `lineman` bb2025 100/100,
+`cargo test --workspace` 14/14 suites ok.
+
+Tests: `right_stuff_properties_are_edition_specific` pins all three editions (including the negative
+— bb2020 must NOT grant `canBeThrown`), and `properties_for_falls_through_to_the_union_for_other_skills`
+guarantees the new function cannot silently change any other skill.
+
+**Follow-up:** sweep the remaining skills whose Java `postConstruct` differs across editions — a
+mechanical diff of `skill/bb2016|bb2020|bb2025/*.java` — and add an arm for each. That is the likely
+source of several remaining failures (`halfling` is still 2/25, so it has at least one more).

@@ -260,6 +260,15 @@ impl Player {
         self.all_skill_ids().any(|id| id.properties().contains(&property))
     }
 
+    /// Edition-aware `hasSkillProperty`. Java resolves a skill's properties through the per-edition
+    /// skill class, so a skill whose `postConstruct` differs between rulesets (see
+    /// `SkillId::properties_for`) must be asked with the game's `Rules`. Use this wherever the
+    /// caller has a `Game`; `has_skill_property` keeps the edition-agnostic union for the many call
+    /// sites that do not.
+    pub fn has_skill_property_in(&self, rules: crate::enums::Rules, property: &str) -> bool {
+        self.all_skill_ids().any(|id| id.properties_for(rules).contains(&property))
+    }
+
     /// Java: getSkillWithProperty — returns the first SkillId that has the given property.
     pub fn skill_id_with_property(&self, property: &str) -> Option<SkillId> {
         self.all_skill_ids().find(|id| id.properties().contains(&property))

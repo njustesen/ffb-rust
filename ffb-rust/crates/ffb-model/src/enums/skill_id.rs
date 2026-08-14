@@ -701,6 +701,38 @@ impl SkillId {
 
     /// Returns the NamedProperty string keys this skill grants.
     /// 1:1 translation of Skill.getSkillProperties() → SkillId lookup table.
+    /// Java registers a skill's `NamedProperties` in the PER-EDITION skill class'
+    /// `postConstruct`, so the same skill can carry different properties in different rulesets.
+    /// `properties()` below is the edition-agnostic UNION, which is right for every skill whose
+    /// three Java classes register the same set — but wrong where they diverge.
+    ///
+    /// `RightStuff` is the first known divergence:
+    ///
+    /// | Java class | registered properties |
+    /// |---|---|
+    /// | `skill/bb2016/RightStuff` | `canBeThrown`, `canBeKicked`, `ignoreTackleWhenBlocked` |
+    /// | `skill/bb2020/RightStuff` | `canBeThrownIfStrengthIs3orLess`, `ignoreTackleWhenBlocked` |
+    /// | `skill/bb2025/RightStuff` | `canBeThrown`, `ignoreTackleWhenBlocked` |
+    ///
+    /// The union makes a BB2020 Right Stuff player answer `true` to `canBeThrown`, so Rust offered a
+    /// Throw Team-Mate target where Java has none at all (chaos_pact bb2020 seed 22: Java's harness
+    /// found `nTargets=0` and deselected, Rust threw and injured the thrown player).
+    ///
+    /// Add an arm here for each skill whose Java `postConstruct` differs across editions; everything
+    /// else falls through to the union.
+    pub fn properties_for(self, rules: crate::enums::Rules) -> &'static [&'static str] {
+        use crate::enums::Rules;
+        match (self, rules) {
+            (SkillId::RightStuff, Rules::Bb2016) =>
+                &["canBeThrown", "canBeKicked", "ignoreTackleWhenBlocked"],
+            (SkillId::RightStuff, Rules::Bb2020) =>
+                &["canBeThrownIfStrengthIs3orLess", "ignoreTackleWhenBlocked"],
+            (SkillId::RightStuff, Rules::Bb2025 | Rules::Common) =>
+                &["canBeThrown", "ignoreTackleWhenBlocked"],
+            _ => self.properties(),
+        }
+    }
+
     pub fn properties(self) -> &'static [&'static str] {
         match self {
             // Java bb2025/Punt.postConstruct: registerProperty(canPunt)
@@ -1226,6 +1258,49 @@ impl SkillId {
 
 #[cfg(test)]
 mod tests {
+
+    /// Java registers a skill's NamedProperties in the PER-EDITION skill class' postConstruct, and
+    /// `RightStuff` genuinely differs: bb2016 grants canBeThrown + canBeKicked, bb2020 grants
+    /// canBeThrownIfStrengthIs3orLess INSTEAD of canBeThrown, bb2025 grants canBeThrown alone.
+    /// The edition-agnostic union made a BB2020 Right Stuff player answer true to canBeThrown, so
+    /// Rust offered a Throw Team-Mate target where Java's list is empty (chaos_pact bb2020 seed 22).
+    #[test]
+    fn right_stuff_properties_are_edition_specific() {
+        use crate::enums::Rules;
+
+        let bb2016 = SkillId::RightStuff.properties_for(Rules::Bb2016);
+        assert!(bb2016.contains(&"canBeThrown"));
+        assert!(bb2016.contains(&"canBeKicked"), "only bb2016 grants canBeKicked");
+
+        let bb2020 = SkillId::RightStuff.properties_for(Rules::Bb2020);
+        assert!(!bb2020.contains(&"canBeThrown"),
+            "bb2020 must NOT grant canBeThrown — it grants canBeThrownIfStrengthIs3orLess");
+        assert!(bb2020.contains(&"canBeThrownIfStrengthIs3orLess"));
+        assert!(!bb2020.contains(&"canBeKicked"));
+
+        let bb2025 = SkillId::RightStuff.properties_for(Rules::Bb2025);
+        assert!(bb2025.contains(&"canBeThrown"));
+        assert!(!bb2025.contains(&"canBeKicked"));
+        assert!(!bb2025.contains(&"canBeThrownIfStrengthIs3orLess"));
+
+        // Every edition keeps the shared property.
+        for r in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            assert!(SkillId::RightStuff.properties_for(r).contains(&"ignoreTackleWhenBlocked"));
+        }
+    }
+
+    /// Skills with no per-edition arm must fall through to the union unchanged, so adding
+    /// `properties_for` cannot silently alter anything else.
+    #[test]
+    fn properties_for_falls_through_to_the_union_for_other_skills() {
+        use crate::enums::Rules;
+        for skill in [SkillId::Dodge, SkillId::Block, SkillId::MightyBlow, SkillId::Stunty] {
+            for r in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+                assert_eq!(skill.properties_for(r), skill.properties(),
+                    "{skill:?} must be unaffected by properties_for under {r:?}");
+            }
+        }
+    }
     use super::*;
 
     #[test]
