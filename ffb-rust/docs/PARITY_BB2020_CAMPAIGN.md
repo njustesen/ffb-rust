@@ -866,3 +866,48 @@ one draw makes it fail.
 lineman bb2025 100/100, `cargo test --workspace` 14/14 suites ok. Remaining lineman fail: seed 50.
 
 Harness: `ParityRunner` gains the gated `FFB_SETUP_DUMP` probe (jar rebuilt).
+
+## ITER17 — lineman seed 50 investigation (no fix): Java's attacker does not fall on BOTH_DOWN
+
+`lineman` bb2020 sits at 99/100; seed 50 is the last fail. **First divergence i=7**, very early —
+`home_02`'s BLOCK at i=6.
+
+**Established, both engines agreeing through die 14:**
+
+```
+12  d6=2  rollBlockDice        (StepBlockRoll.executeStep:241)   — one die, even-strength block
+13  d6=4  rollArmour           InjuryTypeBlock.armourRoll
+14  d6=3  rollArmour           ... <- PilingOnBehaviour$1.handleExecuteStepHook:115  (DEFENDER)
+15  d6=5  rollSkill            StepPass.executeStep:214          — the NEXT action already
+```
+
+Java then continues with **home still active on turn 1** and `h01` (= `Home2`, the attacker)
+**STANDING**. Rust instead draws four more d6 (15–18), leaves `h01` **PRONE**, and ends the home
+turn as a turnover.
+
+**Ruled out by reading the Java source, not by guessing:**
+* the block-die → `BlockResult` mapping — `BlockResultFactory.forRoll` maps `2 → BOTH_DOWN` and
+  Rust's `block_result_for_roll` is identical;
+* an edition-specific both-down step — `step/mixed/block/StepBothDown` carries BOTH
+  `@RulesCollection(BB2020)` and `@RulesCollection(BB2025)`, so BB2020 and BB2025 share it;
+* the Piling On hook consuming the step — it is registered on `StepDropFallingPlayers` and returns
+  `false`, so the step body still runs. It is merely WHERE Java happens to roll the defender's
+  injury (`ApothecaryMode.DEFENDER`), which is why dice 13/14 are only ONE player's armour;
+* a missing skill — the `lineman` fixture has `<skillList/>` on every player in the Java XML and
+  `starting_skills: vec![]` in `make_lineman_team`, so neither side has Block/Wrestle.
+
+**The open question, precisely:** `mixed/block/StepBothDown` line 78 reads
+`if (!actingPlayer.getPlayer().hasSkillProperty(NamedProperties.preventFallOnBothDown))` — with no
+Block skill that should knock the ATTACKER down too, giving two more armour dice and a turnover,
+which is exactly what Rust does. Java does neither. So something upstream of `StepBothDown` is
+either skipping it for this block or clearing the attacker's FALLING state before
+`StepDropFallingPlayers` reaches it.
+
+**Next iteration:** get the Java step sequence for i=6, not just its dice — add a gated per-step
+`stepId` line to `ParityRunner`'s loop (it already prints `JSTEP` only at agent prompts, which is
+too coarse) and compare against Rust's `FFB_DRIVE_TRACE` list
+(`BlockChoice, Juggernaut, BothDown, Wrestle, GotoLabel, DropFallingPlayers, …`). That will show
+whether Java runs `StepBothDown` at all here, which is the fork in the road: if it does, the
+attacker's FALLING state is being cleared; if it does not, the block sequence generator differs.
+
+Baseline unchanged and re-confirmed: `PARITY: 99/100`. No engine changes this iteration.
