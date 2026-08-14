@@ -709,3 +709,29 @@ RUST  pos=10 sides=8                                       ← no d3 at all
 `cargo test --workspace` 14/14 suites ok.
 
 Remaining human fails: seeds 38, 58, 87, 99.
+
+## ITER13 — human 96→99/100: the half-2 kickoff needed the same BLITZ labels
+
+**Seed 38.** Java ran 315 steps, Rust 173, with **no state divergence** among the steps they shared —
+Rust's log carried `FFB DRIVER ERROR: goto unknown label '' — step stack drained`. Java's i=174 is
+`half=2 turn=1`, so the game died at the second-half kickoff.
+
+Same defect as ITER12's opening kickoff, different entry point: `h2_kickoff_sequence()` (used by
+`StepEndTurn` for a new half and after a touchdown) is a second flattened kickoff sequence, and
+ITER12 only labelled `kickoff_tail()`. BB2020's kickoff table can roll `BLITZ` at any kickoff, so
+the goto found the empty label there instead.
+
+**Fix.** Extract the label patch into `add_bb2020_kickoff_labels(&mut Vec<SequenceStep>)` — it adds
+`GOTO_LABEL_ON_END`/`GOTO_LABEL_ON_BLITZ` to `ApplyKickoffResult`, labels
+`BLITZ_TURN`/`KICKOFF_ANIMATION`/`END_KICKOFF`, and inserts the jump that skips the blitz turn on the
+normal path, exactly as `generator/mixed/Kickoff.pushSequence` does — and call it from BOTH
+`kickoff_tail(rules)` and the new `h2_kickoff_sequence_for(rules)`. The bb2020 and shared
+`StepEndTurn` now call the rules-aware variant.
+
+Tests: `bb2020_kickoff_sequences_carry_the_blitz_labels` checks both entry points for the params,
+asserts every goto target the step can name exists as a label in the same sequence, and that the
+jump precedes the labelled `BLITZ_TURN`; `non_bb2020_kickoff_sequences_are_unchanged` pins BB2016
+and BB2025 to the bare sequences.
+
+**Result:** human 96/100 → **99/100**. Gates: lineman bb2016 100/100, lineman bb2025 100/100,
+`cargo test --workspace` 14/14 suites ok. Remaining human fail: seed 43.

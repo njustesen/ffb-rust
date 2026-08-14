@@ -685,7 +685,7 @@ impl StepEndTurn {
 
             // Java: endGenerator.pushSequence / kickoffGenerator
             use ffb_model::enums::InducementPhase;
-            use crate::step::sequences::{inducement_sequence, h2_kickoff_sequence, end_game_sequence};
+            use crate::step::sequences::{inducement_sequence, h2_kickoff_sequence_for, end_game_sequence};
             // BB2016 shares this StepEndTurn (make_step_for(bb2016) does not override EndTurn), but its
             // ApplyKickoffResult (bb2016-routed) GOTOs GotoLabelOnEnd=END_KICKOFF / GotoLabelOnBlitz=
             // BLITZ_TURN on a turn>8 Riot or a Blitz! result. The hand-rolled `h2_kickoff_sequence`
@@ -702,7 +702,7 @@ impl StepEndTurn {
                     crate::step::generator::mixed::kickoff::Kickoff::build_sequence(
                         &crate::step::generator::mixed::kickoff::KickoffParams { with_coin_choice: false })
                 } else {
-                    h2_kickoff_sequence()
+                    h2_kickoff_sequence_for(game.rules)
                 }
             };
             let mut outcome = StepOutcome::next();
