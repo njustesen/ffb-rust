@@ -2172,3 +2172,9 @@ a gaze before blocking, it is a strong candidate for other rosters' remaining re
 diagnosing them individually. `step/bb2020/foul/step_init_fouling.rs` and
 `step/bb2025/foul/step_init_fouling.rs` set the same Rust-only mirror; check them against Java's
 `StepInitFouling` next.
+
+**Post-fix re-scout** (the defender fix is edition-wide, so prior fail counts were re-measured):
+`underworld` 1-100 **100/100** (was 22/25); `lineman` bb2020 1-100 **99/100** (seed 50, step 6 —
+unchanged, still the known BOTH_DOWN where Java's attacker does not fall); `halfling` 1-25 **2/25**
+(unchanged — the Treeman that does not move after passing Take Root; unaffected by the defender bug).
+Next target by the fewest-fails rule: **lineman seed 50**.
