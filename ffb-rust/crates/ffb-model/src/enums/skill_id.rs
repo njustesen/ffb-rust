@@ -718,48 +718,84 @@ impl SkillId {
     /// Throw Team-Mate target where Java has none at all (chaos_pact bb2020 seed 22: Java's harness
     /// found `nTargets=0` and deselected, Rust threw and injured the thrown player).
     ///
-    /// Add an arm here for each skill whose Java `postConstruct` differs across editions; everything
-    /// else falls through to the union.
+    /// The arms are GENERATED from `skill/{bb2016,bb2020,bb2025,mixed,common}/*.java` by parsing
+    /// `registerProperty(NamedProperties.X)`, resolving each edition to its own class if one exists
+    /// and falling back to `mixed/` then `common/` otherwise — which is what Java's per-edition skill
+    /// factory does. BOTH registration shapes are captured — `registerProperty(NamedProperties.X)`
+    /// and `registerProperty(new CancelSkillProperty(NamedProperties.X))`, the latter becoming
+    /// `cancelsX`. Scanning only the three edition directories (the first attempt) MISSED every
+    /// skill that has no per-edition class, e.g. `Stunty`, `Decay`, `Juggernaut`, `PrehensileTail`,
+    /// `SecretWeapon`, `MultipleBlock` and `DivingTackle`.
+    ///
+    /// Everything not listed falls through to the union in `properties()`.
     pub fn properties_for(self, rules: crate::enums::Rules) -> &'static [&'static str] {
         use crate::enums::Rules;
         match (self, rules) {
-            (SkillId::BallAndChain, Rules::Bb2016) => &["blocksDuringMove", "canBlockMoreThanOnce", "canBlockSameTeamPlayer", "convertStunToKO", "flipSameTeamOpponentToOtherTeam", "forceFollowup", "forceFullMovement", "goForItAfterBlock", "grabOutsideBlock", "ignoreTacklezonesWhenMoving", "movesRandomly", "placedProneCausesInjuryRoll", "preventAutoMove", "preventKickTeamMateAction", "preventRecoverFromConcusionAction", "preventRecoverFromGazeAction", "preventRegularBlitzAction", "preventRegularBlockAction", "preventRegularFoulAction", "preventRegularHandOverAction", "preventRegularPassAction", "preventStandUpAction", "preventThrowTeamMateAction"],
-            (SkillId::BallAndChain, Rules::Bb2020) => &["blocksDuringMove", "canBlockMoreThanOnce", "canBlockSameTeamPlayer", "convertStunToKO", "forceFollowup", "goForItAfterBlock", "ignoreBlockAssists", "ignoreTacklezonesWhenMoving", "movesRandomly", "placedProneCausesInjuryRoll", "preventAutoMove", "preventKickTeamMateAction", "preventPickup", "preventRecoverFromConcusionAction", "preventRecoverFromGazeAction", "preventRegularBlitzAction", "preventRegularBlockAction", "preventRegularFoulAction", "preventRegularHandOverAction", "preventRegularPassAction", "preventStandUpAction", "preventThrowTeamMateAction"],
-            (SkillId::BallAndChain, Rules::Bb2025 | Rules::Common) => &["blocksDuringMove", "canBlockMoreThanOnce", "canBlockSameTeamPlayer", "convertStunToKO", "forceFollowup", "goForItAfterBlock", "ignoreBlockAssists", "ignoreTacklezonesWhenMoving", "movesRandomly", "placedProneCausesInjuryRoll", "preventAutoMove", "preventKickTeamMateAction", "preventPickup", "preventRecoverFromConcusionAction", "preventRecoverFromGazeAction", "preventRegularBlitzAction", "preventRegularBlockAction", "preventRegularFoulAction", "preventRegularHandOverAction", "preventRegularPassAction", "preventSecureTheBallAction", "preventStandUpAction", "preventThrowTeamMateAction"],
+            (SkillId::BallAndChain, Rules::Bb2016) => &["blocksDuringMove", "canBlockMoreThanOnce", "canBlockSameTeamPlayer", "cancelsCanBlockMoreThanOnce", "cancelsCanPileOnOpponent", "cancelsForceRollBeforeBeingBlocked", "cancelsInflictsConfusion", "convertStunToKO", "flipSameTeamOpponentToOtherTeam", "forceFollowup", "forceFullMovement", "goForItAfterBlock", "grabOutsideBlock", "ignoreTacklezonesWhenMoving", "movesRandomly", "placedProneCausesInjuryRoll", "preventAutoMove", "preventKickTeamMateAction", "preventRecoverFromConcusionAction", "preventRecoverFromGazeAction", "preventRegularBlitzAction", "preventRegularBlockAction", "preventRegularFoulAction", "preventRegularHandOverAction", "preventRegularPassAction", "preventStandUpAction", "preventThrowTeamMateAction"],
+            (SkillId::BallAndChain, Rules::Bb2020) => &["blocksDuringMove", "canBlockMoreThanOnce", "canBlockSameTeamPlayer", "cancelsCanBlockMoreThanOnce", "cancelsCanMoveBeforeBeingBlocked", "cancelsCanPileOnOpponent", "cancelsForceRollBeforeBeingBlocked", "cancelsInflictsConfusion", "cancelsPreventOpponentFollowingUp", "convertStunToKO", "forceFollowup", "goForItAfterBlock", "ignoreBlockAssists", "ignoreTacklezonesWhenMoving", "movesRandomly", "placedProneCausesInjuryRoll", "preventAutoMove", "preventKickTeamMateAction", "preventPickup", "preventRecoverFromConcusionAction", "preventRecoverFromGazeAction", "preventRegularBlitzAction", "preventRegularBlockAction", "preventRegularFoulAction", "preventRegularHandOverAction", "preventRegularPassAction", "preventStandUpAction", "preventThrowTeamMateAction"],
+            (SkillId::BallAndChain, Rules::Bb2025 | Rules::Common) => &["blocksDuringMove", "canBlockMoreThanOnce", "canBlockSameTeamPlayer", "cancelsCanBlockMoreThanOnce", "cancelsCanMoveBeforeBeingBlocked", "cancelsCanPileOnOpponent", "cancelsForceRollBeforeBeingBlocked", "cancelsInflictsConfusion", "cancelsPreventOpponentFollowingUp", "convertStunToKO", "forceFollowup", "goForItAfterBlock", "ignoreBlockAssists", "ignoreTacklezonesWhenMoving", "movesRandomly", "placedProneCausesInjuryRoll", "preventAutoMove", "preventKickTeamMateAction", "preventPickup", "preventRecoverFromConcusionAction", "preventRecoverFromGazeAction", "preventRegularBlitzAction", "preventRegularBlockAction", "preventRegularFoulAction", "preventRegularHandOverAction", "preventRegularPassAction", "preventSecureTheBallAction", "preventStandUpAction", "preventThrowTeamMateAction"],
             (SkillId::Bombardier, Rules::Bb2016) => &["enableThrowBombAction"],
-            (SkillId::Bombardier, Rules::Bb2020) => &["enableThrowBombAction", "preventStuntyDodgeModifier"],
+            (SkillId::Bombardier, Rules::Bb2020) => &["cancelsIgnoreTacklezonesWhenDodging", "enableThrowBombAction", "preventStuntyDodgeModifier"],
             (SkillId::Bombardier, Rules::Bb2025 | Rules::Common) => &["enableThrowBombAction"],
             (SkillId::Chainsaw, Rules::Bb2016) => &["blocksLikeChainsaw", "makesStrengthTestObsolete", "needsNoDiceDecorations"],
-            (SkillId::Chainsaw, Rules::Bb2020) => &["blocksLikeChainsaw", "preventStuntyDodgeModifier", "providesBlockAlternative", "providesChainsawBlockAlternative", "providesChainsawFoulingAlternative", "providesFoulingAlternative"],
+            (SkillId::Chainsaw, Rules::Bb2020) => &["blocksLikeChainsaw", "cancelsIgnoreTacklezonesWhenDodging", "preventStuntyDodgeModifier", "providesBlockAlternative", "providesChainsawBlockAlternative", "providesChainsawFoulingAlternative", "providesFoulingAlternative"],
             (SkillId::Chainsaw, Rules::Bb2025 | Rules::Common) => &["blocksLikeChainsaw", "providesBlockAlternative", "providesChainsawBlockAlternative", "providesChainsawFoulingAlternative", "providesFoulingAlternative"],
             (SkillId::CloudBurster, Rules::Bb2020) => &["canForceInterceptionRerollOfLongPasses"],
             (SkillId::CloudBurster, Rules::Bb2025 | Rules::Common) => &["passesAreNotIntercepted"],
+            (SkillId::Decay, Rules::Bb2016) => &["cancelsAllowsRaisingLineman", "requiresSecondCasualtyRoll"],
+            (SkillId::Decay, Rules::Bb2020) => &["cancelsAllowsRaisingLineman"],
+            (SkillId::Decay, Rules::Bb2025 | Rules::Common) => &["cancelsAllowsRaisingLineman"],
+            (SkillId::Defensive, Rules::Bb2020) => &["cancelsAssistsBlocksInTacklezones", "cancelsAssistsFoulsInTacklezones"],
+            (SkillId::Defensive, Rules::Bb2025 | Rules::Common) => &["cancelsAssistsBlocksInTacklezones", "cancelsAssistsFoulsInTacklezones", "cancelsCanAlwaysAssistFouls"],
+            (SkillId::DivingTackle, Rules::Bb2016) => &["canAttemptToTackleDodgingPlayer"],
+            (SkillId::DivingTackle, Rules::Bb2020) => &["canAttemptToTackleDodgingPlayer", "canAttemptToTackleJumpingPlayer"],
+            (SkillId::DivingTackle, Rules::Bb2025 | Rules::Common) => &["canAttemptToTackleDodgingPlayer", "canAttemptToTackleJumpingPlayer"],
             (SkillId::HypnoticGaze, Rules::Bb2016) => &["canGazeDuringMove", "inflictsConfusion"],
             (SkillId::HypnoticGaze, Rules::Bb2020) => &["inflictsConfusion"],
             (SkillId::HypnoticGaze, Rules::Bb2025 | Rules::Common) => &["inflictsConfusion"],
+            (SkillId::Juggernaut, Rules::Bb2016) => &["cancelsCanRefuseToBePushed", "cancelsCanTakeDownPlayersWithHimOnBothDown", "cancelsPreventOpponentFollowingUp"],
+            (SkillId::Juggernaut, Rules::Bb2020) => &["cancelsCanRefuseToBePushed", "cancelsCanTakeDownPlayersWithHimOnBothDown", "cancelsPreventOpponentFollowingUp"],
+            (SkillId::Juggernaut, Rules::Bb2025 | Rules::Common) => &["canConvertBothDownToPush", "cancelsCanRefuseToBePushed", "cancelsCanTakeDownPlayersWithHimOnBothDown", "cancelsPreventOpponentFollowingUp"],
             (SkillId::Leap, Rules::Bb2016) => &["canLeap"],
             (SkillId::Leap, Rules::Bb2020) => &["canLeap", "failedRushForJumpAlwaysLandsInTargetSquare"],
             (SkillId::Leap, Rules::Bb2025 | Rules::Common) => &["canLeap"],
-            (SkillId::MonstrousMouth, Rules::Bb2016) => &[],
-            (SkillId::MonstrousMouth, Rules::Bb2020) => &[],
-            (SkillId::MonstrousMouth, Rules::Bb2025 | Rules::Common) => &["canPinPlayers", "providesBlockAlternative"],
+            (SkillId::MonstrousMouth, Rules::Bb2016) => &["cancelsForceOpponentToDropBallOnPushback"],
+            (SkillId::MonstrousMouth, Rules::Bb2020) => &["cancelsForceOpponentToDropBallOnPushback"],
+            (SkillId::MonstrousMouth, Rules::Bb2025 | Rules::Common) => &["canPinPlayers", "cancelsForceOpponentToDropBallOnPushback", "providesBlockAlternative"],
+            (SkillId::MultipleBlock, Rules::Bb2016) => &["canBlockMoreThanOnce"],
+            (SkillId::MultipleBlock, Rules::Bb2020) => &["canBlockTwoAtOnce"],
+            (SkillId::MultipleBlock, Rules::Bb2025 | Rules::Common) => &["canBlockTwoAtOnce"],
             (SkillId::PilingOn, Rules::Bb2016) => &["canPileOnOpponent"],
             (SkillId::PilingOn, Rules::Bb2020) => &[],
-            (SkillId::Regeneration, Rules::Bb2016) => &["canRollToSaveFromInjury", "preventRaiseFromDead"],
-            (SkillId::Regeneration, Rules::Bb2020) => &["canRollToSaveFromInjury", "preventRaiseFromDead"],
-            (SkillId::Regeneration, Rules::Bb2025 | Rules::Common) => &["canRollToSaveFromInjury"],
+            (SkillId::PrehensileTail, Rules::Bb2016) => &["makesDodgingHarder"],
+            (SkillId::PrehensileTail, Rules::Bb2020) => &["makesDodgingHarder", "makesJumpingHarder"],
+            (SkillId::PrehensileTail, Rules::Bb2025 | Rules::Common) => &["makesDodgingHarder", "makesJumpingHarder"],
+            (SkillId::Regeneration, Rules::Bb2016) => &["canRollToSaveFromInjury", "cancelsAllowsRaisingLineman", "preventRaiseFromDead"],
+            (SkillId::Regeneration, Rules::Bb2020) => &["canRollToSaveFromInjury", "cancelsAllowsRaisingLineman", "preventRaiseFromDead"],
+            (SkillId::Regeneration, Rules::Bb2025 | Rules::Common) => &["canRollToSaveFromInjury", "cancelsAllowsRaisingLineman"],
             (SkillId::RightStuff, Rules::Bb2016) => &["canBeKicked", "canBeThrown", "ignoreTackleWhenBlocked"],
             (SkillId::RightStuff, Rules::Bb2020) => &["canBeThrownIfStrengthIs3orLess", "ignoreTackleWhenBlocked"],
             (SkillId::RightStuff, Rules::Bb2025 | Rules::Common) => &["canBeThrown", "ignoreTackleWhenBlocked"],
+            (SkillId::SecretWeapon, Rules::Bb2016) => &["cancelsIgnoreTacklezonesWhenDodging", "getsSentOffAtEndOfDrive", "preventStuntyDodgeModifier"],
+            (SkillId::SecretWeapon, Rules::Bb2020) => &["getsSentOffAtEndOfDrive"],
+            (SkillId::SecretWeapon, Rules::Bb2025 | Rules::Common) => &["getsSentOffAtEndOfDrive"],
+            (SkillId::SideStep, Rules::Bb2016) => &["canChooseOwnPushedBackSquare", "cancelsCanPushBackToAnySquare"],
+            (SkillId::SideStep, Rules::Bb2020) => &["canChooseOwnPushedBackSquare"],
             (SkillId::SneakyGit, Rules::Bb2016) => &["canAlwaysAssistFouls"],
             (SkillId::SneakyGit, Rules::Bb2020) => &["canAlwaysAssistFouls", "canMoveAfterFoul"],
             (SkillId::SneakyGit, Rules::Bb2025 | Rules::Common) => &[],
             (SkillId::Stab, Rules::Bb2016) => &["canPerformArmourRollInsteadOfBlock", "providesBlockAlternative", "providesStabBlockAlternative"],
             (SkillId::Stab, Rules::Bb2020) => &["canPerformArmourRollInsteadOfBlock", "providesBlockAlternative", "providesMultipleBlockAlternative", "providesStabBlockAlternative"],
             (SkillId::Stab, Rules::Bb2025 | Rules::Common) => &["canPerformArmourRollInsteadOfBlock", "providesBlockAlternative", "providesStabBlockAlternative"],
-            (SkillId::Swoop, Rules::Bb2016) => &["preventStuntyDodgeModifier", "ttmScattersInSingleDirection"],
-            (SkillId::Swoop, Rules::Bb2020) => &["preventStuntyDodgeModifier", "ttmScattersInSingleDirection"],
+            (SkillId::Stunty, Rules::Bb2016) => &["cancelsAllowsRaisingLineman", "ignoreTacklezonesWhenDodging", "isHurtMoreEasily", "preventRaiseFromDead", "smallIcon"],
+            (SkillId::Stunty, Rules::Bb2020) => &["cancelsAllowsRaisingLineman", "ignoreTacklezonesWhenDodging", "isHurtMoreEasily", "passesAreInterceptedEasier", "preventRaiseFromDead", "smallIcon"],
+            (SkillId::Stunty, Rules::Bb2025 | Rules::Common) => &["cancelsAllowsRaisingLineman", "ignoreTacklezonesWhenDodging", "isHurtMoreEasily", "passesAreInterceptedEasier", "preventRaiseFromDead", "smallIcon"],
+            (SkillId::Swoop, Rules::Bb2016) => &["cancelsIgnoreTacklezonesWhenDodging", "preventStuntyDodgeModifier", "ttmScattersInSingleDirection"],
+            (SkillId::Swoop, Rules::Bb2020) => &["cancelsIgnoreTacklezonesWhenDodging", "preventStuntyDodgeModifier", "ttmScattersInSingleDirection"],
             (SkillId::Swoop, Rules::Bb2025 | Rules::Common) => &["ttmScattersInSingleDirection"],
+            (SkillId::VeryLongLegs, Rules::Bb2016) => &["cancelsCanCancelInterceptions"],
+            (SkillId::VeryLongLegs, Rules::Bb2020) => &["cancelsCanForceInterceptionRerollOfLongPasses"],
+            (SkillId::VeryLongLegs, Rules::Bb2025 | Rules::Common) => &["cancelsPassesAreNotIntercepted"],
             _ => self.properties(),
         }
     }
@@ -1353,21 +1389,79 @@ mod tests {
         assert!(SkillId::Leap.properties_for(Rules::Bb2020).contains(&"failedRushForJumpAlwaysLandsInTargetSquare"));
         assert!(!SkillId::Leap.properties_for(Rules::Bb2025).contains(&"failedRushForJumpAlwaysLandsInTargetSquare"));
         assert!(SkillId::MonstrousMouth.properties_for(Rules::Bb2025).contains(&"canPinPlayers"));
-        assert!(SkillId::MonstrousMouth.properties_for(Rules::Bb2020).is_empty());
+        assert!(!SkillId::MonstrousMouth.properties_for(Rules::Bb2020).contains(&"canPinPlayers"));
 
         // Piling On loses canPileOnOpponent in BB2020; Regeneration loses preventRaiseFromDead in BB2025.
         assert!(SkillId::PilingOn.properties_for(Rules::Bb2016).contains(&"canPileOnOpponent"));
-        assert!(SkillId::PilingOn.properties_for(Rules::Bb2020).is_empty());
+        assert!(!SkillId::PilingOn.properties_for(Rules::Bb2020).contains(&"canPileOnOpponent"));
         assert!(SkillId::Regeneration.properties_for(Rules::Bb2020).contains(&"preventRaiseFromDead"));
         assert!(!SkillId::Regeneration.properties_for(Rules::Bb2025).contains(&"preventRaiseFromDead"));
 
         // Sneaky Git and Stab and Swoop.
         assert!(SkillId::SneakyGit.properties_for(Rules::Bb2020).contains(&"canMoveAfterFoul"));
-        assert!(SkillId::SneakyGit.properties_for(Rules::Bb2025).is_empty());
+        assert!(!SkillId::SneakyGit.properties_for(Rules::Bb2025).contains(&"canAlwaysAssistFouls"));
         assert!(SkillId::Stab.properties_for(Rules::Bb2020).contains(&"providesMultipleBlockAlternative"));
         assert!(!SkillId::Stab.properties_for(Rules::Bb2025).contains(&"providesMultipleBlockAlternative"));
         assert!(SkillId::Swoop.properties_for(Rules::Bb2020).contains(&"preventStuntyDodgeModifier"));
         assert!(!SkillId::Swoop.properties_for(Rules::Bb2025).contains(&"preventStuntyDodgeModifier"));
+
+        // The seven skills the first extraction MISSED because they have no per-edition class and
+        // resolve through `skill/mixed/` (or `skill/common/`).
+        assert!(SkillId::Decay.properties_for(Rules::Bb2016).contains(&"requiresSecondCasualtyRoll"));
+        assert!(!SkillId::Decay.properties_for(Rules::Bb2020).contains(&"requiresSecondCasualtyRoll"));
+        assert!(!SkillId::DivingTackle.properties_for(Rules::Bb2016).contains(&"canAttemptToTackleJumpingPlayer"));
+        assert!(SkillId::DivingTackle.properties_for(Rules::Bb2020).contains(&"canAttemptToTackleJumpingPlayer"));
+        assert!(SkillId::Juggernaut.properties_for(Rules::Bb2025).contains(&"canConvertBothDownToPush"));
+        assert!(!SkillId::Juggernaut.properties_for(Rules::Bb2020).contains(&"canConvertBothDownToPush"));
+        assert!(SkillId::MultipleBlock.properties_for(Rules::Bb2016).contains(&"canBlockMoreThanOnce"));
+        assert!(SkillId::MultipleBlock.properties_for(Rules::Bb2020).contains(&"canBlockTwoAtOnce"));
+        assert!(!SkillId::PrehensileTail.properties_for(Rules::Bb2016).contains(&"makesJumpingHarder"));
+        assert!(SkillId::PrehensileTail.properties_for(Rules::Bb2020).contains(&"makesJumpingHarder"));
+        assert!(SkillId::SecretWeapon.properties_for(Rules::Bb2016).contains(&"preventStuntyDodgeModifier"));
+        assert!(!SkillId::SecretWeapon.properties_for(Rules::Bb2020).contains(&"preventStuntyDodgeModifier"));
+        assert!(!SkillId::Stunty.properties_for(Rules::Bb2016).contains(&"passesAreInterceptedEasier"));
+        assert!(SkillId::Stunty.properties_for(Rules::Bb2020).contains(&"passesAreInterceptedEasier"));
+        // Stunty ignores tackle zones when dodging in EVERY edition — this is why Rust's empty
+        // dodge-modifier list for a Stunty goblin is correct, not a lookup failure.
+        for r in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            assert!(SkillId::Stunty.properties_for(r).contains(&"ignoreTacklezonesWhenDodging"));
+        }
+    }
+
+    /// INVARIANT: for every tabled skill, the union of its three per-edition property sets must be a
+    /// SUBSET of `properties()`. A tabled arm that lists something the union does not have means the
+    /// generator and the union disagree; the reverse (union ⊋ per-edition union) is expected and fine,
+    /// since a property can be edition-specific. This is the check that would have caught the first
+    /// generator missing `registerProperty(new CancelSkillProperty(..))` entirely — it silently
+    /// dropped `cancelsAllowsRaisingLineman` and friends from every tabled skill.
+    #[test]
+    fn tabled_properties_never_invent_anything_the_union_lacks() {
+        use crate::enums::Rules;
+        // The tabled skills, listed explicitly (SkillId has no iterator).
+        let tabled = [
+            SkillId::BallAndChain, SkillId::Bombardier, SkillId::Chainsaw, SkillId::CloudBurster,
+            SkillId::Decay, SkillId::DivingTackle, SkillId::HypnoticGaze, SkillId::Juggernaut,
+            SkillId::Leap, SkillId::MonstrousMouth, SkillId::MultipleBlock, SkillId::PilingOn,
+            SkillId::PrehensileTail, SkillId::Regeneration, SkillId::RightStuff,
+            SkillId::SecretWeapon, SkillId::SneakyGit, SkillId::Stab, SkillId::Stunty, SkillId::Swoop,
+        ];
+        let mut missing: Vec<String> = Vec::new();
+        for skill in tabled {
+            let union: Vec<&str> = skill.properties().to_vec();
+            for r in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+                for p in skill.properties_for(r) {
+                    // KNOWN, DELIBERATE trim: the union omits Regeneration's `preventRaiseFromDead`
+                    // even though bb2016 and bb2020 register it, because `properties()` is consumed
+                    // edition-agnostically and a BB2025 Regeneration player must stay raisable
+                    // (see `regeneration_does_not_prevent_raise_from_dead_bb2025`, necromantic seed
+                    // 89). The per-edition table is the correct place for the real values; this
+                    // exemption goes away once the remaining consumers move to `properties_for`.
+                    if skill == SkillId::Regeneration && *p == "preventRaiseFromDead" { continue; }
+                    if !union.contains(p) { missing.push(format!("{skill:?}/{r:?}: {p}")); }
+                }
+            }
+        }
+        assert!(missing.is_empty(), "per-edition table lists properties the union lacks: {missing:#?}");
     }
 
     /// Skills with no per-edition arm must fall through to the union unchanged, so adding
@@ -1375,7 +1469,7 @@ mod tests {
     #[test]
     fn properties_for_falls_through_to_the_union_for_other_skills() {
         use crate::enums::Rules;
-        for skill in [SkillId::Dodge, SkillId::Block, SkillId::MightyBlow, SkillId::Stunty] {
+        for skill in [SkillId::Dodge, SkillId::Block, SkillId::MightyBlow, SkillId::Tackle] {
             for r in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
                 assert_eq!(skill.properties_for(r), skill.properties(),
                     "{skill:?} must be unaffected by properties_for under {r:?}");

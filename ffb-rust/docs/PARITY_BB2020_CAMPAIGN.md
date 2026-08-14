@@ -1551,3 +1551,37 @@ to `mixed/` was invisible to that diff, so **the 13-skill table may be incomplet
    model). Dump Java's side via `mechanics/bb2020/DodgeMechanic.minimumRoll` before changing anything.
 
 Baseline unchanged: `goblin` 24/25. No engine changes this iteration.
+
+## ITER32 — the property table completed and made self-checking (20 skills, 65 arms)
+
+Fixed both gaps ITER31 exposed in my own ITER26 extraction:
+
+1. **Directory coverage.** The skill tree is `skill/{bb2016,bb2020,bb2025,mixed,common}/`, and Java's
+   per-edition factory resolves a skill to its own class if one exists, else `mixed/`, else
+   `common/`. Scanning only the three edition directories missed every skill with no per-edition
+   class. Re-running with proper fallback resolution finds **20** divergent skills, not 13 — seven
+   more: `Decay`, `DivingTackle`, `Juggernaut`, `MultipleBlock`, `PrehensileTail`, `SecretWeapon`,
+   **`Stunty`**.
+2. **Registration shape.** The generator matched only `registerProperty(NamedProperties.X)` and
+   missed `registerProperty(new CancelSkillProperty(NamedProperties.X))` (Rust models these as
+   `cancelsX`). That silently dropped 29 properties from the tabled arms. Both shapes are now
+   captured; the table is 65 arms.
+
+**Self-checking.** New invariant test `tabled_properties_never_invent_anything_the_union_lacks`
+walks every tabled skill × every edition and asserts each property also appears in `properties()`.
+It reports ALL violations rather than panicking on the first — and it immediately earned its keep by
+flagging `Regeneration/preventRaiseFromDead`. That turned out to be a **deliberate** trim, not a bug:
+`properties()` is consumed edition-agnostically and a BB2025 Regeneration player must stay raisable
+(`regeneration_does_not_prevent_raise_from_dead_bb2025`, necromantic seed 89). I reverted my
+"correction" to the union and whitelisted that single case in the invariant with the reasoning
+inline, so a future generator omission is still caught. **The exemption disappears once the remaining
+consumers move to `properties_for`.**
+
+**Also settled:** `Stunty` grants `ignoreTacklezonesWhenDodging` in **all three** editions, so Rust's
+empty dodge-modifier list for the Stunty goblin in seed 16 is CORRECT, not a lookup failure. Java's
+minimum of 4 must come from somewhere else — read `mechanics/bb2020/DodgeMechanic.minimumRoll` next
+and dump its modifier list, rather than assuming a tackle-zone difference.
+
+Roster counts unchanged (`chaos_pact` 25/25, `ogre` 25/25, `goblin` 24/25) — expected, since only two
+consumers read `properties_for`. Gates: `human` bb2020 100/100, `lineman` bb2016 100/100, `lineman`
+bb2025 100/100, `cargo test --workspace` 14/14 suites (2788 ffb-model tests).
