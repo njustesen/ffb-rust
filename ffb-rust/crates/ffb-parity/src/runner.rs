@@ -84,6 +84,15 @@ pub fn run_java_headless(seed: u64, home_team_id: &str, away_team_id: &str, home
 
     let mut args: Vec<String> = vec!["-cp".into(), cp.clone()];
     if let Some(opt) = jvm_core_opt() { args.push(opt); }
+    // `java.util.Collections`' one-arg `shuffle(List)` uses a private shared `Random` seeded from
+    // system entropy — non-deterministic within Java itself, and reachable in bb2020 via
+    // `StepApplyKickoffResult.handleCheeringFans` (which picks a Prayer to Nuffle). ParityRunner
+    // seeds that field by reflection so the engine becomes reproducible; JDK 17 needs the module
+    // opened for it. Rust reproduces the identical permutation via
+    // `ffb_model::util::java_random::collections_shuffle`.
+    args.push("--add-opens".into());
+    args.push("java.base/java.util=ALL-UNNAMED".into());
+
     // Mirror the Rust-side trace env vars onto the Java process.
     if std::env::var_os("FFB_DICE_TRACE").is_some() {
         args.push("-Dffb.diceTrace=true".into());
@@ -192,6 +201,15 @@ pub fn run_java_headless_range(
 
     let mut args: Vec<String> = vec!["-cp".into(), cp];
     if let Some(opt) = jvm_core_opt() { args.push(opt); }
+    // `java.util.Collections`' one-arg `shuffle(List)` uses a private shared `Random` seeded from
+    // system entropy — non-deterministic within Java itself, and reachable in bb2020 via
+    // `StepApplyKickoffResult.handleCheeringFans` (which picks a Prayer to Nuffle). ParityRunner
+    // seeds that field by reflection so the engine becomes reproducible; JDK 17 needs the module
+    // opened for it. Rust reproduces the identical permutation via
+    // `ffb_model::util::java_random::collections_shuffle`.
+    args.push("--add-opens".into());
+    args.push("java.base/java.util=ALL-UNNAMED".into());
+
     if std::env::var_os("FFB_DICE_TRACE").is_some() { args.push("-Dffb.diceTrace=true".into()); }
     if std::env::var_os("FFB_TRACE").is_some() { args.push("-Dffb.parityDebug=true".into()); }
     if std::env::var_os("FFB_DICE_DEEP").is_some() { args.push("-Dffb.parityDebugDeep=true".into()); }

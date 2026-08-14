@@ -188,3 +188,64 @@ measurable for the first time. No regressions: bb2016 and bb2025 lineman/human/n
    (`ParityRunner.handleStep` has no `PRAYER` case; BB2020 introduced Prayers to Nuffle). Until that
    is handled the Java game ends in half 1, so a chunk of the remaining failures are harness-side.
 2. Then work rosters fewest-fails-first in the usual loop.
+
+
+## ITER2 — make Java's unseeded `Collections.shuffle` reproducible, and port it
+
+**The problem was not a missing harness case.** Chasing "Java dies on `UNHANDLED_STEP: PRAYER`"
+found something worse underneath. `UNHANDLED_STEP`/`STUCK_STEP` are printed **only by
+`ParityRunner`** — the engine never emits them, and it is not failing; it raises a `PRAYER` step and
+waits for a client command my harness had no case for.
+
+But the prayer itself is chosen like this, in `bb2020/StepApplyKickoffResult.handleCheeringFans`:
+
+```java
+Collections.shuffle(availablePrayerRolls);   // ONE-ARG overload
+int roll = availablePrayerRolls.remove(0);
+```
+
+The one-arg `Collections.shuffle` draws from a **private static `Random` inside
+`java.util.Collections`, seeded from system entropy** — not the game's `DiceRoller`. That is
+non-deterministic *within Java itself*: the same parity seed can pick a different prayer on two
+runs, so no 1:1 Rust port could ever mirror it.
+
+It fires in a MIRROR match because `handleCheeringFans` compares two **D6 rolls**, not team values.
+(The pre-game `StepPrayers` path is gated on `Math.abs(tvAway - tvHome)`, which is 0 in a mirror —
+that one genuinely never fires, and our home/away XML are byte-identical apart from side naming.)
+The same call appears in `bb2020/StepPrayers`, `bb2025/start/StepPrayers`,
+`bb2025/inducements/StepThrowARock` and `bb2020/end/StepAssignTouchdowns` — all currently
+unreachable in our mirrors, which is the only reason bb2025 is green.
+
+**Decision: mirror Java's shortcoming rather than switch it off.** Make Java reproducible and
+reproduce it exactly, so parity stays total.
+
+1. **Harness** (`ParityRunner.seedCollectionsShuffleRng`): seeds `java.util.Collections`' shared
+   `r` field per game, by reflection, from the parity seed. The ENGINE is untouched. Needs
+   `--add-opens java.base/java.util=ALL-UNNAMED`, added by `runner.rs` to both JVM launchers. It
+   throws loudly rather than silently degrading — an unseeded run makes any "green" result for a
+   matchup that reaches a shuffle site meaningless.
+2. **Rust** (`ffb-model/src/util/java_random.rs`): 1:1 ports of `java.util.Random` (48-bit LCG,
+   `next(bits)`, `nextInt(bound)` with both the power-of-two shortcut and the rejection loop) and
+   `Collections.shuffle`'s Fisher-Yates.
+
+**Tests are pinned against real JVM output, not against the port**, so they cannot be
+self-confirming: vectors were captured by running Temurin 17.0.18 and are quoted in the test with
+the Java snippet that produced them. A third test asserts a 0/1-element shuffle draws NOTHING —
+that matters for stream discipline.
+
+**Evidence the fix is load-bearing** (seed 20 is the first human seed that reaches the prayer path):
+- two runs of seed 20 produce byte-identical Java logs → reproducible;
+- changing the shuffle seed constant produces a DIFFERENT log → the shuffle genuinely feeds game
+  state, so this is not a no-op;
+- restoring the constant restores the original log exactly.
+
+**Stream discipline (important):** the seeded `Collections` RNG is a SHARED per-game stream, like the
+dice stream. Every `shuffle` call draws from it in order, so Rust must shuffle at the same points
+and in the same sequence. If a second shuffle site becomes reachable, ordering matters.
+
+Gates: bb2016 lineman/human and bb2025 lineman/human all `100/100 games match`;
+`cargo test` ffb-engine **7115/0**, ffb-model **2783/0**.
+
+### Next
+`ParityRunner` still has no `PRAYER` case, so the step stalls. That is ITER3, together with the
+Rust side consuming the shuffle at the same point.

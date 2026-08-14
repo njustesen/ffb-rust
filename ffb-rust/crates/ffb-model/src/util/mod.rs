@@ -2,6 +2,7 @@
 
 pub mod pathfinding;
 pub mod string_tool;
+pub mod java_random;
 pub mod rng;
 pub mod passing;
 pub mod state_hash;
