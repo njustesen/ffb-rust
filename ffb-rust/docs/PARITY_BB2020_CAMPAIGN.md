@@ -249,3 +249,57 @@ Gates: bb2016 lineman/human and bb2025 lineman/human all `100/100 games match`;
 ### Next
 `ParityRunner` still has no `PRAYER` case, so the step stalls. That is ITER3, together with the
 Rust side consuming the shuffle at the same point.
+
+
+## ITER3 — first divergence pinned: Rust has no Prayers to Nuffle at all
+
+Baseline with the ITER2 seeding in place: bb2020 human **38/100 passed, 62 FAILED**, zero panics.
+Lowest failing seed = 1, and it diverges before the first activation (i=1): Java 13 dice, Rust 12.
+
+Deep stack on the two streams:
+
+| rng | Java | Rust |
+|---:|---|---|
+| 10, 11 | `handleCheeringFans` two D6 | same |
+| **12** | **`d3` — `BadHabitsHandler.affectedPlayers` ← `RandomSelectionPrayerHandler.initEffect`** | *(missing)* |
+| 13 | `d8` `StepCatchScatterThrowIn.bounceBall` | `d8` at pos 12 |
+
+So Cheering Fans awarded a prayer, Java rolled its effect, and **Rust implements no part of the
+Prayers-to-Nuffle system**. That is the whole remaining gap for seed 1.
+
+### The two risky unknowns are now RESOLVED (measured, not assumed)
+
+**1. The pre-shuffle order is just `[1..=16]`.** `PrayerFactory.prayers` is a
+`HashMap<Integer, Prayer>` and `availablePrayerRolls` streams its `entrySet`, so the order looked
+like it might need HashMap-bucket emulation. Running the real class out of the jar shows the
+iteration order for keys 1-16 is plain ascending (Integer hashes to itself, and 16 entries resize
+the table to 32 buckets):
+
+```
+exhibition=8 leagueOnly=8 total=16    (INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE defaults true)
+keys: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16
+1 TREACHEROUS_TRAPDOOR   2 FRIENDS_WITH_THE_REF  3 STILETTO             4 IRON_MAN
+5 KNUCKLE_DUSTERS        6 BAD_HABITS            7 GREASY_CLEATS        8 BLESSED_STATUE_OF_NUFFLE
+9 MOLES_UNDER_THE_PITCH 10 PERFECT_PASSING      11 FAN_INTERACTION     12 NECESSARY_VIOLENCE
+13 FOULING_FRENZY       14 THROW_A_ROCK         15 UNDER_SCRUTINY      16 INTENSIVE_TRAINING
+```
+
+So Rust needs a sorted `1..=16` list, not a HashMap port.
+
+**2. The ITER2 shuffle port predicts Java's actual choice.** Seeding `JavaRandom` with
+`parity_seed ^ 0x5EEDC0113C7104` (the constant `ParityRunner.seedCollectionsShuffleRng` uses) and
+running `collections_shuffle` on `[1..=16]`:
+
+| parity seed | predicted first roll | |
+|---:|---:|---|
+| 1 | **6 → BAD_HABITS** | **matches Java** (its `BadHabitsHandler` rolled the d3 at rng 12) |
+| 20 | 5 → KNUCKLE_DUSTERS | |
+
+The end-to-end selection chain is therefore verified before a line of engine code is written.
+
+### Scope for the next iterations
+16 prayers with 16 handlers (`BadHabitsHandler`, `KnuckleDustersHandler`, … under
+`server/inducements/mixed/prayers/`), plus `StepPrayer`/`StepPrayers` and a `ParityRunner` `PRAYER`
+case. Handlers split into three shapes: `RandomSelectionPrayerHandler` (rolls to pick players —
+consumes GAME dice), `SelectPlayerPrayerHandler` (dialog), and direct-effect ones. Port them
+one at a time, cheapest first, re-running human 1-100 after each.
