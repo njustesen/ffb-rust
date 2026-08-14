@@ -2602,3 +2602,53 @@ roll, its threshold, and whether it returns `GotoLabel`. Java needs the blitzer'
 and cancel. That is now a single step with a single die, so one instrumented run should settle it.
 
 Baseline unchanged and tree clean: `nurgle` 21/25.
+
+## ITER54 — `nurgle` seed 2: Rust has NO defender at the Foul Appearance step
+
+Instrumented `StepFoulAppearance` as planned. For the failing blitz:
+
+```
+FA attacker=Some("away_02") defender=None def_has_fa=false attacker_cancels=false
+```
+
+It returns early without rolling — Java rolls (`rollSkill:112` = 1) and cancels the blitz. So the step
+logic and the sequence placement are both fine; **Rust simply has no defender to test.**
+
+**A real 1:1 deviation found and fixed on the way** (then reverted, see below). Java
+`FoulAppearanceBehaviour` (bb2020:49-53, bb2025 identical) resolves the defender as:
+
+```java
+if (game.getFieldModel().getTargetSelectionState() != null) {
+    defender = game.getPlayerById(targetSelectionState.getSelectedPlayerId());
+} else {
+    defender = game.getDefender();
+}
+```
+
+The only condition is that the state EXISTS. Rust additionally required
+`ts.is_selected() && ts.is_committed()` — and the commit happens later in this very step
+(`commitTargetSelection()` after a successful roll), so a present-but-uncommitted state fell through
+to `game.defenderId`. Mirroring Java exactly did not change the outcome here, because for this blitz
+BOTH sources are empty: no target-selection state AND `game.defenderId == None`.
+
+**So the open question is why the blitz has no defender by then.** In Java the defender is set before
+`FOUL_APPEARANCE`: `generator/bb2020/Block:38` runs `SET_DEFENDER` with `params.getBlockDefenderId()`,
+and `StepInitBlocking` calls `game.setDefenderId(...)` (the ITER44 fix). In Rust,
+`generator/bb2025/block.rs:53-57` only adds `SET_DEFENDER` when `params.block_defender_id` is
+`Some`, and for a blitz the target is chosen later by `SelectBlitzTarget` — so the sequence is built
+with `None` and nothing sets the defender before Foul Appearance runs. Next iteration should confirm
+that ordering and compare it against how Java's blitz path supplies `blockDefenderId` to the Block
+sequence.
+
+**Growing list of verified-but-unlanded 1:1 corrections.** Four now, each checked against the Java
+source and each reverted for lack of a measured effect on its own:
+1. gate the `PS_STANDING` pre-stand on sequences that own a `STAND_UP` step (ITER50/52);
+2. restore the OUTGOING acting player in `change_player_action` (ITER51/52);
+3. `bb2020` Really Stupid: per-activation `ActingPlayer.used_skills`, not the persistent player set
+   (ITER53) — the memory note flags the Bone-head family as latent in the same way;
+4. Foul Appearance defender resolution: drop the extra `is_selected() && is_committed()` filter (this
+   iteration).
+Once the defender-wiring fix lands and gives a signal, these should be re-applied and evaluated
+TOGETHER against a full sweep, rather than continuing to discard them one at a time.
+
+Baseline unchanged and tree clean: `nurgle` 21/25.
