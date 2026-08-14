@@ -1351,3 +1351,47 @@ Test `every_edition_divergent_skill_is_tabled` spot-checks one representative di
 it to nobody, yet Rust's Piling On hook checks `hasUnusedSkillWithProperty(canPileOnOpponent)` through
 the union, so Rust may be offering Piling On in games where Java never can. `canGazeDuringMove` and
 the Ball & Chain / Chainsaw extras are the same shape.
+
+## ITER27 — consumer conversion: measured the follow-up down to almost nothing
+
+ITER26 predicted `canPileOnOpponent` would be the high-value consumer. **Measuring first killed that**:
+`Piling On` appears in **0** bb2020 rosters. Checking every divergent skill against the drafted
+rosters narrows the whole follow-up sharply:
+
+| skill | in bb2020 rosters | does the union mis-grant BB2020? |
+|---|---|---|
+| `PilingOn`, `MonstrousMouth`, `CloudBurster`, `SneakyGit`, `Swoop` | **none** | unreachable |
+| `Regeneration` (11), `Leap` (5), `Stab` (2), `Bombardier` (1) | yes | **no** — BB2020's set is the superset, so the union is already right for BB2020 |
+| `HypnoticGaze` (vampire) | yes | yes, but the one consumer is already hand-gated to `Rules::Bb2016` |
+| `BallAndChain`, `Chainsaw` (goblin) | yes | **yes** |
+
+So the only live mis-grant left was Ball & Chain's `grabOutsideBlock` (BB2016-only) reaching the
+goblin Fanatic in BB2020/BB2025. Converted the three `grab_behaviour.rs` consumers to
+`has_skill_property_in(game.rules, …)`. Chainsaw's BB2016-only `makesStrengthTestObsolete` /
+`needsNoDiceDecorations` and Ball & Chain's other edition-specific properties have **no consumers at
+all** in Rust yet, so nothing to convert.
+
+**Roster counts unchanged** (`goblin` 24/25, `chaos_pact` 25/25). Kept anyway: it is a faithful 1:1,
+it is the difference the property table exists to express, and it is now pinned by
+`has_skill_property_in_is_edition_aware`, which asserts a BB2020 Fanatic answers **false** while the
+union-based accessor still answers true. Gates: `human` bb2020 100/100, `lineman` bb2016 100/100,
+`lineman` bb2025 100/100, `chaos_pact` 25/25, `cargo test --workspace` 14/14.
+
+**Goblin seed 16 is a different bug** — measured, not related to skill properties. The dice are
+byte-identical for 100 rolls, then diverge:
+
+```
+JAVA rng=101 d8=7  rollScatterDirection <- StepCatchScatterThrowIn.bounceBall:680
+RUST pos=101 d6                          ← no bounce at all
+```
+
+Java rng 96-100 are a block (block die, 2× armour, 2× injury); the knocked-down player was holding
+the ball, so Java bounces it. Rust skips the bounce. This is the same shape as the BB2016 fix
+recorded in `util_server_injury.rs` — where the ball handling (`DROPPED_BALL_CARRIER`,
+`SCATTER_BALL`, turnover) must sit OUTSIDE the `placedProneCausesInjuryRoll` if/else so it runs for a
+Ball & Chain player too. Next iteration should check whether the BB2020 block path returns early
+before that ball handling.
+
+**Method note:** an earlier "0 consumers" count in this session was wrong because the shell `cd` had
+reset — always `cd` explicitly in each command before grepping, and re-check a zero result that
+contradicts an earlier grep.

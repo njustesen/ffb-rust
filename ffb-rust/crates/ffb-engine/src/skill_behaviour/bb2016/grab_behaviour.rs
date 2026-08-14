@@ -68,7 +68,11 @@ impl StepModifierTrait for GrabStepModifier {
 
         // Java: boolean allowGrabOutsideBlock = actingPlayer.getPlayer().hasSkillProperty(NamedProperties.grabOutsideBlock)
         let allow_grab_outside_block = game.player(&attacker_id)
-            .map(|p| p.has_skill_property(NamedProperties::GRAB_OUTSIDE_BLOCK))
+            // `grabOutsideBlock` is registered ONLY by `skill/bb2016/BallAndChain`; the BB2020 and
+            // BB2025 classes do not. Ask the edition-aware property set — the union grants it in
+            // every ruleset, so a BB2020/BB2025 Ball & Chain player (the goblin Fanatic) wrongly
+            // answered true here.
+            .map(|p| p.has_skill_property_in(game.rules, NamedProperties::GRAB_OUTSIDE_BLOCK))
             .unwrap_or(false);
 
         // Java: attackerCoordinate.isAdjacent(defenderCoordinate) — no ViciousVines alternative in BB2016

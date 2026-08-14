@@ -576,6 +576,31 @@ impl IXmlReadable for Player {
 
 #[cfg(test)]
 mod tests {
+
+    /// `has_skill_property_in` must answer with the PER-EDITION property set, not the union.
+    /// Ball & Chain registers `grabOutsideBlock` only in `skill/bb2016/BallAndChain`, so a BB2020 or
+    /// BB2025 Fanatic must answer false — the union answered true in every ruleset.
+    #[test]
+    fn has_skill_property_in_is_edition_aware() {
+        use crate::enums::{Rules, SkillId};
+        use crate::model::skill_def::SkillWithValue;
+
+        let mut p = Player { id: "fanatic".into(), name: "fanatic".into(), nr: 1, ..Default::default() };
+        p.starting_skills = vec![SkillWithValue::new(SkillId::BallAndChain)];
+
+        assert!(p.has_skill_property_in(Rules::Bb2016, "grabOutsideBlock"));
+        assert!(!p.has_skill_property_in(Rules::Bb2020, "grabOutsideBlock"),
+            "bb2020 Ball & Chain does not register grabOutsideBlock");
+        assert!(!p.has_skill_property_in(Rules::Bb2025, "grabOutsideBlock"));
+
+        // The union-based accessor still reports it — that is what the edition-aware one exists to fix.
+        assert!(p.has_skill_property("grabOutsideBlock"));
+
+        // A property every edition registers is unaffected.
+        for r in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            assert!(p.has_skill_property_in(r, "movesRandomly"));
+        }
+    }
     use super::*;
     use crate::enums::{PlayerType, PlayerGender};
     use crate::model::player_status::PlayerStatus;
