@@ -584,6 +584,15 @@ pub struct DriverGameState {
 impl DriverGameState {
     pub fn from_game(game: Game, seed: u64) -> Self {
         let rules = game.rules;
+        let mut game = game;
+        // Mirror `ParityRunner.seedCollectionsShuffleRng`: Java's one-arg
+        // `Collections.shuffle(list)` draws from a shared `Random` inside `java.util.Collections`,
+        // a SECOND stream alongside the DiceRoller. The harness seeds Java's field per game with
+        // this exact expression, so seeding ours identically makes both engines draw the same
+        // permutations (prayer selection, per-player picks). Keep the constant in sync with
+        // ParityRunner.
+        game.collections_rng =
+            ffb_model::util::java_random::JavaRandom::new((seed as i64) ^ 0x5EED_C011_3C71_04);
         DriverGameState {
             game, rng: GameRng::new(seed), stack: DriverStepStack::new_with_rules(rules),
             current: None, forwarded: None, pending_prompt: None,

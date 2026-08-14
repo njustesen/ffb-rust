@@ -82,6 +82,15 @@ pub struct Game {
     pub blitz_turn_state: Option<BlitzTurnState>,
     /// Java: GameState.getPrayerState() — prayer effects active this game.
     pub prayer_state: PrayerState,
+    /// Mirror of `java.util.Collections`' shared shuffle `Random`. Java's ONE-ARG
+    /// `Collections.shuffle(list)` draws from that field rather than from the game's `DiceRoller`,
+    /// so it is a SECOND random stream the engine consumes (prayer selection in
+    /// `bb2020/StepApplyKickoffResult.handleCheeringFans`, and the per-player picks in
+    /// `PlayerSelector.selectPlayers`). The parity harness seeds Java's field per game by
+    /// reflection; the driver seeds this identically, so both engines draw the same permutations.
+    /// Not serialised — it is reconstructed by the driver from the game seed.
+    #[serde(skip)]
+    pub collections_rng: crate::util::java_random::JavaRandom,
     /// Java: GameState.getKickingSwarmers / setKickingSwarmers — tracks how many
     /// kicking-team swarming players were placed during the Swarming kickoff result.
     pub kicking_swarmers: i32,
@@ -147,6 +156,7 @@ impl Game {
             last_defender_id: None,
             blitz_turn_state: None,
             prayer_state: PrayerState::new(),
+            collections_rng: crate::util::java_random::JavaRandom::default(),
             kicking_swarmers: 0,
             active_shadowers: Vec::new(),
             dialog_id: None,

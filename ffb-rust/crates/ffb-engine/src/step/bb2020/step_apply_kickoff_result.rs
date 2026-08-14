@@ -349,9 +349,29 @@ impl StepApplyKickoffResult {
         // Exhibition: rolls 1–8; league (INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE): rolls 1–16.
         let use_league = game.options.is_enabled(game_option_id::INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE);
         let max_prayer_roll = if use_league { 16 } else { 8 };
+
+        // Java picks the prayer with
+        //     Collections.shuffle(availablePrayerRolls);
+        //     int roll = availablePrayerRolls.remove(0);
+        // The ONE-ARG shuffle draws from `java.util.Collections`' shared `Random`, NOT from the
+        // DiceRoller — so this selection consumes ZERO game dice. Rust was using
+        // `rng.range(max_prayer_roll)`, which both drew from the wrong stream (shifting every later
+        // game die) and picked a different prayer. `game.collections_rng` mirrors Java's field,
+        // seeded identically by the driver and by ParityRunner.
+        //
+        // `availablePrayerRolls` is `PrayerFactory.prayers.entrySet()` filtered by prayers already
+        // taken. That map is a `HashMap<Integer, Prayer>` whose iteration order for keys 1..=16 is
+        // plain ascending (verified by loading the real class from the jar), so an ordered range is
+        // the faithful equivalent — no HashMap-bucket emulation needed.
+        let pick_prayer_roll = |game: &mut Game| -> i32 {
+            let mut available: Vec<i32> = (1..=max_prayer_roll as i32).collect();
+            ffb_model::util::java_random::collections_shuffle(&mut available, &mut game.collections_rng);
+            available[0]
+        };
+
         let mut outcome = StepOutcome::next();
         let (winner_team_id, prayer_available) = if total_home > total_away {
-            let prayer_roll = rng.range(max_prayer_roll) as i32 + 1;
+            let prayer_roll = pick_prayer_roll(game);
             let team_id = game.team_home.id.clone();
             outcome = outcome.push_seq(vec![
                 SequenceStep::with_params(StepId::Prayer, vec![
@@ -361,7 +381,7 @@ impl StepApplyKickoffResult {
             ]);
             (Some(team_id), true)
         } else if total_away > total_home {
-            let prayer_roll = rng.range(max_prayer_roll) as i32 + 1;
+            let prayer_roll = pick_prayer_roll(game);
             let team_id = game.team_away.id.clone();
             outcome = outcome.push_seq(vec![
                 SequenceStep::with_params(StepId::Prayer, vec![

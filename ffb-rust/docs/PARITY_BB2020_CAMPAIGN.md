@@ -303,3 +303,49 @@ The end-to-end selection chain is therefore verified before a line of engine cod
 case. Handlers split into three shapes: `RandomSelectionPrayerHandler` (rolls to pick players —
 consumes GAME dice), `SelectPlayerPrayerHandler` (dialog), and direct-effect ones. Port them
 one at a time, cheapest first, re-running human 1-100 after each.
+
+
+## ITER4 — prayer SELECTION ported to the right stream (count unchanged at 38/100)
+
+Good news first: **the whole prayer system is already ported.** All 16 handlers, the selectors, the
+factory and `StepPrayer`/`StepPrayers` exist under `crates/ffb-engine/src/inducements/bb2020/prayers/`
+— including `bad_habits_handler.rs`, which correctly rolls `rng.d3()`. ITER3's "Rust implements no
+part of the prayer system" was wrong about the *cause*; what is missing is narrower.
+
+**The real bug in `handle_cheering_fans`:** Rust picked the prayer with
+
+```rust
+let prayer_roll = rng.range(max_prayer_roll) as i32 + 1;   // GAME dice stream
+```
+
+Java picks it with `Collections.shuffle(availablePrayerRolls); remove(0)` — the **Collections**
+stream, consuming **zero** game dice. So Rust both drew from the wrong stream and chose a different
+prayer.
+
+FIXED, as a 1:1 port:
+- `Game::collections_rng` — a `JavaRandom` mirroring `java.util.Collections`' shared field,
+  `#[serde(skip)]`, seeded by `DriverGameState::from_game` with
+  `(seed as i64) ^ 0x5EED_C011_3C71_04`, the *same* expression
+  `ParityRunner.seedCollectionsShuffleRng` uses (keep the two constants in sync).
+- `handle_cheering_fans` now builds `1..=max_prayer_roll`, runs `collections_shuffle`, and takes
+  element 0 — no game dice consumed.
+
+**Fail count unchanged at 38/100** — reported plainly. The selection is now right but the prayer
+still never resolves: `FFB_DRIVE_TRACE` shows `ApplyKickoffResult` (stack_len 5) followed directly
+by `KickoffAnimation` (stack_len 4), so the `StepId::Prayer` sequence this branch pushes is **never
+executed** — the stack shrinks instead of growing. `apply_effects` does drain `outcome.pushes` into
+`stack.push_sequence`, so the push is being lost somewhere between the branch and the stack.
+
+### FRONTIER for ITER5
+Find why the pushed Prayer sequence is dropped. Concrete checks, in order:
+1. Confirm the branch is actually taken — `roll_home=5`, `roll_away=2`, both teams have 0
+   cheerleaders, so `total_home > total_away` should hold. A gated print in the branch settles it in
+   one run (and would rule out a stale build).
+2. If it IS taken, inspect `DriverStepStack::push_sequence` for a StepId whitelist/filter that
+   silently drops `StepId::Prayer` — note the driver's `make_step_for` maps
+   `StepId::Prayer => StepPrayer::new(0, "")`, so an unregistered-id filter is plausible.
+3. Once the step runs, the existing `BadHabitsHandler` should roll its d3 at the right point;
+   re-check that Java's rng 12 `d3` and Rust's line up, then sweep.
+
+Gates for this commit: bb2016 lineman **50/50 games match**, bb2025 lineman **50/50 games match**,
+`cargo test` ffb-engine **7115/0**, ffb-model **2783/0**.

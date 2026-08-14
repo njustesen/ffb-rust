@@ -41,6 +41,12 @@ pub struct JavaRandom {
     seed: u64,
 }
 
+impl Default for JavaRandom {
+    /// Java's `new Random(0)` — only a placeholder; the driver re-seeds per game from the parity
+    /// seed, matching `ParityRunner.seedCollectionsShuffleRng`.
+    fn default() -> Self { Self::new(0) }
+}
+
 impl JavaRandom {
     /// Java: `public Random(long seed) { this.seed = (seed ^ 0x5DEECE66DL) & ((1L << 48) - 1); }`
     pub fn new(seed: i64) -> Self {
