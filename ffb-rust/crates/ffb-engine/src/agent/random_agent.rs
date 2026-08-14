@@ -779,14 +779,29 @@ impl Agent for RandomAgent {
                 let idx = self.pick_action(squares.len());
                 Action::TricksterMove { coord: squares[idx] }
             }
-            // Select skill: pick uniformly from all available skill IDs — 1 decision_rng call.
-            // The u16 IDs in the prompt can't be directly mapped to SkillId enum variants without
-            // a lookup table, so we consume 1 RNG call and return Acknowledge for now.
-            // SelectSkill doesn't appear in T3 parity tests (no level-up in single game).
+            // Java harness: `ParityRunner` has no SELECT_SKILL case, so the dialog falls through to
+            // `UNHANDLED_DIALOG` -> `RandomStrategy.respondToDialog`:
+            //     case SELECT_SKILL: comm.sendSkillSelection(ss.getPlayerId(), skills.get(0));
+            // i.e. the FIRST entry of the list Java built, which `IntensiveTrainingHandler` sorted
+            // with `Comparator.comparing(Skill::getName)`. Deterministic, so it consumes NO decision
+            // RNG - the old arm burned one call and answered `Acknowledge`, which the step ignores.
+            // Sorting here rather than trusting the prompt's order keeps the answer correct however
+            // the prompt groups the skills by category.
             Some(AgentPrompt::SelectSkill { available, .. }) => {
-                let total: usize = available.iter().map(|(_, ids)| ids.len()).sum();
-                if total > 0 { let _ = self.pick(total); }
-                Action::Acknowledge
+                let rules = gs.game.rules;
+                // The prompt carries skills as u16 discriminants; `SkillFactory` is the registry
+                // that can turn them back into `SkillId`s (Java: `SkillFactory.getSkills()`).
+                let factory = ffb_model::factory::skill_factory::SkillFactory::new();
+                let all: Vec<SkillId> = factory.get_skills().collect();
+                let first = available
+                    .iter()
+                    .flat_map(|(_, ids)| ids.iter())
+                    .filter_map(|id| all.iter().copied().find(|s| *s as u16 == *id))
+                    .min_by_key(|s| s.category_and_name_for(rules).1);
+                match first {
+                    Some(skill_id) => Action::SelectSkill { skill_id },
+                    None => Action::Acknowledge,
+                }
             }
             // Team setup: deterministic canonical formation, 0 RNG consumed — 1:1 with Java
             // ParityRunner's `resetCurrentTeam`/`placeReserves` (called directly per StepId,
@@ -928,6 +943,32 @@ mod tests {
         }
         // Java sends the decline unconditionally - no coin flip, so no decision RNG is consumed.
         assert_eq!(agent.decision_rng_count, before);
+    }
+
+    /// Mirrors `RandomStrategy.respondToDialog` case SELECT_SKILL, which `ParityRunner` reaches via
+    /// its `UNHANDLED_DIALOG` fallthrough: `comm.sendSkillSelection(ss.getPlayerId(), skills.get(0))`
+    /// - the first entry of the name-sorted list `IntensiveTrainingHandler` built. The old arm burned
+    /// a decision-RNG call and answered `Acknowledge`, which the step ignores, so the Intensive
+    /// Training prayer granted nothing (lineman bb2020 seed 50).
+    #[test]
+    fn select_skill_prompt_answers_the_name_first_skill_with_no_rng() {
+        use ffb_model::enums::SkillCategory;
+        let mut gs = new_game(1);
+        // Offered out of name order, and split across groups, to prove neither matters.
+        gs.pending_prompt = Some(AgentPrompt::SelectSkill {
+            player_id: "home_02".into(),
+            available: vec![
+                (SkillCategory::General, vec![SkillId::Tackle as u16, SkillId::Block as u16]),
+                (SkillCategory::General, vec![SkillId::Fend as u16]),
+            ],
+        });
+        let mut agent = RandomAgent::new_parity(1);
+        let before = agent.decision_rng_count;
+        match agent.act(&gs) {
+            Action::SelectSkill { skill_id } => assert_eq!(skill_id, SkillId::Block),
+            other => panic!("expected SelectSkill(Block), got {other:?}"),
+        }
+        assert_eq!(agent.decision_rng_count, before, "Java's answer is deterministic");
     }
 
     #[test]

@@ -20,18 +20,20 @@ pub struct StepPrayer {
     pub roll: i32,
     pub team_id: Option<String>,
     pub player_id: Option<String>,
+    /// The skill chosen from a `DialogSelectSkillParameter` (Intensive Training).
+    pub selected_skill: Option<ffb_model::enums::SkillId>,
     pub first_run: bool,
 }
 
 impl StepPrayer {
     pub fn new(roll: i32, team_id: impl Into<String>) -> Self {
-        Self { roll, team_id: Some(team_id.into()), player_id: None, first_run: true }
+        Self { roll, team_id: Some(team_id.into()), player_id: None, selected_skill: None, first_run: true }
     }
 }
 
 impl Default for StepPrayer {
     fn default() -> Self {
-        Self { roll: 0, team_id: None, player_id: None, first_run: true }
+        Self { roll: 0, team_id: None, player_id: None, selected_skill: None, first_run: true }
     }
 }
 
@@ -51,7 +53,11 @@ impl Step for StepPrayer {
             Action::PlayerChoice { player_id, .. } => {
                 self.player_id = player_id.clone();
             }
-            Action::SelectSkill { skill_id: _ } => {}
+            // Java: CLIENT_PRAYER_SELECTION carries the chosen skill; the player id travels with
+            // the dialog, so the step remembers it from when it showed the prompt.
+            Action::SelectSkill { skill_id } => {
+                self.selected_skill = Some(*skill_id);
+            }
             _ => {}
         }
         self.execute_step(game, rng)
@@ -105,6 +111,23 @@ impl StepPrayer {
                     game.prayer_state = prayer_state;
                     if applied {
                         StepOutcome::next()
+                    } else if let Some((player_id, skills)) = h.skill_dialog(game) {
+                        // Java: `UtilServerDialog.showDialog(gameState, new DialogSelectSkillParameter(
+                        //      player.getId(), skills, SkillChoiceMode.INTENSIVE_TRAINING), false)`.
+                        // The skills are already in Java's order (sorted by name); the prompt groups
+                        // them by category because that is the shape `AgentPrompt::SelectSkill` takes.
+                        self.player_id = Some(player_id.clone());
+                        let rules = game.rules;
+                        let mut available: Vec<(ffb_model::enums::SkillCategory, Vec<u16>)> = Vec::new();
+                        for s in &skills {
+                            let cat = s.category_and_name_for(rules).0;
+                            match available.iter_mut().find(|(c, _)| *c == cat) {
+                                Some((_, v)) => v.push(*s as u16),
+                                None => available.push((cat, vec![*s as u16])),
+                            }
+                        }
+                        StepOutcome::cont().with_prompt(
+                            ffb_model::prompts::AgentPrompt::SelectSkill { player_id, available })
                     } else if let Some(mode) = h.dialog_choice_mode() {
                         // Java: `SelectPlayerPrayerHandler.createDialog` →
                         // `UtilServerDialog.showDialog(gameState, new DialogPlayerChoiceParameter(
@@ -133,7 +156,11 @@ impl StepPrayer {
                 // NOT the praying team's id (which is what this passed before).
                 let player_id = self.player_id.clone().unwrap_or_default();
                 let mut prayer_state = std::mem::take(&mut game.prayer_state);
-                h.apply_selection(&mut prayer_state, game, &player_id);
+                match self.selected_skill {
+                    // The selection carried a skill (Intensive Training).
+                    Some(skill_id) => h.apply_skill_selection(&mut prayer_state, game, &player_id, skill_id),
+                    None => h.apply_selection(&mut prayer_state, game, &player_id),
+                }
                 game.prayer_state = prayer_state;
             }
             StepOutcome::next()

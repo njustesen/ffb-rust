@@ -27,6 +27,14 @@ impl PrayerHandler for IntensiveTrainingHandler {
     fn init_effect(&self, prayer_state: &mut PrayerState, game: &mut Game, rng: &mut GameRng, team_id: &str) -> bool {
         base::init_effect(prayer_state, game, rng, team_id, &BB2020PlayerSelector::new())
     }
+    fn skill_dialog(&self, game: &Game) -> Option<(String, Vec<ffb_model::enums::SkillId>)> {
+        let player_id = base::chosen_player(game)?;
+        let skills = base::eligible_skills(game, &player_id);
+        if skills.is_empty() { None } else { Some((player_id, skills)) }
+    }
+    fn apply_skill_selection(&self, prayer_state: &mut PrayerState, game: &mut Game, player_id: &str, skill_id: ffb_model::enums::SkillId) {
+        base::apply_skill_selection(prayer_state, game, player_id, skill_id);
+    }
     fn remove_effect_internal(&self, _prayer_state: &mut PrayerState, game: &mut Game, team_id: &str) {
         base::remove_effect_internal(game, team_id, &BB2020PlayerSelector::new());
     }

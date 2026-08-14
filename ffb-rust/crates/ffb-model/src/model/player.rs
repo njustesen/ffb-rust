@@ -91,6 +91,14 @@ pub struct Player {
     /// Skills used this turn (reset at turn start).
     pub used_skills: HashSet<SkillId>,
 
+    /// Java: `player.getPosition().getSkillCategories(false)` — the categories this player can take
+    /// a skill from on a NORMAL roll. Java reaches them through the position; Rust's `Player` and
+    /// `RosterPosition` are separate structs and the position is not reachable from the player at
+    /// runtime, so `update_position` copies them here the same way it already copies `keywords`.
+    /// Read by the Intensive Training prayer, which offers only skills in these categories.
+    #[serde(default)]
+    pub skill_categories_normal: Vec<crate::enums::SkillCategory>,
+
     /// Permanent serious injuries reducing stats.
     pub niggling_injuries: i32,
     pub stat_injuries: Vec<SeriousInjuryKind>,
@@ -422,6 +430,7 @@ impl Player {
             name: name.into(),
             nr,
             position_id: pos.id.clone(),
+            skill_categories_normal: pos.skill_categories_normal.clone(),
             player_type: pos.player_type,
             gender: pos.gender,
             movement: pos.movement,
@@ -483,6 +492,7 @@ impl Player {
         self.is_lineman = position.is_lineman;
         self.race = position.race.clone();
         self.keywords = position.keywords.clone();
+        self.skill_categories_normal = position.skill_categories_normal.clone();
         for sw in &position.skills {
             self.add_skill(sw.skill_id);
         }
@@ -739,6 +749,7 @@ mod tests {
             injury_current: false,
             inside_player_statistics: false,
             current_skill_value: None,
+            skill_categories_normal: vec![],
         }
     }
 

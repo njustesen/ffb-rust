@@ -44,6 +44,15 @@ pub trait PrayerHandler: Send + Sync {
     /// (`RandomSelectionPrayerHandler` and the plain `PrayerHandler` subclasses).
     fn dialog_choice_mode(&self) -> Option<&'static str> { None }
 
+    /// Java: `IntensiveTrainingHandler.createDialog` -> `DialogSelectSkillParameter(playerId,
+    /// skills, INTENSIVE_TRAINING)` — a SKILL dialog for one already-chosen player, as opposed to
+    /// the PLAYER dialog `dialog_choice_mode` describes. `None` for every other handler.
+    fn skill_dialog(&self, _game: &Game) -> Option<(String, Vec<ffb_model::enums::SkillId>)> { None }
+
+    /// Java: `applySelection(Game, PrayerDialogSelection)` for the skill-dialog handlers, where the
+    /// selection carries a skill as well as the player. Default: no-op.
+    fn apply_skill_selection(&self, _prayer_state: &mut PrayerState, _game: &mut Game, _player_id: &str, _skill_id: ffb_model::enums::SkillId) {}
+
     /// Java: `DialogPrayerHandler.initEffect` -> `selector().eligiblePlayers(...)` — the players the
     /// dialog offers. Only meaningful when `dialog_choice_mode()` is `Some`.
     fn eligible_dialog_players(&self, _game: &Game, _team_id: &str) -> Vec<String> { Vec::new() }

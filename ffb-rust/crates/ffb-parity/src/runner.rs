@@ -9,6 +9,7 @@ use ffb_model::data::roster_json::PositionJson;
 use ffb_model::data::{bb2016_rosters, bb2020_rosters, bb2025_rosters};
 use ffb_model::enums::{PlayerGender, PlayerType, Rules};
 use ffb_model::enums::SkillId;
+use ffb_model::enums::SkillCategory;
 use ffb_model::model::player::Player;
 use ffb_model::model::roster_position::RosterPosition;
 use ffb_model::model::team::Team;
@@ -596,6 +597,16 @@ fn make_lineman_team(side: &str, roster_id: &str) -> Team {
         extra_skills: vec![],
         temporary_skills: vec![],
         used_skills: HashSet::new(),
+        // Mirrors the Java twin of this fixture, ffb-server/rosters/roster_lineman_parity.xml:
+        //     <skillCategoryList>
+        //       <normal>General</normal>
+        //       <double>Agility</double> <double>Strength</double> <double>Passing</double>
+        //     </skillCategoryList>
+        // Only the NORMAL list is modelled, because that is the one Java reads
+        // (`getSkillCategories(false)`) when the Intensive Training prayer builds its skill list.
+        // Without it the offered list is empty and the prayer is silently wasted, while Java grants
+        // a skill (lineman bb2020 seed 50: Java's Home2 gets Block and so does not fall on Both Down).
+        skill_categories_normal: vec![SkillCategory::General],
         niggling_injuries: 0,
         stat_injuries: vec![],
         current_spps: 0,

@@ -2328,3 +2328,39 @@ matches).
 4. `applySelection` -> `add_prayer_skill`, then re-run lineman 1-100.
 
 Tree is clean; no behaviour change this iteration and none claimed. `lineman` bb2020 remains 99/100.
+
+### ITER48 — Intensive Training ported. **lineman bb2020 100/100.**
+
+Landed the four steps ITER47 laid out.
+
+1. **Fixture categories.** `Player` gained `skill_categories_normal`, copied by `update_position` the
+   same way `keywords` already is — Java reaches the categories through `player.getPosition()`, which
+   Rust cannot do at runtime since `Player` and `RosterPosition` are separate structs.
+   `make_lineman_team` sets `[General]`, mirroring `roster_lineman_parity.xml`.
+2. **`createDialog`.** `eligible_skills` filters `SkillFactory::get_skills()` by category-in-position,
+   not-already-held and `canBeAssignedTo`, then sorts by DISPLAY name (`category_and_name_for(rules).1`)
+   — Java's `Comparator.comparing(Skill::getName)`. `init_effect` now returns Java's `handled()`: true
+   (nothing pending) only when the list is empty, which is the `ReportPrayerWasted` branch.
+   `Skill.eligible()` is not modelled because the base returns `true` and no shipped skill overrides it.
+3. **The dialog.** New `PrayerHandler::skill_dialog` / `apply_skill_selection` (Java's SKILL dialog, as
+   distinct from the PLAYER dialog `dialog_choice_mode` describes). `StepPrayer` emits
+   `AgentPrompt::SelectSkill` and remembers the player, exactly as Java carries the id on
+   `DialogSelectSkillParameter` and gets it back in `PrayerDialogSelection(playerId, skill)`. The
+   chosen player is recovered from `field_model.prayer_enhancements[PRAYER_NAME]` rather than stored
+   in `PrayerState`, which is a 1:1 of Java's class and has no such field.
+4. **The agent.** The `SelectSkill` arm answered `Acknowledge` — which the step ignores — after
+   burning a decision-RNG call. It now decodes the offered ids and picks the name-first skill with
+   NO RNG, mirroring `RandomStrategy`'s `skills.get(0)` on Java's already-sorted list. Sorting on the
+   agent side rather than trusting the prompt's grouping keeps it correct either way.
+
+**Result: `lineman` bb2020 1-100 → `PARITY: 100/100 games match`.** Gates: `lineman` bb2016 100/100,
+`lineman` bb2025 100/100, `human` bb2020 100/100, `underworld` bb2020 100/100,
+`cargo test --workspace` 14,445 passed / 0 failed.
+
+Two notes for later:
+- The BB2025 handler has a different file shape and was left unwired. BB2025 lineman is 100/100 either
+  way, so nothing is masked today, but Java's `bb2025/IntensiveTrainingHandler` exists and should get
+  the same treatment with its own verification rather than being folded in untested here.
+- Adding a `Player` field surfaced four test constructors that spell every field out instead of
+  ending with `..Default::default()`; they were updated. A Java-side doc snippet also had to be
+  fenced as ```text — an indented block in a doc comment is compiled as a doctest.
