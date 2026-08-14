@@ -2468,3 +2468,58 @@ the state write entirely and let `StepStandUp` do the work — checking the vamp
 renegades/underworld cases the current comment cites, since those are what the pre-stand was built for.
 
 Baseline unchanged and tree clean: `nurgle` 21/25.
+
+## ITER51 — `nurgle` seed 2: the decision point found, and both of its inputs are wrong
+
+Picked up ITER50's open question — which write stands the blitzer up — and answered it with a
+backtrace probe on `FieldModel::set_player_state` (debug build, `RUST_BACKTRACE=1`):
+
+```
+SETSTATE away_02 Some(3) -> 2      ffb_engine::step::util_server_steps::change_player_action
+SETSTATE away_02 Some(2) -> 1      ffb_engine::step::util_server_steps::change_player_action_to_none
+```
+
+The first is **correct** and matches Java: `UtilActingPlayer.changeActingPlayer` ends with
+`fieldModel.setPlayerState(newPlayer, oldState.changeBase(PlayerState.MOVING))` — "show acting player
+as moving". ITER50's suspicion of the `PS_STANDING` pre-stand was therefore a dead end, which is why
+gating it changed nothing.
+
+The second is the decision point, and Rust's version already implements Java's three-way branch
+faithfully:
+
+```rust
+if acted()                      -> STANDING, inactive
+else if standing_up || was_prone -> PRONE       // the branch Java takes here
+else                             -> STANDING
+```
+
+**But both inputs are wrong for this activation.** Probing the branch:
+
+```
+TONONE old=away_02 acted=true standing_up=false was_prone=false old_ps=Some(1)
+```
+
+`old_player_state` is `STANDING(1)` although the player was demonstrably PRONE(3) when activated (the
+first SETSTATE above proves it), and `standing_up` is `false` although `change_player_action` sets it
+from exactly that pre-activation base. So the PRONE branch is unreachable regardless of what the
+branch itself does. Two upstream suspects, both visible in the source:
+
+1. `change_player_action` only assigns `old_player_state` `if ... .is_none()` — it is deliberately
+   STICKY (a comment cites a Take Root case, wood_elf seed 1 i=49). A stale STANDING from an earlier
+   activation would survive into this one.
+2. `step_init_selecting.rs:120` clears `standing_up` for `Blitz`/`Block` when `block_defender_id`
+   is none, and `StepStandUp` may clear it too.
+
+**Also attempted and REVERTED**: `change_player_action` (unlike `change_player_action_to_none`) never
+restores the OUTGOING acting player, while Java's `changeActingPlayer` does so in its
+`(oldPlayer != null) && (oldPlayer != newPlayer)` block, before the generic BLOCKED/MOVING sweep. I
+ported that restore; a probe showed it never fires on this path (the activation ends through
+`change_player_action_to_none` instead), and `nurgle` stayed 21/25. It looks like a genuine gap and is
+worth revisiting, but it is not this bug and was not committed without a measured effect.
+
+**Next iteration**: fix the inputs, not the branch. Establish for this activation why
+`old_player_state` is STANDING and when `standing_up` is cleared — the same backtrace probe on those
+two fields (or a watch printing every write to them) will name the site in one run. Then re-check the
+Take Root stickiness case the comment cites, since the fix must not reintroduce it.
+
+Baseline unchanged and tree clean: `nurgle` 21/25.
