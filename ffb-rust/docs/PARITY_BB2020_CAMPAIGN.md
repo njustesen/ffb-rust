@@ -774,3 +774,52 @@ permanently a die ahead.
 then the remaining 28 rosters. Note the five shared fixes so far (SneakyGit registration, wildly
 inaccurate pass, coach-choice prayers, kickoff table + Blitz!/Officious Ref + sequence labels,
 throw-in mechanic) are all edition-wide, so other rosters should benefit without roster-specific work.
+
+## ITER15 — lineman bb2020 diagnosis (no fix yet): the harness DROPS a player at setup
+
+`lineman` bb2020 is at 98/100 (seeds 46 and 50). **Seed 46, i=172** (half 2, turn 1 — the H2 setup),
+dice identical at `rng_calls=48`, and exactly two fields differ:
+
+```
+JAVA a02:-1,-1,Reserve   a05:20,9,Standing
+RUST a02:13,8,Standing   a05:-1,-1,Reserve
+```
+
+Both engines field **10** of the away team's 11 players; they disagree on which one sits out.
+
+**Eliminated cheaply:** Sweltering-Heat fainting (an `FFB_HEAT_TRACE` probe showed the block never
+runs on this seed) and `Team.getPlayers()` nr-sort ordering (the parity XML is already
+nr-ascending, so Java's sort is a no-op).
+
+**What the probes showed.** An `FFB_SETUP_TRACE` probe on `canonical_setup_action` proves Rust is
+prompted 11 times per setup and places **all 11** — `away_11` is still a candidate at
+`on_pitch=10`. Mapping Java's away squares back through `transform()` (x → 25−x) shows Java's
+placement order instead:
+
+| player | raw square | list slot |
+|---|---|---|
+| a00 | 12,7 | `LOS[0]` |
+| a01 | 12,6 | `LOS[1]` |
+| a02 | — | **dropped** |
+| a03 | 5,5 | `OVER[0]` |
+| a04 | 5,7 | `OVER[1]` |
+| a05 | 5,9 | `OVER[2]` |
+
+So Java placed two on the line of scrimmage, **silently lost a02**, and continued into the overflow
+squares — never filling `LOS[2]`. `ParityRunner.placeReserves` explains how: `li` (the LOS cursor)
+and `oi` (the overflow cursor) advance monotonically across the WHOLE setup, and `losNeeded--` /
+`placed++` run unconditionally right after `UtilServerSetup.setupPlayer(...)`. A player whose square
+is taken — or whose `setupPlayer` call the server rejects — is therefore dropped with no retry,
+and the cursor moves on. Rust's `canonical_setup_action` instead scans for the FIRST free square,
+so it never drops anyone.
+
+**Next iteration:** mirror `placeReserves`' non-retrying cursor semantics in
+`canonical_setup_action`. The wrinkle is that Rust's agent is prompted once per player and holds no
+cursor state, while the skipped squares leave no trace on the board — so reconstructing `li`/`oi`
+from board occupancy alone is not sufficient. Either give the setup action cursor state across the
+prompts of one setup, or have it emit the whole placement at once. Also worth establishing WHY
+`setupPlayer` didn't take for a02 (an `FFB_TRACE` dump of `LOS[2]`'s occupancy at that moment on the
+Java side would settle it) — if the square was genuinely free, the drop is a rejected placement
+rather than an occupied-square skip, and the mirror must reproduce that condition, not the cursor.
+
+Baseline unchanged and re-confirmed: `PARITY: 98/100`. All probes removed.
