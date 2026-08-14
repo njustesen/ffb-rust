@@ -1801,3 +1801,49 @@ lists (`JAVA_ACT_PICK` vs `RUST_ACT_PICK`) for the turn ending at die 85 — the
 goblin.
 
 Baseline unchanged: `underworld` 22/25. No engine changes this iteration.
+
+## ITER38 — underworld seed 2 ROOT-CAUSED: the Animal Savagery lash-out injury is not applied
+
+Went back further than ITER37. The first STATE divergence is **i=56**, well before the die-86 value
+divergence:
+
+```
+JSTEP i=56 rng_calls=55 chosen=Activate(Away1,FOUL)   h02:-1,-1,Ko
+RUST_STEP i=56 rng_calls=56 chosen=Activate(away_01,Foul)  h02:-1,-1,Standing
+```
+
+`h02` is **KO in Java, Standing in Rust** — and both have it OFF the pitch (`-1,-1`), i.e. Rust boxed
+the player without ever changing its state base.
+
+The two-log join over dice 47-57 shows both engines rolling the identical sequence:
+
+```
+  48 java d6=1  AnimalSavageryBehaviour   rust d6=1  AnimalSavagery   ← AS fails
+  49 java d6=6  InjuryTypeBlock.armourRoll  rust d6=6  AnimalSavagery  ┐ armour 6+6 = 12, broken
+  50 java d6=6  InjuryTypeBlock.armourRoll  rust d6=6  AnimalSavagery  ┘
+  51 java d6=3  InjuryTypeBlock.injuryRoll  rust d6=3  AnimalSavagery  ┐ injury 3+5 = 8 = KNOCKED OUT
+  52 java d6=5  InjuryTypeBlock.injuryRoll  rust d6=5  AnimalSavagery  ┘
+```
+
+(Rust attributes 49-52 to `AnimalSavagery` because it resolves the lash-out injury INSIDE that step —
+the false-positive pattern ITER37 warned about, here confirmed benign.)
+
+So both engines compute the same lash-out injury, and 8 is a KO in BB2020. Java applies it; Rust does
+not. In `mixed/shared/step_animal_savagery.rs` the result IS produced and consumed —
+`handle_injury(...)` at line 334, `injury_result.injury_context().is_casualty() || is_knocked_out()`
+driving `player_removed` at line 584, and the result attached to a context at 425/444 — which
+explains why the victim gets BOXED. What never happens is the state-base change to `KNOCKED_OUT`, so
+the boxed player keeps `STANDING`.
+
+That one unapplied injury is the whole seed: Rust keeps a player Java has removed, which is why Rust
+still has an activation at die 85 where Java has none (the ITER36/37 symptom), and why the dice drift
+from there.
+
+**Next iteration:** compare against Java's `lashOut` — specifically what applies the injury to the
+victim after `UtilServerInjury.handleInjury` returns (the `DropPlayerContext` /
+`SteadyFootingContext` consumer, or an `INJURY_RESULT` publish that Rust drops). The fix belongs
+wherever Rust decides to box the player: it must set the state base from the injury context, not just
+move the player. Add a test asserting an AS lash-out with armour 12 / injury 8 leaves the victim
+`KNOCKED_OUT`, not `STANDING`.
+
+Baseline unchanged: `underworld` 22/25. No engine changes this iteration.
