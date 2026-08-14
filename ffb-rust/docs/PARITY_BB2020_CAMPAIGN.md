@@ -2024,3 +2024,43 @@ Java uses `game.getDefender()` for the victim-state keys where Rust uses
 `apothecaryMode` argument that Rust's `drop_player` does not pass.
 
 Baseline unchanged: `underworld` 22/25. No engine changes this iteration.
+
+## ITER43 — the agent never answered the apothecary dialog (1:1 harness mirror, landed)
+
+Continuing ITER42's probe of `bb2025/shared/step_apothecary.rs`. The mode gate was innocent — the
+step receives the lash-out result correctly:
+
+```
+APO25: mode=Some(AnimalSavagery) status=DoRequest def=Some("home_03") inj=Some(5)   # 5 = PS_KNOCKED_OUT
+APO25: mode=Some(AnimalSavagery) status=WaitForApothecaryUse def=Some("home_03") inj=Some(5)
+APO25-CMD: (never printed)
+```
+
+The step opened the `USE_APOTHECARY` dialog and **nothing ever answered it**. `random_agent.rs`
+answered `AgentPrompt::UseApothecary` with `Action::Acknowledge`, which `StepApothecary::handle_command`
+does not match, so the status stayed `WAIT_FOR_APOTHECARY_USE` — a status the main switch has no arm
+for (`_ => {}`) — and the computed injury was silently discarded.
+
+Java's harness does answer it, `ParityRunner.handleDialog` case `USE_APOTHECARY`:
+
+```java
+comm.sendUseApothecary(apo.getPlayerId(), false, apoType, apo.getSeriousInjury());
+```
+
+— an unconditional DECLINE naming the injured player. **Fix**: mirror it exactly in the agent
+(`UseApothecary { player_id, use_apothecary: false }`), with a colocated regression test
+(`use_apothecary_prompt_is_declined_naming_the_injured_player`) that also asserts no decision RNG is
+consumed, since Java's answer is unconditional.
+
+**Verified effect**: the decline now lands (`status=DoNotUseApothecary`) and `home_03` leaves the
+pitch at i=56 as it does in Java — `h02:11,13,Standing` (mid-pitch, still playing) became
+`h02:-1,-1,Standing` (in the dugout box).
+
+**Seed 2 still fails at the same step 55**, because the base is still `Standing` where Java has `Ko`:
+`apply_to` boxes the player but the state base is not left `KNOCKED_OUT`. Next iteration starts
+there — `injury_result.rs:139` sets the base, then `UtilBox::put_player_into_box` +
+`UtilServerGame::update_player_state_dependent_properties` run; probe which of the three leaves the
+base at `Standing`, against Java's `InjuryResult.applyTo`.
+
+Gates all green with the fix: `lineman` bb2016 100/100, `lineman` bb2025 100/100, `human` bb2020
+100/100, `cargo test --workspace` 0 failed. `underworld` unchanged at 22/25 (seeds 2, 3, 19).

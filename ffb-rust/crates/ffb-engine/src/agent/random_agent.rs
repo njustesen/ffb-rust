@@ -637,8 +637,15 @@ impl Agent for RandomAgent {
             // result (decline the apothecary). Was random-sampled via pick_bool (spurious draw).
             Some(AgentPrompt::ApothecaryChoice { player_id, .. }) =>
                 Action::UseApothecary { player_id: player_id.clone(), use_apothecary: false },
-            Some(AgentPrompt::UseApothecary { .. }) =>
-                Action::Acknowledge,
+            // Java harness `ParityRunner.handleDialog` case USE_APOTHECARY:
+            //     comm.sendUseApothecary(apo.getPlayerId(), false, apoType, apo.getSeriousInjury());
+            // i.e. it DECLINES, naming the injured player. Answering `Acknowledge` instead left
+            // `StepApothecary` in APOTHECARY_STATUS `WAIT_FOR_APOTHECARY_USE` - a status its main
+            // switch has no arm for - so the step fell through and the injury was never applied:
+            // an Animal Savagery lash-out that KO'd its victim in Java left it STANDING in Rust
+            // (underworld bb2020 seed 2: Java KOs `h02` at i=56, Rust never does).
+            Some(AgentPrompt::UseApothecary { player_id, .. }) =>
+                Action::UseApothecary { player_id: player_id.clone(), use_apothecary: false },
             // Block target asked for mid-sequence: `StepInitBlocking` reached with no
             // `blockDefenderId`. This only happens on the sequence `StepEndBlocking` re-pushes after
             // a failed Blood Lust, and the HARNESS never answers it: `INIT_BLOCKING` has no case in
@@ -894,6 +901,33 @@ mod tests {
         ];
         assert_eq!(choose_pushback_square(&reordered), Some(FieldCoordinate::new(11, 7)));
         assert_eq!(choose_pushback_square(&[]), None);
+    }
+
+    /// Mirrors `ParityRunner.handleDialog` case USE_APOTHECARY:
+    ///     `comm.sendUseApothecary(apo.getPlayerId(), false, apoType, apo.getSeriousInjury())`
+    /// The agent must DECLINE and name the injured player. Answering `Acknowledge` (the old
+    /// behaviour) left `StepApothecary` stuck in `WAIT_FOR_APOTHECARY_USE`, whose main switch has
+    /// no arm, so the computed injury was silently discarded - an Animal Savagery lash-out that
+    /// KO'd its victim in Java left it STANDING in Rust (underworld bb2020 seed 2).
+    #[test]
+    fn use_apothecary_prompt_is_declined_naming_the_injured_player() {
+        let mut gs = new_game(1);
+        gs.pending_prompt = Some(AgentPrompt::UseApothecary {
+            player_id: "home_03".into(),
+            apothecary_type: "team".into(),
+        });
+        let mut agent = RandomAgent::new_parity(1);
+        let before = agent.decision_rng_count;
+        let action = agent.act(&gs);
+        match action {
+            Action::UseApothecary { player_id, use_apothecary } => {
+                assert_eq!(player_id, "home_03");
+                assert!(!use_apothecary, "the harness always declines");
+            }
+            other => panic!("expected a declined UseApothecary, got {other:?}"),
+        }
+        // Java sends the decline unconditionally - no coin flip, so no decision RNG is consumed.
+        assert_eq!(agent.decision_rng_count, before);
     }
 
     #[test]
