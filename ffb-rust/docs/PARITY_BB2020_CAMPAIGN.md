@@ -398,3 +398,51 @@ behaviour did.
 Baseline restored after the revert: bb2020 human **38/100 passed**. Gates: bb2016 lineman
 **50/50 games match**, bb2025 lineman **50/50 games match**, `cargo test` ffb-engine **7115/0**,
 ffb-model **2783/0**.
+
+
+## ITER6 — prayer dispatch built; the d3 now matches Java exactly. Routing still held back.
+
+Landed (all inert for bb2020 until the routing arm returns, so **no behaviour change and no
+regression** — baseline stays 38/100):
+
+1. **`PrayerHandlerFactory` ported** (`inducements/bb2020/prayers/prayer_handler_factory.rs`) —
+   Java builds its handler set by classpath scanning; Rust lists the same 16 handlers explicitly and
+   keeps `forPrayer`'s "first handler that handles it" semantics. Two tests: every roll 1..=16
+   resolves to a handler, and no two handlers claim the same prayer.
+2. **`StepPrayer` dispatches** instead of being a stub — `firstRun` → `init_effect` (NEXT_STEP when
+   fully applied, CONTINUE when it needs a dialog, matching Java's shape where the handler, not the
+   step, decides), `else` → `apply_selection`, no handler → NEXT_STEP.
+3. **A real option-default bug**: Rust's `game.options.is_enabled(...)` returns **false for an unset
+   option** — it never consults the factory — while Java reads `getOptionWithDefault`, whose default
+   for `INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE` is **true**. So Rust was shuffling `[1..=8]` where Java
+   shuffles `[1..=16]`: a different prayer AND a different Collections-stream consumption. Both
+   bb2020 sites now use `get_option_with_default`.
+
+**Verified progress on seed 1:** Rust's die at position 12 is now `sides=3 result=2` — exactly
+Java's `d3=2` from `BadHabitsHandler`. The prayer is selected correctly, the handler is found, and
+its effect die matches.
+
+**Why the routing is still reverted:** with routing on, human measured **11/100 vs the 38/100
+baseline**, so it went back per the campaign rule. The remaining cause is the last piece of the
+chain:
+
+### FRONTIER for ITER7 — `PlayerSelector.selectPlayers` is on the wrong stream AND the wrong shape
+Java:
+```java
+for (int i = 0; i < Math.min(amount, available.size()); i++) {
+    Collections.shuffle(available);   // COLLECTIONS stream, whole remaining list, each iteration
+    selected.add(available.remove(0));
+}
+```
+Rust (`inducements/bb2020/prayers/player_selector.rs`) does ONE Fisher-Yates over the whole list
+using the **GAME** rng and then truncates — visible as `sides=10, 9, …` where Java rolls no game
+dice at all (seed 1 pos 13: Rust `sides=10` vs Java `d8` ball bounce).
+
+Fix = use `game.collections_rng` and Java's exact shape (N separate whole-list shuffles, each taking
+element 0). This needs the `PlayerSelector::select_players` signature to take `&mut Game` rather
+than `&Game` + `&mut GameRng`, which touches the trait, both selectors and the handlers that call
+them — mechanical but wide. Land it TOGETHER with re-adding the two routing arms
+(`ApplyKickoffResult`, `Prayer`), then re-sweep.
+
+Gates for this commit: bb2020 human **38/100** (unchanged baseline), bb2016 lineman **50/50 games
+match**, bb2025 lineman **50/50 games match**, `cargo test -p ffb-engine` **7117/0**.

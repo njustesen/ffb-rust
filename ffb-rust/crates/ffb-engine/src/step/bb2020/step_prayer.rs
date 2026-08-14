@@ -5,7 +5,10 @@
 /// Differs from BB2025 only in the report class used (BB2020 uses ReportPrayerBb2020,
 /// BB2025 uses ReportPrayer). Reports are not translated, so behavior is identical.
 ///
-/// Stub: PrayerHandlerFactory not translated → NEXT_STEP immediately.
+/// Dispatches through `inducements::bb2020::prayers::prayer_handler_factory` (Java's
+/// `PrayerHandlerFactory.forPrayer`). Previously a stub that always took Java's "no handler found"
+/// path, so a prayer awarded by the BB2020 Cheering Fans kickoff was reported and then silently
+/// dropped — its effect dice were never rolled.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::bb2020::report_prayer_roll::ReportPrayerRoll;
@@ -35,11 +38,11 @@ impl Default for StepPrayer {
 impl Step for StepPrayer {
     fn id(&self) -> StepId { StepId::Prayer }
 
-    fn start(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game)
+    fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
             Action::SelectPlayer { player_id } => {
                 self.player_id = Some(player_id.clone());
@@ -47,7 +50,7 @@ impl Step for StepPrayer {
             Action::SelectSkill { skill_id: _ } => {}
             _ => {}
         }
-        self.execute_step(game)
+        self.execute_step(game, rng)
     }
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
@@ -60,14 +63,56 @@ impl Step for StepPrayer {
 }
 
 impl StepPrayer {
-    fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
-        // Stub: PrayerHandlerFactory not translated → treat as "no handler found" path.
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        use ffb_model::factory::bb2020::prayer_factory::PrayerFactory;
+        use ffb_model::factory::prayer_factory::PrayerFactory as PrayerFactoryTrait;
+        use ffb_model::option::game_option_id;
+        use crate::inducements::bb2020::prayers::prayer_handler_factory;
+
+        // Java: `prayerFactory.forRoll(roll)` then `handlerFactory.forPrayer(...)`.
+        // Java reads this through `getOptionWithDefault`, whose factory default for
+        // INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE is TRUE (16 prayers). Rust's `options.is_enabled`
+        // returns FALSE for an unset option -- it does not consult the factory -- so the league
+        // table was silently off and only rolls 1..=8 were considered, picking a different prayer
+        // and consuming the Collections stream differently from Java.
+        let use_league = game.options
+            .get_option_with_default(ffb_model::option::game_option_id::GameOptionId::INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE)
+            .get_value_as_string() == "true";
+        let mut factory = PrayerFactory::new();
+        factory.initialize(use_league);
+        let handler = factory
+            .for_roll(self.roll)
+            .and_then(|prayer| prayer_handler_factory::for_prayer(&format!("{prayer:?}")));
+
+        let team_id = self.team_id.clone().unwrap_or_default();
+
         if self.first_run {
+            self.first_run = false;
             // Java: getResult().addReport(new ReportPrayerRoll(roll))
             game.report_list.add(ReportPrayerRoll::new(self.roll));
+
+            match handler {
+                // Java: `prayerHandler.get().initEffect(this, gameState, teamId)` — note Java does
+                // NOT set NEXT_STEP on this branch; the handler decides. Our trait returns
+                // "effect fully applied", i.e. false means it is waiting on a dialog.
+                Some(h) => {
+                    let mut prayer_state = std::mem::take(&mut game.prayer_state);
+                    let applied = h.init_effect(&mut prayer_state, game, rng, &team_id);
+                    game.prayer_state = prayer_state;
+                    if applied { StepOutcome::next() } else { StepOutcome::cont() }
+                }
+                // Java: `else { getResult().setNextAction(NEXT_STEP); }`
+                None => StepOutcome::next(),
+            }
+        } else {
+            // Java: `prayerHandler.ifPresent(h -> h.applySelection(...)); setNextAction(NEXT_STEP);`
+            if let Some(h) = handler {
+                let mut prayer_state = std::mem::take(&mut game.prayer_state);
+                h.apply_selection(&mut prayer_state, game, &team_id);
+                game.prayer_state = prayer_state;
+            }
+            StepOutcome::next()
         }
-        self.first_run = false;
-        StepOutcome::next()
     }
 }
 

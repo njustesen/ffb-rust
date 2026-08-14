@@ -1,3 +1,4 @@
+pub mod prayer_handler_factory;
 pub mod bad_habits_handler;
 pub mod blessed_statue_of_nuffle_handler;
 pub mod fan_interaction_handler;

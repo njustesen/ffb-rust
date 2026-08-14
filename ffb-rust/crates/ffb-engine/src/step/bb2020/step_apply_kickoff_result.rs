@@ -347,7 +347,14 @@ impl StepApplyKickoffResult {
             + game.turn_data_away.inducement_set.value(Usage::ADD_CHEERLEADER);
 
         // Exhibition: rolls 1–8; league (INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE): rolls 1–16.
-        let use_league = game.options.is_enabled(game_option_id::INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE);
+        // Java reads this through `getOptionWithDefault`, whose factory default for
+        // INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE is TRUE (16 prayers). Rust's `options.is_enabled`
+        // returns FALSE for an unset option -- it does not consult the factory -- so the league
+        // table was silently off and only rolls 1..=8 were considered, picking a different prayer
+        // and consuming the Collections stream differently from Java.
+        let use_league = game.options
+            .get_option_with_default(ffb_model::option::game_option_id::GameOptionId::INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE)
+            .get_value_as_string() == "true";
         let max_prayer_roll = if use_league { 16 } else { 8 };
 
         // Java picks the prayer with
