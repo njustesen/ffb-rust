@@ -1889,3 +1889,46 @@ with `actingPlayer.isStandingUp() || actingPlayer.getTeam() != defender.getTeam(
 the same arm, and check `armour_with_modifiers` for the victim.
 
 Baseline unchanged: `underworld` 22/25. No engine changes this iteration.
+
+## ITER40 — RETRACTION: ITER38 and ITER39 were both wrong (id ↔ state-key mis-mapping)
+
+Enabling Java's pre-existing `JAVA_AVBROKE` trace (`-Dffb.parityDebug`, already wired to `FFB_TRACE`)
+settles it:
+
+```
+JAVA_AVBROKE def=…Home3 armour=8 reduced=8 roll=[6,6] modTotal=0 mods= broken=true
+JAVA_AVBROKE def=…Home2 armour=8 reduced=8 roll=[2,4] modTotal=0 mods= broken=false
+```
+
+and Rust's `AS_TRACE` said:
+
+```
+AS_TRACE victim=home_02 ko=false armour_broken=false
+AS_TRACE victim=home_03 ko=true  armour_broken=true
+```
+
+**The two engines agree on both lash-outs.** `Home3`/`home_03` breaks armour 12 vs AV 8 and is KO'd in
+BOTH; `Home2`/`home_02` rolls [2,4] and is not broken in EITHER. ITER39's claim that Rust failed to
+break the armour, and ITER38's claim that Rust computed the injury but failed to apply it, are both
+**retracted** — I compared Rust's `home_02` against the state key `h02`, which is a different player.
+
+**The mapping, recorded so this stops recurring:**
+
+| thing | example | maps to |
+|---|---|---|
+| Rust player id | `home_03` | Java `Home3` |
+| Java player id | `Home3` | state-string key `h02` |
+| state-string key | `h02` | the THIRD home player |
+
+Player ids are **1-based**; the state-string keys in `JSTEP`/`RUST_STEP` are **0-based**. So
+`state key hNN` ↔ `home_(NN+1)`. Always convert before comparing a trace that names players with a
+state string that names slots.
+
+**What remains true about seed 2:** the first STATE divergence is still i=56 with `h02` KO in Java and
+Standing in Rust, and Rust is one die ahead there. Since both engines DO produce that KO, the
+difference is **when** — Java has applied it by i=56 and Rust has not. The next step is to find the
+die index of each engine's `Home3` lash-out (Java via `JAVA_AVBROKE` ordering, Rust via an `AS_TRACE`
+carrying `rng.call_count`) and compare; a timing/order difference in when the AS lash-outs resolve is
+now the live hypothesis, not a missing computation.
+
+Baseline unchanged: `underworld` 22/25. No engine changes in ITER38, ITER39 or ITER40.
