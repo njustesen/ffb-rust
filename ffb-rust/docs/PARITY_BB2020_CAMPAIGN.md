@@ -2240,3 +2240,41 @@ the empty-list wasted-prayer branch, and the agent answering index 0), then re-r
 
 Java engine is back to stock and the jar rebuilt; all Rust probes reverted; baseline re-confirmed at
 `lineman` bb2020 seed 50 FAIL.
+
+### ITER46 — first half of the Intensive Training port: the per-skill category/name table
+
+The port needs the eligible-skill list Java builds in `IntensiveTrainingHandler.createDialog`, which
+filters by `player.getPosition().getSkillCategories(false)` and sorts by `Skill::getName`. Rust had
+**neither** piece of data: `SkillId` exposed `class_name()` and `properties_for()`, but no category
+and no display name, and `data/skills/*.json` carries only class names.
+
+Two pieces of good news found while measuring, both of which shrink the remaining work:
+
+1. **The player selection already matches Java exactly.** Java's `createDialog` does
+   `Collections.shuffle(players); players.get(0)`. Rust's `init_effect_random_selection` calls
+   `select_players(.., 1, ..)`, whose bb2020 selector does one `collections_shuffle` and takes
+   element 0 — same shared `game.collections_rng` stream, same single draw, same index. So the
+   prayer's RNG consumption is already correct; only the skill grant is missing.
+2. **The grant primitive exists**: Java's `FieldModel.addIntensiveTrainingSkill` is
+   `player.addTemporarySkills(prayerName, {skill})`, and Rust has `Player::add_prayer_skill`.
+
+**Landed this iteration**: `SkillId::category_and_name_for(rules)` in `crates/ffb-model`, generated
+from the `super("<name>", SkillCategory.<CAT>)` call in all 199 Java skill classes and resolved
+edition-first then `mixed` then `common` — the same resolution the skill classes themselves use.
+197 of the 199 join to a Rust `SkillId` (the two that do not are alt-spellings, `Bloodlust`/`Claws`).
+**28 skills are edition-divergent**, so the table is edition-aware for exactly the reason
+`properties_for` is: Bone-Head is `EXTRAORDINARY`/`"Bone-Head"` in BB2016 but `TRAIT`/`"Bone Head"`
+in BB2020+, Dirty Player is `GENERAL` in BB2016/BB2020 and `DEVIOUS` only in BB2025, and so on.
+
+Three tests pin what the port depends on: Block is `(General, "Block")` in every edition, the
+Bone-Head and Dirty Player divergences, and that "Block" sorts first among BB2020 General skills —
+which is what the harness picks, since `RandomStrategy` case `SELECT_SKILL` sends `skills.get(0)`.
+
+A drafted assertion that Dirty Player is Devious in BB2020 FAILED against the generated table; the
+Java source says GENERAL there and DEVIOUS only in BB2025. The table was right and the test was
+corrected — worth recording as a reminder that these categories are not guessable.
+
+No behaviour change yet (the table is not yet wired), so no parity movement is claimed:
+`cargo test --workspace` 14,440 passed / 0 failed. Next iteration wires
+`IntensiveTrainingHandler.createDialog`/`applySelection` and the agent's `SELECT_SKILL` answer, then
+re-runs lineman 1-100.

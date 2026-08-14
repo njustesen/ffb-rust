@@ -728,6 +728,307 @@ impl SkillId {
     /// `SecretWeapon`, `MultipleBlock` and `DivingTackle`.
     ///
     /// Everything not listed falls through to the union in `properties()`.
+    /// Java `Skill(String name, SkillCategory category)` - the constructor argument pair every
+    /// skill class passes to `super(...)`, resolved per edition the same way the skill classes
+    /// themselves are (`skill/<edition>/` first, then `mixed/`, then `common/`).
+    ///
+    /// Generated from the Java sources. 28 of the 197 skills declare a different category or a
+    /// different display name per edition - e.g. Bone-Head is EXTRAORDINARY/"Bone-Head" in BB2016
+    /// but TRAIT/"Bone Head" in BB2020+, and Dirty Player moved GENERAL -> DEVIOUS - so this is
+    /// edition-aware for the same reason `properties_for` is.
+    ///
+    /// Needed by the Intensive Training prayer, which offers the coach every skill in the player's
+    /// position categories, sorted by NAME (`Comparator.comparing(Skill::getName)`).
+    pub fn category_and_name_for(self, rules: crate::enums::Rules) -> (crate::model::skill_category::SkillCategory, &'static str) {
+        use crate::enums::Rules;
+        use crate::model::skill_category::SkillCategory;
+        match self {
+            SkillId::ASneakyPair => (SkillCategory::Trait, "A Sneaky Pair"),
+            SkillId::Accurate => (SkillCategory::Passing, "Accurate"),
+            SkillId::AgilityIncrease => (SkillCategory::StatIncrease, "+AG"),
+            SkillId::AllYouCanEat => (SkillCategory::Trait, "All You Can Eat"),
+            SkillId::AlwaysHungry => match rules {
+                Rules::Bb2016 => (SkillCategory::Extraordinary, "Always Hungry"),
+                Rules::Bb2020 | Rules::Bb2025 | Rules::Common => (SkillCategory::Trait, "Always Hungry"),
+            },
+            SkillId::AnimalSavagery => (SkillCategory::Trait, "Animal Savagery"),
+            SkillId::Animosity => match rules {
+                Rules::Bb2016 | Rules::Common => (SkillCategory::Extraordinary, "Animosity"),
+                Rules::Bb2020 | Rules::Bb2025 => (SkillCategory::Trait, "Animosity"),
+            },
+            SkillId::ArmBar => (SkillCategory::Strength, "Arm Bar"),
+            SkillId::ArmourIncrease => (SkillCategory::StatIncrease, "+AV"),
+            SkillId::BalefulHex => (SkillCategory::Trait, "Baleful Hex"),
+            SkillId::BallAndChain => match rules {
+                Rules::Bb2016 | Rules::Common => (SkillCategory::Extraordinary, "Ball and Chain"),
+                Rules::Bb2020 | Rules::Bb2025 => (SkillCategory::Trait, "Ball and Chain"),
+            },
+            SkillId::BeerBarrelBash => (SkillCategory::Trait, "Beer Barrel Bash!"),
+            SkillId::BigHand => (SkillCategory::Mutation, "Big Hand"),
+            SkillId::BlackInk => (SkillCategory::Trait, "Black Ink"),
+            SkillId::BlastIt => (SkillCategory::Trait, "Blast It!"),
+            SkillId::BlindRage => (SkillCategory::Trait, "Blind Rage"),
+            SkillId::Block => (SkillCategory::General, "Block"),
+            SkillId::BloodLust => (SkillCategory::Extraordinary, "Blood Lust"),
+            SkillId::Bombardier => match rules {
+                Rules::Bb2016 | Rules::Common => (SkillCategory::Extraordinary, "Bombardier"),
+                Rules::Bb2020 | Rules::Bb2025 => (SkillCategory::Trait, "Bombardier"),
+            },
+            SkillId::BoneHead => match rules {
+                Rules::Bb2016 | Rules::Common => (SkillCategory::Extraordinary, "Bone-Head"),
+                Rules::Bb2020 | Rules::Bb2025 => (SkillCategory::Trait, "Bone Head"),
+            },
+            SkillId::BoundingLeap => (SkillCategory::Trait, "Bounding Leap"),
+            SkillId::Brawler => (SkillCategory::Strength, "Brawler"),
+            SkillId::BreakTackle => (SkillCategory::Strength, "Break Tackle"),
+            SkillId::BreatheFire => (SkillCategory::Trait, "Breathe Fire"),
+            SkillId::BrutalBlock => (SkillCategory::Trait, "Brutal Block"),
+            SkillId::BugmansXXXXXX => (SkillCategory::Trait, "Bugman's XXXXXX"),
+            SkillId::Bullseye => (SkillCategory::Strength, "Bullseye"),
+            SkillId::BurstOfSpeed => (SkillCategory::Trait, "Burst of Speed"),
+            SkillId::Cannoneer => (SkillCategory::Passing, "Cannoneer"),
+            SkillId::Catch => (SkillCategory::Agility, "Catch"),
+            SkillId::CatchOfTheDay => (SkillCategory::Trait, "Catch of the Day"),
+            SkillId::Chainsaw => match rules {
+                Rules::Bb2016 | Rules::Common => (SkillCategory::Extraordinary, "Chainsaw"),
+                Rules::Bb2020 | Rules::Bb2025 => (SkillCategory::Trait, "Chainsaw"),
+            },
+            SkillId::Claw => (SkillCategory::Mutation, "Claw"),
+            SkillId::CloudBurster => (SkillCategory::Passing, "Cloud Burster"),
+            SkillId::ConsummateProfessional => (SkillCategory::Trait, "Consummate Professional"),
+            SkillId::CrushingBlow => (SkillCategory::Trait, "Crushing Blow"),
+            SkillId::Dauntless => (SkillCategory::General, "Dauntless"),
+            SkillId::Decay => match rules {
+                Rules::Bb2016 => (SkillCategory::Extraordinary, "Decay"),
+                Rules::Bb2020 | Rules::Bb2025 | Rules::Common => (SkillCategory::Trait, "Decay"),
+            },
+            SkillId::Defensive => (SkillCategory::Agility, "Defensive"),
+            SkillId::DirtyPlayer => match rules {
+                Rules::Bb2016 | Rules::Bb2020 | Rules::Common => (SkillCategory::General, "Dirty Player"),
+                Rules::Bb2025 => (SkillCategory::Devious, "Dirty Player"),
+            },
+            SkillId::Disposable => (SkillCategory::Extraordinary, "Disposable"),
+            SkillId::DisturbingPresence => (SkillCategory::Mutation, "Disturbing Presence"),
+            SkillId::DivingCatch => (SkillCategory::Agility, "Diving Catch"),
+            SkillId::DivingTackle => (SkillCategory::Agility, "Diving Tackle"),
+            SkillId::Dodge => (SkillCategory::Agility, "Dodge"),
+            SkillId::Drunkard => (SkillCategory::Trait, "Drunkard"),
+            SkillId::DumpOff => (SkillCategory::Passing, "Dump-Off"),
+            SkillId::DwarfenScourge => (SkillCategory::Trait, "Dwarfen Scourge"),
+            SkillId::DwarvenScourge => (SkillCategory::Trait, "Dwarven Scourge"),
+            SkillId::ExtraArms => (SkillCategory::Mutation, "Extra Arms"),
+            SkillId::EyeGouge => (SkillCategory::Devious, "Eye Gouge"),
+            SkillId::FanFavourite => (SkillCategory::Extraordinary, "Fan Favourite"),
+            SkillId::Fend => (SkillCategory::General, "Fend"),
+            SkillId::FoulAppearance => (SkillCategory::Mutation, "Foul Appearance"),
+            SkillId::FrenziedRush => (SkillCategory::Trait, "Frenzied Rush"),
+            SkillId::Frenzy => (SkillCategory::General, "Frenzy"),
+            SkillId::Fumblerooski => (SkillCategory::Devious, "Fumblerooski"),
+            SkillId::Fumblerooskie => (SkillCategory::Passing, "Fumblerooskie"),
+            SkillId::FuriousOutburst => (SkillCategory::Trait, "Furious Outburst"),
+            SkillId::FuryOfTheBloodGod => (SkillCategory::Trait, "Fury of the Blood God"),
+            SkillId::GhostlyFlames => (SkillCategory::Trait, "Ghostly Flames"),
+            SkillId::GiveAndGo => (SkillCategory::Passing, "Give and Go"),
+            SkillId::GoredByTheBull => (SkillCategory::Trait, "Gored By The Bull"),
+            SkillId::Grab => (SkillCategory::Strength, "Grab"),
+            SkillId::Guard => (SkillCategory::Strength, "Guard"),
+            SkillId::HailMaryPass => (SkillCategory::Passing, "Hail Mary Pass"),
+            SkillId::HalflingLuck => (SkillCategory::Trait, "Halfling Luck"),
+            SkillId::Hatred => (SkillCategory::Trait, "Hatred"),
+            SkillId::HitAndRun => (SkillCategory::Trait, "Hit And Run"),
+            SkillId::Horns => (SkillCategory::Mutation, "Horns"),
+            SkillId::HypnoticGaze => match rules {
+                Rules::Bb2016 | Rules::Common => (SkillCategory::Extraordinary, "Hypnotic Gaze"),
+                Rules::Bb2020 | Rules::Bb2025 => (SkillCategory::Trait, "Hypnotic Gaze"),
+            },
+            SkillId::IllBeBack => (SkillCategory::Trait, "I'll be back!"),
+            SkillId::Incorporeal => (SkillCategory::Trait, "Incorporeal"),
+            SkillId::Indomitable => (SkillCategory::Trait, "Indomitable"),
+            SkillId::Insignificant => (SkillCategory::Trait, "Insignificant"),
+            SkillId::IronHardSkin => (SkillCategory::Mutation, "Iron Hard Skin"),
+            SkillId::Juggernaut => (SkillCategory::Strength, "Juggernaut"),
+            SkillId::JumpUp => (SkillCategory::Agility, "Jump Up"),
+            SkillId::Kaboom => (SkillCategory::Trait, "Kaboom!"),
+            SkillId::KeenPlayer => (SkillCategory::Trait, "Keen Player"),
+            SkillId::Kick => (SkillCategory::General, "Kick"),
+            SkillId::KickEmWhileTheyReDown => (SkillCategory::Trait, "Kick 'em while they're down!"),
+            SkillId::KickOffReturn => (SkillCategory::General, "Kick-Off Return"),
+            SkillId::KickTeamMate => match rules {
+                Rules::Bb2016 => (SkillCategory::Extraordinary, "Kick Team-Mate"),
+                Rules::Bb2020 | Rules::Bb2025 | Rules::Common => (SkillCategory::Trait, "Kick Team-Mate"),
+            },
+            SkillId::KrumpAndSmash => (SkillCategory::Trait, "Krump and Smash"),
+            SkillId::Leader => (SkillCategory::Passing, "Leader"),
+            SkillId::Leap => (SkillCategory::Agility, "Leap"),
+            SkillId::LethalFlight => (SkillCategory::Devious, "Lethal Flight"),
+            SkillId::LoneFouler => (SkillCategory::Devious, "Lone Fouler"),
+            SkillId::Loner => match rules {
+                Rules::Bb2016 => (SkillCategory::Extraordinary, "Loner"),
+                Rules::Bb2020 | Rules::Bb2025 | Rules::Common => (SkillCategory::Trait, "Loner"),
+            },
+            SkillId::LookIntoMyEyes => (SkillCategory::Trait, "Look Into My Eyes"),
+            SkillId::LordOfChaos => (SkillCategory::Trait, "Lord of Chaos"),
+            SkillId::MasterAssassin => (SkillCategory::Trait, "Master Assassin"),
+            SkillId::MaximumCarnage => (SkillCategory::Trait, "Maximum Carnage"),
+            SkillId::MesmerisingDance => (SkillCategory::Trait, "Mesmerising Dance"),
+            SkillId::MesmerizingDance => (SkillCategory::Trait, "Mesmerizing Dance"),
+            SkillId::MightyBlow => (SkillCategory::Strength, "Mighty Blow"),
+            SkillId::MonstrousMouth => match rules {
+                Rules::Bb2016 | Rules::Common => (SkillCategory::Extraordinary, "Monstrous Mouth"),
+                Rules::Bb2020 | Rules::Bb2025 => (SkillCategory::Mutation, "Monstrous Mouth"),
+            },
+            SkillId::MovementIncrease => (SkillCategory::StatIncrease, "+MA"),
+            SkillId::MultipleBlock => (SkillCategory::Strength, "Multiple Block"),
+            SkillId::MyBall => (SkillCategory::Trait, "My Ball"),
+            SkillId::NervesOfSteel => (SkillCategory::Passing, "Nerves of Steel"),
+            SkillId::NoBall => (SkillCategory::Trait, "No Ball"),
+            SkillId::NoHands => match rules {
+                Rules::Bb2016 | Rules::Bb2025 | Rules::Common => (SkillCategory::Extraordinary, "No Hands"),
+                Rules::Bb2020 => (SkillCategory::Trait, "No Hands"),
+            },
+            SkillId::NurglesRot => (SkillCategory::Extraordinary, "Nurgle's Rot"),
+            SkillId::OldPro => (SkillCategory::Trait, "Old Pro"),
+            SkillId::OnTheBall => (SkillCategory::Passing, "On The Ball"),
+            SkillId::Pass => (SkillCategory::Passing, "Pass"),
+            SkillId::PassBlock => (SkillCategory::General, "Pass Block"),
+            SkillId::PassingIncrease => (SkillCategory::StatIncrease, "+PA"),
+            SkillId::PickMeUp => (SkillCategory::Trait, "Pick-me-up"),
+            SkillId::PileDriver => match rules {
+                Rules::Bb2016 | Rules::Bb2020 | Rules::Common => (SkillCategory::Strength, "Pile Driver"),
+                Rules::Bb2025 => (SkillCategory::Devious, "Pile Driver"),
+            },
+            SkillId::PilingOn => (SkillCategory::Strength, "Piling On"),
+            SkillId::PlagueRidden => (SkillCategory::Trait, "Plague Ridden"),
+            SkillId::Pogo => (SkillCategory::Trait, "Pogo"),
+            SkillId::PogoStick => (SkillCategory::Trait, "Pogo Stick"),
+            SkillId::PrehensileTail => (SkillCategory::Mutation, "Prehensile Tail"),
+            SkillId::PrimalSavagery => (SkillCategory::Trait, "Primal Savagery"),
+            SkillId::Pro => (SkillCategory::General, "Pro"),
+            SkillId::ProjectileVomit => (SkillCategory::Trait, "Projectile Vomit"),
+            SkillId::PumpUpTheCrowd => (SkillCategory::Trait, "Pump Up The Crowd"),
+            SkillId::Punt => (SkillCategory::Passing, "Punt"),
+            SkillId::PutTheBootIn => (SkillCategory::Devious, "Put the Boot In"),
+            SkillId::PutridRegurgitation => (SkillCategory::Trait, "Putrid Regurgitation"),
+            SkillId::QuickBite => (SkillCategory::Trait, "Quick Bite"),
+            SkillId::QuickFoul => (SkillCategory::Devious, "Quick Foul"),
+            SkillId::RaidingParty => (SkillCategory::Trait, "Raiding Party"),
+            SkillId::Ram => (SkillCategory::Trait, "Ram"),
+            SkillId::ReallyStupid => match rules {
+                Rules::Bb2016 | Rules::Common => (SkillCategory::Extraordinary, "Really Stupid"),
+                Rules::Bb2020 | Rules::Bb2025 => (SkillCategory::Trait, "Really Stupid"),
+            },
+            SkillId::Regeneration => match rules {
+                Rules::Bb2016 | Rules::Common => (SkillCategory::Extraordinary, "Regeneration"),
+                Rules::Bb2020 | Rules::Bb2025 => (SkillCategory::Trait, "Regeneration"),
+            },
+            SkillId::Reliable => (SkillCategory::Trait, "Reliable"),
+            SkillId::RightStuff => match rules {
+                Rules::Bb2016 | Rules::Common => (SkillCategory::Extraordinary, "Right Stuff"),
+                Rules::Bb2020 | Rules::Bb2025 => (SkillCategory::Trait, "Right Stuff"),
+            },
+            SkillId::RunningPass => (SkillCategory::Passing, "Running Pass"),
+            SkillId::Saboteur => (SkillCategory::Devious, "Saboteur"),
+            SkillId::SafePairOfHands => (SkillCategory::Agility, "Safe Pair Of Hands"),
+            SkillId::SafePass => (SkillCategory::Passing, "Safe Pass"),
+            SkillId::SafeThrow => (SkillCategory::Passing, "Safe Throw"),
+            SkillId::SavageBlow => (SkillCategory::Trait, "Savage Blow"),
+            SkillId::SavageMauling => (SkillCategory::Trait, "Savage Mauling"),
+            SkillId::SecretWeapon => match rules {
+                Rules::Bb2016 => (SkillCategory::Extraordinary, "Secret Weapon"),
+                Rules::Bb2020 | Rules::Bb2025 | Rules::Common => (SkillCategory::Trait, "Secret Weapon"),
+            },
+            SkillId::Shadowing => match rules {
+                Rules::Bb2016 | Rules::Bb2020 | Rules::Common => (SkillCategory::General, "Shadowing"),
+                Rules::Bb2025 => (SkillCategory::Devious, "Shadowing"),
+            },
+            SkillId::ShotToNothing => (SkillCategory::Trait, "Shot to Nothing"),
+            SkillId::SideStep => (SkillCategory::Agility, "Side Step"),
+            SkillId::Sidestep => (SkillCategory::Agility, "Sidestep"),
+            SkillId::SlashingNails => (SkillCategory::Trait, "Slashing Nails"),
+            SkillId::Slayer => (SkillCategory::Trait, "Slayer"),
+            SkillId::SneakiestOfTheLot => (SkillCategory::Trait, "Sneakiest of the Lot"),
+            SkillId::SneakyGit => match rules {
+                Rules::Bb2016 | Rules::Bb2020 | Rules::Common => (SkillCategory::Agility, "Sneaky Git"),
+                Rules::Bb2025 => (SkillCategory::Devious, "Sneaky Git"),
+            },
+            SkillId::Sprint => (SkillCategory::Agility, "Sprint"),
+            SkillId::Stab => match rules {
+                Rules::Bb2016 | Rules::Common => (SkillCategory::Extraordinary, "Stab"),
+                Rules::Bb2020 | Rules::Bb2025 => (SkillCategory::Trait, "Stab"),
+            },
+            SkillId::Stakes => (SkillCategory::Extraordinary, "Stakes"),
+            SkillId::StandFirm => (SkillCategory::Strength, "Stand Firm"),
+            SkillId::StarOfTheShow => (SkillCategory::Trait, "Star of the Show"),
+            SkillId::SteadyFooting => (SkillCategory::Trait, "Steady Footing"),
+            SkillId::StrengthIncrease => (SkillCategory::StatIncrease, "+ST"),
+            SkillId::StripBall => (SkillCategory::General, "Strip Ball"),
+            SkillId::StrongArm => (SkillCategory::Strength, "Strong Arm"),
+            SkillId::StrongPassingGame => (SkillCategory::Trait, "Strong Passing Game"),
+            SkillId::Stunty => match rules {
+                Rules::Bb2016 => (SkillCategory::Extraordinary, "Stunty"),
+                Rules::Bb2020 | Rules::Bb2025 | Rules::Common => (SkillCategory::Trait, "Stunty"),
+            },
+            SkillId::SureFeet => (SkillCategory::Agility, "Sure Feet"),
+            SkillId::SureHands => (SkillCategory::General, "Sure Hands"),
+            SkillId::Swarming => match rules {
+                Rules::Bb2016 | Rules::Bb2025 | Rules::Common => (SkillCategory::Extraordinary, "Swarming"),
+                Rules::Bb2020 => (SkillCategory::Trait, "Swarming"),
+            },
+            SkillId::SwiftAsTheBreeze => (SkillCategory::Trait, "Swift As The Breeze"),
+            SkillId::Swoop => match rules {
+                Rules::Bb2016 | Rules::Common => (SkillCategory::Extraordinary, "Swoop"),
+                Rules::Bb2020 | Rules::Bb2025 => (SkillCategory::Trait, "Swoop"),
+            },
+            SkillId::Tackle => (SkillCategory::General, "Tackle"),
+            SkillId::TakeRoot => match rules {
+                Rules::Bb2016 => (SkillCategory::Extraordinary, "Take Root"),
+                Rules::Bb2020 | Rules::Bb2025 | Rules::Common => (SkillCategory::Trait, "Take Root"),
+            },
+            SkillId::TastyMorsel => (SkillCategory::Trait, "Tasty Morsel"),
+            SkillId::Taunt => (SkillCategory::General, "Taunt"),
+            SkillId::TeamCaptain => (SkillCategory::Trait, "Team Captain"),
+            SkillId::Tentacles => (SkillCategory::Mutation, "Tentacles"),
+            SkillId::TheBallista => (SkillCategory::Trait, "The Ballista"),
+            SkillId::TheFlashingBlade => (SkillCategory::Trait, "The Flashing Blade"),
+            SkillId::ThickSkull => (SkillCategory::Strength, "Thick Skull"),
+            SkillId::ThinkingMansTroll => (SkillCategory::Trait, "Thinking Man's Troll"),
+            SkillId::ThrowTeamMate => match rules {
+                Rules::Bb2016 => (SkillCategory::Extraordinary, "Throw Team-Mate"),
+                Rules::Bb2020 | Rules::Bb2025 | Rules::Common => (SkillCategory::Trait, "Throw Team-Mate"),
+            },
+            SkillId::Timmmber => match rules {
+                Rules::Bb2016 => (SkillCategory::Extraordinary, "Timmm-ber!"),
+                Rules::Bb2020 | Rules::Bb2025 | Rules::Common => (SkillCategory::Trait, "Timmm-ber!"),
+            },
+            SkillId::Titchy => match rules {
+                Rules::Bb2016 => (SkillCategory::Extraordinary, "Titchy"),
+                Rules::Bb2020 | Rules::Bb2025 | Rules::Common => (SkillCategory::Trait, "Titchy"),
+            },
+            SkillId::ToxinConnoisseur => (SkillCategory::Trait, "Toxin Connoisseur"),
+            SkillId::Treacherous => (SkillCategory::Trait, "Treacherous"),
+            SkillId::Trickster => (SkillCategory::Trait, "Trickster"),
+            SkillId::TwoForOne => (SkillCategory::Trait, "Two for One"),
+            SkillId::TwoHeads => (SkillCategory::Mutation, "Two Heads"),
+            SkillId::UnchannelledFury => (SkillCategory::Trait, "Unchannelled Fury"),
+            SkillId::Unsteady => (SkillCategory::Trait, "Unsteady"),
+            SkillId::UnstoppableMomentum => (SkillCategory::Trait, "Unstoppable Momentum"),
+            SkillId::VeryLongLegs => (SkillCategory::Mutation, "Very Long Legs"),
+            SkillId::ViciousVines => (SkillCategory::Trait, "Vicious Vines"),
+            SkillId::ViolentInnovator => (SkillCategory::Devious, "Violent Innovator"),
+            SkillId::WatchOut => (SkillCategory::Trait, "Watch Out!"),
+            SkillId::WeepingDagger => (SkillCategory::Extraordinary, "Weeping Dagger"),
+            SkillId::WhirlingDervish => (SkillCategory::Trait, "Whirling Dervish"),
+            SkillId::WildAnimal => (SkillCategory::Extraordinary, "Wild Animal"),
+            SkillId::WisdomOfTheWhiteDwarf => (SkillCategory::Trait, "Wisdom of the White Dwarf"),
+            SkillId::WoodlandFury => (SkillCategory::Trait, "Woodland Fury"),
+            SkillId::WorkingInTandem => (SkillCategory::Trait, "Working in Tandem"),
+            SkillId::Wrestle => (SkillCategory::General, "Wrestle"),
+            SkillId::Yoink => (SkillCategory::Trait, "Yoink!"),
+            // The handful of Rust-only ids with no Java skill class carry no category.
+            _ => (SkillCategory::Trait, self.class_name()),
+        }
+    }
+
     pub fn properties_for(self, rules: crate::enums::Rules) -> &'static [&'static str] {
         use crate::enums::Rules;
         match (self, rules) {
@@ -1357,6 +1658,61 @@ mod tests {
     }
 
     /// The complete set of skills whose Java `postConstruct` differs across editions, extracted
+    /// `category_and_name_for` is generated from the `super("<name>", SkillCategory.<CAT>)` call in
+    /// every Java skill class, resolved edition-first then `mixed` then `common`. These pin the
+    /// values the Intensive Training prayer depends on: it offers every skill whose category is one
+    /// of the player's position categories, sorted by NAME.
+    #[test]
+    fn category_and_name_match_the_java_skill_constructors() {
+        use crate::enums::Rules;
+        use crate::model::skill_category::SkillCategory;
+        // skill/common/Block.java: super("Block", SkillCategory.GENERAL) - same in every edition.
+        for rules in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025, Rules::Common] {
+            assert_eq!(SkillId::Block.category_and_name_for(rules), (SkillCategory::General, "Block"));
+        }
+        // Sure Hands / Tackle are General too - the three that decide the sorted-first entry.
+        assert_eq!(SkillId::SureHands.category_and_name_for(Rules::Bb2020).0, SkillCategory::General);
+        assert_eq!(SkillId::Tackle.category_and_name_for(Rules::Bb2020).0, SkillCategory::General);
+    }
+
+    /// The table must stay edition-aware: Bone-Head is EXTRAORDINARY/"Bone-Head" in BB2016 and
+    /// TRAIT/"Bone Head" in BB2020+ (the hyphen difference that has bitten roster loading before),
+    /// and Dirty Player moved GENERAL -> DEVIOUS, which changes whether Intensive Training can
+    /// offer it to a General-category lineman at all.
+    #[test]
+    fn category_and_name_are_edition_specific_where_java_diverges() {
+        use crate::enums::Rules;
+        use crate::model::skill_category::SkillCategory;
+        assert_eq!(SkillId::BoneHead.category_and_name_for(Rules::Bb2016),
+                   (SkillCategory::Extraordinary, "Bone-Head"));
+        assert_eq!(SkillId::BoneHead.category_and_name_for(Rules::Bb2020),
+                   (SkillCategory::Trait, "Bone Head"));
+        // skill/bb2016 and skill/bb2020 both declare GENERAL; only skill/bb2025 moves it to DEVIOUS.
+        assert_eq!(SkillId::DirtyPlayer.category_and_name_for(Rules::Bb2016).0, SkillCategory::General);
+        assert_eq!(SkillId::DirtyPlayer.category_and_name_for(Rules::Bb2020).0, SkillCategory::General);
+        assert_eq!(SkillId::DirtyPlayer.category_and_name_for(Rules::Bb2025).0, SkillCategory::Devious);
+    }
+
+    /// Java sorts the offered skills with `Comparator.comparing(Skill::getName)`, so for a position
+    /// whose only normal category is General the coach is offered Block first - which is exactly
+    /// what the parity harness picks (`RandomStrategy` case SELECT_SKILL sends `skills.get(0)`).
+    #[test]
+    fn block_sorts_first_among_bb2020_general_skills() {
+        use crate::enums::Rules;
+        use crate::model::skill_category::SkillCategory;
+        let mut general: Vec<&str> = [
+            SkillId::Block, SkillId::Dauntless, SkillId::Fend, SkillId::Frenzy, SkillId::Kick,
+            SkillId::Pro, SkillId::Shadowing, SkillId::StripBall, SkillId::SureHands,
+            SkillId::Tackle, SkillId::Wrestle,
+        ]
+        .into_iter()
+        .filter(|s| s.category_and_name_for(Rules::Bb2020).0 == SkillCategory::General)
+        .map(|s| s.category_and_name_for(Rules::Bb2020).1)
+        .collect();
+        general.sort();
+        assert_eq!(general.first().copied(), Some("Block"));
+    }
+
     /// mechanically from `skill/bb2016|bb2020|bb2025/*.java`. Spot-checks one representative
     /// divergence per skill so a future edit to the table cannot quietly drop one.
     #[test]
