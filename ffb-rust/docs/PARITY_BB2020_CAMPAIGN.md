@@ -1690,3 +1690,43 @@ java 67 d6=1 StepBlockRoll.executeStep     <- rust rolls a d8 here instead
 Java is rolling Take Root for the halfling Treemen between blocks; Rust reaches a d8 (a scatter) at
 the same position. Use the ITER30 two-log join recipe to get Rust's step at 63-67 and find where the
 sequences part.
+
+## ITER35 — halfling seed 1: narrowed to die 65, three hypotheses eliminated
+
+Two-log join (ITER30 recipe) on halfling seed 1. Alignment is exact through die **64**; at **65** the
+VALUE still matches but the callers part:
+
+```
+  63  java d6=4  StepBlockRoll.executeStep                     rust d6=4  BlockRoll
+  64  java d6=3  TakeRootBehaviour$1.handleExecuteStepHook     rust d6=3  TakeRoot
+  65  java d6=2  StepMoveDodge.dodge                           rust d6=2  TakeRoot   <- sequences part
+  66  java d6=3  TakeRootBehaviour$1.handleExecuteStepHook     rust d6=3  TakeRoot
+  67  java d6=1  StepBlockRoll.executeStep                     rust d8=1  KickoffScatterRoll
+```
+
+Java: Take Root (64) → the same player moves and **dodges** (65) → another Take Root (66) → a block.
+Rust: three consecutive Take Roots (64, 65, 66), no dodge, and by 67 the drive has already ended and
+Rust is kicking off. So after the Take Root at 64 Java's Treeman moves and Rust's does not.
+
+**Eliminated by measurement, not reading:**
+* **The Take Root threshold.** All three Java editions use `minimumRollConfusion(true)`, so a rolled
+  3 cannot pass in one engine and fail in the other.
+* **The once-per-activation guard.** Rust's live step (`bb2025/shared/step_take_root.rs`) gates on
+  `game.acting_player.used_skills`, which is per-ACTIVATION and matches Java's
+  `UtilCards.hasUnusedSkill(actingPlayer, skill)`. (The persistent `Player.used_skills` trap recorded
+  in the TTM tier does NOT apply here.)
+* **An extra Take Root in the Foul sequence.** `generator/bb2020/{Foul,Move,Block}` each contain
+  `StepId.TAKE_ROOT` exactly once, so Rust rolling Take Root on a Foul activation (observed:
+  `TR_TRACE pid=home_02 action=Some(Foul)`) is correct.
+
+A gated `FFB_TR_TRACE` in the live step (added, measured, reverted) shows Rust rolling Take Root for
+`away_01`, `away_02`, `home_01`, `home_02` across Move/Blitz/Foul.
+
+**Next measurement:** correlate `TR_TRACE` with the dice positions in ONE capture (print the die
+counter inside the trace line, or interleave with `FFB_DICE_TRACE` unbuffered) to name which player
+rolls at 64/65/66 on each side. Java's 64 and 66 are Take Root for two DIFFERENT activations with a
+dodge between; if Rust's 64 and 65 are the SAME player, Rust is re-rolling Take Root within one
+activation and the guard is being reset — if they are different players, Rust simply activated a
+third Treeman where Java moved the first.
+
+Baseline unchanged: `halfling` 2/25. No engine changes this iteration.
