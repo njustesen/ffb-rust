@@ -2064,3 +2064,65 @@ base at `Standing`, against Java's `InjuryResult.applyTo`.
 
 Gates all green with the fix: `lineman` bb2016 100/100, `lineman` bb2025 100/100, `human` bb2020
 100/100, `cargo test --workspace` 0 failed. `underworld` unchanged at 22/25 (seeds 2, 3, 19).
+
+## ITER44 — underworld seed 2: the KO is applied, then overwritten by a block's stale OLD_DEFENDER_STATE
+
+Following ITER43's residue. First, the encoding, so the comparison is unambiguous — Java at i=56:
+
+```
+JAVA: h02:-1,-1,Ko          RUST: h02:-1,-1,Standing
+```
+
+Every other player on both teams matches at i=56. The coordinate now agrees (ITER43's fix); only the
+base differs.
+
+**`apply_to` is innocent — it does exactly the right thing.** Probing it directly:
+
+```
+APPLY: def=Some("home_03") want=Some(5) before=Some(3) after=Some(5)     # 5 = PS_KNOCKED_OUT
+```
+
+So the KO IS applied, at the Apothecary step, as Java does.
+
+**A state-change watcher found the overwrite.** Instrumenting `FieldModel::set_player_state` to log
+every base change for one player (`FFB_STATE_WATCH=home_03`) alongside `FFB_DRIVE_TRACE`:
+
+```
+DRIVE step=HandleDropPlayerContext   SETSTATE home_03 Some(1) -> 3     # dropPlayer → PRONE
+DRIVE step=Apothecary                SETSTATE home_03 Some(3) -> 5     # applyTo   → KNOCKED_OUT
+  ... BoneHead, ReallyStupid, TakeRoot, UnchannelledFury, BloodLust, InitBlocking, GoForIt,
+      FoulAppearance, DumpOff, Dauntless, Horns, PickUp, Stab, BlockChainsaw, Chomp, BlockRoll ...
+DRIVE step=BlockChoice               SETSTATE home_03 Some(5) -> 1     # ← the KO is undone
+```
+
+The write is `bb2025/block/step_block_choice.rs:92` (`BlockResult::Skull`; line 206 is the same write
+on `Pushback`), a faithful port of Java's `StepBlockChoice:165`
+`game.getFieldModel().setPlayerState(game.getDefender(), fOldDefenderState)`. Rust restores
+`Standing` because that is what the block published:
+
+```
+BLOCKCHOICE: result=Skull defender=Some("home_03") old_state_param=Some(1) used=1
+```
+
+**Not the ITER42 lead.** That note guessed the acting-player/defender mix-up in
+`StepHandleDropPlayerContext` — but the file that actually runs (`bb2025/shared/…`) already uses
+`game.defender_id` correctly, with a comment citing the Java line. Only the dead `bb2020/` copy has
+the mix-up. Worth fixing for hygiene, but it is not this bug.
+
+**Two hypotheses for the next iteration, in order.** The block that overwrites the KO has `home_03`
+as its defender even though `home_03` was knocked out and boxed several steps earlier:
+1. *Stale block target.* The activation should not still be blocking a player who left the pitch —
+   check whether Java re-targets or ends the action after the AS lash-out KOs the intended victim,
+   and what `game.getDefender()` is at Java's `StepBlockChoice` here.
+2. *Capture ordering.* `bb2025/block/step_init_blocking.rs:222` captures `old_state` from the current
+   defender state, matching Java's `StepInitBlocking:226`. If Java captures after the KO its
+   `fOldDefenderState` is `Ko` and the restore is a no-op, while Rust captured `Standing`. The probe
+   showed `INITBLOCK: defender=home_03 raw=Some(1)` — i.e. by the time this `InitBlocking` ran,
+   `home_03` was ALREADY Standing again, which does not fit a simple ordering story and needs the
+   Java-side value to disambiguate.
+
+Resolve by adding gated logging to the Java `StepInitBlocking`/`StepBlockChoice` (gated-logging-only
+edits to engine files have precedent in this campaign) and printing Java's defender id and
+`fOldDefenderState` at both sites, then joining against the Rust trace above.
+
+All probes reverted. Baseline unchanged: `underworld` 22/25 (seeds 2, 3, 19).
