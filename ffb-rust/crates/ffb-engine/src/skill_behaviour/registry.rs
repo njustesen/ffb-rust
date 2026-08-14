@@ -169,6 +169,7 @@ impl SkillRegistry {
             foul_appearance_behaviour::FoulAppearanceBehaviour,
             jump_up_behaviour::JumpUpBehaviour,
             shadowing_behaviour::ShadowingBehaviour,
+            sneaky_git_behaviour::SneakyGitBehaviour,
             stab_behaviour::StabBehaviour,
             take_root_behaviour::TakeRootBehaviour,
             tentacles_behaviour::TentaclesBehaviour,
@@ -202,6 +203,13 @@ impl SkillRegistry {
         FoulAppearanceBehaviour::register_into(&mut reg);
         JumpUpBehaviour::register_into(&mut reg);
         ShadowingBehaviour::register_into(&mut reg);
+        // Java has its own `skillbehaviour/bb2020/SneakyGitBehaviour` (@RulesCollection BB2020)
+        // whose StepEjectPlayer modifier is byte-identical to the BB2025 one — it is the ONLY
+        // code that sets PlayerState.BANNED on a spotted fouler. Without it registered, BB2020's
+        // shared `mixed/foul/StepEjectPlayer` called `putPlayerIntoBox` on a still-STANDING
+        // player, whose `switch` hits `default: break` → boxX == 0 → the fouler stayed on the
+        // pitch. (BB2016 is unaffected: it routes to its own `bb2016/foul/StepEjectPlayer`.)
+        SneakyGitBehaviour::register_into(&mut reg);
         StabBehaviour::register_into(&mut reg);
         TakeRootBehaviour::register_into(&mut reg);
         TentaclesBehaviour::register_into(&mut reg);
@@ -287,6 +295,21 @@ impl SkillRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Java registers `skillbehaviour/bb2020/SneakyGitBehaviour` under @RulesCollection(BB2020),
+    /// and its StepEjectPlayer modifier is the only writer of PlayerState.BANNED for a spotted
+    /// fouler. If BB2020 loses it, `StepEjectPlayer` boxes a STANDING player — a no-op — and the
+    /// fouler stays on the pitch (bb2020 human seed 2 i=52).
+    #[test]
+    fn bb2020_registers_sneaky_git_with_an_eject_player_modifier() {
+        use crate::step::framework::StepId;
+        let reg = registry_for(Rules::Bb2020);
+        let sb = reg.get(SkillId::SneakyGit).expect("BB2020 must register SneakyGitBehaviour");
+        assert!(
+            sb.get_step_modifiers().iter().any(|m| m.applies_to(StepId::EjectPlayer)),
+            "BB2020 SneakyGitBehaviour must carry the StepEjectPlayer modifier that bans the fouler"
+        );
+    }
 
     #[test]
     fn empty_registry_has_no_entries() {
@@ -383,9 +406,9 @@ mod tests {
     }
 
     #[test]
-    fn bb2020_registry_has_twenty_four_entries() {
+    fn bb2020_registry_has_twenty_five_entries() {
         let reg = SkillRegistry::build_bb2020();
-        assert_eq!(reg.len(), 24, "BB2020 registry should have 24 registered skill entries (21 + Catch + MonstrousMouth + TheBallista)");
+        assert_eq!(reg.len(), 25, "BB2020 registry should have 25 registered skill entries (21 + Catch + MonstrousMouth + TheBallista + SneakyGit)");
     }
 
     #[test]

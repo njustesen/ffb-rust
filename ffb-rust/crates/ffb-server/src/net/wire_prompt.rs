@@ -256,6 +256,10 @@ pub enum WireDialog {
 /// that may be purely internal (never shown to a client).
 pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
     match prompt {
+        // Purely internal: Java has no block-target dialog — the client picks the target with a
+        // ClientCommandBlock, so there is nothing to render. The headless agent answers this
+        // prompt directly; a networked client never sees it.
+        AgentPrompt::BlockTarget { .. } => None,
         AgentPrompt::BlockChoice { attacker_id, defender_id, dice, own_choice, nr_of_dice } =>
             Some(WireDialog::BlockChoice {
                 attacker_id: attacker_id.clone(), defender_id: defender_id.clone(),

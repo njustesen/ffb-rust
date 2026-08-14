@@ -484,3 +484,43 @@ human **100/100**, `cargo test` ffb-engine **7118/0**, ffb-model **2783/0**.
 ### Next
 Take the new lowest failing seed on human and repeat. The prayer machinery is now real, so expect
 the remaining failures to be ordinary rule divergences rather than missing subsystems.
+
+## ITER8 — human 42→62/100: BB2020 never banned a spotted fouler
+
+**Seed 2, i=52.** Dice identical (`rng_calls=47` both sides); state differed in exactly one field:
+
+```
+JAVA h1t54ahomes0,0 b5,0,true pa00:-1,-1,Reserve  | RUST ... pa00:13,6,Standing
+```
+
+`a00` fouled at i=51, the ref spotted it, the argue-the-call roll was a 3 (fail) — Java sent the
+fouler off, Rust left them on the pitch.
+
+**Root cause.** `mixed/foul/StepEjectPlayer` (the live step for BB2020 and BB2025) only calls
+`UtilBox.putPlayerIntoBox`. That method switches on the player's *state* and returns without doing
+anything for a `STANDING` player (`default: break` → `boxX == 0`). The state is set to `BANNED` by
+the `StepEjectPlayer` **step hook** inside `SneakyGitBehaviour` — the same hook in Java's
+`skillbehaviour/bb2020/SneakyGitBehaviour` (`@RulesCollection(BB2020)`) and
+`skillbehaviour/bb2025/SneakyGitBehaviour` (the two files' eject hooks are byte-identical).
+
+Rust's `SkillRegistry::build_bb2020()` never registered `SneakyGitBehaviour`, so
+`execute_step_hooks(StepId::EjectPlayer)` found no modifier and no fouler was ever banned in BB2020.
+BB2016 was unaffected — `make_step_for` routes it to its own `bb2016/foul/StepEjectPlayer`.
+
+**Fix** (`crates/ffb-engine/src/skill_behaviour/registry.rs`): register the shared
+`SneakyGitBehaviour` in `build_bb2020`, matching Java's BB2020 registration. Regression test
+`bb2020_registers_sneaky_git_with_an_eject_player_modifier` asserts BB2020 carries an
+`EjectPlayer` modifier; the entry-count test moves 24 → 25.
+
+Also fixed a compile break in `crates/ffb-server/src/net/wire_prompt.rs`: the `AgentPrompt::BlockTarget`
+variant added during the BB2016 campaign left `prompt_to_wire` non-exhaustive. It maps to `None` —
+Java has no block-target dialog (the client sends `ClientCommandBlock`), so nothing is rendered.
+
+**Result:** human 42/100 → **62/100**. Gates: lineman bb2016 100/100, lineman bb2025 100/100,
+`cargo test --workspace` clean.
+
+**Noted, not yet ported** (needs a Sneaky Git player or the Under Scrutiny prayer to be reachable):
+`bb2020/SneakyGitBehaviour`'s *Referee* hook differs from BB2025 — BB2020 uses
+`refereeSpotsFoul = (armorRoll[0] == armorRoll[1]) && !hasSkill(sneakyGit)` and
+`refereeSpotsFoul |= underScrutiny` (BB2025 drops the skill term and requires `isArmorBroken()` for
+the Under Scrutiny term). Rust inlines this in `step_referee.rs` with the BB2025 form only.
