@@ -2797,3 +2797,52 @@ discrepancy and the evidence, and treating **the measured numbers above as the c
 
 Jar pinned for the record: built 2026-08-15 00:44 from `ffb` HEAD `f5d83384f` plus the six gated-logging
 files. Tree clean; no engine change this iteration.
+
+## ITER58 — the regression PREDATES this session's fixes; earlier greens were measured against an unrecoverable jar
+
+Followed the status correction with a bisect rather than a rebuild of the status table, because the
+first question is whether my own commits caused it.
+
+**They did not.** Built commit `4bea55b8` — *before* the Intensive Training port (`edfd1fdb`) and
+before Under Scrutiny (`dc94c2c3`) — in an isolated git worktree and ran the same sweep:
+
+```
+human bb2020 @4bea55b8:  seeds 20, 26, 69, 70, 72 FAIL  ->  95/100
+human bb2020 @HEAD:      seeds 20, 26, 69, 70, 72 FAIL  ->  95/100
+```
+
+Identical count, identical seeds. So the four landed fixes of this session (apothecary decline,
+`game.setDefenderId`, Intensive Training, Under Scrutiny) are NOT responsible — the failures were
+already there when ITER48/ITER49 reported `human` at 100/100.
+
+**Java-log caching is now ruled out by reading the code, not by grep.** `main.rs:256` calls
+`run_java_headless_range` unconditionally for the whole seed range before any comparison — one batched
+JVM, every seed re-run, logs overwritten. There is no reuse path.
+
+**The local `ffb` changes are load-bearing, not stray.** I tried to build a pristine `HEAD` jar in a
+separate worktree to test whether one of the six uncommitted files is behaviourally significant. **The
+build FAILS**: the committed harness does not compile without them (`ParityRunner` calls the
+`HeadlessGameSetup.create(..., ruleset)` overload that exists only in the working tree). So the
+campaign has always run against `HEAD` + those edits, and they cannot be removed to A/B them.
+
+### Conclusion
+
+Every variable I can still control is identical between the runs that reported green and the runs that
+report 95-99 today — same Rust commit (proved by bisect), same Java source, same batch invocation. The
+one variable I cannot recover is the **jar binary that existed before ITER45's rebuild**. The earlier
+green readings were taken against it; it no longer exists, and rebuilding from the same source does not
+reproduce them.
+
+I am not going to invent a mechanism for that. What is defensible:
+- the current numbers are reproducible across two commits, three consecutive sweeps, and two jar builds;
+- the earlier numbers are not reproducible by any means available;
+- therefore **the measured table in ITER57 is the campaign's status**, and the greens recorded before it
+  must be re-earned rather than assumed.
+
+### Standing rule from here
+
+Every future green claim must cite a sweep run in the SAME turn as the claim, against the jar identity
+recorded in ITER57, and must re-run at least two previously-passing rosters. No roster is "still green"
+on the strength of an earlier turn's measurement.
+
+Temporary worktrees used for the bisect were removed; both repos are clean.
