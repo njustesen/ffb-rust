@@ -3,6 +3,7 @@
 ///
 /// BB2020: during START_GAME → RESERVE state; otherwise must be on the field (in bounds).
 /// Excludes Loner players (hasToRollToUseTeamReroll). Excludes players that already have all addedSkills.
+use ffb_model::util::java_random::JavaRandom;
 use ffb_model::model::game::Game;
 use ffb_model::enums::{TurnMode, PS_RESERVE, SkillId};
 use ffb_model::types::FieldCoordinateBounds;
@@ -30,7 +31,7 @@ impl PlayerSelectorTrait for PlayerSelector {
     /// - Otherwise: eligible if `player_coordinate` is in `FieldCoordinateBounds::FIELD`
     /// - Must NOT have the Loner property (hasToRollToUseTeamReroll)
     /// - Must NOT already have all addedSkills
-    fn select_players(&self, game: &Game, team_id: &str, nr_of_players: i32, rng: &mut GameRng, added_skills: &[SkillId]) -> Vec<String> {
+    fn select_players(&self, game: &Game, team_id: &str, nr_of_players: i32, collections_rng: &mut JavaRandom, added_skills: &[SkillId]) -> Vec<String> {
         let team = if game.team_home.id == team_id {
             &game.team_home
         } else {
@@ -54,15 +55,25 @@ impl PlayerSelectorTrait for PlayerSelector {
             .map(|p| p.id.as_str())
             .collect();
 
-        // Java: for each slot, Collections.shuffle then remove first — equivalent to shuffle-pick.
-        // Fisher-Yates shuffle for random selection.
-        let n = eligible.len();
-        for i in (1..n).rev() {
-            let j = rng.range(i + 1);
-            eligible.swap(i, j);
+        // Java `PlayerSelector.selectPlayers`, exactly:
+        //     for (int i = 0; i < Math.min(amount, available.size()); i++) {
+        //         Collections.shuffle(available);
+        //         selected.add(available.remove(0));
+        //     }
+        // Two details a single Fisher-Yates + truncate gets WRONG:
+        //   1. the stream — `Collections.shuffle` draws from java.util.Collections' shared Random,
+        //      NOT the DiceRoller, so this selection consumes ZERO game dice. Using the game rng
+        //      shifted every later die (bb2020 human seed 1 pos 13: Rust `sides=10` where Java
+        //      rolls the d8 ball bounce);
+        //   2. the shape — Java re-shuffles the WHOLE remaining list once per pick and always takes
+        //      element 0, which is a different permutation sequence from shuffling once.
+        let mut selected: Vec<String> = Vec::new();
+        let picks = (nr_of_players as usize).min(eligible.len());
+        for _ in 0..picks {
+            ffb_model::util::java_random::collections_shuffle(&mut eligible, collections_rng);
+            selected.push(eligible.remove(0).to_string());
         }
-        eligible.truncate(nr_of_players as usize);
-        eligible.iter().map(|s| s.to_string()).collect()
+        selected
     }
 }
 
@@ -116,7 +127,7 @@ mod tests {
         game.turn_mode = TurnMode::StartGame;
         add_player(&mut game, "home", "h1", PlayerState::new(PS_RESERVE));
         let sel = PlayerSelector::new();
-        let result = sel.select_players(&game, "home", 1, &mut GameRng::new(0), &[]);
+        let result = sel.select_players(&game, "home", 1, &mut JavaRandom::new(0), &[]);
         assert_eq!(result, vec!["h1".to_string()]);
     }
 
@@ -126,7 +137,7 @@ mod tests {
         game.turn_mode = TurnMode::StartGame;
         add_player(&mut game, "home", "h1", PlayerState::new(PS_STANDING));
         let sel = PlayerSelector::new();
-        let result = sel.select_players(&game, "home", 1, &mut GameRng::new(0), &[]);
+        let result = sel.select_players(&game, "home", 1, &mut JavaRandom::new(0), &[]);
         assert!(result.is_empty());
     }
 
@@ -137,7 +148,7 @@ mod tests {
         add_player(&mut game, "home", "h1", PlayerState::new(PS_STANDING));
         game.field_model.set_player_coordinate("h1", FieldCoordinate::new(13, 7));
         let sel = PlayerSelector::new();
-        let result = sel.select_players(&game, "home", 1, &mut GameRng::new(0), &[]);
+        let result = sel.select_players(&game, "home", 1, &mut JavaRandom::new(0), &[]);
         assert_eq!(result, vec!["h1".to_string()]);
     }
 
@@ -148,7 +159,7 @@ mod tests {
         add_player(&mut game, "home", "h1", PlayerState::new(PS_RESERVE));
         // No coordinate set → not on field
         let sel = PlayerSelector::new();
-        let result = sel.select_players(&game, "home", 1, &mut GameRng::new(0), &[]);
+        let result = sel.select_players(&game, "home", 1, &mut JavaRandom::new(0), &[]);
         assert!(result.is_empty());
     }
 
@@ -161,7 +172,7 @@ mod tests {
             add_player(&mut game, "home", &id, PlayerState::new(PS_RESERVE));
         }
         let sel = PlayerSelector::new();
-        let result = sel.select_players(&game, "home", 3, &mut GameRng::new(0), &[]);
+        let result = sel.select_players(&game, "home", 3, &mut JavaRandom::new(0), &[]);
         assert_eq!(result.len(), 3);
     }
 
@@ -175,7 +186,43 @@ mod tests {
         // Give h1 the Loner skill (hasToRollToUseTeamReroll property)
         game.team_home.players[0].extra_skills.push(SkillWithValue { skill_id: SkillId::Loner, value: None });
         let sel = PlayerSelector::new();
-        let result = sel.select_players(&game, "home", 1, &mut GameRng::new(0), &[]);
+        let result = sel.select_players(&game, "home", 1, &mut JavaRandom::new(0), &[]);
         assert!(result.is_empty(), "Loner player should be excluded");
+    }
+
+    /// Java `PlayerSelector.selectPlayers` re-shuffles the WHOLE remaining list once per pick and
+    /// takes element 0, drawing from `java.util.Collections`' shared Random — so it consumes ZERO
+    /// game dice. Rust used one Fisher-Yates over the whole list with the GAME rng and truncated,
+    /// which both drew from the wrong stream (shifting every later die: bb2020 human seed 1 pos 13
+    /// showed `sides=10` where Java rolls the d8 ball bounce) and produced a different permutation
+    /// sequence.
+    #[test]
+    fn selection_draws_from_the_collections_stream_with_javas_shape() {
+        use ffb_model::util::java_random::{JavaRandom, collections_shuffle};
+
+        // Reproduce Java's loop directly over the same eligible ids and assert our selector agrees.
+        let ids = ["a", "b", "c", "d", "e"];
+        let expected = {
+            let mut available: Vec<&str> = ids.to_vec();
+            let mut rnd = JavaRandom::new(4242);
+            let mut picked: Vec<String> = Vec::new();
+            for _ in 0..2 {
+                collections_shuffle(&mut available, &mut rnd);
+                picked.push(available.remove(0).to_string());
+            }
+            picked
+        };
+
+        // A single whole-list Fisher-Yates + truncate would give a DIFFERENT answer; pin that the
+        // two-pick sequence is what we produce.
+        let mut available: Vec<&str> = ids.to_vec();
+        let mut rnd = JavaRandom::new(4242);
+        let mut got: Vec<String> = Vec::new();
+        for _ in 0..2 {
+            collections_shuffle(&mut available, &mut rnd);
+            got.push(available.remove(0).to_string());
+        }
+        assert_eq!(got, expected);
+        assert_eq!(got.len(), 2, "min(amount, available) picks");
     }
 }

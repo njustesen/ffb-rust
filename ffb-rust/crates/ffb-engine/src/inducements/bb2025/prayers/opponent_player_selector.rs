@@ -1,5 +1,6 @@
 /// 1:1 translation of `com.fumbbl.ffb.server.inducements.bb2025.prayers.OpponentPlayerSelector`.
 /// Extends PlayerSelector; overrides determineTeam to return the opponent's team.
+use ffb_model::util::java_random::JavaRandom;
 use ffb_model::model::game::Game;
 use ffb_model::enums::SkillId;
 use ffb_model::util::rng::GameRng;
@@ -20,13 +21,13 @@ impl Default for OpponentPlayerSelector {
 
 impl PlayerSelectorTrait for OpponentPlayerSelector {
     /// Delegates to PlayerSelector but with the opponent team id.
-    fn select_players(&self, game: &Game, team_id: &str, nr_of_players: i32, rng: &mut GameRng, added_skills: &[SkillId]) -> Vec<String> {
+    fn select_players(&self, game: &Game, team_id: &str, nr_of_players: i32, collections_rng: &mut JavaRandom, added_skills: &[SkillId]) -> Vec<String> {
         let opponent_id = if game.team_home.id == team_id {
             &game.team_away.id
         } else {
             &game.team_home.id
         };
-        PlayerSelector::new().select_players(game, opponent_id, nr_of_players, rng, added_skills)
+        PlayerSelector::new().select_players(game, opponent_id, nr_of_players, collections_rng, added_skills)
     }
 
     /// Java: `OpponentPlayerSelector.determineTeam(team, game)` returns `game.getOtherTeam(team)`.
@@ -88,7 +89,7 @@ mod tests {
         add_player(&mut game, "home", "h1");
         add_player(&mut game, "away", "a1");
         // Team "home" passes → opponent is "away"
-        let result = OpponentPlayerSelector::new().select_players(&game, "home", 1, &mut GameRng::new(0), &[]);
+        let result = OpponentPlayerSelector::new().select_players(&game, "home", 1, &mut JavaRandom::new(0), &[]);
         assert_eq!(result, vec!["a1".to_string()], "Should select from opponent (away)");
     }
 
@@ -97,7 +98,7 @@ mod tests {
         let mut game = make_game();
         add_player(&mut game, "home", "h1");
         // no away players
-        let result = OpponentPlayerSelector::new().select_players(&game, "home", 1, &mut GameRng::new(0), &[]);
+        let result = OpponentPlayerSelector::new().select_players(&game, "home", 1, &mut JavaRandom::new(0), &[]);
         assert!(result.is_empty());
     }
 
@@ -106,7 +107,7 @@ mod tests {
         let mut game = make_game();
         add_player(&mut game, "home", "h1");
         // no home players beyond h1; away is the praying team → opponent is home
-        let result = OpponentPlayerSelector::new().select_players(&game, "away", 1, &mut GameRng::new(0), &[]);
+        let result = OpponentPlayerSelector::new().select_players(&game, "away", 1, &mut JavaRandom::new(0), &[]);
         assert_eq!(result, vec!["h1".to_string()]);
     }
 
@@ -114,7 +115,7 @@ mod tests {
     fn instance_const_is_usable() {
         let game = make_game();
         // INSTANCE const exists and can be used directly
-        let result = OpponentPlayerSelector::INSTANCE.select_players(&game, "home", 0, &mut GameRng::new(0), &[]);
+        let result = OpponentPlayerSelector::INSTANCE.select_players(&game, "home", 0, &mut JavaRandom::new(0), &[]);
         assert!(result.is_empty());
     }
 
@@ -125,7 +126,7 @@ mod tests {
             let id = format!("a{i}");
             add_player(&mut game, "away", &id);
         }
-        let result = OpponentPlayerSelector::new().select_players(&game, "home", 2, &mut GameRng::new(0), &[]);
+        let result = OpponentPlayerSelector::new().select_players(&game, "home", 2, &mut JavaRandom::new(0), &[]);
         assert_eq!(result.len(), 2);
     }
 
@@ -133,7 +134,7 @@ mod tests {
     fn returns_empty_when_opponent_has_no_players() {
         let mut game = make_game();
         // "away" prays; opponent is "home" — no home players added
-        let result = OpponentPlayerSelector::new().select_players(&game, "away", 1, &mut GameRng::new(0), &[]);
+        let result = OpponentPlayerSelector::new().select_players(&game, "away", 1, &mut JavaRandom::new(0), &[]);
         assert!(result.is_empty());
     }
 }

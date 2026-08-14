@@ -2,6 +2,7 @@
 /// Extends mixed IronManHandler with a BB2025 IronManPlayerSelector (own team RESERVE,
 /// filtered to players with armour < 11 — Java's private inner `IronManPlayerSelector`).
 /// Selects 1 random eligible player on the praying team, marks prayer, and grants +1 AV.
+use ffb_model::util::java_random::JavaRandom;
 use ffb_model::enums::{PS_RESERVE, PlayerType, SkillId};
 use ffb_model::model::animation_type::AnimationType;
 use ffb_model::model::game::Game;
@@ -28,7 +29,7 @@ impl Default for IronManHandler {
 struct IronManPlayerSelector;
 
 impl PlayerSelectorTrait for IronManPlayerSelector {
-    fn select_players(&self, game: &Game, team_id: &str, nr_of_players: i32, rng: &mut GameRng, added_skills: &[SkillId]) -> Vec<String> {
+    fn select_players(&self, game: &Game, team_id: &str, nr_of_players: i32, collections_rng: &mut JavaRandom, added_skills: &[SkillId]) -> Vec<String> {
         let team = if game.team_home.id == team_id {
             &game.team_home
         } else {
@@ -47,13 +48,21 @@ impl PlayerSelectorTrait for IronManPlayerSelector {
             .collect();
 
         // Java: shuffle then remove first for each slot — Fisher-Yates shuffle.
-        let n = eligible.len();
-        for i in (1..n).rev() {
-            let j = rng.range(i + 1);
-            eligible.swap(i, j);
+        // Java `PlayerSelector.selectPlayers`, exactly:
+        //     for (int i = 0; i < Math.min(amount, available.size()); i++) {
+        //         Collections.shuffle(available);
+        //         selected.add(available.remove(0));
+        //     }
+        // Collections.shuffle draws from java.util.Collections' shared Random, NOT the DiceRoller,
+        // so this consumes ZERO game dice; and Java re-shuffles the WHOLE remaining list once per
+        // pick, which is a different permutation sequence from shuffling once and truncating.
+        let mut selected: Vec<String> = Vec::new();
+        let picks = (nr_of_players as usize).min(eligible.len());
+        for _ in 0..picks {
+            ffb_model::util::java_random::collections_shuffle(&mut eligible, collections_rng);
+            selected.push(eligible.remove(0).to_string());
         }
-        eligible.truncate(nr_of_players as usize);
-        eligible.iter().map(|s| s.to_string()).collect()
+        selected
     }
 }
 

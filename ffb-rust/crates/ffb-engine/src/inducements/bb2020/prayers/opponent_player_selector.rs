@@ -2,6 +2,7 @@
 /// Selects players from the OPPOSING team for prayer effects (e.g. Bad Habits, Greasy Cleats).
 ///
 /// Java: overrides `determineTeam(team, game)` to return `game.getOtherTeam(team)`.
+use ffb_model::util::java_random::JavaRandom;
 use ffb_model::model::game::Game;
 use ffb_model::enums::{TurnMode, PS_RESERVE, SkillId};
 use ffb_model::model::property::named_properties::NamedProperties;
@@ -23,7 +24,7 @@ impl Default for OpponentPlayerSelector {
 
 impl PlayerSelectorTrait for OpponentPlayerSelector {
     /// Same eligibility rules as PlayerSelector but applied to the opposing team.
-    fn select_players(&self, game: &Game, team_id: &str, nr_of_players: i32, rng: &mut GameRng, added_skills: &[SkillId]) -> Vec<String> {
+    fn select_players(&self, game: &Game, team_id: &str, nr_of_players: i32, collections_rng: &mut JavaRandom, added_skills: &[SkillId]) -> Vec<String> {
         let other_team_id = if game.team_home.id == team_id {
             game.team_away.id.as_str()
         } else {
@@ -54,13 +55,21 @@ impl PlayerSelectorTrait for OpponentPlayerSelector {
             .collect();
 
         // Fisher-Yates shuffle for random selection.
-        let n = eligible.len();
-        for i in (1..n).rev() {
-            let j = rng.range(i + 1);
-            eligible.swap(i, j);
+        // Java `PlayerSelector.selectPlayers`, exactly:
+        //     for (int i = 0; i < Math.min(amount, available.size()); i++) {
+        //         Collections.shuffle(available);
+        //         selected.add(available.remove(0));
+        //     }
+        // Collections.shuffle draws from java.util.Collections' shared Random, NOT the DiceRoller,
+        // so this consumes ZERO game dice; and Java re-shuffles the WHOLE remaining list once per
+        // pick, which is a different permutation sequence from shuffling once and truncating.
+        let mut selected: Vec<String> = Vec::new();
+        let picks = (nr_of_players as usize).min(eligible.len());
+        for _ in 0..picks {
+            ffb_model::util::java_random::collections_shuffle(&mut eligible, collections_rng);
+            selected.push(eligible.remove(0).to_string());
         }
-        eligible.truncate(nr_of_players as usize);
-        eligible.iter().map(|s| s.to_string()).collect()
+        selected
     }
 
     /// Java: `OpponentPlayerSelector.determineTeam(team, game)` returns `game.getOtherTeam(team)`.
@@ -123,7 +132,7 @@ mod tests {
         add_player(&mut game, "home", "h1", PlayerState::new(PS_RESERVE));
         // Passing "home" as the praying team → should select from "away"
         let sel = OpponentPlayerSelector::new();
-        let result = sel.select_players(&game, "home", 2, &mut GameRng::new(0), &[]);
+        let result = sel.select_players(&game, "home", 2, &mut JavaRandom::new(0), &[]);
         assert_eq!(result, vec!["a1".to_string()]);
     }
 
@@ -134,7 +143,7 @@ mod tests {
         add_player(&mut game, "away", "a1", PlayerState::new(PS_STANDING));
         game.field_model.set_player_coordinate("a1", FieldCoordinate::new(13, 7));
         let sel = OpponentPlayerSelector::new();
-        let result = sel.select_players(&game, "home", 1, &mut GameRng::new(0), &[]);
+        let result = sel.select_players(&game, "home", 1, &mut JavaRandom::new(0), &[]);
         assert_eq!(result, vec!["a1".to_string()]);
     }
 
@@ -147,7 +156,7 @@ mod tests {
             add_player(&mut game, "away", &id, PlayerState::new(PS_RESERVE));
         }
         let sel = OpponentPlayerSelector::new();
-        let result = sel.select_players(&game, "home", 2, &mut GameRng::new(0), &[]);
+        let result = sel.select_players(&game, "home", 2, &mut JavaRandom::new(0), &[]);
         assert_eq!(result.len(), 2);
     }
 
@@ -158,7 +167,7 @@ mod tests {
         add_player(&mut game, "home", "h1", PlayerState::new(PS_RESERVE));
         // "away" is praying → opponent is "home"
         let sel = OpponentPlayerSelector::new();
-        let result = sel.select_players(&game, "away", 1, &mut GameRng::new(0), &[]);
+        let result = sel.select_players(&game, "away", 1, &mut JavaRandom::new(0), &[]);
         assert_eq!(result, vec!["h1".to_string()]);
     }
 
@@ -170,7 +179,7 @@ mod tests {
         add_player(&mut game, "home", "h2", PlayerState::new(PS_RESERVE));
         // Praying team is "home" → opponent is "away" → empty
         let sel = OpponentPlayerSelector::new();
-        let result = sel.select_players(&game, "home", 1, &mut GameRng::new(0), &[]);
+        let result = sel.select_players(&game, "home", 1, &mut JavaRandom::new(0), &[]);
         assert!(result.is_empty());
     }
 
@@ -185,7 +194,7 @@ mod tests {
         // matching Java's PlayerSelector.eligiblePlayers() filter which OpponentPlayerSelector inherits.
         game.team_away.players[0].extra_skills.push(SkillWithValue { skill_id: SkillId::Loner, value: None });
         let sel = OpponentPlayerSelector::new();
-        let result = sel.select_players(&game, "home", 1, &mut GameRng::new(0), &[]);
+        let result = sel.select_players(&game, "home", 1, &mut JavaRandom::new(0), &[]);
         assert!(result.is_empty(), "Loner opponent player should be excluded");
     }
 }

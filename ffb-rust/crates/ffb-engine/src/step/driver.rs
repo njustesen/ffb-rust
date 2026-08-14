@@ -373,6 +373,25 @@ fn seq_step_to_driver_entry(s: SequenceStep, rules: Rules) -> DriverStepEntry {
 /// every other step — and every non-BB2016 edition — falls through to the shared `make_step`, so
 /// BB2020/BB2025 behaviour is byte-for-byte unchanged.
 pub fn make_step_for(id: StepId, rules: Rules) -> Box<dyn Step> {
+    if rules == Rules::Bb2020 {
+        match id {
+            // BB2020 and BB2025 have genuinely DIFFERENT kickoff event tables, and the shared
+            // (bb2025) step implements the BB2025 rules: Cheering Fans grants BB2020 a PRAYER TO
+            // NUFFLE (`handleCheeringFans` pushes `StepId.PRAYER`) but grants BB2025 extra
+            // offensive block assists; the tables differ in membership too (BB2020 Officious Ref
+            // vs BB2025 Charge / Dodgy Snack). `make_step_for` had NO `Rules::Bb2020` arm at all,
+            // so every bb2020 step fell through to the bb2025 default and bb2020 games ran BB2025
+            // kickoff rules.
+            // NOT ApplyKickoffResult: routing the whole step to the bb2020 file regressed human to
+            // 12/100 even with the prayer chain correct, because that file is STALER than the
+            // shared one for the events they have in common (its own header flags QuickSnap /
+            // SolidDefence / HighKick as TODO). Per the bb2016 campaign's lesson, edition-gate the
+            // ONE differing event inside the shared step instead — see `handle_cheering_fans`.
+            StepId::Prayer =>
+                return Box::new(crate::step::bb2020::StepPrayer::default()),
+            _ => {}
+        }
+    }
     if rules == Rules::Bb2016 {
         match id {
             // BB2016 StepSpectators rolls 2D6 per team (spectators + fame via ReportSpectators),

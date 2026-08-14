@@ -1,3 +1,4 @@
+use ffb_model::util::java_random::JavaRandom;
 /// 1:1 translation of `com.fumbbl.ffb.server.inducements.mixed.prayers.EnhancementRemover`.
 /// Removes prayer-granted temporary enhancements from all players of a team.
 ///
@@ -64,7 +65,7 @@ mod tests {
     /// `bb2020::prayers::OpponentPlayerSelector` / `bb2025::prayers::OpponentPlayerSelector`.
     struct TestOpponentSelector;
     impl PlayerSelector for TestOpponentSelector {
-        fn select_players(&self, _game: &Game, _team_id: &str, _nr_of_players: i32, _rng: &mut ffb_model::util::rng::GameRng, _added_skills: &[ffb_model::enums::SkillId]) -> Vec<String> {
+        fn select_players(&self, _game: &Game, _team_id: &str, _nr_of_players: i32, _collections_rng: &mut ffb_model::util::java_random::JavaRandom, _added_skills: &[ffb_model::enums::SkillId]) -> Vec<String> {
             vec![]
         }
         fn determine_team_id<'a>(&self, game: &Game, team_id: &'a str) -> String {

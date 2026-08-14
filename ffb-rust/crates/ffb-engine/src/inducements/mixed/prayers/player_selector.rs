@@ -1,6 +1,7 @@
 /// 1:1 translation of `com.fumbbl.ffb.server.inducements.mixed.prayers.PlayerSelector`.
 /// Java: interface PlayerSelector { List<Player<?>> selectPlayers(Team, Game, int, Set<Skill>) }
 /// In Rust, modelled as a trait.
+use ffb_model::util::java_random::JavaRandom;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::SkillId;
@@ -8,7 +9,7 @@ use ffb_model::enums::SkillId;
 pub trait PlayerSelector: Send + Sync {
     /// Java: selectPlayers(Team, Game, int nrOfPlayers, Set<Skill> addedSkills)
     /// Returns selected player IDs (up to `nr_of_players`).
-    fn select_players(&self, game: &Game, team_id: &str, nr_of_players: i32, rng: &mut GameRng, added_skills: &[SkillId]) -> Vec<String>;
+    fn select_players(&self, game: &Game, team_id: &str, nr_of_players: i32, collections_rng: &mut JavaRandom, added_skills: &[SkillId]) -> Vec<String>;
 
     /// Java: `determineTeam(Team team, Game game)` — resolves which team is actually
     /// affected by this selector. Default: the praying team itself (identity).
@@ -25,7 +26,7 @@ pub trait PlayerSelector: Send + Sync {
 pub struct StubPlayerSelector;
 
 impl PlayerSelector for StubPlayerSelector {
-    fn select_players(&self, _game: &Game, _team_id: &str, _nr_of_players: i32, _rng: &mut GameRng, _added_skills: &[SkillId]) -> Vec<String> {
+    fn select_players(&self, _game: &Game, _team_id: &str, _nr_of_players: i32, _collections_rng: &mut JavaRandom, _added_skills: &[SkillId]) -> Vec<String> {
         vec![]
     }
 }

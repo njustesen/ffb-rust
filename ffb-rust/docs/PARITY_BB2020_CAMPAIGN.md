@@ -446,3 +446,41 @@ them — mechanical but wide. Land it TOGETHER with re-adding the two routing ar
 
 Gates for this commit: bb2020 human **38/100** (unchanged baseline), bb2016 lineman **50/50 games
 match**, bb2025 lineman **50/50 games match**, `cargo test -p ffb-engine` **7117/0**.
+
+
+## ITER7 — the prayer chain completes: **38 → 42/100** (first bb2020 improvement)
+
+Two changes, landed together because neither works alone.
+
+**1. `PlayerSelector.selectPlayers` ported exactly.** Java:
+```java
+for (int i = 0; i < Math.min(amount, available.size()); i++) {
+    Collections.shuffle(available);      // COLLECTIONS stream, whole remaining list
+    selected.add(available.remove(0));
+}
+```
+Rust did ONE Fisher-Yates over the whole list with the **game** rng, then truncated — wrong on both
+counts: the wrong stream (shifting every later die — seed 1 pos 13 showed `sides=10` where Java
+rolls the d8 ball bounce) and a different permutation sequence. The trait parameter changed from
+`rng: &mut GameRng` to `collections_rng: &mut JavaRandom`, which is a truer signature: this
+selection consumes no game dice at all. `random_selection_prayer_handler` split-borrows
+`game.collections_rng` for the call.
+
+**2. Cheering Fans edition-gated INSIDE the shared step — NOT routed.** BB2020 awards a Prayer to
+Nuffle where BB2025 grants extra offensive block assists. Routing `ApplyKickoffResult` to the bb2020
+file made the prayer chain correct but still measured **12/100**, because that file is STALER than
+the shared one for the events they have in common — its own header flags QuickSnap / SolidDefence /
+HighKick as TODO. This is the bb2016 campaign's lesson again: **edition-gate the shared step, never
+route to the staler edition file.** Only `StepId::Prayer` is routed (the bb2025 `StepPrayer` is
+still a stub; the bb2020 one now dispatches).
+
+**Verified:** seed 1's dice now match Java exactly through position 16 —
+`d3=2, d8=2, d6=6, d6=4, d6=2` on both sides, where Rust previously had no `d3` at all. Sweep
+**38 → 42/100 passed**.
+
+Gates: bb2016 lineman **100/100**, bb2016 human **100/100**, bb2025 lineman **100/100**, bb2025
+human **100/100**, `cargo test` ffb-engine **7118/0**, ffb-model **2783/0**.
+
+### Next
+Take the new lowest failing seed on human and repeat. The prayer machinery is now real, so expect
+the remaining failures to be ordinary rule divergences rather than missing subsystems.

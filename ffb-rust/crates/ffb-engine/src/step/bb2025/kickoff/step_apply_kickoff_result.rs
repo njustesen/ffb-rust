@@ -253,6 +253,44 @@ impl StepApplyKickoffResult {
         let total_away = roll_away + game.team_away.cheerleaders
             + game.turn_data_away.inducement_set.value(Usage::ADD_CHEERLEADER);
 
+        // EDITION-SPECIFIC OUTCOME. BB2020's `handleCheeringFans` awards the winner a PRAYER TO
+        // NUFFLE, pushing `StepId.PRAYER` with a roll drawn from `Collections.shuffle` (the shared
+        // java.util.Collections Random — ZERO game dice). BB2025 instead grants extra offensive
+        // block assists. Gated here rather than by routing bb2020 to its own step file: that file
+        // is staler than this one for the events they share (QuickSnap / SolidDefence / HighKick
+        // are TODO there) and routing it regressed bb2020 human to 12/100.
+        if game.rules == ffb_model::enums::Rules::Bb2020 {
+            let use_league = game.options
+                .get_option_with_default(ffb_model::option::game_option_id::GameOptionId::INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE)
+                .get_value_as_string() == "true";
+            let max_prayer_roll = if use_league { 16 } else { 8 };
+            let mut pick = |game: &mut Game| -> i32 {
+                let mut available: Vec<i32> = (1..=max_prayer_roll).collect();
+                ffb_model::util::java_random::collections_shuffle(&mut available, &mut game.collections_rng);
+                available[0]
+            };
+            let mut out = StepOutcome::next();
+            let (winner, available) = if total_home > total_away {
+                let roll = pick(game);
+                let team_id = game.team_home.id.clone();
+                out = out.push_seq(vec![crate::step::framework::SequenceStep::with_params(StepId::Prayer, vec![
+                    StepParameter::PrayerRoll(roll), StepParameter::TeamId(team_id.clone())])]);
+                (team_id, true)
+            } else if total_away > total_home {
+                let roll = pick(game);
+                let team_id = game.team_away.id.clone();
+                out = out.push_seq(vec![crate::step::framework::SequenceStep::with_params(StepId::Prayer, vec![
+                    StepParameter::PrayerRoll(roll), StepParameter::TeamId(team_id.clone())])]);
+                (team_id, true)
+            } else {
+                (String::new(), false)
+            };
+            game.report_list.add(
+                ffb_model::report::bb2020::report_cheering_fans::ReportCheeringFans::new(
+                    winner, available, roll_home, roll_away));
+            return out.with_event(GameEvent::CheeringFans { home_roll: roll_home, away_roll: roll_away });
+        }
+
         // Java: winning team (or both on tie) gains 1 extra offensive block assist.
         let mut winner_ids: Vec<String> = Vec::new();
         if total_home >= total_away {

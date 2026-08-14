@@ -3,6 +3,7 @@
 /// Extends mixed::prayers::PlayerSelector.
 ///
 /// Eligibility: state == RESERVE, not a Star player, not already having all addedSkills.
+use ffb_model::util::java_random::JavaRandom;
 use ffb_model::enums::{PS_RESERVE, PlayerType, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -23,7 +24,7 @@ impl Default for PlayerSelector {
 impl PlayerSelectorTrait for PlayerSelector {
     /// Java: `eligiblePlayers` filtered via `selectPlayers`.
     /// Eligible: RESERVE state, not a Star, not already having all addedSkills.
-    fn select_players(&self, game: &Game, team_id: &str, nr_of_players: i32, rng: &mut GameRng, added_skills: &[SkillId]) -> Vec<String> {
+    fn select_players(&self, game: &Game, team_id: &str, nr_of_players: i32, collections_rng: &mut JavaRandom, added_skills: &[SkillId]) -> Vec<String> {
         let team = if game.team_home.id == team_id {
             &game.team_home
         } else {
@@ -41,13 +42,21 @@ impl PlayerSelectorTrait for PlayerSelector {
             .collect();
 
         // Java: shuffle then remove first for each slot — Fisher-Yates shuffle.
-        let n = eligible.len();
-        for i in (1..n).rev() {
-            let j = rng.range(i + 1);
-            eligible.swap(i, j);
+        // Java `PlayerSelector.selectPlayers`, exactly:
+        //     for (int i = 0; i < Math.min(amount, available.size()); i++) {
+        //         Collections.shuffle(available);
+        //         selected.add(available.remove(0));
+        //     }
+        // Collections.shuffle draws from java.util.Collections' shared Random, NOT the DiceRoller,
+        // so this consumes ZERO game dice; and Java re-shuffles the WHOLE remaining list once per
+        // pick, which is a different permutation sequence from shuffling once and truncating.
+        let mut selected: Vec<String> = Vec::new();
+        let picks = (nr_of_players as usize).min(eligible.len());
+        for _ in 0..picks {
+            ffb_model::util::java_random::collections_shuffle(&mut eligible, collections_rng);
+            selected.push(eligible.remove(0).to_string());
         }
-        eligible.truncate(nr_of_players as usize);
-        eligible.iter().map(|s| s.to_string()).collect()
+        selected
     }
 }
 
@@ -121,7 +130,7 @@ mod tests {
     fn selects_reserve_regular_player() {
         let mut game = make_game();
         add_player(&mut game, "home", "h1", PlayerState::new(PS_RESERVE));
-        let result = PlayerSelector::new().select_players(&game, "home", 1, &mut GameRng::new(0), &[]);
+        let result = PlayerSelector::new().select_players(&game, "home", 1, &mut JavaRandom::new(0), &[]);
         assert_eq!(result, vec!["h1".to_string()]);
     }
 
@@ -129,7 +138,7 @@ mod tests {
     fn excludes_non_reserve_player() {
         let mut game = make_game();
         add_player(&mut game, "home", "h1", PlayerState::new(PS_STANDING));
-        let result = PlayerSelector::new().select_players(&game, "home", 1, &mut GameRng::new(0), &[]);
+        let result = PlayerSelector::new().select_players(&game, "home", 1, &mut JavaRandom::new(0), &[]);
         assert!(result.is_empty());
     }
 
@@ -137,7 +146,7 @@ mod tests {
     fn excludes_star_players() {
         let mut game = make_game();
         add_star_player(&mut game, "home", "star1", PlayerState::new(PS_RESERVE));
-        let result = PlayerSelector::new().select_players(&game, "home", 1, &mut GameRng::new(0), &[]);
+        let result = PlayerSelector::new().select_players(&game, "home", 1, &mut JavaRandom::new(0), &[]);
         assert!(result.is_empty(), "Star player should be excluded");
     }
 
@@ -147,7 +156,7 @@ mod tests {
         for i in 0..5 {
             add_player(&mut game, "home", &format!("h{i}"), PlayerState::new(PS_RESERVE));
         }
-        let result = PlayerSelector::new().select_players(&game, "home", 3, &mut GameRng::new(0), &[]);
+        let result = PlayerSelector::new().select_players(&game, "home", 3, &mut JavaRandom::new(0), &[]);
         assert_eq!(result.len(), 3);
     }
 
@@ -156,7 +165,7 @@ mod tests {
         let mut game = make_game();
         add_player(&mut game, "home", "h1", PlayerState::new(PS_RESERVE));
         add_player(&mut game, "away", "a1", PlayerState::new(PS_RESERVE));
-        let result = PlayerSelector::new().select_players(&game, "away", 2, &mut GameRng::new(0), &[]);
+        let result = PlayerSelector::new().select_players(&game, "away", 2, &mut JavaRandom::new(0), &[]);
         assert_eq!(result, vec!["a1".to_string()]);
     }
 }
