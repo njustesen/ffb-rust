@@ -2278,3 +2278,53 @@ No behaviour change yet (the table is not yet wired), so no parity movement is c
 `cargo test --workspace` 14,440 passed / 0 failed. Next iteration wires
 `IntensiveTrainingHandler.createDialog`/`applySelection` and the agent's `SELECT_SKILL` answer, then
 re-runs lineman 1-100.
+
+### ITER47 — the remaining blocker for the Intensive Training port: the fixture has no skill categories
+
+Traced the wiring end-to-end before writing any of it, and hit a data gap that has to be closed
+first — recording it so the next iteration starts from the answer rather than rediscovering it.
+
+**What is already in place** (nothing to build):
+- `AgentPrompt::SelectSkill { player_id, available }` and `Action::SelectSkill { skill_id }` both
+  exist, and `StepPrayer::handle_command` already has an `Action::SelectSkill` arm (currently a
+  no-op `{}`).
+- `SkillId::category_and_name_for(rules)` (ITER46) supplies the filter key and the sort key.
+- `Player::add_prayer_skill` is the grant primitive (Java `addTemporarySkills`).
+- The player pick already consumes the Collections stream identically.
+
+**The blocker.** Java filters by `player.getPosition().getSkillCategories(false)` — the position's
+NORMAL-roll categories. `roster_lineman_parity.xml` declares them:
+
+```xml
+<skillCategoryList>
+  <normal>General</normal>
+  <double>Agility</double> <double>Strength</double> <double>Passing</double>
+</skillCategoryList>
+```
+
+Rust's side of the same fixture is **synthesised in code**, not loaded from data:
+`crates/ffb-parity/src/runner.rs:582 make_lineman_team` builds 11 players with
+`position_id: "lineman"`, `roster_id: "lineman"`, and there is no `data/rosters/*/roster_lineman.json`
+— every other roster has one. `Player` carries no categories itself (only `RosterPosition` does, via
+`find_position(roster_id, position_id, rules)`), so for the lineman fixture that lookup returns
+`None` and the eligible-skill list would come out EMPTY. An empty list is Java's
+`ReportPrayerWasted` branch — no skill granted — i.e. the port would compile, pass its unit tests,
+and still not fix seed 50.
+
+So the fixture must first expose the same categories as the Java XML it mirrors. `make_lineman_team`
+lives in `ffb-parity` and is co-editable; the Java fixture roster is the truth to copy (General on
+normal; Agility/Strength/Passing on doubles; MA6 ST3 AG3 PA4 AV8, which the synthetic team already
+matches).
+
+**Order of work for the next iteration**, now that the shape is known:
+1. Give the lineman fixture its position categories, mirroring `roster_lineman_parity.xml` (either a
+   `roster_lineman.json` per edition that `find_position` resolves, or categories carried on the
+   synthetic position — whichever keeps `make_lineman_team` the single source for the fixture).
+2. Port `createDialog`: eligible skills = category in the position's normal categories, not already
+   held, `canBeAssignedTo` (Java: no conflicting properties), sorted by name; empty -> wasted prayer.
+3. Emit `AgentPrompt::SelectSkill`; the agent flattens the offered set, sorts by
+   `category_and_name_for(rules).1` and takes the first — reproducing `RandomStrategy`'s
+   `skills.get(0)` on Java's name-sorted list regardless of how the prompt groups them.
+4. `applySelection` -> `add_prayer_skill`, then re-run lineman 1-100.
+
+Tree is clean; no behaviour change this iteration and none claimed. `lineman` bb2020 remains 99/100.
