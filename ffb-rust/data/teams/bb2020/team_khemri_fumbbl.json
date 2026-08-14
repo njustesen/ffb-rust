@@ -1,0 +1,68 @@
+{
+  "edition": "bb2020",
+  "race": "khemri_fumbbl",
+  "roster_id": "55051",
+  "rerolls": 3,
+  "reroll_cost": 70000,
+  "apothecaries": 0,
+  "dedicated_fans": 3,
+  "fan_factor": 0,
+  "treasury": 140000,
+  "spent": 960000,
+  "team_value": 950000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "2895"
+    },
+    {
+      "nr": 2,
+      "position_id": "2894"
+    },
+    {
+      "nr": 3,
+      "position_id": "2894"
+    },
+    {
+      "nr": 4,
+      "position_id": "2893"
+    },
+    {
+      "nr": 5,
+      "position_id": "2893"
+    },
+    {
+      "nr": 6,
+      "position_id": "2892"
+    },
+    {
+      "nr": 7,
+      "position_id": "2892"
+    },
+    {
+      "nr": 8,
+      "position_id": "2892"
+    },
+    {
+      "nr": 9,
+      "position_id": "2892"
+    },
+    {
+      "nr": 10,
+      "position_id": "2892"
+    },
+    {
+      "nr": 11,
+      "position_id": "2892"
+    },
+    {
+      "nr": 12,
+      "position_id": "2892"
+    },
+    {
+      "nr": 13,
+      "position_id": "2892"
+    }
+  ],
+  "special_rules": []
+}

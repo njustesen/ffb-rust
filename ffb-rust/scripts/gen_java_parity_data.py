@@ -7,8 +7,8 @@ The source of truth is checked-in data the teams were drafted into ONCE:
 This script only CONVERTS that data into the XML formats the Java engine
 loads (it makes no drafting decisions):
   <server>/rosters/roster_<race>_<edition>.xml   roster id "<race>.<edition>"
-  <server>/teams/team_<race>_parity{25|16}_{home|away}.xml
-                                                 team id  team<Race>Parity{25|16}{Home|Away}
+  <server>/teams/team_<race>_parity{25|20|16}_{home|away}.xml
+                                                 team id  team<Race>Parity{25|20|16}{Home|Away}
 
 Team special rules: only names Java's SpecialRule enum resolves are emitted,
 and the same filtered list is written back into the team JSON so the Rust
@@ -33,7 +33,7 @@ SERVER_DIRS = [
 SPECIAL_RULE_JAVA = (ROOT.parent / "ffb-java" / "ffb" / "ffb-common" / "src" / "main"
                      / "java" / "com" / "fumbbl" / "ffb" / "model" / "SpecialRule.java")
 
-EDITIONS = {"bb2016": "16", "bb2025": "25"}
+EDITIONS = {"bb2016": "16", "bb2020": "20", "bb2025": "25"}
 SPECIAL_RULE_ALIASES = {"Favoured of...": "Favoured of Chaos Undivided"}
 
 
