@@ -1114,3 +1114,42 @@ what actually runs), then give the live sequence the three negatrait steps with
 `GOTO_LABEL_ON_FAILURE = END_THROW_TEAM_MATE`, matching Java. Verify the abort consumes no extra dice.
 
 Baseline unchanged: `chaos_pact` 24/25, `human` 100/100.
+
+## ITER22 — chaos_pact seed 22: second wrong premise, reverted. Lesson recorded.
+
+ITER21 claimed Rust's live BB2025 TTM sequence "has no negatrait steps at all". **That was wrong**,
+and it was wrong because of a truncated grep (`grep -n "seq.add" … | head -14` on a file where the
+negatrait steps are added by a different call). Dumping the sequence from a test shows the truth:
+
+```
+BB2025 TTM seq = [InitThrowTeamMate, InitActivation, AnimalSavagery, SteadyFooting,
+                  HandleDropPlayerContext, PlaceBall, Apothecary, CatchScatterThrowIn, GotoLabel,
+                  BoneHead, ReallyStupid, TakeRoot, UnchannelledFury, BloodLust, AlwaysHungry,
+                  ThrowTeamMate, DispatchScatterPlayer, RightStuff, …]
+```
+
+The chain is already there. Routing BB2020 to `generator/bb2020/throw_team_mate` was therefore a
+no-op in substance — the dice were byte-identical afterwards and the gates were exactly neutral
+(`chaos_pact` 24/25, `human` 100/100). Reverted; baseline re-confirmed at `chaos_pact` 24/25.
+
+**Method lesson (two wrong premises in a row on this seed):** both ITER21's TTM-guard theory and
+this one were built on reading, not measuring, and both cost a full iteration. The cheap measurement
+existed in each case — dump the sequence from a unit test, or diff the dice after the change. Adopt:
+*before* editing on the strength of a source reading, take one measurement that would FALSIFY the
+premise. The `FFB_DRIVE_TRACE` step list and a one-line `panic!("{:?}")` in a test are both seconds
+of work.
+
+**Where seed 22 actually stands.** Still the same signature and still unexplained:
+
+```
+pos 44 d6=6  ReallyStupid (pass)     pos 45 d6=1  ReallyStupid (FAIL)
+pos 46 Rust d8 = scatter_player      pos 46 Java d6 = the NEXT player's BoneHead
+```
+
+Both engines run a `ReallyStupid` step with `GOTO_LABEL_ON_FAILURE = END_THROW_TEAM_MATE` in the TTM
+sequence, both roll the same failing die — and Rust still throws. So the divergence is **inside
+`StepReallyStupid`**: its failure is not producing the goto. Next iteration should instrument
+`step/action/common/step_really_stupid.rs` directly (what `ActionStatus` it computes, and what
+`StepOutcome` it returns on failure) rather than reasoning about sequences again.
+
+Baseline unchanged: `chaos_pact` 24/25, `human` 100/100.
