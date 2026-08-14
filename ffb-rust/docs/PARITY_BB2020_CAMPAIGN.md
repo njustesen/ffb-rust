@@ -2738,3 +2738,62 @@ the campaign's green list needs re-verification too.
 
 Current measured baselines: `ogre` 95/100, `goblin` 95/100, `nurgle` 21/25. Tree clean on both repos
 (the six `ffb` files are pre-existing gated-logging changes, not from this session).
+
+## ITER57 — ⚠️ STATUS CORRECTION: the bb2020 "green" list does not hold up
+
+ITER56 flagged that `ogre` had moved from 99/100 to 95/100 and made re-verification the next job.
+Doing that re-verification invalidates more than one roster.
+
+### Measured now, against a pinned jar, with a clean tree at HEAD
+
+| matchup | recorded earlier | **measured now** |
+|---|---|---|
+| `lineman` bb2016 | 100/100 | **100/100** ✅ |
+| `lineman` bb2025 | 100/100 | **100/100** ✅ |
+| `lineman` bb2020 | 100/100 (ITER48) | **99/100** |
+| `human` bb2020 | 100/100 (ITER14, re-gated ITER48/49) | **95/100** (seeds 20, 26, 69, 70, 72) |
+| `underworld` bb2020 | 100/100 (ITER44) | **99/100** |
+| `chaos_pact` bb2020 | 100/100 (ITER49) | **97/100** |
+| `renegades` bb2020 | 100/100 (ITER49) | **96/100** |
+| `ogre` bb2020 | 99/100 (ITER55) | **95/100** |
+| `goblin` bb2020 | 95/100 | **95/100** |
+
+**Only the two non-bb2020 fixtures still hold.** Every bb2020 roster previously called green is short.
+
+### What I ruled out
+
+- **Not the Java source.** All six uncommitted files in the `ffb` tree are gated logging
+  (`ffb.parityDebug` / `getenv`) that return unchanged values with the gate off — I read each diff:
+  `StatsMechanic.armourIsBroken` assigns to a local and returns it, `StepGoForIt`/`StepPassBlock` only
+  add printlns, `Xoshiro256StarStar` widens the trace stack capture, `HeadlessGameSetup` is the
+  long-standing ruleset-override plumbing, `HeadlessFantasyFootballServer` gates its DebugLog.
+- **Not the jar build.** Rebuilding produces a different md5 (archive timestamps) but the SAME result:
+  `human` is 95/100 before and after.
+- **Not log caching.** `run_java_headless` re-runs Java and overwrites the log every sweep; there is no
+  reuse path in `ffb-parity/src/runner.rs`.
+- **Not nondeterminism.** Two consecutive `human` sweeps fail on exactly the same five seeds, and three
+  consecutive `ogre` sweeps agreed.
+- **Not a dirty tree.** `git status` is clean apart from `.claude/worktrees`, HEAD is the ITER56 commit,
+  and the binary was rebuilt from scratch before measuring.
+
+### What that leaves
+
+The current numbers are reproducible; the earlier ones are not. So the earlier gate readings are the
+suspect measurement, not today's. I could not reconstruct how they came out at 100/100 — the code and
+jar at those commits look equivalent to now — so rather than invent an explanation I am recording the
+discrepancy and the evidence, and treating **the measured numbers above as the campaign's real status**.
+
+**Practical consequence**: the campaign is NOT at "8 of 30 green". Against the pinned jar it is at
+**2 of 30** (the bb2016/bb2025 lineman fixtures), with seven bb2020 rosters between 95 and 99.
+
+### Next iteration
+
+1. Re-derive the whole status table: sweep every roster 1-100 against the pinned jar and record the
+   per-seed fail lists, so targeting is based on measurements taken under one known configuration.
+2. Then resume fixes with the fewest-fails rule, re-running the affected roster AND at least two
+   previously-passing rosters after every change, so a regression cannot hide again.
+3. The five verified-but-unlanded 1:1 corrections (ITER50-54, plus the chain-push accumulation from
+   ITER56) should be re-evaluated against this corrected baseline — some may now show a signal.
+
+Jar pinned for the record: built 2026-08-15 00:44 from `ffb` HEAD `f5d83384f` plus the six gated-logging
+files. Tree clean; no engine change this iteration.
