@@ -1468,3 +1468,43 @@ comparison lands the exact step where the two sequences part, which is what this
 value stream is useless here because the values coincide across the divergence.
 
 Baseline unchanged: `goblin` 24/25. No engine changes this iteration.
+
+## ITER30 — goblin seed 16 ISOLATED: one dodge roll, same dice, opposite outcome
+
+Fixed the caller-comparison tool from ITER29 (the Java frames live in the `FFB_DICE_DEEP` capture,
+the Rust steps in the `FFB_DRIVE_TRACE` capture — they must be joined across the two logs) and it
+lands the divergence exactly.
+
+**Recipe, worth keeping:** run the seed twice, once with `FFB_TRACE=1 FFB_DICE_TRACE=1
+FFB_DICE_DEEP=1` and once with `FFB_TRACE=1 FFB_DRIVE_TRACE=1 FFB_DICE_TRACE=1`; join on the die
+position; take the Java frame as the first entry in the `from=` chain that is neither `DiceRoller`
+nor `Fortuna`, and the Rust step as the nearest preceding `DRIVE step=`.
+
+```
+   85  java d6=5  StepMoveDodge.dodge                 rust d6=5  MoveDodge     ✓
+   86  java d6=2  StepMoveDodge.dodge                 rust d6=2  MoveDodge     ✓
+   87  java d6=3  StepMoveDodge.dodge                 rust d6=3  MoveDodge     ✓
+   88  java d6=6  InjuryTypeDropDodge.handleInjury    rust d6=6  ReallyStupid  ← FIRST DIVERGENCE
+   89  java d6=5  InjuryTypeDropDodge.handleInjury    rust d6=5  BlockRoll
+   90  java d6=3  InjuryTypeDropDodge.handleInjury    rust d6=3  ReallyStupid
+   91  java d6=4  InjuryTypeDropDodge.handleInjury    rust d6=4  BlockRoll
+```
+
+Everything matches through die 87. On the **third dodge (die 87 = 3)** Java **fails** — falls into
+`InjuryTypeDropDodge` and rolls armour (88/89) then injury (90/91) — while Rust **succeeds** and
+carries straight on to the next activation. The dodging player is `home_01`, the `goblin.troll`.
+
+That single failed dodge is the whole seed: it is what KOs `a03` in Java, which is why Java has one
+fewer available player, ends the away turn an activation early, and diverges from there.
+
+**Next iteration — compare the dodge computation directly**, not the dice. BB2020 dodge is
+`d6 + 1 − (opposing tackle zones on the destination square)` against the dodger's AG target, so the
+two engines disagree on either the AG target for `goblin.troll` or the tackle-zone count on that
+square. Both are cheap to dump: add a gated trace to `step_move_dodge.rs` printing player, from/to
+square, AG target, modifier list and total, and compare against Java's
+`mechanics/bb2020/DodgeMechanic` (and note `preventStuntyDodgeModifier` is one of the properties that
+differs by edition — `Chainsaw`, `Bombardier` and `Swoop` carry it in BB2020, and the goblin roster
+has a Chainsaw Looney and a Bombardier, so an edition-agnostic property lookup could be reaching the
+dodge modifiers).
+
+Baseline unchanged: `goblin` 24/25. No engine changes this iteration.
