@@ -71,6 +71,40 @@ Two drafting details worth knowing:
   (`37733` = Renegade Rat Ogre), so an id-based check silently missed them and the shared Big-Guy
   pool went unenforced.
 
-## Status (update every iteration)
+## Status — 🏁 **30/30 GREEN on the first sweep** (2026-08-14)
 
-Scouting and per-roster results are appended below as the campaign runs.
+**No engine fixes were needed.** Once bb2020 was running rule-legal drafted teams against the
+matching `Parity20` XML, every roster passed immediately. Scouted at 1-25 (all 0), then the real
+gate at 1-100 `--no-abort`:
+
+| | | | | |
+|---|---|---|---|---|
+| amazon 0 | chaos 0 | chaos_dwarf 0 | chaos_pact 0 | dark_elf 0 |
+| dark_elf_league_fumbbl 0 | dwarf 0 | elf 0 | goblin 0 | halfling 0 |
+| high_elf 0 | human 0 | khemri 0 | khemri_fumbbl 0 | lizardman 0 |
+| necromantic 0 | nippon 0 | norse 0 | nurgle 0 | ogre 0 |
+| orc 0 | renegades 0 | skaven 0 | slann 0 | slann_fumbbl 0 |
+| undead 0 | underworld 0 | vampire 0 | wood_elf 0 | **lineman 0** |
+
+29 rosters + the `lineman` fixture = **30 matchups, all 100/100**.
+
+### Why it was already green
+BB2020 and BB2025 share Java's `mixed/` classes for most behaviour (`RulesCollection.Rules.BB2020`
+and `BB2025` both extend `COMMON`, and the bulk of the step/skill code is registered for both), so
+the ~40 engine fixes from the bb2025 campaign and the ~20 from bb2016 had already hardened almost
+every path bb2020 exercises. The only thing missing was the **data**: no drafted teams and no
+`Parity20` XML, which is why nobody could tell.
+
+### Regression evidence for the same commit
+- Existing bb2016/bb2025 XML: **zero** modifications from the generator run (`git status` shows all
+  261 changed files as new/untracked bb2020 artifacts) — the generator is idempotent per edition, and
+  `java_team_id`'s new arm only fires for `bb2020`.
+- Re-ran 1-100 in BOTH other editions for lineman, human, goblin, halfling, vampire, ogre,
+  renegades: **0 fails everywhere**.
+- `cargo test -p ffb-engine` **7115/0**.
+
+### Caveat worth recording
+The Java-side bb2020 XML (29 rosters + 58 team files) lives in the `ffb` harness repo, which sits on
+a local branch `t3-phase2-wip` with **no upstream configured** — those generated files are untracked
+there. Anyone reproducing this needs to re-run `python scripts/gen_java_parity_data.py` after
+checking out `ffb-rust`.

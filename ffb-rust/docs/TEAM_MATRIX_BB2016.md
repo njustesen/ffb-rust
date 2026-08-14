@@ -87,7 +87,11 @@ Every roster re-run 1-100 `--no-abort`, 0 fails: lineman, amazon, chaos, chaos_d
 - **bb2016: 30/30 GREEN** (this doc).
 - **bb2025: 30/30 GREEN** — all 30 re-run 1-100 `--no-abort` at 0 fails. The long-standing `ogre`
   red recorded on 2026-08-08 was STALE: intervening fixes cleared it.
-- **bb2020: not a matrix.** Both engines support exactly three rulesets (BB2016/BB2020/BB2025);
+- **bb2020: 30/30 GREEN (2026-08-14)** — see `docs/PARITY_BB2020_CAMPAIGN.md`. Once bb2020 ran
+  rule-legal drafted teams against matching `Parity20` XML, all 29 rosters + lineman passed 1-100 on
+  the first sweep with NO engine fixes; BB2020 shares Java's `mixed/` classes with BB2025, so the
+  earlier campaigns had already hardened its paths. Superseded note below:
+- ~~**bb2020: not a matrix.**~~ Both engines support exactly three rulesets (BB2016/BB2020/BB2025);
   bb2020 runs in the harness and has 29 rosters, but there are no `data/teams/bb2020/` specs, so
   `make_team` falls back to the legacy first-11-by-(quantity,cost) builder rather than the audited
   rule-legal drafts. Spot-checks are clean (lineman 0/100, human 0/30, and 0/25 each for orc, dwarf,
