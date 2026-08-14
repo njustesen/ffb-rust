@@ -2846,3 +2846,61 @@ recorded in ITER57, and must re-run at least two previously-passing rosters. No 
 on the strength of an earlier turn's measurement.
 
 Temporary worktrees used for the bisect were removed; both repos are clean.
+
+## ITER59 — ✅ MYSTERY SOLVED: I destroyed the harness fix myself. Five rosters restored.
+
+The lost greens are explained, and the cause was mine.
+
+**The symptom.** `lineman` bb2020 seed 26 failed at **step 0** — and seed 26 also appeared in `human`'s
+and `ogre`'s fail lists. Running it alone:
+
+```
+UNHANDLED_STEP: PRAYER turnMode=KICKOFF     ... 500 times
+```
+
+Java was STUCK on the prayer step until the iteration cap, so its log was garbage and the comparison
+failed at the first step. The prayer is `IRON_MAN` (confirmed by a Rust-side probe, since both engines
+roll the same): a `DialogPlayerChoiceParameter` with **minSelects=1**. `ParityRunner`'s PLAYER_CHOICE
+arm declined it with an empty selection, which is invalid, so the dialog re-fired forever.
+
+**Why it appeared mid-campaign.** Rust's agent has had the correct arm all along
+(`random_agent.rs`, the IRON_MAN / KNUCKLE_DUSTERS / BLESSED_STATUE_OF_NUFFLE case picking the lowest
+shirt number), and its comment even says *"ParityRunner's PLAYER_CHOICE arm mirrors this exact rule"*.
+It had no counterpart in `ParityRunner` — because the Java half existed only as an **uncommitted local
+edit**, and in ITER45 and ITER56 I ran `git checkout -- ParityRunner.java` to revert unrelated probes.
+That discarded the campaign's prayer arm along with my probe. The next jar rebuild baked in its
+absence, and five rosters silently stopped being green.
+
+This retro-explains ITER56-58 completely: the code and jar source really were identical, the earlier
+readings really were valid, and the unrecoverable variable really was the jar — because the source
+behind it had been quietly deleted by my own revert.
+
+**The fix**, restored and now **committed** in the `ffb` repo (`c79ad3b67`) rather than left in the
+working tree, so no future `git checkout --` can destroy it again: the three mandatory Prayer-to-Nuffle
+dialogs are answered with the lowest player number, mirroring the Rust rule. Lowest-nr rather than
+min-(x,y) because these prayers choose among RESERVES, which have no board coordinates.
+
+**Result — every sweep run this turn, against the rebuilt jar:**
+
+| matchup | before | **after** |
+|---|---|---|
+| `lineman` bb2020 | 99/100 | **100/100** ✅ |
+| `human` bb2020 | 95/100 | **100/100** ✅ |
+| `underworld` bb2020 | 99/100 | **100/100** ✅ |
+| `chaos_pact` bb2020 | 97/100 | **100/100** ✅ |
+| `renegades` bb2020 | 96/100 | **100/100** ✅ |
+| `ogre` bb2020 | 95/100 | 99/100 |
+| `goblin` bb2020 | 95/100 | 95/100 |
+| `lineman` bb2016 / bb2025 | 100/100 | **100/100** ✅ |
+
+`cargo test --workspace` 14,447 passed / 0 failed. The Rust tree is clean — this turn's only change is
+the harness commit.
+
+**Lesson recorded**: never `git checkout -- <file>` to revert a probe in a file that carries
+uncommitted campaign work. Add the probe with a marker and remove exactly that, or commit the
+pre-existing work first. The `ffb` tree still holds five other uncommitted files
+(`Xoshiro256StarStar`, `HeadlessFantasyFootballServer`, `HeadlessGameSetup`, `StatsMechanic`,
+`StepGoForIt`, `StepPassBlock`) that are load-bearing and equally destructible — `HeadlessGameSetup`
+is required for the build to even compile.
+
+**Status: 5 of 30 bb2020 matchups green.** Next target by fewest fails: `ogre` (1).
