@@ -27,12 +27,30 @@ pub fn start_game_sequence_for(rules: ffb_model::enums::Rules) -> Vec<SequenceSt
         ]
     };
     let mut seq = pregame;
-    seq.extend(kickoff_tail());
+    seq.extend(kickoff_tail(rules));
     seq
 }
 
-fn kickoff_tail() -> Vec<SequenceStep> {
-    vec![
+/// The parity harness's flattened kickoff tail.
+///
+/// BB2020 additionally needs the two GOTO labels Java's `generator/mixed/Kickoff` threads onto
+/// APPLY_KICKOFF_RESULT, plus the labelled `BLITZ_TURN` / `KICKOFF_ANIMATION` / `END_KICKOFF`
+/// targets and the jump that skips the blitz turn on the normal path — BB2020's kickoff table maps
+/// roll 10 to BLITZ, whose handler does `GOTO_LABEL fGotoLabelOnBlitz`. Without them the goto target
+/// is the empty string and the whole step stack drains.
+fn kickoff_tail(rules: ffb_model::enums::Rules) -> Vec<SequenceStep> {
+    use ffb_model::enums::Rules;
+    use crate::step::generator::sequence::labels;
+    let bb2020 = rules == Rules::Bb2020;
+    let akr_params = if bb2020 {
+        vec![
+            StepParameter::GotoLabelOnEnd(labels::END_KICKOFF.into()),
+            StepParameter::GotoLabelOnBlitz(labels::BLITZ_TURN.into()),
+        ]
+    } else {
+        Vec::new()
+    };
+    let mut seq = vec![
         SequenceStep::new(StepId::CoinChoice),
         SequenceStep::new(StepId::ReceiveChoice),
         SequenceStep::new(StepId::InitKickoff),
@@ -41,7 +59,7 @@ fn kickoff_tail() -> Vec<SequenceStep> {
         SequenceStep::new(StepId::Kickoff),
         SequenceStep::new(StepId::KickoffScatterRoll),
         SequenceStep::new(StepId::KickoffResultRoll),
-        SequenceStep::new(StepId::ApplyKickoffResult),
+        SequenceStep::with_params(StepId::ApplyKickoffResult, akr_params),
         // Java Kickoff generator: KICKOFF_ANIMATION between APPLY_KICKOFF_RESULT and
         // CATCH_SCATTER_THROW_IN — it sets ballInPlay(true) and publishes the CATCH_KICKOFF
         // mode. Omitting it left ball_in_play false for the entire drive, which silently
@@ -52,7 +70,22 @@ fn kickoff_tail() -> Vec<SequenceStep> {
         // Java: a second CATCH_SCATTER_THROW_IN resolves the post-touchback ball placement.
         SequenceStep::new(StepId::CatchScatterThrowIn),
         SequenceStep::new(StepId::EndKickoff),
-    ]
+    ];
+    if bb2020 {
+        // Java: `sequence.jump(KICKOFF_ANIMATION); sequence.add(BLITZ_TURN, IStepLabel.BLITZ_TURN);
+        //        sequence.add(KICKOFF_ANIMATION, IStepLabel.KICKOFF_ANIMATION); ...
+        //        sequence.add(END_KICKOFF, IStepLabel.END_KICKOFF);`
+        let anim = seq.iter().position(|st| st.step_id == StepId::KickoffAnimation)
+            .expect("kickoff_tail contains KickoffAnimation");
+        seq[anim].label = Some(labels::KICKOFF_ANIMATION.into());
+        seq.insert(anim, SequenceStep::labelled(StepId::BlitzTurn, labels::BLITZ_TURN, Vec::new()));
+        seq.insert(anim, SequenceStep::with_params(StepId::GotoLabel,
+            vec![StepParameter::GotoLabel(labels::KICKOFF_ANIMATION.into())]));
+        if let Some(last) = seq.last_mut() {
+            last.label = Some(labels::END_KICKOFF.into());
+        }
+    }
+    seq
 }
 
 /// Mirrors Java `com.fumbbl.ffb.server.step.generator.bb2025.EndTurn.pushSequence`.

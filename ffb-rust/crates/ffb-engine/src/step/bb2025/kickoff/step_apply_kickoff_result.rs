@@ -195,7 +195,15 @@ impl StepApplyKickoffResult {
             KickoffResult::Charge           => self.handle_charge(game, rng),
             KickoffResult::DodgySnack       => self.handle_dodgy_snack(game, rng),
             KickoffResult::PitchInvasion    => self.handle_pitch_invasion(game, rng),
-            // Non-BB2025 variants (should not reach here in BB2025 games):
+            // BB2020 roll 10. Java `bb2020/StepApplyKickoffResult.handleBlitz`:
+            //   setAnimation(KICKOFF_BLITZ); getResult().setNextAction(GOTO_LABEL, fGotoLabelOnBlitz)
+            KickoffResult::Blitz if game.rules == ffb_model::enums::Rules::Bb2020 => {
+                StepOutcome::goto(&self.goto_label_on_blitz.clone())
+            }
+            // BB2020 roll 11. Java `bb2020/StepApplyKickoffResult.handleOfficiousRef`.
+            KickoffResult::OficiousRef if game.rules == ffb_model::enums::Rules::Bb2020 =>
+                self.handle_officious_ref(game, rng),
+            // Variants no supported edition rolls here:
             KickoffResult::Blitz            |
             KickoffResult::Riot             |
             KickoffResult::PerfectDefence   |
@@ -206,7 +214,117 @@ impl StepApplyKickoffResult {
         }
     }
 
-    // ── GetTheRef ─────────────────────────────────────────────────────────────
+
+    // ── OficiousRef (BB2020) ──────────────────────────────────────────────────
+
+    /// 1:1 translation of `bb2020/StepApplyKickoffResult.handleOfficiousRef` and its `insertSteps`.
+    ///
+    /// Each team rolls a d6 (`DiceRoller.rollThrowARock`) and adds its fan factor; the team that
+    /// does NOT win has one random on-field player singled out by the ref (both teams on a tie).
+    /// That player rolls a d6: a 1 ejects them, anything else stuns them.
+    fn handle_officious_ref(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        use crate::step::framework::SequenceStep;
+        let roll_home = rng.d6();
+        let roll_away = rng.d6();
+        // Java: `gameResult.getTeamResultHome().getFanFactor()` — the fan factor, not the modifier.
+        let total_home = roll_home + game.game_result.home.fan_factor;
+        let total_away = roll_away + game.game_result.away.fan_factor;
+
+        // Java: `parametersToConsume = {{ add(END_TURN); add(CATCH_SCATTER_THROW_IN_MODE);
+        //        add(FOULER_HAS_BALL); }}`
+        let params_to_consume = vec![
+            std::mem::discriminant(&StepParameter::EndTurn(false)),
+            std::mem::discriminant(&StepParameter::CatchScatterThrowInMode(
+                ffb_model::model::catch_scatter_throw_in_mode::CatchScatterThrowInMode::CatchBomb)),
+            std::mem::discriminant(&StepParameter::FoulerHasBall(false)),
+        ];
+
+        let mut targeted_ids: Vec<String> = Vec::new();
+        let mut stun_params: Vec<StepParameter> = Vec::new();
+        let mut eject_seqs: Vec<Vec<SequenceStep>> = Vec::new();
+
+        // Java: `if (totalAway >= totalHome)` → a HOME player is targeted.
+        if total_away >= total_home {
+            if let Some(pid) = self.random_player_on_field(game, rng, true) {
+                targeted_ids.push(pid.clone());
+                match self.officious_ref_insert_steps(game, rng, &pid, &params_to_consume) {
+                    Ok(params) => stun_params.extend(params),
+                    Err(seq) => eject_seqs.push(seq),
+                }
+            }
+        }
+        // Java: `if (totalHome >= totalAway)` → an AWAY player is targeted.
+        if total_home >= total_away {
+            if let Some(pid) = self.random_player_on_field(game, rng, false) {
+                targeted_ids.push(pid.clone());
+                match self.officious_ref_insert_steps(game, rng, &pid, &params_to_consume) {
+                    Ok(params) => stun_params.extend(params),
+                    Err(seq) => eject_seqs.push(seq),
+                }
+            }
+        }
+
+        // Java: `sequence.add(SET_ACTING_TEAM, TEAM_ID = game.getActingTeam().getId())` — restores
+        // the acting team after the ref's interruption.
+        let acting_team_id = if game.home_playing {
+            game.team_home.id.clone()
+        } else {
+            game.team_away.id.clone()
+        };
+        let mut outcome = StepOutcome::next()
+            .push_seq(vec![SequenceStep::with_params(
+                StepId::SetActingTeam, vec![StepParameter::TeamId(acting_team_id)])])
+            .with_event(GameEvent::KickoffOfficiousRef {
+                roll_home,
+                roll_away,
+                player_ids: targeted_ids,
+            });
+        for seq in eject_seqs {
+            outcome = outcome.push_seq(seq);
+        }
+        // Java: `publishParameters(UtilServerInjury.stunPlayer(this, player, apothecaryMode))`
+        for p in stun_params {
+            outcome = outcome.publish(p);
+        }
+        outcome
+    }
+
+    /// Java: `insertSteps(game, playerId, parametersToConsume, sequence, apothecaryMode)` —
+    /// `Ok(params)` for the stun branch, `Err(sequence)` for the `roll == 1` ejection branch.
+    fn officious_ref_insert_steps(
+        &self,
+        game: &mut Game,
+        rng: &mut GameRng,
+        player_id: &str,
+        params_to_consume: &[std::mem::Discriminant<StepParameter>],
+    ) -> Result<Vec<StepParameter>, Vec<crate::step::framework::SequenceStep>> {
+        use crate::step::framework::SequenceStep;
+        use crate::step::generator::labels;
+        let roll = rng.d6();
+        game.report_list.add(
+            ffb_model::report::bb2020::report_officious_ref_roll::ReportOfficiousRefRoll::new(
+                roll, player_id.to_owned()));
+        if roll == 1 {
+            // Java: SET_ACTING_PLAYER_AND_TEAM, then EJECT_PLAYER with OFFICIOUS_REF=true (without
+            // it `SneakyGitEjectPlayerModifier` cannot tell a ref ejection from a foul ban), then a
+            // CONSUME_PARAMETER labelled END_FOULING.
+            Err(vec![
+                SequenceStep::with_params(StepId::SetActingPlayerAndTeam,
+                    vec![StepParameter::PlayerId(player_id.to_owned())]),
+                SequenceStep::with_params(StepId::EjectPlayer, vec![
+                    StepParameter::GotoLabelOnEnd(labels::END_FOULING.to_owned()),
+                    StepParameter::OfficiousRef(true),
+                ]),
+                SequenceStep::labelled(StepId::ConsumeParameter, labels::END_FOULING,
+                    vec![StepParameter::ParametersToConsume(params_to_consume.to_vec())]),
+            ])
+        } else {
+            Ok(util_server_injury::stun_player(game, player_id))
+        }
+    }
+
+    // ── GetTheRef ──────────────────────────────────────────────────────────────
+
 
     fn handle_get_the_ref(&self, game: &mut Game) -> StepOutcome {
         // Java: InducementTypeFactory.allTypes() → filter AVOID_BAN → computeIfAbsent + setValue+1

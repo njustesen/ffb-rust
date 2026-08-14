@@ -70,13 +70,13 @@ impl StepKickoffResultRoll {
                 let d1 = rng.d6();
                 let d2 = rng.d6();
                 self.kickoff_roll = vec![d1, d2];
-                self.kickoff_result = Some(kickoff_result_for_roll(d1 + d2));
+                self.kickoff_result = Some(kickoff_result_for_roll_in(game.rules, d1 + d2));
             } else if overtime_option == "randomBlitzOrSolidDefence" {
                 let valid_rolls: [[i32; 2]; 6] = [[1, 3], [2, 2], [3, 1], [6, 4], [5, 5], [4, 6]];
                 let index = (rng.d6() - 1) as usize;
                 let pair = valid_rolls[index.min(5)];
                 self.kickoff_roll = vec![pair[0], pair[1]];
-                self.kickoff_result = Some(kickoff_result_for_roll(pair[0] + pair[1]));
+                self.kickoff_result = Some(kickoff_result_for_roll_in(game.rules, pair[0] + pair[1]));
             } else if overtime_option == "blitz" {
                 // Java: com.fumbbl.ffb.kickoff.bb2025.KickoffResult.CHARGE — BB2025 renamed the
                 // "Blitz" kickoff result to "Charge"; the OVERTIME_KICK_OFF_BLITZ option name is
@@ -89,7 +89,7 @@ impl StepKickoffResultRoll {
                 let d1 = rng.d6();
                 let d2 = rng.d6();
                 self.kickoff_roll = vec![d1, d2];
-                self.kickoff_result = Some(kickoff_result_for_roll(d1 + d2));
+                self.kickoff_result = Some(kickoff_result_for_roll_in(game.rules, d1 + d2));
             }
         }
 
@@ -102,9 +102,28 @@ impl StepKickoffResultRoll {
     }
 }
 
-/// BB2025 kickoff event table mapping (2d6 → KickoffResult).
-/// Mirrors Java `com.fumbbl.ffb.kickoff.bb2025.KickoffResultMapping`.
-fn kickoff_result_for_roll(roll: i32) -> KickoffResult {
+/// Kickoff event table mapping (2d6 → KickoffResult), per edition.
+///
+/// Java has one `KickoffResultMapping` per `@RulesCollection`; BB2020's differs from BB2025's on
+/// exactly two rolls, everything else is identical:
+///
+/// | roll | `kickoff/bb2020/KickoffResultMapping` | `kickoff/bb2025/KickoffResultMapping` |
+/// |------|---------------------------------------|---------------------------------------|
+/// | 10   | `BLITZ`                               | `CHARGE`                              |
+/// | 11   | `OFFICIOUS_REF`                       | `DODGY_SNACK`                         |
+///
+/// Both replacements happen to draw the same dice SHAPE as the BB2025 event they displaced
+/// (`StepBlitzTurn` opens with a d3 just like Charge; Officious Ref's d6/d6/d11/d6 matches Dodgy
+/// Snack), so using the BB2025 table for a BB2020 game kept the shared dice stream aligned and
+/// diverged only the board — which is why it survived so long undetected.
+fn kickoff_result_for_roll_in(rules: ffb_model::enums::Rules, roll: i32) -> KickoffResult {
+    if rules == ffb_model::enums::Rules::Bb2020 {
+        match roll {
+            10 => return KickoffResult::Blitz,
+            11 => return KickoffResult::OficiousRef,
+            _ => {}
+        }
+    }
     match roll {
         2  => KickoffResult::GetTheRef,
         3  => KickoffResult::TimeOut,
@@ -122,8 +141,42 @@ fn kickoff_result_for_roll(roll: i32) -> KickoffResult {
     }
 }
 
+/// The BB2025 table — the historical entry point, kept for the existing tests.
+#[cfg(test)]
+fn kickoff_result_for_roll(roll: i32) -> KickoffResult {
+    kickoff_result_for_roll_in(ffb_model::enums::Rules::Bb2025, roll)
+}
+
 #[cfg(test)]
 mod tests {
+    /// Java has one `KickoffResultMapping` per edition. BB2020's rolls 10/11 are BLITZ and
+    /// OFFICIOUS_REF where BB2025's are CHARGE and DODGY_SNACK; every other roll is shared.
+    /// Using the BB2025 table for a BB2020 game applied the wrong kickoff event outright, and
+    /// because each replacement draws the same dice SHAPE as the event it displaced (StepBlitzTurn
+    /// opens with a d3 like Charge; Officious Ref's d6/d6/d11/d6 matches Dodgy Snack) the dice
+    /// stream stayed aligned and only the board diverged (bb2020 human seed 23 i=138).
+    #[test]
+    fn bb2020_and_bb2025_kickoff_tables_differ_only_on_rolls_10_and_11() {
+        use ffb_model::enums::Rules;
+        for roll in 2..=12 {
+            let bb2020 = kickoff_result_for_roll_in(Rules::Bb2020, roll);
+            let bb2025 = kickoff_result_for_roll_in(Rules::Bb2025, roll);
+            match roll {
+                10 => {
+                    assert_eq!(bb2020, KickoffResult::Blitz);
+                    assert_eq!(bb2025, KickoffResult::Charge);
+                }
+                11 => {
+                    assert_eq!(bb2020, KickoffResult::OficiousRef);
+                    assert_eq!(bb2025, KickoffResult::DodgySnack);
+                }
+                _ => assert_eq!(bb2020, bb2025, "roll {roll} must be identical across editions"),
+            }
+        }
+        // BB2016 shares the BB2025 arm of this helper (it has its own step file).
+        assert_eq!(kickoff_result_for_roll_in(Rules::Bb2016, 10), KickoffResult::Charge);
+    }
+
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::{StepAction, StepParameter};

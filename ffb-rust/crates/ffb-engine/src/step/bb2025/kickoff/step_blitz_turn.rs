@@ -52,7 +52,19 @@ impl Step for StepBlitzTurn {
 }
 
 impl StepBlitzTurn {
-    fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    fn execute_step(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java routes by @RulesCollection: `bb2020/StepBlitzTurn` is a materially different class
+        // from `bb2025/kickoff/StepBlitzTurn` — it rolls a d3 for the activation LIMIT
+        // (`limit = roll + 3`), records a `BlitzTurnState(limit, availablePlayers)`, and reports
+        // ACTIVATIONS_EXHAUSTED when the blitzing team has no active players. BB2025's has none of
+        // that. Only BB2020's kickoff table can produce a BLITZ result, so this step is reachable
+        // solely through the BB2020 path — and taking the BB2025 body there cost the d3
+        // (bb2020 human seed 23: Java rng 10 = `StepBlitzTurn.executeStep:87` d3=3; Rust went
+        // straight to the d8 ball bounce).
+        if game.rules == ffb_model::enums::Rules::Bb2020 {
+            let mut bb2020 = crate::step::bb2020::step_blitz_turn::StepBlitzTurn::new();
+            return bb2020.start(game, rng);
+        }
         if game.turn_mode == TurnMode::Blitz {
             // Second entry: blitz turn is over, return to kickoff.
             game.turn_mode = TurnMode::Kickoff;
@@ -82,6 +94,46 @@ impl StepBlitzTurn {
 
 #[cfg(test)]
 mod tests {
+    /// Java routes StepBlitzTurn by @RulesCollection and BB2020's class is materially different:
+    /// it rolls a d3 for the activation limit (`limit = roll + 3`) and records a BlitzTurnState.
+    /// Only BB2020's kickoff table produces a BLITZ result, so running the BB2025 body there
+    /// silently dropped that d3 and desynced the shared dice stream from the very first kickoff
+    /// (bb2020 human seed 23: Java rng 10 = `StepBlitzTurn.executeStep:87` d3).
+    #[test]
+    fn bb2020_blitz_turn_rolls_the_activation_limit_d3() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerState, PS_STANDING};
+        use ffb_model::types::FieldCoordinate;
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        game.home_playing = true;
+        game.team_home.players.push(Player {
+            id: "h1".into(), name: "h1".into(), nr: 1, ..Default::default() });
+        game.field_model.set_player_coordinate("h1", FieldCoordinate::new(5, 5));
+        // Java counts `getPlayerState(player).isActive()`; without the active bit the team has no
+        // available players and Java's `availablePlayers == 0` arm skips the roll entirely.
+        game.field_model.set_player_state("h1", PlayerState::new(PS_STANDING).change_active(true));
+
+        let mut step = StepBlitzTurn::new();
+        let mut rng = GameRng::new(11);
+        step.start(&mut game, &mut rng);
+
+        assert_eq!(rng.call_count, 1, "BB2020 rolls exactly one d3 for the activation limit");
+        assert_eq!(game.turn_mode, TurnMode::Blitz);
+        let st = game.blitz_turn_state.as_ref().expect("BB2020 records a BlitzTurnState");
+        assert!(st.limit >= 4 && st.limit <= 6, "limit = d3 + 3, got {}", st.limit);
+    }
+
+    /// The BB2025 body must stay dice-free — it has no activation limit at all.
+    #[test]
+    fn bb2025_blitz_turn_rolls_nothing() {
+        let mut game = make_game();
+        let mut step = StepBlitzTurn::new();
+        let mut rng = GameRng::new(11);
+        step.start(&mut game, &mut rng);
+        assert_eq!(rng.call_count, 0);
+        assert!(game.blitz_turn_state.is_none());
+    }
+
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::StepAction;

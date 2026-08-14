@@ -666,3 +666,46 @@ revert-on-regression rule. Baseline re-confirmed at `PARITY: 90/100`.
 
 Kept from this iteration: nothing in the engine. The `FFB_UNHANDLED_DUMP` harness probe from ITER10
 and the `FFB_KICK_TRACE`-style dispatch probing technique are what made the diagnosis quick.
+
+## ITER12 — human 90→96/100: the BB2020 kickoff table, landed properly
+
+Lands ITER11's diagnosis (BB2020 rolls 10/11 are `BLITZ`/`OFFICIOUS_REF`, not BB2025's
+`CHARGE`/`DODGY_SNACK`) together with the two things that made the first attempt regress.
+
+**What ITER11 got wrong.** It hand-patched labels onto `kickoff_tail()` and stopped there; the
+`BLITZ` result then reached a `StepBlitzTurn` that never rolled its d3, so the dice stream desynced
+from the very first kickoff. The ball drift (`b12,8` vs `b10,0`) was that missing die, not a step
+ordering problem. The Rust dice trace made it obvious once compared position by position:
+
+```
+JAVA  rng=10 d3=3 from=...StepBlitzTurn.executeStep:87    rng=11 d8=2 (bounce)
+RUST  pos=10 sides=8                                       ← no d3 at all
+```
+
+**Three changes, all edition-gated:**
+
+1. `bb2025/kickoff/step_kickoff_result_roll.rs` — `kickoff_result_for_roll_in(rules, roll)` returns
+   `Blitz`/`OficiousRef` for BB2020 on rolls 10/11 and the BB2025 result otherwise. Test
+   `bb2020_and_bb2025_kickoff_tables_differ_only_on_rolls_10_and_11` walks all of 2..=12.
+2. `bb2025/kickoff/step_blitz_turn.rs` — for BB2020 it delegates to
+   `bb2020::step_blitz_turn::StepBlitzTurn`, which is the real port of Java's
+   `@RulesCollection(BB2020)` class: a d3 for the activation limit (`limit = roll + 3`), a
+   `BlitzTurnState(limit, availablePlayers)`, and the ACTIVATIONS_EXHAUSTED report when the blitzing
+   team has no active players. BB2025's class has none of that. Tests
+   `bb2020_blitz_turn_rolls_the_activation_limit_d3` and `bb2025_blitz_turn_rolls_nothing`.
+   (This is not "routing to a staler file" — the BB2020 port was complete and simply unreachable,
+   and Java itself routes this step per `@RulesCollection`.)
+3. `bb2025/kickoff/step_apply_kickoff_result.rs` — `Blitz` gotos `goto_label_on_blitz`; `OficiousRef`
+   runs a fresh port of `handleOfficiousRef` + `insertSteps`, **including** the `roll == 1` ejection
+   branch (`SetActingPlayerAndTeam` → `EjectPlayer` with `OFFICIOUS_REF=true` → a
+   `ConsumeParameter` labelled `END_FOULING`) that ITER11 had left as a no-op.
+4. `sequences.rs` — `kickoff_tail(rules)` gives BB2020's `ApplyKickoffResult` the
+   `GOTO_LABEL_ON_END`/`GOTO_LABEL_ON_BLITZ` params and adds the labelled `BLITZ_TURN` /
+   `KICKOFF_ANIMATION` / `END_KICKOFF` targets plus the jump that skips the blitz turn on the normal
+   path — the exact shape of `generator/mixed/Kickoff.pushSequence`. Other editions keep the lighter
+   tail unchanged (BB2025 has no BLITZ result; BB2016 reroutes via StepSpectators).
+
+**Result:** human 90/100 → **96/100**. Gates: lineman bb2016 100/100, lineman bb2025 100/100,
+`cargo test --workspace` 14/14 suites ok.
+
+Remaining human fails: seeds 38, 58, 87, 99.
