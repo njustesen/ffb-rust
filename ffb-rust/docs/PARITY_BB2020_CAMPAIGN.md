@@ -1847,3 +1847,45 @@ move the player. Add a test asserting an AS lash-out with armour 12 / injury 8 l
 `KNOCKED_OUT`, not `STANDING`.
 
 Baseline unchanged: `underworld` 22/25. No engine changes this iteration.
+
+## ITER39 — underworld: the lash-out ARMOUR does not break in Rust
+
+Refines ITER38. A gated `FFB_AS_TRACE` on the lash-out (added, measured, reverted) reports the injury
+context straight after `handle_injury`:
+
+```
+AS_TRACE victim=home_02 ko=false cas=false armour_broken=false state_after=Some(1)
+AS_TRACE victim=home_03 ko=true  cas=false armour_broken=true  state_after=Some(1)
+```
+
+The first line is the seed-2 divergence. Java rolled **armour 6+6 = 12**, which breaks any AV in the
+game, then injury 3+5 = 8 = KO. Rust reports **`armour_broken=false`** for the same victim — so the
+KO never arises, and ITER38's "injury computed but not applied" reading was wrong: **the injury is
+not computed as a break in the first place.**
+
+(Note `state_after=Some(1)` = STANDING even on the `ko=true` line, so the state change being deferred
+past this point is normal in both engines and is NOT the bug.)
+
+**Also found, a genuine 1:1 discrepancy at this call site** (inert for these dice, so recorded rather
+than changed): the second constructor argument means different things in the two engines.
+
+```java
+// Java: InjuryTypeBlock(Mode mode, boolean allowAttackerChainsaw)
+UtilServerInjury.handleInjury(step, new InjuryTypeBlock(mode, false), ...)   // chainsaw NOT allowed
+```
+```rust
+// Rust: new(mode, roll_armour) -> new_with_chainsaw(mode, roll_armour, allow_attacker_chainsaw = true)
+let mut injury_type = InjuryTypeBlock::new(mode, true);                       // chainsaw ALLOWED
+```
+
+The faithful call is `InjuryTypeBlock::new_with_chainsaw(mode, /*roll_armour*/ true,
+/*allow_attacker_chainsaw*/ false)`. It does not affect this seed (the acting player carries no
+chainsaw) but it is wrong and should be corrected alongside the real fix.
+
+**Next iteration:** dump the armour computation for the lash-out victim on both sides — the victim's
+AV, the armour modifier list and total, and the roll — and compare. Rust's `InjuryTypeBlock` armour
+path takes `mode` (`DO_NOT_USE_MODIFIERS` vs `USE_MODIFIERS_AGAINST_TEAM_MATES`), which Java selects
+with `actingPlayer.isStandingUp() || actingPlayer.getTeam() != defender.getTeam()`; check Rust picks
+the same arm, and check `armour_with_modifiers` for the victim.
+
+Baseline unchanged: `underworld` 22/25. No engine changes this iteration.
