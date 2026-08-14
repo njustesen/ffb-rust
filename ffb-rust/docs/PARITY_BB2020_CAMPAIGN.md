@@ -2945,3 +2945,56 @@ wholesale. Continuing to test them one at a time has now cost six iterations for
 
 Verified after the revert, same turn: `lineman` bb2020 **100/100**, `human` bb2020 **100/100**. Tree
 clean. `ogre` remains 99/100, `goblin` 95/100.
+
+## ITER61 — the six-correction batch is NEUTRAL. Pile closed; do not re-try them individually.
+
+Ran the experiment ITER60 called for: applied all six recorded 1:1 corrections at once and measured
+seven rosters (700 games) in a single configuration.
+
+Applied together:
+1. pre-stand gate on sequences owning a `STAND_UP` step (`step_init_selecting.rs`);
+2. restore the OUTGOING acting player in `change_player_action` (`util_server_steps.rs`);
+3. Really Stupid reads/writes the per-activation `ActingPlayer.used_skills`
+   (`bb2020/really_stupid_behaviour.rs`);
+4. Foul Appearance defender resolution without the extra `is_selected() && is_committed()` filter
+   (`mixed/step_foul_appearance.rs`);
+5. pushback re-entry: remove-unlocked / keep-locked (`bb2025/block/step_pushback.rs`);
+6. pushback add: accumulate instead of clear (same file).
+
+**Result — every number measured with all six applied:**
+
+| roster | baseline | with all six |
+|---|---|---|
+| `lineman` | 100/100 | **100/100** |
+| `human` | 100/100 | **100/100** |
+| `underworld` | 100/100 | **100/100** |
+| `chaos_pact` | 100/100 | **100/100** |
+| `renegades` | 100/100 | **100/100** |
+| `ogre` | 99/100 | **99/100** |
+| `goblin` | 95/100 | **95/100** |
+
+Exactly neutral: no roster moved in either direction. They are also each verified against named Java
+lines and demonstrably non-regressive across 700 games — but "faithful and harmless" is not the bar
+this campaign sets. The rule is a 1:1 port **tied to a divergence, with a colocated regression test**,
+and none of these six is tied to a divergence any more: each was proposed as a cause and then shown by
+measurement not to be one.
+
+**Reverted, and the pile is now closed.** They are recorded here in full so no future iteration spends
+time rediscovering, re-applying or re-testing them. If a later divergence points at one of these code
+paths, the relevant correction can be lifted from this entry with its Java citation — but none of them
+should be re-tried speculatively.
+
+**New data**: `nurgle`'s first full 1-100 sweep is **86/100** (14 fails) — previously only ever measured
+on 1-25 (21/25). That is the true figure for the fewest-fails ordering.
+
+**Current status, all measured this turn against the pinned jar:**
+
+| green (5) | `lineman`, `human`, `underworld`, `chaos_pact`, `renegades` |
+|---|---|
+| close | `ogre` 99/100, `goblin` 95/100 |
+| far | `nurgle` 86/100 |
+| unmeasured at 1-100 | the remaining 21 rosters |
+
+Next target by fewest fails remains **`ogre` (1)** — the chain-push at seed 57, which ITER60 showed is
+about WHERE the chain is driven from, not the square bookkeeping. Tree clean; `lineman` re-verified at
+100/100 after the revert.
