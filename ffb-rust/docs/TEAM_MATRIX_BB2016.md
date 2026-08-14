@@ -82,3 +82,15 @@ pregame sequence should un-gate all 30 matchups to their first real in-drive fro
 ## 🏁 ALL 30 bb2016 MATCHUPS GREEN (ITER96)
 Every roster re-run 1-100 `--no-abort`, 0 fails: lineman, amazon, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl, dwarf, elf, goblin, halfling, high_elf, human, khemri, khemri_fumbbl, lizardman, necromantic, nippon, norse, nurgle, ogre, orc, renegades, skaven, slann, slann_fumbbl, underworld, undead, vampire, wood_elf.
 - ITER96 (**vampire 100/100 GREEN**): `INIT_BLOCKING` has no case in `ParityRunner.handleStep`, so the harness's `default:` arm injects `ClientCommandEndTurn` — the turn ENDS with no draw and no block. The agent now answers `BlockTarget` with `EndTurn` instead of picking a target.
+
+## Cross-edition status (verified 2026-08-14)
+- **bb2016: 30/30 GREEN** (this doc).
+- **bb2025: 30/30 GREEN** — all 30 re-run 1-100 `--no-abort` at 0 fails. The long-standing `ogre`
+  red recorded on 2026-08-08 was STALE: intervening fixes cleared it.
+- **bb2020: not a matrix.** Both engines support exactly three rulesets (BB2016/BB2020/BB2025);
+  bb2020 runs in the harness and has 29 rosters, but there are no `data/teams/bb2020/` specs, so
+  `make_team` falls back to the legacy first-11-by-(quantity,cost) builder rather than the audited
+  rule-legal drafts. Spot-checks are clean (lineman 0/100, human 0/30, and 0/25 each for orc, dwarf,
+  skaven, wood_elf, undead, chaos, goblin, halfling), but no sweep has ever been run. A real bb2020
+  campaign would start by drafting `data/teams/bb2020/team_<race>.json` and regenerating the
+  Java-side XML with `scripts/gen_java_parity_data.py`.
