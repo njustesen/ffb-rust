@@ -349,3 +349,52 @@ Find why the pushed Prayer sequence is dropped. Concrete checks, in order:
 
 Gates for this commit: bb2016 lineman **50/50 games match**, bb2025 lineman **50/50 games match**,
 `cargo test` ffb-engine **7115/0**, ffb-model **2783/0**.
+
+
+## ITER5 — the real structural cause found; routing REVERTED because it regressed
+
+ITER4's fix went into a file that **never runs**. `make_step_for` has no `Rules::Bb2020` arm at all,
+so `StepId::ApplyKickoffResult` falls through the default, whose `use crate::step::bb2025::kickoff::*`
+glob resolves to the **bb2025** step. `step/bb2020/step_apply_kickoff_result.rs` is dead code — the
+same stale-file trap as ITER1's hook-state panic, and lesson #1 in this very document. A gated print
+in the bb2020 `handle_cheering_fans` produced NO output, which is what exposed it.
+
+**The consequence is bigger than a prayer bug: bb2020 games run BB2025 kickoff rules.** The live
+bb2025 `handle_cheering_fans` grants the winner **extra offensive block assists** (the BB2025 rule);
+BB2020 grants a **Prayer to Nuffle**. The tables differ in membership too (BB2020 has Officious Ref
+where BB2025 has Charge / Dodgy Snack).
+
+Adding a `Rules::Bb2020` arm routing `ApplyKickoffResult` to the bb2020 file DID work mechanically —
+`FFB_DRIVE_TRACE` then showed `ApplyKickoffResult` → **`Prayer`** → `KickoffAnimation`, where before
+the Prayer step never appeared.
+
+**But it regressed human from 38/100 to 11/100, so it was REVERTED** per the campaign rule. The
+reason is the next finding:
+
+### Both `StepPrayer` implementations are stubs
+`step/bb2025/step_prayer.rs` and `step/bb2020/step_prayer.rs` both say:
+
+```
+// Stub: PrayerHandlerFactory not translated → treat as "no handler found" path.
+```
+
+So the Prayer step runs and does nothing. The 16 prayer **handlers** are fully ported under
+`crates/ffb-engine/src/inducements/bb2020/prayers/` (and `bb2025/`), and `PrayerFactory::for_roll`
+exists in `ffb-model` — but **`PrayerHandlerFactory` (roll → handler) was never translated**, so
+nothing dispatches to them. Routing the kickoff without that means bb2020 correctly *awards* a
+prayer and then correctly *fails to apply it*, which diverges in more places than the old wrong-rule
+behaviour did.
+
+### FRONTIER for ITER6 — land these TOGETHER, not separately
+1. Port `PrayerHandlerFactory` (`server/factory/mixed/PrayerHandlerFactory.java`) — the roll →
+   handler map, per edition.
+2. Make `StepPrayer` dispatch: `firstRun` → `handler.init_effect(...)`; the `else` branch →
+   `handler.apply_selection(...)`; no handler → `NEXT_STEP` (Java's shape, already documented in
+   the stub's comments).
+3. THEN re-add the `Rules::Bb2020 => ApplyKickoffResult` routing arm from this iteration
+   (the exact diff is in this commit's message).
+4. Expect the `BadHabitsHandler` d3 to appear at Java's rng 12, and re-sweep.
+
+Baseline restored after the revert: bb2020 human **38/100 passed**. Gates: bb2016 lineman
+**50/50 games match**, bb2025 lineman **50/50 games match**, `cargo test` ffb-engine **7115/0**,
+ffb-model **2783/0**.
