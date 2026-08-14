@@ -2652,3 +2652,41 @@ Once the defender-wiring fix lands and gives a signal, these should be re-applie
 TOGETHER against a full sweep, rather than continuing to discard them one at a time.
 
 Baseline unchanged and tree clean: `nurgle` 21/25.
+
+## ITER55 — gated `goblin`/`ogre` (neither was green), and `ogre` seed 57 is a pushback-square divergence
+
+**Gate first, and it mattered.** ITER49's re-scout showed `goblin` and `ogre` clean on seeds 1-25, and
+it would have been easy to count them green. Their 1-100 gates say otherwise:
+
+| roster | 1-25 | **1-100** |
+|---|---|---|
+| `goblin` | 25/25 | **95/100** (5 fails) |
+| `ogre` | 25/25 | **99/100** (seed 57) |
+
+A reminder that the campaign's VALIDITY GATE is the full 1-100 sweep — a clean 1-25 predicts nothing.
+
+**New protocol target: `ogre` (1 fail), ahead of `nurgle` (4).** Seed 57, step 132 (= `i=133`).
+Diffing every player's state at that step, exactly one differs:
+
+```
+a04   JAVA 12,9,Standing   |   RUST 13,9,Standing
+```
+
+Tracing it back, both engines agree at `i=132` with `a04` at `(13,8)` and the blitzer `h01` at
+`(12,7)`, and both consume the same four dice (rng 91 -> 95) during the blitz. So the dice and the
+block resolution agree; only where `a04` ends up differs, by one square in x.
+
+`a04` is an AWAY player moving during the HOME turn, so it moved by PUSHBACK. `(12,9)` is not a legal
+pushback square for an attacker at `(12,7)` against a defender at `(13,8)`, which means `a04` was not
+the primary defender — it was **chain-pushed** when the real defender was pushed into its square.
+
+The choice rule itself is not the suspect: Java's `ParityRunner.sendPushback` picks min x, ties by min
+y, and Rust's `choose_pushback_square` is a 1:1 of that with its own test. Java picked `(12,9)`, which
+has the LOWER x, so if Rust had been offered that square its own rule would have chosen it too.
+**Therefore Rust's offered option set differs** — the chain-push square computation, not the choice.
+
+**Next iteration**: dump the pushback squares Rust offers for this chain push and compare with the
+squares Java's `PushbackSquare`/`UtilServerPushback` generates for the same geometry. One instrumented
+run on seed 57 should show whether `(12,9)` is missing from Rust's set or an extra square displaces it.
+
+Baseline: `ogre` 99/100, `goblin` 95/100, `nurgle` 21/25. Tree clean; no engine change this iteration.
