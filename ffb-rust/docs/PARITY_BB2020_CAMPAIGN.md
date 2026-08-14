@@ -2523,3 +2523,45 @@ two fields (or a watch printing every write to them) will name the site in one r
 Take Root stickiness case the comment cites, since the fix must not reintroduce it.
 
 Baseline unchanged and tree clean: `nurgle` 21/25.
+
+## ITER52 — `nurgle` seed 2: three writers eliminated, the real question is where the failure label lands
+
+Continued ITER51 by tracing every write to the blitzer's state with a backtrace probe. Three writers
+exist, and this iteration establishes what each one does — correcting two earlier guesses.
+
+1. **`change_player_action` PRONE -> MOVING**: correct, matches Java's "show acting player as moving".
+2. **The `PS_STANDING` pre-stand in `step_init_selecting`**: fires here, confirmed by probe —
+   `PRESTAND player=away_02 action=Blitz has_free=false ma=4 base=Some(2) owns_stand_up=true`.
+   Gating it on `Blitz|Block` DOES suppress the write (the probe prints `owns_stand_up=true`), so
+   ITER50's gate was correct in itself — it just is not sufficient.
+3. **`change_player_action_to_none`**: does NOT run for this activation at all. Correlating the probes
+   shows no `TONONE old=away_02` after the `CPA ... action=Blitz` line — the three `TONONE` lines
+   ITER51 read were from other, MOVE activations of the same player, which is why their
+   `standing_up=false / old_ps=STANDING` looked wrong. **ITER51's "both inputs are wrong" reading is
+   retracted**: at the blitz activation the inputs are right
+   (`CPA player=away_02 action=Blitz changed=true pre_state=Some(3) was_prone=true`).
+
+With the pre-stand gated, the player stays MOVING and a **fourth** path stands it up:
+`StepStandUp::execute_step`. Adding the missing Java restore of the outgoing acting player (ITER51's
+other candidate) alongside the gate still leaves `a01` Standing, because `StepStandUp` runs before
+either could matter.
+
+**So the real question is why `StepStandUp` runs at all.** Java's failed Really Stupid gotos
+`END_BLOCKING`, which is placed AFTER `JUMP_UP`/`STAND_UP` in `generator/bb2020/Block:47-48`, so both
+are skipped. Rust's drive trace for this activation shows the goto happening — the stack drops from
+47 to 41, six steps consumed — and then `JumpUp` (41) and `StandUp` (40) run anyway. The labels
+themselves look right in the generators (`activation_sequence_builder.rs:119` passes
+`GotoLabelOnFailure(fl)` to `ReallyStupid`; `block.rs:66,70` pass the same `fl` to `JumpUp`/`StandUp`).
+So the failure label resolves to a point BEFORE the stand-up steps in Rust and AFTER them in Java.
+
+**Next iteration**: compare where `fl` lands. Dump the assembled Rust blitz sequence with its labels
+and find the index the failure label resolves to, then compare against the Java generator's ordering
+of `IStepLabel.END_BLOCKING` relative to `JUMP_UP`/`STAND_UP`. The fix is a sequence/label placement
+one, not a step-logic one — which also explains why two reasonable step-level fixes changed nothing.
+
+Both experimental changes (the pre-stand gate and the outgoing-player restore) were reverted again:
+each is defensible against the Java source, but neither moves a seed on its own and I am not
+committing behaviour changes with no measured effect. Both are recorded here for when the label fix
+lands and they can be evaluated with a real signal.
+
+Baseline unchanged and tree clean: `nurgle` 21/25.
