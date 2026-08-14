@@ -1312,3 +1312,42 @@ guarantees the new function cannot silently change any other skill.
 **Follow-up:** sweep the remaining skills whose Java `postConstruct` differs across editions — a
 mechanical diff of `skill/bb2016|bb2020|bb2025/*.java` — and add an arm for each. That is the likely
 source of several remaining failures (`halfling` is still 2/25, so it has at least one more).
+
+## ITER26 — the complete per-edition property table (13 skills, 37 arms)
+
+ITER25 fixed `RightStuff` and flagged the sweep. Extracted every divergence mechanically from
+`skill/bb2016|bb2020|bb2025/*.java` by parsing `registerProperty(NamedProperties.X)`:
+
+**13 skills whose Java `postConstruct` differs across editions:**
+`BallAndChain`, `Bombardier`, `Chainsaw`, `CloudBurster`, `HypnoticGaze`, `Leap`, `MonstrousMouth`,
+`PilingOn`, `Regeneration`, `RightStuff`, `SneakyGit`, `Stab`, `Swoop`.
+
+All 37 arms are now in `SkillId::properties_for`, generated from the extraction rather than
+transcribed. Highlights of what the union was getting wrong **for BB2020**:
+
+| skill | union wrongly grants BB2020 | truth |
+|---|---|---|
+| `PilingOn` | `canPileOnOpponent` | BB2020 registers **nothing** (BB2016-only property) |
+| `HypnoticGaze` | `canGazeDuringMove` | BB2016-only |
+| `MonstrousMouth` | `canPinPlayers`, `providesBlockAlternative` | BB2025-only |
+| `CloudBurster` | `passesAreNotIntercepted` | BB2025-only; BB2020 has `canForceInterceptionRerollOfLongPasses` |
+| `BallAndChain` | `forceFullMovement`, `grabOutsideBlock`, `flipSameTeamOpponentToOtherTeam` | BB2016-only |
+| `BallAndChain` | `preventSecureTheBallAction` | BB2025-only |
+| `Chainsaw` | `makesStrengthTestObsolete`, `needsNoDiceDecorations` | BB2016-only |
+
+**Roster counts are unchanged this iteration** (`chaos_pact` 25/25, `ogre` 25/25, `goblin` 24/25,
+`halfling` 2/25, `underworld` 22/25) — and that is expected: only `legal_throw_team_mate_targets`
+consumes `has_skill_property_in` so far. Every other site still asks the union. The table is correct,
+tested groundwork; converting consumers is what turns it into parity.
+
+Gates: `human` bb2020 100/100, `lineman` bb2016 100/100, `lineman` bb2025 100/100,
+`cargo test --workspace` 14/14 suites ok.
+
+Test `every_edition_divergent_skill_is_tabled` spot-checks one representative divergence per skill
+(both the positive and the negative), so a future edit cannot quietly drop one;
+`properties_for_falls_through_to_the_union_for_other_skills` still guards everything else.
+
+**Next:** convert consumers, highest-value first. `canPileOnOpponent` is the standout — BB2020 grants
+it to nobody, yet Rust's Piling On hook checks `hasUnusedSkillWithProperty(canPileOnOpponent)` through
+the union, so Rust may be offering Piling On in games where Java never can. `canGazeDuringMove` and
+the Ball & Chain / Chainsaw extras are the same shape.
