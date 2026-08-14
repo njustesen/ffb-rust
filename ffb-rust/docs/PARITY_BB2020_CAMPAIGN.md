@@ -2904,3 +2904,44 @@ pre-existing work first. The `ffb` tree still holds five other uncommitted files
 is required for the build to even compile.
 
 **Status: 5 of 30 bb2020 matchups green.** Next target by fewest fails: `ogre` (1).
+
+## ITER60 — `ogre` seed 57: the re-entry port lands correctly but the chain still differs
+
+Attacked `ogre` (1 fail, the protocol target) with ITER56's chain-push diagnosis in hand, now that the
+harness prayer fix means the surrounding sweeps are trustworthy again.
+
+**What was ported.** Java `StepPushback:137-145` walks the model's squares on re-entry, REMOVES every
+UNLOCKED one, and re-adds the coach's chosen square marked selected+locked — leaving earlier links'
+LOCKED squares in place. Then `:161` ADDs the new set. Rust kept every square on re-entry and then
+`clear()`ed the whole set before installing the new one, discarding earlier links. I ported both
+halves (remove-unlocked/keep-locked, then add rather than clear).
+
+**It did not fix the seed.** A probe shows the dialog still offers only the current defender's three
+squares:
+
+```
+PUSH rng=95 def=Some("away_05") squares=[(14,8) (14,9) (13,9)]      # Rust, after the port
+JPUSH all=[(14,7) (14,8) (14,9) (13,9) (12,9)] best=(12,9)          # Java, same push
+```
+
+So at the moment this dialog opens, Rust's field model holds no squares from the earlier link at all —
+they are gone before the re-entry pass runs, not lost by it. Rust does have per-link machinery
+(`pushback_stack`, `chain_pushed_player`, re-entry via `handle_command`), so the remaining difference
+is WHERE the chain is driven from, not whether the model accumulates. Reverted, since it moved nothing.
+
+**The unlanded-corrections pile is now six**, each verified against named Java source and each reverted
+for showing no effect alone:
+1. gate the `PS_STANDING` pre-stand on sequences owning a `STAND_UP` step (ITER50/52);
+2. restore the OUTGOING acting player in `change_player_action` (ITER51/52);
+3. `bb2020` Really Stupid: per-activation `ActingPlayer.used_skills` (ITER53);
+4. Foul Appearance: drop the extra `is_selected() && is_committed()` filter (ITER54);
+5. pushback re-entry: remove-unlocked/keep-locked instead of clear (this iteration);
+6. pushback add: accumulate instead of replace (ITER56, folded into 5).
+
+**Next iteration should change tactics**: apply all six TOGETHER and measure once. Individually each is
+invisible; several are in the same code paths (activation state, block/pushback sequencing) and may only
+pay off in combination. If the combined set moves any roster, bisect within it; if it regresses, revert
+wholesale. Continuing to test them one at a time has now cost six iterations for no movement.
+
+Verified after the revert, same turn: `lineman` bb2020 **100/100**, `human` bb2020 **100/100**. Tree
+clean. `ogre` remains 99/100, `goblin` 95/100.
