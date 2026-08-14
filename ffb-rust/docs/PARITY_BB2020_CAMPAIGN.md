@@ -524,3 +524,41 @@ Java has no block-target dialog (the client sends `ClientCommandBlock`), so noth
 `refereeSpotsFoul = (armorRoll[0] == armorRoll[1]) && !hasSkill(sneakyGit)` and
 `refereeSpotsFoul |= underScrutiny` (BB2025 drops the skill term and requires `isArmorBroken()` for
 the Under Scrutiny term). Rust inlines this in `step_referee.rs` with the BB2025 form only.
+
+## ITER9 — human 62→85/100: BB2020's WILDLY_INACCURATE pass never deviated
+
+**Seed 2, i=197** (`Activate(Away4, PASS)`, target `(21,7)`, thrower on `(14,9)`). Both engines
+rolled the same pass die (`rng 87 d6=3`), then diverged:
+
+| | dice for the action | ball after |
+|---|---|---|
+| Java | 4 (`d6=3` pass, `d8=8` dir, `d6=6` **distance**, `d8=7` bounce) | `7,3` |
+| Rust | 5 (`d6=3` pass, three `d8` scatters, `d8` bounce) | `19,4` |
+
+**Root cause — two linked gaps.**
+
+1. `bb2020/PassMechanic.evaluatePass` returns `WILDLY_INACCURATE` where
+   `bb2025/PassMechanic` returns `FUMBLE` (`resultAfterModifiers <= 1`). Rust's mechanics are
+   correct and correctly routed by `pass_mechanic_for(game.rules)` — but the live
+   `bb2025/pass/step_pass.rs` collapsed `INACCURATE | WILDLY_INACCURATE` into one arm that
+   *hard-coded* `PassOutcome::Inaccurate` when publishing `PassResultParam`, so the distinction
+   never left the step.
+2. `bb2020/pass/StepMissedPass` wraps the BB2025 body in
+   `if (state.getResult() == WILDLY_INACCURATE) { deviate from the THROWER by one d8 direction and
+   one d6 distance } else { up to three 1-square scatters, one d8 each }`. Java's two files are
+   otherwise identical. Rust's live `bb2025/pass/step_missed_pass.rs` had only the `else` arm.
+   (`bb2020/pass/step_missed_pass.rs` carries a port of the branch but is dead code — the driver's
+   `use crate::step::bb2025::pass::*` wins.)
+
+**Fix.** Edition-gate the shared step rather than route to the staler file:
+* `bb2025/pass/step_pass.rs` — publish the real outcome (`WildlyInaccurate` vs `Inaccurate`).
+* `bb2025/pass/step_missed_pass.rs` — add `pass_result` (fed by `PassResultParam`) and
+  `deviate_from_thrower`, taken only when `rules == Bb2020 && pass_result == WILDLY_INACCURATE`;
+  everything after Java's if/else stays shared.
+
+Tests: `bb2020_wildly_inaccurate_deviates_from_the_thrower_with_two_dice` (asserts exactly 2 dice,
+start = thrower square not pass target, scatter loop untouched) and
+`bb2025_ignores_wildly_inaccurate_and_uses_the_scatter_loop`.
+
+**Result:** human 62/100 → **85/100**. Gates: lineman bb2016 100/100, lineman bb2025 100/100,
+`cargo test --workspace` clean (14/14 suites ok).

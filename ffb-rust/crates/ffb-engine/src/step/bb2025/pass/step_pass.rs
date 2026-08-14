@@ -444,9 +444,17 @@ impl StepPass {
                     }
                 }
                 let label = self.goto_label_on_missed_pass.clone();
+                // Java stores the PassResult itself in PassState; BB2020's StepMissedPass reads it
+                // back to choose between the deviate (WILDLY_INACCURATE) and 3x1-scatter arms.
+                // Flattening both to Inaccurate here made BB2020 always take the scatter arm.
+                let outcome_param = if self.pass_result == Some(PassResult::WILDLY_INACCURATE) {
+                    ffb_model::enums::PassOutcome::WildlyInaccurate
+                } else {
+                    ffb_model::enums::PassOutcome::Inaccurate
+                };
                 StepOutcome::goto(&label)
                     .publish(StepParameter::CatcherId(None))
-                    .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Inaccurate))
+                    .publish(StepParameter::PassResultParam(outcome_param))
             }
         };
         match roll_event {

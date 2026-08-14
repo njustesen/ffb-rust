@@ -45,6 +45,12 @@ pub struct StepMissedPass {
     pub do_roll: bool,
     /// Java: reRolling — Blast-It re-roll pending
     pub re_rolling: bool,
+    /// Java (BB2020 only): `state.getResult()` — the PassResult published by StepPass.
+    /// BB2020's StepMissedPass wraps this whole body in
+    /// `if (state.getResult().equals(PassResult.WILDLY_INACCURATE)) { deviate } else { ... }`;
+    /// BB2025's PassMechanic can never return WILDLY_INACCURATE (it returns FUMBLE instead),
+    /// so the field stays `None` outside BB2020 and the deviate branch is unreachable there.
+    pub pass_result: Option<ffb_mechanics::pass_result::PassResult>,
 }
 
 impl StepMissedPass {
@@ -59,6 +65,7 @@ impl StepMissedPass {
             roll: 0,
             do_roll: true,
             re_rolling: false,
+            pass_result: None,
         }
     }
 
@@ -106,17 +113,90 @@ impl Step for StepMissedPass {
         self.execute_step(game, rng)
     }
 
-    fn set_parameter(&mut self, _param: &StepParameter) -> bool {
-        false
+    fn set_parameter(&mut self, param: &StepParameter) -> bool {
+        // Java: the PassResult lives in PassState, which BB2020's StepMissedPass reads directly.
+        // Rust publishes it as a step parameter from StepPass.
+        match param {
+            StepParameter::PassResultParam(v) => {
+                use ffb_mechanics::pass_result::PassResult;
+                self.pass_result = Some(match v {
+                    ffb_model::enums::PassOutcome::Complete => PassResult::ACCURATE,
+                    ffb_model::enums::PassOutcome::Inaccurate => PassResult::INACCURATE,
+                    ffb_model::enums::PassOutcome::WildlyInaccurate => PassResult::WILDLY_INACCURATE,
+                    ffb_model::enums::PassOutcome::Fumble
+                    | ffb_model::enums::PassOutcome::Caught
+                    | ffb_model::enums::PassOutcome::MissedCatch => PassResult::FUMBLE,
+                });
+                true
+            }
+            _ => false,
+        }
     }
 }
 
 impl StepMissedPass {
+    /// Java BB2020 `StepMissedPass.executeStep`, the `WILDLY_INACCURATE` arm: the ball deviates
+    /// from the THROWER's square (not the pass target) by one d6 of distance in one d8 direction,
+    /// then walks back to the last in-bounds square.
+    ///
+    /// BB2020 rolls exactly two dice here (direction, distance); the `else` arm rolls up to three
+    /// (one direction per square). Getting the arm wrong therefore desyncs the shared dice stream
+    /// as well as the ball position.
+    fn deviate_from_thrower(&mut self, game: &mut Game, rng: &mut GameRng) {
+        // Java: coordinateStart = game.getFieldModel().getPlayerCoordinate(game.getThrower())
+        let thrower_coord = game.thrower_id.clone()
+            .and_then(|id| game.field_model.player_coordinate(&id));
+        self.coordinate_start = thrower_coord;
+
+        // Java: rollScatterDirection() [d8] then rollScatterDistance() [d6] — in that order.
+        let direction_roll = rng.d8();
+        let distance_roll = rng.d6();
+        let dir = Self::direction_for_roll(direction_roll);
+        self.roll = direction_roll;
+        self.direction = Some(dir);
+
+        if let Some(start) = self.coordinate_start {
+            // Java: coordinateEnd = findScatterCoordinate(coordinateStart, direction, distanceRoll)
+            let end = start.step(dir, distance_roll);
+            self.coordinate_end = Some(end);
+            // Java: lastValidCoordinate = coordinateEnd; then walk back while out of bounds.
+            self.last_valid_coordinate = Some(end);
+            let mut valid_distance = distance_roll;
+            while !self.last_valid_coordinate.map_or(false, |c| c.is_on_pitch()) && valid_distance > 0 {
+                valid_distance -= 1;
+                self.last_valid_coordinate = Some(start.step(dir, valid_distance));
+            }
+        }
+
+        // Java: getResult().addReport(new ReportPassDeviate(coordinateEnd, direction, directionRoll,
+        //       distanceRoll, false)) — report infra deferred, as elsewhere in this step.
+    }
+
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let is_bomb = matches!(
             game.thrower_action,
             Some(PlayerAction::ThrowBomb) | Some(PlayerAction::HailMaryBomb)
         );
+
+        // Java BB2020 `StepMissedPass.executeStep`:
+        //   if (state.getResult().equals(PassResult.WILDLY_INACCURATE)) {
+        //     coordinateStart = throwerCoordinate;
+        //     int directionRoll = rollScatterDirection(); int distanceRoll = rollScatterDistance();
+        //     coordinateEnd = findScatterCoordinate(coordinateStart, direction, distanceRoll);
+        //     lastValidCoordinate = coordinateEnd;
+        //     int validDistance = distanceRoll;
+        //     while (!FIELD.isInBounds(lastValidCoordinate) && validDistance > 0) { validDistance--;
+        //       lastValidCoordinate = findScatterCoordinate(coordinateStart, direction, validDistance); }
+        //     addReport(new ReportPassDeviate(...));
+        //   } else { <the 3x1 scatter loop below> }
+        // BB2025's file has no such branch because its PassMechanic returns FUMBLE where BB2020
+        // returns WILDLY_INACCURATE, so the two editions share everything else.
+        let wildly_inaccurate = game.rules == ffb_model::enums::Rules::Bb2020
+            && self.pass_result == Some(ffb_mechanics::pass_result::PassResult::WILDLY_INACCURATE);
+
+        if wildly_inaccurate {
+            self.deviate_from_thrower(game, rng);
+        } else {
 
         // Java: if (coordinateStart == null) { doRoll = true; coordinateStart = game.getPassCoordinate() }
         if self.coordinate_start.is_none() {
@@ -191,6 +271,8 @@ impl StepMissedPass {
             false,
         ));
 
+        } // end of Java's `else` arm — everything below is shared by both branches
+
         // Java: game.setPassCoordinate(lastValidCoordinate)
         game.pass_coordinate = self.last_valid_coordinate;
 
@@ -255,6 +337,52 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2025)
+    }
+
+    // ── BB2020 wildly-inaccurate deviate ───────────────────────────────────────
+
+    /// Java BB2020 `StepMissedPass` deviates from the THROWER on a WILDLY_INACCURATE pass:
+    /// exactly two dice (d8 direction, d6 distance). The BB2025 arm rolls one d8 per square, up
+    /// to three. Taking the wrong arm desyncs the shared dice stream *and* misplaces the ball
+    /// (bb2020 human seed 2 i=197: Java put the ball on 7,3, Rust on 19,4).
+    #[test]
+    fn bb2020_wildly_inaccurate_deviates_from_the_thrower_with_two_dice() {
+        use ffb_mechanics::pass_result::PassResult;
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        let thrower = "thrower_1".to_string();
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: thrower.clone(), name: thrower.clone(), nr: 1, ..Default::default()
+        });
+        game.thrower_id = Some(thrower.clone());
+        game.field_model.set_player_coordinate(&thrower, FieldCoordinate::new(13, 7));
+        // The pass TARGET is far away; the deviate arm must ignore it and start from the thrower.
+        game.pass_coordinate = Some(FieldCoordinate::new(3, 2));
+
+        let mut step = StepMissedPass::new();
+        assert!(step.set_parameter(&StepParameter::PassResultParam(
+            ffb_model::enums::PassOutcome::WildlyInaccurate)));
+        let mut rng = GameRng::new(7);
+        step.start(&mut game, &mut rng);
+
+        assert_eq!(rng.call_count, 2, "deviate rolls exactly one d8 + one d6");
+        assert_eq!(step.coordinate_start, Some(FieldCoordinate::new(13, 7)),
+            "deviate starts from the thrower, not the pass target");
+        assert!(step.roll_list.is_empty(), "the 3x1 scatter loop must not run");
+        assert_eq!(step.pass_result, Some(PassResult::WILDLY_INACCURATE));
+    }
+
+    /// The same parameter under BB2025 must NOT take the deviate arm — BB2025's PassMechanic
+    /// cannot produce WILDLY_INACCURATE, and its StepMissedPass has no such branch.
+    #[test]
+    fn bb2025_ignores_wildly_inaccurate_and_uses_the_scatter_loop() {
+        let mut game = make_game();
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+        let mut step = StepMissedPass::new();
+        step.set_parameter(&StepParameter::PassResultParam(
+            ffb_model::enums::PassOutcome::WildlyInaccurate));
+        let mut rng = GameRng::new(7);
+        step.start(&mut game, &mut rng);
+        assert!(!step.roll_list.is_empty(), "BB2025 must still run the 3x1 scatter loop");
     }
 
     // ── basic execution ────────────────────────────────────────────────────────
