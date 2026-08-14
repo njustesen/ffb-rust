@@ -911,3 +911,49 @@ whether Java runs `StepBothDown` at all here, which is the fork in the road: if 
 attacker's FALLING state is being cleared; if it does not, the block sequence generator differs.
 
 Baseline unchanged and re-confirmed: `PARITY: 99/100`. No engine changes this iteration.
+
+## ITER18 — lineman seed 50, probes narrow it to the BLOCK_ROLL_PARTIAL_RE_ROLL answer
+
+Two new gated probes in `ParityRunner` (harness only, jar rebuilt):
+* `FFB_JSTEP_ALL=1` → `JDRIVE step=<StepId> dice=<n> dialog=<id> state=<board>` at every server loop
+  top, i.e. every step that actually waits for a command. `JSTEP` only fires at agent prompts, which
+  is far too coarse to see inside one action.
+* `FFB_BLOCK_DUMP=1` → attacker/defender ids and `PlayerState`s either side of the harness answering
+  a block dialog.
+
+**What they show for `home_02`'s block at i=6:**
+
+```
+JDRIVE INIT_SELECTING dice=11              a01:13,6,Standing   h01:12,6,Moving
+JDRIVE BLOCK_ROLL     dice=12 dialog=BLOCK_ROLL_PARTIAL_RE_ROLL
+                                           a01:13,6,Reserve*   h01:12,6,Moving
+JDRIVE INIT_SELECTING dice=14              a01:13,6,Prone      h01:12,6,Standing
+```
+
+`*` the harness's `playerStateStr` renders **FALLING** through its `default:` arm as "Reserve" — the
+same aliasing that made BANNED look like a reserve in ITER16. So the DEFENDER is already FALLING when
+the dialog opens, and the ATTACKER goes `MOVING → STANDING`: it never falls, takes no armour roll,
+and there is no turnover. That is POW-shaped behaviour, not BOTH_DOWN.
+
+Yet the die was `d6=2` and the mapping is unambiguous: `factory/BlockResultFactory` is annotated
+`@RulesCollection(Rules.COMMON)` — a single class for all editions — with `case 2: return BOTH_DOWN`,
+and `step/mixed/block/StepBothDown.start()` unconditionally calls `executeStep()`, which sets the
+attacker FALLING whenever it lacks `preventFallOnBothDown`. The `lineman` fixture has no skills in
+either engine (`<skillList></skillList>` in `rosters/roster_lineman_parity.xml`, `starting_skills:
+vec![]` in `make_lineman_team`), so that branch must be taken.
+
+**Surviving hypothesis.** The harness answers this dialog with `comm.sendBlockChoice(0)` under a
+comment claiming it "picks die index 0". For `DialogBlockRollPartialReRollParameter` that index may
+not mean "use die 0" at all — a *partial re-roll* dialog asks WHICH die to re-roll. If the server
+reads it that way, Java re-rolls and lands on a different result, which would explain a POW-shaped
+outcome from a `2`. Rust's agent meanwhile treats index 0 as "use this die" and gets BOTH_DOWN.
+
+**Next iteration:** read `ClientCommandBlockChoice`'s consumer for the partial-re-roll path
+(`StepBlockRoll` / the Brawler-style modifier that raises `DialogBlockRollPartialReRollParameter`) to
+establish what index 0 means there, then make ParityRunner and the Rust agent agree on it. Note a
+re-roll would consume a die, and the streams show no extra die — so if index 0 does mean "re-roll",
+the re-roll must be free, which the consumer will confirm or refute. If it refutes the hypothesis,
+the next datum to get is Java's `BlockResult` itself: the report list carries `ReportBlockRoll`, so a
+gated dump of it from the harness after the dialog would settle what result Java actually applied.
+
+Baseline unchanged and re-confirmed: `PARITY: 99/100`. No engine changes this iteration.
