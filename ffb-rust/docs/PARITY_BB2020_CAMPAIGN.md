@@ -2416,3 +2416,55 @@ Worth noting the pattern: this is the third fix in a row where the Rust engine h
 simply never connected it (the apothecary answer, the Intensive Training grant, now Under Scrutiny).
 A grep for "Stub:" and "not yet implemented" in the step tree is probably the cheapest way to find
 the next few.
+
+## ITER50 — `nurgle` seed 2 narrowed: a prone blitzer stands up despite a failed Really Stupid
+
+`nurgle` fails 4 of 25 (seeds 2, 14, 23, 24). Seed 2, step 32:
+
+```
+i=32  both: Activate(away_02, BLITZ)   a01 = away_02, Prone in both engines
+      JAVA_DIE rng=30 d6=1 from=DiceRoller.rollSkill:112     ← the negatrait, FAILED
+i=33  JAVA a01:13,8,Prone      RUST a01:13,8,Standing
+```
+
+Both engines consume exactly one die and the same value, so the roll itself agrees; only the state
+differs. `away_02` is the Beast of Nurgle — Really Stupid, rolled at 1, failed.
+
+**Why Java leaves it prone.** The generators differ in a way that decides this:
+
+- `generator/bb2020/Move` has **no** `STAND_UP` step at all — the move path stands the player up.
+- `generator/bb2020/Block:47-48` has `JUMP_UP` + `STAND_UP` with
+  `GOTO_LABEL_ON_FAILURE=END_BLOCKING`, placed **after** the negatraits (`BONE_HEAD`,
+  `REALLY_STUPID`, …).
+
+So on a blitz, a failed Really Stupid gotos `END_BLOCKING` and never reaches `STAND_UP`: the player
+stays PRONE. On a move there is nothing to skip.
+
+**And Java's `StepInitSelecting` never sets the player state.** Its stand-up block
+(`bb2025/shared/StepInitSelecting.java:501-510`) sets only `currentMove` and `goingForIt` and then
+calls `updateMoveSquares` — there is no `setPlayerState` in it. Rust's counterpart writes
+`PS_STANDING` there, a Rust addition made for a vampire Bloodlust case on a MOVE action (the comment
+in `step_init_selecting.rs` records it).
+
+**Attempted and REVERTED.** I gated that pre-stand to exclude `Blitz`/`Block` (the sequences that own
+a `STAND_UP` step). It changed nothing: `nurgle` stayed 21/25 and seed 2 still failed at step 32.
+Watching the player proves why — the write that stands it up is a *different* one:
+
+```
+DRIVE step=InitSelecting
+SETSTATE away_02 Some(3) -> 2        # PRONE -> MOVING, not the PS_STANDING line I gated
+```
+
+Base 2 is `PS_MOVING`, and `step_init_selecting.rs` has only ONE direct state write (the
+`PS_STANDING` one at line 177), so this comes from something it calls. A grep for `PS_MOVING` writers
+across `ffb-engine`/`ffb-model` outside tests found none, so the write is indirect — via a helper or
+a literal — and finding it is the next iteration's first job. Since the gate produced no measurable
+improvement, it was reverted rather than committed on a plausible-sounding rationale.
+
+**Next iteration**: put the `FFB_STATE_WATCH` probe back (it is a 10-line addition to
+`FieldModel::set_player_state`, and has now earned its keep twice), add a backtrace or a
+`PS_MOVING`-specific marker to identify the writer, then decide whether the correct 1:1 is to drop
+the state write entirely and let `StepStandUp` do the work — checking the vampire Bloodlust and
+renegades/underworld cases the current comment cites, since those are what the pre-stand was built for.
+
+Baseline unchanged and tree clean: `nurgle` 21/25.
