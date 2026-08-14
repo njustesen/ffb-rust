@@ -2178,3 +2178,65 @@ diagnosing them individually. `step/bb2020/foul/step_init_fouling.rs` and
 unchanged, still the known BOTH_DOWN where Java's attacker does not fall); `halfling` 1-25 **2/25**
 (unchanged — the Treeman that does not move after passing Take Root; unaffected by the defender bug).
 Next target by the fewest-fails rule: **lineman seed 50**.
+
+## ITER45 — lineman seed 50 root-caused: the Intensive Training prayer never grants its skill
+
+The divergence at step 6/i=7 is an active-team split (Java stays `home`, Rust hands over to `away`),
+caused by an extra turnover in Rust. Dice, joined by position:
+
+```
+             die 12   die 13,14      die 15,16
+JAVA:        2        4,3            (none)          -> 3 dice, home turn continues
+RUST:        2        4,3            5,1             -> 5 dice, turnover, away's turn
+```
+
+Both engines roll the SAME block die (2 = `BOTH_DOWN` per `BlockResultFactory`) and the SAME defender
+armour roll (`JAVA_AVBROKE def=Away2 armour=8 roll=[4,3] broken=false`). Rust then rolls two more —
+the ATTACKER's armour — because in Rust the attacker also falls. At i=7 Java has `h01:12,6,Standing`
+and Rust `h01:12,6,Prone`; every other player matches.
+
+**Why Java's attacker does not fall.** A gated probe in Java's `mixed/block/StepBothDown` (added,
+measured, reverted — the jar is rebuilt back to stock):
+
+```
+JBOTHDOWN atk=teamLinemanParityHome2 def=teamLinemanParityAway2 atkPreventFall=true
+```
+
+`preventFallOnBothDown` is the Block property — on a roster with **no skills at all**
+(`roster_lineman_parity.xml` and `team_lineman_parity_home.xml` both carry empty `<skillList>`). The
+skill came from a **Prayer to Nuffle**. Confirmed on the Rust side:
+
+```
+RUST_PRAYER roll=16 league=true prayer=Some(INTENSIVE_TRAINING) handler=Some("IntensiveTrainingHandler") team=home_lineman
+```
+
+**Rust's handler is a deliberate stub.** `inducements/bb2020/prayers/intensive_training_handler.rs`
+says so in its own header: *"Headless: selects one player and marks the prayer enhancement; skips
+skill-selection dialog (position skill categories not available server-side)."* So Java grants a real
+skill and Rust grants none — invisible in the state hash until the first Both Down, where it decides
+whether the attacker falls.
+
+**The port (full spec, all four pieces confirmed against source).** Java
+`mixed/prayers/IntensiveTrainingHandler.createDialog`:
+1. `Collections.shuffle(players)` — the **unseeded one-arg overload**. The harness already seeds
+   `Collections`' private static Random (`ParityRunner:230-262`) and Rust already has the 1:1
+   `ffb_model::util::java_random::{JavaRandom, collections_shuffle}`. It is a SHARED per-game stream,
+   so Rust must shuffle at the same point and in the same order.
+2. `player = players.get(0)`.
+3. Eligible skills = every skill that `eligible()`, whose category is in
+   `player.getPosition().getSkillCategories(false)`, that the player does not already have, and that
+   `canBeAssignedTo(player)` — **sorted by `Skill::getName`**.
+4. `DialogSelectSkillParameter(playerId, skills, SkillChoiceMode.INTENSIVE_TRAINING)`; if the list is
+   empty, `ReportPrayerWasted` instead. `applySelection` →
+   `game.getFieldModel().addIntensiveTrainingSkill(playerId, skill)`.
+
+The agent mirror is settled too: `ParityRunner` has no `SELECT_SKILL` case, so it falls to
+`UNHANDLED_DIALOG` → `RandomStrategy.respondToDialog`, whose `case SELECT_SKILL` sends
+`skills.get(0)` — the first entry of the name-sorted list. For a General-category lineman that is
+**Block**, exactly matching the `atkPreventFall=true` observed.
+
+Next iteration implements this as a 1:1 port with tests (shuffle order, name-sorted eligibility,
+the empty-list wasted-prayer branch, and the agent answering index 0), then re-runs lineman 1-100.
+
+Java engine is back to stock and the jar rebuilt; all Rust probes reverted; baseline re-confirmed at
+`lineman` bb2020 seed 50 FAIL.
