@@ -1508,3 +1508,46 @@ has a Chainsaw Looney and a Bombardier, so an edition-agnostic property lookup c
 dodge modifiers).
 
 Baseline unchanged: `goblin` 24/25. No engine changes this iteration.
+
+## ITER31 — goblin seed 16 traced to the dodge target; ITER26's extraction had a GAP
+
+Instrumented the dodge computation (gated `FFB_DODGE_TRACE` in `bb2025/move_/step_move_dodge.rs`,
+now reverted) and measured the failing roll:
+
+```
+DODGE_TRACE pid=away_04 from=(13,8) to=(13,9) ag=3 min=3 roll=3 mods=[]
+DODGE_TRACE   neighbours=["home_04@12,8 base=1 tz=true"] other_team=home util_adjacent=["home_04"]
+```
+
+Rust needs **3**, so the 3 passes. Java needs **4**, so it fails and the player falls. Everything
+else agrees: same square, same opponent adjacency (`UtilPlayer::find_adjacent_players_with_tacklezones`
+does return `home_04`), same AG value.
+
+**What was ruled out, by measurement not reading:**
+* the acting player is set when the context is built (`acting_player_id=Some("away_04")`);
+* `find_other_team` returns the right team;
+* the tackle-zone helper finds the marking opponent;
+* the modifier collection is populated (8 TACKLEZONE + 8 PREHENSILE_TAIL);
+* `DodgeContext::new`'s source/target argument order is correct.
+
+`mods=[]` is therefore not a lookup failure — Rust is deliberately skipping the tackle-zone modifier
+because `find_applicable` checks `ignoreTacklezonesWhenDodging`, and the dodger is a Stunty goblin.
+
+**And that exposed a gap in ITER26's sweep.** The extraction scanned only
+`skill/bb2016|bb2020|bb2025/`, but the skill tree also has **`skill/mixed/` and `skill/common/`** —
+and `skill/mixed/Stunty.java` is one of the classes registering `ignoreTacklezonesWhenDodging`
+(alongside `bb2016/Stunty`, `bb2016/SecretWeapon`, `bb2016/Swoop`, and `bb2020/Bombardier`,
+`bb2020/Chainsaw`, `bb2020/Swoop`). Any skill whose per-edition class is absent and which falls back
+to `mixed/` was invisible to that diff, so **the 13-skill table may be incomplete**.
+
+**Next iteration:**
+1. Re-run the `registerProperty` extraction over **all five** directories (`bb2016`, `bb2020`,
+   `bb2025`, `mixed`, `common`), resolving each edition to its own class if present and the `mixed`/
+   `common` fallback otherwise — that is what Java's per-edition skill factory actually does. Add any
+   newly-found divergences to `SkillId::properties_for`.
+2. Then settle this dodge specifically: with Stunty granting `ignoreTacklezonesWhenDodging` in the
+   mixed class, BOTH engines should skip the tackle-zone modifier — so Java's minimum of 4 must come
+   from somewhere else (a different AG target for the BB2020 goblin, or a modifier Rust does not
+   model). Dump Java's side via `mechanics/bb2020/DodgeMechanic.minimumRoll` before changing anything.
+
+Baseline unchanged: `goblin` 24/25. No engine changes this iteration.
