@@ -1059,3 +1059,58 @@ Instrument still needed: `GameState.startNextStep` already calls
 is now gated on `FFB_SERVER_DEBUG=1` — the lazy creation fires (`JSTEPALL debugLog created` prints)
 but `logCurrentStep` never does, so the harness must be driving steps through a path that does not go
 via `startNextStep`. Finding that path is the unlock.
+
+## ITER21 — chaos_pact seed 22: TTM guard mirroring REGRESSED and was reverted
+
+**Seed 22, i=125.** Rust ran 10 dice ahead (`53` vs Java's `43`) with `h05` Injured where Java has it
+Standing. An `FFB_RNG_BT=46` backtrace put Rust's first extra die in
+`step::action::ttm::util_throw_team_mate_sequence::scatter_player` — Rust performs a Throw Team-Mate
+that Java does not.
+
+**What the Java source says (and it is unambiguous):**
+
+| edition | TTM guard in `StepInitSelecting` | `ThrowTeamMateBehaviour` sets |
+|---|---|---|
+| bb2016 | `!isPassUsed()` (`bb2016/move/…:211`) | `setPassUsed(true)` |
+| **bb2020** | **`!isPassUsed() \|\| isKicked()`** (`bb2020/shared/…:274`) | **`setPassUsed(true)`** |
+| bb2025 | `!isTtmUsed() \|\| isKicked()` (`bb2025/shared/…:293`) | `setTtmUsed(true)` |
+
+So BB2020 spends the team's PASS action on a Throw Team-Mate exactly as BB2016 does; `ttmUsed` is a
+BB2025-only flag. Rust's `legal_actions` gates TTM on `!ttm_used` for every edition, and
+ParityRunner's keep-rule special-cases only bb2016.
+
+**Mirroring both guards to `!ttmUsed && !passUsed` for bb2020 REGRESSED the campaign** —
+`chaos_pact` 24→23/25 and `human` **100→99**/100 — and did not fix seed 22 at all. Both changes were
+reverted and the baseline re-confirmed (`chaos_pact` 24/25, `human` 100/100). The guards above are
+real, so something else about how the two agents build their action lists absorbs them; that needs
+explaining before either side is touched again.
+
+**The actual seed-22 cause, now visible in the dice.** The TTM is already IN FLIGHT when the Really
+Stupid roll fails:
+
+```
+pos 44 d6=6  ReallyStupid (pass)
+pos 45 d6=1  ReallyStupid (FAIL)
+pos 46 d8    ← Rust: scatter_player, i.e. the throw happens anyway
+             ← Java: next activation's BoneHead — the throw was abandoned
+pos 52 d16   ← Rust: bb2020 casualty roll for the thrown player
+```
+
+`generator/bb2020/ThrowTeamMate` line 40 is explicit:
+
+```java
+sequence.add(StepId.REALLY_STUPID, from(GOTO_LABEL_ON_FAILURE, IStepLabel.END_THROW_TEAM_MATE));
+sequence.add(StepId.TAKE_ROOT);
+sequence.add(StepId.UNCHANNELLED_FURY, from(GOTO_LABEL_ON_FAILURE, IStepLabel.END_THROW_TEAM_MATE));
+```
+
+A failed Really Stupid jumps straight to `END_THROW_TEAM_MATE` and the throw never happens. Rust's
+live `generator/bb2025/throw_team_mate` has **no negatrait steps at all** — no `ReallyStupid`, no
+`TakeRoot`, no `UnchannelledFury` — so nothing can abort the throw.
+
+**Next iteration:** establish which TTM generator is live for bb2020 (`generator/bb2020/throw_team_mate`
+exists and is referenced from `bb2020/move_/step_end_selecting.rs`, but the bb2025 one appears to be
+what actually runs), then give the live sequence the three negatrait steps with
+`GOTO_LABEL_ON_FAILURE = END_THROW_TEAM_MATE`, matching Java. Verify the abort consumes no extra dice.
+
+Baseline unchanged: `chaos_pact` 24/25, `human` 100/100.
