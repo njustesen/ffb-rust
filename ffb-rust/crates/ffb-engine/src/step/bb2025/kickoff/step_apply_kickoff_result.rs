@@ -243,24 +243,36 @@ impl StepApplyKickoffResult {
         let mut stun_params: Vec<StepParameter> = Vec::new();
         let mut eject_seqs: Vec<Vec<SequenceStep>> = Vec::new();
 
-        // Java: `if (totalAway >= totalHome)` → a HOME player is targeted.
-        if total_away >= total_home {
-            if let Some(pid) = self.random_player_on_field(game, rng, true) {
-                targeted_ids.push(pid.clone());
-                match self.officious_ref_insert_steps(game, rng, &pid, &params_to_consume) {
-                    Ok(params) => stun_params.extend(params),
-                    Err(seq) => eject_seqs.push(seq),
-                }
-            }
+        // PHASE ORDER MATTERS. Java picks BOTH players first and only then runs `insertSteps` for
+        // each, so on a tie (both teams targeted) the dice are: d11 home pick, d11 away pick,
+        // d6 home ref roll, d6 away ref roll. Interleaving pick→insertSteps→pick→insertSteps draws
+        // the same NUMBER of dice in a different ORDER, so the counts stay aligned while the away
+        // pick reads the home team's ref die — a silent, state-only divergence
+        // (lineman bb2020 seed 46: Java ejected away_03 on `d11=3`, Rust ejected away_06 on `d11=6`).
+        //
+        // Java:
+        //   if (totalAway >= totalHome) { playerIdHome = randomPlayer(playersOnField(teamHome)); }
+        //   if (totalHome >= totalAway) { playerIdAway = randomPlayer(playersOnField(teamAway)); }
+        //   addReport(new ReportKickoffOfficiousRef(...));
+        //   if (playerIdHome != null) insertSteps(..., ApothecaryMode.HOME);
+        //   if (playerIdAway != null) insertSteps(..., ApothecaryMode.AWAY);
+        let player_id_home = if total_away >= total_home {
+            self.random_player_on_field(game, rng, true)
+        } else {
+            None
+        };
+        let player_id_away = if total_home >= total_away {
+            self.random_player_on_field(game, rng, false)
+        } else {
+            None
+        };
+        for pid in [player_id_home.as_ref(), player_id_away.as_ref()].into_iter().flatten() {
+            targeted_ids.push(pid.clone());
         }
-        // Java: `if (totalHome >= totalAway)` → an AWAY player is targeted.
-        if total_home >= total_away {
-            if let Some(pid) = self.random_player_on_field(game, rng, false) {
-                targeted_ids.push(pid.clone());
-                match self.officious_ref_insert_steps(game, rng, &pid, &params_to_consume) {
-                    Ok(params) => stun_params.extend(params),
-                    Err(seq) => eject_seqs.push(seq),
-                }
+        for pid in [player_id_home, player_id_away].into_iter().flatten() {
+            match self.officious_ref_insert_steps(game, rng, &pid, &params_to_consume) {
+                Ok(params) => stun_params.extend(params),
+                Err(seq) => eject_seqs.push(seq),
             }
         }
 
@@ -908,6 +920,70 @@ fn count_active_players_on_field(game: &Game) -> i32 {
 
 #[cfg(test)]
 mod tests {
+    /// Java's `handleOfficiousRef` picks BOTH targets before running `insertSteps` for either, so
+    /// on a tie the dice are `d11 home pick, d11 away pick, d6 home ref roll, d6 away ref roll`.
+    /// Interleaving pick→insertSteps→pick→insertSteps draws the same NUMBER of dice in a different
+    /// ORDER, so the stream stays aligned while the away pick reads the home ref die — a state-only
+    /// divergence that ejected the wrong player (lineman bb2020 seed 46: Java ejected away_03 on
+    /// `d11=3`, Rust ejected away_06 on `d11=6`).
+    #[test]
+    fn bb2020_officious_ref_picks_both_targets_before_rolling_either_ref_die() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{KickoffResult, PlayerState, Rules, PS_STANDING};
+        use ffb_model::types::FieldCoordinate;
+
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        for (side, x) in [(true, 5), (false, 20)] {
+            for n in 1..=11 {
+                let id = format!("{}_{n:02}", if side { "home" } else { "away" });
+                let team = if side { &mut game.team_home } else { &mut game.team_away };
+                team.players.push(Player { id: id.clone(), name: id.clone(), nr: n, ..Default::default() });
+                game.field_model.set_player_coordinate(&id, FieldCoordinate::new(x, n));
+                game.field_model.set_player_state(&id, PlayerState::new(PS_STANDING));
+            }
+        }
+
+        // Find a seed whose two fan-factor d6 rolls TIE, so both teams are targeted and all four
+        // remaining dice are drawn — that is the only case the phase order can be wrong in.
+        let seed = (0u64..500).find(|&s| {
+            let mut p = GameRng::new(s);
+            p.d6() == p.d6()
+        }).expect("some seed ties the two fan-factor d6 rolls");
+
+        // Replay the stream to learn what Java's ORDER implies: d6, d6, then BOTH d11 picks, then
+        // the two d6 ref rolls.
+        let (want_away_pick, want_away_ref) = {
+            let mut p = GameRng::new(seed);
+            p.d6(); p.d6();
+            let _home_pick = p.die(11);
+            let away_pick = p.die(11);
+            let _home_ref = p.d6();
+            let away_ref = p.d6();
+            (away_pick, away_ref)
+        };
+
+        let mut step = StepApplyKickoffResult::new("end".into(), "blitz".into());
+        step.kickoff_result = Some(KickoffResult::OficiousRef);
+        let mut rng = GameRng::new(seed);
+        step.start(&mut game, &mut rng);
+
+        // 2 fan-factor d6 + 2 d11 picks + 2 d6 ref rolls.
+        assert_eq!(rng.call_count, 6, "a tie targets both teams: 2 d6 + 2 d11 + 2 d6");
+
+        // The away victim must be the one named by the SECOND d11 — the interleaved version read
+        // the home team's ref d6 here instead and hit a different player.
+        let victim = format!("away_{:02}", want_away_pick);
+        let state = game.field_model.player_state(&victim)
+            .expect("the away victim has a state").base();
+        if want_away_ref == 1 {
+            assert_eq!(state, ffb_model::enums::PS_BANNED,
+                "away ref roll {want_away_ref} == 1 must BAN {victim}");
+        } else {
+            assert_eq!(state, ffb_model::enums::PS_STUNNED,
+                "away ref roll {want_away_ref} != 1 must STUN {victim}");
+        }
+    }
+
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::{StepAction, StepParameter};

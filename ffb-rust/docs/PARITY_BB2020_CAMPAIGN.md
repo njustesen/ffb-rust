@@ -823,3 +823,46 @@ Java side would settle it) — if the square was genuinely free, the drop is a r
 rather than an occupied-square skip, and the mirror must reproduce that condition, not the cursor.
 
 Baseline unchanged and re-confirmed: `PARITY: 98/100`. All probes removed.
+
+## ITER16 — lineman 98→99/100: Officious Ref must pick BOTH targets before either ref roll
+
+**Corrects ITER15's diagnosis, which was wrong.** A gated `FFB_SETUP_DUMP` added to
+`ParityRunner.placeReserves` shows Java places **all 11** away players at the half-2 setup, `A3` at
+`(13,8)` — exactly where Rust puts it. Nothing is dropped at setup; `placeReserves`' cursor
+semantics are not involved. The player leaves the pitch *after* the setup, at the kickoff.
+
+**The real cause.** Seed 46's half-2 kickoff rolls 11 → Officious Ref, and the fan-factor totals
+TIE, so both teams are targeted. The two dice traces line up as:
+
+```
+JAVA  45 d11=2 (home pick) | 46 d11=3 (away pick) | 47 d6=4 (home ref) | 48 d6=1 (away ref)
+RUST  45 d11=2 (home pick) | 46 d6=4  (home ref)  | 47 d11=6 (away pick) | 48 d6=1 (away ref)
+```
+
+Java's `handleOfficiousRef` picks **both** players first and only then calls `insertSteps` for each:
+
+```java
+if (totalAway >= totalHome) { playerIdHome = randomPlayer(playersOnField(teamHome)); }
+if (totalHome >= totalAway) { playerIdAway = randomPlayer(playersOnField(teamAway)); }
+addReport(new ReportKickoffOfficiousRef(...));
+if (playerIdHome != null) insertSteps(..., ApothecaryMode.HOME);
+if (playerIdAway != null) insertSteps(..., ApothecaryMode.AWAY);
+```
+
+ITER12's port fused the two phases into one loop. That draws the same NUMBER of dice in a different
+ORDER, so `rng_calls` stayed aligned and only the board diverged: the away pick read the home team's
+ref d6 (`6` instead of `3`), and the `d6=1` ref roll then **banned `away_06` instead of `away_03`**.
+BANNED renders through the harness's `default:` arm as "Reserve", which is what made the state diff
+look like a setup problem.
+
+**Fix.** Split the phases in `handle_officious_ref` exactly as Java does.
+
+Test `bb2020_officious_ref_picks_both_targets_before_rolling_either_ref_die` finds a seed whose
+fan-factor d6 rolls tie, replays the stream to derive which away player the SECOND d11 names, and
+asserts that player is the one banned/stunned. Verified to have teeth: perturbing the dice order by
+one draw makes it fail.
+
+**Result:** lineman bb2020 98/100 → **99/100**. Gates: human bb2020 100/100, lineman bb2016 100/100,
+lineman bb2025 100/100, `cargo test --workspace` 14/14 suites ok. Remaining lineman fail: seed 50.
+
+Harness: `ParityRunner` gains the gated `FFB_SETUP_DUMP` probe (jar rebuilt).
