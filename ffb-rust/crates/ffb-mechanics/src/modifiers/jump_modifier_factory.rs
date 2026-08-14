@@ -70,6 +70,19 @@ impl JumpModifierFactory {
             }
         }
 
+        // Java `mixed/JumpModifierFactory.findModifiers`:
+        //   if (!UtilCards.hasSkillToCancelProperty(context.getPlayer(), NamedProperties.makesJumpingHarder)) {
+        //       prehensileTailModifier(...).ifPresent(modifiers::add);
+        //   }
+        // i.e. the JUMPING player's own skills can cancel the prehensile-tail penalty outright,
+        // independently of how many opponents carry the property. Rust never modelled cancellation
+        // (see `Player::has_skill_to_cancel_property_in`, ported alongside the dodge fix).
+        let jumper_cancels_pt = ctx.game.acting_player.player_id.as_deref()
+            .and_then(|id| ctx.game.player(id))
+            .map(|p| p.has_skill_to_cancel_property_in(
+                ctx.game.rules, NamedProperties::MAKES_JUMPING_HARDER))
+            .unwrap_or(false);
+
         // Count prehensile tails: adjacent opponents at `from` with makesJumpingHarder.
         let pt_count = from_ids.iter()
             .filter(|id| ctx.game.player(id.as_str())
@@ -77,7 +90,7 @@ impl JumpModifierFactory {
                 .unwrap_or(false))
             .count() as i32;
 
-        if pt_count > 0 {
+        if pt_count > 0 && !jumper_cancels_pt {
             if let Some(m) = self.collection.get_modifiers().iter()
                 .find(|m| m.get_type() == ModifierType::PREHENSILE_TAIL && m.get_multiplier() == pt_count)
             {

@@ -293,6 +293,22 @@ impl Player {
         !self.all_skill_ids().any(|id| id.properties_for(rules).contains(&cancel.as_str()))
     }
 
+    /// 1:1 translation of `UtilCards.hasSkillToCancelProperty(Player, ISkillProperty)`:
+    ///
+    /// ```java
+    /// return Arrays.stream(findAllSkills(player)).flatMap(s -> s.getSkillProperties().stream())
+    ///     .anyMatch(sp -> sp instanceof CancelSkillProperty && sp.cancelsProperty(property));
+    /// ```
+    ///
+    /// Unlike `has_uncanceled_skill_property_in` this asks ONLY whether some skill cancels the
+    /// property — the player need not have it. Java calls this at a dozen sites
+    /// (`FoulAppearanceBehaviour`, `PilingOnBehaviour`, `StepEndBlocking`, `StepHypnoticGaze`,
+    /// `StepJump`, `JumpModifierFactory`, `InjuryMechanic`, `UtilPassing`, …).
+    pub fn has_skill_to_cancel_property_in(&self, rules: crate::enums::Rules, property: &str) -> bool {
+        let cancel = format!("cancels{}{}", property[..1].to_uppercase(), &property[1..]);
+        self.all_skill_ids().any(|id| id.properties_for(rules).contains(&cancel.as_str()))
+    }
+
     /// Java: getSkillWithProperty — returns the first SkillId that has the given property.
     pub fn skill_id_with_property(&self, property: &str) -> Option<SkillId> {
         self.all_skill_ids().find(|id| id.properties().contains(&property))
@@ -600,6 +616,28 @@ impl IXmlReadable for Player {
 
 #[cfg(test)]
 mod tests {
+
+    /// 1:1 of `UtilCards.hasSkillToCancelProperty`: asks only whether SOME skill cancels the
+    /// property — the player need not have it. Java calls this at a dozen sites (FoulAppearance,
+    /// PilingOn, StepEndBlocking, StepHypnoticGaze, StepJump, JumpModifierFactory, InjuryMechanic,
+    /// UtilPassing).
+    #[test]
+    fn skill_to_cancel_property_does_not_require_having_it() {
+        use crate::enums::{Rules, SkillId};
+        use crate::model::skill_def::SkillWithValue;
+
+        let mut bombardier = Player { id: "b".into(), name: "b".into(), nr: 1, ..Default::default() };
+        bombardier.starting_skills = vec![SkillWithValue::new(SkillId::Bombardier)];
+        // Bombardier cancels ignoreTacklezonesWhenDodging without granting it.
+        assert!(!bombardier.has_skill_property_in(Rules::Bb2020, "ignoreTacklezonesWhenDodging"));
+        assert!(bombardier.has_skill_to_cancel_property_in(Rules::Bb2020, "ignoreTacklezonesWhenDodging"));
+
+        // BB2025 Bombardier does not carry the cancel (it is a BB2020-only registration).
+        assert!(!bombardier.has_skill_to_cancel_property_in(Rules::Bb2025, "ignoreTacklezonesWhenDodging"));
+
+        let plain = Player { id: "p".into(), name: "p".into(), nr: 2, ..Default::default() };
+        assert!(!plain.has_skill_to_cancel_property_in(Rules::Bb2020, "ignoreTacklezonesWhenDodging"));
+    }
 
     /// 1:1 of Java's `UtilCards.hasUncanceledSkillWithProperty`: the player must HAVE the property
     /// and no skill of theirs may cancel it. A BB2020 goblin Bombardier gets

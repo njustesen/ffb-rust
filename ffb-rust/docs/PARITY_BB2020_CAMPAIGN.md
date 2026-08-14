@@ -1638,3 +1638,55 @@ plain check still answers `true` for the Bombardier while the uncancelled one an
 **Follow-up:** `hasUncanceledSkillWithProperty` and `hasSkillToCancelProperty` are used at other Java
 call sites too. Grep them and convert the matching Rust checks — every one is a latent version of
 this bug.
+
+## ITER34 — the sibling cancel-check ported; halfling's first divergence located
+
+Followed up ITER33's note. Java calls the cancellation-aware checks at a dozen sites:
+
+```
+DodgeModifierFactory:117  hasUncanceledSkillWithProperty(player, ignoreTacklezonesWhenDodging)   ← done, ITER33
+JumpModifierFactory:91    hasSkillToCancelProperty(player, makesJumpingHarder)
+FoulAppearanceBehaviour   hasSkillToCancelProperty(player, forceRollBeforeBeingBlocked)   x3
+PilingOnBehaviour:138     hasSkillToCancelProperty(player, canPileOnOpponent)
+StepEndBlocking:130       hasSkillToCancelProperty(player, canBlockMoreThanOnce)
+StepHypnoticGaze          hasSkillToCancelProperty(player, inflictsConfusion)            x3
+StepJump                  hasSkillToCancelProperty(player, canAttemptToTackleJumpingPlayer) x2
+InjuryMechanic:42         hasSkillToCancelProperty(deadPlayer, allowsRaisingLineman)
+UtilPassing:31            hasSkillToCancelProperty(otherPlayer, passesAreNotIntercepted)
+```
+
+Added `Player::has_skill_to_cancel_property_in(rules, prop)` — the 1:1 sibling of ITER33's helper,
+asking only whether SOME skill cancels the property (the player need not have it) — and converted the
+`JumpModifierFactory` site, which was missing Java's outer guard entirely:
+
+```java
+if (!UtilCards.hasSkillToCancelProperty(context.getPlayer(), NamedProperties.makesJumpingHarder)) {
+    prehensileTailModifier(...).ifPresent(modifiers::add);
+}
+```
+
+i.e. the JUMPING player's own skills can cancel the prehensile-tail penalty outright, regardless of
+how many opponents carry it.
+
+**No roster movement** (`halfling` 2/25, `underworld` 22/25, `goblin` 25/25) — measured, not assumed:
+nothing in the current bb2020 rosters cancels `makesJumpingHarder`. Kept because it is a faithful 1:1
+of a named Java guard and is pinned by `skill_to_cancel_property_does_not_require_having_it`, which
+checks that the BB2020 Bombardier cancels without granting, and that BB2025's does not cancel at all.
+The remaining call sites above are still unconverted — each is a latent copy of the ITER33 bug.
+
+Gates: `human` bb2020 100/100, `lineman` bb2016 100/100, `lineman` bb2025 100/100,
+`cargo test --workspace` 14/14 suites.
+
+**Next target — halfling (2/25).** First dice divergence on seed 1 is at die 67:
+
+```
+java 63 d6=4 StepBlockRoll.executeStep
+java 64 d6=3 TakeRootBehaviour$1.handleExecuteStepHook
+java 65 d6=2 StepMoveDodge.dodge
+java 66 d6=3 TakeRootBehaviour$1.handleExecuteStepHook
+java 67 d6=1 StepBlockRoll.executeStep     <- rust rolls a d8 here instead
+```
+
+Java is rolling Take Root for the halfling Treemen between blocks; Rust reaches a d8 (a scatter) at
+the same position. Use the ITER30 two-log join recipe to get Rust's step at 63-67 and find where the
+sequences part.
