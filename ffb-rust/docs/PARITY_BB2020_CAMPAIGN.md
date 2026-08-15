@@ -5957,3 +5957,55 @@ BB2020 reverts, BB2025 does not.
 ## 🏁 BB2020 30/30 — THE THREE-RULESET CAMPAIGN IS COMPLETE
 
 bb2016 30/30 · bb2020 30/30 · bb2025 30/30. A full-matrix confirmation sweep is the next step.
+
+## ITER111 — FULL-MATRIX CONFIRMATION: bb2020 is 30/30, measured
+
+ITER110 declared 30/30 on the strength of seven rosters (the ones the session had touched) plus the
+lineman gate. That is exactly the inference that produced the **retracted** 2026-08-14 "30/30"
+claim, so it was re-measured rather than asserted.
+
+A single sequential sweep of **every** BB2020 roster, seeds 1-100, tier 3:
+
+```
+lineman amazon chaos chaos_dwarf chaos_pact dark_elf dark_elf_league_fumbbl dwarf elf goblin
+halfling high_elf human khemri khemri_fumbbl lizardman necromantic nippon norse nurgle ogre orc
+renegades skaven slann slann_fumbbl undead underworld vampire wood_elf
+```
+
+**Result: 30 rosters, 30 with a result, 30 at `PARITY: 100/100 games match`. Zero missing, zero
+below 100.** Each line carries the required `PARITY:` marker, so every run genuinely completed its
+Rust loop — the guard that caught the false 2026-08-14 claim.
+
+(Script: `scratchpad/matrix.sh`. Note the `PARITY:` summary goes to **stderr**; a first attempt with
+`2>/dev/null` silently produced empty results for every roster. Capture `2>&1`.)
+
+## 🏁 CAMPAIGN COMPLETE — ALL THREE RULESETS AT 30/30
+
+| ruleset | status |
+|---|---|
+| BB2016 | 30/30 |
+| BB2020 | **30/30 (this sweep)** |
+| BB2025 | 30/30 |
+
+Every team mirror matchup reaches per-step state-hash parity with stock Java across all three
+rulesets, at 100 seeds each.
+
+### What closed BB2020 this session
+
+| iteration | fix | effect |
+|---|---|---|
+| ITER89 | Stand Firm must auto-ACCEPT (harness always uses the skill) | dwarf → 100, +3 rosters moved |
+| ITER91 | Stand Firm avoid-push must publish `FOLLOWUP_CHOICE(false)` | necromantic 32 → 100 |
+| ITER95 | pass Moles under the Pitch into `GoForItContext` | halfling 98 → 100 |
+| ITER96 | publish the trap-door injury instead of applying it | wood_elf 99 → 100 |
+| ITER99 | record granted prayers, then expire them by duration | slann_fumbbl 98 → 99 |
+| ITER100 | filter already-held prayers from the Cheering Fans pick | slann_fumbbl 99 → 100 |
+| ITER110 | revert a BB2020 blitzer to prone on a failed Foul Appearance | nurgle 86 → 100 |
+
+### Method notes worth keeping
+
+* Pair Java's `caller=` frames with Rust's `FFB_DIE_AT` backtrace. A matching VALUE at the same index
+  is not the same roll — that trap produced three committed wrong conclusions (ITER93/101/102).
+* Java's `rng_calls` counts CALLS, Rust counts DICE. Never compare the counters.
+* When Rust's command shape differs from Java's, port the observable END STATE, not the control flow
+  (ITER110, after five control-flow attempts scored 0/15/15/25 against an 86 baseline).
