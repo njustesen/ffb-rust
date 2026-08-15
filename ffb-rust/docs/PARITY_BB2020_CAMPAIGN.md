@@ -4524,3 +4524,61 @@ have sent the next iteration hunting a phantom.
 |---|---|
 | `halfling` bb2020 | 5/100 (baseline, unchanged) |
 | working tree | no engine change; adds `scripts/statediff.py` |
+
+## ITER89 — Stand Firm auto-DECLINED where the harness always uses it: **4 rosters move, dwarf GREEN**
+
+One line. `halfling` 5→98, `wood_elf` 15→98, `dwarf` 20→**100 🟢**, `necromantic` 15→32.
+
+### The bug
+
+Java's `StandFirmBehaviour` (bb2020) shows a `DialogSkillUseParameter(defender, StandFirm)` when the
+choice has not been made, and applies the client's answer on re-entry. `ParityRunner`'s SKILL_USE
+arm **always uses the skill**, with exactly four exceptions — DumpOff, PrimalSavagery,
+SafePairOfHands, Swoop (`ParityRunner.java:748-751`). Stand Firm is not one of them, so **Java always
+refuses the push**.
+
+Rust's hook auto-**DECLINED** instead:
+
+```rust
+// Java: if (!standingFirm.containsKey(id)) show dialog → headless: auto-decline
+if !state.standing_firm.contains_key(&defender_id) {
+    state.standing_firm.insert(defender_id.clone(), false);
+    return false;                     // → push proceeds
+}
+```
+
+So every Stand Firm defender in BB2020 got pushed where Java leaves it standing. Changed to
+auto-ACCEPT and fall through to the existing refusal path (which already cleared the pushback stack
+and published `FOLLOWUP_CHOICE=false` correctly — only the decision was wrong).
+
+The colocated test `stand_firm_not_decided_headless_auto_declines` asserted the wrong behaviour and
+had frozen it in place; it is now `..._auto_accepts` and additionally checks `do_push` and the
+cleared pushback stack.
+
+### Why this moved four rosters at once
+
+Stand Firm is a Big-Guy staple: the halfling and wood elf **Treemen**, the dwarf **Deathroller**,
+necromantic's **Flesh Golems**. ITER86's "these reds share one cause" hypothesis was right about the
+grouping even though it was wrong about the mechanism (it guessed a cancelled-activation revert; the
+real cause is a refused push).
+
+### Results
+
+| roster | before | after |
+|---|---:|---:|
+| dwarf | 20/100 | **100/100 🟢** |
+| halfling | 5/100 | 98/100 |
+| wood_elf | 15/100 | 98/100 |
+| necromantic | 15/100 | 32/100 |
+
+### Gate
+
+| check | result |
+|---|---|
+| `lineman` bb2020 | 100/100 |
+| `ogre` bb2020 | 100/100 |
+| `cargo test --workspace` | all pass (the one stale test corrected) |
+
+**Status: 25 of 30 green.** Remaining: halfling 98, wood_elf 98, slann_fumbbl 98, nurgle 86,
+necromantic 32. Next: `necromantic` (68 fails) — it moved but least, so it likely has a second
+roster-wide cause of its own; then the three 98s.

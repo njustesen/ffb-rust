@@ -122,11 +122,20 @@ impl StepModifierTrait for StandFirmStepModifier {
             return false;
         }
 
-        // Java: if (!standingFirm.containsKey(id)) show dialog → headless: auto-decline
-        // (established precedent: see StandFirmStepModifier in bb2025, Phase AAF Dodge convention)
+        // Java: `if (!standingFirm.containsKey(id)) showDialog(DialogSkillUseParameter(defender,
+        // StandFirm))` and returns true; the client's answer comes back through `handleCommandHook`
+        // and the step re-executes with the entry present.
+        //
+        // `ParityRunner`'s SKILL_USE arm ALWAYS uses the skill except DumpOff / PrimalSavagery /
+        // SafePairOfHands / Swoop (`ParityRunner.java:748-751`) — Stand Firm is not in that list, so
+        // Java answers USE and refuses the push. Rust auto-DECLINED, so the defender was pushed
+        // where Java leaves it standing still (halfling bb2020 seed 1 i=100: the opposing Treeman
+        // `h00` ends at 12,7 in Java and 11,6 in Rust, on identical dice — Take Root 2, block die 3
+        // = pushback).
+        //
+        // Auto-ACCEPT to mirror the harness, then fall through to the refusal below.
         if !state.standing_firm.contains_key(&defender_id) {
-            state.standing_firm.insert(defender_id.clone(), false);
-            return false;
+            state.standing_firm.insert(defender_id.clone(), true);
         }
 
         // Java: state.doPush = true; pushbackStack.clear(); publish STARTING_PUSHBACK_SQUARE=null;
@@ -241,8 +250,15 @@ mod tests {
         assert!(!result);
     }
 
+    /// Java shows a `DialogSkillUseParameter(defender, StandFirm)` when the choice has not been
+    /// made yet, and `ParityRunner`'s SKILL_USE arm ALWAYS uses the skill except DumpOff /
+    /// PrimalSavagery / SafePairOfHands / Swoop — Stand Firm is not among them. So the undecided
+    /// case must auto-ACCEPT and refuse the push.
+    ///
+    /// This test previously asserted auto-DECLINE, which is what let the defender be pushed where
+    /// Java leaves it standing (halfling bb2020 seed 1 i=100; halfling 5→98, wood_elf 15→98).
     #[test]
-    fn stand_firm_not_decided_headless_auto_declines() {
+    fn stand_firm_not_decided_headless_auto_accepts() {
         let mut game = make_game();
         game.team_away.players.push(player_with_skills("def1", vec![SkillId::StandFirm]));
         game.field_model.set_player_coordinate("def1", FieldCoordinate::new(5, 5));
@@ -251,8 +267,10 @@ mod tests {
         let m = StandFirmStepModifier;
         let mut hs = default_hook_state("def1");
         let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
-        assert!(!result);
-        assert_eq!(hs.standing_firm.get("def1"), Some(&false));
+        assert!(result, "undecided Stand Firm auto-accepts and stops pushback processing");
+        assert_eq!(hs.standing_firm.get("def1"), Some(&true));
+        assert!(hs.do_push, "the push is converted to a stay-put");
+        assert!(hs.pushback_squares.is_empty(), "pushback stack cleared");
     }
 
     #[test]
