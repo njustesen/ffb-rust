@@ -5298,3 +5298,67 @@ expired. bb2020 stays **28 of 30 green**; slann_fumbbl is now one seed away.
 which this fixed, so seed 50 needs its own diagnosis from `stepdiff.py` + `FFB_DIE_AT`. After that
 only `nurgle` 86 remains, whose confirmed root cause (BB2020 resolves Foul Appearance BEFORE
 STAND_UP, ITER92) still has an unexplained die-count contradiction blocking the obvious fix.
+
+## ITER100 — the Cheering Fans prayer pick ignored already-held prayers: slann_fumbbl 99 → 100/100 GREEN
+
+### Measurement
+
+slann_fumbbl seed 50 diverges at step 132, and badly — Java ends the turn (home active, t1) while
+Rust plays on (away, t0), with the blitzer KO'd in Java and standing in Rust.
+
+Whole-game dice counts: **Java 97, Rust 78**. Java rolls exactly ONE prayer die all game; Rust rolls
+none:
+
+```
+pos 54  JAVA d3=2  BadHabitsHandler.affectedPlayers ← RandomSelectionPrayerHandler.initEffect
+                   ← PrayerHandler.initEffect ← StepPrayer.executeStep
+        RUST d6     StepBlockRoll        (FFB_DIE_AT=54)
+```
+
+Positions 47-53 match exactly, including the two `handleCheeringFans` d6s — so both engines ran
+Cheering Fans, both pushed a `PRAYER` step, and both picked a prayer. Java picked **Bad Habits**,
+which rolls a d3 for its affected players; Rust picked a prayer that rolls nothing. Different
+prayer, same position.
+
+(A probe in `bb2020/step_apply_kickoff_result.rs` printed nothing — that file is DEAD for bb2020,
+the shared bb2025 step runs. Its own bb2020 gate is where the live code is.)
+
+### Root cause
+
+Java picks from `prayerFactory.availablePrayerRolls(ownInducements, opponentInducements)`
+(`PrayerFactory.java:35-41`), which **filters out prayers the team already holds** — and any
+`affectsBothTeams()` prayer the opponent holds — before `Collections.shuffle`. Rust shuffled the
+full `1..=max_prayer_roll` every time. Once any prayer had been granted the two engines shuffled
+lists of **different length**, so the same shuffle stream yielded a different first element, a
+different prayer, and from there a different dice stream for the rest of the game.
+
+This filter was **impossible to implement before ITER99** — nothing was ever recorded in an
+inducement set, so there was never anything to filter. ITER99 and ITER100 are one fix in two parts,
+and the ordering was forced.
+
+### Fix
+
+Mirror `availablePrayerRolls` in the bb2020-gated Cheering Fans branch of the shared
+`bb2025/kickoff/step_apply_kickoff_result.rs`, keyed off the praying team's own set and the
+opponent's for `affects_both_teams` prayers. Regression test
+`bb2020_cheering_fans_prayer_pick_excludes_prayers_already_held`.
+
+### Gate
+
+| check | result |
+|---|---|
+| `slann_fumbbl` bb2020 | **99/100 → 100/100 GREEN** |
+| `halfling` / `wood_elf` / `necromantic` / `dwarf` bb2020 | 100/100 each (hold) |
+| `nurgle` bb2020 | 86/100 (unchanged) |
+| `lineman` bb2020 / bb2025 / bb2016 | 100/100 each (run serially) |
+| `cargo test --workspace` | clean (exit 0) |
+
+**bb2020 is now 29 of 30 green.** RED: nurgle 86 — the last one.
+
+### Next iteration
+
+Only `nurgle` remains. Its root cause is already confirmed (ITER92: BB2020 resolves Foul Appearance
+BEFORE STAND_UP, BB2025 after), but the obvious sequence-move regressed it 86 → 0 and left an
+unexplained die-count contradiction — the move should be die-neutral yet Rust gained a die at
+seed 1 step 1. Start from that contradiction, with the `FFB_DIE_AT` + Java `caller=` pairing that
+has now resolved five reds in a row, and do NOT re-apply the ITER92 patch blind.

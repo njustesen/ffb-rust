@@ -409,20 +409,45 @@ impl StepApplyKickoffResult {
                 .get_option_with_default(ffb_model::option::game_option_id::GameOptionId::INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE)
                 .get_value_as_string() == "true";
             let max_prayer_roll = if use_league { 16 } else { 8 };
-            let mut pick = |game: &mut Game| -> i32 {
-                let mut available: Vec<i32> = (1..=max_prayer_roll).collect();
+            // Java: `prayerFactory.availablePrayerRolls(ownInducements, opponentInducements)`
+            // (`PrayerFactory.java:35-41`) — the shuffled list EXCLUDES prayers the team already
+            // holds, and also any `affectsBothTeams()` prayer the OPPONENT holds. Rust shuffled the
+            // full 1..=max every time, so once any prayer had been granted the two engines shuffled
+            // lists of different LENGTH and picked different prayers (slann_fumbbl bb2020 seed 50:
+            // Java grants Bad Habits and rolls its d3, Rust grants a roll-free prayer and the whole
+            // dice stream shifts from there). This filter was impossible before granted prayers were
+            // recorded at all — see `bb2020/step_prayer.rs`.
+            let mut pick = |game: &mut Game, home_is_praying: bool| -> i32 {
+                let (own, opponent) = if home_is_praying {
+                    (&game.turn_data_home.inducement_set, &game.turn_data_away.inducement_set)
+                } else {
+                    (&game.turn_data_away.inducement_set, &game.turn_data_home.inducement_set)
+                };
+                let own: Vec<String> = own.get_prayers().iter().map(|s| s.to_string()).collect();
+                let opponent: Vec<String> = opponent.get_prayers().iter().map(|s| s.to_string()).collect();
+                let table = ffb_model::inducement::bb2020::prayers::Prayers::new();
+                let mut available: Vec<i32> = (1..=max_prayer_roll)
+                    .filter(|roll| match table.get_prayer(*roll) {
+                        Some(p) => {
+                            let name = p.name();
+                            !own.iter().any(|n| n == name)
+                                && !(p.affects_both_teams() && opponent.iter().any(|n| n == name))
+                        }
+                        None => true,
+                    })
+                    .collect();
                 ffb_model::util::java_random::collections_shuffle(&mut available, &mut game.collections_rng);
                 available[0]
             };
             let mut out = StepOutcome::next();
             let (winner, available) = if total_home > total_away {
-                let roll = pick(game);
+                let roll = pick(game, true);
                 let team_id = game.team_home.id.clone();
                 out = out.push_seq(vec![crate::step::framework::SequenceStep::with_params(StepId::Prayer, vec![
                     StepParameter::PrayerRoll(roll), StepParameter::TeamId(team_id.clone())])]);
                 (team_id, true)
             } else if total_away > total_home {
-                let roll = pick(game);
+                let roll = pick(game, false);
                 let team_id = game.team_away.id.clone();
                 out = out.push_seq(vec![crate::step::framework::SequenceStep::with_params(StepId::Prayer, vec![
                     StepParameter::PrayerRoll(roll), StepParameter::TeamId(team_id.clone())])]);
@@ -1140,6 +1165,44 @@ mod tests {
         step.kickoff_result = Some(KickoffResult::CheeringFans);
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    /// Java `PrayerFactory.availablePrayerRolls(own, opponent)` excludes prayers the team already
+    /// holds. Rust shuffled the full 1..=max every time, so after any prayer had been granted the
+    /// two engines shuffled lists of different LENGTH and picked different prayers — which then
+    /// desynced the whole dice stream (slann_fumbbl bb2020 seed 50).
+    #[test]
+    fn bb2020_cheering_fans_prayer_pick_excludes_prayers_already_held() {
+        use ffb_model::enums::Rules;
+        // Same RNG + same cheering-fans outcome, differing only in what the winner already holds.
+        let pick_for = |already_held: Option<&str>| -> Option<i32> {
+            let mut game = Game::new(
+                crate::step::framework::test_team("home", 0),
+                crate::step::framework::test_team("away", 0),
+                Rules::Bb2020,
+            );
+            game.team_home.cheerleaders = 20; // guarantee home wins the cheer-off
+            if let Some(p) = already_held {
+                game.turn_data_home.inducement_set.add_prayer(p);
+            }
+            let mut step = make_step();
+            step.kickoff_result = Some(KickoffResult::CheeringFans);
+            let out = step.start(&mut game, &mut GameRng::new(7));
+            out.pushes.iter().flatten()
+                .find(|s| s.step_id == StepId::Prayer)
+                .and_then(|s| s.params.iter().find_map(|p| match p {
+                    StepParameter::PrayerRoll(r) => Some(*r),
+                    _ => None,
+                }))
+        };
+
+        let baseline = pick_for(None).expect("cheering fans must push a Prayer step");
+        // Excluding the prayer that baseline would have picked must change the pick.
+        let table = ffb_model::inducement::bb2020::prayers::Prayers::new();
+        let held = table.get_prayer(baseline).expect("baseline roll maps to a prayer").name();
+        let with_exclusion = pick_for(Some(held)).expect("a Prayer step is still pushed");
+        assert_ne!(with_exclusion, baseline,
+            "a prayer the team already holds must be filtered out of availablePrayerRolls");
     }
 
     #[test]
