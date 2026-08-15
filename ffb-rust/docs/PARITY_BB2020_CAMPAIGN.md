@@ -5177,3 +5177,72 @@ one run.
 | working tree | clean at HEAD, no engine change |
 
 bb2020 stays **28 of 30 green**. RED: nurgle 86 · slann_fumbbl 98.
+
+## ITER98 — root cause of the slann trap door found in full: Rust never records a granted prayer, so NO prayer effect can ever expire
+
+No engine change; slann_fumbbl stays 98/100. The causal chain is now complete and the fix is a
+well-defined two-part change, deliberately left for the next iteration rather than half-landed.
+
+### The probe that settled it
+
+A gated print at `StepTrapDoor::execute_step` on slann_fumbbl seed 29:
+
+```
+TD half=2 turnH=8 turnA=8 pid=home_01 coord=(13,10)
+   doors=[(6,1), (19,13)]   home_prayers=[]   away_prayers=[]
+```
+
+Trap doors are still on the pitch in the SECOND half — while **both teams' prayer lists are
+empty**. That single line falsifies the ITER97 hypothesis and replaces it.
+
+### The chain
+
+1. **Rust never adds a granted prayer to `turn_data.inducement_set`.** Outside tests there is not
+   one production call to `add_prayer` (`grep -rn "add_prayer" crates/ffb-engine/src`); the prayer
+   step applies `init_effect` and records nothing.
+2. Java's expiry walks exactly that collection —
+   `for (Prayer prayer : game.getTurnDataHome().getInducementSet().getPrayers())` in
+   `StepEndTurn.deactivatePrayers` — so with an empty set there is nothing to expire.
+3. **No prayer effect is ever removed on the live path.** `PrayerHandlerFactory::deactivate_prayers`
+   exists but is called only from the DEAD `bb2020/step_end_turn.rs`; the live BB2025 `StepEndTurn`
+   deactivates CARDS for each duration and never prayers, where Java's
+   `deactivateEffectsAndPrayers` does both (`StepEndTurn.java:489-506`).
+4. So Treacherous Trapdoor's doors (BB2020 duration `UntilEndOfHalf`) survive into half 2, and a
+   player standing on one rolls a Trap Door d6 that Java never rolls — the ITER97 die.
+
+Invisible to the parity state hash throughout: neither trap doors nor prayers are in the state
+string. Same property as ITER95's Moles prayer, and the same class of bug.
+
+### Measured and REVERTED: duration-aware prayer deactivation alone
+
+Ported `deactivatePrayers(duration, isHomeTurnEnding)` faithfully — both teams' sets, the
+`UNTIL_END_OF_OPPONENTS_TURN` skip, remove-from-set then `removeEffect` then `ReportPrayerEnd`, plus
+a `prayer_duration_by_name` lookup per ruleset, wired into the live `StepEndTurn` at Java's four
+call sites (with `UNTIL_END_OF_HALF` correctly under `if (fNewHalf)` ALONE, not
+`fNewHalf || fTouchdown` — Java `:502-506`).
+
+**Result: slann_fumbbl 98/100, unchanged.** Necessarily so: step 1 means the collection it iterates
+is always empty. Reverted rather than left in as dead-but-correct code.
+
+### The fix, for the next iteration
+
+Both parts are required and must land together, then be measured as one change:
+
+1. **Record the prayer.** Find where the prayer step applies `init_effect` and add the prayer to the
+   praying team's `inducement_set` (Java's `StepPrayer` does both). Verify against Java which
+   collection and which name form (`get_name()` vs `name()`) is stored.
+2. **Expire it.** Re-apply the duration-aware `deactivate_prayers_for_duration` above (the exact
+   code is in this commit's history if needed).
+
+Expect this to move more than slann_fumbbl: no `UntilEndOfHalf` or `UntilEndOfDrive` prayer effect
+has ever expired in any bb2020 game, so it is a broad behavioural change. Gate it against the full
+green set, not just the target.
+
+### Gate
+
+| check | result |
+|---|---|
+| `slann_fumbbl` bb2020 | 98/100 (unchanged — findings only) |
+| working tree | clean at HEAD, no engine change |
+
+bb2020 stays **28 of 30 green**. RED: nurgle 86 · slann_fumbbl 98.
