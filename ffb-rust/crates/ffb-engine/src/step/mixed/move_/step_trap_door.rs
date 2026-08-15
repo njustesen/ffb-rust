@@ -154,8 +154,13 @@ impl StepTrapDoor {
                 ApothecaryMode::TrapDoor,
             )
         };
-        ir.apply_to(game);
-        let mut outcome = StepOutcome::next();
+        // Java: `publishParameter(new StepParameter(StepParameterKey.INJURY_RESULT,
+        //        UtilServerInjury.handleInjury(...)))` — the result is PUBLISHED for the
+        // APOTHECARY(TRAP_DOOR) step that follows in the sequence, NOT applied here. Rust applied
+        // it inline instead, and the `remove(player)` two lines down then overwrote the state, so a
+        // trap-door casualty came out as `Reserve` where Java has `Injured` — wood_elf bb2020
+        // seed 50 i=300, `h05`, on identical dice (injury 5+5, casualty d16=1/d6=5).
+        let mut outcome = StepOutcome::next().publish(StepParameter::InjuryResult(Box::new(ir)));
         for p in self.trap_door_triggered_params(game, coord) {
             outcome = outcome.publish(p);
         }
@@ -358,6 +363,28 @@ mod tests {
         });
         // Either the event is present or a re-roll was offered (either is correct behavior)
         assert!(trap_event.is_some() || !out.published.is_empty() || out.action == StepAction::NextStep);
+    }
+
+    /// Java `trapDoorTriggered` PUBLISHES the injury result for the APOTHECARY(TRAP_DOOR) step
+    /// that follows; it never applies it inline. Rust applied it and then `remove_player` overwrote
+    /// the state, so a trap-door casualty surfaced as `Reserve` instead of `Injured`
+    /// (wood_elf bb2020 seed 50 i=300).
+    #[test]
+    fn trap_door_publishes_the_injury_result_instead_of_applying_it() {
+        let coord = FieldCoordinate::new(5, 5);
+        let mut step = StepTrapDoor::new();
+        step.player_id = Some("p1".into());
+        let mut game = make_game();
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.trap_doors.push(coord);
+
+        let out = step.trap_door_triggered(
+            &mut game, &mut GameRng::new(3), "p1".into(), coord);
+
+        assert!(
+            out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))),
+            "the trap-door injury must be published for the apothecary step, got {:?}",
+            out.published);
     }
 
     #[test]

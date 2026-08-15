@@ -5027,3 +5027,75 @@ the start: `stepdiff.py` for the diverging step, then `FFB_DIE_AT` vs Java `call
 Worth checking opportunistically: other `*Context` constructions in Rust that drop an argument Java
 passes. This defect class — a context built with fewer arguments than Java's, silently disabling a
 whole modifier family — is new to the campaign and would be invisible to the state hash every time.
+
+## ITER96 — the trap-door injury was applied inline instead of published: wood_elf 99 → 100/100 GREEN
+
+### Measurement
+
+wood_elf seed 50, last turn (t8 h2), step 299 `Activate(Home6, MOVE)`. One differing field:
+
+```
+i=300   h05:  JAVA -1,-1,Injured   RUST -1,-1,Reserve
+```
+
+Dice are genuinely identical this time — verified the right way, by `caller=` frame rather than by
+index. Java's tail:
+
+```
+86  d6=1   StepTrapDoor.start                      (the trap door opens)
+87  d6=5   rollInjury  InjuryTypeCrowd.handleInjury  StepTrapDoor.trapDoorTriggered
+88  d6=5   rollInjury  InjuryTypeCrowd.handleInjury  StepTrapDoor.trapDoorTriggered
+89  d16=1  InjuryTypeServer.setInjury (casualty)
+90  d6=5   InjuryTypeServer.setInjury (casualty)
+```
+
+Rust's dice at 86-90 are `1, 5, 5, d16=1, 5` — the same rolls, including the casualty. Both engines
+rolled the casualty; only Rust failed to apply it.
+
+### Root cause
+
+Java `StepTrapDoor.trapDoorTriggered` (`:137-140`):
+
+```java
+publishParameter(new StepParameter(StepParameterKey.INJURY_RESULT,
+    UtilServerInjury.handleInjury(this, ..., ApothecaryMode.TRAP_DOOR)));
+game.getFieldModel().remove(player);
+```
+
+The result is **published** for the `APOTHECARY(TRAP_DOOR)` step that follows in the sequence — the
+drive trace confirms `TrapDoor → Apothecary → CatchScatterThrowIn`. Rust instead called
+`ir.apply_to(game)` inline and published nothing, and the `remove_player` two lines later then
+overwrote the state, so the casualty surfaced as `Reserve` instead of `Injured`.
+
+This is the **roll-it-but-don't-apply-it** pattern already recorded for the Ball & Chain chain
+injury: in Java these results travel to the apothecary step as a parameter. Applying them at the
+roll site loses them.
+
+### Fix
+
+Publish `StepParameter::InjuryResult(Box::new(ir))` and drop the inline `apply_to`, mirroring Java
+exactly. Regression test `trap_door_publishes_the_injury_result_instead_of_applying_it`.
+
+### Gate
+
+| check | result |
+|---|---|
+| `wood_elf` bb2020 | **99/100 → 100/100 GREEN** |
+| `halfling` bb2020 | 100/100 (ITER95 holds) |
+| `necromantic` bb2020 | 100/100 (holds) |
+| `slann_fumbbl` bb2020 | 98/100 (unchanged) |
+| `nurgle` bb2020 | 86/100 (unchanged) |
+| `lineman` bb2020 / bb2016 / bb2025 | 100/100 each (run serially) |
+| `cargo test --workspace` | clean |
+
+**bb2020 is now 28 of 30 green.** RED: nurgle 86 · slann_fumbbl 98.
+
+### Next iteration
+
+`slann_fumbbl` at 98/100 (2 seeds) is the cheaper of the two remaining. Same method: `stepdiff.py`
+for the diverging step, then `FFB_DIE_AT` vs Java `caller=` to pin the die — this has now resolved
+three reds in a row at single-die precision.
+
+Worth a cheap sweep at some point: grep for other sites that call `apply_to` on an
+`InjuryResult` where the Java publishes `INJURY_RESULT` instead. Two instances of this pattern have
+now cost a red each (Ball & Chain, trap door).
