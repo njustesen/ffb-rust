@@ -5673,3 +5673,64 @@ running `SelectBlitzTarget` (ITER103).
 | working tree | clean at HEAD, no engine change |
 
 bb2020 stays **29 of 30 green**. RED: nurgle 86.
+
+## ITER106 — CONFIRMED: the prone blitzer takes the INLINE path, so its FA failure aborts to the wrong place
+
+No engine change (reverted); nurgle stays 86/100. The mechanism is now fully pinned by measurement.
+
+### The decisive line
+
+nurgle seed 2, with both FA placements applied, probing the roll itself:
+
+```
+FA-ROLL acting=away_02 action=Blitz def=home_03 roll=1 min=2 ok=false
+        fail_label=END_BLOCKING  standing_up=true
+```
+
+Everything works except the destination:
+
+* Foul Appearance **runs** and finds the right defender (`home_03`).
+* It **FAILS** — `roll=1` against `min=2`, exactly matching the single die Java spends here.
+* The blitzer has **not yet stood up** (`standing_up=true` = still prone, pending).
+* But `fail_label=END_BLOCKING`, which means this blitz is on the **inline activation path**, NOT
+  `SelectBlitzTarget`.
+
+So even a PRONE blitzer takes the inline path. `goto END_BLOCKING` jumps to the end of the
+`BlitzBlock` sequence — and the stand-up is not in that sequence, so aborting there cannot prevent
+it. In Java the same failure jumps to `END_BLITZING` INSIDE `SelectBlitzTarget`, which sits before
+`STAND_UP`, so the stand-up never runs at all.
+
+Note `fail_fa` does publish `END_PLAYER_ACTION(true)` for a blitzing player (Java's
+`handleFailure` does the same, and `is_blitzing()` covers `Blitz`), yet the player still ends up
+standing — so the publish alone does not substitute for aborting before the stand-up.
+
+### Conclusion
+
+This is the third independent measurement pointing at the same structural gap, and it retires the
+"just move the step" family of fixes for good:
+
+1. ITER103 — a blitz needing no stand-up skips `SelectBlitzTarget` entirely.
+2. ITER105 — with the step inserted on both paths it executes and resolves its defender.
+3. ITER106 — it also rolls and fails correctly; only the abort TARGET is wrong, because the prone
+   blitzer is on the inline path too.
+
+**The fix is ITER103's: route every BB2020 blitz through `SelectBlitzTarget`, as Java does**, so the
+Foul Appearance abort lands before `STAND_UP`. Placement patches cannot express this, because the
+inline activation has no stand-up to abort past.
+
+### Next iteration
+
+Attempt the routing change, gated on `Rules::Bb2020` so bb2016/bb2025 (both 30/30) are untouched: in
+`StepEndSelecting`'s Blitz dispatch, for BB2020 push the `SelectBlitzTarget` sequence (carrying the
+already-chosen `block_defender_id`) instead of the inline activation + `BlitzBlock`. The agent
+pre-picks the target, so `StepSelectBlitzTarget` must accept it rather than prompt. Gate against the
+full 30-roster bb2020 matrix plus lineman in all three editions — this changes every BB2020 blitz.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 86/100 (unchanged — reverted, findings only) |
+| working tree | clean at HEAD, no engine change |
+
+bb2020 stays **29 of 30 green**. RED: nurgle 86.
