@@ -140,6 +140,16 @@ impl StepFoulAppearance {
                 || pa.is_block_action()
                 || pa == PlayerAction::GazeMove
                 || pa.is_kicking_downed()
+                // BB2020 BRIDGE. Java's list has no BLITZ because it never needs one: BB2020
+                // resolves Foul Appearance inside `SelectBlitzTarget`, BEFORE JUMP_UP/STAND_UP, so a
+                // failure gotos END_BLITZING and the blitzer simply never stands
+                // (`bb2020/SelectBlitzTarget.java:35-36`). Rust's agent commits to blitz+target in a
+                // single command, so `StepEndSelecting` dispatches an inline activation and the
+                // stand-up happens outside it — there is no abort point before the stand-up to jump
+                // to. Relocating the step cannot fix that (ITER103-110: every variant measured
+                // 0/100, 15/100 or 25/100 against an 86/100 baseline). Reverting the stand-up here
+                // reaches the same END STATE Java reaches, on the same dice.
+                || (game.rules == ffb_model::enums::Rules::Bb2020 && pa.is_blitzing())
             ).unwrap_or(false);
             if set_prone {
                 if let Some(pid) = game.acting_player.player_id.clone() {
@@ -348,6 +358,36 @@ mod tests {
         let state = game.field_model.player_state("atk").unwrap();
         assert_eq!(state.base(), PS_PRONE);
         assert!(!state.is_active());
+    }
+
+    /// BB2020 bridge: a failed Foul Appearance must leave a BB2020 blitzer PRONE. Java never needs
+    /// `BLITZ` in the revert list because it resolves Foul Appearance in `SelectBlitzTarget`, before
+    /// the stand-up; Rust's single-command blitz has no abort point there, so it reverts instead.
+    /// BB2025/BB2016 must keep Java's list exactly — a `Blitz` action does NOT revert there.
+    #[test]
+    fn bb2020_failed_foul_appearance_reverts_a_blitzer_to_prone() {
+        use ffb_model::enums::{PlayerAction, PS_PRONE, PS_STANDING, Rules};
+        let run = |rules: Rules| {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+            game.turn_mode = TurnMode::Regular;
+            game.home_playing = true;
+            game.turn_data_home.rerolls = 0;
+            add_player(&mut game, "atk", vec![]);
+            add_player(&mut game, "def", vec![SkillId::FoulAppearance]);
+            game.acting_player.player_id = Some("atk".into());
+            game.acting_player.player_action = Some(PlayerAction::Blitz);
+            game.acting_player.standing_up = true;
+            game.field_model.set_player_state("atk", PlayerState::new(PS_STANDING));
+            game.defender_id = Some("def".into());
+            let mut step = StepFoulAppearance::new("fa_fail");
+            step.roll = 1; // guaranteed failure (minimum is 2)
+            step.start(&mut game, &mut GameRng::new(0));
+            game.field_model.player_state("atk").unwrap().base()
+        };
+        assert_eq!(run(Rules::Bb2020), PS_PRONE,
+            "a BB2020 blitzer that fails Foul Appearance must end up prone, as it does in Java");
+        assert_eq!(run(Rules::Bb2025), PS_STANDING,
+            "BB2025 keeps Java's revert list exactly — BLITZ is not in it");
     }
 
     #[test]

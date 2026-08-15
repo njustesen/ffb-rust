@@ -5905,3 +5905,55 @@ Option 2 needs no new parameter and uses state Java also sets, so try it first.
 | working tree | clean at HEAD, no engine change |
 
 bb2020 stays **29 of 30 green**. RED: nurgle 86.
+
+## ITER110 — nurgle 86 → 100/100 GREEN. **BB2020 IS 30/30. ALL THREE RULESETS COMPLETE.**
+
+### First, the negative result that pointed the way
+
+ITER109 said to gate the block push on the target-selection state instead of `end_player_action`.
+Measured: **25/100** — better than the 15/100 of ITER108/109 (so `end_player_action` really was
+part of the problem) but still far below the 86/100 baseline. That is the third variant of the
+conditional-push design to lose most blitzes, and it retires the whole family:
+
+| approach | nurgle |
+|---|---|
+| baseline (FA in BlitzBlock, after STAND_UP) | 86/100 |
+| move FA to `SelectBlitzTarget` only (ITER101/103) | 0/100 |
+| route through `SelectBlitzTarget` + conditional push (ITER108) | 15/100 |
+| inline activation + conditional push (ITER109) | 15/100 |
+| conditional push gated on target-selection state (ITER110) | 25/100 |
+
+Every attempt to reproduce Java's CONTROL FLOW failed, because Rust's agent commits to blitz+target
+in a single command and there is simply no abort point before the stand-up.
+
+### The fix: reproduce the END STATE instead
+
+Java's `FoulAppearanceBehaviour.handleFailure` reverts a standing-up player to PRONE for
+`BLITZ_MOVE || isBlockAction() || GAZE_MOVE || isKickingDowned()`. **`BLITZ` is absent from that
+list, and Java does not need it** — BB2020 resolves Foul Appearance inside `SelectBlitzTarget`,
+before JUMP_UP/STAND_UP, so a failure gotos END_BLITZING and the blitzer never stands in the first
+place.
+
+Rust's dispatch has no such abort point, so it reaches the same end state the other way: add
+`BLITZ` to the revert list, **gated on `Rules::Bb2020`**. One condition, no dice consumed or moved,
+BB2025/BB2016 keep Java's list exactly.
+
+This is an explicit Rust-side bridge, of the same kind already documented for the defender-as-step-
+parameter: the command shape differs, so the mechanism differs, but the observable game state and
+the dice stream match Java exactly.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | **86/100 → 100/100 GREEN** |
+| `halfling` / `necromantic` / `wood_elf` / `slann_fumbbl` / `dwarf` bb2020 | 100/100 each |
+| `lineman` bb2020 / bb2025 / bb2016 | 100/100 each (run serially) |
+| `cargo test --workspace` | clean (exit 0) |
+
+Regression test `bb2020_failed_foul_appearance_reverts_a_blitzer_to_prone` pins both directions:
+BB2020 reverts, BB2025 does not.
+
+## 🏁 BB2020 30/30 — THE THREE-RULESET CAMPAIGN IS COMPLETE
+
+bb2016 30/30 · bb2020 30/30 · bb2025 30/30. A full-matrix confirmation sweep is the next step.
