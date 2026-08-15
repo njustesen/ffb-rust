@@ -404,10 +404,11 @@ impl StepEndSelecting {
                         using_vomit: self.using_vomit,
                         using_breathe_fire: self.using_breathe_fire,
                         using_chomp: self.using_chomp,
+                        rules: game.rules,
                         ..Default::default()
                     }
                 } else {
-                    BlockParams::default()
+                    BlockParams { rules: game.rules, ..Default::default() }
                 };
                 let seq = Block::build_sequence(&params);
                 StepOutcome::next().push_seq(seq)

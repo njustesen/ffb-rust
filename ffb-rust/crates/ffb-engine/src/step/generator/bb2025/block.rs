@@ -1,12 +1,12 @@
 /// BB2025 block action step sequence.
 /// Mirrors Java `com.fumbbl.ffb.server.step.generator.bb2025.Block`.
-use ffb_model::enums::ApothecaryMode;
+use ffb_model::enums::{ApothecaryMode, Rules};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
 use super::activation_sequence_builder::ActivationSequenceBuilder;
 
 /// Parameters for the Block sequence — mirrors Java `Block.SequenceParams`.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct BlockParams {
     pub block_defender_id: Option<String>,
     pub multi_block_defender_id: Option<String>,
@@ -17,6 +17,28 @@ pub struct BlockParams {
     pub using_chomp: bool,
     pub ask_for_block_kind: bool,
     pub publish_defender: bool,
+    /// Ruleset this sequence is being built for — see `bb2025::BlitzBlockParams::rules`, which
+    /// gates the same entry in the sibling BlitzBlock sequence for the same reason:
+    /// `bb2025/Block.java:43` adds PICK_UP between TRICKSTER and CATCH_SCATTER_THROW_IN and
+    /// `bb2020/Block.java` does not.
+    pub rules: Rules,
+}
+
+impl Default for BlockParams {
+    fn default() -> Self {
+        Self {
+            block_defender_id: None,
+            multi_block_defender_id: None,
+            using_stab: false,
+            using_chainsaw: false,
+            using_vomit: false,
+            using_breathe_fire: false,
+            using_chomp: false,
+            ask_for_block_kind: false,
+            publish_defender: false,
+            rules: Rules::Bb2025,
+        }
+    }
 }
 
 pub struct Block;
@@ -76,10 +98,12 @@ impl Block {
         seq.add(StepId::Dauntless, vec![]);
         // 9 TRICKSTER
         seq.add(StepId::Trickster, vec![]);
-        // 10 PICK_UP
-        seq.add(StepId::PickUp, vec![
-            StepParameter::GotoLabelOnFailure(labels::DROP_FALLING_PLAYERS.into()),
-        ]);
+        // 10 PICK_UP — BB2025 only; see `BlockParams::rules`.
+        if params.rules != Rules::Bb2020 {
+            seq.add(StepId::PickUp, vec![
+                StepParameter::GotoLabelOnFailure(labels::DROP_FALLING_PLAYERS.into()),
+            ]);
+        }
         // 11 CATCH_SCATTER_THROW_IN
         seq.add(StepId::CatchScatterThrowIn, vec![]);
         // 12 STAB
@@ -252,5 +276,27 @@ mod tests {
         let steps = Block::build_sequence(&params);
         let init = &steps[0];
         assert!(init.params.iter().any(|p| matches!(p, StepParameter::BlockDefenderId(id) if id == "p42")));
+    }
+
+    /// The BLOCK twin of `bb2025::blitz_block`'s gate: `bb2025/Block.java:43` runs PICK_UP between
+    /// TRICKSTER and CATCH_SCATTER_THROW_IN, `bb2020/Block.java` does not (its only PICK_UP is
+    /// after SHADOWING, in the pushback branch). The stray attempt drew a d6 Java never rolls,
+    /// shifting the injury and casualty rolls by one (goblin bb2020 seed 50 i=13).
+    #[test]
+    fn pick_up_before_catch_scatter_is_bb2025_only() {
+        let count_between = |rules: Rules| {
+            let steps = Block::build_sequence(&BlockParams { rules, ..Default::default() });
+            let trickster = steps.iter().position(|s| s.step_id == StepId::Trickster).unwrap();
+            let catch = steps.iter().skip(trickster)
+                .position(|s| s.step_id == StepId::CatchScatterThrowIn).unwrap() + trickster;
+            steps[trickster..catch].iter().filter(|s| s.step_id == StepId::PickUp).count()
+        };
+        assert_eq!(count_between(Rules::Bb2025), 1);
+        assert_eq!(count_between(Rules::Bb2020), 0);
+
+        // Only that one entry is gated.
+        let bb2025 = Block::build_sequence(&BlockParams::default());
+        let bb2020 = Block::build_sequence(&BlockParams { rules: Rules::Bb2020, ..Default::default() });
+        assert_eq!(bb2020.len(), bb2025.len() - 1);
     }
 }

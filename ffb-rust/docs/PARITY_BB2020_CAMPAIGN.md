@@ -3268,3 +3268,54 @@ only if it printed `rust_total` **and** an `N/100 games match` line — not on e
 **Status: 6 of 30 green**, `goblin` 97/100 still the fewest-fails target. Next: seed 50 (i=13, the
 ITER66 thread — Rust draws an extra d6 before the casualty roll; re-check it against this fix first,
 since a stray blitz-path pickup is exactly the shape ITER66 was chasing).
+
+## ITER68 — the same PICK_UP gate, in the BLOCK sequence: `goblin` 97 → **98/100**
+
+Straight continuation of ITER67, and it closes the ITER66 thread.
+
+ITER66 had measured seed 50 correctly — "Rust draws one extra d6 immediately before the casualty
+d16" — but attributed it to the injury machinery. Comparing the dice by SIDES against a fresh run
+puts the first divergence at position 25 (Java d16 casualty, Rust d6), and the Rust
+`FFB_DRIVE_TRACE` shows the extra draw at position 21 with its step named directly:
+
+```
+DRIVE step=Trickster
+DRIVE step=PickUp          <- DICE_TRACE pos=21 sides=6 result=6
+DRIVE step=CatchScatterThrowIn
+...
+DRIVE step=BlockRoll       <- pos=22,23   (Java: 21,22)
+```
+
+Same defect as ITER67, one generator over: this is a plain BLOCK, and `bb2025/Block.java:43` adds
+`PICK_UP` between `TRICKSTER` and `CATCH_SCATTER_THROW_IN` where `bb2020/Block.java:51-52` goes
+straight from one to the other (BB2020's only `PICK_UP` is at line 88, after `SHADOWING`, in the
+pushback branch). Unlike seed 85 the pickup here SUCCEEDS — it just spends a die Java never spends,
+shifting the injury pair from (23,24) to (24,25) and the casualty from 25 to 26.
+
+**Fix**: the identical edition gate — `bb2025::BlockParams` gains `rules`, the entry is emitted only
+when `rules != Bb2020`, and `StepEndSelecting` passes `game.rules` through. Test
+`pick_up_before_catch_scatter_is_bb2025_only` in `bb2025/block.rs` mirrors the BlitzBlock one and
+asserts the BB2020 sequence is exactly one step shorter.
+
+### Swept the rest of the generator pair for the same class of defect
+
+```
+BlitzBlock.java     bb2025=2 PICK_UP   bb2020=1   <- fixed ITER67
+Block.java          bb2025=1           bb2020=1   <- EQUAL COUNT, different POSITION; fixed here
+ThrowTeamMate.java  bb2025=0           bb2020=1   <- OPEN: bb2020 has a PICK_UP bb2025 lacks
+```
+
+Block is the warning: counting occurrences is not enough, the position matters. `ThrowTeamMate` is a
+real open lead for a later iteration (bb2020 picks up where bb2025 does not) but nothing measured
+points at it yet, so it is recorded, not changed.
+
+### Gate
+
+| check | result |
+|---|---|
+| `goblin` bb2020 | 97/100 → **98/100** (seed 50 fixed; 81, 98 remain) |
+| `lineman` bb2016 / bb2020 / bb2025 | 100/100 each |
+| `human`, `ogre`, `underworld`, `chaos_pact`, `renegades` bb2020 | 100/100 each |
+| `cargo test --workspace` | **14,452 passed / 0 failed** |
+
+**Status: 6 of 30 green**, `goblin` 98/100. Next: seed 81 (i=128, away turn 8) and seed 98 (i=10).
