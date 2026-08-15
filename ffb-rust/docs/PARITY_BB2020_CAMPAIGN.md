@@ -3035,3 +3035,39 @@ must be offered every free adjacent square, not the three-square fan.
 Probes on both sides were removed with targeted edits rather than `git checkout --` (per the ITER59
 lesson); the jar was rebuilt and `lineman` bb2020 re-verified at **100/100** in this same turn. Tree
 clean on both repos.
+
+### ITER63 — `ogre` 🟢 100/100: Side Step was auto-declined
+
+Two faults in `skill_behaviour/bb2020/side_step_behaviour.rs`, both found by probing the guard and
+then the re-entry:
+
+1. **The answer was wrong.** Java shows a `DialogSkillUseParameter` and re-enters with the coach's
+   reply; `ParityRunner` answers every SKILL_USE with USE=true except four named skills (DumpOff,
+   PrimalSavagery, SafePairOfHands, Swoop). Side Step is not among them, so **Java always side-steps**.
+   Rust recorded `false` with the comment *"headless: auto-decline"* — a Rust-only shortcut with no
+   Java counterpart.
+2. **The fall-through was missing.** Setting the answer to `true` alone changed nothing: a probe showed
+   the hook runs exactly ONCE per push (`SS-MODE` never printed). Java gets a second pass from the
+   dialog round trip; Rust has none, so recording the answer and returning left `pushback_mode` at
+   `REGULAR` forever. Recording it and falling straight through to the mode switch reaches the same
+   state Java reaches on its second pass.
+
+With both fixed, the defender is offered every free adjacent square, as Java does:
+`ogre` seed 57 `a04` now lands on (12,9) in both engines.
+
+An existing test, `side_step_headless_auto_declines`, asserted the old shortcut and failed — it
+encoded the bug. Rewritten as `side_step_records_the_harness_answer_not_a_decline`, plus a new
+`side_step_is_used_and_switches_the_pushback_mode` that pins both halves (answer recorded as `true`
+AND `pushback_mode == SIDE_STEP` in the same pass).
+
+**Result: `ogre` bb2020 1-100 → `PARITY: 100/100 games match`** (99 → 100).
+
+Gates, all run this turn against the pinned jar: `lineman` **100/100**, `human` **100/100**,
+`underworld` **100/100**, `chaos_pact` **100/100**, `renegades` **100/100**, `lineman` bb2016
+**100/100**, `lineman` bb2025 **100/100**, `cargo test --workspace` **14,448 passed / 0 failed**.
+`goblin` unchanged at 95/100.
+
+**Status: 6 of 30 bb2020 matchups green** — `lineman`, `human`, `underworld`, `chaos_pact`,
+`renegades`, `ogre`. Next by fewest fails: `goblin` (5). Note `bb2025`'s Side Step behaviour carries the
+same auto-decline shortcut and was deliberately left alone — bb2025 lineman is 100/100 either way, so it
+needs its own divergence and verification rather than an untested ride-along.

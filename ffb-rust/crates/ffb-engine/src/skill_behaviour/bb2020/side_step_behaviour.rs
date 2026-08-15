@@ -96,11 +96,18 @@ impl StepModifierTrait for SideStepStepModifier {
             && !(cancelling_skill.is_some() && !attacker_conflicts)
             && in_tacklezone
         {
-            // Java: if (!sideStepping.containsKey(id)) show dialog → headless: auto-decline
-            if !state.side_stepping.contains_key(&defender_id) {
-                state.side_stepping.insert(defender_id.clone(), false);
-                return true;
-            }
+            // Java: `if (!sideStepping.containsKey(id))` shows a `DialogSkillUseParameter` and
+            // re-enters the step with the coach's answer. The parity harness answers every SKILL_USE
+            // dialog with USE=true except four named skills (`ParityRunner`: DumpOff, PrimalSavagery,
+            // SafePairOfHands, Swoop) — Side Step is not among them, so Java ALWAYS side-steps.
+            // Rust recorded `false` here ("auto-decline"), so Side Step never fired: the defender was
+            // offered the three-square REGULAR fan instead of every free adjacent square, and picked a
+            // different destination (ogre bb2020 seed 57 i=133: the Snotling away_05 ends at (12,9) in
+            // Java, (13,9) in Rust). Record the harness's answer instead.
+            // Java returns here and re-enters the step once the coach answers; Rust has no dialog
+            // round trip for this hook, so record the harness's answer and fall straight through to
+            // the mode switch below - the same state Java reaches on its second pass.
+            state.side_stepping.entry(defender_id.clone()).or_insert(true);
 
             // Java: if (state.sideStepping.get(id)) { switch to SIDE_STEP mode }
             if *state.side_stepping.get(&defender_id).unwrap_or(&false) {
@@ -238,6 +245,31 @@ mod tests {
         assert_eq!(m.priority(), 3);
     }
 
+    /// Java's hook shows a `DialogSkillUseParameter` and re-enters the step with the answer; the
+    /// parity harness answers every SKILL_USE with USE=true except DumpOff / PrimalSavagery /
+    /// SafePairOfHands / Swoop, so Side Step is always USED. Rust used to record `false`
+    /// ("auto-decline") and return, so `pushback_mode` never became SIDE_STEP and the defender got
+    /// the three-square REGULAR fan instead of every free adjacent square (ogre bb2020 seed 57).
+    #[test]
+    fn side_step_is_used_and_switches_the_pushback_mode() {
+        let mut game = make_game();
+        game.team_away.players.push(player_with_skills("def1", vec![SkillId::SideStep]));
+        game.defender_id = Some("def1".into());
+        game.field_model.set_player_coordinate("def1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("def1", PlayerState::new(PS_STANDING));
+
+        let m = SideStepStepModifier;
+        let mut hs = default_hook_state("def1", true);
+        assert!(hs.side_stepping.is_empty(), "no answer recorded yet");
+        let handled = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
+
+        assert!(handled, "the hook handles the step when Side Step applies");
+        assert_eq!(hs.side_stepping.get("def1"), Some(&true),
+            "the harness answer is USE=true, not a decline");
+        assert_eq!(hs.pushback_mode, PushbackMode::SIDE_STEP,
+            "recording the answer must fall through to the mode switch in the same pass,              since Rust has no dialog round trip to re-enter on");
+    }
+
     #[test]
     fn no_side_step_skill_returns_false() {
         let mut game = make_game();
@@ -266,8 +298,13 @@ mod tests {
         assert!(!result, "SideStep should not fire when no free squares around defender");
     }
 
+    /// Superseded by `side_step_is_used_and_switches_the_pushback_mode`. This test asserted the
+    /// old "headless auto-decline" (`side_stepping = false`), which was a Rust-only shortcut with no
+    /// Java counterpart: the harness answers SKILL_USE with USE=true for Side Step, so Java always
+    /// side-steps. The assertion is inverted here rather than deleted, to keep a guard on the value
+    /// actually recorded for an eligible defender.
     #[test]
-    fn side_step_headless_auto_declines() {
+    fn side_step_records_the_harness_answer_not_a_decline() {
         let mut game = make_game();
         game.team_away.players.push(player_with_skills("def1", vec![SkillId::SideStep]));
         game.defender_id = Some("def1".into());
@@ -277,8 +314,8 @@ mod tests {
         let m = SideStepStepModifier;
         let mut hs = default_hook_state("def1", true);
         let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
-        assert!(result, "side step handled (declined) should return true");
-        assert_eq!(hs.side_stepping.get("def1"), Some(&false));
+        assert!(result, "an eligible Side Step handles the step");
+        assert_eq!(hs.side_stepping.get("def1"), Some(&true));
     }
 
     #[test]
