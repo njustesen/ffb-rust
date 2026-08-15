@@ -5492,3 +5492,65 @@ before touching it.
 | working tree | clean at HEAD, no engine change |
 
 bb2020 stays **29 of 30 green**. RED: nurgle 86.
+
+## ITER103 — ROOT CAUSE: a Rust blitz that needs no stand-up SKIPS `SelectBlitzTarget` entirely
+
+No engine change; nurgle stays 86/100. The chain is now complete, and it is a structural gap, not a
+sequence-ordering tweak.
+
+### The measurement
+
+With the FA move applied, a probe placed at `StepFoulAppearance`'s early return printed **no line at
+all for any BLITZ** — the step was never executing, not merely returning early. The drive trace
+shows why. nurgle seed 1 step 1, `Activate(away_03, Blitz)`:
+
+```
+RUST_BLOCK_PICK pid=away_03 def=home_03            ← agent pre-picks the target at activation
+DRIVE step=EndSelecting
+DRIVE step=InitActivation … BoneHead … BloodLust    ← activation block
+DRIVE step=InitBlocking                             ← straight into BlitzBlock
+DRIVE step=GoForIt / SteadyFooting / BlockStatistics / … / BlockRoll
+```
+
+**There is no `SelectBlitzTarget` sequence.** For this blitz Rust goes `StepEndSelecting` → blitz
+block directly. The FA step inserted into `SelectBlitzTarget` therefore lives in a sequence this
+blitz never enters, while the patch removed the FA from `BlitzBlock` — so the roll is deleted, Rust
+runs a die ahead, and the block die becomes 6 (POW) instead of 4 (PUSHBACK). That is the whole 0/100.
+
+Contrast nurgle seed 2, whose blitzer is PRONE: that one DOES run `SelectBlitzTarget`
+(`GotoLabel → JumpUp → StandUp → EndSelecting`, seen in the ITER92 trace). So in Rust **some blitzes
+route through `SelectBlitzTarget` and some do not** — apparently only those needing a stand-up.
+
+In Java every blitz goes through `SelectBlitzTarget` — that is where the target is chosen, and where
+BB2020 puts FOUL_APPEARANCE + DUMP_OFF. Java's seed-1 die 14 is a Foul Appearance roll for this same
+standing blitzer, which confirms Java ran the sequence.
+
+### Why the naive fix cannot work
+
+BB2020 needs FA resolved **before the blitzer stands up**. The stand-up lives in `SelectBlitzTarget`
+(prone case) and there is no such step at all in the standing case. So no single placement in the
+current Rust routing is correct for both:
+
+* FA in `SelectBlitzTarget` only → skipped for standing blitzers (this iteration, 0/100).
+* FA in `BlitzBlock` only → runs after STAND_UP for prone blitzers (status quo, nurgle 86/100).
+
+### The actual fix
+
+Make Rust's blitz always route through `SelectBlitzTarget`, as Java does, and then place
+FOUL_APPEARANCE + DUMP_OFF there for BB2020 with `BlitzBlock`'s copy frenzy-only. That is a
+structural change to `StepEndSelecting`'s BLITZ dispatch (and interacts with the agent pre-picking
+the block target at activation), so it needs its own iteration and a full-matrix gate — it will
+change every blitz in every edition if not carefully gated.
+
+Cheaper alternative worth measuring first: find whether the standing-blitzer path can be routed
+through `BlitzSelect` → `SelectBlitzTarget` without disturbing bb2016/bb2025 (both currently 30/30),
+i.e. gate the routing change on `Rules::Bb2020` only.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 86/100 (unchanged — reverted, findings only) |
+| working tree | clean at HEAD, no engine change |
+
+bb2020 stays **29 of 30 green**. RED: nurgle 86.
