@@ -3144,3 +3144,37 @@ bb2025 **100/100**, `cargo test --workspace` **14,450 / 0**. Adding the steps fo
 disturb bb2016 or bb2025.
 
 **Status: 6 of 30 green**, `goblin` 96/100 next by fewest fails.
+
+## ITER66 — `goblin` seed 50: Rust draws an extra d6 before the casualty roll
+
+Next seed after ITER65. At i=13 both engines activate `away_01` for a BLOCK with `rng_calls=19`; Java
+then spends 9 dice and continues the away turn, Rust spends 15 and takes a turnover.
+
+**The dice, compared by SIDES rather than position** (position is unreliable — Java logs the count
+BEFORE the roll, Rust after, so the two can sit one apart; the sequence of die TYPES is offset-proof):
+
+```
+JAVA:  6 6 6 6 6 16 6 6 6
+RUST:  6 6 6 6 6  6 16 6 6
+```
+
+Rust draws one extra d6 immediately before the casualty d16.
+
+**Backtraces pin the structure.** Probing individual draws (a temporary `FFB_DIE_AT=<n>` hook in
+`GameRng::die`, since reverted):
+
+- die 25 (d6) → `do_injury_roll_for_player_impl` directly (frame 5 is `GameRng::d6`), so it is one of
+  that function's own `d1`/`d2`;
+- die 26 (d16) → `roll_casualty` ← `outcome_to_player_state` ← the SAME
+  `do_injury_roll_for_player_impl` call.
+
+Since one impl call rolls `d1`, `d2` and then the casualty, that call owns dice **24, 25, 26** — i.e.
+Rust's injury pair is (24,25) where Java's is (23,24). The extra draw therefore happens at or before
+die 23, shifting the injury roll one die later; `roll_casualty` itself is correct
+(`bb2020/roll_mechanic.rs:122` is `[rng.die(16), rng.d6()]`, matching Java's d16-then-d6).
+
+**Next iteration**: backtrace dice 21, 22 and 23 the same way to segment them (Java has 21-22 from
+`rollDice:84` and 23-24 from `rollDice:98`), and find which Rust roll has no Java counterpart. The
+answer is one of the block-dice / armour draws before the injury, not the casualty machinery.
+
+Baseline unchanged and tree clean: `goblin` 96/100 (seeds 50, 81, 85, 98).
