@@ -5246,3 +5246,55 @@ green set, not just the target.
 | working tree | clean at HEAD, no engine change |
 
 bb2020 stays **28 of 30 green**. RED: nurgle 86 · slann_fumbbl 98.
+
+## ITER99 — record the prayer, then expire it: slann_fumbbl 98 → 99/100
+
+The two-part fix ITER98 scoped, landed together and measured as one change.
+
+### Part 1 — record the granted prayer
+
+Java's FINAL `PrayerHandler.initEffect(step, gameState, prayingTeamId)` does
+`inducementSet.addPrayer(handledPrayer())` before delegating to the concrete effect
+(`PrayerHandler.java:46-47`). Rust's trait has no such wrapper — each handler implements the
+concrete `init_effect` directly — so the recording was simply never done and **not one granted
+prayer ever landed in an inducement set**. Added at Rust's equivalent single entry point, the
+`h.init_effect(...)` call in `bb2020/step_prayer.rs`.
+
+### Part 2 — expire it by duration
+
+`PrayerHandlerFactory::deactivate_prayers_for_duration`, a 1:1 port of
+`StepEndTurn.deactivatePrayers(duration, isHomeTurnEnding)`: both teams' sets, the
+`UNTIL_END_OF_OPPONENTS_TURN` skip, remove-from-set → `removeEffect` → `ReportPrayerEnd`, with a
+per-ruleset `prayer_duration_by_name` lookup. Wired into the live BB2025 `StepEndTurn` at Java's
+four call sites — `UNTIL_END_OF_HALF` under `if (fNewHalf)` **alone**, not
+`fNewHalf || fTouchdown` like the drive block (`StepEndTurn.java:502-506`).
+
+Neither part does anything without the other, which is why ITER98's part-2-only attempt measured
+inert.
+
+Regression test `expiring_a_duration_removes_only_matching_prayers_and_their_effects` pins both
+directions: a non-matching duration leaves the prayer and its trap doors alone; the matching one
+removes it from the set AND clears the doors.
+
+### Gate
+
+| check | result |
+|---|---|
+| `slann_fumbbl` bb2020 | **98/100 → 99/100** |
+| `halfling` bb2020 | 100/100 (holds) |
+| `wood_elf` bb2020 | 100/100 (holds) |
+| `necromantic` bb2020 | 100/100 (holds) |
+| `dwarf` bb2020 | 100/100 (holds) |
+| `nurgle` bb2020 | 86/100 (unchanged) |
+| `lineman` bb2020 / bb2025 / bb2016 | 100/100 each (run serially) |
+| `cargo test --workspace` | clean |
+
+No regression anywhere, despite this being the first time any BB2020 prayer effect has ever
+expired. bb2020 stays **28 of 30 green**; slann_fumbbl is now one seed away.
+
+### Next iteration
+
+`slann_fumbbl` seed 50 is the last blocker on that roster — the ITER97 finding was for seed 29,
+which this fixed, so seed 50 needs its own diagnosis from `stepdiff.py` + `FFB_DIE_AT`. After that
+only `nurgle` 86 remains, whose confirmed root cause (BB2020 resolves Foul Appearance BEFORE
+STAND_UP, ITER92) still has an unexplained die-count contradiction blocking the obvious fix.

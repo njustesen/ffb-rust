@@ -106,6 +106,21 @@ impl StepPrayer {
                 // NOT set NEXT_STEP on this branch; the handler decides. Our trait returns
                 // "effect fully applied", i.e. false means it is waiting on a dialog.
                 Some(h) => {
+                    // Java's FINAL `PrayerHandler.initEffect(step, gameState, prayingTeamId)` does
+                    // `inducementSet.addPrayer(handledPrayer())` BEFORE delegating to the concrete
+                    // effect (`PrayerHandler.java:46-47`). Rust's trait has no such wrapper — the
+                    // handlers implement the concrete `init_effect` directly — so the recording was
+                    // simply never done, and NOT ONE granted prayer ever landed in an inducement
+                    // set. `StepEndTurn.deactivatePrayers` iterates exactly that collection, so no
+                    // prayer effect could ever expire: Treacherous Trapdoor's doors (BB2020
+                    // duration `UntilEndOfHalf`) survived into the second half and a player standing
+                    // on one rolled a Trap Door d6 Java never rolls (slann_fumbbl bb2020 seed 29).
+                    let prayer_name = h.handled_prayer_name();
+                    if game.team_home.id == team_id {
+                        game.turn_data_home.inducement_set.add_prayer(prayer_name);
+                    } else {
+                        game.turn_data_away.inducement_set.add_prayer(prayer_name);
+                    }
                     let mut prayer_state = std::mem::take(&mut game.prayer_state);
                     let applied = h.init_effect(&mut prayer_state, game, rng, &team_id);
                     game.prayer_state = prayer_state;

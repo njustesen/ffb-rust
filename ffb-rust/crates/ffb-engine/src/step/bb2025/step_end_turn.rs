@@ -652,10 +652,19 @@ impl StepEndTurn {
                 use crate::util::util_server_cards::UtilServerCards;
                 use ffb_model::enums::InducementDuration;
                 let is_home = self.is_home_turn_ending.unwrap_or(game.home_playing);
+                // Java `deactivateEffectsAndPrayers(duration, isHomeTurnEnding)` does BOTH the card
+                // and the prayer deactivation at each of these points (`StepEndTurn.java:489-506`).
+                use crate::factory::mixed::prayer_handler_factory::PrayerHandlerFactory;
                 UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfTurn, is_home);
+                PrayerHandlerFactory::deactivate_prayers_for_duration(
+                    game, InducementDuration::UntilEndOfTurn, is_home);
                 UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfOpponentsTurn, is_home);
+                PrayerHandlerFactory::deactivate_prayers_for_duration(
+                    game, InducementDuration::UntilEndOfOpponentsTurn, is_home);
                 if self.new_half || touchdown {
                     UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfDrive, is_home);
+                    PrayerHandlerFactory::deactivate_prayers_for_duration(
+                        game, InducementDuration::UntilEndOfDrive, is_home);
                     UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfHalf, is_home);
                     // Java StepEndTurn (fNewHalf || fTouchdown): remove the Dodgy Snack kickoff
                     // enhancement from every player — it lasts UNTIL_END_OF_DRIVE. Rust stores it as a
@@ -668,6 +677,14 @@ impl StepEndTurn {
                     {
                         p.remove_temporary_stat_mods("Dodgy Snack");
                     }
+                }
+                // Java gates UNTIL_END_OF_HALF on `if (fNewHalf)` ALONE (`StepEndTurn.java:502-506`),
+                // NOT on `fNewHalf || fTouchdown` like the drive-duration block above. (The
+                // `deactivate_cards(UntilEndOfHalf)` call sits in the wider block — a pre-existing
+                // deviation left untouched, since BB2025 is 30/30 with it.)
+                if self.new_half {
+                    PrayerHandlerFactory::deactivate_prayers_for_duration(
+                        game, InducementDuration::UntilEndOfHalf, is_home);
                 }
             }
             // bb2025 order: the KO recovery / fainting block runs AFTER the Secret Weapon

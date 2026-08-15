@@ -138,6 +138,80 @@ impl PrayerHandlerFactory {
             game.prayer_state = prayer_state;
         }
     }
+
+    /// Java `StepEndTurn.deactivatePrayers(InducementDuration, boolean isHomeTurnEnding)`.
+    ///
+    /// The live BB2025 `StepEndTurn` deactivated CARDS for each expiring duration but never
+    /// PRAYERS — Java's `deactivateEffectsAndPrayers` does both (`StepEndTurn.java:489-506`). Only
+    /// the DEAD `bb2020/step_end_turn.rs` called into prayers at all, and duration-lessly. Paired
+    /// with the missing `addPrayer` (see `bb2020/step_prayer.rs`), no prayer effect ever expired.
+    ///
+    /// BB2025 prayers are all `UntilEndOfGame`, so this is inert there; BB2016 has no prayers.
+    pub fn deactivate_prayers_for_duration(
+        game: &mut ffb_model::model::game::Game,
+        duration: ffb_model::enums::InducementDuration,
+        is_home_turn_ending: bool,
+    ) {
+        for home in [true, false] {
+            // Java: `if (duration == UNTIL_END_OF_OPPONENTS_TURN && isHomeTurnEnding) continue;`
+            // for the HOME set, and the negation of that for the AWAY set.
+            if duration == ffb_model::enums::InducementDuration::UntilEndOfOpponentsTurn
+                && home == is_home_turn_ending
+            {
+                continue;
+            }
+            let names: Vec<String> = if home {
+                game.turn_data_home.inducement_set.get_prayers().iter().map(|s| s.to_string()).collect()
+            } else {
+                game.turn_data_away.inducement_set.get_prayers().iter().map(|s| s.to_string()).collect()
+            };
+            let team_id = if home { game.team_home.id.clone() } else { game.team_away.id.clone() };
+            let mut factory = PrayerHandlerFactory::new();
+            factory.initialize(game.rules);
+            for name in names {
+                if prayer_duration_by_name(game.rules, &name) != Some(duration) {
+                    continue;
+                }
+                // Java `deactivatePrayer`: removePrayer, then removeEffect, then ReportPrayerEnd.
+                if home {
+                    game.turn_data_home.inducement_set.remove_prayer(&name);
+                } else {
+                    game.turn_data_away.inducement_set.remove_prayer(&name);
+                }
+                let mut prayer_state = std::mem::take(&mut game.prayer_state);
+                if let Some(handler) = factory.for_prayer(&name) {
+                    handler.remove_effect(&mut prayer_state, game, &team_id);
+                }
+                game.prayer_state = prayer_state;
+                use ffb_model::report::mixed::report_prayer_end::ReportPrayerEnd;
+                game.report_list.add(ReportPrayerEnd::new(Some(name.clone())));
+            }
+        }
+    }
+}
+
+/// Java `Prayer.getDuration()`, resolved from the stored prayer NAME for the game's ruleset.
+fn prayer_duration_by_name(
+    rules: ffb_model::enums::Rules,
+    name: &str,
+) -> Option<ffb_model::enums::InducementDuration> {
+    match rules {
+        Rules::Bb2020 => {
+            let table = ffb_model::inducement::bb2020::prayers::Prayers::new();
+            table.get_exhibition_prayers().values()
+                .chain(table.get_league_only_prayers().values())
+                .find(|p| p.get_name() == name || p.name() == name)
+                .map(|p| p.get_duration())
+        }
+        Rules::Bb2025 => {
+            let table = ffb_model::inducement::bb2025::prayers::Prayers::new();
+            table.get_all_prayers().values()
+                .find(|p| p.get_name() == name || p.name() == name)
+                .map(|p| p.get_duration())
+        }
+        // BB2016 has no Prayers to Nuffle.
+        _ => None,
+    }
 }
 
 impl Default for PrayerHandlerFactory {
@@ -238,5 +312,43 @@ mod tests {
         let mut game = Game::new(home, away, Rules::Bb2020);
         // No prayers registered; must not panic
         PrayerHandlerFactory::deactivate_prayers(&mut game, true);
+    }
+
+    /// Java `StepEndTurn.deactivatePrayers` expires ONLY the prayers whose duration matches, and
+    /// removes each from the inducement set before running `removeEffect`. Treacherous Trapdoor is
+    /// `UntilEndOfHalf` in BB2020, so its trap doors must be gone after the half expires — and must
+    /// still be there when a shorter duration is expired.
+    #[test]
+    fn expiring_a_duration_removes_only_matching_prayers_and_their_effects() {
+        use crate::step::framework::test_team;
+        use ffb_model::enums::InducementDuration;
+        use ffb_model::model::game::Game;
+        use ffb_model::types::FieldCoordinate;
+
+        let setup = || {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+            game.turn_data_home.inducement_set.add_prayer("TREACHEROUS_TRAPDOOR");
+            game.field_model.add_trap_door(FieldCoordinate::new(6, 1));
+            game.field_model.add_trap_door(FieldCoordinate::new(19, 13));
+            game
+        };
+
+        // A non-matching duration must leave both the prayer and its effect alone.
+        let mut game = setup();
+        PrayerHandlerFactory::deactivate_prayers_for_duration(
+            &mut game, InducementDuration::UntilEndOfTurn, true);
+        assert!(game.field_model.has_trap_door(FieldCoordinate::new(6, 1)),
+            "UntilEndOfTurn must not expire an UntilEndOfHalf prayer");
+        assert_eq!(game.turn_data_home.inducement_set.get_prayers().len(), 1);
+
+        // The matching duration removes it from the set AND runs removeEffect.
+        let mut game = setup();
+        PrayerHandlerFactory::deactivate_prayers_for_duration(
+            &mut game, InducementDuration::UntilEndOfHalf, true);
+        assert!(game.turn_data_home.inducement_set.get_prayers().is_empty(),
+            "the expired prayer must be removed from the inducement set");
+        assert!(game.field_model.trap_doors.is_empty(),
+            "removeEffect must clear the trap doors — leaving them let a BB2020 player roll a Trap \
+             Door d6 in the second half that Java never rolls");
     }
 }
