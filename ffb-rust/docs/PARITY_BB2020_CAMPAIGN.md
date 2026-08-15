@@ -4891,3 +4891,65 @@ knocks it down there. Both "pushed nowhere" outcomes point at the pushback/Stand
 (the Treeman attacker has Stand Firm; the defender is a plain halfling, so it is the RESULT
 interpretation, not a refused push). Read `StepBlockChoice`'s BothDown/Wrestle arm against
 `bb2020/StepBlockChoice.java` before anything else.
+
+## ITER94 — RETRACTION: halfling seed 74's dice are NOT identical; Rust is ~3 dice BEHIND Java at the block
+
+No engine change. halfling stays 98/100. This iteration corrects ITER93 and replaces its conclusion
+with a measured one.
+
+### Retraction
+
+**ITER93 claimed "dice confirmed identical" for halfling seed 74. That is false.** It rested on
+`dicediff.py` reporting the value sequences matching through index 193 — but matching VALUES at the
+same index does not mean the same ROLL. Two `FFB_DIE_AT` probes settle it:
+
+| die pos | Java (`caller=` frame) | Rust (`FFB_DIE_AT` backtrace) |
+|---|---|---|
+| 188 | `DiceRoller.rollDice:90` — a **block die** | `StepTakeRoot::start` — a **Take Root** roll |
+| 195 | `RollMechanic.rollCasualty` — a **casualty** roll | `StepMoveDodge::start` — a **dodge** |
+
+Both engines happen to roll a 6 at position 188, which is exactly why the value comparison looked
+clean. At the same absolute die position Java is already resolving the block while Rust is still on
+Take Root, so **Rust needs more dice to reach the block — it has spent extra dice earlier in the
+game.** Java's Take Root for this activation is at 185, Rust's at 188: Rust runs about three dice
+behind.
+
+Corroboration from the two engines' own views of the block roll: Java's three block dice are
+`6,5,6` (positions 188-190, `rollDice:90` frames), while Rust's `BlockChoice` prompt carries
+`dice: [2, 5, 6], nr_of_dice: 3`. Different first die → different chosen result at index 0 → Java
+leaves `away_03` standing, Rust knocks it down. The dice count (3) and the choice index (0) agree;
+only the values differ.
+
+### What this means
+
+The halfling divergence is **not** in `StepBlockChoice` or the Both Down / Skull interpretation, and
+ITER93's "read `bb2020/StepBlockChoice.java` first" is withdrawn. The real defect is upstream: Rust
+performs one or more rolls that Java does not, early enough to be invisible in the state hashes
+(the per-step states match all the way to 206). An extra roll whose outcome does not change state
+is precisely the shape that hides from `stepdiff.py`.
+
+Note the shape matches ITER92's unexplained nurgle observation — there too Rust gained a die where
+the accounting said it should not. These may be the same defect.
+
+### Method note (third correction in two iterations)
+
+`scripts/dicediff.py` compares by position and therefore CANNOT distinguish "same roll" from "same
+number". It is only safe once both streams are known to be aligned. The reliable pairing is
+Java's `caller=` frames against Rust's `FFB_DIE_AT=<pos>` backtrace — one probe each, and the
+question is answered outright. Use that pair FIRST on any suspected dice divergence; do not let
+`dicediff.py`'s first-diff index set the hypothesis.
+
+### Gate
+
+| check | result |
+|---|---|
+| `halfling` bb2020 | 98/100 (unchanged — findings only) |
+| working tree | no engine change |
+
+bb2020 stays **26 of 30 green**. RED: nurgle 86 · halfling 98 · wood_elf 98 · slann_fumbbl 98.
+
+### Next iteration
+
+Find the earliest die position where the two engines' backtraces disagree about which STEP drew the
+die — bisect with `FFB_DIE_AT` against the Java `caller=` list, which is already dumped for this
+seed. That names the extra Rust roll directly. Do not start from the block.
