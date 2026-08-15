@@ -4725,3 +4725,104 @@ the same matchup applies **across editions** — this is what it is for.
 a Foul Appearance cancel-revert there without landing it; re-open it with the ITER88/91 method —
 statediff the first diverging step and identify which single field moves — rather than from the
 prior hypothesis.
+
+## ITER92 — nurgle root cause FOUND (BB2020 resolves Foul Appearance BEFORE STAND_UP); one 1:1 fix landed, the sequence move measured and REVERTED
+
+nurgle stays 86/100. This iteration produced a **confirmed root cause** for the six-iteration
+nurgle mystery, one landed 1:1 correction, and one measured-and-reverted attempt. Read the reverted
+attempt's numbers before trying it again — it is the obvious fix and it does not work as written.
+
+### The root cause (confirmed, not hypothesised)
+
+nurgle seed 2, `Activate(Away2, BLITZ)` at i=32 → i=33. Both engines spend **exactly one die**
+(rng 29 → 30) and produce **one** differing field:
+
+```
+i=32 (pre)   a01:13,8,Prone      (a01 = away_02, adjacent to h02 @12,7)
+i=33 JAVA    a01:13,8,Prone      state 5ea531449cae133d (== the pre-state: nothing happened)
+i=33 RUST    a01:13,8,Standing   state af8d5d3a78631af3
+```
+
+One die, spent by both: the **Foul Appearance** roll against the Nurgle target. It FAILS in both,
+and the blitz is abandoned. The difference is only *when* the roll happens:
+
+| | sequence | on failure |
+|---|---|---|
+| `bb2020/SelectBlitzTarget.java:35-36` | … BLOOD_LUST, **FOUL_APPEARANCE**, **DUMP_OFF**, JUMP_UP, STAND_UP | goto END_BLITZING — the blitzer is **still prone** and stays prone |
+| `bb2025/SelectBlitzTarget.java` | … BLOOD_LUST, JUMP_UP, STAND_UP (no FA, no DUMP_OFF — both moved into `BlitzBlock`) | the blitzer has already **stood up** |
+
+BB2020 puts Foul Appearance *before* the stand-up; BB2025 puts it *after*. The driver runs the
+shared BB2025 generator for BB2020 games, so a BB2020 blitzer that fails Foul Appearance stands up
+in Rust and does not in Java. Same die, same value, different order.
+
+`bb2020/BlitzBlock.java:31` repeats FOUL_APPEARANCE only under `params.isFrenzyBlock()`, and has no
+DUMP_OFF at all; `bb2025/BlitzBlock.java:37,39` adds both unconditionally.
+
+### Landed: `StepStandUp` cleared `standingUp` on the free path (1:1, gate-neutral)
+
+Chasing the above surfaced a genuine 1:1 divergence. Java's free stand-up branch
+(`bb2025/StepStandUp.java:136-138`) sets **only** `setHasMoved(true)`; `standingUp` deliberately
+stays TRUE. Only the ROLLED stand-up's success (`:114-115`) clears it. Rust cleared it on both
+paths. The flag is read later — `FoulAppearanceBehaviour.handleFailure` reverts the attacker to
+PRONE when `isStandingUp()` — so clearing it early disables that revert.
+
+Fixed, with the colocated test rewritten to assert BOTH branches
+(`rolled_success_clears_standing_up_but_free_stand_up_does_not`; the old
+`success_clears_standing_up_flag` asserted the wrong behaviour on whichever branch it happened to
+hit). Re-entry is still blocked by the `has_moved` half of the outer guard, exactly as in Java.
+
+**This did not move nurgle**, and a probe says why: at the BB2025-order Foul Appearance failure the
+acting action is `Blitz`, and Java's revert list is `BLITZ_MOVE || isBlockAction() || GAZE_MOVE ||
+isKickingDowned()` — `BLITZ` is in neither engine's list (`PlayerAction.isBlockAction()` is
+`BLOCK|VICIOUS_VINES|BREATHE_FIRE|CHAINSAW|STAB|PROJECTILE_VOMIT|CHOMP` in both). So the revert
+cannot rescue the wrong ordering; the ordering itself has to change. The fix is kept because it is
+correct against the Java and now has a test pinning it.
+
+### Measured and REVERTED: moving FOUL_APPEARANCE into SelectBlitzTarget for BB2020
+
+Implemented exactly as the tables above describe — edition-gate FA+DUMP_OFF into
+`bb2025/select_blitz_target.rs` for BB2020, and in `bb2025/blitz_block.rs` gate FA behind a new
+`frenzy_block` param and drop DUMP_OFF, for BB2020 only. Threaded `rules` through
+`StepEndMoving::push_sequence_for_player_action` and the two `StepEndBlocking` push sites.
+
+**Result: nurgle 86/100 → 0/100.** Reverted per the gate rule.
+
+It fails at seed 1 step 1 — a blitz that previously passed:
+
+```
+i=2  JAVA h02:11,7,Standing   RUST h02:11,7,Prone
+     Java rng 13 -> 15 (2 dice)      Rust rng 13 -> 16 (3 dice)
+```
+
+Both engines push h02 to 11,7; Java leaves it standing (a Push), Rust knocks it down and rolls
+armour. The net die count should have been unchanged by the move (one added, one removed) but Rust
+gained a die. **That contradiction is the thing to explain before retrying** — do not simply
+re-apply the change. Two concrete leads: BB2020 rolls Foul Appearance at target-selection time,
+i.e. BEFORE the blitzer moves, when the target may not be adjacent yet — check whether
+`StepFoulAppearance` is reached with a defender set at that point, and what `StepDumpOff` does that
+early. Also verify whether the Rust blitz reaches `SelectBlitzTarget` on every path or only from
+`StepEndSelecting::BlitzSelect`.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 86/100 (unchanged — no progress this iteration) |
+| `lineman` bb2020 | 100/100 |
+| `necromantic` bb2020 | 100/100 (ITER91 holds) |
+| `dwarf` bb2020 | 100/100 |
+| `cargo test --workspace` | clean |
+
+bb2020 remains **26 of 30 green**. RED: nurgle 86 · halfling 98 · wood_elf 98 · slann_fumbbl 98.
+
+### Note
+
+`crates/ffb-engine/src/step/bb2020/move_/step_stand_up.rs` has the same extra
+`standing_up = false` on its free path, but that file is DEAD — the driver runs the shared bb2025
+step for bb2020. Left alone deliberately rather than editing unreachable code mid-measurement.
+
+### Next iteration
+
+Either finish the sequence move above (starting from the die-count contradiction, not from the
+patch), or switch to one of the three 98/100 rosters, which are single-seed problems and likely
+cheaper: halfling 55/74, wood_elf, slann_fumbbl.

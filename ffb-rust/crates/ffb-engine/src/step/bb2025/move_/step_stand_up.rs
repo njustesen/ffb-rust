@@ -111,8 +111,15 @@ impl StepStandUp {
                     game.field_model.set_player_state(&pid, ps.change_base(ffb_model::enums::PS_STANDING));
                 }
             }
+            // Java's free-stand-up branch (`StepStandUp.java:136-138`) sets ONLY `setHasMoved(true)`
+            // — `standingUp` deliberately stays TRUE. Only the ROLLED stand-up's success path
+            // (`:114-115`) clears it. Rust cleared it here too, and that flag is read later:
+            // `FoulAppearanceBehaviour.handleFailure` reverts the attacker to PRONE when
+            // `isStandingUp()`, so a blitzer who stood up for free and then failed Foul Appearance
+            // must go back down. With the flag cleared the revert was skipped and the blitzer stayed
+            // standing — nurgle bb2020 seed 2 i=33, `a01` Prone in Java, Standing in Rust, same dice.
+            // Re-entry is still prevented by the `has_moved` half of the outer guard, as in Java.
             game.acting_player.has_moved = true;
-            game.acting_player.standing_up = false;
             return StepOutcome::next();
         }
 
@@ -413,18 +420,37 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
     }
 
+    /// Java clears `standingUp` ONLY on the ROLLED stand-up's success path
+    /// (`StepStandUp.java:114-115`). The free stand-up (`:136-138`) sets `hasMoved` and leaves
+    /// `standingUp` TRUE, because `FoulAppearanceBehaviour.handleFailure` reads it later to send a
+    /// blitzer who failed Foul Appearance back to PRONE. Rust cleared it on both paths.
     #[test]
-    fn success_clears_standing_up_flag() {
+    fn rolled_success_clears_standing_up_but_free_stand_up_does_not() {
         for seed in 0u64..200 {
             let mut g = make_game();
             g.acting_player.standing_up = true;
+            let rolls = g.acting_player.player_id.as_deref()
+                .and_then(|id| g.player(id))
+                .map(|p| p.movement_with_modifiers() < MINIMUM_MOVE_TO_STAND_UP
+                    && !p.has_skill_property(NamedProperties::CAN_STAND_UP_FOR_FREE))
+                .unwrap_or(true);
             let mut step = StepStandUp::new("fail".into());
             let out = step.start(&mut g, &mut GameRng::new(seed));
-            if out.action == StepAction::NextStep {
-                assert!(!g.acting_player.standing_up);
-                return;
+            if out.action != StepAction::NextStep {
+                continue;
             }
+            if rolls {
+                assert!(!g.acting_player.standing_up,
+                    "a ROLLED stand-up success clears standingUp (Java :115)");
+            } else {
+                assert!(g.acting_player.standing_up,
+                    "a FREE stand-up leaves standingUp set (Java :136-138) so a later Foul \
+                     Appearance failure can revert the player to PRONE");
+            }
+            assert!(g.acting_player.has_moved);
+            return;
         }
+        panic!("no seed produced a successful stand-up");
     }
 
     #[test]
