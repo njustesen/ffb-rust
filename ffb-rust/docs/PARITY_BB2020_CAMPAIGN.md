@@ -3781,3 +3781,61 @@ campaign hit — there it turned out to be a roster-lookup problem rather than a
 the team actually loads before assuming a rules bug.
 
 **Status: 24 of 30 green.** Next: `nurgle` seed-by-seed from the lowest failing seed.
+
+## ITER76 — `nurgle`: a BLITZ never rolls Foul Appearance, because the bb2020 blitz bridge has no FOUL_APPEARANCE step
+
+`nurgle` 86/100 (seeds 2, 14, 23, 24, 26, 40, 43, 52, 57, 60, 65, 66, 75, 77). No engine change
+this iteration — the root cause is pinned and the fix is structural enough to want its own gate.
+
+### Evidence
+
+Seed 2's first diverging PRE-state is i=33, so **step 32 resolved differently**:
+
+```
+[  32] JAVA t2 h1 away  pre=5ea531449cae133d post=5ea531449cae133d  Activate(Away2,BLITZ)
+       RUST t2 h1 away  pre=5ea531449cae133d post=af8d5d3a78631af3  Activate(away_02,Blitz)
+```
+
+**Java's blitz is a complete no-op** — post == pre. That is a FAILED Foul Appearance cancelling the
+declared action, and the Java dice confirm it:
+
+```
+pos 48  DiceRoller.rollSkill  FoulAppearanceBehaviour$1.handleExecuteStepHook:68
+          StepFoulAppearance.executeStep:75    result 1  = fail
+```
+
+Rust rolls no such die and resolves the blitz normally.
+
+### Why
+
+Probing `StepFoulAppearance` across the whole seed (291 invocations): it resolves a defender only
+**12** times, always via `game.defender_id`, and `target_selection_state` is `None` on every single
+call. Those 12 are BLOCK actions, where `InitBlocking` sets `defender_id` before the step runs.
+
+For a BLITZ, Java rolls Foul Appearance inside the **SelectBlitzTarget** sequence
+(`bb2020/SelectBlitzTarget.java:35`), reading the target from the `TargetSelectionState`. Rust's
+blitz bridge — the one ITER67 documented — replaces that sequence with bb2025's
+`ActivationSequenceBuilder`, which has **no FOUL_APPEARANCE step at all**, and never creates a
+TargetSelectionState. So a blitzed Foul Appearance defender is never rolled against.
+
+This is precisely the gap ITER67 flagged and could not land: bb2020's SelectBlitzTarget carries
+FOUL_APPEARANCE, DUMP_OFF, JUMP_UP and STAND_UP that the bb2025 builder omits. Back then swapping
+the whole activation regressed goblin to 10/100 — but that attempt ALSO swapped the BlitzBlock
+sequence, and predates the FOLLOWUP_CHOICE and pitch-bounds fixes.
+
+### Next iteration
+
+Add **only** `FOUL_APPEARANCE` (failure → END_BLOCKING) to the bb2020 blitz activation bridge in
+`bb2025/shared/step_end_selecting.rs`, not the whole bb2020 sequence. It needs a defender to read:
+Rust has no TargetSelectionState, so either set `game.defender_id` at the blitz dispatch (the
+dispatch already knows `block_defender_id`) or build the TSS there. Prefer `defender_id` — it is
+what the 12 working BLOCK cases already use, and `StepFoulAppearance` reads it as its fallback.
+
+Gate it against `nurgle` AND `goblin`/`ogre` (both blitz-heavy and currently green) before keeping.
+
+### Tooling
+
+`scripts/stepdiff.py` — prints the Java and Rust step logs for a seed side by side and names the
+first diverging PRE-state, i.e. the step that resolved differently. `dicediff.py` finds where the
+DICE part company; this finds where the STATE does, which is the more useful question when a step
+is a silent no-op on one side.
