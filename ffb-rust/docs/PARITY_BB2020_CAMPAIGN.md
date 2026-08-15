@@ -5787,3 +5787,64 @@ Concretely for the next iteration:
 | working tree | clean at HEAD, no engine change |
 
 bb2020 stays **29 of 30 green**. RED: nurgle 86.
+
+## ITER108 — conditional push implemented; the routing drags in extra steps (86 → 15/100)
+
+No engine change (reverted); nurgle stays 86/100. ITER107's specified fix was built in full and
+measured. It changes the blitz flow as intended but brings unwanted baggage.
+
+### What was built
+
+* New `StepParameter::PushBlitzBlockAfterSelect(bool)`.
+* `StepSelectBlitzTargetEnd` gained `end_player_action` / `push_blitz_block` / `block_defender_id` /
+  `using_stab`, and a `continue_blitz()` that pushes `BlitzBlock` **only** when the blitz was not
+  aborted (`!end_player_action && !end_turn`), called from every success path.
+* BB2020 dispatch pushes just the `SelectBlitzTarget` sequence, attaching the flag and the blitz
+  params to its `SelectBlitzTargetEnd` entry.
+* `SelectBlitzTarget` carries FOUL_APPEARANCE + DUMP_OFF before JUMP_UP/STAND_UP; `BlitzBlock`'s FA
+  is frenzy-only.
+
+**Result: 86/100 → 15/100.** Reverted.
+
+### Why
+
+Routing through `SelectBlitzTarget` does not only relocate Foul Appearance — it also runs steps the
+inline activation never ran for this dispatch:
+
+* `SELECT_BLITZ_TARGET` itself (the first entry of the sequence),
+* `JUMP_UP` and `STAND_UP`.
+
+For a blitzer that is already standing those are new steps in the stream, and `STAND_UP` in
+particular can roll. The inline activation deliberately contained only the negatrait block
+(`ActivationSequenceBuilder`) precisely because the agent's single-command blitz has already done
+the target selection and the driver reaches the block directly.
+
+So the conditional-push mechanism is right (and is the only thing that can express Java's
+"abort ⇒ no block"), but it has to be combined with a `SelectBlitzTarget` variant that omits the
+steps the inline path already accounts for — or the inline path has to gain a real abort target.
+
+### Next iteration
+
+Rather than swapping the whole sequence, keep the inline activation and give it the missing
+capability: append FOUL_APPEARANCE + DUMP_OFF (BB2020) as in ITER105 — which measured 86/100, i.e.
+regression-free — and then make the FA failure abort the blitz outright instead of `goto
+END_BLOCKING`. `continue_blitz`'s guard is the model: the block sequence must not run after an
+aborted activation. Concretely, dispatch the inline activation ALONE, and have its terminator push
+`BlitzBlock` under the same `!end_player_action` guard. That keeps the current step set (no new
+JUMP_UP/STAND_UP/SELECT) while gaining the abort semantics.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 86/100 (unchanged — reverted, findings only) |
+| working tree | clean at HEAD, no engine change |
+
+bb2020 stays **29 of 30 green**. RED: nurgle 86.
+
+### Cost note
+
+nurgle has now taken ITER92 and ITER101-108 without a numeric gain, though each iteration has
+eliminated a specific mechanism and the remaining space is small and well-mapped. The other 29
+rosters are green and every fix from this stretch (Stand Firm, Moles, trap door, prayers) landed
+from the same method.
