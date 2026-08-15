@@ -4826,3 +4826,68 @@ step for bb2020. Left alone deliberately rather than editing unreachable code mi
 Either finish the sequence move above (starting from the die-count contradiction, not from the
 patch), or switch to one of the three 98/100 rosters, which are single-seed problems and likely
 cheaper: halfling 55/74, wood_elf, slann_fumbbl.
+
+## ITER93 — halfling seed 74 localised to one activation, dice IDENTICAL; two tooling corrections
+
+No engine change. halfling stays 98/100 (seeds 55, 74). Findings only, plus two measurement
+corrections that cost time today and must not be repeated.
+
+### halfling seed 74
+
+```
+[207] JAVA t4 h2 home  pre=d7185a18a5979c67 post=f120cfb03c309153 Activate(Home1, BLITZ)
+      RUST t4 h2 home  pre=d7185a18a5979c67 post=2e973c007ef08f4b Activate(home_01, Blitz)
+[208]   a02:  JAVA 12,9,Standing   RUST 12,9,Prone      <- the only differing field
+```
+
+`home_01` is the halfling **Treeman** (Take Root, Mighty Blow, Stand Firm, Strong Arm, Thick Skull,
+Throw Team-Mate, Timmm-ber!) at (12,8); the target `away_03` is the adjacent halfling at (12,9), so
+the blitz needs no movement. The Rust drive trace shows the whole block resolving —
+`InitBlocking → GoForIt → FoulAppearance → … → BlockRoll → BlockChoice → BothDown/Wrestle →
+DropFallingPlayers` — and the defender ending PRONE **in the same square**. Java leaves it standing,
+also in the same square. Same square, different knocked-down state, same dice.
+
+Note this is the third bb2020 red in a row (necromantic ITER91, nurgle ITER92, halfling here) whose
+first divergence is a BLITZ activation that Java resolves more conservatively than Rust.
+
+### Correction 1 — Java `rng_calls` are per-CALL, Rust's are per-DIE
+
+Step 207 reads `rng_calls` 168 → 173 in Java (5) and 168 → 180 in Rust (12). That is **NOT a dice
+divergence**: Java counts one call for a 3-dice block roll, Rust counts three. A ~2.4x ratio on an
+activation containing a block + armour + injury is normal. Two iterations today nearly chased this
+as a missing/extra roll. Compare dice by the `(sides, result)` SEQUENCE, never by either counter.
+
+### Correction 2 — `scripts/dicediff.py`'s first-diff index is not the first divergence
+
+For this seed it reported "FIRST DIFF at index 194: java d16=1 vs rust d6=5", which looks exactly
+like a wrong casualty-die width. It is not:
+
+* Rust's bb2020 `roll_casualty` is **already** `[rng.die(16), rng.d6()]`, matching Java's bb2020
+  `RollMechanic.rollCasualty` (bb2025 the same; bb2016 is `[d6, d8]`). All three are correct — this
+  was checked, not assumed.
+* Java's `caller=` frames put that d16 at dice pos 195, while the state diverged at `rng_calls` 168.
+  The window pos 186-196 (`StepStandUp` → `GoForIt` → 3 block dice → armour → injury → casualty) is
+  entirely DOWNSTREAM of step 208. The "first diff" is just where the two already-desynced streams
+  finally disagreed on a die WIDTH.
+
+So: once the state has diverged, every later dice index is meaningless. Always establish the first
+diverging step with `stepdiff.py` FIRST, and only compare dice within that step's window. The
+`caller=` frames in the Java trace are the reliable way to place a die in the sequence.
+
+### Gate
+
+| check | result |
+|---|---|
+| `halfling` bb2020 | 98/100 (unchanged — findings only) |
+| working tree | no engine change |
+
+bb2020 stays **26 of 30 green**. RED: nurgle 86 · halfling 98 · wood_elf 98 · slann_fumbbl 98.
+
+### Next iteration
+
+halfling seed 74 step 207 is now a tight target: ONE activation, dice confirmed identical, one
+differing field. Determine why Java's block leaves `away_03` standing in its own square while Rust
+knocks it down there. Both "pushed nowhere" outcomes point at the pushback/Stand Firm family again
+(the Treeman attacker has Stand Firm; the defender is a plain halfling, so it is the RESULT
+interpretation, not a refused push). Read `StepBlockChoice`'s BothDown/Wrestle arm against
+`bb2020/StepBlockChoice.java` before anything else.
