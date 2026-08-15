@@ -389,6 +389,14 @@ impl StepEndSelecting {
                 ActivationSequenceBuilder::new()
                     .with_failure_label(labels::END_BLOCKING)
                     .add_to(&mut activation);
+                // NOTE (ITER77, NOT landed): `bb2020/SelectBlitzTarget.java:35` runs FOUL_APPEARANCE
+                // at the end of the blitz activation, which the BB2025 `ActivationSequenceBuilder`
+                // borrowed here does not — so a BB2020 blitz never rolls against a Foul Appearance
+                // defender (nurgle bb2020 seed 2 i=32). Adding the step here AND setting
+                // `game.defender_id` at dispatch so it has a defender to read took nurgle from
+                // 86/100 to 0/100: setting `defender_id` this early is visible to every step in the
+                // activation, not just this one. See docs/PARITY_BB2020_CAMPAIGN.md ITER77 — the
+                // defender has to reach StepFoulAppearance as a step PARAMETER, not via game state.
                 let mut seq = activation.build();
                 seq.extend(BlitzBlock::build_sequence(&params));
                 StepOutcome::next().push_seq(seq)

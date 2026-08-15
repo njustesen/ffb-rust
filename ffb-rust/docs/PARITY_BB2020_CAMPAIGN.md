@@ -3839,3 +3839,49 @@ Gate it against `nurgle` AND `goblin`/`ogre` (both blitz-heavy and currently gre
 first diverging PRE-state, i.e. the step that resolved differently. `dicediff.py` finds where the
 DICE part company; this finds where the STATE does, which is the more useful question when a step
 is a silent no-op on one side.
+
+## ITER77 — the blitz Foul Appearance fix, attempted and REVERTED: `86 → 0/100`
+
+Implemented exactly what ITER76 prescribed, measured it, and reverted it. `nurgle` stays 86/100.
+
+**The change**: for BB2020, append `FOUL_APPEARANCE` (failure → END_BLOCKING) to the blitz
+activation bridge, and set `game.defender_id` from `params.block_defender_id` at dispatch so the
+step has a defender to read.
+
+**The result**: `nurgle` **0/100** — every seed, worse than the disease. Reverted.
+
+### Why it failed, and what that rules out
+
+The step insertion is not obviously the problem; setting `game.defender_id` at dispatch is.
+`defender_id` is not a private channel to `StepFoulAppearance` — it is game state that **every**
+step in the activation sees, and several read it: `StepHandleDropPlayerContext` resolves its
+`victim_state_key` through `game.defender_id`, and the negatrait steps that run in this very
+activation can drop the acting player. Setting it before the activation instead of at
+`InitBlocking` therefore changes behaviour for a whole sequence of steps that Java runs with
+`defenderId` still null.
+
+Java has no such problem because it does NOT use `defenderId` here — the blitz target lives in the
+`TargetSelectionState`, a separate field that only `StepFoulAppearance` (and the block steps)
+consult. Rust has no TargetSelectionState at all on this path (`tss=None` on all 291 probes in
+ITER76), which is the actual missing piece.
+
+### Next iteration — two options, in preference order
+
+1. **Give `StepFoulAppearance` the defender as a step PARAMETER.** It currently accepts only
+   `GOTO_LABEL_ON_FAILURE`; add `BLOCK_DEFENDER_ID` to its `set_parameter`, and have the blitz
+   bridge publish it alongside the step. This keeps the target on the same private channel Java
+   uses (its TSS) instead of leaking it into shared game state. Smallest change, most faithful.
+2. **Build the TargetSelectionState in the blitz bridge**, so the step's existing
+   TSS-then-`defender_id` lookup resolves the way Java's does. Closer to Java structurally, but the
+   TSS is consulted by more code than the parameter is, so it carries the same class of risk that
+   just failed — and `StepFoulAppearance`'s TSS branch additionally filters on
+   `is_selected() && is_committed()`, which Java does not, so that would need correcting too.
+
+Do NOT retry via `game.defender_id`.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 86/100 — baseline restored after the revert |
+| working tree | change reverted; a note at the insertion point records the 0/100 result |
