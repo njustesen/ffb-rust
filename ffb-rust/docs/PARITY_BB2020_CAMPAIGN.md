@@ -2998,3 +2998,40 @@ on 1-25 (21/25). That is the true figure for the fewest-fails ordering.
 Next target by fewest fails remains **`ogre` (1)** — the chain-push at seed 57, which ITER60 showed is
 about WHERE the chain is driven from, not the square bookkeeping. Tree clean; `lineman` re-verified at
 100/100 after the revert.
+
+## ITER62 — `ogre` seed 57 root-caused: it is SIDE STEP, not a chain push
+
+Three iterations of chain-push theory were wrong. A side-by-side probe of both engines' pushback
+dialogs settles it:
+
+```
+JPUSH rng=95 all=[(14,7) (14,8) (14,9) (13,9) (12,9)] best=(12,9) occupant=-
+RPUSH rng=95 def=Some("away_05")  squares=[(14,8) (14,9) (13,9)]
+```
+
+Rust's three squares are the REGULAR pushback set for an attacker at (12,7) against a defender at
+(13,8) — straight back (14,9) plus the two flanks. Java's five are **every free ADJACENT square**,
+including (12,9) and (14,7), which lie sideways/backwards relative to the push and are not reachable
+by a regular push at all.
+
+That is the signature of `PushbackMode.SIDE_STEP`, and the roster confirms it: `away_05` is `nr=5` =
+`ogre.snotling`, whose skills are `['Dodge', 'Right Stuff', 'Side Step', 'Stunty', 'Titchy']`. Java's
+`UtilServerPushback.findPushbackSquares` has an explicit `SIDE_STEP`/`GRAB` branch that offers every
+adjacent empty valid square instead of the three-square fan. Java used it; Rust did not.
+
+So the accumulate/clear bookkeeping investigated in ITER56 and ITER60 was never the issue — the sets
+differ because Rust computed the WRONG MODE, and the ITER60 revert was correct. Also note both engines
+clear identically: Rust's `init_pushback` clear cites `UtilBlockSequence:43`, which really does call
+`clearPushbackSquares()`, and Java's other clear (`StepPushback:219`) is inside `if (state.doPush)`
+exactly as Rust's is.
+
+**Next iteration**: find why Rust's Side Step does not fire here. `skill_behaviour/bb2020/side_step_behaviour.rs`
+exists and manipulates `state.pushback_squares`, so the question is its trigger — compare its hook
+condition against Java's `SideStepBehaviour` and check what sets `PushbackMode` to `SIDE_STEP`
+(Java: the defender having the skill, an unused-skill check, and possibly a coach confirmation).
+The fix is expected to be in mode selection, and it should be testable directly: a Snotling defender
+must be offered every free adjacent square, not the three-square fan.
+
+Probes on both sides were removed with targeted edits rather than `git checkout --` (per the ITER59
+lesson); the jar was rebuilt and `lineman` bb2020 re-verified at **100/100** in this same turn. Tree
+clean on both repos.
