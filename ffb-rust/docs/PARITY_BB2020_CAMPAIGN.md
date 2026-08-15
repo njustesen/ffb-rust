@@ -3464,3 +3464,62 @@ the first thing to run on any new failing seed.
 | `cargo test -p ffb-engine` | 7,150 passed / 0 failed |
 
 No engine change committed, so the wider roster gate was not re-run.
+
+## ITER71 — `StepFollowup` never republished FOLLOWUP_CHOICE: `goblin` 98 → **99/100**
+
+Landed ITER70's two halves together, exactly as that iteration predicted.
+
+### The missing half
+
+Java publishes the follow-up answer to the whole stack from `handleCommand`, not just to itself:
+
+```java
+case CLIENT_FOLLOWUP_CHOICE:
+    publishParameter(new StepParameter(StepParameterKey.FOLLOWUP_CHOICE, cmd.isChoiceFollowup()));
+```
+
+Rust's `StepFollowup::handle_command` only assigned the local field. Everything downstream of it
+was therefore blind to the answer — and the step that cares is `StepPickUp`, whose
+`setParameter(FOLLOWUP_CHOICE)` sets `ignore = !choice` and whose `isPickUp()` starts with
+`!ignore`. Rust already had the field, the mapping and the `!ignore` guard; nothing ever
+delivered the parameter, so `ignore` stayed false.
+
+That was invisible while the BB2020 follow-up pick-up was missing from the sequence — the two bugs
+cancelled out. Adding either alone breaks a seed, which is why ITER70's sequence-only attempt
+traded seed 98 for seed 50.
+
+`StepFollowup` reaches `execute_step` via `handle_command` before building its outcome, so the
+answer is stashed in a `pending_choice_publish` field and pushed onto the existing `out_params`
+list on the way through — the same route the automated (Pinned / Multiple Block / Frenzy / Taunt)
+choices already used.
+
+### Both halves, together
+
+| change | fixes | breaks alone |
+|---|---|---|
+| `StepFollowup` republishes `FOLLOWUP_CHOICE` | (enables the gate below) | — |
+| bb2020 Block gains `TENTACLES, SHADOWING, PICK_UP` after `FOLLOWUP` | seed 98 | seed 50 |
+
+`ParityRunner` always declines the follow-up (`sendFollowupChoice(false)`), so in practice that
+pick-up is ignored whenever a follow-up dialog was shown (seed 50, where the blocker was already
+standing on the loose ball), and runs when no dialog was needed (seed 98, where the No Hands
+attacker ends up on the ball and fails without a roll, bouncing it).
+
+Tests: `answering_the_followup_dialog_republishes_the_choice` (both answers),
+`followup_pick_up_is_bb2020_only`, and `bb2020_block_gates_are_exactly_two` — which pins the two
+edition gates in the Block sequence as going in OPPOSITE directions (bb2020 loses the TRICKSTER
+pick-up, gains the three follow-up steps) so a future edit cannot widen either silently.
+
+### Gate
+
+| check | result |
+|---|---|
+| `goblin` bb2020 | 98/100 → **99/100** (seeds 50 AND 98 fixed; 81 remains) |
+| `lineman` bb2016 / bb2020 / bb2025 | 100/100 each |
+| `human`, `ogre`, `underworld`, `chaos_pact`, `renegades` bb2020 | 100/100 each |
+| `cargo test --workspace` | **14,456 passed / 0 failed** |
+
+**Status: 6 of 30 green**, `goblin` 99/100. Next: seed 81 (i=128, away turn 8) — the last goblin
+seed. Note the same BlitzBlock question is still open: `bb2020/BlitzBlock.java` also has
+`TENTACLES, SHADOWING, PICK_UP` after FOLLOWUP, and the bb2025 BlitzBlock port has only a bare
+PICK_UP there; worth checking against seed 81 before hunting further.

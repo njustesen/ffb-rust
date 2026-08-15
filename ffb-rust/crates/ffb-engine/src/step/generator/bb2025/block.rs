@@ -189,12 +189,27 @@ impl Block {
         ]);
         // 34 FOLLOWUP
         seq.add(StepId::Followup, vec![]);
-        // NOTE (ITER70, not yet landed): `bb2020/Block.java:86-89` runs TENTACLES, SHADOWING and
-        // PICK_UP between FOLLOWUP and DROP_FALLING_PLAYERS; `bb2025/Block.java:90-93` goes
-        // straight from one to the other, which is what this port does. Adding the BB2020 three
-        // here fixes goblin bb2020 seed 98 but breaks seed 50, because Rust's `StepPickUp` never
-        // receives the `FollowupChoice` parameter that Java uses to set its `ignore` flag. Land
-        // the two together, not this half alone. See docs/PARITY_BB2020_CAMPAIGN.md ITER70.
+        // BB2020 ONLY: `bb2020/Block.java:86-89` runs TENTACLES, SHADOWING and PICK_UP between
+        // FOLLOWUP and DROP_FALLING_PLAYERS; `bb2025/Block.java:90-93` goes straight from one to
+        // the other. That PICK_UP is what makes an attacker who ends up on a loose ball try to
+        // pick it up — and a No Hands attacker (goblin Fanatic, Ball & Chain) fails it WITHOUT a
+        // roll, which bounces the ball (goblin bb2020 seed 98 i=10, rng 20).
+        //
+        // It is only correct alongside `StepFollowup` republishing FOLLOWUP_CHOICE, which is what
+        // sets `StepPickUp::ignore`: a DECLINED follow-up must disable this pick-up entirely
+        // (goblin bb2020 seed 50 — otherwise it rolls a d6 Java never rolls).
+        //
+        // Java's `sequence.jump(DROP_FALLING_PLAYERS)` after PICK_UP is a no-op here: the very
+        // next entry IS the DROP_FALLING_PLAYERS-labelled step, so falling through is equivalent.
+        if params.rules == Rules::Bb2020 {
+            seq.add(StepId::Tentacles, vec![
+                StepParameter::GotoLabelOnSuccess(labels::DROP_FALLING_PLAYERS.into()),
+            ]);
+            seq.add(StepId::Shadowing, vec![]);
+            seq.add(StepId::PickUp, vec![
+                StepParameter::GotoLabelOnFailure(labels::DROP_FALLING_PLAYERS.into()),
+            ]);
+        }
         // 35 DROP_FALLING_PLAYERS [DROP_FALLING_PLAYERS]
         seq.add_labelled(StepId::DropFallingPlayers, labels::DROP_FALLING_PLAYERS, vec![]);
         // 36 STEADY_FOOTING (defender)
@@ -299,10 +314,33 @@ mod tests {
         };
         assert_eq!(count_between(Rules::Bb2025), 1);
         assert_eq!(count_between(Rules::Bb2020), 0);
+    }
 
-        // Only that one entry is gated.
+    /// The other direction: `bb2020/Block.java:86-89` runs TENTACLES, SHADOWING and PICK_UP
+    /// between FOLLOWUP and DROP_FALLING_PLAYERS where `bb2025/Block.java:90-93` goes straight
+    /// from one to the other. That PICK_UP bounces a loose ball off a No Hands attacker who ends
+    /// up standing on it (goblin bb2020 seed 98 i=10).
+    #[test]
+    fn followup_pick_up_is_bb2020_only() {
+        let after_followup = |rules: Rules| {
+            let steps = Block::build_sequence(&BlockParams { rules, ..Default::default() });
+            let followup = steps.iter().position(|s| s.step_id == StepId::Followup).unwrap();
+            let drop = steps.iter().skip(followup)
+                .position(|s| s.step_id == StepId::DropFallingPlayers).unwrap() + followup;
+            steps[followup + 1..drop].iter().map(|s| s.step_id).collect::<Vec<_>>()
+        };
+        assert_eq!(after_followup(Rules::Bb2025), Vec::<StepId>::new());
+        assert_eq!(
+            after_followup(Rules::Bb2020),
+            vec![StepId::Tentacles, StepId::Shadowing, StepId::PickUp]);
+    }
+
+    /// Exactly two entries are edition-gated, in opposite directions: bb2020 loses the
+    /// TRICKSTER pick-up and gains the three follow-up steps.
+    #[test]
+    fn bb2020_block_gates_are_exactly_two() {
         let bb2025 = Block::build_sequence(&BlockParams::default());
         let bb2020 = Block::build_sequence(&BlockParams { rules: Rules::Bb2020, ..Default::default() });
-        assert_eq!(bb2020.len(), bb2025.len() - 1);
+        assert_eq!(bb2020.len(), bb2025.len() - 1 + 3);
     }
 }

@@ -23,6 +23,9 @@ pub struct StepFollowup {
     pub old_defender_state: Option<PlayerState>,
     /// Java: usingSkillForcingFollowUp (Boolean — tristate: null/true/false)
     pub using_skill_forcing_follow_up: Option<bool>,
+    /// Set when CLIENT_FOLLOWUP_CHOICE answered the dialog, so the next `execute_step` republishes
+    /// it to the rest of the stack — see the note in `handle_command`.
+    pending_choice_publish: Option<bool>,
 }
 
 impl StepFollowup {
@@ -34,6 +37,7 @@ impl StepFollowup {
             followup_choice: None,
             old_defender_state: None,
             using_skill_forcing_follow_up: None,
+            pending_choice_publish: None,
         }
     }
 }
@@ -64,7 +68,14 @@ impl Step for StepFollowup {
                 }
             }
             Action::FollowUp { follow_up } => {
+                // Java `StepFollowup.handleCommand` CLIENT_FOLLOWUP_CHOICE:
+                //   publishParameter(new StepParameter(FOLLOWUP_CHOICE, cmd.isChoiceFollowup()))
+                // The publish matters beyond this step: `StepPickUp.setParameter` turns
+                // FOLLOWUP_CHOICE into its `ignore` flag, so a DECLINED follow-up disables the
+                // pick-up that BB2020's Block/BlitzBlock sequences run right after FOLLOWUP.
+                // Only setting the local field left that pick-up armed.
                 self.followup_choice = Some(*follow_up);
+                self.pending_choice_publish = Some(*follow_up);
             }
             _ => {}
         }
@@ -103,6 +114,9 @@ impl StepFollowup {
         // immediately updates `followupChoice` on the current step via the stack walk.
         let mut effective_choice = self.followup_choice;
         let mut out_params: Vec<StepParameter> = Vec::new();
+        if let Some(choice) = self.pending_choice_publish.take() {
+            out_params.push(StepParameter::FollowupChoice(choice));
+        }
 
         // Pinned or Vicious Vines: cannot follow up
         if attacker_state.is_pinned() || player_action == Some(PlayerAction::ViciousVines) {
@@ -439,6 +453,29 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         // Should publish CoordinateFrom(0,0) for no-followup path
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::CoordinateFrom(_))));
+    }
+
+    /// Java `handleCommand` CLIENT_FOLLOWUP_CHOICE publishes FOLLOWUP_CHOICE to the whole stack,
+    /// not just to this step. `StepPickUp.setParameter` turns it into its `ignore` flag, so a
+    /// declined follow-up must disable the pick-up BB2020's Block sequence runs right after
+    /// FOLLOWUP. Rust only set the local field, leaving that pick-up armed and rolling a d6 Java
+    /// never rolls (goblin bb2020 seed 50).
+    #[test]
+    fn answering_the_followup_dialog_republishes_the_choice() {
+        for choice in [false, true] {
+            let mut step = StepFollowup::new();
+            step.using_skill_preventing_follow_up = Some(false);
+            step.using_skill_forcing_follow_up = Some(false);
+            let mut game = make_game();
+            let out = step.handle_command(
+                &Action::FollowUp { follow_up: choice },
+                &mut game,
+                &mut GameRng::new(0),
+            );
+            assert!(
+                out.published.iter().any(|p| matches!(p, StepParameter::FollowupChoice(v) if *v == choice)),
+                "choice {choice} not republished: {:?}", out.published);
+        }
     }
 
     #[test]
