@@ -3110,3 +3110,37 @@ Gates, all run this turn: `lineman` **100/100**, `human` **100/100**, `ogre` **1
 **100/100**, `chaos_pact` **100/100**, `renegades` **100/100**, `lineman` bb2016 **100/100**, `lineman`
 bb2025 **100/100**, `cargo test --workspace` **14,449 / 0**. `goblin` unchanged at 95/100 (seeds 38, 50,
 81, 85, 98) — the count has not moved yet, so no progress is claimed beyond the dice.
+
+### ITER65 — the kickoff sequence had no apothecary: `goblin` 95 → 96/100
+
+Completed ITER64's partial fix. The dice matched but the injury was never applied, and probes showed
+why in two steps:
+
+```
+APO-PARAM step_mode=Some(Defender) ir_mode=Attacker ...     # never ir_mode=Home/Away
+DRIVE  ApplyKickoffResult -> SetActingTeam -> GotoLabel -> KickoffAnimation
+```
+
+No apothecary step ever received the result, and the drive trace shows why: after
+`ApplyKickoffResult` the sequence goes straight to `KickoffAnimation`. **`kickoff_tail` — the sequence
+Rust actually builds — has no `Apothecary` steps at all.** Java's `generator/mixed/Kickoff.java:45-46`
+places `APOTHECARY(HOME)` then `APOTHECARY(AWAY)` immediately after `APPLY_KICKOFF_RESULT`; they are
+what consumes and APPLIES the `INJURY_RESULT` a kickoff event publishes.
+
+(Rust's `generator/mixed/kickoff.rs` DOES have both steps — but that generator is not the one this
+path uses, which is why grepping for the steps earlier in the iteration was misleading. Checking that
+a step exists somewhere is not the same as checking the built sequence contains it; the drive trace is
+the authority.)
+
+**Fix**: add both steps to `kickoff_tail`, for every edition, matching the shared Java generator.
+Test `kickoff_sequence_applies_kickoff_event_injuries` asserts that for BB2016/BB2020/BB2025 the two
+steps immediately follow `APPLY_KICKOFF_RESULT` in HOME-then-AWAY order.
+
+**Result: `goblin` 95/100 → 96/100** (seed 38 fixed; 50, 81, 85, 98 remain).
+
+Gates, all run this turn: `lineman` **100/100**, `human` **100/100**, `ogre` **100/100**, `underworld`
+**100/100**, `chaos_pact` **100/100**, `renegades` **100/100**, `lineman` bb2016 **100/100**, `lineman`
+bb2025 **100/100**, `cargo test --workspace` **14,450 / 0**. Adding the steps for all editions did not
+disturb bb2016 or bb2025.
+
+**Status: 6 of 30 green**, `goblin` 96/100 next by fewest fails.

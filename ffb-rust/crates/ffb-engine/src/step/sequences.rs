@@ -51,6 +51,17 @@ fn kickoff_tail(rules: ffb_model::enums::Rules) -> Vec<SequenceStep> {
         SequenceStep::new(StepId::KickoffScatterRoll),
         SequenceStep::new(StepId::KickoffResultRoll),
         SequenceStep::new(StepId::ApplyKickoffResult),
+        // Java `generator/mixed/Kickoff.java:45-46`:
+        //     sequence.add(StepId.APOTHECARY, from(APOTHECARY_MODE, ApothecaryMode.HOME));
+        //     sequence.add(StepId.APOTHECARY, from(APOTHECARY_MODE, ApothecaryMode.AWAY));
+        // These consume the INJURY_RESULT that a kickoff event publishes for a hit player and APPLY
+        // it. Without them the result was published into a sequence that had no consumer: the
+        // Officious Ref's Ball & Chain injury was rolled and then dropped, leaving the goblin Fanatic
+        // Standing where Java has it Ko (goblin bb2020 seed 38 i=1, `a02`).
+        SequenceStep::with_params(StepId::Apothecary,
+            vec![StepParameter::ApothecaryMode(ApothecaryMode::Home)]),
+        SequenceStep::with_params(StepId::Apothecary,
+            vec![StepParameter::ApothecaryMode(ApothecaryMode::Away)]),
         // Java Kickoff generator: KICKOFF_ANIMATION between APPLY_KICKOFF_RESULT and
         // CATCH_SCATTER_THROW_IN — it sets ballInPlay(true) and publishes the CATCH_KICKOFF
         // mode. Omitting it left ball_in_play false for the entire drive, which silently
@@ -274,6 +285,30 @@ pub fn select_sequence() -> Vec<SequenceStep> {
 
 #[cfg(test)]
 mod tests {
+
+    /// Java `generator/mixed/Kickoff.java:45-46` places APOTHECARY(HOME) and APOTHECARY(AWAY)
+    /// immediately after APPLY_KICKOFF_RESULT. They consume and APPLY the INJURY_RESULT a kickoff
+    /// event publishes for a hit player; without them the Officious Ref's Ball & Chain injury was
+    /// rolled and then silently dropped (goblin bb2020 seed 38: the Fanatic stayed Standing where
+    /// Java has it Ko).
+    #[test]
+    fn kickoff_sequence_applies_kickoff_event_injuries() {
+        use ffb_model::enums::Rules;
+        for rules in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            let seq = kickoff_tail(rules);
+            let akr = seq.iter().position(|st| st.step_id == StepId::ApplyKickoffResult)
+                .unwrap_or_else(|| panic!("{rules:?}: no ApplyKickoffResult"));
+            let modes: Vec<ApothecaryMode> = seq[akr + 1..].iter()
+                .take_while(|st| st.step_id == StepId::Apothecary)
+                .filter_map(|st| st.params.iter().find_map(|p| match p {
+                    StepParameter::ApothecaryMode(m) => Some(*m),
+                    _ => None,
+                }))
+                .collect();
+            assert_eq!(modes, vec![ApothecaryMode::Home, ApothecaryMode::Away],
+                "{rules:?}: APPLY_KICKOFF_RESULT must be followed by APOTHECARY(HOME) then AWAY");
+        }
+    }
     /// Java's `generator/mixed/Kickoff.pushSequence` threads GOTO_LABEL_ON_END/ON_BLITZ onto
     /// APPLY_KICKOFF_RESULT and labels BLITZ_TURN / KICKOFF_ANIMATION / END_KICKOFF. BB2020's
     /// kickoff table maps roll 10 to BLITZ, whose handler GOTOs the blitz label, so a flattened
