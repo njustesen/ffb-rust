@@ -4095,3 +4095,59 @@ it is not this bug, and should be revisited with a test once the real writer is 
 |---|---|
 | `nurgle` bb2020 | 86/100 unchanged |
 | working tree | clean at HEAD |
+
+## ITER82 — the writer named: `change_player_action` stands the blitzer up; the revert never runs
+
+`nurgle` 86/100, no engine change. The backtrace answers ITER81's question.
+
+### Who writes STANDING
+
+A gated backtrace in `FieldModel::set_player_state` for `away_02` gives the full state history for
+the seed. The relevant transition is `Prone(3) → Moving(2)`:
+
+```
+STAND_BT pid=away_02 Some(3) -> 2
+  4: ffb_model::model::field_model::FieldModel::set_player_state
+  5: ffb_engine::step::util_server_steps::change_player_action
+  6: <...step_init_selecting::StepInitSelecting as Step>::handle_command
+```
+
+So the blitzer is lifted off the ground **at declaration**, by `change_player_action` — Java's
+`UtilActingPlayer.changeActingPlayer`, which does the same thing ("show acting player as moving").
+That is correct and shared. The player later goes `Moving(2) → Standing(1)`, which is what the state
+string reports at i=33.
+
+**Java does the identical Prone → MOVING write and then UNDOES it** when the Foul Appearance fails:
+`handleFailure` → `changeBase(PRONE).changeActive(false)`. Rust's revert never happens.
+
+### Why the ITER81 fix did not take
+
+Rust's `fail_fa` guard is `if game.acting_player.standing_up { ... }`, and `change_player_action`
+DOES set `standing_up = was_prone` (`util_server_steps.rs:77`), so the guard should hold. Adding
+`|| pa == Blitz` to the action test should then have fired it — and measured nothing. The remaining
+possibility is that **`fail_fa` is not reached at all**.
+
+There is evidence for that: the FA step is invoked TWICE for this blitz (probe at `n=29` and
+`n=30`), which is the re-roll path — first invocation rolls and fails, offers a re-roll, the agent
+declines, second invocation takes `already_rerolled`. Whether that second pass reaches `fail_fa` or
+returns earlier is exactly what has not been checked.
+
+### Next iteration — one `eprintln`, not a redesign
+
+Put a single gated print at the top of `fail_fa` and at each `return` inside `execute_step`, run
+seed 2, and see which arm the second invocation takes. If `fail_fa` runs, the `|| pa == Blitz`
+change is the fix and something else blocks it; if it does not, the re-roll-decline path is
+returning without the Java failure handling — which would be the real defect and is a different
+repair.
+
+Five iterations on nurgle without moving the count. The seed is now pinned to a single state bit
+with the writer named, so this is convergent, but it is worth saying plainly that the sequencing
+detours (ITER76-80) were wasted and the state-diff + backtrace pair should have been the FIRST
+tools reached for, not the last.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 86/100 unchanged |
+| working tree | clean at HEAD; probe reverted |
