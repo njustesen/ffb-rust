@@ -4582,3 +4582,55 @@ real cause is a refused push).
 **Status: 25 of 30 green.** Remaining: halfling 98, wood_elf 98, slann_fumbbl 98, nurgle 86,
 necromantic 32. Next: `necromantic` (68 fails) — it moved but least, so it likely has a second
 roster-wide cause of its own; then the three 98s.
+
+## ITER90 — `necromantic` is a Frenzy follow-up geometry difference, not another auto-decline
+
+`necromantic` 32/100. No engine change. Scoped in one pass using the ITER88 method.
+
+### Ruled out first: no other auto-decline applies here
+
+Following ITER89's lead, the remaining bb2020 auto-decline hooks are **Grab**
+(`bb2020/grab_behaviour.rs:127`) and **Indomitable** (`mixed/indomitable_behaviour.rs`). Java's
+`GrabBehaviour` has the same dialog shape as Stand Firm, so Rust's auto-decline there is almost
+certainly wrong the same way — but **no bb2020 roster has Grab** (`grep -rn Grab data/rosters/bb2020/`
+is empty), so fixing it cannot move this matrix. Recorded as a latent 1:1 gap, not done.
+
+(`bb2020/side_step_behaviour.rs` was already corrected this way in an earlier iteration —
+"use Side Step instead of auto-declining it", ogre 100/100 — which is what made Stand Firm's
+identical shape recognisable.)
+
+### The actual divergence
+
+Seed 1, step 14 — `Activate(Home1, BLITZ)`:
+
+```
+i=15  JAVA state hashes to d9dcfa1991073cd4      RUST 2e23e6ab75d3ae02
+  h00:  JAVA 12,7,Standing   RUST 13,8,Standing
+```
+
+Only the **attacker's own square** differs, and by a diagonal. The defender's position matches, as
+does every other player. Both engines spend exactly **4 dice** (rng 18 → 22).
+
+`home_01` is a **Werewolf**, whose skills are `Claw, Claws, Frenzy, Regeneration`
+(`roster_necromantic.json`). Frenzy carries `forceFollowup`: the attacker must follow up and then
+block again. So this is a follow-up/Frenzy **geometry or decision** difference — same dice, same
+push, different ending square for the blitzer — and NOT the negatrait/auto-decline family.
+
+Relevant context: `ParityRunner` always answers FOLLOWUP_CHOICE with `false`, but Java's
+`StepFollowup` checks `forceFollowup` INSIDE its `effective_choice == null` block, before the dialog
+is ever shown — so a Frenzy attacker force-follows-up and the harness's decline never applies. If
+Rust evaluates the decline first, or applies the force in a different order, the attacker ends up in
+a different square. That ordering is the first thing to check.
+
+### Next iteration
+
+Compare Rust's `bb2025/block/step_followup.rs` force-followup ordering against Java's
+`StepFollowup` for a Frenzy attacker, and check where the Frenzy second block re-enters. Then
+confirm with `statediff.py` on necromantic seed 1 i=15 — a one-field check.
+
+### Gate
+
+| check | result |
+|---|---|
+| `necromantic` bb2020 | 32/100 (post-ITER89 baseline, unchanged) |
+| working tree | clean at HEAD; no engine change |
