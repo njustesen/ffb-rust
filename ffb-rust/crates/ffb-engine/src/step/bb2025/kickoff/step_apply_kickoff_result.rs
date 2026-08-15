@@ -269,8 +269,15 @@ impl StepApplyKickoffResult {
         for pid in [player_id_home.as_ref(), player_id_away.as_ref()].into_iter().flatten() {
             targeted_ids.push(pid.clone());
         }
-        for pid in [player_id_home, player_id_away].into_iter().flatten() {
-            match self.officious_ref_insert_steps(game, rng, &pid, &params_to_consume) {
+        // Java passes ApothecaryMode.HOME for the home victim and AWAY for the away one
+        // (`StepApplyKickoffResult:684,688`); it reaches `dropPlayer`, which needs it for a
+        // Ball & Chain player's injury result.
+        let victims = [
+            (player_id_home, ffb_model::enums::ApothecaryMode::Home),
+            (player_id_away, ffb_model::enums::ApothecaryMode::Away),
+        ];
+        for (pid, apothecary_mode) in victims.into_iter().filter_map(|(p, m)| p.map(|p| (p, m))) {
+            match self.officious_ref_insert_steps(game, rng, &pid, &params_to_consume, apothecary_mode) {
                 Ok(params) => stun_params.extend(params),
                 Err(seq) => eject_seqs.push(seq),
             }
@@ -309,6 +316,7 @@ impl StepApplyKickoffResult {
         rng: &mut GameRng,
         player_id: &str,
         params_to_consume: &[std::mem::Discriminant<StepParameter>],
+        apothecary_mode: ffb_model::enums::ApothecaryMode,
     ) -> Result<Vec<StepParameter>, Vec<crate::step::framework::SequenceStep>> {
         use crate::step::framework::SequenceStep;
         use crate::step::generator::labels;
@@ -331,7 +339,14 @@ impl StepApplyKickoffResult {
                     vec![StepParameter::ParametersToConsume(params_to_consume.to_vec())]),
             ])
         } else {
-            Ok(util_server_injury::stun_player(game, player_id))
+            // Java: `publishParameters(UtilServerInjury.stunPlayer(this, player, apothecaryMode))`.
+            // `stunPlayer` -> `dropPlayer`, which for a player with `placedProneCausesInjuryRoll`
+            // (Ball & Chain) rolls a full `InjuryTypeBallAndChain` injury (2d6 armour) and publishes
+            // the result INSTEAD of placing it STUNNED. The rng-less `stun_player` skipped that roll,
+            // so the goblin Fanatic hit by an Officious Ref cost Rust two dice against Java and
+            // desynced the stream from the kickoff onward (goblin bb2020 seed 38 i=1: Java's ball is
+            // at (25,5) with rng 16, Rust's at (23,4) with rng 14).
+            Ok(util_server_injury::stun_player_rng(game, rng, player_id, apothecary_mode))
         }
     }
 
@@ -920,6 +935,48 @@ fn count_active_players_on_field(game: &Game) -> i32 {
 
 #[cfg(test)]
 mod tests {
+
+    /// Java `StepApplyKickoffResult.insertSteps` ends with
+    /// `publishParameters(UtilServerInjury.stunPlayer(this, player, apothecaryMode))`, and `stunPlayer`
+    /// -> `dropPlayer` rolls a full `InjuryTypeBallAndChain` (2d6) for a player with
+    /// `placedProneCausesInjuryRoll` instead of placing it STUNNED. Rust called the rng-LESS
+    /// `stun_player`, so an Officious Ref hitting the goblin Fanatic consumed two dice fewer than Java
+    /// and desynced the stream from the kickoff on (goblin bb2020 seed 38).
+    #[test]
+    fn officious_ref_stun_rolls_the_ball_and_chain_injury() {
+        use ffb_model::enums::{PlayerState, PS_STANDING, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+
+        let mut game = make_game();
+        let mut fanatic = ffb_model::model::player::Player {
+            id: "h1".into(), name: "Fanatic".into(), nr: 1, position_id: "pos".into(),
+            movement: 3, strength: 7, agility: 3, passing: 6, armour: 8,
+            ..Default::default()
+        };
+        fanatic.starting_skills = vec![SkillWithValue { skill_id: SkillId::BallAndChain, value: None }];
+        game.team_home.players.push(fanatic);
+        game.field_model.set_player_coordinate("h1", FieldCoordinate::new(13, 7));
+        game.field_model.set_player_state("h1", PlayerState::new(PS_STANDING));
+
+        let step = StepApplyKickoffResult::new(String::new(), String::new());
+        // A d6 of 1 takes the EJECT branch instead; find a seed that reaches the stun branch.
+        let mut checked = false;
+        for seed in 0..40u64 {
+            let mut rng = GameRng::new(seed);
+            let before = rng.call_count;
+            let outcome = step.officious_ref_insert_steps(
+                &mut game, &mut rng, "h1", &[], ffb_model::enums::ApothecaryMode::Home);
+            if outcome.is_ok() {
+                let spent = rng.call_count - before;
+                assert_eq!(spent, 3,
+                    "the officious-ref d6 plus the Ball & Chain armour roll (2d6) must all be drawn");
+                checked = true;
+                break;
+            }
+        }
+        assert!(checked, "no seed in 0..40 reached the stun branch");
+    }
     /// Java's `handleOfficiousRef` picks BOTH targets before running `insertSteps` for either, so
     /// on a tie the dice are `d11 home pick, d11 away pick, d6 home ref roll, d6 away ref roll`.
     /// Interleaving pick→insertSteps→pick→insertSteps draws the same NUMBER of dice in a different

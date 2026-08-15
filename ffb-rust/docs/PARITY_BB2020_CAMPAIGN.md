@@ -3071,3 +3071,42 @@ Gates, all run this turn against the pinned jar: `lineman` **100/100**, `human` 
 `renegades`, `ogre`. Next by fewest fails: `goblin` (5). Note `bb2025`'s Side Step behaviour carries the
 same auto-decline shortcut and was deliberately left alone — bb2025 lineman is 100/100 either way, so it
 needs its own divergence and verification rather than an untested ride-along.
+
+## ITER64 — `goblin` seed 38: the Officious Ref's stun must roll the Ball & Chain injury (PARTIAL)
+
+`goblin` seed 38 diverged at **step 0**, i.e. before any activation. The dice join shows where:
+
+```
+die 12  d11=3    randomPlayer            (both)
+die 13  d6=4     insertSteps             (both)
+die 14  JAVA d6=2  rollDice:98           RUST d8=8   <-- Rust is 2 dice short
+```
+
+The kickoff result is **Officious Ref**. Java's `StepApplyKickoffResult.insertSteps` ends with
+`publishParameters(UtilServerInjury.stunPlayer(this, player, apothecaryMode))`, and `stunPlayer` ->
+`dropPlayer` has a branch: a player with `placedProneCausesInjuryRoll` — **Ball & Chain**, i.e. the
+goblin Fanatic — gets a full `handleInjury(new InjuryTypeBallAndChain(), …)` (2d6 armour) instead of
+simply being placed STUNNED. Rust called the rng-LESS `stun_player`, skipping those two dice.
+
+Rust already had the rng-aware `stun_player_rng` (added for the Pitch Invasion path); the Officious Ref
+path just never used it. Fixed by threading Java's `ApothecaryMode.HOME` / `AWAY` through
+`officious_ref_insert_steps` (Java passes exactly those at `StepApplyKickoffResult:684,688`) and calling
+the rng-aware variant. Test `officious_ref_stun_rolls_the_ball_and_chain_injury` searches for a seed
+that reaches the stun branch and asserts exactly 3 dice are drawn (the ref d6 + 2d6 armour).
+
+**Partial, and stated as such.** The dice now match Java exactly through the kickoff — `rng_calls` at
+i=1 is 16 on both sides and the ball agrees at (25,5), where before Rust had 14 and (23,4). But the seed
+still fails: one player differs, `a02` is `-1,-1,Ko` in Java and `13,8,Standing` in Rust. The injury is
+now ROLLED but not APPLIED. Both engines' kickoff sequences do contain `APOTHECARY(HOME)` and
+`APOTHECARY(AWAY)` immediately after `APPLY_KICKOFF_RESULT` (Rust `generator/mixed/kickoff.rs:53,55`,
+Java `generator/mixed/Kickoff.java:45,46`), and Rust does publish the `InjuryResult` — so the next
+iteration should trace why the apothecary step does not apply it, which is the same shape as the ITER43
+`WAIT_FOR_APOTHECARY_USE` dead-end.
+
+Kept rather than reverted, because unlike the six closed corrections this one has a **measured** effect
+(the dice stream now matches through the kickoff) and is a prerequisite for the remaining state fix.
+
+Gates, all run this turn: `lineman` **100/100**, `human` **100/100**, `ogre` **100/100**, `underworld`
+**100/100**, `chaos_pact` **100/100**, `renegades` **100/100**, `lineman` bb2016 **100/100**, `lineman`
+bb2025 **100/100**, `cargo test --workspace` **14,449 / 0**. `goblin` unchanged at 95/100 (seeds 38, 50,
+81, 85, 98) — the count has not moved yet, so no progress is claimed beyond the dice.
