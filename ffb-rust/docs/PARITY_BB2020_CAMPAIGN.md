@@ -5848,3 +5848,60 @@ nurgle has now taken ITER92 and ITER101-108 without a numeric gain, though each 
 eliminated a specific mechanism and the remaining space is small and well-mapped. The other 29
 rosters are green and every fix from this stretch (Stand Firm, Moles, trap door, prayers) landed
 from the same method.
+
+## ITER109 — the regression is the GATE, not the step set: `end_player_action` is the wrong signal
+
+No engine change (reverted); nurgle stays 86/100. A clean discriminator this iteration.
+
+### The experiment
+
+ITER108's diagnosis said the 86 → 15 regression came from routing through `SelectBlitzTarget`,
+which drags in `SELECT_BLITZ_TARGET` + `JUMP_UP` + `STAND_UP`. So this iteration kept the **inline
+activation** (no extra steps at all) and only added:
+
+* FOUL_APPEARANCE + DUMP_OFF at the end of it (BB2020), failure → a new terminator;
+* the nega-trait failure label re-pointed at that terminator;
+* `StepSelectBlitzTargetEnd` as the terminator, pushing `BlitzBlock` via `continue_blitz()` only
+  when `!end_player_action && !end_turn`.
+
+**Result: 15/100 — identical to ITER108.**
+
+### What that proves
+
+Two structurally different step sets produce exactly the same score, so the extra
+`SelectBlitzTarget` steps were NOT the cause. ITER108's stated reason is therefore wrong and is
+retracted. The one thing both experiments share is `continue_blitz`'s guard, so **the regression is
+the gate**: `end_player_action` is true on far more blitzes than it should be, and most blitzes
+never get their block pushed at all.
+
+That is consistent with the score: 15/100 is roughly "blitzes mostly stop happening", not "blitzes
+resolve slightly differently".
+
+### Why `end_player_action` is the wrong signal
+
+It is a general parameter published by many steps and simply latched by
+`StepSelectBlitzTargetEnd::set_parameter` without being consumed or reset, so anything upstream in
+the activation that publishes it — not just a Foul Appearance failure — permanently disables the
+block for that activation. Java does not gate on a flag at all: it never pushes `BlitzBlock` in the
+first place, because the abort ends the command and the block arrives only on the NEXT command.
+
+### Next iteration
+
+Gate on the abort itself rather than on a latched flag. Options, cheapest first:
+
+1. Have `StepFoulAppearance::fail_fa` (and the nega-traits) publish a dedicated
+   `BlitzAborted(true)`-style parameter that only the terminator reads, so no unrelated publisher can
+   suppress the block.
+2. Or have the terminator check the concrete post-conditions instead — e.g. the target selection
+   state being `failed()`/`canceled()`, which `StepFoulAppearance` already sets via `ts.failed()`.
+
+Option 2 needs no new parameter and uses state Java also sets, so try it first.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 86/100 (unchanged — reverted, findings only) |
+| working tree | clean at HEAD, no engine change |
+
+bb2020 stays **29 of 30 green**. RED: nurgle 86.
