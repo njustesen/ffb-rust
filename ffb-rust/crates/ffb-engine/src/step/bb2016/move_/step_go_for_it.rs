@@ -155,7 +155,11 @@ impl StepGoForIt {
             let factory = GoForItModifierFactory::for_rules(game.rules);
             if let Some(pid) = player_id.as_deref() {
                 if let Some(player) = game.player(pid) {
-                    let ctx = GoForItContext::new(game, player);
+                    // Java: `new GoForItContext(game, actingPlayer.getPlayer(),
+                    // getGameState().getPrayerState().getMolesUnderThePitch())`
+                    // (`bb2016/StepGoForIt.java:161`). See the note in bb2025 `step_go_for_it.rs`.
+                    let moles = game.prayer_state.get_moles_under_the_pitch().clone();
+                    let ctx = GoForItContext::new_with_moles(game, player, moles);
                     let mods = factory.find_applicable(&ctx);
                     let card_mods = factory.find_card_modifiers(&ctx);
                     let skill_mods = factory.find_skill_modifiers(&ctx);

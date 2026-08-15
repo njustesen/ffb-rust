@@ -251,7 +251,11 @@ impl UtilServerPlayerMove {
         if go_for_it {
             let factory = GoForItModifierFactory::for_rules(game.rules);
             minimum_roll_gfi = if let Some(player) = game.player(&acting_id) {
-                let ctx = GoForItContext::new(game, player);
+                // Java: `new GoForItContext(game, actingPlayer.getPlayer(),
+                // pGameState.getPrayerState().getMolesUnderThePitch())`
+                // (`UtilServerPlayerMove.java:173`). See the note in bb2025 `step_go_for_it.rs`.
+                let moles = game.prayer_state.get_moles_under_the_pitch().clone();
+                let ctx = GoForItContext::new_with_moles(game, player, moles);
                 let mods = factory.find_applicable(&ctx);
                 let card_mods = factory.find_card_modifiers(&ctx);
                 let all: Vec<&GoForItModifier> = mods.iter().copied().chain(card_mods.iter()).collect();

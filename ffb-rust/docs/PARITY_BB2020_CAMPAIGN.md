@@ -4953,3 +4953,77 @@ bb2020 stays **26 of 30 green**. RED: nurgle 86 · halfling 98 · wood_elf 98 ·
 Find the earliest die position where the two engines' backtraces disagree about which STEP drew the
 die — bisect with `FFB_DIE_AT` against the Java `caller=` list, which is already dumped for this
 seed. That names the extra Rust roll directly. Do not start from the block.
+
+## ITER95 — "Moles under the Pitch" was never passed to the Rush modifier: halfling 98 → 100/100 GREEN, wood_elf 98 → 99
+
+The ITER94 method worked exactly as intended. Bisecting with `FFB_DIE_AT` against Java's `caller=`
+frames pinned the divergence to a **single die** in four probe runs.
+
+### Bisection
+
+Probing Rust at 20/40/60/80/100/120/140/160/180 and comparing which STEP drew each die against
+Java's frames: aligned through 160, mismatched at 180. Second pass (165-179): aligned through 171,
+mismatched at 173. Third pass (170-174) closed it:
+
+| die | Java | Rust |
+|---|---|---|
+| 170 | `StepStandUp` | `StepStandUp` ✓ |
+| 171 | `StepGoForIt.rush`, **d6 = 2** | `StepGoForIt` ✓ |
+| 172 | `InjuryTypeDropGFI.handleInjury` ← `StepFallDown` | `StepBlockRoll` ✗ |
+
+Same roll, same value: **Java's rush FAILED and the player fell; Rust's succeeded and went on to
+block.** All 11 GFI rolls in the seed match in value and order
+(`4,3,5,2,2,6,4,3,2,6,6`), so Java's minimum at die 171 was 3 while Rust's was 2.
+
+### Root cause
+
+Weather was `Nice`, so Blizzard was not it. The other `+1` GFI modifiers in the BB2016/BB2020
+collection are the two **Moles under the Pitch** entries — a Prayer to Nuffle. Every Java call site
+builds the context with the prayer state:
+
+```java
+new GoForItContext(game, actingPlayer.getPlayer(), getGameState().getPrayerState().getMolesUnderThePitch())
+```
+(`bb2025/StepGoForIt.java:214`, `bb2020:213`, `bb2016:161`, `UtilServerPlayerMove.java:173`)
+
+All four Rust call sites used the **2-arg** `GoForItContext::new(game, player)`, which leaves
+`teams_with_moles_under_pitch` EMPTY — so the modifier could never fire anywhere, in any edition.
+Everything else was already correct and in place: `PrayerState::get_moles_under_the_pitch`, the
+prayer handlers, the modifier entries in the factory, even a
+`GoForItContext::new_with_moles` constructor with its own unit test. Only the wiring between them
+was missing.
+
+**Why it hid for so long:** the prayer is not part of the parity state string, so an unapplied
+modifier is invisible until it flips a roll — and it only flips one when the rush comes up exactly
+on the boundary (a 2). Halfling is the roster that rushes constantly with Prayers active.
+
+### Fix
+
+Pass `game.prayer_state.get_moles_under_the_pitch().clone()` into
+`GoForItContext::new_with_moles` at all four sites (bb2025 + bb2016 + `UtilServerPlayerMove` are
+live; the bb2020 step is off the live path but kept in step with its Java counterpart). Regression
+test `moles_under_the_pitch_raises_the_rush_minimum` pins both directions — a Rush of 2 succeeds
+without the prayer and FAILS with it.
+
+### Gate
+
+| check | result |
+|---|---|
+| `halfling` bb2020 | **98/100 → 100/100 GREEN** |
+| `wood_elf` bb2020 | **98/100 → 99/100** |
+| `slann_fumbbl` bb2020 | 98/100 (unchanged) |
+| `nurgle` bb2020 | 86/100 (unchanged) |
+| `necromantic` bb2020 | 100/100 (holds) |
+| `lineman` bb2020 / bb2025 / bb2016 | 100/100 each (run serially) |
+| `cargo test --workspace` | clean |
+
+**bb2020 is now 27 of 30 green.** RED: nurgle 86 · slann_fumbbl 98 · wood_elf 99.
+
+### Next iteration
+
+`wood_elf` at 99/100 is one seed from green and the cheapest target. Use the ITER94/95 method from
+the start: `stepdiff.py` for the diverging step, then `FFB_DIE_AT` vs Java `caller=` to pin the die.
+
+Worth checking opportunistically: other `*Context` constructions in Rust that drop an argument Java
+passes. This defect class — a context built with fewer arguments than Java's, silently disabling a
+whole modifier family — is new to the campaign and would be invisible to the state hash every time.

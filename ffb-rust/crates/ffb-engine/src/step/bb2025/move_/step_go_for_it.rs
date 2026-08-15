@@ -166,7 +166,16 @@ impl StepGoForIt {
         let factory = GoForItModifierFactory::for_rules(game.rules);
         let (minimum_roll, mod_names): (i32, Vec<String>) = if let Some(pid) = player_id.as_deref() {
             if let Some(player) = game.player(pid) {
-                let ctx = GoForItContext::new(game, player);
+                // Java: `new GoForItContext(game, actingPlayer.getPlayer(),
+                //        getGameState().getPrayerState().getMolesUnderThePitch())`
+                // (`bb2025/StepGoForIt.java:214`, bb2020 `:213`). Rust used the 2-arg constructor,
+                // which leaves the set EMPTY, so the two "Moles under the Pitch" GFI modifiers
+                // (+1 each, home/away) could never fire and a Rush that Java fails at 3+ succeeded
+                // here at 2+. Invisible to the parity state hash — the prayer is not part of the
+                // state string — until it flips a roll: halfling bb2020 seed 74 die 171, both
+                // engines roll a 2, Java falls (InjuryTypeDropGFI) and Rust rushes on.
+                let moles = game.prayer_state.get_moles_under_the_pitch().clone();
+                let ctx = GoForItContext::new_with_moles(game, player, moles);
                 let mods = factory.find_applicable(&ctx);
                 let card_mods = factory.find_card_modifiers(&ctx);
                 let skill_mods = factory.find_skill_modifiers(&ctx);
@@ -402,6 +411,33 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         // Without a real player, modifier lookup falls back → minimum=2, roll=2 → success
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    /// Java builds the context with `getPrayerState().getMolesUnderThePitch()`, so the prayer's
+    /// +1 GFI modifier raises the minimum to 3 and a Rush of 2 FAILS. Rust used the 2-arg
+    /// constructor, leaving the set empty — the modifier could never fire (halfling bb2020 seed 74
+    /// die 171: both engines roll 2, Java falls, Rust rushed on).
+    #[test]
+    fn moles_under_the_pitch_raises_the_rush_minimum() {
+        let run = |with_moles: bool| {
+            let mut game = make_gfi_game();
+            add_player(&mut game, "p1");
+            game.acting_player.set_player("p1".into(), PlayerAction::Move);
+            game.acting_player.goes_for_it = true;
+            game.acting_player.current_move = 10;
+            if with_moles {
+                // The modifier applies to the OPPOSING team's rushes, keyed by team id.
+                let away_id = game.team_away.id.clone();
+                game.prayer_state.add_moles_under_the_pitch(&away_id);
+            }
+            let mut step = StepGoForIt::new("fail".into());
+            step.roll = 2;
+            step.start(&mut game, &mut GameRng::new(0)).action
+        };
+        assert_eq!(run(false), StepAction::NextStep,
+            "without the prayer a Rush of 2 succeeds (minimum 2)");
+        assert_ne!(run(true), StepAction::NextStep,
+            "with Moles under the Pitch the minimum is 3, so a Rush of 2 must FAIL");
     }
 
     #[test]
