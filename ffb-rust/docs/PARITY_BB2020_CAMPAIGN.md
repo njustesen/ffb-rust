@@ -4217,3 +4217,52 @@ Suggested order: `slann_fumbbl` (check the team loads), then `halfling`, then `d
 | `nurgle` bb2020 | 86/100 unchanged; seed 2's post-hash byte-identical |
 | `cargo test --workspace` | 2 failures WITH the change → reverted; clean at HEAD |
 | working tree | clean at HEAD |
+
+## ITER84 — the Bone Head hyphen drop was gated one edition too narrowly: `slann_fumbbl` 0 → **98/100**
+
+Parked nurgle per ITER83 and took `slann_fumbbl` (0/100). It was the cheapest red on the board and
+went from worst to nearly green in one iteration.
+
+### The bug
+
+`loader.rs::position_json_to_roster_position` drops the hyphen-spelled `"bone-head"` skill that the
+FUMBBL slann roster gives its Kroxigor, because Java's `SkillFactory.forName` does an exact
+case-insensitive match and never resolves it — so Java's Kroxigor has NO Bone Head, while Rust's
+lenient `from_class_name` would give it one and roll a per-activation negatrait d6 Java never rolls.
+
+That drop was gated on `is_bb2025`. But the canonical names are:
+
+```
+skill/bb2016/BoneHead.java:25   super("Bone-Head", ...)   <- hyphen
+skill/bb2020/BoneHead.java:25   super("Bone Head", ...)   <- space
+skill/bb2025/BoneHead.java:25   super("Bone Head", ...)   <- space
+```
+
+**BB2020 and BB2025 both use the space form**; only bb2016 uses the hyphen. So the drop belongs to
+both modern editions, and the bb2025-only gate left the BB2020 Kroxigor carrying a Bone Head Java
+does not have — the same extra d6, one edition over (seed 1 step 14, `home_01` BLITZ).
+
+The code comment already said "The bb2020/bb2025 Bone Head skill's canonical name is 'Bone Head'".
+The prose was right and the condition did not match it.
+
+### The fix
+
+`position_json_to_roster_position` and `roster_json_to_roster` now take `rules: Rules` instead of an
+`is_bb2025: bool`. The two drops they perform are NOT the same set and a single boolean could not
+express both:
+
+- hyphenated Bone Head → dropped for **BB2020 + BB2025** (kept for bb2016, where it resolves)
+- bb2016-only skills (No Hands etc.) → dropped for **BB2025 only** (bb2020 defines them)
+
+### Gate
+
+| check | result |
+|---|---|
+| `slann_fumbbl` bb2020 | 0/100 → **98/100** (seeds remaining: 2) |
+| `slann_fumbbl` bb2025 | 100/100 — the edition the original fix targeted is untouched |
+| `slann` bb2020 | 100/100 — the non-FUMBBL Kroxigor roster |
+| `lineman` bb2016 | 100/100 — the edition that KEEPS the hyphen spelling |
+| `cargo test --workspace` | 14,456 passed / 0 failed |
+
+**Status: 24 of 30 green**, `slann_fumbbl` 98/100 now the fewest-fails target. ITER83's call to
+park nurgle was right: one iteration on a different roster beat six on that one.

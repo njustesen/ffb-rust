@@ -547,7 +547,7 @@ pub fn make_team_from_file(roster_name: &str, side: &str, edition: &str) -> Resu
         let pos_json = roster_json.positions.iter()
             .find(|p| p.id == pl.position_id)
             .ok_or_else(|| format!("position '{}' not in roster '{}'", pl.position_id, spec.roster_id))?;
-        let rp = position_json_to_roster_position(pos_json, &roster_json.id, roster_json.undead, edition == "bb2025");
+        let rp = position_json_to_roster_position(pos_json, &roster_json.id, roster_json.undead, edition_to_rules(edition));
         players.push(Player::from_position(
             format!("{side}_{:02}", pl.nr),
             format!("{} {} {}", side, rp.name, pl.nr),
@@ -688,7 +688,7 @@ pub fn make_team_from_roster(roster_name: &str, side: &str, edition: &str) -> Re
     let mut nr = 1i32;
 
     'outer: for pos_json in &non_star {
-        let rp = position_json_to_roster_position(pos_json, &roster_json.id, roster_json.undead, edition == "bb2025");
+        let rp = position_json_to_roster_position(pos_json, &roster_json.id, roster_json.undead, edition_to_rules(edition));
         let max_this = pos_json.quantity.min(11 - players.len() as i32);
         for _ in 0..max_this {
             if players.len() >= 11 {

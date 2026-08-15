@@ -222,14 +222,14 @@ pub fn find_roster(roster_id: &str, rules: Rules) -> Option<Roster> {
     };
     rosters.into_iter()
         .find(|r| r.id == roster_id)
-        .map(|r| roster_json_to_roster(&r, rules == Rules::Bb2025))
+        .map(|r| roster_json_to_roster(&r, rules))
 }
 
 /// Converts a `RosterJson` (deserialized from data/) into a `Roster` model struct.
-/// `is_bb2025` gates edition-specific skill resolution (see `position_json_to_roster_position`).
-pub fn roster_json_to_roster(rj: &RosterJson, is_bb2025: bool) -> Roster {
+/// `rules` gates edition-specific skill resolution (see `position_json_to_roster_position`).
+pub fn roster_json_to_roster(rj: &RosterJson, rules: Rules) -> Roster {
     let positions = rj.positions.iter()
-        .map(|p| position_json_to_roster_position(p, &rj.id, rj.undead, is_bb2025))
+        .map(|p| position_json_to_roster_position(p, &rj.id, rj.undead, rules))
         .collect();
     Roster {
         id: rj.id.clone(),
@@ -247,8 +247,11 @@ pub fn roster_json_to_roster(rj: &RosterJson, is_bb2025: bool) -> Roster {
 
 /// Converts a `PositionJson` to a `RosterPosition`.
 ///
-/// `is_bb2025` gates the No Hands drop below.
-pub fn position_json_to_roster_position(pos: &PositionJson, roster_id: &str, is_undead: bool, is_bb2025: bool) -> RosterPosition {
+/// `rules` gates edition-specific skill resolution: the hyphenated Bone Head drop (BB2020 +
+/// BB2025) and the bb2016-only skill drops (BB2025 only). These are NOT the same set, which is
+/// why this takes the ruleset rather than a single `is_bb2025` flag.
+pub fn position_json_to_roster_position(pos: &PositionJson, roster_id: &str, is_undead: bool, rules: Rules) -> RosterPosition {
+    let is_bb2025 = rules == Rules::Bb2025;
     // Java parity: `SkillFactory.forName` does an EXACT case-insensitive lookup against each skill's
     // canonical name (the map is keyed by `skill.getName().toLowerCase()`); it does NOT normalize
     // hyphens vs spaces (only "Ball & Chain" is special-cased). The bb2020/bb2025 Bone Head skill's
@@ -259,10 +262,15 @@ pub fn position_json_to_roster_position(pos: &PositionJson, roster_id: &str, is_
     // resolve it, giving the Kroxigor a per-activation Bone Head negatrait test Java never rolls. That
     // extra d6 desynced the shared dice stream (slann_fumbbl seed 1 step 9: the Kroxigor's dodge then
     // consumed the following die, failed, fell → turnover, ending the away turn two activations early).
-    // Drop the hyphen-spelled "bone-head" for bb2025 only — bb2016's canonical IS "Bone-Head", so the
-    // hyphen spelling correctly resolves there and must be kept.
+    // Drop the hyphen-spelled "bone-head" for BB2020 AND BB2025 — both name the skill "Bone Head"
+    // (`skill/bb2020/BoneHead.java:25`, `skill/bb2025/BoneHead.java:25`), so `forName("bone-head")`
+    // misses in both. Only bb2016's canonical IS "Bone-Head" (`skill/bb2016/BoneHead.java:25`), so
+    // the hyphen spelling resolves there and must be kept. This was gated on bb2025 alone, which
+    // left the BB2020 Kroxigor with a Bone Head that Java does not have — the same extra
+    // per-activation d6, one edition over (slann_fumbbl bb2020 seed 1 step 14, home_01 BLITZ).
+    let hyphen_bone_head_resolves = rules == Rules::Bb2016;
     let skills: Vec<SkillWithValue> = pos.skills.iter()
-        .filter(|entry| !(is_bb2025 && entry.name().eq_ignore_ascii_case("bone-head")))
+        .filter(|entry| !(!hyphen_bone_head_resolves && entry.name().eq_ignore_ascii_case("bone-head")))
         .filter_map(skill_entry_to_skill_with_value)
         .collect();
     // Java: some skills are bb2016-only (no @RulesCollection(BB2025) class), so bb2025's SkillFactory
@@ -414,10 +422,10 @@ mod tests {
             r#"{"id":"p","name":"Deathroller","type":"Regular","quantity":1,"cost":0,
                 "ma":4,"st":7,"ag":1,"pa":6,"av":11,"skills":["No Hands","Stand Firm"]}"#,
         ).unwrap();
-        let rp_2025 = position_json_to_roster_position(&pos, "dwarf", false, true);
+        let rp_2025 = position_json_to_roster_position(&pos, "dwarf", false, Rules::Bb2025);
         assert!(!rp_2025.skills.iter().any(|s| s.skill_id == SkillId::NoHands), "bb2025 must drop No Hands");
         assert!(rp_2025.skills.iter().any(|s| s.skill_id == SkillId::StandFirm), "other skills kept");
-        let rp_2020 = position_json_to_roster_position(&pos, "dwarf", false, false);
+        let rp_2020 = position_json_to_roster_position(&pos, "dwarf", false, Rules::Bb2020);
         assert!(rp_2020.skills.iter().any(|s| s.skill_id == SkillId::NoHands), "non-bb2025 keeps No Hands");
     }
 
@@ -432,10 +440,10 @@ mod tests {
             r#"{"id":"t","name":"Thrower","type":"Regular","quantity":1,"cost":0,
                 "ma":6,"st":3,"ag":4,"pa":2,"av":8,"skills":["Pass","Safe Throw"]}"#,
         ).unwrap();
-        let rp_2025 = position_json_to_roster_position(&pos, "high_elf", false, true);
+        let rp_2025 = position_json_to_roster_position(&pos, "high_elf", false, Rules::Bb2025);
         assert!(!rp_2025.skills.iter().any(|s| s.skill_id == SkillId::SafeThrow), "bb2025 must drop Safe Throw");
         assert!(rp_2025.skills.iter().any(|s| s.skill_id == SkillId::Pass), "other skills kept");
-        let rp_2020 = position_json_to_roster_position(&pos, "high_elf", false, false);
+        let rp_2020 = position_json_to_roster_position(&pos, "high_elf", false, Rules::Bb2020);
         assert!(rp_2020.skills.iter().any(|s| s.skill_id == SkillId::SafeThrow), "non-bb2025 keeps Safe Throw");
     }
 
