@@ -3319,3 +3319,67 @@ points at it yet, so it is recorded, not changed.
 | `cargo test --workspace` | **14,452 passed / 0 failed** |
 
 **Status: 6 of 30 green**, `goblin` 98/100. Next: seed 81 (i=128, away turn 8) and seed 98 (i=10).
+
+## ITER69 — `StepHandleDropPlayerContext` was doing half of `dropPlayer`; seed 98 is an ORDERING divergence
+
+`goblin` stays at **98/100**. One real 1:1 correction landed, and seed 98 is now characterised
+precisely rather than guessed at. Stated as no-count-change, per ITER64's precedent for keeping a
+verified correction that has a measured effect but does not yet close a seed.
+
+### The correction
+
+Seed 98's first dice divergence is at rng 20: Java rolls a d8
+(`StepCatchScatterThrowIn.bounceBall`) where Rust rolls a d6. Reading Java's
+`UtilServerInjury.dropPlayer` shows the shape that matters — the `placedProneCausesInjuryRoll`
+(Ball & Chain) branch and the place-PRONE branch are an `if/else` over the **state change only**;
+the ball handling below it (`DROPPED_BALL_CARRIER`, `setBallMoving(true)`,
+`CATCH_SCATTER_THROW_IN_MODE = SCATTER_BALL`, the turnover) sits OUTSIDE that `if/else` and runs for
+a Ball & Chain player too.
+
+Rust's `drop_player_rng` already ports this correctly — with a doc comment describing this exact
+bug, fixed once for bb2016. **`StepHandleDropPlayerContext` was not calling it.** It inlined the B&C
+injury roll itself and returned `Vec::new()` for the drop parameters, so dropping a Fanatic that was
+standing on the ball rolled the chain injury but never published `SCATTER_BALL` — the ball did not
+bounce. It also hardcoded `ApothecaryMode::Defender` where Java passes
+`dropPlayerContext.getApothecaryMode()`.
+
+Fixed by calling `drop_player_rng` — i.e. by deleting the duplicate. Verified with a probe that the
+ball now bounces off the Fanatic's square (13,8 → 13,7) where before it stayed put. Test
+`dropping_a_ball_and_chain_player_on_the_ball_publishes_scatter_ball` asserts both halves survive:
+`SCATTER_BALL` published *and* the chain `InjuryResult` still rolled.
+
+**Lesson, and worth generalising:** the duplicate had been written because the shared helper
+"couldn't roll" at the time it was needed. Once the rng-aware helper existed, the duplicate was
+never removed and silently kept the older, half-complete behaviour. Grep for a second
+implementation before extending a step's inline logic.
+
+### Seed 98 is an ordering divergence, not a missing roll
+
+With that fixed the dice COUNT and VALUES around the divergence now line up — the d8 is simply in a
+different place:
+
+```
+       20  21  22  23  24  25  26  27  28  29  30  31
+JAVA   d8  d6  d6  d6  d6  d6  d6  d6  d6  d6  d6  d6
+RUST   d6  d6  d6  d6  d6  d6  d6  d6  d6  d6  d6  d8
+       ^^ bounce                                  ^^ bounce, 11 rolls late
+```
+
+Every result in 21..30 is identical. Java bounces the ball the moment the drop happens; Rust defers
+the same bounce to the end of the block sequence. The `SCATTER_BALL` published by the drop is not
+being consumed by the `CatchScatterThrowIn` that immediately follows it — probing the step shows it
+arriving with `mode=None` there and with `mode=ScatterBall` only much later.
+
+**Next iteration** should start there: which `CatchScatterThrowIn` in the sequence receives the
+published `CATCH_SCATTER_THROW_IN_MODE`, and why the nearer one does not. That is a parameter-routing
+question in the driver, not a dice or rules question — a different shape from every fix so far this
+campaign, and likely to explain seed 81 too.
+
+### Gate
+
+| check | result |
+|---|---|
+| `goblin` bb2020 | 98/100 (unchanged — no progress claimed) |
+| `lineman` bb2016 / bb2020 / bb2025 | 100/100 each |
+| `human`, `ogre`, `underworld`, `chaos_pact`, `renegades` bb2020 | 100/100 each |
+| `cargo test --workspace` | **14,453 passed / 0 failed** |

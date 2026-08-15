@@ -7,7 +7,7 @@ use crate::action::Action;
 use crate::drop_player_context::{DropPlayerContext, VictimStateKey};
 use crate::step::framework::{Step, StepOutcome, StepParameter};
 use crate::step::framework::StepId;
-use crate::step::util_server_injury::drop_player;
+use crate::step::util_server_injury::drop_player_rng;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.shared.StepHandleDropPlayerContext.
 ///
@@ -114,28 +114,21 @@ impl StepHandleDropPlayerContext {
                 .map(|s| !s.is_prone_or_stunned())
                 .unwrap_or(false);
             let fell_coord = game.field_model.player_coordinate(&player_id);
-            // Java UtilServerInjury.dropPlayer: a player with placedProneCausesInjuryRoll (Ball &
-            // Chain) is NOT placed prone — the chain injures it: handleInjury(new
-            // InjuryTypeBallAndChain(), null, player, coord, ..., mode) → publish INJURY_RESULT.
-            // Rust's drop_player only implements the else (placement) branch and can't roll (no rng),
-            // so a dropped B&C player never rolled its 2 InjuryTypeBallAndChain dice (goblin seed 1
-            // i=14: home_01's both-down blitz drops the away B&C fanatic → Java rolls it, Rust omitted
-            // it → rng desync). This step HAS rng, so roll it here for a B&C player.
-            let placed_prone_causes_injury = game.player(&player_id)
-                .map(|p| p.has_skill_property(ffb_model::model::property::named_properties::NamedProperties::PLACED_PRONE_CAUSES_INJURY_ROLL))
-                .unwrap_or(false);
-            let drop_params = if placed_prone_causes_injury {
-                let bc_coord = fell_coord.unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
-                let mut it = crate::injury::injuryType::injury_type_ball_and_chain::InjuryTypeBallAndChain::new();
-                let res = crate::step::util_server_injury::handle_injury(
-                    game, rng, &mut it, None, &player_id, bc_coord, None, None,
-                    ffb_model::enums::ApothecaryMode::Defender,
-                );
-                out = out.publish(StepParameter::InjuryResult(Box::new(res)));
-                Vec::new()
-            } else {
-                drop_player(game, &player_id, ctx.eligible_for_safe_pair_of_hands)
-            };
+            // Java: publishParameters(UtilServerInjury.dropPlayer(this, player, mode, spoh)).
+            //
+            // `drop_player_rng` is the full port — it does the `placedProneCausesInjuryRoll` (Ball &
+            // Chain) branch, which needs an rng, AND the ball handling that Java places OUTSIDE
+            // that if/else and therefore runs for a B&C player too. This step used to inline the
+            // injury half and return no parameters, so dropping a Ball & Chain player standing on a
+            // loose ball never set SCATTER_BALL: Java bounced the ball off the Fanatic's square
+            // (a d8) and Rust did not (goblin bb2020 seed 98 i=10, rng 20).
+            let drop_params = drop_player_rng(
+                game,
+                rng,
+                &player_id,
+                ctx.eligible_for_safe_pair_of_hands,
+                ctx.apothecary_mode.unwrap_or(ffb_model::enums::ApothecaryMode::Defender),
+            );
             if was_upright {
                 if let Some(coord) = fell_coord {
                     out = out.with_event(ffb_model::events::GameEvent::PlayerFellDown {
@@ -422,5 +415,36 @@ mod tests {
         // Should NOT have dropped the player
         let state = game.field_model.player_state("p1").unwrap();
         assert_eq!(state.base(), PS_STANDING);
+    }
+
+    /// Java `StepHandleDropPlayerContext.executeStep` calls `UtilServerInjury.dropPlayer`, whose
+    /// ball handling sits OUTSIDE the `placedProneCausesInjuryRoll` if/else and therefore runs for
+    /// a Ball & Chain player too. This step used to inline the B&C injury roll and return no
+    /// parameters at all, so a dropped Fanatic standing on the ball never published SCATTER_BALL
+    /// and the ball did not bounce (goblin bb2020 seed 98).
+    #[test]
+    fn dropping_a_ball_and_chain_player_on_the_ball_publishes_scatter_ball() {
+        let mut game = make_game();
+        add_player(&mut game, "bc1");
+        {
+            let p = game.team_home.players.iter_mut().find(|p| p.id == "bc1").unwrap();
+            p.starting_skills.push(ffb_model::model::skill_def::SkillWithValue::new(SkillId::BallAndChain));
+        }
+        let coord = game.field_model.player_coordinate("bc1").unwrap();
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_in_play = true;
+
+        let mut step = StepHandleDropPlayerContext::new();
+        step.drop_player_context = Some(make_dpc("bc1"));
+        let mut rng = GameRng::new(7);
+        let out = step.start(&mut game, &mut rng);
+
+        assert!(out.published.iter().any(|p| matches!(p,
+            StepParameter::CatchScatterThrowInMode(
+                crate::step::framework::CatchScatterThrowInMode::ScatterBall))),
+            "expected SCATTER_BALL, published: {:?}", out.published);
+        assert!(game.field_model.ball_moving);
+        // The B&C chain injury is still rolled — that half must not be lost either.
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))));
     }
 }
