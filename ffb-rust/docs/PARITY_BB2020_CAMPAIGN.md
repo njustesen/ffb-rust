@@ -5362,3 +5362,68 @@ BEFORE STAND_UP, BB2025 after), but the obvious sequence-move regressed it 86 �
 unexplained die-count contradiction — the move should be die-neutral yet Rust gained a die at
 seed 1 step 1. Start from that contradiction, with the `FFB_DIE_AT` + Java `caller=` pairing that
 has now resolved five reds in a row, and do NOT re-apply the ITER92 patch blind.
+
+## ITER101 — nurgle: the FA sequence move is DICE-CORRECT; ITER92's "extra die" was a counter artifact
+
+No engine change; nurgle stays 86/100. This iteration re-ran ITER92's experiment with the ITER93
+method and **corrects its diagnosis**, narrowing the remaining problem to one specific effect.
+
+### Retraction of ITER92's blocker
+
+ITER92 abandoned the sequence move partly on a stated contradiction: "the move should be die-neutral
+yet Rust gained a die at seed 1 step 1 (Java 2, Rust 3)". **That was the per-call/per-die counter
+confusion documented in ITER93** — Java's `rng_calls` counts one call for a multi-die roll, Rust
+counts each die. There was never an extra die. That reasoning should not be carried forward.
+
+### What the move actually does (measured properly)
+
+Re-applied in full, then compared dice by `(sides, result)` with Java's `caller=` frames rather than
+by counter. On nurgle seed 1 the dice now match **through position 49**, including the Foul
+Appearance roll landing in the right place:
+
+```
+pos 14  JAVA d6=6  FoulAppearanceBehaviour.handleExecuteStepHook   | RUST d6=6   ← now aligned
+pos 15  JAVA d6=4  rollBlockDice                                    | RUST d6=4
+```
+
+Before the move, Rust's FA fired after STAND_UP and the streams parted much earlier. **The move is
+correct.** Confirmed separately that the defender IS already set when `SelectBlitzTarget` runs
+(`defender=Some("home_03")` at the STAND_UP probe), so the inserted FA step does fire.
+
+### Why it still regresses 86 → 0/100
+
+The failure is a **state** difference on identical dice. nurgle seed 1 step 1, block die = 4
+(PUSHBACK):
+
+```
+i=2   h02:  JAVA 11,7,Standing   RUST 11,7,Prone
+```
+
+Both engines push `h02` to the same square; Java leaves it standing, Rust knocks it down. Every die
+up to that point matches.
+
+**DUMP_OFF placement is NOT the cause** — isolated and measured: keeping DUMP_OFF in `BlitzBlock`
+(instead of moving it to `SelectBlitzTarget` as Java does) still gives 0/100. It is the FA move
+alone.
+
+### Leading hypothesis for the next iteration
+
+`StepFoulAppearance`'s SUCCESS path calls `commit_target_selection()`
+(`mixed/step_foul_appearance.rs`: `ts.commit()`). Moving FA out of `BlitzBlock` removes that commit
+from the block sequence, and something in Rust's block resolution depends on it —
+`step_remove_target_selection_state.rs:45` reads `tss.is_committed()` to set
+`acting_player.has_triggered_effect`, and `StepFoulAppearance` itself resolves its defender only
+from a TSS that is `is_selected() && is_committed()`.
+
+Java has the same commit in the same place and is fine, so the coupling is Rust-side. Next step:
+find what in the block path changes a PUSHBACK into a knockdown when the TSS commit happens earlier
+— instrument `StepBlockChoice` / `StepPushback` for the commit flag, not the dice.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 86/100 (unchanged — reverted, findings only) |
+| working tree | clean at HEAD, no engine change |
+
+bb2020 stays **29 of 30 green**. RED: nurgle 86.
