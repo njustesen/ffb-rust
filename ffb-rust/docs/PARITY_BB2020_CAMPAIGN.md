@@ -3178,3 +3178,93 @@ die 23, shifting the injury roll one die later; `roll_casualty` itself is correc
 answer is one of the block-dice / armour draws before the injury, not the casualty machinery.
 
 Baseline unchanged and tree clean: `goblin` 96/100 (seeds 50, 81, 85, 98).
+
+## ITER67 — `goblin` seed 85: the BB2020 blitz ran BB2025's PICK_UP and bounced the ball → 96/100 → **97/100**
+
+Re-measured the baseline first (valid sweep: exit prints `rust_total`, `96/100 games match`):
+`goblin` 96/100, seeds **50, 81, 85, 98**. Took seed 85 — it diverges earliest, at i=4, and shares
+seed 50's shape (Java continues the away turn, Rust takes a turnover).
+
+**The pre-state hashes are IDENTICAL at i=4** (`7e4fc1a9904ce30b`) and both engines activate
+`away_03` for a BLITZ, so the board and the agent's choice agree; only the resolution differs.
+
+**Diffing the dice by SIDES** (`FFB_DICE_TRACE=1`, splitting the Java lines by their `caller=` field)
+localises it to a single call:
+
+```
+pos 25  JAVA d6=4   RUST d6=4
+pos 26  JAVA d6=3   RUST d8=3     <-- Rust rolls a SCATTER where Java rolls the block die
+pos 27  JAVA d6=2   RUST d6=2
+```
+
+Java's one block die is 3 = PUSH and the away turn continues. Rust's scatter pushes its block die to
+pos 27 = 2 = BOTH DOWN → turnover. Everything downstream follows from that one extra d8.
+
+**`FFB_DIE_AT=26` names the drawer in one run** (a backtrace hook in `GameRng::die`, now kept
+permanently — see below): `StepCatchScatterThrowIn`. `FFB_DRIVE_TRACE=1` then shows the sequence
+around it:
+
+```
+... Dauntless, Horns, Trickster, PickUp, CatchScatterThrowIn, CatchScatterThrowIn <- d8
+```
+
+That is the **BB2025** BlitzBlock sequence. `bb2025/BlitzBlock.java:43` adds `PICK_UP` between
+`TRICKSTER` and `CATCH_SCATTER_THROW_IN`; `bb2020/BlitzBlock.java` has **no** `PICK_UP` there at all
+(its only one is after `SHADOWING`, in the pushback branch). `away_03` is the goblin **Fanatic** —
+Ball & Chain, i.e. No Hands — standing on the loose ball at (13,8): BB2025's PICK_UP cannot pick up,
+so it publishes the ball and `CatchScatterThrowIn` bounces it. BB2020 never attempts the pickup.
+
+The reason the BB2025 generator runs a BB2020 game at all: `bb2025/shared/step_end_selecting.rs` is
+the live `StepEndSelecting` for every edition (the driver's per-edition overrides in
+`make_step_for` cover BB2016 and, so far, only `StepId::Prayer` for BB2020), and its BLITZ arm
+builds `bb2025::BlitzBlock` unconditionally.
+
+### Two rejected fixes, both measured
+
+Both were reverted under the campaign's gate (the roster's count must DROP):
+
+1. **BB2020 `SelectBlitzTarget` activation + BB2020 `BlitzBlock`** (the full 1:1 swap) → `goblin`
+   **10/100**.
+2. **BB2025 activation bridge + BB2020 `BlitzBlock`** (isolating which half was to blame) →
+   `goblin` **10/100** again.
+
+So the BB2020 *sequence* is what the shared step-set cannot run: these steps depend on the BB2025
+shape elsewhere in the sequence (`STEADY_FOOTING`/`CHOMP`, the `REMOVE_TARGET_SELECTION_STATE` and
+`RESET_FUMBLEROOSKIE` positions, the leading `GO_FOR_IT` label). Wholesale BB2020 sequences need the
+BB2020 *step* classes routed with them — the same "approach A" the BB2016 campaign did, and a
+multi-iteration job, not this one.
+
+### The fix that landed
+
+The precedent is already in this codebase — `driver.rs`'s `StepApplyKickoffResult` note: when a
+shared step is right except for one edition-specific detail, **edition-gate that one detail inside
+the shared file** rather than routing the whole thing to a staler per-edition file. Applied here:
+`bb2025::BlitzBlockParams` gains a `rules` field, and the `TRICKSTER → PICK_UP` entry is emitted
+only when `rules != Bb2020`. `StepEndSelecting` passes `game.rules` through. Nothing else moves.
+
+Test `pick_up_before_catch_scatter_is_bb2025_only` asserts the entry is present for BB2025 and
+absent for BB2020, that the post-`FOLLOWUP` PICK_UP (which BB2020 has too) survives in both, and
+that the BB2020 sequence is exactly one step shorter — so the gate cannot silently widen.
+
+### Tooling kept
+
+`FFB_DIE_AT=<n>[,<n>…]` in `GameRng::die` prints a backtrace for the named die positions. Previous
+iterations added and reverted this hook repeatedly; it is now permanent, parsed once into a
+`OnceLock<Vec<u64>>` so it costs an empty-slice check per roll when unset.
+
+### Gate
+
+| check | result |
+|---|---|
+| `goblin` bb2020 | 96/100 → **97/100** (seed 85 fixed; 50, 81, 98 remain) |
+| `lineman` bb2016 / bb2020 / bb2025 | 100/100 each |
+| `human`, `ogre`, `underworld`, `chaos_pact`, `renegades` bb2020 | 100/100 each |
+| `cargo test --workspace` | **14,451 passed / 0 failed** |
+
+**Note on exit codes**: `ffb-parity` exits 1 on `REQUIRED ITEMS MISSING` (a coverage requirement)
+even when the run is 100/100. The ITER57 validity rule should therefore be read as: a sweep counts
+only if it printed `rust_total` **and** an `N/100 games match` line — not on exit code alone.
+
+**Status: 6 of 30 green**, `goblin` 97/100 still the fewest-fails target. Next: seed 50 (i=13, the
+ITER66 thread — Rust draws an extra d6 before the casualty roll; re-check it against this fix first,
+since a stray blitz-path pickup is exactly the shape ITER66 was chasing).

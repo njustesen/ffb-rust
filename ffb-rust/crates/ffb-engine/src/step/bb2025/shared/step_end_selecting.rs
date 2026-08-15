@@ -30,6 +30,7 @@ use crate::step::generator::bb2025::throw_team_mate::{ThrowTeamMate, ThrowTeamMa
 use crate::step::generator::bb2025::treacherous::{Treacherous, TreacherousParams};
 use crate::step::generator::bb2025::activation_sequence_builder::ActivationSequenceBuilder;
 use crate::step::generator::sequence::{Sequence, labels};
+use ffb_model::enums::Rules;
 #[cfg(test)]
 use crate::step::framework::StepAction;
 
@@ -365,10 +366,11 @@ impl StepEndSelecting {
                         using_vomit: self.using_vomit,
                         using_breathe_fire: self.using_breathe_fire,
                         using_chomp: self.using_chomp,
+                        rules: game.rules,
                         ..Default::default()
                     }
                 } else {
-                    BlitzBlockParams::default()
+                    BlitzBlockParams { rules: game.rules, ..Default::default() }
                 };
                 // Rust bridging: Java resolves a blitz in two commands — CLIENT_ACTING_PLAYER
                 // (BLITZ_MOVE) dispatches BLITZ_SELECT → the SelectBlitzTarget sequence, which runs

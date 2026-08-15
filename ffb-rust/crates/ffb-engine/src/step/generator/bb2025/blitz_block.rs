@@ -2,13 +2,13 @@
 /// Mirrors Java `com.fumbbl.ffb.server.step.generator.bb2025.BlitzBlock`.
 /// Like Block but NO activation block, with leading GFI + HORNS, and richer
 /// POW/PUSHBACK tail with REMOVE_TARGET_SELECTION_STATE.
-use ffb_model::enums::ApothecaryMode;
+use ffb_model::enums::{ApothecaryMode, Rules};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
 
 /// Parameters for the BlitzBlock sequence — mirrors Java `BlitzBlock.SequenceParams`.
 /// Same weapon flags as Block; no activation / no bloodlust.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct BlitzBlockParams {
     pub block_defender_id: Option<String>,
     pub multi_block_defender_id: Option<String>,
@@ -19,6 +19,33 @@ pub struct BlitzBlockParams {
     pub using_chomp: bool,
     pub ask_for_block_kind: bool,
     pub publish_defender: bool,
+    /// Ruleset this sequence is being built for.
+    ///
+    /// The shared BB2025 step-set runs BB2020 games too, but the two editions' BlitzBlock
+    /// generators are NOT identical: `bb2025/BlitzBlock.java:43` adds PICK_UP between TRICKSTER
+    /// and CATCH_SCATTER_THROW_IN and `bb2020/BlitzBlock.java` does not (BB2020's only PICK_UP is
+    /// the one after SHADOWING, in the pushback branch). Building the whole BB2020 sequence here
+    /// regresses badly — the shared steps depend on the BB2025 shape elsewhere — so, following the
+    /// precedent set for `StepApplyKickoffResult` in `driver.rs`, edition-gate the one entry that
+    /// differs on the measured path.
+    pub rules: Rules,
+}
+
+impl Default for BlitzBlockParams {
+    fn default() -> Self {
+        Self {
+            block_defender_id: None,
+            multi_block_defender_id: None,
+            using_stab: false,
+            using_chainsaw: false,
+            using_vomit: false,
+            using_breathe_fire: false,
+            using_chomp: false,
+            ask_for_block_kind: false,
+            publish_defender: false,
+            rules: Rules::Bb2025,
+        }
+    }
 }
 
 pub struct BlitzBlock;
@@ -72,10 +99,12 @@ impl BlitzBlock {
         seq.add(StepId::Horns, vec![]);
         // 9 TRICKSTER
         seq.add(StepId::Trickster, vec![]);
-        // 10 PICK_UP
-        seq.add(StepId::PickUp, vec![
-            StepParameter::GotoLabelOnFailure(labels::DROP_FALLING_PLAYERS.into()),
-        ]);
+        // 10 PICK_UP — BB2025 only; see `BlitzBlockParams::rules`.
+        if params.rules != Rules::Bb2020 {
+            seq.add(StepId::PickUp, vec![
+                StepParameter::GotoLabelOnFailure(labels::DROP_FALLING_PLAYERS.into()),
+            ]);
+        }
         // 11 CATCH_SCATTER_THROW_IN
         seq.add(StepId::CatchScatterThrowIn, vec![]);
         // 12 STAB
@@ -293,6 +322,36 @@ mod tests {
     fn blitz_block_has_51_steps() {
         let steps = BlitzBlock::build_sequence(&BlitzBlockParams::default());
         assert_eq!(steps.len(), 51);
+    }
+
+    /// `bb2025/BlitzBlock.java:43` runs PICK_UP between TRICKSTER and CATCH_SCATTER_THROW_IN;
+    /// `bb2020/BlitzBlock.java` has no PICK_UP there at all (its only one is after SHADOWING, in
+    /// the pushback branch). Getting this wrong made a BB2020 goblin Fanatic attempt a No-Hands
+    /// pickup off a loose-ball square and BOUNCE the ball — one d8 Java never rolls (goblin
+    /// bb2020 seed 85 i=4: the shifted block die turned Java's push into a both-down turnover).
+    #[test]
+    fn pick_up_before_catch_scatter_is_bb2025_only() {
+        let pos = |rules: Rules| {
+            let steps = BlitzBlock::build_sequence(&BlitzBlockParams { rules, ..Default::default() });
+            let trickster = steps.iter().position(|s| s.step_id == StepId::Trickster).unwrap();
+            let catch = steps.iter()
+                .position(|s| s.step_id == StepId::CatchScatterThrowIn && s.label.is_none())
+                .unwrap();
+            steps[trickster..catch].iter().filter(|s| s.step_id == StepId::PickUp).count()
+        };
+        assert_eq!(pos(Rules::Bb2025), 1, "bb2025 picks up between TRICKSTER and CATCH_SCATTER");
+        assert_eq!(pos(Rules::Bb2020), 0, "bb2020 has no PICK_UP between TRICKSTER and CATCH_SCATTER");
+
+        // Only that one entry is gated: the pushback-branch PICK_UP after FOLLOWUP — which BB2020
+        // has too — stays in both, and nothing else about the sequence moves.
+        for rules in [Rules::Bb2025, Rules::Bb2020] {
+            let steps = BlitzBlock::build_sequence(&BlitzBlockParams { rules, ..Default::default() });
+            let followup = steps.iter().position(|s| s.step_id == StepId::Followup).unwrap();
+            assert_eq!(steps[followup + 1].step_id, StepId::PickUp, "{rules:?}");
+        }
+        let bb2025 = BlitzBlock::build_sequence(&BlitzBlockParams::default());
+        let bb2020 = BlitzBlock::build_sequence(&BlitzBlockParams { rules: Rules::Bb2020, ..Default::default() });
+        assert_eq!(bb2020.len(), bb2025.len() - 1);
     }
 
     #[test]

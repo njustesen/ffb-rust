@@ -25,6 +25,21 @@ fn dice_trace_enabled() -> bool {
     *ENABLED.get_or_init(|| std::env::var_os("FFB_DICE_TRACE").is_some())
 }
 
+/// Die positions to print a backtrace for, from the comma-separated FFB_DIE_AT env var.
+///
+/// The single most effective parity tool there is: when the two engines' dice streams diverge at
+/// call N, `FFB_DIE_AT=N` names the exact Rust function that drew it — which repeatedly turns out
+/// to be a file other than the one that looked responsible (stale duplicate impls, or a shared
+/// step standing in for a per-edition one). Parsed once; empty and free when the var is unset.
+fn die_at_positions() -> &'static [u64] {
+    static POSITIONS: std::sync::OnceLock<Vec<u64>> = std::sync::OnceLock::new();
+    POSITIONS.get_or_init(|| {
+        std::env::var("FFB_DIE_AT")
+            .map(|v| v.split(',').filter_map(|s| s.trim().parse::<u64>().ok()).collect())
+            .unwrap_or_default()
+    })
+}
+
 /// Seeded deterministic RNG matching Java's Xoshiro256StarStar exactly.
 /// Seeding uses SplitMix64 (same constants as Java's Xoshiro256StarStar.java).
 /// Die rolls use rejection sampling: threshold = u64::MAX - (u64::MAX % sides);
@@ -53,6 +68,9 @@ impl GameRng {
                     // Same format as the Java Xoshiro256StarStar -Dffb.diceTrace output
                     // so the two streams can be diffed directly.
                     eprintln!("DICE_TRACE pos={} sides={} result={}", self.call_count, sides, result);
+                }
+                if die_at_positions().contains(&self.call_count) {
+                    eprintln!("DIE_AT {} BT:\n{}", self.call_count, std::backtrace::Backtrace::force_capture());
                 }
                 return result;
             }

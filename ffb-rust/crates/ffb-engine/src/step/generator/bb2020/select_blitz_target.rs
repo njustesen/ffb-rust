@@ -18,7 +18,33 @@ impl SelectBlitzTarget {
             StepParameter::GotoLabelOnEnd(fl.into()),
         ]);
 
-        // ACTIVATION BLOCK (with GotoLabel, fl=END_BLITZING, BloodLust with failure label)
+        Self::add_activation(&mut seq, fl);
+
+        // SELECT_BLITZ_TARGET_END [END_BLITZING]
+        seq.add_labelled(StepId::SelectBlitzTargetEnd, labels::END_BLITZING, vec![]);
+
+        seq.build()
+    }
+
+    /// The activation half of the Java sequence — everything between SELECT_BLITZ_TARGET and
+    /// SELECT_BLITZ_TARGET_END (`bb2020/SelectBlitzTarget.java:21-38`), with the failure label
+    /// left open.
+    ///
+    /// Rust's random agent picks the blitz and its target in a single `Action::ActivatePlayer`, so
+    /// `StepInitSelecting` force-gotos straight to the BlitzBlock dispatch and the whole
+    /// SelectBlitzTarget sequence is skipped. `StepEndSelecting` prepends this block so the
+    /// negatrait rolls (Bone Head, Really Stupid, …) still land at the Java dice position — the
+    /// same bridge bb2025 builds with `ActivationSequenceBuilder`, which is a BB2025-only class
+    /// (its STEADY_FOOTING step and its omission of FOUL_APPEARANCE / DUMP_OFF / JUMP_UP /
+    /// STAND_UP do not match BB2020).
+    pub fn build_activation_sequence(failure_label: &str) -> Vec<SequenceStep> {
+        let mut seq = Sequence::new();
+        Self::add_activation(&mut seq, failure_label);
+        seq.build()
+    }
+
+    fn add_activation(seq: &mut Sequence, fl: &str) {
+        // ACTIVATION BLOCK (with GotoLabel, BloodLust with failure label)
         let fl_s: String = fl.into();
         seq.add(StepId::InitActivation, vec![]);
         seq.add(StepId::AnimalSavagery, vec![StepParameter::GotoLabelOnFailure(fl_s.clone())]);
@@ -44,10 +70,6 @@ impl SelectBlitzTarget {
         seq.add(StepId::JumpUp, vec![StepParameter::GotoLabelOnFailure(fl.into())]);
         // STAND_UP → END_BLITZING
         seq.add(StepId::StandUp, vec![StepParameter::GotoLabelOnFailure(fl.into())]);
-        // SELECT_BLITZ_TARGET_END [END_BLITZING]
-        seq.add_labelled(StepId::SelectBlitzTargetEnd, labels::END_BLITZING, vec![]);
-
-        seq.build()
     }
 }
 
