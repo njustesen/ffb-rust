@@ -3683,3 +3683,56 @@ rng 69-70 against the Java callers above is the direct comparison.
 Harness note: the `JAVA_ARGUE_DIALOG` line is `DEBUG`-gated (silent without `FFB_TRACE=1`) and lives
 in the local `ffb` checkout, which is not pushed — same as the other six gated-logging edits the
 campaign already depends on.
+
+## ITER74 — the pitch was two rows too tall: `goblin` 99 → **100/100 🟢 GREEN**
+
+A hand-rolled bounds check in `StepMoveBallAndChain` used a **26×17** pitch (`y` 0..16) where Java's
+`FieldCoordinateBounds.FIELD` is **(0,0)..(25,14)**.
+
+### How it surfaced
+
+ITER73 established that Java performs a Ball & Chain fall Rust does not, three dice before the
+visible divergence. Probing the chain-move scatter shows the Fanatic walking straight down the
+sideline on its compulsory random move:
+
+```
+BC_PROBE roll=6 from=(13,10) orig_to=(14,11) base=East dir=Southeast
+BC_PROBE roll=1 from=(14,11) orig_to=(13,10) base=West dir=Southwest
+BC_PROBE roll=2 from=(13,12) orig_to=(12,11) base=West dir=Southwest
+BC_PROBE roll=1 from=(12,13) orig_to=(11,12) base=West dir=Southwest
+BC_PROBE roll=5 from=(11,14) orig_to=(12,13) base=East dir=Southeast   <- (12,15)
+```
+
+y = 10, 11, 12, 13, 14 … and then southeast to **(12,15)**. y=15 is the crowd. Java's
+`!FieldCoordinateBounds.FIELD.isInBounds(coordinateTo)` fires, publishes `InjuryTypeCrowdPush` and
+gotos FALL_DOWN — a crowd injury (2 dice) plus the chain injury from `dropPlayer` (2 more). Rust's
+local check said (12,15) was on the pitch, so the Fanatic kept standing on a square that does not
+exist and none of those dice were rolled.
+
+Everything ITER72 and ITER73 chased — the Secret Weapon ban rolls landing 3 positions early, Java
+arguing five times to Rust's four, the d8/d6 sides clash at index 77 — was this one offset
+propagating.
+
+### The fix
+
+`is_in_bounds` now delegates to `FieldCoordinateBounds::FIELD.is_in_bounds`, which was already
+correct at (25,14). The colocated test asserted `(25,16)` was IN bounds, so it had frozen the bug in
+place; it now asserts the real pitch and that `(12,15)` — the bottom sideline — is the crowd.
+
+**Worth generalising: this bug was a hand-rolled copy of a constant that already existed correctly
+elsewhere in the tree.** Same shape as the three `dropPlayer` duplicates (ITER69, ITER73). Grepping
+for other local re-implementations of `FieldCoordinateBounds` is a cheap, high-value sweep.
+
+### Gate
+
+| check | result |
+|---|---|
+| `goblin` bb2020 | 99/100 → **100/100 🟢** |
+| `lineman` bb2020 | 100/100 |
+| `ogre`, `underworld` bb2020 | 100/100 each |
+| `cargo test --workspace` | **14,456 passed / 0 failed** |
+
+**Status: 7 of 30 green** — `lineman`, `human`, `ogre`, `underworld`, `chaos_pact`, `renegades`,
+`goblin`. Next: re-measure the remaining 23 rosters to pick the new fewest-fails target; several
+were last measured before the ITER67-74 fixes and the Ball & Chain / pitch-bounds corrections are
+broad enough that some may have moved on their own.

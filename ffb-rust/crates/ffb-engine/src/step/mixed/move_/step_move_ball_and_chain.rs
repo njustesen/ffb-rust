@@ -15,7 +15,7 @@ use ffb_model::model::skill_use::SkillUse;
 use ffb_model::option::game_option_id;
 use ffb_model::report::report_scatter_player::ReportScatterPlayer;
 use ffb_model::report::report_skill_use::ReportSkillUse;
-use ffb_model::types::FieldCoordinate;
+use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -305,9 +305,16 @@ fn scatter_one_square(from: FieldCoordinate, dir: Direction) -> FieldCoordinate 
     FieldCoordinate::new(from.x + dx, from.y + dy)
 }
 
-/// Check if within standard Blood Bowl field (26×17, columns 0-25, rows 0-16).
+/// Java: `FieldCoordinateBounds.FIELD.isInBounds(coord)` — the pitch is (0,0)..(25,14).
+///
+/// This was a hand-rolled copy that allowed `y` up to **16**, i.e. two phantom rows below the
+/// bottom sideline. A Ball & Chain player walking down the sideline that scattered off the pitch at
+/// y=15 was therefore left standing on a square that does not exist, instead of being pushed into
+/// the crowd: Java ran `StepFallDown` with `InjuryTypeCrowdPush` (a crowd injury, then the chain
+/// injury from `dropPlayer`) and Rust ran neither, losing 3 dice and desyncing everything after
+/// (goblin bb2020 seed 81, rng 67 — the player had walked 8,9,…,14 down the sideline).
 fn is_in_bounds(coord: FieldCoordinate) -> bool {
-    coord.x >= 0 && coord.x <= 25 && coord.y >= 0 && coord.y <= 16
+    FieldCoordinateBounds::FIELD.is_in_bounds(coord)
 }
 
 /// Java: check the reRollSetting to decide whether to ask the player for a re-roll.
@@ -449,13 +456,18 @@ mod tests {
         assert!(meaningful);
     }
 
+    /// Java `FieldCoordinateBounds.FIELD` is (0,0)..(25,14). This test used to assert (25,16) was
+    /// IN bounds — two phantom rows below the bottom sideline — which is what let a Ball & Chain
+    /// player scatter off the pitch and keep standing instead of being crowd-pushed.
     #[test]
     fn is_in_bounds_edge_cases() {
         assert!(is_in_bounds(FieldCoordinate::new(0, 0)));
-        assert!(is_in_bounds(FieldCoordinate::new(25, 16)));
+        assert!(is_in_bounds(FieldCoordinate::new(25, 14)));
         assert!(!is_in_bounds(FieldCoordinate::new(-1, 0)));
         assert!(!is_in_bounds(FieldCoordinate::new(26, 0)));
         assert!(!is_in_bounds(FieldCoordinate::new(0, -1)));
+        // The bottom sideline: y=15 is the crowd, not the pitch.
+        assert!(!is_in_bounds(FieldCoordinate::new(12, 15)));
         assert!(!is_in_bounds(FieldCoordinate::new(0, 17)));
     }
 
