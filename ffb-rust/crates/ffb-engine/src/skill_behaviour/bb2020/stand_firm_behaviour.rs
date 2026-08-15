@@ -143,6 +143,14 @@ impl StepModifierTrait for StandFirmStepModifier {
         state.do_push = true;
         state.pushback_squares.clear();
         state.starting_pushback_square = None;
+        // Java: `publishParameter(new StepParameter(StepParameterKey.FOLLOWUP_CHOICE, false))`.
+        // The push was AVOIDED, so the defender's square is never vacated and the attacker must not
+        // follow up. Leaving `followupChoice` unset lets `StepFollowup` fall into its
+        // `followupChoice == null` block, where a `forceFollowup` attacker (Frenzy) publishes
+        // FOLLOWUP_CHOICE=true and walks into the still-occupied square — necromantic bb2020 seed 1
+        // i=15: the Werewolf `h00` stays at 12,7 in Java but lands on the Flesh Golem's 13,8 in Rust.
+        // The bb2025 sibling already publishes this; the bb2020 copy did not.
+        state.published.push(crate::step::framework::StepParameter::FollowupChoice(false));
 
         game.report_list.add(ReportSkillUse::new(
             Some(defender_id.clone()),
@@ -289,6 +297,45 @@ mod tests {
         assert!(hs.do_push, "do_push should be true after stand firm");
         assert!(hs.starting_pushback_square.is_none(), "starting square should be cleared");
         assert!(hs.pushback_squares.is_empty(), "pushback squares should be cleared");
+    }
+
+    /// Java publishes `FOLLOWUP_CHOICE = false` on the avoid-push branch. Without it `StepFollowup`
+    /// still sees `followupChoice == null` and a `forceFollowup` attacker (Frenzy) forces a
+    /// follow-up into the square the defender never left — necromantic bb2020 seed 1 i=15.
+    #[test]
+    fn stand_firm_accepted_publishes_followup_choice_false() {
+        let mut game = make_game();
+        game.team_away.players.push(player_with_skills("def1", vec![SkillId::StandFirm]));
+        game.field_model.set_player_coordinate("def1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("def1", PlayerState::new(PS_STANDING));
+
+        let m = StandFirmStepModifier;
+        let mut hs = default_hook_state("def1");
+        hs.standing_firm.insert("def1".into(), true);
+        m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
+
+        assert!(
+            hs.published.iter().any(|p| matches!(
+                p, crate::step::framework::StepParameter::FollowupChoice(false))),
+            "avoid-push must publish FOLLOWUP_CHOICE(false), got {:?}", hs.published);
+    }
+
+    /// The auto-accepted (never-prompted) path takes the same branch and must publish it too.
+    #[test]
+    fn stand_firm_auto_accept_publishes_followup_choice_false() {
+        let mut game = make_game();
+        game.team_away.players.push(player_with_skills("def1", vec![SkillId::StandFirm]));
+        game.field_model.set_player_coordinate("def1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("def1", PlayerState::new(PS_STANDING));
+
+        let m = StandFirmStepModifier;
+        let mut hs = default_hook_state("def1");
+        m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
+
+        assert!(
+            hs.published.iter().any(|p| matches!(
+                p, crate::step::framework::StepParameter::FollowupChoice(false))),
+            "avoid-push must publish FOLLOWUP_CHOICE(false), got {:?}", hs.published);
     }
 
     #[test]

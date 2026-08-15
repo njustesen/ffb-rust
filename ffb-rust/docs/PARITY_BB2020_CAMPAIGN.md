@@ -4634,3 +4634,94 @@ confirm with `statediff.py` on necromantic seed 1 i=15 — a one-field check.
 |---|---|
 | `necromantic` bb2020 | 32/100 (post-ITER89 baseline, unchanged) |
 | working tree | clean at HEAD; no engine change |
+
+## ITER91 — bb2020 Stand Firm never published FOLLOWUP_CHOICE(false): necromantic 32 → 100/100 GREEN
+
+ITER90 named the symptom (a Frenzy attacker ending on a different square) but guessed the mechanism
+was ordering inside `StepFollowup`. It is not: `StepFollowup` is correct. The parameter it needed
+was never published.
+
+### Measurement
+
+necromantic seed 1, `Activate(Home1, BLITZ)` at i=14 → i=15. Full states:
+
+```
+i=14 (pre)   a02:13,8,Standing   h00:12,7,Standing
+i=15 JAVA    a02:13,8,Prone      h00:12,7,Standing     rng 18 -> 22
+i=15 RUST    a02:13,8,Prone      h00:13,8,Standing     rng 18 -> 22
+```
+
+The defender `a02` is **knocked down without being moved** in BOTH engines — that is a Stand Firm
+avoid-push (necromantic's Flesh Golems carry Stand Firm). Java's blitzer therefore stays put. Rust's
+blitzer walks onto 13,8 — the square the defender never vacated, with the defender still on it.
+
+`h00` is a **Werewolf**: `Claw, Claws, Frenzy, Regeneration`. Frenzy carries `forceFollowup`.
+
+### Root cause
+
+Java `bb2020/StandFirmBehaviour.handleExecuteStepHook`, avoid-push branch:
+
+```java
+state.doPush = true;
+state.pushbackStack.clear();
+step.publishParameter(new StepParameter(StepParameterKey.STARTING_PUSHBACK_SQUARE, null));
+step.publishParameter(new StepParameter(StepParameterKey.FOLLOWUP_CHOICE, false));   // <—
+```
+
+Rust's bb2020 copy set `do_push` / cleared the squares / cleared the starting square — and dropped
+the FOLLOWUP_CHOICE publish. Without it `StepFollowup` still sees `followup_choice == None`, enters
+its `effective_choice.is_none()` block, finds `FORCE_FOLLOWUP` on the attacker and publishes
+`FollowupChoice(true)`. Java never reaches that block at all, because the parameter is already set.
+
+The **bb2025 sibling already had this line** (`bb2025/stand_firm_behaviour.rs:155`, landed for dwarf
+seed 1 step 101). The bb2020 file's own comment even claimed the publish
+("Java: … publish FOLLOWUP_CHOICE=false") while the code below it did not do it — a comment
+describing the Java, not the Rust.
+
+### Fix
+
+`crates/ffb-engine/src/skill_behaviour/bb2020/stand_firm_behaviour.rs` — push
+`StepParameter::FollowupChoice(false)` onto `state.published` on the avoid-push branch, exactly as
+bb2025 does. Two colocated regression tests cover both entry paths into that branch
+(`stand_firm_accepted_publishes_followup_choice_false`, `..._auto_accept_...`), since only the
+already-decided path was previously exercised.
+
+### Gate
+
+| check | result |
+|---|---|
+| `necromantic` bb2020 | **32/100 → 100/100 GREEN** |
+| `lineman` bb2020 | 100/100 |
+| `lineman` bb2025 | 100/100 |
+| `lineman` bb2016 | 100/100 |
+| `dwarf` bb2020 (prev. green) | 100/100 |
+| `halfling` bb2020 | 98/100 (unchanged) |
+| `wood_elf` bb2020 | 98/100 (unchanged) |
+| `nurgle` bb2020 | 86/100 (unchanged) |
+| `slann_fumbbl` bb2020 | 98/100 (unchanged) |
+| `cargo test --workspace` | clean |
+
+**bb2020 is now 26 of 30 green.** RED: nurgle 86 · halfling 98 · wood_elf 98 · slann_fumbbl 98.
+
+### Process note (cost one wasted measurement)
+
+Three `lineman` sweeps in bb2020/bb2025/bb2016 were launched CONCURRENTLY. They share
+`parity/lineman_vs_lineman/seed_N_*.jsonl`, so they clobber each other and reported 21/100 and
+78/100. Re-run one at a time all three are 100/100. The ban in `/parity-iter` on concurrent runs of
+the same matchup applies **across editions** — this is what it is for.
+
+### Two open leads carried forward
+
+1. Rust's bb2020 (and bb2025) Stand Firm hooks do not set `clear_pushback_stack`, while Java does
+   `state.pushbackStack.clear()`. The step's own `self.pushback_stack` therefore survives an avoid-
+   push. Not observed to matter yet (necromantic seed 1 pushed nobody), and bb2025 is 30/30 without
+   it, so it was left alone rather than changed speculatively. Only bb2016 sets the flag.
+2. `bb2020/grab_behaviour.rs` still auto-DECLINES where `ParityRunner` always uses the skill. Inert
+   today — no bb2020 roster has Grab — but it is the same defect class as ITER89 and ITER91.
+
+### Next iteration
+
+`nurgle` at 86 is the largest remaining red and the only one below 98. Six earlier iterations chased
+a Foul Appearance cancel-revert there without landing it; re-open it with the ITER88/91 method —
+statediff the first diverging step and identify which single field moves — rather than from the
+prior hypothesis.
