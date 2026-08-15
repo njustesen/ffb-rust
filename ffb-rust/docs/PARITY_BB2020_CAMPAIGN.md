@@ -3936,3 +3936,60 @@ roll happens at all — but it cannot be measured until the roll happens.
 |---|---|
 | `nurgle` bb2020 | 86/100 — unchanged, all four variants reverted |
 | working tree | clean at HEAD; no engine change |
+
+## ITER79 — the blitz Foul Appearance DOES roll; it is in the wrong PLACE (after the blitz GFI)
+
+`nurgle` 86/100, no engine change. Instrumented instead of rearranging, and two earlier readings
+turn out to be wrong.
+
+### Two retractions
+
+**1. ITER76: "`StepFoulAppearance` resolves a defender only 12 times, never on a blitz" — WRONG.**
+Printing the acting action alongside the defender shows blitzes resolve fine, from
+`game.defender_id`, which `InitBlocking` sets at the top of BlitzBlock:
+
+```
+FA2 n=25  act=home_02 action=Blitz param=Some(away_02) gamedef=Some(away_02) resolved=Some(away_02)
+FA2 n=29  act=away_02 action=Blitz param=Some(home_03) gamedef=Some(home_03) resolved=Some(home_03)
+FA2 n=30  act=away_02 action=Blitz param=Some(home_03) gamedef=Some(home_03) resolved=Some(home_03)
+```
+
+The 291 invocations are dominated by the Move sequence's own FOUL_APPEARANCE step, which correctly
+has no defender — that is what I mistook for "never resolves". **The blitz already rolls Foul
+Appearance, and always had a defender.** That also explains ITER78 variants C and D changing
+nothing: they supplied a parameter the step did not need.
+
+**2. "Every nurgle player has Foul Appearance" — WRONG.** Only the Nurgle Warrior and the Beast of
+Nurgle carry it (`roster_nurgle.json:84,115`) — 4 of 12 players, not 12.
+
+### The actual defect
+
+Rust's blitz rolls Foul Appearance at BlitzBlock position 4, i.e. **after** `GO_FOR_IT` and
+`STEADY_FOOTING`. Java rolls it in the SelectBlitzTarget activation, **before** the blitz GFI ever
+happens (`bb2020/SelectBlitzTarget.java:35`), and BB2020's BlitzBlock therefore carries one only for
+a frenzy follow-up.
+
+Two consequences, and the second is the killer:
+
+- the d6 lands at a different stream position; and
+- **a failed blitz GFI gotos `STEADY_FOOTING` → `FALL_DOWN`, skipping the FA step entirely** — so on
+  those blitzes Rust rolls no Foul Appearance at all where Java always has. Seed 2 step 32 is
+  exactly that case: no blitz FA invocation anywhere near rng 46-49, while Java rolls one at 48.
+
+### Why ITER78 variant D did not fix it
+
+Variant D moved the step into the activation AND gated it out of BB2020's BlitzBlock — the right
+shape — and still measured 86/100 unchanged. That needs explaining before another attempt: the most
+likely reason is that the activation copy runs BEFORE `InitBlocking`, so `game.defender_id` is not
+yet set and the parameter path was the only source — which D did supply, so verify with the FA2
+probe that the activation copy actually fires and resolves, rather than assuming.
+
+**Re-run the FA2 probe with variant D applied** and confirm `action=Blitz` invocations appear at the
+activation position. That is one build+run and settles it.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 86/100 unchanged |
+| working tree | clean at HEAD; probe reverted |
