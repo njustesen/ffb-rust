@@ -104,10 +104,18 @@ impl StepModifierTrait for GrabStepModifier {
                 }
             }
 
-            // Java: if (state.grabbing == null) show dialog → headless: auto-decline
+            // Java shows a `DialogSkillUseParameter(actingPlayer, Grab)` here and leaves
+            // `grabbing` null until the client answers. `ParityRunner`'s SKILL_USE arm ALWAYS
+            // uses the skill except DumpOff / PrimalSavagery / SafePairOfHands / Swoop, and Grab
+            // is not among them -- so Java always USES Grab. Rust left `grabbing` None, which
+            // silently DECLINES it. Same defect the Stand Firm and Side Step behaviours had.
+            //
+            // Auto-ACCEPT to mirror the harness, then fall through to the grab branch below.
+            // NOTE: no team roster in any edition currently carries Grab (it appears only in
+            // `data/skills/` and `data/star_players/`), so this cannot move the parity matrix --
+            // it is corrected because it is wrong against the Java, not for a score.
             if state.grabbing.is_none() {
-                state.grabbing = None;
-                return true;
+                state.grabbing = Some(true);
             }
 
             if state.grabbing == Some(true) {

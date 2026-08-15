@@ -124,10 +124,18 @@ impl StepModifierTrait for GrabStepModifier {
                 }
             }
 
-            // Java: if (state.grabbing == null) show dialog → headless: auto-decline
+            // Java shows a `DialogSkillUseParameter(actingPlayer, Grab)` here and leaves
+            // `grabbing` null until the client answers. `ParityRunner`'s SKILL_USE arm ALWAYS
+            // uses the skill except DumpOff / PrimalSavagery / SafePairOfHands / Swoop, and Grab
+            // is not among them -- so Java always USES Grab. Rust left `grabbing` None, which
+            // silently DECLINES it. Same defect the Stand Firm and Side Step behaviours had.
+            //
+            // Auto-ACCEPT to mirror the harness, then fall through to the grab branch below.
+            // NOTE: no team roster in any edition currently carries Grab (it appears only in
+            // `data/skills/` and `data/star_players/`), so this cannot move the parity matrix --
+            // it is corrected because it is wrong against the Java, not for a score.
             if state.grabbing.is_none() {
-                state.grabbing = None;
-                return true;
+                state.grabbing = Some(true);
             }
 
             if state.grabbing == Some(true) {
@@ -257,6 +265,43 @@ mod tests {
         let m = GrabStepModifier;
         let mut hs = default_hook_state_with_sq("def", sq);
         assert!(!m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs));
+    }
+
+
+    /// Java shows a Grab skill-use dialog when a pushback square is OCCUPIED (so the optimistic
+    /// auto-grab above resets `grabbing` to null), and `ParityRunner` always answers USE -- Grab is
+    /// not in its decline list. Rust left `grabbing` None, silently declining, exactly as the Stand
+    /// Firm behaviour did before ITER89.
+    #[test]
+    fn grab_with_occupied_pushback_square_auto_accepts() {
+        let mut game = make_game();
+        game.team_home.players.push(player_with_skills("att", vec![SkillId::Grab]));
+        game.acting_player.player_id = Some("att".into());
+        game.acting_player.player_action = Some(PlayerAction::Block);
+        let att_coord = FieldCoordinate::new(5, 5);
+        let def_coord = FieldCoordinate::new(5, 6); // adjacent
+        game.field_model.set_player_coordinate("att", att_coord);
+        game.defender_id = Some("def".into());
+        game.team_away.players.push(player_with_skills("def", vec![]));
+        game.field_model.set_player_coordinate("def", def_coord);
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+
+        // A THIRD player standing ON a pushback square is what makes Java reset its optimistic
+        // `grabbing = true` back to null and show the dialog.
+        let blocked = FieldCoordinate::new(4, 6);
+        game.team_away.players.push(player_with_skills("blk", vec![]));
+        game.field_model.set_player_coordinate("blk", blocked);
+        game.field_model.set_player_state("blk", PlayerState::new(PS_STANDING));
+
+        let sq = PushbackSquare::new(def_coord, Direction::North, true);
+        let m = GrabStepModifier;
+        let mut hs = default_hook_state_with_sq("def", sq);
+        hs.pushback_squares = vec![PushbackSquare::new(blocked, Direction::Northwest, true)];
+
+        assert!(m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs),
+            "the Grab hook still handles the step");
+        assert_eq!(hs.pushback_mode, PushbackMode::GRAB,
+            "the harness always USES Grab, so the push must switch to GRAB mode");
     }
 
     #[test]

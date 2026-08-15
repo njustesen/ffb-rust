@@ -6009,3 +6009,43 @@ rulesets, at 100 seeds each.
 * Java's `rng_calls` counts CALLS, Rust counts DICE. Never compare the counters.
 * When Rust's command shape differs from Java's, port the observable END STATE, not the control flow
   (ITER110, after five control-flow attempts scored 0/15/15/25 against an 86 baseline).
+
+## ITER112 (backlog) - Grab auto-decline corrected in all three editions
+
+The original goal is met (all three rulesets 30/30, ITER111). New goal, chosen by the user: clear
+the deferred backlog. First item.
+
+`GrabBehaviour` had the same defect ITER89 fixed in Stand Firm and an earlier iteration fixed in
+Side Step: Java shows a `DialogSkillUseParameter(actingPlayer, Grab)` and `ParityRunner` ALWAYS uses
+the skill (its decline list is only DumpOff / PrimalSavagery / SafePairOfHands / Swoop), but Rust
+left `grabbing = None` and returned, silently DECLINING. Corrected to auto-ACCEPT and fall through
+to the grab branch, in bb2016, bb2020 and bb2025.
+
+**This cannot move the parity matrix and is not claimed to.** No team roster in any edition carries
+Grab -- it appears only in `data/skills/` and `data/star_players/` (`grep -rl Grab data/`). It is
+corrected because it is wrong against the Java, and because the two sibling behaviours with the
+identical shape both turned out to be real bugs once a roster exercised them.
+
+Regression test `grab_with_occupied_pushback_square_auto_accepts` (bb2020 + bb2025) drives the exact
+branch: a third player standing ON a pushback square is what makes Java reset its optimistic
+`grabbing = true` to null and show the dialog. A first version of the test asserted the same thing
+via `free_square_around_defender` and did NOT reach the branch (it failed), so the assertion was
+rewritten around the real trigger rather than weakened.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 100/100 |
+| `dwarf` bb2020 | 100/100 |
+| `lineman` bb2025 | 100/100 |
+| `cargo test --workspace` | clean (exit 0) |
+
+### Backlog remaining
+
+* dead bb2020 step files that drift from their Java counterparts (`step_prayer` aside, most are
+  unreachable -- decide: delete, or keep in sync);
+* the game-option key mismatch (`MVP_NOMINATIONS` vs `mvpNominations`) and the dead
+  `UtilServerStartGame::add_default_game_options`;
+* `clear_pushback_stack` is set by bb2016 but never consumed by the shared bb2025 `StepPushback`;
+* `ThrowTeamMate` has a PICK_UP in bb2020 that bb2025 lacks (never edition-gated).
