@@ -4453,3 +4453,74 @@ investigation that the halfling BLOCK case does not have.
 | `nurgle` / `halfling` bb2020 | 86/100 and 5/100 — both unchanged |
 | `cargo test -p ffb-engine` | 7,153 / 0 WITH the change (tests corrected) — then reverted |
 | working tree | clean at HEAD |
+
+## ITER88 — halfling pinned to ONE coordinate: the defender is pushed in Rust, not in Java (Stand Firm)
+
+`halfling` 5/100, no engine change. The BLOCK case was the right one to take — it gave a
+single-field answer in one iteration where the blitz case took six.
+
+### The divergence, exactly
+
+`scripts/statediff.py` on seed 1, i=101 (the pre-state of the step after the failing one):
+
+```
+JAVA state hashes to a2409412555b888e     <- matches the parity log exactly
+RUST state hashes to 913aca7fda9c7da8     <- matches the parity log exactly
+  h00:  JAVA 12,7,Standing   RUST 11,6,Standing
+```
+
+One field. **The defender `h00` is pushed one square in Rust and not moved at all in Java.**
+Everything else — every other player, the ball, the header — is identical.
+
+### Both engines spend the SAME two dice
+
+```
+JSTEP     i=100 rng_calls=56 ... Activate(Away1, BLOCK)
+RUST_STEP i=100 rng_calls=56 ... Activate(away_01, Block)
+JSTEP     i=101 rng_calls=58        RUST_STEP i=101 rng_calls=58
+```
+
+and Java's two are:
+
+```
+pos 57  rollSkill      TakeRootBehaviour   result 2   (Take Root passed)
+pos 58  rollBlockDice                      result 3   (= PUSHBACK)
+```
+
+So Java rolls a **pushback** and the defender still does not move. `h00` is the opposing
+**Treeman**, and the halfling Treeman has **Stand Firm** (`roster_halfling.json:25`) — the skill
+whose whole function is refusing a push. Java honours it; Rust pushes anyway.
+
+Note this reframes ITER86 again: the activation is not "cancelled by a negatrait". Take Root
+PASSED. The block resolves normally in both engines; only the push is refused in Java.
+
+### Where to look
+
+`StandFirmStepModifier` exists, hooks `StepId::Pushback`, and is registered for all three editions
+(`registry.rs:105,187,260`), so the machinery is present. The next question is narrow: does
+`StepPushback` actually invoke the step-modifier hooks, and is the hook's refusal applied to the
+chosen pushback square? Note the campaign's opening retraction recorded a Rust panic in this exact
+file (`StandFirmStepModifier: step_state must be StepPushbackHookState`) — it no longer panics, but
+that is not the same as being wired up.
+
+`wood_elf` (85 fails) also fields a Treeman and is the natural second measurement.
+
+### Tooling — and a warning
+
+`scripts/statediff.py` prints the field-level difference between the two engines' `FFB_TRACE`
+state strings, and now also prints each string's fnv1a64 so it can be checked against the parity
+log's `state_hash` (they must match — the log hash IS `fnv1a64(state_string)`).
+
+**It reported "state strings are IDENTICAL" for every step on its first run.** The state blob
+contains spaces (`h1t67aaways0,0 b25,8,true p<players>`), so a `state=(\S+)` capture grabbed only
+the header. The hash printout is what caught it: the traced strings hashed to a value matching
+NEITHER engine's logged hash. **Any state-diff tool must print the hash and be checked against the
+log before its output is trusted** — a silently-truncating diff that always says "identical" would
+have sent the next iteration hunting a phantom.
+
+### Gate
+
+| check | result |
+|---|---|
+| `halfling` bb2020 | 5/100 (baseline, unchanged) |
+| working tree | no engine change; adds `scripts/statediff.py` |
