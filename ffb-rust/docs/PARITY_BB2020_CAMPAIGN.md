@@ -3602,3 +3602,84 @@ all-d6, compare the CALLERS, not the values.
 |---|---|
 | `goblin` bb2020 | 99/100 (unchanged) |
 | working tree | probes removed, no engine change |
+
+## ITER73 — harness log settles seed 81's argue count; `StepFallDown` was doing half of `dropPlayer`
+
+`goblin` stays **99/100**. One 1:1 correction landed (no count change), and seed 81's real frontier
+moved three dice EARLIER than ITER72 thought.
+
+### The harness log
+
+`ParityRunner`'s `ARGUE_THE_CALL` arm now prints the dialog's player ids under `DEBUG`
+(`JAVA_ARGUE_DIALOG`). Rebuilt per the ITER69-era recipe in `PARITY_BB2016_CAMPAIGN.md`
+(`javac` the one class against the fat jar, `jar uf` it back in; backup at `…jar.bak-iter73`), and
+verified safe FIRST: `lineman` bb2020 100/100 against the rebuilt harness before trusting anything
+it printed.
+
+```
+JAVA_ARGUE_DIALOG team=…Away  ids=[Away3, Away4, Away5]
+JAVA_ARGUE_DIALOG team=…Away  ids=[Away4, Away5]
+JAVA_ARGUE_DIALOG team=…Away  ids=[Away5]
+JAVA_ARGUE_DIALOG team=…Home  ids=[Home4, Home5]
+JAVA_ARGUE_DIALOG team=…Home  ids=[Home5]
+```
+
+Java argues **five** times (away 3, home 2), re-firing per player exactly as the source read
+suggested. Rust argues four — it is missing `away_05`, because `away_04`'s argue rolls a natural 1,
+Rust sets `coach_banned` and `break`s out of the away loop. Java's `askForArgueTheCall` also guards
+on `!turnData.isCoachBanned()`, so the shape is right; Java simply did not roll a 1 there.
+
+**ITER72's "Java argues 2× / Rust 4×" is corrected: it is 5× vs 4×**, and the counts differ because
+the two engines are drawing DIFFERENT raw values by then — they are already offset.
+
+### The real frontier is three dice earlier
+
+The Java callers around the offset:
+
+```
+pos 70,71  InjuryTypeBallAndChain … UtilServerInjury.dropPlayer:316  StepFallDown.executeStep:88
+pos 72     ReallyStupidBehaviour
+pos 73-76  rollSecretWeapon  (two 2d6 ban rolls)
+pos 77+    rollArgueTheCall
+```
+
+Rust's ban rolls sit at pos 70-73 — three dice early. So **Rust never performs a fall that Java
+does**: a Ball & Chain player falls via `StepFallDown`, taking a chain injury (2 dice), plus a
+Really Stupid roll. Everything downstream (ban rolls, argues) is just that offset propagating.
+
+This is invisible to `dicediff.py` because the whole window is d6: the first SIDES difference is 7
+dice later, where Rust's kickoff d8 meets Java's argue d6.
+
+### The correction that landed
+
+`StepFallDown` had the same defect ITER69 fixed in `StepHandleDropPlayerContext`: it inlined the
+Ball & Chain injury roll and returned `Vec::new()` for the drop parameters, losing the ball handling
+Java puts outside that if/else. It also passed `eligibleForSafePairOfHands = true` where Java line 88
+calls the THREE-arg `dropPlayer(this, player, ApothecaryMode.ATTACKER)` overload — i.e. **false**.
+
+Replaced with `drop_player_rng(game, rng, &player_id, false, ApothecaryMode::Attacker)`. That is now
+the third site where an inline duplicate of `dropPlayer` had drifted from the shared helper; a sweep
+for any remaining ones is worth an iteration on its own.
+
+**No count change** — seed 81's dice are byte-identical before and after, so the missing fall is
+elsewhere. Kept because it is a verified 1:1 correction with no regression.
+
+### Next iteration
+
+Find why Rust never runs that `StepFallDown`. It is at the very end of a drive, immediately before
+the Secret Weapon phase, and involves a Ball & Chain player — so the candidates are the end-of-turn
+sequence and the Ball & Chain "falls over if it does not move" rule. `FFB_DRIVE_TRACE` around Rust
+rng 69-70 against the Java callers above is the direct comparison.
+
+### Gate
+
+| check | result |
+|---|---|
+| `goblin` bb2020 | 99/100 (unchanged — no progress claimed) |
+| `lineman` bb2016 / bb2020 / bb2025 | 100/100 each |
+| `human`, `ogre`, `renegades` bb2020 | 100/100 each |
+| `cargo test --workspace` | **14,456 passed / 0 failed** |
+
+Harness note: the `JAVA_ARGUE_DIALOG` line is `DEBUG`-gated (silent without `FFB_TRACE=1`) and lives
+in the local `ffb` checkout, which is not pushed — same as the other six gated-logging edits the
+campaign already depends on.

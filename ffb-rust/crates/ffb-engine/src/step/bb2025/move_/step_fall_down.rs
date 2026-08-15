@@ -8,7 +8,7 @@ use crate::injury::injuryType::injury_type_ball_and_chain::InjuryTypeBallAndChai
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::util_server_injury::{
-    drop_player, handle_injury, handle_injury_by_name, injury_type_causes_turnover,
+    drop_player_rng, handle_injury_by_name, injury_type_causes_turnover,
 };
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.move.StepFallDown.
@@ -76,25 +76,18 @@ impl StepFallDown {
             None, ApothecaryMode::Attacker,
         );
 
-        // Java: publishParameters(UtilServerInjury.dropPlayer(this, actingPlayer, ATTACKER, true)).
-        // dropPlayer, for a placedProneCausesInjuryRoll (Ball & Chain) player, does NOT place it
-        // prone/scatter the ball — it rolls InjuryTypeBallAndChain and publishes INJURY_RESULT
-        // (Java UtilServerInjury.dropPlayer:339-342). The plain drop_player() util skips that chain
-        // injury (documented TODO), so a falling Ball & Chain Fanatic never rolled its 2d6 armour +
-        // injury (+ casualty) — desyncing the dice stream (goblin seed 27 i=105: the home Fanatic
-        // pushed into the crowd). Mirror Java: roll InjuryTypeBallAndChain here for such players.
-        let placed_prone_causes_injury = game.player(&player_id)
-            .map(|p| p.has_skill_property(NamedProperties::PLACED_PRONE_CAUSES_INJURY_ROLL))
-            .unwrap_or(false);
-        let (drop_params, bc_injury) = if placed_prone_causes_injury {
-            let mut it = InjuryTypeBallAndChain::new();
-            let res = handle_injury(
-                game, rng, &mut it, None, &player_id, coord, None, None, ApothecaryMode::Attacker,
-            );
-            (Vec::new(), Some(res))
-        } else {
-            (drop_player(game, &player_id, true), None)
-        };
+        // Java line 88: `publishParameters(UtilServerInjury.dropPlayer(this, actingPlayer,
+        // ApothecaryMode.ATTACKER))` — the THREE-arg overload, so eligibleForSafePairOfHands is
+        // FALSE (this file used to pass true).
+        //
+        // `drop_player_rng` is the full port. It does the `placedProneCausesInjuryRoll` (Ball &
+        // Chain) branch — a falling Fanatic takes a chain injury instead of being placed prone —
+        // AND the ball handling that Java puts OUTSIDE that if/else. This step used to inline the
+        // injury half and return no drop parameters, which lost the ball handling exactly as
+        // `StepHandleDropPlayerContext` did before it.
+        let drop_params = drop_player_rng(
+            game, rng, &player_id, false, ApothecaryMode::Attacker,
+        );
 
         // Java: if (fInjuryType.fallingDownCausesTurnover() && getTurnMode() != PASS_BLOCK)
         let causes_turnover = injury_type_causes_turnover(injury_type_name);
@@ -109,11 +102,8 @@ impl StepFallDown {
         for p in drop_params {
             outcome = outcome.publish(p);
         }
-        // Java line 88: dropPlayer publishes the Ball & Chain INJURY_RESULT (for a B&C player)
-        // BEFORE line 89's fInjuryType result.
-        if let Some(res) = bc_injury {
-            outcome = outcome.publish(StepParameter::InjuryResult(Box::new(res)));
-        }
+        // Java line 88's dropPlayer publishes the Ball & Chain INJURY_RESULT (inside drop_params,
+        // above) BEFORE line 89's fInjuryType result.
         outcome = outcome.publish(StepParameter::InjuryResult(Box::new(injury_result)));
         if causes_turnover && !is_pass_block {
             outcome = outcome.publish(StepParameter::EndTurn(true));
