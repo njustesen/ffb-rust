@@ -5099,3 +5099,81 @@ three reds in a row at single-die precision.
 Worth a cheap sweep at some point: grep for other sites that call `apply_to` on an
 `InjuryResult` where the Java publishes `INJURY_RESULT` instead. Two instances of this pattern have
 now cost a red each (Ball & Chain, trap door).
+
+## ITER97 — slann_fumbbl: Rust rolls a Trap Door d6 Java never rolls (die identified, cause not yet)
+
+No engine change; slann_fumbbl stays 98/100 (seeds 29, 50). One measured-and-reverted attempt.
+
+### The extra die, named exactly
+
+slann_fumbbl seed 29, step 287 `Activate(Away1, BLITZ)` at t8 h2. One differing field at i=288:
+`h00` is `13,10,Standing` in Java and `13,10,Prone` in Rust — the same "Java's blitz is more
+conservative" shape as the last three reds.
+
+Pairing Java `caller=` frames with Rust `FFB_DIE_AT` backtraces at the same positions:
+
+| die | Java | Rust |
+|---|---|---|
+| 90 | `rollBlockDice` (a 1-die block) | **`StepTrapDoor::start`** |
+| 91 | `rollKnockoutRecovery` ← `StepEndTurn` | `StepBlockRoll` |
+| 92-93 | `StepMvp` (d1 picks) | `InjuryTypeBlock` armour |
+
+**Rust rolls a Trap Door d6 that Java does not roll at all.** That one spurious die shifts the block
+roll by one position — Java blocks with a 3, Rust with a 6 — which is why the defender goes down in
+Rust and stays up in Java. Everything downstream follows from it.
+
+### Ruled out
+
+* **`roll_casualty` widths** — checked, not assumed: Rust bb2020/bb2025 are `[die(16), d6]`,
+  bb2016 `[d6, d8]`, all matching Java.
+* **`rng_calls` 89 vs 90 at i=271** — NOT evidence of an extra roll. Java counts per CALL, Rust per
+  DIE, so a multi-die block roll alone explains the gap. (This is the trap recorded in ITER93; it
+  briefly pointed at the wrong step here too.)
+* **The trap-door coordinates** — `TreacherousTrapdoorHandler` is identical in both engines:
+  (6,1) and (19,13) on `initEffect`, `clearTrapdoors()` on `removeEffectInternal`.
+
+### Measured and REVERTED: gating `PLAYER_ENTERING_SQUARE` on the trap door
+
+Java's `setParameter` records the id ONLY if the player is on a trap door at PUBLISH time:
+
+```java
+case PLAYER_ENTERING_SQUARE:
+  if (isOnTrapDoor(fieldModel, fieldModel.getPlayerCoordinate(player))) {
+    playerId = (String) parameter.getValue();
+  }
+```
+
+Rust stores it unconditionally and re-tests at EXECUTE time — a genuinely different question once
+the player has moved on. Implemented faithfully by adding a `Step::set_parameter_with_game` hook
+(default no-op) so the condition could be evaluated at publish time, wired through
+`DriverStepStack::publish`.
+
+**Result: slann_fumbbl 98/100, unchanged; the same two seeds; `FFB_DIE_AT=90` still lands in
+`StepTrapDoor::start`.** So the player IS on a trap door at publish time and this is not the cause.
+Reverted rather than left in place: it adds framework surface (a new trait method on every step)
+for no measured gain, and it is one minute's work to re-apply if the real fix needs it. The
+observation that Rust's version is not 1:1 stands and is recorded here.
+
+### Leading hypothesis for the next iteration
+
+The prayer's duration is `UntilEndOfHalf`. This divergence is in **half 2, turn 8** — so if the
+Treacherous Trapdoor prayer was granted in half 1 and Java ran `removeEffectInternal`
+(`clearTrapdoors()`) at the end of that half while Rust did not, Rust would carry trap doors into
+half 2 that Java does not have. That fits every observation: Java rolls nothing because
+`isOnTrapDoor` is false for it, and the discrepancy is invisible to the parity state hash because
+trap doors are not part of the state string — the same "invisible until it flips a roll" property
+as ITER95's Moles prayer.
+
+Check first: where Rust expires `InducementDuration::UntilEndOfHalf` prayer effects, and whether
+`remove_effect_internal` is actually invoked for Treacherous Trapdoor at half end. A gated probe
+printing `game.field_model.trap_doors` with half/turn at `StepTrapDoor::execute_step` settles it in
+one run.
+
+### Gate
+
+| check | result |
+|---|---|
+| `slann_fumbbl` bb2020 | 98/100 (unchanged — findings only) |
+| working tree | clean at HEAD, no engine change |
+
+bb2020 stays **28 of 30 green**. RED: nurgle 86 · slann_fumbbl 98.
