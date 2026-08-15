@@ -189,6 +189,12 @@ impl Block {
         ]);
         // 34 FOLLOWUP
         seq.add(StepId::Followup, vec![]);
+        // NOTE (ITER70, not yet landed): `bb2020/Block.java:86-89` runs TENTACLES, SHADOWING and
+        // PICK_UP between FOLLOWUP and DROP_FALLING_PLAYERS; `bb2025/Block.java:90-93` goes
+        // straight from one to the other, which is what this port does. Adding the BB2020 three
+        // here fixes goblin bb2020 seed 98 but breaks seed 50, because Rust's `StepPickUp` never
+        // receives the `FollowupChoice` parameter that Java uses to set its `ignore` flag. Land
+        // the two together, not this half alone. See docs/PARITY_BB2020_CAMPAIGN.md ITER70.
         // 35 DROP_FALLING_PLAYERS [DROP_FALLING_PLAYERS]
         seq.add_labelled(StepId::DropFallingPlayers, labels::DROP_FALLING_PLAYERS, vec![]);
         // 36 STEADY_FOOTING (defender)

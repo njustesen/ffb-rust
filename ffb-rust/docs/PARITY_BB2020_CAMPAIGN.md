@@ -3383,3 +3383,84 @@ campaign, and likely to explain seed 81 too.
 | `lineman` bb2016 / bb2020 / bb2025 | 100/100 each |
 | `human`, `ogre`, `underworld`, `chaos_pact`, `renegades` bb2020 | 100/100 each |
 | `cargo test --workspace` | **14,453 passed / 0 failed** |
+
+## ITER70 — seed 98 root-caused and FIXED, but the fix regresses seed 50; REVERTED per the gate
+
+`goblin` stays **98/100** (seeds 81, 98). No engine change landed. This iteration bought a complete
+root cause for seed 98 and, more usefully, found the second half that has to land with it.
+
+### Seed 98's root cause (confirmed)
+
+The i=10 block is `home_03` (Java `h02`) blocking `away_03` (Java `a02`) — and `a02`, the goblin
+**Fanatic**, is standing on the loose ball at (13,8). Java's state strings show the outcome:
+
+```
+JSTEP i=10  b13,8,true   a02:13,8,Standing   h02:12,8,Standing
+JSTEP i=11  b12,9,true   a02:-1,-1,Ko        h02:13,8,Standing
+```
+
+`a02` is pushed off, knocked down and KO'd; `h02` ends on (13,8); the ball has moved (13,8) → (12,9).
+That move is the rng-20 d8. It is a BOUNCE caused by a failed pick-up: Java's `StepPickUp.pickUp()`
+returns FAILURE **without rolling** for a player with `preventHoldBall` / `preventPickup` — No Hands
+— and `h02` is the other Fanatic. So the attacker ends up on the loose ball, cannot pick it up, and
+the ball bounces.
+
+Rust never attempted that pick-up, because **`bb2020/Block.java:86-89` runs TENTACLES, SHADOWING and
+PICK_UP between FOLLOWUP and DROP_FALLING_PLAYERS, and `bb2025/Block.java:90-93` goes straight from
+one to the other.** The shared bb2025 generator (the one bb2020 uses) faithfully ports bb2025 — so
+bb2020 is missing three steps. This is the mirror image of ITER67/68: there bb2020 had FEWER steps
+than bb2025, here it has MORE.
+
+### Why the obvious fix is not enough
+
+Adding the three steps for bb2020 **fixes seed 98 and breaks seed 50** — still 98/100, so the
+count did not drop and a previously-green seed went red. Reverted.
+
+Seed 50 shows why. Java's `StepPickUp` has an `ignore` flag set from a step parameter:
+
+```java
+if (parameter.getKey() == StepParameterKey.FOLLOWUP_CHOICE) { ignore = !toPrimitive(...); }
+...
+private boolean isPickUp(Player<?> p) { return !ignore && isBallInPlay() && isBallMoving() && ...; }
+```
+
+`ParityRunner` answers `FOLLOWUP_CHOICE` with `sendFollowupChoice(false)` — always decline — so in
+Java that pick-up is ignored whenever a follow-up choice was actually made. In seed 50 the blocker
+(`away_01`, the Troll — no No Hands) is already standing on the loose ball at (13,7), so with the
+step present and `ignore` false Rust rolled a pick-up d6 that Java never rolls, shifting the injury
+pair and casualty by one — exactly the ITER66 signature, re-created.
+
+**Rust already has the `ignore` field and already maps `FollowupChoice` to it**
+(`bb2025/move_/step_pick_up.rs:36,89`), and `StepFollowup` already publishes `FollowupChoice`. Probing
+shows the step nevertheless entering with `ignore=false`, so the parameter is not reaching it. The
+driver's `DriverStepStack::publish` delivers top-of-stack downward and stops at the first step whose
+`consumes_parameter` returns true, so the candidates are: the parameter is not published on this
+path at all, or something between `FOLLOWUP` and `PICK_UP` consumes it first.
+
+### Next iteration — land these two together
+
+1. Find why `FollowupChoice` does not reach `StepPickUp` (instrument
+   `DriverStepStack::publish` for that key; check whether `StepFollowup` publishes it on the
+   declined path in this branch).
+2. With `ignore` wired, re-add the bb2020 `TENTACLES, SHADOWING, PICK_UP` block after `FOLLOWUP`.
+   Expect seed 98 green AND seed 50 to stay green.
+
+Do not land the sequence half alone — a note to that effect is in `bb2025/block.rs` at the insertion
+point.
+
+### Also landed
+
+`scripts/dicediff.py` — splits a combined `FFB_DICE_TRACE=1` capture into the Java stream (the lines
+carrying `caller=`) and the Rust stream, compares by `(sides, result)` in order, and prints the first
+disagreement with context. Positions are not directly comparable (Java logs the count before the
+roll, Rust after), which has misled several iterations; this compares the sequences instead. It is
+the first thing to run on any new failing seed.
+
+### Gate
+
+| check | result |
+|---|---|
+| `goblin` bb2020 | 98/100, seeds 81 + 98 — baseline restored after the revert |
+| `cargo test -p ffb-engine` | 7,150 passed / 0 failed |
+
+No engine change committed, so the wider roster gate was not re-run.
