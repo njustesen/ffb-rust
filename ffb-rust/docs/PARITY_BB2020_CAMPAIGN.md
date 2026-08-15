@@ -5427,3 +5427,68 @@ find what in the block path changes a PUSHBACK into a knockdown when the TSS com
 | working tree | clean at HEAD, no engine change |
 
 bb2020 stays **29 of 30 green**. RED: nurgle 86.
+
+## ITER102 — the inserted FA step never FIRES: the move loses the die rather than relocating it
+
+No engine change; nurgle stays 86/100. This supersedes both ITER92's and ITER101's explanations,
+and corrects ITER101's central claim.
+
+### Correction to ITER101
+
+ITER101 said "the dice now match through position 49, including the Foul Appearance roll landing in
+the right place". **That was the value-coincidence trap for the third time in this campaign.** Java
+and Rust both roll a 6 at position 14, so a value comparison looked aligned. They are not the same
+roll:
+
+| die 14 | Java `caller=` | Rust `FFB_DIE_AT` |
+|---|---|---|
+| | `FoulAppearanceBehaviour.handleExecuteStepHook` | **`StepBlockRoll`** |
+
+Java's die 14 is the Foul Appearance roll and its block die is 15 (=4 → PUSHBACK). Rust's die 14 IS
+the block die (=6 → POW). So under the patch Rust runs **one die ahead** at the block: the FA step
+inserted into `SelectBlitzTarget` **never fired**, while the FA in `BlitzBlock` was removed. The
+move DELETES the Foul Appearance roll instead of relocating it.
+
+A `StepBlockChoice` probe confirms the consequence directly:
+
+```
+BC result=Pow  def=Some("home_03")      ← Rust, from block die 6
+                                          Java's block die is 4 → PUSHBACK
+```
+
+Hence `h02` Prone in Rust and Standing in Java, on what looked like identical dice. Rust's
+`block_result_for_roll` mapping is correct (`1 Skull, 2 BothDown, 5 PowPushback, 6 Pow, _ Pushback`)
+— it was fed a different die, not mis-mapped. Checked, not assumed.
+
+This also retires ITER101's `commit_target_selection` hypothesis: the FA step is not reaching its
+commit because it is not running at all.
+
+### The remaining question, now precise
+
+Why does `StepFoulAppearance` return early when placed in `SelectBlitzTarget`? Its guards are:
+
+```rust
+let defender_id = tss.filter(|ts| ts.is_selected() && ts.is_committed())
+                     .and_then(get_selected) .or(game.defender_id);
+if !defender_has_fa || attacker_cancels { return next(); }
+```
+
+A STAND_UP probe in the same sequence showed `defender=Some("home_03")` and `tss=None`, so
+`game.defender_id` IS populated there — for nurgle seed 2. Seed 1 step 1 must be checked directly:
+instrument the early-return in `StepFoulAppearance` (defender_id, defender_has_fa,
+attacker_cancels) and run nurgle seed 1 with the move applied. That single probe names the guard.
+
+Note `attacker_cancels` is the likely suspect: it tests
+`has_skill_to_cancel_property(FORCE_ROLL_BEFORE_BEING_BLOCKED)` on the ACTING player, and in a
+nurgle-vs-nurgle mirror both sides carry Foul Appearance. A previous fix in that same line is
+already documented in the file's comments, so the surrounding logic is delicate — read the Java
+before touching it.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 86/100 (unchanged — reverted, findings only) |
+| working tree | clean at HEAD, no engine change |
+
+bb2020 stays **29 of 30 green**. RED: nurgle 86.
