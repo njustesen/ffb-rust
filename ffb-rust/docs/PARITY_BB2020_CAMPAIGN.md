@@ -3523,3 +3523,82 @@ pick-up, gains the three follow-up steps) so a future edit cannot widen either s
 seed. Note the same BlitzBlock question is still open: `bb2020/BlitzBlock.java` also has
 `TENTACLES, SHADOWING, PICK_UP` after FOLLOWUP, and the bb2025 BlitzBlock port has only a bare
 PICK_UP there; worth checking against seed 81 before hunting further.
+
+## ITER72 — `goblin` seed 81 is Argue-the-Call: Rust argues 4× where Java argues 2×
+
+`goblin` unchanged at **99/100**. No engine change — the Rust side is measured out and the decisive
+next probe is on the Java harness. Recording the state so the next iteration starts from evidence.
+
+### Where it diverges
+
+`scripts/dicediff.py` puts the first sides difference at index 77: Java rolls a d6, Rust a d8.
+`FFB_DIE_AT=78` shows Rust is already in `StepKickoffScatterRoll` — the next drive's kickoff —
+while Java is still finishing the previous drive. Java's caller at that die:
+
+```
+DiceRoller.rollArgueTheCall:152  StepEndTurn.argueTheCall:813  StepEndTurn.handleCommand:193
+   ParityRunner.handleDialog:811
+```
+
+So this is the end-of-drive Secret Weapon send-off, and Rust runs out of it early.
+
+### What matches, and what does not
+
+Probing `report_secret_weapons_used` and `argue_and_remove_secret_weapons`:
+
+| | Java | Rust |
+|---|---|---|
+| players flagged `hasUsedSecretWeapon` | 6 (both teams' Fanatic + Bombardier + Looney) | 6 — **matches** |
+| Secret-Weapon ban rolls (`rollSecretWeapon`, 2d6) | 2 | 2 — **matches** |
+| argue-the-call d6 rolls | **2** | **4** |
+
+The flagging rule is identical and correctly ported (`markPlayedAndSecretWeapons`: on the pitch this
+drive + `getsSentOffAtEndOfDrive` — it is NOT about actually using the weapon). Only the goblin
+Bombardier carries a valued `Secret Weapon (5)` in `data/rosters/bb2020/roster_goblin.json`, so
+exactly the two Bombardiers take a 2d6 ban roll and the other four are auto-banned with no die —
+both engines agree on that.
+
+The divergence is purely the argue COUNT. Rust argues for every eligible flagged player
+(`away_03=5, away_04=1, home_04=4, home_05=5`; `home_03` correctly skipped as REMOVED_FROM_PLAY).
+Java rolls only two.
+
+### Ruled out
+
+- **The eligibility filter.** `bb2020/StepEndTurn.getPlayerIds` is `hasUsedSecretWeapon() &&
+  !REMOVED_FROM_PLAY.contains(base)` plus the IllBeBack opt-out — identical to bb2025, and
+  `REMOVED_FROM_PLAY = {BANNED, BADLY_HURT, SERIOUS_INJURY, RIP}` is exactly Rust's
+  `is_casualty() || base == BANNED`.
+- **The bb2016 "one argue per team" shape.** bb2020 HAS `playerIdsArgued` (5 references, same as
+  bb2025; bb2016 has none), and `argueTheCall` leaves `fArgueTheCallChoice*` null while
+  `playersForArgue` is non-empty, so it re-fires the dialog per player. Rust's per-player loop is
+  the right shape for bb2020 — it is the count that is wrong, not the structure.
+- **Coach-banned early exit.** The first Rust argue rolls a 5 (not a natural 1), so nothing is
+  banning the coach and cutting the loop short.
+
+### The next probe is on the harness, not the engine
+
+Everything above is Rust-side evidence; what is missing is which player ids Java's dialog actually
+offers. `ParityRunner` is co-editable, so add a one-line log in the `ARGUE_THE_CALL` dialog arm
+(around line 800) printing `argueParam.getPlayerIds()` and the team on every firing, rebuild the
+jar, and compare the two lists directly. Two shapes to look for:
+
+1. Java's dialog offers fewer ids than Rust's eligible set → the flag is being cleared somewhere
+   Rust does not clear it (one Rust probe already hints at this: `away_05` appears in the ban-roll
+   pass but NOT in the argue pass, while its opposite number `home_05` appears in both — an
+   asymmetry with no obvious cause on the Rust side).
+2. Java's dialog fires once per team and the loop exits early for a reason not visible in the
+   source read above.
+
+### Note on the dice diff
+
+Values matching either side of the divergence proves nothing here: every roll in this window is a
+d6 drawn from the same raw stream, so identical values appear at identical indices no matter which
+roll they belong to. Only the SIDES change (the d8 at index 77) exposed it. When a window is
+all-d6, compare the CALLERS, not the values.
+
+### Gate
+
+| check | result |
+|---|---|
+| `goblin` bb2020 | 99/100 (unchanged) |
+| working tree | probes removed, no engine change |
