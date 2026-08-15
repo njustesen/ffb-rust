@@ -4266,3 +4266,73 @@ express both:
 
 **Status: 24 of 30 green**, `slann_fumbbl` 98/100 now the fewest-fails target. ITER83's call to
 park nurgle was right: one iteration on a different roster beat six on that one.
+
+## ITER85 — `slann_fumbbl`'s last 2 seeds are the end-of-game MVP roll; found a dead-code option path
+
+`slann_fumbbl` stays **98/100** (seeds 29, 50). No engine change kept. The remaining failure is
+fully characterised and it turned up a structural finding worth more than the seed.
+
+### The divergence
+
+Seed 29's first sides difference is at the very end of the game, rng 92-93:
+
+```
+pos 92  JAVA d1=1   DiceRoller.randomPlayerId:289  StepMvp.executeStep:120
+pos 93  JAVA d1=1   DiceRoller.randomPlayerId:289  StepMvp.executeStep:126
+        RUST d6=5 / d6=1
+```
+
+Java rolls a **d1** twice — one per team. `randomPlayerId(playerIds)` is
+`playerIds[rollDice(playerIds.length) - 1]`, so a d1 means the list had exactly ONE entry. That is
+the MVP *nomination* path: `mvpNominations > 0` makes `StepMvp` show a player-choice dialog, the
+harness answers with exactly one player (lowest jersey, `ParityRunner:885-891`), and Java then rolls
+`d(1)` to "pick" from that single nomination.
+
+Rust took the `else` branch and auto-rolled `d(eligible)` — a d6, six eligible players.
+
+### The structural finding
+
+Rust's `mvpNominations` is unset, for two independent reasons:
+
+1. **`UtilServerStartGame::add_default_game_options` is dead code.** It is never called outside its
+   own unit tests, so NONE of the 18 options Java's `addDefaultGameOptions` sets are set in a Rust
+   parity run. (The parity runner has its own short `BASELINE_SETUP_OPTIONS` list instead.)
+2. **Even if it were called, the keys would not match.** It writes `opt::MVP_NOMINATIONS =
+   `"MVP_NOMINATIONS"`` — a Rust enum-style spelling — while every reader looks up the Java wire
+   name `"mvpNominations"` (`ffb_model::option::game_option_id`). The same mismatch applies to most
+   of that module: `WIZARD_AVAILABLE`, `ALLOW_BALL_AND_CHAIN_RE_ROLL`, `CLAW_DOES_NOT_STACK`,
+   `PETTY_CASH_AFFECTS_TV`, … Its own tests pass because they read back through the same wrong
+   constant.
+
+This is an open audit item and a likely source of several remaining divergences: wherever Java runs
+with an option ON and Rust silently reads the factory default.
+
+### What was tried and reverted
+
+Both aliasing `opt::MVP_NOMINATIONS` to the wire name AND adding
+`(MVP_NOMINATIONS, "6")` to `BASELINE_SETUP_OPTIONS` — measured **98/100, unchanged**, seeds 29 and
+50 still failing with the same d1-vs-d6. So simply switching the option on is not sufficient: with
+nominations enabled, Rust's `StepMvp` returns `cont()` awaiting a player-choice the parity agent
+never sends, so it does not reach Java's single-nomination `d(1)` either. The agent side has to
+answer that dialog the way `ParityRunner` does (one player, lowest jersey) for the option to help.
+Reverted rather than leave an inert switch on.
+
+### Next iteration
+
+Two options, in preference order:
+
+1. **Finish the MVP path**: teach the agent to answer the MVP player-choice prompt with the
+   lowest-jersey eligible player, THEN enable `mvpNominations`. The two only work together — same
+   shape as ITER71's FOLLOWUP_CHOICE pair.
+2. **Or move on to `halfling` (5/100)** and come back; `slann_fumbbl` at 98 is already the best of
+   the reds and this is an end-of-game-only divergence.
+
+Separately, the option-key audit deserves its own pass — it is cheap to enumerate (compare the
+`opt` module against `game_option_id`) and each mismatch is a candidate cause elsewhere.
+
+### Gate
+
+| check | result |
+|---|---|
+| `slann_fumbbl` bb2020 | 98/100 unchanged (seeds 29, 50) |
+| working tree | clean at HEAD; both attempts reverted |
