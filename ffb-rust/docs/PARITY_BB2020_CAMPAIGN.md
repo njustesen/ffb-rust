@@ -3993,3 +3993,43 @@ activation position. That is one build+run and settles it.
 |---|---|
 | `nurgle` bb2020 | 86/100 unchanged |
 | working tree | clean at HEAD; probe reverted |
+
+## ITER80 — variant D + probe together: Foul Appearance is a RED HERRING for seed 2
+
+`nurgle` 86/100, no engine change. Ran ITER78's variant D with the FA probe active, which answers
+ITER79's open question and closes off the whole Foul Appearance line for this seed.
+
+### Two results
+
+**1. Variant D's reordering is a dice no-op.** With FA moved into the activation and gated out of
+BB2020's BlitzBlock, the blitz FA rolls land at rng **25, 29, 30, 66** — the exact positions they
+occupied before the move (the `param=Some(...)` on those rows confirms they are the activation
+copies, since only that path supplies the parameter). Nothing rolls between `InitBlocking` and
+`GO_FOR_IT` on these blitzes, so moving the step across them changes no dice. That fully explains
+ITER78's "no change" — the change was real but inert.
+
+**2. Rust's step-32 blitz never reaches the Foul Appearance step at all** — not before variant D and
+not after. There are exactly **5** blitz FA invocations in the whole seed (rng 25, 29, 30, 66, 101)
+and none anywhere near rng 46-49, where Java rolls its FA at pos 48.
+
+### What that means
+
+The FA step is present in the sequence and is now FIRST in the blitz activation, yet the step-32
+blitz still does not execute it. So the sequence is short-circuiting BEFORE it — some earlier
+activation step gotos `END_BLOCKING`. **The divergence at step 32 is upstream of Foul Appearance,
+and Java's pos-48 FA roll is a consequence of that, not the cause.**
+
+Chasing Foul Appearance was the wrong thread from ITER76 onward. Four iterations, no count change.
+
+### Next iteration
+
+`FFB_DRIVE_TRACE=1` on nurgle seed 2, find the step-32 blitz activation, and read which step exits
+it. That names the real defect directly and costs one run. Do not touch the FA sequencing again
+until that trace says it is involved.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 86/100 unchanged |
+| working tree | clean at HEAD; variant D and the probe both reverted |
