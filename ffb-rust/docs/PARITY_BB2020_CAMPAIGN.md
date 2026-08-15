@@ -5616,3 +5616,60 @@ The exact patch is in this commit's history; re-applying it is mechanical.
 | working tree | clean at HEAD, no engine change |
 
 bb2020 stays **29 of 30 green**. RED: nurgle 86.
+
+## ITER105 — FA now EXECUTES on blitz activations with the right defender; the question moves to its failure path
+
+No engine change (reverted); nurgle stays 86/100. One more possibility eliminated, and the target
+narrows again.
+
+### The probe ITER104 asked for
+
+Both halves re-applied, with a probe at the TOP of `StepFoulAppearance::execute_step` (ITER103's
+probe sat at the early return and printed nothing, which could not distinguish "never ran" from
+"ran and rejected"). nurgle seed 2:
+
+```
+FA-ENTER action=Some(Blitz) acting=Some("away_02") game_def=Some("home_03") param_def=Some("home_03")
+FA-ENTER action=Some(Blitz) acting=Some("away_02") game_def=Some("home_03") param_def=Some("home_03")
+```
+
+So on the blitz activation the step **does execute**, and the defender resolves correctly by BOTH
+routes — `game.defender_id` and the new step parameter. ITER103's "the step never runs" is therefore
+specific to the un-patched routing, not to the patched one; with both halves in place the step is
+reached.
+
+(The doubled line is a re-entry — `execute_step` runs from `start()` and again via `handle_command`
+— and does not roll twice, since `self.roll` is retained. Consistent with nurgle measuring 86/100
+rather than worse.)
+
+### What is left
+
+Foul Appearance runs, finds the defender, and rolls — yet nurgle seed 2 is byte-identical to
+baseline: `i=33 a01: JAVA 13,8,Prone / RUST 13,8,Standing`. So the remaining gap is in the
+**outcome**, not the placement:
+
+* does Rust's roll FAIL as Java's does (Java spends exactly one die here and its blitz aborts)?
+* if it fails, why does `fail_fa`'s `goto` not stop the blitzer standing up?
+
+Note the two blitz paths use different failure labels — `END_BLITZING` in `SelectBlitzTarget`
+(which sits BEFORE JUMP_UP/STAND_UP, so the goto skips them) versus `END_BLOCKING` in the inline
+activation used by `StepEndSelecting`'s Blitz dispatch. If a PRONE blitzer takes the inline path,
+its stand-up does not live in that sequence at all, so `goto END_BLOCKING` cannot prevent it. That
+is the most likely remaining mechanism and is directly checkable.
+
+### Next iteration
+
+Re-apply and extend the same probe to print `self.roll`, the minimum, the success flag, and which
+sequence the step is in (the failure label distinguishes them). If the prone blitzer is on the
+inline path, the fix is to give that path the `END_BLITZING`-equivalent behaviour — i.e. the blitz
+activation must be able to abort BEFORE the stand-up, which is what Java gets for free by always
+running `SelectBlitzTarget` (ITER103).
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 86/100 (unchanged — reverted, findings only) |
+| working tree | clean at HEAD, no engine change |
+
+bb2020 stays **29 of 30 green**. RED: nurgle 86.
