@@ -4151,3 +4151,69 @@ tools reached for, not the last.
 |---|---|
 | `nurgle` bb2020 | 86/100 unchanged |
 | working tree | clean at HEAD; probe reverted |
+
+## ITER83 — `fail_fa` IS reached, with `standing_up=false`; the `if (changed)` fix breaks two tests
+
+`nurgle` 86/100. Nothing landed. **Recommend switching rosters — see the end.**
+
+### The arm trace (this part is solid)
+
+Gated prints on every return of `StepFoulAppearance` for seed 2's step-32 blitz:
+
+```
+FA4 enter n=29 act=away_02 action=Blitz def=home_03 hasfa=true standing_up=false roll=0
+FA4 rolled=1 min=2 may_block=false already_rr=false
+FA4 arm=ask-rr
+FA4 enter n=30 act=away_02 action=Blitz def=home_03 hasfa=true standing_up=false roll=0
+FA4 arm=rr-not-consumed
+FA4 fail_fa standing_up=false action=Some(Blitz)
+```
+
+The roll is a **1**, it fails, a re-roll is offered, the agent declines, and **`fail_fa` IS
+reached** — with `standing_up = false`. That is the whole reason the blitzer is not put back prone.
+ITER82 guessed `fail_fa` might not be reached; it is.
+
+### Why `standing_up` is false, and why the obvious fix is wrong
+
+Java gates `setPlayer` / `setOldPlayerState` / `setStandingUp` — and the Prone→MOVING write —
+inside `if (newPlayer != oldPlayer)`, leaving only `setPlayerAction` / `setJumping` unconditional
+(`UtilActingPlayer.java:75-86`). Rust sets `set_player` and `standing_up` UNCONDITIONALLY. A blitz
+re-invokes `change_player_action` on the same player for its block sub-activation, by which time the
+player is already MOVING, so `was_prone` recomputes to false and the flag is lost.
+
+Moving both inside the existing `if changed` guard — which is what Java does — **breaks two existing
+tests**:
+
+- `step_init_selecting::tests::activate_prone_player_blitz_with_target_runs_standup_via_next`
+- `step_init_selecting::tests::prone_move_activation_sets_current_move_to_stand_up_cost`
+
+Both assert `standing_up` after an activation where `changed` is FALSE, i.e. they encode the current
+unconditional behaviour. Whether they assert the right thing, or were written around the existing
+bug, is unresolved — and resolving it means understanding why `StepInitSelecting` calls
+`change_player_action` with the player already set. Reverted rather than rewrite tests to fit an
+unproven fix.
+
+(The companion `|| pa == Blitz` change in `fail_fa` is still a genuine 1:1 gap — Rust's bridge keeps
+the action as `Blitz` where Java is in `BLITZ_MOVE` — but it is inert on its own.)
+
+### Recommendation: park nurgle, take a different roster
+
+Six iterations (ITER76-83), no count movement. The seed is fully characterised — one player left
+standing, exact cause known — but the repair runs into a test/behaviour question about
+`change_player_action` that is a bigger piece of work than a seed fix, and it sits on the shared
+activation path every roster uses.
+
+The other five reds (dwarf 20, necromantic 15, wood_elf 15, halfling 5, slann_fumbbl 0) are all
+80-100 fails, which historically means ONE first-drive cause each — cheaper per iteration and more
+likely to move the matrix. `slann_fumbbl` at 0/100 in particular matched a roster-lookup fallback in
+the bb2025 campaign, not an engine bug at all.
+
+Suggested order: `slann_fumbbl` (check the team loads), then `halfling`, then `dwarf`.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 86/100 unchanged; seed 2's post-hash byte-identical |
+| `cargo test --workspace` | 2 failures WITH the change → reverted; clean at HEAD |
+| working tree | clean at HEAD |
