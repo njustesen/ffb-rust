@@ -3885,3 +3885,54 @@ Do NOT retry via `game.defender_id`.
 |---|---|
 | `nurgle` bb2020 | 86/100 — baseline restored after the revert |
 | working tree | change reverted; a note at the insertion point records the 0/100 result |
+
+## ITER78 — three more blitz Foul Appearance attempts, all measured, all reverted
+
+`nurgle` stays **86/100**. Nothing landed. Three variants were built and swept; recording all three
+so the next attempt does not re-walk them.
+
+| # | change | result |
+|---|---|---|
+| A | FOUL_APPEARANCE added to the bb2020 blitz activation + defender via `game.defender_id` | **0/100** |
+| B | same, but defender via a new `BLOCK_DEFENDER_ID` step parameter | **0/100** |
+| C | defender parameter attached to the EXISTING FOUL_APPEARANCE in bb2025's BlitzBlock (no added step) | 86/100 — no change |
+| D | C + move it: FA in the bb2020 activation, removed from bb2020's BlitzBlock unless `frenzy_block` | 86/100 — no change |
+
+### What that establishes
+
+**ITER77's conclusion was wrong and is retracted.** It blamed `game.defender_id` leaking into the
+activation. Variant B kept the defender on a private step parameter and still gave 0/100, so the
+delivery mechanism was never the problem — **adding the step at all is**.
+
+The reason is now clear and was missed in ITER76: **bb2025's BlitzBlock ALREADY has a
+FOUL_APPEARANCE step** (`bb2025/blitz_block.rs:89`, position 4, right after the blitz GFI). So
+variants A and B rolled Foul Appearance TWICE per blitz. ITER76's claim that "the blitz has no
+FOUL_APPEARANCE step" was simply false — the step is there; what it lacked was a defender.
+
+Variants C and D then gave it one, and the count did not move at all — which means it STILL is not
+rolling. Handing `BLOCK_DEFENDER_ID` to the step did not make `defender_has_fa` true.
+
+### Where to start next time
+
+Do not add or move the step again. Instrument the EXISTING one and answer one question:
+**with `BLOCK_DEFENDER_ID` supplied, why does `StepFoulAppearance` still not roll?** Candidates, in
+order:
+
+1. The parameter never arrives. `DriverStepStack::publish` delivers top-of-stack downward and stops
+   at the first step that CONSUMES a key — and `StepInitBlocking` also takes `BLOCK_DEFENDER_ID`
+   and sits earlier in the sequence. If it consumes the key, the FA step never sees it. Check
+   `consumes_parameter` on both. **This is the most likely cause and is cheap to confirm.**
+2. `defender_has_fa` is false for another reason — e.g. the id is a Java-style id where the lookup
+   wants a Rust one.
+3. `attacker_cancels` is true (the file already carries one fix in this area).
+
+Note the ordering question is real but SECONDARY: Java rolls the blitz FA in SelectBlitzTarget,
+before the blitz GFI, whereas Rust's sits after it. That matters for the dice position once the
+roll happens at all — but it cannot be measured until the roll happens.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 86/100 — unchanged, all four variants reverted |
+| working tree | clean at HEAD; no engine change |
