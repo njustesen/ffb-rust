@@ -4336,3 +4336,67 @@ Separately, the option-key audit deserves its own pass — it is cheap to enumer
 |---|---|
 | `slann_fumbbl` bb2020 | 98/100 unchanged (seeds 29, 50) |
 | working tree | clean at HEAD; both attempts reverted |
+
+## ITER86 — `halfling` has the SAME signature as `nurgle`: a cancelled action Java reverts and Rust does not
+
+`halfling` 5/100, no engine change. The point of this iteration is the connection, not the seed.
+
+### Seed 1
+
+```
+[ 100] JAVA t7 h1 away  pre=a2409412555b888e post=a2409412555b888e  Activate(Away1,BLOCK)
+       RUST t7 h1 away  pre=a2409412555b888e post=913aca7fda9c7da8  Activate(away_01,Block)
+```
+
+**Java's block is a complete no-op — `post == pre`.** Rust's changes state. `away_01` is a
+**Treeman** (`team_halfling.json:16`), and the Java dice trace for this seed contains a
+`TakeRootBehaviour` roll (`rollSkill`, pos 70). A Treeman that fails Take Root cannot carry out its
+declared action; Java unwinds the declaration completely.
+
+### This is nurgle seed 2 again, with a different negatrait
+
+| | nurgle seed 2 | halfling seed 1 |
+|---|---|---|
+| step | 32, `Activate(Away2, BLITZ)` | 100, `Activate(Away1, BLOCK)` |
+| negatrait | Foul Appearance (Warrior) | Take Root (Treeman) |
+| Java | `post == pre` — action cancelled, state unwound | `post == pre` — same |
+| Rust | state changed — action partly resolved | same |
+
+Both are "a negatrait check fails, Java reverts the declaration's state effects, Rust leaves them
+applied". ITER81-83 traced the nurgle case to `acting_player.standing_up` being lost on the blitz's
+same-player `change_player_action` re-dispatch, and the repair being blocked on Java's
+`if (newPlayer != oldPlayer)` guard vs two `step_init_selecting` tests that encode the current
+unconditional behaviour.
+
+**That reframes ITER83's "park nurgle" advice.** It is not one roster's seed — the remaining reds
+are exactly the rosters that field negatrait Big Guys:
+
+| roster | fails | negatrait carrier |
+|---|---:|---|
+| dwarf | 80 | Deathroller (Secret Weapon / Bone Head-class) |
+| necromantic | 85 | Flesh Golem / Werewolf |
+| wood_elf | 85 | Treeman — Take Root |
+| halfling | 95 | Treeman ×2 — Take Root |
+| nurgle | 14 | Beast of Nurgle (Really Stupid), Warriors (Foul Appearance) |
+
+If the cancel-revert path is one bug, fixing it could move several of these at once — which makes
+it worth more than its per-seed cost, and worth resolving the `change_player_action` test question
+properly rather than routing around it.
+
+### Next iteration
+
+Do NOT keep sampling seeds. Settle the shared question:
+
+1. Read the two `step_init_selecting` tests and determine why they call `change_player_action` with
+   the acting player already set — is that the real engine flow, or test scaffolding?
+2. If it is scaffolding, apply Java's `if (newPlayer != oldPlayer)` guard, fix the tests to set up
+   the real flow, and measure nurgle + halfling + wood_elf together.
+3. If it IS the real flow, then Rust's `StepInitSelecting` differs from Java's command sequence and
+   that is the actual defect.
+
+### Gate
+
+| check | result |
+|---|---|
+| `halfling` bb2020 | 5/100 (baseline, unchanged) |
+| working tree | clean at HEAD; no engine change |
