@@ -5554,3 +5554,65 @@ i.e. gate the routing change on `Rules::Bb2020` only.
 | working tree | clean at HEAD, no engine change |
 
 bb2020 stays **29 of 30 green**. RED: nurgle 86.
+
+## ITER104 — FA can now be placed correctly on BOTH blitz paths with NO regression, but nurgle is unmoved
+
+No engine change (reverted); nurgle stays 86/100 with the identical 14 seeds. The important result
+is that the ITER77 blocker is solved and the placement problem is no longer what stands in the way.
+
+### ITER77's blocker is solved
+
+An in-code note at `bb2025/shared/step_end_selecting.rs` (Blitz dispatch) recorded that adding
+FOUL_APPEARANCE to the inline blitz activation required a defender, and that setting
+`game.defender_id` at dispatch to provide one took nurgle 86 → 0/100 because every step in the
+activation then saw it. Its stated remedy — "the defender has to reach StepFoulAppearance as a step
+PARAMETER, not via game state" — works:
+
+* `StepFoulAppearance` now accepts `StepParameter::BlockDefenderId`, used only as a last resort after
+  the TSS and `game.defender_id` lookups, so no other caller changes.
+* The Blitz dispatch appends FOUL_APPEARANCE + DUMP_OFF (BB2020 only) to the inline activation,
+  passing `block_defender_id` as that parameter.
+* `BlitzBlock` gates its own FOUL_APPEARANCE to `frenzy_block` and drops DUMP_OFF for BB2020, so the
+  roll happens exactly once.
+
+Measured stepwise: with only the dispatch half, **86/100** (baseline, no regression). Adding the
+`SelectBlitzTarget` half for the prone-blitzer path: **86/100** again. Both placements together are
+regression-free — a real improvement over ITER92/101/103, where every attempt scored 0/100.
+
+### But it does not move nurgle
+
+nurgle seed 2 is unchanged with both halves applied:
+
+```
+i=33   a01:  JAVA 13,8,Prone   RUST 13,8,Standing
+```
+
+The prone blitzer still stands up, so **Foul Appearance is still not firing on that activation** even
+though the step is now in the sequence and the defender is available (a STAND_UP probe two steps
+later in the same sequence reports `defender=Some("home_03")`, and Java spends exactly one die there
+— its failing FA roll).
+
+Reverted per the gate rule: correct-looking but zero measured gain, and it changes every BB2020
+blitz, so it should not land without a win to justify a full-matrix re-gate.
+
+### Next iteration — one specific probe
+
+Re-apply both halves and put a probe at the TOP of `StepFoulAppearance::execute_step` (not at the
+early return, which ITER103's probe used and which printed nothing for any blitz). That
+distinguishes the two remaining possibilities:
+
+1. the step still is not being executed at all on the blitz path → the sequence insert is not where
+   the driver runs it, or a preceding `GotoLabel` skips it;
+2. it executes but the defender/`has_fa`/`attacker_cancels` guard rejects → `attacker_cancels` is
+   the prime suspect in a nurgle mirror, where both sides carry Foul Appearance.
+
+The exact patch is in this commit's history; re-applying it is mechanical.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 86/100 (unchanged — reverted, findings only) |
+| working tree | clean at HEAD, no engine change |
+
+bb2020 stays **29 of 30 green**. RED: nurgle 86.
