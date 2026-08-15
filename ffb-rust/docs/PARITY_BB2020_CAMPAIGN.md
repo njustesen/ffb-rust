@@ -4400,3 +4400,56 @@ Do NOT keep sampling seeds. Settle the shared question:
 |---|---|
 | `halfling` bb2020 | 5/100 (baseline, unchanged) |
 | working tree | clean at HEAD; no engine change |
+
+## ITER87 — the `if (changed)` question SETTLED, and `standing_up` is NOT the blocker
+
+`nurgle` 86/100, `halfling` 5/100 — both unchanged. Reverted. But two things are now closed off,
+and one earlier hypothesis is disproven.
+
+### The test question is answered: it was scaffolding
+
+`StepInitSelecting::handle_command(ActivatePlayer)` calls `change_player_action(game, player_id, …)`
+directly and does NOT pre-set the acting player (`step_init_selecting.rs:95-97`). A real activation
+arrives with the previous one already cleared, so `changed` is TRUE — consistent with the ITER82
+backtrace, where the Prone→MOVING write (which lives inside `if changed`) did fire.
+
+The two tests set `game.acting_player.player_id = Some("p1")` before calling `handle_command` with
+that same id, which forces `changed = false` and makes them exercise the same-player re-dispatch
+path instead of an activation. **That is test scaffolding, not the engine flow.** With the pre-set
+removed, both tests pass alongside Java's guard (`cargo test -p ffb-engine` 7,153 / 0).
+
+### But the fix is inert
+
+Applying Java's `if (newPlayer != oldPlayer)` guard to `set_player` / `standing_up` — plus the
+`|| pa == Blitz` companion in `fail_fa` — and correcting the two tests measured:
+
+| roster | before | after |
+|---|---:|---:|
+| nurgle | 86/100 | 86/100 |
+| halfling | 5/100 | 5/100 |
+
+**So `standing_up` being lost on re-dispatch is NOT what leaves the player standing.** ITER81-83
+built on that hypothesis; it is now disproven by measurement. Reverted (no measured effect, and it
+touches the shared activation path for every roster, so it is not worth carrying unproven).
+
+### What survives
+
+The ITER86 observation still stands and is the real target: in both rosters Java's activation is a
+complete no-op (`post == pre`) after a failed negatrait, and Rust's is not. What has been ruled out
+is the `standing_up` flag as the mechanism.
+
+### Next iteration
+
+Stop hypothesising about which flag and diff the state directly, as ITER81 did for nurgle — but for
+halfling seed 1 step 100, which is a BLOCK (simpler than a blitz: no bridge, no re-dispatch, no
+TargetSelectionState). Get the two state strings at i=100/101, find exactly which player/field
+differs, then backtrace that write. The blitz path added three confounders to the nurgle
+investigation that the halfling BLOCK case does not have.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` / `halfling` bb2020 | 86/100 and 5/100 — both unchanged |
+| `cargo test -p ffb-engine` | 7,153 / 0 WITH the change (tests corrected) — then reverted |
+| working tree | clean at HEAD |
