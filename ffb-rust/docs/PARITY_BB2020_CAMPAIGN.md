@@ -4033,3 +4033,65 @@ until that trace says it is involved.
 |---|---|
 | `nurgle` bb2020 | 86/100 unchanged |
 | working tree | clean at HEAD; variant D and the probe both reverted |
+
+## ITER81 — seed 2 pinned to ONE player state: `a01` Prone (Java) vs Standing (Rust)
+
+`nurgle` 86/100, no engine change kept. But the seed is now pinned exactly, and the earlier
+framing was wrong again.
+
+### It is a STATE-only divergence, and both engines roll the same die
+
+`FFB_TRACE=1` state strings at the failing step:
+
+```
+JSTEP     i=32 rng_calls=29 ... a01:13,8,Prone     chosen=Activate(Away2,BLITZ)
+RUST_STEP i=32 rng_calls=29 ... a01:13,8,Prone     chosen=Activate(away_02,Blitz)
+
+JSTEP     i=33 rng_calls=30 ... a01:13,8,Prone     <-- Java
+RUST_STEP i=33 rng_calls=30 ... a01:13,8,Standing  <-- Rust
+```
+
+`rng_calls` 29 → 30 on BOTH sides: the blitz spends exactly one die in each engine, and every other
+player and the ball agree. **The entire seed-2 divergence is one player left STANDING that Java
+leaves PRONE.**
+
+This also corrects ITER80: the FA step is not skipped — it runs and rolls, at rng 30. ITER80 was
+looking for the roll in the wrong window (rng 46-49 came from the *Java dice trace positions*, which
+are a different numbering from `rng_calls` at the step boundary).
+
+`away_02` (=`a01`) is a prone Nurgle Warrior declaring a stand-up-and-blitz. Java's Foul Appearance
+fails, `handleFailure` runs, and it puts the player BACK on the ground:
+
+```java
+if (actingPlayer.isStandingUp() && (playerAction == BLITZ_MOVE || isBlockAction || GAZE_MOVE || isKickingDowned))
+    setPlayerState(player, playerState.changeBase(PRONE).changeActive(false));
+```
+
+Net effect in Java: nothing changes, which is exactly the `post == pre` hash.
+
+### The attempted fix, and why it is not the answer
+
+Rust's `fail_fa` ports that condition, but tests `PlayerAction::BlitzMove` — and Rust's
+single-command blitz bridge leaves the acting action as plain `Blitz`, which is also not in
+`is_block_action()`. So the condition is false for every Rust blitz. Adding `|| pa == Blitz`
+looked like the fix.
+
+**It measured 86/100 — no change.** So `fail_fa` is not what stands the player up, or is not
+reached. Reverted (no measured effect).
+
+### Next iteration
+
+The question is now very small: **what sets `a01` to Standing during that blitz, and does Java's
+equivalent run?** Put a gated backtrace in `FieldModel::set_player_state` firing when the new base
+is STANDING for that player id (the campaign's documented technique, and the one that has resolved
+this class of bug fastest). That names the writer in one run.
+
+Keep the `|| pa == Blitz` change in mind — it is a genuine 1:1 discrepancy in `fail_fa` even though
+it is not this bug, and should be revisited with a test once the real writer is known.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 86/100 unchanged |
+| working tree | clean at HEAD |
