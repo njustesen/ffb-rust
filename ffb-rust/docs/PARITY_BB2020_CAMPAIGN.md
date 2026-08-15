@@ -3736,3 +3736,48 @@ for other local re-implementations of `FieldCoordinateBounds` is a cheap, high-v
 `goblin`. Next: re-measure the remaining 23 rosters to pick the new fewest-fails target; several
 were last measured before the ITER67-74 fixes and the Ball & Chain / pitch-bounds corrections are
 broad enough that some may have moved on their own.
+
+## ITER75 — full re-sweep: **7 → 24 of 30 green**
+
+No engine change. Every roster re-measured 1-100 against HEAD, because the ITER67-74 fixes (the two
+PICK_UP sequence gates, FOLLOWUP_CHOICE republishing, three `dropPlayer` duplicates, the pitch
+bounds) were broad and most rosters had not been swept since.
+
+**Seventeen rosters went green with no roster-specific work.** That is the campaign's usual
+pattern — shared-engine fixes carry most of the matrix — but it is by far the largest single jump.
+
+### 🟢 GREEN — 24 of 30
+
+| | | | |
+|---|---|---|---|
+| amazon | chaos | chaos_dwarf | chaos_pact |
+| dark_elf | dark_elf_league_fumbbl | elf | goblin |
+| high_elf | human | khemri | khemri_fumbbl |
+| lineman | lizardman | nippon | norse |
+| ogre | orc | renegades | skaven |
+| slann | undead | underworld | vampire |
+
+### 🔴 RED — 6, by fewest fails
+
+| roster | passed | fails |
+|---|---:|---:|
+| **nurgle** | 86/100 | 14 |
+| dwarf | 20/100 | 80 |
+| necromantic | 15/100 | 85 |
+| wood_elf | 15/100 | 85 |
+| halfling | 5/100 | 95 |
+| slann_fumbbl | 0/100 | 100 |
+
+Every sweep printed `rust_total` and an `N/100` line, so all 30 readings are valid measurements.
+
+### Reading the reds
+
+`nurgle` at 14 is the fewests-fails target and the next iteration's work. The other five cluster at
+80-100 fails, which is the signature of a divergence in the FIRST drive rather than 100 independent
+bugs — most likely one roster-wide trait each (Decay/Foul Appearance for necromantic and nurgle;
+Titchy/Stunty and the halfling Treeman for halfling; the wood elf Treeman; Dwarf Blockers'
+Thick Skull / the Deathroller for dwarf). `slann_fumbbl` at 0/100 is the same shape the bb2025
+campaign hit — there it turned out to be a roster-lookup problem rather than an engine one, so check
+the team actually loads before assuming a rules bug.
+
+**Status: 24 of 30 green.** Next: `nurgle` seed-by-seed from the lowest failing seed.
