@@ -5734,3 +5734,56 @@ full 30-roster bb2020 matrix plus lineman in all three editions — this changes
 | working tree | clean at HEAD, no engine change |
 
 bb2020 stays **29 of 30 green**. RED: nurgle 86.
+
+## ITER107 — routing through `SelectBlitzTarget` is not enough: the abort must also CANCEL the block
+
+No engine change (reverted); nurgle stays 86/100. ITER103/106's proposed fix was implemented and
+measured, and it is necessary but not sufficient. The remaining requirement is now exact.
+
+### What was tried
+
+For BB2020 only, `StepEndSelecting`'s Blitz dispatch pushed the real `SelectBlitzTarget` sequence
+(with FOUL_APPEARANCE + DUMP_OFF before JUMP_UP/STAND_UP) followed by the `BlitzBlock` sequence,
+replacing the inline activation. `BlitzBlock`'s own FA gated frenzy-only.
+
+**Result: 86/100, and nurgle seed 2 is bit-identical to baseline** — `a01` still Standing where Java
+has it Prone.
+
+### Why concatenating the two sequences cannot work
+
+In Java the two halves are pushed by SEPARATE client commands: `SelectBlitzTarget` runs first, and
+`BlitzBlock` is only pushed later, by the subsequent CLIENT_BLOCK. So when Foul Appearance fails and
+gotos `END_BLITZING`, the blitz ends and **`BlitzBlock` never exists**.
+
+Rust pushes both at once. The goto to `END_BLITZING` correctly skips JUMP_UP/STAND_UP *within*
+`SelectBlitzTarget` — but execution then falls straight into the concatenated `BlitzBlock`
+sequence, which proceeds to block and (somewhere in that flow) leaves the blitzer standing. Aborting
+the first sequence does not cancel the second, because they are one sequence.
+
+This is the same class as the ITER99/100 pairing: the change is only correct when BOTH halves are
+present. Here the missing half is **conditional pushing**.
+
+### The fix, precisely
+
+`BlitzBlock` must not be pushed until `SelectBlitzTarget` completes successfully.
+`StepSelectBlitzTargetEnd` is the natural place: it is the `END_BLITZING`-labelled terminator, it
+already receives the `EndPlayerAction`/`EndTurn` parameters that `fail_fa` publishes, and pushing
+`BlitzBlock` from there (only when the action was NOT ended) reproduces Java's two-command shape
+without touching the agent protocol.
+
+Concretely for the next iteration:
+
+1. Give `StepSelectBlitzTargetEnd` the blitz params it needs (`block_defender_id`, `using_stab`, …)
+   as step parameters from the dispatch.
+2. In its `execute_step`, if `end_player_action || end_turn` → do the existing EndPlayerAction push;
+   otherwise push `BlitzBlock`.
+3. Keep the BB2020 gate on the routing so bb2016/bb2025 are untouched, and gate the whole matrix.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 86/100 (unchanged — reverted, findings only) |
+| working tree | clean at HEAD, no engine change |
+
+bb2020 stays **29 of 30 green**. RED: nurgle 86.
