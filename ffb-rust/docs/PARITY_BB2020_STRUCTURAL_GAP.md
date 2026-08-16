@@ -115,3 +115,79 @@ edition-independent arms — they are the shared implementation for their StepId
 specialisations: StepAssignTouchdowns, StepBuyCardsAndInducements, StepCheckStalling,
 StepReportStabInjury, StepSelectGazeTarget, StepSelectGazeTargetEnd,
 StepSetActingPlayerAndTeam, StepSetActingTeam, StepStateMultipleRolls.
+
+## Generator inventory (added ITER118)
+
+Same comparison over `step/generator/`: **25 BB2020/BB2025 Java generator pairs, all differing,
+none identical.** Most different first:
+
+| sim | generator | note |
+|-----|-----------|------|
+| 0.56 | `SelectBlitzTarget.java` (29/14) | activation spelled out |
+| 0.57 | `BlackInk.java` (28/14) | activation spelled out |
+| 0.58 | `BalefulHex.java` (25/13) | activation spelled out |
+| 0.58 | `CatchOfTheDay.java` (25/13) | activation spelled out |
+| 0.58 | `Block.java` (87/78) | |
+| 0.58 | `Move.java` (57/53) | |
+| 0.60 | `RaidingParty.java` (26/14) | activation spelled out |
+| 0.60 | `LookIntoMyEyes.java` (28/15) | activation spelled out |
+| 0.65 | `ThenIStartedBlastin.java` (30/19) | activation spelled out |
+| 0.65 | `ThrowKeg.java` (30/19) | activation spelled out |
+| 0.67 | `Treacherous.java` (30/18) | activation spelled out |
+| 0.67 | `BlitzBlock.java` (75/80) | |
+| 0.70 | `ThrowTeamMate.java` (51/35) | tail gated in ITER115 |
+| 0.70 | `Select.java` (35/22) | |
+| 0.72 | `FuriousOutburst.java` (40/27) | |
+| 0.72 | `BlitzMove.java` (37/46) | |
+| 0.73 | `Foul.java` (40/26) | |
+| 0.78 | `MultiBlock.java` (45/32) | |
+| 0.78 | `EndPlayerAction.java` (21/25) | **DONE, ITER118** |
+| 0.80 | `Pass.java` (48/35) | |
+| 0.85 | `ScatterPlayer.java` (33/33) | |
+| 0.88 | `StartGame.java` (16/16) | already routed |
+| 0.91 | `SpecialEffect.java` (17/18) | |
+| 0.92 | `EndGame.java` (20/19) | |
+| 0.93 | `Bomb.java` (28/30) | |
+
+BB2020-only generator: `SelectGazeTarget.java`. BB2025-only: `ActivationSequenceBuilder.java`,
+`AutoGazeZoat.java`, `EndTurn.java`, `Kickoff.java`, `Punt.java`, `ThrowARock.java`.
+
+`ActivationSequenceBuilder` being BB2025-only is the whole story behind the cluster of small
+low-similarity generators above: BB2020 spells its activation block out by hand in each generator,
+BB2025 factors it into the builder. Those rows are NOT independent work items -- they are all
+blocked on the same thing.
+
+## The blocker to attack next (ITER119)
+
+**Converting the activation block for BB2020 unblocks ~10 of the generators above at once.** It is
+the single highest-leverage item on this list, and it is the refactor ITER116 deliberately deferred
+back when the backlog, not the structural gap, was the goal.
+
+What is verified so far:
+
+- BB2020 Java has no STEADY_FOOTING step anywhere; BB2025 puts one in every activation.
+- `StepSteadyFooting` is the only consumer of a published `SteadyFootingContext`.
+- The editions publish DIFFERENT parameters from the same fall. Compare `failGfi()`:
+    bb2020 `move/StepGoForIt.java:201`  publishParameter(INJURY_TYPE, new InjuryTypeDropGFI())
+    bb2025 `move/StepGoForIt.java:199`  publishParameter(STEADY_FOOTING_CONTEXT,
+                                          new SteadyFootingContext(new InjuryTypeDropGFI()))
+  So BB2020 does not "apply the drop inline" (ITER116 said that loosely, and it is wrong) -- it
+  publishes a plain INJURY_TYPE for a different downstream consumer.
+- The same `failGfi` also differs in its jump branch: BB2020 additionally requires `!fSecondGoForIt`,
+  `currentMove > MA + 1`, and no `failedRushForJumpAlwaysLandsInTargetSquare` skill.
+
+Working hypothesis, NOT yet verified -- verify before building on it: the coupling decomposes
+per-sequence rather than needing one big-bang change, because each fall site pairs with its own
+downstream STEADY_FOOTING in the SAME sequence (confirmed for BlitzBlock: GO_FOR_IT fails to
+STEADY_FOOTING, which fails on to FALL_DOWN), while the ACTIVATION's STEADY_FOOTING pairs with the
+ANIMAL_SAVAGERY two steps above it. If that holds, the activation block can be converted on its own
+without touching the move/blitz fall sites.
+
+Open question to settle first: what does the shared `StepAnimalSavagery` publish, and what consumes
+it in BB2020 Java? That determines whether BB2020's activation can simply drop STEADY_FOOTING and
+let HANDLE_DROP_PLAYER_CONTEXT (already the next step but one) take over.
+
+Do not start by deleting the step. Start by making the BB2020 publisher/consumer pair match Java,
+prove it with the 30-roster matrix, and only then remove the step -- and re-read the guard test
+`steady_footing_stays_in_the_activation_because_bb2020_fall_sites_depend_on_it`, which exists
+precisely to stop the removal happening first.
