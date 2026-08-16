@@ -1,3 +1,32 @@
+//! BB2020 step ports.
+//!
+//! ## Most of this module is NOT on the live path — read before trusting a file here
+//!
+//! `make_step_for(id, rules)` (`step/driver.rs`) has exactly ONE `Rules::Bb2020` arm,
+//! `StepId::Prayer`. Every other StepId in a BB2020 game falls through to the SHARED (bb2025) step
+//! set, so a BB2020 game does not run most of the files in this module. Of 104 step files here,
+//! roughly 93 are never instantiated by any code path.
+//!
+//! The ~10 that DO run are reachable from the driver's edition-independent match arms — they are
+//! the shared implementation for their StepId in EVERY edition, not just BB2020: `CloudBurster`,
+//! `ReportStabInjury`, `StateMultipleRolls`, `AssignTouchdowns`, `BuyCardsAndInducements`,
+//! `CheckStalling`, `SelectGazeTarget`, `SelectGazeTargetEnd`, `SetActingPlayerAndTeam`,
+//! `SetActingTeam` (driver.rs:198-339), plus `StepPrayer` and the bb2020 `start_game` generator.
+//!
+//! Two consequences:
+//!
+//! 1. **Do not cite a file here as evidence of what BB2020 does at runtime.** It is a translation
+//!    of the BB2020 Java class, but the engine is probably running the bb2025 twin instead. This
+//!    has already produced one wrong rationale — see docs/PARITY_BB2020_CAMPAIGN.md, ITER117.
+//! 2. **Fixing a BB2020 bug here usually changes nothing.** Edition-gate the shared bb2025 file
+//!    instead; that is the campaign's standing pattern. Note the dead twin drifts silently, so
+//!    keep it in sync by hand when you touch its live counterpart (ITER95 did this for all four
+//!    `step_go_for_it.rs` files).
+//!
+//! These files are kept, not deleted: closing the structural gap means eventually routing
+//! `make_step_for` AT them, the way BB2016 already routes Spectators, the kickoff chain,
+//! MissedPass and the pass step-set. Deleting would discard a finished port.
+
 pub mod block;
 pub mod end;
 pub mod foul;

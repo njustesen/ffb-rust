@@ -92,15 +92,19 @@ impl ActivationSequenceBuilder {
         // this half silently breaks every BB2020 fall.
         //
         // `StepSteadyFooting` is the ONLY consumer of a published `SteadyFootingContext`
-        // (`StepHandleDropPlayerContext` below does not read it). Rust's BB2020 fall sites publish
-        // one anyway — `bb2020/move_/step_go_for_it.rs:259`, plus bb2020 jump / move_dodge /
-        // block_chainsaw / breathe_fire / stalling_player — where BB2020 Java instead applies the
-        // drop directly. Those publishes and this step cancel out exactly, which is why all 30
-        // BB2020 rosters are 100/100 with it present, including the only two that can even reach
-        // it from ANIMAL_SAVAGERY above (renegades, underworld).
+        // (`StepHandleDropPlayerContext` below does not read it). A BB2020 game publishes one
+        // anyway: `make_step_for` routes only `StepId::Prayer` to a bb2020 step, so BB2020 games
+        // run the SHARED bb2025 fall sites — `bb2025/move_/step_go_for_it.rs`, `step_jump.rs`,
+        // `step_move_dodge.rs`, `block/step_block_chainsaw.rs` — every one of which publishes a
+        // context, where BB2020 Java applies the drop directly instead. (The bb2020/*.rs twins of
+        // those files publish one too, but they are dead code and never instantiated; do not be
+        // fooled into thinking the publisher disappears with them.) Those publishes and this step
+        // cancel out exactly, which is why all 30 BB2020 rosters are 100/100 with it present,
+        // including the only two that can even reach it from ANIMAL_SAVAGERY above (renegades,
+        // underworld).
         //
-        // Making BB2020 truly 1:1 here means changing BOTH halves together: rewrite those ~6
-        // BB2020 fall sites to apply the drop inline as Java does, THEN drop this step for
+        // Making BB2020 truly 1:1 here means changing BOTH halves together: edition-gate those
+        // shared fall sites to apply the drop inline as BB2020 Java does, THEN drop this step for
         // BB2020. See docs/PARITY_BB2020_CAMPAIGN.md (ITER116).
         sequence.add(StepId::SteadyFooting, vec![]);
         // 4 HANDLE_DROP_PLAYER_CONTEXT

@@ -6218,14 +6218,20 @@ Java never runs. The one-line gate writes itself.
 ### Why the one-line gate is wrong
 
 `StepSteadyFooting` is the **only** consumer of a published `SteadyFootingContext` --
-`StepHandleDropPlayerContext`, the step immediately after it, does not read it. But Rust's BB2020
-fall sites publish one anyway:
+`StepHandleDropPlayerContext`, the step immediately after it, does not read it. A BB2020 game
+publishes one anyway.
 
-  bb2020/move_/step_go_for_it.rs:259, bb2020/move_/step_jump.rs, bb2020/move_/step_move_dodge.rs,
-  bb2020/block/step_block_chainsaw.rs, bb2020/step_breathe_fire.rs, bb2020/step_stalling_player.rs
+**Corrected in ITER117:** this section first cited the `bb2020/*.rs` fall sites as the publishers.
+Those files are dead code (see ITER117 below) -- `make_step_for` routes only `StepId::Prayer` to a
+bb2020 step, so a BB2020 game runs the SHARED bb2025 fall sites, and every one of those publishes a
+context too:
 
-...where BB2020 Java applies the drop directly instead of publishing anything. Two unfaithful
-halves that cancel out exactly. Gate the step off for BB2020 and those contexts are stranded with
+  bb2025/move_/step_go_for_it.rs, bb2025/move_/step_jump.rs, bb2025/move_/step_move_dodge.rs,
+  bb2025/block/step_block_chainsaw.rs
+
+...where BB2020 Java applies the drop directly instead of publishing anything. The conclusion is
+unchanged and in fact stronger: the publisher is on the live path and does not go away if the dead
+bb2020 twins are ever deleted. Two unfaithful halves that cancel out exactly. Gate the step off for BB2020 and those contexts are stranded with
 no consumer: **no BB2020 player ever falls from a failed rush, dodge, or jump.** The matrix would
 not "drop a few seeds", it would come apart on the most-exercised path in the engine.
 
@@ -6266,3 +6272,57 @@ Cleared: Grab auto-decline (ITER112), game-option key mismatch (ITER113), `clear
 (ITER114), ThrowTeamMate PICK_UP (ITER115), activation STEADY_FOOTING (ITER116, won't-fix).
 Remaining: the dead BB2020 step files that drift from their Java counterparts -- decide delete
 versus keep-in-sync.
+
+## ITER117 -- the dead BB2020 step files, and a correction to ITER116
+
+Last backlog item. Also corrects ITER116 above, which cited dead files as the publishers of the
+`SteadyFootingContext`; the passage is amended in place and the conclusion is unchanged.
+
+### The finding
+
+`make_step_for(id, rules)` has exactly ONE `Rules::Bb2020` arm: `StepId::Prayer`. Everything else in
+a BB2020 game falls through to the shared (bb2025) step set. That is the known structural gap, but
+the consequence for `crates/ffb-engine/src/step/bb2020/` had not been measured:
+
+- 104 step files under `step/bb2020/`
+- 10 of them are reachable, and NOT because they are BB2020 -- the driver's edition-independent
+  match arms use them as the shared implementation for their StepId in EVERY edition:
+  CloudBurster, ReportStabInjury, StateMultipleRolls, AssignTouchdowns, BuyCardsAndInducements,
+  CheckStalling, SelectGazeTarget, SelectGazeTargetEnd, SetActingPlayerAndTeam, SetActingTeam
+  (driver.rs:198-339), plus StepPrayer via the Bb2020 arm and the bb2020 `start_game` generator.
+- The remaining ~93 are never instantiated by any code path.
+
+They still compile, still carry `#[cfg(test)]` tests that pass, and drift from their Java
+counterparts with nothing to catch it. `bb2020/move_/step_go_for_it.rs` is the cautionary case: it
+tracked ITER95's Moles-under-the-Pitch fix only because that iteration edited all four GFI files by
+hand. Read casually, a dead file looks like proof of what BB2020 does, and in ITER116 it produced a
+wrong (if harmlessly wrong) rationale.
+
+### Decision: keep, do not delete
+
+Deleting ~93 files is tempting and wrong for this campaign. They are the already-translated BB2020
+Java classes, and the standing direction is to close the structural gap by giving BB2020 its real
+step set -- which means routing `make_step_for` AT them, not throwing them away. Deleting would
+discard the port and force a re-translation later.
+
+The actual hazard is not their existence, it is that they read as authoritative. Mitigation is
+cheap and does not touch behaviour, so that is what this iteration lands.
+
+### Landed
+
+- A module-level warning in `step/bb2020/mod.rs`: what is dead, the ~10 files that are live and why
+  (they are the shared implementation for their StepId in every edition, not BB2020-specific), the
+  rule that fixing a bug here usually changes nothing, and why the files are kept rather than deleted.
+- ITER116's rationale corrected in place (dead bb2020 paths -> the live shared bb2025 ones), in
+  both the ledger and the comment in `activation_sequence_builder.rs`.
+
+### Backlog
+
+Empty. Items cleared: Grab auto-decline (ITER112), game-option key mismatch (ITER113),
+`clear_pushback_stack` (ITER114), ThrowTeamMate PICK_UP (ITER115), activation STEADY_FOOTING
+(ITER116, won't-fix with a guard test), dead BB2020 step files (ITER117, keep-with-warnings).
+
+Natural next goal, NOT started -- close the structural gap itself: route `make_step_for` at the
+BB2020 step set edition by edition, the way ITER-era work already did for BB2016 (Spectators, the
+kickoff chain, MissedPass, the pass step-set). That is a large campaign of its own and a goal-level
+decision, not a backlog item.
