@@ -105,7 +105,9 @@ impl StepUnchannelledFury {
         if self.status == Some(SkillChoiceStatus::Yes) {
             // Java: actingPlayer.markSkillUsed(canPerformTwoBlocksAfterFailedFury)
             //       step.publishParameter(ALLOW_SECOND_BLOCK_ACTION, true) → NextStep
-            mark_skill_used(game, &player_id, SkillId::FuryOfTheBloodGod);
+            // Per-activation, like the Unchannelled Fury mark below (Java
+            // `UnchannelledFuryBehaviour.java:54` marks the ACTING player, not the persistent one).
+            game.acting_player.used_skills.insert(SkillId::FuryOfTheBloodGod);
             return StepOutcome::next()
                 .publish(StepParameter::AllowSecondBlockAction(true));
         }
@@ -155,9 +157,19 @@ impl StepUnchannelledFury {
         }
 
         // Java: boolean doRoll = UtilCards.hasUnusedSkill(actingPlayer, skill)
-        let do_roll = game.player(&player_id)
-            .map(|p| p.has_skill(SkillId::UnchannelledFury) && !p.used_skills.contains(&SkillId::UnchannelledFury))
+        //
+        // `hasUnusedSkill(ACTING PLAYER, ...)` — the per-activation `ActingPlayer.fUsedSkills`,
+        // cleared whenever the acting player changes, NOT the persistent `Player`. Reading the
+        // persistent set here marked the skill used for the rest of the GAME, so a Minotaur rolled
+        // Unchannelled Fury once and never again: every later activation silently skipped the d6,
+        // leaving Rust one draw behind Java for the whole rest of the game (chaos bb2020 seed 1,
+        // block dice [5,1] against Java's [1,6]). Same bug the BB2025 BoneHeadBehaviour already
+        // fixed — see `skill_behaviour/bb2025/bone_head_behaviour.rs:99`.
+        let has_uf_skill = game.player(&player_id)
+            .map(|p| p.has_skill(SkillId::UnchannelledFury))
             .unwrap_or(false);
+        let do_roll = has_uf_skill
+            && !game.acting_player.used_skills.contains(&SkillId::UnchannelledFury);
 
         if !do_roll {
             return StepOutcome::next();
@@ -173,8 +185,8 @@ impl StepUnchannelledFury {
         let min_roll = minimum_roll_confusion(good_conditions);
         let successful = roll >= min_roll;
 
-        // Java: actingPlayer.markSkillUsed(skill)
-        mark_skill_used(game, &player_id, SkillId::UnchannelledFury);
+        // Java: actingPlayer.markSkillUsed(skill) — per-activation, see the `do_roll` note above.
+        game.acting_player.used_skills.insert(SkillId::UnchannelledFury);
 
         let event = GameEvent::ConfusionRoll { player_id: player_id.clone(), roll, confused: !successful };
 
@@ -208,10 +220,13 @@ impl StepUnchannelledFury {
             .publish(StepParameter::EndPlayerAction(true))
     }
 
+    /// Java: `UtilCards.getUnusedSkillWithProperty(ACTING PLAYER, canPerformTwoBlocksAfterFailedFury)`
+    /// — the per-activation used-skill set, matching the mark in `handle_command`.
     fn has_unused_fury_of_blood_god(&self, game: &Game, player_id: &str) -> bool {
         game.player(player_id)
-            .map(|p| p.has_skill(SkillId::FuryOfTheBloodGod) && !p.used_skills.contains(&SkillId::FuryOfTheBloodGod))
+            .map(|p| p.has_skill(SkillId::FuryOfTheBloodGod))
             .unwrap_or(false)
+            && !game.acting_player.used_skills.contains(&SkillId::FuryOfTheBloodGod)
     }
 }
 
@@ -365,6 +380,40 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
     }
 
+    /// The ITER126 bug: `doRoll` read the PERSISTENT `Player.used_skills`, so a Minotaur rolled
+    /// Unchannelled Fury on its first activation and never again for the rest of the game. Java
+    /// checks `UtilCards.hasUnusedSkill(ACTING PLAYER, ...)`
+    /// (`bb2020/UnchannelledFuryBehaviour.java:82`), a set cleared whenever the acting player
+    /// changes, so the roll happens once PER ACTIVATION.
+    ///
+    /// Missing that draw put Rust one die behind Java for the whole rest of the game -- chaos
+    /// bb2020 seed 1 took block dice [5,1] where Java took [1,6], resolving Defender Down instead
+    /// of the Attacker Down that ends the turn.
+    #[test]
+    fn unchannelled_fury_rolls_again_on_the_next_activation() {
+        let mut game = make_game();
+        let pid = add_player_with_skill(&mut game, "p1", SkillId::UnchannelledFury);
+        game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING));
+        game.acting_player.player_action = Some(PlayerAction::Block);
+
+        let mut rng = GameRng::new(0);
+        let before = rng.call_count;
+        StepUnchannelledFury::new("FAIL").start(&mut game, &mut rng);
+        assert!(rng.call_count > before, "first activation must roll the negatrait d6");
+        assert!(game.acting_player.used_skills.contains(&SkillId::UnchannelledFury));
+        assert!(!game.team_home.players.iter().any(|p| p.used_skills.contains(&SkillId::UnchannelledFury)),
+            "the mark must NOT land on the persistent Player");
+
+        // A new activation clears the per-activation set; the skill must roll again.
+        game.acting_player.used_skills.clear();
+        game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING));
+        game.acting_player.player_action = Some(PlayerAction::Block);
+        let before2 = rng.call_count;
+        StepUnchannelledFury::new("FAIL").start(&mut game, &mut rng);
+        assert!(rng.call_count > before2,
+            "second activation must roll again — this is the draw Rust was skipping");
+    }
+
     #[test]
     fn set_parameter_goto_label_on_failure() {
         let mut step = StepUnchannelledFury::default();
@@ -410,8 +459,10 @@ mod tests {
         // AllowSecondBlockAction(true) should be published
         let published = out.published.iter().any(|p| matches!(p, StepParameter::AllowSecondBlockAction(true)));
         assert!(published);
-        // Skill marked used
-        assert!(game.team_home.players[0].used_skills.contains(&SkillId::FuryOfTheBloodGod));
+        // Marked used on the PER-ACTIVATION acting player (Java `actingPlayer.markSkillUsed`),
+        // not the persistent Player — the persistent set would keep it used for the whole game.
+        assert!(game.acting_player.used_skills.contains(&SkillId::FuryOfTheBloodGod));
+        assert!(!game.team_home.players[0].used_skills.contains(&SkillId::FuryOfTheBloodGod));
     }
 
     #[test]
@@ -575,11 +626,9 @@ mod tests {
         }
         game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
         game.acting_player.player_action = Some(PlayerAction::Stab);
-        // Mark UnchannelledFury as already used (roll happened), simulating the
-        // second invocation after the coach declined the re-roll offer.
-        if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == "p1") {
-            p.used_skills.insert(SkillId::UnchannelledFury);
-        }
+        // Mark UnchannelledFury as already used (roll happened), simulating the second invocation
+        // after the coach declined the re-roll offer. Per-activation set, as Java marks it.
+        game.acting_player.used_skills.insert(SkillId::UnchannelledFury);
         let mut step = StepUnchannelledFury::new("FAIL");
         step.re_rolled_action = Some("UNCHANNELLED_FURY".into());
         step.re_roll_source = None; // declined

@@ -360,6 +360,23 @@ pub fn bb2025_rosters() -> Vec<RosterJson> {
 mod tests {
     use super::*;
 
+    /// Diagnostic for ITER126: the BB2020 chaos Minotaur must actually receive Unchannelled Fury.
+    /// Java grants it (the negatrait rolls at rng 25 of chaos seed 1); if Rust does not, Rust skips
+    /// that draw and every later die in the activation shifts by one -- which is exactly how the
+    /// block came out [5,1] in Rust against [1,6] in Java.
+    #[test]
+    fn bb2020_chaos_minotaur_has_unchannelled_fury() {
+        let rosters = bb2020_rosters();
+        let chaos = rosters.iter().find(|r| r.name == "Chaos")
+            .expect("bb2020 chaos roster");
+        let mino_json = chaos.positions.iter().find(|p| p.name.contains("Minotaur"))
+            .expect("chaos Minotaur position");
+        let mino = position_json_to_roster_position(mino_json, "chaos", false, Rules::Bb2020);
+        let ids: Vec<SkillId> = mino.skills.iter().map(|s| s.skill_id).collect();
+        assert!(ids.contains(&SkillId::UnchannelledFury),
+            "Minotaur must have Unchannelled Fury, got {:?}", ids);
+    }
+
     #[test]
     fn bb2020_rosters_load() {
         let rosters = bb2020_rosters();

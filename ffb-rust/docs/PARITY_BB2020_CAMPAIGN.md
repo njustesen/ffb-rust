@@ -6849,3 +6849,75 @@ re-verified by pairing Java `caller=` frames with Rust `FFB_DIE_AT` backtraces b
 Log, for this one block in both engines: the block dice array as stored, the chosen index, the
 resulting `BlockResult`, and the attacker/defender strengths that decide who chooses. That is four
 values and settles it; everything above is inference from state deltas.
+
+## ITER126 -- Unchannelled Fury was marked used for the whole GAME, not the activation
+
+All six reds from ITER124 are green and the branch is ready to merge. One engine bug.
+
+### ITER124's "byte-identical dice" was wrong, and this is the retraction
+
+Rust already emits a `GameEvent::BlockRoll` carrying the dice, the chosen index and `nr_of_dice`, so
+the probe ITER125 asked for was built in all along. For chaos seed 1, block #2:
+
+    attacker home_01  defender away_03  nr_of_dice 2  dice [5, 1]  selected_index 0
+
+Java rolled **[1, 6]** for that same block. The RNG *stream* is identical -- same seed, so position N
+holds the same value in both engines -- but the engines **consume it at different offsets**: Rust's
+block took positions 25-26 where Java's took 26-27. Comparing values at equal positions and
+concluding "identical" is precisely the trap `feedback-parity-dice-comparison` warns about, and
+ITER124 fell into it. The dice were never identical in the sense that mattered.
+
+Java's extra draw at position 25 is the Unchannelled Fury `rollSkill`.
+
+### The bug
+
+`step/mixed/step_unchannelled_fury.rs` read and wrote the **persistent** `Player.used_skills`:
+
+    let do_roll = game.player(&player_id)
+        .map(|p| p.has_skill(UnchannelledFury) && !p.used_skills.contains(&UnchannelledFury))
+
+Java checks `UtilCards.hasUnusedSkill(ACTING PLAYER, skill)` and marks with
+`actingPlayer.markSkillUsed(skill)` (`bb2020/UnchannelledFuryBehaviour.java:82,95`) -- the
+per-activation `ActingPlayer.fUsedSkills`, cleared whenever the acting player changes. Reading the
+persistent set meant a Minotaur rolled Unchannelled Fury on its FIRST activation and never again for
+the rest of the game, so every later activation silently skipped a d6 and Rust ran one draw behind
+Java from that point on.
+
+**This is a known bug class in this codebase, not a new discovery.** `skill_behaviour/bb2025/
+bone_head_behaviour.rs:99` carries a comment describing the identical failure -- "left the skill
+marked forever, skipping every later roll" -- and the campaign notes list the remaining sites as
+latent. Unchannelled Fury was one of them; it only became visible once a BB2020 roster actually
+carried the skill (ITER124).
+
+Fixed all four sites: the `do_roll` check, the Unchannelled Fury mark, and both `FuryOfTheBloodGod`
+sites, which Java also marks on the acting player (`:54`).
+
+### Results
+
+    chaos 0 -> 100    chaos_dwarf 1 -> 100    chaos_pact 0 -> 100
+    norse 1 -> 100    skaven 1 -> 100         slann_fumbbl 0 -> 100
+
+**Two of those are unexplained and are recorded as such.** Neither `roster_skaven.json` nor
+`roster_slann_fumbbl.json` contains Unchannelled Fury (grep: 0 occurrences), and the step returns
+early for any player without the skill, so this fix cannot be what turned them green. The only other
+change between their red measurements and now was the skaven `Animal Savagery` correction, which
+cannot affect slann_fumbbl at all. Both are green under two independent measurements (an individual
+100-seed run and the full matrix), so the current state is solid -- but the transition is not
+understood, and claiming credit for it would be wrong. If either regresses later, start here.
+
+### Gate
+
+Full 30-roster BB2020 matrix **30/30 x 100/100**. Cross-edition, which matters more than usual since
+`step_unchannelled_fury.rs` is a MIXED step shared by every ruleset: **chaos bb2025 100/100** (a
+BB2025 roster that genuinely has Unchannelled Fury), lineman bb2025 100/100, lineman bb2016 100/100.
+ffb-engine 7169/0, workspace clean.
+
+### Tests
+
+- `unchannelled_fury_rolls_again_on_the_next_activation` -- the regression test: asserts the d6 is
+  drawn on a second activation after the per-activation set is cleared, and that the mark does NOT
+  land on the persistent Player.
+- `bb2020_chaos_minotaur_has_unchannelled_fury` (ffb-model) -- pins that the roster fix actually
+  grants the skill, which is what made the engine bug reachable.
+- Two existing tests encoded the old behaviour and were updated to Java's semantics rather than
+  reverted.
