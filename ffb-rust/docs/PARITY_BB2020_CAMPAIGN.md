@@ -6104,3 +6104,40 @@ code.
 * dead bb2020 step files that drift from their Java counterparts;
 * `clear_pushback_stack` set by bb2016 but never consumed by the shared bb2025 `StepPushback`;
 * `ThrowTeamMate` has a PICK_UP in bb2020 that bb2025 lacks (never edition-gated).
+
+## ITER114 (backlog) - the shared bb2025 StepPushback never honoured `clear_pushback_stack`
+
+Backlog item 3, and a real 1:1 gap.
+
+Java a hook that CANCELS a push calls `state.pushbackStack.clear()`, and `state.pushbackStack` is
+the STEP own chain stack, not merely the candidate squares. `bb2016/step_pushback.rs` already
+honoured this through the `clear_pushback_stack` flag. The shared `bb2025/block/step_pushback.rs`
+**declared the field but never read it**, and neither bb2020 nor bb2025 `StandFirmBehaviour` set it -
+they cleared only `pushback_squares`. So a Stand Firm (or Side Step) refusal left an already-chosen
+CHAIN push queued on `self.pushback_stack`.
+
+Now set by both Stand Firm hooks and consumed by the shared step, matching bb2016.
+
+**Reachability, stated honestly:** this can only differ when the pushback stack is NON-EMPTY at the
+moment of refusal - i.e. a chain push where the refusing player is not the first in the chain. That
+is why the 30/30 matrix never caught it, and why this change moves no number. ITER91 noted the same
+thing when it deliberately left the flag alone: "necromantic seed 1 pushed nobody".
+
+No new test: the existing Stand Firm tests build a hook state directly and assert on
+`pushback_squares` / `do_push`, and a test for the chain case would need a full multi-player push
+chain through the real step rather than the hook. Recorded here rather than faked with a shallow
+assertion.
+
+### Gate
+
+| check | result |
+|---|---|
+| `nurgle` bb2020 | 100/100 |
+| `halfling` bb2020 (Treemen, Stand Firm) | 100/100 |
+| `dwarf` bb2020 (Deathroller, Stand Firm) | 100/100 |
+| `cargo test --workspace` | clean (exit 0) |
+
+### Backlog remaining
+
+* dead bb2020 step files that drift from their Java counterparts;
+* `ThrowTeamMate` has a PICK_UP in bb2020 that bb2025 lacks (never edition-gated).

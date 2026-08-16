@@ -146,6 +146,9 @@ impl StepModifierTrait for StandFirmStepModifier {
         //       publish FOLLOWUP_CHOICE(false); publish BALL_KNOCKED_LOSE(false); addReport(AVOID_PUSH)
         state.do_push = true;
         state.pushback_squares.clear();
+        // Java `state.pushbackStack.clear()` empties the step's CHAIN stack too, not only the
+        // candidate squares -- the step honours this via `clear_pushback_stack`.
+        state.clear_pushback_stack = true;
         state.starting_pushback_square = None;
         // Java: `publishParameter(FOLLOWUP_CHOICE, false)` — the push was avoided, so the attacker
         // must NOT follow up (there is no vacated square). Without this the attacker wrongly

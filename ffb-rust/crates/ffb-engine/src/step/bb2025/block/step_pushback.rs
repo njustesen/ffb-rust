@@ -251,6 +251,16 @@ impl StepPushback {
                 // Java: behaviour hooks may `step.publishParameter(...)` (e.g. Stand Firm publishing
                 // FOLLOWUP_CHOICE=false to suppress the attacker's follow-up when the push is avoided).
                 extra_params.append(&mut hook_state.published);
+                // Java: a hook that CANCELS the push calls `state.pushbackStack.clear()` -- and
+                // `state.pushbackStack` IS this step's stack, not just the candidate squares. The
+                // bb2016 `StepPushback` already honours this flag; the shared bb2025 step declared
+                // `clear_pushback_stack` but never read it, so a Stand Firm / Side Step refusal left
+                // an already-chosen CHAIN push queued on `self.pushback_stack`. Only reachable when
+                // the stack is non-empty at refusal time (a chain push), which is why the matrix
+                // never caught it.
+                if hook_state.clear_pushback_stack {
+                    self.pushback_stack.clear();
+                }
                 let final_pushback_squares = hook_state.pushback_squares;
 
                 let pushback_squares_found = !final_pushback_squares.is_empty() || stop_processing;
