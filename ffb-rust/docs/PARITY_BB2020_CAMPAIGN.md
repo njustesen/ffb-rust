@@ -6735,3 +6735,68 @@ after ANY roster change, or the engines disagree), and gate on the full matrix. 
 **change behaviour and possibly break rosters** -- granting five big guys a negatrait they have
 never had, and Claws to two more, will move dice. That is the point: it is the first BB2020 change
 in a long while that can actually be validated end to end.
+
+## ITER124 -- the roster fix lands, and surfaces two real engine bugs (WIP, on a branch)
+
+Applied ITER123's 15 fixes to `data/rosters/bb2020/`, re-ran `gen_java_parity_data.py`,
+`check_skill_names.py` clean. **This is on branch `bb2020-roster-skill-legality`, NOT main** --
+6 rosters are red and main stays green until they are fixed.
+
+### Matrix: 24 green, 6 red
+
+    chaos         0/100     chaos_dwarf   1/100     chaos_pact    0/100
+    norse         1/100     skaven        1/100     slann_fumbbl  0/100
+
+Green despite being changed: nurgle (Plague Ridden x4), necromantic (Claws), high_elf (Safe Pass),
+human (Bone Head), halfling (Hatred dropped). So most of the renames were behaviourally safe.
+
+The reds cluster on exactly two mechanics, **both of which had never executed in a BB2020 parity
+game before this commit**: the Unchannelled Fury / Animal Savagery negatrait (5 rosters) and Bone
+Head on the FUMBBL slann (1).
+
+### A rename of mine that was wrong
+
+`Wild Animal -> Unchannelled Fury` was applied as a blanket rename to all five positions holding it.
+BB2020 does not work that way -- different big guys get different traits. Checked against
+`rules/teams/`:
+
+    Minotaur (chaos, chaos_dwarf, chaos_pact)  Unchannelled Fury   correct
+    Yhetee / snow troll (norse)                Claws + Unch. Fury  correct
+    Rat Ogre (skaven)                          ANIMAL SAVAGERY     WRONG -> corrected
+
+skaven is still 1/100 after the correction, so its divergence is real and not an artifact of the
+bad rename.
+
+**Scope limit worth stating:** there is no in-repo authority for BB2020 position-level rosters --
+`rules/teams/` is BB2025 data and the BB2020 rosters are the bad clone. Every skill NAME is now
+legal in BB2020 (Java is the authority for that), and individual positions were sanity-checked
+against BB2025 where the editions agree, but the full BB2020 team lists are NOT verified.
+
+### chaos seed 1 diagnosed: state-only, not dice
+
+Divergence at i=13, the Minotaur's BLOCK. Java ends the home turn there; Rust plays on with two more
+players.
+
+Dice were the obvious suspect and are **not** the cause. Both streams through the divergence are
+byte-identical:
+
+    pos  22 23 24 25 26 27 28 29 30 31
+         2  4  3  5  1  6  1  2  6  4
+
+with pos 25 the Unchannelled Fury `rollSkill` (=5, a SUCCESS, so the block proceeds normally),
+26-27 the two block dice, 28-29 the armour roll from `StepDropFallingPlayers`. Java's own
+`JAVA_DIE` stream agrees call-for-call (rng 25-29, step 13 consuming exactly 5 calls, 24 -> 29).
+
+So both engines roll the same negatrait, take the same block dice, and drop the same player -- and
+then Java treats it as a **turnover** and Rust does not. That is a state-only divergence, which per
+this campaign's own playbook means diffing the post-step state strings rather than chasing dice.
+
+Blocked there for now: Rust's parity log emits `state: None` and `FFB_TRACE` on the Rust side prints
+`LOOP`/`DRC_DRAW` lines rather than the `JSTEP`-style state string Java produces, so there is
+nothing to diff yet. Next step is to get Rust to emit the state string at the post-step, then diff
+against Java's `h1t11ahome...` / `h1t12aaway...`.
+
+### Not committed to main
+
+The data fix is correct but currently regresses 6 rosters, so it sits on a branch per the standing
+"commit when progress is made without regression" rule. Main remains 30/30.
