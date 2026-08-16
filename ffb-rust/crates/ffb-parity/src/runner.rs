@@ -14,7 +14,7 @@ use ffb_model::model::player::Player;
 use ffb_model::model::roster_position::RosterPosition;
 use ffb_model::model::team::Team;
 use ffb_model::prompts::AgentPrompt;
-use ffb_model::option::game_option_id::{INDUCEMENTS, MAX_PLAYERS_ON_FIELD, MIN_PLAYERS_ON_LOS, MAX_PLAYERS_IN_WIDE_ZONE, MB_STACKS_AGAINST_CHAINSAW};
+use ffb_model::option::game_option_id::{INDUCEMENTS, MAX_PLAYERS_ON_FIELD, MIN_PLAYERS_ON_LOS, MAX_PLAYERS_IN_WIDE_ZONE, MB_STACKS_AGAINST_CHAINSAW, CLAW_DOES_NOT_STACK};
 use crate::log_format::{GameLog, LogLine, java_log_path_for, rust_log_path_for, rust_events_path_for};
 use crate::state_hash::state_hash;
 use ffb_model::util::state_hash::state_string;
@@ -35,6 +35,18 @@ pub const BASELINE_SETUP_OPTIONS: &[(&str, &str)] = &[
     // Java — otherwise a fallen Looney's armour holds (chainsaw-only +3) where Java breaks it
     // (chainsaw +3 + Mighty Blow +2), diverging the dice (goblin seed 99).
     (MB_STACKS_AGAINST_CHAINSAW, "true"),
+    // Same shape, opposite direction. Java's `UtilServerStartGame:247-249` explicitly sets
+    // clawDoesNotStack=false, but Rust never applies its equivalent defaults: the list in
+    // `util_server_start_game.rs` exists and `add_default_game_options` is DEAD CODE, called from
+    // nowhere in any crate. An unset option falls back to the FACTORY default, and this one's
+    // factory default is TRUE, so Rust silently ran with Claws-does-not-stack while Java did not.
+    //
+    // Effect: with Claws AND Mighty Blow on the attacker, Java stacks them (JAVA_AVBROKE
+    // `mods=Claws,Mighty Blow modTotal=1 reduced=8 broken=true` on a roll of 7), while Rust
+    // discarded the stack and kept Claws alone (`mods=[Claws] modTotal=0 broken=false`), leaving
+    // the defender Prone instead of KO'd — necromantic bb2020 seed 65, where a Knuckle Dusters
+    // prayer grants the Claws Werewolf a temporary Mighty Blow (+1).
+    (CLAW_DOES_NOT_STACK, "false"),
 ];
 
 /// Invoke the Java parity runner as a subprocess.

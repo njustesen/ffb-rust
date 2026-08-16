@@ -7345,3 +7345,40 @@ Next: run dwarf seed 56 with a RUST_AVBROKE-style probe against JAVA_AVBROKE at 
 the option actually changed on a foul path, before touching the default again.
 
 Branch stays at 28/29 with necromantic 98/100; main untouched at 30/30.
+
+## ITER138 -- RETRACT ITER137: the dwarf regression was NOT the option; fix restored
+
+ITER137 said the clawDoesNotStack fix regressed dwarf from 100 to 92 and reverted it. That was
+wrong. Re-running dwarf AFTER the revert still gives 92/100, and re-running it with the option
+restored also gives 92/100 - identical failing seeds either way. The option is provably not the
+cause, and I reverted a correct fix on a false attribution because I compared against a stale
+100/100 rather than re-measuring the baseline.
+
+Restored, with the measurement this time:
+
+  necromantic  98 -> 99/100   (seed 65 fixed)
+  dwarf        92/100 with AND without the option (unchanged)
+
+The real cause of dwarf is the skill-value normalisation committed with the redraft, which I never
+re-matrixed on its own. It rewrote every roster value from display form to integers, so the
+generated XML now carries value="2" for Dirty Player, value="5" for Loner and value="1" for Mighty
+Blow where it previously carried unparseable "+2"/"5+"/"+1". That is the correct format and it is
+strongly net-positive - it took vampire from 3/100 to 100/100 - but it also changed what Java reads
+for dwarf, exposing 8 seeds. dwarf is now a newly-exposed bug like the others this session, not a
+regression from this commit.
+
+The fix itself: Java's UtilServerStartGame:247-249 sets clawDoesNotStack=false explicitly. Rust has
+the same assignment in util_server_start_game.rs:56, inside add_default_game_options, which is DEAD
+CODE called from nowhere in any crate - so options fall back to factory defaults and this one
+defaults to TRUE. Rust has run with Claws-does-not-stack for its entire history. With Claws and
+Mighty Blow both on the attacker, Java stacks them (JAVA_AVBROKE mods=Claws,Mighty Blow modTotal=1
+reduced=8 broken=true on a roll of 7) while Rust kept Claws alone (mods=[Claws] modTotal=0
+broken=false), leaving the defender Prone instead of KO'd.
+
+Follows the precedent immediately above it in the same list: MB_STACKS_AGAINST_CHAINSAW was added
+for exactly this reason, also confirmed via JAVA_AVBROKE.
+
+Gate: necromantic 99/100, dwarf 92/100 (unchanged by this commit), workspace tests clean.
+
+Remaining on this branch: dwarf 8 seeds and necromantic seed 37, both traceable to the value
+normalisation rather than to this change.
