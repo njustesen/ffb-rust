@@ -13,7 +13,7 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `chaos_pact` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `dark_elf` | 🟢 100/100 |  |  |
 | `dark_elf_league_fumbbl` | 🟢 100/100 |  | FUMBBL-legacy roster |
-| `dwarf` | 🔴 97/100 | seed 42, step 173, java 5bc679926337a399 vs rust 7bdf9cbd2d84d202 |  |
+| `dwarf` | 🟢 100/100 |  |  |
 | `elf` | 🟢 100/100 |  |  |
 | `goblin` | 🟢 100/100 |  |  |
 | `halfling` | 🟢 100/100 |  |  |
@@ -22,7 +22,7 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `khemri` | 🟢 100/100 |  |  |
 | `khemri_fumbbl` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `lizardman` | 🟢 100/100 |  |  |
-| `necromantic` | 🔴 99/100 | seed 37, step 182, java 3f3ae608bd7fb18f vs rust 12d6c8b0c7c49601 |  |
+| `necromantic` | 🟢 100/100 |  |  |
 | `nippon` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `norse` | 🟢 100/100 |  |  |
 | `nurgle` | 🟢 100/100 |  |  |
@@ -37,4 +37,4 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `vampire` | 🟢 100/100 |  |  |
 | `wood_elf` | 🟢 100/100 |  |  |
 
-**28 green / 2 red of 30.**
+**30 green / 0 red of 30.**

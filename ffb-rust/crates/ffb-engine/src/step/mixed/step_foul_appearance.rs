@@ -149,7 +149,16 @@ impl StepFoulAppearance {
                 // to. Relocating the step cannot fix that (ITER103-110: every variant measured
                 // 0/100, 15/100 or 25/100 against an 86/100 baseline). Reverting the stand-up here
                 // reaches the same END STATE Java reaches, on the same dice.
-                || (game.rules == ffb_model::enums::Rules::Bb2020 && pa.is_blitzing())
+                // ...but ONLY before the blitzer has actually blocked. Frenzy forces a second block,
+                // which re-runs this step; by then the first Foul Appearance roll has already
+                // succeeded and Java has committed the stand-up, so a failure on the SECOND roll
+                // leaves the player Standing (Java falls through to INIT_MOVING and the activation
+                // is deselected). Without the has_blocked guard Rust retroactively undid a stand-up
+                // Java keeps — necromantic seed 37 step 182: FA 4 (pass), block 4 (push), Frenzy FA
+                // 1 (fail), Java h01 Standing vs Rust h01 Prone.
+                || (game.rules == ffb_model::enums::Rules::Bb2020
+                    && pa.is_blitzing()
+                    && !game.acting_player.has_blocked)
             ).unwrap_or(false);
             if set_prone {
                 if let Some(pid) = game.acting_player.player_id.clone() {
@@ -388,6 +397,31 @@ mod tests {
             "a BB2020 blitzer that fails Foul Appearance must end up prone, as it does in Java");
         assert_eq!(run(Rules::Bb2025), PS_STANDING,
             "BB2025 keeps Java's revert list exactly — BLITZ is not in it");
+    }
+
+    /// Frenzy forces a second block, which re-runs this step. By then the FIRST Foul Appearance
+    /// roll has succeeded and Java has committed the stand-up, so a failure on the second roll must
+    /// leave the blitzer Standing. necromantic seed 37 step 182: FA 4 (pass), block 4 (push),
+    /// Frenzy FA 1 (fail) — Java h01 Standing, Rust was reverting it to Prone.
+    #[test]
+    fn bb2020_blitzer_that_has_already_blocked_is_not_reverted_to_prone() {
+        use ffb_model::enums::{PlayerAction, PS_STANDING, Rules};
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        add_player(&mut game, "atk", vec![]);
+        add_player(&mut game, "def", vec![SkillId::FoulAppearance]);
+        game.acting_player.player_id = Some("atk".into());
+        game.acting_player.player_action = Some(PlayerAction::Blitz);
+        game.acting_player.standing_up = true;
+        game.acting_player.has_blocked = true; // the Frenzy re-entry
+        game.field_model.set_player_state("atk", PlayerState::new(PS_STANDING));
+        game.defender_id = Some("def".into());
+        let mut step = StepFoulAppearance::new("fa_fail");
+        step.roll = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.field_model.player_state("atk").unwrap().base(), PS_STANDING);
     }
 
     #[test]
