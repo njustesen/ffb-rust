@@ -17,6 +17,7 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
 use ffb_mechanics::modifiers::injury_modifier::InjuryModifier;
+use ffb_mechanics::modifiers::armor_modifier::ArmorModifier;
 use ffb_mechanics::modifiers::Modifier;
 use crate::injury::{InjuryContext, InjuryTypeServer};
 
@@ -28,6 +29,15 @@ use crate::injury::{InjuryContext, InjuryTypeServer};
 /// `ArmorModifierFactory` results, shared here since Block/Foul/Chainsaw all need it for
 /// `InjuryModifierFactory` results.
 pub fn leak_injury_modifier(m: &dyn InjuryModifier, attacker: Option<&Player>, defender: &Player, rules: ffb_model::enums::Rules) -> Modifier {
+    let name: &'static str = Box::leak(m.get_name().to_owned().into_boxed_str());
+    Modifier::new(name, m.get_modifier(attacker, defender), rules)
+}
+
+/// Armour-side twin of [`leak_injury_modifier`], for `ArmorModifierFactory` results.
+/// Private copies of this function live in `injury_type_bomb_with_modifier.rs` and
+/// `injury_type_bomb_with_modifier_for_spp.rs`; new call sites should use this one rather than
+/// add a fourth (local re-implementations of shared helpers are a recurring defect source here).
+pub fn leak_armor_modifier(m: &dyn ArmorModifier, attacker: Option<&Player>, defender: &Player, rules: ffb_model::enums::Rules) -> Modifier {
     let name: &'static str = Box::leak(m.get_name().to_owned().into_boxed_str());
     Modifier::new(name, m.get_modifier(attacker, defender), rules)
 }

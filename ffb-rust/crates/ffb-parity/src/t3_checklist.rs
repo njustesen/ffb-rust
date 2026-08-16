@@ -76,7 +76,13 @@ fn foul_items(cov: &CoverageReport) -> Vec<Item> {
 /// shared between both checklists.
 fn game_flow_items(cov: &CoverageReport) -> Vec<Item> {
     vec![
-        Item { name: "touchdowns",      count: cov.touchdowns,      required: true,  note: "" },
+        // GENUINELY UNCOVERED, and the only required item that is: across 100 games x 30 rosters
+        // x 3 editions the tier-3 random agent has never scored, so touchdown detection, the score
+        // increment and the post-touchdown kickoff have NEVER been compared between the engines.
+        // Reaching an endzone needs ~10+ squares of directed movement by a ball carrier and the
+        // agent moves at random, so this will not close by adding seeds — it needs a scoring-biased
+        // agent mirrored in ParityRunner.java. Kept required so the gap stays visible.
+        Item { name: "touchdowns",      count: cov.touchdowns,      required: true,  note: "NEVER exercised: the random agent does not score — needs a scoring-biased tier" },
         Item { name: "half starts",     count: cov.half_starts,     required: true,  note: "" },
         Item { name: "weather changes", count: cov.weather_changes, required: false, note: "kickoff event roll of 8 only" },
         Item { name: "kickoff events",  count: cov.kickoff_events.values().sum(), required: true, note: "per-result table below" },
@@ -89,10 +95,15 @@ pub fn lineman_items(cov: &CoverageReport) -> Vec<Item> {
     let mut items = vec![
         // ── Actions (agent-initiated activations) ────────────────────────────
         Item { name: "action Move",         count: act("Move"),         required: true,  note: "" },
-        Item { name: "action StandUp",      count: act("StandUp"),      required: true,  note: "prone player stands (mapped from Move choice)" },
+        // NOT required: unsatisfiable by construction. Both agents map a prone player's stand-up
+        // into a Move (or Blitz) choice, so no activation is ever recorded under these names —
+        // 0 here does NOT mean prone players never stand up, only that the action is not named.
+        // Left required, these two flagged "REQUIRED ITEMS MISSING" on every 100/100 run and
+        // masked the one genuine gap below (touchdowns).
+        Item { name: "action StandUp",      count: act("StandUp"),      required: false, note: "not a distinct action: mapped into the Move choice by both agents" },
         Item { name: "action Block",        count: act("Block"),        required: true,  note: "" },
         Item { name: "action Blitz",        count: act("Blitz"),        required: true,  note: "" },
-        Item { name: "action StandUpBlitz", count: act("StandUpBlitz"), required: true,  note: "prone + adjacent + blitz available" },
+        Item { name: "action StandUpBlitz", count: act("StandUpBlitz"), required: false, note: "not a distinct action: mapped into the Blitz choice by both agents" },
         Item { name: "action Foul",         count: act("Foul"),         required: true,  note: "" },
         Item { name: "action Pass",         count: act("Pass"),         required: true,  note: "needs a ball carrier" },
         Item { name: "action HandOver",     count: act("HandOver"),     required: true,  note: "needs carrier + adjacent teammate" },

@@ -8,14 +8,12 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
 use ffb_model::model::game::Game;
-use ffb_mechanics::modifiers::{
-    foul_assist_armor_modifier, Modifier, ARMOR_CHAINSAW_3, ARMOR_DIRTY_PLAYER_1,
-    ARMOR_DIRTY_PLAYER_2, ARMOR_FOUL,
-};
+use ffb_mechanics::modifiers::{foul_assist_armor_modifier, ARMOR_CHAINSAW_3, ARMOR_FOUL};
 use ffb_mechanics::mechanics::armor_broken_for_rules;
 use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
 use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
-use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury, leak_injury_modifier};
+use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury, leak_injury_modifier, leak_armor_modifier};
+use ffb_mechanics::modifiers::armor_modifier_factory::ArmorModifierFactory;
 
 pub struct InjuryTypeFoul { ctx: InjuryContext, use_chainsaw: bool }
 impl InjuryTypeFoul {
@@ -38,10 +36,6 @@ impl InjuryTypeServer for InjuryTypeFoul {
 }
 impl ModificationAwareInjuryType for InjuryTypeFoul {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
-        // TODO: Java (lines 75-91) additionally re-checks `armorModifierFactory.findArmorModifiers`
-        // (general attacker/defender skill-based armor modifiers, including a "sneaky pair"
-        // affectsEitherArmourOrInjuryWithPartner modifier held back for a second pass) when the
-        // roll above didn't break armor. Not modeled here yet — same known gap as InjuryTypeStab.
         // Add foul-assist armor modifier based on net offensive - defensive assists
         if let Some(aid) = attacker_id {
             let off = UtilPlayer::find_offensive_foul_assists(game, aid, defender_id) as i32;
@@ -84,40 +78,62 @@ impl ModificationAwareInjuryType for InjuryTypeFoul {
             // checks `isArmourBroken` FIRST; only `if (!injuryContext.isArmorBroken())` does it then
             // add the general skill-based armour modifiers (Dirty Player) and re-check.
             do_armor_roll(game, rng, &mut self.ctx, defender_id);
-            // Dirty Player (registered to affectsEitherArmourOrInjuryOnFoul): spend its +1 on the
-            // ARMOUR roll only when the base roll did not already break armour. If it IS spent here it
-            // is mutually excluded from the injury roll (see injury_roll); if the base roll already
-            // broke armour, Dirty Player is left free to boost the injury roll instead. (dwarf seed
-            // 60: base 7 < AV8 -> DP breaks armour, injury 8 stays Thick-Skull Stunned. seed 8: base
-            // roll already breaks AV -> DP boosts the injury roll.)
+            // Java `InjuryTypeFoul.armourRoll:75-91`, ported in full. Only when the base roll did
+            // NOT break armour does Java add the general skill-based armour modifiers and re-check.
+            // The chief one on a foul is Dirty Player (registered to
+            // affectsEitherArmourOrInjuryOnFoul); if it is spent here it is mutually excluded from
+            // the injury roll (see injury_roll), and if the base roll already broke armour it is
+            // left free to boost the injury roll instead. (dwarf seed 60: base 7 < AV8 -> DP breaks
+            // armour, injury 8 stays Thick-Skull Stunned. seed 8: base roll already breaks AV -> DP
+            // boosts the injury roll.) Dirty Player's VALUE comes from the factory, which reads the
+            // attacker's own skill value in bb2020/bb2025 and a static +1 in bb2016 — the dwarf
+            // Deathroller's "Dirty Player (2)" is +2 (`JAVA_AVBROKE ... modTotal=2 broken=true`).
+            //
+            // This replaces a hand-rolled Dirty-Player-only special case that also duplicated the
+            // factory's value logic; the general form additionally covers every other armour
+            // modifier Java would apply on a foul.
             if !self.ctx.armor_broken {
-                if let Some(aid) = attacker_id {
-                    if game.player(aid).map(|p| p.has_skill(SkillId::DirtyPlayer)).unwrap_or(false) {
-                        // Java's DirtyPlayer registers a VariableArmourModifier whose value is the
-                        // attacker's own skill value (`bb2020/DirtyPlayer.java:32` -- the `1` in
-                        // `super(..., 1)` is only the DEFAULT). Hardcoding +1 here understated the
-                        // dwarf Deathroller's "Dirty Player (2)": a foul armour roll of 7 against
-                        // AV9 stayed unbroken where Java reports
-                        // `JAVA_AVBROKE armour=9 reduced=9 roll=[1,6] modTotal=2 mods=Dirty Player broken=true`.
-                        // bb2016 registers a StaticArmourModifier(+1) instead
-                        // (`bb2016/DirtyPlayer.java:31`), so the value only tracks the skill in
-                        // bb2020/bb2025.
-                        let dp = if game.rules == ffb_model::enums::Rules::Bb2016 {
-                            1
-                        } else {
-                            game.player(aid)
-                                .map(|p| p.get_skill_value_int(SkillId::DirtyPlayer, 1))
-                                .unwrap_or(1)
-                        };
-                        self.ctx.add_armor_modifier(match dp {
-                            1 => ARMOR_DIRTY_PLAYER_1,
-                            2 => ARMOR_DIRTY_PLAYER_2,
-                            n => Modifier::new("Dirty Player", n, ffb_model::enums::Rules::Bb2020),
-                        });
-                        if let Some(roll) = self.ctx.armor_roll {
-                            let av = game.player(defender_id)
-                                .map(|p| p.armour_with_modifiers()).unwrap_or(7);
-                            self.ctx.armor_broken = armor_broken_for_rules(av, roll, &self.ctx.armor_modifiers, game.rules);
+                let defender = game.player(defender_id);
+                if let Some(defender) = defender {
+                    let attacker = attacker_id.and_then(|aid| game.player(aid));
+                    let factory = ArmorModifierFactory::new(game.rules);
+                    let mut modifiers =
+                        factory.find_armor_modifiers(game, attacker, defender, false, true);
+
+                    // Java holds back a single "sneaky pair" modifier
+                    // (affectsEitherArmourOrInjuryWithPartner) for a SECOND pass, so it is only
+                    // spent if the others were not enough to break armour. The sole owner is the
+                    // bb2025 special skill `ASneakyPair`, which no drafted roster has — this branch
+                    // is fidelity, not something the parity suites currently reach.
+                    let sneaky_idx = modifiers.iter().position(|m| {
+                        m.is_registered_to_skill_with_property(
+                            NamedProperties::AFFECTS_EITHER_ARMOUR_OR_INJURY_WITH_PARTNER,
+                        )
+                    });
+                    let sneaky = sneaky_idx.map(|i| modifiers.remove(i));
+
+                    let av = defender.armour_with_modifiers();
+                    for m in modifiers {
+                        self.ctx.add_armor_modifier(leak_armor_modifier(
+                            m.as_ref(),
+                            attacker,
+                            defender,
+                            game.rules,
+                        ));
+                    }
+                    if let Some(roll) = self.ctx.armor_roll {
+                        self.ctx.armor_broken = armor_broken_for_rules(
+                            av, roll, &self.ctx.armor_modifiers, game.rules);
+                    }
+
+                    if !self.ctx.armor_broken {
+                        if let Some(sneaky) = sneaky {
+                            self.ctx.add_armor_modifier(leak_armor_modifier(
+                                sneaky.as_ref(), attacker, defender, game.rules));
+                            if let Some(roll) = self.ctx.armor_roll {
+                                self.ctx.armor_broken = armor_broken_for_rules(
+                                    av, roll, &self.ctx.armor_modifiers, game.rules);
+                            }
                         }
                     }
                 }
@@ -162,7 +178,7 @@ impl ModificationAwareInjuryType for InjuryTypeFoul {
 mod tests {
     use super::*;
     use ffb_model::enums::{Rules, SkillId};
-    use ffb_mechanics::modifiers::{ARMOR_DIRTY_PLAYER_1, Modifier};
+    use ffb_mechanics::modifiers::{ARMOR_DIRTY_PLAYER_1, ARMOR_DIRTY_PLAYER_2, Modifier};
 
     /// Real `InjuryModifierFactory`-sourced Dirty Player injury modifier is named "Dirty Player"
     /// (not the pre-Phase-ABJ placeholder constant `INJURY_DIRTY_PLAYER_1` = "Dirty Player +1")
@@ -233,8 +249,72 @@ mod tests {
         let mut t = InjuryTypeFoul::new();
         let mut rng = GameRng::new(1);
         t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
-        assert!(t.ctx.armor_modifiers.contains(&ARMOR_DIRTY_PLAYER_1));
+        // The modifier now comes from ArmorModifierFactory, so it carries Java's own name
+        // ("Dirty Player", per JAVA_AVBROKE `mods=Dirty Player`) rather than the local
+        // "Dirty Player +1" constant. Assert name + value, not constant identity.
+        let dp = t.ctx.armor_modifiers.iter().find(|m| m.name == "Dirty Player");
+        assert!(dp.is_some(), "Dirty Player must be applied to the armour roll");
+        assert_eq!(dp.unwrap().value, 1);
     }
+    /// Java `InjuryTypeFoul.armourRoll:78-91` holds the "sneaky pair" modifier
+    /// (affectsEitherArmourOrInjuryWithPartner) OUT of the first pass and only spends it in a
+    /// second pass if the other modifiers were not enough to break armour. Before the general
+    /// port this file applied a Dirty-Player-only special case, so ASneakyPair could never apply
+    /// at all. It is a bb2025 special skill on no drafted roster, hence untestable via parity —
+    /// these two cases pin the ordering directly.
+    fn sneaky_pair_game(defender_armour: i32) -> Game {
+        use ffb_model::types::FieldCoordinate;
+        let mut home = crate::step::framework::test_team("home", 0);
+        // The modifier is read off the ATTACKER's own skills, and partner_marks_defender then
+        // requires more than one adjacent same-team player to also have it.
+        home.players.push(make_player("attacker", 7, vec![SkillId::DirtyPlayer, SkillId::ASneakyPair]));
+        home.players.push(make_player("mate1", 7, vec![SkillId::ASneakyPair]));
+        home.players.push(make_player("mate2", 7, vec![SkillId::ASneakyPair]));
+        let mut away = crate::step::framework::test_team("away", 0);
+        away.players.push(make_player("defender", defender_armour, vec![]));
+        let mut game = Game::new(home, away, Rules::Bb2025);
+        game.field_model.set_player_coordinate("defender", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_coordinate("attacker", FieldCoordinate::new(4, 4));
+        game.field_model.set_player_coordinate("mate1", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_coordinate("mate2", FieldCoordinate::new(5, 6));
+        // partner_marks_defender counts only adjacent players WITH tackle zones, so the partners
+        // must be standing and active or the sneaky-pair modifier is never produced at all.
+        for id in ["attacker", "mate1", "mate2", "defender"] {
+            game.field_model.set_player_state(
+                id,
+                ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING).change_active(true),
+            );
+        }
+        game
+    }
+
+    #[test]
+    fn sneaky_pair_is_held_back_and_spent_only_on_the_second_pass() {
+        // AV high enough that Dirty Player alone cannot break it, so the second pass must run.
+        let game = sneaky_pair_game(13);
+        let mut t = InjuryTypeFoul::new();
+        let mut rng = GameRng::new(1);
+        t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
+        let names: Vec<&str> = t.ctx.armor_modifiers.iter().map(|m| m.name).collect();
+        // Dirty Player goes on in the first pass; A Sneaky Pair is held back and only added by the
+        // second pass, so it must appear AFTER it. Before the general port it never appeared at all.
+        assert_eq!(names, vec!["Dirty Player", "A Sneaky Pair"],
+            "sneaky pair must be spent last, only after the first pass failed to break armour");
+    }
+
+    #[test]
+    fn sneaky_pair_is_not_spent_when_the_first_pass_already_broke_armour() {
+        // AV 2: the base roll breaks armour outright, so neither pass runs and no skill is spent.
+        let game = sneaky_pair_game(2);
+        let mut t = InjuryTypeFoul::new();
+        let mut rng = GameRng::new(1);
+        t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
+        assert!(t.ctx.armor_broken);
+        let names: Vec<&str> = t.ctx.armor_modifiers.iter().map(|m| m.name).collect();
+        assert!(!names.iter().any(|n| n.contains("Sneaky")),
+            "a sneaky-pair modifier must not be spent once armour is already broken, got {names:?}");
+    }
+
     #[test]
     fn dirty_player_not_added_to_armor_when_base_roll_breaks() {
         // AV 2 is always broken by the base roll; Java does NOT then apply Dirty Player to armour
@@ -274,8 +354,9 @@ mod tests {
         let mut t = InjuryTypeFoul::new();
         let mut rng = GameRng::new(1);
         t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
-        assert!(t.ctx.armor_modifiers.contains(&ARMOR_DIRTY_PLAYER_2));
-        assert!(!t.ctx.armor_modifiers.contains(&ARMOR_DIRTY_PLAYER_1));
+        let dp = t.ctx.armor_modifiers.iter().find(|m| m.name.starts_with("Dirty Player"));
+        assert_eq!(dp.map(|m| m.value), Some(2),
+            "the bonus must be the attacker's own Dirty Player value, not a hardcoded 1");
     }
 
     /// The mutual exclusion must key off the modifier NAME, not the +1 constant: with a Dirty
