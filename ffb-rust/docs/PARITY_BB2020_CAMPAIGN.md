@@ -7194,3 +7194,46 @@ Instrument the JAVA side, debug-gated exactly as `DiceRoller` already is, to pri
 armour, the modifier total and `armorBroken` at the moment of the decision. That is the one value
 neither the dice trace nor static reading can supply, and every remaining hypothesis needs it.
 
+## ITER134 -- necromantic root cause: the Intensive Training prayer skill grant
+
+Found it, and the third pre-existing tool found it. mechanics/mixed/StatsMechanic.java in the LIVE
+tree already carries a JAVA_AVBROKE trace gated behind ffb.parityDebug, which FFB_TRACE=1 already
+sets. For seed 65 it prints the armour decision three times as modifiers accumulate:
+
+  def=Home2 armour=9 reduced=9 roll=[3,4] modTotal=0 mods=                      broken=false
+  def=Home2 armour=9 reduced=8 roll=[3,4] modTotal=0 mods=Claws,                broken=false
+  def=Home2 armour=9 reduced=8 roll=[3,4] modTotal=1 mods=Claws,Mighty Blow,    broken=true
+
+So Java breaks the armour because the attacker has MIGHTY BLOW, worth +1, taking 7 to 8 against the
+Claws-reduced AV of 8. Rust has no such modifier, gets 7 < 8, and never rolls injury.
+
+No Necromantic player has Mighty Blow. Ruled out one by one: the BB2020 rulebook page gives the
+Werewolf exactly Claws, Frenzy, Regeneration at AV9+; the roster JSON matches; the generated
+roster XML matches; the team XML matches and points at the correct rosterId necromantic.bb2020; and
+only the three real MightyBlow skill classes register a modifier by that name. So the skill is
+acquired DURING the game.
+
+It is the Intensive Training Prayer to Nuffle, and Rust's own handler says so in its header:
+
+  "Headless: selects one player and marks the prayer enhancement; SKIPS SKILL-SELECTION DIALOG
+   (position skill categories not available server-side)."
+
+Java's mixed/prayers/IntensiveTrainingHandler shuffles the eligible players, takes the first, builds
+the eligible skills from that player's PRIMARY skill categories sorted by name, shows a
+DialogSelectSkillParameter, and applySelection calls addIntensiveTrainingSkill. Rust selects the
+player and stops. The timing fits exactly - half 2 turn 1, right after the kickoff, where BB2020
+Cheering Fans grants a Prayer to Nuffle.
+
+This also explains why it surfaced only now: the roster redraft changed the game flow enough for
+Cheering Fans to roll Intensive Training in these two seeds.
+
+Two things to settle before fixing, neither guessed at here. Java's Collections.shuffle(players)
+CONSUMES RNG, so Rust must consume identically or the streams part regardless of which skill is
+granted. And the observed grantee is the attacker Away2, a Werewolf whose primary categories are A
+and G, while Mighty Blow is a Strength skill - so either the grant is not restricted to primaries in
+the path taken, or the shuffle picked a different player and the modifier reaches the block another
+way. Both are answerable by tracing the prayer itself.
+
+Ends a run of five disproven hypotheses. Every one of those came from correlating dice values or
+reasoning forward from Java source; all three real findings today came from traces that already
+existed - FFB_DIE_AT, FFB_DICE_DEEP and now JAVA_AVBROKE.
