@@ -7,9 +7,9 @@
   "apothecaries": 0,
   "dedicated_fans": 0,
   "fan_factor": 3,
-  "treasury": 0,
-  "spent": 1100000,
-  "team_value": 1100000,
+  "treasury": 10000,
+  "spent": 1090000,
+  "team_value": 1090000,
   "players": [
     {
       "nr": 1,
