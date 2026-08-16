@@ -6049,3 +6049,58 @@ rewritten around the real trigger rather than weakened.
   `UtilServerStartGame::add_default_game_options`;
 * `clear_pushback_stack` is set by bb2016 but never consumed by the shared bb2025 `StepPushback`;
 * `ThrowTeamMate` has a PICK_UP in bb2020 that bb2025 lacks (never edition-gated).
+
+## ITER113 (backlog) - two prayer options were read under keys that do not exist
+
+Backlog item 2. It turned into a retraction plus a real bug.
+
+### The claimed "MVP_NOMINATIONS vs mvpNominations" mismatch does NOT exist
+
+Checked rather than assumed: `game_option_id.rs:48` defines
+`pub const MVP_NOMINATIONS: &str = "mvpNominations"`, and every reader
+(`bb2016/bb2020/bb2025 step_mvp.rs`) queries `"mvpNominations"`. They agree. **That backlog entry
+was wrong and is withdrawn.**
+
+### `add_default_game_options` is unused, and that is CORRECT
+
+Only its own tests call it. It is a faithful translation of Java
+`UtilServerStartGame.addDefaultGameOptions`, which Java calls in standalone/dev mode - a mode Rust
+does not have yet. The project ground rule is a file-for-file, method-for-method translation, so a
+translated-but-not-yet-called method is the expected state, not dead code to delete. **No change.**
+
+### The real bug the audit found
+
+A mechanical scan of every string literal passed to an `options.get*/set` call against the 127
+constants in `game_option_id.rs` found **two literals matching no key at all**, both in
+`bb2025/start/step_prayers.rs`:
+
+| literal used | real key |
+|---|---|
+| `inducement_prayers_cost` | `inducementPrayersCost` |
+| `inducement_prayers_available_for_underdog` | `inducementPrayersAvailableForUnderdog` |
+
+snake_case instead of camelCase, so **both reads always missed and silently fell back to their
+defaults**: a configured prayer cost had no effect, and the underdog rule could not be turned off.
+Exactly the "invisible until it changes an outcome" class as the Moles prayer (ITER95) and the trap
+doors (ITER98) - nothing crashes, the value is just quietly wrong.
+
+Both now read through the constants, so a future typo is a compile error rather than a silent
+default. Re-running the scan reports all 18 remaining literals matching a defined constant.
+
+Regression test `prayer_options_are_read_under_their_real_keys` pins the key spellings AND asserts
+the option is honoured end-to-end: a 30k TV gap at a configured 10k cost must grant 3 prayers. Before
+the fix the ignored option defaulted to 50k and granted 0, so the test genuinely fails on the old
+code.
+
+### Gate
+
+| check | result |
+|---|---|
+| `lineman` bb2025 | 100/100 |
+| `cargo test --workspace` | clean (exit 0) |
+
+### Backlog remaining
+
+* dead bb2020 step files that drift from their Java counterparts;
+* `clear_pushback_stack` set by bb2016 but never consumed by the shared bb2025 `StepPushback`;
+* `ThrowTeamMate` has a PICK_UP in bb2020 that bb2025 lacks (never edition-gated).

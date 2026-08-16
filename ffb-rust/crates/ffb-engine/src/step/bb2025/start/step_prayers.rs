@@ -7,11 +7,12 @@
 /// Init params (via `set_parameter`): TV_HOME, TV_AWAY, PRAYERS_BOUGHT_HOME, PRAYERS_BOUGHT_AWAY.
 ///
 /// Game options consumed:
-/// - `"inducement_prayers_cost"` (int, default 50000) — TV gap per additional prayer.
-/// - `"inducement_prayers_available_for_underdog"` (bool, default true) — whether the
+/// - `INDUCEMENT_PRAYERS_COST` (int, default 50000) — TV gap per additional prayer.
+/// - `INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG` (bool, default true) — whether the
 ///   TV-underdog team receives free prayers.
 ///
 /// Prayer roll table: rolls 1–16 (BB2025 has exactly 16 prayer entries).
+use ffb_model::option::game_option_id;
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::report::mixed::report_prayer_amount::ReportPrayerAmount;
@@ -46,15 +47,21 @@ impl StepPrayers {
 
     fn execute_step(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: additionalPrayerAmount = |tvAway - tvHome| / INDUCEMENT_PRAYERS_COST
+        // The option KEY is `inducementPrayersCost` (`game_option_id.rs:94`). This read used a
+        // snake_case literal that matches no defined key, so it ALWAYS missed and silently fell back
+        // to the default -- a configured prayer cost had no effect. Use the constant so a typo is a
+        // compile error rather than a silent default.
         let prayers_cost = game.options
-            .get_int("inducement_prayers_cost")
+            .get_int(game_option_id::INDUCEMENT_PRAYERS_COST)
             .unwrap_or(DEFAULT_PRAYERS_COST);
         let cost = if prayers_cost > 0 { prayers_cost } else { DEFAULT_PRAYERS_COST };
         let additional_prayer_amount_raw = (self.tv_away - self.tv_home).abs() / cost;
 
         // Java: addPrayersToUnderdog = game option INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG (default true)
+        // Same defect as above: the key is `inducementPrayersAvailableForUnderdog`
+        // (`game_option_id.rs:97`), so the snake_case literal never matched.
         let add_prayers_to_underdog = game.options
-            .get("inducement_prayers_available_for_underdog")
+            .get(game_option_id::INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG)
             .map(|v| !matches!(v, "false" | "0" | "no"))
             .unwrap_or(true);
 
@@ -221,6 +228,33 @@ mod tests {
     use crate::step::framework::test_team;
     use crate::step::framework::{StepAction, StepParameter};
     use ffb_model::enums::Rules;
+
+    /// The two prayer options were read with snake_case literals
+    /// (`"inducement_prayers_cost"` / `"inducement_prayers_available_for_underdog"`) that match no
+    /// key in `game_option_id.rs`, so both reads always missed and silently used their defaults --
+    /// a configured prayer cost or a disabled underdog rule had no effect at all. Pin the real keys.
+    #[test]
+    fn prayer_options_are_read_under_their_real_keys() {
+        use ffb_model::option::game_option_id as opt;
+        assert_eq!(opt::INDUCEMENT_PRAYERS_COST, "inducementPrayersCost");
+        assert_eq!(opt::INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG,
+                   "inducementPrayersAvailableForUnderdog");
+
+        // A cost set under the real key must actually be honoured: with a 10k cost and a 30k TV gap
+        // the underdog gets 3 extra prayers, where the ignored-option default (50k) would give 0.
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        game.options.set(opt::INDUCEMENT_PRAYERS_COST, "10000");
+        let mut step = StepPrayers::new();
+        step.tv_home = 0;
+        step.tv_away = 30000;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        let prayers = out.pushes.iter().flatten()
+            .filter(|e| e.step_id == StepId::Prayer)
+            .count();
+        assert_eq!(prayers, 3,
+            "a 30k TV gap at a 10k configured cost must grant 3 prayers; got {prayers} \
+             (0 or 1 means the option key was ignored again)");
+    }
 
     fn prayer_roll_from_entry(entry: &SequenceStep) -> i32 {
         entry.params.iter().find_map(|p| if let StepParameter::PrayerRoll(r) = p { Some(*r) } else { None })
