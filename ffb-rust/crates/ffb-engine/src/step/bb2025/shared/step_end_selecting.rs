@@ -338,9 +338,12 @@ impl StepEndSelecting {
                         thrown_player_id: self.thrown_player_id.clone(),
                         is_kicked: self.kicked,
                         target_coordinate: self.target_coordinate,
+                        rules: game.rules,
                     }
                 } else {
-                    ThrowTeamMateParams::default()
+                    // `rules` must be carried here too — the Default is BB2025, which would give a
+                    // BB2020 game the wrong TTM tail.
+                    ThrowTeamMateParams { rules: game.rules, ..Default::default() }
                 };
                 let seq = ThrowTeamMate::build_sequence(&params);
                 StepOutcome::next().push_seq(seq)

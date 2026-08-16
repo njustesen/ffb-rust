@@ -158,7 +158,7 @@ impl StepEndMoving {
                 let jumping = game.acting_player.jumping;
                 change_player_action(game, pid, dispatch_action, jumping);
             }
-            if let Some(seq) = self.push_sequence_for_player_action(dispatch_action) {
+            if let Some(seq) = self.push_sequence_for_player_action(dispatch_action, game.rules) {
                 return StepOutcome::next().push_seq(seq);
             }
         }
@@ -249,7 +249,7 @@ impl StepEndMoving {
                     || action == PlayerAction::HandOver)
                     && !has_ball;
                 if !action.is_moving() && !pass_or_handover_no_ball {
-                    if let Some(seq) = self.push_sequence_for_player_action(action) {
+                    if let Some(seq) = self.push_sequence_for_player_action(action, game.rules) {
                         return StepOutcome::next().push_seq(seq);
                     }
                 }
@@ -331,9 +331,12 @@ impl StepEndMoving {
 
     /// Java: pushSequenceForPlayerAction(pPlayerAction).
     /// Returns the sequence to push, or None if the action isn't handled.
+    /// `rules` is threaded in because the shared BB2025 generators edition-gate a few entries for
+    /// BB2020 (see `throw_team_mate.rs`); Java picks the edition's own generator instead.
     fn push_sequence_for_player_action(
         &self,
         action: PlayerAction,
+        rules: ffb_model::enums::Rules,
     ) -> Option<Vec<crate::step::framework::SequenceStep>> {
         match action {
             // Java: VICIOUS_VINES | BLOCK → Block sequence
@@ -370,6 +373,7 @@ impl StepEndMoving {
                 Some(ThrowTeamMate::build_sequence(&ThrowTeamMateParams {
                     thrown_player_id: self.thrown_player_id.clone(),
                     is_kicked: false,
+                    rules,
                     ..Default::default()
                 }))
             }
@@ -378,6 +382,7 @@ impl StepEndMoving {
                 Some(ThrowTeamMate::build_sequence(&ThrowTeamMateParams {
                     thrown_player_id: self.thrown_player_id.clone(),
                     is_kicked: true,
+                    rules,
                     ..Default::default()
                 }))
             }

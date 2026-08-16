@@ -6141,3 +6141,61 @@ assertion.
 
 * dead bb2020 step files that drift from their Java counterparts;
 * `ThrowTeamMate` has a PICK_UP in bb2020 that bb2025 lacks (never edition-gated).
+
+## ITER115 (backlog) - BB2020 ThrowTeamMate ends the scatter with PICK_UP, not STEADY_FOOTING
+
+Backlog item 4. A real edition difference on a LIVE path, gated.
+
+The two Java TTM generators diverge in their tails:
+
+```
+bb2020  RIGHT_STUFF -> jump APOTHECARY_THROWN_PLAYER -> PICK_UP [END_SCATTER_PLAYER]
+        (failure -> SCATTER_BALL) -> jump END_THROW_TEAM_MATE -> EAT_TEAM_MATE
+        -> APOTHECARY -> CATCH_SCATTER_THROW_IN [SCATTER_BALL] -> RESET_TO_MOVE
+
+bb2025  RIGHT_STUFF -> STEADY_FOOTING (success -> END_SCATTER_PLAYER)
+        -> jump APOTHECARY_THROWN_PLAYER -> EAT_TEAM_MATE -> APOTHECARY
+        -> CATCH_SCATTER_THROW_IN [END_SCATTER_PLAYER] -> RESET_TO_MOVE
+```
+
+Three differences, not one: BB2020 has a PICK_UP where BB2025 has STEADY_FOOTING; the
+END_SCATTER_PLAYER label sits on the PICK_UP rather than on CATCH_SCATTER_THROW_IN; and BB2020 puts
+SCATTER_BALL on CATCH_SCATTER_THROW_IN. Since RIGHT_STUFF jumps to END_SCATTER_PLAYER on success,
+the label placement decides what a landed player actually does -- **a pick-up in BB2020 versus a
+catch/scatter in Rust**.
+
+Edition-gated in the shared generator, with `rules` threaded to all four `ThrowTeamMateParams`
+construction sites (including the two `..Default::default()` ones in `step_end_moving.rs`, whose
+default is BB2025 and would silently give a BB2020 game the wrong tail).
+
+**No score change, and none expected:** ogre and halfling are the TTM rosters and both were already
+100/100. The difference only bites when a thrown player LANDS ON THE BALL SQUARE, which those 200
+seeds never produce.
+
+Regression test `bb2020_ttm_ends_the_scatter_with_pick_up_not_steady_footing` pins all three
+differences in both directions.
+
+### A second difference found while testing, NOT fixed
+
+The first version of that test asserted BB2020 has no STEADY_FOOTING anywhere and FAILED -- the
+shared `ActivationSequenceBuilder` emits one near the top, while `bb2020/ThrowTeamMate.java:29-43`
+spells its activation out by hand WITHOUT a STEADY_FOOTING. That is a separate edition difference in
+the ACTIVATION block, which is shared by many sequences and is currently green across all 30
+rosters. Left alone deliberately; the test was scoped to the tail rather than weakened. **Added to
+the backlog below rather than silently absorbed.**
+
+### Gate
+
+| check | result |
+|---|---|
+| `ogre` bb2020 (TTM) | 100/100 |
+| `halfling` bb2020 (TTM) | 100/100 |
+| `lineman` bb2020 | 100/100 |
+| `lineman` bb2025 | 100/100 |
+| `cargo test --workspace` | clean (exit 0) |
+
+### Backlog remaining
+
+* the shared `ActivationSequenceBuilder` emits STEADY_FOOTING where BB2020 Java has none (found
+  above; touches every activation, so it needs its own iteration and a full-matrix gate);
+* dead bb2020 step files that drift from their Java counterparts.
