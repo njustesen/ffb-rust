@@ -6921,3 +6921,54 @@ ffb-engine 7169/0, workspace clean.
   grants the skill, which is what made the engine bug reachable.
 - Two existing tests encoded the old behaviour and were updated to Java's semantics rather than
   reverted.
+
+## ITER127 -- the BB2020 rosters are BB2016 data, not just BB2016 spellings
+
+ITER123 fixed 15 BB2016 skill SPELLINGS in the BB2020 rosters. This iteration asked whether that was
+the whole of the "legacy clone" problem. It is not.
+
+### Evidence
+
+Comparing every position present in both editions' roster JSON: **90 of 125 shared positions
+differ**, and the differences are not noise. Representative:
+
+    wood_elf:Catcher   bb2020 ma9 ag4 av7      bb2025 ma8 ag2 av8   (+ Sprint in bb2025)
+    wood_elf:Lineman   bb2020 ag4 av7          bb2025 ag2 av8
+    vampire:Thrall     bb2020 av7              bb2025 av8
+
+BB2020's actual Wood Elf Catcher is MA8 ST2 AG2+ PA4+ AV8+. So **the bb2025 numbers ARE the BB2020
+numbers, and the bb2020 numbers are the BB2016/LRB6 ones.** The AG column settles it: BB2016 used
+"higher is better" (AG4), BB2020 switched to a roll-target (AG2+). Our bb2020 rosters store 4, i.e.
+BB2016 semantics, which under BB2020 rules means the engine asks a Wood Elf Catcher for 4+ where the
+rules say 2+.
+
+### Why the matrix never caught it, and cannot
+
+Both engines read the SAME roster JSON. A wrong stat is wrong identically on both sides, so per-step
+state hashes agree and the roster stays 100/100. **Roster fidelity is invisible to the parity
+harness by construction** -- it can only catch engine disagreement, never bad shared input. The
+30/30 says the two engines agree about a BB2016 team playing under BB2020 rules.
+
+### Scope of the real problem
+
+Three layers, of which ITER123 fixed only the first:
+
+1. **Skill spellings** -- 15 found, fixed, and the checker now covers bb2020 (ITER123).
+2. **Stats and skill lists** -- 90 of 125 shared positions carry BB2016 values.
+3. **The team list itself** -- `rules/teams/` holds the 30 modern (BB2020/BB2025) teams including
+   Black Orc, Gnome, Imperial Nobility, Khorne, Old World Alliance and Snotling. Our roster set is
+   the BB2016 race list (nippon, slann, chaos_pact, the `*_fumbbl` variants) and has none of them.
+   That is the actual reason Brawler is unreachable: BB2020 puts it on the Black Orc Blocker, and we
+   have no Black Orc team. 105 of 164 BB2020-legal skills are granted by no bb2020 roster at all.
+
+### Recommendation, not started
+
+Derive the bb2020 rosters from the bb2025 ones -- which CLAUDE.md records as audited against the
+official team pages -- then BB2020-legalise them by replacing or dropping any skill that
+`check_skill_names.py` rejects for BB2020. That gets layers 2 and 3 in one pass and reuses an
+already-audited source rather than inventing data.
+
+It is a large change and should be treated as such: every bb2020 game's dice change, so the whole
+matrix goes red until re-greened, and it will surface engine bugs the way ITER124 did. Worth doing
+for exactly that reason, but it is a multi-iteration effort and a scope decision, so it is recorded
+here rather than begun.
