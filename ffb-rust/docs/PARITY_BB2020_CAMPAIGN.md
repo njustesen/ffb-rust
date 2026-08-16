@@ -6474,3 +6474,67 @@ The activation blocks now agree, which is the shared prerequisite behind the gen
 Next on the roadmap, working the list in `PARITY_BB2020_STRUCTURAL_GAP.md`: the per-generator
 differences that remain once the activation is factored out -- `Block.java` (0.58), `Move.java`
 (0.58), `BlitzBlock.java` (0.67), `Select.java` (0.70), `Foul.java` (0.73).
+
+## ITER120 -- the Move sequence's non-STEADY_FOOTING differences
+
+With the activation block aligned (ITER119), `generator/bb2020/Move.java` still differs from the
+BB2025 twin in three ways. All three are now edition-gated in the shared generator.
+
+1. **No FOUL_APPEARANCE and no DUMP_OFF.** BB2020's Move goes straight from the activation's
+   BLOOD_LUST to HYPNOTIC_GAZE (`bb2020/Move.java:44`). BB2020 resolves both on the BLITZ paths
+   instead (`bb2020/SelectBlitzTarget.java:34-35`) -- the same edition split ITER110 hit from the
+   other side when it fixed nurgle.
+2. **No PLACE_BALL after FALL_DOWN.** BB2020 goes FALL_DOWN -> APOTHECARY(DEFENDER) directly.
+3. **END_MOVING takes no parameters.** The BLOOD_LUST_ACTION hand-off is a BB2025 addition.
+
+### On (1) being behaviourally inert, and why that was worth checking
+
+Rust was running a FOUL_APPEARANCE step on every BB2020 move that Java never runs, and Foul
+Appearance ROLLS A DIE -- so on the face of it this should have desynced every nurgle move and it
+did not (nurgle bb2020 has been 100/100 throughout). The explanation is that `StepFoulAppearance`
+only acts for block-type player actions, so on a plain Move it returns without rolling. The 30/30
+gate below confirms it: removing the step moved nothing.
+
+That is the good outcome, but the reasoning had to be checked rather than assumed -- a live step
+that draws dice sitting in a sequence Java does not have is exactly the shape that produces a
+silent divergence on some roster nobody has run yet.
+
+### Gate
+
+Full 30-roster BB2020 matrix **30/30 x `PARITY: 100/100`**, no exceptions. lineman bb2025 100/100,
+lineman bb2016 100/100, and nurgle bb2025 100/100 as a targeted check that the untouched edition's
+Foul Appearance path still behaves. ffb-engine 7168/0, workspace clean.
+
+### Test
+
+`bb2020_move_omits_foul_appearance_dump_off_place_ball_and_blood_lust_action` pins all three in
+both directions. Its first version asserted BB2020 has NO PlaceBall anywhere and failed -- the
+activation block legitimately contains one. Tightened to exact counts (BB2020 1, BB2025 2) rather
+than weakened; same trap as the ITER115 TTM test, which is now twice-seen and worth remembering:
+**when asserting a step is absent, scope it, because the activation block re-uses several of the
+same StepIds.**
+
+### The big remaining item, and why it is NOT decomposable
+
+Converting the move/blitz STEADY_FOOTING steps is the last structural piece here, and it cannot be
+done sequence-by-sequence. The publishers are SHARED STEPS -- `bb2025/move_/step_go_for_it.rs`,
+`step_jump.rs`, `step_move_dodge.rs`, `block/step_block_chainsaw.rs` -- each used by many
+sequences, and none of them currently edition-gates its publish (unlike `step_animal_savagery.rs`,
+which does). Gate a publisher for BB2020 and EVERY BB2020 sequence containing a STEADY_FOOTING must
+convert in the same commit, or the contexts strand and players stop falling.
+
+Scope of that atomic change: 4+ publisher steps, and the ~12 generators holding a STEADY_FOOTING --
+`blitz_block` (6 of them), `block` (6), `blitz_move` (3), `move_` (3), plus `end_turn`,
+`scatter_player`, `special_effect`, `then_i_started_blastin`, `throw_a_rock`, `throw_keg`,
+`throw_team_mate`. In BB2020 Java each of those failure gotos points straight at FALL_DOWN instead.
+
+Expected behavioural delta: **none.** The BB2025 chain (fall -> SteadyFootingContext ->
+StepSteadyFooting -> on failure publishes InjuryTypeName -> FALL_DOWN) collapses to BB2020's direct
+(fall -> InjuryTypeName -> FALL_DOWN) whenever no player has Steady Footing, and Steady Footing is
+a BB2025-only skill. The shared `bb2025/move_/step_fall_down.rs:49` already consumes InjuryTypeName,
+and bb2016 already works exactly this way (`bb2016/move_/step_go_for_it.rs:243`), so the target
+mechanism is proven.
+
+So it is a large atomic change to the hottest path in the engine for zero expected behavioural
+change. Worth doing for fidelity, but it needs its own iteration, and it must land as one commit
+with a full-matrix gate -- not incrementally.

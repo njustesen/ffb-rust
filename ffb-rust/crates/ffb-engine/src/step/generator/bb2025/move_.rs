@@ -60,12 +60,16 @@ impl Move {
             .prevent_null_defender()
             .add_to(&mut seq);
 
-        // 16 FOUL_APPEARANCE
-        seq.add(StepId::FoulAppearance, vec![
-            StepParameter::GotoLabelOnFailure(fl.into()),
-        ]);
-        // 17 DUMP_OFF
-        seq.add(StepId::DumpOff, vec![]);
+        // 16 FOUL_APPEARANCE + 17 DUMP_OFF -- BB2025 ONLY.
+        // `generator/bb2020/Move.java:44` goes straight from the activation's BLOOD_LUST to
+        // HYPNOTIC_GAZE: BB2020 resolves Foul Appearance and Dump Off on the BLITZ paths
+        // (`bb2020/SelectBlitzTarget.java:34-35`), never on a plain Move.
+        if params.rules != ffb_model::enums::Rules::Bb2020 {
+            seq.add(StepId::FoulAppearance, vec![
+                StepParameter::GotoLabelOnFailure(fl.into()),
+            ]);
+            seq.add(StepId::DumpOff, vec![]);
+        }
         // 18 HYPNOTIC_GAZE [HYPNOTIC_GAZE]
         seq.add_labelled(StepId::HypnoticGaze, labels::HYPNOTIC_GAZE, vec![
             StepParameter::GotoLabelOnEnd(fl.into()),
@@ -140,8 +144,11 @@ impl Move {
         seq.add(StepId::Shadowing, vec![]);
         // 38 FALL_DOWN
         seq.add(StepId::FallDown, vec![]);
-        // 39 PLACE_BALL
-        seq.add(StepId::PlaceBall, vec![]);
+        // 39 PLACE_BALL -- BB2025 ONLY. `generator/bb2020/Move.java:65-66` goes straight from
+        // FALL_DOWN to APOTHECARY(DEFENDER).
+        if params.rules != ffb_model::enums::Rules::Bb2020 {
+            seq.add(StepId::PlaceBall, vec![]);
+        }
         // 40 APOTHECARY (DEFENDER)
         seq.add(StepId::Apothecary, vec![
             StepParameter::ApothecaryMode(ApothecaryMode::Defender),
@@ -159,9 +166,13 @@ impl Move {
         // 44 CATCH_SCATTER_THROW_IN
         seq.add(StepId::CatchScatterThrowIn, vec![]);
         // 45 END_MOVING [END_MOVING]
+        // BB2020's END_MOVING takes no parameters (`generator/bb2020/Move.java:73`); the
+        // BLOOD_LUST_ACTION hand-off is a BB2025 addition.
         let mut end_params = vec![];
-        if let Some(action) = params.bloodlust_action {
-            end_params.push(StepParameter::BloodLustAction(Some(action)));
+        if params.rules != ffb_model::enums::Rules::Bb2020 {
+            if let Some(action) = params.bloodlust_action {
+                end_params.push(StepParameter::BloodLustAction(Some(action)));
+            }
         }
         seq.add_labelled(StepId::EndMoving, fl, end_params);
 
@@ -248,5 +259,36 @@ mod tests {
     fn move_has_two_gfi_steps() {
         let steps = Move::build_sequence(&MoveParams::default());
         assert_eq!(steps.iter().filter(|s| s.step_id == StepId::GoForIt).count(), 2);
+    }
+
+    /// `generator/bb2020/Move.java` differs from the BB2025 twin in more than the activation
+    /// block: a plain BB2020 Move has no FOUL_APPEARANCE and no DUMP_OFF (BB2020 resolves both on
+    /// the blitz paths, `bb2020/SelectBlitzTarget.java:34-35`), no PLACE_BALL after FALL_DOWN, and
+    /// its END_MOVING takes no BLOOD_LUST_ACTION.
+    #[test]
+    fn bb2020_move_omits_foul_appearance_dump_off_place_ball_and_blood_lust_action() {
+        use ffb_model::enums::{PlayerAction, Rules};
+        let bb2020 = Move::build_sequence(&MoveParams {
+            rules: Rules::Bb2020,
+            bloodlust_action: Some(PlayerAction::Move),
+            ..Default::default()
+        });
+        assert!(!bb2020.iter().any(|s| s.step_id == StepId::FoulAppearance));
+        assert!(!bb2020.iter().any(|s| s.step_id == StepId::DumpOff));
+        // Exactly one PLACE_BALL, the activation's. BB2025 adds a second after FALL_DOWN.
+        assert_eq!(bb2020.iter().filter(|s| s.step_id == StepId::PlaceBall).count(), 1);
+        let end = bb2020.iter().find(|s| s.step_id == StepId::EndMoving).unwrap();
+        assert!(end.params.is_empty(), "BB2020 END_MOVING takes no parameters");
+
+        // BB2025 keeps all four.
+        let bb2025 = Move::build_sequence(&MoveParams {
+            bloodlust_action: Some(PlayerAction::Move),
+            ..Default::default()
+        });
+        assert!(bb2025.iter().any(|s| s.step_id == StepId::FoulAppearance));
+        assert!(bb2025.iter().any(|s| s.step_id == StepId::DumpOff));
+        assert_eq!(bb2025.iter().filter(|s| s.step_id == StepId::PlaceBall).count(), 2);
+        let end25 = bb2025.iter().find(|s| s.step_id == StepId::EndMoving).unwrap();
+        assert!(end25.params.iter().any(|p| matches!(p, StepParameter::BloodLustAction(Some(_)))));
     }
 }
