@@ -32,6 +32,10 @@ LEGACY = {
                "khemri_fumbbl", "slann_fumbbl", "lineman"},
     "bb2016": {"nippon", "renegades", "dark_elf_league_fumbbl", "khemri_fumbbl",
                "slann_fumbbl", "lineman"},
+    # bb2020 draws the same non-official rosters as bb2025 (the FUMBBL imports and the
+    # synthetic lineman team have no official BB2020 team page to audit against).
+    "bb2020": {"nippon", "slann", "chaos_pact", "dark_elf_league_fumbbl",
+               "khemri_fumbbl", "slann_fumbbl", "lineman"},
 }
 
 
@@ -57,7 +61,7 @@ def run_one(key: str, edition: str, seeds: str) -> dict:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--edition", required=True, choices=["bb2016", "bb2025"])
+    ap.add_argument("--edition", required=True, choices=["bb2016", "bb2020", "bb2025"])
     ap.add_argument("--seeds", default="1-100")
     ap.add_argument("--parallel", type=int, default=6)
     ap.add_argument("--only", default=None)
