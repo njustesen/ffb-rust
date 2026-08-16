@@ -1,5 +1,22 @@
-"""Download BB2025 ruleset from bloodbowlbase.ru to local markdown files."""
+"""Download a Blood Bowl ruleset from bloodbowlbase.ru to local markdown files.
 
+    python scripts/download_rules.py                 # BB2025 (default)
+    python scripts/download_rules.py --edition bb2020
+    python scripts/download_rules.py --edition bb2020 --only teams
+
+Output layout:
+    BB2025  rules/core_rules/, rules/teams/, rules/star_players/      (historical, kept in place)
+    others  rules/<edition>/core_rules/, .../teams/, .../star_players/
+
+BB2025 keeps the flat layout because `scripts/audit_rosters.py`, CLAUDE.md and the drafting docs
+all reference `rules/teams/*.md` directly. Newer editions are namespaced so the three can coexist.
+
+Section and team slugs are discovered from the edition's index page rather than hardcoded — the
+two editions do not share slugs (BB2025 has `game_essentials`, BB2020 has `the_rules_of_blood_bowl`).
+"""
+
+import argparse
+import collections
 import re
 import time
 from pathlib import Path
@@ -8,26 +25,25 @@ import html2text
 import requests
 from bs4 import BeautifulSoup
 
-BASE_URL = "https://bloodbowlbase.ru/bb2025/"
-OUT_DIR = Path(__file__).parent.parent / "rules"
+SITE = "https://bloodbowlbase.ru/"
+OUT_ROOT = Path(__file__).parent.parent / "rules"
 
-CORE_SECTIONS = [
-    ("01", "game_essentials"),
-    ("02", "rules_and_regulations"),
-    ("03", "the_game_of_blood_bowl"),
-    ("04", "drafting_a_blood_bowl_team"),
-    ("05", "league_play"),
-    ("06", "matched_play"),
-    ("07", "exhibition_play"),
-    ("08", "skills_and_traits"),
-    ("09", "inducements"),
-    ("10", "the_teams"),
-    ("11", "latest_faq"),
+# BB2025 shipped with a curated order; keep it so filenames stay stable for existing references.
+BB2025_CORE_ORDER = [
+    "game_essentials", "rules_and_regulations", "the_game_of_blood_bowl",
+    "drafting_a_blood_bowl_team", "league_play", "matched_play", "exhibition_play",
+    "skills_and_traits", "inducements", "the_teams", "latest_faq",
 ]
+# BB2020's chapters, in rulebook order (the index lists them alphabetically).
+BB2020_CORE_ORDER = [
+    "the_rules_of_blood_bowl", "rules_and_regulations", "skills_and_traits",
+    "the_teams", "inducements_in_detail", "special_plays_card_pack",
+    "league_and_exhibition_play", "post-game_sequence", "blood_bowl_stadia",
+    "cheat_sheet", "faq_290525",
+]
+CORE_ORDER = {"bb2025": BB2025_CORE_ORDER, "bb2020": BB2020_CORE_ORDER}
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; ffb-rust-rules-downloader/1.0)"
-}
+HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; ffb-rust-rules-downloader/1.0)"}
 
 
 def fetch(url: str) -> BeautifulSoup:
@@ -37,15 +53,12 @@ def fetch(url: str) -> BeautifulSoup:
 
 
 def extract_main(soup: BeautifulSoup) -> str:
-    # Try common content containers in order of preference
     for selector in ["main", "article", ".content", ".page-content", "#content"]:
         el = soup.select_one(selector)
         if el:
-            # Remove nav/sidebar elements inside main if any
             for tag in el.select("nav, .sidebar, .menu, aside"):
                 tag.decompose()
             return str(el)
-    # Fallback: body without header/footer/nav
     body = soup.find("body")
     if body:
         for tag in body.select("header, footer, nav, .sidebar, .menu, aside"):
@@ -61,123 +74,75 @@ def to_markdown(html: str, source_url: str) -> str:
     h.ignore_images = True
     h.ignore_tables = False
     md = h.handle(html)
-    # Clean up excessive blank lines
     md = re.sub(r"\n{3,}", "\n\n", md)
     return f"<!-- source: {source_url} -->\n\n" + md.strip() + "\n"
 
 
-def download_core_rules():
-    dest = OUT_DIR / "core_rules"
-    dest.mkdir(parents=True, exist_ok=True)
-    for num, slug in CORE_SECTIONS:
-        url = f"{BASE_URL}core_rules/{slug}/"
-        print(f"  Fetching {url}")
-        soup = fetch(url)
-        html = extract_main(soup)
-        md = to_markdown(html, url)
-        outfile = dest / f"{num}_{slug}.md"
-        outfile.write_text(md, encoding="utf-8")
-        print(f"    -> {outfile} ({len(md):,} chars)")
-        time.sleep(0.5)
-
-
-def get_star_player_slugs() -> list[str]:
-    url = f"{BASE_URL}starplayers/"
-    soup = fetch(url)
-    slugs = []
+def discover(base_url: str) -> dict[str, list[str]]:
+    """section -> slugs, read off the edition's index page."""
+    soup = fetch(base_url)
+    found = collections.defaultdict(set)
     for a in soup.find_all("a", href=True):
-        href = a["href"]
-        # Match relative links like "Griff_Oberwald/" or absolute with starplayers
-        if re.match(r"^[A-Z][A-Za-z0-9_%'.-]+/$", href):
-            slug = href.rstrip("/")
-            if slug not in slugs:
-                slugs.append(slug)
-        elif "starplayers/" in href:
-            m = re.search(r"starplayers/([^/]+)/?$", href)
-            if m:
-                slug = m.group(1)
-                if slug not in slugs:
-                    slugs.append(slug)
-    return slugs
+        href = a["href"].replace("../", "").strip()
+        m = re.match(r"^(?:/[a-z0-9]+/)?(core_rules|teams|starplayers)/([A-Za-z0-9_%'.\-]+)/?$", href)
+        if m:
+            found[m.group(1)].add(m.group(2))
+    return {k: sorted(v) for k, v in found.items()}
 
 
-def download_star_players():
-    dest = OUT_DIR / "star_players"
-    dest.mkdir(parents=True, exist_ok=True)
-    print("  Fetching star player index...")
-    slugs = get_star_player_slugs()
-    print(f"  Found {len(slugs)} star players")
-    for slug in slugs:
-        url = f"{BASE_URL}starplayers/{slug}/"
-        print(f"  Fetching {url}")
-        try:
-            soup = fetch(url)
-            html = extract_main(soup)
-            md = to_markdown(html, url)
-            outfile = dest / f"{slug}.md"
-            outfile.write_text(md, encoding="utf-8")
-            print(f"    -> {outfile} ({len(md):,} chars)")
-        except Exception as e:
-            print(f"    ERROR: {e}")
-        time.sleep(0.5)
+def save(url: str, outfile: Path) -> bool:
+    try:
+        md = to_markdown(extract_main(fetch(url)), url)
+    except Exception as exc:                                   # noqa: BLE001
+        print(f"    ERROR {url}: {exc}")
+        return False
+    outfile.parent.mkdir(parents=True, exist_ok=True)
+    outfile.write_text(md, encoding="utf-8")
+    print(f"    -> {outfile.relative_to(OUT_ROOT.parent)} ({len(md):,} chars)")
+    return True
 
 
-def get_team_slugs() -> list[str]:
-    """Team page slugs, parsed from the already-downloaded the_teams chapter."""
-    teams_md = OUT_DIR / "core_rules" / "10_the_teams.md"
-    slugs: list[str] = []
-    if teams_md.exists():
-        text = teams_md.read_text(encoding="utf-8")
-        for m in re.finditer(r"\.\./\.\./teams/([A-Za-z0-9_]+)/", text):
-            slug = m.group(1)
-            if slug not in slugs:
-                slugs.append(slug)
-    if not slugs:
-        # Fallback: scrape the teams index page
-        soup = fetch(f"{BASE_URL}teams/")
-        for a in soup.find_all("a", href=True):
-            m = re.search(r"teams/([A-Za-z0-9_]+)/?$", a["href"])
-            if m and m.group(1) not in slugs:
-                slugs.append(m.group(1))
-    return sorted(slugs)
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--edition", default="bb2025", choices=["bb2025", "bb2020"])
+    ap.add_argument("--only", default="all", choices=["all", "core", "teams", "stars"])
+    ap.add_argument("--delay", type=float, default=0.5)
+    args = ap.parse_args()
 
+    base = f"{SITE}{args.edition}/"
+    dest = OUT_ROOT if args.edition == "bb2025" else OUT_ROOT / args.edition
+    print(f"Downloading {args.edition} from {base}\n  into {dest}")
 
-def download_teams():
-    dest = OUT_DIR / "teams"
-    dest.mkdir(parents=True, exist_ok=True)
-    slugs = get_team_slugs()
-    print(f"  Found {len(slugs)} team pages")
-    for slug in slugs:
-        url = f"{BASE_URL}teams/{slug}/"
-        print(f"  Fetching {url}")
-        try:
-            soup = fetch(url)
-            html = extract_main(soup)
-            md = to_markdown(html, url)
-            outfile = dest / f"{slug}.md"
-            outfile.write_text(md, encoding="utf-8")
-            print(f"    -> {outfile} ({len(md):,} chars)")
-        except Exception as e:
-            print(f"    ERROR: {e}")
-        time.sleep(0.5)
+    idx = discover(base)
+    print(f"  index: " + ", ".join(f"{k} {len(v)}" for k, v in sorted(idx.items())))
 
+    if args.only in ("all", "core"):
+        slugs = idx.get("core_rules", [])
+        order = CORE_ORDER.get(args.edition, [])
+        # keep the rulebook order where known, append anything new the site has added
+        ordered = [s for s in order if s in slugs] + [s for s in slugs if s not in order]
+        print(f"\ncore_rules ({len(ordered)})")
+        for i, slug in enumerate(ordered, 1):
+            save(f"{base}core_rules/{slug}/", dest / "core_rules" / f"{i:02d}_{slug}.md")
+            time.sleep(args.delay)
 
-def main():
-    import sys
+    if args.only in ("all", "teams"):
+        slugs = idx.get("teams", [])
+        print(f"\nteams ({len(slugs)}) — one file per roster")
+        for slug in slugs:
+            save(f"{base}teams/{slug}/", dest / "teams" / f"{slug}.md")
+            time.sleep(args.delay)
 
-    if "--teams-only" in sys.argv:
-        print("=== Downloading BB2025 Team Rosters ===")
-        download_teams()
-        print("\nDone.")
-        return
-    print("=== Downloading BB2025 Core Rules ===")
-    download_core_rules()
-    print("\n=== Downloading Star Players ===")
-    download_star_players()
-    print("\n=== Downloading BB2025 Team Rosters ===")
-    download_teams()
-    print("\nDone.")
+    if args.only in ("all", "stars"):
+        slugs = idx.get("starplayers", [])
+        print(f"\nstar_players ({len(slugs)})")
+        for slug in slugs:
+            save(f"{base}starplayers/{slug}/", dest / "star_players" / f"{slug}.md")
+            time.sleep(args.delay)
+
+    print("\ndone")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
