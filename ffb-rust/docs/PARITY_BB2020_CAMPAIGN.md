@@ -6602,3 +6602,69 @@ dedicated iteration and a full-matrix gate -- and it is legitimately lower prior
 remaining difference that could actually bite. ITER120's FOUL_APPEARANCE was that shape (a live
 dice-rolling step in a sequence Java lacks) and turned out inert; the audit above says the BB2020
 twins are ready whenever this is picked up.
+
+## ITER122 -- reachability: why the remaining structural work cannot be validated
+
+Three iterations in a row (119, 120, 121) landed structural fixes that moved the score by exactly
+zero, each time for the same underlying reason. This iteration went looking for that reason instead
+of landing a fourth, because it decides what the rest of this goal is worth.
+
+### The finding
+
+**BB2020 is 30/30 not because the engine is faithful, but partly because the BB2020 parity teams do
+not carry the skills that distinguish the two editions.** Skill presence across
+`data/rosters/bb2020/`:
+
+    Brawler          0      Bone Head        6
+    Steady Footing   0      Really Stupid    6
+    Chomp            0      Right Stuff      7
+    Blood Lust       0*     Animal Savagery  2
+    Hatred           1      Take Root        2
+    Pro              1      Foul Appearance  1
+                            Ball and Chain   1
+    (* spelling not confirmed; vampire is in the matrix)
+
+The zero rows are exactly the features behind the differences that keep turning out inert:
+
+- **Steady Footing 0** -> the whole STEADY_FOOTING detour collapses to BB2020's direct route in
+  every BB2020 game (ITER119, ITER121).
+- **Brawler 0, Chomp 0** -> `StepBlockRoll` differs substantially between the editions (sim 0.52:
+  BB2020 has `brawlerIndex` / `reRolledDiceIndexes` / `DialogBlockRollPartialReRollParameter`,
+  BB2025 has Hatred, `RollMechanic`, `DialogBlockRollPropertiesParameter`) and **none of it is
+  reachable**.
+
+And a third shape, found the same way: `StepPickUp` (sim 0.82) carries BB2025's `secureTheBall`,
+`optionalPickUp`, `attemptPickUp` and `PLAYER_ON_BALL_ID` with **no `game.rules` gate at all** in
+the Rust shared step -- yet it is harmless, because `secure_the_ball` keys off the BB2025-only
+`PlayerAction::SecureTheBall` and the other two are only ever published by BB2025 generators. Inert
+by DATA, not by design.
+
+### What this means
+
+The 30-roster x 100-seed BB2020 suite **cannot validate structural fidelity work.** It can only
+prove no regression. That is a real but limited bar, and it will stay that way for every remaining
+item on `PARITY_BB2020_STRUCTURAL_GAP.md` whose difference is keyed on a skill or game option the
+BB2020 teams do not have.
+
+Worth being blunt about the consequence: continuing to grind the roadmap produces commits that are
+correct, well-tested at unit level, and **unverifiable end-to-end**. That is not worthless -- it
+removes latent traps for future rosters and future edition changes, and ITER118's CHECK_STALLING
+was a genuine "BB2020 never ran this step" bug -- but it is a different proposition from the first
+118 iterations, which were fixing measurable failures.
+
+### Options from here (a goal-level choice, surfaced not taken)
+
+1. **Make the work verifiable first** -- draft BB2020 parity teams that actually carry Brawler,
+   Steady Footing, Chomp, Blood Lust etc., so the differentiating paths execute. This turns the
+   remaining roadmap from unverifiable into testable, and would likely surface real divergences
+   immediately. Costs a team-drafting pass (`docs/TEAM_DRAFTS_*.md`, `scripts/gen_java_parity_data.py`).
+2. **Widen the net instead** -- more seeds / cross-team matchups on the existing teams, which finds
+   real divergences in the paths that ARE reachable.
+3. **Continue structural alignment as pure fidelity work**, accepting no-regression as the bar and
+   the atomic delegation (ITER121) as the finish line.
+
+Recommendation: (1) before finishing the roadmap, because it converts the remaining work from
+faith-based to measured, and because a BB2020 team with Steady Footing would immediately tell us
+whether the ITER121 atomic change is genuinely inert or merely untested.
+
+No engine change this iteration -- the finding is the deliverable.
