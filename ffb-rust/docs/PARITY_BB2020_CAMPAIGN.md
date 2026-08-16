@@ -7098,3 +7098,21 @@ taken before the block resolved -- note Java captures `attackerState` at the TOP
 candidate.
 
 Still on branch `bb2020-roster-redraft`; 28/29, main untouched at 30/30.
+
+### ITER131 -- the flag is set upstream, not in this step
+
+Checked the obvious fix first and ruled it out: Java reads `attackerState` at the top of the hook
+(`PilingOnBehaviour.java:59`) and Rust reads it just before the injury call, but nothing between
+those two points touches the ATTACKER -- the intervening mutations are all on the defender (rooted
+clear, HIT_ON_GROUND -> FALLING) plus `drop_player_rng(defender)`. So snapshotting earlier in
+`step_drop_falling_players.rs` would be a no-op, and the difference is real: by the time this step
+runs, Rust has the attacker FALLING and Java does not.
+
+That moves the search upstream, to whoever marks the attacker FALLING during block resolution. The
+measured clue points the same way: Rust spends dice 63-64 on a `StepBlockRoll` BETWEEN the two
+drops, where Java resolves the drops back to back. Both necromantic Werewolves have Frenzy, so a
+second block is in play, and the likely fault is Rust resolving Frenzy's second block before the
+first block's falling players are finished.
+
+Next: compare the block/Frenzy sequence ordering, not this step.
+
