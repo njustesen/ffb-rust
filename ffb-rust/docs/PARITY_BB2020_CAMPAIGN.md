@@ -6538,3 +6538,67 @@ mechanism is proven.
 So it is a large atomic change to the hottest path in the engine for zero expected behavioural
 change. Worth doing for fidelity, but it needs its own iteration, and it must land as one commit
 with a full-matrix gate -- not incrementally.
+
+## ITER121 -- the BB2020 generators are faithful; the endgame is one atomic delegation
+
+Two findings that together fix the shape of the rest of this goal.
+
+### 1. Block cannot be split the way Move was
+
+ITER120 peeled the non-STEADY_FOOTING differences off `Move`. The same move does not work on
+`Block`: its label topology is entangled with the STEADY_FOOTING steps. BB2020 has
+`PLACE_BALL[ATTACKER_DROPPED]` where BB2025 moves that label onto a
+`STEADY_FOOTING[ATTACKER_DROPPED](APOTHECARY_MODE=ATTACKER)` and leaves PLACE_BALL unlabelled; the
+GO_FOR_IT failure target likewise moves from NEXT to STEADY_FOOTING. Take the STEADY_FOOTING steps
+out and the labels have to move with them, so there is no "non-STEADY_FOOTING subset" to land
+separately. Block also has two genuine extras: BB2025's INIT_BLOCKING takes USING_CHOMP, and BB2025
+adds a `PICK_UP(gotoOnFailure=DROP_FALLING_PLAYERS)` and a `CHOMP` step BB2020 lacks.
+
+### 2. All 26 Rust BB2020 generators are faithful ports -- audited, not assumed
+
+`scripts/audit_bb2020_generators.py` (added this iteration) compares the StepId sequence each Rust
+`step/generator/bb2020/*.rs` emits against its Java counterpart. Result: **24 MATCH, 2 DIFFER, 0
+missing**, and both DIFFERs are scanner artifacts, hand-checked:
+
+- `select.rs` -- an `if params.block_targets.is_empty()` / `else` emits END_SELECTING on each
+  branch; the regex counts both, the runtime emits one.
+- `select_blitz_target.rs` -- SELECT_BLITZ_TARGET_END *is* last (line 24); the activation steps come
+  from an `add_activation` helper defined further down the file, so a linear scan sorts them wrong.
+- (`multi_block.rs` was a third, now folded into the script's spelling table: Java
+  `MULTI_BLOCK_FORK` vs Rust `MultipleBlockFork`, same step.)
+
+The script is triage, not proof, and says so: MATCH is reassuring, DIFFER means go read both files.
+It exists because these files are dead code (ITER117) and dead code drifts -- the audit had to
+happen before delegating to any of them, not after.
+
+### What this means for the endgame
+
+The remaining structural gap is **not** ~23 independent per-generator iterations. It is one atomic
+change:
+
+  a. gate the shared fall-site publishers -- `bb2025/move_/step_go_for_it.rs`, `step_jump.rs`,
+     `step_move_dodge.rs`, `block/step_block_chainsaw.rs` and the rest -- to publish
+     `InjuryTypeName` for BB2020 instead of `SteadyFootingContext`, exactly as
+     `step_animal_savagery.rs` already does and as bb2016 has always done
+     (`bb2016/move_/step_go_for_it.rs:243`);
+  b. delegate every remaining shared generator to its BB2020 twin for `Rules::Bb2020`, the way
+     ITER118 did for EndPlayerAction. The twins already carry the right labels and no
+     STEADY_FOOTING, so (a) and (b) fit each other.
+
+It must be atomic because the publishers are SHARED STEPS: gate GO_FOR_IT for BB2020 and every
+BB2020 sequence containing a STEADY_FOOTING must already be delegated, or the context strands with
+no consumer and BB2020 players stop falling.
+
+**Expected behavioural delta: zero, and now proven rather than argued.** `StepSteadyFooting` only
+acts for a player with the Steady Footing skill; otherwise it forwards `InjuryTypeName` to
+FALL_DOWN, which is precisely BB2020's direct route. Steady Footing is BB2025-only:
+`grep -rli steady data/rosters/bb2020/` returns **nothing**, while the BB2025 rosters (chaos_dwarf,
+high_elf, lizardman, ...) do carry it. So the BB2025 detour collapses to the BB2020 route in every
+BB2020 game.
+
+That is worth stating plainly: this final step buys structural fidelity, not correctness. It is a
+large atomic change to the hottest path in the engine for no behavioural change, so it earns a
+dedicated iteration and a full-matrix gate -- and it is legitimately lower priority than any
+remaining difference that could actually bite. ITER120's FOUL_APPEARANCE was that shape (a live
+dice-rolling step in a sequence Java lacks) and turned out inert; the audit above says the BB2020
+twins are ready whenever this is picked up.
