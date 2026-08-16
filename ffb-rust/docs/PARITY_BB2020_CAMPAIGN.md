@@ -6668,3 +6668,70 @@ faith-based to measured, and because a BB2020 team with Steady Footing would imm
 whether the ITER121 atomic change is genuinely inert or merely untested.
 
 No engine change this iteration -- the finding is the deliverable.
+
+## ITER123 -- the BB2020 rosters were never skill-checked, and 15 skills do not exist in BB2020
+
+New goal, chosen by the user after ITER122: **draft BB2020 teams that actually follow their
+ruleset**, so the edition-differentiating paths execute and the structural work becomes verifiable.
+
+The first step was meant to be drafting. It turned into something better.
+
+### `check_skill_names.py` has never looked at BB2020
+
+    EDITION_TO_RULES = {"bb2016": "BB2016", "bb2025": "BB2025"}
+    # bb2020 data is an unaudited legacy clone (not used by the parity matrix) and
+    # is intentionally NOT checked.
+
+That comment stopped being true a long time ago -- BB2020 is a full parity ruleset whose 30-roster
+matrix runs 100/100. The exclusion meant its rosters were never validated against Java at all, and
+the script's reassuring `0 unresolvable skill names` was computed over BB2016 and BB2025 only.
+Adding `bb2020` to the map turns up **15 failures**.
+
+### The 15
+
+Java's `SkillFactory.forName` only resolves skills whose `@RulesCollection` covers the ruleset, and
+silently returns nothing otherwise -- so each of these is a skill Java DROPS while Rust's more
+lenient lookup may keep it. This is the exact shape of the FUMBBL slann Kroxigor "Bone-head" desync
+already recorded in this campaign.
+
+Every one is a **BB2016 spelling left behind in a BB2020 clone**, which corroborates that stale
+comment's "legacy clone" description:
+
+    Wild Animal      -> Unchannelled Fury   chaos/chaos_dwarf/chaos_pact minotaur,
+                                            norse snow troll, skaven rat ogre   (5 positions)
+    Nurgle's Rot     -> Plague Ridden       nurgle rotter/pestigor/warrior/beast (4)
+    Claw             -> Claws               necromantic werewolf, norse snow troll (2)
+    Safe Throw       -> Safe Pass           high_elf thrower
+    bone-head        -> Bone Head           human ogre
+    Bone-head        -> Bone Head           slann_fumbbl 2996
+    Hatred           -> (BB2025-only)       halfling Hopeful
+
+Canonical BB2020 names confirmed from the Java `super("...")` declarations, not guessed:
+`mixed/UnchannelledFury.java` "Unchannelled Fury", `mixed/PlagueRidden.java` "Plague Ridden",
+`mixed/Claws.java` "Claws", `mixed/SafePass.java` "Safe Pass", `bb2020/BoneHead.java` "Bone Head".
+`Hatred` exists only as `skill/bb2025/Hatred.java` with a single `@RulesCollection(BB2025)`, so a
+BB2020 halfling cannot legally have it.
+
+### Why this matters more than the structural roadmap
+
+Five minotaur-class positions currently have **no negatrait at all in Java** -- Wild Animal does not
+resolve under BB2020 and Unchannelled Fury was never granted. So the UNCHANNELLED_FURY step, which
+sits in every activation block, has almost certainly never fired in a BB2020 parity game. Same
+story for Claws (armour-value modifier), Safe Pass, and the two Bone Head positions.
+
+That is a direct answer to ITER122's question of why so much of the engine is unreachable: it is
+not only that BB2020 teams lack BB2025 skills, it is that they are missing **their own edition's**
+skills through a bad clone. It also means the matrix's 30/30 is measuring less than it appears to.
+
+### Landed
+
+- `scripts/check_skill_names.py` now checks bb2020, with the stale exclusion comment replaced by
+  the reason it was wrong. The script exits non-zero on the 15 findings, as it should.
+
+### Next (ITER124)
+
+Fix the 15 names in `data/rosters/bb2020/`, re-run `scripts/gen_java_parity_data.py` (mandatory
+after ANY roster change, or the engines disagree), and gate on the full matrix. Expect this one to
+**change behaviour and possibly break rosters** -- granting five big guys a negatrait they have
+never had, and Claws to two more, will move dice. That is the point: it is the first BB2020 change
+in a long while that can actually be validated end to end.
