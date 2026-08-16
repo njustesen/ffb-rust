@@ -185,7 +185,18 @@ fn skill_to_injury_modifier_untagged(
         }
         SkillId::DirtyPlayer => {
             if context.is_foul {
-                Some(Box::new(StaticInjuryModifierAttacker::new("Dirty Player", 1, false)))
+                // Same split as Mighty Blow above: bb2016 registers a StaticInjuryModifierAttacker(+1)
+                // (`bb2016/DirtyPlayer.java:37`), bb2020 a VariableInjuryModifierAttacker whose value is
+                // the attacker's own skill value (`bb2020/DirtyPlayer.java:38`) -- 2 for the dwarf
+                // Deathroller's "Dirty Player (2)".
+                if context.game.rules == Rules::Bb2016 {
+                    Some(Box::new(StaticInjuryModifierAttacker::new("Dirty Player", 1, false)))
+                } else {
+                    Some(Box::new(VariableInjuryModifierAttacker::new("Dirty Player", false)
+                        .with_modifier_fn(|a, _d| {
+                            a.map(|p| p.get_skill_value_int(SkillId::DirtyPlayer, 1)).unwrap_or(1)
+                        })))
+                }
             } else {
                 None
             }
@@ -391,6 +402,41 @@ mod tests {
         let defender = bare_player("d");
         let mods = f.find_injury_modifiers_without_niggling(&game, Some(&attacker), &defender, false, true, false, false);
         assert!(mods.is_empty());
+    }
+
+    /// `bb2020/DirtyPlayer.java:38` registers a VariableInjuryModifierAttacker, so the foul injury
+    /// bonus is the attacker's OWN skill value -- 2 for the dwarf Deathroller's "Dirty Player (2)".
+    /// bb2016 keeps a StaticInjuryModifierAttacker(+1) (`bb2016/DirtyPlayer.java:37`).
+    #[test]
+    fn find_injury_modifiers_dirty_player_value_tracks_the_skill_in_bb2020() {
+        use ffb_model::model::skill_def::SkillWithValue;
+        let f = InjuryModifierFactory::new(Rules::Bb2020);
+        let game = make_game(Rules::Bb2020);
+        let mut attacker = bare_player("a");
+        attacker.starting_skills = vec![SkillWithValue {
+            skill_id: SkillId::DirtyPlayer,
+            value: Some("2".into()),
+        }];
+        let defender = bare_player("d");
+        let mods = f.find_injury_modifiers_without_niggling(&game, Some(&attacker), &defender, false, true, false, false);
+        assert_eq!(mods.len(), 1);
+        assert_eq!(mods[0].get_modifier(Some(&attacker), &defender), 2);
+    }
+
+    #[test]
+    fn find_injury_modifiers_dirty_player_stays_static_in_bb2016() {
+        use ffb_model::model::skill_def::SkillWithValue;
+        let f = InjuryModifierFactory::new(Rules::Bb2016);
+        let game = make_game(Rules::Bb2016);
+        let mut attacker = bare_player("a");
+        attacker.starting_skills = vec![SkillWithValue {
+            skill_id: SkillId::DirtyPlayer,
+            value: Some("2".into()),
+        }];
+        let defender = bare_player("d");
+        let mods = f.find_injury_modifiers_without_niggling(&game, Some(&attacker), &defender, false, true, false, false);
+        assert_eq!(mods.len(), 1);
+        assert_eq!(mods[0].get_modifier(Some(&attacker), &defender), 1);
     }
 
     #[test]

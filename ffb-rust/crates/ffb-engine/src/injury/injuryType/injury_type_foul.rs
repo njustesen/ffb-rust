@@ -99,10 +99,16 @@ impl ModificationAwareInjuryType for InjuryTypeFoul {
                         // dwarf Deathroller's "Dirty Player (2)": a foul armour roll of 7 against
                         // AV9 stayed unbroken where Java reports
                         // `JAVA_AVBROKE armour=9 reduced=9 roll=[1,6] modTotal=2 mods=Dirty Player broken=true`.
-                        let dp = game
-                            .player(aid)
-                            .map(|p| p.get_skill_value_int(SkillId::DirtyPlayer, 1))
-                            .unwrap_or(1);
+                        // bb2016 registers a StaticArmourModifier(+1) instead
+                        // (`bb2016/DirtyPlayer.java:31`), so the value only tracks the skill in
+                        // bb2020/bb2025.
+                        let dp = if game.rules == ffb_model::enums::Rules::Bb2016 {
+                            1
+                        } else {
+                            game.player(aid)
+                                .map(|p| p.get_skill_value_int(SkillId::DirtyPlayer, 1))
+                                .unwrap_or(1)
+                        };
                         self.ctx.add_armor_modifier(match dp {
                             1 => ARMOR_DIRTY_PLAYER_1,
                             2 => ARMOR_DIRTY_PLAYER_2,
