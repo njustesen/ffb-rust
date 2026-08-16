@@ -5,7 +5,7 @@ use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
 use super::activation_sequence_builder::ActivationSequenceBuilder;
 
 /// Parameters for the Select sequence — mirrors Java `Select.SequenceParams`.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct SelectParams {
     pub update_persistence: bool,
     /// True when the current player action is a blitz move (affects ResetFumblerooskie).
@@ -13,6 +13,19 @@ pub struct SelectParams {
     /// Java `blockTargets` — defender IDs threaded to END_SELECTING (here as strings, matching
     /// the bb2020 sibling convention, since `BlockTarget` isn't threaded through this step layer).
     pub block_targets: Vec<String>,
+    /// Edition this sequence is built for; only BB2020 differs (no STEADY_FOOTING in the activation).
+    pub rules: ffb_model::enums::Rules,
+}
+
+impl Default for SelectParams {
+    fn default() -> Self {
+        Self {
+            update_persistence: Default::default(),
+            is_blitz_move: Default::default(),
+            block_targets: Default::default(),
+            rules: ffb_model::enums::Rules::Bb2025,
+        }
+    }
 }
 
 pub struct Select;
@@ -33,6 +46,7 @@ impl Select {
 
         // 2 [ACTIVATION(END_SELECTING)] — no SET_DEFENDER for select
         ActivationSequenceBuilder::new()
+            .with_rules(params.rules)
             .with_failure_label(fl)
             .add_to(&mut seq);
 

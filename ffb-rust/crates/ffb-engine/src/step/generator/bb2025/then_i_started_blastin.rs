@@ -10,11 +10,12 @@ pub struct ThenIStartedBlastin;
 impl ThenIStartedBlastin {
     pub fn new() -> Self { Self }
 
-    pub fn build_sequence() -> Vec<SequenceStep> {
+    pub fn build_sequence(rules: ffb_model::enums::Rules) -> Vec<SequenceStep> {
         let mut seq = Sequence::new();
 
         // 1-13 [ACTIVATION(END)]
         ActivationSequenceBuilder::new()
+            .with_rules(rules)
             .with_failure_label(labels::END)
             .add_to(&mut seq);
 
@@ -51,14 +52,14 @@ mod tests {
     #[test]
     fn then_i_started_blastin_has_19_steps_with_activation() {
         // Java pushSequence: ActivationSequenceBuilder.create()...addTo(sequence) (13) + 6 own steps = 19.
-        let steps = ThenIStartedBlastin::build_sequence();
+        let steps = ThenIStartedBlastin::build_sequence(ffb_model::enums::Rules::Bb2025);
         assert_eq!(steps.len(), 19);
         assert_eq!(steps[0].step_id, StepId::InitActivation);
     }
 
     #[test]
     fn then_i_started_blastin_ends_with_end_labelled() {
-        let steps = ThenIStartedBlastin::build_sequence();
+        let steps = ThenIStartedBlastin::build_sequence(ffb_model::enums::Rules::Bb2025);
         let last = steps.last().unwrap();
         assert_eq!(last.step_id, StepId::EndThenIStartedBlastin);
         assert_eq!(last.label.as_deref(), Some(labels::END));
@@ -66,19 +67,19 @@ mod tests {
 
     #[test]
     fn then_i_started_blastin_step_follows_activation_sub_sequence() {
-        let steps = ThenIStartedBlastin::build_sequence();
+        let steps = ThenIStartedBlastin::build_sequence(ffb_model::enums::Rules::Bb2025);
         assert_eq!(steps[13].step_id, StepId::ThenIStartedBlastin);
     }
 
     #[test]
     fn then_i_started_blastin_step_has_goto_label_on_end() {
-        let steps = ThenIStartedBlastin::build_sequence();
+        let steps = ThenIStartedBlastin::build_sequence(ffb_model::enums::Rules::Bb2025);
         assert!(steps[13].params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnEnd(_))));
     }
 
     #[test]
     fn contains_apothecary_step() {
-        let steps = ThenIStartedBlastin::build_sequence();
+        let steps = ThenIStartedBlastin::build_sequence(ffb_model::enums::Rules::Bb2025);
         assert!(steps.iter().any(|s| s.step_id == StepId::Apothecary));
     }
 }

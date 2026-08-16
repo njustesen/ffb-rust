@@ -24,6 +24,9 @@ pub struct ActivationSequenceBuilder {
     eventual_defender: Option<String>,
     prevent_null_defender: bool,
     target_coordinate: Option<FieldCoordinate>,
+    /// Edition of the activation being built. The driver runs this BB2025 builder for BB2020
+    /// games, but BB2020 has no STEADY_FOOTING step -- see `add_to`.
+    rules: ffb_model::enums::Rules,
 }
 
 impl ActivationSequenceBuilder {
@@ -34,7 +37,14 @@ impl ActivationSequenceBuilder {
             eventual_defender: None,
             prevent_null_defender: false,
             target_coordinate: None,
+            rules: ffb_model::enums::Rules::Bb2025,
         }
+    }
+
+    /// Edition of the activation being built; only BB2020 differs (it has no STEADY_FOOTING).
+    pub fn with_rules(mut self, rules: ffb_model::enums::Rules) -> Self {
+        self.rules = rules;
+        self
     }
 
     /// Label to jump to when a negatrait fails (usually the sequence's END label).
@@ -84,29 +94,29 @@ impl ActivationSequenceBuilder {
         }
         sequence.add(StepId::AnimalSavagery, as_params);
 
-        // 3 STEADY_FOOTING
+        // 3 STEADY_FOOTING -- BB2025 ONLY.
         //
-        // DO NOT edition-gate this off for BB2020, even though it looks like you should:
-        // `grep -rn STEADY_FOOTING .../server/step/generator/bb2020/` is EMPTY, so no BB2020 Java
-        // generator has this step anywhere. It is one half of a COUPLED pair, and removing only
-        // this half silently breaks every BB2020 fall.
+        // `grep -rn STEADY_FOOTING .../server/step/generator/bb2020/` is empty: BB2020 has no such
+        // step anywhere, and its hand-written activation block
+        // (`bb2020/SelectBlitzTarget.java:20-31`) runs INIT_ACTIVATION, ANIMAL_SAVAGERY,
+        // HANDLE_DROP_PLAYER_CONTEXT, ... -- 12 steps to this builder's 13.
         //
-        // `StepSteadyFooting` is the ONLY consumer of a published `SteadyFootingContext`
-        // (`StepHandleDropPlayerContext` below does not read it). A BB2020 game publishes one
-        // anyway: `make_step_for` routes only `StepId::Prayer` to a bb2020 step, so BB2020 games
-        // run the SHARED bb2025 fall sites — `bb2025/move_/step_go_for_it.rs`, `step_jump.rs`,
-        // `step_move_dodge.rs`, `block/step_block_chainsaw.rs` — every one of which publishes a
-        // context, where BB2020 Java applies the drop directly instead. (The bb2020/*.rs twins of
-        // those files publish one too, but they are dead code and never instantiated; do not be
-        // fooled into thinking the publisher disappears with them.) Those publishes and this step
-        // cancel out exactly, which is why all 30 BB2020 rosters are 100/100 with it present,
-        // including the only two that can even reach it from ANIMAL_SAVAGERY above (renegades,
-        // underworld).
+        // Safe to omit because the only thing that can feed it here is ANIMAL_SAVAGERY two steps
+        // up, and `step/mixed/shared/step_animal_savagery.rs` ALREADY edition-gates its publish:
+        // BB2025 publishes a SteadyFootingContext, BB2020 publishes a plain DropPlayerContext for
+        // HANDLE_DROP_PLAYER_CONTEXT below (mirroring `skillbehaviour/bb2020/
+        // AnimalSavageryBehaviour.java:235` vs the bb2025 twin's :293). So in BB2020 this step
+        // never had a context to consume.
         //
-        // Making BB2020 truly 1:1 here means changing BOTH halves together: edition-gate those
-        // shared fall sites to apply the drop inline as BB2020 Java does, THEN drop this step for
-        // BB2020. See docs/PARITY_BB2020_CAMPAIGN.md (ITER116).
-        sequence.add(StepId::SteadyFooting, vec![]);
+        // This is ONLY true of the activation copy. The STEADY_FOOTING steps inside the move and
+        // blitz sequences are NOT removable the same way: the shared fall sites (GFI, jump,
+        // dodge, chainsaw) publish a SteadyFootingContext in every edition, and those steps are
+        // its only consumer -- drop them and BB2020 players stop falling. Do not "simplify" this
+        // by making StepSteadyFooting a no-op under BB2020 in `make_step_for`; that would hit the
+        // move-sequence copies too. See docs/PARITY_BB2020_CAMPAIGN.md (ITER116, ITER119).
+        if self.rules != ffb_model::enums::Rules::Bb2020 {
+            sequence.add(StepId::SteadyFooting, vec![]);
+        }
         // 4 HANDLE_DROP_PLAYER_CONTEXT
         sequence.add(StepId::HandleDropPlayerContext, vec![]);
         // 5 PLACE_BALL
@@ -189,26 +199,52 @@ mod tests {
         assert_eq!(steps[8].label.as_deref(), Some(labels::NEXT));
     }
 
-    /// Guards the coupling documented at the STEADY_FOOTING line in `add_to`.
+    /// The BB2020 activation block is `bb2020/SelectBlitzTarget.java:20-31` exactly: the BB2025
+    /// block minus STEADY_FOOTING, 12 steps to 13.
     ///
-    /// No BB2020 Java generator contains STEADY_FOOTING, so gating this step off for BB2020 looks
-    /// like an obvious 1:1 fix. It is not: `StepSteadyFooting` is the only consumer of a published
-    /// `SteadyFootingContext`, and Rust's BB2020 fall sites (`bb2020/move_/step_go_for_it.rs:259`
-    /// and friends) publish one. Removing just this step strands those contexts and no BB2020
-    /// player ever falls. Both halves have to change together, or neither.
-    ///
-    /// If you are here because this test failed: you removed one half. Read the comment in
-    /// `add_to` and `docs/PARITY_BB2020_CAMPAIGN.md` (ITER116) before going further.
+    /// Supersedes the ITER116 guard test, which asserted the opposite. That test was built on a
+    /// wrong premise -- that ANIMAL_SAVAGERY feeds this step in BB2020 too -- when in fact
+    /// `step/mixed/shared/step_animal_savagery.rs` already edition-gates its publish and hands
+    /// BB2020 a plain DropPlayerContext for HANDLE_DROP_PLAYER_CONTEXT instead. See ITER119.
     #[test]
-    fn steady_footing_stays_in_the_activation_because_bb2020_fall_sites_depend_on_it() {
-        let steps = build_with_label("END");
-        let sf = steps.iter().position(|s| s.step_id == StepId::SteadyFooting)
-            .expect("STEADY_FOOTING must stay: BB2020 fall sites publish a context only it reads");
-        let animal_savagery = steps.iter().position(|s| s.step_id == StepId::AnimalSavagery)
-            .expect("ANIMAL_SAVAGERY feeds the context consumed below");
-        assert!(animal_savagery < sf,
-            "ANIMAL_SAVAGERY publishes the SteadyFootingContext that STEADY_FOOTING consumes, \
-             so it has to come first");
+    fn bb2020_activation_omits_steady_footing_and_matches_javas_twelve_steps() {
+        use ffb_model::enums::Rules;
+        let mut seq = Sequence::new();
+        ActivationSequenceBuilder::new()
+            .with_rules(Rules::Bb2020)
+            .with_failure_label("END")
+            .add_to(&mut seq);
+        let bb2020 = seq.build();
+
+        assert!(!bb2020.iter().any(|s| s.step_id == StepId::SteadyFooting),
+            "BB2020 has no STEADY_FOOTING step in any generator");
+        assert_eq!(bb2020.len(), 12, "Java bb2020 builds exactly 12 activation steps");
+
+        // ANIMAL_SAVAGERY must still hand straight to HANDLE_DROP_PLAYER_CONTEXT, which is what
+        // consumes the DropPlayerContext BB2020 publishes in place of a SteadyFootingContext.
+        let as_i = bb2020.iter().position(|s| s.step_id == StepId::AnimalSavagery).unwrap();
+        let hdpc = bb2020.iter().position(|s| s.step_id == StepId::HandleDropPlayerContext).unwrap();
+        assert_eq!(hdpc, as_i + 1, "nothing may sit between them in BB2020");
+
+        // BB2025 keeps the step, and keeps it between those two.
+        let bb2025 = build_with_label("END");
+        assert_eq!(bb2025.len(), 13);
+        let sf = bb2025.iter().position(|s| s.step_id == StepId::SteadyFooting).unwrap();
+        let as25 = bb2025.iter().position(|s| s.step_id == StepId::AnimalSavagery).unwrap();
+        assert_eq!(sf, as25 + 1);
+    }
+
+    /// The move/blitz-sequence STEADY_FOOTING steps are NOT removable for BB2020 the way the
+    /// activation copy is: the shared fall sites (GFI, jump, dodge, chainsaw) publish a
+    /// `SteadyFootingContext` in every edition and those steps are its only consumer, so dropping
+    /// them stops BB2020 players falling. This pins the distinction so nobody generalises the
+    /// ITER119 gate into `make_step_for`, which would hit every copy at once.
+    #[test]
+    fn steady_footing_gate_is_scoped_to_the_activation_only() {
+        use crate::step::generator::bb2025::blitz_block::BlitzBlock;
+        let blitz = BlitzBlock::build_sequence(&Default::default());
+        assert!(blitz.iter().any(|s| s.step_id == StepId::SteadyFooting),
+            "the blitz sequence keeps its own STEADY_FOOTING regardless of edition");
     }
 
     #[test]

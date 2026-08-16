@@ -9,7 +9,7 @@ pub struct SelectBlitzTarget;
 impl SelectBlitzTarget {
     pub fn new() -> Self { Self }
 
-    pub fn build_sequence() -> Vec<SequenceStep> {
+    pub fn build_sequence(rules: ffb_model::enums::Rules) -> Vec<SequenceStep> {
         let mut seq = Sequence::new();
         // 1 SELECT_BLITZ_TARGET [SELECT]
         seq.add_labelled(StepId::SelectBlitzTarget, labels::SELECT, vec![
@@ -18,6 +18,7 @@ impl SelectBlitzTarget {
 
         // [ACTIVATION(END_BLITZING)]
         ActivationSequenceBuilder::new()
+            .with_rules(rules)
             .with_failure_label(labels::END_BLITZING)
             .add_to(&mut seq);
 
@@ -47,34 +48,34 @@ mod tests {
     fn select_blitz_target_has_17_steps_with_activation() {
         // Java pushSequence: SELECT_BLITZ_TARGET (1) + ActivationSequenceBuilder.create()...addTo(sequence)
         // (13) + 3 own steps = 17.
-        let steps = SelectBlitzTarget::build_sequence();
+        let steps = SelectBlitzTarget::build_sequence(ffb_model::enums::Rules::Bb2025);
         assert_eq!(steps.len(), 17);
         assert_eq!(steps[1].step_id, StepId::InitActivation);
     }
 
     #[test]
     fn select_blitz_target_is_labelled_select() {
-        let steps = SelectBlitzTarget::build_sequence();
+        let steps = SelectBlitzTarget::build_sequence(ffb_model::enums::Rules::Bb2025);
         let s = steps.iter().find(|s| s.step_id == StepId::SelectBlitzTarget).unwrap();
         assert_eq!(s.label.as_deref(), Some(labels::SELECT));
     }
 
     #[test]
     fn select_blitz_target_end_is_labelled_end_blitzing() {
-        let steps = SelectBlitzTarget::build_sequence();
+        let steps = SelectBlitzTarget::build_sequence(ffb_model::enums::Rules::Bb2025);
         let s = steps.iter().find(|s| s.step_id == StepId::SelectBlitzTargetEnd).unwrap();
         assert_eq!(s.label.as_deref(), Some(labels::END_BLITZING));
     }
 
     #[test]
     fn select_blitz_target_has_jump_up_and_stand_up() {
-        let steps = SelectBlitzTarget::build_sequence();
+        let steps = SelectBlitzTarget::build_sequence(ffb_model::enums::Rules::Bb2025);
         assert!(steps.iter().any(|s| s.step_id == StepId::JumpUp));
         assert!(steps.iter().any(|s| s.step_id == StepId::StandUp));
     }
     #[test]
     fn build_sequence_returns_vec() {
-        let seq = SelectBlitzTarget::build_sequence();
+        let seq = SelectBlitzTarget::build_sequence(ffb_model::enums::Rules::Bb2025);
         assert!(!seq.is_empty(), "sequence should not be empty");
     }
 

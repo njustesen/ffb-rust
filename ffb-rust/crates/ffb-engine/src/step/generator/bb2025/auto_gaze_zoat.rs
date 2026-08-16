@@ -4,10 +4,22 @@ use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
 use super::activation_sequence_builder::ActivationSequenceBuilder;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct AutoGazeZoatParams {
     pub failure_label: String,
     pub old_player_state: Option<ffb_model::enums::PlayerState>,
+    /// Edition this sequence is built for; only BB2020 differs (no STEADY_FOOTING in the activation).
+    pub rules: ffb_model::enums::Rules,
+}
+
+impl Default for AutoGazeZoatParams {
+    fn default() -> Self {
+        Self {
+            failure_label: Default::default(),
+            old_player_state: Default::default(),
+            rules: ffb_model::enums::Rules::Bb2025,
+        }
+    }
 }
 
 pub struct AutoGazeZoat;
@@ -20,6 +32,7 @@ impl AutoGazeZoat {
 
         // 1-13 [ACTIVATION(END)]
         ActivationSequenceBuilder::new()
+            .with_rules(params.rules)
             .with_failure_label(labels::END)
             .add_to(&mut seq);
 
@@ -45,8 +58,7 @@ mod tests {
     fn auto_gaze_zoat_last_step_labelled_end() {
         let steps = AutoGazeZoat::build_sequence(&AutoGazeZoatParams {
             failure_label: "someLabel".into(),
-            old_player_state: None,
-        });
+            old_player_state: None, ..Default::default() });
         let last = steps.last().unwrap();
         assert_eq!(last.step_id, StepId::AutoGazeZoat);
         assert_eq!(last.label.as_deref(), Some(labels::END));
@@ -65,8 +77,7 @@ mod tests {
     fn failure_label_passed_as_goto_label_on_failure() {
         let steps = AutoGazeZoat::build_sequence(&AutoGazeZoatParams {
             failure_label: "myLabel".into(),
-            old_player_state: None,
-        });
+            old_player_state: None, ..Default::default() });
         let last = steps.last().unwrap();
         let has_label = last.params.iter().any(|p| {
             matches!(p, StepParameter::GotoLabelOnFailure(l) if l == "myLabel")
@@ -80,8 +91,7 @@ mod tests {
         let state = PlayerState::new(PS_STANDING);
         let steps = AutoGazeZoat::build_sequence(&AutoGazeZoatParams {
             failure_label: "X".into(),
-            old_player_state: Some(state),
-        });
+            old_player_state: Some(state), ..Default::default() });
         let last = steps.last().unwrap();
         let has_state = last.params.iter().any(|p| matches!(p, StepParameter::OldPlayerState(_)));
         assert!(has_state);
@@ -91,8 +101,7 @@ mod tests {
     fn old_player_state_absent_when_none() {
         let steps = AutoGazeZoat::build_sequence(&AutoGazeZoatParams {
             failure_label: "X".into(),
-            old_player_state: None,
-        });
+            old_player_state: None, ..Default::default() });
         let last = steps.last().unwrap();
         let has_state = last.params.iter().any(|p| matches!(p, StepParameter::OldPlayerState(_)));
         assert!(!has_state);

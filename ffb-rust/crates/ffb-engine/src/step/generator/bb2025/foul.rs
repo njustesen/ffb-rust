@@ -6,10 +6,22 @@ use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
 use super::activation_sequence_builder::ActivationSequenceBuilder;
 
 /// Parameters — mirrors Java `Foul.SequenceParams`.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct FoulParams {
     pub fouled_defender_id: Option<String>,
     pub using_chainsaw: bool,
+    /// Edition this sequence is built for; only BB2020 differs (no STEADY_FOOTING in the activation).
+    pub rules: ffb_model::enums::Rules,
+}
+
+impl Default for FoulParams {
+    fn default() -> Self {
+        Self {
+            fouled_defender_id: Default::default(),
+            using_chainsaw: Default::default(),
+            rules: ffb_model::enums::Rules::Bb2025,
+        }
+    }
 }
 
 pub struct Foul;
@@ -35,6 +47,7 @@ impl Foul {
 
         // 2 [ACTIVATION(END_FOULING; SET_DEFENDER)]
         ActivationSequenceBuilder::new()
+            .with_rules(params.rules)
             .with_failure_label(fl)
             .with_eventual_defender(params.fouled_defender_id.clone())
             .add_to(&mut seq);

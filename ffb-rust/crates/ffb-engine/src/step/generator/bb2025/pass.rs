@@ -8,9 +8,20 @@ use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
 use super::activation_sequence_builder::ActivationSequenceBuilder;
 
 /// Parameters — mirrors Java `Pass.SequenceParams`.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct PassParams {
     pub target_coordinate: Option<FieldCoordinate>,
+    /// Edition this sequence is built for; only BB2020 differs (no STEADY_FOOTING in the activation).
+    pub rules: ffb_model::enums::Rules,
+}
+
+impl Default for PassParams {
+    fn default() -> Self {
+        Self {
+            target_coordinate: Default::default(),
+            rules: ffb_model::enums::Rules::Bb2025,
+        }
+    }
 }
 
 pub struct Pass;
@@ -34,6 +45,7 @@ impl Pass {
 
         // 2 [ACTIVATION(END_PASSING; TARGET_COORDINATE → ANIMAL_SAVAGERY)]
         ActivationSequenceBuilder::new()
+            .with_rules(params.rules)
             .with_failure_label(fl)
             .with_target_coordinate(params.target_coordinate)
             .add_to(&mut seq);

@@ -310,13 +310,14 @@ impl StepEndSelecting {
             update_persistence: true,
             is_blitz_move: false,
             block_targets: self.block_targets.clone(),
+                    rules: game.rules,
         };
 
         match player_action {
             // ── BLITZ_SELECT ──────────────────────────────────────────────────
             PlayerAction::BlitzSelect => {
                 // Java: selectBlitzTarget.pushSequence(new SequenceGenerator.SequenceParams(getGameState()))
-                let seq = SelectBlitzTarget::build_sequence();
+                let seq = SelectBlitzTarget::build_sequence(game.rules);
                 StepOutcome::next().push_seq(seq)
             }
 
@@ -328,6 +329,7 @@ impl StepEndSelecting {
             | PlayerAction::HandOver => {
                 let params = PassParams {
                     target_coordinate: if with_param { self.target_coordinate } else { None },
+                                    rules: game.rules,
                 };
                 let seq = Pass::build_sequence(&params);
                 StepOutcome::next().push_seq(seq)
@@ -430,9 +432,9 @@ impl StepEndSelecting {
             // ── MULTIPLE_BLOCK ────────────────────────────────────────────────
             PlayerAction::MultipleBlock => {
                 let params = if with_param {
-                    MultiBlockParams { block_targets: self.block_targets.clone() }
+                    MultiBlockParams { block_targets: self.block_targets.clone(), rules: game.rules, }
                 } else {
-                    MultiBlockParams { block_targets: Vec::new() }
+                    MultiBlockParams { block_targets: Vec::new(), rules: game.rules, }
                 };
                 let seq = MultiBlock::build_sequence(&params);
                 StepOutcome::next().push_seq(seq)
@@ -444,6 +446,7 @@ impl StepEndSelecting {
                     FoulParams {
                         fouled_defender_id: self.foul_defender_id.clone(),
                         using_chainsaw: self.using_chainsaw,
+                                            rules: game.rules,
                     }
                 } else {
                     FoulParams::default()
@@ -483,6 +486,7 @@ impl StepEndSelecting {
                         move_start: self.move_start,
                         ball_and_chain_rr_setting: self.ball_and_chain_rr_setting.clone(),
                         bloodlust_action: None,
+                                            rules: game.rules,
                     }
                 } else {
                     MoveParams::default()
@@ -536,6 +540,7 @@ impl StepEndSelecting {
                 let select_seq = Select::build_sequence(&select_params);
                 let treacherous_seq = Treacherous::build_sequence(&TreacherousParams {
                     failure_label: labels::END_SELECTING.into(),
+                                    rules: game.rules,
                 });
                 StepOutcome::next()
                     .push_seq(treacherous_seq)
@@ -550,6 +555,7 @@ impl StepEndSelecting {
                 let raiding_seq = RaidingParty::build_sequence(&RaidingPartyParams {
                     failure_label: labels::END_SELECTING.into(),
                     success_label: String::new(),
+                                    rules: game.rules,
                 });
                 StepOutcome::next()
                     .push_seq(raiding_seq)
@@ -575,6 +581,7 @@ impl StepEndSelecting {
                 // Java: ThrowKeg.pushSequence(new ThrowKeg.SequenceParams(getGameState(), targetPlayerId))
                 let seq = ThrowKeg::build_sequence(&ThrowKegParams {
                     player_id: self.target_player_id.clone(),
+                                    rules: game.rules,
                 });
                 StepOutcome::next().push_seq(seq)
             }
@@ -585,6 +592,7 @@ impl StepEndSelecting {
                 let seq = LookIntoMyEyes::build_sequence(&LookIntoMyEyesParams {
                     push_select: true,
                     goto_on_end: String::new(),
+                                    rules: game.rules,
                 });
                 StepOutcome::next().push_seq(seq)
             }
@@ -596,6 +604,7 @@ impl StepEndSelecting {
                 let select_seq = Select::build_sequence(&select_params);
                 let baleful_seq = BalefulHex::build_sequence(&BalefulHexParams {
                     failure_label: labels::END_SELECTING.into(),
+                                    rules: game.rules,
                 });
                 StepOutcome::next()
                     .push_seq(baleful_seq)
@@ -610,6 +619,7 @@ impl StepEndSelecting {
                 let black_ink_seq = BlackInk::build_sequence(&BlackInkParams {
                     failure_label: labels::END_SELECTING.into(),
                     old_player_state: player_state,
+                                    rules: game.rules,
                 });
                 StepOutcome::next()
                     .push_seq(black_ink_seq)
@@ -623,6 +633,7 @@ impl StepEndSelecting {
                 let select_seq = Select::build_sequence(&select_params);
                 let cotd_seq = CatchOfTheDay::build_sequence(&CatchOfTheDayParams {
                     failure_label: labels::END_SELECTING.into(),
+                                    rules: game.rules,
                 });
                 StepOutcome::next()
                     .push_seq(cotd_seq)
@@ -634,7 +645,7 @@ impl StepEndSelecting {
                 // Java: selectGenerator.pushSequence(selectParams)
                 //       tisbGenerator.pushSequence(new ThenIStartedBlastin.SequenceParams(getGameState()))
                 let select_seq = Select::build_sequence(&select_params);
-                let tisb_seq = ThenIStartedBlastinGen::build_sequence();
+                let tisb_seq = ThenIStartedBlastinGen::build_sequence(game.rules);
                 StepOutcome::next()
                     .push_seq(tisb_seq)
                     .push_seq(select_seq)
@@ -643,7 +654,7 @@ impl StepEndSelecting {
             // ── FURIOUS_OUTBURST ──────────────────────────────────────────────
             PlayerAction::FuriousOutburst => {
                 // Java: FuriousOutburst.pushSequence(new SequenceGenerator.SequenceParams(getGameState()))
-                let seq = FuriousOutburst::build_sequence();
+                let seq = FuriousOutburst::build_sequence(game.rules);
                 StepOutcome::next().push_seq(seq)
             }
 
@@ -655,6 +666,7 @@ impl StepEndSelecting {
                 let agz_seq = AutoGazeZoat::build_sequence(&AutoGazeZoatParams {
                     failure_label: labels::END_SELECTING.into(),
                     old_player_state: player_state,
+                                    rules: game.rules,
                 });
                 StepOutcome::next()
                     .push_seq(agz_seq)

@@ -4,9 +4,20 @@ use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
 use super::activation_sequence_builder::ActivationSequenceBuilder;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct BalefulHexParams {
     pub failure_label: String,
+    /// Edition this sequence is built for; only BB2020 differs (no STEADY_FOOTING in the activation).
+    pub rules: ffb_model::enums::Rules,
+}
+
+impl Default for BalefulHexParams {
+    fn default() -> Self {
+        Self {
+            failure_label: Default::default(),
+            rules: ffb_model::enums::Rules::Bb2025,
+        }
+    }
 }
 
 pub struct BalefulHex;
@@ -19,6 +30,7 @@ impl BalefulHex {
 
         // 1-13 [ACTIVATION(END)]
         ActivationSequenceBuilder::new()
+            .with_rules(params.rules)
             .with_failure_label(labels::END)
             .add_to(&mut seq);
 
@@ -40,7 +52,7 @@ mod tests {
 
     #[test]
     fn baleful_hex_last_step_labelled_end() {
-        let steps = BalefulHex::build_sequence(&BalefulHexParams { failure_label: "X".into() });
+        let steps = BalefulHex::build_sequence(&BalefulHexParams { failure_label: "X".into(), ..Default::default() });
         let last = steps.last().unwrap();
         assert_eq!(last.step_id, StepId::BalefulHex);
         assert_eq!(last.label.as_deref(), Some(labels::END));
@@ -48,7 +60,7 @@ mod tests {
 
     #[test]
     fn failure_label_in_params() {
-        let steps = BalefulHex::build_sequence(&BalefulHexParams { failure_label: "theLabel".into() });
+        let steps = BalefulHex::build_sequence(&BalefulHexParams { failure_label: "theLabel".into(), ..Default::default() });
         let last = steps.last().unwrap();
         let has = last.params.iter().any(|p| {
             matches!(p, StepParameter::GotoLabelOnFailure(l) if l == "theLabel")

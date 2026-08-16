@@ -123,6 +123,7 @@ impl StepEndFeeding {
         if !self.end_player_action && thrower_passing {
             let params = PassParams {
                 target_coordinate: game.pass_coordinate,
+                            rules: game.rules,
             };
             let seq = Pass::build_sequence(&params);
             return StepOutcome::next().push_seq(seq);

@@ -4,10 +4,22 @@ use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
 use super::activation_sequence_builder::ActivationSequenceBuilder;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct LookIntoMyEyesParams {
     pub push_select: bool,
     pub goto_on_end: String,
+    /// Edition this sequence is built for; only BB2020 differs (no STEADY_FOOTING in the activation).
+    pub rules: ffb_model::enums::Rules,
+}
+
+impl Default for LookIntoMyEyesParams {
+    fn default() -> Self {
+        Self {
+            push_select: Default::default(),
+            goto_on_end: Default::default(),
+            rules: ffb_model::enums::Rules::Bb2025,
+        }
+    }
 }
 
 pub struct LookIntoMyEyes;
@@ -20,6 +32,7 @@ impl LookIntoMyEyes {
 
         // 1-13 [ACTIVATION(END)]
         ActivationSequenceBuilder::new()
+            .with_rules(params.rules)
             .with_failure_label(labels::END)
             .add_to(&mut seq);
 
@@ -64,14 +77,14 @@ mod tests {
 
     #[test]
     fn push_select_param_wired() {
-        let steps = LookIntoMyEyes::build_sequence(&LookIntoMyEyesParams { push_select: true, goto_on_end: String::new() });
+        let steps = LookIntoMyEyes::build_sequence(&LookIntoMyEyesParams { push_select: true, goto_on_end: String::new(), ..Default::default() });
         let s = steps.iter().find(|s| s.step_id == StepId::LookIntoMyEyes).unwrap();
         assert!(s.params.iter().any(|p| matches!(p, StepParameter::PushSelect(true))));
     }
 
     #[test]
     fn goto_on_end_wired() {
-        let steps = LookIntoMyEyes::build_sequence(&LookIntoMyEyesParams { push_select: false, goto_on_end: "MY_LABEL".into() });
+        let steps = LookIntoMyEyes::build_sequence(&LookIntoMyEyesParams { push_select: false, goto_on_end: "MY_LABEL".into(), ..Default::default() });
         let s = steps.iter().find(|s| s.step_id == StepId::LookIntoMyEyes).unwrap();
         assert!(s.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnEnd(l) if l == "MY_LABEL")));
     }

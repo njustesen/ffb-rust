@@ -4,9 +4,20 @@ use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
 use super::activation_sequence_builder::ActivationSequenceBuilder;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct MultiBlockParams {
     pub block_targets: Vec<String>,
+    /// Edition this sequence is built for; only BB2020 differs (no STEADY_FOOTING in the activation).
+    pub rules: ffb_model::enums::Rules,
+}
+
+impl Default for MultiBlockParams {
+    fn default() -> Self {
+        Self {
+            block_targets: Default::default(),
+            rules: ffb_model::enums::Rules::Bb2025,
+        }
+    }
 }
 
 pub struct MultiBlock;
@@ -19,6 +30,7 @@ impl MultiBlock {
         let size = params.block_targets.len() as i32;
         // 0 [ACTIVATION(END_BLOCKING)]
         ActivationSequenceBuilder::new()
+            .with_rules(params.rules)
             .with_failure_label(labels::END_BLOCKING)
             .add_to(&mut seq);
         // 1 FOUL_APPEARANCE_MULTIPLE (fail → END_BLOCKING)
@@ -67,8 +79,7 @@ mod tests {
     #[test]
     fn multi_block_has_22_steps() {
         let steps = MultiBlock::build_sequence(&MultiBlockParams {
-            block_targets: vec!["p1".into(), "p2".into()],
-        });
+            block_targets: vec!["p1".into(), "p2".into()], ..Default::default() });
         // 13 activation steps + 9 multi-block steps
         assert_eq!(steps.len(), 22);
     }

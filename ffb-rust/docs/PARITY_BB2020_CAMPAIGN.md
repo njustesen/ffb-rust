@@ -6396,3 +6396,81 @@ differences in both directions.
 
 Work down `PARITY_BB2020_STRUCTURAL_GAP.md`. Next by rank: `StepApothecaryMultiple` (sim 0.43),
 `StepBlockRoll` (0.52), `StepApothecary` (0.57), `StepInitScatterPlayer` (0.60).
+
+## ITER119 -- BB2020 activations lose STEADY_FOOTING (and ITER116 is retracted)
+
+The activation block, flagged in ITER118 as the highest-leverage item on the structural-gap
+roadmap: ~10 of the low-similarity generators differ ONLY because `ActivationSequenceBuilder` is
+BB2025-only, so BB2020 spells its activation out by hand in each one.
+
+### ITER116 was wrong, and this is the second correction to it
+
+ITER116 refused to gate this step, on the reasoning that ANIMAL_SAVAGERY (step 2) publishes a
+`SteadyFootingContext` straight into STEADY_FOOTING (step 3), so removing it would strand the
+context. **That premise is false.** `step/mixed/shared/step_animal_savagery.rs:423` already
+edition-gates the publish:
+
+    if is_bb2025 { publish SteadyFootingContext }   // is_bb2025 = game.rules == Rules::Bb2025
+    else         { publish DropPlayerContext    }
+
+which mirrors Java exactly -- `skillbehaviour/bb2020/AnimalSavageryBehaviour.java:235` publishes
+DROP_PLAYER_CONTEXT where the bb2025 twin at :293 publishes STEADY_FOOTING_CONTEXT. In BB2020 the
+activation's STEADY_FOOTING never had a context to consume. It was inert, exactly as the first
+(reverted) ITER116 attempt assumed.
+
+ITER117 already corrected ITER116's file citations; this corrects its conclusion. Both corrections
+have the same root cause: reasoning about BB2020 behaviour from `step/bb2020/*.rs` and from the
+sequence shape, instead of reading the code the BB2020 path actually executes.
+
+**What IS true, and is the part worth keeping:** the coupling is real for the OTHER STEADY_FOOTING
+copies. The ones inside the move and blitz sequences consume contexts that the shared fall sites
+(GFI, jump, dodge, chainsaw) publish in EVERY edition, and those steps are the only consumer.
+Removing them stops BB2020 players falling. So the gate belongs in the activation builder, NOT in
+`make_step_for` -- a `StepId::SteadyFooting => no-op under Bb2020` arm would look equivalent and
+would hit every copy at once.
+
+### Ground truth
+
+`bb2020/SelectBlitzTarget.java:20-31` spells the block out as INIT_ACTIVATION, ANIMAL_SAVAGERY,
+HANDLE_DROP_PLAYER_CONTEXT, PLACE_BALL, APOTHECARY(ANIMAL_SAVAGERY), CATCH_SCATTER_THROW_IN,
+GOTO_LABEL, BONE_HEAD[NEXT], REALLY_STUPID, TAKE_ROOT, UNCHANNELLED_FURY, BLOOD_LUST -- **12 steps,
+which is this builder's 13 minus STEADY_FOOTING.** Nothing else differs.
+
+### The fix
+
+`ActivationSequenceBuilder` gained a `rules` field (default Bb2025) and `with_rules`, and omits
+STEADY_FOOTING when `rules == Bb2020`. Threading: `rules` added to 13 generator params structs
+(each losing `#[derive(Default)]` for a hand-written impl, since `Rules` has no `Default`), and a
+`rules` argument added to the three that take no params and exist in BB2020 Java --
+`SelectBlitzTarget`, `FuriousOutburst`, `ThenIStartedBlastin`. `Punt` deliberately keeps Bb2025: it
+is a BB2025-only generator with no BB2020 twin.
+
+Only 16 live construction sites needed updating, far fewer than the earlier estimate, because the
+bb2016 and bb2020 step files construct their OWN generators' params types, not these. Every one was
+an exhaustive struct literal, so the compiler enumerated them.
+
+### Gate
+
+Full 30-roster BB2020 matrix: **30/30 x `PARITY: 100/100`**, no exceptions. lineman bb2025 100/100,
+lineman bb2016 100/100. ffb-engine 7167/0, workspace clean.
+
+Renegades and underworld -- the only two BB2020 rosters with Animal Savagery, i.e. the only ones
+that can reach this step at all -- are both still 100/100, which is the specific evidence that
+matters here.
+
+### Tests
+
+`bb2020_activation_omits_steady_footing_and_matches_javas_twelve_steps` replaces the ITER116 guard
+test (which asserted the opposite, on the false premise). It pins the 12-step count, the absence of
+the step, and that ANIMAL_SAVAGERY hands directly to HANDLE_DROP_PLAYER_CONTEXT in BB2020 while
+BB2025 keeps the step between them.
+
+`steady_footing_gate_is_scoped_to_the_activation_only` pins the surviving distinction: the blitz
+sequence keeps its own STEADY_FOOTING regardless of edition.
+
+### Next
+
+The activation blocks now agree, which is the shared prerequisite behind the generator cluster.
+Next on the roadmap, working the list in `PARITY_BB2020_STRUCTURAL_GAP.md`: the per-generator
+differences that remain once the activation is factored out -- `Block.java` (0.58), `Move.java`
+(0.58), `BlitzBlock.java` (0.67), `Select.java` (0.70), `Foul.java` (0.73).

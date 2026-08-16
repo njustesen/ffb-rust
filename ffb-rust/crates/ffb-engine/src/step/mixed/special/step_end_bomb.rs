@@ -101,7 +101,7 @@ impl StepEndBomb {
         game.home_playing = game.team_home.players.iter().any(|p| p.id == catcher_id);
         change_player_action(game, &catcher_id, PlayerAction::ThrowBomb, false);
 
-        let seq = Pass::build_sequence(&PassParams { target_coordinate: None });
+        let seq = Pass::build_sequence(&PassParams { target_coordinate: None, rules: game.rules, });
 
         // Java: removePassCoordinate stays true so passCoordinate is cleared again here
         if remove_pass_coordinate {

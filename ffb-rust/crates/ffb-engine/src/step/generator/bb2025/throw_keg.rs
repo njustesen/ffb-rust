@@ -5,9 +5,20 @@ use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
 use super::activation_sequence_builder::ActivationSequenceBuilder;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ThrowKegParams {
     pub player_id: Option<String>,
+    /// Edition this sequence is built for; only BB2020 differs (no STEADY_FOOTING in the activation).
+    pub rules: ffb_model::enums::Rules,
+}
+
+impl Default for ThrowKegParams {
+    fn default() -> Self {
+        Self {
+            player_id: Default::default(),
+            rules: ffb_model::enums::Rules::Bb2025,
+        }
+    }
 }
 
 pub struct ThrowKeg;
@@ -20,6 +31,7 @@ impl ThrowKeg {
 
         // 1-13 [ACTIVATION(END)]
         ActivationSequenceBuilder::new()
+            .with_rules(params.rules)
             .with_failure_label(labels::END)
             .add_to(&mut seq);
 
@@ -79,7 +91,7 @@ mod tests {
 
     #[test]
     fn player_id_param_wired_when_provided() {
-        let steps = ThrowKeg::build_sequence(&ThrowKegParams { player_id: Some("p1".into()) });
+        let steps = ThrowKeg::build_sequence(&ThrowKegParams { player_id: Some("p1".into()), ..Default::default() });
         let throw_keg_step = &steps[13];
         assert!(throw_keg_step.params.iter().any(|p| matches!(p, StepParameter::TargetPlayerId(Some(id)) if id == "p1")));
     }

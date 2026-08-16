@@ -5,9 +5,20 @@ use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
 use super::activation_sequence_builder::ActivationSequenceBuilder;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct TreacherousParams {
     pub failure_label: String,
+    /// Edition this sequence is built for; only BB2020 differs (no STEADY_FOOTING in the activation).
+    pub rules: ffb_model::enums::Rules,
+}
+
+impl Default for TreacherousParams {
+    fn default() -> Self {
+        Self {
+            failure_label: Default::default(),
+            rules: ffb_model::enums::Rules::Bb2025,
+        }
+    }
 }
 
 pub struct Treacherous;
@@ -20,6 +31,7 @@ impl Treacherous {
 
         // [ACTIVATION(END)]
         ActivationSequenceBuilder::new()
+            .with_rules(params.rules)
             .with_failure_label(labels::END)
             .add_to(&mut seq);
 
@@ -56,21 +68,21 @@ mod tests {
     #[test]
     fn treacherous_has_18_steps_with_activation() {
         // Java pushSequence: ActivationSequenceBuilder.create()...addTo(sequence) (13) + 5 own steps = 18.
-        let steps = Treacherous::build_sequence(&TreacherousParams { failure_label: "X".into() });
+        let steps = Treacherous::build_sequence(&TreacherousParams { failure_label: "X".into(), ..Default::default() });
         assert_eq!(steps.len(), 18);
         assert_eq!(steps[0].step_id, StepId::InitActivation);
     }
 
     #[test]
     fn treacherous_is_labelled_end() {
-        let steps = Treacherous::build_sequence(&TreacherousParams { failure_label: "X".into() });
+        let steps = Treacherous::build_sequence(&TreacherousParams { failure_label: "X".into(), ..Default::default() });
         let t = steps.iter().find(|s| s.step_id == StepId::Treacherous).unwrap();
         assert_eq!(t.label.as_deref(), Some(labels::END));
     }
 
     #[test]
     fn failure_label_wired_to_treacherous_step() {
-        let steps = Treacherous::build_sequence(&TreacherousParams { failure_label: "MY_END".into() });
+        let steps = Treacherous::build_sequence(&TreacherousParams { failure_label: "MY_END".into(), ..Default::default() });
         let t = steps.iter().find(|s| s.step_id == StepId::Treacherous).unwrap();
         assert!(t.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnFailure(l) if l == "MY_END")));
     }

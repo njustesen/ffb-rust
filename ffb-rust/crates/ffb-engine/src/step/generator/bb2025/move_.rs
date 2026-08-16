@@ -7,13 +7,28 @@ use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
 use super::activation_sequence_builder::ActivationSequenceBuilder;
 
 /// Parameters — mirrors Java `Move.SequenceParams`.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct MoveParams {
     pub move_stack: Vec<FieldCoordinate>,
     pub gaze_victim_id: Option<String>,
     pub move_start: Option<FieldCoordinate>,
     pub ball_and_chain_rr_setting: Option<String>,
     pub bloodlust_action: Option<ffb_model::enums::PlayerAction>,
+    /// Edition this sequence is built for; only BB2020 differs (no STEADY_FOOTING in the activation).
+    pub rules: ffb_model::enums::Rules,
+}
+
+impl Default for MoveParams {
+    fn default() -> Self {
+        Self {
+            move_stack: Default::default(),
+            gaze_victim_id: Default::default(),
+            move_start: Default::default(),
+            ball_and_chain_rr_setting: Default::default(),
+            bloodlust_action: Default::default(),
+            rules: ffb_model::enums::Rules::Bb2025,
+        }
+    }
 }
 
 pub struct Move;
@@ -39,6 +54,7 @@ impl Move {
 
         // 2-15 [ACTIVATION(END_MOVING; preventNullDefender; SET_DEFENDER if gaze victim)]
         ActivationSequenceBuilder::new()
+            .with_rules(params.rules)
             .with_failure_label(fl)
             .with_eventual_defender(params.gaze_victim_id.clone())
             .prevent_null_defender()

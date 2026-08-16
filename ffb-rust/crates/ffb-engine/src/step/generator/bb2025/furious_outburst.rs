@@ -10,7 +10,7 @@ pub struct FuriousOutburst;
 impl FuriousOutburst {
     pub fn new() -> Self { Self }
 
-    pub fn build_sequence() -> Vec<SequenceStep> {
+    pub fn build_sequence(rules: ffb_model::enums::Rules) -> Vec<SequenceStep> {
         let mut seq = Sequence::new();
         // 1 INIT_FURIOUS_OUTBURST
         seq.add(StepId::InitFuriousOutburst, vec![
@@ -19,6 +19,7 @@ impl FuriousOutburst {
         // [ACTIVATION(END)] — Java pushSequence inserts the activation sub-sequence here
         // (ActivationSequenceBuilder.create().withFailureLabel(END).addTo(sequence)).
         ActivationSequenceBuilder::new()
+            .with_rules(rules)
             .with_failure_label(labels::END)
             .add_to(&mut seq);
         // 2 FOUL_APPEARANCE (goto END on failure)
@@ -75,14 +76,14 @@ mod tests {
     fn furious_outburst_has_28_steps_with_activation() {
         // Java pushSequence: INIT_FURIOUS_OUTBURST (1) + ActivationSequenceBuilder (13)
         // + 14 own steps = 28.
-        let steps = FuriousOutburst::build_sequence();
+        let steps = FuriousOutburst::build_sequence(ffb_model::enums::Rules::Bb2025);
         assert_eq!(steps.len(), 28);
         assert_eq!(steps[1].step_id, StepId::InitActivation);
     }
 
     #[test]
     fn furious_outburst_ends_with_end_furious_outburst_labelled_end() {
-        let steps = FuriousOutburst::build_sequence();
+        let steps = FuriousOutburst::build_sequence(ffb_model::enums::Rules::Bb2025);
         let last = steps.last().unwrap();
         assert_eq!(last.step_id, StepId::EndFuriousOutburst);
         assert_eq!(last.label.as_deref(), Some(labels::END));
@@ -90,7 +91,7 @@ mod tests {
 
     #[test]
     fn furious_outburst_place_ball_is_labelled_next() {
-        let steps = FuriousOutburst::build_sequence();
+        let steps = FuriousOutburst::build_sequence(ffb_model::enums::Rules::Bb2025);
         let pb = steps.iter().find(|s| {
             s.step_id == StepId::PlaceBall && s.label.as_deref() == Some(labels::NEXT)
         });
@@ -99,13 +100,13 @@ mod tests {
 
     #[test]
     fn furious_outburst_starts_with_init_furious_outburst() {
-        let steps = FuriousOutburst::build_sequence();
+        let steps = FuriousOutburst::build_sequence(ffb_model::enums::Rules::Bb2025);
         assert_eq!(steps[0].step_id, StepId::InitFuriousOutburst);
     }
 
     #[test]
     fn furious_outburst_has_stab() {
-        let steps = FuriousOutburst::build_sequence();
+        let steps = FuriousOutburst::build_sequence(ffb_model::enums::Rules::Bb2025);
         assert!(steps.iter().any(|s| s.step_id == StepId::Stab));
     }
 }

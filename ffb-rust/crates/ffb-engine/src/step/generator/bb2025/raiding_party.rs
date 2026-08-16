@@ -4,10 +4,22 @@ use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
 use super::activation_sequence_builder::ActivationSequenceBuilder;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct RaidingPartyParams {
     pub failure_label: String,
     pub success_label: String,
+    /// Edition this sequence is built for; only BB2020 differs (no STEADY_FOOTING in the activation).
+    pub rules: ffb_model::enums::Rules,
+}
+
+impl Default for RaidingPartyParams {
+    fn default() -> Self {
+        Self {
+            failure_label: Default::default(),
+            success_label: Default::default(),
+            rules: ffb_model::enums::Rules::Bb2025,
+        }
+    }
 }
 
 pub struct RaidingParty;
@@ -20,6 +32,7 @@ impl RaidingParty {
 
         // [ACTIVATION(END)]
         ActivationSequenceBuilder::new()
+            .with_rules(params.rules)
             .with_failure_label(labels::END)
             .add_to(&mut seq);
 
@@ -43,8 +56,7 @@ mod tests {
     fn raiding_party_last_step_labelled_end() {
         let steps = RaidingParty::build_sequence(&RaidingPartyParams {
             failure_label: "fail".into(),
-            success_label: "ok".into(),
-        });
+            success_label: "ok".into(), ..Default::default() });
         let last = steps.last().unwrap();
         assert_eq!(last.step_id, StepId::RaidingParty);
         assert_eq!(last.label.as_deref(), Some(labels::END));
@@ -61,8 +73,7 @@ mod tests {
     #[test]
     fn failure_label_wired() {
         let steps = RaidingParty::build_sequence(&RaidingPartyParams {
-            failure_label: "FAIL_LABEL".into(), success_label: "OK".into()
-        });
+            failure_label: "FAIL_LABEL".into(), success_label: "OK".into(), ..Default::default() });
         let last = steps.last().unwrap();
         assert!(last.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnFailure(l) if l == "FAIL_LABEL")));
     }
@@ -70,8 +81,7 @@ mod tests {
     #[test]
     fn success_label_wired() {
         let steps = RaidingParty::build_sequence(&RaidingPartyParams {
-            failure_label: "F".into(), success_label: "SUCCESS_LABEL".into()
-        });
+            failure_label: "F".into(), success_label: "SUCCESS_LABEL".into(), ..Default::default() });
         let last = steps.last().unwrap();
         assert!(last.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnSuccess(l) if l == "SUCCESS_LABEL")));
     }
