@@ -7237,3 +7237,39 @@ way. Both are answerable by tracing the prayer itself.
 Ends a run of five disproven hypotheses. Every one of those came from correlating dice values or
 reasoning forward from Java source; all three real findings today came from traces that already
 existed - FFB_DIE_AT, FFB_DICE_DEEP and now JAVA_AVBROKE.
+
+## ITER135 -- RETRACTION of ITER134: Intensive Training cannot be the cause
+
+ITER134 claimed the necromantic divergence was Rust skipping the Intensive Training prayer's skill
+grant. That is wrong on two counts and is retracted.
+
+First, Rust does NOT skip it. The bb2020 handler's header comment says "skips skill-selection dialog"
+but the comment is STALE: step/bb2020/step_prayer.rs:129-145 calls h.skill_dialog(game) and raises
+AgentPrompt::SelectSkill, and random_agent.rs:790 answers it with the alphabetically first eligible
+skill, matching Java's Comparator.comparing(Skill::getName). I quoted the comment instead of reading
+the code beneath it - the same mistake this campaign has hit repeatedly with stale comments.
+
+Second, Intensive Training could not have granted Mighty Blow to this player anyway. Java picks
+eligible skills from player.getPosition().getSkillCategories(false), and RosterPosition:195 shows
+false = the NORMAL-roll list, which is exactly Rust's player.skill_categories_normal. The attacker
+is a Werewolf whose normal categories are Agility and General; Mighty Blow is Strength, so it is
+ineligible in BOTH engines. The rebuilt roster has the categories the right way round (Werewolf
+normal A/G double P/S, Flesh Golem normal G/S double A), so the converter did not swap the columns.
+
+Confirmed and still standing: cheeringFans fires once in this game, so a Prayer to Nuffle IS granted
+at half 2 turn 1, and JAVA_AVBROKE shows Java applying a +1 modifier named Mighty Blow to the
+attacking Werewolf that Rust does not apply. Also confirmed the Java team XML player order matches
+the JSON, so Away2 is the same Werewolf in both engines.
+
+That makes six disproven hypotheses on this one divergence: Blood Lust per-activation, Throw a Rock
+armour-vs-injury, unequal drop counts, the defender-mode flag, the attacker snapshot, and now
+Intensive Training. Every single one came from reading code and reasoning forward. Every real fact
+came from a trace that already existed.
+
+So I am not hypothesising again. The next step is the one measurement that names the source
+directly: extend the JAVA_AVBROKE trace in mechanics/mixed/StatsMechanic.java - which already exists
+and is already gated behind ffb.parityDebug - to print, for each modifier, the skill it is
+registered to and the player owning that skill, then rebuild the jar and run seed 65 once. That
+turns "where does this Mighty Blow come from" from a guess into a read.
+
+Branch parked at 28/29; main untouched at 30/30.
