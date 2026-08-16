@@ -85,6 +85,23 @@ impl ActivationSequenceBuilder {
         sequence.add(StepId::AnimalSavagery, as_params);
 
         // 3 STEADY_FOOTING
+        //
+        // DO NOT edition-gate this off for BB2020, even though it looks like you should:
+        // `grep -rn STEADY_FOOTING .../server/step/generator/bb2020/` is EMPTY, so no BB2020 Java
+        // generator has this step anywhere. It is one half of a COUPLED pair, and removing only
+        // this half silently breaks every BB2020 fall.
+        //
+        // `StepSteadyFooting` is the ONLY consumer of a published `SteadyFootingContext`
+        // (`StepHandleDropPlayerContext` below does not read it). Rust's BB2020 fall sites publish
+        // one anyway — `bb2020/move_/step_go_for_it.rs:259`, plus bb2020 jump / move_dodge /
+        // block_chainsaw / breathe_fire / stalling_player — where BB2020 Java instead applies the
+        // drop directly. Those publishes and this step cancel out exactly, which is why all 30
+        // BB2020 rosters are 100/100 with it present, including the only two that can even reach
+        // it from ANIMAL_SAVAGERY above (renegades, underworld).
+        //
+        // Making BB2020 truly 1:1 here means changing BOTH halves together: rewrite those ~6
+        // BB2020 fall sites to apply the drop inline as Java does, THEN drop this step for
+        // BB2020. See docs/PARITY_BB2020_CAMPAIGN.md (ITER116).
         sequence.add(StepId::SteadyFooting, vec![]);
         // 4 HANDLE_DROP_PLAYER_CONTEXT
         sequence.add(StepId::HandleDropPlayerContext, vec![]);
@@ -166,6 +183,28 @@ mod tests {
         // Without eventual_defender: GotoLabel at 7, BoneHead [NEXT] at 8
         assert_eq!(steps[8].step_id, StepId::BoneHead);
         assert_eq!(steps[8].label.as_deref(), Some(labels::NEXT));
+    }
+
+    /// Guards the coupling documented at the STEADY_FOOTING line in `add_to`.
+    ///
+    /// No BB2020 Java generator contains STEADY_FOOTING, so gating this step off for BB2020 looks
+    /// like an obvious 1:1 fix. It is not: `StepSteadyFooting` is the only consumer of a published
+    /// `SteadyFootingContext`, and Rust's BB2020 fall sites (`bb2020/move_/step_go_for_it.rs:259`
+    /// and friends) publish one. Removing just this step strands those contexts and no BB2020
+    /// player ever falls. Both halves have to change together, or neither.
+    ///
+    /// If you are here because this test failed: you removed one half. Read the comment in
+    /// `add_to` and `docs/PARITY_BB2020_CAMPAIGN.md` (ITER116) before going further.
+    #[test]
+    fn steady_footing_stays_in_the_activation_because_bb2020_fall_sites_depend_on_it() {
+        let steps = build_with_label("END");
+        let sf = steps.iter().position(|s| s.step_id == StepId::SteadyFooting)
+            .expect("STEADY_FOOTING must stay: BB2020 fall sites publish a context only it reads");
+        let animal_savagery = steps.iter().position(|s| s.step_id == StepId::AnimalSavagery)
+            .expect("ANIMAL_SAVAGERY feeds the context consumed below");
+        assert!(animal_savagery < sf,
+            "ANIMAL_SAVAGERY publishes the SteadyFootingContext that STEADY_FOOTING consumes, \
+             so it has to come first");
     }
 
     #[test]

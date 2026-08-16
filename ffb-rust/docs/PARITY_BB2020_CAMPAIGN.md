@@ -6199,3 +6199,70 @@ the backlog below rather than silently absorbed.**
 * the shared `ActivationSequenceBuilder` emits STEADY_FOOTING where BB2020 Java has none (found
   above; touches every activation, so it needs its own iteration and a full-matrix gate);
 * dead bb2020 step files that drift from their Java counterparts.
+
+## ITER116 -- activation STEADY_FOOTING: investigated, deliberately NOT changed
+
+Backlog item 5, the last one carried over from ITER115. Resolved as a documented won't-fix with a
+guard test, NOT as a code change. The reasoning matters more than the outcome, because the "fix"
+here looks obviously correct and is actively dangerous.
+
+### The apparent bug
+
+`grep -rn STEADY_FOOTING ffb-java/.../server/step/generator/bb2020/` is **empty**. No BB2020 Java
+generator contains the step anywhere; BB2020 spells its activations out by hand
+(`bb2020/SelectBlitzTarget.java`, `bb2020/ThrowTeamMate.java:29-43`) without one. The driver runs
+the shared BB2025 `ActivationSequenceBuilder` for BB2020 games, and that builder emits
+STEADY_FOOTING as step 3 of EVERY activation. So Rust runs a step in every BB2020 activation that
+Java never runs. The one-line gate writes itself.
+
+### Why the one-line gate is wrong
+
+`StepSteadyFooting` is the **only** consumer of a published `SteadyFootingContext` --
+`StepHandleDropPlayerContext`, the step immediately after it, does not read it. But Rust's BB2020
+fall sites publish one anyway:
+
+  bb2020/move_/step_go_for_it.rs:259, bb2020/move_/step_jump.rs, bb2020/move_/step_move_dodge.rs,
+  bb2020/block/step_block_chainsaw.rs, bb2020/step_breathe_fire.rs, bb2020/step_stalling_player.rs
+
+...where BB2020 Java applies the drop directly instead of publishing anything. Two unfaithful
+halves that cancel out exactly. Gate the step off for BB2020 and those contexts are stranded with
+no consumer: **no BB2020 player ever falls from a failed rush, dodge, or jump.** The matrix would
+not "drop a few seeds", it would come apart on the most-exercised path in the engine.
+
+An earlier read in this iteration claimed the step was inert because `execute_step` returns
+NEXT_STEP without a context. That was wrong and is retracted: ANIMAL_SAVAGERY is step 2 of the
+activation and `step/mixed/shared/step_animal_savagery.rs` publishes a context straight into it.
+The step is live, not inert.
+
+### Evidence it is currently equivalent
+
+Only two BB2020 rosters carry Animal Savagery at all -- `data/rosters/bb2020/roster_renegades.json`
+and `roster_underworld.json` -- and both are 100/100. All 30 BB2020 rosters are 100/100 with the
+step present (ITER111). The paired shape is behaviourally correct; it is only structurally unfaithful.
+
+### What a real fix costs
+
+Both halves have to move together: rewrite those ~6 BB2020 fall sites to apply the drop inline the
+way BB2020 Java does, THEN drop the step from BB2020 activations -- which additionally needs `rules`
+threaded into ~20 generator params structs (most use `#[derive(Default)]`, and `Rules` has no
+`Default`, so each needs a hand-written impl plus every exhaustive struct-literal construction site
+updated: 50+ edit sites). All of it on the hottest path of a 30/30/30-green engine, for zero
+expected behavioural change. Not worth it now; recorded so the decision is deliberate rather than
+forgotten.
+
+### Landed
+
+- The STEADY_FOOTING line in `activation_sequence_builder.rs` now carries the full coupling
+  explanation, so the next reader does not "fix" it.
+- Test `steady_footing_stays_in_the_activation_because_bb2020_fall_sites_depend_on_it` fails loudly
+  if the step is removed or reordered before ANIMAL_SAVAGERY, and its doc comment points here.
+
+Gate: `cargo test --workspace` clean. No engine behaviour changed (comment + test only), so no
+matrix re-run was required.
+
+### Backlog after this iteration
+
+Cleared: Grab auto-decline (ITER112), game-option key mismatch (ITER113), `clear_pushback_stack`
+(ITER114), ThrowTeamMate PICK_UP (ITER115), activation STEADY_FOOTING (ITER116, won't-fix).
+Remaining: the dead BB2020 step files that drift from their Java counterparts -- decide delete
+versus keep-in-sync.
