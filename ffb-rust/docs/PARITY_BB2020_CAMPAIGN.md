@@ -7308,3 +7308,40 @@ I should have checked the toolchain before proposing it.
 Next: instrument find_armor_modifiers / get_armor_modifiers_from_skills for this one block and print
 the skill ids it iterates and what each maps to. Expected output is a list containing MightyBlow;
 if it is absent the fault is in the enumeration, if present the fault is in the Claws branch.
+
+## ITER137 -- clawDoesNotStack: root cause confirmed, obvious fix regresses dwarf, reverted
+
+Root cause of necromantic seed 65, confirmed by probe rather than inference:
+
+find_armor_modifiers returns BOTH ["Claws", "Mighty Blow"] for the attacker, so the modifiers are
+found and then discarded. That is precisely what the CLAW_DOES_NOT_STACK branch of
+injury_type_block.rs does - clear, retry without Claws, then restore Claws alone - and it matches
+the observed end state exactly (mods=[Claws] modTotal=0 broken=false against Java's
+mods=Claws,Mighty Blow modTotal=1 broken=true).
+
+The option is meant to be false. Java UtilServerStartGame:247-249 sets it explicitly. Rust has the
+same assignment in util_server_start_game.rs:56 - inside add_default_game_options, WHICH IS CALLED
+FROM NOWHERE. grep across all crates finds no caller. So every option falls back to its factory
+default, and clawDoesNotStack's factory default is TRUE (util_game_option.rs says so in its own
+comment). Rust has been running with Claws-does-not-stack for its entire history while Java has not.
+
+That dead function is a backlog item I recorded at ITER113 and dismissed as inert. It is not.
+
+THE OBVIOUS FIX DOES NOT WORK. Adding (CLAW_DOES_NOT_STACK, "false") to BASELINE_SETUP_OPTIONS -
+exactly the precedent MB_STACKS_AGAINST_CHAINSAW set in the same list for the same reason - fixes
+necromantic seed 65 (98 -> 99/100) but REGRESSES dwarf from 100/100 to 92/100. Net 2 failures
+before, 9 after, so it is reverted.
+
+The dwarf regression is not a Claws case at all. Seed 56 diverges at step 3 on a FOUL:
+JAVA_AVBROKE shows armour=9 reduced=9 mods=Dirty Player modTotal=2 broken=true - no Claws involved,
+and Claws returns None for fouls anyway. So flipping this option changes dwarf through some path
+other than the one it names, which means my model of what the option gates is incomplete.
+
+What this tells us: the option default IS wrong in Rust, but it is not independently settable -
+something else in the armour path compensates for it today, and correcting one without the other
+trades necromantic's 2 failures for dwarf's 8. The pair has to be understood together.
+
+Next: run dwarf seed 56 with a RUST_AVBROKE-style probe against JAVA_AVBROKE at step 3 to see what
+the option actually changed on a foul path, before touching the default again.
+
+Branch stays at 28/29 with necromantic 98/100; main untouched at 30/30.
