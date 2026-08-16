@@ -7116,3 +7116,33 @@ first block's falling players are finished.
 
 Next: compare the block/Frenzy sequence ordering, not this step.
 
+### ITER132 -- the snapshot hypothesis is DISPROVEN; stop guessing, widen the Java trace
+
+Implemented ITER131's candidate and measured it: **inert**. Java captures `attackerState` once at
+the top of the hook and reuses it for both the injury-modifier mode and the attacker-fall branch,
+while Rust re-reads live state at each point -- the second read happening after the defender's
+injury and `drop_player`. Making Rust snapshot once, exactly as Java does, changed **nothing**:
+necromantic is still 98/100, failing the same two seeds at the same two steps (37/182, 65/130).
+So the two reads always agreed and the premise was false.
+
+Reverted rather than kept. The change was behaviourally inert but carried a comment asserting a bug
+that does not exist, and a wrong explanation in the source is worse than no explanation -- that is
+the same trap ITER116 and ITER117 had to undo.
+
+**Five hypotheses on this one divergence have now been disproven** -- Blood Lust per-activation,
+Throw a Rock armour-vs-injury, unequal drop counts, the defender-mode flag, and now the attacker
+snapshot. Every one came from correlating dice values or reading Java statically and reasoning
+forward. The only things that have actually produced facts here are `FFB_DIE_AT` backtraces and the
+temporary Rust probe.
+
+The blocker is asymmetry of evidence: Rust can be probed freely, but the Java engine cannot be
+modified (only `ParityRunner` is co-editable), so Java's side is visible solely through
+`JAVA_DIE ... from=DiceRoller.rollDice:98` -- which names the dice helper, never the STEP that
+called it. Every remaining hypothesis is about which Java step is running, and that line cannot
+distinguish them.
+
+**Next: widen the Java dice trace in the harness** to print several caller frames, or the current
+step id, alongside each `JAVA_DIE`. `ParityRunner` is explicitly co-editable and the campaign has
+precedent for exactly this (`JAVA_BLOCKROLL`, `JAVA_AVBROKE`, `FFB_IDSTATE`). One harness change
+converts this from guesswork into a direct read.
+
