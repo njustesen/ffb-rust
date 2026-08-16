@@ -7273,3 +7273,38 @@ registered to and the player owning that skill, then rebuild the jar and run see
 turns "where does this Mighty Blow come from" from a guess into a read.
 
 Branch parked at 28/29; main untouched at 30/30.
+
+## ITER136 -- narrowed to Mighty Blow missing from Rust armour modifiers
+
+Built the Rust mirror of JAVA_AVBROKE (temporary probe, since removed) and compared the same armour
+decision side by side at seed 65 step 130:
+
+  JAVA  def=Home2  armour=9 reduced=8 roll=[3,4] modTotal=1 mods=Claws,Mighty Blow  broken=true
+  RUST  def=home_02 att=away_02        roll=[3,4] modTotal=0 mods=[Claws]           broken=false
+        att temp skills = [MightyBlow=Some("+1")]
+
+The attacker HOLDS Mighty Blow in Rust - the probe confirms it on temporary_skills and has_skill
+returns true - yet Rust's armour modifier list contains only Claws. Java stacks Claws and Mighty
+Blow for +1, reaching the Claws-reduced AV of 8 on a roll of 7 and breaking armour; Rust totals 0,
+does not break, never rolls injury, and the player stays Prone instead of being KO'd.
+
+Where the skill comes from is now fully explained and NOT a bug: the BB2020 Cheering Fans kickoff
+result grants a Prayer to Nuffle, both engines roll KNUCKLE_DUSTERS, both apply it to away_02 at the
+half-2 kickoff, and Prayer.java:52-58 shows KNUCKLE_DUSTERS grants Mighty Blow (+1). Rust's
+prayer_player_effect.rs:35 grants the same skill. Prayer selection, player selection and timing all
+agree.
+
+So the defect is downstream, in injury_type_block.rs armour_roll. mods contains only Claws after
+find_armor_modifiers, so Mighty Blow was never returned for the attacker - the Claws branch cannot
+have dropped it, because that branch re-adds the remaining mods and CLAW_DOES_NOT_STACK is set to
+false in util_server_start_game.rs:56. Either the factory does not see the temporary skill on this
+path, or the Claws handling clears the list before the others are added.
+
+Also ruled out this iteration: the Java jar CANNOT be rebuilt - there is no mvn on PATH and no
+wrapper, only prebuilt jars in ffb-ai/target - so the Java-side instrumentation proposed in ITER135
+is not available and the JAVA_AVBROKE trace already compiled in is the most Java detail obtainable.
+I should have checked the toolchain before proposing it.
+
+Next: instrument find_armor_modifiers / get_armor_modifiers_from_skills for this one block and print
+the skill ids it iterates and what each maps to. Expected output is a list containing MightyBlow;
+if it is absent the fault is in the enumeration, if present the fault is in the Claws branch.
