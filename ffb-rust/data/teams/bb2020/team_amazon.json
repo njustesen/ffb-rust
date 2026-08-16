@@ -7,17 +7,17 @@
   "apothecaries": 1,
   "dedicated_fans": 3,
   "fan_factor": 0,
-  "treasury": 0,
-  "spent": 1100000,
-  "team_value": 1090000,
+  "treasury": 30000,
+  "spent": 1070000,
+  "team_value": 1060000,
   "players": [
     {
       "nr": 1,
-      "position_id": "amazon.blitzer"
+      "position_id": "amazon.jaguarwarriorblocker"
     },
     {
       "nr": 2,
-      "position_id": "amazon.blitzer"
+      "position_id": "amazon.jaguarwarriorblocker"
     },
     {
       "nr": 3,
@@ -29,19 +29,19 @@
     },
     {
       "nr": 5,
-      "position_id": "amazon.catcher"
+      "position_id": "amazon.thrower"
     },
     {
       "nr": 6,
-      "position_id": "amazon.catcher"
+      "position_id": "amazon.thrower"
     },
     {
       "nr": 7,
-      "position_id": "amazon.thrower"
+      "position_id": "amazon.linewoman"
     },
     {
       "nr": 8,
-      "position_id": "amazon.thrower"
+      "position_id": "amazon.linewoman"
     },
     {
       "nr": 9,
@@ -57,10 +57,6 @@
     },
     {
       "nr": 12,
-      "position_id": "amazon.linewoman"
-    },
-    {
-      "nr": 13,
       "position_id": "amazon.linewoman"
     }
   ],

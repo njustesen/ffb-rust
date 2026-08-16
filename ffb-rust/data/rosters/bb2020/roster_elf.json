@@ -12,23 +12,51 @@
       "name": "Lineman",
       "display_name": "Lineman",
       "type": "Regular",
-      "quantity": 16,
+      "quantity": 12,
       "cost": 60000,
       "ma": 6,
       "st": 3,
-      "ag": 4,
+      "ag": 2,
       "pa": 4,
-      "av": 7,
+      "av": 8,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
-          "General",
-          "Agility"
+          "Agility",
+          "General"
         ],
         "double": [
-          "Strength",
-          "Passing"
+          "Strength"
         ]
-      }
+      },
+      "skills": []
+    },
+    {
+      "id": "elf.thrower",
+      "name": "Thrower",
+      "display_name": "Thrower",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 75000,
+      "ma": 6,
+      "st": 3,
+      "ag": 2,
+      "pa": 2,
+      "av": 8,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General",
+          "Passing"
+        ],
+        "double": [
+          "Strength"
+        ]
+      },
+      "skills": [
+        "Pass"
+      ]
     },
     {
       "id": "elf.catcher",
@@ -39,49 +67,23 @@
       "cost": 100000,
       "ma": 8,
       "st": 3,
-      "ag": 4,
+      "ag": 2,
       "pa": 4,
-      "av": 7,
-      "skills": [
-        "Catch",
-        "Nerves of Steel"
-      ],
+      "av": 8,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
-          "General",
-          "Agility"
-        ],
-        "double": [
-          "Strength",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "elf.thrower",
-      "name": "Thrower",
-      "display_name": "Thrower",
-      "type": "Regular",
-      "quantity": 2,
-      "cost": 70000,
-      "ma": 6,
-      "st": 3,
-      "ag": 4,
-      "pa": 2,
-      "av": 7,
-      "skills": [
-        "Pass"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
           "Agility",
-          "Passing"
+          "General"
         ],
         "double": [
           "Strength"
         ]
-      }
+      },
+      "skills": [
+        "Catch",
+        "Nerves of Steel"
+      ]
     },
     {
       "id": "elf.blitzer",
@@ -89,26 +91,27 @@
       "display_name": "Blitzer",
       "type": "Regular",
       "quantity": 2,
-      "cost": 110000,
+      "cost": 115000,
       "ma": 7,
       "st": 3,
-      "ag": 4,
+      "ag": 2,
       "pa": 3,
-      "av": 8,
+      "av": 9,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General"
+        ],
+        "double": [
+          "Passing",
+          "Strength"
+        ]
+      },
       "skills": [
         "Block",
         "Side Step"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Agility"
-        ],
-        "double": [
-          "Strength",
-          "Passing"
-        ]
-      }
+      ]
     }
   ]
 }

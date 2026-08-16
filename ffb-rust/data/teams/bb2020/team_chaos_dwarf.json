@@ -7,9 +7,9 @@
   "apothecaries": 1,
   "dedicated_fans": 3,
   "fan_factor": 0,
-  "treasury": 0,
-  "spent": 1100000,
-  "team_value": 1090000,
+  "treasury": 10000,
+  "spent": 1090000,
+  "team_value": 1080000,
   "players": [
     {
       "nr": 1,
@@ -21,19 +21,19 @@
     },
     {
       "nr": 3,
-      "position_id": "chaosdwarf.bullcentaur"
+      "position_id": "chaosdwarf.chaosdwarfflamesmith"
     },
     {
       "nr": 4,
-      "position_id": "chaosdwarf.blocker"
+      "position_id": "chaosdwarf.chaosdwarfflamesmith"
     },
     {
       "nr": 5,
-      "position_id": "chaosdwarf.blocker"
+      "position_id": "chaosdwarf.hobgoblinsneakystabba"
     },
     {
       "nr": 6,
-      "position_id": "chaosdwarf.hobgoblin"
+      "position_id": "chaosdwarf.blocker"
     },
     {
       "nr": 7,

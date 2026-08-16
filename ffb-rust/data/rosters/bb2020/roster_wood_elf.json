@@ -8,64 +8,28 @@
   "necromancer": false,
   "positions": [
     {
-      "id": "woodelf.treeman",
-      "name": "Treeman",
-      "display_name": "Treeman",
-      "type": "Big Guy",
-      "quantity": 1,
-      "cost": 120000,
-      "ma": 2,
-      "st": 6,
-      "ag": 1,
-      "pa": 5,
-      "av": 10,
-      "skills": [
-        "Loner",
-        "Mighty Blow",
-        "Stand Firm",
-        "Strong Arm",
-        "Take Root",
-        "Thick Skull",
-        "Throw Team-Mate"
-      ],
-      "skill_categories": {
-        "normal": [
-          "Strength"
-        ],
-        "double": [
-          "General",
-          "Agility",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "woodelf.wardancer",
-      "name": "Wardancer",
-      "display_name": "Wardancer",
+      "id": "woodelf.lineman",
+      "name": "Wood Elf Lineman",
+      "display_name": "Wood Elf Lineman",
       "type": "Regular",
-      "quantity": 2,
-      "cost": 120000,
-      "ma": 8,
+      "quantity": 12,
+      "cost": 70000,
+      "ma": 7,
       "st": 3,
-      "ag": 4,
+      "ag": 2,
       "pa": 4,
-      "av": 7,
-      "skills": [
-        "Block",
-        "Dodge",
-        "Leap"
-      ],
+      "av": 8,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
-          "General",
-          "Agility"
+          "Agility",
+          "General"
         ],
         "double": [
-          "Strength",
-          "Passing"
+          "Strength"
         ]
-      }
+      },
+      "skills": []
     },
     {
       "id": "woodelf.thrower",
@@ -73,25 +37,26 @@
       "display_name": "Thrower",
       "type": "Regular",
       "quantity": 2,
-      "cost": 90000,
+      "cost": 95000,
       "ma": 7,
       "st": 3,
-      "ag": 4,
+      "ag": 2,
       "pa": 2,
-      "av": 7,
-      "skills": [
-        "Pass"
-      ],
+      "av": 8,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
-          "General",
           "Agility",
+          "General",
           "Passing"
         ],
         "double": [
           "Strength"
         ]
-      }
+      },
+      "skills": [
+        "Pass"
+      ]
     },
     {
       "id": "woodelf.catcher",
@@ -100,48 +65,93 @@
       "type": "Regular",
       "quantity": 4,
       "cost": 90000,
-      "ma": 9,
+      "ma": 8,
       "st": 2,
-      "ag": 4,
+      "ag": 2,
       "pa": 4,
-      "av": 7,
+      "av": 8,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General"
+        ],
+        "double": [
+          "Passing",
+          "Strength"
+        ]
+      },
       "skills": [
         "Catch",
         "Dodge"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Agility"
-        ],
-        "double": [
-          "Strength",
-          "Passing"
-        ]
-      }
+      ]
     },
     {
-      "id": "woodelf.lineman",
-      "name": "Lineman",
-      "display_name": "Lineman",
+      "id": "woodelf.wardancer",
+      "name": "Wardancer",
+      "display_name": "Wardancer",
       "type": "Regular",
-      "quantity": 16,
-      "cost": 70000,
-      "ma": 7,
+      "quantity": 2,
+      "cost": 125000,
+      "ma": 8,
       "st": 3,
-      "ag": 4,
+      "ag": 2,
       "pa": 4,
-      "av": 7,
+      "av": 8,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
-          "General",
-          "Agility"
+          "Agility",
+          "General"
         ],
         "double": [
-          "Strength",
-          "Passing"
+          "Passing",
+          "Strength"
         ]
-      }
+      },
+      "skills": [
+        "Block",
+        "Dodge",
+        "Leap"
+      ]
+    },
+    {
+      "id": "woodelf.treeman",
+      "name": "Loren Forest Treeman",
+      "display_name": "Loren Forest Treeman",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 120000,
+      "ma": 2,
+      "st": 6,
+      "ag": 5,
+      "pa": 5,
+      "av": 11,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General"
+        ]
+      },
+      "skills": [
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Stand Firm",
+        "Strong Arm",
+        "Take Root",
+        "Thick Skull",
+        "Throw Team-mate"
+      ]
     }
   ],
   "infamous_staff": [

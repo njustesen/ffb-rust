@@ -9,54 +9,27 @@
   "positions": [
     {
       "id": "darkelf.lineman",
-      "name": "Lineman",
-      "display_name": "Lineman",
+      "name": "Dark Elf Lineman",
+      "display_name": "Dark Elf Lineman",
       "type": "Regular",
-      "quantity": 16,
+      "quantity": 12,
       "cost": 70000,
       "ma": 6,
       "st": 3,
-      "ag": 4,
+      "ag": 2,
       "pa": 4,
-      "av": 8,
+      "av": 9,
       "shorthand": "L",
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Agility"
-        ],
-        "double": [
-          "Strength",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "darkelf.blitzer",
-      "name": "Blitzer",
-      "display_name": "Blitzer",
-      "type": "Regular",
-      "quantity": 4,
-      "cost": 100000,
-      "ma": 7,
-      "st": 3,
-      "ag": 4,
-      "pa": 4,
-      "av": 8,
-      "shorthand": "Z",
-      "skills": [
-        "Block"
-      ],
       "skill_categories": {
         "normal": [
           "Agility",
           "General"
         ],
         "double": [
-          "Strength",
-          "Passing"
+          "Strength"
         ]
-      }
+      },
+      "skills": []
     },
     {
       "id": "darkelf.runner",
@@ -67,23 +40,50 @@
       "cost": 80000,
       "ma": 7,
       "st": 3,
-      "ag": 4,
+      "ag": 2,
       "pa": 3,
-      "av": 7,
+      "av": 8,
       "shorthand": "R",
-      "skills": [
-        "Dump-Off"
-      ],
       "skill_categories": {
         "normal": [
-          "General",
           "Agility",
+          "General",
           "Passing"
         ],
         "double": [
           "Strength"
         ]
-      }
+      },
+      "skills": [
+        "Dump-Off"
+      ]
+    },
+    {
+      "id": "darkelf.blitzer",
+      "name": "Blitzer",
+      "display_name": "Blitzer",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 100000,
+      "ma": 7,
+      "st": 3,
+      "ag": 2,
+      "pa": 4,
+      "av": 9,
+      "shorthand": "Z",
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General"
+        ],
+        "double": [
+          "Passing",
+          "Strength"
+        ]
+      },
+      "skills": [
+        "Block"
+      ]
     },
     {
       "id": "darkelf.assassin",
@@ -91,27 +91,27 @@
       "display_name": "Assassin",
       "type": "Regular",
       "quantity": 2,
-      "cost": 90000,
-      "ma": 6,
+      "cost": 85000,
+      "ma": 7,
       "st": 3,
-      "ag": 4,
+      "ag": 2,
       "pa": 5,
-      "av": 7,
+      "av": 8,
       "shorthand": "A",
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General"
+        ],
+        "double": [
+          "Passing",
+          "Strength"
+        ]
+      },
       "skills": [
         "Shadowing",
         "Stab"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Agility"
-        ],
-        "double": [
-          "Strength",
-          "Passing"
-        ]
-      }
+      ]
     },
     {
       "id": "darkelf.witchelf",
@@ -122,25 +122,25 @@
       "cost": 110000,
       "ma": 7,
       "st": 3,
-      "ag": 4,
+      "ag": 2,
       "pa": 5,
-      "av": 7,
+      "av": 8,
       "shorthand": "W",
-      "skills": [
-        "Dodge",
-        "Frenzy",
-        "Jump Up"
-      ],
       "skill_categories": {
         "normal": [
           "Agility",
           "General"
         ],
         "double": [
-          "Strength",
-          "Passing"
+          "Passing",
+          "Strength"
         ]
-      }
+      },
+      "skills": [
+        "Dodge",
+        "Frenzy",
+        "Jump Up"
+      ]
     }
   ],
   "name_generator": "default"

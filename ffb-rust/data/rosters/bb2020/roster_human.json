@@ -9,7 +9,7 @@
   "positions": [
     {
       "id": "human.lineman",
-      "name": "Lineman",
+      "name": "Human Lineman",
       "display_name": "Human Lineman",
       "type": "Regular",
       "quantity": 16,
@@ -18,60 +18,32 @@
       "st": 3,
       "ag": 3,
       "pa": 4,
-      "av": 8,
+      "av": 9,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
           "General"
         ],
         "double": [
           "Agility",
-          "Strength",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "human.blitzer",
-      "name": "Blitzer",
-      "display_name": "Human Blitzer",
-      "type": "Regular",
-      "quantity": 4,
-      "cost": 90000,
-      "ma": 7,
-      "st": 3,
-      "ag": 3,
-      "pa": 4,
-      "av": 8,
-      "skills": [
-        "Block"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
           "Strength"
-        ],
-        "double": [
-          "Agility",
-          "Passing"
         ]
-      }
+      },
+      "skills": []
     },
     {
       "id": "human.thrower",
       "name": "Thrower",
-      "display_name": "Human Thrower",
+      "display_name": "Thrower",
       "type": "Regular",
       "quantity": 2,
-      "cost": 70000,
+      "cost": 80000,
       "ma": 6,
       "st": 3,
       "ag": 3,
       "pa": 2,
-      "av": 8,
-      "skills": [
-        "Pass",
-        "Sure Hands"
-      ],
+      "av": 9,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
           "General",
@@ -81,61 +53,94 @@
           "Agility",
           "Strength"
         ]
-      }
-    },
-    {
-      "id": "human.catcher",
-      "name": "Catcher",
-      "display_name": "Human Catcher",
-      "type": "Regular",
-      "quantity": 4,
-      "cost": 70000,
-      "ma": 8,
-      "st": 2,
-      "ag": 3,
-      "pa": 5,
-      "av": 7,
+      },
       "skills": [
-        "Catch",
-        "Dodge"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Agility"
-        ],
-        "double": [
-          "Passing",
-          "Strength"
-        ]
-      }
+        "Pass",
+        "Sure Hands"
+      ]
     },
     {
       "id": "human.catcher.old",
       "name": "Catcher",
-      "display_name": "Human Catcher",
+      "display_name": "Catcher",
       "type": "Regular",
-      "quantity": 0,
-      "cost": 70000,
+      "quantity": 4,
+      "cost": 65000,
       "ma": 8,
       "st": 2,
       "ag": 3,
       "pa": 5,
-      "av": 7,
-      "skills": [
-        "Catch",
-        "Dodge"
-      ],
+      "av": 8,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
-          "General",
-          "Agility"
+          "Agility",
+          "General"
         ],
         "double": [
           "Passing",
           "Strength"
         ]
-      }
+      },
+      "skills": [
+        "Catch",
+        "Dodge"
+      ]
+    },
+    {
+      "id": "human.blitzer",
+      "name": "Blitzer",
+      "display_name": "Blitzer",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 85000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 9,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Passing"
+        ]
+      },
+      "skills": [
+        "Block"
+      ]
+    },
+    {
+      "id": "human.halflinghopeful",
+      "name": "Halfling Hopeful",
+      "display_name": "Halfling Hopeful",
+      "type": "Regular",
+      "quantity": 3,
+      "cost": 30000,
+      "ma": 5,
+      "st": 2,
+      "ag": 3,
+      "pa": 4,
+      "av": 7,
+      "shorthand": "Ha",
+      "skill_categories": {
+        "normal": [
+          "Agility"
+        ],
+        "double": [
+          "General",
+          "Strength"
+        ]
+      },
+      "skills": [
+        "Dodge",
+        "Right Stuff",
+        "Stunty"
+      ]
     },
     {
       "id": "human.ogre",
@@ -146,27 +151,32 @@
       "cost": 140000,
       "ma": 5,
       "st": 5,
-      "ag": 2,
+      "ag": 4,
       "pa": 5,
-      "av": 9,
-      "skills": [
-        "Loner",
-        "bone head",
-        "Bone Head",
-        "Mighty Blow",
-        "Thick Skull",
-        "Throw Team-Mate"
-      ],
+      "av": 10,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
           "Strength"
         ],
         "double": [
           "Agility",
-          "Passing",
           "General"
         ]
-      }
+      },
+      "skills": [
+        "Bone Head",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Thick Skull",
+        "Throw Team-mate"
+      ]
     }
   ],
   "name_generator": "default",

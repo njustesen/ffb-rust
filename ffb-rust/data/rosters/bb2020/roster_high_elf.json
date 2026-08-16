@@ -16,72 +16,21 @@
       "cost": 70000,
       "ma": 6,
       "st": 3,
-      "ag": 4,
+      "ag": 2,
       "pa": 4,
-      "av": 8,
+      "av": 9,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
-          "General",
-          "Agility"
-        ],
-        "double": [
-          "Strength",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "highelf.thrower",
-      "name": "Thrower",
-      "display_name": "Thrower",
-      "type": "Regular",
-      "quantity": 2,
-      "cost": 90000,
-      "ma": 6,
-      "st": 3,
-      "ag": 4,
-      "pa": 2,
-      "av": 8,
-      "skills": [
-        "Pass",
-        "Safe Pass"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
           "Agility",
-          "Passing"
+          "General"
         ],
         "double": [
+          "Passing",
           "Strength"
         ]
-      }
-    },
-    {
-      "id": "highelf.blitzer",
-      "name": "Blitzer",
-      "display_name": "Blitzer",
-      "type": "Regular",
-      "quantity": 2,
-      "cost": 100000,
-      "ma": 7,
-      "st": 3,
-      "ag": 4,
-      "pa": 4,
-      "av": 8,
-      "skills": [
-        "Block"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Agility"
-        ],
-        "double": [
-          "Strength",
-          "Passing"
-        ]
-      }
+      },
+      "skills": []
     },
     {
       "id": "highelf.catcher",
@@ -92,22 +41,78 @@
       "cost": 90000,
       "ma": 8,
       "st": 3,
-      "ag": 4,
+      "ag": 2,
       "pa": 5,
-      "av": 7,
-      "skills": [
-        "Catch"
-      ],
+      "av": 8,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
-          "General",
-          "Agility"
+          "Agility",
+          "General"
         ],
         "double": [
-          "Strength",
-          "Passing"
+          "Strength"
         ]
-      }
+      },
+      "skills": [
+        "Catch"
+      ]
+    },
+    {
+      "id": "highelf.thrower",
+      "name": "Thrower",
+      "display_name": "Thrower",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 100000,
+      "ma": 6,
+      "st": 3,
+      "ag": 2,
+      "pa": 2,
+      "av": 9,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General",
+          "Passing"
+        ],
+        "double": [
+          "Strength"
+        ]
+      },
+      "skills": [
+        "Cloud Burster",
+        "Pass",
+        "Safe Pass"
+      ]
+    },
+    {
+      "id": "highelf.blitzer",
+      "name": "Blitzer",
+      "display_name": "Blitzer",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 100000,
+      "ma": 7,
+      "st": 3,
+      "ag": 2,
+      "pa": 4,
+      "av": 9,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General"
+        ],
+        "double": [
+          "Passing",
+          "Strength"
+        ]
+      },
+      "skills": [
+        "Block"
+      ]
     }
   ],
   "infamous_staff": [

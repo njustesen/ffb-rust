@@ -8,37 +8,37 @@
   "necromancer": false,
   "positions": [
     {
-      "id": "chaos.beastman",
-      "name": "Chaos Beastman",
-      "display_name": "Chaos Beastman",
+      "id": "chaos.beastmanrunnerlineman",
+      "name": "Beastman Runner Lineman",
+      "display_name": "Beastman Runner Lineman",
       "type": "Regular",
-      "quantity": 12,
+      "quantity": 16,
       "cost": 60000,
       "ma": 6,
       "st": 3,
       "ag": 3,
       "pa": 4,
-      "av": 8,
-      "shorthand": "B",
-      "skills": [
-        "Horns"
-      ],
+      "av": 9,
+      "shorthand": "Be",
       "skill_categories": {
         "normal": [
           "General",
-          "Strength",
-          "Mutation"
+          "Mutation",
+          "Strength"
         ],
         "double": [
           "Agility",
           "Passing"
         ]
-      }
+      },
+      "skills": [
+        "Horns"
+      ]
     },
     {
-      "id": "chaos.warrior",
-      "name": "Chaos Warrior",
-      "display_name": "Chaos Warrior",
+      "id": "chaos.chosenblocker",
+      "name": "Chosen Blocker",
+      "display_name": "Chosen Blocker",
       "type": "Regular",
       "quantity": 4,
       "cost": 100000,
@@ -46,19 +46,95 @@
       "st": 4,
       "ag": 3,
       "pa": 5,
-      "av": 9,
-      "shorthand": "W",
+      "av": 10,
+      "shorthand": "Ch",
       "skill_categories": {
         "normal": [
           "General",
-          "Strength",
-          "Mutation"
+          "Mutation",
+          "Strength"
+        ],
+        "double": [
+          "Agility"
+        ]
+      },
+      "skills": []
+    },
+    {
+      "id": "chaos.chaostroll",
+      "name": "Chaos Troll",
+      "display_name": "Chaos Troll",
+      "type": "BigGuy",
+      "quantity": 1,
+      "cost": 115000,
+      "ma": 4,
+      "st": 5,
+      "ag": 5,
+      "pa": 5,
+      "av": 10,
+      "shorthand": "Ch",
+      "skill_categories": {
+        "normal": [
+          "Mutation",
+          "Strength"
         ],
         "double": [
           "Agility",
-          "Passing"
+          "General"
         ]
-      }
+      },
+      "skills": [
+        "Always Hungry",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Projectile Vomit",
+        "Really Stupid",
+        "Regeneration",
+        "Throw Team-mate"
+      ]
+    },
+    {
+      "id": "chaos.chaosogre",
+      "name": "Chaos Ogre",
+      "display_name": "Chaos Ogre",
+      "type": "BigGuy",
+      "quantity": 1,
+      "cost": 140000,
+      "ma": 5,
+      "st": 5,
+      "ag": 4,
+      "pa": 5,
+      "av": 10,
+      "shorthand": "Ch",
+      "skill_categories": {
+        "normal": [
+          "Mutation",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General"
+        ]
+      },
+      "skills": [
+        "Bone Head",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Thick Skull",
+        "Throw Team-mate"
+      ]
     },
     {
       "id": "chaos.minotaur",
@@ -69,28 +145,34 @@
       "cost": 150000,
       "ma": 5,
       "st": 5,
-      "ag": 2,
+      "ag": 4,
       "pa": 0,
-      "av": 8,
-      "skills": [
-        "Loner",
-        "Frenzy",
-        "Horns",
-        "Mighty Blow",
-        "Thick Skull",
-        "Unchannelled Fury"
-      ],
+      "av": 9,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
-          "Strength",
-          "Mutation"
+          "Mutation",
+          "Strength"
         ],
         "double": [
-          "General",
           "Agility",
-          "Passing"
+          "General"
         ]
-      }
+      },
+      "skills": [
+        "Frenzy",
+        "Horns",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Thick Skull",
+        "Unchannelled Fury"
+      ]
     }
   ],
   "name_generator": "default"

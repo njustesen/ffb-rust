@@ -8,36 +8,89 @@
   "necromancer": true,
   "positions": [
     {
-      "id": "undead.mummy",
-      "name": "Mummy",
-      "display_name": "Mummy",
+      "id": "undead.skeleton",
+      "name": "Skeleton Lineman",
+      "display_name": "Skeleton Lineman",
       "type": "Regular",
-      "quantity": 2,
-      "cost": 110000,
-      "ma": 3,
-      "st": 5,
-      "ag": 1,
-      "pa": 0,
-      "av": 9,
-      "skills": [
-        "Mighty Blow",
-        "Regeneration"
-      ],
+      "quantity": 12,
+      "cost": 40000,
+      "ma": 5,
+      "st": 3,
+      "ag": 4,
+      "pa": 6,
+      "av": 8,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
-          "Strength"
+          "General"
         ],
         "double": [
-          "General",
           "Agility",
-          "Passing"
+          "Strength"
         ]
-      }
+      },
+      "skills": [
+        "Regeneration",
+        "Thick Skull"
+      ]
+    },
+    {
+      "id": "undead.zombie",
+      "name": "Zombie Lineman",
+      "display_name": "Zombie Lineman",
+      "type": "Regular",
+      "quantity": 12,
+      "cost": 40000,
+      "ma": 4,
+      "st": 3,
+      "ag": 4,
+      "pa": 0,
+      "av": 9,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "General"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      },
+      "skills": [
+        "Regeneration"
+      ]
+    },
+    {
+      "id": "undead.ghoul",
+      "name": "Ghoul Runner",
+      "display_name": "Ghoul Runner",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 75000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General"
+        ],
+        "double": [
+          "Passing",
+          "Strength"
+        ]
+      },
+      "skills": [
+        "Dodge"
+      ]
     },
     {
       "id": "undead.wight",
-      "name": "Wight",
-      "display_name": "Wight",
+      "name": "Wight Blitzer",
+      "display_name": "Wight Blitzer",
       "type": "Regular",
       "quantity": 2,
       "cost": 90000,
@@ -45,11 +98,8 @@
       "st": 3,
       "ag": 3,
       "pa": 5,
-      "av": 8,
-      "skills": [
-        "Block",
-        "Regeneration"
-      ],
+      "av": 9,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
           "General",
@@ -59,85 +109,41 @@
           "Agility",
           "Passing"
         ]
-      }
-    },
-    {
-      "id": "undead.ghoul",
-      "name": "Ghoul",
-      "display_name": "Ghoul",
-      "type": "Regular",
-      "quantity": 4,
-      "cost": 70000,
-      "ma": 7,
-      "st": 3,
-      "ag": 3,
-      "pa": 4,
-      "av": 7,
+      },
       "skills": [
-        "Dodge"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Agility"
-        ],
-        "double": [
-          "Strength",
-          "Passing"
-        ]
-      }
+        "Block",
+        "Regeneration"
+      ]
     },
     {
-      "id": "undead.zombie",
-      "name": "Zombie",
-      "display_name": "Zombie",
+      "id": "undead.mummy",
+      "name": "Mummy",
+      "display_name": "Mummy",
       "type": "Regular",
-      "quantity": 16,
-      "cost": 40000,
-      "ma": 4,
-      "st": 3,
-      "ag": 2,
+      "quantity": 2,
+      "cost": 125000,
+      "ma": 3,
+      "st": 5,
+      "ag": 5,
       "pa": 0,
-      "av": 8,
-      "skills": [
-        "Regeneration"
-      ],
+      "av": 10,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
-          "General"
+          "Strength"
         ],
         "double": [
-          "Strength",
           "Agility",
-          "Passing"
+          "General"
         ]
-      }
-    },
-    {
-      "id": "undead.skeleton",
-      "name": "Skeleton",
-      "display_name": "Skeleton",
-      "type": "Regular",
-      "quantity": 16,
-      "cost": 30000,
-      "ma": 5,
-      "st": 3,
-      "ag": 2,
-      "pa": 6,
-      "av": 7,
+      },
       "skills": [
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
         "Regeneration"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General"
-        ],
-        "double": [
-          "Strength",
-          "Agility",
-          "Passing"
-        ]
-      }
+      ]
     }
   ],
   "raised_position_id": "undead.zombie"

@@ -8,32 +8,60 @@
   "necromancer": false,
   "positions": [
     {
-      "id": "dwarf.blocker",
-      "name": "Blocker",
-      "display_name": "Blocker",
+      "id": "dwarf.dwarfblockerlineman",
+      "name": "Dwarf Blocker Lineman",
+      "display_name": "Dwarf Blocker Lineman",
       "type": "Regular",
       "quantity": 12,
       "cost": 70000,
       "ma": 4,
       "st": 3,
-      "ag": 2,
+      "ag": 4,
       "pa": 5,
-      "av": 9,
-      "skills": [
-        "Block",
-        "Tackle",
-        "Thick Skull"
-      ],
+      "av": 10,
+      "shorthand": "Dw",
       "skill_categories": {
         "normal": [
           "General",
           "Strength"
         ],
         "double": [
-          "Agility",
-          "Passing"
+          "Agility"
         ]
-      }
+      },
+      "skills": [
+        "Block",
+        "Tackle",
+        "Thick Skull"
+      ]
+    },
+    {
+      "id": "dwarf.runner",
+      "name": "Runner",
+      "display_name": "Runner",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 85000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 9,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Passing"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      },
+      "skills": [
+        "Sure Hands",
+        "Thick Skull"
+      ]
     },
     {
       "id": "dwarf.blitzer",
@@ -46,48 +74,22 @@
       "st": 3,
       "ag": 3,
       "pa": 4,
-      "av": 9,
+      "av": 10,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Passing"
+        ]
+      },
       "skills": [
         "Block",
         "Thick Skull"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Strength"
-        ],
-        "double": [
-          "Agility",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "dwarf.runner",
-      "name": "Runner",
-      "display_name": "Runner",
-      "type": "Regular",
-      "quantity": 2,
-      "cost": 80000,
-      "ma": 6,
-      "st": 3,
-      "ag": 3,
-      "pa": 4,
-      "av": 8,
-      "skills": [
-        "Sure Hands",
-        "Thick Skull"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Passing"
-        ],
-        "double": [
-          "Agility",
-          "Strength"
-        ]
-      }
+      ]
     },
     {
       "id": "dwarf.trollslayer",
@@ -95,28 +97,28 @@
       "display_name": "Troll Slayer",
       "type": "Regular",
       "quantity": 2,
-      "cost": 90000,
+      "cost": 95000,
       "ma": 5,
       "st": 3,
-      "ag": 2,
+      "ag": 4,
       "pa": 0,
-      "av": 8,
-      "skills": [
-        "Block",
-        "Dauntless",
-        "Frenzy",
-        "Thick Skull"
-      ],
+      "av": 9,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
           "General",
           "Strength"
         ],
         "double": [
-          "Agility",
-          "Passing"
+          "Agility"
         ]
-      }
+      },
+      "skills": [
+        "Block",
+        "Dauntless",
+        "Frenzy",
+        "Thick Skull"
+      ]
     },
     {
       "id": "dwarf.deathroller",
@@ -124,31 +126,41 @@
       "display_name": "Deathroller",
       "type": "Big Guy",
       "quantity": 1,
-      "cost": 160000,
+      "cost": 170000,
       "ma": 4,
       "st": 7,
-      "ag": 1,
+      "ag": 5,
       "pa": 0,
-      "av": 10,
-      "skills": [
-        "Break Tackle",
-        "Dirty Player",
-        "Juggernaut",
-        "Mighty Blow",
-        "No Hands",
-        "Secret Weapon",
-        "Stand Firm"
-      ],
+      "av": 11,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
           "Strength"
         ],
         "double": [
-          "General",
           "Agility",
-          "Passing"
+          "General"
         ]
-      }
+      },
+      "skills": [
+        "Break Tackle",
+        {
+          "name": "Dirty Player",
+          "value": 2
+        },
+        "Juggernaut",
+        {
+          "name": "Loner",
+          "value": 5
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "No Hands",
+        "Secret Weapon",
+        "Stand Firm"
+      ]
     }
   ],
   "name_generator": "default"

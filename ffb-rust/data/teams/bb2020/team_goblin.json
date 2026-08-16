@@ -7,9 +7,9 @@
   "apothecaries": 1,
   "dedicated_fans": 3,
   "fan_factor": 0,
-  "treasury": 210000,
-  "spent": 890000,
-  "team_value": 880000,
+  "treasury": 150000,
+  "spent": 950000,
+  "team_value": 940000,
   "players": [
     {
       "nr": 1,
@@ -25,19 +25,19 @@
     },
     {
       "nr": 4,
-      "position_id": "goblin.bombardier"
+      "position_id": "goblin.ooligan"
     },
     {
       "nr": 5,
-      "position_id": "goblin.looney"
+      "position_id": "goblin.doomdiver"
     },
     {
       "nr": 6,
-      "position_id": "goblin.goblin"
+      "position_id": "goblin.bomma"
     },
     {
       "nr": 7,
-      "position_id": "goblin.goblin"
+      "position_id": "goblin.looney"
     },
     {
       "nr": 8,

@@ -9,21 +9,17 @@
   "positions": [
     {
       "id": "nurgle.rotter",
-      "name": "Rotter",
-      "display_name": "Rotter",
+      "name": "Rotter Lineman",
+      "display_name": "Rotter Lineman",
       "type": "Regular",
-      "quantity": 16,
-      "cost": 40000,
+      "quantity": 12,
+      "cost": 35000,
       "ma": 5,
       "st": 3,
-      "ag": 3,
+      "ag": 4,
       "pa": 6,
-      "av": 8,
+      "av": 9,
       "shorthand": "R",
-      "skills": [
-        "Decay",
-        "Plague Ridden"
-      ],
       "skill_categories": {
         "normal": [
           "General",
@@ -31,10 +27,13 @@
         ],
         "double": [
           "Agility",
-          "Strength",
-          "Passing"
+          "Strength"
         ]
-      }
+      },
+      "skills": [
+        "Decay",
+        "Plague Ridden"
+      ]
     },
     {
       "id": "nurgle.pestigor",
@@ -42,95 +41,99 @@
       "display_name": "Pestigor",
       "type": "Regular",
       "quantity": 4,
-      "cost": 80000,
+      "cost": 75000,
       "ma": 6,
       "st": 3,
       "ag": 3,
       "pa": 4,
-      "av": 8,
+      "av": 9,
       "shorthand": "P",
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Mutation",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Passing"
+        ]
+      },
       "skills": [
         "Horns",
         "Plague Ridden",
         "Regeneration"
-      ],
+      ]
+    },
+    {
+      "id": "nurgle.bloater",
+      "name": "Bloater",
+      "display_name": "Bloater",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 115000,
+      "ma": 4,
+      "st": 4,
+      "ag": 4,
+      "pa": 6,
+      "av": 10,
+      "shorthand": "Bl",
       "skill_categories": {
         "normal": [
           "General",
-          "Strength",
-          "Mutation"
+          "Mutation",
+          "Strength"
         ],
         "double": [
-          "Agility",
-          "Passing"
+          "Agility"
         ]
-      }
-    },
-    {
-      "id": "nurgle.warrior",
-      "name": "Nurgle Warrior",
-      "display_name": "Nurgle Warrior",
-      "type": "Regular",
-      "quantity": 4,
-      "cost": 110000,
-      "ma": 4,
-      "st": 4,
-      "ag": 2,
-      "pa": 6,
-      "av": 9,
-      "shorthand": "W",
+      },
       "skills": [
         "Disturbing Presence",
         "Foul Appearance",
         "Plague Ridden",
         "Regeneration"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Strength",
-          "Mutation"
-        ],
-        "double": [
-          "Agility",
-          "Passing"
-        ]
-      }
+      ]
     },
     {
-      "id": "nurgle.beast",
-      "name": "Beast of Nurgle",
-      "display_name": "Beast of Nurgle",
-      "type": "Big Guy",
+      "id": "nurgle.rotspawn",
+      "name": "Rotspawn",
+      "display_name": "Rotspawn",
+      "type": "Regular",
       "quantity": 1,
       "cost": 140000,
       "ma": 4,
       "st": 5,
-      "ag": 1,
+      "ag": 5,
       "pa": 0,
-      "av": 9,
-      "shorthand": "B",
-      "skills": [
-        "Disturbing Presence",
-        "Foul Appearance",
-        "Loner",
-        "Mighty Blow",
-        "Plague Ridden",
-        "Really Stupid",
-        "Regeneration",
-        "Tentacles"
-      ],
+      "av": 10,
+      "shorthand": "Ro",
       "skill_categories": {
         "normal": [
           "Strength"
         ],
         "double": [
-          "General",
           "Agility",
-          "Passing",
+          "General",
           "Mutation"
         ]
-      }
+      },
+      "skills": [
+        "Disturbing Presence",
+        "Foul Appearance",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Plague Ridden",
+        "Really Stupid",
+        "Regeneration",
+        "Tentacles"
+      ]
     }
   ],
   "raised_position_id": "nurgle.beast",

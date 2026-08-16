@@ -8,6 +8,33 @@
   "necromancer": false,
   "positions": [
     {
+      "id": "khemri.skeleton",
+      "name": "Skeleton Lineman",
+      "display_name": "Skeleton Lineman",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 40000,
+      "ma": 5,
+      "st": 3,
+      "ag": 4,
+      "pa": 6,
+      "av": 8,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "General"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      },
+      "skills": [
+        "Regeneration",
+        "Thick Skull"
+      ]
+    },
+    {
       "id": "khemri.tombguardian",
       "name": "Tomb Guardian",
       "display_name": "Tomb Guardian",
@@ -16,105 +43,81 @@
       "cost": 100000,
       "ma": 4,
       "st": 5,
-      "ag": 1,
+      "ag": 5,
       "pa": 0,
-      "av": 9,
+      "av": 10,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General"
+        ]
+      },
       "skills": [
         "Decay",
         "Regeneration"
-      ],
-      "skill_categories": {
-        "normal": [
-          "Strength"
-        ],
-        "double": [
-          "General",
-          "Agility",
-          "Passing"
-        ]
-      }
+      ]
     },
     {
-      "id": "khemri.blitzra",
-      "name": "Blitz-Ra",
-      "display_name": "Blitz-Ra",
-      "type": "Regular",
-      "quantity": 2,
-      "cost": 90000,
-      "ma": 6,
-      "st": 3,
-      "ag": 2,
-      "pa": 6,
-      "av": 8,
-      "skills": [
-        "Block",
-        "Regeneration"
-      ],
-      "skill_categories": {
-        "normal": [
-          "General",
-          "Strength"
-        ],
-        "double": [
-          "Agility",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "khemri.throra",
-      "name": "Thro-Ra",
-      "display_name": "Thro-Ra",
+      "id": "khemri.anointedthrower",
+      "name": "Anointed Thrower",
+      "display_name": "Anointed Thrower",
       "type": "Regular",
       "quantity": 2,
       "cost": 70000,
       "ma": 6,
       "st": 3,
-      "ag": 2,
+      "ag": 4,
       "pa": 3,
-      "av": 7,
-      "skills": [
-        "Pass",
-        "Regeneration",
-        "Sure Hands"
-      ],
+      "av": 8,
+      "shorthand": "An",
       "skill_categories": {
         "normal": [
           "General",
           "Passing"
         ],
         "double": [
-          "Agility",
-          "Strength"
+          "Agility"
         ]
-      }
+      },
+      "skills": [
+        "Pass",
+        "Regeneration",
+        "Sure Hands",
+        "Thick Skull"
+      ]
     },
     {
-      "id": "khemri.skeleton",
-      "name": "Skeleton",
-      "display_name": "Skeleton",
+      "id": "khemri.anointedblitzer",
+      "name": "Anointed Blitzer",
+      "display_name": "Anointed Blitzer",
       "type": "Regular",
-      "quantity": 16,
-      "cost": 40000,
-      "ma": 5,
+      "quantity": 2,
+      "cost": 90000,
+      "ma": 6,
       "st": 3,
-      "ag": 2,
+      "ag": 4,
       "pa": 6,
-      "av": 7,
-      "skills": [
-        "Regeneration",
-        "Thick Skull"
-      ],
+      "av": 9,
+      "shorthand": "An",
       "skill_categories": {
         "normal": [
-          "General"
+          "General",
+          "Strength"
         ],
         "double": [
           "Agility",
-          "Strength",
           "Passing"
         ]
-      }
+      },
+      "skills": [
+        "Block",
+        "Regeneration",
+        "Thick Skull"
+      ]
     }
   ]
 }

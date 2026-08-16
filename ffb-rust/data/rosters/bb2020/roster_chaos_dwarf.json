@@ -9,8 +9,8 @@
   "positions": [
     {
       "id": "chaosdwarf.hobgoblin",
-      "name": "Hobgoblin",
-      "display_name": "Hobgoblin",
+      "name": "Hobgoblin Lineman",
+      "display_name": "Hobgoblin Lineman",
       "type": "Regular",
       "quantity": 16,
       "cost": 40000,
@@ -18,35 +18,59 @@
       "st": 3,
       "ag": 3,
       "pa": 4,
-      "av": 7,
+      "av": 8,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
           "General"
         ],
         "double": [
           "Agility",
-          "Strength",
-          "Passing"
+          "Strength"
         ]
-      }
+      },
+      "skills": []
+    },
+    {
+      "id": "chaosdwarf.hobgoblinsneakystabba",
+      "name": "Hobgoblin Sneaky Stabba",
+      "display_name": "Hobgoblin Sneaky Stabba",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 70000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 5,
+      "av": 8,
+      "shorthand": "Ho",
+      "skill_categories": {
+        "normal": [
+          "General"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      },
+      "skills": [
+        "Shadowing",
+        "Stab"
+      ]
     },
     {
       "id": "chaosdwarf.blocker",
       "name": "Chaos Dwarf Blocker",
       "display_name": "Chaos Dwarf Blocker",
       "type": "Regular",
-      "quantity": 6,
+      "quantity": 4,
       "cost": 70000,
       "ma": 4,
       "st": 3,
-      "ag": 2,
+      "ag": 4,
       "pa": 6,
-      "av": 9,
-      "skills": [
-        "Block",
-        "Tackle",
-        "Thick Skull"
-      ],
+      "av": 10,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
           "General",
@@ -54,28 +78,58 @@
         ],
         "double": [
           "Agility",
-          "Passing",
           "Mutation"
         ]
-      }
+      },
+      "skills": [
+        "Block",
+        "Iron Hard Skin",
+        "Thick Skull"
+      ]
+    },
+    {
+      "id": "chaosdwarf.chaosdwarfflamesmith",
+      "name": "Chaos Dwarf Flamesmith",
+      "display_name": "Chaos Dwarf Flamesmith",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 80000,
+      "ma": 5,
+      "st": 3,
+      "ag": 4,
+      "pa": 6,
+      "av": 10,
+      "shorthand": "Ch",
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Mutation"
+        ]
+      },
+      "skills": [
+        "Brawler",
+        "Breathe Fire",
+        "Disturbing Presence",
+        "Thick Skull"
+      ]
     },
     {
       "id": "chaosdwarf.bullcentaur",
-      "name": "Bull Centaur",
-      "display_name": "Bull Centaur",
+      "name": "Bull Centaur Blitzer",
+      "display_name": "Bull Centaur Blitzer",
       "type": "Regular",
       "quantity": 2,
       "cost": 130000,
       "ma": 6,
       "st": 4,
-      "ag": 2,
+      "ag": 4,
       "pa": 6,
-      "av": 9,
-      "skills": [
-        "Sprint",
-        "Sure Feet",
-        "Thick Skull"
-      ],
+      "av": 10,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
           "General",
@@ -83,9 +137,14 @@
         ],
         "double": [
           "Agility",
-          "Passing"
+          "Mutation"
         ]
-      }
+      },
+      "skills": [
+        "Sprint",
+        "Sure Feet",
+        "Thick Skull"
+      ]
     },
     {
       "id": "chaosdwarf.minotaur",
@@ -96,28 +155,34 @@
       "cost": 150000,
       "ma": 5,
       "st": 5,
-      "ag": 2,
+      "ag": 4,
       "pa": 0,
-      "av": 8,
-      "skills": [
-        "Loner",
-        "Frenzy",
-        "Horns",
-        "Mighty Blow",
-        "Thick Skull",
-        "Unchannelled Fury"
-      ],
+      "av": 9,
+      "shorthand": "",
       "skill_categories": {
         "normal": [
           "Strength"
         ],
         "double": [
-          "General",
           "Agility",
-          "Passing",
+          "General",
           "Mutation"
         ]
-      }
+      },
+      "skills": [
+        "Frenzy",
+        "Horns",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Thick Skull",
+        "Unchannelled Fury"
+      ]
     }
   ],
   "name_generator": "default"

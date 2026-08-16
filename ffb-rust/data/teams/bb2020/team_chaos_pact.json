@@ -2,7 +2,7 @@
   "edition": "bb2020",
   "race": "chaos_pact",
   "roster_id": "chaospact.lrb6",
-  "rerolls": 3,
+  "rerolls": 2,
   "reroll_cost": 70000,
   "apothecaries": 0,
   "dedicated_fans": 3,
@@ -17,47 +17,47 @@
     },
     {
       "nr": 2,
-      "position_id": "chaospact.ogre.chaos"
+      "position_id": "chaospact.renegaderatogre"
     },
     {
       "nr": 3,
-      "position_id": "chaospact.troll.chaos"
+      "position_id": "chaospact.renegadeogre"
     },
     {
       "nr": 4,
-      "position_id": "chaospact.darkelf.renegade"
+      "position_id": "chaospact.renegadehumanthrower"
     },
     {
       "nr": 5,
-      "position_id": "chaospact.skaven.renegade"
+      "position_id": "chaospact.renegadedarkelf"
     },
     {
       "nr": 6,
-      "position_id": "chaospact.goblin.renegade"
+      "position_id": "chaospact.renegadeorc"
     },
     {
       "nr": 7,
-      "position_id": "chaospact.marauder"
+      "position_id": "chaospact.renegadeskaven"
     },
     {
       "nr": 8,
-      "position_id": "chaospact.marauder"
+      "position_id": "chaospact.renegadegoblin"
     },
     {
       "nr": 9,
-      "position_id": "chaospact.marauder"
+      "position_id": "chaospact.renegadehumanlineman"
     },
     {
       "nr": 10,
-      "position_id": "chaospact.marauder"
+      "position_id": "chaospact.renegadehumanlineman"
     },
     {
       "nr": 11,
-      "position_id": "chaospact.marauder"
+      "position_id": "chaospact.renegadehumanlineman"
     },
     {
       "nr": 12,
-      "position_id": "chaospact.marauder"
+      "position_id": "chaospact.renegadehumanlineman"
     }
   ],
   "special_rules": []
