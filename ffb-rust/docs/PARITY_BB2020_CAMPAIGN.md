@@ -6800,3 +6800,52 @@ against Java's `h1t11ahome...` / `h1t12aaway...`.
 
 The data fix is correct but currently regresses 6 rosters, so it sits on a branch per the standing
 "commit when progress is made without regression" rule. Main remains 30/30.
+
+## ITER125 -- chaos seed 1 narrowed to the block RESULT, not the dice (branch WIP)
+
+Got the Rust state string out (it populates only under `FFB_TRACE=1`; the matrix run's log has
+`state: None`, which is why ITER124 could not diff). The two post-states at the divergence:
+
+    JAVA  i=13 -> i=14   h1t11ahome -> h1t12aaway   h00 12,7,Standing -> 12,7,PRONE
+                                                    a02 13,8,Standing  (unchanged)
+    RUST  i=13 -> i=14   h1t11ahome -> h1t11ahome   h00 12,7,Standing -> 13,8,Standing
+                                                    a02 13,8,Standing -> -1,-1,KO
+
+`teamChaosParity20Home1` is `h00`, the Minotaur, and both engines block the same defender
+(`Away3` = `a02`; `JAVA_BLOCK_PICK pid=Home1 N=2 idx=1 def=Away3` is the TARGET pick, not the die
+pick -- worth noting since the name invites the opposite reading).
+
+So with the identical dice established in ITER124, **Java resolves the block to Attacker Down and
+Rust resolves it to Defender Down**. Java's Minotaur falls, which is the turnover that ends the
+home turn; Rust's Minotaur knocks the defender out and follows up into 13,8.
+
+### What is ruled out
+
+- **Dice.** Both streams are byte-identical across pos 22-31 (ITER124).
+- **Die index choice.** `ParityRunner` answers BLOCK_ROLL / BLOCK_ROLL_PARTIAL_RE_ROLL /
+  BLOCK_ROLL_PROPERTIES with `sendBlockChoice(0)` unconditionally (`ParityRunner.java:581,591`), and
+  Rust's agent answers `AgentPrompt::BlockChoice` with `die_index: 0`
+  (`agent/random_agent.rs:581-588`). Both pick index 0.
+- **A general block bug.** 24 rosters block constantly and are 100/100, so neither the die-value ->
+  BlockResult mapping nor the roll order can be wrong in general.
+
+### Open, and deliberately not guessed at
+
+Two things do not add up yet and need instrumentation rather than more reading:
+
+1. If both pick index 0 of the same `[1, 6]`, both should get the same BlockResult. Something about
+   THIS block -- a Minotaur, so Frenzy plus a freshly-granted Unchannelled Fury -- changes which
+   array or index is in play.
+2. Rust KO'd `a02` on an armour roll of 1+2=3, which cannot break AV8. Either the KO came from dice
+   I have mis-attributed, or Rust took a different injury path entirely.
+
+Point 2 in particular means the dice attribution may not be as clean as ITER124 concluded. This
+campaign's own notes warn that Java `rng_calls` count CALLS while Rust counts DICE, and that equal
+values at equal indexes do not prove the same roll -- so the "byte-identical dice" claim should be
+re-verified by pairing Java `caller=` frames with Rust `FFB_DIE_AT` backtraces before being built on.
+
+### Next probe
+
+Log, for this one block in both engines: the block dice array as stored, the chosen index, the
+resulting `BlockResult`, and the attacker/defender strengths that decide who chooses. That is four
+values and settles it; everything above is inference from state deltas.
