@@ -6735,3 +6735,189 @@ after ANY roster change, or the engines disagree), and gate on the full matrix. 
 **change behaviour and possibly break rosters** -- granting five big guys a negatrait they have
 never had, and Claws to two more, will move dice. That is the point: it is the first BB2020 change
 in a long while that can actually be validated end to end.
+
+## ITER124 -- the roster fix lands, and surfaces two real engine bugs (WIP, on a branch)
+
+Applied ITER123's 15 fixes to `data/rosters/bb2020/`, re-ran `gen_java_parity_data.py`,
+`check_skill_names.py` clean. **This is on branch `bb2020-roster-skill-legality`, NOT main** --
+6 rosters are red and main stays green until they are fixed.
+
+### Matrix: 24 green, 6 red
+
+    chaos         0/100     chaos_dwarf   1/100     chaos_pact    0/100
+    norse         1/100     skaven        1/100     slann_fumbbl  0/100
+
+Green despite being changed: nurgle (Plague Ridden x4), necromantic (Claws), high_elf (Safe Pass),
+human (Bone Head), halfling (Hatred dropped). So most of the renames were behaviourally safe.
+
+The reds cluster on exactly two mechanics, **both of which had never executed in a BB2020 parity
+game before this commit**: the Unchannelled Fury / Animal Savagery negatrait (5 rosters) and Bone
+Head on the FUMBBL slann (1).
+
+### A rename of mine that was wrong
+
+`Wild Animal -> Unchannelled Fury` was applied as a blanket rename to all five positions holding it.
+BB2020 does not work that way -- different big guys get different traits. Checked against
+`rules/teams/`:
+
+    Minotaur (chaos, chaos_dwarf, chaos_pact)  Unchannelled Fury   correct
+    Yhetee / snow troll (norse)                Claws + Unch. Fury  correct
+    Rat Ogre (skaven)                          ANIMAL SAVAGERY     WRONG -> corrected
+
+skaven is still 1/100 after the correction, so its divergence is real and not an artifact of the
+bad rename.
+
+**Scope limit worth stating:** there is no in-repo authority for BB2020 position-level rosters --
+`rules/teams/` is BB2025 data and the BB2020 rosters are the bad clone. Every skill NAME is now
+legal in BB2020 (Java is the authority for that), and individual positions were sanity-checked
+against BB2025 where the editions agree, but the full BB2020 team lists are NOT verified.
+
+### chaos seed 1 diagnosed: state-only, not dice
+
+Divergence at i=13, the Minotaur's BLOCK. Java ends the home turn there; Rust plays on with two more
+players.
+
+Dice were the obvious suspect and are **not** the cause. Both streams through the divergence are
+byte-identical:
+
+    pos  22 23 24 25 26 27 28 29 30 31
+         2  4  3  5  1  6  1  2  6  4
+
+with pos 25 the Unchannelled Fury `rollSkill` (=5, a SUCCESS, so the block proceeds normally),
+26-27 the two block dice, 28-29 the armour roll from `StepDropFallingPlayers`. Java's own
+`JAVA_DIE` stream agrees call-for-call (rng 25-29, step 13 consuming exactly 5 calls, 24 -> 29).
+
+So both engines roll the same negatrait, take the same block dice, and drop the same player -- and
+then Java treats it as a **turnover** and Rust does not. That is a state-only divergence, which per
+this campaign's own playbook means diffing the post-step state strings rather than chasing dice.
+
+Blocked there for now: Rust's parity log emits `state: None` and `FFB_TRACE` on the Rust side prints
+`LOOP`/`DRC_DRAW` lines rather than the `JSTEP`-style state string Java produces, so there is
+nothing to diff yet. Next step is to get Rust to emit the state string at the post-step, then diff
+against Java's `h1t11ahome...` / `h1t12aaway...`.
+
+### Not committed to main
+
+The data fix is correct but currently regresses 6 rosters, so it sits on a branch per the standing
+"commit when progress is made without regression" rule. Main remains 30/30.
+
+## ITER125 -- chaos seed 1 narrowed to the block RESULT, not the dice (branch WIP)
+
+Got the Rust state string out (it populates only under `FFB_TRACE=1`; the matrix run's log has
+`state: None`, which is why ITER124 could not diff). The two post-states at the divergence:
+
+    JAVA  i=13 -> i=14   h1t11ahome -> h1t12aaway   h00 12,7,Standing -> 12,7,PRONE
+                                                    a02 13,8,Standing  (unchanged)
+    RUST  i=13 -> i=14   h1t11ahome -> h1t11ahome   h00 12,7,Standing -> 13,8,Standing
+                                                    a02 13,8,Standing -> -1,-1,KO
+
+`teamChaosParity20Home1` is `h00`, the Minotaur, and both engines block the same defender
+(`Away3` = `a02`; `JAVA_BLOCK_PICK pid=Home1 N=2 idx=1 def=Away3` is the TARGET pick, not the die
+pick -- worth noting since the name invites the opposite reading).
+
+So with the identical dice established in ITER124, **Java resolves the block to Attacker Down and
+Rust resolves it to Defender Down**. Java's Minotaur falls, which is the turnover that ends the
+home turn; Rust's Minotaur knocks the defender out and follows up into 13,8.
+
+### What is ruled out
+
+- **Dice.** Both streams are byte-identical across pos 22-31 (ITER124).
+- **Die index choice.** `ParityRunner` answers BLOCK_ROLL / BLOCK_ROLL_PARTIAL_RE_ROLL /
+  BLOCK_ROLL_PROPERTIES with `sendBlockChoice(0)` unconditionally (`ParityRunner.java:581,591`), and
+  Rust's agent answers `AgentPrompt::BlockChoice` with `die_index: 0`
+  (`agent/random_agent.rs:581-588`). Both pick index 0.
+- **A general block bug.** 24 rosters block constantly and are 100/100, so neither the die-value ->
+  BlockResult mapping nor the roll order can be wrong in general.
+
+### Open, and deliberately not guessed at
+
+Two things do not add up yet and need instrumentation rather than more reading:
+
+1. If both pick index 0 of the same `[1, 6]`, both should get the same BlockResult. Something about
+   THIS block -- a Minotaur, so Frenzy plus a freshly-granted Unchannelled Fury -- changes which
+   array or index is in play.
+2. Rust KO'd `a02` on an armour roll of 1+2=3, which cannot break AV8. Either the KO came from dice
+   I have mis-attributed, or Rust took a different injury path entirely.
+
+Point 2 in particular means the dice attribution may not be as clean as ITER124 concluded. This
+campaign's own notes warn that Java `rng_calls` count CALLS while Rust counts DICE, and that equal
+values at equal indexes do not prove the same roll -- so the "byte-identical dice" claim should be
+re-verified by pairing Java `caller=` frames with Rust `FFB_DIE_AT` backtraces before being built on.
+
+### Next probe
+
+Log, for this one block in both engines: the block dice array as stored, the chosen index, the
+resulting `BlockResult`, and the attacker/defender strengths that decide who chooses. That is four
+values and settles it; everything above is inference from state deltas.
+
+## ITER126 -- Unchannelled Fury was marked used for the whole GAME, not the activation
+
+All six reds from ITER124 are green and the branch is ready to merge. One engine bug.
+
+### ITER124's "byte-identical dice" was wrong, and this is the retraction
+
+Rust already emits a `GameEvent::BlockRoll` carrying the dice, the chosen index and `nr_of_dice`, so
+the probe ITER125 asked for was built in all along. For chaos seed 1, block #2:
+
+    attacker home_01  defender away_03  nr_of_dice 2  dice [5, 1]  selected_index 0
+
+Java rolled **[1, 6]** for that same block. The RNG *stream* is identical -- same seed, so position N
+holds the same value in both engines -- but the engines **consume it at different offsets**: Rust's
+block took positions 25-26 where Java's took 26-27. Comparing values at equal positions and
+concluding "identical" is precisely the trap `feedback-parity-dice-comparison` warns about, and
+ITER124 fell into it. The dice were never identical in the sense that mattered.
+
+Java's extra draw at position 25 is the Unchannelled Fury `rollSkill`.
+
+### The bug
+
+`step/mixed/step_unchannelled_fury.rs` read and wrote the **persistent** `Player.used_skills`:
+
+    let do_roll = game.player(&player_id)
+        .map(|p| p.has_skill(UnchannelledFury) && !p.used_skills.contains(&UnchannelledFury))
+
+Java checks `UtilCards.hasUnusedSkill(ACTING PLAYER, skill)` and marks with
+`actingPlayer.markSkillUsed(skill)` (`bb2020/UnchannelledFuryBehaviour.java:82,95`) -- the
+per-activation `ActingPlayer.fUsedSkills`, cleared whenever the acting player changes. Reading the
+persistent set meant a Minotaur rolled Unchannelled Fury on its FIRST activation and never again for
+the rest of the game, so every later activation silently skipped a d6 and Rust ran one draw behind
+Java from that point on.
+
+**This is a known bug class in this codebase, not a new discovery.** `skill_behaviour/bb2025/
+bone_head_behaviour.rs:99` carries a comment describing the identical failure -- "left the skill
+marked forever, skipping every later roll" -- and the campaign notes list the remaining sites as
+latent. Unchannelled Fury was one of them; it only became visible once a BB2020 roster actually
+carried the skill (ITER124).
+
+Fixed all four sites: the `do_roll` check, the Unchannelled Fury mark, and both `FuryOfTheBloodGod`
+sites, which Java also marks on the acting player (`:54`).
+
+### Results
+
+    chaos 0 -> 100    chaos_dwarf 1 -> 100    chaos_pact 0 -> 100
+    norse 1 -> 100    skaven 1 -> 100         slann_fumbbl 0 -> 100
+
+**Two of those are unexplained and are recorded as such.** Neither `roster_skaven.json` nor
+`roster_slann_fumbbl.json` contains Unchannelled Fury (grep: 0 occurrences), and the step returns
+early for any player without the skill, so this fix cannot be what turned them green. The only other
+change between their red measurements and now was the skaven `Animal Savagery` correction, which
+cannot affect slann_fumbbl at all. Both are green under two independent measurements (an individual
+100-seed run and the full matrix), so the current state is solid -- but the transition is not
+understood, and claiming credit for it would be wrong. If either regresses later, start here.
+
+### Gate
+
+Full 30-roster BB2020 matrix **30/30 x 100/100**. Cross-edition, which matters more than usual since
+`step_unchannelled_fury.rs` is a MIXED step shared by every ruleset: **chaos bb2025 100/100** (a
+BB2025 roster that genuinely has Unchannelled Fury), lineman bb2025 100/100, lineman bb2016 100/100.
+ffb-engine 7169/0, workspace clean.
+
+### Tests
+
+- `unchannelled_fury_rolls_again_on_the_next_activation` -- the regression test: asserts the d6 is
+  drawn on a second activation after the per-activation set is cleared, and that the mark does NOT
+  land on the persistent Player.
+- `bb2020_chaos_minotaur_has_unchannelled_fury` (ffb-model) -- pins that the roster fix actually
+  grants the skill, which is what made the engine bug reachable.
+- Two existing tests encoded the old behaviour and were updated to Java's semantics rather than
+  reverted.

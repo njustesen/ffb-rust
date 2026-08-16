@@ -55,10 +55,6 @@
       "skills": [
         "Dodge",
         "Right Stuff",
-        {
-          "name": "Hatred",
-          "value": "goblin;troll"
-        },
         "Multiple Block"
       ],
       "skill_categories": {

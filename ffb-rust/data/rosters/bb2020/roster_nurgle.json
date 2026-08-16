@@ -22,7 +22,7 @@
       "shorthand": "R",
       "skills": [
         "Decay",
-        "Nurgle's Rot"
+        "Plague Ridden"
       ],
       "skill_categories": {
         "normal": [
@@ -51,7 +51,7 @@
       "shorthand": "P",
       "skills": [
         "Horns",
-        "Nurgle's Rot",
+        "Plague Ridden",
         "Regeneration"
       ],
       "skill_categories": {
@@ -82,7 +82,7 @@
       "skills": [
         "Disturbing Presence",
         "Foul Appearance",
-        "Nurgle's Rot",
+        "Plague Ridden",
         "Regeneration"
       ],
       "skill_categories": {
@@ -115,7 +115,7 @@
         "Foul Appearance",
         "Loner",
         "Mighty Blow",
-        "Nurgle's Rot",
+        "Plague Ridden",
         "Really Stupid",
         "Regeneration",
         "Tentacles"
