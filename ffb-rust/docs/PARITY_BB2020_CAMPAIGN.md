@@ -7035,3 +7035,66 @@ and skips the armour roll, so neither is the cause. An armour-vs-injury theory b
 event-log entries was wrong -- those entries came from elsewhere in the game, not step 130.
 
 Held on branch `bb2020-roster-redraft` until this is green; main stays 30/30.
+
+## ITER130 -- necromantic root cause: the two engines disagree on WHEN the attacker starts falling
+
+Seed 65 is now understood. It is not a dice bug, not a roster bug, and not the drop ORDER as ITER129
+guessed -- it is a modifier-suppression flag keyed on the attacker's state at the moment the
+defender's armour is rolled.
+
+### The mechanism
+
+Java BB2020 `skillbehaviour/bb2020/PilingOnBehaviour.java:103`, in the branch taken when Piling On
+is NOT being used:
+
+    InjuryTypeBlock.Mode mode = (attackerState != null && attackerState.getBase() == PlayerState.FALLING)
+        ? InjuryTypeBlock.Mode.DO_NOT_USE_MODIFIERS
+        : InjuryTypeBlock.Mode.REGULAR;
+
+Rust mirrors this in `step_drop_falling_players.rs` via `attacker_also_falling`. The port is
+faithful; what differs is the ANSWER each engine gives to "is the attacker falling right now".
+
+`DO_NOT_USE_MODIFIERS` suppresses armour modifiers, and the necromantic Werewolf has **Claws**, which
+breaks armour on 8+ regardless of AV. So the flag decides the outcome outright.
+
+### The evidence
+
+A temporary probe in the defender branch (since removed) printed, for seed 65:
+
+    DFP defender=home_02 attacker=away_02  attacker_also_falling=false  rng=62  armour=[3,4]
+    DFP defender=home_01 attacker=away_03  attacker_also_falling=TRUE   rng=66  armour=[6,2]
+
+home_01 is a Werewolf, AV9+. Its armour total is **8** in both engines -- Rust rolls it at dice
+65-66 as `[6,2]`, Java at dice 63-64 as `[2,6]`. Same total, and 8 is exactly the number Claws
+breaks on.
+
+- Rust: `attacker_also_falling = true` -> DO_NOT_USE_MODIFIERS -> Claws suppressed -> 8 < AV9 ->
+  armour holds -> `h01` ends **Prone**.
+- Java: KOs `h01`, which requires the armour to have broken, which requires REGULAR mode, which
+  requires `attackerState.getBase() != FALLING` at that instant.
+
+So at the moment the defender's armour is rolled, Rust already considers the attacker FALLING and
+Java does not.
+
+### Corrections to ITER129
+
+ITER129 concluded "Rust drops one fewer player, or resolves one fewer injury". That was wrong. Both
+engines drop the same players; Rust simply interleaves a block roll (dice 63-64) between the two
+drops where Java resolves them back to back, which made the counts look unequal. The dice-position
+mismatch is a symptom of the interleaving, not the cause.
+
+Two further dead ends, both checked and cleared: Java's shared
+`bb2025/shared/StepDropFallingPlayers.java:135` uses `Mode.REGULAR` unconditionally, so the
+DO_NOT_USE_MODIFIERS behaviour comes from the BB2020 PilingOn hook and nowhere else; and there is no
+`bb2020/.../StepDropFallingPlayers.java` at all, only the `action/block` COMMON one.
+
+### Next
+
+Find where each engine transitions the attacker to `FALLING` during a Both Down and align the
+ordering with Java. The Rust flag reads `game.field_model.player_state(&attacker_id).base() ==
+PS_FALLING`, so either Rust sets that state earlier than Java does, or Java re-reads a snapshot
+taken before the block resolved -- note Java captures `attackerState` at the TOP of the step
+(`StepDropFallingPlayers.java:122`) and then mutates it, so a stale snapshot is the leading
+candidate.
+
+Still on branch `bb2020-roster-redraft`; 28/29, main untouched at 30/30.
