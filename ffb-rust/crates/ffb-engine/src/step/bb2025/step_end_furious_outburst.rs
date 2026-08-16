@@ -100,6 +100,7 @@ impl StepEndFuriousOutburst {
             end_player_action: true,
             end_turn: self.end_turn,
             check_forgo: self.check_forgo,
+                    rules: game.rules,
         });
         StepOutcome::next().push_seq(seq)
     }

@@ -86,6 +86,7 @@ impl StepEndBomb {
                 end_player_action: true,
                 end_turn: self.end_turn,
                 check_forgo: false,
+                            rules: game.rules,
             });
             game.pass_coordinate = None;
             game.thrower_id = None;

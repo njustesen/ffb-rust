@@ -140,6 +140,7 @@ impl StepEndPassing {
                 end_player_action: true,
                 end_turn: self.end_turn,
                 check_forgo: false,
+                            rules: game.rules,
             });
             return StepOutcome::next().push_seq(seq);
         }
@@ -296,6 +297,7 @@ impl StepEndPassing {
                 end_player_action: self.end_player_action,
                 end_turn: self.end_turn,
                 check_forgo: false,
+                            rules: game.rules,
             });
             return StepOutcome::next().push_seq(seq);
         }
@@ -365,6 +367,7 @@ impl StepEndPassing {
                 end_player_action: self.end_player_action,
                 end_turn: self.end_turn,
                 check_forgo: false,
+                            rules: game.rules,
             });
             return StepOutcome::next().push_seq(seq);
         }

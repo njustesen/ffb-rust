@@ -201,6 +201,7 @@ impl StepEndSelecting {
                 end_player_action: true,
                 end_turn: self.end_turn,
                 check_forgo: self.check_forgo,
+                            rules: game.rules,
             };
             let seq = EndPlayerAction::build_sequence(&params);
             return StepOutcome::next().push_seq(seq);
@@ -301,6 +302,7 @@ impl StepEndSelecting {
             end_player_action: true,
             end_turn: false,
             check_forgo: false,
+                    rules: game.rules,
         };
         // Select params used by special-skill cases (Treacherous, RaidingParty, etc.).
         // Java: new Select.SequenceParams(getGameState(), true, blockTargets)

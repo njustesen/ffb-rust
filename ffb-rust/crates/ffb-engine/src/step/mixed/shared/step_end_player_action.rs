@@ -76,6 +76,7 @@ impl StepEndPlayerAction {
             end_player_action: self.end_player_action,
             end_turn: false,
             check_forgo: self.check_forgo,
+                    rules: game.rules,
         };
         StepOutcome::next().push_seq(EndPlayerAction::build_sequence(&params))
     }

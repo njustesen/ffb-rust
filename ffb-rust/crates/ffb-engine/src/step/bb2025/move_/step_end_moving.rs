@@ -201,6 +201,7 @@ impl StepEndMoving {
                 end_player_action: self.end_player_action,
                 end_turn: self.end_turn,
                 check_forgo: self.check_forgo,
+                            rules: game.rules,
             });
             return StepOutcome::next().push_seq(seq);
         }
@@ -325,6 +326,7 @@ impl StepEndMoving {
             end_player_action: self.end_player_action,
             end_turn: self.end_turn,
             check_forgo: self.check_forgo,
+                    rules: game.rules,
         });
         StepOutcome::next().push_seq(seq)
     }

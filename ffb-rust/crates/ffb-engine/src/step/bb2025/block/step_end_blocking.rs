@@ -272,6 +272,7 @@ impl StepEndBlocking {
                 end_player_action: true,
                 end_turn: self.end_turn,
                 check_forgo: self.check_forgo,
+                            rules: game.rules,
             });
             return StepOutcome::next().push_seq(seq);
         }
@@ -740,6 +741,7 @@ impl StepEndBlocking {
             end_player_action: true,
             end_turn: false,
             check_forgo: false,
+                    rules: game.rules,
         });
         StepOutcome::next().push_seq(seq)
     }

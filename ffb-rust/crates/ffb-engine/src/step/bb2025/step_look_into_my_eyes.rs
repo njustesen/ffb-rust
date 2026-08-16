@@ -201,6 +201,7 @@ impl StepLookIntoMyEyes {
                 end_player_action,
                 end_turn,
                 check_forgo: false,
+                            rules: game.rules,
             });
             let mut out = StepOutcome::next().push_seq(seq);
             if clear_stack {

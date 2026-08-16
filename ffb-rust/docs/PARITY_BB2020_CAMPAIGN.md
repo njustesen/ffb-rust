@@ -6326,3 +6326,73 @@ Natural next goal, NOT started -- close the structural gap itself: route `make_s
 BB2020 step set edition by edition, the way ITER-era work already did for BB2016 (Spectators, the
 kickoff chain, MissedPass, the pass step-set). That is a large campaign of its own and a goal-level
 decision, not a backlog item.
+
+## ITER118 -- NEW GOAL: close the structural gap. First routing: EndPlayerAction
+
+The deferred backlog is empty, and the user chose the next goal: **give BB2020 its real step set**
+instead of running the shared BB2025 one with a growing pile of per-difference gates.
+
+### The roadmap (new artifact)
+
+`docs/PARITY_BB2020_STRUCTURAL_GAP.md` inventories every candidate, ranked by how much the two JAVA
+files differ. Headline number: **all 79 BB2020/BB2025 Java step pairs genuinely differ -- there is
+not one identical twin.** So every pair is a real candidate; none can be dismissed as a no-op.
+
+The ranking is deliberately built from JAVA-vs-JAVA similarity, not Rust-vs-Rust. A dead
+`step/bb2020/*.rs` file can be STALER than the shared one it is supposed to replace (documented for
+`step_apply_kickoff_result`), so Rust similarity measures drift, not edition difference. Per-candidate
+method and the standing "route individual StepIds, never a whole sequence" constraint are in the doc.
+
+### First routing: EndPlayerAction
+
+Picked because the Java pair is the most different of all (`StepStallingPlayer.java`, sim 0.24) and
+the difference turned out to be in the SEQUENCE, not just the step.
+
+**The editions do not agree on what `STALLING_PLAYER` means.**
+
+  bb2025 `shared/StepStallingPlayer.java`  = the stalling CHECK (delegates to stallingExtension)
+  bb2020 `StepStallingPlayer.java`         = the ROCK THROW at a staller (d6, >=5 hits, drops him)
+
+BB2020 does its check in a separate `CHECK_STALLING` step, and the two generators wire that up
+differently (`generator/bb2020/EndPlayerAction.java:25-36` vs the bb2025 twin):
+
+  bb2020 (7 steps)   ... CATCH_SCATTER_THROW_IN, CHECK_STALLING[END_FEEDING](IGNORE_ACTED_FLAG=false),
+                     END_FEEDING
+  bb2025 (11 steps)  ... CATCH_SCATTER_THROW_IN, STALLING_PLAYER[END_FEEDING],
+                     STEADY_FOOTING(HIT_PLAYER), PLACE_BALL, APOTHECARY(HIT_PLAYER),
+                     CATCH_SCATTER_THROW_IN, END_FEEDING(CHECK_FORGO)
+
+So a BB2020 game was running **BB2025's stalling check** after every player action and **never
+running CHECK_STALLING at all**, plus a four-step HIT_PLAYER tail BB2020 does not have. Two smaller
+differences ride along: BB2020 passes RESET_FOR_FAILED_BLOCK=false to RESET_FUMBLEROOSKIE, and its
+END_FEEDING takes no CHECK_FORGO.
+
+### The fix
+
+`generator/bb2020/end_player_action.rs` already held a faithful 1:1 port of the BB2020 sequence --
+dead code, never called. The shared `EndPlayerActionParams` gained a `rules` field (explicit
+`Default` = Bb2025, since `Rules` has none) and `build_sequence` delegates to that BB2020 generator
+when `rules == Bb2020`. `game.rules` threaded through all 17 live construction sites under
+`step/bb2025/**` and `step/mixed/**`; every one was an exhaustive struct literal, so the compiler
+found them all. `StepSelectBlitzTarget::execute_step` needed `&Game` threaded in to reach `game.rules`.
+
+Note the live sites are the bb2025/mixed ones -- the `step/bb2020/**` call sites in the grep are
+themselves dead code (ITER117) and were deliberately left alone.
+
+### Gate
+
+Full 30-roster BB2020 matrix: **30 rosters, 30 results, 30 x `PARITY: 100/100`.** Cross-edition:
+lineman bb2025 100/100, lineman bb2016 100/100 (run serially -- the same-matchup ban applies across
+editions). ffb-engine 7166/0, workspace clean.
+
+No score movement, and none expected: the sequences were already behaviourally equivalent on these
+3,000 games. The win is structural -- BB2020 now runs BB2020's EndPlayerAction, and CHECK_STALLING
+is reachable in BB2020 for the first time.
+
+Regression test `bb2020_end_player_action_uses_check_stalling_not_stalling_player` pins all four
+differences in both directions.
+
+### Next
+
+Work down `PARITY_BB2020_STRUCTURAL_GAP.md`. Next by rank: `StepApothecaryMultiple` (sim 0.43),
+`StepBlockRoll` (0.52), `StepApothecary` (0.57), `StepInitScatterPlayer` (0.60).

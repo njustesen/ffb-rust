@@ -61,8 +61,8 @@ impl Default for StepSelectBlitzTarget {
 impl Step for StepSelectBlitzTarget {
     fn id(&self) -> StepId { StepId::SelectBlitzTarget }
 
-    fn start(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        self.execute_step()
+    fn start(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        self.execute_step(game)
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
@@ -118,7 +118,7 @@ impl Step for StepSelectBlitzTarget {
             }
             _ => {}
         }
-        self.execute_step()
+        self.execute_step(game)
     }
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
@@ -138,13 +138,14 @@ impl Step for StepSelectBlitzTarget {
 }
 
 impl StepSelectBlitzTarget {
-    fn execute_step(&self) -> StepOutcome {
+    fn execute_step(&self, game: &Game) -> StepOutcome {
         if self.end_player_action || self.end_turn {
             let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
                 feeding_allowed: false,
                 end_player_action: true,
                 end_turn: self.end_turn,
                 check_forgo: self.check_forgo,
+                rules: game.rules,
             });
             return StepOutcome::next().push_seq(seq);
         }
