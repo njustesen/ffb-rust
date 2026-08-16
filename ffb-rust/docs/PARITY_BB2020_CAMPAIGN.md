@@ -6972,3 +6972,66 @@ It is a large change and should be treated as such: every bb2020 game's dice cha
 matrix goes red until re-greened, and it will surface engine bugs the way ITER124 did. Worth doing
 for exactly that reason, but it is a multi-iteration effort and a scope decision, so it is recorded
 here rather than begun.
+
+## ITER128-129 -- BB2020 rosters rebuilt from the rulebook; necromantic is the last red
+
+The rulebooks arrived (see the Rules commit): `rules/bb2020/` now holds 11 core chapters, 29 team
+pages and 64 star players scraped from bloodbowlbase.ru, and `rules/bb2016/teams/` holds the 24 LRB6
+rosters extracted from the rulebook PDF. fumbbl.com was NOT scraped -- it sits behind an Anubis
+proof-of-work challenge and defeating that is not ours to do.
+
+### The rebuild
+
+`scripts/roster_from_rulebook.py` regenerates an edition's roster JSON from its team pages.
+All 29 bb2020 rosters rebuilt: **78 positions corrected, 43 added, 24 dropped**. The additions are
+real BB2020 differences, not noise -- Vampire splits into Runner/Blitzer/Thrower/Vargheist, Ogre's
+Snotling becomes Gnoblar Lineman, Nurgle gains Bloater and Rotspawn. Dropping 24 positions
+invalidated the squads that referenced them, so `draft_bb2020_teams.py` redrafted all 29 in the same
+change; rosters and teams land together or not at all.
+
+### Three converter bugs caught before they reached the data
+
+1. **Suffix-only name matching.** `Skeleton -> Skeleton Lineman` read as a drop plus an add rather
+   than a rename: 60 spurious additions. Now matches on either side being a prefix or suffix.
+2. **Id reuse.** Nothing stopped several new positions claiming the SAME old id. With Vampire
+   splitting three ways that would have written duplicate ids and broken lookups silently. Each old
+   position is now claimed once, longest match first.
+3. **Skill values stored in display form.** The rulebook writes `Bloodlust (3+)` and `Loner (4+)`;
+   the roster convention is a plain integer, `Bloodlust: 3`. Storing `"3+"` means
+   `get_skill_value_int` cannot parse it and silently falls back to the skill's DEFAULT -- a
+   Vargheist rolled Blood Lust on 2+ in Rust against Java's 3+. **That alone was vampire 3/100**;
+   fixed, it is 100/100. The failure mode to remember: wrong data degrades quietly, it does not error.
+
+`check_skill_names.py` also caught the rulebook spelling `Sidestep` against Java's BB2020 name
+`Side Step` -- four positions would have silently lost the skill.
+
+### Result
+
+**28 of 29 rosters 100/100.** Better than expected for a change that moves AG and AV on nearly every
+player, and so changes every dodge, pick-up and armour roll in every game.
+
+### The remaining red: necromantic 98/100 (seeds 37, 65)
+
+Seed 65, step 130, half 2 turn 1. Both engines have `h01` (a Werewolf, AV9+) Standing at 12,6; after
+the step Java has it `-1,-1,Ko` and Rust has it `11,5,Prone`. Every prior state hash matches.
+
+Dice are **identical in value and sides** through the whole window --
+`pos 59..64 = d8:2, d6:5, 3, 4, 2, 6` -- and Java's own `JAVA_DIE` stream agrees, with step 130
+consuming exactly rng 60-64.
+
+What separates them is WHICH STEP consumes them, which `FFB_DIE_AT` names directly:
+
+    die 61   Java  DiceRoller.rollDice:98 (a 2d6)      Rust  StepDropFallingPlayers   -- agree
+    die 63   Java  DiceRoller.rollDice:98 (a 2d6)      Rust  StepBlockRoll            -- DIVERGE
+
+So by die 63 Java is still resolving injuries from dropped players while Rust has already moved on
+to a block. **Rust drops one fewer player, or resolves one fewer injury, in
+`StepDropFallingPlayers`.** That is the next thing to measure -- how many players each engine drops
+there, and why one is missing.
+
+Two dead ends recorded so they are not re-run: Blood Lust is already per-activation
+(`step_blood_lust.rs:175`), and `injury_type_throw_a_rock.rs` correctly sets `armor_broken = true`
+and skips the armour roll, so neither is the cause. An armour-vs-injury theory built on sampled
+event-log entries was wrong -- those entries came from elsewhere in the game, not step 130.
+
+Held on branch `bb2020-roster-redraft` until this is green; main stays 30/30.
