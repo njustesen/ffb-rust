@@ -7146,3 +7146,51 @@ step id, alongside each `JAVA_DIE`. `ParityRunner` is explicitly co-editable and
 precedent for exactly this (`JAVA_BLOCKROLL`, `JAVA_AVBROKE`, `FFB_IDSTATE`). One harness change
 converts this from guesswork into a direct read.
 
+### ITER133 -- the deep Java trace exists; necromantic localised to the armour-break decision
+
+**The tool I said needed building was already there.** `DiceRoller.java` in the LIVE Java tree
+(`niels/ffb`, not the `ffb-java/` reference copy) already prints up to six caller frames per die,
+gated behind `-Dffb.parityDebugDeep`, and the harness already exposes it as `FFB_DICE_DEEP`. It was
+in the env-var list I scanned several iterations ago. Use `FFB_TRACE=1 FFB_DICE_DEEP=1`.
+
+Worth recording separately: **the jar is built from `C:/Users/Admin/niels/ffb/`, not from
+`ffb-rust/ffb-java/`.** The latter is a reference copy. They are in sync for the files checked here,
+but a Java behaviour question should be answered from the tree the jar is actually built from.
+
+### What the trace settles
+
+necromantic seed 65, step 130, with players named:
+
+    Activate(Away2, BLOCK) -> JAVA_BLOCK_PICK def=Home2, nDice=1
+    rng 60  block die = 5                      StepBlockRoll.executeStep:241
+    rng 61,62  armour = 3,4 = 7                InjuryTypeBlock.armourRoll:83  <- PilingOnBehaviour
+    rng 63,64  INJURY  = 2,6 = 8 -> KO         InjuryTypeBlock.injuryRoll:47
+
+So Java rolls a single block die, the defender (Home2 = `h01`, the Werewolf that ends up KO) goes
+down, and **Java breaks armour on a total of 7 and proceeds to an injury roll.** Rust rolls the same
+armour and does not break, so it never rolls injury and the player stays Prone.
+
+### The open contradiction -- do not build on my arithmetic
+
+Attacker Away2 is a Werewolf with Claws; defender Home2 is a Werewolf, AV9+. Java's own
+`mechanics/mixed/StatsMechanic.java:25` is
+
+    reduceArmour(context, armour, 8) <= (roll[0] + roll[1] + context.getArmorModifierTotal(game))
+
+Claws registers `reducesArmourToFixedValue` and applies when AV > 8, so the effective AV is 8, and
+`8 <= 7` is FALSE. Without Claws it is `9 <= 7`, also false. By that reading Java should NOT have
+broken this armour -- but the trace shows it did. **So my model of Java's armour path is
+incomplete**, and any fix derived from it would be guesswork. The roster is not the problem: the
+scraped BB2020 page gives the Werewolf exactly Claws, Frenzy, Regeneration at AV9+, and the
+generated XML matches.
+
+Rust's side of the same decision is `mechanics/roll.rs` `is_armour_broken` (`roll_total >= armour`)
+plus `apply_fixed_armour_reduction` (BB2016 caps at 7, BB2020/25 at 8), which mirrors the Java
+constants -- so the divergence is in what feeds them, not the constants themselves.
+
+### Next
+
+Instrument the JAVA side, debug-gated exactly as `DiceRoller` already is, to print the effective
+armour, the modifier total and `armorBroken` at the moment of the decision. That is the one value
+neither the dice trace nor static reading can supply, and every remaining hypothesis needs it.
+
