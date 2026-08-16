@@ -8,7 +8,10 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
 use ffb_model::model::game::Game;
-use ffb_mechanics::modifiers::{foul_assist_armor_modifier, ARMOR_CHAINSAW_3, ARMOR_DIRTY_PLAYER_1, ARMOR_FOUL};
+use ffb_mechanics::modifiers::{
+    foul_assist_armor_modifier, Modifier, ARMOR_CHAINSAW_3, ARMOR_DIRTY_PLAYER_1,
+    ARMOR_DIRTY_PLAYER_2, ARMOR_FOUL,
+};
 use ffb_mechanics::mechanics::armor_broken_for_rules;
 use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
 use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
@@ -90,7 +93,21 @@ impl ModificationAwareInjuryType for InjuryTypeFoul {
             if !self.ctx.armor_broken {
                 if let Some(aid) = attacker_id {
                     if game.player(aid).map(|p| p.has_skill(SkillId::DirtyPlayer)).unwrap_or(false) {
-                        self.ctx.add_armor_modifier(ARMOR_DIRTY_PLAYER_1);
+                        // Java's DirtyPlayer registers a VariableArmourModifier whose value is the
+                        // attacker's own skill value (`bb2020/DirtyPlayer.java:32` -- the `1` in
+                        // `super(..., 1)` is only the DEFAULT). Hardcoding +1 here understated the
+                        // dwarf Deathroller's "Dirty Player (2)": a foul armour roll of 7 against
+                        // AV9 stayed unbroken where Java reports
+                        // `JAVA_AVBROKE armour=9 reduced=9 roll=[1,6] modTotal=2 mods=Dirty Player broken=true`.
+                        let dp = game
+                            .player(aid)
+                            .map(|p| p.get_skill_value_int(SkillId::DirtyPlayer, 1))
+                            .unwrap_or(1);
+                        self.ctx.add_armor_modifier(match dp {
+                            1 => ARMOR_DIRTY_PLAYER_1,
+                            2 => ARMOR_DIRTY_PLAYER_2,
+                            n => Modifier::new("Dirty Player", n, ffb_model::enums::Rules::Bb2020),
+                        });
                         if let Some(roll) = self.ctx.armor_roll {
                             let av = game.player(defender_id)
                                 .map(|p| p.armour_with_modifiers()).unwrap_or(7);
@@ -113,7 +130,15 @@ impl ModificationAwareInjuryType for InjuryTypeFoul {
             // modifiers contain nothing registered to affectsEitherArmourOrInjuryOnFoul. Our only
             // such modifier is Dirty Player's armour +1 — if it was spent on the armour roll, exclude
             // the Dirty Player injury +1 (mutual exclusion).
-            let dirty_player_on_armour = self.ctx.armor_modifiers.contains(&ARMOR_DIRTY_PLAYER_1);
+            // Match by NAME, not by exact constant: the armour-side modifier now carries the
+            // attacker's own Dirty Player value (ARMOR_DIRTY_PLAYER_2 for the dwarf Deathroller),
+            // so an equality test against the +1 constant would miss it and let Dirty Player boost
+            // BOTH rolls, which is exactly what the mutual exclusion forbids.
+            let dirty_player_on_armour = self
+                .ctx
+                .armor_modifiers
+                .iter()
+                .any(|m| m.name.starts_with("Dirty Player"));
             for m in factory.find_injury_modifiers(game, attacker, defender, false, true, false) {
                 let leaked = leak_injury_modifier(m.as_ref(), attacker, defender, game.rules);
                 if dirty_player_on_armour && leaked.name == "Dirty Player" {
@@ -227,6 +252,40 @@ mod tests {
         t.injury_roll(&game, &mut rng, Some("attacker"), "defender");
         assert!(!t.ctx.injury_modifiers.contains(&dirty_player_injury_modifier(game.rules)));
     }
+    /// Java registers Dirty Player as a `VariableArmourModifier` (`bb2020/DirtyPlayer.java:32`),
+    /// so the armour bonus is the attacker's OWN skill value — the dwarf Deathroller's
+    /// "Dirty Player (2)" is +2, not +1. A hardcoded +1 left a foul armour roll of 7 against AV9
+    /// unbroken where Java reports `modTotal=2 broken=true`.
+    #[test]
+    fn dirty_player_armour_bonus_is_the_attackers_own_skill_value() {
+        use ffb_model::model::SkillWithValue;
+        let mut game = game_with_attacker_and_defender(vec![], 13);
+        let att = game.team_home.players.last_mut().unwrap();
+        att.starting_skills.push(SkillWithValue {
+            skill_id: SkillId::DirtyPlayer,
+            value: Some("2".into()),
+        });
+        let mut t = InjuryTypeFoul::new();
+        let mut rng = GameRng::new(1);
+        t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
+        assert!(t.ctx.armor_modifiers.contains(&ARMOR_DIRTY_PLAYER_2));
+        assert!(!t.ctx.armor_modifiers.contains(&ARMOR_DIRTY_PLAYER_1));
+    }
+
+    /// The mutual exclusion must key off the modifier NAME, not the +1 constant: with a Dirty
+    /// Player (2) attacker the armour list holds ARMOR_DIRTY_PLAYER_2, and an equality test
+    /// against the +1 constant would miss it and let Dirty Player boost both rolls.
+    #[test]
+    fn dirty_player_two_on_armour_still_excludes_the_injury_modifier() {
+        let game = game_with_attacker_and_defender(vec![SkillId::DirtyPlayer], 2);
+        let mut t = InjuryTypeFoul::new();
+        let mut rng = GameRng::new(1);
+        t.ctx.armor_broken = true;
+        t.ctx.add_armor_modifier(ARMOR_DIRTY_PLAYER_2);
+        t.injury_roll(&game, &mut rng, Some("attacker"), "defender");
+        assert!(!t.ctx.injury_modifiers.contains(&dirty_player_injury_modifier(game.rules)));
+    }
+
     #[test]
     fn no_dirty_player_no_armor_modifier() {
         let game = game_with_attacker_and_defender(vec![], 2);

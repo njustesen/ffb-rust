@@ -250,7 +250,19 @@ fn skill_to_armor_modifier(
         }
         SkillId::DirtyPlayer => {
             if context.is_foul {
-                Some(Box::new(StaticArmourModifier::new("Dirty Player", 1, false)))
+                // Java registers a VariableArmourModifier, not a static +1
+                // (`bb2020/DirtyPlayer.java:32`, `super(..., 1)` is only the DEFAULT value). The
+                // modifier is worth the attacker's own Dirty Player value, and the dwarf
+                // Deathroller has "Dirty Player (2)". Hardcoding +1 let a foul armour roll of 7
+                // hold against AV9 where Java breaks it with 7+2 (dwarf bb2020 seed 56 step 3:
+                // JAVA_AVBROKE `mods=Dirty Player modTotal=2 broken=true`, Rust modTotal=0 and the
+                // post-state hash unchanged because nothing happened at all).
+                //
+                // Exactly the Mighty Blow case a few arms below, same cause, same fix.
+                Some(Box::new(VariableArmourModifier::new("Dirty Player", false)
+                    .with_modifier_fn(|a, _d| {
+                        a.map(|p| p.get_skill_value_int(SkillId::DirtyPlayer, 1)).unwrap_or(1)
+                    })))
             } else {
                 None
             }
