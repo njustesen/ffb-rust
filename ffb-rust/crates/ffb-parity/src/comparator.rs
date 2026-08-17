@@ -36,9 +36,9 @@ impl CompareResult {
 ///
 /// Reads both log files from disk. Returns a `CompareResult` describing the
 /// outcome. If either file is missing, the result is a failure.
-pub fn compare_logs(seed: u64, home: &str, away: &str) -> CompareResult {
-    let java_path = java_log_path_for(seed, home, away);
-    let rust_path = rust_log_path_for(seed, home, away);
+pub fn compare_logs(seed: u64, edition: &str, home: &str, away: &str) -> CompareResult {
+    let java_path = java_log_path_for(seed, edition, home, away);
+    let rust_path = rust_log_path_for(seed, edition, home, away);
 
     let java_lines = match GameLog::read_from_file(&java_path) {
         Ok(l) => l,

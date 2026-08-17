@@ -37,6 +37,12 @@ struct ParityArgs {
     /// Parity tier: 2 = T2 trivial agent (1 decisionRng pick + EndTurn, the 26-race
     /// regression suite), 3 = T3 Phase 2 agent (real activations). Default 2.
     tier: u8,
+    /// `--reuse-java`: skip the JVM entirely and compare against the Java logs already on
+    /// disk, when those logs were produced by the same jar, the same Java server data and
+    /// the same invocation. ~98% of a gate's wall-clock is JVM time, and an iteration that
+    /// only touched Rust cannot change what Java produced. The reuse is refused (and the
+    /// JVM runs) unless `runner::java_logs_reusable` confirms the recorded fingerprint.
+    reuse_java: bool,
 }
 
 impl ParityArgs {
@@ -56,6 +62,7 @@ impl ParityArgs {
         let mut verbose = false;
         let mut visualize = false;
         let mut tier = 2u8;
+        let mut reuse_java = false;
 
         let mut i = 0;
         while i < raw.len() {
@@ -68,6 +75,7 @@ impl ParityArgs {
                 "--no-abort" => no_abort = true,
                 "--verbose" => verbose = true,
                 "--visualize" => visualize = true,
+                "--reuse-java" => reuse_java = true,
                 "--home" if i + 1 < raw.len() => { home = raw[i + 1].clone(); i += 1; }
                 "--away" if i + 1 < raw.len() => { away = raw[i + 1].clone(); i += 1; }
                 "--edition" if i + 1 < raw.len() => { edition = raw[i + 1].clone(); i += 1; }
@@ -90,7 +98,7 @@ impl ParityArgs {
         let home_java = runner::java_team_id(&home, "home", &edition);
         let away_java = runner::java_team_id(&away, "away", &edition);
 
-        ParityArgs { network, coverage, uniform, all_rosters, all_editions, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize, tier }
+        ParityArgs { network, coverage, uniform, all_rosters, all_editions, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize, tier, reuse_java }
     }
 }
 
@@ -116,7 +124,7 @@ fn main() {
         let snaps = runner::run_visual_game(seed, &args.home, &args.away, &args.edition);
         println!("  {} snapshots captured", snaps.len());
         let html = visual::generate_html(seed, &args.home, &args.away, &args.edition, &snaps);
-        let dir = format!("parity/{}_{}_vs_{}", args.edition, args.home, args.away);
+        let dir = log_format::matchup_dir(&args.edition, &args.home, &args.away);
         std::fs::create_dir_all(&dir).ok();
         let path = format!("{dir}/seed_{seed}_visual.html");
         std::fs::write(&path, &html).expect("Failed to write visual HTML");
@@ -296,8 +304,32 @@ fn main() {
     // Amortize JVM start-up + fat-jar class-loading + server construction (perf reasons #1/#2/#4):
     // run EVERY Java game in ONE JVM via ParityRunner's batch mode, instead of a fresh JVM per seed.
     // Then run the Rust engine per seed. Report per-engine wall-clock at the end.
+    //
+    // `--reuse-java` short-circuits that when the logs on disk provably came from the same jar,
+    // the same Java server data and the same invocation (see runner::java_logs_reusable). The
+    // reason for the decision is always printed: a silently-reused stale log would turn a red
+    // into a green, so the run must say which of the two it did and why.
     let java_t0 = std::time::Instant::now();
-    runner::run_java_headless_range(args.seed_start, args.seed_end, &args.home_java, &args.away_java, &args.home, &args.away, args.tier, &args.edition);
+    let reused = if args.reuse_java {
+        match runner::java_logs_reusable(args.seed_start, args.seed_end, &args.home_java,
+            &args.away_java, &args.home, &args.away, args.tier, &args.edition) {
+            Ok(()) => {
+                println!("REUSE java logs for {} vs {} ({}) — cached batch matches",
+                    args.home, args.away, args.edition);
+                true
+            }
+            Err(why) => {
+                println!("REUSE declined ({why}) — running the JVM");
+                false
+            }
+        }
+    } else {
+        false
+    };
+    if !reused {
+        runner::run_java_headless_range(args.seed_start, args.seed_end, &args.home_java, &args.away_java, &args.home, &args.away, args.tier, &args.edition);
+        runner::write_java_manifest(&args.home_java, &args.away_java, &args.home, &args.away, args.tier, &args.edition);
+    }
     let java_total = java_t0.elapsed();
     println!("TIMING java_total={:.3}s (batched JVM, {total} seeds)", java_total.as_secs_f64());
     let mut rust_total = std::time::Duration::ZERO;
@@ -329,7 +361,7 @@ fn main() {
                     for ev in &events { cov.tally(ev); }
                     cov.games += 1;
                 }
-                comparator::compare_logs(seed, &args.home, &args.away)
+                comparator::compare_logs(seed, &args.edition, &args.home, &args.away)
             }
             Err(payload) => {
                 let msg = payload

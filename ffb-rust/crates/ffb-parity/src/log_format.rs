@@ -98,17 +98,28 @@ pub fn rust_log_path(seed: u64) -> String {
     format!("parity/seed_{seed}_rust.jsonl")
 }
 
-/// Race-specific log paths — include home+away so multiple races don't overwrite each other.
-pub fn java_log_path_for(seed: u64, home: &str, away: &str) -> String {
-    format!("parity/{home}_vs_{away}/seed_{seed}_java.jsonl")
+/// Directory holding one matchup's logs, scoped by edition AND by the two rosters.
+///
+/// The edition segment is not cosmetic. Without it the three edition matrices share
+/// `parity/<matchup>/`, so gating bb2016, bb2020 and bb2025 concurrently has each run
+/// overwriting the other's `seed_N_java.jsonl` mid-comparison — the same class of
+/// phantom red that a `cargo build` rewriting `ffb-parity.exe` mid-gate produces.
+/// Scoped this way the three matrices are independent and can gate in parallel.
+pub fn matchup_dir(edition: &str, home: &str, away: &str) -> String {
+    format!("parity/{edition}/{home}_vs_{away}")
 }
 
-pub fn rust_log_path_for(seed: u64, home: &str, away: &str) -> String {
-    format!("parity/{home}_vs_{away}/seed_{seed}_rust.jsonl")
+/// Race-specific log paths — include edition + home + away so no two runs collide.
+pub fn java_log_path_for(seed: u64, edition: &str, home: &str, away: &str) -> String {
+    format!("{}/seed_{seed}_java.jsonl", matchup_dir(edition, home, away))
 }
 
-pub fn rust_events_path_for(seed: u64, home: &str, away: &str) -> String {
-    format!("parity/{home}_vs_{away}/seed_{seed}_rust_events.jsonl")
+pub fn rust_log_path_for(seed: u64, edition: &str, home: &str, away: &str) -> String {
+    format!("{}/seed_{seed}_rust.jsonl", matchup_dir(edition, home, away))
+}
+
+pub fn rust_events_path_for(seed: u64, edition: &str, home: &str, away: &str) -> String {
+    format!("{}/seed_{seed}_rust_events.jsonl", matchup_dir(edition, home, away))
 }
 
 /// A minimal LogEntry type used by comparator for per-line diffs.
@@ -121,6 +132,24 @@ pub struct LogEntry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The three edition matrices must never share a log directory: before the edition
+    /// segment existed, gating bb2016 and bb2025 concurrently had each run overwriting the
+    /// other's `seed_N_java.jsonl` and reporting reds that did not reproduce in isolation.
+    #[test]
+    fn log_paths_are_scoped_by_edition_and_matchup() {
+        let a = java_log_path_for(7, "bb2016", "ogre", "ogre");
+        let b = java_log_path_for(7, "bb2025", "ogre", "ogre");
+        assert_ne!(a, b, "two editions must not write the same Java log path");
+        assert_eq!(a, "parity/bb2016/ogre_vs_ogre/seed_7_java.jsonl");
+        assert_eq!(rust_log_path_for(7, "bb2025", "ogre", "orc"),
+                   "parity/bb2025/ogre_vs_orc/seed_7_rust.jsonl");
+        assert_eq!(rust_events_path_for(7, "bb2020", "elf", "elf"),
+                   "parity/bb2020/elf_vs_elf/seed_7_rust_events.jsonl");
+        // Rust and Java logs for one seed live side by side but never collide.
+        assert_ne!(java_log_path_for(7, "bb2020", "elf", "elf"),
+                   rust_log_path_for(7, "bb2020", "elf", "elf"));
+    }
 
     #[test]
     fn game_start_round_trip() {
