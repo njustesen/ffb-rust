@@ -237,6 +237,26 @@ concurrency-safe. Re-run in isolation, both were 100/100.
 **Never believe a red without reproducing it in isolation**, and never touch a matchup while a gate
 is live.
 
+## Iteration 6 — weather
+
+`" wNice Weather"`. Nothing compared the weather, yet it gates real rules: Sweltering Heat faints
+players at drive end, and a Blizzard puts Long Pass and Long Bomb out of range — a bug actually
+fixed earlier in this project's history.
+
+Both engines already spell the weather identically (`Weather.getName()` / `Weather::name()`), so
+there is no hand-written enum mapping that could drift.
+
+**Result: 30/30 on all three editions — no divergence found.** A regression guard.
+
+### Two candidates rejected after checking
+
+* **Ball carrier** — fully implied by the hashed player positions plus the ball coordinate. Adding
+  it would grow the string and verify nothing new.
+* **KO-box contents** — largely implied now that player states distinguish `Ko` / `Bh` / `Si` /
+  `Rip` and off-pitch players report `-1,-1`.
+
+The goal is coverage of *distinct* state, not field count.
+
 ## Remaining groups
 
 1. ~~Per-team turn-used flags~~ — done, iteration 2.

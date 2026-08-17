@@ -83,6 +83,12 @@ pub fn state_string(game: &Game) -> String {
     // Must stay byte-identical with `ParityRunner.actingPlayerPart`.
     s.push_str(" ap");
     s.push_str(&acting_player_part(game));
+    // Weather. Nothing compared it, yet it gates real rules — Sweltering Heat faints players at
+    // drive end, a Blizzard puts Long Pass and Long Bomb out of range (an actual bug fixed earlier
+    // in this project's history). Uses the display name, which both engines already spell the same
+    // way (`Weather.getName()` / `Weather::name()`).
+    s.push_str(" w");
+    s.push_str(game.field_model.weather.name());
     s.push_str(" p");
     for (i, part) in player_parts.iter().enumerate() {
         if i > 0 {
