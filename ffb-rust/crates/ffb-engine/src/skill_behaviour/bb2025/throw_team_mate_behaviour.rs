@@ -11,7 +11,7 @@ use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
 use crate::skill_behaviour::registry::SkillRegistry;
-use ffb_model::enums::{PassOutcome, SkillId};
+use ffb_model::enums::{PassOutcome, Rules, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::step::framework::StepOutcome;
@@ -111,6 +111,14 @@ impl StepModifierTrait for ThrowTeamMateStepModifier {
         game.concession_possible = false;
 
         // Java: if (state.kicked) { turnData.setKtmUsed(true); } else { turnData.setTtmUsed(true); }
+        //
+        // …except under BB2020, where `bb2020/ThrowTeamMateBehaviour` sets **passUsed** instead of
+        // ttmUsed: BB2020 spends the team's once-per-turn PASS on a Throw Team-Mate (its
+        // `TtmMechanic.isTtmAvailable` is literally `!turnData.isPassUsed()`), whereas BB2025 tracks
+        // TTM on its own flag and leaves the pass intact. This shared behaviour runs for both, so a
+        // BB2020 team could throw AND still pass in the same turn (ogre bb2020 seed 6: java
+        // f0001 vs rust f0000 at the very next activation).
+        let bb2020 = game.rules == Rules::Bb2020;
         let turn_data = if game.home_playing {
             &mut game.turn_data_home
         } else {
@@ -118,6 +126,8 @@ impl StepModifierTrait for ThrowTeamMateStepModifier {
         };
         if state.kicked {
             turn_data.ktm_used = true;
+        } else if bb2020 {
+            turn_data.pass_used = true;
         } else {
             turn_data.ttm_used = true;
         }

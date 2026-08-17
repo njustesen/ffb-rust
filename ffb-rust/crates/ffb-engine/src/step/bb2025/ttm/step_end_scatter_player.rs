@@ -119,6 +119,8 @@ impl StepEndScatterPlayer {
                 thrown_player_coordinate: self.thrown_player_coordinate,
                 throw_scatter: false,
                 has_swoop: false,
+                // Re-scatter after a bounce is never a deviate: the deviate is the throw itself.
+                deviates: false,
             });
             let mut outcome = StepOutcome::next().push_seq(seq);
             if self.is_kicked_player {

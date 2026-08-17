@@ -71,6 +71,8 @@ pub enum Action {
     HitAndRun { coord: Option<FieldCoordinate> },
     /// Move to one adjacent square before a block resolves (Trickster skill).
     TricksterMove { coord: FieldCoordinate },
+    /// Java `ClientCommandSwoop` — the square a BB2016/BB2020 swooping player is steered toward.
+    Swoop { coord: FieldCoordinate },
 
     // ── Pass ─────────────────────────────────────────────────────────────────
     /// Throw the ball (or team-mate) to this coordinate.

@@ -9,13 +9,14 @@
 ///  - SteadyFootingContext — published for hit-player scenarios (implemented).
 ///  - SppMechanic — grants SPP on TTM hit for skilled players (wired: addCasualty for lethalSpp+violentSpp).
 ///  - Always uses `InjuryTypeCrowdPush` (no InjuryTypeKTMCrowd) for OOB.
-///  - No `deviate` / `crashLanding` flags (BB2020-only).
+///  - `crashLanding` is BB2020-only; `deviate` is set only by BB2020 (see the field docs).
 ///  - Publishes `USING_SWOOP` and `OLD_DEFENDER_STATE` from `handleLanding`.
 use std::sync::Arc;
 use ffb_mechanics::bb2025::spp_mechanic::SppMechanic as SppMechanic2025;
 use ffb_mechanics::mechanics::scatter_coordinate;
+use ffb_model::report::report_pass_deviate::ReportPassDeviate;
 use ffb_mechanics::spp_mechanic::SppMechanic as SppMechanicTrait;
-use ffb_model::enums::{ApothecaryMode, Direction, PS_IN_THE_AIR, PS_PICKED_UP, PlayerState};
+use ffb_model::enums::{ApothecaryMode, Direction, PS_IN_THE_AIR, PS_PICKED_UP, PlayerState, Rules};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
@@ -61,8 +62,8 @@ pub struct StepInitScatterPlayer {
     /// Java (bb2020): crashLanding — init param CRASH_LANDING (bb2020 edition only; stored,
     /// bb2020-specific crash-landing logic not yet wired into the shared step).
     pub crash_landing: bool,
-    /// Java (bb2020): deviate — init param PASS_DEVIATES (bb2020 edition only; stored,
-    /// bb2020-specific deviate logic not yet wired into the shared step).
+    /// Java (bb2020 only): `PASS_DEVIATES`. Set for a WILDLY_INACCURATE throw — a pass result the
+    /// BB2025 rules never produce, so this stays false under BB2025.
     pub deviate: bool,
     // AbstractStepWithReRoll stubs
     re_rolled_action: Option<String>,
@@ -120,7 +121,14 @@ impl StepInitScatterPlayer {
         }
 
         let mut start_coord = thrown_player_coord;
-        if self.throw_scatter {
+        // BB2020 only: a WILDLY_INACCURATE throw DEVIATES from the thrower's square (d8 direction +
+        // d6 distance) instead of throw-scattering from the target square. BB2025 has no such pass
+        // result, so `deviate` is always false there. Keeping the start coordinate at the thrown
+        // player's square is deliberate — Java's bb2020 twin skips the pass-coordinate assignment on
+        // this path.
+        if self.deviate {
+            // Java: setRangeRuler(null); clearMoveSquares() — client-side display only.
+        } else if self.throw_scatter {
             // Java: setRangeRuler(null); clearMoveSquares(); startCoordinate = game.passCoordinate
             // Range ruler / move squares are client-side only.
             if let Some(pc) = game.pass_coordinate {
@@ -130,7 +138,9 @@ impl StepInitScatterPlayer {
 
         let scatter_result: ScatterResult;
         let mut swoop_event: Option<GameEvent> = None;
-        if swooping {
+        if self.deviate {
+            scatter_result = self.deviate_scatter(game, rng, thrown_player_coord);
+        } else if swooping {
             // Java: doRoll = reRolledAction != SWOOP_DISTANCE || (reRollSource != null && useReRoll)
             // client-only: re-roll availability check requires dialog; headless proceeds without re-roll offer
             scatter_result = self.swoop_scatter(game, rng, start_coord);
@@ -342,12 +352,52 @@ impl StepInitScatterPlayer {
     /// Java: swoop(FieldCoordinate throwerCoordinate, Direction direction, int distanceOption)
     ///
     /// distanceOption == 0 → roll D6; else use distanceOption directly.
+    /// Java (bb2020): `StepInitScatterPlayer.deviate(game, throwerCoordinate)` — a WILDLY_INACCURATE
+    /// throw sends the player deviating from the THROWER's square: d8 direction then d6 distance, in
+    /// that order, walking back to the last on-pitch square if it runs off the field. The die order
+    /// is part of the parity contract: getting it backwards desyncs every roll that follows.
+    fn deviate_scatter(&mut self, game: &mut Game, rng: &mut GameRng, thrower_coord: FieldCoordinate) -> ScatterResult {
+        let direction_roll = rng.d8();
+        let distance_roll = rng.d6();
+        let direction = Direction::for_roll(direction_roll).expect("d8 is 1..=8");
+
+        let (ex, ey) = scatter_coordinate(thrower_coord.x, thrower_coord.y, direction, distance_roll);
+        let coord_end = FieldCoordinate::new(ex, ey);
+
+        let mut last_valid = coord_end;
+        let mut valid_dist = distance_roll;
+        while !last_valid.is_on_pitch() && valid_dist > 0 {
+            valid_dist -= 1;
+            let (vx, vy) = scatter_coordinate(thrower_coord.x, thrower_coord.y, direction, valid_dist);
+            last_valid = FieldCoordinate::new(vx, vy);
+        }
+
+        // Java: publishParameter(THROWN_PLAYER_COORDINATE, lastValidCoordinate)
+        self.thrown_player_coordinate = Some(last_valid);
+        // Java: addReport(new ReportPassDeviate(coordinateEnd, direction, directionRoll, distanceRoll, true))
+        game.report_list.add(ReportPassDeviate::new(
+            coord_end, direction, direction_roll, distance_roll, true));
+
+        ScatterResult::new(last_valid, coord_end.is_on_pitch())
+    }
+
     fn swoop_scatter(&mut self, game: &mut Game, rng: &mut GameRng, start_coord: FieldCoordinate) -> ScatterResult {
         let direction = self.swoop_direction.expect("swoop_direction is set");
 
-        // Java: getOptionWithDefault(SWOOP_DISTANCE).getValue() — 0 means roll D6.
+        // Java: getOptionWithDefault(SWOOP_DISTANCE).getValue() — 0 means roll for the distance, and
+        // the DIE SIZE is edition-specific: bb2025 rolls a d6 (`StepInitScatterPlayer:275`), while
+        // bb2016/bb2020 roll a d3 (`bb2020/StepInitScatterPlayer.swoop:286`). Rolling BB2025's d6
+        // under BB2020 both drew the wrong die from the shared stream and flew the player twice as
+        // far — a swooping Doom Diver landed 6 squares north-west where Java put it 3
+        // (goblin bb2020 seed 40: java a04 at 11,4, rust a04 at 8,1).
         let distance_option = get_int_option(game, SWOOP_DISTANCE);
-        let distance_roll = if distance_option == 0 { rng.d6() } else { distance_option };
+        let distance_roll = if distance_option != 0 {
+            distance_option
+        } else if game.rules == Rules::Bb2025 {
+            rng.d6()
+        } else {
+            rng.d3()
+        };
 
         let (ex, ey) = scatter_coordinate(start_coord.x, start_coord.y, direction, distance_roll);
         let coord_end = FieldCoordinate::new(ex, ey);
@@ -631,6 +681,31 @@ mod tests {
         step.is_kicked_player = true;
         let out = step.start(&mut game, &mut GameRng::new(3));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::IsKickedPlayer(true))));
+    }
+
+    #[test]
+    /// The swoop distance die is edition-specific: bb2025 rolls a d6, bb2016/bb2020 a d3. Rolling
+    /// BB2025's d6 under BB2020 both drew the wrong die from the shared stream and flew the player
+    /// twice as far (goblin bb2020 seed 40: java landed the Doom Diver 3 squares north-west, rust 6).
+    #[test]
+    fn swoop_distance_die_is_edition_specific() {
+        for (rules, sides) in [(Rules::Bb2025, 6), (Rules::Bb2020, 3), (Rules::Bb2016, 3)] {
+            // Find a seed whose first die of the OTHER size would differ, then assert the distance
+            // never exceeds this edition's die.
+            let mut max_seen = 0;
+            for seed in 0..40u64 {
+                let mut step = StepInitScatterPlayer::new();
+                step.swoop_direction = Some(Direction::North);
+                let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+                let mut rng = GameRng::new(seed);
+                let start = FieldCoordinate::new(13, 9);
+                step.swoop_scatter(&mut game, &mut rng, start);
+                let landed = step.thrown_player_coordinate.unwrap();
+                max_seen = max_seen.max(start.y - landed.y);
+            }
+            assert_eq!(max_seen, sides,
+                "{rules:?}: swoop distance must span 1..={sides} (a d{sides})");
+        }
     }
 
     #[test]

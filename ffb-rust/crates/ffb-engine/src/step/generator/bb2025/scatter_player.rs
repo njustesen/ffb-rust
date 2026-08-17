@@ -14,6 +14,10 @@ pub struct ScatterPlayerParams {
     pub throw_scatter: bool,
     /// Whether to include the SWOOP step (Swoop skill).
     pub has_swoop: bool,
+    /// BB2020 only: `PASS_DEVIATES`. `bb2020/StepDispatchScatterPlayer` sets this for a
+    /// WILDLY_INACCURATE throw — a result BB2025 does not have at all (its evaluatePass returns
+    /// FUMBLE there), so BB2025 always leaves this false and its behaviour is unchanged.
+    pub deviates: bool,
 }
 
 pub struct ScatterPlayer;
@@ -47,6 +51,7 @@ impl ScatterPlayer {
         let mut init_params = vec![
             StepParameter::ThrownPlayerHasBall(params.thrown_player_has_ball),
             StepParameter::ThrowScatter(params.throw_scatter),
+            StepParameter::PassDeviates(params.deviates),
         ];
         if let Some(ref id) = params.thrown_player_id {
             init_params.push(StepParameter::ThrownPlayerId(Some(id.clone())));

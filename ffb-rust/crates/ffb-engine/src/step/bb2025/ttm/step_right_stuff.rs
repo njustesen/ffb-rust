@@ -1,4 +1,4 @@
-use ffb_model::enums::{ApothecaryMode, PlayerState, PS_FALLING, SkillId};
+use ffb_model::enums::{ApothecaryMode, PlayerState, Rules, PS_FALLING, SkillId};
 use ffb_model::enums::PassOutcome as ModelPassResult;
 use ffb_model::enums::ReRollSource;
 use ffb_model::model::game::Game;
@@ -17,7 +17,7 @@ use crate::step::framework::{Step, StepOutcome, CatchScatterThrowInMode};
 use crate::step::framework::{DeferredCommand, StepId, StepParameter};
 use crate::step::bb2025::command::RightStuffCommand;
 use std::sync::Arc;
-use crate::step::util_server_injury::handle_injury_by_name;
+use crate::step::util_server_injury::{drop_player_rng, handle_injury_by_name};
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 use crate::step::util_server_steps::check_touchdown;
 use ffb_mechanics::pass_result::PassResult as MechanicPassResult;
@@ -199,7 +199,14 @@ impl StepRightStuff {
         // Java: fumbledKtm = (passResult==FUMBLE && kickedPlayer)
         let fumbled_ktm = self.pass_result == Some(ModelPassResult::Fumble) && self.kicked_player;
         // Java: autoFailLanding = oldPlayerState != null && (oldPlayerState.isProneOrStunned() || oldPlayerState.isDistracted())
-        let auto_fail_landing = self.old_player_state
+        //
+        // BB2025 ONLY. The bb2020 twin's doRoll is plainly `!fDropThrownPlayer && !fumbledKtm` — it
+        // has no autoFailLanding term at all, so a BB2020 player thrown while prone, stunned or
+        // distracted still gets its Right Stuff landing roll. Applying BB2025's rule under BB2020
+        // skipped the roll and sent the player straight to the injury: a swooped Doom Diver ended
+        // Prone where Java landed it Standing and moved it again the same turn (goblin bb2020 seed 9
+        // i=248 — Java had an activation Rust did not).
+        let auto_fail_landing = game.rules == Rules::Bb2025 && self.old_player_state
             .map(|s| s.is_prone_or_stunned() || s.is_distracted())
             .unwrap_or(false);
         // Java: doRoll = !dropThrownPlayer && !fumbledKtm && !autoFailLanding
@@ -395,6 +402,45 @@ impl StepRightStuff {
         // of a ball-carrier neither bounced the ball nor turned over (halfling seed 7 i=9: Java rolled a
         // ball-bounce d8 + flipped to the other team; Rust did neither).
         let has_ball = self.thrown_player_has_ball.unwrap_or(false);
+
+        // BB2020 resolves the failed landing HERE; BB2025 hands it to a following STEADY_FOOTING.
+        // The BB2025 tail runs `RIGHT_STUFF -> STEADY_FOOTING`, and it is that step which applies
+        // the injury result to the field model. BB2020's tail (Java bb2020/ThrowTeamMate.java:56,
+        // mirrored in the generator) ends with a PICK_UP and has no STEADY_FOOTING at all, so under
+        // BB2020 the context published below was read by nobody: the thrown player failed its
+        // landing roll, took its armour roll, and still stood there unharmed (ogre bb2020 seed 6 —
+        // java h09 Prone at 7,6, rust h09 Standing).
+        //
+        // Java bb2020 StepRightStuff: publish INJURY_RESULT, then `UtilServerInjury.dropPlayer`,
+        // dropping the END_TURN param unless the thrown player carried the ball.
+        if game.rules == Rules::Bb2020 {
+            // Order matters, and it is the same subtlety the bb2016 twin documents: `handleInjury`
+            // only ROLLS, so the player is still standing on its landing square when `dropPlayer`
+            // runs and can therefore see "player is on the ball square" and publish the SCATTER_BALL
+            // bounce. Compute the drop parameters against the PRE-injury board, then apply the
+            // injury — applying it first would send a KO'd player to the box at (-1,-1) and the
+            // bounce would be lost. Applying the injury is also what makes the outcome stick: a drop
+            // alone left a Badly Hurt player standing Prone on the pitch (ogre bb2020 seed 5 i=7 —
+            // java `h06:-1,-1,Bh`, rust `h06:7,6,Prone`).
+            let mut params = drop_player_rng(
+                game, rng, &player_id, false, ApothecaryMode::ThrownPlayer,
+            );
+            injury_result.apply_to(game);
+            if !has_ball {
+                params.retain(|p| !matches!(p, StepParameter::EndTurn(_)));
+            }
+            let mut out = StepOutcome::next()
+                .publish(StepParameter::InjuryResult(Box::new(injury_result)));
+            for p in params {
+                out = out.publish(p);
+            }
+            if has_ball {
+                out = out.publish(StepParameter::EndTurn(true));
+            }
+            if let Some(ev) = pending_right_stuff.take() { out = out.with_event(ev); }
+            return out.publish(StepParameter::ThrownPlayerCoordinate(None));
+        }
+
         let commands: Vec<Arc<dyn DeferredCommand>> =
             vec![Arc::new(RightStuffCommand::new(player_id.clone(), has_ball))];
         let ctx = SteadyFootingContext::from_injury_result_with_commands(injury_result, commands);
@@ -587,6 +633,37 @@ mod tests {
             "no dice roll / RIGHT_STUFF_ROLL report should be added when auto-failing due to prior Stunned state");
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))),
             "auto-fail path must still publish SteadyFootingContext for injury resolution");
+    }
+
+    /// …and that auto-fail is BB2025-ONLY. The bb2020 twin's doRoll is plainly
+    /// `!fDropThrownPlayer && !fumbledKtm` — no autoFailLanding term — so a BB2020 player thrown
+    /// while prone, stunned or distracted still gets its landing roll. Applying BB2025's rule under
+    /// BB2020 skipped the roll and sent the player straight to the injury (goblin bb2020 seed 9).
+    #[test]
+    fn auto_fail_landing_is_bb2025_only() {
+        use ffb_model::report::report_id::ReportId;
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PS_STANDING, PS_STUNNED, PlayerState};
+        use ffb_model::types::FieldCoordinate;
+        for (rules, expect_roll) in [(Rules::Bb2025, false), (Rules::Bb2020, true), (Rules::Bb2016, true)] {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+            let mut p = Player::default();
+            p.id = "p1".into();
+            p.agility = 3;
+            game.team_home.players.push(p);
+            game.field_model.set_player_coordinate("p1", FieldCoordinate::new(5, 5));
+            game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+
+            let mut step = StepRightStuff::new("success".into());
+            step.thrown_player_id = Some("p1".into());
+            step.thrown_player_has_ball = Some(false);
+            step.old_player_state = Some(PlayerState::new(PS_STUNNED));
+            step.start(&mut game, &mut GameRng::new(0));
+
+            assert_eq!(game.report_list.has_report(ReportId::RIGHT_STUFF_ROLL), expect_roll,
+                "{rules:?}: a player thrown while stunned must {} roll for the landing",
+                if expect_roll { "still" } else { "NOT" });
+        }
     }
 
     #[test]

@@ -397,8 +397,17 @@ fn drop_player_with_base_rng(
         }
         new_state = new_state.change_base(target_base);
         // Java: (player == actingPlayer && mode != THROWN_PLAYER) || (STUNNED == pPlayerBase) → deactivate
+        //
+        // The `mode != THROWN_PLAYER` term was missing, and it matters exactly when the dropped
+        // player IS the acting player — which a THROWN player becomes the moment a swoop hands it
+        // the activation. Deactivating it there left the landed player inactive where Java leaves it
+        // active. The compared state hash encodes only the BASE state, so this was invisible to the
+        // hash and surfaced instead through the agents: Java offered the landed player another
+        // activation while Rust's inactive-skip rejected the same pick, burning an extra decisionRng
+        // draw and diverging every activation afterwards (goblin bb2020 seed 9 i=248).
         let is_acting = game.acting_player.player_id.as_deref() == Some(player_id);
-        if is_acting || target_base == PS_STUNNED {
+        let deactivates_acting = is_acting && apothecary_mode != ApothecaryMode::ThrownPlayer;
+        if deactivates_acting || target_base == PS_STUNNED {
             new_state = new_state.change_active(false);
         }
         game.field_model.set_player_state(player_id, new_state);
@@ -1356,6 +1365,35 @@ mod tests {
     /// skips that, so each Ball & Chain player dropped cost 2 missing d6 (goblin bb2016 seed 1 i=1:
     /// a Fanatic-vs-Fanatic both-down needs FOUR injury rolls — B&C + block for the defender AND
     /// the attacker — where Rust rolled only the two block injuries).
+    #[test]
+    /// Java deactivates a dropped player only when it is the acting player AND the mode is not
+    /// THROWN_PLAYER: `(player == actingPlayer && mode != THROWN_PLAYER) || (STUNNED == base)`.
+    /// The mode term matters exactly when a thrown player has been handed the activation (a BB2020
+    /// swoop does this), and the compared state hash cannot see the ACTIVE bit at all — the loss
+    /// showed up only as the two agents' activation picks drifting apart (goblin bb2020 seed 9).
+    #[test]
+    fn dropping_a_thrown_acting_player_keeps_it_active() {
+        for (mode, expect_active) in [
+            (ApothecaryMode::ThrownPlayer, true),
+            (ApothecaryMode::Defender, false),
+        ] {
+            let mut game = make_game();
+            add_player(&mut game, "p1", PS_STANDING);
+            // Mark it ACTIVE and make it the acting player, as a swoop hand-over does.
+            let active_state = PlayerState::new(PS_STANDING).change_active(true);
+            game.field_model.set_player_state("p1", active_state);
+            game.acting_player.player_id = Some("p1".into());
+
+            let mut rng = GameRng::new(0);
+            drop_player_rng(&mut game, &mut rng, "p1", false, mode);
+
+            let after = game.field_model.player_state("p1").unwrap();
+            assert_eq!(after.base(), PS_PRONE, "{mode:?}: the player is dropped prone either way");
+            assert_eq!(after.is_active(), expect_active,
+                "{mode:?}: ACTIVE bit after dropping the acting player");
+        }
+    }
+
     #[test]
     fn drop_player_rng_rolls_the_chain_injury_for_a_ball_and_chain_player() {
         let roll = |ball_and_chain: bool| {

@@ -189,6 +189,18 @@ impl Agent for UniformAgent {
                 let idx = self.pick(sorted.len());
                 Action::PushTo { coord: sorted[idx] }
             }
+            // Swoop target (BB2016/BB2020): pick uniformly among the offered squares. The step has
+            // no decline path, so an unanswered prompt would stall the game.
+            Some(AgentPrompt::SwoopTarget { player_id, squares }) => {
+                if squares.is_empty() {
+                    Action::EndTurn
+                } else {
+                    let idx = (self.rng.next_u64() % squares.len() as u64) as usize;
+                    let target = squares[idx];
+                    let is_home = gs.game.team_home.player(player_id).is_some();
+                    Action::Swoop { coord: if is_home { target } else { target.transform() } }
+                }
+            }
             Some(AgentPrompt::FollowUp { .. }) => Action::FollowUp { follow_up: self.pick_bool() },
             Some(AgentPrompt::BlockChoice { dice, .. }) => {
                 let idx = self.pick(dice.len().max(1));

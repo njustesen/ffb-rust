@@ -56,6 +56,16 @@ pub enum AgentPrompt {
         player_id: PlayerId,
         squares: Vec<FieldCoordinate>,
     },
+    /// Swoop (BB2016/BB2020): a thrown player with `ttmScattersInSingleDirection` must be steered
+    /// into one of the (at most four) orthogonally adjacent squares — Java's mixed `StepSwoop` ends
+    /// its execute with `UtilServerPlayerSwoop.updateSwoopSquares` and then WAITS for a
+    /// `CLIENT_SWOOP` naming the square. Unlike BB2025, where Swoop is an optional skill offer the
+    /// harness declines, the BB2016/BB2020 step has no decline path: something must answer it or the
+    /// step never advances.
+    SwoopTarget {
+        player_id: PlayerId,
+        squares: Vec<FieldCoordinate>,
+    },
     FollowUp {
         attacker_id: PlayerId,
         target_coord: FieldCoordinate,

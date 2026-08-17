@@ -389,6 +389,29 @@ pub fn make_step_for(id: StepId, rules: Rules) -> Box<dyn Step> {
             // ONE differing event inside the shared step instead — see `handle_cheering_fans`.
             StepId::Prayer =>
                 return Box::new(crate::step::bb2020::StepPrayer::default()),
+            // BB2020 Throw-Team-Mate step-set. These twins were translated with the rest of the
+            // port and then sat dead: the driver had no BB2020 TTM arm, so a BB2020 throw ran the
+            // BB2025 chain. Nothing noticed for as long as it didn't because BB2020 never reached a
+            // throw at all — both harnesses filtered throwable team-mates on the raw `canBeThrown`
+            // property, which bb2020's Right Stuff does not register (it registers
+            // `canBeThrownIfStrengthIs3orLess`), so the candidate list was always empty.
+            //
+            // The two chains genuinely differ: BB2020 scatters the thrown player 3x d8 and carries
+            // PASS_DEVIATES / WILDLY_INACCURATE / crash-landing; BB2025 replaces those with
+            // bullseye and swoop. Running BB2025's chain under BB2020 landed an accurate throw
+            // on-target and standing where Java scattered it and then failed the landing roll
+            // (ogre bb2020 seed 6: java h09 Prone at 7,6 with pass_used set, rust h09 Standing).
+            // Routing the WHOLE set was measured and is worse: the outer twins
+            // (ThrowTeamMate / InitThrowTeamMate / EndThrowTeamMate / RightStuff / AlwaysHungry) are
+            // staler than the shared chain and no longer match the generator that pushes them — the
+            // throw never rolled at all, two players took armour rolls and the turn ended on a
+            // turnover (ogre bb2020 seed 6). Same lesson as ApplyKickoffResult above: route only the
+            // steps whose BB2020 behaviour genuinely differs, and leave the rest shared.
+            // Routing DispatchScatterPlayer / InitScatterPlayer alone was measured too, and is also
+            // wrong: the SHARED StepThrowTeamMate hands the scatter over by PUBLISHING
+            // PASS_RESULT + USING_BULLSEYE, and the bb2020 twin reads a different parameter set, so
+            // the hand-over silently drops. Whatever BB2020 needs has to be edition-gated INSIDE the
+            // shared chain, the way handle_cheering_fans does above.
             _ => {}
         }
     }

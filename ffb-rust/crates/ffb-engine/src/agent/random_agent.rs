@@ -297,11 +297,14 @@ impl Agent for RandomAgent {
                     // BB2016 spends the team's PASS on a Throw Team-Mate (bb2016
                     // ThrowTeamMateBehaviour sets passUsed), and bb2016 StepInitSelecting rejects the
                     // command once the pass is gone. Mirrors ParityRunner.filterStaleActions.
+                    // BB2020 spends the pass exactly as BB2016 does (bb2020
+                    // ThrowTeamMateBehaviour sets passUsed; bb2020 TtmMechanic.isTtmAvailable is
+                    // `!turnData.isPassUsed()`); only BB2025 tracks TTM on its own flag.
                     PlayerAction::ThrowTeamMate => {
-                        if gs.game.rules == ffb_model::enums::Rules::Bb2016 {
-                            !td.ttm_used && !td.pass_used
-                        } else {
+                        if gs.game.rules == ffb_model::enums::Rules::Bb2025 {
                             !td.ttm_used
+                        } else {
+                            !td.ttm_used && !td.pass_used
                         }
                     }
                     PlayerAction::KickTeamMate => !td.ktm_used,
@@ -570,6 +573,25 @@ impl Agent for RandomAgent {
                     .unwrap_or(FieldCoordinate::new(0, 0));
                 let cmd_coord = if is_home { target } else { target.transform() };
                 Action::ThrowTeamMate { player_id: thrown_player_id.clone(), coord: cmd_coord }
+            }
+            // Swoop target (BB2016/BB2020): Java's mixed StepSwoop offers the (at most four)
+            // orthogonally adjacent squares and WAITS for a CLIENT_SWOOP naming one — there is no
+            // decline, unlike BB2025's optional skill offer. Coordinate-sorted candidate list plus a
+            // single actionRng pick, exactly like every other target choice (AGENT_CONTRACT §6);
+            // ParityRunner.sendSwoopTarget mirrors this list, order and draw.
+            Some(AgentPrompt::SwoopTarget { player_id, squares }) => {
+                let mut squares = squares.clone();
+                squares.sort_by_key(|c| (c.x, c.y));
+                if squares.is_empty() {
+                    // Java would sit here forever; nothing legal means nothing to send.
+                    Action::EndTurn
+                } else {
+                    let idx = self.pick_action(squares.len());
+                    let target = squares[idx];
+                    let is_home = gs.game.team_home.player(player_id).is_some();
+                    let cmd_coord = if is_home { target } else { target.transform() };
+                    Action::Swoop { coord: cmd_coord }
+                }
             }
             Some(AgentPrompt::FollowUp { .. }) => {
                 Action::FollowUp { follow_up: false }

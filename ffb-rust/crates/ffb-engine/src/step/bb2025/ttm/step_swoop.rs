@@ -1,4 +1,4 @@
-use ffb_model::enums::{Direction, PlayerAction, PlayerState};
+use ffb_model::enums::{Direction, PlayerAction, PlayerState, Rules};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -135,6 +135,17 @@ impl Step for StepSwoop {
                 // Java: CLIENT_USE_SKILL -> usingSwoop = isSkillUsed -> EXECUTE_STEP
                 self.using_swoop = Some(*use_skill);
             }
+            // Java (bb2016/bb2020 `StepSwoop`): CLIENT_SWOOP sets coordinateTo (un-mirrored for the
+            // away coach) and then runs executeSwoop → the edition's SwoopBehaviour hook, which
+            // rolls a throw-in direction and publishes DIRECTION for StepInitScatterPlayer.
+            Action::Swoop { coord } => {
+                let is_home_player = self.thrown_player_id.as_deref()
+                    .map(|id| game.team_home.player(id).is_some())
+                    .unwrap_or(game.home_playing);
+                let to = if is_home_player { *coord } else { coord.transform() };
+                self.coordinate_to = Some(to);
+                return self.execute_swoop(game, rng, to);
+            }
             Action::Pass { coord } => {
                 // Java: CLIENT_SWOOP -> coordinateTo = swoopCommand.getTargetCoordinate()
                 // Java: if !checkCommandIsFromHomePlayer: coordinateTo = coordinateTo.transform()
@@ -176,7 +187,40 @@ impl Step for StepSwoop {
 }
 
 impl StepSwoop {
-    fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    /// Java `bb2020/SwoopBehaviour.handleExecuteStepHook` (the bb2016 twin is the same shape): the
+    /// chosen square only picks the TEMPLATE direction — the actual deflection is a throw-in
+    /// direction roll interpreted against it, so a swoop still spreads over three directions.
+    fn execute_swoop(
+        &mut self, game: &mut Game, rng: &mut GameRng, to: ffb_model::types::FieldCoordinate,
+    ) -> StepOutcome {
+        use ffb_mechanics::throw_in_mechanic::ThrowInMechanic;
+        let player_id = match self.thrown_player_id.as_deref() {
+            Some(id) => id.to_string(),
+            None => return StepOutcome::next(),
+        };
+        let from = game.field_model.player_coordinate(&player_id)
+            .unwrap_or(self.coordinate_from.unwrap_or(to));
+        self.coordinate_from = Some(from);
+
+        // Java: rollThrowInDirection() — a d6, drawn BEFORE the direction is interpreted.
+        let roll = rng.d6();
+        let template = if from.x < to.x {
+            Direction::East
+        } else if from.x > to.x {
+            Direction::West
+        } else if from.y < to.y {
+            Direction::South
+        } else {
+            Direction::North
+        };
+        // Any edition's impl serves: the Direction-template interpretation is defined once on the
+        // trait and is identical across rulesets.
+        let mechanic = ffb_mechanics::bb2020::throw_in_mechanic::ThrowInMechanic::new();
+        let direction = mechanic.interpret_throw_in_direction_roll_with_template(template, roll);
+        StepOutcome::next().publish(StepParameter::Direction(direction))
+    }
+
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: thrownPlayer = game.getPlayerById(state.thrownPlayerId)
         // Java: if (thrownPlayer == null || state.thrownPlayerCoordinate == null) -> NEXT_STEP
         let player_id = match self.thrown_player_id.as_deref() {
@@ -196,6 +240,17 @@ impl StepSwoop {
         // ttmScattersInSingleDirection skill (Swoop); the parity agent (and ParityRunner) DECLINE
         // it — using Swoop opens a CLIENT_SWOOP target dialog the harness can't drive (STUCK_STEP
         // → force-ended game), so both engines decline and the thrown player lands normally.
+        // BB2016/BB2020 have NO skill-use offer here: their Swoop step is
+        // `ffb-server/.../step/mixed/ttm/StepSwoop.java`, which goes straight to the swoop squares
+        // and waits for a CLIENT_SWOOP naming one. Only BB2025's twin asks "use Swoop?" first — the
+        // offer the parity agents decline. Running BB2025's optional shape under BB2020 meant Rust
+        // declined and moved on while Java sat waiting for a square that never came, spinning until
+        // the harness abandoned the game (`STUCK_STEP: SWOOP`, goblin bb2020 seeds 9/29/31/...,
+        // reachable only once BB2020 could throw a Doom Diver at all).
+        let legacy_swoop = game.rules != Rules::Bb2025;
+        if legacy_swoop {
+            self.using_swoop = Some(true);
+        }
         if self.using_swoop.is_none() {
             // Java shows the dialog UNCONDITIONALLY (thrownPlayer.getSkillWithProperty(
             // ttmScattersInSingleDirection)); the step is only pushed for Swoop players, so the
@@ -238,8 +293,22 @@ impl StepSwoop {
                 // Move player to the pass coordinate
                 game.field_model.set_player_coordinate(&player_id, pass_coord);
                 // Java: UtilActingPlayer.changeActingPlayer(game, thrownPlayerId, SWOOP, false)
+                //
+                // That helper does more than set the acting-player fields: it records the old state,
+                // sets `standingUp`, and shows the new acting player as MOVING (preserving every
+                // other bit, ACTIVE included). Setting only the ids left the swooping player's state
+                // untouched, so it came out of the landing inactive where Java's came out active —
+                // invisible to the compared hash, which encodes only the BASE state, but decisive
+                // for the agents: Java offered the landed player another activation and Rust's
+                // inactive-skip rejected it, burning an extra decisionRng draw and picking a
+                // different player from there on (goblin bb2020 seed 9 i=248).
+                let old_state = game.field_model.player_state(&player_id).unwrap_or_default();
                 game.acting_player.player_id = Some(player_id.clone());
                 game.acting_player.player_action = Some(PlayerAction::Swoop);
+                game.acting_player.old_player_state = Some(old_state);
+                game.acting_player.standing_up = old_state.base() == ffb_model::enums::PS_PRONE;
+                game.field_model.set_player_state(
+                    &player_id, old_state.change_base(ffb_model::enums::PS_MOVING));
                 // no-op: blitzTurnState.changeActingPlayer() — BlitzTurnState not ported (headless no-op)
                 if self.thrown_player_has_ball {
                     game.field_model.ball_coordinate = Some(pass_coord);
@@ -263,6 +332,19 @@ impl StepSwoop {
         //   [implicit wait for CLIENT_SWOOP]
         if self.coordinate_to.is_none() {
             UtilServerPlayerSwoop::update_swoop_squares(game, &player_id);
+            // BB2016/BB2020: Java WAITS here for CLIENT_SWOOP, so the agent must be asked. Surface
+            // the offered squares (a bare `cont()` with no prompt reads as a stall to the headless
+            // driver and abandons the throw).
+            if legacy_swoop {
+                let squares: Vec<ffb_model::types::FieldCoordinate> =
+                    game.field_model.move_squares.keys().copied().collect();
+                return outcome
+                    .publish(StepParameter::UsingSwoop(true))
+                    .with_prompt(AgentPrompt::SwoopTarget {
+                        player_id: player_id.clone(),
+                        squares,
+                    });
+            }
             // Java: publishParameter(USING_SWOOP, true) then waits for CLIENT_SWOOP (a client
             // coordinate dialog). Unreachable in the parity harness — both agents DECLINE Swoop
             // above (usingSwoop=false → NEXT_STEP), so the throw_scatter/deflection path never

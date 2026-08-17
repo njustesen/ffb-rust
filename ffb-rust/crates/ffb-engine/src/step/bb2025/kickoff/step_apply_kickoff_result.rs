@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use ffb_model::events::GameEvent;
-use ffb_model::enums::{KickoffResult, TurnMode, Weather, PS_EXHAUSTED, PS_RESERVE, PS_STANDING};
+use ffb_model::enums::{KickoffResult, Rules, TurnMode, Weather, PS_EXHAUSTED, PS_RESERVE, PS_STANDING};
 use ffb_model::inducement::inducement::Inducement;
 use ffb_model::inducement::usage::Usage;
 use ffb_model::report::mixed::report_kickoff_sequence_activations_count::ReportKickoffSequenceActivationsCount;
@@ -482,26 +482,40 @@ impl StepApplyKickoffResult {
         let roll_home = rng.d6();
         let roll_away = rng.d6();
 
+        // BB2020 differs from BB2025 twice over, and this shared step runs for BOTH editions
+        // (`step/bb2020/step_apply_kickoff_result.rs` states the rules correctly but is not the file
+        // the driver dispatches). bb2020/StepApplyKickoffResult.handleBrilliantCoaching subtracts 1
+        // for a banned coach, which the BB2025 twin does not.
+        let bb2020 = game.rules == Rules::Bb2020;
+        let ban_home = if bb2020 && game.turn_data_home.coach_banned { -1 } else { 0 };
+        let ban_away = if bb2020 && game.turn_data_away.coach_banned { -1 } else { 0 };
+
         let total_home = roll_home + game.team_home.assistant_coaches
-            + game.turn_data_home.inducement_set.value(Usage::ADD_COACH);
+            + game.turn_data_home.inducement_set.value(Usage::ADD_COACH) + ban_home;
         let total_away = roll_away + game.team_away.assistant_coaches
-            + game.turn_data_away.inducement_set.value(Usage::ADD_COACH);
+            + game.turn_data_away.inducement_set.value(Usage::ADD_COACH) + ban_away;
 
         let mut outcome = StepOutcome::next();
         let tie = total_home == total_away;
+        // …and the second difference: BB2025 grants the re-roll on `>=`, so a TIE gives BOTH teams
+        // one; BB2020 uses a strict `>` on each side, so a tie gives NOBODY one. Running BB2025's
+        // `>=` under BB2020 handed out two re-rolls Java never granted (ogre bb2020 seed 10: both
+        // engines rolled 3 and 3, Java stayed r3,3 while Rust went to r4,4).
+        let home_gains = if bb2020 { total_home > total_away } else { total_home >= total_away };
+        let away_gains = if bb2020 { total_away > total_home } else { total_away >= total_home };
         // Java: winning team (or both on tie) gains +1 re-roll for the drive.
         // Java grants into the pool AND records it in the one-drive counter
         // (`bb2025/StepApplyKickoffResult.java:449-462`), so `StepEndTurn.removeReRollsLastingForDrive`
         // can take it back out again at end of drive. Rust incremented only the pool, leaving the
         // mirrored counter permanently 0 — the re-roll then never expired and the team kept it for
         // the rest of the half (human bb2025 seeds 1/6/10: Java r3,3 at the final whistle, Rust r3,4).
-        if total_home >= total_away {
+        if home_gains {
             game.turn_data_home.rerolls += 1;
             game.turn_data_home.rerolls_brilliant_coaching_one_drive += 1;
             let team_id = game.team_home.id.clone();
             outcome = outcome.with_event(GameEvent::KickoffExtraReRoll { team_id });
         }
-        if total_away >= total_home {
+        if away_gains {
             game.turn_data_away.rerolls += 1;
             game.turn_data_away.rerolls_brilliant_coaching_one_drive += 1;
             let team_id = game.team_away.id.clone();
@@ -1187,6 +1201,70 @@ mod tests {
         assert_eq!(game.turn_data_home.rerolls_brilliant_coaching_one_drive, 1,
             "the granted re-roll must be recorded as lasting one drive");
         assert_eq!(game.turn_data_away.rerolls_brilliant_coaching_one_drive, 0);
+    }
+
+    /// A seed whose first two d6 come out equal, so a Brilliant Coaching roll-off between teams
+    /// with equal coaching staff is a guaranteed TIE. Searched rather than hard-coded so the test
+    /// stays valid if the RNG is ever re-tuned.
+    fn tied_d6_seed() -> u64 {
+        (0u64..256).find(|&s| {
+            let mut rng = GameRng::new(s);
+            let (a, b) = (rng.d6(), rng.d6());
+            a == b
+        }).expect("no seed in 0..256 rolls two equal d6")
+    }
+
+    /// A TIE is where BB2020 and BB2025 part company, and this shared step runs for BOTH editions:
+    /// BB2025 grants the re-roll on `>=`, so a tie gives each team one; BB2020 uses a strict `>` on
+    /// each side, so a tie gives nobody one. Running BB2025's rule under BB2020 handed out two
+    /// re-rolls Java never granted, which the state hash caught at the FIRST activation of ogre
+    /// bb2020 seed 10 (java r3,3, rust r4,4).
+    #[test]
+    fn brilliant_coaching_tie_follows_the_edition() {
+        let seed = tied_d6_seed();
+        for (rules, expect_gain) in [(Rules::Bb2025, 1i32), (Rules::Bb2020, 0)] {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+            game.team_home.assistant_coaches = 3;
+            game.team_away.assistant_coaches = 3;
+            let (home_before, away_before) = (game.turn_data_home.rerolls, game.turn_data_away.rerolls);
+            let mut step = make_step();
+            step.kickoff_result = Some(KickoffResult::BrilliantCoaching);
+            step.start(&mut game, &mut GameRng::new(seed));
+            assert_eq!(game.turn_data_home.rerolls - home_before, expect_gain,
+                "{rules:?}: a tied Brilliant Coaching must grant home {expect_gain} re-roll(s)");
+            assert_eq!(game.turn_data_away.rerolls - away_before, expect_gain,
+                "{rules:?}: a tied Brilliant Coaching must grant away {expect_gain} re-roll(s)");
+            assert_eq!(game.turn_data_home.rerolls_brilliant_coaching_one_drive, expect_gain,
+                "{rules:?}: the one-drive counter must track the grant");
+            assert_eq!(game.turn_data_away.rerolls_brilliant_coaching_one_drive, expect_gain);
+        }
+    }
+
+    /// BB2020 subtracts 1 from a banned coach's total; the BB2025 twin has no such term. With the
+    /// dice tied and coaching staff level, the ban is the only thing that can separate the teams.
+    #[test]
+    fn brilliant_coaching_coach_ban_penalty_is_bb2020_only() {
+        let seed = tied_d6_seed();
+        for rules in [Rules::Bb2020, Rules::Bb2025] {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+            game.team_home.assistant_coaches = 3;
+            game.team_away.assistant_coaches = 3;
+            game.turn_data_home.coach_banned = true;
+            let mut step = make_step();
+            step.kickoff_result = Some(KickoffResult::BrilliantCoaching);
+            step.start(&mut game, &mut GameRng::new(seed));
+            if rules == Rules::Bb2020 {
+                // -1 breaks the tie: away wins outright, home gets nothing.
+                assert_eq!(game.turn_data_away.rerolls_brilliant_coaching_one_drive, 1,
+                    "BB2020: the banned home coach loses the roll-off outright");
+                assert_eq!(game.turn_data_home.rerolls_brilliant_coaching_one_drive, 0);
+            } else {
+                // BB2025 ignores the ban, so the totals stay tied and `>=` grants BOTH.
+                assert_eq!(game.turn_data_home.rerolls_brilliant_coaching_one_drive, 1,
+                    "BB2025 has no coach-ban penalty");
+                assert_eq!(game.turn_data_away.rerolls_brilliant_coaching_one_drive, 1);
+            }
+        }
     }
 
     #[test]

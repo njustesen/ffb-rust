@@ -11,7 +11,7 @@
 /// Init param: IS_KICKED_PLAYER (optional).
 /// Consumed params: THROWN_PLAYER_ID, THROWN_PLAYER_STATE, THROWN_PLAYER_HAS_BALL.
 use std::collections::HashSet;
-use ffb_model::enums::{PassingDistance, PassOutcome, PlayerState, ReRollSource, SkillId};
+use ffb_model::enums::{PassingDistance, PassOutcome, PlayerState, ReRollSource, Rules, SkillId};
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -79,6 +79,13 @@ impl StepThrowTeamMate {
         game.concession_possible = false;
 
         let rerolled_action_key = if self.kicked { "KICK_TEAM_MATE" } else { "THROW_TEAM_MATE" };
+        // BB2020 spends the team's once-per-turn PASS on a Throw Team-Mate
+        // (`bb2020/ThrowTeamMateBehaviour` calls setPassUsed, and its `TtmMechanic.isTtmAvailable`
+        // is literally `!turnData.isPassUsed()`); BB2025 tracks TTM on its own flag and leaves the
+        // pass intact. This shared step runs for both, so under BB2020 a team could throw a
+        // team-mate AND still pass in the same turn — visible at the very next activation as
+        // java `f0001` vs rust `f0000` (ogre bb2020 seed 6).
+        let bb2020 = game.rules == Rules::Bb2020;
         let turn_data = if game.home_playing {
             &mut game.turn_data_home
         } else {
@@ -86,6 +93,8 @@ impl StepThrowTeamMate {
         };
         if self.kicked {
             turn_data.ktm_used = true;
+        } else if bb2020 {
+            turn_data.pass_used = true;
         } else {
             turn_data.ttm_used = true; // BB2025 uses ttm_used, not pass_used
         }
@@ -154,7 +163,11 @@ impl StepThrowTeamMate {
                 .map(|p| p.passing_with_modifiers())
                 .unwrap_or(0);
 
-            self.pass_result = Some(evaluate_ttm_pass_bb2025(player_can_pass, passing_value, roll, modifier_sum));
+            self.pass_result = Some(if bb2020 {
+                evaluate_ttm_pass_bb2020(player_can_pass, passing_value, roll, modifier_sum)
+            } else {
+                evaluate_ttm_pass_bb2025(player_can_pass, passing_value, roll, modifier_sum)
+            });
             let pass_result = self.pass_result.unwrap();
 
             // Java: successful = ACCURATE || INACCURATE
@@ -224,6 +237,30 @@ impl StepThrowTeamMate {
     fn handle_pass_result(&self) -> StepOutcome {
         let result = self.pass_result.unwrap_or(PassOutcome::Fumble);
         StepOutcome::next().publish(StepParameter::PassResultParam(result))
+    }
+}
+
+/// Java: `bb2020/ThrowTeamMateBehaviour.evaluatePass`. Identical to the BB2025 version except for
+/// the bottom rung: a throw that lands at 1 or less after modifiers is WILDLY_INACCURATE here,
+/// where BB2025 calls it a FUMBLE. The two diverge sharply downstream — BB2020's
+/// DispatchScatterPlayer turns WILDLY_INACCURATE into a pass DEVIATE with no throw-scatter, while a
+/// FUMBLE drops the player where it stands. Running BB2025's table under BB2020 turned a wild throw
+/// into a fumble whose landing then succeeded, leaving a player standing that Java had KO'd
+/// (ogre bb2020 seed 8 i=15: java `h08:-1,-1,Ko`, rust `h08:3,8,Standing`).
+fn evaluate_ttm_pass_bb2020(player_can_pass: bool, passing_value: i32, roll: i32, modifier_sum: i32) -> PassOutcome {
+    if !player_can_pass || passing_value <= 0 {
+        return PassOutcome::Fumble;
+    }
+    if roll == 1 {
+        return PassOutcome::Fumble;
+    }
+    let result_after_modifiers = roll - modifier_sum;
+    if roll == 6 || result_after_modifiers >= passing_value {
+        PassOutcome::Complete
+    } else if result_after_modifiers <= 1 {
+        PassOutcome::WildlyInaccurate
+    } else {
+        PassOutcome::Inaccurate
     }
 }
 
@@ -435,6 +472,50 @@ mod tests {
         step.thrown_player_id = Some("tp1".into());
         step.start(&mut game, &mut GameRng::new(42));
         assert!(game.turn_data_home.ttm_used);
+    }
+
+    /// BB2020 spends the team's once-per-turn PASS on a Throw Team-Mate; BB2025 tracks TTM on its
+    /// own flag and leaves the pass intact. This shared step runs for both, so under BB2020 a team
+    /// could throw a team-mate AND still pass in the same turn — and, worse, the harness kept
+    /// re-offering a throw the engine then refused, spinning the turn until the game was abandoned
+    /// (9 of 10 ogre bb2020 seeds died on `STUCK_STEP: INIT_SELECTING`).
+    #[test]
+    fn bb2020_throw_spends_the_pass_not_the_ttm_flag() {
+        for (rules, expect_pass, expect_ttm) in
+            [(Rules::Bb2020, true, false), (Rules::Bb2025, false, true)]
+        {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+            game.home_playing = true;
+            add_thrower(&mut game, "thrower", FieldCoordinate::new(10, 7), 4);
+            game.acting_player.player_id = Some("thrower".into());
+            game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+            let mut step = StepThrowTeamMate::new();
+            step.thrown_player_id = Some("tp1".into());
+            step.start(&mut game, &mut GameRng::new(42));
+            assert_eq!(game.turn_data_home.pass_used, expect_pass, "{rules:?} pass_used");
+            assert_eq!(game.turn_data_home.ttm_used, expect_ttm, "{rules:?} ttm_used");
+        }
+    }
+
+    /// The bottom rung of the pass table differs by edition: BB2020 calls a throw that lands at 1 or
+    /// less after modifiers WILDLY_INACCURATE, BB2025 calls it a FUMBLE. They diverge sharply
+    /// downstream — BB2020 deviates the player (d8+d6 from the thrower) and crash-lands it, BB2025
+    /// drops it where it stands. Running BB2025's table under BB2020 turned a wild throw into a
+    /// fumble whose landing then succeeded, leaving a player standing that Java had KO'd
+    /// (ogre bb2020 seed 8).
+    #[test]
+    fn evaluate_ttm_pass_bottom_rung_differs_by_edition() {
+        // roll 3, modifier 2 → resultAfterModifiers = 1, and 1 <= 1 takes the bottom rung.
+        assert_eq!(evaluate_ttm_pass_bb2020(true, 4, 3, 2), PassOutcome::WildlyInaccurate);
+        assert_eq!(evaluate_ttm_pass_bb2025(true, 4, 3, 2), PassOutcome::Fumble);
+        // Every other rung agrees between the two editions.
+        for (pv, roll, m) in [(4, 1, 0), (4, 6, 0), (4, 5, 0), (4, 4, 1)] {
+            assert_eq!(evaluate_ttm_pass_bb2020(true, pv, roll, m),
+                       evaluate_ttm_pass_bb2025(true, pv, roll, m),
+                       "pv={pv} roll={roll} mod={m} must agree across editions");
+        }
+        // A player who cannot pass fumbles under both.
+        assert_eq!(evaluate_ttm_pass_bb2020(false, 4, 5, 0), PassOutcome::Fumble);
     }
 
     #[test]

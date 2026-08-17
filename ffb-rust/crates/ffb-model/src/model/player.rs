@@ -434,10 +434,22 @@ impl Player {
             .unwrap_or(default)
     }
 
-    /// 1:1 translation of canBeThrown — true if player has canBeThrown property, or canBeThrownIfStrengthIs3orLess and ST<=3.
-    pub fn can_be_thrown(&self) -> bool {
-        self.has_skill_property(NamedProperties::CAN_BE_THROWN)
-            || (self.has_skill_property(NamedProperties::CAN_BE_THROWN_IF_STRENGTH_IS_3_OR_LESS) && self.strength_with_modifiers() <= 3)
+    /// 1:1 translation of `Player.canBeThrown()` — true if the player has `canBeThrown`, or has
+    /// `canBeThrownIfStrengthIs3orLess` and ST<=3.
+    ///
+    /// Takes `rules` where Java takes none. Java's `Player` holds the PER-EDITION skill objects, so
+    /// `hasSkillProperty` there is already edition-resolved; Rust's `has_skill_property` answers
+    /// from the edition-agnostic UNION, and Right Stuff is precisely the skill whose properties
+    /// differ by edition (bb2016/bb2025 register `canBeThrown`, bb2020 registers
+    /// `canBeThrownIfStrengthIs3orLess`). Asked against the union, a BB2020 Right Stuff player
+    /// answered `true` at ANY strength, because the union carries bb2025's unconditional
+    /// `canBeThrown` — dropping BB2020's ST<=3 restriction entirely. That went unnoticed for as
+    /// long as it did only because no BB2020 game ever reached a throw: the parity harness filtered
+    /// its own candidate list on the raw `canBeThrown` property, found nobody, and never threw.
+    pub fn can_be_thrown(&self, rules: crate::enums::Rules) -> bool {
+        self.has_skill_property_in(rules, NamedProperties::CAN_BE_THROWN)
+            || (self.has_skill_property_in(rules, NamedProperties::CAN_BE_THROWN_IF_STRENGTH_IS_3_OR_LESS)
+                && self.strength_with_modifiers() <= 3)
     }
 
     /// 1:1 translation of isJourneyman — true if the player has journeyman status (borrowed for the drive).
@@ -679,6 +691,45 @@ impl IXmlReadable for Player {
 
 #[cfg(test)]
 mod tests {
+
+    /// `Player.canBeThrown` must be resolved against the GAME's edition, because Right Stuff is
+    /// exactly the skill whose registered properties differ by edition: bb2016/bb2025 grant
+    /// `canBeThrown` unconditionally, bb2020 grants `canBeThrownIfStrengthIs3orLess`. Answering from
+    /// the edition-agnostic union made a BB2020 ST4 Right Stuff player throwable, silently dropping
+    /// BB2020's strength restriction — invisible only because no BB2020 game ever reached a throw.
+    #[test]
+    fn can_be_thrown_is_resolved_per_edition() {
+        use crate::enums::{Rules, SkillId};
+        use crate::model::player::STAT_ST;
+        use crate::model::skill_def::SkillWithValue;
+
+        let mut p = Player { id: "rs".into(), name: "rs".into(), nr: 1, strength: 3, ..Default::default() };
+        p.starting_skills = vec![SkillWithValue::new(SkillId::RightStuff)];
+
+        // ST 3 — throwable under every edition.
+        for rules in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            assert!(p.can_be_thrown(rules), "ST3 Right Stuff must be throwable under {rules:?}");
+        }
+
+        // ST 4 — bb2016/bb2025 still throwable, bb2020 NOT (its property is ST<=3 only).
+        p.strength = 4;
+        assert!(p.can_be_thrown(Rules::Bb2016));
+        assert!(p.can_be_thrown(Rules::Bb2025));
+        assert!(!p.can_be_thrown(Rules::Bb2020),
+            "BB2020 Right Stuff only allows a throw at ST<=3");
+
+        // The restriction reads the MODIFIED strength, like Java's getStrengthWithModifiers().
+        p.strength = 4;
+        p.add_temporary_stat_mod("SOME_DEBUFF", STAT_ST, -1);
+        assert!(p.can_be_thrown(Rules::Bb2020),
+            "a ST4 player debuffed to ST3 becomes throwable in BB2020");
+
+        // No Right Stuff at all — never throwable.
+        let plain = Player { id: "p".into(), name: "p".into(), nr: 2, strength: 2, ..Default::default() };
+        for rules in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            assert!(!plain.can_be_thrown(rules));
+        }
+    }
 
     /// 1:1 of `UtilCards.hasSkillToCancelProperty`: asks only whether SOME skill cancels the
     /// property — the player need not have it. Java calls this at a dozen sites (FoulAppearance,

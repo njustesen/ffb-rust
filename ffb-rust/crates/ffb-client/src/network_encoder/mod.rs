@@ -221,6 +221,10 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
         Action::ThrowKeg { coord } => Some(ClientCommand::ClientPass(ClientPass { target_coordinate: coord, hail_mary: false })),
         Action::CatchOfTheDay => Some(ClientCommand::ClientConfirm(ClientConfirm)),
 
+        // Java's ClientCommandSwoop has no ffb-protocol port yet; the parity harness drives the
+        // BB2016/BB2020 swoop in-process, so nothing needs to cross the wire for it.
+        Action::Swoop { .. } => None,
+
         Action::TricksterMove { coord } => {
             Some(ClientCommand::ClientMove(ClientMove { move_squares: vec![coord] }))
         }

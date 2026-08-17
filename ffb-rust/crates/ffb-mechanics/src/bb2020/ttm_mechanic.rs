@@ -38,14 +38,14 @@ impl TtmMechanicTrait for TtmMechanic {
 
     fn can_be_thrown(&self, game: &Game, player: &Player) -> bool {
         let player_state = game.field_model.player_state(&player.id).unwrap_or_default();
-        player.can_be_thrown()
+        player.can_be_thrown(game.rules)
             && !player_state.is_rooted()
             && game.is_active_team_player(&player.id)
     }
 
     fn can_be_kicked(&self, game: &Game, player: &Player) -> bool {
         let player_state = game.field_model.player_state(&player.id).unwrap_or_default();
-        player.can_be_thrown()
+        player.can_be_thrown(game.rules)
             && player_state.is_standing()
             && !player_state.is_rooted()
             && game.is_active_team_player(&player.id)

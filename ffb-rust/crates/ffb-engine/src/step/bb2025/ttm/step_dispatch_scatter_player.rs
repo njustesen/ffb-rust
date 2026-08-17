@@ -129,13 +129,18 @@ impl StepDispatchScatterPlayer {
         // Java: FUMBLE → throwScatter=false, scattersSingleDirection=false
         // Java: INACCURATE/ACCURATE + bullseye → throwScatter=false, scattersSingleDirection=false
         // Java: INACCURATE/ACCURATE → throwScatter=true
-        let (throw_scatter, has_swoop) = match self.pass_result {
-            PassOutcome::Fumble => (false, false),
+        // Java bb2020 adds a third case the BB2025 twin does not have:
+        //   WILDLY_INACCURATE -> throwScatter=false, deviate=true, scattersSingleDirection=false
+        // BB2025's evaluatePass never produces WILDLY_INACCURATE (it returns FUMBLE instead), so
+        // this arm is reachable only under BB2020 and BB2025's behaviour is untouched.
+        let (throw_scatter, has_swoop, deviates) = match self.pass_result {
+            PassOutcome::Fumble => (false, false, false),
+            PassOutcome::WildlyInaccurate => (false, false, true),
             PassOutcome::Inaccurate | PassOutcome::Complete => {
-                if self.using_bullseye { (false, false) }
-                else { (true, scatters_single_direction) }
+                if self.using_bullseye { (false, false, false) }
+                else { (true, scatters_single_direction, false) }
             }
-            _ => (false, false),
+            _ => (false, false, false),
         };
 
         let seq = ScatterPlayer::build_sequence(&ScatterPlayerParams {
@@ -145,6 +150,7 @@ impl StepDispatchScatterPlayer {
             thrown_player_coordinate: thrower_coordinate,
             throw_scatter,
             has_swoop,
+            deviates,
         });
 
         StepOutcome::next()
@@ -176,6 +182,34 @@ mod tests {
         step.is_kicked_player = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    /// BB2020's WILDLY_INACCURATE throw must hand the scatter sequence a DEVIATE and no
+    /// throw-scatter (Java bb2020 StepDispatchScatterPlayer: `throwScatter=false, deviate=true`).
+    /// The result is unreachable under BB2025, whose evaluatePass returns FUMBLE instead — so the
+    /// FUMBLE arm must stay a plain drop, with no deviate.
+    #[test]
+    fn wildly_inaccurate_deviates_instead_of_throw_scattering() {
+        let mut game = make_game();
+        let mut step = StepDispatchScatterPlayer::new();
+        step.pass_result = PassOutcome::WildlyInaccurate;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        let init = out.pushes[0].iter()
+            .find(|s| s.step_id == StepId::InitScatterPlayer)
+            .expect("the scatter sequence must still be pushed");
+        assert!(init.params.iter().any(|p| matches!(p, StepParameter::PassDeviates(true))),
+            "a wildly inaccurate throw must deviate");
+        assert!(init.params.iter().any(|p| matches!(p, StepParameter::ThrowScatter(false))),
+            "a wildly inaccurate throw must NOT throw-scatter");
+
+        let mut step = StepDispatchScatterPlayer::new();
+        step.pass_result = PassOutcome::Fumble;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        let init = out.pushes[0].iter()
+            .find(|s| s.step_id == StepId::InitScatterPlayer)
+            .expect("a fumble still pushes the sequence");
+        assert!(init.params.iter().any(|p| matches!(p, StepParameter::PassDeviates(false))),
+            "a fumble drops the player where it stands — it never deviates");
     }
 
     #[test]

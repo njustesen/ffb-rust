@@ -196,8 +196,17 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             });
         }
 
-        // ThrowTeamMate: player must have ThrowTeamMate skill and an adjacent teammate
-        if !turn_data.ttm_used && player.has_skill(SkillId::ThrowTeamMate) {
+        // ThrowTeamMate: player must have ThrowTeamMate skill and an adjacent teammate.
+        // Availability follows the edition's `TtmMechanic.isTtmAvailable`: BB2025 tests its own
+        // `ttmUsed` flag, while BB2016 and BB2020 spend the team's once-per-turn PASS on the throw
+        // and test `!isPassUsed()`. Offering a second BB2020 throw after the pass was gone got the
+        // command refused by StepInitSelecting, which advanced nothing and spun the turn.
+        let ttm_available = if game.rules == ffb_model::enums::Rules::Bb2025 {
+            !turn_data.ttm_used
+        } else {
+            !turn_data.ttm_used && !turn_data.pass_used
+        };
+        if ttm_available && player.has_skill(SkillId::ThrowTeamMate) {
             let adjacent_teammate = team.players.iter().any(|tp| {
                 tp.id != pid
                     && game.field_model.player_coordinate(&tp.id)
@@ -549,13 +558,18 @@ pub fn legal_throw_team_mate_targets(game: &Game, player_id: &str, side: TeamSid
     };
     let mut targets: Vec<PlayerId> = team.players.iter()
         .filter(|p| p.id != player_id)
-        // Java ParityRunner.sendThrowTeamMateAction filters on
-        // `tp.hasSkillProperty(NamedProperties.canBeThrown)`, and that property is registered by the
-        // PER-EDITION skill class: bb2016 and bb2025 Right Stuff grant `canBeThrown`, but bb2020's
-        // grants `canBeThrownIfStrengthIs3orLess` instead — so BB2020 has no `canBeThrown` players
-        // at all and Java's target list comes back EMPTY. Asking the edition-agnostic union here
-        // built a non-empty list and threw a player Java never throws (chaos_pact bb2020 seed 22).
-        .filter(|p| p.has_skill_property_in(game.rules, NamedProperties::CAN_BE_THROWN))
+        // Java ParityRunner.sendThrowTeamMateAction filters on `tp.canBeThrown()` — the ENGINE's own
+        // predicate (`Player.canBeThrown`, the one every edition's `TtmMechanic` uses), not the raw
+        // `canBeThrown` property.
+        //
+        // The distinction is the whole reason BB2020 had no Throw Team-Mate coverage. Right Stuff is
+        // registered per edition: bb2016 and bb2025 grant `canBeThrown`, bb2020 grants
+        // `canBeThrownIfStrengthIs3orLess`. Both harnesses used to test the raw property, so in
+        // BB2020 the candidate list was ALWAYS empty — the action was declared 7,235 times per 8,700
+        // games and `StepThrowTeamMate` was dispatched exactly zero times. Testing the engine
+        // predicate instead lets BB2020 throw the players it is supposed to (ST<=3) and keeps
+        // refusing the ones it is not, which the raw-union alternative did not.
+        .filter(|p| p.can_be_thrown(game.rules))
         .filter(|p| {
             game.field_model.player_coordinate(&p.id)
                 .map(|c| c.is_adjacent(coord))
@@ -829,6 +843,32 @@ mod tests {
     }
 
     // ── legal_activate_player_actions ─────────────────────────────────────────
+
+    /// Throw Team-Mate availability follows the edition's `TtmMechanic.isTtmAvailable`: BB2025 tests
+    /// its own `ttmUsed` flag, while BB2016 and BB2020 spend the team's once-per-turn PASS on the
+    /// throw and test `!isPassUsed()`. Offering a BB2020 throw after the pass was gone got the
+    /// command refused by StepInitSelecting, which advanced nothing and spun the turn until the
+    /// harness abandoned the game (9 of 10 ogre bb2020 seeds).
+    #[test]
+    fn ttm_availability_follows_the_edition() {
+        for (rules, offered_after_pass) in
+            [(Rules::Bb2025, true), (Rules::Bb2020, false), (Rules::Bb2016, false)]
+        {
+            let mut game = make_game(rules);
+            add_player(&mut game, true, "thrower", c(5, 5), PS_STANDING, vec![SkillId::ThrowTeamMate]);
+            add_player(&mut game, true, "mate", c(5, 6), PS_STANDING, vec![SkillId::RightStuff]);
+            // Before anything is spent, every edition offers the throw.
+            let actions = legal_activate_player_actions(&game, TeamSide::Home);
+            assert!(has_action(&actions, "thrower", PlayerActionChoice::ThrowTeamMate),
+                "{rules:?}: a fresh turn must offer Throw Team-Mate");
+
+            game.turn_data_home.pass_used = true;
+            let actions = legal_activate_player_actions(&game, TeamSide::Home);
+            assert_eq!(has_action(&actions, "thrower", PlayerActionChoice::ThrowTeamMate),
+                offered_after_pass,
+                "{rules:?}: Throw Team-Mate availability after the pass is spent");
+        }
+    }
 
     #[test]
     fn seed14_my_ball_carrier_not_offered_pass() {

@@ -33,13 +33,13 @@ impl TtmMechanicTrait for TtmMechanic {
         UtilPlayer::find_adjacent_players_with_tacklezones(game, team, thrower_coord, false)
             .into_iter()
             .filter_map(|id| game.player(id))
-            .filter(|p| p.can_be_thrown())
+            .filter(|p| p.can_be_thrown(game.rules))
             .collect()
     }
 
     fn can_be_thrown(&self, game: &Game, player: &Player) -> bool {
         let player_state = game.field_model.player_state(&player.id).unwrap_or_default();
-        player.can_be_thrown()
+        player.can_be_thrown(game.rules)
             && player_state.has_tacklezones()
             && game.is_active_team_player(&player.id)
     }
