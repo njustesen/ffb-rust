@@ -1740,3 +1740,47 @@ VERIFIED: slann_fumbbl 100/100; cargo ffb-engine 7040/0, ffb-model 1150/0, ffb-m
 24-roster regression 0 FAIL; goblin/ogre/dark_elf_league_fumbbl/khemri_fumbbl all 100/100.
 
 **ALL 30 ROSTER MATCHUPS NOW GREEN.**
+
+---
+
+## BB2020 Throw Team-Mate — a mechanic that never ran (2026-08-18, commit f23668e6)
+
+Coverage instrumentation showed BB2020 declaring THROW_TEAM_MATE **7,235 times per 8,700 games**
+and dispatching `StepThrowTeamMate` **zero** times, against 13 in one BB2025 game.
+
+ROOT CAUSE (harness, both sides): `ParityRunner.sendThrowTeamMateAction` and Rust's
+`legal_throw_team_mate_targets` filtered candidates on the raw `canBeThrown` PROPERTY. bb2020's
+`RightStuff` registers `canBeThrownIfStrengthIs3orLess` instead, so the list was always empty. The
+engine's own `TtmMechanic` calls `Player.canBeThrown()` in all three editions — the harness
+disagreed with the engine it was testing. Both sides now use the engine predicate.
+
+Switching it on exposed **ten Rust engine bugs**, every one the shared BB2025 step running unchanged
+for BB2020. In rough order of discovery:
+
+| # | Bug | Symptom |
+|---|---|---|
+| 1 | `can_be_thrown` read the edition-agnostic property union | BB2020 would throw ST4+ players; its ST<=3 rule was absent |
+| 2 | Brilliant Coaching granted on `>=`, no coach-ban term | a tie gave both teams a re-roll (java r3,3 vs rust r4,4 at the FIRST activation) |
+| 3 | failed landing handed to a following STEADY_FOOTING BB2020 lacks | thrown player took its armour roll and stood there unharmed |
+| 4 | throw set `ttm_used` instead of `pass_used` | a BB2020 team could throw AND still pass in the same turn |
+| 5 | `evaluatePass` returned FUMBLE where BB2020 returns WILDLY_INACCURATE | wild throw resolved as a fumble whose landing then succeeded |
+| 6 | no deviate path | BB2020 resolves WILDLY_INACCURATE as a pass deviate: d8 direction + d6 distance from the THROWER |
+| 7 | Swoop ran BB2025's optional skill offer | BB2016/BB2020 Swoop has NO decline path — Java waited for a square, Rust moved on, `STUCK_STEP: SWOOP` killed 9 of 10 goblin seeds |
+| 8 | swoop distance rolled a d6 | BB2016/BB2020 roll a d3 — the player flew twice as far |
+| 9 | `autoFailLanding` applied under BB2020 | BB2025-only; BB2020 still rolls the landing for a player thrown while prone/distracted |
+| 10 | `dropPlayer` lost Java's `&& mode != THROWN_PLAYER` | deactivated a thrown player a swoop had just handed the activation |
+
+**Worth remembering about #10:** the compared state hash encodes only a player's BASE state, never
+the ACTIVE bit, so the difference was invisible to the hash. It surfaced only because the two agents'
+activation picks drifted apart afterwards (goblin bb2020 seed 9 i=248) — Java offered the landed
+player another activation while Rust's inactive-skip rejected the same pick, burning an extra
+decisionRng draw. Any per-player flag outside the hash can hide indefinitely this way.
+
+TWO ROUTING EXPERIMENTS WERE MEASURED AND ARE WRONG (recorded in `step/driver.rs`; do not retry):
+routing the whole BB2020 TTM step-set to its translated-but-dead twins breaks the throw entirely (no
+pass roll, two armour rolls, turnover), and routing only `DispatchScatterPlayer`/`InitScatterPlayer`
+breaks the shared step's published-parameter hand-over. The working shape is the one
+`ApplyKickoffResult` already used: edition-gate the differing behaviour INSIDE the shared step.
+
+VERIFIED: bb2016 30/30, bb2020 30/30, bb2025 30/30 (90 matchups, seeds 1-100, tier 3); ogre and
+goblin bb2020 both 100/100; workspace tests 14,513 pass / 0 fail.
