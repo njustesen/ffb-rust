@@ -557,6 +557,23 @@ fn adjacent_targets(game: &Game, team: &Team, player_coordinate: FieldCoordinate
         .into_iter()
         .cloned()
         .collect();
+    // Java's `game.getDefender()` is NULL during a pass or hand-over: the receiver travels in the
+    // command (`ClientCommandHandOver(playerId, receiverId)`), never in the game state. Rust's
+    // harness bridge instead parks the agent's activation-time target in `game.defender_id` and
+    // leaves it there, because the pass sequence reads it downstream. Without this guard that
+    // bridging value reaches Java's `adjacentTargets` defender branch and a confused thrower lashes
+    // out at its own RECEIVER instead of losing the action — chaos_dwarf vs chaos_pact seed 16
+    // step 82, Rust players={away_03} against Java {}. The receiver there is PRONE, so
+    // find_adjacent_blockable_players had already (correctly) excluded it; the defender branch was
+    // the only way in. Scoped to this read rather than clearing defender_id at dispatch: that was
+    // measured and took goblin from 100/100 to 4/100, since the pass path needs the value.
+    let action_has_no_java_defender = matches!(
+        game.acting_player.player_action,
+        Some(PlayerAction::Pass) | Some(PlayerAction::HandOver)
+    );
+    if action_has_no_java_defender {
+        return set;
+    }
     if let Some(defender_id) = game.defender_id.clone() {
         if team.has_player(&defender_id) {
             if let Some(defender_coord) = game.field_model.player_coordinate(&defender_id) {
@@ -1307,6 +1324,39 @@ mod tests {
     }
 
     // ── adjacent_targets ──────────────────────────────────────────────────────
+
+    /// Java's `game.getDefender()` is null during a pass or hand-over (the receiver rides in the
+    /// command), so its `adjacentTargets` defender branch contributes nothing. Rust's activation
+    /// bridge parks the receiver in `game.defender_id`, which previously let a confused thrower
+    /// lash out at its own receiver: chaos_dwarf vs chaos_pact seed 16 step 82.
+    #[test]
+    fn adjacent_targets_ignores_the_bridged_receiver_on_a_hand_over() {
+        for action in [PlayerAction::HandOver, PlayerAction::Pass] {
+            let mut game = make_game();
+            game.acting_player.player_action = Some(action);
+            add_player(&mut game, true, "receiver", vec![]);
+            game.defender_id = Some("receiver".into());
+            game.field_model.set_player_coordinate("receiver", FieldCoordinate::new(6, 5));
+            // PRONE: not blockable, so the defender branch is the only way it could be added.
+            game.field_model.set_player_state("receiver", ffb_model::enums::PlayerState::new(PS_PRONE));
+            let targets = adjacent_targets(&game, &game.team_home, FieldCoordinate::new(5, 5));
+            assert!(!targets.contains("receiver"),
+                "{action:?} must not offer its receiver as an Animal Savagery lash-out target");
+        }
+    }
+
+    /// ...but a BLOCK's defender is a real defender in Java too, and must still be offered.
+    #[test]
+    fn adjacent_targets_still_includes_a_block_defender() {
+        let mut game = make_game();
+        game.acting_player.player_action = Some(PlayerAction::Block);
+        add_player(&mut game, true, "teammate", vec![]);
+        game.defender_id = Some("teammate".into());
+        game.field_model.set_player_coordinate("teammate", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("teammate", ffb_model::enums::PlayerState::new(PS_PRONE));
+        let targets = adjacent_targets(&game, &game.team_home, FieldCoordinate::new(5, 5));
+        assert!(targets.contains("teammate"));
+    }
 
     #[test]
     fn adjacent_targets_includes_defender_on_team_when_adjacent() {

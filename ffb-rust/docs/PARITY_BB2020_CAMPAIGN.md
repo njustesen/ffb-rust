@@ -7401,7 +7401,40 @@ before claiming a mirror cannot reach a rule -- an earlier draft of this note go
 
 FIRST RUN, 10 pairs x 25 seeds, bb2020: 9 green, 1 RED -- a real bug on the very first cross run.
 
-### OPEN: chaos_dwarf vs chaos_pact seed 16 step 82 (Animal Savagery on a HAND_OVER)
+### FIXED: chaos_dwarf vs chaos_pact seed 16 step 82 (Animal Savagery on a HAND_OVER)
+
+> **RETRACTION.** The "root cause is ORDERING" analysis below is WRONG and is kept only for its
+> lesson. It rested on a probe line reading `action=Some(Move)`, but that probe printed twelve
+> lines across the run and I read one belonging to a different activation. Re-run and correlated
+> against the trace, the step-82 line reads
+> `RUST_AS pid=away_02 players={"away_03"} action=Some(HandOver)` — Rust's action ordering was
+> correct all along. The real signal in that same line was `players={"away_03"}` (Java's set is
+> EMPTY). Second time in one sitting I drew a conclusion from evidence not pinned to the specific
+> step; the first was reading "Rust consumed 0 dice" off per-step `rng_calls`, also wrong.
+> **A probe that fires more than once per game is not evidence until you anchor it to the step.**
+>
+> ACTUAL CAUSE — a harness-bridge leak, not a rule and not an ordering difference. Java carries the
+> receiver in the command (`ClientCommandHandOver(playerId, receiverId)`), so `game.getDefender()`
+> is NULL throughout a pass or hand-over. Rust's activation bridge parks the agent's chosen target
+> in `game.defender_id` and leaves it there because the pass sequence reads it downstream.
+> `AnimalSavageryBehaviour.adjacentTargets` adds `game.getDefender()` to its lash-out candidates,
+> so a confused thrower lashed out at its own RECEIVER instead of losing the action. The receiver
+> is PRONE, so `findAdjacentBlockablePlayers` had already correctly excluded it — the defender
+> branch was the only way in. Both engines' `canBeBlocked` / `findAdjacentBlockablePlayers` are
+> faithful.
+>
+> FIX: `adjacent_targets` skips the defender branch when the acting action is Pass or HandOver,
+> i.e. exactly where Java would have no defender to add.
+>
+> REJECTED FIX, measured not reasoned: clearing `game.defender_id` at dispatch once the target
+> coordinate has been threaded through. It fixes the cross pair but takes **goblin from 100/100 to
+> 4/100** (first divergence seed 5 step 2) because Rust's pass path genuinely consumes the value.
+> The bridge value must stay; only the one read that Java doesn't have may ignore it.
+>
+> Gate: bb2020 30/0, chaos_dwarf vs chaos_pact 25/25, goblin 100/100, workspace green.
+
+<details><summary>Original (incorrect) analysis, retained for the lesson</summary>
+
 
 away_02 (Animal Savagery) declares HAND_OVER. Both engines roll the confusion die and fail, and
 both decline the re-roll. Then:
@@ -7436,3 +7469,8 @@ LATENT, found while reading and NOT the cause here: `step_animal_savagery.rs` co
 `UtilCards.hasUnusedSkill(actingPlayer, skill)`. Same bug class as the Unchannelled Fury fix
 (ITER124-126) and the documented `bone_head_behaviour.rs:99` case. Symptom would be a missing roll
 on a LATER activation, not this divergence, so it is recorded rather than fixed here.
+
+</details>
+
+The LATENT `Player.used_skills` note above still stands and is still unfixed — it is a real instance
+of the known per-activation bug class, just not what caused seed 16.

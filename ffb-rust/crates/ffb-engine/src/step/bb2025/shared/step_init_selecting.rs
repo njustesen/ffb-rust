@@ -538,6 +538,40 @@ mod tests {
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(_))));
     }
 
+    /// A hand-over's receiver IS parked in `game.defender_id` by the activation bridge, and must
+    /// stay there — the pass sequence reads it downstream. Clearing it here was tried and measured
+    /// goblin 100/100 -> 4/100. The leak it caused (Animal Savagery lashing out at the receiver) is
+    /// fixed where Java's `getDefender()` would be null instead: see
+    /// `step_animal_savagery::adjacent_targets`.
+    #[test]
+    fn hand_over_keeps_its_receiver_as_the_bridged_defender() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        let mut step = StepInitSelecting::new("end_label".into());
+        let action = Action::ActivatePlayer {
+            player_id: "p1".into(),
+            player_action: PlayerActionChoice::HandOff,
+            block_defender_id: Some("p2".into()),
+        };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert_eq!(game.defender_id.as_deref(), Some("p2"));
+    }
+
+    /// A BLOCK genuinely has a defender and must keep it.
+    #[test]
+    fn block_keeps_its_defender() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        let mut step = StepInitSelecting::new("end_label".into());
+        let action = Action::ActivatePlayer {
+            player_id: "p1".into(),
+            player_action: PlayerActionChoice::Block,
+            block_defender_id: Some("p2".into()),
+        };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert_eq!(game.defender_id.as_deref(), Some("p2"));
+    }
+
     #[test]
     fn hand_over_activation_without_receiver_deselects() {
         use ffb_model::enums::PlayerAction;
