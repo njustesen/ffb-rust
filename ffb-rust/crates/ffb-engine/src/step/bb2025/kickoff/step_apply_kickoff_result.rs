@@ -490,13 +490,20 @@ impl StepApplyKickoffResult {
         let mut outcome = StepOutcome::next();
         let tie = total_home == total_away;
         // Java: winning team (or both on tie) gains +1 re-roll for the drive.
+        // Java grants into the pool AND records it in the one-drive counter
+        // (`bb2025/StepApplyKickoffResult.java:449-462`), so `StepEndTurn.removeReRollsLastingForDrive`
+        // can take it back out again at end of drive. Rust incremented only the pool, leaving the
+        // mirrored counter permanently 0 — the re-roll then never expired and the team kept it for
+        // the rest of the half (human bb2025 seeds 1/6/10: Java r3,3 at the final whistle, Rust r3,4).
         if total_home >= total_away {
             game.turn_data_home.rerolls += 1;
+            game.turn_data_home.rerolls_brilliant_coaching_one_drive += 1;
             let team_id = game.team_home.id.clone();
             outcome = outcome.with_event(GameEvent::KickoffExtraReRoll { team_id });
         }
         if total_away >= total_home {
             game.turn_data_away.rerolls += 1;
+            game.turn_data_away.rerolls_brilliant_coaching_one_drive += 1;
             let team_id = game.team_away.id.clone();
             outcome = outcome.with_event(GameEvent::KickoffExtraReRoll { team_id });
         }
@@ -1156,6 +1163,12 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.turn_data_home.rerolls > home_before, "Home should gain a reroll");
         assert_eq!(game.turn_data_away.rerolls, away_before, "Away should not gain a reroll");
+        // Java records the grant in the one-drive counter too, so StepEndTurn can take it back out
+        // at end of drive. Without this the re-roll never expired and the team kept it for the rest
+        // of the half (human bb2025 seeds 1/6/10: Java r3,3 at the final whistle, Rust r3,4).
+        assert_eq!(game.turn_data_home.rerolls_brilliant_coaching_one_drive, 1,
+            "the granted re-roll must be recorded as lasting one drive");
+        assert_eq!(game.turn_data_away.rerolls_brilliant_coaching_one_drive, 0);
     }
 
     #[test]

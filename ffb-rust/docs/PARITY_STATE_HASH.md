@@ -84,8 +84,76 @@ this field it would have been caught at the step it occurred.
 `ttm_used` / `ktm_used` are absent: Java's `TurnData` exposes no accessor and `TurnData.java` is
 engine code, not the co-editable harness.
 
+## Iteration 3 — per-team re-rolls remaining
+
+`" r3,4"`, home then away. **Result: human bb2025 dropped to 7/10 immediately** (seeds 1, 6, 10),
+diverging on the final `game_end` hash: Java `r3,3`, Rust `r3,4`.
+
+### The bug it caught
+
+The extra re-roll appears the moment `StepApplyKickoffResult` resolves **Brilliant Coaching**:
+
+```rust
+// step_apply_kickoff_result.rs::handle_brilliant_coaching
+game.turn_data_away.rerolls += 1;      // straight into the permanent pool
+```
+
+Java keeps that re-roll in a **separate one-drive bucket**. `TurnData` has
+`reRollsBrilliantCoachingOneDrive`; both `bb2020` and `bb2025` `RollMechanic` spend it *first* when
+a re-roll is used, and `getReRolls()` does not include it. Rust's `TurnData` carries the mirrored
+field `rerolls_brilliant_coaching_one_drive` — and never reads or writes it.
+
+So in Rust a Brilliant Coaching re-roll **never expires at the end of the drive**: the team keeps it
+for the rest of the half. In the failing seeds it survived to the final whistle.
+
+This never showed up before for two reasons: re-roll counts were not in the hash at all, and the
+parity agent declines team re-rolls by contract, so the surplus rarely changes a die.
+
+### What it caught — four defects, three editions
+
+**1. Brilliant Coaching re-rolls never expired (engine).** Java grants the re-roll into the main
+pool AND records it in a one-drive counter, then `StepEndTurn.removeReRollsLastingForDrive` zeroes
+the counters and subtracts their sum back out at end of drive. Rust granted only into the pool and
+left the mirrored `rerolls_brilliant_coaching_one_drive` permanently 0, so the team kept the re-roll
+for the rest of the half. Fixed in `step_apply_kickoff_result.rs` (grant) and `step_end_turn.rs`
+(new `remove_rerolls_lasting_for_drive`, both teams, Java's `!new_half || half > 1` guard).
+
+**2. `rollExtraReRoll` is a d3, not a d6 (engine) — the big one.** `DiceRoller.java:193-195` defines
+it as `rollDice(3)`, and bb2016 uses it for BOTH the Cheering Fans and Brilliant Coaching contests.
+BB2025 is the edition that rolls a d6. Rust rolled a d6 in both.
+
+The draw COUNT was right, so the shared dice stream never desynced — the only observable was which
+team won the contest, a re-roll count nothing compared. **This shipped green through every 30/30
+gate in the project's history.** It turned all 30 bb2016 rosters red at once (lineman seed 6: Java
+d3 3/3 → tie, both gain; Rust d6 6/3 → home only). bb2016 went 0/30 → 29/30 on the fix alone.
+
+**3. The new one-drive removal must not run for BB2016 (engine, self-inflicted).** Rust routes every
+edition's `EndTurn` to the shared BB2025 step, and `bb2016/StepEndTurn.java` has no one-drive
+handling *at all* — grep it for `OneDrive` or `setReRolls` and there is nothing. Since the mixed
+`handle_pump_up` that BB2016 uses does fill the pump-up counter, the new code would have taken back
+a re-roll Java keeps. Gated to `rules != Bb2016`. Caught by reading the Java twin, not by a test.
+
+**4. The lineman parity team's fan factor (harness data).** `team_lineman_parity_{home,away}.xml`
+carry `<fanFactor>5`; `make_lineman_team` in `ffb-parity` hard-coded 0. Fan factor feeds the
+spectator count, which sets FAME, which decides the extra-re-roll contest — bb2016 lineman seed 65:
+Java spectators 8000/11000 → `fameA=1` → a 3-3 tie where both teams gain; Rust 3000/6000 →
+`fameA=2` → away only. The dice were byte-identical (`pos=44 sides=3 result=3`,
+`pos=45 sides=3 result=2`); only the bonus differed. Fixed in the harness, not the engine.
+
+### The pattern worth remembering
+
+Three of the four trace back to one question: **which edition's file actually runs?** The d3 bug,
+the BB2016 gating slip, and (in the coverage work the same day) the BB2016 event blackout and the
+MVP/winnings/deviate blind spots are all the same shape — a twin exists per edition, the driver
+routes to one of them, and the others drift. Ask that question first whenever an edition-specific
+number looks wrong.
+
+### Gate
+
+bb2016 30/30, bb2020 30/30, bb2025 30/30, seeds 1-100, on the rebuilt jar.
+
 ## Remaining groups
 
 1. ~~Per-team turn-used flags~~ — done, iteration 2.
-2. **Per-team re-rolls remaining** (`TurnData.getReRolls()`).
-3. **Acting-player state** — who is activated, MA spent — if the first two land clean.
+2. ~~Per-team re-rolls remaining~~ — done, iteration 3; four defects, listed above.
+3. **Acting-player state** — who is activated, MA spent.

@@ -163,6 +163,40 @@ impl StepEndTurn {
     /// three halftime dice are 4, 6, 3 — Java spends 4 on the KO recovery (recovers) then 6/3
     /// on the away/home argues; the bb2025 order spent 4/6 on the argues and 3 on the KO
     /// recovery, so the KO'd player stayed down and the wrong team's Deathroller was banned).
+    /// 1:1 port of Java `StepEndTurn.removeReRollsLastingForDrive(boolean)` (`:634-668`).
+    ///
+    /// Brilliant Coaching, Pump Up The Crowd and Show Star each grant a re-roll that lasts ONE
+    /// DRIVE. Java grants them into the main pool AND records them in a per-source one-drive
+    /// counter, then subtracts the sum back out of the pool here, at end of drive.
+    ///
+    /// Rust granted Brilliant Coaching straight into `turn_data.rerolls` and left the mirrored
+    /// `rerolls_brilliant_coaching_one_drive` field permanently 0, so the re-roll NEVER EXPIRED —
+    /// the team kept it for the rest of the half. Invisible until re-roll counts entered the state
+    /// hash (human bb2025 seeds 1/6/10: Java `r3,3` at the final whistle, Rust `r3,4`).
+    ///
+    /// The `!new_half || half > 1` guard is Java's: on the transition INTO half 1 the pool was just
+    /// refilled from the team sheet, so there is nothing to subtract.
+    fn remove_rerolls_lasting_for_drive(game: &mut Game, home_team: bool, new_half: bool) {
+        let half = game.half;
+        let turn_data = if home_team { &mut game.turn_data_home } else { &mut game.turn_data_away };
+
+        let brilliant_coaching = turn_data.rerolls_brilliant_coaching_one_drive;
+        let pump_up_the_crowd = turn_data.rerolls_pump_up_the_crowd_one_drive;
+        let show_star = turn_data.reroll_show_star_one_drive;
+        let sum = brilliant_coaching + pump_up_the_crowd + show_star;
+        if sum <= 0 {
+            return;
+        }
+        // Java reports each lost source separately (ReportBrilliantCoachingReRollsLost etc.);
+        // the reports are client-facing and not part of the compared state.
+        turn_data.rerolls_brilliant_coaching_one_drive = 0;
+        turn_data.rerolls_pump_up_the_crowd_one_drive = 0;
+        turn_data.reroll_show_star_one_drive = 0;
+        if !new_half || half > 1 {
+            turn_data.rerolls = (turn_data.rerolls - sum).max(0);
+        }
+    }
+
     fn recover_knockouts_and_fainting(&mut self, game: &mut Game, rng: &mut GameRng, touchdown: bool) {
         // Java: getFaintingCount / heatExhaustions / KO recovery — only on new half or touchdown
         if self.new_half || touchdown {
@@ -677,6 +711,19 @@ impl StepEndTurn {
                     {
                         p.remove_temporary_stat_mods("Dodgy Snack");
                     }
+                    // Java: removeReRollsLastingForDrive(true); removeReRollsLastingForDrive(false)
+                    // — `StepEndTurn.java:497-498`, inside this same (fNewHalf || fTouchdown) block.
+                    // Both teams every time, not just the one whose turn ended.
+                    //
+                    // BB2016 ONLY: `bb2016/StepEndTurn.java` has no such method — grep it for
+                    // `OneDrive` or `setReRolls` and there is nothing. That edition never takes a
+                    // one-drive re-roll back. Rust routes every edition's EndTurn to this shared
+                    // step, and the mixed `handle_pump_up` (which BB2016 uses) DOES fill the
+                    // pump-up counter, so without this gate BB2016 would lose a re-roll Java keeps.
+                    if game.rules != ffb_model::enums::Rules::Bb2016 {
+                        Self::remove_rerolls_lasting_for_drive(game, true, self.new_half);
+                        Self::remove_rerolls_lasting_for_drive(game, false, self.new_half);
+                    }
                 }
                 // Java gates UNTIL_END_OF_HALF on `if (fNewHalf)` ALONE (`StepEndTurn.java:502-506`),
                 // NOT on `fNewHalf || fTouchdown` like the drive-duration block above. (The
@@ -823,6 +870,42 @@ mod tests {
         game.turn_data_home.turn_nr = 1;
         game.turn_data_away.turn_nr = 1;
         game
+    }
+
+    /// Java `removeReRollsLastingForDrive` zeroes the one-drive counters and subtracts their sum
+    /// from the main pool at end of drive. Rust never did, so a Brilliant Coaching re-roll survived
+    /// to the final whistle (human bb2025 seeds 1/6/10: Java `r3,3`, Rust `r3,4`).
+    #[test]
+    fn one_drive_rerolls_are_taken_back_out_of_the_pool_at_end_of_drive() {
+        let mut game = make_game();
+        game.half = 2;
+        game.turn_data_home.rerolls = 4;
+        game.turn_data_home.rerolls_brilliant_coaching_one_drive = 1;
+        game.turn_data_away.rerolls = 5;
+        game.turn_data_away.rerolls_pump_up_the_crowd_one_drive = 1;
+        game.turn_data_away.reroll_show_star_one_drive = 1;
+
+        StepEndTurn::remove_rerolls_lasting_for_drive(&mut game, true, false);
+        StepEndTurn::remove_rerolls_lasting_for_drive(&mut game, false, false);
+
+        assert_eq!(game.turn_data_home.rerolls, 3, "the Brilliant Coaching re-roll expires");
+        assert_eq!(game.turn_data_home.rerolls_brilliant_coaching_one_drive, 0);
+        assert_eq!(game.turn_data_away.rerolls, 3, "both one-drive sources expire together");
+        assert_eq!(game.turn_data_away.rerolls_pump_up_the_crowd_one_drive, 0);
+        assert_eq!(game.turn_data_away.reroll_show_star_one_drive, 0);
+    }
+
+    /// Java's guard: on the transition INTO half 1 the pool was just refilled from the team sheet,
+    /// so the counters clear but nothing is subtracted.
+    #[test]
+    fn one_drive_rerolls_clear_without_subtracting_on_the_half_one_transition() {
+        let mut game = make_game();
+        game.half = 1;
+        game.turn_data_home.rerolls = 3;
+        game.turn_data_home.rerolls_brilliant_coaching_one_drive = 1;
+        StepEndTurn::remove_rerolls_lasting_for_drive(&mut game, true, true);
+        assert_eq!(game.turn_data_home.rerolls, 3, "nothing to subtract after the half-1 refill");
+        assert_eq!(game.turn_data_home.rerolls_brilliant_coaching_one_drive, 0);
     }
 
     /// Regression: end-of-drive Secret Weapon send-off with argue-the-call. A played Secret Weapon

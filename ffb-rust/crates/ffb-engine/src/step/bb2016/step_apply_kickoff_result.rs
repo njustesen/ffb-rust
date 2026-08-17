@@ -252,8 +252,17 @@ impl StepApplyKickoffResult {
         // for CHEERING_FANS (isFanReRoll) and assistant coaches (minus a ban penalty) only
         // for BRILLIANT_COACHING (isCoachReRoll) — these two bonuses are mutually exclusive,
         // gated by which specific kickoff result triggered this handler.
-        let roll_home = rng.d6();
-        let roll_away = rng.d6();
+        // Java `DiceRoller.rollExtraReRoll()` is `rollDice(3)` — a **d3**, not a d6
+        // (`DiceRoller.java:193-195`), used by bb2016 for BOTH the Cheering Fans and Brilliant
+        // Coaching contests. BB2025 is the edition that rolls a d6 here
+        // (`bb2025/StepApplyKickoffResult.java:432-434`), so the two must not share a value.
+        //
+        // Rust rolled a d6 in both. The draw COUNT was right, so the shared dice stream never
+        // desynced and the only observable was which team won the contest — a re-roll count nothing
+        // compared until re-rolls entered the state hash. It then turned every bb2016 roster red at
+        // once (lineman seed 6: Java d3 3/3 → tie, both gain; Rust d6 6/3 → home only).
+        let roll_home = rng.die(3);
+        let roll_away = rng.die(3);
 
         let fan_favs_home = players_on_field_with_property(game, true, NamedProperties::INCREASES_TEAMS_FAME);
         let fan_favs_away = players_on_field_with_property(game, false, NamedProperties::INCREASES_TEAMS_FAME);
@@ -273,6 +282,15 @@ impl StepApplyKickoffResult {
             if game.turn_data_away.coach_banned { total_away -= 1; }
         }
 
+        // FFB_TRACE probe, mirroring the JAVA_XRR print in `bb2016/StepApplyKickoffResult.java`:
+        // this contest is decided by dice AND by fame/fan-favourites, so a divergence needs all the
+        // inputs side by side to attribute.
+        if std::env::var_os("FFB_TRACE").is_some() {
+            eprintln!("RUST_XRR rollH={} rollA={} fameH={} fameA={} ffH={} ffA={} totH={} totA={} specH={} specA={}",
+                roll_home, roll_away, game.game_result.home.fame, game.game_result.away.fame,
+                fan_favs_home, fan_favs_away, total_home, total_away,
+                game.game_result.home.spectators, game.game_result.away.spectators);
+        }
         let home_gains = total_home >= total_away;
         let away_gains = total_away >= total_home;
         if home_gains {
@@ -557,6 +575,34 @@ mod tests {
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2016)
+    }
+
+    /// Java `DiceRoller.rollExtraReRoll()` is `rollDice(3)` — a **d3** — and bb2016 uses it for
+    /// both the Cheering Fans and Brilliant Coaching contests. Rust rolled a d6, which kept the
+    /// dice-stream COUNT correct (so parity stayed green) while changing which team won. It turned
+    /// all 30 bb2016 rosters red the moment re-roll counts entered the state hash.
+    ///
+    /// Replays each seed with an independent d3 stream and checks the winner matches. A d6
+    /// implementation diverges from this on most seeds.
+    #[test]
+    fn extra_reroll_contest_rolls_a_d3_not_a_d6() {
+        for seed in 0..24u64 {
+            let mut expected = GameRng::new(seed);
+            let (roll_home, roll_away) = (expected.die(3), expected.die(3));
+
+            let mut game = make_game();
+            let home_before = game.turn_data_home.rerolls;
+            let away_before = game.turn_data_away.rerolls;
+            let mut step = StepApplyKickoffResult::new("end".into(), "blitz".into());
+            step.kickoff_result = Some(KickoffResult::BrilliantCoaching);
+            step.start(&mut game, &mut GameRng::new(seed));
+
+            let home_gained = game.turn_data_home.rerolls > home_before;
+            let away_gained = game.turn_data_away.rerolls > away_before;
+            // Identical test teams: no fame, no fan favourites, no coaches — the dice alone decide.
+            assert_eq!(home_gained, roll_home >= roll_away, "seed {seed}: home gain from d3 {roll_home}/{roll_away}");
+            assert_eq!(away_gained, roll_away >= roll_home, "seed {seed}: away gain from d3 {roll_home}/{roll_away}");
+        }
     }
 
     #[test]

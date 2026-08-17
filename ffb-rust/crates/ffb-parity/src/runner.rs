@@ -402,6 +402,9 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
 
     // Fill post_hashes retroactively
     let end_hash = state_hash(&engine.game);
+    if std::env::var_os("FFB_TRACE").is_some() {
+        eprintln!("RUST_END state={}", ffb_model::util::state_hash::state_string(&engine.game));
+    }
     for i in 0..pending_steps.len() {
         let post_hash = if i + 1 < pending_steps.len() {
             pending_steps[i + 1].hash.clone()
@@ -640,7 +643,13 @@ fn make_lineman_team(side: &str, roster_id: &str) -> Team {
         prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
         cheerleaders: 0,
         assistant_coaches: 0,
-        fan_factor: 0,
+        // Java's parity team sheets carry <fanFactor>5 for BOTH lineman teams
+        // (`ffb-server/teams/team_lineman_parity_{home,away}.xml`); Rust's synthetic twin hard-coded
+        // 0. Fan factor feeds the spectator count, which sets FAME, which decides the kickoff
+        // extra-re-roll contest — so Rust computed a different winner (bb2016 lineman seed 65: Java
+        // spectators 8000/11000 → fameA=1 → a 3-3 tie and BOTH teams gain; Rust 3000/6000 → fameA=2
+        // → away only). Invisible until re-rolls entered the state hash.
+        fan_factor: 5,
         dedicated_fans: 0,
         team_value: 1_000_000,
         treasury: 0,
@@ -1218,6 +1227,21 @@ mod fumbbl_roster_tests {
     /// to null and the Kroxigor gets NO Bone Head. Rust's lenient resolver used to keep it, adding a
     /// per-activation negatrait d6 Java never rolled, desyncing the dice stream (the Kroxigor's dodge
     /// then failed → turnover). bb2025 must therefore build the Kroxigor WITHOUT Bone Head to match Java.
+    /// Java's parity team sheets (`ffb-server/teams/team_lineman_parity_{home,away}.xml`) carry
+    /// `<fanFactor>5`; Rust's synthetic twin hard-coded 0. Fan factor feeds the spectator count,
+    /// which sets FAME, which decides the kickoff extra-re-roll contest — so the two engines picked
+    /// different winners (bb2016 lineman seed 65: Java 8000/11000 spectators → fameA=1 → a 3-3 tie
+    /// where BOTH teams gain; Rust 3000/6000 → fameA=2 → away only). Invisible until re-roll counts
+    /// entered the state hash.
+    #[test]
+    fn lineman_parity_team_matches_the_java_sheet_fan_factor() {
+        for side in ["home", "away"] {
+            let team = make_team("lineman", side, "bb2016");
+            assert_eq!(team.fan_factor, 5, "{side} must match <fanFactor>5 in the Java team sheet");
+            assert_eq!(team.rerolls, 3, "{side} must match <reRolls>3 in the Java team sheet");
+        }
+    }
+
     #[test]
     fn fumbbl_slann_kroxigor_has_no_bonehead_in_bb2025() {
         let team = make_team("slann_fumbbl", "away", "bb2025");

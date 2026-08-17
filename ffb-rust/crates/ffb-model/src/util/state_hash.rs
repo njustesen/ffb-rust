@@ -69,6 +69,13 @@ pub fn state_string(game: &Game) -> String {
     s.push_str(&flags(&game.turn_data_home));
     s.push(',');
     s.push_str(&flags(&game.turn_data_away));
+    // Team re-rolls remaining. A re-roll wrongly consumed (or wrongly kept) changed no compared
+    // field, so the two engines could disagree about a team's re-roll pool indefinitely; it only
+    // ever surfaced if the difference later changed a die. Java: `TurnData.getReRolls()`.
+    s.push_str(" r");
+    s.push_str(&game.turn_data_home.rerolls.to_string());
+    s.push(',');
+    s.push_str(&game.turn_data_away.rerolls.to_string());
     s.push_str(" p");
     for (i, part) in player_parts.iter().enumerate() {
         if i > 0 {
