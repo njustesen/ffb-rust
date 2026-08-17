@@ -10,6 +10,7 @@ use ffb_model::enums::KickoffResult;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::report_kickoff_result::ReportKickoffResult;
+use ffb_model::events::GameEvent;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -56,6 +57,10 @@ impl StepKickoffResultRoll {
         self.kickoff_result = Some(result);
         game.report_list.add(ReportKickoffResult::new(result, dice.to_vec()));
         StepOutcome::next()
+            // Coverage: mirrors the bb2020/bb2025 twins. BB2016 runs this step instead, so the
+            // edition reported ZERO kickoff results across 2,900 games while starting 5,797 halves.
+            // Report-only: no state, no dice.
+            .with_event(GameEvent::KickoffResultEvent { result })
             .publish(StepParameter::KickoffResult(result))
     }
 }
@@ -104,6 +109,17 @@ mod tests {
         assert_eq!(StepKickoffResultRoll::interpret_roll(10), KickoffResult::Blitz);
         assert_eq!(StepKickoffResultRoll::interpret_roll(11), KickoffResult::ThrowARock);
         assert_eq!(StepKickoffResultRoll::interpret_roll(12), KickoffResult::PitchInvasion);
+    }
+
+    /// BB2016 reported ZERO kickoff results across 2,900 coverage games because only the
+    /// bb2020/bb2025 twins emitted the event. The whole edition's kickoff coverage was invisible.
+    #[test]
+    fn emits_kickoff_result_event() {
+        let mut step = StepKickoffResultRoll::new();
+        let mut game = make_game();
+        let outcome = step.start(&mut game, &mut GameRng::new(0));
+        assert!(outcome.events.iter().any(|e| matches!(e, GameEvent::KickoffResultEvent { .. })),
+            "bb2016 must report its kickoff result like every other edition");
     }
 
     #[test]

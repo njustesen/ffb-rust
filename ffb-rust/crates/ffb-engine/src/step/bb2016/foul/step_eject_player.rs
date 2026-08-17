@@ -15,6 +15,7 @@
 /// Publishes: END_TURN, CATCH_SCATTER_THROW_IN_MODE.
 ///
 /// Publishes ReportSkillWasted for any unused single-use-reroll skills on the ejected player.
+use ffb_model::events::GameEvent;
 use ffb_model::enums::{PS_RESERVE, PS_BANNED, PS_KNOCKED_OUT, SkillId, SendToBoxReason};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -43,6 +44,7 @@ impl StepEjectPlayer {
     }
 
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
+        let mut ejected_event: Option<GameEvent> = None;
         if let Some(player_id) = game.acting_player.player_id.clone() {
             // Java: executeStepHooks(this, state) → SneakyGitBehaviour.handleExecuteStepHook
             // Sets player state to RESERVE/KNOCKED_OUT/BANNED before putPlayerIntoBox.
@@ -79,6 +81,9 @@ impl StepEjectPlayer {
             }
 
             UtilBox::put_player_into_box(game, &player_id);
+            // Coverage: mirrors the shared `mixed/foul/step_eject_player.rs` emission. BB2016 runs
+            // this step instead, so ejections were invisible for the whole edition. Report-only.
+            ejected_event = Some(GameEvent::PlayerEjected { player_id: player_id.clone() });
         }
         UtilBox::refresh_boxes(game);
         if let Some(ref pid) = game.acting_player.player_id.clone() {
@@ -86,13 +91,17 @@ impl StepEjectPlayer {
         }
         UtilServerGame::update_player_state_dependent_properties(game);
         let has_ball = self.fouler_has_ball.unwrap_or(false);
-        if has_ball {
+        let out = if has_ball {
             StepOutcome::next()
                 .publish(StepParameter::EndTurn(true))
                 .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall))
         } else {
             StepOutcome::goto(&self.goto_label_on_end)
                 .publish(StepParameter::EndTurn(true))
+        };
+        match ejected_event {
+            Some(ev) => out.with_event(ev),
+            None => out,
         }
     }
 }

@@ -8,6 +8,8 @@
 use ffb_model::enums::{PassingDistance, PlayerState, ReRollSource};
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::game::Game;
+use ffb_model::events::GameEvent;
+use ffb_model::enums::PassOutcome;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::bb2016::report_throw_team_mate_roll::ReportThrowTeamMateRoll;
 use ffb_mechanics::bb2016::pass_mechanic::PassMechanic as Bb2016PassMechanic;
@@ -137,6 +139,18 @@ impl StepThrowTeamMate {
                 self.thrown_player_id.clone().unwrap_or_default(),
             ));
 
+            // Coverage: `GameEvent::ThrowTeamMateRoll` had no construction site in the engine, so a
+            // roll behind 14,762 ThrowTeamMate activations reported nothing. Report-only.
+            let roll_event = GameEvent::ThrowTeamMateRoll {
+                // BB2016 never sets `game.thrower_id` (only the BB2025 step does), so read the local.
+                thrower_id: thrower_id.clone(),
+                thrown_id: self.thrown_player_id.clone().unwrap_or_default(),
+                roll,
+                // BB2016's TTM has no accuracy grades — `is_ttm_fumble` is the whole result — so the
+                // report carries the only two outcomes this edition can produce.
+                result: if successful { PassOutcome::Complete } else { PassOutcome::Fumble },
+            };
+
             if successful {
                 // Java: scattersSingleDirection = thrownPlayer.hasSkillProperty(ttmScattersInSingleDirection)
                 let scatters_single = self.thrown_player_id.as_deref()
@@ -154,7 +168,7 @@ impl StepThrowTeamMate {
                     has_swoop: scatters_single,
                 };
                 let seq = ScatterPlayer::build_sequence(&scatter_params);
-                return StepOutcome::next().push_seq(seq);
+                return StepOutcome::next().push_seq(seq).with_event(roll_event);
             } else {
                 // Java: if (getReRolledAction() != ReRolledActions.THROW_TEAM_MATE) → try reroll
                 if self.re_rolled_action.is_none() {
@@ -164,10 +178,10 @@ impl StepThrowTeamMate {
                     if let Some(prompt) = ask_for_reroll_if_available(game, "THROW_TEAM_MATE", self.minimum_roll, true) {
                         self.re_rolled_action = Some("THROW_TEAM_MATE".into());
                         self.re_roll_source = Some("TRR".into());
-                        return StepOutcome::cont().with_prompt(prompt);
+                        return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
                     }
                 }
-                return StepOutcome::goto(&self.goto_label_on_failure);
+                return StepOutcome::goto(&self.goto_label_on_failure).with_event(roll_event);
             }
         }
 

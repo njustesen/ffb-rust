@@ -3,6 +3,7 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::report_foul::ReportFoul;
+use ffb_model::events::GameEvent;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -77,6 +78,14 @@ impl StepFoul {
         );
 
         StepOutcome::next()
+            // Coverage: one Foul event per resolved foul, mirroring the shared `mixed/foul/step_foul.rs`
+            // emission. BB2016 runs this step instead of that one, so without it the edition reported
+            // zero fouls across 2,900 coverage games while producing 1,479 argue-the-call rolls —
+            // which only ever follow a foul the referee spotted. Report-only: no state, no dice.
+            .with_event(GameEvent::Foul {
+                attacker_id: attacker_id.clone().unwrap_or_default(),
+                defender_id: defender_id.clone(),
+            })
             .publish(StepParameter::InjuryResult(Box::new(injury_result)))
     }
 }
@@ -160,6 +169,22 @@ mod tests {
         let mut step = StepFoul::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    /// BB2016 reported ZERO fouls across 2,900 coverage games — while producing 1,479
+    /// argue-the-call rolls, which only ever follow a foul the referee spotted. Only the shared
+    /// `mixed/foul/step_foul.rs` emitted the event, and BB2016 runs this step instead.
+    #[test]
+    fn emits_foul_event() {
+        let mut game = make_game();
+        add_player(&mut game, "home", "att");
+        add_player(&mut game, "away", "def");
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("def".into());
+        let mut step = StepFoul::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.events.iter().any(|e| matches!(e, GameEvent::Foul { .. })),
+            "bb2016 must report its fouls like every other edition");
     }
 
     #[test]

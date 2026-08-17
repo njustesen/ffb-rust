@@ -10,6 +10,7 @@
 ///   - ReportLeader: caller responsibility — emitted when update_leader_re_rolls_for_team returns Some
 ///   - ReportPumpUpTheCrowdReRoll: wired via GameEvent::PumpUpTheCrowdReRoll in handle_injury_side_effects
 use ffb_model::enums::LeaderState;
+use ffb_model::enums::SeriousInjuryKind;
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::team::Team;
@@ -92,11 +93,21 @@ pub trait StateMechanic: Send + Sync {
         // armor_roll only (injury_roll None); broken armor carries both rolls plus the
         // KO/casualty outcome and serious-injury kind.
         let ctx = injury_result.injury_context();
+        // A DEAD player carries no `serious_injury`: the casualty tier sets the state to PS_RIP
+        // (`casualty_tier_bb2020`/`_bb2025`, roll >= 15) while `si_sub_type_*` returns None for
+        // 15-16, so the kind is never filled in. Report it from the resulting state instead —
+        // 8,700 coverage games showed 7,071 casualties and ZERO deaths, which no d16 table can
+        // produce. Read-only: the context is left exactly as the engine built it.
+        let serious_injury = ctx.serious_injury.or_else(|| {
+            ctx.get_player_state()
+                .filter(|s| s.base() == ffb_model::enums::PS_RIP)
+                .map(|_| SeriousInjuryKind::Dead)
+        });
         Some(GameEvent::Injury {
             player_id: ctx.defender_id.clone().unwrap_or_default(),
             armor_roll: ctx.armor_roll,
             injury_roll: ctx.injury_roll,
-            serious_injury: ctx.serious_injury,
+            serious_injury,
             was_ko: ctx.is_knocked_out(),
             was_cas: ctx.is_casualty(),
         })
@@ -302,6 +313,40 @@ mod tests {
         m.report_injury(&mut g, &mut ir);
         assert!(ir.is_already_reported());
         assert!(g.report_list.has_report(ReportId::INJURY));
+    }
+
+    /// A dead player carries no `serious_injury`: the casualty tier sets PS_RIP while
+    /// `si_sub_type_*` returns None for 15-16. 8,700 coverage games reported 7,071 casualties and
+    /// ZERO deaths — impossible on a d16 table whose 15-16 is Dead. Report it from the state.
+    #[test]
+    fn report_injury_reports_a_rip_player_as_dead() {
+        use ffb_model::enums::{PlayerState, PS_RIP};
+        let m = TestMechanic;
+        let mut g = make_game();
+        let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+        ir.injury_context.defender_id = Some("p1".into());
+        ir.injury_context.injury_type_name = Some("REGULAR".into());
+        ir.injury_context.injury = Some(PlayerState::new(PS_RIP));
+        ir.injury_context.serious_injury = None;
+        let ev = m.report_injury(&mut g, &mut ir).expect("an injury event");
+        assert!(matches!(ev, GameEvent::Injury { serious_injury: Some(SeriousInjuryKind::Dead), .. }));
+        // Read-only: the engine's own context must be left exactly as it was.
+        assert_eq!(ir.injury_context.serious_injury, None);
+    }
+
+    /// ...but a kind the engine DID set is never overwritten.
+    #[test]
+    fn report_injury_keeps_an_existing_serious_injury_kind() {
+        use ffb_model::enums::{PlayerState, PS_SERIOUS_INJURY};
+        let m = TestMechanic;
+        let mut g = make_game();
+        let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+        ir.injury_context.defender_id = Some("p1".into());
+        ir.injury_context.injury_type_name = Some("REGULAR".into());
+        ir.injury_context.injury = Some(PlayerState::new(PS_SERIOUS_INJURY));
+        ir.injury_context.serious_injury = Some(SeriousInjuryKind::HeadInjuryAv);
+        let ev = m.report_injury(&mut g, &mut ir).expect("an injury event");
+        assert!(matches!(ev, GameEvent::Injury { serious_injury: Some(SeriousInjuryKind::HeadInjuryAv), .. }));
     }
 
     #[test]

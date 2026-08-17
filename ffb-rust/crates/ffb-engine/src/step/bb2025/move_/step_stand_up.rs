@@ -3,6 +3,7 @@ use ffb_model::enums::ReRollSource;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
+use ffb_model::events::GameEvent;
 use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
@@ -188,6 +189,15 @@ impl StepStandUp {
             ));
         }
 
+        // Coverage: `GameEvent::StandUpRoll` had no construction site in the engine, so a roll that
+        // fires whenever a sub-MA-3 player stands up read as 0 across 8,700 games. Report-only.
+        let roll_event = GameEvent::StandUpRoll {
+            player_id: game.acting_player.player_id.clone().unwrap_or_default(),
+            target: i32::max(2, 4 - modifier),
+            roll: self.roll,
+            success: successful,
+        };
+
         if successful {
             game.acting_player.has_moved = true;
             game.acting_player.standing_up = false;
@@ -213,14 +223,14 @@ impl StepStandUp {
                 .unwrap_or(false);
             if is_pinned {
                 let label = self.goto_label_on_failure.clone();
-                StepOutcome::goto(&label)
+                StepOutcome::goto(&label).with_event(roll_event)
             } else {
-                StepOutcome::next()
+                StepOutcome::next().with_event(roll_event)
             }
         } else {
             // Java: if (reRolledAction == STAND_UP || !askForReRollIfAvailable(...)) → handleFailedStandUp
             if already_rerolled {
-                return self.fail_stand_up(game);
+                return self.fail_stand_up(game).with_event(roll_event);
             }
             let minimum_roll = i32::max(2, 4 - modifier);
             if let Some(prompt) = ask_for_reroll_if_available(game, "STAND_UP", minimum_roll, false) {
@@ -228,9 +238,9 @@ impl StepStandUp {
                 self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("STAND_UP"));
                 self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
                 self.roll = 0; // reset so the re-roll gets a fresh d6
-                return StepOutcome::cont().with_prompt(prompt);
+                return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
             }
-            self.fail_stand_up(game)
+            self.fail_stand_up(game).with_event(roll_event)
         }
     }
 

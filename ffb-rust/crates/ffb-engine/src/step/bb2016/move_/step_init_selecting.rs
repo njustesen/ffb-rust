@@ -4,6 +4,7 @@ use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
 use crate::action::{Action, PlayerActionChoice};
+use ffb_model::events::GameEvent;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::util_server_steps::change_player_action;
@@ -43,6 +44,14 @@ pub struct StepInitSelecting {
     pub end_player_action: bool,
     /// Java: fUpdatePersistence (transient)
     pub update_persistence: bool,
+    /// Activation to report on the way out of `execute_step`.
+    ///
+    /// The BB2025 twin emits `GameEvent::PlayerAction` inline, but this arm has a dozen return
+    /// paths (folded block/foul/pass/TTM targets, deselects), so the event is parked here and
+    /// attached at the single `execute_step` exit instead. Without it BB2016 reported ZERO
+    /// activations across 2,900 coverage games while plainly fouling and blocking — the whole
+    /// edition's action coverage was unmeasurable. Purely a report: no state, no dice.
+    pending_activation: Option<(String, PlayerAction)>,
 }
 
 impl StepInitSelecting {
@@ -53,6 +62,7 @@ impl StepInitSelecting {
             end_turn: false,
             end_player_action: false,
             update_persistence: false,
+            pending_activation: None,
         }
     }
 }
@@ -191,6 +201,9 @@ impl Step for StepInitSelecting {
                     return self.execute_step(game, rng);
                 }
                 change_player_action(game, player_id, pa, false);
+                // Report the activation (see `pending_activation`). Parked rather than returned so
+                // every folded-target and deselect path below reports identically.
+                self.pending_activation = Some((player_id.clone(), pa));
                 // BB2016 two-command activation, folded on the RUST harness side: the parity agent
                 // supplies the BLOCK/BLITZ/FOUL target folded into ActivatePlayer (identical RNG to
                 // bb2025 — player, action, target picked at activation). Dispatch it here so the
@@ -321,7 +334,17 @@ impl Step for StepInitSelecting {
 }
 
 impl StepInitSelecting {
-    pub fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    /// Attaches the parked `GameEvent::PlayerAction` (see `pending_activation`) to whichever
+    /// outcome the step produces. Report-only, so every return path can share one exit.
+    pub fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        let out = self.execute_step_inner(game, rng);
+        match self.pending_activation.take() {
+            Some((player_id, action)) => out.with_event(GameEvent::PlayerAction { player_id, action }),
+            None => out,
+        }
+    }
+
+    fn execute_step_inner(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         let label = self.goto_label_on_end.clone();
 
         // no-op: headless engine has no turn timer; game.isTimeoutEnforced() always treated as false

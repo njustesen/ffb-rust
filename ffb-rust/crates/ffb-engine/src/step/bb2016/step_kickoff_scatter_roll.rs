@@ -24,6 +24,7 @@ use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::report_kickoff_scatter::ReportKickoffScatter;
+use ffb_model::events::GameEvent;
 use ffb_model::report::report_skill_use::ReportSkillUse;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -185,6 +186,13 @@ impl StepKickoffScatterRoll {
             let touchback = self.touchback;
 
             return StepOutcome::next()
+                // Coverage: mirrors the bb2020/bb2025 twins; BB2016 runs this step instead and so
+                // reported zero kickoff scatters. Report-only: no state, no dice.
+                .with_event(GameEvent::KickoffScatter {
+                    start: kicking_coord,
+                    direction: self.scatter_direction_roll,
+                    distance: self.scatter_distance,
+                })
                 .publish(StepParameter::KickingPlayerCoordinate(kicking_coord))
                 .publish(StepParameter::KickoffBounds(
                     self.kickoff_bounds.unwrap_or(FieldCoordinateBounds::FIELD),

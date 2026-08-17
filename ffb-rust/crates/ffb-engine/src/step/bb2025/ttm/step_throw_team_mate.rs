@@ -16,6 +16,7 @@ use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::mixed::report_throw_team_mate_roll::ReportThrowTeamMateRoll;
+use ffb_model::events::GameEvent;
 use ffb_mechanics::bb2025::pass_mechanic::PassMechanic as Bb2025PassMechanic;
 use ffb_mechanics::bb2025::ttm_mechanic::TtmMechanic as Bb2025TtmMechanic;
 use ffb_mechanics::modifiers::pass_modifier::PassModifier;
@@ -175,6 +176,15 @@ impl StepThrowTeamMate {
                 self.kicked,
             ));
 
+            // Coverage: `GameEvent::ThrowTeamMateRoll` had no construction site in the engine, so a
+            // roll behind 14,762 ThrowTeamMate activations reported nothing. Report-only.
+            let roll_event = GameEvent::ThrowTeamMateRoll {
+                thrower_id: game.thrower_id.clone().unwrap_or_default(),
+                thrown_id: self.thrown_player_id.clone().unwrap_or_default(),
+                roll,
+                result: pass_result,
+            };
+
             if successful {
                 // Java: if ACCURATE && hasSkillProperty(canSkipTtmScatterOnSuperbThrow) && usingBullseye == null
                 //   show dialog → Continue (wait for Bullseye decision)
@@ -193,6 +203,7 @@ impl StepThrowTeamMate {
                 // thrown player scattered TWICE (the first from the correct dice, the second an extra
                 // that desynced the whole throw — ogre seed 1 i=2). Just publish the result params.
                 return self.handle_pass_result()
+                    .with_event(roll_event)
                     .publish(StepParameter::UsingBullseye(self.using_bullseye.unwrap_or(false)));
             } else {
                 if self.re_rolled_action.is_none() && player_can_pass {
@@ -200,10 +211,10 @@ impl StepThrowTeamMate {
                     if let Some(prompt) = ask_for_reroll_if_available(game, rerolled_action_key, self.minimum_roll, is_fumble) {
                         self.re_rolled_action = Some(rerolled_action_key.into());
                         self.re_roll_source = Some("TRR".into());
-                        return StepOutcome::cont().with_prompt(prompt);
+                        return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
                     }
                 }
-                return self.handle_pass_result();
+                return self.handle_pass_result().with_event(roll_event);
             }
         }
 

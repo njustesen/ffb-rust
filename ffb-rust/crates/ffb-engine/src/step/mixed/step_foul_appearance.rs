@@ -17,6 +17,7 @@ use ffb_model::model::game::Game;
 use ffb_model::enums::{SkillId, ReRollSource, PlayerAction, PS_PRONE};
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
+use ffb_model::events::GameEvent;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -131,12 +132,21 @@ impl StepFoulAppearance {
         let minimum_roll = DiceInterpreter::minimum_roll_resisting_foul_appearance();
         let may_block = DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
 
+        // Coverage: `GameEvent::FoulAppearanceRoll` had no construction site anywhere in the engine,
+        // so the counter read 0 across 8,700 games for a roll that demonstrably fires — this file's
+        // own BB2020 ordering bug was found by watching it in a dice trace. Report-only.
+        let roll_event = GameEvent::FoulAppearanceRoll {
+            player_id: game.acting_player.player_id.clone().unwrap_or_default(),
+            roll: self.roll,
+            failed: !may_block,
+        };
+
         if may_block {
             // Java: step.commitTargetSelection() — calls targetSelectionState.commit() if not null
             if let Some(ref mut ts) = game.field_model.target_selection_state {
                 ts.commit();
             }
-            return StepOutcome::next();
+            return StepOutcome::next().with_event(roll_event);
         }
 
         // Failure — try re-roll if first failure
@@ -158,11 +168,11 @@ impl StepFoulAppearance {
             if let Some(prompt) = ask_for_reroll_if_available(game, "FOUL_APPEARANCE", minimum_roll, false) {
                 self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
                 self.roll = 0;
-                return StepOutcome::cont().with_prompt(prompt);
+                return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
             }
         }
 
-        self.fail_fa(game)
+        self.fail_fa(game).with_event(roll_event)
     }
 
     fn fail_fa(&mut self, game: &mut Game) -> StepOutcome {

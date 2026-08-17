@@ -13,6 +13,7 @@
 use std::collections::HashSet;
 use ffb_model::enums::{PassingDistance, PassOutcome, PlayerState, ReRollSource, SkillId};
 use ffb_model::model::game::Game;
+use ffb_model::events::GameEvent;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::mixed::report_throw_team_mate_roll::ReportThrowTeamMateRoll;
 use ffb_mechanics::bb2020::pass_mechanic::PassMechanic as Bb2020PassMechanic;
@@ -148,13 +149,22 @@ impl StepThrowTeamMate {
                 self.kicked,
             ));
 
+            // Coverage: `GameEvent::ThrowTeamMateRoll` had no construction site in the engine, so a
+            // roll behind 14,762 ThrowTeamMate activations reported nothing. Report-only.
+            let roll_event = GameEvent::ThrowTeamMateRoll {
+                thrower_id: game.thrower_id.clone().unwrap_or_default(),
+                thrown_id: self.thrown_player_id.clone().unwrap_or_default(),
+                roll,
+                result: pass_result,
+            };
+
             if successful {
                 // Java: handlePassResult(state.passResult, step) — publish PASS_RESULT, NEXT_STEP.
                 // The generator sequence places StepDispatchScatterPlayer immediately after this
                 // step; it is StepDispatchScatterPlayer (not this step) that reads PASS_RESULT and
                 // decides whether/what ScatterPlayer sequence to push. Pushing one here as well
                 // would double-push the scatter sequence.
-                return self.handle_pass_result(game);
+                return self.handle_pass_result(game).with_event(roll_event);
             } else {
                 // Java: if (getReRolledAction() != rerolledAction && playerCanPass) → try reroll
                 if self.re_rolled_action.is_none() && player_can_pass {
@@ -162,10 +172,10 @@ impl StepThrowTeamMate {
                     if let Some(prompt) = ask_for_reroll_if_available(game, rerolled_action_key, self.minimum_roll, is_fumble) {
                         self.re_rolled_action = Some(rerolled_action_key.into());
                         self.re_roll_source = Some("TRR".into());
-                        return StepOutcome::cont().with_prompt(prompt);
+                        return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
                     }
                 }
-                return self.handle_pass_result(game);
+                return self.handle_pass_result(game).with_event(roll_event);
             }
         }
 
