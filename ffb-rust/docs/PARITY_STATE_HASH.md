@@ -68,9 +68,25 @@ Fixed by mirroring `getPlayerState()` and routing every helper and the apply sit
 This bug was invisible to every previous 30/30 gate and would have stayed invisible: the two states
 it confuses hashed identically. It was found on the widening's first run.
 
+## Iteration 2 — per-team turn-used flags
+
+`blitz_used` / `foul_used` / `hand_over_used` / `pass_used`, home then away, as `f0100,0011`. The
+hash carried no turn state at all, so a team that wrongly consumed (or wrongly kept) a once-per-turn
+action still hashed identically.
+
+**Result: 30/30 on all three editions — no divergence found.** A negative result, and a useful one:
+those four flags are already in sync everywhere the suite reaches. The field earns its place as a
+*regression* guard rather than a bug-finder. Today's `blitz_used` bug (a select-phase Foul Appearance
+failure skipped the dispatch that sets the flag, letting a team blitz twice) was caught only
+indirectly, because the stale flag happened to change which actions the agent was offered next; with
+this field it would have been caught at the step it occurred.
+
+`ttm_used` / `ktm_used` are absent: Java's `TurnData` exposes no accessor and `TurnData.java` is
+engine code, not the co-editable harness.
+
 ## Remaining groups
 
-1. **Per-team turn-used flags.** `blitz_used` / `foul_used` / `hand_over_used` / `pass_used` — the
+1. ~~Per-team turn-used flags~~ — done, iteration 2. `blitz_used` / `foul_used` / `hand_over_used` / `pass_used` — the
    four Java's `TurnData` exposes. Today's `blitz_used` regression (a select-phase Foul Appearance
    failure skipping the dispatch that set the flag, letting a team blitz twice) was caught only
    *indirectly*, because the flag happened to change which actions the agent was offered. This field

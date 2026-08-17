@@ -52,6 +52,23 @@ pub fn state_string(game: &Game) -> String {
     s.push_str(&by.to_string());
     s.push(',');
     s.push_str(if in_play { "true" } else { "false" });
+    // Per-team once-per-turn flags, home then away, as 0/1 in a fixed order: blitz, foul, hand-over,
+    // pass. The hash encoded no turn state at all, so a team that consumed (or failed to consume) an
+    // action still hashed identically — a Foul Appearance failure that skipped the dispatch setting
+    // `blitz_used` let a team blitz twice, and that was caught only INDIRECTLY, because the flag
+    // happened to change which actions the agent was offered next.
+    //
+    // `ttm_used`/`ktm_used` are deliberately absent: Java's `TurnData` exposes no accessor for them
+    // and `TurnData.java` is engine code, not the co-editable harness. Must stay byte-identical with
+    // `ParityRunner.stateString`/`stateHash`.
+    let flags = |td: &crate::model::turn_data::TurnData| {
+        format!("{}{}{}{}",
+            td.blitz_used as u8, td.foul_used as u8, td.hand_over_used as u8, td.pass_used as u8)
+    };
+    s.push_str(" f");
+    s.push_str(&flags(&game.turn_data_home));
+    s.push(',');
+    s.push_str(&flags(&game.turn_data_away));
     s.push_str(" p");
     for (i, part) in player_parts.iter().enumerate() {
         if i > 0 {
