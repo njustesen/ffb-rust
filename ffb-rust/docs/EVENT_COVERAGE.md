@@ -26,22 +26,29 @@ without it, a variant no arm covers reads as zero and is indistinguishable from 
 
 | | count | share |
 |---|---:|---:|
-| Emitted in parity-verified games (**A**) | **54** | 42% |
+| Emitted in parity-verified games (**A**) | **57** | 45% |
 | Only under the uniform agent (**B**) | 1 | 1% |
-| Never emitted by either | **73** | 57% |
-| *of those: no construction site in the engine at all* | 32 | 25% |
-| *of those: constructed somewhere, never reached* | 41 | 32% |
+| Never emitted by either | **70** | 55% |
 
-Two very different problems hide behind a zero, and separating them is what this report is for:
+The 70 that never fire split four ways, and telling them apart is the whole point — a zero means
+something completely different in each:
 
-* **32 are instrumentation gaps.** The mechanic runs — the dice are visible in a trace — but
-  the engine never constructs the event, so no report can see it. **These zeros are not coverage facts.**
-* **41 are genuine coverage gaps.** The engine can build the event; no agent ever gets there.
-  These are the agent's to-do list.
+| class | n | meaning |
+|---|---:|---|
+| **No emitter** | 33 | nothing anywhere constructs the event |
+| **Dead path** | 15 | an emitter exists, but its step is *never dispatched* |
+| **Helper** | 7 | emitted from a helper, not a step — three from the superseded `step/engine.rs` |
+| **Gated** | 15 | the step runs; a condition or an edition twin blocks the event |
+
+Only the **gated** class is about agents. The other three are instrumentation: the mechanic runs and
+nothing reports it, so **those zeros are not coverage facts**. An earlier version of this report
+bucketed by "is `GameEvent::X` constructed anywhere in the engine", which conflated the classes —
+a constructor sitting in an edition twin the driver never routes to reads exactly like a mechanic
+that never happens.
 
 ### Closed in the 2026-08-17 pass
 
-Nine emission sites, no logic changes, parity re-gated at 30/30 on all three editions:
+Twelve emission sites, no logic changes, parity re-gated at 30/30 on all three editions after each batch:
 
 | was | now | cause |
 |---|---|---|
@@ -52,6 +59,9 @@ Nine emission sites, no logic changes, parity re-gated at 30/30 on all three edi
 | 0 Foul Appearance rolls | 3,770 | no construction site anywhere in the engine |
 | 0 stand-up rolls | 8,323 | same |
 | 0 throw-team-mate rolls | 3,087 | same |
+| 0 pass deviations | 444 | emitter only in the bb2020 twin the driver never routes to |
+| 0 MVP awards | 17,392 | emitter only in the bb2020 twin; the step runs every game |
+| 0 winnings rolls | 17,392 | emitter only in the bb2016 twin; same |
 
 `ReRoll` was deliberately left out: emitting it means threading a return value through
 `use_reroll`, and the parity agent declines team re-rolls by contract, so it would still read ~0.
@@ -64,92 +74,97 @@ same BB2025 matchup. BB2020 is 30/30 green against Java, so either Java declines
 (faithful — but the mechanic is untested in that edition) or both engines share a gap the state
 hash cannot see. Worth a direct check.
 
-## 1. Instrumentation gaps — mechanic runs, event never constructed
+## 1. Never emitted, by class
 
-`GameEvent::X` appears nowhere in `ffb-engine` / `ffb-mechanics` / `ffb-model` outside the enum
-definition; only `ffb-parity`'s tally arms mention it. Each has a `CoverageReport` field that is
-structurally incapable of being non-zero.
+### No emitter — nothing constructs the event (33)
 
-| event | mechanic known to run? |
+| event | detail |
 |---|---|
-| `balefulHexRoll` | unknown |
-| `ballPickedUp` | **yes** — `pickupRoll` fires 4,362 times in A |
-| `ballScattered` | **yes** — `scatter_balls` counts 27,792 in A |
-| `bombExplodesAfterCatch` | unknown |
-| `breatheFireRoll` | unknown |
-| `cardEffectRoll` | unknown |
-| `cardsAndInducementsBought` | unknown |
-| `coachBanned` | unknown |
-| `defectingPlayers` | unknown |
-| `doubleHiredStarPlayer` | unknown |
-| `gameOptions` | unknown |
-| `heatExhaustion` | unknown — needs Sweltering Heat |
-| `hypnoticGazeRoll` | unknown |
-| `jumpRoll` | unknown |
-| `kickoffPitchInvasionStun` | unknown |
-| `lonerRoll` | no — Loner only fires when a team re-roll is used, which the agent declines |
-| `lookIntoMyEyesRoll` | unknown |
-| `passBlockEligible` | unknown |
-| `pilingOn` | unknown |
-| `playCard` | unknown |
-| `prayerRoll` | unknown — prayers may simply never trigger |
-| `proRoll` | no — same |
-| `reRoll` | **yes** — dodge/catch/pickup/pass all report `rerolled>0`, so re-rolls are consumed |
-| `regenerationRoll` | **yes** — undead/necromantic run 100 seeds each |
-| `rightStuffRoll` | unknown |
-| `riotousRookies` | unknown |
-| `secretWeaponBan` | unknown |
-| `specialEffectRoll` | unknown |
-| `teamCaptainRoll` | unknown |
-| `timeoutEnforced` | unknown |
-| `turnEnd` | **yes** — 17,397 half-starts imply tens of thousands of turn ends |
-| `weepingDaggerRoll` | unknown |
+| `balefulHexRoll` | no construction site anywhere |
+| `ballPickedUp` | no construction site anywhere |
+| `ballScattered` | no construction site anywhere |
+| `bombExplodesAfterCatch` | no construction site anywhere |
+| `breatheFireRoll` | no construction site anywhere |
+| `cardEffectRoll` | no construction site anywhere |
+| `cardsAndInducementsBought` | no construction site anywhere |
+| `coachBanned` | no construction site anywhere |
+| `defectingPlayers` | no construction site anywhere |
+| `doubleHiredStarPlayer` | no construction site anywhere |
+| `gameOptions` | no construction site anywhere |
+| `heatExhaustion` | no construction site anywhere |
+| `hypnoticGazeRoll` | no construction site anywhere |
+| `jumpRoll` | no construction site anywhere |
+| `kickoffPitchInvasionStun` | no construction site anywhere |
+| `kickoffThrowARock` | no construction site anywhere |
+| `lonerRoll` | no construction site anywhere |
+| `lookIntoMyEyesRoll` | no construction site anywhere |
+| `passBlockEligible` | no construction site anywhere |
+| `pilingOn` | no construction site anywhere |
+| `playCard` | no construction site anywhere |
+| `prayerRoll` | no construction site anywhere |
+| `proRoll` | no construction site anywhere |
+| `reRoll` | no construction site anywhere |
+| `regenerationRoll` | no construction site anywhere |
+| `rightStuffRoll` | no construction site anywhere |
+| `riotousRookies` | no construction site anywhere |
+| `secretWeaponBan` | no construction site anywhere |
+| `specialEffectRoll` | no construction site anywhere |
+| `teamCaptainRoll` | no construction site anywhere |
+| `timeoutEnforced` | no construction site anywhere |
+| `turnEnd` | no construction site anywhere |
+| `weepingDaggerRoll` | no construction site anywhere |
 
-## 2. Coverage gaps — engine builds the event, no agent reaches it
+### Dead path — emitter exists, step never dispatched (15)
 
-| event | reachable in B? |
+| event | detail |
 |---|---|
-| `allYouCanEatRoll` | no |
-| `apothecaryChoice` | no |
-| `biasedRefRoll` | no |
-| `bombOutOfBounds` | no |
-| `bribesRoll` | no |
-| `buyInducement` | no |
-| `cardDeactivated` | no |
-| `chainsawRoll` | no |
-| `coinThrow` | no |
-| `fumblerooskie` | no |
-| `hitAndRun` | no |
-| `inducement` | no |
-| `interceptionRoll` | no |
-| `jumpUpRoll` | no |
-| `kegThrow` | no |
-| `kickTeamMateFumble` | no |
-| `kickoffSequenceActivationsExhausted` | no |
-| `kickoffThrowARock` | no |
-| `leader` | no |
-| `masterChefRoll` | no |
-| `mvpRoll` | no |
-| `noPlayersToField` | no |
-| `passDeviate` | no |
-| `pettyCash` | no |
-| `pickMeUpRoll` | no |
-| `playerNote` | no |
-| `prayerAmount` | no |
-| `projectileVomitRoll` | no |
-| `pumpUpTheCrowdReRoll` | no |
-| `receiveChoice` | no |
-| `safeThrowRoll` | no |
-| `selectBlitzTarget` | no |
-| `selectGazeTarget` | no |
-| `spellEffectRoll` | no |
-| `swarmingPlayersRoll` | no |
-| `swoopPlayer` | no |
-| `thenIStartedBlastin` | no |
-| `throwAtPlayer` | no |
-| `throwAtStallingPlayer` | no |
-| `winningsRoll` | no |
-| `wizardUse` | no |
+| `allYouCanEatRoll` | only `AllYouCanEat`, which is never dispatched |
+| `bombOutOfBounds` | only `InitBomb`, which is never dispatched |
+| `buyInducement` | only `BuyCardsAndInducements/BuyInducements`, which is never dispatched |
+| `hitAndRun` | only `HitAndRun`, which is never dispatched |
+| `kegThrow` | only `ThrowKeg`, which is never dispatched |
+| `masterChefRoll` | only `MasterChef`, which is never dispatched |
+| `pettyCash` | only `PettyCash`, which is never dispatched |
+| `prayerAmount` | only `Prayers`, which is never dispatched |
+| `safeThrowRoll` | only `SafeThrow`, which is never dispatched |
+| `selectBlitzTarget` | only `SelectBlitzTarget`, which is never dispatched |
+| `selectGazeTarget` | only `SelectGazeTarget`, which is never dispatched |
+| `spellEffectRoll` | only `SpecialEffect`, which is never dispatched |
+| `thenIStartedBlastin` | only `ThenIStartedBlastin`, which is never dispatched |
+| `throwAtPlayer` | only `ThrowARock`, which is never dispatched |
+| `wizardUse` | only `Wizard`, which is never dispatched |
+
+### Helper — emitted outside a step (7)
+
+| event | detail |
+|---|---|
+| `cardDeactivated` | emitted from a helper, not a step (crates/ffb-engine/src/util/util_server_cards.rs) |
+| `coinThrow` | emitted from a helper, not a step (crates/ffb-engine/src/step/engine.rs) |
+| `inducement` | emitted from a helper, not a step (crates/ffb-engine/src/mechanic/state_mechanic.rs) |
+| `interceptionRoll` | emitted from a helper, not a step (crates/ffb-engine/src/step/engine.rs) |
+| `leader` | emitted from a helper, not a step (crates/ffb-engine/src/mechanic/bb2025/state_mechanic.rs, crates/ffb-engine/src/mechanic/mixed/state_mechanic.rs) |
+| `pumpUpTheCrowdReRoll` | emitted from a helper, not a step (crates/ffb-engine/src/mechanic/state_mechanic.rs, crates/ffb-engine/src/step/util_server_injury.rs) |
+| `receiveChoice` | emitted from a helper, not a step (crates/ffb-engine/src/step/engine.rs) |
+
+### Gated — step runs, event blocked by a condition or edition twin (15)
+
+| event | detail |
+|---|---|
+| `apothecaryChoice` | `Apothecary` runs; the event is gated |
+| `biasedRefRoll` | `Referee` runs; the event is gated |
+| `bribesRoll` | `Bribes` runs; the event is gated |
+| `chainsawRoll` | `BlockChainsaw/FoulChainsaw` runs; the event is gated |
+| `fumblerooskie` | `ResetFumblerooskie` runs; the event is gated |
+| `jumpUpRoll` | `JumpUp` runs; the event is gated |
+| `kickTeamMateFumble` | `DispatchScatterPlayer` runs; the event is gated |
+| `kickoffSequenceActivationsExhausted` | `ApplyKickoffResult` runs; the event is gated |
+| `noPlayersToField` | `Setup` runs; the event is gated |
+| `pickMeUpRoll` | `PickMeUp` runs; the event is gated |
+| `playerNote` | `ForgoneStalling/StallingPlayer` runs; the event is gated |
+| `projectileVomitRoll` | `ProjectileVomit` runs; the event is gated |
+| `swarmingPlayersRoll` | `Swarming` runs; the event is gated |
+| `swoopPlayer` | `InitScatterPlayer` runs; the event is gated |
+| `throwAtStallingPlayer` | `StallingPlayer` runs; the event is gated |
 
 ## 3. Covered — emitted in parity-verified play
 
@@ -171,6 +186,8 @@ structurally incapable of being non-zero.
 | `kickoffScatter` | 17,397 | 4,341 | 5,797 | 5,800 | 5,800 |
 | `kickoffResultEvent` | 17,397 | 4,309 | 5,797 | 5,800 | 5,800 |
 | `startHalf` | 17,397 | 4,240 | 5,797 | 5,800 | 5,800 |
+| `winningsRoll` | 17,392 | 4,108 | 5,792 | 5,800 | 5,800 |
+| `mvpRoll` | 17,392 | 4,108 | 5,792 | 5,800 | 5,800 |
 | `animalSavagery` | 12,487 | 1,172 | 0 | 8,473 | 4,014 |
 | `catchRoll` | 10,340 | 2,891 | 4,020 | 2,962 | 3,358 |
 | `apothecaryRoll` | 9,372 | 0 | 2,043 | 4,100 | 3,229 |
@@ -194,6 +211,7 @@ structurally incapable of being non-zero.
 | `solidDefenceRoll` | 971 | 163 | 0 | 477 | 494 |
 | `kickoffTimeout` | 555 | 99 | 0 | 273 | 282 |
 | `blitzRoll` | 551 | 208 | 0 | 551 | 0 |
+| `passDeviate` | 444 | 97 | 0 | 444 | 0 |
 | `kickoffPitchInvasion` | 424 | 154 | 0 | 214 | 210 |
 | `dauntlessRoll` | 423 | 73 | 222 | 75 | 126 |
 | `kickoffThrowARockBb2016` | 326 | 109 | 326 | 0 | 0 |
@@ -380,7 +398,7 @@ gap in this report, and partly an artefact of section 1: a skill that fires with
 | | bb2016 | bb2020 | bb2025 |
 |---|---:|---:|---:|
 | games | 2,900 | 2,900 | 2,900 |
-| distinct event types | 31 | 45 | 47 |
+| distinct event types | 33 | 48 | 49 |
 | fouls | 7,598 | 7,410 | 7,430 |
 | players ejected | 1,520 | 1,352 | 1,274 |
 | weather changes | 960 | 701 | 689 |
