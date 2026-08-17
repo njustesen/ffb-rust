@@ -4,6 +4,7 @@ use ffb_model::model::game::Game;
 use ffb_model::report::report_most_valuable_players::ReportMostValuablePlayers;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
+use ffb_model::events::GameEvent;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::StepId;
 
@@ -186,7 +187,23 @@ impl StepMvp {
             self.away_players_mvp.clone(),
         ));
 
-        StepOutcome::next()
+        // Coverage: `GameEvent::MvpRoll` is emitted only by the BB2020 twin, and the driver routes
+        // BB2025 (and BB2016) here, so the MVP award reported nothing across 8,700 games. One event
+        // per awarded player, mirroring the report just added. Report-only.
+        let mut out = StepOutcome::next();
+        let home_id = game.team_home.id.clone();
+        let away_id = game.team_away.id.clone();
+        for pid in &self.home_players_mvp {
+            out = out.with_event(GameEvent::MvpRoll {
+                team_id: home_id.clone(), player_id: pid.clone(), spp: mvp_spp,
+            });
+        }
+        for pid in &self.away_players_mvp {
+            out = out.with_event(GameEvent::MvpRoll {
+                team_id: away_id.clone(), player_id: pid.clone(), spp: mvp_spp,
+            });
+        }
+        out
     }
 }
 

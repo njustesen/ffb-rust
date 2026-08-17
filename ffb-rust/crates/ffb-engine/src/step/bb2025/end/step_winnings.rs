@@ -2,6 +2,7 @@ use ffb_model::model::game::Game;
 use ffb_model::report::mixed::report_winnings::ReportWinnings;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
+use ffb_model::events::GameEvent;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::StepId;
 
@@ -54,7 +55,23 @@ impl StepWinnings {
             game.game_result.away.winnings,
         ));
 
+        // Coverage: `GameEvent::WinningsRoll` is emitted only by the BB2016 twin, and the driver
+        // routes BB2020 and BB2025 here, so post-game winnings reported nothing across 8,700 games.
+        // BB2025 winnings are computed, not rolled, so `roll` is 0 and `base` carries the attendance
+        // that stands in for FAME. Report-only.
         StepOutcome::next()
+            .with_event(GameEvent::WinningsRoll {
+                team_id: game.team_home.id.clone(),
+                base: attendance as i32,
+                roll: 0,
+                total: game.game_result.home.winnings,
+            })
+            .with_event(GameEvent::WinningsRoll {
+                team_id: game.team_away.id.clone(),
+                base: attendance as i32,
+                roll: 0,
+                total: game.game_result.away.winnings,
+            })
     }
 }
 

@@ -1,6 +1,7 @@
 use ffb_model::enums::{Direction, PlayerAction};
 use ffb_model::types::{FieldCoordinate, MoveSquare};
 use ffb_model::model::game::Game;
+use ffb_model::events::GameEvent;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::report_scatter_ball::ReportScatterBall;
 use crate::action::Action;
@@ -33,6 +34,8 @@ pub struct StepMissedPass {
     pub direction_list: Vec<Direction>,
     /// Java: coordinateStart
     pub coordinate_start: Option<FieldCoordinate>,
+    /// `GameEvent::PassDeviate` parked by `deviate_from_thrower`, attached at `execute_step`'s exit.
+    pending_deviate: Option<GameEvent>,
     /// Java: coordinateEnd
     pub coordinate_end: Option<FieldCoordinate>,
     /// Java: lastValidCoordinate
@@ -59,6 +62,7 @@ impl StepMissedPass {
             roll_list: Vec::new(),
             direction_list: Vec::new(),
             coordinate_start: None,
+            pending_deviate: None,
             coordinate_end: None,
             last_valid_coordinate: None,
             direction: None,
@@ -169,7 +173,18 @@ impl StepMissedPass {
         }
 
         // Java: getResult().addReport(new ReportPassDeviate(coordinateEnd, direction, directionRoll,
-        //       distanceRoll, false)) — report infra deferred, as elsewhere in this step.
+        //       distanceRoll, false)).
+        //
+        // Coverage: `GameEvent::PassDeviate` is emitted only by the BB2020 twin of this file, which
+        // the driver never routes to (BB2016 has its own override, BB2020 and BB2025 both land
+        // here), so a wildly-inaccurate pass deviated without reporting it. Parked because this
+        // helper returns nothing; `execute_step` attaches it. Report-only.
+        if let Some(start) = self.coordinate_start {
+            self.pending_deviate = Some(GameEvent::PassDeviate {
+                from: start,
+                scatter_directions: vec![direction_roll, distance_roll],
+            });
+        }
     }
 
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
@@ -319,9 +334,15 @@ impl StepMissedPass {
             if let Some(lvc) = self.last_valid_coordinate {
                 outcome = outcome.publish(StepParameter::ThrowInCoordinate(lvc));
             }
-            outcome
+            match self.pending_deviate.take() {
+                Some(ev) => outcome.with_event(ev),
+                None => outcome,
+            }
         } else {
-            StepOutcome::next()
+            match self.pending_deviate.take() {
+                Some(ev) => StepOutcome::next().with_event(ev),
+                None => StepOutcome::next(),
+            }
         }
     }
 }
