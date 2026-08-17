@@ -7382,3 +7382,57 @@ Gate: necromantic 99/100, dwarf 92/100 (unchanged by this commit), workspace tes
 
 Remaining on this branch: dwarf 8 seeds and necromantic seed 37, both traceable to the value
 normalisation rather than to this change.
+
+## Cross-team matchups — the first coverage frontier past the mirror matrix
+
+All three mirror matrices are 30/30. That is a narrower claim than it sounds: the matrix only ever
+runs a roster against ITSELF, so a rule needing the ATTACKER to have one skill and the DEFENDER
+another is reachable only when a SINGLE roster carries both.
+
+`scripts/run_cross_matrix.py` runs non-mirror matchups, ranking pairs by how many such interactions
+they reach and weighting those NO roster can reach alone. In bb2020 five are mirror-unreachable:
+Chainsaw/Iron Hard Skin, Dirty Player/Iron Hard Skin, **Tackle/Dodge**, Stab/Regeneration,
+Bombardier/Foul Appearance. Tackle-cancels-Dodge is about as mainstream as Blood Bowl gets and had
+never been compared between the engines.
+
+Trap worth remembering: chaos_dwarf carries BOTH Stab and Iron Hard Skin, so its own mirror DOES
+reach the stab `ignoresArmourModifiersFromSkills` branch. Check both halves against one roster
+before claiming a mirror cannot reach a rule -- an earlier draft of this note got that wrong.
+
+FIRST RUN, 10 pairs x 25 seeds, bb2020: 9 green, 1 RED -- a real bug on the very first cross run.
+
+### OPEN: chaos_dwarf vs chaos_pact seed 16 step 82 (Animal Savagery on a HAND_OVER)
+
+away_02 (Animal Savagery) declares HAND_OVER. Both engines roll the confusion die and fail, and
+both decline the re-roll. Then:
+
+  JAVA  action lost, post-state == pre-state, next player activates
+  RUST  player reverts to a Move and MOVES to (13,7)
+
+Root cause is ORDERING, not a rule. Probes show Rust's `acting_player.player_action` is still
+`Move` when Animal Savagery runs, while Java's is already `HAND_OVER` (`JAVA_P2 action=HAND_OVER`
+precedes the die). Rust rolls it in the MOVE activation, before the declared hand-off is applied;
+Java changes the action first so the roll happens inside the Pass/HandOver sequence. The die count
+and target number agree (Move and HAND_OVER both give `goodConditions=false`), so the dice stay in
+step -- only the FAILURE LABEL differs: Rust routes to END_MOVING and keeps moving, Java to
+END_PASSING with `END_PLAYER_ACTION=true`, which pushes the EndPlayerAction sequence
+(`StepEndPassing:236`) and ends the activation.
+
+Ruled out along the way, each by direct evidence rather than inference:
+  - receiver eligibility: `legal_handoff_receivers` matches ParityRunner exactly (adjacent
+    teammates, NO state filter, coordinate-sorted) -- prone receivers included on both sides
+  - the EndPlayerAction publish: Rust's failure path DOES publish it
+  - StepResetToMove: faithful, no-ops without RESET_PLAYER_ACTION, same as Java
+  - StepEndPassing: has the same `end_turn || end_player_action` branch
+  - "Rust consumed 0 dice": WRONG, read off per-step `rng_calls`. Rust does roll -- the trace shows
+    `ReRollOffer { action: "ANIMAL_SAVAGERY" }`. Per-step rng_calls deltas are not a reliable dice
+    comparison; see the standing note on Java per-call vs Rust per-die counting.
+
+Needs (a) Animal Savagery, (b) a HandOff/Pass declaration, (c) a failed roll -- which is why 90
+green mirror matchups never hit it.
+
+LATENT, found while reading and NOT the cause here: `step_animal_savagery.rs` computes
+`do_roll` from the PERSISTENT `Player.used_skills` where Java uses the per-activation
+`UtilCards.hasUnusedSkill(actingPlayer, skill)`. Same bug class as the Unchannelled Fury fix
+(ITER124-126) and the documented `bone_head_behaviour.rs:99` case. Symptom would be a missing roll
+on a LATER activation, not this divergence, so it is recorded rather than fixed here.
