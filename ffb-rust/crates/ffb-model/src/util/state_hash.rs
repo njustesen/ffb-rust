@@ -106,9 +106,14 @@ fn player_state_str(base: u32) -> &'static str {
         b if b == PS_PRONE    => "Prone",
         b if b == PS_STUNNED  => "Stunned",
         b if b == PS_KNOCKED_OUT    => "Ko",
-        b if b == PS_BADLY_HURT     => "Injured",
-        b if b == PS_SERIOUS_INJURY => "Injured",
-        b if b == PS_RIP            => "Injured",
+        // The three casualty states used to collapse to one "Injured" label, so the compared hash
+        // could not tell a DEAD player from a bruised one: Rust could kill a player where Java
+        // merely badly-hurt it and every matchup stayed green. The coverage sweep made the risk
+        // concrete — 990 deaths per 8,700 games that nothing was checking. Must stay in lockstep
+        // with `ParityRunner.playerStateStr`.
+        b if b == PS_BADLY_HURT     => "Bh",
+        b if b == PS_SERIOUS_INJURY => "Si",
+        b if b == PS_RIP            => "Rip",
         _ => "Reserve",
     }
 }

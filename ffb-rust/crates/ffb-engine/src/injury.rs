@@ -161,20 +161,38 @@ impl InjuryContext {
     }
 
     // Outcome helpers (Java: isCasualty(), isKnockedOut(), getPlayerState())
+    //
+    // All of them route through `get_player_state()` exactly as Java's do
+    // (`InjuryContext.java:243-257`), so Decay's second roll is honoured everywhere, not just where
+    // someone remembered to look at `injury_decay`.
     pub fn is_knocked_out(&self) -> bool {
-        self.injury.map(|s| s.base() == PS_KNOCKED_OUT).unwrap_or(false)
+        self.get_player_state().map(|s| s.base() == PS_KNOCKED_OUT).unwrap_or(false)
     }
     pub fn is_casualty(&self) -> bool {
-        self.injury.map(|s| s.is_casualty()).unwrap_or(false)
+        self.get_player_state().map(|s| s.is_casualty()).unwrap_or(false)
     }
-    pub fn get_player_state(&self) -> Option<PlayerState> { self.injury }
+    /// Java `InjuryContext.getPlayerState()` (`:218-228`) — the WORSE of the primary casualty and
+    /// Decay's second roll, by raw state id.
+    ///
+    /// Rust stored `injury_decay` and then never read it: a BB2016 Decay player (Khemri mummy) took
+    /// the FIRST roll's result even when the second was worse. Java takes the worse, so a casualty
+    /// that Java resolved as SERIOUS_INJURY stayed BADLY_HURT in Rust — invisible until the state
+    /// hash stopped collapsing both to "Injured" (khemri bb2016 seed 6 i=9: h02, Java d6=3 then
+    /// decay d6=5 → Si, Rust kept the 3 → Bh).
+    pub fn get_player_state(&self) -> Option<PlayerState> {
+        match (self.injury, self.injury_decay) {
+            // Java compares raw ids and falls back to `getInjury()` whenever either is null.
+            (Some(injury), Some(decay)) if decay.0 > injury.0 => Some(decay),
+            _ => self.injury,
+        }
+    }
     pub fn get_defender_id(&self) -> Option<&str> { self.defender_id.as_deref() }
     pub fn set_injury(&mut self, state: PlayerState) { self.injury = Some(state); }
     pub fn set_armor_broken(&mut self, broken: bool) { self.armor_broken = broken; }
 
     // Java: isSeriousInjury() — true when injury state is SERIOUS_INJURY (casualty needing SI detail)
     pub fn is_serious_injury(&self) -> bool {
-        self.injury.map(|s| s.base() == PS_SERIOUS_INJURY).unwrap_or(false)
+        self.get_player_state().map(|s| s.base() == PS_SERIOUS_INJURY).unwrap_or(false)
     }
 
     // Java: isReserve()
@@ -294,7 +312,9 @@ impl InjuryResult {
             game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon = true;
         }
 
-        let new_state = match ctx.injury {
+        // Java `InjuryResult.applyTo` reads `injuryContext.getPlayerState()`, which is the WORSE of
+        // the casualty roll and Decay's second roll — not the raw `injury` field.
+        let new_state = match ctx.get_player_state() {
             Some(s) => s,
             None => return,
         };
@@ -1069,6 +1089,38 @@ mod tests {
         assert!(ctx.casualty_roll_decay.is_some(), "Decay must roll a fresh second casualty pair");
         assert_ne!(ctx.casualty_roll, ctx.casualty_roll_decay, "the decay roll must be independent dice, not a copy");
         assert!(ctx.injury_decay.is_some(), "Decay's second roll must be interpreted into an injury_decay outcome");
+    }
+
+    /// Java `InjuryContext.getPlayerState()` returns the WORSE of the casualty roll and Decay's
+    /// second roll. Rust stored `injury_decay` and never read it, so a Decay player took the FIRST
+    /// result even when the second was worse — khemri bb2016 seed 6 i=9, where Java rolled d6=3 then
+    /// decay d6=5 (SERIOUS_INJURY) and Rust kept the 3 (BADLY_HURT). Invisible until the state hash
+    /// stopped collapsing both states to "Injured".
+    #[test]
+    fn get_player_state_takes_the_worse_of_injury_and_decay() {
+        use ffb_model::enums::{PS_BADLY_HURT, PS_SERIOUS_INJURY, PS_RIP};
+        let worse_wins = |primary: u32, decay: u32| {
+            let mut ctx = InjuryContext::new(ffb_model::enums::ApothecaryMode::Defender);
+            ctx.injury = Some(PlayerState::new(primary));
+            ctx.injury_decay = Some(PlayerState::new(decay));
+            ctx.get_player_state().unwrap().base()
+        };
+        assert_eq!(worse_wins(PS_BADLY_HURT, PS_SERIOUS_INJURY), PS_SERIOUS_INJURY, "decay worse → decay");
+        assert_eq!(worse_wins(PS_SERIOUS_INJURY, PS_BADLY_HURT), PS_SERIOUS_INJURY, "decay better → primary");
+        assert_eq!(worse_wins(PS_BADLY_HURT, PS_RIP), PS_RIP);
+
+        // Java falls back to getInjury() whenever either side is null — including when only the
+        // decay roll exists, which must NOT resurrect a state from nothing.
+        let mut only_decay = InjuryContext::new(ffb_model::enums::ApothecaryMode::Defender);
+        only_decay.injury_decay = Some(PlayerState::new(PS_RIP));
+        assert!(only_decay.get_player_state().is_none());
+
+        // The outcome helpers must all see the worse state, not the raw field.
+        let mut ctx = InjuryContext::new(ffb_model::enums::ApothecaryMode::Defender);
+        ctx.injury = Some(PlayerState::new(PS_BADLY_HURT));
+        ctx.injury_decay = Some(PlayerState::new(PS_SERIOUS_INJURY));
+        assert!(ctx.is_serious_injury(), "is_serious_injury must route through get_player_state");
+        assert!(ctx.is_casualty());
     }
 
     /// bb2025 Decay must NOT roll a second casualty (mixed/Decay lacks requiresSecondCasualtyRoll).
