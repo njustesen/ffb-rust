@@ -86,12 +86,6 @@ engine code, not the co-editable harness.
 
 ## Remaining groups
 
-1. ~~Per-team turn-used flags~~ — done, iteration 2. `blitz_used` / `foul_used` / `hand_over_used` / `pass_used` — the
-   four Java's `TurnData` exposes. Today's `blitz_used` regression (a select-phase Foul Appearance
-   failure skipping the dispatch that set the flag, letting a team blitz twice) was caught only
-   *indirectly*, because the flag happened to change which actions the agent was offered. This field
-   would catch that class directly.
-   **Not** included: `ttm_used` / `ktm_used`. Java's `TurnData` has no accessor for them, and
-   `TurnData.java` is engine code — adding one is off-limits.
-2. **Per-team re-rolls remaining** (`getReRolls`).
+1. ~~Per-team turn-used flags~~ — done, iteration 2.
+2. **Per-team re-rolls remaining** (`TurnData.getReRolls()`).
 3. **Acting-player state** — who is activated, MA spent — if the first two land clean.
