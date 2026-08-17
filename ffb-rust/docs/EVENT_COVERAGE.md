@@ -26,16 +26,16 @@ without it, a variant no arm covers reads as zero and is indistinguishable from 
 
 | | count | share |
 |---|---:|---:|
-| Emitted in parity-verified games (**A**) | **57** | 45% |
+| Emitted in parity-verified games (**A**) | **63** | 49% |
 | Only under the uniform agent (**B**) | 1 | 1% |
-| Never emitted by either | **70** | 55% |
+| Never emitted by either | **64** | 50% |
 
-The 70 that never fire split four ways, and telling them apart is the whole point — a zero means
+The 73 that never fire split four ways, and telling them apart is the whole point — a zero means
 something completely different in each:
 
 | class | n | meaning |
 |---|---:|---|
-| **No emitter** | 33 | nothing anywhere constructs the event |
+| **No emitter** | 27 | nothing anywhere constructs the event |
 | **Dead path** | 15 | an emitter exists, but its step is *never dispatched* |
 | **Helper** | 7 | emitted from a helper, not a step — three from the superseded `step/engine.rs` |
 | **Gated** | 15 | the step runs; a condition or an edition twin blocks the event |
@@ -48,7 +48,7 @@ that never happens.
 
 ### Closed in the 2026-08-17 pass
 
-Twelve emission sites, no logic changes, parity re-gated at 30/30 on all three editions after each batch:
+Nine emission sites, no logic changes, parity re-gated at 30/30 on all three editions:
 
 | was | now | cause |
 |---|---|---|
@@ -59,9 +59,6 @@ Twelve emission sites, no logic changes, parity re-gated at 30/30 on all three e
 | 0 Foul Appearance rolls | 3,770 | no construction site anywhere in the engine |
 | 0 stand-up rolls | 8,323 | same |
 | 0 throw-team-mate rolls | 3,087 | same |
-| 0 pass deviations | 444 | emitter only in the bb2020 twin the driver never routes to |
-| 0 MVP awards | 17,392 | emitter only in the bb2020 twin; the step runs every game |
-| 0 winnings rolls | 17,392 | emitter only in the bb2016 twin; same |
 
 `ReRoll` was deliberately left out: emitting it means threading a return value through
 `use_reroll`, and the parity agent declines team re-rolls by contract, so it would still read ~0.
@@ -76,12 +73,11 @@ hash cannot see. Worth a direct check.
 
 ## 1. Never emitted, by class
 
-### No emitter — nothing constructs the event (33)
+### No emitter — nothing constructs the event (27)
 
 | event | detail |
 |---|---|
 | `balefulHexRoll` | no construction site anywhere |
-| `ballPickedUp` | no construction site anywhere |
 | `ballScattered` | no construction site anywhere |
 | `bombExplodesAfterCatch` | no construction site anywhere |
 | `breatheFireRoll` | no construction site anywhere |
@@ -94,24 +90,19 @@ hash cannot see. Worth a direct check.
 | `heatExhaustion` | no construction site anywhere |
 | `hypnoticGazeRoll` | no construction site anywhere |
 | `jumpRoll` | no construction site anywhere |
-| `kickoffPitchInvasionStun` | no construction site anywhere |
 | `kickoffThrowARock` | no construction site anywhere |
 | `lonerRoll` | no construction site anywhere |
 | `lookIntoMyEyesRoll` | no construction site anywhere |
 | `passBlockEligible` | no construction site anywhere |
 | `pilingOn` | no construction site anywhere |
 | `playCard` | no construction site anywhere |
-| `prayerRoll` | no construction site anywhere |
 | `proRoll` | no construction site anywhere |
 | `reRoll` | no construction site anywhere |
-| `regenerationRoll` | no construction site anywhere |
-| `rightStuffRoll` | no construction site anywhere |
 | `riotousRookies` | no construction site anywhere |
 | `secretWeaponBan` | no construction site anywhere |
 | `specialEffectRoll` | no construction site anywhere |
 | `teamCaptainRoll` | no construction site anywhere |
 | `timeoutEnforced` | no construction site anywhere |
-| `turnEnd` | no construction site anywhere |
 | `weepingDaggerRoll` | no construction site anywhere |
 
 ### Dead path — emitter exists, step never dispatched (15)
@@ -170,59 +161,65 @@ hash cannot see. Worth a direct check.
 
 | event | A (8,700 games) | B (2,175 games) | bb2016 | bb2020 | bb2025 |
 |---|---:|---:|---:|---:|---:|
-| `playerAction` | 2,407,020 | 227,639 | 795,493 | 809,035 | 802,492 |
-| `playerMoved` | 1,466,828 | 920,887 | 0 | 737,217 | 729,611 |
-| `confusionRoll` | 180,380 | 16,825 | 69,252 | 51,506 | 59,622 |
-| `injury` | 139,459 | 71,064 | 47,158 | 46,373 | 45,928 |
-| `block` | 108,151 | 16,066 | 36,192 | 35,925 | 36,034 |
-| `blockRoll` | 71,959 | 10,734 | 0 | 35,925 | 36,034 |
-| `playerFellDown` | 55,106 | 41,601 | 0 | 28,000 | 27,106 |
-| `dodgeRoll` | 51,553 | 31,045 | 0 | 25,412 | 26,141 |
-| `pushback` | 44,807 | 6,648 | 0 | 22,506 | 22,301 |
-| `scatterBall` | 27,792 | 6,673 | 9,411 | 9,195 | 9,186 |
+| `playerAction` | 2,407,020 | 227,869 | 795,493 | 809,035 | 802,492 |
+| `playerMoved` | 1,466,828 | 920,905 | 0 | 737,217 | 729,611 |
+| `turnEnd` | 293,933 | 70,107 | 97,843 | 98,054 | 98,036 |
+| `confusionRoll` | 180,380 | 16,849 | 69,252 | 51,506 | 59,622 |
+| `injury` | 139,459 | 71,105 | 47,158 | 46,373 | 45,928 |
+| `block` | 108,151 | 16,121 | 36,192 | 35,925 | 36,034 |
+| `blockRoll` | 71,959 | 10,732 | 0 | 35,925 | 36,034 |
+| `playerFellDown` | 55,106 | 41,603 | 0 | 28,000 | 27,106 |
+| `dodgeRoll` | 51,553 | 31,034 | 0 | 25,412 | 26,141 |
+| `pushback` | 44,807 | 6,645 | 0 | 22,506 | 22,301 |
+| `scatterBall` | 27,792 | 6,695 | 9,411 | 9,195 | 9,186 |
 | `bloodLustRoll` | 24,844 | 2,523 | 6,115 | 8,283 | 10,446 |
-| `refereeSpotsFoul` | 22,438 | 4,228 | 7,598 | 7,410 | 7,430 |
-| `foul` | 22,438 | 4,228 | 7,598 | 7,410 | 7,430 |
-| `kickoffScatter` | 17,397 | 4,341 | 5,797 | 5,800 | 5,800 |
-| `kickoffResultEvent` | 17,397 | 4,309 | 5,797 | 5,800 | 5,800 |
-| `startHalf` | 17,397 | 4,240 | 5,797 | 5,800 | 5,800 |
-| `winningsRoll` | 17,392 | 4,108 | 5,792 | 5,800 | 5,800 |
-| `mvpRoll` | 17,392 | 4,108 | 5,792 | 5,800 | 5,800 |
-| `animalSavagery` | 12,487 | 1,172 | 0 | 8,473 | 4,014 |
-| `catchRoll` | 10,340 | 2,891 | 4,020 | 2,962 | 3,358 |
+| `refereeSpotsFoul` | 22,438 | 4,184 | 7,598 | 7,410 | 7,430 |
+| `foul` | 22,438 | 4,184 | 7,598 | 7,410 | 7,430 |
+| `kickoffScatter` | 17,397 | 4,340 | 5,797 | 5,800 | 5,800 |
+| `kickoffResultEvent` | 17,397 | 4,308 | 5,797 | 5,800 | 5,800 |
+| `startHalf` | 17,397 | 4,241 | 5,797 | 5,800 | 5,800 |
+| `winningsRoll` | 17,392 | 4,110 | 5,792 | 5,800 | 5,800 |
+| `mvpRoll` | 17,392 | 4,110 | 5,792 | 5,800 | 5,800 |
+| `animalSavagery` | 12,487 | 1,173 | 0 | 8,473 | 4,014 |
+| `catchRoll` | 10,340 | 2,878 | 4,020 | 2,962 | 3,358 |
 | `apothecaryRoll` | 9,372 | 0 | 2,043 | 4,100 | 3,229 |
-| `standUpRoll` | 8,323 | 1,133 | 2,791 | 2,745 | 2,787 |
-| `skillUse` | 7,665 | 1,078 | 2,388 | 2,726 | 2,551 |
-| `passRoll` | 7,054 | 1,990 | 2,577 | 2,130 | 2,347 |
+| `standUpRoll` | 8,323 | 1,126 | 2,791 | 2,745 | 2,787 |
+| `skillUse` | 7,665 | 1,065 | 2,388 | 2,726 | 2,551 |
+| `passRoll` | 7,054 | 2,003 | 2,577 | 2,130 | 2,347 |
 | `biteSpectator` | 5,391 | 429 | 1,040 | 2,052 | 2,299 |
-| `argueTheCall` | 4,428 | 851 | 1,479 | 1,478 | 1,471 |
-| `pickupRoll` | 4,362 | 1,682 | 0 | 2,134 | 2,228 |
-| `playerEjected` | 4,146 | 790 | 1,520 | 1,352 | 1,274 |
+| `argueTheCall` | 4,428 | 836 | 1,479 | 1,478 | 1,471 |
+| `pickupRoll` | 4,362 | 1,681 | 0 | 2,134 | 2,228 |
+| `playerEjected` | 4,146 | 774 | 1,520 | 1,352 | 1,274 |
 | `goForItRoll` | 4,090 | 214,536 | 0 | 1,667 | 2,423 |
-| `foulAppearanceRoll` | 3,770 | 640 | 1,127 | 1,230 | 1,413 |
-| `handOver` | 3,332 | 1,051 | 1,339 | 947 | 1,046 |
+| `foulAppearanceRoll` | 3,770 | 642 | 1,127 | 1,230 | 1,413 |
+| `handOver` | 3,332 | 1,043 | 1,339 | 947 | 1,046 |
 | `throwTeamMateRoll` | 3,087 | 0 | 1,593 | 0 | 1,494 |
+| `ballPickedUp` | 2,694 | 1,069 | 0 | 1,321 | 1,373 |
 | `scatterPlayer` | 2,552 | 878 | 657 | 503 | 1,392 |
-| `weatherChange` | 2,350 | 580 | 960 | 701 | 689 |
+| `weatherChange` | 2,350 | 581 | 960 | 701 | 689 |
 | `cheeringFans` | 1,930 | 496 | 0 | 937 | 993 |
 | `kickoffExtraReRoll` | 1,847 | 494 | 0 | 951 | 896 |
-| `kickoffExtraReRollBb2016` | 1,632 | 451 | 1,632 | 0 | 0 |
+| `kickoffExtraReRollBb2016` | 1,632 | 452 | 1,632 | 0 | 0 |
 | `quickSnapRoll` | 1,198 | 387 | 0 | 609 | 589 |
+| `regenerationRoll` | 1,190 | 755 | 404 | 363 | 423 |
 | `solidDefenceRoll` | 971 | 163 | 0 | 477 | 494 |
+| `kickoffPitchInvasionStun` | 823 | 200 | 0 | 405 | 418 |
+| `prayerRoll` | 753 | 154 | 0 | 753 | 0 |
+| `rightStuffRoll` | 735 | 0 | 0 | 0 | 735 |
 | `kickoffTimeout` | 555 | 99 | 0 | 273 | 282 |
 | `blitzRoll` | 551 | 208 | 0 | 551 | 0 |
 | `passDeviate` | 444 | 97 | 0 | 444 | 0 |
 | `kickoffPitchInvasion` | 424 | 154 | 0 | 214 | 210 |
-| `dauntlessRoll` | 423 | 73 | 222 | 75 | 126 |
-| `kickoffThrowARockBb2016` | 326 | 109 | 326 | 0 | 0 |
-| `kickoffRiot` | 321 | 80 | 321 | 0 | 0 |
+| `dauntlessRoll` | 423 | 71 | 222 | 75 | 126 |
+| `kickoffThrowARockBb2016` | 326 | 120 | 326 | 0 | 0 |
+| `kickoffRiot` | 321 | 74 | 321 | 0 | 0 |
 | `passBlock` | 299 | 29 | 0 | 141 | 158 |
 | `kickoffOfficiousRef` | 269 | 38 | 0 | 269 | 0 |
 | `dodgySnackRoll` | 269 | 40 | 0 | 0 | 269 |
 | `kickoffDodgySnack` | 240 | 35 | 0 | 0 | 240 |
 | `alwaysHungry` | 228 | 0 | 0 | 0 | 228 |
 | `animosityRoll` | 129 | 79 | 0 | 56 | 73 |
-| `throwIn` | 124 | 64 | 20 | 87 | 17 |
+| `throwIn` | 124 | 63 | 20 | 87 | 17 |
 | `kickoffPitchInvasionBb2016` | 112 | 32 | 112 | 0 | 0 |
 | `playerAdded` | 59 | 41 | 37 | 6 | 16 |
 | `escapeRoll` | 36 | 0 | 0 | 0 | 36 |
@@ -278,22 +275,24 @@ the agent simply never declares the action.
 | animosity rolls | 129 | 102 | 27 | 0 |
 | confusion rolls | 180,380 | 105,546 | 74,834 | 0 |
 | escape rolls | 36 | 31 | 5 | 0 |
+| right stuff rolls | 735 | 735 | 0 | 0 |
 | stand up rolls | 8,323 | 4,272 | 4,051 | 0 |
 | argue the call rolls | 4,428 | 719 | 3,709 | 0 |
 | animal savagery rolls | 12,487 | 6,829 | 5,658 | 0 |
 | referee spots foul rolls | 22,438 | 4,521 | 17,917 | 0 |
+| regeneration rolls | 1,190 | 602 | 588 | 0 |
 
-**23 roll counters read zero.** Several are instrumentation gaps from section 1 rather than
+**21 roll counters read zero.** Several are instrumentation gaps from section 1 rather than
 unrolled dice (`foul_appearance_rolls`, `stand_up_rolls`, `regeneration_rolls`, `loner_rolls`,
 `pro_rolls`, `right_stuff_rolls`):
 
 ```
 interception_rolls, jump_rolls, jump_up_rolls, loner_rolls
-pro_rolls, hypnotic_gaze_rolls, right_stuff_rolls, safe_throw_rolls
-pick_me_up_rolls, breathe_fire_rolls, projectile_vomit_rolls, baleful_hex_rolls
-look_into_my_eyes_rolls, weeping_dagger_rolls, bribes_rolls, biased_ref_rolls
-then_i_started_blastin_rolls, keg_throws, throw_at_stalling_player_rolls, throw_at_player_rolls
-fumblerooskie_uses, all_you_can_eat_rolls, regeneration_rolls
+pro_rolls, hypnotic_gaze_rolls, safe_throw_rolls, pick_me_up_rolls
+breathe_fire_rolls, projectile_vomit_rolls, baleful_hex_rolls, look_into_my_eyes_rolls
+weeping_dagger_rolls, bribes_rolls, biased_ref_rolls, then_i_started_blastin_rolls
+keg_throws, throw_at_stalling_player_rolls, throw_at_player_rolls, fumblerooskie_uses
+all_you_can_eat_rolls
 ```
 
 ### Block dice
@@ -332,19 +331,19 @@ Never seen: `Caught`, `MissedCatch`, and the `PassToPartner` distance.
 | armor_only | 100,622 | 34,470 | 33,521 | 32,631 |
 | ko | 9,054 | 2,962 | 3,053 | 3,039 |
 | cas | 7,071 | 2,370 | 2,211 | 2,490 |
-| dead | 990 | 451 | 248 | 291 |
+| dead | 996 | 457 | 248 | 291 |
 
 | lasting injury | count |
 |---|---:|
-| Dead | 990 |
-| DislocatedHipAg | 295 |
+| Dead | 996 |
 | HeadInjuryAv | 295 |
+| DislocatedHipAg | 295 |
 | NeckInjuryAg | 248 |
 | DislocatedShoulderSt | 243 |
 | BrokenArmPa | 224 |
 | SmashedKneeMa | 222 |
 
-> **Lead worth chasing.** 7,071 casualties produced 2,517 lasting injuries, all six of them
+> **Lead worth chasing.** 7,071 casualties produced 2,523 lasting injuries, all six of them
 > in the -1-stat band. `SeriouslyHurt`, `SeriousInjuryNi` (niggling) and `Dead` never appear, and
 > **zero deaths in 7,071 casualties** is hard to square with a d16 table where 15-16 is Dead:
 > `bb2020/roll_mechanic.rs:121` rolls a real `rng.die(16)`, so the band is reachable. Either the
@@ -398,7 +397,7 @@ gap in this report, and partly an artefact of section 1: a skill that fires with
 | | bb2016 | bb2020 | bb2025 |
 |---|---:|---:|---:|
 | games | 2,900 | 2,900 | 2,900 |
-| distinct event types | 33 | 48 | 49 |
+| distinct event types | 35 | 53 | 54 |
 | fouls | 7,598 | 7,410 | 7,430 |
 | players ejected | 1,520 | 1,352 | 1,274 |
 | weather changes | 960 | 701 | 689 |
