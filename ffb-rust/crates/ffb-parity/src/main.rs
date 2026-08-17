@@ -195,6 +195,7 @@ fn main() {
         std::fs::write("FULL_MECHANIC_COVERAGE.md", &md).ok();
         let json = serde_json::to_string(&cov).expect("coverage serialization failed");
         std::fs::write("uniform_coverage.html", coverage_report::generate_html(&json)).ok();
+        std::fs::write("coverage_uniform.json", &json).ok();
         println!("\n{md}");
         println!("Coverage written to FULL_MECHANIC_COVERAGE.md and uniform_coverage.html ({} games)", cov.games);
         if !ok {
@@ -207,37 +208,80 @@ fn main() {
     // ── Coverage mode ────────────────────────────────────────────────────────────
     // Uses the full RandomAgent (players activate and take real actions) to collect
     // the broadest possible event coverage. No Java invocation or parity comparison.
+    // `--all-rosters` / `--all-editions` sweep here exactly as they do for `--uniform`, so the
+    // parity agent's reachable surface can be measured in ONE run instead of 90 shell-outs into a
+    // fixed `coverage.html` path. A per-edition JSON is written alongside the combined one: the
+    // editions do NOT cover the same mechanics (BB2016 has no Prayers, BB2020/25 have no
+    // apothecary-on-KO, …), so a single merged total hides exactly the gaps worth seeing.
     if args.coverage {
-        println!("Coverage run: {} vs {} ({}) — {} seeds", args.home, args.away, args.edition, total);
-        let mut cov = coverage_report::CoverageReport::default();
-        cov.matchups.push(coverage_report::MatchupSummary {
-            home: args.home.clone(),
-            away: args.away.clone(),
-            seeds: total as u32,
-            home_wins: 0, away_wins: 0, draws: 0,
-            touchdowns_home: 0, touchdowns_away: 0,
-        });
-        for seed in args.seed_start..=args.seed_end {
-            let (events, home_score, away_score) =
-                runner::run_coverage_game(seed, &args.home, &args.away, &args.edition);
-            for ev in &events { cov.tally(ev); }
-            cov.games += 1;
-            cov.touchdowns_home += home_score as u32;
-            cov.touchdowns_away += away_score as u32;
-            if let Some(m) = cov.matchups.last_mut() {
-                m.touchdowns_home += home_score as u32;
-                m.touchdowns_away += away_score as u32;
-                if home_score > away_score { cov.home_wins += 1; m.home_wins += 1; }
-                else if away_score > home_score { cov.away_wins += 1; m.away_wins += 1; }
-                else { cov.draws += 1; m.draws += 1; }
+        let editions: Vec<String> = if args.all_editions {
+            vec!["bb2016".into(), "bb2020".into(), "bb2025".into()]
+        } else {
+            vec![args.edition.clone()]
+        };
+        let n_threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).max(1);
+        let mut combined = coverage_report::CoverageReport::default();
+
+        for edition in &editions {
+            let matchups: Vec<(String, String)> = if args.all_rosters {
+                runner::roster_names_for_edition(edition).into_iter().map(|r| (r.clone(), r)).collect()
+            } else {
+                vec![(args.home.clone(), args.away.clone())]
+            };
+            let mut per_edition = coverage_report::CoverageReport::default();
+
+            for (home, away) in &matchups {
+                println!("Coverage run: {home} vs {away} ({edition}) — {total} seeds");
+                let mut summary = coverage_report::MatchupSummary {
+                    home: home.clone(), away: away.clone(), seeds: total as u32,
+                    home_wins: 0, away_wins: 0, draws: 0,
+                    touchdowns_home: 0, touchdowns_away: 0,
+                };
+                let seeds: Vec<u64> = (args.seed_start..=args.seed_end).collect();
+                for chunk in seeds.chunks(n_threads.max(1)) {
+                    let results: Vec<(Vec<ffb_model::events::GameEvent>, i32, i32)> =
+                        std::thread::scope(|scope| {
+                            let handles: Vec<_> = chunk.iter().map(|&seed| {
+                                let home = home.clone();
+                                let away = away.clone();
+                                let edition = edition.clone();
+                                scope.spawn(move || runner::run_coverage_game(seed, &home, &away, &edition))
+                            }).collect();
+                            handles.into_iter().map(|h| h.join().expect("coverage game thread panicked")).collect()
+                        });
+                    for (events, home_score, away_score) in results {
+                        for ev in &events { per_edition.tally(ev); combined.tally(ev); }
+                        for c in [&mut per_edition, &mut combined] {
+                            c.games += 1;
+                            c.touchdowns_home += home_score as u32;
+                            c.touchdowns_away += away_score as u32;
+                            if home_score > away_score { c.home_wins += 1; }
+                            else if away_score > home_score { c.away_wins += 1; }
+                            else { c.draws += 1; }
+                        }
+                        summary.touchdowns_home += home_score as u32;
+                        summary.touchdowns_away += away_score as u32;
+                        if home_score > away_score { summary.home_wins += 1; }
+                        else if away_score > home_score { summary.away_wins += 1; }
+                        else { summary.draws += 1; }
+                    }
+                }
+                per_edition.matchups.push(summary.clone());
+                combined.matchups.push(summary);
             }
-            println!("  seed {seed} done ({home_score}-{away_score})");
+
+            per_edition.skill_names = coverage_report::build_skill_names();
+            let json = serde_json::to_string(&per_edition).expect("coverage serialization failed");
+            std::fs::write(format!("coverage_{edition}.json"), &json).ok();
+            println!("  wrote coverage_{edition}.json ({} games)", per_edition.games);
         }
-        cov.skill_names = coverage_report::build_skill_names();
-        let json = serde_json::to_string(&cov).expect("coverage serialization failed");
-        let html = coverage_report::generate_html(&json);
-        std::fs::write("coverage.html", &html).expect("failed to write coverage.html");
-        println!("Coverage report written to coverage.html ({} games)", cov.games);
+
+        combined.skill_names = coverage_report::build_skill_names();
+        let json = serde_json::to_string(&combined).expect("coverage serialization failed");
+        std::fs::write("coverage.json", &json).ok();
+        std::fs::write("coverage.html", coverage_report::generate_html(&json))
+            .expect("failed to write coverage.html");
+        println!("Coverage report written to coverage.html / coverage.json ({} games)", combined.games);
         return;
     }
 

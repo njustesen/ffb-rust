@@ -225,9 +225,27 @@ pub struct CoverageReport {
     // ── Diagnostics fed from outside tally() (e.g. UniformAgent unhandled-prompt
     // tracking) — not populated by `tally()` itself, see `record_unhandled_prompt`.
     pub unhandled_prompts: HashMap<String, u32>,
+
+    /// Raw count per `GameEvent` serde tag, taken straight off the event rather than from a
+    /// hand-written `tally()` arm.
+    ///
+    /// Every field above needs its own match arm, so a variant nobody wrote an arm for reads as
+    /// zero and is indistinguishable from one the engine never emits — the exact confusion a
+    /// coverage report exists to prevent. This map is derived from the serialised tag, so it
+    /// counts all ~130 variants whether or not `tally()` knows about them.
+    pub event_type_counts: HashMap<String, u32>,
 }
 
-#[derive(Serialize)]
+/// The `#[serde(tag = "type", rename_all = "camelCase")]` discriminant of a `GameEvent`.
+/// Serialising just to read the tag is not free, but this runs in analysis tools, not the engine.
+fn event_type_name(ev: &GameEvent) -> String {
+    serde_json::to_value(ev)
+        .ok()
+        .and_then(|v| v.get("type").and_then(|t| t.as_str()).map(str::to_string))
+        .unwrap_or_else(|| "<unserialisable>".to_string())
+}
+
+#[derive(Serialize, Clone)]
 pub struct MatchupSummary {
     pub home: String,
     pub away: String,
@@ -241,6 +259,7 @@ pub struct MatchupSummary {
 
 impl CoverageReport {
     pub fn tally(&mut self, ev: &GameEvent) {
+        *self.event_type_counts.entry(event_type_name(ev)).or_default() += 1;
         match ev {
             GameEvent::DodgeRoll { success, rerolled, .. } =>
                 self.dodge_rolls.record(*success, *rerolled),
