@@ -31,6 +31,14 @@ pub struct StepFoulAppearance {
     pub re_roll_state: ReRollState,
     /// Roll value (0 = not yet rolled)
     pub roll: i32,
+    /// True for the copy of this step that sits in the SELECT sequence (`StepParameter::InSelect`).
+    ///
+    /// `bb2020/SelectBlitzTarget.java:35` rolls Foul Appearance in the blitz's SELECT phase —
+    /// after BLOOD_LUST, BEFORE JUMP_UP/STAND_UP and before the blitz's GO_FOR_IT — while
+    /// `bb2025/BlitzBlock.java:37` rolls it inside the block sequence, after GO_FOR_IT. Rust runs
+    /// the BB2025 step-set for BB2020 games, so the select copy exists in every edition and this
+    /// flag makes it a no-op except for the one case Java puts there: a BB2020 blitz.
+    pub in_select: bool,
 }
 
 impl StepFoulAppearance {
@@ -39,10 +47,21 @@ impl StepFoulAppearance {
             goto_label_on_failure: goto_label_on_failure.into(),
             re_roll_state: ReRollState::new(),
             roll: 0,
+            in_select: false,
         }
     }
 
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // The SELECT-sequence copy only stands in for `bb2020/SelectBlitzTarget.java:35`; every
+        // other edition/action rolls Foul Appearance from its own sequence, so skip silently here
+        // (a second roll would consume an extra die and desync the whole stream).
+        if self.in_select
+            && !(game.rules == ffb_model::enums::Rules::Bb2020
+                && game.acting_player.player_action.map(|pa| pa.is_blitzing()).unwrap_or(false))
+        {
+            return StepOutcome::next();
+        }
+
         // Java: resolve defender from TargetSelectionState (if selected+committed) or game.defender_id
         let defender_id = {
             let from_ts = game.field_model.target_selection_state.as_ref()
@@ -68,6 +87,23 @@ impl StepFoulAppearance {
 
         if !defender_has_fa || attacker_cancels {
             return StepOutcome::next();
+        }
+
+        // Java runs the BB2020 blitz's Foul Appearance exactly once, in SelectBlitzTarget. Rust has
+        // to carry TWO copies of that one roll: the SELECT sequence covers a PRONE blitzer (whose
+        // select body runs, standing it up), the EndSelecting blitz-dispatch prepend covers a
+        // STANDING one (whose select body is force-gotoed straight to END_SELECTING). Only one of
+        // them may roll — mark the activation on the first, and bail out on the second. Cleared with
+        // the rest of `used_skills` when the acting player changes, and NOT consulted by the
+        // blitz-block copy, so a Frenzy re-block still rolls again as Java does.
+        if self.in_select {
+            let first_entry = self.re_roll_state.re_rolled_action.is_none();
+            if first_entry {
+                if game.acting_player.used_skills.contains(&SkillId::FoulAppearance) {
+                    return StepOutcome::next();
+                }
+                game.acting_player.used_skills.insert(SkillId::FoulAppearance);
+            }
         }
 
         // Java: if (FOUL_APPEARANCE == reRolledAction)
@@ -173,11 +209,21 @@ impl StepFoulAppearance {
         game.turn_data_mut().turn_started = true;
 
         // Java: targetSelectionState.failed(); if blitzing → blitzUsed = true
+        let is_blitzing = player_action.map(|pa| pa.is_blitzing()).unwrap_or(false);
         if let Some(ref mut ts) = game.field_model.target_selection_state {
             ts.failed();
-            if player_action.map(|pa| pa.is_blitzing()).unwrap_or(false) {
+            if is_blitzing {
                 game.turn_data_mut().blitz_used = true;
             }
+        } else if self.in_select && is_blitzing {
+            // The select-phase copy runs BEFORE StepInitBlocking builds the TargetSelectionState, so
+            // Java's `targetSelectionState != null` guard cannot be read literally here — in Java the
+            // state always exists by this point, because StepSelectBlitzTarget created it at the top
+            // of the same sequence. Mark the blitz used anyway: this failure skips the EndSelecting
+            // blitz dispatch (the only other place Rust sets the flag), and leaving it false let the
+            // team blitz a second time in the same turn — nurgle mirror seed 6 i=39, where away_02
+            // was offered a Block that Java had already filtered out.
+            game.turn_data_mut().blitz_used = true;
         }
 
         // Java (bb2025 FoulAppearanceBehaviour.handleFailure): if (GAZE || blockAction || blitzing)
@@ -226,6 +272,7 @@ impl Step for StepFoulAppearance {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             StepParameter::GotoLabelOnFailure(v) => { self.goto_label_on_failure = v.clone(); true }
+            StepParameter::InSelect(v) => { self.in_select = *v; true }
             _ => false,
         }
     }
@@ -336,6 +383,61 @@ mod tests {
         let accepted = step.set_parameter(&StepParameter::GotoLabelOnFailure("new_label".into()));
         assert!(accepted);
         assert_eq!(step.goto_label_on_failure, "new_label");
+    }
+
+    /// The SELECT-sequence copy stands in for `bb2020/SelectBlitzTarget.java:35` and must roll for
+    /// a BB2020 blitz only — anything else already rolls Foul Appearance from its own sequence, so
+    /// a second roll here would eat a die and desync the stream.
+    #[test]
+    fn in_select_copy_only_rolls_for_a_bb2020_blitz() {
+        use ffb_model::enums::{PlayerAction, Rules};
+        let run = |rules: Rules, action: PlayerAction| {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+            game.turn_mode = TurnMode::Regular;
+            game.home_playing = true;
+            game.turn_data_home.rerolls = 0;
+            add_player(&mut game, "atk", vec![]);
+            add_player(&mut game, "def", vec![SkillId::FoulAppearance]);
+            game.acting_player.player_id = Some("atk".into());
+            game.acting_player.player_action = Some(action);
+            game.defender_id = Some("def".into());
+            let mut step = StepFoulAppearance::new("fa_fail");
+            step.in_select = true;
+            step.roll = 1; // a failure, so a roll that happens is unmistakable
+            step.start(&mut game, &mut GameRng::new(0))
+        };
+        assert_eq!(run(Rules::Bb2020, PlayerAction::Blitz).action, StepAction::GotoLabel);
+        assert_eq!(run(Rules::Bb2020, PlayerAction::Block).action, StepAction::NextStep);
+        assert_eq!(run(Rules::Bb2025, PlayerAction::Blitz).action, StepAction::NextStep);
+    }
+
+    /// A BB2020 blitz carries the select copy TWICE — once in the select sequence (prone blitzer),
+    /// once in the EndSelecting dispatch prepend (standing blitzer) — because only one of the two
+    /// ever runs. If both were to run, the second must not roll again.
+    #[test]
+    fn in_select_copy_rolls_only_once_per_activation() {
+        use ffb_model::enums::{PlayerAction, Rules};
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        add_player(&mut game, "atk", vec![]);
+        add_player(&mut game, "def", vec![SkillId::FoulAppearance]);
+        game.acting_player.player_id = Some("atk".into());
+        game.acting_player.player_action = Some(PlayerAction::Blitz);
+        game.defender_id = Some("def".into());
+
+        let mut first = StepFoulAppearance::new("fa_fail");
+        first.in_select = true;
+        let mut rng = GameRng::new(0);
+        first.start(&mut game, &mut rng);
+        let after_first = rng.call_count;
+
+        let mut second = StepFoulAppearance::new("fa_fail");
+        second.in_select = true;
+        let out = second.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(rng.call_count, after_first, "the second copy must not roll a die");
     }
 
     #[test]

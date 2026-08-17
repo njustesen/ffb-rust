@@ -50,6 +50,21 @@ impl Select {
             .with_failure_label(fl)
             .add_to(&mut seq);
 
+        // 2b FOUL_APPEARANCE — BB2020 blitz only, gated at runtime inside the step.
+        //
+        // `bb2020/SelectBlitzTarget.java:35` rolls Foul Appearance right after BLOOD_LUST, i.e.
+        // BEFORE JUMP_UP/STAND_UP and before the blitz's GO_FOR_IT; `bb2025/BlitzBlock.java:37`
+        // rolls it inside the block sequence instead. Rust's agent commits blitz+target in one
+        // command, so SelectBlitzTarget never runs and the roll used to land in the shared BB2025
+        // blitz-block position — three dice late for a BB2020 blitz (nurgle-vs-undead seed 1 i=20:
+        // Rust rolled GFI 5 / FA 1, Java rolled FA 5 / GFI 1). This is the Java position; the step
+        // no-ops (see `in_select`) for every other edition and action, and `blitz_block.rs` drops
+        // its own copy under BB2020 so the roll still happens exactly once.
+        seq.add(StepId::FoulAppearance, vec![
+            StepParameter::GotoLabelOnFailure(fl.into()),
+            StepParameter::InSelect(true),
+        ]);
+
         // 3 GOTO_LABEL → NEXT (alternate → END_SELECTING)
         seq.add(StepId::GotoLabel, vec![
             StepParameter::GotoLabel(labels::NEXT.into()),
@@ -136,6 +151,21 @@ mod tests {
         let steps = Select::build_sequence(&params);
         let end = steps.iter().find(|s| s.step_id == StepId::EndSelecting).unwrap();
         assert!(end.params.iter().any(|p| matches!(p, StepParameter::BlockTargets(v) if v == &vec!["p1".to_string()])));
+    }
+
+    /// `bb2020/SelectBlitzTarget.java:35` rolls FOUL_APPEARANCE after BLOOD_LUST and before
+    /// JUMP_UP/STAND_UP. The step itself no-ops outside a BB2020 blitz, but its POSITION here is
+    /// what puts the roll ahead of the stand-up and of the blitz's GO_FOR_IT.
+    #[test]
+    fn foul_appearance_sits_between_the_activation_and_jump_up() {
+        let steps = Select::build_sequence(&SelectParams::default());
+        let fa = steps.iter().position(|s| s.step_id == StepId::FoulAppearance).unwrap();
+        let blood_lust = steps.iter().position(|s| s.step_id == StepId::BloodLust).unwrap();
+        let jump_up = steps.iter().position(|s| s.step_id == StepId::JumpUp).unwrap();
+        let stand_up = steps.iter().position(|s| s.step_id == StepId::StandUp).unwrap();
+        assert!(blood_lust < fa && fa < jump_up && jump_up < stand_up);
+        assert!(steps[fa].params.iter().any(|p| matches!(p, StepParameter::InSelect(true))),
+            "the select copy must be flagged so it no-ops outside a BB2020 blitz");
     }
 
     #[test]

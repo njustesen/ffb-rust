@@ -396,14 +396,26 @@ impl StepEndSelecting {
                 ActivationSequenceBuilder::new()
                     .with_failure_label(labels::END_BLOCKING)
                     .add_to(&mut activation);
-                // NOTE (ITER77, NOT landed): `bb2020/SelectBlitzTarget.java:35` runs FOUL_APPEARANCE
-                // at the end of the blitz activation, which the BB2025 `ActivationSequenceBuilder`
-                // borrowed here does not — so a BB2020 blitz never rolls against a Foul Appearance
-                // defender (nurgle bb2020 seed 2 i=32). Adding the step here AND setting
-                // `game.defender_id` at dispatch so it has a defender to read took nurgle from
-                // 86/100 to 0/100: setting `defender_id` this early is visible to every step in the
-                // activation, not just this one. See docs/PARITY_BB2020_CAMPAIGN.md ITER77 — the
-                // defender has to reach StepFoulAppearance as a step PARAMETER, not via game state.
+                // `bb2020/SelectBlitzTarget.java:35` runs FOUL_APPEARANCE at the END of the blitz
+                // activation — after BLOOD_LUST, before JUMP_UP/STAND_UP and before the block's
+                // GO_FOR_IT — while the BB2025 sequence Rust shares rolls it inside BlitzBlock,
+                // after GO_FOR_IT. Restore the BB2020 position here (`in_select` makes the step a
+                // no-op for every other edition/action, and `blitz_block.rs` drops its own copy
+                // under BB2020, so the roll still happens exactly once).
+                //
+                // This is the STANDING blitzer's copy: StepInitSelecting force-gotos a standing
+                // blitz straight to END_SELECTING, so the select sequence's copy never runs for it.
+                // A PRONE blitzer runs the select body instead and rolls there — whichever fires
+                // first marks the activation, and the other bails out.
+                //
+                // (ITER77 tried this and measured nurgle 86/100 → 0/100, because it ALSO set
+                // `game.defender_id` at dispatch, which is visible to every step in the activation.
+                // No such change is needed: StepInitSelecting already sets `defender_id` from the
+                // activation command.)
+                activation.add(StepId::FoulAppearance, vec![
+                    StepParameter::GotoLabelOnFailure(labels::END_BLOCKING.into()),
+                    StepParameter::InSelect(true),
+                ]);
                 let mut seq = activation.build();
                 seq.extend(BlitzBlock::build_sequence(&params));
                 StepOutcome::next().push_seq(seq)

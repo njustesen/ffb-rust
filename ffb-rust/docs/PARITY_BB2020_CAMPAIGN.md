@@ -7474,3 +7474,70 @@ on a LATER activation, not this divergence, so it is recorded rather than fixed 
 
 The LATENT `Player.used_skills` note above still stands and is still unfixed — it is a real instance
 of the known per-activation bug class, just not what caused seed 16.
+
+## CROSS-2 — the BB2020 blitz Foul Appearance rolls a phase too late (ITER77/ITER103-110 finally landed)
+
+Found by the full 870-pair cross sweep at 1 seed, which came back **868 green / 2 red**:
+
+| pair | first divergence |
+|---|---|
+| `nurgle` vs `undead` | seed 1, step 20 |
+| `halfling` vs `nurgle` | seed 1, step 49 |
+
+Both are the same bug. `bb2020/SelectBlitzTarget.java:35` rolls a blitz's Foul Appearance in the
+SELECT phase — after `BLOOD_LUST`, before `JUMP_UP`/`STAND_UP` and before the block's `GO_FOR_IT` —
+whereas `bb2025/BlitzBlock.java:37` rolls it inside the block sequence, after `GO_FOR_IT`. Rust runs
+the shared BB2025 step-set for BB2020 games, so the roll landed two or three dice late and the
+results were swapped:
+
+```
+nurgle vs undead  i=20   JAVA  FA 5 (pass)      GFI 1 (fall, turnover)
+                         RUST  GFI 5 (pass)     FA 1 (fail)
+halfling vs nurgle i=49  JAVA  FA 6 / StandUp 6 / GFI 1 (fall)
+                         RUST  StandUp 6 / GFI 6 / FA 1 (fail)
+```
+
+### The fix — two copies of one roll, because Rust has two blitz entry paths
+
+Rust's agent commits blitz+target in a single command, so `StepInitSelecting` force-gotos a
+STANDING blitzer straight to `END_SELECTING` (its select body never runs) while a PRONE one runs the
+select body to stand up. Java has one code path; Rust needs the step in both:
+
+* `generator/bb2025/select.rs` — FOUL_APPEARANCE between the activation block and `JUMP_UP`
+  (the prone blitzer's copy), flagged `StepParameter::InSelect`.
+* `bb2025/shared/step_end_selecting.rs` — the same step appended to the blitz-dispatch activation
+  prepend (the standing blitzer's copy).
+* `generator/bb2025/blitz_block.rs` — its own FOUL_APPEARANCE is now BB2025-only, matching
+  `bb2020/BlitzBlock.java:31-33`, which has it solely for the frenzy follow-up. The frenzy re-block
+  sites in `step_end_blocking.rs` build with default (BB2025) params, so they keep it.
+* `step_foul_appearance.rs` — `in_select` copies no-op outside a BB2020 blitz and mark the
+  activation in `ActingPlayer.used_skills`, so exactly one of the two ever rolls. The blitz-block
+  copy does NOT consult the mark, so a Frenzy re-block still rolls again as Java does.
+
+**ITER77's recorded blocker is retired.** Its note said the defender had to reach the step as a
+PARAMETER because setting `game.defender_id` at dispatch took nurgle 86 → 0/100. No such plumbing is
+needed: `StepInitSelecting` already sets `defender_id` from the activation command.
+
+### The regression the first cut caused, and what it taught
+
+The first version measured **28/30** — `necromantic` 99, `nurgle` 97 — against a 30/30 baseline.
+Cause: a select-phase FA failure gotos `END_SELECTING` and so SKIPS the EndSelecting blitz dispatch,
+which was Rust's only writer of `blitz_used`. The team could then blitz twice in one turn (nurgle
+mirror seed 6 i=39: away_02 was offered a Block that Java had already filtered out).
+
+Java sets the flag in `handleFailure` under an `if (targetSelectionState != null)` guard, which in
+BB2020 is ALWAYS true because `StepSelectBlitzTarget` built the state at the top of the same
+sequence. Rust's select copy runs before `StepInitBlocking` creates that state, so the guard read
+literally was false and the assignment was skipped — **a guard that is dead-true in Java became
+live-false in Rust.** Worth remembering as a porting hazard in its own right: a conditional that
+never varies on the Java path carries no signal about when it should fire on a restructured one.
+
+### Gate
+
+| check | result |
+|---|---|
+| bb2016 mirror matrix, seeds 1-100 | **30 green / 0 red** |
+| bb2020 mirror matrix, seeds 1-100 | **30 green / 0 red** |
+| bb2025 mirror matrix, seeds 1-100 | **30 green / 0 red** |
+| bb2020 cross sweep, 870 pairs | **870 green / 0 red** |
+| `cargo test --workspace` | pass (ffb-engine 7182/0), +4 regression tests |

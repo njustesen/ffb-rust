@@ -85,10 +85,18 @@ impl BlitzBlock {
         seq.add_labelled(StepId::SteadyFooting, labels::STEADY_FOOTING, vec![
             StepParameter::GotoLabelOnFailure(labels::FALL_DOWN.into()),
         ]);
-        // 4 FOUL_APPEARANCE
-        seq.add(StepId::FoulAppearance, vec![
-            StepParameter::GotoLabelOnFailure(fl.into()),
-        ]);
+        // 4 FOUL_APPEARANCE — BB2025 only on the primary blitz; see `BlitzBlockParams::rules`.
+        //
+        // `bb2020/BlitzBlock.java:31-33` adds it here ONLY for a frenzy follow-up block; the
+        // primary blitz rolls it a phase earlier, in `bb2020/SelectBlitzTarget.java:35` (mirrored
+        // by the SELECT sequence's `in_select` copy). The frenzy re-block sites in
+        // `step_end_blocking.rs` build with the default (BB2025) params, so they keep this entry —
+        // which is exactly the frenzyBlock branch BB2020 wants.
+        if params.rules != Rules::Bb2020 {
+            seq.add(StepId::FoulAppearance, vec![
+                StepParameter::GotoLabelOnFailure(fl.into()),
+            ]);
+        }
         // 5 DUMP_OFF
         seq.add(StepId::DumpOff, vec![]);
         // 6 BLOCK_STATISTICS
@@ -342,8 +350,8 @@ mod tests {
         assert_eq!(pos(Rules::Bb2025), 1, "bb2025 picks up between TRICKSTER and CATCH_SCATTER");
         assert_eq!(pos(Rules::Bb2020), 0, "bb2020 has no PICK_UP between TRICKSTER and CATCH_SCATTER");
 
-        // Only that one entry is gated: the pushback-branch PICK_UP after FOLLOWUP — which BB2020
-        // has too — stays in both, and nothing else about the sequence moves.
+        // The pushback-branch PICK_UP after FOLLOWUP — which BB2020 has too — stays in both, and
+        // nothing else about the sequence moves.
         for rules in [Rules::Bb2025, Rules::Bb2020] {
             let steps = BlitzBlock::build_sequence(&BlitzBlockParams { rules, ..Default::default() });
             let followup = steps.iter().position(|s| s.step_id == StepId::Followup).unwrap();
@@ -351,7 +359,19 @@ mod tests {
         }
         let bb2025 = BlitzBlock::build_sequence(&BlitzBlockParams::default());
         let bb2020 = BlitzBlock::build_sequence(&BlitzBlockParams { rules: Rules::Bb2020, ..Default::default() });
-        assert_eq!(bb2020.len(), bb2025.len() - 1);
+        // Two entries are edition-gated: this PICK_UP and the FOUL_APPEARANCE below.
+        assert_eq!(bb2020.len(), bb2025.len() - 2);
+    }
+
+    /// `bb2020/BlitzBlock.java:31-33` adds FOUL_APPEARANCE here only for a frenzy follow-up; the
+    /// primary blitz rolls it a phase earlier, in `bb2020/SelectBlitzTarget.java:35`. Building it
+    /// in both places would roll twice and desync the whole dice stream.
+    #[test]
+    fn foul_appearance_here_is_bb2025_only() {
+        let has = |rules: Rules| BlitzBlock::build_sequence(&BlitzBlockParams { rules, ..Default::default() })
+            .iter().any(|s| s.step_id == StepId::FoulAppearance);
+        assert!(has(Rules::Bb2025));
+        assert!(!has(Rules::Bb2020));
     }
 
     #[test]
