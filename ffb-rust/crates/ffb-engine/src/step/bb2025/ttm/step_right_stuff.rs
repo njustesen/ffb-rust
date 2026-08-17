@@ -167,6 +167,7 @@ impl Step for StepRightStuff {
 
 impl StepRightStuff {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        let mut pending_right_stuff: Option<ffb_model::events::GameEvent> = None;
         // Java: thrownPlayer = game.getPlayerById(fThrownPlayerId)
         let player_id = match self.thrown_player_id.as_deref() {
             Some(id) if game.player(id).is_some() => id.to_string(),
@@ -272,6 +273,16 @@ impl StepRightStuff {
                 ));
             }
 
+            // Coverage: `GameEvent::RightStuffRoll` had no construction site in the engine, so the
+            // landing roll behind every Throw Team-Mate reported nothing. Assigned to the outer
+            // binding so the FAILED landing (which falls through to the injury below) reports too —
+            // emitting only on success would have swapped one blind spot for a biased one.
+            pending_right_stuff = Some(ffb_model::events::GameEvent::RightStuffRoll {
+                player_id: self.thrown_player_id.clone().unwrap_or_default(),
+                roll: self.roll,
+                success: successful,
+            });
+
             if successful {
                 // Java: spp.addLanding(playerResult)
                 // BB2025: landing_spp = 1
@@ -313,7 +324,7 @@ impl StepRightStuff {
 
                 let has_ball = self.thrown_player_has_ball.unwrap_or(false);
                 let player_coord_after = game.field_model.player_coordinate(&player_id);
-                let mut out = StepOutcome::goto(&self.goto_on_success)
+                let mut out = StepOutcome::goto(&self.goto_on_success).with_event(pending_right_stuff.clone().unwrap())
                     .publish(StepParameter::ThrownPlayerCoordinate(None));
                 if has_ball {
                     if check_touchdown(game) {
@@ -387,8 +398,10 @@ impl StepRightStuff {
         let commands: Vec<Arc<dyn DeferredCommand>> =
             vec![Arc::new(RightStuffCommand::new(player_id.clone(), has_ball))];
         let ctx = SteadyFootingContext::from_injury_result_with_commands(injury_result, commands);
-        StepOutcome::next()
-            .publish(StepParameter::SteadyFootingContext(Box::new(ctx)))
+        let mut out = StepOutcome::next()
+            .publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
+        if let Some(ev) = pending_right_stuff.take() { out = out.with_event(ev); }
+        out
             .publish(StepParameter::ThrownPlayerCoordinate(None))
     }
 }

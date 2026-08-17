@@ -906,19 +906,27 @@ impl StepApplyKickoffResult {
 
         let stunned = rng.d3();
 
+        let mut stun_events = Vec::new();
         if total_home <= total_away {
-            self.stun_random_standing_players(game, rng, true, stunned);
+            stun_events.extend(self.stun_random_standing_players(game, rng, true, stunned));
         }
         if total_home >= total_away {
-            self.stun_random_standing_players(game, rng, false, stunned);
+            stun_events.extend(self.stun_random_standing_players(game, rng, false, stunned));
         }
 
         // client-only: setAnimation(KICKOFF_PITCH_INVASION)
-        StepOutcome::next().with_event(GameEvent::KickoffPitchInvasion { home_roll: roll_home, away_roll: roll_away })
+        let mut out = StepOutcome::next()
+            .with_event(GameEvent::KickoffPitchInvasion { home_roll: roll_home, away_roll: roll_away });
+        for ev in stun_events { out = out.with_event(ev); }
+        out
     }
 
     /// Java: `stunPlayers` — randomly select up to `count` standing players and stun them.
-    fn stun_random_standing_players(&self, game: &mut Game, rng: &mut GameRng, home: bool, count: i32) {
+    /// Returns one `KickoffPitchInvasionStun` per player actually stunned — the event had no
+    /// construction site in the engine, so a Pitch Invasion reported the team rolls but never WHICH
+    /// players it put down (424 pitch invasions per 8,700 games, all invisible). Report-only.
+    fn stun_random_standing_players(&self, game: &mut Game, rng: &mut GameRng, home: bool, count: i32) -> Vec<GameEvent> {
+        let mut events = Vec::new();
         let team = if home { &game.team_home } else { &game.team_away };
         let mut standing: Vec<String> = team.players.iter()
             .filter(|p| game.field_model.player_state(&p.id)
@@ -937,7 +945,9 @@ impl StepApplyKickoffResult {
             // Ball & Chain player rolls InjuryTypeBallAndChain (2d6) — consumed for parity but its
             // result is published unconsumed (not applied) — instead of being placed STUNNED.
             util_server_injury::stun_player_rng(game, rng, &id, ffb_model::enums::ApothecaryMode::Home);
+            events.push(GameEvent::KickoffPitchInvasionStun { player_id: id });
         }
+        events
     }
 
     /// Java: `randomPlayer(playersOnField(game, team))` — random player on field for given side.

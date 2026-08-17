@@ -236,7 +236,14 @@ impl StepPickUp {
 
         if successful {
             game.field_model.ball_moving = false;
-            let mut out = StepOutcome::next().with_event(roll_event);
+            // Coverage: `GameEvent::BallPickedUp` had no construction site anywhere in the engine,
+            // so a successful pick-up reported the ROLL but never the ball changing hands — 4,362
+            // pickup rolls per 8,700 games, and `ball_picked_up` read 0. Report-only.
+            let picked_up = ffb_model::events::GameEvent::BallPickedUp {
+                player_id: player_id.clone().unwrap_or_default(),
+                coord: game.field_model.ball_coordinate.unwrap_or(ffb_model::types::FieldCoordinate::new(-1, -1)),
+            };
+            let mut out = StepOutcome::next().with_event(roll_event).with_event(picked_up);
             if self.secure_the_ball {
                 out = out.publish(StepParameter::EndPlayerAction(true));
             }

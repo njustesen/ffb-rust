@@ -33,6 +33,10 @@ use crate::step::framework::{StepId, StepParameter};
 use crate::util::util_server_game::UtilServerGame;
 
 pub struct StepEndTurn {
+    /// `GameEvent::TurnEnd` parked at `game.start_turn()` and attached at the step's exit.
+    /// The event had no construction site anywhere in the engine, so the single most frequent
+    /// transition in the game — a team's turn ending — reported nothing at all.
+    pending_turn_end: Option<GameEvent>,
     /// Java: fTouchdown (Boolean tristate — None = unchecked)
     pub touchdown: Option<bool>,
     /// Java: fBribesChoiceHome
@@ -77,6 +81,7 @@ pub struct StepEndTurn {
 impl StepEndTurn {
     pub fn new() -> Self {
         Self {
+            pending_turn_end: None,
             touchdown: None,
             bribes_choice_home: None,
             bribes_choice_away: None,
@@ -745,6 +750,12 @@ impl StepEndTurn {
             // Java: game.startTurn() — resets pass_coordinate, acting_player, thrower/defender
             // ids+actions, waiting_for_opponent, timeout flags, concession_possible,
             // last_defender_id, AND per-turn flags for both teams' TurnData.
+            // Coverage: report the turn that just ended, before start_turn() clears the state it
+            // describes. `is_home_turn_ending` was captured at entry, before the active-team flip.
+            if let Some(is_home) = self.is_home_turn_ending {
+                let team_id = if is_home { game.team_home.id.clone() } else { game.team_away.id.clone() };
+                self.pending_turn_end = Some(GameEvent::TurnEnd { team_id, turn_nr: self.turn_nr });
+            }
             game.start_turn();
 
             // Java: endGenerator.pushSequence / kickoffGenerator
@@ -827,11 +838,19 @@ impl Step for StepEndTurn {
     fn id(&self) -> StepId { StepId::EndTurn }
 
     fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game, rng)
+        let out = self.execute_step(game, rng);
+        match self.pending_turn_end.take() {
+            Some(ev) => out.with_event(ev),
+            None => out,
+        }
     }
 
     fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game, rng)
+        let out = self.execute_step(game, rng);
+        match self.pending_turn_end.take() {
+            Some(ev) => out.with_event(ev),
+            None => out,
+        }
     }
 
     // Java StepEndTurn does not override setParameter.

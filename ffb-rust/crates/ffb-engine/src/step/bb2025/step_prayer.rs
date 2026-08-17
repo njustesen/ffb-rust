@@ -10,6 +10,7 @@
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::bb2025::report_prayer_roll::ReportPrayerRoll;
+use ffb_model::events::GameEvent;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -100,6 +101,16 @@ impl StepPrayer {
                 .unwrap_or_default();
             let home_team = game.team_home.id == team_id;
             game.report_list.add(ReportPrayerRoll::new(team_name, self.roll, home_team));
+            // Coverage: `GameEvent::PrayerRoll` had no construction site in the engine. Prayers
+            // demonstrably fire — an IRON_MAN prayer is what exposed the missing stat-limit clamp —
+            // yet the counter read 0. `prayer_id` carries the roll because the handler factory that
+            // would name the prayer is not translated here; the roll is what identifies it.
+            let event = GameEvent::PrayerRoll {
+                team_id: team_id.clone(),
+                roll: self.roll,
+                prayer_id: self.roll.to_string(),
+            };
+            return StepOutcome::next().with_event(event);
         } else {
             self.first_run = false;
         }

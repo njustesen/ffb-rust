@@ -10,6 +10,7 @@
 /// path, so a prayer awarded by the BB2020 Cheering Fans kickoff was reported and then silently
 /// dropped — its effect dice were never rolled.
 use ffb_model::model::game::Game;
+use ffb_model::events::GameEvent;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::bb2020::report_prayer_roll::ReportPrayerRoll;
 use crate::action::Action;
@@ -23,17 +24,19 @@ pub struct StepPrayer {
     /// The skill chosen from a `DialogSelectSkillParameter` (Intensive Training).
     pub selected_skill: Option<ffb_model::enums::SkillId>,
     pub first_run: bool,
+    /// `GameEvent::PrayerRoll` parked on the first run and attached at the step's exit.
+    pending_prayer_event: Option<GameEvent>,
 }
 
 impl StepPrayer {
     pub fn new(roll: i32, team_id: impl Into<String>) -> Self {
-        Self { roll, team_id: Some(team_id.into()), player_id: None, selected_skill: None, first_run: true }
+        Self { roll, team_id: Some(team_id.into()), player_id: None, selected_skill: None, first_run: true, pending_prayer_event: None }
     }
 }
 
 impl Default for StepPrayer {
     fn default() -> Self {
-        Self { roll: 0, team_id: None, player_id: None, selected_skill: None, first_run: true }
+        Self { roll: 0, team_id: None, player_id: None, selected_skill: None, first_run: true, pending_prayer_event: None }
     }
 }
 
@@ -41,7 +44,11 @@ impl Step for StepPrayer {
     fn id(&self) -> StepId { StepId::Prayer }
 
     fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game, rng)
+        let out = self.execute_step(game, rng);
+        match self.pending_prayer_event.take() {
+            Some(ev) => out.with_event(ev),
+            None => out,
+        }
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
@@ -60,7 +67,11 @@ impl Step for StepPrayer {
             }
             _ => {}
         }
-        self.execute_step(game, rng)
+        let out = self.execute_step(game, rng);
+        match self.pending_prayer_event.take() {
+            Some(ev) => out.with_event(ev),
+            None => out,
+        }
     }
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
@@ -100,6 +111,17 @@ impl StepPrayer {
             self.first_run = false;
             // Java: getResult().addReport(new ReportPrayerRoll(roll))
             game.report_list.add(ReportPrayerRoll::new(self.roll));
+            // Coverage: `GameEvent::PrayerRoll` had no construction site in the engine. Prayers
+            // demonstrably fire — an IRON_MAN prayer is what exposed the missing stat-limit clamp —
+            // yet the counter read 0. This is the twin the driver actually routes to for BB2020
+            // (`driver.rs:390`), the edition that HAS prayers; patching only the BB2025 file left
+            // the counter at 0, which is how this was caught.
+            self.pending_prayer_event = Some(GameEvent::PrayerRoll {
+                team_id: team_id.clone(),
+                roll: self.roll,
+                prayer_id: handler.as_ref().map(|h| h.handled_prayer_name().to_string())
+                    .unwrap_or_else(|| self.roll.to_string()),
+            });
 
             match handler {
                 // Java: `prayerHandler.get().initEffect(this, gameState, teamId)` — note Java does

@@ -24,6 +24,10 @@ use crate::injury::InjuryResult;
 use crate::step::framework::{SequenceStep, Step, StepOutcome, StepId, StepParameter};
 
 pub struct StepApothecary {
+    /// `GameEvent::RegenerationRoll`s made during this step, attached at its exit. Regeneration is
+    /// not a step of its own in either engine — Java resolves it inside StepApothecary — so the
+    /// roll has to be reported from here.
+    pending_regeneration: Vec<GameEvent>,
     /// Java: fApothecaryMode (mandatory init param)
     pub apothecary_mode: Option<ApothecaryMode>,
     /// Java: fInjuryResult
@@ -41,6 +45,7 @@ pub struct StepApothecary {
 impl StepApothecary {
     pub fn new() -> Self {
         Self {
+            pending_regeneration: Vec::new(),
             apothecary_mode: None,
             injury_result: None,
             show_report: true,
@@ -159,7 +164,8 @@ impl StepApothecary {
                         } else {
                             game.turn_data_away.inducement_set.use_one_for_usage(Usage::REGENERATION);
                         }
-                        crate::step::util_server_injury::handle_regeneration(game, rng, id);
+                        let (_, ev) = crate::step::util_server_injury::handle_regeneration_reporting(game, rng, id);
+                        if let Some(ev) = ev { self.pending_regeneration.push(ev); }
                     }
                 }
                 _ => {
@@ -183,9 +189,11 @@ impl StepApothecary {
                             .map(|s| s.is_casualty())
                             .unwrap_or(false);
                         if is_casualty && can_use_apo {
-                            let regenerated = crate::step::util_server_injury::handle_regeneration(
-                                game, rng, &defender_id,
-                            );
+                            let (regenerated, ev) =
+                                crate::step::util_server_injury::handle_regeneration_reporting(
+                                    game, rng, &defender_id,
+                                );
+                            if let Some(ev) = ev { self.pending_regeneration.push(ev); }
                             if regenerated {
                                 self.cure_poison(game);
                             } else {
@@ -363,7 +371,11 @@ impl Step for StepApothecary {
     fn id(&self) -> StepId { StepId::Apothecary }
 
     fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game, rng)
+        let mut out = self.execute_step(game, rng);
+        for ev in std::mem::take(&mut self.pending_regeneration) {
+            out = out.with_event(ev);
+        }
+        out
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
@@ -398,7 +410,11 @@ impl Step for StepApothecary {
             }
             _ => {}
         }
-        self.execute_step(game, rng)
+        let mut out = self.execute_step(game, rng);
+        for ev in std::mem::take(&mut self.pending_regeneration) {
+            out = out.with_event(ev);
+        }
+        out
     }
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {

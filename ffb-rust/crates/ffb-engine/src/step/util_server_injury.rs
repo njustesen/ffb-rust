@@ -210,11 +210,26 @@ fn can_use_apo_for_edition(game: &Game, defender: &ffb_model::model::player::Pla
 ///
 /// Returns `true` if the player regenerated (casualty → reserve).
 /// Callers must update the injury context themselves if needed.
+/// Thin wrapper kept for the callers that do not report — see `handle_regeneration_reporting`.
 pub fn handle_regeneration(
     game: &mut Game,
     rng: &mut GameRng,
     player_id: &str,
 ) -> bool {
+    handle_regeneration_reporting(game, rng, player_id).0
+}
+
+/// As above, but also returns the `GameEvent::RegenerationRoll` for the roll actually made.
+///
+/// The event had no construction site in the engine, so regeneration — which decides whether a
+/// casualty on an undead/necromantic roster comes back — reported nothing at all. Regeneration is
+/// not a step of its own in either engine (Java resolves it inside `StepApothecary`), so the roll
+/// has to be reported from here, where the die is thrown.
+pub fn handle_regeneration_reporting(
+    game: &mut Game,
+    rng: &mut GameRng,
+    player_id: &str,
+) -> (bool, Option<ffb_model::events::GameEvent>) {
     let state = game.field_model.player_state(player_id);
     let can_regen = game.player(player_id)
         .map(|p| p.has_skill_property(NamedProperties::CAN_ROLL_TO_SAVE_FROM_INJURY))
@@ -228,10 +243,15 @@ pub fn handle_regeneration(
                 let new_state = state.change_base(PS_RESERVE);
                 game.field_model.set_player_state(player_id, new_state);
             }
-            return successful;
+            let event = ffb_model::events::GameEvent::RegenerationRoll {
+                player_id: player_id.to_string(),
+                roll,
+                success: successful,
+            };
+            return (successful, Some(event));
         }
     }
-    false
+    (false, None)
 }
 
 // ── handle_injury_by_name ─────────────────────────────────────────────────────
