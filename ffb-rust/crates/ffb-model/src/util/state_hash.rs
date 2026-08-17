@@ -126,7 +126,16 @@ fn collect_player_parts(game: &Game, out: &mut Vec<String>, home: bool) {
             None => "Reserve",
             Some(ps) => player_state_str(ps.base()),
         };
-        out.push(format!("{prefix}{i:02}:{x},{y},{state_str}"));
+        // Effective stats, i.e. base PLUS temporary modifiers. Only positions and a state label
+        // were compared, so a wrong stat modifier was invisible until it happened to change a die —
+        // e.g. the Dodgy Snack -MA/-AV enhancement outliving its drive left a player permanently
+        // AV-1, and only surfaced when its armour broke on a roll Java's AV survived.
+        // Must stay byte-identical with `ParityRunner.addPlayersFromTeam`.
+        out.push(format!("{prefix}{i:02}:{x},{y},{state_str},{}/{}/{}/{}",
+            player.movement_with_modifiers(),
+            player.strength_with_modifiers(),
+            player.agility_with_modifiers(),
+            player.armour_with_modifiers()));
     }
 }
 

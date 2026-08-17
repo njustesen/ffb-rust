@@ -862,9 +862,17 @@ impl StepApplyKickoffResult {
                     game.field_model.set_player_state(id, state.change_base(PS_RESERVE));
                 }
                 UtilBox::put_player_into_box(game, id);
-            } else if let Some(p) = game.player_mut(id) {
-                p.add_temporary_stat_mod("Dodgy Snack", ffb_model::model::player::STAT_MA, -1);
-                p.add_temporary_stat_mod("Dodgy Snack", ffb_model::model::player::STAT_AV, -1);
+            } else {
+                // Java attaches the edition's PlayerStatLimit to every temporary modifier; without
+                // it a decrement can push a stat below the edition's floor. Read the limits before
+                // taking the mutable player borrow.
+                use ffb_model::model::player::{stat_limit, STAT_MA, STAT_AV};
+                let (ma_limit, av_limit) =
+                    (stat_limit(game.rules, STAT_MA), stat_limit(game.rules, STAT_AV));
+                if let Some(p) = game.player_mut(id) {
+                    p.add_temporary_stat_mod_limited("Dodgy Snack", STAT_MA, -1, ma_limit);
+                    p.add_temporary_stat_mod_limited("Dodgy Snack", STAT_AV, -1, av_limit);
+                }
             }
         };
         if let Some(id) = player_home.clone() { targeted_ids.push(id); }
@@ -1337,9 +1345,9 @@ mod tests {
         // Check if hp1 was targeted and had snack_roll != 1 (stat penalty applied)
         if let Some(player) = game.team_home.player("hp1") {
             let ma_mod: i32 = player.temporary_stat_mods.iter()
-                .filter(|(_, s, _)| *s == STAT_MA).map(|(_, _, d)| *d).sum();
+                .filter(|(_, s, _, _, _)| *s == STAT_MA).map(|(_, _, d, _, _)| *d).sum();
             let av_mod: i32 = player.temporary_stat_mods.iter()
-                .filter(|(_, s, _)| *s == STAT_AV).map(|(_, _, d)| *d).sum();
+                .filter(|(_, s, _, _, _)| *s == STAT_AV).map(|(_, _, d, _, _)| *d).sum();
             // Either: stat penalty applied OR player was sent to reserve (roll == 1)
             let to_box = game.field_model.player_state("hp1")
                 .map(|s| s.base() == ffb_model::enums::PS_RESERVE)

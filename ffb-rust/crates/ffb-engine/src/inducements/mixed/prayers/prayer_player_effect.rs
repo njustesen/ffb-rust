@@ -13,15 +13,21 @@ use ffb_model::model::player::{STAT_MA, STAT_AV};
 /// Java: Prayer.enhancements(mechanic) + Player.addEnhancement.
 /// Applies the prayer's stat/skill effect to the given player.
 pub fn apply_prayer_player_effect(game: &mut Game, player_id: &str, prayer_name: &str) {
+    // Java attaches the edition's PlayerStatLimit to every temporary modifier
+    // (`StatsMechanic.limit`), and `getStatWithModifiers` clamps to it. Without the limit an
+    // IRON_MAN prayer pushed a BB2020 Treeman to AV 12 where Java caps AV at 11.
+    let rules = game.rules;
     let Some(player) = game.player_mut(player_id) else { return };
     match prayer_name {
         // GREASY_CLEATS: TemporaryStatDecrementer(PlayerStatKey.MA)
         "GREASY_CLEATS" => {
-            player.add_temporary_stat_mod(prayer_name, STAT_MA, -1);
+            player.add_temporary_stat_mod_limited(prayer_name, STAT_MA, -1,
+                ffb_model::model::player::stat_limit(rules, STAT_MA));
         }
         // IRON_MAN: TemporaryStatIncrementer(PlayerStatKey.AV)
         "IRON_MAN" => {
-            player.add_temporary_stat_mod(prayer_name, STAT_AV, 1);
+            player.add_temporary_stat_mod_limited(prayer_name, STAT_AV, 1,
+                ffb_model::model::player::stat_limit(rules, STAT_AV));
         }
         // STILETTO: withSkills({Stab})
         "STILETTO" => {

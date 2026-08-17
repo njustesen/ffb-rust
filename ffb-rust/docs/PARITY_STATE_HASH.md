@@ -170,6 +170,73 @@ Java engine change — only the `ParityRunner` helper.
 regression guard: the hash previously carried no activation state at all, so an engine could hold a
 different player active, or a different MA spend, with nothing compared moving.
 
+## Iteration 5 — effective player stats
+
+Each player part gains `,MA/ST/AG/AV` **with modifiers applied**:
+`h00:12,7,Standing,6/3/3/8`. Chosen because temporary stat modifiers feed armour and injury rolls
+and have a bug history here (the Dodgy Snack `-MA/-AV` enhancement outliving its drive, elf seed 38:
+effective AV 6 vs Java's 7).
+
+**Result: bb2016 30/30, bb2025 30/30, bb2020 29/30** — `halfling` 97/100, first divergence seed 9
+step 131.
+
+### The bug it caught — missing stat-limit clamp
+
+`h00` (the Treeman, MA2/ST6) ends the game with **AV 11 in Java, 12 in Rust**. Base AV 11 plus a
+`+1` from the Iron Man prayer (`inducements/mixed/prayers/prayer_player_effect.rs:24`).
+
+Java clamps: `Player.getStatWithModifiers` reads a `PlayerStatLimit` off the temporary modifier and
+applies `min(max, sum)` / `max(min, sum)`. Rust's `*_with_modifiers` just sums the deltas.
+
+The limits are edition-specific (`mechanics/{bb2016,mixed}/StatsMechanic.limit`):
+
+| stat | bb2016 | bb2020 / bb2025 |
+|---|---|---|
+| MA | none | 1–9 |
+| ST | none | 1–8 |
+| AG | none | 1–6 |
+| PA | none | 1–6 |
+| AV | 1–10 | 3–11 |
+
+Two details that matter for the port:
+
+* the clamp applies **only when a temporary modifier for that stat is present** — Java takes the
+  limit from the modifier stream, so a base stat above the cap is never clamped;
+* the limits differ per edition, so applying one set universally would mis-clamp the other (a BB2016
+  MA-1 player with Greasy Cleats should reach 0; the mixed limit would floor it at 1).
+
+Fixed by carrying the limit on the modifier the way Java does: `temporary_stat_mods` becomes
+`(source, stat, delta, limit_min, limit_max)`, `stat_limit(rules, stat)` reproduces
+`StatsMechanic.limit`, and `add_temporary_stat_mod_limited` is used by the two production call sites
+(the prayers, and the Dodgy Snack grant). Only two of the eleven `add_temporary_stat_mod` uses were
+production code — the other nine were inside test modules, checked individually rather than assumed.
+
+### A correction worth recording
+
+The first version of this fix read BB2016's limit table off one line and wrote `AV => (1, 10),
+_ => (0, 0)`. Java's switch **falls through** `MA`, `ST`, `AG` and `AV` to a single
+`PlayerStatLimit(1, 10)`, leaving only PA unbounded (`bb2016/StatsMechanic.java:44-49`).
+
+Worse, the regression test asserted the same misreading — *"BB2016 bounds only AV, so MA may reach
+0"* — so it would have locked the bug in rather than caught it. A test derived from the same wrong
+reading as the code is no test at all. It now pins the whole table for both editions explicitly,
+against the Java source rather than against one inferred case.
+
+### Gate
+
+bb2016 30/30, bb2020 30/30, bb2025 30/30, seeds 1-100.
+
+### Two phantom reds — a harness hazard, not engine behaviour
+
+This iteration produced two reds that did not reproduce: `bb2025 lineman` (99/100) and
+`bb2016 dark_elf_league_fumbbl` (33/100). Both came from running a parity command for a matchup
+while a matrix gate was running that same matchup — both engines' logs share
+`parity/<home>_vs_<away>/`, and `run_cross_matrix.py` documents that same-matchup runs are not
+concurrency-safe. Re-run in isolation, both were 100/100.
+
+**Never believe a red without reproducing it in isolation**, and never touch a matchup while a gate
+is live.
+
 ## Remaining groups
 
 1. ~~Per-team turn-used flags~~ — done, iteration 2.

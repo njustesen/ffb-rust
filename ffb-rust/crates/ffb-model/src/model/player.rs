@@ -132,9 +132,11 @@ pub struct Player {
 
     /// Temporary stat modifications from prayers/cards, keyed by source name for removal.
     /// Java: Player.addTemporaryModifiers(sourceName, modifiers) / removeTemporaryModifiers(sourceName).
-    /// Each entry: (source_name, stat_code, delta). stat_code uses STAT_MA..STAT_AV constants.
+    /// Each entry: (source_name, stat_code, delta, limit_min, limit_max). stat_code uses
+    /// STAT_MA..STAT_AV constants; the limit mirrors Java's `PlayerStatLimit` carried by
+    /// `TemporaryStatModifier`, with (0, 0) meaning "no limit" exactly as Java's default does.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub temporary_stat_mods: Vec<(String, u8, i32)>,
+    pub temporary_stat_mods: Vec<(String, u8, i32, i32, i32)>,
 
     /// Source tracking for prayer/card skill grants, keyed by source name for removal.
     /// Java: Player.addTemporarySkills(sourceName, skills) / removeTemporarySkills(sourceName).
@@ -173,56 +175,107 @@ pub struct Player {
     pub current_skill_value: Option<String>,
 }
 
+/// Java `Player.getStatWithModifiers(stat, baseValue)` (`Player.java:245-262`).
+///
+/// Sums the temporary deltas onto the base, then clamps to the `PlayerStatLimit` carried by the
+/// FIRST modifier for that stat. Two details are load-bearing and easy to get wrong:
+///
+/// * the clamp only applies when a modifier for the stat EXISTS — Java sources the limit from the
+///   modifier stream, so a base stat already above the cap is never clamped down;
+/// * a zero bound means "unbounded" (Java's `PlayerStatLimit(0, 0)` default), and the minimum is
+///   floored at 0 rather than the limit when the BASE value is 0.
+///
+/// Rust previously just summed the deltas, so an Iron Man prayer pushed a BB2020 Treeman to AV 12
+/// where Java caps AV at 11 (halfling bb2020 seed 9: Java `11`, Rust `12`). Invisible until
+/// effective stats entered the state hash.
+fn stat_with_modifiers(base: i32, mods: &[(String, u8, i32, i32, i32)], stat: u8) -> i32 {
+    let mut sum = base;
+    let mut limit: Option<(i32, i32)> = None;
+    for (_, s, delta, min, max) in mods.iter() {
+        if *s != stat {
+            continue;
+        }
+        sum += *delta;
+        if limit.is_none() {
+            limit = Some((*min, *max));
+        }
+    }
+    if let Some((min, max)) = limit {
+        if max != 0 {
+            sum = sum.min(max);
+        }
+        if min != 0 {
+            sum = sum.max(if base == 0 { 0 } else { min });
+        }
+    }
+    sum
+}
+
+/// Java `mechanics/{bb2016,mixed}/StatsMechanic.limit(PlayerStatKey)` — the bounds an edition
+/// attaches to a temporary stat modifier. `(0, 0)` is Java's "no limit".
+///
+/// The editions genuinely differ: BB2016 bounds only AV, BB2020/BB2025 bound every stat. Applying
+/// one edition's table to the other mis-clamps — a BB2016 MA-1 player with Greasy Cleats must be
+/// able to reach 0, where the mixed table would floor it at 1.
+pub fn stat_limit(rules: crate::enums::Rules, stat: u8) -> (i32, i32) {
+    use crate::enums::Rules;
+    match rules {
+        // BB2016 bounds MA, ST, AG and AV alike — the Java switch falls through all four cases to
+        // one PlayerStatLimit(1, 10) (`bb2016/StatsMechanic.java:44-49`). Only PA is unbounded.
+        Rules::Bb2016 => match stat {
+            STAT_MA | STAT_ST | STAT_AG | STAT_AV => (1, 10),
+            _ => (0, 0),
+        },
+        _ => match stat {
+            STAT_MA => (1, 9),
+            STAT_ST => (1, 8),
+            STAT_AG => (1, 6),
+            STAT_PA => (1, 6),
+            STAT_AV => (3, 11),
+            _ => (0, 0),
+        },
+    }
+}
+
 impl Player {
-    /// Java: Player.getMovementWithModifiers() — base movement plus all temporary stat deltas.
+    /// Java: Player.getMovementWithModifiers() — base plus temporary deltas, then clamped.
     pub fn movement_with_modifiers(&self) -> i32 {
-        self.movement
-            + self.temporary_stat_mods.iter()
-                .filter(|(_, s, _)| *s == STAT_MA)
-                .map(|(_, _, d)| *d)
-                .sum::<i32>()
+        stat_with_modifiers(self.movement, &self.temporary_stat_mods, STAT_MA)
     }
 
     pub fn strength_with_modifiers(&self) -> i32 {
-        self.strength
-            + self.temporary_stat_mods.iter()
-                .filter(|(_, s, _)| *s == STAT_ST)
-                .map(|(_, _, d)| *d)
-                .sum::<i32>()
+        stat_with_modifiers(self.strength, &self.temporary_stat_mods, STAT_ST)
     }
 
     pub fn agility_with_modifiers(&self) -> i32 {
-        self.agility
-            + self.temporary_stat_mods.iter()
-                .filter(|(_, s, _)| *s == STAT_AG)
-                .map(|(_, _, d)| *d)
-                .sum::<i32>()
+        stat_with_modifiers(self.agility, &self.temporary_stat_mods, STAT_AG)
     }
 
     pub fn passing_with_modifiers(&self) -> i32 {
-        self.passing
-            + self.temporary_stat_mods.iter()
-                .filter(|(_, s, _)| *s == STAT_PA)
-                .map(|(_, _, d)| *d)
-                .sum::<i32>()
+        stat_with_modifiers(self.passing, &self.temporary_stat_mods, STAT_PA)
     }
 
     pub fn armour_with_modifiers(&self) -> i32 {
-        self.armour
-            + self.temporary_stat_mods.iter()
-                .filter(|(_, s, _)| *s == STAT_AV)
-                .map(|(_, _, d)| *d)
-                .sum::<i32>()
+        stat_with_modifiers(self.armour, &self.temporary_stat_mods, STAT_AV)
     }
 
-    /// Java: Player.addTemporaryModifiers(source, modifiers) — add a temporary stat delta.
+    /// Java: Player.addTemporaryModifiers(source, modifiers) — add a temporary stat delta with NO
+    /// limit. Java always attaches a `PlayerStatLimit` from the edition's `StatsMechanic`, so engine
+    /// code should prefer `add_temporary_stat_mod_limited`; this remains for tests and for the
+    /// handful of sources Java gives `PlayerStatLimit(0, 0)`.
     pub fn add_temporary_stat_mod(&mut self, source: &str, stat: u8, delta: i32) {
-        self.temporary_stat_mods.push((source.to_string(), stat, delta));
+        self.temporary_stat_mods.push((source.to_string(), stat, delta, 0, 0));
+    }
+
+    /// Java: the same, with the `PlayerStatLimit` the edition's `StatsMechanic` attaches to the
+    /// modifier. Use `stat_limit(rules, stat)` to obtain it.
+    pub fn add_temporary_stat_mod_limited(&mut self, source: &str, stat: u8, delta: i32, limit: (i32, i32)) {
+        self.temporary_stat_mods.push((source.to_string(), stat, delta, limit.0, limit.1));
     }
 
     /// Java: Player.removeTemporaryModifiers(source) — remove all stat mods for this source.
     pub fn remove_temporary_stat_mods(&mut self, source: &str) {
-        self.temporary_stat_mods.retain(|(s, _, _)| s != source);
+        self.temporary_stat_mods.retain(|(s, _, _, _, _)| s != source);
     }
 
     /// Java: Player.addTemporarySkills(source, skills) — add a skill grant tagged by source.
@@ -809,6 +862,45 @@ mod tests {
     }
 
     #[test]
+    /// Java `Player.getStatWithModifiers` clamps the modified stat to the `PlayerStatLimit` the
+    /// edition attaches to the modifier. Rust summed the deltas unclamped, so an Iron Man prayer
+    /// pushed a BB2020 Treeman to AV 12 where Java caps AV at 11 (halfling bb2020 seed 9).
+    #[test]
+    fn modified_stats_clamp_to_the_editions_limit() {
+        use crate::enums::Rules;
+        let mut p = test_player();
+
+        // BB2020/BB2025: AV is capped at 11, so base 11 + Iron Man's +1 stays 11.
+        p.armour = 11;
+        p.add_temporary_stat_mod_limited("IRON_MAN", STAT_AV, 1, stat_limit(Rules::Bb2020, STAT_AV));
+        assert_eq!(p.armour_with_modifiers(), 11, "AV must not exceed the BB2020 cap of 11");
+
+        // The clamp only applies when a modifier for that stat EXISTS — a base above the cap is
+        // never clamped down, mirroring Java sourcing the limit from the modifier stream.
+        let mut untouched = test_player();
+        untouched.armour = 12;
+        assert_eq!(untouched.armour_with_modifiers(), 12, "an unmodified base stat is never clamped");
+
+        // The editions differ, and not only in the numbers: BB2016's switch falls through MA/ST/AG/AV
+        // to one (1, 10) limit and leaves PA unbounded, while BB2020 bounds each stat separately.
+        assert_eq!(stat_limit(Rules::Bb2016, STAT_MA), (1, 10));
+        assert_eq!(stat_limit(Rules::Bb2016, STAT_ST), (1, 10));
+        assert_eq!(stat_limit(Rules::Bb2016, STAT_AG), (1, 10));
+        assert_eq!(stat_limit(Rules::Bb2016, STAT_AV), (1, 10));
+        assert_eq!(stat_limit(Rules::Bb2016, STAT_PA), (0, 0), "BB2016 leaves PA unbounded");
+        assert_eq!(stat_limit(Rules::Bb2020, STAT_MA), (1, 9));
+        assert_eq!(stat_limit(Rules::Bb2020, STAT_ST), (1, 8));
+        assert_eq!(stat_limit(Rules::Bb2020, STAT_AV), (3, 11));
+
+        // Both editions floor MA at 1, so Greasy Cleats cannot take an MA-1 player to 0.
+        for rules in [Rules::Bb2016, Rules::Bb2020] {
+            let mut p = test_player();
+            p.movement = 1;
+            p.add_temporary_stat_mod_limited("GREASY_CLEATS", STAT_MA, -1, stat_limit(rules, STAT_MA));
+            assert_eq!(p.movement_with_modifiers(), 1, "{rules:?} floors MA at 1");
+        }
+    }
+
     fn movement_with_modifiers_returns_base() {
         let p = test_player();
         assert_eq!(p.movement_with_modifiers(), 6);

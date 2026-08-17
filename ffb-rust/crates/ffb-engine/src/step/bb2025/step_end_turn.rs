@@ -1185,7 +1185,7 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         let p = game.player("snacked").unwrap();
         assert_eq!(p.armour_with_modifiers(), p.armour, "Dodgy Snack -AV must be cleared at drive end");
-        assert!(p.temporary_stat_mods.iter().all(|(s, _, _)| s != "Dodgy Snack"),
+        assert!(p.temporary_stat_mods.iter().all(|(s, _, _, _, _)| s != "Dodgy Snack"),
             "Dodgy Snack stat-mods must be removed at drive end");
     }
 
