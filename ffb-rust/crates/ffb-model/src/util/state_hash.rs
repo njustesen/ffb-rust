@@ -76,6 +76,13 @@ pub fn state_string(game: &Game) -> String {
     s.push_str(&game.turn_data_home.rerolls.to_string());
     s.push(',');
     s.push_str(&game.turn_data_away.rerolls.to_string());
+    // Acting player: WHO is activated and how much movement it has spent, as `h03,2` (the same
+    // h/a index the player parts use, since raw ids differ between the engines) or `-` when nobody
+    // is activated. The hash carried no activation state at all, so an engine could hold a
+    // different player active, or a different MA spend, with no compared field moving.
+    // Must stay byte-identical with `ParityRunner.actingPlayerPart`.
+    s.push_str(" ap");
+    s.push_str(&acting_player_part(game));
     s.push_str(" p");
     for (i, part) in player_parts.iter().enumerate() {
         if i > 0 {
@@ -121,6 +128,29 @@ fn collect_player_parts(game: &Game, out: &mut Vec<String>, home: bool) {
         };
         out.push(format!("{prefix}{i:02}:{x},{y},{state_str}"));
     }
+}
+
+/// `h03,2` — the acting player's index in the same ordering `collect_player_parts` uses (sorted by
+/// squad number, first 11 per team) plus its spent movement; `-` when no player is activated.
+fn acting_player_part(game: &Game) -> String {
+    let pid = match game.acting_player.player_id.as_deref() {
+        Some(id) if !id.is_empty() => id,
+        _ => return "-".to_string(),
+    };
+    for (home, prefix) in [(true, "h"), (false, "a")] {
+        let team = if home { &game.team_home } else { &game.team_away };
+        let mut players: Vec<_> = team.players.iter().collect();
+        players.sort_by_key(|p| p.nr);
+        if players.len() > 11 {
+            players.truncate(11);
+        }
+        if let Some(i) = players.iter().position(|p| p.id == pid) {
+            return format!("{prefix}{i:02},{}", game.acting_player.current_move);
+        }
+    }
+    // Activated but not among the first 11 of either squad — report the move alone rather than
+    // silently claiming nobody is acting.
+    format!("?,{}", game.acting_player.current_move)
 }
 
 fn player_state_str(base: u32) -> &'static str {

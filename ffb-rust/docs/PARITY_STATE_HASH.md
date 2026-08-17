@@ -152,8 +152,28 @@ number looks wrong.
 
 bb2016 30/30, bb2020 30/30, bb2025 30/30, seeds 1-100, on the rebuilt jar.
 
+## Iteration 4 — acting-player state
+
+`" ap h03,2"` — WHO is activated and how much movement it has spent; `-` when nobody is activated.
+
+The player is identified by its index in the same ordering the player parts use (sorted by squad
+number, first 11 per team), because the raw ids differ between the engines
+(`teamKhemriParity16Away10` vs `away_10`) and hashing those directly would diverge on every step
+for reasons that have nothing to do with the engine. If the acting player is somehow not among the
+first 11 of either squad, both sides emit `?,<move>` rather than `-`: reporting "nobody is acting"
+for a player that IS acting would be exactly the kind of silent lie this campaign exists to remove.
+
+Java's `ActingPlayer` already exposes `getPlayerId()` and `getCurrentMove()`, so this needed no
+Java engine change — only the `ParityRunner` helper.
+
+**Result: 30/30 on all three editions — no divergence found.** Like iteration 2, it lands as a
+regression guard: the hash previously carried no activation state at all, so an engine could hold a
+different player active, or a different MA spend, with nothing compared moving.
+
 ## Remaining groups
 
 1. ~~Per-team turn-used flags~~ — done, iteration 2.
 2. ~~Per-team re-rolls remaining~~ — done, iteration 3; four defects, listed above.
-3. **Acting-player state** — who is activated, MA spent.
+3. ~~Acting-player state~~ — done, iteration 4.
+4. Candidates not yet taken: ball carrier id, weather, turn mode, temporary player stat modifiers
+   (the Dodgy Snack -MA/-AV class), KO-box contents.
