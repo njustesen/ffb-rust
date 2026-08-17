@@ -89,6 +89,12 @@ pub fn state_string(game: &Game) -> String {
     // way (`Weather.getName()` / `Weather::name()`).
     s.push_str(" w");
     s.push_str(game.field_model.weather.name());
+    // Turn mode. The hash recorded whose turn it was but never WHICH KIND of turn — a Blitz!, a
+    // Quick Snap, a Pass Block window and a regular turn all hashed alike, though they route
+    // through different step sequences and allow different actions. Both engines already emit the
+    // same camelCase names ("regular", "perfectDefence", ...) across all 32 constants.
+    s.push_str(" tm");
+    s.push_str(game.turn_mode.name());
     s.push_str(" p");
     for (i, part) in player_parts.iter().enumerate() {
         if i > 0 {

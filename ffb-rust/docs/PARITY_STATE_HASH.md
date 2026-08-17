@@ -257,6 +257,53 @@ there is no hand-written enum mapping that could drift.
 
 The goal is coverage of *distinct* state, not field count.
 
+## Iteration 7 — turn mode
+
+`" tmregular"`. The hash recorded WHOSE turn it was but never WHICH KIND: a Blitz!, a Quick Snap, a
+Pass Block window and a regular turn all hashed alike, though they route through different step
+sequences and permit different actions.
+
+Both engines already emit the same camelCase names across all 32 constants
+(`TurnMode::name()` / `TurnMode.getName()`), so no hand-written mapping can drift.
+
+**Result: 30/30 on all three editions — no divergence found.** A regression guard.
+
+## Where the hash stands
+
+| | before this campaign | now |
+|---|---|---|
+| half / turn / active team / score | yes | yes |
+| ball x,y,in-play | yes | yes |
+| per player: x, y, state | one coarse label — `Ko`, and `Injured` for all three casualty states | `Ko` / `Bh` / `Si` / `Rip` |
+| per player: MA/ST/AG/AV with modifiers | — | yes |
+| per-team turn-used flags | — | blitz / foul / hand-over / pass |
+| per-team re-rolls remaining | — | yes |
+| acting player + MA spent | — | yes |
+| weather | — | yes |
+| turn mode | — | yes |
+
+## Diminishing returns
+
+The genuinely unhashed state is close to exhausted. What is left is implied by fields already
+compared (ball carrier, KO-box contents), absent from one engine, or client-only. Further fields
+would grow the string without verifying anything new.
+
+Seven field groups produced **seven defects**, six in the engine and one in harness data:
+
+| field group | defects |
+|---|---|
+| casualty-state split | Decay took the first casualty roll, not the worse of two |
+| turn-used flags | none — regression guard |
+| re-rolls remaining | Brilliant Coaching never expired; `rollExtraReRoll` d6 vs Java's d3; my own one-drive removal wrongly applied to BB2016; lineman `fan_factor` 0 vs Java's 5 |
+| acting-player state | none — regression guard |
+| effective player stats | modified stats never clamped to their limits |
+| weather | none — regression guard |
+| turn mode | none — regression guard |
+
+The `rollExtraReRoll` d6/d3 bug is the one to remember: it consumed the same number of dice as the
+correct roll, so the shared stream never desynced and it survived every green gate in the project's
+history. Its only footprint was a re-roll count nothing compared.
+
 ## Remaining groups
 
 1. ~~Per-team turn-used flags~~ — done, iteration 2.
