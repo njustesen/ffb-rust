@@ -107,14 +107,6 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             // meant both agents declared a kick and then immediately deselected it, so the mechanic
             // never executed in ANY edition and every matrix was green because of it.
             | PlayerActionChoice::KickTeamMate
-            // THROW_BOMB. A bomb declares through the SAME command and target rule as a pass — it
-            // dispatches into the Pass sequence (`step_end_selecting`'s Pass|ThrowBomb arm) and
-            // `StepInitBomb` reads the pass coordinate, consuming only CLIENT_USE_SKILL itself.
-            // Leaving it out meant both agents declared THROW_BOMB and then immediately deselected
-            // it (Java logs `UNHANDLED_ACTING_ACTION_AT_PICK`), so the whole bomb chain — InitBomb,
-            // ResolveBomb, EndBomb, Bombardier2 — never executed in ANY edition and every matrix was
-            // green because of it. Same shape as Throw/Kick Team-Mate above.
-            | PlayerActionChoice::ThrowBomb
     )
 }
 
@@ -381,9 +373,7 @@ impl Agent for RandomAgent {
                             Some(receivers[ridx].clone())
                         }
                     }
-                    // A bomb picks its target square with the same rule as a pass (see
-                    // `is_handled_acting_action`): ParityRunner routes THROW_BOMB to sendPassAction.
-                    PlayerActionChoice::Pass | PlayerActionChoice::ThrowBomb => {
+                    PlayerActionChoice::Pass => {
                         let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
                         let receivers = legal_pass_receivers(&gs.game, player_id, side);
                         if receivers.is_empty() {

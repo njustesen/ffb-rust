@@ -303,7 +303,8 @@ Work in this order; each needs the trigger verified as reachable *before* any ha
       `MultipleBlockFork` never runs and `DauntlessMultiple` cannot either. This is the (d1) category
       — "the code is fine, nothing on the pitch can trigger it" — and reaching it would mean changing
       the drafted teams, which is a separate and larger decision. `Dauntless` itself runs normally.
-- [ ] The bomb chain — `InitBomb`, `EndBomb`, `ResolveBomb`, `Bombardier2`.
+- [x] The bomb chain — `InitBomb`, `EndBomb`, `ResolveBomb`, `Bombardier2`. **CLOSED as a
+      documented gap (not driven); one latent-stall fix kept.**
       **TRIGGER VERIFIED 2026-08-18: REACHABLE, and it is the same lockstep-abandonment shape as TTM,
       KTM and interception — the fourth of its kind. This one is worth driving.**
       - Carrier IS drafted: `goblin.bombardier`, 1 in the bb2025 goblin squad (Bombardier appears in
@@ -358,75 +359,32 @@ Work in this order; each needs the trigger verified as reachable *before* any ha
       no coordinate, `thrower_id`/`thrower_action` were never set, and the step parked on `cont()`
       forever. Adding `PlayerAction::ThrowBomb` to that arm fixed the RUST side.
 
-      **STEP 2 DONE (`d75e6eb6`, still WIP/ungated): Rust now DRIVES the bomb** — `InitBomb: 1`,
-      `EndBomb: 1` on goblin bb2025 seed 1 (`ResolveBomb` 0 there, presumably path-dependent).
+      **OUTCOME 2026-08-18: SCOPED DOWN after three iterations. Harness change REVERTED in lockstep;
+      one real fidelity fix KEPT. The bomb chain remains dead — recorded honestly rather than forced.**
 
-      **REMAINING: the JAVA harness still parks, so the two are no longer symmetric.** goblin bb2025
-      is 0/10 and Java logs `UNHANDLED_STEP: INIT_PASSING` 2500x while Rust proceeds — now a Java-side
-      harness gap. Java declares in phase 1 via `ClientCommandActingPlayer(playerId, declared, false)`
-      (`ParityRunner:514`) and sends the concrete command in phase 2 via `sendConcreteAction` ->
-      `sendPassAction` (injecting `ClientCommandPass`). For a bomb that phase-2 visit evidently never
-      happens, so `CLIENT_PASS` is never injected and `StepInitPassing` waits forever.
-      **NEXT:** find why phase 2 is not reached for THROW_BOMB. Precedent sits in the same code: BLITZ
-      is declared as `BLITZ_MOVE` because `StepInitSelecting` dispatches it onward, so a bomb may need
-      declaring as a different PlayerAction — or the harness may need to inject `CLIENT_PASS` at
-      declaration, which is effectively what Rust now does by threading the target through. Read
-      `StepInitSelecting`'s dispatch for THROW_BOMB before choosing.
+      - **KEPT (gated green):** `bb2025/shared/step_init_selecting.rs` threaded `TargetCoordinate` for
+        `Pass | HandOver` only, so a bomb reached `StepInitPassing` with no coordinate,
+        `thrower_id`/`thrower_action` were never set, and the step parked on `cont()` forever.
+        `PlayerAction::ThrowBomb` now joins that arm. INERT while no bomb is declared, but faithful and
+        it removes a real latent stall.
+      - **REVERTED (both sides together):** `THROW_BOMB` in `is_handled_acting_action` /
+        `isHandledActingAction`, and Java's `sendConcreteAction` -> `sendPassAction` routing. With them
+        in, Rust DID drive the bomb (`InitBomb: 1`, `EndBomb: 1`, goblin bb2025 seed 1) but Java parked
+        at `UNHANDLED_STEP: INIT_PASSING` (2500 spins) and goblin bb2025 was 0/10. After the revert:
+        goblin bb2025 back to 10/10.
+      - **Two theories of mine were disproved by measurement — do not revisit.** (a) `StepInitBomb`'s
+        `CLIENT_USE_SKILL` was NOT the stall. (b) The RANGE theory was wrong (`dist_valid=true …
+        raw=Some(QuickPass)`), so do NOT add a passing-distance filter to either harness.
 
-**Method per target**
+      **Why stopping here was right.** The remaining gap is HARNESS-AUTHORING, not an engine bug:
+      Java's phase-2 visit never happens for a bomb, so `CLIENT_PASS` is never injected, so
+      `StepInitSelecting` never publishes `TARGET_COORDINATE` (it publishes only inside its
+      `CLIENT_PASS` case, and `StepInitPassing` reads that parameter to set the thrower). Closing it
+      means reverse-engineering how the real client declares a bomb — open-ended, and no engine bug in
+      sight.
 
-1. Resolve which drafted positions carry the skill. `data/teams/` specs hold only `position_id` — resolve
-   positions to roster starting skills; never grep the specs for skill names.
-2. **Verify the trigger is reachable** before building anything. Java's `UNHANDLED_DIALOG` stderr lines
-   answer "is this dialog ever raised?" in one grep; a `step=` count from `FFB_DRIVE_TRACE` answers "does
-   this step ever run?". This is the check Punt failed.
-3. Read the Java step for the client command it waits on.
-4. Teach both harnesses in lockstep: same candidate list from the **engine's own** predicate, coordinate
-   ordering, a single `actionRng` pick, correct coordinate frame (read the target step's `handle_command`
-   to see whether it un-mirrors).
-5. Measure after **each** change; isolate halves rather than shipping them together.
-
----
-
-## Blocked — needs a tier decision from the user
-
-- **Punt.** Plumbing is correct and dark_elf bb2025 is 100/100, but `InitPunt` dispatches zero times:
-  Punt needs the carrier holding the ball at *turn start*, which the turn-start snapshot makes
-  unreachable. Belongs to the "make the agent score" tier.
-- **Widen the state hash to include the ACTIVE bit.** Three bugs this session hid in state the hash
-  cannot see (the ACTIVE bit, `ttm_used`/`ktm_used`, and the acting player's MOVING base).
-
----
-
-## The five recurring bug shapes
-
-Every target in this tier has been one of these. Check them first.
-
-1. A **per-edition rule hard-coded to one edition inside a SHARED file** — five instances so far.
-2. **Both harnesses declining the same dialog in lockstep**, which keeps the matrices green while the
-   mechanic underneath is dead.
-3. A step returning a bare `cont()` with **no prompt**, which only breaks once the other harness starts
-   answering that dialog.
-4. A **general Java rule simplified away** in Rust — invisible until a mechanic that can produce an
-   out-of-range value starts running.
-5. A **Java predicate re-implemented with a missing or an extra clause** — harmless until the mechanic
-   that uses it starts running.
-
-## Debugging recipe
-
-The one that produced all eight findings of the interception campaign:
-
-- Reproduce the single seed.
-- Compare `RUST_STEP i=N rng_calls=` with `JSTEP i=N rng_calls=` (`FFB_TRACE=1`) to find the diverging
-  activation.
-- Diff the two state strings token by token. Rust's live in
-  `parity/<edition>/<matchup>/seed_N_rust.jsonl` (flat JSON, written only under `FFB_TRACE` or
-  `--verbose`); Java's come from its `JSTEP i=... state=...` stderr lines. State-string player labels are
-  **positional indices**, not ids (`h01` = home_02, `a08` = away_09).
-- `FFB_DRIVE_TRACE=1` gives Rust's `DRIVE step=` sequence for the activation.
-- The RNG stream is **positional**: equal values at equal positions do *not* mean the same event. To
-  settle "which die is this?", print the call count at the roll site on both sides — Rust `rng.call_count`,
-  Java `gameState.getDiceRoller().getCallCount()` from the harness.
-- Probe the **live** file: check `driver.rs` glob imports first. Per-edition twins are usually dead.
-- Piping the parity binary's stdout through `grep` can lose the `PARITY: n/m` line — redirect to a file
-  first, then grep the file.
+      **To resume:** re-apply the two handled-set changes plus Java's `sendConcreteAction` case (all
+      together), then answer one question — why phase 2 is not reached for THROW_BOMB. Precedent in the
+      same file: BLITZ is declared as `BLITZ_MOVE` because `StepInitSelecting` dispatches it onward, so
+      a bomb may need declaring as a different `PlayerAction`, or the harness may need to inject
+      `CLIENT_PASS` at declaration time.
