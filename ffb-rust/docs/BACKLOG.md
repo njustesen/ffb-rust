@@ -260,7 +260,25 @@ hit twice.
 
 Work in this order; each needs the trigger verified as reachable *before* any harness plumbing.
 
-- [ ] `SelectGazeTarget` / `SelectGazeTargetEnd` — all editions; `HypnoticGaze` itself already runs.
+- [ ] `SelectGazeTarget` / `SelectGazeTargetEnd` — **trigger verified 2026-08-18, TWO blockers found.
+      Not yet fixed.** Correction to the line above: these are **BB2020-ONLY**, not "all editions" —
+      the Java steps are `@RulesCollection(BB2020)` and are pushed solely from
+      `bb2020/move/StepEndSelecting`; BB2025 has no gaze-target path at all (only `AutoGazeZoat`).
+
+      1. **Dead-twin routing.** The only Rust code that pushes the sequence is
+         `step/bb2020/move_/step_end_selecting.rs`, which is DEAD: BB2020 and BB2025 both run the
+         glob'd `bb2025::shared::step_end_selecting` (no gaze push), and BB2016 gets its own via the
+         per-edition override block. So the sequence is never pushed in any edition. Fix by
+         edition-gating the push INSIDE the shared step — never by routing to the dead twin.
+      2. **The trigger needs a declaration neither harness makes.** Java pushes the sequence on
+         `PlayerAction.GAZE_SELECT`, and `GAZE_SELECT` is produced ONLY by
+         `bb2020/shared/StepInitSelecting:113` when the client declares **`GAZE_MOVE`** with no target
+         selection state. Both harnesses declare plain `GAZE` (`ParityRunner:1996` adds
+         `PlayerAction.GAZE`), so `GAZE_SELECT` never arises. Driving this therefore needs both
+         harnesses taught to declare `GAZE_MOVE` **in lockstep** — the same shape as the TTM, KTM and
+         interception campaigns, and the same risk profile: expect it to expose real engine bugs.
+
+      Do blocker 1 first (it is a pure fidelity fix and gate-able on its own), then decide on 2.
 - [ ] `DauntlessMultiple` — `Dauntless` itself runs.
 - [ ] The bomb chain — `InitBomb`, `EndBomb`, `ResolveBomb`, `Bombardier2`.
 - [ ] `HailMaryPass`.
