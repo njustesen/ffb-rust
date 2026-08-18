@@ -337,14 +337,12 @@ impl StepEndSelecting {
 
             // ── THROW_TEAM_MATE / KICK_TEAM_MATE ─────────────────────────────
             pa @ (PlayerAction::ThrowTeamMate | PlayerAction::KickTeamMate) => {
-                // Whether this is a KICK is decided by the DECLARED ACTION, exactly as in Java where
-                // the sequence is built for a KICK_TEAM_MATE declaration. Reading it from the
-                // `IsKickedPlayer` parameter alone did not work: StepInitSelecting publishes that
-                // parameter, but it does not reach this step, so every kick built a THROW sequence.
-                // The visible effect was the wrong once-per-turn slot being spent — a BB2020 kick
-                // marked ttm_used instead of ktm_used, so the team could not throw afterwards but
-                // could kick again, while Java could do the opposite (ogre bb2020 seed 7 i=111:
-                // rust offered [Move, KickTeamMate] where java offered [MOVE, THROW_TEAM_MATE]).
+                // Belt-and-braces: `self.kicked` comes from the published `IsKickedPlayer`
+                // parameter, and the declared action says the same thing. (An earlier note here
+                // claimed that parameter never reaches this step — that was WRONG, and verified
+                // so by tracing the publish: it does arrive, and the same instance dispatches
+                // with it. Kicks behaved as throws because the agent's `is_handled_acting_action`
+                // omitted KickTeamMate, so a kick was deselected before any of this ran.)
                 let is_kicked = self.kicked || pa == PlayerAction::KickTeamMate;
                 let params = if with_param {
                     ThrowTeamMateParams {
