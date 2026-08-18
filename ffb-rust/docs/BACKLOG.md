@@ -260,8 +260,8 @@ hit twice.
 
 Work in this order; each needs the trigger verified as reachable *before* any harness plumbing.
 
-- [ ] `SelectGazeTarget` / `SelectGazeTargetEnd` — **trigger verified 2026-08-18, TWO blockers found.
-      Not yet fixed.** Correction to the line above: these are **BB2020-ONLY**, not "all editions" —
+- [x] `SelectGazeTarget` / `SelectGazeTargetEnd` — **DONE 2026-08-18: routing fixed (`a7e7da8f`),
+      mechanic confirmed UNREACHABLE IN JAVA. Closed, not driven.** Correction to the line above: these are **BB2020-ONLY**, not "all editions" —
       the Java steps are `@RulesCollection(BB2020)` and are pushed solely from
       `bb2020/move/StepEndSelecting`; BB2025 has no gaze-target path at all (only `AutoGazeZoat`).
 
@@ -283,11 +283,18 @@ Work in this order; each needs the trigger verified as reachable *before* any ha
       `gaze_select_pushes_the_gaze_target_sequence_in_bb2020`. It is **LATENT** — vampire bb2020 still
       measures 10/10 with ZERO `SelectGazeTarget` dispatches, exactly as blocker 2 predicts. The steps
       can now be reached; they are not yet driven.
-      **Blocker 2 REMAINS** and is the whole job: teach both harnesses to declare `GAZE_MOVE` in
-      lockstep. Use `--home vampire --away vampire --edition bb2020` (vampire is the Hypnotic Gaze
-      roster). Expect it to behave like the interception campaign — reds first, real engine bugs
-      behind them. If two iterations pass without converging, say so plainly and consider scoping
-      down rather than grinding; that fallback was right once already.
+      **Blocker 2 RESOLVED — the steps are UNREACHABLE IN JAVA ITSELF. Do not build harness
+      plumbing for them.** The chain requires a `GAZE_MOVE` declaration, which the client only offers
+      when the player has `canGazeDuringMove` (`MoveLogicModule:362`, and `ParityRunner:1995` uses the
+      same property). That property is registered **only by `skill/bb2016/HypnoticGaze`** — bb2020's
+      and bb2025's HypnoticGaze register just `inflictsConfusion`. So no BB2020 player can ever
+      declare GAZE, `GAZE_SELECT` is never produced, and the BB2020-only `SelectGazeTarget` /
+      `SelectGazeTargetEnd` can never run. They are **vestigial in Java**, not merely unported.
+      BB2016 does offer GAZE, but its gaze path is `bb2016/move/StepHypnoticGaze`, which already runs.
+      Teaching the harness to declare `GAZE_MOVE` under BB2020 would FABRICATE an action Java's own
+      eligibility rules never offer — that is inventing behaviour, not fixing parity.
+      Note this also means blocker 1's fix (`a7e7da8f`) is correct but will never fire in practice;
+      it is kept as faithful routing, not as a live mechanic.
 - [ ] `DauntlessMultiple` — `Dauntless` itself runs.
 - [ ] The bomb chain — `InitBomb`, `EndBomb`, `ResolveBomb`, `Bombardier2`.
 - [ ] `HailMaryPass`.

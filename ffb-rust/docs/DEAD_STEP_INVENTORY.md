@@ -264,3 +264,30 @@ bad fix to working code.
 Also: `driver.rs` has a PER-EDITION OVERRIDE BLOCK (~line 434) that takes precedence over its glob
 imports — BB2016 runs its own `StepCatchScatterThrowIn`. Checking the globs alone is not enough;
 three probes went into dead files this session before that was understood.
+
+---
+
+## Update 2026-08-18 (4) — the gaze-target steps are vestigial in Java
+
+`SelectGazeTarget` / `SelectGazeTargetEnd` were listed as "(d2) reachable by data, yet never fires,
+all editions". Both halves of that were wrong.
+
+**They are BB2020-only** — the Java steps are `@RulesCollection(BB2020)` and are pushed solely from
+`bb2020/move/StepEndSelecting`. BB2025 has no gaze-target path at all (only `AutoGazeZoat`), and
+BB2016 uses `bb2016/move/StepHypnoticGaze`, which already runs.
+
+**They are unreachable in Java itself.** The push happens on `PlayerAction.GAZE_SELECT`, which
+`bb2020/shared/StepInitSelecting:113` produces only from a client `GAZE_MOVE` declaration. A client
+offers GAZE only when the player has `canGazeDuringMove` (`MoveLogicModule:362`; `ParityRunner:1995`
+uses the same property) — and that property is registered **only by `skill/bb2016/HypnoticGaze`**.
+bb2020's and bb2025's HypnoticGaze register just `inflictsConfusion`. So no BB2020 player can declare
+GAZE, and the BB2020-only gaze-target steps can never run.
+
+A Rust routing bug was fixed along the way (`a7e7da8f`): the push existed only in the dead
+`step/bb2020/move_/step_end_selecting.rs`, so it would not have fired even if the action existed. That
+fix is faithful but will never be exercised — recorded here so nobody re-measures it hoping otherwise.
+
+**Method note.** This is the second target closed by checking the trigger before building plumbing
+(after Punt). The check cost minutes; the alternative was teaching both harnesses to declare an action
+Java's own eligibility rules never offer, i.e. fabricating behaviour and then "fixing" the engine until
+the fabrication matched.
