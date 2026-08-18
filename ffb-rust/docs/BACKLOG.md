@@ -14,6 +14,12 @@ box, add the commit hash, and record anything learned that the next item needs.
 - Limited CPU: `--parallel 3`, `PARITY_JVM_CORES=1`, never 8. Never build or run while a gate is active.
 - `--seeds N` means 1..N — write `N-N` for a single seed.
 - Remove every probe before gating, then `git diff` the file and read **every** `-` line.
+- **Rust-only change? Gate with `--reuse-java`.** The gate runs BOTH engines and Java is ~10x the
+  wall-clock (one matchup, 10 seeds: `java_total=6.588s` vs `rust_total=0.675s`), so the JVM is
+  essentially the whole gate. `--reuse-java` skips it for any matchup whose cached logs provably came
+  from the same jar and Java data, and prints REUSE / REUSE declined so it is never silent. Only omit
+  it when `ParityRunner.java` was actually touched and the jar rebuilt — that invalidates the cache.
+  (Gates 8 and 9 were Rust-only and re-ran the full JVM for nothing; do not repeat that.)
 
 ---
 
