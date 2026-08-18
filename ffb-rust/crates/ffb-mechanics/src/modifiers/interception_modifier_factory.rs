@@ -277,6 +277,21 @@ mod tests {
         assert_eq!(dp_mods[0].get_modifier(), 1);
     }
 
+    /// The interception minimum is PER-EDITION and `driver.rs` globs `bb2025::pass::*`, so the
+    /// shared `StepIntercept` serves all three editions and must pick the right formula. BB2016 is
+    /// `max(2, 7 - min(AG,6) + 2 + mods)` (`bb2016/AgilityMechanic.minimumRollInterception` via
+    /// `getAgilityRollBase`); BB2020/BB2025 are AG-based. Using the BB2020 formula for BB2016 made
+    /// interceptions succeed on rolls Java fails, reddening most of the bb2016 matrix.
+    #[test]
+    fn the_two_editions_disagree_about_the_interception_target() {
+        let mut p = Player::default();
+        p.agility = 2;
+        // BB2016: 7 - 2 + 2 = 7 (unreachable without the natural-6 rule).
+        assert_eq!(InterceptionModifierFactory::minimum_roll_bb2016(&p, &[]), 7);
+        // BB2020/BB2025: the AG value IS the target, floored at 2.
+        assert_eq!(InterceptionModifierFactory::minimum_roll_bb2020(&p, &[]), 2);
+    }
+
     #[test]
     fn minimum_roll_bb2016_agility_3_no_modifiers() {
         // max(2, 7 - min(3, 6) + 2) = max(2, 6) = 6

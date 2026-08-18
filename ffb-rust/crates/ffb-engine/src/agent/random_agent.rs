@@ -700,9 +700,19 @@ impl Agent for RandomAgent {
             // i=100 before play passes to the other team at i=101.)
             // Picking a target here instead would roll block dice Java never rolls.
             Some(AgentPrompt::BlockTarget { .. }) => Action::EndTurn,
-            // Interception: always decline — 0 RNG calls.
-            // Java ParityRunner falls through to RandomStrategy which always sends sendInterceptorChoice(null,null).
-            // Keeping both at 0 advances avoids RNG divergence.
+            // Interception: DELIBERATELY DECLINED, in lockstep with Java's
+            // `RandomStrategy.sendInterceptorChoice(null, null)` (ParityRunner has no INTERCEPTION
+            // case, so the dialog falls through to it). Both harnesses therefore consume 0 RNG.
+            //
+            // This is a KNOWN, DOCUMENTED gap, not an oversight: an earlier revision had both
+            // harnesses attempt the interception (coordinate-sorted candidates from the engine's own
+            // `UtilPassing.findInterceptors`, one actionRng draw each). That switched the mechanic on
+            // and immediately exposed eight real Rust fidelity bugs — seven of which are fixed and
+            // shipped — but the BB2020 DEFLECTION chain below `StepResolvePass` is still not
+            // faithful: a deflected ball that Java leaves on the deflector ends on the receiver in
+            // Rust (dark_elf bb2020 seed 21 i=95). Attempting interceptions is therefore disabled
+            // until that chain is ported; see docs/DEAD_STEP_INVENTORY.md. Re-enabling means
+            // restoring this arm AND ParityRunner's `case INTERCEPTION:` together — never one alone.
             Some(AgentPrompt::Interception { .. }) =>
                 Action::Intercept { attempt: false },
             // Touchback: Java ParityRunner picks the receiving player NEAREST to the fixed kick-from
@@ -1074,6 +1084,27 @@ mod tests {
         }
         assert!(squares.contains(&picks[0]), "the home coach sends the canonical square");
         assert_eq!(picks[1], picks[0].transform(), "the away coach sends the mirrored view");
+    }
+
+    /// Both harnesses DECLINE every interception in lockstep — Rust with
+    /// `Action::Intercept { attempt: false }`, Java by falling through to
+    /// `RandomStrategy.sendInterceptorChoice(null, null)` — so neither consumes RNG here. This is a
+    /// documented gap rather than an oversight: attempting interceptions works and exposed eight
+    /// real fidelity bugs, but the BB2020 deflection chain is not yet faithful, so the attempt stays
+    /// off until it is. Re-enabling requires changing BOTH harnesses together.
+    #[test]
+    fn interception_is_declined_in_lockstep_with_the_java_harness() {
+        let mut gs = new_game(1);
+        gs.pending_prompt = Some(AgentPrompt::Interception {
+            player_id: "away_01".into(),
+            target_number: 0,
+            candidates: vec!["away_01".into(), "away_02".into()],
+        });
+        let mut agent = RandomAgent::new_parity(1);
+        let before = agent.decision_rng_count;
+        assert!(matches!(agent.act(&gs), Action::Intercept { attempt: false }),
+            "the interception window is declined while BB2020 deflection is unported");
+        assert_eq!(agent.decision_rng_count, before, "a decline consumes no RNG on either side");
     }
 
     #[test]

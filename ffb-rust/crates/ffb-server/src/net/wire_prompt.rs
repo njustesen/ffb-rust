@@ -314,7 +314,7 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
             Some(WireDialog::PilingOn { player_id: player_id.clone(), target_id: target_id.clone() }),
         AgentPrompt::DefenderAction { player_id, actions } =>
             Some(WireDialog::DefenderAction { player_id: player_id.clone(), actions: actions.clone() }),
-        AgentPrompt::Interception { player_id, target_number } =>
+        AgentPrompt::Interception { player_id, target_number, .. } =>
             Some(WireDialog::Interception { player_id: player_id.clone(), target_number: *target_number }),
         AgentPrompt::ApothecaryChoice { player_id, can_heal } =>
             Some(WireDialog::ApothecaryChoice { player_id: player_id.clone(), can_heal: *can_heal }),

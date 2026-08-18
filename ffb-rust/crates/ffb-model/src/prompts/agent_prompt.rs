@@ -124,8 +124,14 @@ pub enum AgentPrompt {
 
     // ── Interception / catch ───────────────────────────────────────────────────
     Interception {
+        /// The first candidate — kept for the wire prompt and for existing consumers.
         player_id: PlayerId,
         target_number: i32,
+        /// Every player `UtilPassing.findInterceptors` returned, in the engine's own order.
+        /// Java's `DialogInterceptionParameter` carries only the thrower, so its client (and
+        /// `ParityRunner`) recomputes the same list from the same shared util — publishing it here
+        /// lets both harnesses pick from an identical candidate set.
+        candidates: Vec<PlayerId>,
     },
 
     // ── Apothecary ─────────────────────────────────────────────────────────────

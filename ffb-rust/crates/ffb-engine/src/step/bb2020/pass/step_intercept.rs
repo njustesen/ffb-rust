@@ -295,6 +295,7 @@ impl StepIntercept {
             return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::Interception {
                 player_id: possible_interceptors[0].clone(),
                 target_number: 0,
+                candidates: possible_interceptors.clone(),
             });
         }
 

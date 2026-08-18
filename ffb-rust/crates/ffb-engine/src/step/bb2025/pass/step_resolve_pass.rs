@@ -24,6 +24,11 @@ pub struct StepResolvePass {
     pub pass_accurate: bool,
     /// Consumed from InterceptorId parameter published by StepIntercept.
     pub interceptor_id: Option<String>,
+    /// Java BB2020 `PassState.deflectionSuccessful` — a successful interception ROLL.
+    pub deflection_successful: bool,
+    /// Java BB2020 `PassState.interceptionSuccessful` — set only by an *easy* intercept, i.e. the
+    /// deflection was also an outright catch.
+    pub interception_successful: bool,
     /// Consumed from CatcherId parameter.
     pub catcher_id: Option<String>,
     /// Whether the pass is a bomb action (derived from thrower_action).
@@ -35,6 +40,8 @@ impl StepResolvePass {
         Self {
             pass_accurate: false,
             interceptor_id: None,
+            deflection_successful: false,
+            interception_successful: false,
             catcher_id: None,
             is_bomb: false,
         }
@@ -60,6 +67,9 @@ impl Step for StepResolvePass {
         match param {
             StepParameter::PassAccurate(v) => { self.pass_accurate = *v; true }
             StepParameter::InterceptorId(v) => { self.interceptor_id = v.clone(); true }
+            // BB2020 PassState.deflectionSuccessful / interceptionSuccessful (see execute_step).
+            StepParameter::DeflectionSuccessful(v) => { self.deflection_successful = *v; true }
+            StepParameter::InterceptionSuccessful(v) => { self.interception_successful = *v; true }
             StepParameter::CatcherId(v) => { self.catcher_id = v.clone(); true }
             _ => false,
         }
@@ -78,8 +88,25 @@ impl StepResolvePass {
             Some(PlayerAction::ThrowBomb) | Some(PlayerAction::HailMaryBomb)
         );
 
-        // Java: if (state.isInterceptionSuccessful())
-        if self.interceptor_id.is_some() {
+        // Java: `if (state.isInterceptionSuccessful())` — the SUCCESS FLAG, not the mere presence
+        // of an interceptor id. Rust gated on `interceptor_id.is_some()`, so a FAILED interception
+        // (whose id is still around) teleported the ball onto the player who missed it, and a
+        // published id could even outlive its own pass sequence — Java re-creates `PassState` per
+        // pass, Rust threads step parameters that persist (dwarf bb2025 seed 45 i=17: Rust put the
+        // ball on away_01 at 13,7 where Java bounced it to 12,4, with identical dice).
+        // The gate is PER-EDITION. `bb2020/StepResolvePass:43` opens on
+        // `state.isDeflectionSuccessful()` (the deflected ball still has to be caught or scattered
+        // from the interceptor's square), whereas `bb2025:43` opens on
+        // `state.isInterceptionSuccessful()` (a successful interception simply IS a catch).
+        // Both are the SUCCESS FLAG, never the mere presence of an interceptor id: an id left over
+        // from a failed interception — or from an earlier pass, since Rust's step parameters outlive
+        // the sequence Java re-creates per pass — teleported the ball onto the player who missed it.
+        let took_the_ball = if game.rules == ffb_model::enums::Rules::Bb2020 {
+            self.deflection_successful
+        } else {
+            self.interception_successful
+        };
+        if took_the_ball {
             // Java: ball/bomb → interceptor coordinate
             if let Some(ref id) = self.interceptor_id {
                 if let Some(coord) = game.field_model.player_coordinate(id) {
@@ -89,6 +116,25 @@ impl StepResolvePass {
                         game.field_model.ball_coordinate = Some(coord);
                     }
                 }
+            }
+            // BB2020 (`bb2020/pass/StepResolvePass:43-53`): a DEFLECTION that was not an outright
+            // catch puts the ball on the interceptor's square and publishes
+            // CATCH_SCATTER_THROW_IN_MODE = DEFLECTED, so the deflected ball is caught-or-scattered
+            // from there. BB2025 has no deflection concept — every successful interception is a
+            // catch — and this shared step runs for both, so the ball simply stopped dead on the
+            // interceptor in BB2020 and the whole scatter chain was skipped (high_elf bb2020
+            // seed 61 i=3: the ball ended at 12,7 in Rust and 14,7 in Java).
+            if game.rules == ffb_model::enums::Rules::Bb2020
+                && self.deflection_successful
+                && !self.interception_successful
+            {
+                return StepOutcome::next().publish(StepParameter::CatchScatterThrowInMode(
+                    if is_bomb {
+                        CatchScatterThrowInMode::DeflectedBomb
+                    } else {
+                        CatchScatterThrowInMode::Deflected
+                    },
+                ));
             }
             return StepOutcome::next();
         }
@@ -218,6 +264,90 @@ mod tests {
         Game::new(home, away, Rules::Bb2025)
     }
 
+    /// `bb2020/pass/StepResolvePass:43-53`: a DEFLECTION that was not an outright catch puts the
+    /// ball on the interceptor's square and publishes CATCH_SCATTER_THROW_IN_MODE = DEFLECTED, so
+    /// the deflected ball is caught-or-scattered from there. BB2025 has no deflection concept and
+    /// this shared step serves both editions, so without the gate the ball stopped dead on the
+    /// interceptor and the whole scatter chain was skipped (high_elf bb2020 seed 61 i=3).
+    /// The ball-to-interceptor branch opens on the PER-EDITION SUCCESS FLAG, never on the mere
+    /// presence of an interceptor id. Java re-creates `PassState` per pass, so a failed (or earlier)
+    /// interception simply has no flag set; Rust threads step parameters that OUTLIVE the sequence,
+    /// so gating on the id teleported the ball onto a player who had missed it — or onto the
+    /// interceptor of a previous pass entirely (dwarf bb2025 seed 45 i=17).
+    #[test]
+    fn a_stale_interceptor_id_without_a_success_flag_does_not_move_the_ball() {
+        use ffb_model::model::player::Player;
+        for rules in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            let mut away = test_team("away", 0);
+            let mut opp = Player::default();
+            opp.id = "opp1".into();
+            away.players.push(opp);
+            let mut game = Game::new(test_team("home", 0), away, rules);
+            game.field_model.set_player_coordinate("opp1", FieldCoordinate::new(7, 7));
+            game.field_model.ball_coordinate = Some(FieldCoordinate::new(2, 2));
+
+            let mut step = StepResolvePass::new();
+            step.interceptor_id = Some("opp1".into());   // id present …
+            step.deflection_successful = false;          // … but nothing succeeded
+            step.interception_successful = false;
+
+            step.start(&mut game, &mut GameRng::new(0));
+            assert_eq!(game.field_model.ball_coordinate, Some(FieldCoordinate::new(2, 2)),
+                "{rules:?}: an interceptor id alone must not move the ball");
+        }
+    }
+
+    #[test]
+    fn a_bb2020_deflection_publishes_the_deflected_mode_and_bb2025_does_not() {
+        use ffb_model::model::player::Player;
+        for (rules, expect_deflected) in [(Rules::Bb2020, true), (Rules::Bb2025, false)] {
+            let mut away = test_team("away", 0);
+            let mut opp = Player::default();
+            opp.id = "opp1".into();
+            away.players.push(opp);
+            let mut game = Game::new(test_team("home", 0), away, rules);
+            game.field_model.set_player_coordinate("opp1", FieldCoordinate::new(7, 7));
+
+            let mut step = StepResolvePass::new();
+            step.interceptor_id = Some("opp1".into());
+            // Each edition opens the branch on its OWN flag: BB2020 on deflection, BB2025 on
+            // interception (Java `bb2020/StepResolvePass:43` vs `bb2025:43`).
+            step.deflection_successful = rules == Rules::Bb2020;
+            step.interception_successful = rules != Rules::Bb2020;
+
+            let out = step.start(&mut game, &mut GameRng::new(0));
+            let deflected = out.published.iter().any(|p| matches!(p,
+                StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::Deflected)));
+            assert_eq!(deflected, expect_deflected,
+                "{rules:?}: DEFLECTED mode is BB2020-only");
+            assert_eq!(game.field_model.ball_coordinate, Some(FieldCoordinate::new(7, 7)),
+                "{rules:?}: either way the ball lands on the interceptor's square");
+        }
+    }
+
+    /// An *easy* intercept (`interceptionSuccessful`) IS an outright catch even in BB2020, so it
+    /// must NOT publish DEFLECTED — Java guards the branch with `!state.isInterceptionSuccessful()`.
+    #[test]
+    fn a_bb2020_easy_intercept_is_a_catch_not_a_deflection() {
+        use ffb_model::model::player::Player;
+        let mut away = test_team("away", 0);
+        let mut opp = Player::default();
+        opp.id = "opp1".into();
+        away.players.push(opp);
+        let mut game = Game::new(test_team("home", 0), away, Rules::Bb2020);
+        game.field_model.set_player_coordinate("opp1", FieldCoordinate::new(7, 7));
+
+        let mut step = StepResolvePass::new();
+        step.interceptor_id = Some("opp1".into());
+        step.deflection_successful = true;
+        step.interception_successful = true;
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(!out.published.iter().any(|p| matches!(p,
+            StepParameter::CatchScatterThrowInMode(_))),
+            "an easy intercept keeps the ball — no catch/scatter mode is published");
+    }
+
     #[test]
     fn accurate_pass_with_catcher_publishes_catch_accurate_pass() {
         let mut game = make_game();
@@ -299,6 +429,9 @@ mod tests {
         game.field_model.set_player_coordinate("i1", FieldCoordinate::new(8, 5));
         let mut step = StepResolvePass::new();
         step.interceptor_id = Some("i1".into());
+        // The branch opens on Java's success flag (`isInterceptionSuccessful()` in BB2025), not on
+        // the presence of an id — an id alone can be left over from a failed or earlier pass.
+        step.interception_successful = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(game.field_model.ball_coordinate, Some(FieldCoordinate::new(8, 5)));

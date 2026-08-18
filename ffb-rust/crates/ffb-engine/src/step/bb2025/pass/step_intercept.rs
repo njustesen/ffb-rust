@@ -95,8 +95,11 @@ impl StepIntercept {
                 if !has_tacklezones {
                     return false;
                 }
-                // Must not be thrower's square or pass_coord square
-                if coord == thrower_coord || coord == pass_coord {
+                // Java `UtilPassing.findInterceptors`: `!otherPlayer.hasSkillProperty(preventCatch)`.
+                // A player who cannot catch cannot intercept — a dwarf Deathroller (No Hands) was
+                // being offered as an interceptor by Rust and by neither Java nor the rules, so the
+                // ball teleported onto it (dwarf bb2025 seed 45 i=17: Rust 13,7 vs Java 12,4).
+                if player.has_skill_property(NamedProperties::PREVENT_CATCH) {
                     return false;
                 }
                 // Geometric corridor check
@@ -111,15 +114,17 @@ impl StepIntercept {
     /// Returns `true` on success, `false` on failure.
     /// Note: re-roll handling (skill re-rolls / team re-rolls) is not yet translated;
     /// this is a single-roll implementation.
+    /// Returns `(successful, easy_intercept)`. BB2020 needs the second half: there a successful
+    /// roll is a DEFLECTION, and only an *easy* intercept is an outright catch.
     fn intercept(
         &self,
         interceptor_id: &str,
         game: &mut Game,
         rng: &mut GameRng,
-    ) -> bool {
+    ) -> (bool, bool) {
         let interceptor = match game.player(interceptor_id) {
             Some(p) => p,
-            None => return false,
+            None => return (false, false),
         };
 
         // Java: easyIntercept = interceptionSkill != null && pInterceptor.hasUnused(interceptionSkill)
@@ -142,12 +147,30 @@ impl StepIntercept {
             let skill_mods = factory.find_skill_modifiers(game, interceptor);
             let card_mods = factory.find_card_modifiers(game, interceptor);
             let all: Vec<&ffb_mechanics::modifiers::interception_modifier::InterceptionModifier> = mods.iter().copied().chain(skill_mods.iter()).chain(card_mods.iter()).collect();
-            // Java: AgilityMechanic.minimumRollInterception(pInterceptor, interceptionModifiers)
-            let min = InterceptionModifierFactory::minimum_roll_bb2020(interceptor, &all);
+            // Java: AgilityMechanic.minimumRollInterception(pInterceptor, interceptionModifiers) —
+            // and that mechanic is per-EDITION. BB2016 needs `7 - min(AG, 6) + 2 + modifiers`
+            // (a 6 for an AG3 player), while BB2020/BB2025 use the AG-based roll. This shared step
+            // runs for ALL THREE editions (`step/bb2016/pass/step_intercept.rs` is dead — driver.rs
+            // globs `bb2025::pass::*`), so using the BB2020 formula made BB2016 interceptions
+            // succeed on rolls Java fails: lizardman bb2016 seed 6 i=18, an AG3 interceptor rolled
+            // a 2 and Rust caught the ball while Java let the pass through and scattered it.
+            let min = if game.rules == ffb_model::enums::Rules::Bb2016 {
+                InterceptionModifierFactory::minimum_roll_bb2016(interceptor, &all)
+            } else {
+                InterceptionModifierFactory::minimum_roll_bb2020(interceptor, &all)
+            };
             (min, false)
         };
 
-        let successful = roll >= minimum_roll;
+        // Java: DiceInterpreter.isSkillRollSuccessful(roll, minimumRoll) —
+        //   `(roll == 6) || ((roll != 1) && (roll >= pMinimumRoll))`
+        // A natural 6 ALWAYS succeeds and a natural 1 ALWAYS fails, whatever the target. A plain
+        // `roll >= minimum` diverges exactly where the target is unreachable: an AG2 BB2016
+        // interceptor needs 7, so only the natural-6 rule can ever succeed — Java caught the ball
+        // and Rust let it through (dark_elf_league_fumbbl bb2016 seed 1 i=142, both engines rolling
+        // the same 6 at stream position 46). The rule is edition-independent; it only became
+        // reachable once the harnesses started attempting interceptions.
+        let successful = roll == 6 || (roll != 1 && roll >= minimum_roll);
         let re_rolled = self.re_rolled_action.is_some() && self.re_roll_source.is_some();
         let is_bomb = matches!(
             game.thrower_action,
@@ -181,7 +204,7 @@ impl StepIntercept {
             easy_intercept,
         ));
 
-        successful
+        (successful, easy_intercept)
     }
 }
 
@@ -255,7 +278,7 @@ impl StepIntercept {
 
         // Java: boolean doIntercept = (possibleInterceptors.length > 0)
         if possible_interceptors.is_empty() {
-            return StepOutcome::goto(&label);
+            return StepOutcome::goto(&label).publish(StepParameter::InterceptorId(None));
         }
 
         // Java: if (!state.isInterceptorChosen()) → showDialog, TurnMode=INTERCEPTION, doNextStep=false
@@ -265,15 +288,28 @@ impl StepIntercept {
             return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::Interception {
                 player_id: possible_interceptors[0].clone(),
                 target_number: 0,
+                candidates: possible_interceptors.clone(),
             });
         }
 
         // Java: else if (interceptor != null) → intercept(interceptor, state)
+        // BB2020 splits what BB2025 fuses. `bb2020/pass/StepIntercept:179` sets
+        // `deflectionSuccessful = doIntercept` and stops the ball ONLY inside the `easyIntercept`
+        // branch, whereas `bb2025:179` sets `interceptionSuccessful` and stops the ball for every
+        // success. A BB2020 deflection therefore leaves the ball MOVING on the interceptor's square
+        // and the sequence carries on to StepCloudBurster (which may force a re-roll) and then to
+        // RESOLVE_PASS, which scatters it. This shared step runs for BOTH editions —
+        // `step/bb2020/pass/step_intercept.rs` is dead — so the difference is gated here rather
+        // than routed to the dead twin (see step/driver.rs for why routing does not work).
+        let is_bb2020 = game.rules == ffb_model::enums::Rules::Bb2020;
+        let mut easy = false;
         let do_intercept = if let Some(ref interceptor_id) = self.interceptor_id.clone() {
             // Roll the interception
-            let success = self.intercept(interceptor_id, game, rng);
-            if success {
-                // Java: game.getFieldModel().setBallMoving(false) / setBombMoving(false)
+            let (success, easy_intercept) = self.intercept(interceptor_id, game, rng);
+            easy = easy_intercept;
+            // Java: game.getFieldModel().setBallMoving(false) / setBombMoving(false)
+            let stops_the_ball = success && (!is_bb2020 || easy_intercept);
+            if stops_the_ball {
                 let is_bomb = matches!(
                     game.thrower_action,
                     Some(PlayerAction::ThrowBomb) | Some(PlayerAction::HailMaryBomb)
@@ -294,11 +330,31 @@ impl StepIntercept {
             let interceptor_id = self.interceptor_id.clone();
             // Java: publishParameter(StepParameter.from(StepParameterKey.INTERCEPTOR_ID, pInterceptor.getId()))
             // Java: getResult().setNextAction(StepAction.NEXT_STEP)
-            StepOutcome::next()
-                .publish(StepParameter::InterceptorId(interceptor_id))
+            let mut out = StepOutcome::next()
+                .publish(StepParameter::InterceptorId(interceptor_id));
+            if is_bb2020 {
+                // `PassState.deflectionSuccessful` — read by StepCloudBurster and StepResolvePass.
+                // BB2020 only counts an *easy* intercept as an outright catch.
+                out = out
+                    .publish(StepParameter::DeflectionSuccessful(true))
+                    .publish(StepParameter::InterceptionSuccessful(easy));
+            } else {
+                // `PassState.interceptionSuccessful` — BB2016/BB2025 treat every successful
+                // interception as a catch (`bb2025/StepIntercept:223`). StepResolvePass gates its
+                // ball-to-interceptor branch on THIS flag, not on "an interceptor id exists".
+                out = out.publish(StepParameter::InterceptionSuccessful(true));
+            }
+            out
         } else {
             // Java: doIntercept = false → getResult().setNextAction(StepAction.GOTO_LABEL, fGotoLabelOnFailure)
-            StepOutcome::goto(&label)
+            // …and CLEAR the interceptor. Java keeps `interceptorId` in a per-pass `PassState` that a
+            // fresh pass sequence re-creates, so a failed (or absent) interception simply has none.
+            // Rust threads it as a published StepParameter, which OUTLIVES the sequence: a successful
+            // interception in one pass was still visible to the NEXT pass's StepResolvePass, which
+            // then teleported that ball onto the old interceptor without any roll (dwarf bb2025 seed
+            // 45: the i=16 pass intercepted, and the unrelated i=17 pass put the ball on away_01 at
+            // 13,7 while Java bounced it to 12,4). The bb2016 twin already published None here.
+            StepOutcome::goto(&label).publish(StepParameter::InterceptorId(None))
         }
     }
 }
@@ -552,9 +608,154 @@ mod tests {
         for seed in 0u64..20 {
             let mut game_clone = game.clone();
             let result = step.intercept("opp1", &mut game_clone, &mut GameRng::new(seed));
-            if result { any_success = true; break; }
+            if result.0 { any_success = true; break; }
         }
         assert!(any_success, "intercept() never returned true for AG2 with FUMBLE pass (min_roll=2)");
+    }
+
+    /// BB2020 splits what BB2025 fuses. `bb2020/pass/StepIntercept:179` sets
+    /// `deflectionSuccessful` and stops the ball ONLY inside the `easyIntercept` branch, while
+    /// `bb2025:179` sets `interceptionSuccessful` and stops it on every success. A BB2020
+    /// deflection therefore leaves the ball MOVING on the interceptor's square so RESOLVE_PASS can
+    /// scatter it. This shared step runs for BOTH editions (`step/bb2020/pass/step_intercept.rs`
+    /// is dead), so without the gate a BB2020 deflection stopped the ball dead and the whole
+    /// scatter chain was skipped (high_elf bb2020 seed 61 i=3: ball at 12,7 vs Java's 14,7).
+    #[test]
+    fn a_successful_bb2020_interception_deflects_while_bb2025_catches() {
+        use ffb_model::enums::PlayerState as PS;
+        for (rules, ball_should_stop) in [(Rules::Bb2020, false), (Rules::Bb2025, true)] {
+            // Find a seed whose roll succeeds, then assert what the success DID.
+            let mut proved = false;
+            for seed in 0u64..40 {
+                let mut home = test_team("home", 0);
+                let mut away = test_team("away", 0);
+                let mut thrower = ffb_model::model::player::Player::default();
+                thrower.id = "t1".into();
+                home.players.push(thrower);
+                let mut opp = ffb_model::model::player::Player::default();
+                opp.id = "opp1".into();
+                opp.agility = 2;
+                away.players.push(opp);
+                let mut game = Game::new(home, away, rules);
+                game.thrower_id = Some("t1".into());
+                game.thrower_action = Some(PlayerAction::Pass);
+                game.pass_coordinate = Some(FieldCoordinate::new(14, 7));
+                game.field_model.set_player_coordinate("t1", FieldCoordinate::new(1, 7));
+                game.field_model.set_player_coordinate("opp1", FieldCoordinate::new(7, 7));
+                game.field_model.set_player_state("opp1", PS::new(ffb_model::enums::PS_STANDING));
+                game.field_model.ball_moving = true;
+
+                let mut step = StepIntercept::new("fail".into());
+                step.interceptor_id = Some("opp1".into());
+                step.interceptor_chosen = true;
+                step.pass_result = PassResult::FUMBLE;
+
+                let out = step.execute_step(&mut game, &mut GameRng::new(seed));
+                if out.action != StepAction::NextStep {
+                    continue; // the roll failed for this seed
+                }
+                assert_eq!(!game.field_model.ball_moving, ball_should_stop,
+                    "{rules:?}: a plain (non-easy) success must {} the ball",
+                    if ball_should_stop { "stop" } else { "leave moving" });
+                let deflection = out.published.iter().any(|p|
+                    matches!(p, StepParameter::DeflectionSuccessful(true)));
+                assert_eq!(deflection, rules == Rules::Bb2020,
+                    "{rules:?}: DeflectionSuccessful is a BB2020-only concept");
+                proved = true;
+                break;
+            }
+            assert!(proved, "{rules:?}: no seed produced a successful interception");
+        }
+    }
+
+    /// Java `DiceInterpreter.isSkillRollSuccessful(roll, min)` is
+    /// `(roll == 6) || ((roll != 1) && (roll >= min))` — a natural 6 ALWAYS succeeds and a natural 1
+    /// ALWAYS fails. Rust used a plain `roll >= min`, which diverges precisely where the target is
+    /// unreachable: an AG2 BB2016 interceptor needs 7, so only the natural-6 rule can ever succeed
+    /// (dark_elf_league_fumbbl bb2016 seed 1 i=142 — same interceptor, same die, Java caught the
+    /// ball and Rust let it through). The rule is edition-independent.
+    #[test]
+    fn a_natural_six_intercepts_even_when_the_target_is_unreachable() {
+        use ffb_model::enums::PlayerState as PS;
+        // AG2 in BB2016 needs max(2, 7 - 2 + 2) = 7, which no d6 can reach except by the natural-6
+        // rule. Find the seed whose interception die is a 6 and assert it succeeds.
+        let mut proved = false;
+        for seed in 0u64..60 {
+            let mut home = test_team("home", 0);
+            let mut away = test_team("away", 0);
+            let mut thrower = ffb_model::model::player::Player::default();
+            thrower.id = "t1".into();
+            home.players.push(thrower);
+            let mut opp = ffb_model::model::player::Player::default();
+            opp.id = "opp1".into();
+            opp.agility = 2;
+            away.players.push(opp);
+            let mut game = Game::new(home, away, Rules::Bb2016);
+            game.thrower_id = Some("t1".into());
+            game.thrower_action = Some(PlayerAction::Pass);
+            game.pass_coordinate = Some(FieldCoordinate::new(14, 7));
+            game.field_model.set_player_coordinate("t1", FieldCoordinate::new(1, 7));
+            game.field_model.set_player_coordinate("opp1", FieldCoordinate::new(7, 7));
+            game.field_model.set_player_state("opp1", PS::new(ffb_model::enums::PS_STANDING));
+
+            let mut step = StepIntercept::new("fail".into());
+            step.interceptor_id = Some("opp1".into());
+            step.interceptor_chosen = true;
+            step.pass_result = PassResult::FUMBLE;
+
+            let mut rng = GameRng::new(seed);
+            let before = rng.call_count;
+            let out = step.execute_step(&mut game, &mut rng);
+            let _ = before;
+            if out.action == StepAction::NextStep {
+                proved = true; // a success at an unreachable target can only be the natural 6
+                break;
+            }
+        }
+        assert!(proved,
+            "an unreachable target (AG2 BB2016 needs 7) must still be interceptable on a natural 6");
+    }
+
+    /// Java `UtilPassing.findInterceptors` skips `otherPlayer.hasSkillProperty(preventCatch)` — a
+    /// player who cannot catch cannot intercept. Rust omitted the clause, so a dwarf Deathroller
+    /// (No Hands) was offered as an interceptor and the ball ended on it (dwarf bb2025 seed 45).
+    /// Java's `canIntercept` is purely geometric and has NO thrower-square / target-square
+    /// exclusion, so Rust must not add one either.
+    #[test]
+    fn a_player_who_cannot_catch_is_not_an_interceptor() {
+        use ffb_model::enums::PlayerState as PS;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::enums::SkillId;
+        let mut home = test_team("home", 0);
+        let mut away = test_team("away", 0);
+        let mut thrower = ffb_model::model::player::Player::default();
+        thrower.id = "t1".into();
+        home.players.push(thrower);
+        // Two opponents in the corridor; only the second can catch.
+        let mut no_hands = ffb_model::model::player::Player::default();
+        no_hands.id = "roller".into();
+        no_hands.starting_skills = vec![SkillWithValue { skill_id: SkillId::NoHands, value: None }];
+        away.players.push(no_hands);
+        let mut ok = ffb_model::model::player::Player::default();
+        ok.id = "catcher".into();
+        away.players.push(ok);
+
+        let mut game = Game::new(home, away, Rules::Bb2025);
+        game.thrower_id = Some("t1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.pass_coordinate = Some(FieldCoordinate::new(14, 7));
+        game.field_model.set_player_coordinate("t1", FieldCoordinate::new(1, 7));
+        for id in ["roller", "catcher"] {
+            game.field_model.set_player_state(id, PS::new(ffb_model::enums::PS_STANDING));
+        }
+        game.field_model.set_player_coordinate("roller", FieldCoordinate::new(7, 7));
+        game.field_model.set_player_coordinate("catcher", FieldCoordinate::new(9, 7));
+
+        let found = StepIntercept::find_interceptors(&game);
+        assert!(!found.iter().any(|id| id == "roller"),
+            "a No Hands player must never be offered as an interceptor");
+        assert!(found.iter().any(|id| id == "catcher"),
+            "an ordinary opponent in the corridor still is one");
     }
 
     #[test]

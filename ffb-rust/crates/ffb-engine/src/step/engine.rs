@@ -2141,8 +2141,9 @@ impl Step {
                 if let Some(interceptor_id) = eligible.into_iter().next() {
                     // Interception target for a skill-less lineman: 6 (BB2025 base without modifiers).
                     StepOutcome::cont().with_prompt(AgentPrompt::Interception {
-                        player_id: interceptor_id,
+                        player_id: interceptor_id.clone(),
                         target_number: 6,
+                        candidates: vec![interceptor_id],
                     })
                 } else {
                     StepOutcome::next()

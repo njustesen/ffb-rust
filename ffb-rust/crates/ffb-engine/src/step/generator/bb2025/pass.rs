@@ -84,10 +84,13 @@ impl Pass {
         seq.add_labelled(StepId::Intercept, labels::INTERCEPT, vec![
             StepParameter::GotoLabelOnFailure(labels::RESOLVE_PASS.into()),
         ]);
-        // 12 insertHooks(PASS_INTERCEPT) — real call, but BB2025 has no @StepHook-annotated
-        // step registered for this hook point (StepSafeThrow is BB2016-only, StepCloudBurster
-        // is BB2020-only), so this is a genuine no-op, matching real Java's own StepFactory.
-        seq.insert_hooks(Rules::Bb2025, HookPoint::PassIntercept, vec![
+        // 12 insertHooks(PASS_INTERCEPT) — the hook set is per-EDITION: BB2016 registers
+        // StepSafeThrow, BB2020 registers StepCloudBurster, BB2025 registers nothing (matching
+        // real Java's own StepFactory). This generator is SHARED — a BB2020 game builds its pass
+        // sequence here, `generator/bb2020/pass.rs` being dead — so the edition must come from the
+        // game, not a literal. Hard-coding Rules::Bb2025 made the call an unconditional no-op and
+        // StepCloudBurster never dispatched in any BB2020 game.
+        seq.insert_hooks(params.rules, HookPoint::PassIntercept, vec![
             StepParameter::GotoLabelOnFailure(labels::RESOLVE_PASS.into()),
         ]);
         // 13 RESOLVE_PASS [RESOLVE_PASS]
@@ -151,6 +154,35 @@ mod tests {
         let steps = Pass::build_sequence(&PassParams::default());
         let intercept_idx = steps.iter().position(|s| s.step_id == StepId::Intercept).unwrap();
         assert_eq!(steps[intercept_idx + 1].step_id, StepId::ResolvePass);
+    }
+
+    /// The PASS_INTERCEPT hook set is per-EDITION and this generator is SHARED — a BB2020 game
+    /// builds its pass sequence here (`generator/bb2020/pass.rs` is dead), so the edition must come
+    /// from the game rather than a literal. Hard-coding `Rules::Bb2025` made the call an
+    /// unconditional no-op, and `StepCloudBurster` was never spliced into any BB2020 pass sequence.
+    #[test]
+    fn pass_splices_the_intercept_hook_of_the_games_own_edition() {
+        for (rules, expected) in [
+            (Rules::Bb2016, Some(StepId::SafeThrow)),
+            (Rules::Bb2020, Some(StepId::CloudBurster)),
+            (Rules::Bb2025, None),
+        ] {
+            let steps = Pass::build_sequence(&PassParams { rules, ..Default::default() });
+            let idx = steps.iter().position(|s| s.step_id == StepId::Intercept).unwrap();
+            let after = steps[idx + 1].step_id;
+            match expected {
+                Some(hook) => {
+                    assert_eq!(after, hook, "{rules:?}: INTERCEPT must be followed by its hook step");
+                    assert_eq!(steps[idx + 2].step_id, StepId::ResolvePass,
+                        "{rules:?}: the hook sits between INTERCEPT and RESOLVE_PASS");
+                    assert!(steps[idx + 1].params.iter().any(|p| matches!(p,
+                        StepParameter::GotoLabelOnFailure(l) if l == labels::RESOLVE_PASS)),
+                        "{rules:?}: the hook step is forwarded GOTO_LABEL_ON_FAILURE=RESOLVE_PASS");
+                }
+                None => assert_eq!(after, StepId::ResolvePass,
+                    "{rules:?}: no step is registered for this hook point"),
+            }
+        }
     }
 
     #[test]
