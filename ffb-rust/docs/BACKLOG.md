@@ -90,10 +90,24 @@ expected intermediate state), then fix, then green the seeds. Do not gate or com
 away turn 5 — Rust ended the home turn early; `h02` Prone in Rust, Standing in Java). But `rng_calls`
 diverge EARLIER, at i=56: Java 37 vs Rust 36. So the extra Java call happens during the i=55
 activation `Activate(away_03, PASS)`, where Java spends four calls (33→37) and Rust three (33→36).
-Java's calls #36 `d6=4` and #37 `d6=2` are both `rollSkill:112`, so the die name cannot say which is
-the pass, the interception or a catch — identify it by printing the rng call-count at each roll site
-on both sides. Likely shape: one engine's interception succeeded and skipped a catch roll the other
-made (bb2016 has no deflection — an interception simply IS a catch).
+Narrowed further (2026-08-18). Both engines roll the SAME VALUES at calls #34-#37 (`2, 4, 4, 2`).
+Rust spends three of them and Java four:
+
+- Rust `#34` = the interception, `roll=2 min=6 ok=false ag=4` (probe `IC`), then `#35` = the pass roll,
+  then `#36` = something that is NOT a catch. Its `DRIVE` window for i=55 is
+  `Pass -> ResolvePass -> GotoLabel -> CatchScatterThrowIn -> EndPassing`.
+- **`catch_ball` is NEVER CALLED in the whole game** — a probe at its entry printed nothing. So after
+  a FAILED bb2016 interception Rust never rolls the receiver's catch, while Java rolls `#36 d6=4` and
+  then `#37 d6=2`, which looks like a catch followed by a **Catch-skill re-roll** (high elves have
+  Catch). That missing catch is the bug; find why `CatchScatterThrowIn` reaches neither
+  `handle_regular_catch`'s roll nor `catch_ball` — most likely `catcher_id` is None AND nobody is
+  registered under the ball, so it takes an empty-square branch.
+- This seed was ALREADY red in gate4 (step 66), so it is a pre-existing bug, not something the
+  interception work introduced.
+
+PROBES CURRENTLY IN THE TREE for this investigation — remove before gating, then `git diff` and read
+every `-` line: `FFB_P2` prints `IC` in `bb2025/pass/step_intercept.rs`, and `CB entry` + `CATCH` in
+`bb2025/shared/step_catch_scatter_throw_in.rs`.
 
 **Blocking seeds** (four are BB2020 deflections)
 
