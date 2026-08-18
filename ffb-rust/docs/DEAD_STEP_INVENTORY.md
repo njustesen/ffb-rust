@@ -218,3 +218,49 @@ Every target in this tier has been one of these:
    invisible until a mechanic that can produce an out-of-range target starts running.
 5. A **Java predicate re-implemented with a missing or an extra clause** (`preventCatch`; the extra
    thrower/target-square exclusion), harmless until the mechanic that uses it starts running.
+
+
+---
+
+## Update 2026-08-18 (3) — Cloud Burster is DRIVEN; interception is ON in both harnesses
+
+**Supersedes Update (2) above**, which recorded Cloud Burster as "plumbing correct, blocked on BB2020
+deflection fidelity". That blocker is gone. Agent-driven interception is now ENABLED in both
+harnesses — each picks a COORDINATE-sorted candidate (never id-sorted; the two engines' player ids
+differ) from the ENGINE's own `UtilPassing.findInterceptors`, with exactly one `actionRng` draw.
+
+| skill | drafted carrier | trigger reachable? |
+|---|---|---|
+| **Cloud Burster** | bb2020 only (bb2025 has no `CloudBursterBehaviour` at all) | **YES — driven** |
+
+Switching interception on exposed **twelve** Rust fidelity bugs in total. The seven shipped in
+`4677499b` are listed in Update (2); the five that finished the job:
+
+| # | Fix | Commit |
+|---|-----|--------|
+| 8 | `StepResolvePass` gates the ball-to-interceptor branch on the PER-EDITION success flag (BB2020 `isDeflectionSuccessful`, BB2016/BB2025 `isInterceptionSuccessful`) — never on `interceptor_id.is_some()` | `66607f9b` |
+| 9 | The BB2020 deflected branch clears `CatcherId`, so the deflected catch resolves for the DEFLECTOR under the ball rather than the intended receiver | `494c68a0` |
+| 10 | A FAILED interception is re-rolled from a SKILL source on the interceptor, recursing into `intercept()`; the lookup key is per-edition (BB2016 `CATCH`, BB2020/BB2025 `INTERCEPTION`) | `ef647683` |
+| 11 | A successful Safe Throw clears the interception success flags as well as `InterceptorId` | `01da521e` |
+
+### The parameter-outlives-its-sequence family — four instances
+
+Java keeps pass state in a `PassState` object that is **re-created for each pass**. Rust threads the
+same values as published step parameters, which **persist past the sequence that published them**.
+Every one of these was the same bug wearing a different hat: `InterceptorId` surviving into a later
+pass, `CatcherId` leaking into a deflected catch, the deflection flags outliving their pass, and the
+Safe Throw flags not being cleared when the interception was cancelled.
+
+**When adding any new published flag, ask what clears it.** That question would have caught all four.
+
+### Technique note
+
+`FFB_DICE_DEEP=1` makes Java print the FULL caller chain for every die. When two dice share a
+`rollSkill:112` frame — as the pass, interception, Safe Throw and catch rolls all do — never infer
+which is which from the values. It identified the culprit in one run for three consecutive bugs, and
+one inference-based theory ("missing tacklezone modifiers") was flatly wrong and nearly produced a
+bad fix to working code.
+
+Also: `driver.rs` has a PER-EDITION OVERRIDE BLOCK (~line 434) that takes precedence over its glob
+imports — BB2016 runs its own `StepCatchScatterThrowIn`. Checking the globs alone is not enough;
+three probes went into dead files this session before that was understood.

@@ -44,7 +44,7 @@ Gate `gate5` came back **bb2016 30/30, bb2020 30/30, bb2025 30/30, zero reds**. 
 
 ---
 
-## 2. BB2020 deflection fidelity, then re-enable interception
+## 2. BB2020 deflection fidelity, then re-enable interception — ✅ DONE 2026-08-18
 
 The only thing between this campaign and a live Cloud Burster. Diagnosed down to one function.
 
@@ -113,8 +113,18 @@ expected intermediate state), then fix, then green the seeds. Do not gate or com
       of the same family already fixed twice (`InterceptorId` leaking, `CatcherId` leaking), so check
       whether a parameter is missing or stale here too.
 
-      PROBES IN THE TREE for this: `FFB_ST` prints `ST entry` and `ST rolling` in
-      `bb2016/pass/step_safe_throw.rs`. Remove before gating and read every `-` line of the diff. After the narrowed CatcherId fix:
+      **DONE (`01da521e`).** The cause was a consequence of fix 8: a successful Safe Throw CANCELS
+      the interception (Java publishes `INTERCEPTOR_ID = null`), but the interception success flags
+      that `StepResolvePass` now gates on were left set, so ResolvePass took the interceptor branch,
+      published no catch mode, and the bb2016 `CatchScatterThrowIn` returned early on `mode == None`.
+      Safe Throw's success path now clears all three. Test
+      `a_successful_safe_throw_clears_the_interception_flags`.
+
+**SECTION COMPLETE.** Gate `gate7`: bb2016 30/30, bb2020 30/30, bb2025 30/30 at seeds 1-100 with
+agent-driven interception ENABLED. Workspace 14,539 pass / 0 fail. Cloud Burster is a live mechanic.
+Twelve Rust fidelity bugs came out of this campaign; see `docs/DEAD_STEP_INVENTORY.md` Update (3) for
+the full table and the two technique notes worth carrying forward (`FFB_DICE_DEEP=1`, and the
+parameter-outlives-its-sequence family). After the narrowed CatcherId fix:
       **green** — dark_elf bb2020 21, dark_elf_league_fumbbl bb2020 21, amazon bb2020 75,
       necromantic bb2020 41 (and necromantic 8, the regression the first attempt caused);
       **still red** — elf bb2016 83, high_elf bb2016 24. Both bb2016, so the BB2020 deflection work
