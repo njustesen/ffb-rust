@@ -278,7 +278,16 @@ Work in this order; each needs the trigger verified as reachable *before* any ha
          harnesses taught to declare `GAZE_MOVE` **in lockstep** — the same shape as the TTM, KTM and
          interception campaigns, and the same risk profile: expect it to expose real engine bugs.
 
-      Do blocker 1 first (it is a pure fidelity fix and gate-able on its own), then decide on 2.
+      **Blocker 1 FIXED (`gate9` 30/30/30).** The `GAZE_SELECT` arm now lives in the LIVE shared
+      `bb2025/shared/step_end_selecting.rs`, gated to BB2020, test
+      `gaze_select_pushes_the_gaze_target_sequence_in_bb2020`. It is **LATENT** — vampire bb2020 still
+      measures 10/10 with ZERO `SelectGazeTarget` dispatches, exactly as blocker 2 predicts. The steps
+      can now be reached; they are not yet driven.
+      **Blocker 2 REMAINS** and is the whole job: teach both harnesses to declare `GAZE_MOVE` in
+      lockstep. Use `--home vampire --away vampire --edition bb2020` (vampire is the Hypnotic Gaze
+      roster). Expect it to behave like the interception campaign — reds first, real engine bugs
+      behind them. If two iterations pass without converging, say so plainly and consider scoping
+      down rather than grinding; that fallback was right once already.
 - [ ] `DauntlessMultiple` — `Dauntless` itself runs.
 - [ ] The bomb chain — `InitBomb`, `EndBomb`, `ResolveBomb`, `Bombardier2`.
 - [ ] `HailMaryPass`.
