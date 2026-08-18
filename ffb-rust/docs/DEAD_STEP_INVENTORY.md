@@ -86,3 +86,47 @@ by data, not by bug — BB2020/BB2025 kicks go through the ThrowTeamMate sequenc
 Both campaigns finished today started from exactly this question and each yielded six to ten real
 engine bugs. A green matrix can mean the harness never exercised the mechanic at all — the 69 steps
 above are where that is provably true today.
+
+---
+
+## Bucket (d) triaged against the DATA (2026-08-18, second pass)
+
+The categories above were name-based guesses. This pass resolves them against what the parity teams
+actually field: team specs list only `position_id`, so a skill is present only if a **drafted
+position** carries it as a starting skill. (Grepping `data/teams/` for skill names proves nothing —
+the specs contain no skill names at all. That mistake is why the first pass was only a hypothesis.)
+
+Drafted-player starting skills: bb2016 57 distinct, bb2020 76, bb2025 88.
+
+### (d1) Unreachable by DATA — no drafted player has the skill. Not bugs.
+
+`Pro`, `Treacherous`, `Baleful Hex`, `Black Ink`, `Catch of the Day`, `Wisdom of the White Dwarf`,
+`Then I Started Blastin`, `Raiding Party`, `All You Can Eat`, `Quick Bite`, `Pile Driver`,
+`Furious Outburst`, `Look Into My Eyes`.
+
+Same class as the BB2016 Kick-Team-Mate chain: the code is fine, nothing on the pitch can trigger it.
+Reaching these means changing the drafted teams, which is a separate (and larger) decision.
+
+### (d2) Reachable by data, yet the step never fires — the real targets
+
+| skill | editions with a drafted carrier | dead steps |
+|---|---|---|
+| **Punt** | bb2025 | `InitPunt`, `EndPunt`, `PuntDirection`, `PuntDistance` |
+| **Hit and Run** | bb2020, bb2025 | `HitAndRun` |
+| **Hail Mary Pass** | bb2025 | `HailMaryPass` |
+| **Cloud Burster** | bb2020, bb2025 | `CloudBurster` |
+| Hypnotic Gaze | all three | `SelectGazeTarget`, `SelectGazeTargetEnd` (the `HypnoticGaze` step itself DOES run) |
+| Dauntless | all three | `DauntlessMultiple` (`Dauntless` itself runs) |
+| Bombardier | all three | `InitBomb`, `EndBomb`, `ResolveBomb`, `Bombardier2` (`Bombardier` itself runs) |
+
+### Punt is the clearest next campaign — same shape as TTM and KTM
+
+Both harnesses OFFER the action and then abort the target window, in lockstep:
+- Rust `random_agent.rs`: `Some(AgentPrompt::PuntTarget { .. }) => Action::EndTurn`, with a comment
+  noting Java has no INIT_PUNT handler.
+- Java `ParityRunner`: `computeEligiblePlayers` adds `PlayerAction.PUNT` (BB2025, `canPunt`, ball
+  carrier), but there is no `INIT_PUNT` step handler at all.
+
+Because both abort together the matrices stay green — exactly how Throw Team-Mate and Kick Team-Mate
+stayed green while never executing. A BB2025 roster fields a Punt carrier, so the mechanic is
+reachable the moment both harnesses learn to drive the target window.
