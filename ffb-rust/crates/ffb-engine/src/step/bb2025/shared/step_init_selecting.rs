@@ -341,7 +341,13 @@ impl StepInitSelecting {
                         PlayerAction::Foul => {
                             target_params.push(StepParameter::FoulDefenderId(def));
                         }
-                        PlayerAction::Pass | PlayerAction::HandOver => {
+                        // A bomb travels the same route as a pass: it dispatches into the Pass
+                        // sequence and `StepInitPassing` takes its target from TARGET_COORDINATE
+                        // (Rust's stand-in for Java's CLIENT_PASS). Without ThrowBomb here the
+                        // bomb reached that step with no coordinate, so thrower/throwerAction were
+                        // never set and the step parked on `cont()` forever — both engines stalled
+                        // three steps into goblin bb2025 seed 1.
+                        PlayerAction::Pass | PlayerAction::HandOver | PlayerAction::ThrowBomb => {
                             if let Some(coord) = game.field_model.player_coordinate(&def) {
                                 target_params.push(StepParameter::TargetCoordinate(coord));
                             }
