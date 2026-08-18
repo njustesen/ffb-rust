@@ -74,7 +74,14 @@ pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerActi
         let was_prone = pre_state
             .map(|s| s.base() == ffb_model::enums::PS_PRONE).unwrap_or(false);
         game.acting_player.set_player(player_id.to_owned(), action);
-        game.acting_player.standing_up = was_prone;
+        // `standingUp` is set ONLY on a genuine player change: Java puts setPlayer /
+        // setOldPlayerState / setStandingUp / the MOVING write inside `if (newPlayer != oldPlayer)`
+        // and leaves only setPlayerAction / setJumping outside it. Rust set it unconditionally, so a
+        // same-player RE-DISPATCH recomputed `was_prone` from the CURRENT state — by then MOVING, not
+        // PRONE — and silently cleared the flag mid-activation, skipping the stand-up.
+        if changed {
+            game.acting_player.standing_up = was_prone;
+        }
         game.acting_player.jumping = jumping;
         // Java UtilActingPlayer.changeActingPlayer: "// show acting player as moving" —
         // fieldModel.setPlayerState(newPlayer, oldState.changeBase(PlayerState.MOVING)).
@@ -325,6 +332,35 @@ mod tests {
         assert_eq!(game.field_model.player_state("mov").unwrap().base(), PS_STANDING, "stray MOVING → STANDING");
         assert_eq!(game.field_model.player_state("thr").unwrap().base(), PS_MOVING, "thrower MOVING preserved");
         assert_eq!(game.field_model.player_state("act").unwrap().base(), PS_MOVING, "acting-player MOVING preserved");
+    }
+
+    /// Java puts `setPlayer` / `setOldPlayerState` / `setStandingUp` / the MOVING write inside
+    /// `if (newPlayer != oldPlayer)` and leaves only `setPlayerAction` / `setJumping` outside it, so
+    /// a SAME-player re-dispatch must not touch `standingUp`. Rust set it unconditionally from a
+    /// `was_prone` recomputed off the CURRENT state — by then MOVING, never PRONE — which cleared
+    /// the flag mid-activation and skipped the stand-up (skaven seed 30 i=29).
+    #[test]
+    fn a_same_player_redispatch_leaves_standing_up_alone() {
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_PRONE, PS_MOVING};
+        use ffb_model::model::player::Player;
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8, ..Default::default()
+        });
+        game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE));
+
+        // Genuine activation of a PRONE player: standing_up is set, the base becomes MOVING.
+        change_player_action(&mut game, "p1", PlayerAction::Move, false);
+        assert!(game.acting_player.standing_up, "activating a prone player sets standingUp");
+        assert_eq!(game.field_model.player_state("p1").unwrap().base(), PS_MOVING);
+
+        // Re-dispatching the SAME player (e.g. a Blitz whose block sub-activation re-invokes this)
+        // must leave the flag alone, even though the state now reads MOVING rather than PRONE.
+        change_player_action(&mut game, "p1", PlayerAction::Move, false);
+        assert!(game.acting_player.standing_up,
+            "a same-player re-dispatch must not clear standingUp");
     }
 
     #[test]

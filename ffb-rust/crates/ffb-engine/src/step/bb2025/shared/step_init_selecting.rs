@@ -158,9 +158,18 @@ impl Step for StepInitSelecting {
                         // (Bloodlust prone=false for a MA6 Vampire; vampire seed 1 i=43: a prone Vampire failing
                         // Bloodlust ends STANDING in Java but stayed PRONE in Rust). MA<3 players still roll to
                         // stand up in StepStandUp, so they are not pre-stood here.
+                        // The base is MOVING, not STANDING: Java's changeActingPlayer already put the
+                        // freshly activated player in MOVING ("show acting player as moving") and its
+                        // StepStandUp never writes STANDING on success — only a FAILED stand-up writes
+                        // PRONE. MOVING is Java's "standing" for every isStanding() test, and the acting
+                        // player must still read MOVING later in the activation: StepEndBlocking's
+                        // canMoveAfterBlock (Hit and Run) and canFoulAfterBlock (Pile Driver) both gate on
+                        // `playerState.getBase() == MOVING`, so writing STANDING here silently disabled
+                        // both for every player that stood up (amazon bb2020 seed 3 i=7: home_03's Hit
+                        // and Run window never opened in Rust while Java drove the move).
                         if has_free || ma >= 3 {
                             if let Some(ps) = game.field_model.player_state(player_id) {
-                                game.field_model.set_player_state(player_id, ps.change_base(ffb_model::enums::PS_STANDING));
+                                game.field_model.set_player_state(player_id, ps.change_base(ffb_model::enums::PS_MOVING));
                             }
                         }
                         if !has_free {
@@ -441,6 +450,42 @@ mod tests {
         assert!(matches!(out.prompt, Some(AgentPrompt::ActivatePlayer { .. })));
     }
 
+    /// The activation pre-stand writes MOVING, not STANDING. Java's `changeActingPlayer` puts the
+    /// freshly activated player in MOVING ("show acting player as moving") and its `StepStandUp`
+    /// never writes STANDING on success. MOVING satisfies every `isStanding()` test and the
+    /// activation-end `changeActingPlayer` reverts it to STANDING, so the compared state hash is
+    /// unaffected — but MID-activation `StepEndBlocking` gates both `canMoveAfterBlock` (Hit and
+    /// Run) and `canFoulAfterBlock` (Pile Driver) on `base == MOVING`, so STANDING here silently
+    /// disabled both for any player that stood up (amazon bb2020 seed 3 i=7).
+    #[test]
+    fn a_prone_player_activated_for_a_move_is_left_moving_not_standing() {
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_PRONE, PS_MOVING};
+        use ffb_model::model::player::Player;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.team_home.players.push(Player {
+            id: "h1".into(), name: "h1".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("h1", FieldCoordinate::new(12, 7));
+        game.field_model.set_player_state("h1", PlayerState::new(PS_PRONE));
+
+        let mut step = StepInitSelecting::new("end".into());
+        let out = step.handle_command(&Action::ActivatePlayer {
+            player_id: "h1".into(),
+            player_action: PlayerActionChoice::Move,
+            block_defender_id: None,
+        }, &mut game, &mut GameRng::new(0));
+        let _ = out;
+
+        assert!(game.acting_player.standing_up, "a PRONE activation is standing up");
+        assert_eq!(game.field_model.player_state("h1").unwrap().base(), PS_MOVING,
+            "the pre-stand must leave the acting player MOVING, not STANDING");
+    }
+
     #[test]
     fn standing_blitz_with_no_target_ends_the_turn_without_dispatch() {
         // Regression (human seed 7 i=196): a STANDING player that declares a Blitz with no adjacent
@@ -632,7 +677,9 @@ mod tests {
         // force_goto for Block/Blitz jumped straight to the block and the prone blitzer never stood up.
         let mut game = make_game();
         game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE));
-        game.acting_player.player_id = Some("p1".into());
+        // NOTE: the acting player must NOT already be "p1" — Java sets standingUp only inside
+        // `if (newPlayer != oldPlayer)`, so pre-assigning the same id would make this a re-dispatch.
+        game.acting_player.player_id = None;
         let mut step = StepInitSelecting::new("end_label".into());
         let action = Action::ActivatePlayer {
             player_id: "p1".into(),
@@ -682,7 +729,9 @@ mod tests {
         });
         game.field_model.set_player_coordinate("p1", FieldCoordinate::new(5, 5));
         game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE));
-        game.acting_player.player_id = Some("p1".into());
+        // NOTE: the acting player must NOT already be "p1" — Java sets standingUp only inside
+        // `if (newPlayer != oldPlayer)`, so pre-assigning the same id would make this a re-dispatch.
+        game.acting_player.player_id = None;
         let mut step = StepInitSelecting::new("end_label".into());
         let action = Action::ActivatePlayer {
             player_id: "p1".into(),

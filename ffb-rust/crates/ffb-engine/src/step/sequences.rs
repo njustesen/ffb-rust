@@ -264,9 +264,24 @@ pub fn inducement_sequence_with_check_forgo(phase: InducementPhase, home_team: b
 
 /// Java: HitAndRun / ball-enters-square sequence — PickUp followed by CatchScatterThrowIn.
 pub fn pick_up_catch_scatter_sequence() -> Vec<SequenceStep> {
+    use crate::step::generator::sequence::labels;
+    // Java `StepHitAndRun` builds this as THREE entries, not two:
+    //     sequence.add(PICK_UP, from(GOTO_LABEL_ON_FAILURE, SCATTER_BALL));
+    //     sequence.jump(NEXT);
+    //     sequence.add(CATCH_SCATTER_THROW_IN, SCATTER_BALL);
+    // The FAILURE LABEL is the part that matters here. Without it a failed pick-up gotos the unset
+    // label `""`, which drains the whole step stack and ends the game on the spot — Rust logged 11
+    // lines where Java played 263 (amazon bb2020 seed 8, first reachable once Hit and Run actually
+    // ran). Adding it took amazon bb2020 from 7/10 to 8/10.
+    //
+    // Java's `sequence.jump(NEXT)` is deliberately NOT translated: NEXT is a fall-through sentinel
+    // in Java's sequence builder, and Rust's flattened sequence expresses the same thing by simply
+    // continuing to the following entry. Emitting a real GotoLabel("NEXT") step finds no such label
+    // and drains the stack — measured, and it scored 0/10 where omitting it scores 8/10.
     vec![
-        SequenceStep::new(StepId::PickUp),
-        SequenceStep::new(StepId::CatchScatterThrowIn),
+        SequenceStep::with_params(StepId::PickUp,
+            vec![StepParameter::GotoLabelOnFailure(labels::SCATTER_BALL.into())]),
+        SequenceStep::labelled(StepId::CatchScatterThrowIn, labels::SCATTER_BALL, Vec::new()),
     ]
 }
 
@@ -291,6 +306,26 @@ mod tests {
     /// event publishes for a hit player; without them the Officious Ref's Ball & Chain injury was
     /// rolled and then silently dropped (goblin bb2020 seed 38: the Fanatic stayed Standing where
     /// Java has it Ko).
+    /// Java `StepHitAndRun` threads GOTO_LABEL_ON_FAILURE=SCATTER_BALL onto its PICK_UP and labels
+    /// the following CATCH_SCATTER_THROW_IN with it. Without the pair a FAILED pick-up gotos the
+    /// unset label `""`, which drains the whole step stack and ends the game (amazon bb2020 seed 8:
+    /// Rust logged 11 steps where Java played 263). `sequence.jump(NEXT)` is deliberately absent —
+    /// NEXT is Java's fall-through sentinel, and a literal GotoLabel("NEXT") measured 0/10.
+    #[test]
+    fn pick_up_catch_scatter_routes_a_failed_pick_up_to_the_scatter_label() {
+        use crate::step::generator::sequence::labels;
+        let seq = pick_up_catch_scatter_sequence();
+        let ids: Vec<StepId> = seq.iter().map(|st| st.step_id).collect();
+        assert_eq!(ids, vec![StepId::PickUp, StepId::CatchScatterThrowIn]);
+        assert!(seq[0].params.iter().any(|p| matches!(p,
+            StepParameter::GotoLabelOnFailure(l) if l == labels::SCATTER_BALL)),
+            "a failed pick-up must goto SCATTER_BALL, not the unset label");
+        assert_eq!(seq[1].label.as_deref(), Some(labels::SCATTER_BALL),
+            "the goto target must exist in the same sequence");
+        assert!(!ids.iter().any(|id| format!("{id:?}").contains("Goto")),
+            "Java's sequence.jump(NEXT) is a fall-through sentinel, never a real step");
+    }
+
     #[test]
     fn kickoff_sequence_applies_kickoff_event_injuries() {
         use ffb_model::enums::Rules;

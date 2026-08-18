@@ -109,7 +109,15 @@ impl StepStandUp {
             // standing-up flow). current_move already holds the STAND_UP_COST from the activation.
             if let Some(pid) = game.acting_player.player_id.clone() {
                 if let Some(ps) = game.field_model.player_state(&pid) {
-                    game.field_model.set_player_state(&pid, ps.change_base(ffb_model::enums::PS_STANDING));
+                    // MOVING, not STANDING: Java's changeActingPlayer keeps the acting player in
+                    // MOVING for the whole activation ("show acting player as moving"), and
+                    // MOVING satisfies every isStanding() test. The activation-end
+                    // changeActingPlayer reverts it to STANDING, so the compared state hash is
+                    // unchanged — but MID-activation the difference matters: StepEndBlocking's
+                    // canMoveAfterBlock (Hit and Run) and canFoulAfterBlock (Pile Driver) both
+                    // require base == MOVING, so writing STANDING here disabled both for any
+                    // player that had stood up this activation.
+                    game.field_model.set_player_state(&pid, ps.change_base(ffb_model::enums::PS_MOVING));
                 }
             }
             // Java's free-stand-up branch (`StepStandUp.java:136-138`) sets ONLY `setHasMoved(true)`
@@ -211,7 +219,15 @@ impl StepStandUp {
             // diverging from Java's Standing at the next activation's state hash).
             if let Some(pid) = game.acting_player.player_id.clone() {
                 if let Some(ps) = game.field_model.player_state(&pid) {
-                    game.field_model.set_player_state(&pid, ps.change_base(ffb_model::enums::PS_STANDING));
+                    // MOVING, not STANDING: Java's changeActingPlayer keeps the acting player in
+                    // MOVING for the whole activation ("show acting player as moving"), and
+                    // MOVING satisfies every isStanding() test. The activation-end
+                    // changeActingPlayer reverts it to STANDING, so the compared state hash is
+                    // unchanged — but MID-activation the difference matters: StepEndBlocking's
+                    // canMoveAfterBlock (Hit and Run) and canFoulAfterBlock (Pile Driver) both
+                    // require base == MOVING, so writing STANDING here disabled both for any
+                    // player that had stood up this activation.
+                    game.field_model.set_player_state(&pid, ps.change_base(ffb_model::enums::PS_MOVING));
                 }
             }
             // Java: only checked in the `successful` branch, and — unlike the failure
@@ -329,7 +345,7 @@ mod tests {
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::{StepAction, StepParameter};
-    use ffb_model::enums::{Rules, TurnMode};
+    use ffb_model::enums::{PlayerState, Rules, TurnMode, PS_MOVING, PS_PRONE};
     use ffb_model::util::rng::GameRng;
 
     fn make_game() -> Game {
@@ -458,6 +474,36 @@ mod tests {
                      Appearance failure can revert the player to PRONE");
             }
             assert!(g.acting_player.has_moved);
+            return;
+        }
+        panic!("no seed produced a successful stand-up");
+    }
+
+    /// Java's `changeActingPlayer` puts the activated player in MOVING ("show acting player as
+    /// moving") and its `StepStandUp` never writes STANDING — only a FAILED stand-up writes PRONE.
+    /// A player that stood up must therefore still read MOVING for the rest of its activation:
+    /// `StepEndBlocking`'s `canMoveAfterBlock` (Hit and Run) and `canFoulAfterBlock` (Pile Driver)
+    /// both require `playerState.getBase() == MOVING`, so writing STANDING here silently disabled
+    /// both skills for anyone who had stood up (amazon bb2020 seed 3 i=7).
+    #[test]
+    fn a_stood_up_player_stays_moving_for_the_rest_of_the_activation() {
+        for seed in 0u64..200 {
+            let mut g = make_game();
+            let mut p = ffb_model::model::player::Player::default();
+            p.id = "h1".into();
+            p.movement = 6; // MA >= 3 -> free stand-up, no roll
+            g.team_home.players.push(p);
+            let pid = "h1".to_string();
+            g.acting_player.set_player(pid.clone(), PlayerAction::Move);
+            g.field_model.set_player_state(&pid, PlayerState::new(PS_PRONE));
+            g.acting_player.standing_up = true;
+            let mut step = StepStandUp::new("fail".into());
+            let out = step.start(&mut g, &mut GameRng::new(seed));
+            if out.action != StepAction::NextStep {
+                continue;
+            }
+            assert_eq!(g.field_model.player_state(&pid).unwrap().base(), PS_MOVING,
+                "a successful stand-up leaves the acting player MOVING, not STANDING");
             return;
         }
         panic!("no seed produced a successful stand-up");

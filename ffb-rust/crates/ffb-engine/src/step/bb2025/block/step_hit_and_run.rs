@@ -1,5 +1,5 @@
 use ffb_model::events::GameEvent;
-use ffb_model::enums::{Direction, TurnMode};
+use ffb_model::enums::{Direction, Rules, TurnMode};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::skill_use::SkillUse;
@@ -73,7 +73,17 @@ impl StepHitAndRun {
             .map(|p| p.has_skill_property(NamedProperties::CAN_MOVE_AFTER_BLOCK))
             .unwrap_or(false);
 
-        if has_hit_and_run_skill && !attacker_state.is_pinned() {
+        // BB2025 gates on `!playerState.isPinned()`; BB2020's twin gates on `!isRooted()`
+        // (bb2020/StepHitAndRun:122 vs bb2025/StepHitAndRun:130). This shared step runs for BOTH —
+        // `step/bb2020/block/step_hit_and_run.rs` is dead — so using the BB2025 condition under
+        // BB2020 denied a pinned-but-not-rooted attacker its Hit and Run: Java drove two
+        // hit-and-runs on amazon bb2020 seed 3 where Rust raised the skill window only once.
+        let denied = if game.rules == Rules::Bb2025 {
+            attacker_state.is_pinned()
+        } else {
+            attacker_state.is_rooted()
+        };
+        if has_hit_and_run_skill && !denied {
             if self.end_turn || self.end_player_action {
                 self.reset_state(game);
                 return StepOutcome::next();
@@ -255,6 +265,40 @@ mod tests {
     }
 
     /// When eligible squares exist, a ReportSkillUse(MOVE_SQUARE) is added to report_list.
+    /// The entry condition is edition-specific: BB2025's `StepHitAndRun:130` denies a PINNED
+    /// attacker, BB2020's twin at `:122` denies only a ROOTED one. `is_pinned() == is_chomped() ||
+    /// is_rooted()`, so a CHOMPED-but-not-rooted attacker is the case that separates them. This
+    /// shared step runs for BOTH editions — `step/bb2020/block/step_hit_and_run.rs` is dead — so the
+    /// BB2025 condition was silently denying BB2020 attackers their Hit and Run.
+    #[test]
+    fn a_chomped_attacker_may_hit_and_run_in_bb2020_but_not_bb2025() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, PS_STANDING, PlayerState, PlayerAction, SkillId};
+        use ffb_model::report::report_id::ReportId;
+
+        for (rules, expect_window) in [(Rules::Bb2020, true), (Rules::Bb2025, false)] {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+            game.team_home.players.push(Player {
+                id: "attacker".into(), name: "a".into(), nr: 1, position_id: "p".into(),
+                player_type: PlayerType::Regular, gender: PlayerGender::Male,
+                movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+                starting_skills: vec![ffb_model::model::skill_def::SkillWithValue {
+                    skill_id: SkillId::HitAndRun, value: None }],
+                ..Default::default()
+            });
+            game.field_model.set_player_coordinate("attacker", FieldCoordinate::new(5, 5));
+            game.field_model.set_player_state("attacker",
+                PlayerState::new(PS_STANDING).change_chomped(true));
+            game.acting_player.set_player("attacker".into(), PlayerAction::Block);
+
+            let mut step = StepHitAndRun::new();
+            step.start(&mut game, &mut GameRng::new(0));
+
+            assert_eq!(game.report_list.has_report(ReportId::SKILL_USE), expect_window,
+                "{rules:?}: a chomped attacker's Hit and Run window");
+        }
+    }
+
     #[test]
     fn eligible_squares_adds_report_skill_use_move_square() {
         use ffb_model::model::player::Player;

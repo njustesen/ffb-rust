@@ -805,16 +805,47 @@ impl Agent for RandomAgent {
                 let idx = self.pick(options.len());
                 Action::SelectWeather { weather: options[idx] }
             }
-            // Hit And Run move window: Java ParityRunner has NO handler for the HIT_AND_RUN
-            // step (UNHANDLED_STEP) — its default injects ClientCommandEndTurn(turnMode) with
-            // ZERO rng draws, aborting the move (StepHitAndRun end_turn → resetState). Mirror
-            // that exactly; picking a square here would desync the action stream.
-            Some(AgentPrompt::HitAndRun { .. }) => Action::EndTurn,
-            // Punt target window: Java ParityRunner has NO handler for INIT_PUNT
-            // (UNHANDLED_STEP) — its default injects ClientCommandEndTurn(turnMode) with
-            // ZERO rng draws, aborting the punt (StepInitPunt endTurn -> publish
-            // END_TURN + CHECK_FORGO + goto label). Mirror that exactly.
-            Some(AgentPrompt::PuntTarget { .. }) => Action::EndTurn,
+            // Hit And Run move window. Java's StepHitAndRun publishes the eligible squares as
+            // MoveSquares and waits for a CLIENT_FIELD_COORDINATE naming one (CLIENT_END_TURN is
+            // its abort); ParityRunner.sendHitAndRunTarget mirrors this list, order and single
+            // actionRng pick (AGENT_CONTRACT §6). Both harnesses used to abort here, which is why
+            // the `HitAndRun` step never executed while the matrices stayed green.
+            Some(AgentPrompt::HitAndRun { player_id, squares }) => {
+                let mut squares = squares.clone();
+                squares.sort_by_key(|c| (c.x, c.y));
+                if squares.is_empty() {
+                    Action::EndTurn
+                } else {
+                    let idx = self.pick_action(squares.len());
+                    // CANONICAL coordinate, deliberately NOT mirrored for the away coach. Java's
+                    // StepHitAndRun un-mirrors what the away client sends
+                    // (checkCommandIsFromHomePlayer -> transform), so ParityRunner sends the mirrored
+                    // view and Java converts back; Rust's twin stores `coord` verbatim, so mirroring
+                    // here would land the player on the reflected square (away_03 at 11,7 instead of
+                    // Java's 14,7 — amazon bb2020 seed 1 i=2).
+                    let _ = player_id;
+                    Action::HitAndRun { coord: Some(squares[idx]) }
+                }
+            }
+            // Punt target window. Java's StepInitPunt publishes the legal punt squares as
+            // MoveSquares and waits for a CLIENT_FIELD_COORDINATE naming one; ParityRunner.sendPunt
+            // mirrors this list, order and single actionRng pick (AGENT_CONTRACT §6). Both harnesses
+            // used to abort here — Rust with EndTurn, Java with its UNHANDLED_STEP default — which
+            // is why the whole Punt family (InitPunt, PuntDirection, PuntDistance, EndPunt) never
+            // executed while the matrices stayed green.
+            Some(AgentPrompt::PuntTarget { player_id, squares }) => {
+                let mut squares = squares.clone();
+                squares.sort_by_key(|c| (c.x, c.y));
+                if squares.is_empty() {
+                    // Nothing legal to punt to: Java's step falls through to its end label.
+                    Action::EndTurn
+                } else {
+                    let idx = self.pick_action(squares.len());
+                    let target = squares[idx];
+                    let is_home = gs.game.team_home.player(player_id).is_some();
+                    Action::Punt { coord: if is_home { target } else { target.transform() } }
+                }
+            }
             Some(AgentPrompt::TricksterMove { squares, .. }) => {
                 if squares.is_empty() {
                     return Action::Acknowledge;
@@ -967,6 +998,84 @@ mod tests {
     /// behaviour) left `StepApothecary` stuck in `WAIT_FOR_APOTHECARY_USE`, whose main switch has
     /// no arm, so the computed injury was silently discarded - an Animal Savagery lash-out that
     /// KO'd its victim in Java left it STANDING in Rust (underworld bb2020 seed 2).
+    /// Hit and Run answers with a CANONICAL square, coordinate-sorted, one `actionRng` draw
+    /// (AGENT_CONTRACT §6). Rust's `StepHitAndRun` stores `coord` verbatim, unlike
+    /// `StepInitThrowTeamMate` which un-mirrors it — mirroring here put the away player on the
+    /// reflected square (amazon bb2020 seed 1 i=2). Before this arm existed both harnesses aborted
+    /// the window, so `StepHitAndRun` never executed while the matrices stayed green.
+    #[test]
+    fn hit_and_run_answers_a_sorted_canonical_square_for_either_coach() {
+        for side in ["home_03", "away_03"] {
+            let mut gs = new_game(1);
+            let squares = vec![
+                FieldCoordinate::new(14, 7),
+                FieldCoordinate::new(11, 9),
+                FieldCoordinate::new(11, 7),
+            ];
+            gs.pending_prompt = Some(AgentPrompt::HitAndRun {
+                player_id: side.into(),
+                squares: squares.clone(),
+            });
+            let mut agent = RandomAgent::new_parity(1);
+            let before = agent.decision_rng_count;
+            let action = agent.act(&gs);
+            let mut sorted = squares.clone();
+            sorted.sort_by_key(|c| (c.x, c.y));
+            match action {
+                Action::HitAndRun { coord: Some(c) } => {
+                    assert!(sorted.contains(&c), "must pick from the published squares");
+                    assert!(!sorted.iter().any(|s| s.transform() == c && !sorted.contains(&c)),
+                        "the square is sent canonical, never mirrored");
+                }
+                other => panic!("expected HitAndRun, got {other:?}"),
+            }
+            assert_eq!(agent.decision_rng_count, before,
+                "the square comes from actionRng, not the decision stream");
+        }
+    }
+
+    /// An empty Hit and Run window ends the turn rather than sending a coordinate — Java's
+    /// `StepHitAndRun` treats `CLIENT_END_TURN` as its abort.
+    #[test]
+    fn hit_and_run_with_no_squares_ends_the_turn() {
+        let mut gs = new_game(1);
+        gs.pending_prompt = Some(AgentPrompt::HitAndRun {
+            player_id: "home_03".into(),
+            squares: vec![],
+        });
+        let mut agent = RandomAgent::new_parity(1);
+        assert!(matches!(agent.act(&gs), Action::EndTurn));
+    }
+
+    /// Punt answers with the MIRRORED square for the away coach: Java's `StepInitPunt` un-mirrors
+    /// what the away client sends, so the harness must send the mirrored view (the opposite of
+    /// `HitAndRun` above — always read the target step's `handle_command` first).
+    #[test]
+    fn punt_target_is_mirrored_for_the_away_coach_only() {
+        let squares = vec![FieldCoordinate::new(13, 4), FieldCoordinate::new(12, 6)];
+        let mut picks = vec![];
+        for side in ["home_03", "away_03"] {
+            let mut gs = new_game(1);
+            let mut p = ffb_model::model::player::Player::default();
+            p.id = side.into();
+            if side.starts_with("home") { gs.game.team_home.players.push(p); }
+            else { gs.game.team_away.players.push(p); }
+            gs.pending_prompt = Some(AgentPrompt::PuntTarget {
+                player_id: side.into(),
+                squares: squares.clone(),
+            });
+            let mut agent = RandomAgent::new_parity(1);
+            let before = agent.decision_rng_count;
+            match agent.act(&gs) {
+                Action::Punt { coord } => picks.push(coord),
+                other => panic!("expected Punt, got {other:?}"),
+            }
+            assert_eq!(agent.decision_rng_count, before);
+        }
+        assert!(squares.contains(&picks[0]), "the home coach sends the canonical square");
+        assert_eq!(picks[1], picks[0].transform(), "the away coach sends the mirrored view");
+    }
+
     #[test]
     fn use_apothecary_prompt_is_declined_naming_the_injured_player() {
         let mut gs = new_game(1);

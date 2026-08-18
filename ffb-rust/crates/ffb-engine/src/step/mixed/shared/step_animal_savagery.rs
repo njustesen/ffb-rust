@@ -729,7 +729,18 @@ fn good_conditions_for_savagery(player_action: Option<PlayerAction>) -> bool {
 }
 
 /// Mark a skill as used for the given player.
+///
+/// Java calls `actingPlayer.markSkillUsed(skill)`, which adds to the ACTING PLAYER's used-skill set
+/// (and only propagates to the Player when the usage type tracks outside the activation). That set
+/// feeds `ActingPlayer.hasActed()`, so a FAILED negatrait counts as "acted": at the end of the
+/// activation `changeActingPlayer` then writes STANDING+inactive instead of taking the
+/// `isStandingUp() || wasProne()` branch back to PRONE. Rust marked only the Player, leaving
+/// `acting_player.used_skills` empty — so a prone Rat Ogre whose Unchannelled Fury failed before the
+/// stand-up ended the activation PRONE in Rust and STANDING in Java (skaven bb2025 seed 30 i=29).
 fn mark_skill_used(game: &mut Game, player_id: &str, skill: SkillId) {
+    if game.acting_player.player_id.as_deref() == Some(player_id) {
+        game.acting_player.used_skills.insert(skill);
+    }
     let is_home = game.team_home.player(player_id).is_some();
     if is_home {
         if let Some(p) = game.team_home.player_mut(player_id) {
@@ -1382,6 +1393,45 @@ mod tests {
     }
 
     // ── good_conditions_for_savagery ─────────────────────────────────────────
+
+    /// Java's `actingPlayer.markSkillUsed(skill)` adds to the ACTING PLAYER's used-skill set, which
+    /// feeds `ActingPlayer.hasActed()` (`!fUsedSkills.isEmpty()`). That is what makes a FAILED
+    /// negatrait count as "acted", so the end-of-activation `changeActingPlayer` writes
+    /// STANDING+inactive instead of taking the `isStandingUp() || wasProne()` branch back to PRONE.
+    /// Rust marked only the Player, leaving `acting_player.used_skills` empty — a prone Rat Ogre
+    /// whose Unchannelled Fury failed before its stand-up ended PRONE in Rust, STANDING in Java
+    /// (skaven seed 30 i=29).
+    #[test]
+    fn marking_a_trait_used_also_marks_the_acting_player_so_it_counts_as_having_acted() {
+        let mut game = make_game();
+        add_player(&mut game, true, "p1", vec![SkillId::AnimalSavagery]);
+        game.acting_player.set_player("p1".into(), ffb_model::enums::PlayerAction::Move);
+        assert!(!game.acting_player.acted(), "nothing has happened yet");
+
+        mark_skill_used(&mut game, "p1", SkillId::AnimalSavagery);
+
+        assert!(game.acting_player.used_skills.contains(&SkillId::AnimalSavagery),
+            "Java marks the skill on the ACTING player, not only on the Player");
+        assert!(game.acting_player.acted(),
+            "a used negatrait makes hasActed() true, which decides STANDING vs PRONE at activation end");
+        assert!(game.team_home.player("p1").unwrap().used_skills.contains(&SkillId::AnimalSavagery),
+            "the Player-side flag still gates the once-per-activation re-roll");
+    }
+
+    /// The acting-player mark is scoped to the acting player: marking a DIFFERENT player's skill
+    /// (a lash-out victim, say) must not make the acting player look like it has acted.
+    #[test]
+    fn marking_another_players_trait_does_not_touch_the_acting_player() {
+        let mut game = make_game();
+        add_player(&mut game, true, "p1", vec![SkillId::AnimalSavagery]);
+        add_player(&mut game, false, "p2", vec![SkillId::AnimalSavagery]);
+        game.acting_player.set_player("p1".into(), ffb_model::enums::PlayerAction::Move);
+
+        mark_skill_used(&mut game, "p2", SkillId::AnimalSavagery);
+
+        assert!(game.acting_player.used_skills.is_empty());
+        assert!(!game.acting_player.acted());
+    }
 
     #[test]
     fn good_conditions_true_for_blitz_and_block() {
