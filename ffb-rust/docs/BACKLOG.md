@@ -295,7 +295,14 @@ Work in this order; each needs the trigger verified as reachable *before* any ha
       eligibility rules never offer — that is inventing behaviour, not fixing parity.
       Note this also means blocker 1's fix (`a7e7da8f`) is correct but will never fire in practice;
       it is kept as faithful routing, not as a live mechanic.
-- [ ] `DauntlessMultiple` — `Dauntless` itself runs.
+- [x] `DauntlessMultiple` — **CLOSED 2026-08-18: unreachable by DATA, no code change needed.**
+      It is pushed only from `StepMultipleBlockFork` (both engines, live bb2025 path), so it requires a
+      MULTIPLE BLOCK. **No roster in any edition carries "Multiple Block"** — the only occurrence
+      anywhere in `data/` is on a STAR PLAYER (`data/star_players/all_editions.json`), and the drafted
+      parity teams hire none: 0 star entries across all 1,049 drafted player rows. So
+      `MultipleBlockFork` never runs and `DauntlessMultiple` cannot either. This is the (d1) category
+      — "the code is fine, nothing on the pitch can trigger it" — and reaching it would mean changing
+      the drafted teams, which is a separate and larger decision. `Dauntless` itself runs normally.
 - [ ] The bomb chain — `InitBomb`, `EndBomb`, `ResolveBomb`, `Bombardier2`.
 - [ ] `HailMaryPass`.
 - [ ] `Swoop` — unreached by the uniform sweep at 3 seeds/matchup; confirm whether it is genuinely dead.
