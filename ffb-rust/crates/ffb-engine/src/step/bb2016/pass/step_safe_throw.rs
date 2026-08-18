@@ -54,11 +54,6 @@ impl StepSafeThrow {
     }
 
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        if std::env::var_os("FFB_ST").is_some() {
-            eprintln!("ST entry interceptor={:?} thrower={:?} has_st={:?}",
-                self.interceptor_id, game.thrower_id,
-                game.thrower().map(|p| p.has_skill_property(NamedProperties::CAN_CANCEL_INTERCEPTIONS)));
-        }
         // No interceptor → skip to next (nothing to cancel).
         let interceptor_id = match &self.interceptor_id {
             Some(id) if !id.is_empty() => id.clone(),
@@ -106,9 +101,6 @@ impl StepSafeThrow {
         }
 
         // Roll d6 and compare to minimum.
-        if std::env::var_os("FFB_ST").is_some() {
-            eprintln!("ST rolling calls_before={}", rng.call_count);
-        }
         let roll = rng.d6();
         let minimum_roll = game.thrower()
             .map(|p| Bb2016AgilityMechanic::default().minimum_roll_safe_throw(p))
@@ -139,9 +131,19 @@ impl StepSafeThrow {
         }
 
         if successful {
+            // Java publishes INTERCEPTOR_ID = null: a successful Safe Throw CANCELS the
+            // interception and the pass carries on to its target. Rust must also clear the
+            // interception SUCCESS FLAGS, because `StepResolvePass` gates its ball-to-interceptor
+            // branch on them (BB2020 `deflection_successful`, BB2016/BB2025
+            // `interception_successful`) — leaving them set made ResolvePass take the interceptor
+            // branch, publish no catch mode, and the bb2016 CatchScatterThrowIn then returned early
+            // on `mode == None`, so the receiver's catch was never rolled (high_elf bb2016 seed 90
+            // i=268: Java spends four dice there, Rust three).
             return StepOutcome::next()
                 .with_event(safe_throw_event)
-                .publish(StepParameter::InterceptorId(None));
+                .publish(StepParameter::InterceptorId(None))
+                .publish(StepParameter::InterceptionSuccessful(false))
+                .publish(StepParameter::DeflectionSuccessful(false));
         }
 
         self.fail_safe_throw(game, &interceptor_id).with_event(safe_throw_event)
@@ -290,6 +292,44 @@ mod tests {
         step.interceptor_id = Some("p3".into());
         assert!(step.set_parameter(&StepParameter::InterceptorId(None)));
         assert!(step.interceptor_id.is_none());
+    }
+
+    /// Java's success path publishes `INTERCEPTOR_ID = null` — a successful Safe Throw CANCELS the
+    /// interception and the pass carries on. Rust must clear the interception SUCCESS FLAGS too,
+    /// because `StepResolvePass` gates its ball-to-interceptor branch on them; leaving them set made
+    /// ResolvePass take the interceptor branch, publish no catch mode, and the bb2016
+    /// CatchScatterThrowIn return early on `mode == None`, so the receiver's catch was never rolled
+    /// (high_elf bb2016 seed 90 i=268 — Java spends four dice there, Rust three).
+    #[test]
+    fn a_successful_safe_throw_clears_the_interception_flags() {
+        // Find a seed whose Safe Throw succeeds, then assert what the success published.
+        let mut proved = false;
+        for seed in 0u64..40 {
+            let mut game = make_game();
+            game.thrower_id = Some("thrower".into());
+            add_player_with_skill(&mut game, true, "thrower", SkillId::SafeThrow);
+            add_player_with_skill(&mut game, false, "interceptor", SkillId::Block);
+            game.field_model.set_player_coordinate("interceptor", FieldCoordinate::new(5, 5));
+            let mut step = StepSafeThrow::new();
+            step.goto_label_on_failure = "fail".into();
+            step.interceptor_id = Some("interceptor".into());
+            let out = step.start(&mut game, &mut GameRng::new(seed));
+            if out.action != StepAction::NextStep {
+                continue; // this seed failed the Safe Throw
+            }
+            assert!(out.published.iter().any(|p|
+                matches!(p, StepParameter::InterceptorId(None))),
+                "a cancelled interception clears the interceptor id");
+            assert!(out.published.iter().any(|p|
+                matches!(p, StepParameter::InterceptionSuccessful(false))),
+                "…and the BB2016/BB2025 success flag ResolvePass gates on");
+            assert!(out.published.iter().any(|p|
+                matches!(p, StepParameter::DeflectionSuccessful(false))),
+                "…and the BB2020 deflection flag");
+            proved = true;
+            break;
+        }
+        assert!(proved, "no seed produced a successful Safe Throw");
     }
 
     #[test]
