@@ -98,7 +98,8 @@ expected intermediate state), then fix, then green the seeds. Do not gate or com
       Java's FULL caller chain per die and identified the real culprit in one run — use it whenever
       two dice share a `rollSkill:112` caller instead of inferring from values.
 
-- [ ] **Gate `gate6` came back bb2020 30/30, bb2025 30/30, bb2016 29/30 — ONE red left:**
+- [x] **RESOLVED — gate6 had one red left (high_elf bb2016 seed 90), fixed by the Safe Throw flag
+      clearing (`01da521e`); the final gate7 was 30/30/30. Historical detail follows.** Original note: gate6 came back bb2020 30/30, bb2025 30/30, bb2016 29/30 — ONE red left:**
       `high_elf bb2016 seed 90`, first `rng_calls` divergence at i=269 (Rust 88, Java 89), i.e. the
       extra die falls in activation i=268 `Activate(home_08, PASS)`. Green this, then re-gate and commit.
 
@@ -172,7 +173,9 @@ itself is right (`minimum_roll_catch_edition`, BB2016 = `(7 - AG) + modifiers` f
 so the divergence is the MODIFIER TOTAL: Rust ends at 3 + (-1 accurate pass) = 2, Java at >= 5, a gap
 of about +3 that looks like missing TACKLEZONE modifiers on the catcher.
 
-- [ ] Finish this. Measured so far:
+- [x] **RESOLVED — this bb2016 catch investigation was closed by the interception skill re-roll fix
+      (`ef647683`), not by a catch-modifier change; the tacklezone theory below was disproved.**
+      Historical measurements:
 
           CMODS total=-1 ["Accurate Pass=-1"] tz=0 at=Some((12, 7)) ball=Some((12, 7))
 
@@ -394,3 +397,78 @@ Work in this order; each needs the trigger verified as reachable *before* any ha
       same file: BLITZ is declared as `BLITZ_MOVE` because `StepInitSelecting` dispatches it onward, so
       a bomb may need declaring as a different `PlayerAction`, or the harness may need to inject
       `CLIENT_PASS` at declaration time.
+
+- [x] `HailMaryPass` — **CLOSED 2026-08-18: blocked by the SAME root cause as the bomb chain.**
+      - Carrier IS drafted: `elf.thrower` carries Hail Mary Pass and TWO are in the bb2025 elf squad.
+      - **Neither harness ever offers the action.** `ParityRunner` contains no `HAIL_MARY` occurrence
+        at all; Rust's `legal_actions/mod.rs` has no `HailMaryPass` entry (the mention at
+        `random_agent.rs:954` is only a display mapping).
+      - **Same declaration route as the bomb:** `bb2025/move/StepInitMoving:215` dispatches it from the
+        `CLIENT_PASS` handler and only when `actingPlayer.getPlayerAction() == HAIL_MARY_PASS` — so it
+        must be declared at activation and then confirmed by `CLIENT_PASS`, exactly the path the bomb
+        campaign proved is broken.
+      - **This is a PREDICTION, not a measurement.** Deliberately not tested: the bomb chain had just
+        been scoped down for this reason, and re-running the same experiment on a second action would
+        spend an iteration to learn what is already known.
+      **Resolving the phase-2 declaration question unlocks BOTH targets at once** — one follow-up, not
+      two campaigns. Highest-value remaining item in this section.
+- [ ] `Swoop` — unreached by the uniform sweep at 3 seeds/matchup; confirm whether it is genuinely dead.
+
+**Method per target**
+
+1. Resolve which drafted positions carry the skill. `data/teams/` specs hold only `position_id` — resolve
+   positions to roster starting skills; never grep the specs for skill names.
+2. **Verify the trigger is reachable** before building anything. Java's `UNHANDLED_DIALOG` stderr lines
+   answer "is this dialog ever raised?" in one grep; a `step=` count from `FFB_DRIVE_TRACE` answers "does
+   this step ever run?". This is the check Punt failed.
+3. Read the Java step for the client command it waits on.
+4. Teach both harnesses in lockstep: same candidate list from the **engine's own** predicate, coordinate
+   ordering, a single `actionRng` pick, correct coordinate frame (read the target step's `handle_command`
+   to see whether it un-mirrors).
+5. Measure after **each** change; isolate halves rather than shipping them together.
+
+---
+
+## Blocked — needs a tier decision from the user
+
+- **Punt.** Plumbing is correct and dark_elf bb2025 is 100/100, but `InitPunt` dispatches zero times:
+  Punt needs the carrier holding the ball at *turn start*, which the turn-start snapshot makes
+  unreachable. Belongs to the "make the agent score" tier.
+- **Widen the state hash to include the ACTIVE bit.** Three bugs this session hid in state the hash
+  cannot see (the ACTIVE bit, `ttm_used`/`ktm_used`, and the acting player's MOVING base).
+
+---
+
+## The five recurring bug shapes
+
+Every target in this tier has been one of these. Check them first.
+
+1. A **per-edition rule hard-coded to one edition inside a SHARED file** — five instances so far.
+2. **Both harnesses declining the same dialog in lockstep**, which keeps the matrices green while the
+   mechanic underneath is dead.
+3. A step returning a bare `cont()` with **no prompt**, which only breaks once the other harness starts
+   answering that dialog.
+4. A **general Java rule simplified away** in Rust — invisible until a mechanic that can produce an
+   out-of-range value starts running.
+5. A **Java predicate re-implemented with a missing or an extra clause** — harmless until the mechanic
+   that uses it starts running.
+
+## Debugging recipe
+
+The one that produced all eight findings of the interception campaign:
+
+- Reproduce the single seed.
+- Compare `RUST_STEP i=N rng_calls=` with `JSTEP i=N rng_calls=` (`FFB_TRACE=1`) to find the diverging
+  activation.
+- Diff the two state strings token by token. Rust's live in
+  `parity/<edition>/<matchup>/seed_N_rust.jsonl` (flat JSON, written only under `FFB_TRACE` or
+  `--verbose`); Java's come from its `JSTEP i=... state=...` stderr lines. State-string player labels are
+  **positional indices**, not ids (`h01` = home_02, `a08` = away_09).
+- `FFB_DRIVE_TRACE=1` gives Rust's `DRIVE step=` sequence for the activation.
+- The RNG stream is **positional**: equal values at equal positions do *not* mean the same event. To
+  settle "which die is this?", print the call count at the roll site on both sides — Rust `rng.call_count`,
+  Java `gameState.getDiceRoller().getCallCount()` from the harness.
+- Probe the **live** file: check `driver.rs` glob imports first. Per-edition twins are usually dead.
+- Piping the parity binary's stdout through `grep` can lose the `PARITY: n/m` line — redirect to a file
+  first, then grep the file.
+
