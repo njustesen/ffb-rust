@@ -128,13 +128,27 @@ impl StepResolvePass {
                 && self.deflection_successful
                 && !self.interception_successful
             {
-                return StepOutcome::next().publish(StepParameter::CatchScatterThrowInMode(
-                    if is_bomb {
-                        CatchScatterThrowInMode::DeflectedBomb
-                    } else {
-                        CatchScatterThrowInMode::Deflected
-                    },
-                ));
+                // …and CLEAR the catcher. In Java `StepPass.setParameter` CONSUMES CATCHER_ID into
+                // the shared `PassState`, so `StepCatchScatterThrowIn.fCatcherId` is null on a
+                // deflected pass and its `if (!isProvided(fCatcherId)) fCatcherId = playerUnderBall`
+                // picks the DEFLECTOR standing under the ball. Rust threads the id as a step
+                // parameter that keeps travelling, so the intended receiver leaked in and the
+                // deflected catch was resolved for the RECEIVER — the ball ended on the receiver's
+                // square (dark_elf bb2020 seed 21 i=95: catcher_id=away_09 while under_ball=home_02,
+                // ball 22,7 in Rust vs 12,7 in Java).
+                // Cleared HERE rather than by having StepPass consume the key: Java's later steps
+                // read `catcherId` off the shared PassState, but Rust's `StepEndPassing` reads the
+                // PARAMETER, so consuming it at StepPass starves them (measured: necromantic bb2020
+                // gained a new red at seed 8 step 5).
+                return StepOutcome::next()
+                    .publish(StepParameter::CatcherId(None))
+                    .publish(StepParameter::CatchScatterThrowInMode(
+                        if is_bomb {
+                            CatchScatterThrowInMode::DeflectedBomb
+                        } else {
+                            CatchScatterThrowInMode::Deflected
+                        },
+                    ));
             }
             return StepOutcome::next();
         }

@@ -71,12 +71,29 @@ expected intermediate state), then fix, then green the seeds. Do not gate or com
       never fired — the deflected catch resolved for the RECEIVER instead of the deflector under the
       ball. Probe confirmed it exactly: `catcher_id=away_09` vs `under_ball=home_02`. Fix is a
       `consumes_parameter` override on StepPass; test
-      `catcher_id_is_consumed_so_it_cannot_leak_downstream`. This is the THIRD instance of the
-      parameter-outlives-its-sequence shape (after `InterceptorId` and the pass-state ids), so treat
-      "does Java's setParameter return true here?" as a standard check.
-- [ ] Green the remaining THREE seeds, then gate and commit. Progress after the CatcherId fix:
-      **green** — dark_elf bb2020 21, dark_elf_league_fumbbl bb2020 21, amazon bb2020 75;
-      **still red** — necromantic bb2020 41, elf bb2016 83, high_elf bb2016 24.
+      This is the THIRD instance of the parameter-outlives-its-sequence shape (after `InterceptorId`
+      and the pass-state ids), so treat "does Java's setParameter return true here?" as a standard check.
+      **Second correction:** the first attempt made `StepPass` CONSUME `CatcherId` (mirroring Java's
+      `setParameter` returning true). That over-reached and REGRESSED necromantic bb2020 seed 8 to a
+      new red at step 5 — in Java the later steps read `catcherId` off the shared `PassState`, but
+      Rust's `StepEndPassing` reads the PARAMETER, so consuming it at StepPass starves them. The
+      shipped fix instead publishes `CatcherId(None)` from the BB2020 deflected branch of
+      `step_resolve_pass.rs`, alongside the `Deflected` mode. Strictly better: it greens necromantic
+      41 as well and causes no regression.
+- [ ] Green the remaining TWO seeds, then gate and commit. After the narrowed CatcherId fix:
+      **green** — dark_elf bb2020 21, dark_elf_league_fumbbl bb2020 21, amazon bb2020 75,
+      necromantic bb2020 41 (and necromantic 8, the regression the first attempt caused);
+      **still red** — elf bb2016 83, high_elf bb2016 24. Both bb2016, so the BB2020 deflection work
+      is done and these are a different cause.
+
+**Frontier — high_elf bb2016 seed 24.** State strings first differ at i=67 (Java home turn 4, Rust
+away turn 5 — Rust ended the home turn early; `h02` Prone in Rust, Standing in Java). But `rng_calls`
+diverge EARLIER, at i=56: Java 37 vs Rust 36. So the extra Java call happens during the i=55
+activation `Activate(away_03, PASS)`, where Java spends four calls (33→37) and Rust three (33→36).
+Java's calls #36 `d6=4` and #37 `d6=2` are both `rollSkill:112`, so the die name cannot say which is
+the pass, the interception or a catch — identify it by printing the rng call-count at each roll site
+on both sides. Likely shape: one engine's interception succeeded and skipped a catch roll the other
+made (bb2016 has no deflection — an interception simply IS a catch).
 
 **Blocking seeds** (four are BB2020 deflections)
 

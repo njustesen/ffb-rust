@@ -120,16 +120,6 @@ impl Step for StepPass {
         }
     }
 
-    /// Java `StepPass.setParameter` returns TRUE for CATCHER_ID — i.e. it CONSUMES the key into
-    /// `PassState.catcherId` and the parameter travels no further. Rust accepted it without
-    /// consuming, so the intended receiver kept flowing downstream to `StepCatchScatterThrowIn`,
-    /// whose `if catcher_id.is_none() { catcher_id = player_under_ball }` then never fired. On a
-    /// DEFLECTED pass that resolved the catch for the RECEIVER instead of the deflector standing
-    /// under the ball, and the ball landed on the receiver's square (dark_elf bb2020 seed 21 i=95:
-    /// `catcher_id=away_09` while `under_ball=home_02`, ball 22,7 in Rust vs 12,7 in Java).
-    fn consumes_parameter(&self, param: &StepParameter) -> bool {
-        matches!(param, StepParameter::CatcherId(_))
-    }
 }
 
 impl StepPass {
@@ -504,19 +494,6 @@ mod tests {
         // thrower_id is None by default
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::Continue);
-    }
-
-    /// Java's `StepPass.setParameter` returns TRUE for CATCHER_ID — it CONSUMES the key into
-    /// `PassState.catcherId`, so the parameter never reaches `StepCatchScatterThrowIn`. Rust merely
-    /// accepted it, and the leaked receiver id then resolved a DEFLECTED catch for the receiver
-    /// instead of the deflector under the ball (dark_elf bb2020 seed 21).
-    #[test]
-    fn catcher_id_is_consumed_so_it_cannot_leak_downstream() {
-        let step = make_step();
-        assert!(step.consumes_parameter(&StepParameter::CatcherId(Some("p1".into()))),
-            "CATCHER_ID stops at StepPass, as in Java");
-        assert!(!step.consumes_parameter(&StepParameter::GotoLabelOnEnd("x".into())),
-            "other keys are not consumed here");
     }
 
     #[test]
