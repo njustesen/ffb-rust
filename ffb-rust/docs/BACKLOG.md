@@ -338,11 +338,24 @@ Work in this order; each needs the trigger verified as reachable *before* any ha
       Dispatch counts confirm nothing downstream ran: `InitBomb`/`ResolveBomb`/`EndBomb`/`Bombardier2`
       all 0, while `Bombardier` (already live) ran 3 times.
 
-      **NEXT:** find what each engine is waiting on after the declaration. Check Java's stderr for
-      `UNHANDLED_DIALOG` / `UNHANDLED_STEP` on that seed, and Rust's pending prompt at the stall
-      (`prompt_after=` in the LOOP trace). Prime suspect is `StepInitBomb`'s `CLIENT_USE_SKILL` — the
-      "force bomb explosion" skill window — which neither harness answers. Whatever it is, teach BOTH
-      sides together.
+      **STALL ROOT-CAUSED (not `StepInitBomb` — that suspicion was wrong).** Both engines park in
+      `StepInitPassing` (`step/mixed/pass/StepInitPassing.java`); Java logs
+      `UNHANDLED_STEP: INIT_PASSING` 500 times and Rust's last `DRIVE step=` is `InitPassing`.
+      That method has **NO else branch**: if none of its three branches matches it leaves the default
+      `CONTINUE` and waits forever. Every bomb-capable branch requires
+      `mechanic.findPassingDistance(game, throwerCoordinate, passCoordinate, false) != null` — the
+      target must be IN RANGE. `sendPassAction` (and Rust's mirrored pass-receiver rule) picks any
+      teammate square on the pitch with NO range filter, so an out-of-range bomb target matches no
+      branch and the step never advances. `CLIENT_PASS` itself is handled fine: it sets
+      `passCoordinate`, `throwerId = actingPlayer` and `throwerAction = THROW_BOMB`, so those
+      conjuncts hold; only the distance one fails.
+
+      **NEXT:** make BOTH harnesses pick a bomb target that is in range, filtering candidates with the
+      ENGINE's own passing-distance predicate (`findPassingDistance != null`) — same list, same
+      ordering, one `actionRng` pick on each side. Note a plain PASS deliberately does NOT filter by
+      range today and still works, so scope the filter to the bomb path and say why in the comment
+      rather than changing pass behaviour. Verify the bomb range really is narrower than a pass's
+      before assuming that is the difference.
 - [ ] `HailMaryPass`.
 - [ ] `Swoop` — unreached by the uniform sweep at 3 seeds/matchup; confirm whether it is genuinely dead.
 
