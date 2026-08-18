@@ -48,16 +48,23 @@ Gate `gate5` came back **bb2016 30/30, bb2020 30/30, bb2025 30/30, zero reds**. 
 
 The only thing between this campaign and a live Cloud Burster. Diagnosed down to one function.
 
+**Order correction (2026-08-18):** the boxes were originally written fix-then-re-enable, but the fix
+cannot be MEASURED while the interception attempt is off — no interception means no deflection means
+the `Deflected` arm never runs. Re-enable FIRST (the tree returns to nine known reds, which is the
+expected intermediate state), then fix, then green the seeds. Do not gate or commit in between.
+
+- [ ] Re-enable the interception attempt in **both** harnesses together — never one alone:
+      the Rust `AgentPrompt::Interception` arm in `random_agent.rs`, and `case INTERCEPTION:` +
+      `sendInterceptorChoice` in `ParityRunner.java` (rebuild the jar). Coordinate-sorted candidates
+      from the engine's own `UtilPassing.findInterceptors`, exactly one `actionRng` draw each. Never
+      id-sorted — the two engines' player ids differ (`away_03` vs `teamHighElfParity20Away3`). The
+      exact code is in commit `4677499b`'s parent — recover it with `git show 4677499b -- <file>`.
+      Also replace the `interception_is_declined_in_lockstep_with_the_java_harness` test.
 - [ ] Fix the `Deflected` arm of `bb2025/shared/step_catch_scatter_throw_in.rs`. It sets
       `deflected_pass = true` and calls `handle_regular_catch(game, rng, deflected_pass, &player_under_ball)`.
       Check what `player_under_ball` holds there, and whether a **failed** deflected catch should bounce
       from the deflector's square rather than land on the pass coordinate. Compare against Java's bb2020
       catch/scatter path for `DEFLECTED`.
-- [ ] Re-enable the interception attempt in **both** harnesses together — never one alone:
-      the Rust `AgentPrompt::Interception` arm in `random_agent.rs`, and `case INTERCEPTION:` +
-      `sendInterceptorChoice` in `ParityRunner.java`. Coordinate-sorted candidates from the engine's own
-      `UtilPassing.findInterceptors`, exactly one `actionRng` draw each. Never id-sorted — the two
-      engines' player ids differ (`away_03` vs `teamHighElfParity20Away3`).
 - [ ] Green these six seeds, then gate and commit.
 
 **Blocking seeds** (four are BB2020 deflections)
@@ -77,6 +84,17 @@ matches Java exactly: same candidate `home_02`, same call #49, `roll=6 min=6 ok=
 deflection branch in `step_resolve_pass.rs` fires (`took=true`) and places the ball on the deflector.
 Java ends with the ball at 12,7 (the deflector caught it); Rust ends at 22,7 (the receiver / pass
 coordinate). So the bug is strictly below `ResolvePass`.
+
+**Leading suspect, found while ticking item 1.** `handle_regular_catch` does
+`if self.catcher_id.is_none() { self.catcher_id = player_under_ball.clone(); }` — the same shape as
+Java's `if (!StringTool.isProvided(fCatcherId))`. So the structure matches and the divergence must be
+the VALUE of `catcher_id` on entry: if a stale `CatcherId` (the intended receiver, published upstream)
+survives into this step, the deflected catch is resolved for the RECEIVER instead of the deflector,
+and the ball lands on the receiver's square — exactly the 22,7 observed. This is the same
+parameter-outlives-its-sequence bug as fix 8 (`InterceptorId`); `step_resolve_pass.rs` already carries
+a comment that Rust's `CatcherId` delivery "STOPS at the first consumer". Confirm by probing
+`catcher_id` vs `player_under_ball` at the `Deflected` arm, then decide whether the deflected path
+should clear `catcher_id` or whether the upstream publish should not reach here at all.
 
 ---
 
