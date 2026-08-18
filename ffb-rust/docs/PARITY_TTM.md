@@ -1784,3 +1784,48 @@ breaks the shared step's published-parameter hand-over. The working shape is the
 
 VERIFIED: bb2016 30/30, bb2020 30/30, bb2025 30/30 (90 matchups, seeds 1-100, tier 3); ogre and
 goblin bb2020 both 100/100; workspace tests 14,513 pass / 0 fail.
+
+---
+
+## Kick Team-Mate — a mechanic that had never executed anywhere (2026-08-18, commit 60131597)
+
+Straight after the BB2020 TTM campaign, the same question asked of Kick Team-Mate gave a worse
+answer: KTM had **never executed in any edition**. Both agents declared `KICK_TEAM_MATE` and then
+immediately deselected it (Java: `UNHANDLED_ACTING_ACTION_AT_PICK`), so all three matrices were green
+precisely *because* no kick ever happened. The harness additionally gated the action to BB2025 alone,
+though `skill/mixed/KickTeamMate` is registered for BB2020 and all three `TtmMechanic`s implement
+`isKtmAvailable`.
+
+STRUCTURE (settled — the dedicated four-step chain is a red herring): `step/action/ktm/`
+(`StepInitKickTeamMate` and friends) is **BB2016's** implementation; its generator exists only at
+`generator/bb2016/KickTeamMate.java`. BB2020 and BB2025 dispatch a kick through the **ThrowTeamMate**
+generator with `kicked=true`, which Rust already did. Java tells a kick from a throw by the `kicked`
+flag on `ClientCommandThrowTeamMate`, which `StepInitSelecting` republishes as `IS_KICKED_PLAYER`.
+
+SIX RUST ENGINE BUGS, plus three harness gaps:
+
+| # | Bug | Symptom |
+|---|---|---|
+| 1 | KTM availability ignored the edition's `isKtmAvailable` | BB2016 spends the BLITZ, BB2020/BB2025 use `ktmUsed`; gating to BB2025 left it unreachable elsewhere |
+| 2 | the agent picked a thrown player for THROWS only | a declared kick carried no target, so the sequence stalled and the kick silently never resolved |
+| 3 | `is_kicked` read from a published parameter that never arrives | every kick built a THROW sequence and spent the wrong once-per-turn slot — a BB2020 team could kick AND still pass |
+| 4 | crowd injury always `CrowdPush` | BB2020 uses `InjuryTypeKTMCrowd` for a KICKED player |
+| 5 | attacker-side injury modifiers ignored the context mode | a player's OWN Mighty Blow modified the injury roll against itself |
+| 6 | one fumbled-kick injury type for both editions | BB2025 uses `InjuryTypeFumbledKtmApoKo` (NULL attacker → no attacker skill modifies the roll), BB2020 uses `InjuryTypeFumbledKtm`; the wrong one let Mighty Blow turn a 9 into a 10 and a knock-out into a casualty |
+
+**Measured-worse attempt, do not repeat.** Java reads "is stunty" off the injury MODIFIERS in the
+context (`RollMechanic`: `anyMatch(isRegisteredToSkillWithProperty(isHurtMoreEasily))`), not off the
+defender's skills. Porting that rule into the SHARED injury path scored **4/10, 1/10, 2/10** — Rust's
+modifier set usually carries no Stunty entry at all, so it removed stunty handling everywhere. The
+correct scope is the individual injury types that filter their own modifier set (here,
+`InjuryTypeFumbledKtm`, which keeps only `affectsEitherArmourOrInjuryOnBlock` modifiers).
+
+TWO DEBUGGING FACTS THAT COST REAL TIME (both were wrong assumptions of mine):
+- **Both engines print `DICE_TRACE` lines WITH stack frames.** Frames do NOT identify Rust's rolls.
+  The reliable way to attribute a roll is to probe the suspected Rust path and see whether it fires.
+- **State-string player labels (`a07`, `h10`) are POSITIONAL indices**, sorted by squad number, first
+  11 per team — not player ids. `a07` was `away_08`, which is why the event log kept "disagreeing"
+  with the hash.
+
+VERIFIED: bb2016 30/30, bb2020 30/30, bb2025 30/30 (90 matchups, seeds 1-100, tier 3); ogre 100/100
+in both BB2020 and BB2025; workspace tests 14,520 pass / 0 fail.
