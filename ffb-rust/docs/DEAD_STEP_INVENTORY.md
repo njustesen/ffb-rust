@@ -175,3 +175,46 @@ Read the table as:
 
 Verify the trigger BEFORE building harness plumbing for the remaining rows — that check is what would
 have saved the Punt round-trip.
+
+---
+
+## Update 2026-08-18 (2) — Cloud Burster: plumbing correct, mechanic still blocked
+
+`CloudBurster` is **not** driven. Correcting the (d2) table again: it listed Cloud Burster for
+**bb2025**, but Java has no `bb2025/CloudBursterBehaviour` at all — only bb2020 registers a step for
+the PASS_INTERCEPT hook point, so there is nothing to drive in bb2025. Only `high_elf` carries the
+skill (`highelf.thrower`, one drafted in the bb2020 parity team).
+
+| skill | drafted carrier | trigger reachable? |
+|---|---|---|
+| **Cloud Burster** | bb2020 only (NOT bb2025 — no behaviour exists) | plumbing correct; blocked on BB2020 deflection fidelity |
+
+**What now works:** the PASS_INTERCEPT hook splices correctly per edition (it had been hard-coded to
+`Rules::Bb2025` inside the SHARED generator, making the call an unconditional no-op), and both
+harnesses *can* drive the interception window — candidates from the engine's own
+`UtilPassing.findInterceptors`, coordinate-sorted, one `actionRng` draw each.
+
+**Why it is off:** switching the attempt on exposed eight Rust fidelity bugs. Seven are fixed
+(commit 4677499b). The eighth is the BB2020 **deflection** chain below `StepResolvePass`: a deflected
+ball that Java leaves on the deflector ends on the receiver in Rust. Until that is ported, the attempt
+is reverted in both harnesses — see `docs/BACKLOG.md` §2 for the diagnosis (dark_elf bb2020 seed 21,
+narrowed to the `Deflected` arm of `bb2025/shared/step_catch_scatter_throw_in.rs`).
+
+**Routing note that cost real time twice this session:** `driver.rs` globs
+`use crate::step::bb2025::pass::*` and `use crate::step::bb2025::shared::*`, so the **bb2016 AND
+bb2020 pass twins are DEAD** — every edition runs the BB2025 steps. Always check the glob imports in
+`driver.rs` before probing a per-edition file; a probe added to `step/bb2016/pass/step_intercept.rs`
+produced no output and was briefly credited with a fix it could not have caused.
+
+### The five recurring shapes
+
+Every target in this tier has been one of these:
+
+1. A **per-edition rule hard-coded to one edition inside a SHARED file** — five instances now.
+2. **Both harnesses declining the same dialog in lockstep**, keeping the matrices green while the
+   mechanic underneath is dead.
+3. A step returning a bare `cont()` with **no prompt** — breaks only once the other harness answers.
+4. A **general Java rule simplified away** in Rust (`isSkillRollSuccessful`'s natural 6 / natural 1),
+   invisible until a mechanic that can produce an out-of-range target starts running.
+5. A **Java predicate re-implemented with a missing or an extra clause** (`preventCatch`; the extra
+   thrower/target-square exclusion), harmless until the mechanic that uses it starts running.
