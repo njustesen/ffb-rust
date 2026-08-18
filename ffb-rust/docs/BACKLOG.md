@@ -412,7 +412,13 @@ Work in this order; each needs the trigger verified as reachable *before* any ha
         spend an iteration to learn what is already known.
       **Resolving the phase-2 declaration question unlocks BOTH targets at once** — one follow-up, not
       two campaigns. Highest-value remaining item in this section.
-- [ ] `Swoop` — unreached by the uniform sweep at 3 seeds/matchup; confirm whether it is genuinely dead.
+- [x] `Swoop` — **CLOSED 2026-08-18: NOT dead. It is live and parity-verified.**
+      Measured on goblin bb2020, seeds 1-20, parity agent: `Swoop: 1` dispatch, matchup **20/20 green**.
+      Its absence from the uniform sweep was SEED DEPTH (3 seeds/matchup), not a second gap — exactly
+      the alternative the inventory flagged as "not yet verified".
+      **Correction to `docs/DEAD_STEP_INVENTORY.md`:** the note said Swoop "needs a kicked Doom Diver
+      in BB2016/BB2020 specifically". The run that produced it had `KickTeamMate: 0` and
+      `ThrowTeamMate: 13`, so it came from a THROWN Doom Diver; a kick is not required.
 
 **Method per target**
 

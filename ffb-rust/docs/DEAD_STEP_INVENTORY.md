@@ -42,8 +42,11 @@ primitive the parity agent uses. Re-measured over the same sweep: the uniform ag
 `InitScatterPlayer`, `InitThrowTeamMate`, `RightStuff`, `ThrowTeamMate`). The sweep alone now matches
 what previously took both agents together.
 
-`Swoop` remains unreached by the uniform sweep at 3 seeds/matchup — it needs a kicked Doom Diver in
-BB2016/BB2020 specifically, so this may be seed depth rather than a second gap. Not yet verified.
+`Swoop` remains unreached by the uniform sweep at 3 seeds/matchup — **VERIFIED 2026-08-18 as seed
+depth, not a second gap.** Under the PARITY agent it dispatches on goblin bb2020 at seeds 1-20
+(`Swoop: 1`, matchup 20/20 green), so the step is live and parity-checked. Two corrections to the
+sentence this replaces: it does NOT need a *kicked* Doom Diver — that run had `KickTeamMate: 0` and
+`ThrowTeamMate: 13`, so a THROWN Doom Diver produced it — and it is no longer "not yet verified".
 
 ## Finding 2 — 69 steps no agent reaches
 
