@@ -6,7 +6,7 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
 use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
-use crate::injury::{InjuryContext, InjuryTypeServer, do_injury_roll_for_player};
+use crate::injury::{InjuryContext, InjuryTypeServer, do_injury_roll_for_player_no_stunty};
 use crate::injury::injuryType::modification_aware_injury_type_server::leak_injury_modifier;
 
 pub struct InjuryTypeFumbledKtm { ctx: InjuryContext }
@@ -37,7 +37,13 @@ impl InjuryTypeServer for InjuryTypeFumbledKtm {
                 }
             }
         }
-        do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
+        // Java reads "is stunty" off the INJURY MODIFIERS in the context
+        // (`RollMechanic`: anyMatch(isRegisteredToSkillWithProperty(isHurtMoreEasily))), not off the
+        // defender's skills. Normally the two agree — but this type FILTERS the modifier set down to
+        // `affectsEitherArmourOrInjuryOnBlock` modifiers, which drops Stunty's, so Java never sees a
+        // stunty modifier here. Hence the no-stunty variant: a fumbled kick on a Snotling totalling
+        // 9 is a plain KNOCKED_OUT, not the 9-and-stunty BADLY_HURT (ogre bb2020 seed 7 i=111).
+        do_injury_roll_for_player_no_stunty(rng, &mut self.ctx, game, defender_id);
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
@@ -63,6 +69,43 @@ mod tests {
         assert!(t.ctx.injury.is_some());
         assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
+    /// Java reads "is stunty" off the INJURY MODIFIERS in the context
+    /// (`RollMechanic`: anyMatch(isRegisteredToSkillWithProperty(isHurtMoreEasily))), not off the
+    /// defender's skills. This type FILTERS its modifier set down to
+    /// `affectsEitherArmourOrInjuryOnBlock` modifiers, which drops Stunty's — so Java never sees a
+    /// stunty modifier here and a total of 9 is a plain KNOCKED_OUT, not the 9-and-stunty
+    /// BADLY_HURT. Hence the no-stunty roll variant (ogre bb2020 seed 7 i=111).
+    #[test]
+    fn stunty_defender_does_not_get_the_stunty_injury_band() {
+        use ffb_model::enums::{Rules, PS_KNOCKED_OUT, SkillId, PS_STANDING, PlayerState};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        // Seed chosen so the injury dice total 9 (4+5) — the band where stunty would change KO->BH.
+        let mut seed = 0u64;
+        let (d1, d2) = loop {
+            let mut rng = GameRng::new(seed);
+            let (a, b) = (rng.d6(), rng.d6());
+            if a + b == 9 { break (a, b); }
+            seed += 1;
+        };
+        assert_eq!(d1 + d2, 9);
+
+        let mut game = Game::new(crate::step::framework::test_team("home", 0),
+                                 crate::step::framework::test_team("away", 0), Rules::Bb2020);
+        let mut p = Player { id: "snot".into(), name: "snot".into(), nr: 1, ..Default::default() };
+        p.starting_skills = vec![SkillWithValue::new(SkillId::Stunty)];
+        game.team_home.players.push(p);
+        game.field_model.set_player_coordinate("snot", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("snot", PlayerState::new(PS_STANDING));
+
+        let mut t = InjuryTypeFumbledKtm::new();
+        let mut rng = GameRng::new(seed);
+        t.handle_injury(&game, &mut rng, None, "snot", FieldCoordinate::new(5, 5),
+                        None, None, ApothecaryMode::ThrownPlayer);
+        assert_eq!(t.ctx.injury.map(|s| s.base()), Some(PS_KNOCKED_OUT),
+            "a stunty defender must NOT get the 9-and-stunty BADLY_HURT band here — this type's              filtered modifier set contains no stunty modifier for Java to see");
+    }
+
     #[test] fn stun_is_ko() { assert!(InjuryTypeFumbledKtm::new().stun_is_treated_as_ko()); }
     #[test]
     fn send_to_box_reason_is_kicked() {

@@ -101,6 +101,12 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             | PlayerActionChoice::HandOff
             // THROW_TEAM_MATE / THROW_TEAM_MATE_MOVE
             | PlayerActionChoice::ThrowTeamMate
+            // KICK_TEAM_MATE / KICK_TEAM_MATE_MOVE. A kick declares through the same command and
+            // the same candidate rule as a throw — every edition's `TtmMechanic.canBeKicked` is
+            // `canBeThrown()` plus STANDING (plus not-rooted and own-team). Leaving it out here
+            // meant both agents declared a kick and then immediately deselected it, so the mechanic
+            // never executed in ANY edition and every matrix was green because of it.
+            | PlayerActionChoice::KickTeamMate
     )
 }
 
@@ -307,7 +313,16 @@ impl Agent for RandomAgent {
                             !td.ttm_used && !td.pass_used
                         }
                     }
-                    PlayerAction::KickTeamMate => !td.ktm_used,
+                    // BB2016 spends the team's BLITZ on a Kick Team-Mate
+                    // (`bb2016/TtmMechanic.isKtmAvailable` is `!turnData.isBlitzUsed()`); BB2020 and
+                    // BB2025 track it on their own flag.
+                    PlayerAction::KickTeamMate => {
+                        if gs.game.rules == ffb_model::enums::Rules::Bb2016 {
+                            !td.blitz_used
+                        } else {
+                            !td.ktm_used
+                        }
+                    }
                     _ => true,
                 }).cloned().collect();
                 let action_idx = self.pick_action(live_actions.len());
@@ -372,7 +387,13 @@ impl Agent for RandomAgent {
                     // teammate), coordinate-sorted, 1 actionRng. Empty → None → StepInitSelecting
                     // deselects (no valid throwable teammate). The target square is chosen later, on
                     // the ThrowTeamMateTarget prompt. 1:1 with ParityRunner.sendThrowTeamMateAction.
-                    PlayerActionChoice::ThrowTeamMate => {
+                    // A KICK uses the same candidate rule as a throw: every edition's
+                    // `TtmMechanic.canBeKicked` is `canBeThrown()` plus STANDING (plus not-rooted and
+                    // own-team), which is what `legal_throw_team_mate_targets` already computes, and
+                    // what ParityRunner.sendThrowTeamMateAction sends for both. Picking a target for
+                    // the throw only meant a declared KICK carried no thrown player at all, so the
+                    // sequence stalled and the kick silently never resolved.
+                    PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate => {
                         let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
                         let targets = legal_throw_team_mate_targets(&gs.game, player_id, side);
                         if targets.is_empty() {
@@ -1363,13 +1384,17 @@ mod rng_trace_tests {
             PlayerActionChoice::Pass,
             PlayerActionChoice::HandOff,
             PlayerActionChoice::ThrowTeamMate,
+            // A kick declares through the same command as a throw and ParityRunner now routes
+            // KICK_TEAM_MATE / KICK_TEAM_MATE_MOVE to sendThrowTeamMateAction. Until both sides did,
+            // every kick was declared and instantly deselected, so Kick Team-Mate never executed in
+            // ANY edition and the matrices were green because of it.
+            PlayerActionChoice::KickTeamMate,
         ] {
             assert!(is_handled_acting_action(pa), "{pa:?} has a sendConcreteAction arm");
         }
         for pa in [
             PlayerActionChoice::ThrowBomb,
             PlayerActionChoice::Stab,
-            PlayerActionChoice::KickTeamMate,
             PlayerActionChoice::HypnoticGaze,
             PlayerActionChoice::Swoop,
             PlayerActionChoice::Punt,

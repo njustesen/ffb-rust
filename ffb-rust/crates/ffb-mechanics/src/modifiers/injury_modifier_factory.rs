@@ -163,6 +163,16 @@ fn skill_to_injury_modifier_untagged(
     if context.is_defender_mode() { return None; }
     match skill_id {
         SkillId::MightyBlow => {
+            // Java's `VariableInjuryModifierAttacker.appliesToContext` is
+            // `context.isAttackerMode() && UtilCards.hasSkill(context.getAttacker(), registeredTo)`,
+            // and the factory flips the context to DEFENDER mode before walking the defender's own
+            // skills. Without that gate an attacker-side modifier was collected from the DEFENDER:
+            // a kicked Ogre's own Mighty Blow added +1 to the injury roll against itself, turning a
+            // total of 9 into 10 and sending it to the casualty table where Java stopped at a
+            // knock-out (ogre bb2025 seed 2 i=245 — the fumbled-kick apo-KO injury on away_08).
+            if !context.is_attacker_mode() {
+                return None;
+            }
             if context.is_foul || context.is_stab || context.is_vomit_like || context.is_chainsaw {
                 return None;
             }
@@ -381,6 +391,32 @@ mod tests {
         };
         let away = home.clone();
         Game::new(home, away, rules)
+    }
+
+    /// Java's `VariableInjuryModifierAttacker.appliesToContext` is
+    /// `isAttackerMode() && hasSkill(attacker, registeredTo)`, and the factory flips the context to
+    /// DEFENDER mode before walking the defender's own skills. Without that gate an attacker-side
+    /// modifier was collected from the DEFENDER — a player's own Mighty Blow modified the injury
+    /// roll against itself, turning a total of 9 into 10 (casualty instead of knock-out).
+    #[test]
+    fn attacker_side_modifiers_do_not_apply_to_their_owner_as_defender() {
+        let f = InjuryModifierFactory::new(Rules::Bb2025);
+        let game = make_game(Rules::Bb2025);
+        let victim = player_with_skill("d", SkillId::MightyBlow);
+        let plain = player_with_skill("a2", SkillId::Block);
+
+        // The victim owns Mighty Blow but is the DEFENDER: it must not modify its own injury.
+        let mods = f.find_injury_modifiers_without_niggling(
+            &game, Some(&plain), &victim, false, false, false, false);
+        assert!(!mods.iter().any(|m| m.get_name() == "Mighty Blow"),
+            "a defender's own Mighty Blow must not modify the injury roll against it");
+
+        // The same skill on the ATTACKER still applies.
+        let attacker_mb = player_with_skill("a", SkillId::MightyBlow);
+        let mods = f.find_injury_modifiers_without_niggling(
+            &game, Some(&attacker_mb), &plain, false, false, false, false);
+        assert!(mods.iter().any(|m| m.get_name() == "Mighty Blow"),
+            "an attacker's Mighty Blow must still apply");
     }
 
     #[test]

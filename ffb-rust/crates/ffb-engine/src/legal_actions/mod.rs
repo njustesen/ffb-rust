@@ -222,8 +222,18 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             }
         }
 
-        // KickTeamMate (BB2025): player must have KickTeamMate skill and an adjacent teammate
-        if game.rules == Rules::Bb2025 && !turn_data.ktm_used && player.has_skill(SkillId::KickTeamMate) {
+        // KickTeamMate: player must have the Kick Team-Mate skill and an adjacent teammate.
+        // Availability follows the edition's `TtmMechanic.isKtmAvailable`: BB2020 and BB2025 test
+        // their own `ktmUsed` flag, while BB2016 spends the team's BLITZ on the kick
+        // (`bb2016/TtmMechanic.isKtmAvailable` is `!turnData.isBlitzUsed()`). This was gated to
+        // BB2025 alone, which left the whole mechanic unreachable in BB2020 even though
+        // `skill/mixed/KickTeamMate` is registered for BB2020 and the BB2020 ogre roster carries it.
+        let ktm_available = if game.rules == Rules::Bb2016 {
+            !turn_data.blitz_used
+        } else {
+            !turn_data.ktm_used
+        };
+        if ktm_available && player.has_skill(SkillId::KickTeamMate) {
             let adjacent_teammate = team.players.iter().any(|tp| {
                 tp.id != pid
                     && game.field_model.player_coordinate(&tp.id)
@@ -1111,19 +1121,32 @@ mod tests {
         assert!(has_action(&actions, "p1", PlayerActionChoice::ThrowTeamMate));
     }
 
+    /// Kick Team-Mate is available in EVERY edition — `skill/mixed/KickTeamMate` is registered for
+    /// BB2020 and BB2025, `skill/bb2016/KickTeamMate` for BB2016, and all three TtmMechanics
+    /// implement isKtmAvailable. What differs is WHICH once-per-turn slot the kick spends: BB2016
+    /// spends the BLITZ, BB2020 and BB2025 use their own ktmUsed flag. This was gated to BB2025
+    /// alone, which left the mechanic unreachable in BB2020 even though the BB2020 ogre roster
+    /// carries the skill.
     #[test]
-    fn kick_team_mate_only_offered_in_bb2025() {
-        let mut game16 = make_game(Rules::Bb2016);
-        add_player(&mut game16, true, "p1", c(5, 5), PS_STANDING, vec![SkillId::KickTeamMate]);
-        add_player(&mut game16, true, "p2", c(6, 5), PS_STANDING, vec![]);
-        let actions16 = legal_activate_player_actions(&game16, TeamSide::Home);
-        assert!(!has_action(&actions16, "p1", PlayerActionChoice::KickTeamMate));
+    fn kick_team_mate_availability_follows_the_edition() {
+        for rules in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            let mut game = make_game(rules);
+            add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![SkillId::KickTeamMate]);
+            add_player(&mut game, true, "p2", c(6, 5), PS_STANDING, vec![]);
+            let actions = legal_activate_player_actions(&game, TeamSide::Home);
+            assert!(has_action(&actions, "p1", PlayerActionChoice::KickTeamMate),
+                "{rules:?}: a fresh turn must offer Kick Team-Mate");
 
-        let mut game25 = make_game(Rules::Bb2025);
-        add_player(&mut game25, true, "p1", c(5, 5), PS_STANDING, vec![SkillId::KickTeamMate]);
-        add_player(&mut game25, true, "p2", c(6, 5), PS_STANDING, vec![]);
-        let actions25 = legal_activate_player_actions(&game25, TeamSide::Home);
-        assert!(has_action(&actions25, "p1", PlayerActionChoice::KickTeamMate));
+            // BB2016 spends the blitz; BB2020/BB2025 spend ktm_used.
+            if rules == Rules::Bb2016 {
+                game.turn_data_home.blitz_used = true;
+            } else {
+                game.turn_data_home.ktm_used = true;
+            }
+            let actions = legal_activate_player_actions(&game, TeamSide::Home);
+            assert!(!has_action(&actions, "p1", PlayerActionChoice::KickTeamMate),
+                "{rules:?}: Kick Team-Mate must be gone once its slot is spent");
+        }
     }
 
     #[test]

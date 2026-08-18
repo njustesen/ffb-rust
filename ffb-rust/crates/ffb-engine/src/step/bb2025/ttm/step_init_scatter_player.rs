@@ -29,6 +29,7 @@ use ffb_model::report::mixed::report_player_event::ReportPlayerEvent;
 use crate::action::Action;
 use crate::drop_player_context::SteadyFootingContext;
 use crate::injury::injuryType::injury_type_crowd_push::InjuryTypeCrowdPush;
+use crate::injury::injuryType::injury_type_ktm_crowd::InjuryTypeKTMCrowd;
 use crate::injury::injuryType::injury_type_ttm_hit_player::InjuryTypeTTMHitPlayer;
 use crate::injury::injuryType::injury_type_ttm_hit_player_for_spp::InjuryTypeTTMHitPlayerForSpp;
 use crate::step::action::ttm::util_throw_team_mate_sequence::{scatter_player, ScatterResult};
@@ -172,11 +173,22 @@ impl StepInitScatterPlayer {
         let outcome = if scatter_result.in_bounds {
             self.handle_landing(game, rng, &thrown_player_id, end_coord)
         } else {
-            // Java: new TtmToCrowdHandler().handle(game, this, thrownPlayer, endCoord, hasBall, new InjuryTypeCrowdPush())
-            let mut injury_type = InjuryTypeCrowdPush::new();
+            // Java: new TtmToCrowdHandler().handle(game, this, thrownPlayer, endCoord, hasBall, ...)
+            //
+            // BB2020 picks the injury type by HOW the player got there:
+            // `isKickedPlayer ? new InjuryTypeKTMCrowd() : new InjuryTypeCrowdPush()`
+            // (bb2020/StepInitScatterPlayer:251-252). The BB2025 twin always uses CrowdPush. Using
+            // CrowdPush for a KICKED BB2020 player gave the wrong injury severity — a kicked ogre
+            // Snotling booted into the crowd came out Badly Hurt where Java knocked it out
+            // (ogre bb2020 seed 7 i=111).
+            let use_ktm_crowd = self.is_kicked_player && game.rules == Rules::Bb2020;
+            let mut crowd_push = InjuryTypeCrowdPush::new();
+            let mut ktm_crowd = InjuryTypeKTMCrowd::new();
+            let injury_type: &mut dyn crate::injury::InjuryTypeServer =
+                if use_ktm_crowd { &mut ktm_crowd } else { &mut crowd_push };
             let crowd_params = TtmToCrowdHandler::handle(
                 game, rng, &thrown_player_id, end_coord,
-                self.thrown_player_has_ball, &mut injury_type,
+                self.thrown_player_has_ball, injury_type,
             );
             let mut outcome = StepOutcome::next();
             for p in crowd_params {

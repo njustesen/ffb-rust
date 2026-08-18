@@ -98,6 +98,11 @@ pub struct StepRightStuff {
     pub roll: i32,
 }
 
+/// See `fumbled_kick_injury_type_is_edition_specific` — BB2025 and BB2020 name different types.
+pub(crate) fn fumbled_kick_injury_type(rules: Rules) -> &'static str {
+    if rules == Rules::Bb2025 { "InjuryTypeFumbledKtmApoKo" } else { "InjuryTypeFumbledKtm" }
+}
+
 impl StepRightStuff {
     pub fn new(goto_on_success: String) -> Self {
         Self {
@@ -384,7 +389,19 @@ impl StepRightStuff {
 
         // Java: !doRoll → handleInjury; publish INJURY_RESULT; dropPlayer params; NEXT_STEP
         // Java: injuryType = fumbledKtm ? new InjuryTypeFumbledKtm() : new InjuryTypeTTMLanding()
-        let injury_type = if fumbled_ktm { "InjuryTypeFumbledKtm" } else { "InjuryTypeTTMLanding" };
+        // A fumbled KICK uses a DIFFERENT injury type per edition, and this shared step serves both:
+        // bb2025/StepRightStuff:254 uses `InjuryTypeFumbledKtmApoKo`, bb2020/StepRightStuff uses
+        // `InjuryTypeFumbledKtm`. They are not interchangeable — the ApoKo variant passes a NULL
+        // attacker to the injury-modifier factory, so no attacker skill can modify the roll, while
+        // the plain variant passes the attacker and keeps its `affectsEitherArmourOrInjuryOnBlock`
+        // modifiers. Using the BB2020 type under BB2025 let the kicker's Mighty Blow add +1, turning
+        // a total of 9 into 10 and sending the kicked player to the casualty table where Java
+        // stopped at a knock-out (ogre bb2025 seed 2 i=245, state index a07 = player away_08).
+        let injury_type = if fumbled_ktm {
+            fumbled_kick_injury_type(game.rules)
+        } else {
+            "InjuryTypeTTMLanding"
+        };
         let coord = game.field_model.player_coordinate(&player_id)
             .unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
         // Java: actingPlayer.getPlayer() is the attacker (thrower); thrownPlayer is defender-role
@@ -639,6 +656,18 @@ mod tests {
     /// `!fDropThrownPlayer && !fumbledKtm` — no autoFailLanding term — so a BB2020 player thrown
     /// while prone, stunned or distracted still gets its landing roll. Applying BB2025's rule under
     /// BB2020 skipped the roll and sent the player straight to the injury (goblin bb2020 seed 9).
+    /// A fumbled KICK picks a different injury type per edition, and this shared step serves both:
+    /// BB2025 uses InjuryTypeFumbledKtmApoKo (which passes a NULL attacker, so no attacker skill can
+    /// modify the roll), BB2016/BB2020 use InjuryTypeFumbledKtm (which passes the attacker and keeps
+    /// its affectsEitherArmourOrInjuryOnBlock modifiers). Using BB2020's type under BB2025 let the
+    /// kicker's Mighty Blow add +1 and pushed a total of 9 to 10 — casualty instead of knock-out.
+    #[test]
+    fn fumbled_kick_injury_type_is_edition_specific() {
+        assert_eq!(fumbled_kick_injury_type(Rules::Bb2025), "InjuryTypeFumbledKtmApoKo");
+        assert_eq!(fumbled_kick_injury_type(Rules::Bb2020), "InjuryTypeFumbledKtm");
+        assert_eq!(fumbled_kick_injury_type(Rules::Bb2016), "InjuryTypeFumbledKtm");
+    }
+
     #[test]
     fn auto_fail_landing_is_bb2025_only() {
         use ffb_model::report::report_id::ReportId;

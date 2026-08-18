@@ -336,18 +336,27 @@ impl StepEndSelecting {
             }
 
             // ── THROW_TEAM_MATE / KICK_TEAM_MATE ─────────────────────────────
-            PlayerAction::ThrowTeamMate | PlayerAction::KickTeamMate => {
+            pa @ (PlayerAction::ThrowTeamMate | PlayerAction::KickTeamMate) => {
+                // Whether this is a KICK is decided by the DECLARED ACTION, exactly as in Java where
+                // the sequence is built for a KICK_TEAM_MATE declaration. Reading it from the
+                // `IsKickedPlayer` parameter alone did not work: StepInitSelecting publishes that
+                // parameter, but it does not reach this step, so every kick built a THROW sequence.
+                // The visible effect was the wrong once-per-turn slot being spent — a BB2020 kick
+                // marked ttm_used instead of ktm_used, so the team could not throw afterwards but
+                // could kick again, while Java could do the opposite (ogre bb2020 seed 7 i=111:
+                // rust offered [Move, KickTeamMate] where java offered [MOVE, THROW_TEAM_MATE]).
+                let is_kicked = self.kicked || pa == PlayerAction::KickTeamMate;
                 let params = if with_param {
                     ThrowTeamMateParams {
                         thrown_player_id: self.thrown_player_id.clone(),
-                        is_kicked: self.kicked,
+                        is_kicked,
                         target_coordinate: self.target_coordinate,
                         rules: game.rules,
                     }
                 } else {
                     // `rules` must be carried here too — the Default is BB2025, which would give a
                     // BB2020 game the wrong TTM tail.
-                    ThrowTeamMateParams { rules: game.rules, ..Default::default() }
+                    ThrowTeamMateParams { rules: game.rules, is_kicked, ..Default::default() }
                 };
                 let seq = ThrowTeamMate::build_sequence(&params);
                 StepOutcome::next().push_seq(seq)

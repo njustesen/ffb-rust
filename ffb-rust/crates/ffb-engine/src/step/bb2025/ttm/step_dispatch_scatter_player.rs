@@ -151,6 +151,7 @@ impl StepDispatchScatterPlayer {
             throw_scatter,
             has_swoop,
             deviates,
+            is_kicked: self.is_kicked_player,
         });
 
         StepOutcome::next()
