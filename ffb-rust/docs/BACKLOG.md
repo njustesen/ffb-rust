@@ -320,6 +320,29 @@ Work in this order; each needs the trigger verified as reachable *before* any ha
       `handle_command` (`StepInitThrowTeamMate` un-mirrors, `StepHitAndRun` does not; do not assume).
       Expect reds and real engine bugs, as with the previous three: interception surfaced twelve.
       Measure after EACH change and isolate halves. Use `--home goblin --away goblin --edition bb2025`.
+
+      **STEP 1 DONE (uncommitted): THROW_BOMB added to BOTH handled-sets in lockstep.**
+      Rust `random_agent.rs` — `is_handled_acting_action` now accepts `ThrowBomb`, and the
+      declaration picks its target with the SAME rule as a pass (`PlayerActionChoice::Pass |
+      PlayerActionChoice::ThrowBomb` share the receiver arm). Java `ParityRunner` —
+      `isHandledActingAction` accepts `THROW_BOMB`, and `sendConcreteAction` routes it to
+      `sendPassAction`. Jar rebuilt. Justification: a bomb dispatches into the PASS sequence
+      (`step_end_selecting`'s `Pass|HailMaryPass|ThrowBomb|HailMaryBomb|HandOver` arm) and
+      `StepInitBomb` consumes only `CLIENT_USE_SKILL`, reading the pass coordinate for its target.
+
+      **RESULT: goblin bb2025 0/10 — but NOT a content divergence.** `UNHANDLED_ACTING_ACTION_AT_PICK`
+      is now 0 (the action is no longer deselected), and both engines declare the bomb IDENTICALLY:
+      seed 1 i=3 `Activate(away_07, ThrowBomb)` in Rust and `Activate(...Away7, THROW_BOMB)` in Java.
+      Then **BOTH logs stop at 3 steps** and the diff reports `java=None rust=None`. So both engines
+      STALL right after the declaration — each is waiting for a command neither harness sends.
+      Dispatch counts confirm nothing downstream ran: `InitBomb`/`ResolveBomb`/`EndBomb`/`Bombardier2`
+      all 0, while `Bombardier` (already live) ran 3 times.
+
+      **NEXT:** find what each engine is waiting on after the declaration. Check Java's stderr for
+      `UNHANDLED_DIALOG` / `UNHANDLED_STEP` on that seed, and Rust's pending prompt at the stall
+      (`prompt_after=` in the LOOP trace). Prime suspect is `StepInitBomb`'s `CLIENT_USE_SKILL` — the
+      "force bomb explosion" skill window — which neither harness answers. Whatever it is, teach BOTH
+      sides together.
 - [ ] `HailMaryPass`.
 - [ ] `Swoop` — unreached by the uniform sweep at 3 seeds/matchup; confirm whether it is genuinely dead.
 
