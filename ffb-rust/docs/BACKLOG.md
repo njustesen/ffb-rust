@@ -105,9 +105,32 @@ Rust spends three of them and Java four:
 - This seed was ALREADY red in gate4 (step 66), so it is a pre-existing bug, not something the
   interception work introduced.
 
+**RESOLVED to a single wrong number (2026-08-18).** The catch IS rolled — the earlier "catch_ball is
+never called" reading was from probing the WRONG FILE. `driver.rs` has an explicit per-edition
+override block (~line 434) that takes precedence over its glob imports, and BB2016 maps
+`StepId::CatchScatterThrowIn` to its OWN `crate::step::bb2016::StepCatchScatterThrowIn`. **Checking
+the globs is not enough — check the override block too.** (Third wrong-file probe this session.)
+
+With the right file probed:
+
+    IC      id=home_03 roll=2 min=6 ok=false calls=34 ag=4      <- interception fails, both engines
+    CATCH16 id=away_02 roll=4 min=2 ok=true  calls=36 ag=4 mode=CatchAccuratePass
+
+Rust's catch target is **2** and it SUCCEEDS on the 4. Java rolls the same 4, FAILS, and spends `#37`
+on the Catch-skill re-roll (high elves have Catch) — so Java's target is **5 or more**. The formula
+itself is right (`minimum_roll_catch_edition`, BB2016 = `(7 - AG) + modifiers` floor 2; AG4 -> base 3),
+so the divergence is the MODIFIER TOTAL: Rust ends at 3 + (-1 accurate pass) = 2, Java at >= 5, a gap
+of about +3 that looks like missing TACKLEZONE modifiers on the catcher.
+
+- [ ] Compare Rust's bb2016 catch modifier set against Java's `modifiers/bb2016/CatchModifierCollection`
+      and `bb2016/AgilityMechanic.minimumRollCatch`, exactly as was done for the interception minimum
+      (fix 5). Print the individual modifiers, not just the total. Then re-check `elf bb2016 83`,
+      which may share the cause.
+
 PROBES CURRENTLY IN THE TREE for this investigation — remove before gating, then `git diff` and read
-every `-` line: `FFB_P2` prints `IC` in `bb2025/pass/step_intercept.rs`, and `CB entry` + `CATCH` in
-`bb2025/shared/step_catch_scatter_throw_in.rs`.
+every `-` line: `FFB_P2` prints `IC` in `bb2025/pass/step_intercept.rs`, and `CS16` + `CATCH16` in
+`bb2016/step_catch_scatter_throw_in.rs`. (The bb2025 shared-file probes were already removed — that
+file is not the one BB2016 runs.)
 
 **Blocking seeds** (four are BB2020 deflections)
 
