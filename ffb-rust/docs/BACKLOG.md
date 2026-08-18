@@ -304,6 +304,22 @@ Work in this order; each needs the trigger verified as reachable *before* any ha
       — "the code is fine, nothing on the pitch can trigger it" — and reaching it would mean changing
       the drafted teams, which is a separate and larger decision. `Dauntless` itself runs normally.
 - [ ] The bomb chain — `InitBomb`, `EndBomb`, `ResolveBomb`, `Bombardier2`.
+      **TRIGGER VERIFIED 2026-08-18: REACHABLE, and it is the same lockstep-abandonment shape as TTM,
+      KTM and interception — the fourth of its kind. This one is worth driving.**
+      - Carrier IS drafted: `goblin.bombardier`, 1 in the bb2025 goblin squad (Bombardier appears in
+        the goblin roster of all three editions).
+      - BOTH harnesses OFFER the action — Rust `legal_actions/mod.rs:194` pushes
+        `PlayerActionChoice::ThrowBomb`; Java `ParityRunner:1949` adds `PlayerAction.THROW_BOMB`.
+      - BOTH then ABANDON it in lockstep: `isHandledActingAction` (`ParityRunner:2191`) and Rust's
+        `is_handled_acting_action` (`random_agent.rs:85`) both omit THROW_BOMB / HAIL_MARY_BOMB, so
+        the pick is deselected with no step logged (`UNHANDLED_ACTING_ACTION_AT_PICK`). That is
+        exactly why every matrix stays green while the whole bomb chain is dead.
+      **PLAN:** add THROW_BOMB to both handled-sets IN LOCKSTEP, then teach both harnesses to answer
+      the bomb-target prompt with the same candidate list from the ENGINE's own predicate, the same
+      ordering, and ONE `actionRng` pick — and check the coordinate frame by reading the target step's
+      `handle_command` (`StepInitThrowTeamMate` un-mirrors, `StepHitAndRun` does not; do not assume).
+      Expect reds and real engine bugs, as with the previous three: interception surfaced twelve.
+      Measure after EACH change and isolate halves. Use `--home goblin --away goblin --edition bb2025`.
 - [ ] `HailMaryPass`.
 - [ ] `Swoop` — unreached by the uniform sweep at 3 seeds/matchup; confirm whether it is genuinely dead.
 
