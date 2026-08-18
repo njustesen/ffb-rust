@@ -130,3 +130,48 @@ Both harnesses OFFER the action and then abort the target window, in lockstep:
 Because both abort together the matrices stay green — exactly how Throw Team-Mate and Kick Team-Mate
 stayed green while never executing. A BB2025 roster fields a Punt carrier, so the mechanic is
 reachable the moment both harnesses learn to drive the target window.
+
+---
+
+## Update 2026-08-18 — Hit and Run driven; the (d2) table needs a second column
+
+`HitAndRun` now EXECUTES in bb2020 and bb2025 (commit 6c392fef). Both harnesses learned its move
+window in lockstep — Rust answers `AgentPrompt::HitAndRun`, `ParityRunner` gained
+`sendHitAndRunTarget` + a `HIT_AND_RUN` case — and the mechanic promptly exposed an engine bug that
+had nothing to do with Hit and Run itself. See the commit message for the full chain; the part worth
+carrying forward is this:
+
+**`Pile Driver` was dead for the same reason and is now live too.** Java's `changeActingPlayer` keeps
+an activated player in `MOVING` for the whole activation; Rust wrote `STANDING` on every stand-up.
+`StepEndBlocking` gates BOTH `canMoveAfterBlock` (Hit and Run) and `canFoulAfterBlock` (Pile Driver)
+on `base == MOVING`, so a single wrong state write disabled two skills at once — and the compared
+state hash could not see it, because the activation-end `changeActingPlayer` reverts
+`MOVING`->`STANDING` before the next comparison. **A mid-activation state that the hash cannot see is
+the recurring shape of these bugs** (this is the third: the ACTIVE bit in the TTM campaign, the
+`ttm_used`/`ktm_used` flags in KTM, and now the acting player's base).
+
+### The (d2) table conflates two different things
+
+"A drafted position carries the skill" is NOT the same as "the trigger is reachable". Punt is the
+counter-example, and it invalidates the "Punt is the clearest next campaign" section above:
+
+**Punt's plumbing is now correct and dark_elf bb2025 measures 100/100 — and `InitPunt` still
+dispatches ZERO times.** Punt requires the acting player to be holding the ball at TURN START, and
+both agents take their eligible-action snapshot once per turn, so a player who picks the ball up
+mid-turn is never offered it. No amount of harness work reaches this; it needs an agent that
+deliberately scores, which is a different tier.
+
+Read the table as:
+
+| skill | drafted carrier | trigger reachable under the turn-start snapshot? |
+|---|---|---|
+| **Hit and Run** | bb2020, bb2025 | YES — driven, 30/30/30 |
+| **Punt** | bb2025 | NO — needs the carrier holding the ball at turn start |
+| **Hail Mary Pass** | bb2025 | unverified |
+| **Cloud Burster** | bb2020, bb2025 | unverified — needs an OPPONENT long pass, check first |
+| Hypnotic Gaze | all three | unverified |
+| Dauntless | all three | unverified |
+| Bombardier | all three | unverified |
+
+Verify the trigger BEFORE building harness plumbing for the remaining rows — that check is what would
+have saved the Punt round-trip.
