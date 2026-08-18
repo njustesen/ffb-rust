@@ -225,17 +225,34 @@ should clear `catcher_id` or whether the upstream publish should not reach here 
 
 ---
 
-## 3. Audit the bare skill-roll comparisons
+## 3. Audit the bare skill-roll comparisons — ✅ DONE 2026-08-18 (`be482da4`)
 
 `crates/ffb-engine/src/dice_interpreter.rs` already has the correct rule, yet ~25 sites still compare
 `roll >= min_roll` directly (bone head, really stupid, wild animal, blood lust, take root, dauntless,
 jump up, chainsaw, GFI, shadowing, …). One of them was a real bug this session (fix 6 above).
 
-- [ ] For each site, check whether the Java counterpart calls `isSkillRollSuccessful`. Fix only those.
+- [x] Audited. The ~55 sites were SPLIT rather than swept:
+      - **Fixed targets** (`>= 2/3/4/5`) left alone — inside 2..6 the natural-6/natural-1 rule and a
+        bare `>=` are provably identical (a natural 6 clears any target ≤ 6; a natural 1 fails any
+        target ≥ 2), so there is nothing to fix.
+      - **Variable targets** cross-referenced against the Java classes that actually call
+        `isSkillRollSuccessful` (`grep -rl isSkillRollSuccessful ffb-server/.../server/`). That
+        membership test replaced guesswork. **23 sites** changed: bone head (×3 editions), really
+        stupid (×3), wild animal, blood lust (×4), take root (×2), jump up, shadowing (×2),
+        tentacles, unchannelled fury, animal savagery, go-for-it (×3), and the dead bb2020 intercept
+        twin (kept faithful).
+      - **Deliberately NOT changed:** chainsaw and chomp — Java's `StepBlockChainsaw` uses a literal
+        `roll >= minimumRoll` and neither is in the helper list; and **dauntless**, whose roll could
+        not be located in `StepDauntless.java`. Only CONFIRMED mismatches were touched.
+      - Gate 30/30/30, workspace 14,539/0.
 
-**Do not blanket-change them.** Only some Java call sites use that rule, and a sweeping edit is exactly
-the "measured worse" trap this project has hit twice. Fix a site when a red seed points at it and the
-Java call site is verified — not before.
+**Residual risk, recorded honestly:** this class of mismatch is INVISIBLE until a target leaves 2..6,
+so the green gate does NOT prove the untouched sites are correct — it only proves these 23 changed
+nothing observable. The verification that counted was reading the Java call sites. If a future red
+seed implicates a roll, re-check its Java helper before assuming the site is fine.
+
+**Do not blanket-change the remainder.** A sweeping edit is the "measured worse" trap this project has
+hit twice.
 
 ---
 
