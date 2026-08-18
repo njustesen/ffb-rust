@@ -53,13 +53,16 @@ cannot be MEASURED while the interception attempt is off — no interception mea
 the `Deflected` arm never runs. Re-enable FIRST (the tree returns to nine known reds, which is the
 expected intermediate state), then fix, then green the seeds. Do not gate or commit in between.
 
-- [ ] Re-enable the interception attempt in **both** harnesses together — never one alone:
-      the Rust `AgentPrompt::Interception` arm in `random_agent.rs`, and `case INTERCEPTION:` +
-      `sendInterceptorChoice` in `ParityRunner.java` (rebuild the jar). Coordinate-sorted candidates
-      from the engine's own `UtilPassing.findInterceptors`, exactly one `actionRng` draw each. Never
-      id-sorted — the two engines' player ids differ (`away_03` vs `teamHighElfParity20Away3`). The
-      exact code is in commit `4677499b`'s parent — recover it with `git show 4677499b -- <file>`.
-      Also replace the `interception_is_declined_in_lockstep_with_the_java_harness` test.
+- [x] **Re-enabled 2026-08-18, uncommitted.** Rust `AgentPrompt::Interception` arm in
+      `random_agent.rs` answers `SelectPlayer`; `ParityRunner.java` has `case INTERCEPTION:` +
+      `sendInterceptorChoice(Game, GameState)`; jar rebuilt. Coordinate-sorted candidates from the
+      engine's own `UtilPassing.findInterceptors`, one `actionRng` draw each. The decline test was
+      swapped back for `interception_picks_a_coordinate_sorted_candidate_with_one_action_draw` +
+      `interception_with_no_candidates_declines` (22 agent tests pass).
+      **Correction:** the note above said to recover the code from `4677499b`'s parent — that is
+      WRONG, the enabled version was never committed (its parent `e2c646c1` holds the *old* decline).
+      It was rewritten from the spec. Verified back in the expected intermediate state:
+      dark_elf bb2020 seed 21 is RED again. Do NOT gate or commit until the next box lands.
 - [ ] Fix the `Deflected` arm of `bb2025/shared/step_catch_scatter_throw_in.rs`. It sets
       `deflected_pass = true` and calls `handle_regular_catch(game, rng, deflected_pass, &player_under_ball)`.
       Check what `player_under_ball` holds there, and whether a **failed** deflected catch should bounce
