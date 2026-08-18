@@ -28,8 +28,8 @@ Gate `gate5` came back **bb2016 30/30, bb2020 30/30, bb2025 30/30, zero reds**. 
       written down (bb2016/bb2020 pass twins are dead).
 - [x] Memory updated (`parity_tier_ttm.md`, `MEMORY.md`).
 
-**For the next item:** nothing is in flight, the tree is clean, and both commits are local — they still
-need pushing. The seven fixes are in; the eighth bug (BB2020 deflection) is §2 below.
+**For the next item:** nothing is in flight, the tree is clean, and everything is pushed
+(`e2c646c1..c7b2e158`). The seven fixes are in; the eighth bug (BB2020 deflection) is §2 below.
 
 **The seven fixes in this commit**
 
