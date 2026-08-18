@@ -17,19 +17,19 @@ box, add the commit hash, and record anything learned that the next item needs.
 
 ---
 
-## 1. Land the interception fidelity fixes — IN FLIGHT
+## 1. Land the interception fidelity fixes — ✅ DONE 2026-08-18
 
-Gate `gate5` (bash `bo9hggq5x`) is running; at the last check 84 of 90 matchups were done with **0 reds**.
+Gate `gate5` came back **bb2016 30/30, bb2020 30/30, bb2025 30/30, zero reds**. Workspace 14,536/0.
 
-- [ ] Read the gate result.
-- [ ] At 30/30/30, commit the seven fixes. Honest message: these are latent fidelity bugs surfaced by
-      temporarily switching agent-driven interception on; the switch itself is reverted because the
-      BB2020 deflection chain is not yet faithful.
-- [ ] `docs/DEAD_STEP_INVENTORY.md`: Cloud Burster is **not** driven — record it as "plumbing correct,
-      blocked on BB2020 deflection fidelity". Drop it from the bb2025 row (Java has no bb2025
-      `CloudBursterBehaviour`). Record that `driver.rs` globs `bb2025::pass::*` and `bb2025::shared::*`,
-      so the bb2016/bb2020 pass twins are dead — always check the globs before probing a per-edition file.
-- [ ] Update memory (`parity_tier_ttm.md`, `MEMORY.md`) with the five recurring bug shapes below.
+- [x] Read the gate result — 30/30/30.
+- [x] Commit the seven fixes — `4677499b`.
+- [x] `docs/DEAD_STEP_INVENTORY.md` updated — `0ac9ed89`. Cloud Burster recorded as "plumbing correct,
+      blocked on BB2020 deflection fidelity"; dropped from the bb2025 row; `driver.rs` glob routing
+      written down (bb2016/bb2020 pass twins are dead).
+- [x] Memory updated (`parity_tier_ttm.md`, `MEMORY.md`).
+
+**For the next item:** nothing is in flight, the tree is clean, and both commits are local — they still
+need pushing. The seven fixes are in; the eighth bug (BB2020 deflection) is §2 below.
 
 **The seven fixes in this commit**
 
