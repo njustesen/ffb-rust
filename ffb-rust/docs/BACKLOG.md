@@ -63,12 +63,20 @@ expected intermediate state), then fix, then green the seeds. Do not gate or com
       WRONG, the enabled version was never committed (its parent `e2c646c1` holds the *old* decline).
       It was rewritten from the spec. Verified back in the expected intermediate state:
       dark_elf bb2020 seed 21 is RED again. Do NOT gate or commit until the next box lands.
-- [ ] Fix the `Deflected` arm of `bb2025/shared/step_catch_scatter_throw_in.rs`. It sets
-      `deflected_pass = true` and calls `handle_regular_catch(game, rng, deflected_pass, &player_under_ball)`.
-      Check what `player_under_ball` holds there, and whether a **failed** deflected catch should bounce
-      from the deflector's square rather than land on the pass coordinate. Compare against Java's bb2020
-      catch/scatter path for `DEFLECTED`.
-- [ ] Green these six seeds, then gate and commit.
+- [x] **Fixed 2026-08-18, uncommitted — and it was NOT in the `Deflected` arm.** That arm is faithful;
+      the bug was upstream. Java's `StepPass.setParameter` returns TRUE for `CATCHER_ID`, i.e. it
+      CONSUMES the key into `PassState.catcherId` so it never reaches `StepCatchScatterThrowIn`.
+      Rust's `bb2025/pass/step_pass.rs` accepted the key without consuming it, so the intended
+      receiver leaked downstream and `if catcher_id.is_none() { catcher_id = player_under_ball }`
+      never fired — the deflected catch resolved for the RECEIVER instead of the deflector under the
+      ball. Probe confirmed it exactly: `catcher_id=away_09` vs `under_ball=home_02`. Fix is a
+      `consumes_parameter` override on StepPass; test
+      `catcher_id_is_consumed_so_it_cannot_leak_downstream`. This is the THIRD instance of the
+      parameter-outlives-its-sequence shape (after `InterceptorId` and the pass-state ids), so treat
+      "does Java's setParameter return true here?" as a standard check.
+- [ ] Green the remaining THREE seeds, then gate and commit. Progress after the CatcherId fix:
+      **green** — dark_elf bb2020 21, dark_elf_league_fumbbl bb2020 21, amazon bb2020 75;
+      **still red** — necromantic bb2020 41, elf bb2016 83, high_elf bb2016 24.
 
 **Blocking seeds** (four are BB2020 deflections)
 

@@ -700,21 +700,26 @@ impl Agent for RandomAgent {
             // i=100 before play passes to the other team at i=101.)
             // Picking a target here instead would roll block dice Java never rolls.
             Some(AgentPrompt::BlockTarget { .. }) => Action::EndTurn,
-            // Interception: DELIBERATELY DECLINED, in lockstep with Java's
-            // `RandomStrategy.sendInterceptorChoice(null, null)` (ParityRunner has no INTERCEPTION
-            // case, so the dialog falls through to it). Both harnesses therefore consume 0 RNG.
-            //
-            // This is a KNOWN, DOCUMENTED gap, not an oversight: an earlier revision had both
-            // harnesses attempt the interception (coordinate-sorted candidates from the engine's own
-            // `UtilPassing.findInterceptors`, one actionRng draw each). That switched the mechanic on
-            // and immediately exposed eight real Rust fidelity bugs — seven of which are fixed and
-            // shipped — but the BB2020 DEFLECTION chain below `StepResolvePass` is still not
-            // faithful: a deflected ball that Java leaves on the deflector ends on the receiver in
-            // Rust (dark_elf bb2020 seed 21 i=95). Attempting interceptions is therefore disabled
-            // until that chain is ported; see docs/DEAD_STEP_INVENTORY.md. Re-enabling means
-            // restoring this arm AND ParityRunner's `case INTERCEPTION:` together — never one alone.
-            Some(AgentPrompt::Interception { .. }) =>
-                Action::Intercept { attempt: false },
+            // Interception: pick a candidate, coordinate-sorted, with ONE actionRng draw
+            // (AGENT_CONTRACT §6). `ParityRunner.sendInterceptorChoice` mirrors this list, order and
+            // draw. The candidate set comes from the ENGINE's own `UtilPassing.findInterceptors` on
+            // both sides, so the harness cannot drift from the engine it is testing — the mistake
+            // the BB2020 Throw-Team-Mate campaign made with `canBeThrown`.
+            // Sorted by COORDINATE, never by id: the two engines' player ids differ
+            // (`away_03` vs `teamHighElfParity20Away3`), so an id sort would not agree.
+            Some(AgentPrompt::Interception { candidates, .. }) => {
+                let mut ids: Vec<String> = candidates.clone();
+                ids.sort_by_key(|id| {
+                    let c = gs.game.field_model.player_coordinate(id);
+                    (c.map(|c| c.x).unwrap_or(i32::MAX), c.map(|c| c.y).unwrap_or(i32::MAX))
+                });
+                if ids.is_empty() {
+                    Action::Intercept { attempt: false }
+                } else {
+                    let idx = self.pick_action(ids.len());
+                    Action::SelectPlayer { player_id: ids[idx].clone() }
+                }
+            }
             // Touchback: Java ParityRunner picks the receiving player NEAREST to the fixed kick-from
             // square (13,8) by squared distance, iterating team order so the first candidate wins ties.
             // This is fully deterministic — NO decisionRng draw. The previous random pick both chose the
@@ -1086,25 +1091,48 @@ mod tests {
         assert_eq!(picks[1], picks[0].transform(), "the away coach sends the mirrored view");
     }
 
-    /// Both harnesses DECLINE every interception in lockstep — Rust with
-    /// `Action::Intercept { attempt: false }`, Java by falling through to
-    /// `RandomStrategy.sendInterceptorChoice(null, null)` — so neither consumes RNG here. This is a
-    /// documented gap rather than an oversight: attempting interceptions works and exposed eight
-    /// real fidelity bugs, but the BB2020 deflection chain is not yet faithful, so the attempt stays
-    /// off until it is. Re-enabling requires changing BOTH harnesses together.
+    /// Both harnesses ATTEMPT the interception in lockstep: Rust answers `SelectPlayer`, Java's
+    /// `ParityRunner.sendInterceptorChoice` picks from the same engine-computed candidate list with
+    /// the same ordering and a single `actionRng` draw. The pick is COORDINATE-sorted, never
+    /// id-sorted — the two engines' player ids differ.
     #[test]
-    fn interception_is_declined_in_lockstep_with_the_java_harness() {
+    fn interception_picks_a_coordinate_sorted_candidate_with_one_action_draw() {
         let mut gs = new_game(1);
+        for (id, x, y) in [("away_05", 14, 7), ("away_02", 11, 9), ("away_04", 11, 6)] {
+            let mut p = ffb_model::model::player::Player::default();
+            p.id = id.into();
+            gs.game.team_away.players.push(p);
+            gs.game.field_model.set_player_coordinate(id, FieldCoordinate::new(x, y));
+        }
+        let candidates = vec!["away_05".to_string(), "away_02".to_string(), "away_04".to_string()];
         gs.pending_prompt = Some(AgentPrompt::Interception {
-            player_id: "away_01".into(),
+            player_id: candidates[0].clone(),
             target_number: 0,
-            candidates: vec!["away_01".into(), "away_02".into()],
+            candidates: candidates.clone(),
         });
         let mut agent = RandomAgent::new_parity(1);
         let before = agent.decision_rng_count;
-        assert!(matches!(agent.act(&gs), Action::Intercept { attempt: false }),
-            "the interception window is declined while BB2020 deflection is unported");
-        assert_eq!(agent.decision_rng_count, before, "a decline consumes no RNG on either side");
+        match agent.act(&gs) {
+            Action::SelectPlayer { player_id } => {
+                assert!(candidates.contains(&player_id), "must pick a published candidate");
+            }
+            other => panic!("expected SelectPlayer, got {other:?}"),
+        }
+        assert_eq!(agent.decision_rng_count, before,
+            "the candidate comes from actionRng, not the decision stream");
+    }
+
+    /// An empty candidate list declines, matching Java's `sendInterceptorChoice(null, null)`.
+    #[test]
+    fn interception_with_no_candidates_declines() {
+        let mut gs = new_game(1);
+        gs.pending_prompt = Some(AgentPrompt::Interception {
+            player_id: String::new(),
+            target_number: 0,
+            candidates: vec![],
+        });
+        let mut agent = RandomAgent::new_parity(1);
+        assert!(matches!(agent.act(&gs), Action::Intercept { attempt: false }));
     }
 
     #[test]
