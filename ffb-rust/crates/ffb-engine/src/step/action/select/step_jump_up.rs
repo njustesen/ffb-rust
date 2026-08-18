@@ -136,7 +136,10 @@ impl StepJumpUp {
             .collect();
         let min_roll = minimum_roll_jump_up(agility, &modifiers);
         let roll = rng.d6();
-        let successful = roll >= min_roll;
+        // Java `JumpUpBehaviour` uses DiceInterpreter.isSkillRollSuccessful: a natural 6 always succeeds and a
+        // natural 1 always fails, whatever the target. Only differs from a bare `>=` when the target
+        // leaves 2..6, which is exactly when it matters.
+        let successful = crate::dice_interpreter::DiceInterpreter::is_skill_roll_successful(roll, min_roll);
 
         let jump_up_event = GameEvent::JumpUpRoll {
             player_id: player_id.clone(),

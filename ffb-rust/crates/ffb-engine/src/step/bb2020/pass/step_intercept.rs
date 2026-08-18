@@ -152,7 +152,10 @@ impl StepIntercept {
             (easy_intercept, minimum_roll, roll)
         };
 
-        let successful = roll >= minimum_roll;
+        // Java `StepIntercept` uses DiceInterpreter.isSkillRollSuccessful: a natural 6 always succeeds and a
+        // natural 1 always fails, whatever the target. Only differs from a bare `>=` when the target
+        // leaves 2..6, which is exactly when it matters.
+        let successful = crate::dice_interpreter::DiceInterpreter::is_skill_roll_successful(roll, minimum_roll);
         let re_rolled = self.re_rolled_action.is_some() && self.re_roll_source.is_some();
         let is_bomb = matches!(
             game.thrower_action,

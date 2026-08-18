@@ -183,7 +183,10 @@ impl StepUnchannelledFury {
         let player_action = game.acting_player.player_action;
         let good_conditions = good_conditions_for_uf(player_action);
         let min_roll = minimum_roll_confusion(good_conditions);
-        let successful = roll >= min_roll;
+        // Java `UnchannelledFuryBehaviour` uses DiceInterpreter.isSkillRollSuccessful: a natural 6 always succeeds and a
+        // natural 1 always fails, whatever the target. Only differs from a bare `>=` when the target
+        // leaves 2..6, which is exactly when it matters.
+        let successful = crate::dice_interpreter::DiceInterpreter::is_skill_roll_successful(roll, min_roll);
 
         // Java: actingPlayer.markSkillUsed(skill) — per-activation, see the `do_roll` note above.
         game.acting_player.used_skills.insert(SkillId::UnchannelledFury);

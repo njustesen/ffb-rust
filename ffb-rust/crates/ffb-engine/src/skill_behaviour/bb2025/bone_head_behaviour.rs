@@ -126,7 +126,10 @@ impl StepModifierTrait for BoneHeadStepModifier {
         }
         let roll = rng.d6();
         let min_roll = minimum_roll_confusion(true);
-        let successful = roll >= min_roll;
+        // Java `BoneHeadBehaviour` uses DiceInterpreter.isSkillRollSuccessful: a natural 6 always succeeds and a
+        // natural 1 always fails, whatever the target. Only differs from a bare `>=` when the target
+        // leaves 2..6, which is exactly when it matters.
+        let successful = crate::dice_interpreter::DiceInterpreter::is_skill_roll_successful(roll, min_roll);
 
         // Java: actingPlayer.markSkillUsed(skill) — Bone Head's SkillUsageType is not
         // "track outside activation", so it is recorded ONLY on the acting player (reset each

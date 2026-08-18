@@ -154,7 +154,10 @@ impl StepBloodLust {
             .unwrap_or(2);
         let roll = rng.d6();
         let min_roll = minimum_roll_blood_lust_with(skill_value, good_conditions);
-        let successful = roll >= min_roll;
+        // Java `BloodLustBehaviour` uses DiceInterpreter.isSkillRollSuccessful: a natural 6 always succeeds and a
+        // natural 1 always fails, whatever the target. Only differs from a bare `>=` when the target
+        // leaves 2..6, which is exactly when it matters.
+        let successful = crate::dice_interpreter::DiceInterpreter::is_skill_roll_successful(roll, min_roll);
 
         // Java: actingPlayer.markSkillUsed(skill)
         if let Some(player) = game.player_mut(&acting_id) {

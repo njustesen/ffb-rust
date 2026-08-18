@@ -190,7 +190,10 @@ impl StepGoForIt {
             (2, vec![])
         };
 
-        let successful = self.roll >= minimum_roll;
+        // Java `StepGoForIt` uses DiceInterpreter.isSkillRollSuccessful: a natural 6 always succeeds and a
+        // natural 1 always fails, whatever the target. Only differs from a bare `>=` when the target
+        // leaves 2..6, which is exactly when it matters.
+        let successful = crate::dice_interpreter::DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
 
         // Java line 234-238: if (usingModifierIgnoringSkill == null) addReport(new ReportGoForItRoll(...))
         if self.using_modifier_ignoring_skill.is_none() {

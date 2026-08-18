@@ -205,7 +205,10 @@ impl StepModifierTrait for WildAnimalStepModifier {
         }
 
         let roll = rng.d6();
-        let successful = roll >= min_roll;
+        // Java `WildAnimalBehaviour` uses DiceInterpreter.isSkillRollSuccessful: a natural 6 always succeeds and a
+        // natural 1 always fails, whatever the target. Only differs from a bare `>=` when the target
+        // leaves 2..6, which is exactly when it matters.
+        let successful = crate::dice_interpreter::DiceInterpreter::is_skill_roll_successful(roll, min_roll);
 
         // Java: actingPlayer.markSkillUsed(WildAnimal) — recorded on the ACTING PLAYER (reset each
         // activation by setPlayerId), NOT the persistent Player, so the hasUnusedSkill guard above

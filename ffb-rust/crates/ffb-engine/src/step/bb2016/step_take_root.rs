@@ -104,7 +104,10 @@ impl StepTakeRoot {
 
         let roll = rng.d6();
         let min_roll = DiceInterpreter::minimum_roll_confusion(true);
-        let successful = roll >= min_roll;
+        // Java `TakeRootBehaviour` uses DiceInterpreter.isSkillRollSuccessful: a natural 6 always succeeds and a
+        // natural 1 always fails, whatever the target. Only differs from a bare `>=` when the target
+        // leaves 2..6, which is exactly when it matters.
+        let successful = crate::dice_interpreter::DiceInterpreter::is_skill_roll_successful(roll, min_roll);
 
         // Java: actingPlayer.markSkillUsed(skill) — per-activation, matching hasUnusedSkill above.
         game.acting_player.used_skills.insert(SkillId::TakeRoot);

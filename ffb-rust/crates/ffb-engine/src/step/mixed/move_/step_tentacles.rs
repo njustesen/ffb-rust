@@ -130,7 +130,10 @@ impl StepTentacles {
                                 .unwrap_or(0);
                             let st_difference = defender_st - actor_st;
                             let min_roll = (6 - st_difference).max(2);
-                            let successful = roll >= min_roll;
+                            // Java `TentaclesBehaviour` uses DiceInterpreter.isSkillRollSuccessful: a natural 6 always succeeds and a
+        // natural 1 always fails, whatever the target. Only differs from a bare `>=` when the target
+        // leaves 2..6, which is exactly when it matters.
+        let successful = crate::dice_interpreter::DiceInterpreter::is_skill_roll_successful(roll, min_roll);
 
                             // Java: `boolean reRolled = ((getReRolledAction() == TENTACLES) &&
                             //   (getReRollSource() != null))` — recomputed here (distinct from
