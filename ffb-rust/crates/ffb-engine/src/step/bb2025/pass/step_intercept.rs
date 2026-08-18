@@ -117,7 +117,7 @@ impl StepIntercept {
     /// Returns `(successful, easy_intercept)`. BB2020 needs the second half: there a successful
     /// roll is a DEFLECTION, and only an *easy* intercept is an outright catch.
     fn intercept(
-        &self,
+        &mut self,
         interceptor_id: &str,
         game: &mut Game,
         rng: &mut GameRng,
@@ -203,6 +203,38 @@ impl StepIntercept {
             is_bomb,
             easy_intercept,
         ));
+
+        // Java (`bb2016:182-196`, `bb2025:234-249`): a FAILED interception is re-rolled by a SKILL
+        // source on the interceptor, recursing into intercept() — that recursion is visible in the
+        // Java dice trace as `StepIntercept.intercept:172 <- StepIntercept.intercept:189`. The
+        // lookup key is per-edition: BB2016 asks for a `CATCH` re-roll source (the Catch skill),
+        // BB2020/BB2025 ask for `INTERCEPTION`. Rust never re-rolled, so a Catch-carrying
+        // interceptor was one die short of Java for the rest of the game (high_elf bb2016 seed 24
+        // i=55: Java spends calls #34 AND #35 on the interception, Rust only #34).
+        // The team-re-roll branch Java falls back to is deliberately NOT ported here: the harness
+        // always declines team re-rolls, and an interceptor is on the non-acting team, so
+        // `isTeamReRollAvailable` is false for it anyway (same reasoning as the bb2016 catch step).
+        if !successful && self.re_rolled_action.is_none() {
+            let action = if game.rules == ffb_model::enums::Rules::Bb2016 { "CATCH" } else { "INTERCEPTION" };
+            let source = game.player(interceptor_id).and_then(|p| {
+                p.all_skill_ids()
+                    .filter(|id| !p.used_skills.contains(id))
+                    .filter_map(|id| id.reroll_sources().iter()
+                        .find(|(a, _)| *a == action)
+                        .map(|(_, priority)| (id, *priority)))
+                    .min_by_key(|(id, priority)| (*priority, *id as i32))
+            });
+            if let Some((skill_id, _)) = source {
+                self.re_rolled_action = Some(action.to_string());
+                self.re_roll_source = Some(format!("{:?}", skill_id));
+                if let Some(p) = game.team_home.player_mut(interceptor_id)
+                    .or_else(|| game.team_away.player_mut(interceptor_id))
+                {
+                    p.used_skills.insert(skill_id);
+                }
+                return self.intercept(interceptor_id, game, rng);
+            }
+        }
 
         (successful, easy_intercept)
     }
@@ -592,7 +624,7 @@ mod tests {
         let mut game = Game::new(home, away, Rules::Bb2025);
         game.thrower_id = Some("t1".into());
 
-        let step = StepIntercept {
+        let mut step = StepIntercept {
             goto_label_on_failure: "fail".into(),
             interception_skill_name: None,
             interceptor_id: Some("opp1".into()),
@@ -756,6 +788,61 @@ mod tests {
             "a No Hands player must never be offered as an interceptor");
         assert!(found.iter().any(|id| id == "catcher"),
             "an ordinary opponent in the corridor still is one");
+    }
+
+    /// Java re-rolls a FAILED interception with a SKILL source on the interceptor, recursing into
+    /// `intercept()` (`bb2016:182-196`, `bb2025:234-249`) — visible in the Java dice trace as
+    /// `StepIntercept.intercept:172 <- StepIntercept.intercept:189`. The lookup key is per-edition:
+    /// BB2016 asks for a `CATCH` source (the Catch skill), BB2020/BB2025 for `INTERCEPTION`. Rust
+    /// never re-rolled, leaving a Catch-carrying interceptor one die behind Java for the rest of the
+    /// game (high_elf bb2016 seed 24 i=55).
+    #[test]
+    fn a_failed_bb2016_interception_is_rerolled_by_the_catch_skill() {
+        use ffb_model::enums::PlayerState as PS;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::enums::SkillId;
+
+        // AG2 in BB2016 needs 7, which no single d6 can reach — so if the Catch re-roll fires we
+        // must see TWO dice consumed, and if it does not, only one.
+        let build = |with_catch: bool| {
+            let mut home = test_team("home", 0);
+            let mut away = test_team("away", 0);
+            let mut thrower = ffb_model::model::player::Player::default();
+            thrower.id = "t1".into();
+            home.players.push(thrower);
+            let mut opp = ffb_model::model::player::Player::default();
+            opp.id = "opp1".into();
+            opp.agility = 2;
+            if with_catch {
+                opp.starting_skills = vec![SkillWithValue { skill_id: SkillId::Catch, value: None }];
+            }
+            away.players.push(opp);
+            let mut game = Game::new(home, away, Rules::Bb2016);
+            game.thrower_id = Some("t1".into());
+            game.thrower_action = Some(PlayerAction::Pass);
+            game.pass_coordinate = Some(FieldCoordinate::new(14, 7));
+            game.field_model.set_player_coordinate("t1", FieldCoordinate::new(1, 7));
+            game.field_model.set_player_coordinate("opp1", FieldCoordinate::new(7, 7));
+            game.field_model.set_player_state("opp1", PS::new(ffb_model::enums::PS_STANDING));
+            game
+        };
+
+        let mut without = build(false);
+        let mut step = StepIntercept::new("fail".into());
+        let mut rng = GameRng::new(7);
+        step.intercept("opp1", &mut without, &mut rng);
+        let calls_without = rng.call_count;
+
+        let mut with = build(true);
+        let mut step2 = StepIntercept::new("fail".into());
+        let mut rng2 = GameRng::new(7);
+        step2.intercept("opp1", &mut with, &mut rng2);
+        let calls_with = rng2.call_count;
+
+        assert_eq!(calls_without, 1, "no Catch skill -> a single interception die");
+        assert_eq!(calls_with, 2, "Catch re-rolls the failed interception exactly once");
+        assert!(with.team_away.player("opp1").unwrap().used_skills.contains(&SkillId::Catch),
+            "the re-roll consumes the skill");
     }
 
     #[test]

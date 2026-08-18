@@ -54,6 +54,11 @@ impl StepSafeThrow {
     }
 
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        if std::env::var_os("FFB_ST").is_some() {
+            eprintln!("ST entry interceptor={:?} thrower={:?} has_st={:?}",
+                self.interceptor_id, game.thrower_id,
+                game.thrower().map(|p| p.has_skill_property(NamedProperties::CAN_CANCEL_INTERCEPTIONS)));
+        }
         // No interceptor → skip to next (nothing to cancel).
         let interceptor_id = match &self.interceptor_id {
             Some(id) if !id.is_empty() => id.clone(),
@@ -101,6 +106,9 @@ impl StepSafeThrow {
         }
 
         // Roll d6 and compare to minimum.
+        if std::env::var_os("FFB_ST").is_some() {
+            eprintln!("ST rolling calls_before={}", rng.call_count);
+        }
         let roll = rng.d6();
         let minimum_roll = game.thrower()
             .map(|p| Bb2016AgilityMechanic::default().minimum_roll_safe_throw(p))

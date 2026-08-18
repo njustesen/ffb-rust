@@ -80,7 +80,41 @@ expected intermediate state), then fix, then green the seeds. Do not gate or com
       shipped fix instead publishes `CatcherId(None)` from the BB2020 deflected branch of
       `step_resolve_pass.rs`, alongside the `Deflected` mode. Strictly better: it greens necromantic
       41 as well and causes no regression.
-- [ ] Green the remaining TWO seeds, then gate and commit. After the narrowed CatcherId fix:
+- [x] **All six original blocking seeds are GREEN.** The last of them needed one more fix: Java
+      re-rolls a FAILED interception from a SKILL source on the interceptor, recursing into
+      `intercept()` (`bb2016:182-196`, `bb2025:234-249`). The lookup key is PER-EDITION — BB2016 asks
+      for a `CATCH` source (the Catch skill), BB2020/BB2025 for `INTERCEPTION`. Rust never re-rolled,
+      so a Catch-carrying interceptor stayed one die behind Java for the rest of the game. Implemented
+      in `bb2025/pass/step_intercept.rs` (`intercept` now takes `&mut self`); test
+      `a_failed_bb2016_interception_is_rerolled_by_the_catch_skill` pins the die count at 1 without
+      Catch and 2 with it. **Process note:** the previous iteration's "missing tacklezone modifiers"
+      theory was WRONG and was flagged as unverified before any code changed. `FFB_DICE_DEEP=1` prints
+      Java's FULL caller chain per die and identified the real culprit in one run — use it whenever
+      two dice share a `rollSkill:112` caller instead of inferring from values.
+
+- [ ] **Gate `gate6` came back bb2020 30/30, bb2025 30/30, bb2016 29/30 — ONE red left:**
+      `high_elf bb2016 seed 90`, first `rng_calls` divergence at i=269 (Rust 88, Java 89), i.e. the
+      extra die falls in activation i=268 `Activate(home_08, PASS)`. Green this, then re-gate and commit.
+
+      Java's four dice there, from `FFB_DICE_DEEP=1`:
+
+          #86 StepIntercept.intercept            d6=6  <- interception SUCCEEDS (natural 6)
+          #87 StepSafeThrow.executeStep:125      d6=4  <- Safe Throw cancels it
+          #88 StepPass.executeStep               d6=4  <- the pass
+          #89 StepCatchScatterThrowIn.catchBall  d6=2  <- the catch
+
+      Rust spends only three. Probes confirm Rust DOES reach both earlier rolls: `ST entry
+      interceptor=Some("away_03") thrower=Some("home_08") has_st=Some(true)` and `ST rolling
+      calls_before=86`, so the interception (#86) and the Safe Throw (#87) both happen, and #88 is the
+      pass. **The missing roll is the CATCH (#89).** So after a Safe-Throw-cancelled interception the
+      pass completes but Rust never rolls the receiver's catch. Look at what the bb2016
+      `StepCatchScatterThrowIn` receives in that path — `catcher_id`, the player under the ball, and
+      the incoming `CatchScatterThrowInMode` — and compare with Java's. Note this is a THIRD variant
+      of the same family already fixed twice (`InterceptorId` leaking, `CatcherId` leaking), so check
+      whether a parameter is missing or stale here too.
+
+      PROBES IN THE TREE for this: `FFB_ST` prints `ST entry` and `ST rolling` in
+      `bb2016/pass/step_safe_throw.rs`. Remove before gating and read every `-` line of the diff. After the narrowed CatcherId fix:
       **green** — dark_elf bb2020 21, dark_elf_league_fumbbl bb2020 21, amazon bb2020 75,
       necromantic bb2020 41 (and necromantic 8, the regression the first attempt caused);
       **still red** — elf bb2016 83, high_elf bb2016 24. Both bb2016, so the BB2020 deflection work
