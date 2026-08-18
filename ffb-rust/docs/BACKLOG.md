@@ -350,14 +350,28 @@ Work in this order; each needs the trigger verified as reachable *before* any ha
       `passCoordinate`, `throwerId = actingPlayer` and `throwerAction = THROW_BOMB`, so those
       conjuncts hold; only the distance one fails.
 
-      **NEXT:** make BOTH harnesses pick a bomb target that is in range, filtering candidates with the
-      ENGINE's own passing-distance predicate (`findPassingDistance != null`) — same list, same
-      ordering, one `actionRng` pick on each side. Note a plain PASS deliberately does NOT filter by
-      range today and still works, so scope the filter to the bomb path and say why in the comment
-      rather than changing pass behaviour. Verify the bomb range really is narrower than a pass's
-      before assuming that is the difference.
-- [ ] `HailMaryPass`.
-- [ ] `Swoop` — unreached by the uniform sweep at 3 seeds/matchup; confirm whether it is genuinely dead.
+      **THE RANGE THEORY WAS WRONG — do not implement a range filter.** Measuring instead of assuming
+      (as the caution demanded) showed the distance was perfectly valid:
+      `IP action=Some(ThrowBomb) thrower_acting=true dist_valid=true tc=(19,6) pc=(22,6) raw=Some(QuickPass)`.
+      The real Rust cause was a MISSING TARGET: `bb2025/shared/step_init_selecting.rs` threaded
+      `TargetCoordinate` through for `Pass | HandOver` only, so a bomb reached `StepInitPassing` with
+      no coordinate, `thrower_id`/`thrower_action` were never set, and the step parked on `cont()`
+      forever. Adding `PlayerAction::ThrowBomb` to that arm fixed the RUST side.
+
+      **STEP 2 DONE (`d75e6eb6`, still WIP/ungated): Rust now DRIVES the bomb** — `InitBomb: 1`,
+      `EndBomb: 1` on goblin bb2025 seed 1 (`ResolveBomb` 0 there, presumably path-dependent).
+
+      **REMAINING: the JAVA harness still parks, so the two are no longer symmetric.** goblin bb2025
+      is 0/10 and Java logs `UNHANDLED_STEP: INIT_PASSING` 2500x while Rust proceeds — now a Java-side
+      harness gap. Java declares in phase 1 via `ClientCommandActingPlayer(playerId, declared, false)`
+      (`ParityRunner:514`) and sends the concrete command in phase 2 via `sendConcreteAction` ->
+      `sendPassAction` (injecting `ClientCommandPass`). For a bomb that phase-2 visit evidently never
+      happens, so `CLIENT_PASS` is never injected and `StepInitPassing` waits forever.
+      **NEXT:** find why phase 2 is not reached for THROW_BOMB. Precedent sits in the same code: BLITZ
+      is declared as `BLITZ_MOVE` because `StepInitSelecting` dispatches it onward, so a bomb may need
+      declaring as a different PlayerAction — or the harness may need to inject `CLIENT_PASS` at
+      declaration, which is effectively what Rust now does by threading the target through. Read
+      `StepInitSelecting`'s dispatch for THROW_BOMB before choosing.
 
 **Method per target**
 
