@@ -122,10 +122,28 @@ itself is right (`minimum_roll_catch_edition`, BB2016 = `(7 - AG) + modifiers` f
 so the divergence is the MODIFIER TOTAL: Rust ends at 3 + (-1 accurate pass) = 2, Java at >= 5, a gap
 of about +3 that looks like missing TACKLEZONE modifiers on the catcher.
 
-- [ ] Compare Rust's bb2016 catch modifier set against Java's `modifiers/bb2016/CatchModifierCollection`
-      and `bb2016/AgilityMechanic.minimumRollCatch`, exactly as was done for the interception minimum
-      (fix 5). Print the individual modifiers, not just the total. Then re-check `elf bb2016 83`,
-      which may share the cause.
+- [ ] Finish this. Measured so far:
+
+          CMODS total=-1 ["Accurate Pass=-1"] tz=0 at=Some((12, 7)) ball=Some((12, 7))
+
+      Rust applies ONLY `Accurate Pass=-1` and counts **zero** tacklezones on the catcher `away_02`
+      at (12,7) — even though `home_03` stands at (12,8), directly adjacent. The plumbing all looks
+      right: Rust's bb2016 `CatchModifierCollection` extends the base collection (which does carry
+      `1..8 Tacklezone` and the disturbing-presence entries, exactly like Java's), the factory's
+      `find_applicable` does the count-based TACKLEZONE selection, and `UtilPlayer::find_tacklezones`
+      -> `find_tacklezone_players` correctly takes the OTHER team relative to the given player and
+      the player's own coordinate. So the next question is why the count is 0: most likely `home_03`
+      has no tacklezones at that moment (prone/stunned), which would ALSO mean Java counts none.
+
+      **CAUTION — an unverified assumption underpins the "Java target >= 5" reading.** It assumes
+      Java's 4th die (`#37 d6=2`) is a Catch-skill re-roll after a FAILED catch on `#36 d6=4`. That
+      has NOT been confirmed; `#36` and `#37` are both `rollSkill:112` and the die name cannot tell
+      them apart. If instead Java's catch SUCCEEDED on `#36` (min <= 4) then `#37` is something else
+      entirely and the whole tacklezone theory is wrong. **Verify what Java's `#37` actually is
+      before changing any modifier code** — e.g. by checking whether Java's ReportCatchRoll for this
+      catch says rerolled, or by finding which Java call site consumes call #37. Do not fix on the
+      assumption.
+      Then re-check `elf bb2016 83`, which may share the cause.
 
 PROBES CURRENTLY IN THE TREE for this investigation — remove before gating, then `git diff` and read
 every `-` line: `FFB_P2` prints `IC` in `bb2025/pass/step_intercept.rs`, and `CS16` + `CATCH16` in
