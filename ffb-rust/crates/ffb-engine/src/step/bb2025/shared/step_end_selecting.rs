@@ -321,6 +321,19 @@ impl StepEndSelecting {
                 StepOutcome::next().push_seq(seq)
             }
 
+            // ── GAZE_SELECT ───────────────────────────────────────────────────
+            // Java: `bb2020/move/StepEndSelecting:270` pushes SelectGazeTarget for GAZE_SELECT.
+            // The gaze-target steps are `@RulesCollection(BB2020)` and BB2025 has no gaze-target
+            // path at all (only AutoGazeZoat), so this arm is edition-gated. The push lived ONLY in
+            // `step/bb2020/move_/step_end_selecting.rs`, which is DEAD — BB2020 and BB2025 both run
+            // THIS shared step — so `SelectGazeTarget`/`SelectGazeTargetEnd` were never pushed in any
+            // edition. Gated here rather than by routing BB2020 to its twin: whole-set routing has
+            // been measured worse twice (see `step/driver.rs`).
+            PlayerAction::GazeSelect if game.rules == Rules::Bb2020 => {
+                let seq = crate::step::generator::bb2020::SelectGazeTarget::build_sequence();
+                StepOutcome::next().push_seq(seq)
+            }
+
             // ── PASS / HAIL_MARY_PASS / THROW_BOMB / HAIL_MARY_BOMB / HAND_OVER ──
             PlayerAction::Pass
             | PlayerAction::HailMaryPass
@@ -892,6 +905,28 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(out.pushes.len(), 1);
         assert_eq!(out.pushes[0][0].step_id, StepId::SelectBlitzTarget);
+    }
+
+    /// Java `bb2020/move/StepEndSelecting:270` pushes SelectGazeTarget for GAZE_SELECT, and the
+    /// gaze-target steps are `@RulesCollection(BB2020)` — BB2025 has no gaze-target path at all.
+    /// The push lived only in the DEAD `step/bb2020/move_/step_end_selecting.rs` (BB2020 and BB2025
+    /// both run THIS shared step), so `SelectGazeTarget`/`SelectGazeTargetEnd` were never pushed in
+    /// any edition.
+    ///
+    /// Only BB2020 is asserted here: `GAZE_SELECT` is produced solely by
+    /// `bb2020/shared/StepInitSelecting`, so it cannot arise under BB2025, and forcing it there just
+    /// trips this step's unhandled-action invariant — which is the correct behaviour for a state
+    /// Java never constructs, not something to paper over.
+    #[test]
+    fn gaze_select_pushes_the_gaze_target_sequence_in_bb2020() {
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        let mut step = StepEndSelecting::new();
+        step.dispatch_player_action = Some(PlayerAction::GazeSelect);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.pushes.iter()
+            .any(|seq| seq.first().map(|s| s.step_id) == Some(StepId::SelectGazeTarget)),
+            "BB2020 must push the gaze-target sequence");
     }
 
     #[test]
