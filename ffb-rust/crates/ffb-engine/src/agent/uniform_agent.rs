@@ -16,7 +16,8 @@ use ffb_model::enums::PlayerAction;
 use crate::action::{Action, InducementPurchase, PlayerActionChoice};
 use crate::legal_actions::{
     canonical_setup_action, legal_block_targets, legal_foul_targets, legal_handoff_receivers,
-    legal_inducement_purchases, legal_pass_receivers, legal_skill_choices, TeamSide,
+    legal_inducement_purchases, legal_pass_receivers, legal_skill_choices,
+    legal_throw_team_mate_targets, TeamSide,
 };
 use crate::step::GameState;
 
@@ -153,6 +154,16 @@ impl Agent for UniformAgent {
                     PlayerActionChoice::Pass => {
                         let receivers = legal_pass_receivers(&gs.game, player_id, side);
                         if receivers.is_empty() { None } else { Some(receivers[self.pick(receivers.len())].clone()) }
+                    }
+                    // A Throw/Kick Team-Mate declaration must carry the thrown player, exactly as it
+                    // does for the parity agent. Without this arm the declaration went out with no
+                    // target, StepInitSelecting deselected it, and the whole TTM family never ran:
+                    // `step=ThrowTeamMate` appeared ZERO times in 5.7M dispatch lines across all 87
+                    // matchups, so the uniform sweep — the tool whose job is to measure how much of
+                    // the mechanic surface random play reaches — was under-reporting a whole action.
+                    PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate => {
+                        let targets = legal_throw_team_mate_targets(&gs.game, player_id, side);
+                        if targets.is_empty() { None } else { Some(targets[self.pick(targets.len())].clone()) }
                     }
                     _ => None,
                 };
@@ -473,6 +484,49 @@ mod tests {
         }
         assert!(seen_indices.len() > 1,
             "expected more than one distinct index across 50 seeds, got {:?}", seen_indices);
+    }
+
+    /// A Throw/Kick Team-Mate declaration must carry the thrown player. The target-selection
+    /// `match` had arms for Block/Blitz, Foul, HandOff and Pass then `_ => None`, so a TTM
+    /// declaration went out with no target, `StepInitSelecting` deselected it, and the whole
+    /// Throw-Team-Mate family never ran: `step=ThrowTeamMate` appeared ZERO times in 5.7M dispatch
+    /// lines across all 87 matchups. That silently understated every coverage number this agent
+    /// reports — its entire purpose. (Same shape as the parity agent's Kick Team-Mate bug: an agent
+    /// declaring an action it never supplies a target for.)
+    #[test]
+    fn throw_team_mate_declaration_carries_the_thrown_player() {
+        use ffb_model::enums::{PlayerAction, PS_STANDING, PlayerState, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+
+        let mut gs = new_game(7);
+        gs.game.home_playing = true;
+
+        let mut thrower = Player { id: "ogre".into(), name: "ogre".into(), nr: 1, ..Default::default() };
+        thrower.starting_skills = vec![SkillWithValue::new(SkillId::ThrowTeamMate)];
+        let mut mate = Player { id: "snot".into(), name: "snot".into(), nr: 2, strength: 1, ..Default::default() };
+        mate.starting_skills = vec![SkillWithValue::new(SkillId::RightStuff)];
+        gs.game.team_home.players.push(thrower);
+        gs.game.team_home.players.push(mate);
+        gs.game.field_model.set_player_coordinate("ogre", FieldCoordinate::new(13, 7));
+        gs.game.field_model.set_player_coordinate("snot", FieldCoordinate::new(13, 8));
+        gs.game.field_model.set_player_state("ogre", PlayerState::new(PS_STANDING));
+        gs.game.field_model.set_player_state("snot", PlayerState::new(PS_STANDING));
+
+        gs.pending_prompt = Some(AgentPrompt::ActivatePlayer {
+            eligible_players: vec![("ogre".into(), vec![PlayerAction::ThrowTeamMate])],
+        });
+
+        let mut agent = UniformAgent::new(7);
+        match agent.act(&gs) {
+            Action::ActivatePlayer { player_action, block_defender_id, .. } => {
+                assert_eq!(player_action, PlayerActionChoice::ThrowTeamMate);
+                assert_eq!(block_defender_id.as_deref(), Some("snot"),
+                    "the declaration must name the thrown player, or the engine deselects it");
+            }
+            other => panic!("expected ActivatePlayer, got {other:?}"),
+        }
     }
 
     /// End-to-end smoke test that the `ActivatePlayer` branch itself (not just `pick()` in

@@ -11,12 +11,12 @@ Method: extract every `StepId` variant (199), then collect every `step=` line fr
 | | count |
 |---|---|
 | StepId variants | 199 |
-| reached by the uniform agent | 121 |
+| reached by the uniform agent | 121 -> **130** after the Finding-1 fix |
 | reached by the parity agent (2 matchups only) | 117 |
 | reached by either | 130 |
 | **never reached by either** | **69** |
 
-## Finding 1 — the coverage tool has a blind spot
+## Finding 1 — the coverage tool had a blind spot (FIXED)
 
 Nine steps are reached by the PARITY agent but never by the UNIFORM agent, even though the uniform
 sweep covers all 87 matchups including ogre:
@@ -24,10 +24,26 @@ sweep covers all 87 matchups including ogre:
     AlwaysHungry  DispatchScatterPlayer  EndScatterPlayer  EndThrowTeamMate
     InitScatterPlayer  InitThrowTeamMate  RightStuff  Swoop  ThrowTeamMate
 
-That is the entire Throw-Team-Mate family. `step=ThrowTeamMate` appears **zero times** in 5.7M
+That is the entire Throw-Team-Mate family. `step=ThrowTeamMate` appeared **zero times** in 5.7M
 uniform dispatch lines. The uniform agent exists precisely to answer "how much of the mechanic
-surface does random play exercise?", so a whole action it never declares undercuts every coverage
-number it reports. Worth fixing before trusting the uniform sweep as a coverage baseline.
+surface does random play exercise?", so a whole action it never declared undercut every coverage
+number it reported.
+
+ROOT CAUSE: `uniform_agent.rs`'s target-selection `match` had arms for Block/Blitz, Foul, HandOff and
+Pass, then `_ => None` — no arm for Throw/Kick Team-Mate. The declaration therefore went out with no
+thrown player, `StepInitSelecting` deselected it, and the action never resolved. Exactly the shape of
+the Kick Team-Mate bug in the parity agent found the same day: an agent declaring an action it never
+supplies a target for.
+
+FIXED — the uniform agent now picks a thrown player from `legal_throw_team_mate_targets`, the same
+primitive the parity agent uses. Re-measured over the same sweep: the uniform agent now reaches
+**130 of 199** step-ids, up from 121, gaining eight of those nine
+(`AlwaysHungry`, `DispatchScatterPlayer`, `EndScatterPlayer`, `EndThrowTeamMate`,
+`InitScatterPlayer`, `InitThrowTeamMate`, `RightStuff`, `ThrowTeamMate`). The sweep alone now matches
+what previously took both agents together.
+
+`Swoop` remains unreached by the uniform sweep at 3 seeds/matchup — it needs a kicked Doom Diver in
+BB2016/BB2020 specifically, so this may be seed depth rather than a second gap. Not yet verified.
 
 ## Finding 2 — 69 steps no agent reaches
 
