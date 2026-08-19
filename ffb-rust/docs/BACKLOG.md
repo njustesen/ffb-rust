@@ -650,6 +650,57 @@ executes in BOTH engines (it had never executed in either). Workspace 14,540 pas
 
 ---
 
+## 6. Widen the state hash (USER-SELECTED 2026-08-19)
+
+Goal: make the per-step hash see the state that hid 4+ bugs this session — above all the
+player's **ACTIVE bit** (invisible re-activations, lost deactivations), evaluated for the
+**MOVING base** (currently normalised?) too. The two builders MUST stay byte-identical:
+
+- Java: `ParityRunner.stateString(game)` (+ `turnFlags`) — HARNESS, co-editable.
+- Rust: the `state_string`/`state_hash` in ffb-parity (see `state_hash.rs` / runner.rs).
+
+Constraints:
+- ttm_used/ktm_used stay OUT unless Java's TurnData exposes an accessor (engine code is
+  off-limits; the old note says it exposes none — RE-CHECK before assuming).
+- Edit BOTH sides in lockstep, rebuild the jar, then re-gate the FULL matrix. NEW REDS ARE THE
+  POINT: each one is a real, previously-invisible divergence. Fix them in the Rust engine per
+  the standing rules; expect the ACTIVE bit to surface several.
+- [x] Format DECIDED + IMPLEMENTED lockstep (uncommitted): each player part gains a trailing
+      `,<active-bit>` — `h03:x,y,State,M/S/A/V,1`. Java `ps.isActive()`, Rust `state.is_active()`.
+      Jar + binary rebuilt; ffb-model state_hash tests pass.
+- [x] **All 8 goblin reds fixed with TWO engine bugs — goblin 100/100 ×3 with the widened hash:**
+      1. `change_player_action` never retired the OLD acting player on a genuine change (Java's
+         UtilActingPlayer does it on EVERY change: acted → STANDING+INACTIVE with the THROW_BOMB
+         carve-out, standing-up → PRONE, else STANDING) — ported as `retire_old_acting_player`,
+         evaluated BEFORE set_player resets the acting struct. Test
+         `genuine_change_retires_old_acting_player_inactive`. (Fixed the bomber-active-after-bomb
+         family: seeds 2/20/83/90 etc.)
+      2. The turn-start refresh (`refresh_players_for_turn_start`) was gated `Regular && !new_half`
+         — Java runs it UNCONDITIONALLY after the turn-flip handling, including at touchdowns and
+         new halves, BEFORE the KO-recovery/fainting block. The gate left last-activation-inactive
+         players fainting/boxing with a dead bit that survived into the next drive's Reserve state
+         (seed 75 and the java=None/rust=None tails).
+      RWATCH/RRETIRE probes removed (diff-verified). Workspace 14,547 / 0.
+- [ ] **FULL MATRIX GATE running in background** (bash id `bmgs7h3e3`, gate_activebit.txt). At
+      30/30/30 ×3: commit+push both repos (ffb-rust engine+hash; ParityRunner's stateString change
+      on ffb `t3-phase2-wip`). If RED: other rosters' ACTIVE-bit divergences — same recipe; the
+      trailing `,0/1` on each player part is the new signal.
+- [x] (was: burn-down list)
+- [x] OLD:  (they are the previously-invisible
+      ACTIVE-bit divergences this tier exists to surface):
+      bb2016: seeds 2 (step 56), 20 (78), 52 (279 java=None rust=None — BOTH logs short?!),
+      75 (119); bb2020: 57 (278 both-None), 83 (57), 90 (89); bb2025: 83 (112).
+      **Seed 2 bb2016 traced**: after away_05's THROW_BOMB, positional a04 (= away_05, the
+      BOMBER) is INACTIVE in Java, ACTIVE in Rust, same rng — the bomber's retire is losing the
+      deactivation. Suspects: `change_player_action_to_none`'s THROW_BOMB carve-out
+      (`bombardier_spent` — check the ENABLE_THROW_BOMB_ACTION property is registered/edition-
+      aware and that StepBombardier really marked the skill used), or the stray-MOVING reset
+      (which keeps ACTIVE) running instead of the retire. The `java=None rust=None` fails mean
+      BOTH logs ended early — different game lengths, diff the last common step.
+- [ ] Then the FULL matrix gate; expect more reds on other rosters (TTM'd players, stunned
+      recoveries, pass-block movers all touch the ACTIVE bit).
+- [ ] Gate 30/30/30 → commit+push both repos (ffb-rust + ParityRunner in ffb `t3-phase2-wip`).
+
 ## Blocked — needs a tier decision from the user
 
 - **Punt.** Plumbing is correct and dark_elf bb2025 is 100/100, but `InitPunt` dispatches zero times:

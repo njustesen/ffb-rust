@@ -58,6 +58,46 @@ pub fn check_command_with_acting_player(game: &Game, acting_player_id: &str) -> 
 /// ServerUtilBlock.updateDiceDecorations). Without the updateMoveSquares call the
 /// first square of every move had no MoveSquare data, so StepInitMoving never set
 /// actingPlayer.dodging and dodge rolls never fired.
+
+/// Java `UtilActingPlayer.changeActingPlayer`'s OLD-player retire (the `oldState.getBase() ==
+/// MOVING` branch): a player leaving the acting slot goes STANDING+INACTIVE if he has acted
+/// (with the THROW_BOMB carve-out — a catcher re-throwing a caught bomb is not spending his
+/// activation, but a Bombardier whose bomb skill is now used IS), PRONE if he was standing up,
+/// STANDING otherwise. Java runs this on EVERY genuine acting-player change; Rust previously ran
+/// it only in `change_player_action_to_none`, so a bomber handing the slot to his bomb's catcher
+/// was never deactivated (goblin bb2016 seed 2 — surfaced the moment the state hash learned to
+/// see the ACTIVE bit). MUST be evaluated BEFORE `set_player` resets the acting struct.
+fn retire_old_acting_player(game: &mut Game) {
+    use ffb_model::enums::{PS_MOVING, PS_PRONE, PS_STANDING};
+    let Some(old_id) = game.acting_player.player_id.clone() else { return };
+    let Some(state) = game.field_model.player_state(&old_id) else { return };
+    if state.base() != PS_MOVING {
+        return;
+    }
+    let was_prone = game.acting_player.old_player_state
+        .map(|s| s.base() == PS_PRONE)
+        .unwrap_or(false);
+    let is_bomb_action = matches!(
+        game.acting_player.player_action,
+        Some(ffb_model::enums::PlayerAction::ThrowBomb)
+            | Some(ffb_model::enums::PlayerAction::HailMaryBomb)
+    );
+    let bombardier_spent = game.player(&old_id).map(|p| {
+        use ffb_model::model::property::NamedProperties;
+        p.has_skill_property(NamedProperties::ENABLE_THROW_BOMB_ACTION)
+            && !p.has_unused_skill_with_property(NamedProperties::ENABLE_THROW_BOMB_ACTION)
+    }).unwrap_or(false);
+    let retire_inactive = game.acting_player.acted() && (!is_bomb_action || bombardier_spent);
+    let new_state = if retire_inactive {
+        state.change_base(PS_STANDING).change_active(false)
+    } else if game.acting_player.standing_up || was_prone {
+        state.change_base(PS_PRONE)
+    } else {
+        state.change_base(PS_STANDING)
+    };
+    game.field_model.set_player_state(&old_id, new_state);
+}
+
 pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerAction, jumping: bool) {
     if !player_id.is_empty() {
         // Java UtilActingPlayer.changeActingPlayer gates the used-skills / blocked-moving resets on
@@ -67,6 +107,12 @@ pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerActi
         // skill usage, or a once-per-activation negatrait like Bloodlust re-rolls (vampire seed 2 i=11:
         // home_03's failed-Bloodlust blitz re-rolled Bloodlust in the block sub-activation → extra dice).
         let changed = game.acting_player.player_id.as_deref() != Some(player_id);
+        // Java UtilActingPlayer.changeActingPlayer: `if (oldPlayer != null && oldPlayer !=
+        // newPlayer)` retires the OLD acting player (STANDING+inactive when he has acted, with
+        // the THROW_BOMB carve-out) BEFORE the new player takes the slot.
+        if changed && game.acting_player.player_id.is_some() {
+            retire_old_acting_player(game);
+        }
         // Java UtilActingPlayer.changeActingPlayer: standingUp = (oldState.base == PRONE). A prone
         // player being activated is "standing up" this activation, which lets StepStandUp resolve the
         // stand-up. set_player resets standing_up=false, so set it AFTER, from the pre-activation base.
@@ -304,6 +350,25 @@ mod tests {
             PS_STANDING,
             "a blitzer that moved+blocked has acted → MOVING must restore to STANDING, not PRONE"
         );
+    }
+
+    #[test]
+    fn genuine_change_retires_old_acting_player_inactive() {
+        // Java UtilActingPlayer.changeActingPlayer retires the OLD acting player on EVERY genuine
+        // change — a mover who has acted goes STANDING+INACTIVE the moment another player takes
+        // the slot (goblin bb2016 seed 2: the bomber handing the slot to his bomb's catcher was
+        // never deactivated; invisible until the state hash carried the ACTIVE bit).
+        use ffb_model::enums::{PS_MOVING, PS_STANDING};
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        add_player_to_home(&mut game, "p1", FieldCoordinate::new(5, 5), PS_MOVING);
+        add_player_to_home(&mut game, "p2", FieldCoordinate::new(7, 7), PS_STANDING);
+        game.acting_player.set_player("p1".into(), PlayerAction::Move);
+        game.acting_player.has_moved = true;
+        change_player_action(&mut game, "p2", PlayerAction::Move, false);
+        let s1 = game.field_model.player_state("p1").unwrap();
+        assert_eq!(s1.base(), PS_STANDING);
+        assert!(!s1.is_active(), "an acted mover must retire inactive when the slot changes hands");
     }
 
     #[test]

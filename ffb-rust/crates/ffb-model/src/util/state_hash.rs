@@ -143,11 +143,17 @@ fn collect_player_parts(game: &Game, out: &mut Vec<String>, home: bool) {
         // e.g. the Dodgy Snack -MA/-AV enhancement outliving its drive left a player permanently
         // AV-1, and only surfaced when its armour broke on a roll Java's AV survived.
         // Must stay byte-identical with `ParityRunner.addPlayersFromTeam`.
-        out.push(format!("{prefix}{i:02}:{x},{y},{state_str},{}/{}/{}/{}",
+        // Trailing ACTIVE bit: the hash was blind to it, and it decides whether a player can be
+        // activated at all — several re-activation/lost-deactivation bugs stayed invisible for
+        // whole games (a thrown player re-acting, a bomb catcher retired for the half). Must stay
+        // byte-identical with `ParityRunner.addPlayersFromTeam`.
+        let active_bit = fm.player_state(&player.id).map(|s| s.is_active() as u8).unwrap_or(0);
+        out.push(format!("{prefix}{i:02}:{x},{y},{state_str},{}/{}/{}/{},{}",
             player.movement_with_modifiers(),
             player.strength_with_modifiers(),
             player.agility_with_modifiers(),
-            player.armour_with_modifiers()));
+            player.armour_with_modifiers(),
+            active_bit));
     }
 }
 

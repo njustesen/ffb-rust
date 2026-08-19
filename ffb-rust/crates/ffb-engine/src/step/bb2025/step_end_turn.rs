@@ -608,19 +608,22 @@ impl StepEndTurn {
                     }
                     _ => {}
                 }
-                // Java StepEndTurn: UtilPlayer.refreshPlayersForTurnStart on the newly-active team —
-                // PRONE/STANDING players → active (per hasToMissTurn), STUNNED → PRONE inactive. The
-                // live driver path (this step) was missing it (only the deleted engine.rs had it), so a
-                // knocked-down (prone) player was never reactivated at its next turn and the agent
-                // wrongly rejected it as inactive. Run only when a real team turn starts (a flip
-                // happened): turn_mode is Regular and it is not the new-half Setup handoff.
-                if game.turn_mode == TurnMode::Regular && !self.new_half {
-                    let gm = crate::mechanic::game_mechanic_for(game.rules);
-                    let etr = gm.enhancements_to_remove_at_end_of_turn();
-                    let etr_wna = gm.enhancements_to_remove_at_end_of_turn_when_not_setting_active();
-                    ffb_model::util::util_player::UtilPlayer::refresh_players_for_turn_start(game, &etr, &etr_wna);
-                }
                 // Stub: sequence generator pushes (Kickoff, EndGame, Inducement) → skip
+            }
+
+            // Java StepEndTurn (all editions — bb2016:260, bb2025:358): UtilPlayer.
+            // refreshPlayersForTurnStart runs UNCONDITIONALLY after the touchdown/turn-flip
+            // handling — INCLUDING touchdowns and new halves, BEFORE the KO-recovery /
+            // Sweltering-Heat fainting block. The old `Regular && !new_half` gate skipped the
+            // refresh at drive ends, so players retired inactive by their last activation were
+            // fainted/boxed while still INACTIVE and carried the dead bit into the next drive's
+            // Reserve state (Java: Reserve+active) — invisible until the state hash learned the
+            // ACTIVE bit (goblin bb2016 seed 75 step 119).
+            {
+                let gm = crate::mechanic::game_mechanic_for(game.rules);
+                let etr = gm.enhancements_to_remove_at_end_of_turn();
+                let etr_wna = gm.enhancements_to_remove_at_end_of_turn_when_not_setting_active();
+                ffb_model::util::util_player::UtilPlayer::refresh_players_for_turn_start(game, &etr, &etr_wna);
             }
 
             // Java: fieldModel.clearMoveSquares / clearTrackNumbers / clearDiceDecorations → stub
