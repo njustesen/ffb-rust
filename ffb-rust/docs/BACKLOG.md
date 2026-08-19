@@ -833,11 +833,21 @@ Facts so far:
       first in the live trace (special drained by end-of-activation gotos) — the arm comment
       claims the opposite; when building the UseSkill route, verify/fix the push order against
       Java's LIFO (last pushSequence runs first → special first).
-- [ ] Implement the CLIENT_USE_SKILL channel 1:1: Rust InitSelecting UseSkill arm gains the
-      6-property dispatch chain; agents/ParityRunner send ActingPlayer(normal action) + UseSkill
-      when the skill's availability rule holds (client's isTreacherousAvailable etc. — align the
-      rule text exactly both sides); fix EndSelecting push order; then Treacherous/BalefulHex/
-      RaidingParty/LookIntoMyEyes/CatchOfTheDay/Blastin become reachable for drafted stars.
+- [x] CLIENT_USE_SKILL channel implemented — **Treacherous LIVE: renegades bb2020 100/100 with
+      3 StepTreacherous dispatches** (stab + post-stab pass continuation both match Java).
+      Pieces: (a) skill_id.rs — the 8 special skills register their Java properties (they
+      registered NONE); (b) shared EndSelecting: all 8 special arms push select FIRST, special
+      LAST (pushes drain in order onto the LIFO stack → LAST push runs FIRST, matching Java —
+      the old order silently DRAINED every special); (c) shared InitSelecting: UseSkill
+      6-property dispatch chain (Java :354-378), CLIENT_PASS arm (Java :256-277, dispatching
+      DIRECTLY past the folded-model no-defender deselect), start() continuation guard (acting
+      player with PASS_MOVE → BombRethrow pass-window instead of the activation-retire clear),
+      PAC::Treacherous bridging (= the client's ActingPlayer(PASS_MOVE)+UseSkill pair as one
+      agent action); (d) legal_actions + ParityRunner offer TREACHEROUS after KTM under the
+      client's isTreacherousAvailable rule; ParityRunner phase-1 double-inject. LESSONS: the
+      CLIENT_PASS coordinate is RAW from Rust agents (transforming it threw the pass at the
+      mirrored square, seed 85); regression seeds 52/85/91 all green; dark_elf/dwarf/goblin
+      regressions green; 3 unit tests; workspace 14,258/0.
 - [ ] Find BLACK_INK's real client trigger (not in the UseSkill chain) and route it.
 - [ ] Then batch the rest, edition-correct; full gate 30/30/30; update inventory; commit+push.
 

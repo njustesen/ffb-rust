@@ -575,9 +575,16 @@ impl StepEndSelecting {
                     failure_label: labels::END_SELECTING.into(),
                                     rules: game.rules,
                 });
+                // Push order mirrors Java LITERALLY: selectGenerator.pushSequence first, the
+                // special second — the stack is LIFO (driver drains outcome.pushes in order,
+                // each sequence reversed onto the stack), so the LAST-pushed special runs FIRST,
+                // then the select re-prompt. The old reversed order ran the SELECT sequence
+                // first and the special was drained by end-of-activation gotos — 12 Treacherous
+                // declarations in renegades bb2020 seed 1 produced ZERO StepTreacherous
+                // dispatches while both engines stayed green (the skill never marked used).
                 StepOutcome::next()
-                    .push_seq(treacherous_seq)
                     .push_seq(select_seq)
+                    .push_seq(treacherous_seq)
             }
 
             // ── RAIDING_PARTY ─────────────────────────────────────────────────
@@ -591,8 +598,8 @@ impl StepEndSelecting {
                                     rules: game.rules,
                 });
                 StepOutcome::next()
-                    .push_seq(raiding_seq)
                     .push_seq(select_seq)
+                    .push_seq(raiding_seq)
             }
 
             // ── WISDOM_OF_THE_WHITE_DWARF ─────────────────────────────────────
@@ -605,8 +612,8 @@ impl StepEndSelecting {
                     crate::step::framework::SequenceStep::new(StepId::WisdomOfTheWhiteDwarf),
                 ];
                 StepOutcome::next()
-                    .push_seq(wisdom_seq)
                     .push_seq(select_seq)
+                    .push_seq(wisdom_seq)
             }
 
             // ── THROW_KEG ─────────────────────────────────────────────────────
@@ -640,8 +647,8 @@ impl StepEndSelecting {
                                     rules: game.rules,
                 });
                 StepOutcome::next()
-                    .push_seq(baleful_seq)
                     .push_seq(select_seq)
+                    .push_seq(baleful_seq)
             }
 
             // ── BLACK_INK ─────────────────────────────────────────────────────
@@ -655,8 +662,8 @@ impl StepEndSelecting {
                                     rules: game.rules,
                 });
                 StepOutcome::next()
-                    .push_seq(black_ink_seq)
                     .push_seq(select_seq)
+                    .push_seq(black_ink_seq)
             }
 
             // ── CATCH_OF_THE_DAY ──────────────────────────────────────────────
@@ -669,8 +676,8 @@ impl StepEndSelecting {
                                     rules: game.rules,
                 });
                 StepOutcome::next()
-                    .push_seq(cotd_seq)
                     .push_seq(select_seq)
+                    .push_seq(cotd_seq)
             }
 
             // ── THEN_I_STARTED_BLASTIN ────────────────────────────────────────
@@ -680,8 +687,8 @@ impl StepEndSelecting {
                 let select_seq = Select::build_sequence(&select_params);
                 let tisb_seq = ThenIStartedBlastinGen::build_sequence(game.rules);
                 StepOutcome::next()
-                    .push_seq(tisb_seq)
                     .push_seq(select_seq)
+                    .push_seq(tisb_seq)
             }
 
             // ── FURIOUS_OUTBURST ──────────────────────────────────────────────
@@ -702,8 +709,8 @@ impl StepEndSelecting {
                                     rules: game.rules,
                 });
                 StepOutcome::next()
-                    .push_seq(agz_seq)
                     .push_seq(select_seq)
+                    .push_seq(agz_seq)
             }
 
             // ── FORGO ─────────────────────────────────────────────────────────
@@ -781,6 +788,25 @@ mod tests {
         // EndFeeding step (last) should have CheckForgo(true)
         let end_feeding = seq.iter().find(|s| s.step_id == StepId::EndFeeding).unwrap();
         assert!(end_feeding.params.iter().any(|p| matches!(p, StepParameter::CheckForgo(true))));
+    }
+
+    /// §9 push-order lesson: outcome.pushes drain IN ORDER onto the LIFO stack (each sequence
+    /// reversed), so the LAST-pushed sequence runs FIRST. Java pushes select first, the special
+    /// second → the special runs first. The old reversed order ran the SELECT sequence first
+    /// and the special was drained by end-of-activation gotos: 12 Treacherous declarations in
+    /// renegades bb2020 seed 1 produced ZERO StepTreacherous dispatches while staying green.
+    #[test]
+    fn dispatch_treacherous_pushes_select_first_special_last() {
+        let mut game = make_game();
+        let mut step = StepEndSelecting::new();
+        step.dispatch_player_action = Some(PlayerAction::Treacherous);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.pushes.len(), 2, "select + treacherous sequences");
+        // pushes[0] = select (drains first, ends up UNDER), pushes[1] = special (runs first)
+        assert_eq!(out.pushes[0][0].step_id, StepId::InitSelecting,
+            "the select sequence must be pushed FIRST (runs after the special)");
+        assert!(out.pushes[1].iter().any(|s| s.step_id == StepId::Treacherous),
+            "the special sequence must be pushed LAST so it runs FIRST");
     }
 
     #[test]

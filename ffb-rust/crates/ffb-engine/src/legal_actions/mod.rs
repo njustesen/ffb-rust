@@ -272,6 +272,30 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             }
         }
 
+        // Treacherous (bb2020+ star special): the client's isTreacherousAvailable rule —
+        // unused canStabTeamMateForBall skill + an adjacent BLOCKABLE teammate carrying the
+        // ball (bb2025 SelectLogicModule.isTreacherousAvailable: UtilCards.hasUnusedSkill…
+        // && findAdjacentBlockablePlayers(actingTeam, coord).anyMatch(hasBall)). Declaring it
+        // maps to the client's ActingPlayer(PASS_MOVE)+UseSkill(treacherous) command pair.
+        // Offer sits DIRECTLY AFTER KickTeamMate — ParityRunner inserts it at the same slot.
+        if player.has_skill(SkillId::Treacherous)
+            && !player.used_skills.contains(&SkillId::Treacherous)
+        {
+            let carrier_adjacent =
+                ffb_model::util::util_player::UtilPlayer::find_adjacent_blockable_players(
+                    game, team, coord,
+                )
+                .into_iter()
+                .any(|tp_id| ffb_model::util::util_player::UtilPlayer::has_ball(game, tp_id));
+            if carrier_adjacent {
+                actions.push(Action::ActivatePlayer {
+                    player_id: pid.clone(),
+                    player_action: PlayerActionChoice::Treacherous,
+                    block_defender_id: None,
+                });
+            }
+        }
+
         // Punt (BB2025): ball-carrier with Punt skill; once per drive
         if game.rules == Rules::Bb2025
             && !turn_data.punt_used
@@ -1157,6 +1181,31 @@ mod tests {
             assert!(!has_action(&a2, "p1", PlayerActionChoice::HailMaryPass),
                 "{rules:?}: no HMP offer without the ball");
         }
+    }
+
+    /// §9: Treacherous is offered under the CLIENT's rule (bb2025 SelectLogicModule
+    /// isTreacherousAvailable): unused skill + an adjacent blockable teammate CARRYING the
+    /// ball. No adjacent carrier → no offer; used skill → no offer.
+    #[test]
+    fn treacherous_offered_only_with_adjacent_ball_carrier() {
+        let mut game = make_game(Rules::Bb2020);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![SkillId::Treacherous]);
+        add_player(&mut game, true, "p2", c(6, 5), PS_STANDING, vec![]);
+        // teammate adjacent but NOT carrying → no offer
+        let a0 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a0, "p1", PlayerActionChoice::Treacherous));
+        // teammate carries the ball → offered
+        game.field_model.ball_coordinate = Some(c(6, 5));
+        game.field_model.ball_in_play = true;
+        let a1 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&a1, "p1", PlayerActionChoice::Treacherous),
+            "unused Treacherous + adjacent carrier must be offered");
+        // used skill withdraws it
+        if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == "p1") {
+            p.used_skills.insert(SkillId::Treacherous);
+        }
+        let a2 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a2, "p1", PlayerActionChoice::Treacherous));
     }
 
     #[test]

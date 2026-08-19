@@ -59,6 +59,19 @@ impl Step for StepInitSelecting {
     fn id(&self) -> StepId { StepId::InitSelecting }
 
     fn start(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        // Post-special continuation (Treacherous bridging): the acting player still carries
+        // PASS_MOVE and must now throw the declared pass — Java's select-sequence InitSelecting
+        // leaves the acting player in place and the client sends CLIENT_PASS (ParityRunner
+        // phase 2 → sendPassAction). Without this guard the activation-retire bridging below
+        // CLEARED the acting player and re-opened the team-wide activation prompt, so the agent
+        // activated a DIFFERENT player while Java threw the pass (renegades bb2020 seed 91
+        // i=94). BombRethrow is the generic "acting player must pass now" window — both agents
+        // answer it with sendPassAction's exact contract.
+        if game.acting_player.player_action == Some(PlayerAction::PassMove) {
+            if let Some(pid) = game.acting_player.player_id.clone() {
+                return StepOutcome::cont().with_prompt(AgentPrompt::BombRethrow { player_id: pid });
+            }
+        }
         // Rust bridging for Java's UtilActingPlayer.changeActingPlayer: Java deactivates the
         // previous acting player when the NEXT one is selected and leaves "already activated
         // this turn" tracking to the coach; here the engine records the finished activation
@@ -93,6 +106,23 @@ impl Step for StepInitSelecting {
                 self.end_turn = true;
             }
             Action::ActivatePlayer { player_id, player_action, block_defender_id } => {
+                // Rust bridging: a TREACHEROUS "declaration" stands for the client's two
+                // commands — CLIENT_ACTING_PLAYER(PASS_MOVE) then CLIENT_USE_SKILL(treacherous)
+                // (bb2025 SelectLogicModule pairs sendUseSkill with the ball-action cases;
+                // Treacherous ADDS those ball actions to a non-carrier's menu). Mirror both:
+                // set the acting player with PASS_MOVE, then take the UseSkill chain's
+                // dispatch (Java StepInitSelecting:354 canStabTeamMateForBall → TREACHEROUS,
+                // forceGotoOnDispatch).
+                if *player_action == PlayerActionChoice::Treacherous {
+                    game.original_bombardier = None;
+                    util_server_steps::change_player_action(game, player_id, PlayerAction::PassMove, false);
+                    game.defender_id = None;
+                    self.dispatch_player_action = Some(PlayerAction::Treacherous);
+                    self.force_goto_on_dispatch = true;
+                    Self::check_for_staller(game);
+                    return self.execute_step(game, rng)
+                        .with_event(GameEvent::PlayerAction { player_id: player_id.clone(), action: PlayerAction::Treacherous });
+                }
                 let pa = pac_to_player_action(*player_action);
                 // Java CLIENT_ACTING_PLAYER: `if (playerAction.isBomb()) {
                 //   passState.setOriginalBombardier(playerId); ... } else { passState.reset(); }`
@@ -205,8 +235,79 @@ impl Step for StepInitSelecting {
                 return self.execute_step(game, rng)
                     .with_event(GameEvent::PlayerAction { player_id: player_id.clone(), action: pa });
             }
+            // Java: CLIENT_PASS (bb2025 shared StepInitSelecting:256-277) — publish the target
+            // coordinate (transformed for the away side), change the action to PASS (unless the
+            // acting action is already HAIL_MARY_PASS / THROW_BOMB / HAIL_MARY_BOMB, which keep
+            // their own dispatch), dispatch, EXECUTE_STEP. NO passUsed gate — Java throws the
+            // post-Treacherous pass even though markActionUsed already set passUsed. This arm is
+            // the phase-2 continuation of the special-skill flow: after the stab the acting
+            // player still carries PASS_MOVE and the client sends CLIENT_PASS.
+            Action::Pass { coord } => {
+                if let Some(pid) = game.acting_player.player_id.clone() {
+                    // NO away-side transform: Java's CLIENT_PASS handler un-transforms the WIRE
+                    // coordinate the away client sent, but the Rust agents answer prompts with
+                    // REAL board coordinates (the BombRethrow/StepInitPassing::handle_command
+                    // precedent). Transforming here threw the post-Treacherous pass at the
+                    // mirrored square — (19,6) became (6,6), 15 squares out of range, and the
+                    // turn ended with no roll (renegades bb2020 seed 85 i=142).
+                    let target = *coord;
+                    let dispatch = match game.acting_player.player_action {
+                        Some(pa @ (PlayerAction::HailMaryPass
+                            | PlayerAction::ThrowBomb
+                            | PlayerAction::HailMaryBomb)) => pa,
+                        _ => {
+                            util_server_steps::change_player_action(game, &pid, PlayerAction::Pass, false);
+                            PlayerAction::Pass
+                        }
+                    };
+                    self.dispatch_player_action = Some(dispatch);
+                    // Dispatch DIRECTLY: execute_step's no-defender deselect belongs to the
+                    // FOLDED declaration model (a Pass declared with no receiver); this arm is
+                    // Java's CLIENT_PASS, which always carries a target coordinate and always
+                    // dispatches (routing it through execute_step ended the player action —
+                    // renegades bb2020 seed 91: the post-Treacherous pass turned into the
+                    // EndPlayerAction sequence).
+                    return StepOutcome::goto(&self.goto_label_on_end)
+                        .publish(StepParameter::DispatchPlayerAction(Some(dispatch)))
+                        .publish(StepParameter::TargetCoordinate(target));
+                }
+                return self.execute_step(game, rng);
+            }
             // Java: CLIENT_USE_SKILL — selected skills that are resolved immediately (SKIP_STEP).
             Action::UseSkill { skill_id, use_skill: true } => {
+                // Java StepInitSelecting:354-378 — the star-special dispatch chain: a
+                // CLIENT_USE_SKILL whose skill carries one of six properties turns into a
+                // special-action dispatch (fDispatchPlayerAction = X, EXECUTE_STEP,
+                // forceGotoOnDispatch). This is how the client's declare-action-then-
+                // sendUseSkill pairing reaches the special sequences; there is no declared
+                // TREACHEROUS/RAIDING_PARTY/... client action. The property check is on the
+                // SKILL itself (each property is registered by exactly one mixed/special
+                // skill in every edition, so the edition-agnostic union is safe here —
+                // unlike the Ball & Chain case).
+                {
+                    use ffb_model::model::property::named_properties::NamedProperties as NP;
+                    let props = skill_id.properties();
+                    let special = if props.contains(&NP::CAN_STAB_TEAM_MATE_FOR_BALL) {
+                        Some(PlayerAction::Treacherous)
+                    } else if props.contains(&NP::CAN_MOVE_OPEN_TEAM_MATE) {
+                        Some(PlayerAction::RaidingParty)
+                    } else if props.contains(&NP::CAN_STEAL_BALL_FROM_OPPONENT) {
+                        Some(PlayerAction::LookIntoMyEyes)
+                    } else if props.contains(&NP::CAN_MAKE_OPPONENT_MISS_TURN) {
+                        Some(PlayerAction::BalefulHex)
+                    } else if props.contains(&NP::CAN_GET_BALL_ON_GROUND) {
+                        Some(PlayerAction::CatchOfTheDay)
+                    } else if props.contains(&NP::CAN_BLAST_REMOTE_PLAYER) {
+                        Some(PlayerAction::ThenIStartedBlastin)
+                    } else {
+                        None
+                    };
+                    if let Some(pa) = special {
+                        self.dispatch_player_action = Some(pa);
+                        self.force_goto_on_dispatch = true;
+                        return self.execute_step(game, rng);
+                    }
+                }
                 let acting_player_id = game.acting_player.player_id.clone();
                 // Collect skill property booleans before any mutable borrow of game.
                 let (gain_hail_mary, avoid_dodging, add_block_die) = {
@@ -394,6 +495,22 @@ impl StepInitSelecting {
                 return outcome;
             }
         }
+        // Post-special continuation: the select sequence re-enters with the acting player
+        // still set and carrying PASS_MOVE (the Treacherous bridging's declared action). Java
+        // shows no dialog here — its client just sends CLIENT_PASS, and ParityRunner's phase 2
+        // calls sendPassAction. Emit the BombRethrow prompt: despite the name it is the generic
+        // "acting player must pass now" window, and both agents answer it with sendPassAction's
+        // exact contract (all on-pitch teammates coordinate-sorted, 1 actionRng; empty list →
+        // 2 decisionRng for a random square) → Action::Pass, which the CLIENT_PASS arm above
+        // dispatches. Without this the step rebuilt the team-wide activation prompt and the
+        // agent activated a DIFFERENT player while Java threw the pass (renegades bb2020 seed
+        // 91 i=94: Java home_11 PASS_MOVE rolls 3 dice, Rust home_07 Move).
+        if game.acting_player.player_action == Some(PlayerAction::PassMove) {
+            if let Some(pid) = game.acting_player.player_id.clone() {
+                return StepOutcome::cont()
+                    .with_prompt(AgentPrompt::BombRethrow { player_id: pid });
+            }
+        }
         // Waiting: build activation prompt
         let eligible = crate::legal_actions::eligible_players_for_activation(game);
         StepOutcome::cont()
@@ -470,6 +587,54 @@ mod tests {
         let mut step = StepInitSelecting::new("end".into());
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(matches!(out.prompt, Some(AgentPrompt::ActivatePlayer { .. })));
+    }
+
+    /// §9 UseSkill special chain (Java StepInitSelecting:354-378): a CLIENT_USE_SKILL whose
+    /// skill carries canStabTeamMateForBall dispatches TREACHEROUS (forceGotoOnDispatch), and
+    /// the TREACHEROUS "declaration" bridges the client's two-command pair (PASS_MOVE acting
+    /// player + UseSkill).
+    #[test]
+    fn use_skill_with_stab_property_dispatches_treacherous() {
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_STANDING, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.team_home.players.push(Player {
+            id: "h1".into(), name: "h1".into(), nr: 1, position_id: "star".into(),
+            player_type: PlayerType::Star, gender: PlayerGender::Male,
+            movement: 9, strength: 3, agility: 2, passing: 3, armour: 8,
+            starting_skills: vec![SkillWithValue::new(SkillId::Treacherous)],
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("h1", FieldCoordinate::new(12, 7));
+        game.field_model.set_player_state("h1", PlayerState::new(PS_STANDING));
+
+        // Route A: the bridged declaration.
+        let mut step = StepInitSelecting::new("end".into());
+        let out = step.handle_command(&Action::ActivatePlayer {
+            player_id: "h1".into(),
+            player_action: PlayerActionChoice::Treacherous,
+            block_defender_id: None,
+        }, &mut game, &mut GameRng::new(0));
+        assert_eq!(step.dispatch_player_action, Some(PlayerAction::Treacherous));
+        assert!(out.published.iter().any(|p| matches!(p,
+            StepParameter::DispatchPlayerAction(Some(PlayerAction::Treacherous)))),
+            "the outcome must publish the TREACHEROUS dispatch");
+        assert_eq!(game.acting_player.player_action, Some(PlayerAction::PassMove),
+            "the acting player carries the client's PASS_MOVE declaration");
+
+        // Route B: the raw UseSkill command (what ParityRunner injects).
+        let mut step2 = StepInitSelecting::new("end".into());
+        crate::step::util_server_steps::change_player_action(
+            &mut game, "h1", PlayerAction::PassMove, false);
+        let out2 = step2.handle_command(&Action::UseSkill {
+            skill_id: SkillId::Treacherous, use_skill: true,
+        }, &mut game, &mut GameRng::new(0));
+        assert_eq!(step2.dispatch_player_action, Some(PlayerAction::Treacherous));
+        assert!(step2.force_goto_on_dispatch);
+        let _ = out2;
     }
 
     /// The activation pre-stand writes MOVING, not STANDING. Java's `changeActingPlayer` puts the

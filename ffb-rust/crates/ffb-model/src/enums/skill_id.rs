@@ -1103,6 +1103,17 @@ impl SkillId {
 
     pub fn properties(self) -> &'static [&'static str] {
         match self {
+            // Java mixed/special star skills — each registers exactly one property; the
+            // CLIENT_USE_SKILL special-dispatch chain (StepInitSelecting) keys on these.
+            SkillId::Treacherous => &["canStabTeamMateForBall"],
+            SkillId::RaidingParty => &["canMoveOpenTeamMate"],
+            SkillId::LookIntoMyEyes => &["canStealBallFromOpponent"],
+            SkillId::BalefulHex => &["canMakeOpponentMissTurn"],
+            SkillId::CatchOfTheDay => &["canGetBallOnGround"],
+            SkillId::BlackInk => &["canGazeAutomatically"],
+            // Java bb2020/special/ThenIStartedBlastin + bb2025/special/BlastinSolvesEverything
+            SkillId::ThenIStartedBlastin => &["canBlastRemotePlayer"],
+            SkillId::BlastinSolvesEverything => &["canBlastRemotePlayer"],
             // Java bb2025/Punt.postConstruct: registerProperty(canPunt)
             SkillId::Punt => &["canPunt"],
             SkillId::SteadyFooting => &["canAvoidFallingDown"],
