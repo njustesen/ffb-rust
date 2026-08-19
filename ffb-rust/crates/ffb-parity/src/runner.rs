@@ -1365,7 +1365,11 @@ mod team_file_tests {
                 for side in ["home", "away"] {
                     let team = make_team_from_file(&race, side, edition)
                         .unwrap_or_else(|e| panic!("{edition}/{race}/{side}: {e}"));
-                    assert_eq!(team.players.len(), n, "{edition}/{race}/{side}: player count");
+                    // Stars ride on top of the hand-drafted spend: they model an INDUCED star
+                    // player (bought from petty cash in a real game), so they are deliberately
+                    // outside the 1.1M budget/treasury identity checked above.
+                    assert_eq!(team.players.len(), n + spec.stars.len(),
+                        "{edition}/{race}/{side}: player count");
                     assert_eq!(team.rerolls, spec.rerolls);
                     assert_eq!(team.dedicated_fans, spec.dedicated_fans);
                 }

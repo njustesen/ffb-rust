@@ -45,7 +45,7 @@ KickTeamMateDoubleRolled` reclassified to needs-specific-roster (bb2016-only ids
 roster drafts the skill — bb2020/bb2025 kicks run live through the shared TTM steps).
 
 **Needs a specific star/skill/inducement the parity teams do not draft:**
-`AllYouCanEat AutoGazeZoat BalefulHex BlackInk CatchOfTheDay DispatchDumpOff DoubleStrength
+`AllYouCanEat AutoGazeZoat BalefulHex BlackInk CatchOfTheDay DoubleStrength
 EatTeamMate HailMaryPass LookIntoMyEyes InitLookIntoMyEyes PileDriver QuickBite RaidingParty
 ThenIStartedBlastin EndThenIStartedBlastin ThrowARock ThrowKeg EndThrowKeg Treacherous
 WeatherMage WisdomOfTheWhiteDwarf Pro` — star-player specials, Dump Off, Hail Mary, Pro, kegs,
@@ -53,7 +53,10 @@ cards. Unreachable until the drafted teams change.
 
 **Needs the Multiple Block skill (no parity roster drafts it):**
 `MultipleBlockFork BlockRollMultiple FoulAppearanceMultiple ApothecaryMultiple
-DauntlessMultiple StateMultipleRolls ReportStabInjury`
+DauntlessMultiple StateMultipleRolls ReportStabInjury DispatchDumpOff` — DispatchDumpOff
+moved here 2026-08-19 pm: it is a MULTI-BLOCK-sequence step (generator/bb2020+bb2025
+multi_block.rs); the ordinary Dump-Off window is `StepId::DumpOff`, which sits in every regular
+block sequence and IS reached. The dark elf Runner's Dump-off itself is live.
 
 **Needs an inducement/card/prayer path the harness declines:**
 `PlayCard Wizard MasterChef FanFactor PrayerRoll` (the harness buys no cards/wizards; FanFactor

@@ -142,7 +142,7 @@ impl Agent for UniformAgent {
                 let td = if gs.game.home_playing { &gs.game.turn_data_home } else { &gs.game.turn_data_away };
                 let live_actions: Vec<PlayerAction> = actions.iter().filter(|a| match a {
                     PlayerAction::Block | PlayerAction::Blitz | PlayerAction::StandUpBlitz => !td.blitz_used,
-                    PlayerAction::Pass => !td.pass_used,
+                    PlayerAction::Pass | PlayerAction::HailMaryPass => !td.pass_used,
                     PlayerAction::HandOver => !td.hand_over_used,
                     PlayerAction::Foul => !td.foul_used,
                     // Staleness filters mirrored from RandomAgent/ParityRunner.filterStaleActions:
@@ -189,7 +189,8 @@ impl Agent for UniformAgent {
                     // ThrowBomb rides the same receiver rule as a pass (mirrors the parity agent
                     // and ParityRunner's sendConcreteAction) — same bug shape as the TTM arm below:
                     // without a receiver the declaration deselects and the bomb chain never runs.
-                    PlayerActionChoice::Pass | PlayerActionChoice::ThrowBomb => {
+                    PlayerActionChoice::Pass | PlayerActionChoice::ThrowBomb
+                    | PlayerActionChoice::HailMaryPass => {
                         let receivers = legal_pass_receivers(&gs.game, player_id, side);
                         if receivers.is_empty() { None } else { Some(receivers[self.pick(receivers.len())].clone()) }
                     }

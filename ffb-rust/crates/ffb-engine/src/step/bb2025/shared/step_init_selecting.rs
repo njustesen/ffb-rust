@@ -315,7 +315,8 @@ impl StepInitSelecting {
                 if matches!(dispatch,
                         PlayerAction::HandOver | PlayerAction::Pass
                         | PlayerAction::ThrowTeamMate | PlayerAction::KickTeamMate
-                        | PlayerAction::ThrowBomb | PlayerAction::HailMaryBomb)
+                        | PlayerAction::ThrowBomb | PlayerAction::HailMaryBomb
+                        | PlayerAction::HailMaryPass)
                     && game.defender_id.is_none()
                 {
                     return StepOutcome::goto(label)
@@ -358,7 +359,8 @@ impl StepInitSelecting {
                         // bomb reached that step with no coordinate, so thrower/throwerAction were
                         // never set and the step parked on `cont()` forever — both engines stalled
                         // three steps into goblin bb2025 seed 1.
-                        PlayerAction::Pass | PlayerAction::HandOver | PlayerAction::ThrowBomb => {
+                        PlayerAction::Pass | PlayerAction::HandOver | PlayerAction::ThrowBomb
+                        | PlayerAction::HailMaryPass => {
                             if let Some(coord) = game.field_model.player_coordinate(&def) {
                                 target_params.push(StepParameter::TargetCoordinate(coord));
                             }
@@ -415,6 +417,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::KickTeamMate => PlayerAction::KickTeamMate,
         PlayerActionChoice::HypnoticGaze => PlayerAction::Gaze,
         PlayerActionChoice::ThrowBomb => PlayerAction::ThrowBomb,
+        PlayerActionChoice::HailMaryPass => PlayerAction::HailMaryPass,
         PlayerActionChoice::Swoop => PlayerAction::Swoop,
         PlayerActionChoice::Punt => PlayerAction::Punt,
         PlayerActionChoice::BreatheFire => PlayerAction::BreatheFire,

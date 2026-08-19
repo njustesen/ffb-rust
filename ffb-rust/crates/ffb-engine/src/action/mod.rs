@@ -212,6 +212,9 @@ pub enum PlayerActionChoice {
     KickTeamMate,
     HypnoticGaze,
     ThrowBomb,
+    /// Hail Mary Pass — a DISTINCT declared action (Java PlayerAction.HAIL_MARY_PASS):
+    /// StepDispatchPassing routes on it, so folding it into Pass can never reach the step.
+    HailMaryPass,
     Swoop,
     Punt,
     BreatheFire,

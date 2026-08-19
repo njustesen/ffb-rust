@@ -339,6 +339,7 @@ impl StepEndSelecting {
             | PlayerAction::HailMaryPass
             | PlayerAction::ThrowBomb
             | PlayerAction::HailMaryBomb
+            | PlayerAction::HailMaryPass
             | PlayerAction::HandOver => {
                 let params = PassParams {
                     target_coordinate: if with_param { self.target_coordinate } else { None },

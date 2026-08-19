@@ -807,10 +807,15 @@ Facts so far:
 - [x] Pilot bb2016 dwarf + dwarf.Farblast at nr 11 (blocker 11→13): 10/10 GREEN vs Java — the
       star drafts, plays, and his Secret Weapon ban matches (both Bariks + Deathrollers benched
       in matching states). Seeds 1-100 running.
-- [ ] `step=HailMaryPass` still 0: HAIL_MARY_PASS is a DECLARED action (StepDispatchPassing
-      routes on PlayerAction::HailMaryPass) that neither harness ever declares — the familiar
-      shape. Needs a matched declaration route: legal_actions offer + Rust agent arm +
-      ParityRunner filterActions/sendConcreteAction case + jar rebuild.
+- [x] HAIL_MARY_PASS declaration route (2026-08-19): PAC::HailMaryPass variant; legal_actions
+      offers it DIRECTLY AFTER Pass for a canPassToAnySquare carrier (order = snapshot contract);
+      agents ride the Pass receiver arm + pass_used staleness; bb2016 InitSelecting folded arm,
+      bb2025-shared InitSelecting deselect+target arms, bb2025-shared EndSelecting Pass-sequence
+      arm, ffb-client encoder; ParityRunner: eligible builder + filterStaleActions +
+      isHandledActingAction + sendConcreteAction→sendPassAction. dwarf bb2016 **100/100 GREEN
+      with 4 live `step=HailMaryPass` dispatches** — first star special ever exercised. Tests:
+      hail_mary_pass_offered_to_carrier_right_after_pass; legality test counts stars outside the
+      1.1M budget (modeled induced star).
 - [ ] Then batch the rest, edition-correct; full gate 30/30/30; update inventory; commit+push.
 
 ## Blocked — needs a tier decision from the user

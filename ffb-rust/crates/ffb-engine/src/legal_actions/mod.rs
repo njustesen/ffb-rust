@@ -159,6 +159,21 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             });
         }
 
+        // Hail Mary Pass: a canPassToAnySquare carrier declares HAIL_MARY_PASS as its own action
+        // (StepDispatchPassing routes on it). Offered DIRECTLY AFTER Pass — ParityRunner inserts
+        // it at the same slot, and the two turn-start snapshots must match in length and order.
+        if !turn_data.pass_used && ball_coord == Some(coord)
+            && player.has_skill_property(
+                ffb_model::model::property::named_properties::NamedProperties::CAN_PASS_TO_ANY_SQUARE,
+            )
+        {
+            actions.push(Action::ActivatePlayer {
+                player_id: pid.clone(),
+                player_action: PlayerActionChoice::HailMaryPass,
+                block_defender_id: None,
+            });
+        }
+
         // HandOff: ball-carrier can hand off to an adjacent teammate
         if !turn_data.hand_over_used && ball_coord == Some(coord) {
             let teammate_adjacent = team.players.iter().any(|tp| {
@@ -341,6 +356,7 @@ pub fn eligible_players_for_activation(game: &Game) -> Vec<(PlayerId, Vec<ffb_mo
             PAC::ThrowTeamMate => PA::ThrowTeamMate,
             PAC::KickTeamMate => PA::KickTeamMate,
             PAC::ThrowBomb => PA::ThrowBomb,
+            PAC::HailMaryPass => PA::HailMaryPass,
             PAC::Punt => PA::Punt,
             PAC::SecureTheBall => PA::SecureTheBall,
             // ParityRunner adds PlayerAction.GAZE for any canGazeDuringMove player; the two
@@ -1110,6 +1126,35 @@ mod tests {
         add_player(&mut game, false, "op1", c(6, 5), PS_STANDING, vec![]);
         let actions = legal_activate_player_actions(&game, TeamSide::Home);
         assert!(!has_action(&actions, "p1", PlayerActionChoice::Foul));
+    }
+
+    /// §9: a canPassToAnySquare carrier is offered HAIL_MARY_PASS as its own declared action,
+    /// DIRECTLY AFTER Pass — ParityRunner inserts it at the same slot, and the two turn-start
+    /// snapshots must match in length and order or idx % N pairs different actions.
+    #[test]
+    fn hail_mary_pass_offered_to_carrier_right_after_pass() {
+        for rules in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            let mut game = make_game(rules);
+            add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![SkillId::HailMaryPass]);
+            game.field_model.ball_coordinate = Some(c(5, 5));
+            game.field_model.ball_in_play = true;
+            let actions = legal_activate_player_actions(&game, TeamSide::Home);
+            let p1_actions: Vec<_> = actions.iter().filter_map(|a| match a {
+                Action::ActivatePlayer { player_id, player_action, .. } if player_id == "p1" =>
+                    Some(*player_action),
+                _ => None,
+            }).collect();
+            let pass_pos = p1_actions.iter().position(|a| *a == PlayerActionChoice::Pass)
+                .unwrap_or_else(|| panic!("{rules:?}: Pass must be offered"));
+            assert_eq!(p1_actions.get(pass_pos + 1), Some(&PlayerActionChoice::HailMaryPass),
+                "{rules:?}: HailMaryPass must sit directly after Pass, got {p1_actions:?}");
+            // No HMP without the ball
+            let mut g2 = make_game(rules);
+            add_player(&mut g2, true, "p1", c(5, 5), PS_STANDING, vec![SkillId::HailMaryPass]);
+            let a2 = legal_activate_player_actions(&g2, TeamSide::Home);
+            assert!(!has_action(&a2, "p1", PlayerActionChoice::HailMaryPass),
+                "{rules:?}: no HMP offer without the ball");
+        }
     }
 
     #[test]

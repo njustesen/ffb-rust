@@ -2743,6 +2743,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> ffb_model::enums::PlayerActi
         PlayerActionChoice::KickTeamMate => PA::KickTeamMate,
         PlayerActionChoice::HypnoticGaze => PA::Gaze,
         PlayerActionChoice::ThrowBomb  => PA::ThrowBomb,
+        PlayerActionChoice::HailMaryPass => PA::HailMaryPass,
         PlayerActionChoice::Swoop      => PA::Swoop,
         PlayerActionChoice::Punt       => PA::Punt,
         PlayerActionChoice::BreatheFire => PA::BreatheFire,

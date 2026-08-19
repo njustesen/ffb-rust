@@ -186,6 +186,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::KickTeamMate => PlayerAction::KickTeamMate,
         PlayerActionChoice::HypnoticGaze => PlayerAction::Gaze,
         PlayerActionChoice::ThrowBomb => PlayerAction::ThrowBomb,
+        PlayerActionChoice::HailMaryPass => PlayerAction::HailMaryPass,
         PlayerActionChoice::Swoop => PlayerAction::Swoop,
         PlayerActionChoice::Punt => PlayerAction::Punt,
         PlayerActionChoice::BreatheFire => PlayerAction::BreatheFire,

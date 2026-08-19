@@ -110,6 +110,9 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             // THROW_BOMB: declares through the same ClientCommandPass as a pass; ParityRunner
             // routes it to sendPassAction.
             | PlayerActionChoice::ThrowBomb
+            // HAIL_MARY_PASS: a distinct declared action for a canPassToAnySquare carrier;
+            // rides the same ClientCommandPass/sendPassAction route as PASS.
+            | PlayerActionChoice::HailMaryPass
     )
 }
 
@@ -300,7 +303,7 @@ impl Agent for RandomAgent {
                 let td = if gs.game.home_playing { &gs.game.turn_data_home } else { &gs.game.turn_data_away };
                 let live_actions: Vec<PlayerAction> = actions.iter().filter(|a| match a {
                     PlayerAction::Block | PlayerAction::Blitz | PlayerAction::StandUpBlitz => !td.blitz_used,
-                    PlayerAction::Pass => !td.pass_used,
+                    PlayerAction::Pass | PlayerAction::HailMaryPass => !td.pass_used,
                     PlayerAction::HandOver => !td.hand_over_used,
                     PlayerAction::Foul => !td.foul_used,
                     // Throw/Kick Team-Mate are once per team turn (set ttm_used/ktm_used). The
@@ -386,7 +389,10 @@ impl Agent for RandomAgent {
                     // target left StepInitPassing parked with an unset thrower and NO prompt, and
                     // the parity loop breaks silently on a prompt-less park -- the game simply
                     // ended at the first bomb.
-                    PlayerActionChoice::Pass | PlayerActionChoice::ThrowBomb => {
+                    // HAIL_MARY_PASS rides it too: ParityRunner routes the declaration to the
+                    // same sendPassAction (same candidates, same single actionRng draw).
+                    PlayerActionChoice::Pass | PlayerActionChoice::ThrowBomb
+                    | PlayerActionChoice::HailMaryPass => {
                         let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
                         let receivers = legal_pass_receivers(&gs.game, player_id, side);
                         if receivers.is_empty() {
@@ -990,7 +996,8 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         PlayerAction::StandUp | PlayerAction::RemoveConfusion => PlayerActionChoice::StandUp,
         PlayerAction::StandUpBlitz => PlayerActionChoice::StandUpBlitz,
         PlayerAction::Foul       => PlayerActionChoice::Foul,
-        PlayerAction::Pass | PlayerAction::HailMaryPass | PlayerAction::DumpOff => PlayerActionChoice::Pass,
+        PlayerAction::Pass | PlayerAction::DumpOff => PlayerActionChoice::Pass,
+        PlayerAction::HailMaryPass => PlayerActionChoice::HailMaryPass,
         PlayerAction::HandOver      => PlayerActionChoice::HandOff,
         PlayerAction::SecureTheBall => PlayerActionChoice::SecureTheBall,
         PlayerAction::ThrowTeamMate | PlayerAction::ThrowTeamMateMove => PlayerActionChoice::ThrowTeamMate,

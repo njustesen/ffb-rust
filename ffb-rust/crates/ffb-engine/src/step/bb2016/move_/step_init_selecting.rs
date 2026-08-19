@@ -235,7 +235,8 @@ impl Step for StepInitSelecting {
                         // sendPassAction, so it also arrives carrying a receiver id and must
                         // publish a TARGET_COORDINATE. Without it StepInitPassing parked with an
                         // unset thrower and no prompt, and the parity loop ends the game silently.
-                        PlayerAction::Pass | PlayerAction::HandOver | PlayerAction::ThrowBomb => {
+                        PlayerAction::Pass | PlayerAction::HandOver | PlayerAction::ThrowBomb
+                        | PlayerAction::HailMaryPass => {
                             let coord_opt = game.field_model.player_coordinate(def);
                             self.dispatch_player_action = Some(pa);
                             let out = self.execute_step(game, rng);
@@ -466,6 +467,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::KickTeamMate => PlayerAction::KickTeamMate,
         PlayerActionChoice::HypnoticGaze => PlayerAction::Gaze,
         PlayerActionChoice::ThrowBomb => PlayerAction::ThrowBomb,
+        PlayerActionChoice::HailMaryPass => PlayerAction::HailMaryPass,
         PlayerActionChoice::Swoop => PlayerAction::Swoop,
         PlayerActionChoice::Punt => PlayerAction::Punt,
         PlayerActionChoice::BreatheFire => PlayerAction::BreatheFire,

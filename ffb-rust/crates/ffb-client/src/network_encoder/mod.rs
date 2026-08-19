@@ -420,6 +420,7 @@ fn choice_to_player_action(choice: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::KickTeamMate => PlayerAction::KickTeamMate,
         PlayerActionChoice::HypnoticGaze => PlayerAction::Gaze,
         PlayerActionChoice::ThrowBomb => PlayerAction::ThrowBomb,
+        PlayerActionChoice::HailMaryPass => PlayerAction::HailMaryPass,
         PlayerActionChoice::Swoop => PlayerAction::Swoop,
         PlayerActionChoice::Punt => PlayerAction::Punt,
         PlayerActionChoice::StandUp => PlayerAction::StandUp,
