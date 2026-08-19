@@ -292,6 +292,17 @@ impl Agent for UniformAgent {
                 Action::Touchback { player_id: sorted[idx].0.clone() }
             }
             Some(AgentPrompt::ArgueTheCall { .. }) => Action::ArgueTheCall { argue: self.pick_bool() },
+            Some(AgentPrompt::MultiBlockTargets { eligible_players, .. }) => {
+                if eligible_players.len() < 2 {
+                    return Action::EndPlayerAction;
+                }
+                let mut pool = eligible_players.clone();
+                let i1 = self.pick(pool.len());
+                let d1 = pool.remove(i1);
+                let i2 = self.pick(pool.len());
+                let d2 = pool.remove(i2);
+                Action::MultiBlock { defender1_id: d1, defender2_id: d2 }
+            }
             Some(AgentPrompt::PlayerChoice { eligible_players, .. }) => {
                 if eligible_players.is_empty() { return Action::Acknowledge; }
                 let mut sorted = eligible_players.clone();

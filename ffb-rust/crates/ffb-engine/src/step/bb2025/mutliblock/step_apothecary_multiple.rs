@@ -382,6 +382,39 @@ mod tests {
     }
 
     #[test]
+    fn acting_team_resolution_applies_attacker_ko() {
+        // dark_elf bb2020 seed 53 i=8: the driver constructed this step with
+        // new(String::new()), pre-setting team_id to Some("") — the acting-team → team-id
+        // resolution (Java: init from ACTING_TEAM) is guarded on team_id.is_none() and never
+        // ran, so the retain filter compared "" against real team ids and dropped the
+        // multiple-block attacker's KO. Default-constructed (team_id None) + ActingTeam(true)
+        // must resolve to the acting team and apply the KO.
+        use ffb_model::enums::{PlayerState, PS_KNOCKED_OUT, PS_PRONE, PS_STANDING};
+        let mut game = make_game();
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: "home_02".into(), name: "home_02".into(), nr: 2,
+            position_id: "lineman".into(),
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            ..Default::default()
+        });
+        game.home_playing = true;
+        game.field_model.set_player_coordinate("home_02", FieldCoordinate::new(12, 6));
+        game.field_model.set_player_state("home_02", PlayerState::new(PS_PRONE));
+        let _ = PS_STANDING;
+        let mut step = StepApothecaryMultiple::default();
+        step.set_parameter(&StepParameter::ActingTeam(true));
+        let mut ir = make_injury("home_02", ApothecaryMode::Attacker, ApothecaryStatus::NoApothecary);
+        ir.injury_context_mut().injury = Some(PlayerState::new(PS_KNOCKED_OUT));
+        step.set_parameter(&StepParameter::InjuryResult(ir));
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(step.team_id.as_deref(), Some("home"),
+            "ActingTeam(true) with home acting must resolve team_id to the home team");
+        let state = game.field_model.player_state("home_02").expect("state");
+        assert_eq!(state.base(), PS_KNOCKED_OUT,
+            "the acting-team apothecary step must apply the attacker's KO");
+    }
+
+    #[test]
     fn start_no_injuries_returns_next_step() {
         let mut game = make_game();
         let mut step = StepApothecaryMultiple::new("home_lineman".into());

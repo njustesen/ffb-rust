@@ -14,7 +14,7 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `dark_elf` | 🟢 100/100 |  |  |
 | `dark_elf_league_fumbbl` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `dwarf` | 🟢 100/100 |  |  |
-| `elf` | 🟢 100/100 | re-measured after the Hail-Mary mechanic + stale-CatcherId fixes |  |
+| `elf` | 🟢 100/100 |  |  |
 | `goblin` | 🟢 100/100 |  |  |
 | `halfling` | 🟢 100/100 |  |  |
 | `high_elf` | 🟢 100/100 |  |  |
@@ -37,4 +37,4 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `vampire` | 🟢 100/100 |  |  |
 | `wood_elf` | 🟢 100/100 |  |  |
 
-**30 green / 0 red of 30** (elf re-measured 100/100 after the Hail-Mary/catch fixes).
+**30 green / 0 red of 30.**

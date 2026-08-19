@@ -202,6 +202,15 @@ pub enum AgentPrompt {
         count: i32,
     },
 
+    /// Multiple Block target selection (bb2020/bb2025): the acting player declared
+    /// MULTIPLE_BLOCK and must now pick TWO adjacent blockable opponents — the client sends
+    /// CLIENT_SYNCHRONOUS_MULTI_BLOCK with both targets. `eligible_players` is
+    /// coordinate-sorted; the agents draw two actionRng picks (idx % N, then idx % (N-1)).
+    MultiBlockTargets {
+        player_id: PlayerId,
+        eligible_players: Vec<PlayerId>,
+    },
+
     // ── Misc ───────────────────────────────────────────────────────────────────
     PlayerChoice {
         eligible_players: Vec<PlayerId>,

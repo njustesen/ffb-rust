@@ -173,7 +173,13 @@ pub fn make_step(id: StepId) -> Box<dyn Step> {
         // ── Multi-block ──────────────────────────────────────────────────────
         StepId::MultipleBlockFork      => Box::new(step_multiple_block_fork::StepMultipleBlockFork::new(vec![])),
         StepId::BlockRollMultiple      => Box::new(step_block_roll_multiple::StepBlockRollMultiple::new()),
-        StepId::ApothecaryMultiple     => Box::new(step_apothecary_multiple::StepApothecaryMultiple::new(String::new())),
+        // Java resolves teamId from the ACTING_TEAM init parameter (handleActingTeam); the step's
+        // own execute maps acting_team → team id on first run, but ONLY while team_id is None —
+        // constructing with new(String::new()) pre-set it to Some("") and the resolution never
+        // ran, so the retain filter compared "" against real team ids and silently dropped every
+        // acting-team injury (dark_elf bb2020 seed 53: the multiple-block attacker's KO was never
+        // applied and he stood up next turn where Java had him in the KO box).
+        StepId::ApothecaryMultiple     => Box::new(step_apothecary_multiple::StepApothecaryMultiple::default()),
         // ── Negatraits ───────────────────────────────────────────────────────
         StepId::BoneHead               => { use crate::step::action::common::step_bone_head::StepBoneHead; Box::new(StepBoneHead::new()) }
         StepId::ReallyStupid           => { use crate::step::action::common::step_really_stupid::StepReallyStupid; Box::new(StepReallyStupid::new()) }

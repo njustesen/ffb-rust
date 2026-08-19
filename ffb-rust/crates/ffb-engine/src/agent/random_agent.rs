@@ -113,6 +113,9 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             // HAIL_MARY_PASS: a distinct declared action for a canPassToAnySquare carrier;
             // rides the same ClientCommandPass/sendPassAction route as PASS.
             | PlayerActionChoice::HailMaryPass
+            // MULTIPLE_BLOCK: two-phase declaration; targets come from the
+            // MultiBlockTargets continuation prompt (2 actionRng draws).
+            | PlayerActionChoice::MultipleBlock
             // TREACHEROUS / BLACK_INK (bb2020+ star specials): declared with no folded target —
             // the step finds its own victim.
             | PlayerActionChoice::Treacherous
@@ -804,6 +807,31 @@ impl Agent for RandomAgent {
             // engine-agnostic (Rust ids `home_02` ≠ Java `teamRenegadesParityHome2`, but board coords
             // match) so both engines lash out at the SAME team-mate and the shared block dice align.
             // Java ParityRunner's PLAYER_CHOICE handler mirrors this exact min-(x,y) pick.
+            // Multi-block reroll window (DialogReRollForTargetsParameter): DECLINE, exactly
+            // like the plain RE_ROLL dialog — ParityRunner injects
+            // ClientCommandUseReRollForTarget(action, null, null). 0 rng consumed either side.
+            Some(AgentPrompt::ReRollForTargets { re_rolled_action, .. }) => {
+                Action::UseReRollForTarget {
+                    re_rolled_action: Some(re_rolled_action.clone()),
+                    re_roll_source: None,
+                    target_id: None,
+                }
+            }
+            // MULTIPLE_BLOCK target window: pick TWO distinct targets from the
+            // coordinate-sorted adjacent blockables — first idx % N, second idx % (N-1) —
+            // exactly ParityRunner's sendSynchronousMultiBlock. With fewer than two targets
+            // (both KO'd since the turn-start snapshot) deselect like any stale declaration.
+            Some(AgentPrompt::MultiBlockTargets { eligible_players, .. }) => {
+                if eligible_players.len() < 2 {
+                    return Action::EndPlayerAction;
+                }
+                let mut pool = eligible_players.clone();
+                let i1 = self.pick_action(pool.len());
+                let d1 = pool.remove(i1);
+                let i2 = self.pick_action(pool.len());
+                let d2 = pool.remove(i2);
+                Action::MultiBlock { defender1_id: d1, defender2_id: d2 }
+            }
             // BLACK_INK is the second mandatory PlayerChoice: Kiroth's auto-gaze picks its
             // victim with the same engine-agnostic min-(x,y) rule (ParityRunner's PLAYER_CHOICE
             // handler mirrors it), and the step consumes a plain Action::SelectPlayer.
@@ -1036,6 +1064,7 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         PlayerAction::Pass | PlayerAction::DumpOff => PlayerActionChoice::Pass,
         PlayerAction::HailMaryPass => PlayerActionChoice::HailMaryPass,
         PlayerAction::Treacherous => PlayerActionChoice::Treacherous,
+        PlayerAction::MultipleBlock => PlayerActionChoice::MultipleBlock,
         PlayerAction::BlackInk => PlayerActionChoice::BlackInk,
         PlayerAction::HandOver      => PlayerActionChoice::HandOff,
         PlayerAction::SecureTheBall => PlayerActionChoice::SecureTheBall,

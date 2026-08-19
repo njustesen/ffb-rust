@@ -879,7 +879,71 @@ Facts so far:
 - [ ] Batch the remaining specials (needs bb2025 star DATA drafted from rules/star_players; Pro
       reroll route; Horkon Multiple Block) — NEXT-TIER DECISION for the user.
 
-## Blocked — needs a tier decision from the user
+## 10. Pro + Multiple Block (USER-SELECTED 2026-08-19)
+
+Goal: finish the drafted stars' remaining specials. Helmut Wulf (bb2020 dark_elf @10) carries
+Pro + Old Pro; Horkon Heartripper (bb2016-id star) carries Multiple Block. Targets: StepId::Pro,
+and the 8-step multiblock family (MultipleBlockFork BlockRollMultiple FoulAppearanceMultiple
+ApothecaryMultiple DauntlessMultiple StateMultipleRolls ReportStabInjury DispatchDumpOff).
+
+- [x] INVESTIGATED (2026-08-19): (a) the multiblock STEP family is bb2020/bb2025-only (Java
+      generators; bb2016 multi-block = MULTI_BLOCK_DEFENDER_ID params on ordinary Block seqs —
+      different mechanism, никогда dispatches the family). Horkon (darkelf.Horkon, the only
+      Multiple Block star in the data) is hostable in bb2020 dark_elf — his skills all resolve
+      in bb2020 (Multiple Block/Dodge/Leap/Shadowing/Stab/Loner) and the star plumbing is
+      edition-agnostic. (b) Pro (bb2016+bb2020; bb2025 has a different Pro class): StepId.PRO
+      dispatches from ONE site — StepHandleDropPlayerContext.handleCommand: a DROPPED player's
+      skill whose InjuryContextModification requiresConditionalReRollSkill() (Helmut's Old Pro)
+      is offered via a SkillUse dialog; USING it pushes the PRO step (the conditional d6).
+      ParityRunner's SKILL_USE arm auto-uses. **Rust's bb2020 step_handle_drop_player_context.rs
+      documents the gap**: 'requires Sequence/StepId::Pro wiring and a skill→modification lookup
+      that don't exist'. dark_elf bb2020 is green only because Helmut never got dropped with the
+      modification applicable in seeds 1-100 — a live landmine, not a safe stub. (c) the client
+      declares MULTIPLE_BLOCK via sendActingPlayer(player, MULTIPLE_BLOCK, false); target
+      selection runs through SynchronousMultiBlockLogicModule dialogs.
+- [x] Multiple Block LIVE (2026-08-19): darkelf.Horkon drafted @nr2 bb2020 dark_elf (blitzer
+      2→15, witchelf 1→11); **dark_elf bb2020 100/100** with BlockRollMultiple /
+      FoulAppearanceMultiple / DispatchDumpOff / DauntlessMultiple / ApothecaryMultiple all
+      dispatching. NINE fixes (uncommitted pending gate):
+      [ffb-rust] (1) PAC::MultipleBlock plumbing + offer (legal_actions: CAN_BLOCK_TWO_AT_ONCE,
+      >1 adjacent blockables) + two-phase declaration in shared InitSelecting (ActivatePlayer arm
+      + Action::MultiBlock = Java CLIENT_SYNCHRONOUS_MULTI_BLOCK :308-316 publish BLOCK_TARGETS +
+      dispatch) + MultiBlockTargets continuation window (start guard AND execute tail);
+      (2) Action::EndPlayerAction deselect arm (stale-target infinite loop, seed 2);
+      (3) one-roll-per-pass push_self next_step in BOTH step_block_roll_multiple twins — batching
+      both eval sequences' pushes+publishes in one outcome parked the 2nd BlockChoice promptless
+      (Java interleaves per roll; publish delivery is consume-scoped); (4) first_run captures each
+      target's pre-block state into BlockRolls (BLOCK_TARGETS is id-only; the restore wrote
+      unwrap_or_default() = PlayerState(0) → targets teleported to Reserve, seed 10);
+      (5) bb2020 DropFallingPlayers publishes the DEFENDER's DropPlayerContext directly (Java
+      PilingOnBehaviour :157; SteadyFooting is bb2025-only — the wrap only ever worked in
+      sequences that CONTAIN a SteadyFooting step, which the MB eval seq does not) AND
+      (6) publishes the attacker INJURY_RESULT for bb2016|bb2020 (:183), seed 5;
+      (7) **MB dice-count folds ASSISTS** (seed 10 second red): the roll phase passed raw
+      strengths to find_nr_of_block_dice — port of Java findNrOfBlockDice full path
+      (getTotalAttackerStrength + findBlockStrength both sides, MB modifiers on base strength,
+      using_multi_block=false to avoid double-apply — same shape as bb2016 bug #12). NOTE:
+      Java's isValidAssist MB-target exclusion is a NO-OP in this flow — the synchronous command
+      never calls addMultiBlockTarget, only the GUI's incremental SET_BLOCK_TARGET does;
+      (8) **driver.rs constructed StepApothecaryMultiple with new(String::new())** (seed 53):
+      team_id pre-set to Some("") disabled the acting-team resolution (guarded on is_none) → the
+      retain filter compared "" to real team ids and silently DROPPED every acting-team injury —
+      the MB attacker's KO was never applied and he stood up next turn (Java: KO box). Fixed to
+      ::default() (team_id None). Bug shape: a bad FACTORY DEFAULT that poisons a
+      resolve-on-first-run guard — invisible until the step first processes an acting-team injury.
+      (9) 2 stale tests updated to the Java-faithful bb2020 no-SteadyFooting expectation.
+      [ParityRunner] MB offer + isHandled + phase-2 sendSynchronousMultiBlock (2 actionRng picks
+      idx%N, idx%(N-1) over coordinate-sorted blockables; BlockTarget(id, BLOCK, state)) +
+      RE_ROLL_BLOCK_FOR_TARGETS handler (first needsSelection roll → die index 0; decline
+      DialogReRollForTargetsParameter). Tests: multi_block_dice_count_folds_assists,
+      acting_team_resolution_applies_attacker_ko. ffb-engine 7242/0.
+- [ ] Full 3-edition gate with the MB fixes (in flight), then commit+push both repos.
+- [ ] Pro route + verify dark_elf bb2020 (Helmut already fielded): StepHandleDropPlayerContext
+      skill→modification lookup + SkillUse dialog + StepId::Pro push (documented gap at bb2020
+      step_handle_drop_player_context.rs:21).
+- [ ] Inventory update (multiblock family reached; ReportStabInjury/StateMultipleRolls status).
+
+## Blocked — needs a tier decision from the user## Blocked — needs a tier decision from the user
 
 - **Punt.** Plumbing is correct and dark_elf bb2025 is 100/100, but `InitPunt` dispatches zero times:
   Punt needs the carrier holding the ball at *turn start*, which the turn-start snapshot makes

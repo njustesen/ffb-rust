@@ -176,7 +176,21 @@ impl StepHailMaryPass {
         // triple-scattered instead of bouncing at the thrower). ACCURATE converts to INACCURATE
         // (a Hail Mary always deviates); the minimum reported/offered to the reroll dialog is
         // Java :148's explicit `max(2, 2 + distance.mod2020 + sum(mods))`.
-        let (raw_result, java_min) = {
+        let (raw_result, java_min) = if game.rules == ffb_model::enums::Rules::Bb2016 {
+            // Java bb2016 PassBehaviour's StepHailMaryPass hook bypasses the pass mechanic
+            // entirely: `state.result = (roll == 1) ? FUMBLE : INACCURATE` — no distance or
+            // tacklezone modifiers, no SAVED_FUMBLE, and the reroll dialogs are offered with a
+            // fixed minimum of 2 (DialogSkillUseParameter(..., 2) / askForReRollIfAvailable(...,
+            // 2, false)). Routing bb2016 through the bb2025-style mechanic evaluate made a
+            // natural 3 a "modified fumble" (3 + LongBomb -2 = 1) and burned a team reroll Java
+            // never rolled (dwarf bb2016 seed 43 i=2: one extra d6 shifted all three scatter d8s).
+            let raw = if self.roll == 1 {
+                ffb_mechanics::pass_result::PassResult::FUMBLE
+            } else {
+                ffb_mechanics::pass_result::PassResult::INACCURATE
+            };
+            (raw, 2)
+        } else {
             let thrower = game.thrower_id.clone().and_then(|id| game.player(&id)).cloned();
             match thrower {
                 Some(t) => {
@@ -322,6 +336,27 @@ mod tests {
         });
         game.thrower_id = Some("thrower".into());
         game
+    }
+
+    #[test]
+    fn bb2016_hmp_fumbles_only_on_a_natural_one() {
+        // Java bb2016 PassBehaviour hook: `result = (roll == 1) ? FUMBLE : INACCURATE` — no
+        // mechanic evaluation. The mechanic path called a natural 3 a modified fumble
+        // (3 + LongBomb -2 = 1) and burned a reroll Java never rolled (dwarf bb2016 seed 43).
+        let mut game = make_game_with_thrower(4);
+        game.rules = Rules::Bb2016;
+        game.home_playing = true;
+        let mut step = StepHailMaryPass::new(String::new());
+        // Pre-set the roll to the dwarf seed-43 value (the step skips rolling when roll != 0):
+        // 3 at LongBomb is a modified fumble under the mechanic but INACCURATE per Java bb2016.
+        step.roll = 3;
+        let mut rng = GameRng::new(7);
+        step.execute_step(&mut game, &mut rng);
+        assert_eq!(step.result, Some(PassOutcome::Inaccurate),
+            "bb2016 HMP roll {} must be INACCURATE, not a modified fumble", step.roll);
+        assert!(step.re_rolled_action.is_none(),
+            "no reroll cascade may trigger for a non-1 bb2016 HMP roll");
+        assert_eq!(step.minimum_roll, 2, "Java offers bb2016 HMP rerolls with minimum 2");
     }
 
     #[test]

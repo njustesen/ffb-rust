@@ -2744,6 +2744,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> ffb_model::enums::PlayerActi
         PlayerActionChoice::HypnoticGaze => PA::Gaze,
         PlayerActionChoice::ThrowBomb  => PA::ThrowBomb,
         PlayerActionChoice::HailMaryPass => PA::HailMaryPass,
+        PlayerActionChoice::MultipleBlock => PA::MultipleBlock,
         PlayerActionChoice::Treacherous => PA::Treacherous,
         PlayerActionChoice::BlackInk => PA::BlackInk,
         PlayerActionChoice::Swoop      => PA::Swoop,

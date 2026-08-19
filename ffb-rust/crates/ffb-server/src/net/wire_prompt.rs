@@ -260,6 +260,9 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
         // ClientCommandBlock, so there is nothing to render. The headless agent answers this
         // prompt directly; a networked client never sees it.
         AgentPrompt::BlockTarget { .. } => None,
+        // Purely internal like BlockTarget: Java's multi-block target selection is a client-side
+        // dice-decoration flow ending in CLIENT_SYNCHRONOUS_MULTI_BLOCK — no server dialog.
+        AgentPrompt::MultiBlockTargets { .. } => None,
         AgentPrompt::BlockChoice { attacker_id, defender_id, dice, own_choice, nr_of_dice } =>
             Some(WireDialog::BlockChoice {
                 attacker_id: attacker_id.clone(), defender_id: defender_id.clone(),

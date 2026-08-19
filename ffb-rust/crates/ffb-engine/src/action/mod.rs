@@ -215,6 +215,9 @@ pub enum PlayerActionChoice {
     /// Hail Mary Pass — a DISTINCT declared action (Java PlayerAction.HAIL_MARY_PASS):
     /// StepDispatchPassing routes on it, so folding it into Pass can never reach the step.
     HailMaryPass,
+    /// Multiple Block (bb2020/bb2025): declared action; the player then picks TWO targets via
+    /// CLIENT_SYNCHRONOUS_MULTI_BLOCK (AgentPrompt::MultiBlockTargets / Action::MultiBlock).
+    MultipleBlock,
     /// Treacherous (bb2020+ star special): declared action; the step stabs an adjacent
     /// teammate carrying the ball, then the activation continues via a fresh Select sequence.
     Treacherous,

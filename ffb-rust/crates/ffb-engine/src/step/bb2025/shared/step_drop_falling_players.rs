@@ -415,6 +415,15 @@ impl StepDropFallingPlayers {
                 // Bypass Steady Footing — publish DROP_PLAYER_CONTEXT + INJURY_RESULT directly
                 out = out.publish(StepParameter::DropPlayerContext(Box::new(dpc)));
                 out = out.publish(StepParameter::InjuryResult(injury_result.clone()));
+            } else if game.rules == Rules::Bb2020 {
+                // Java bb2020 PilingOnBehaviour :157 publishes DROP_PLAYER_CONTEXT directly —
+                // Steady Footing is a bb2025 mechanic. The bb2025-style wrap only worked in
+                // sequences that happen to CONTAIN a SteadyFooting step (the ordinary block
+                // sequence); the multi-block evaluation sequence has none, so the wrapped
+                // context died unapplied and the knocked-down defender POPPED BACK UP at end of
+                // turn (dark_elf bb2020 seed 5: Horkon's POW'd target stood while Java had him
+                // prone).
+                out = out.publish(StepParameter::DropPlayerContext(Box::new(dpc)));
             } else {
                 let ctx = SteadyFootingContext::from_drop_player(dpc);
                 out = out.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
@@ -532,13 +541,18 @@ impl StepDropFallingPlayers {
                     let ctx = SteadyFootingContext::from_injury_result_with_commands(
                         injury_result_attacker, vec![cmd]);
                     out = out.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
-                } else if game.rules == Rules::Bb2016 {
+                } else if matches!(game.rules, Rules::Bb2016 | Rules::Bb2020) {
                     // Java bb2016 PilingOnBehaviour publishes INJURY_RESULT for the attacker's own
-                    // fall (line 174); StepApothecary(ATTACKER) applies the injury state. bb2016 has
-                    // no Steady Footing step to unwrap a SteadyFootingContext, so wrapping it there
-                    // left the attacker stuck at the drop_player PRONE state instead of the rolled
-                    // injury (amazon seed1 i=98: home_01 SKULL, armour 8>7 broken, injury 5 → Java
-                    // Stunned, Rust Prone).
+                    // fall (line 174) — and the bb2020 PilingOnBehaviour does the SAME (:183);
+                    // StepApothecary(ATTACKER) applies the injury state. Neither edition has a
+                    // Steady Footing step to unwrap a SteadyFootingContext, so wrapping it left
+                    // the attacker stuck at the drop_player PRONE state instead of the rolled
+                    // injury (bb2016: amazon seed1 i=98 home_01 SKULL → Java Stunned, Rust Prone;
+                    // bb2020: dark_elf seed 5, Horkon's multi-block BOTH DOWN — armour [6,1]=7
+                    // broke AV7, injury stunned in Java, Rust stayed Prone+ACTIVE). The ordinary
+                    // bb2020 block sequence happens to contain a SteadyFooting step that unwrapped
+                    // the context, masking this for every previous matchup — the multi-block
+                    // evaluation sequence has none.
                     out = out.publish(StepParameter::InjuryResult(Box::new(injury_result_attacker)));
                 } else {
                     let ctx = SteadyFootingContext::from_injury_result(injury_result_attacker);
@@ -839,7 +853,12 @@ mod tests {
         );
         assert_eq!(out.action, StepAction::NextStep);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::UsingPilingOn(false))));
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))));
+        // Java bb2020 PilingOnBehaviour :157 publishes DROP_PLAYER_CONTEXT + INJURY_RESULT
+        // directly — Steady Footing is bb2025-only, and the multi-block evaluation sequence
+        // contains no SteadyFooting step to unwrap a wrapped context.
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DropPlayerContext(_))));
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))),
+            "bb2020 must NOT wrap the defender drop in a SteadyFootingContext");
     }
 
     #[test]
@@ -885,8 +904,12 @@ mod tests {
             &mut game, &mut GameRng::new(0),
         );
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::UsingPilingOn(true))));
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))),
-            "re-rolled defender InjuryResult should still be published via SteadyFootingContext");
+        // Java bb2020 publishes the re-rolled defender injury via DROP_PLAYER_CONTEXT +
+        // INJURY_RESULT directly (PilingOnBehaviour :157) — no SteadyFootingContext in bb2020.
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DropPlayerContext(_))),
+            "re-rolled defender InjuryResult should be published via DROP_PLAYER_CONTEXT");
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))),
+            "bb2020 must NOT wrap the defender drop in a SteadyFootingContext");
     }
 
     #[test]

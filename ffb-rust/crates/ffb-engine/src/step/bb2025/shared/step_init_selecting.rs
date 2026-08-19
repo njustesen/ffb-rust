@@ -80,6 +80,25 @@ impl Step for StepInitSelecting {
                         return StepOutcome::cont().with_prompt(AgentPrompt::BombRethrow { player_id: pid });
                     }
                 }
+                // MULTIPLE_BLOCK continuation: the declared player must now pick TWO targets —
+                // Java waits for CLIENT_SYNCHRONOUS_MULTI_BLOCK; surface the window as a prompt.
+                Some(PlayerAction::MultipleBlock) => {
+                    if let Some(pid) = game.acting_player.player_id.clone() {
+                        if let Some(coord) = game.field_model.player_coordinate(&pid) {
+                            let inactive = game.inactive_team();
+                            let mut elig: Vec<String> =
+                                ffb_model::util::util_player::UtilPlayer::find_adjacent_blockable_players(
+                                    game, inactive, coord,
+                                ).into_iter().cloned().collect();
+                            elig.sort_by_key(|id| {
+                                game.field_model.player_coordinate(id)
+                                    .map(|c| (c.x, c.y)).unwrap_or((i32::MAX, i32::MAX))
+                            });
+                            return StepOutcome::cont().with_prompt(
+                                AgentPrompt::MultiBlockTargets { player_id: pid, eligible_players: elig });
+                        }
+                    }
+                }
                 // Post-Black-Ink continuation: the acting player still carries MOVE and Java's
                 // phase 2 simply moves them (sendMoveAction). Re-dispatch the MOVE so
                 // EndSelecting pushes the Move sequence and the agent gets the ordinary Move
@@ -124,6 +143,15 @@ impl Step for StepInitSelecting {
             Action::EndTurn => {
                 self.end_turn = true;
             }
+            // Java: CLIENT_ACTING_PLAYER(null, null, false) — the DESELECT. The agents send it
+            // when a declared two-phase action can no longer proceed (e.g. a MULTIPLE_BLOCK
+            // whose second target died between the turn-start snapshot and the activation —
+            // ParityRunner's sendSynchronousMultiBlock injects the same null ActingPlayer).
+            // Without this arm the command fell through and the MultiBlockTargets window
+            // re-prompted forever (dark_elf bb2020 seed 2 i=6).
+            Action::EndPlayerAction => {
+                util_server_steps::change_player_action_to_none(game);
+            }
             Action::ActivatePlayer { player_id, player_action, block_defender_id } => {
                 // Rust bridging: a TREACHEROUS "declaration" stands for the client's two
                 // commands — CLIENT_ACTING_PLAYER(PASS_MOVE) then CLIENT_USE_SKILL(treacherous)
@@ -132,6 +160,18 @@ impl Step for StepInitSelecting {
                 // set the acting player with PASS_MOVE, then take the UseSkill chain's
                 // dispatch (Java StepInitSelecting:354 canStabTeamMateForBall → TREACHEROUS,
                 // forceGotoOnDispatch).
+                // MULTIPLE_BLOCK is two-phase like Java: the declaration only sets the acting
+                // player (CLIENT_ACTING_PLAYER); the engine then waits for
+                // CLIENT_SYNCHRONOUS_MULTI_BLOCK with both targets (the MultiBlockTargets
+                // continuation prompt below).
+                if *player_action == PlayerActionChoice::MultipleBlock {
+                    game.original_bombardier = None;
+                    util_server_steps::change_player_action(game, player_id, PlayerAction::MultipleBlock, false);
+                    game.defender_id = None;
+                    Self::check_for_staller(game);
+                    return self.execute_step(game, rng)
+                        .with_event(GameEvent::PlayerAction { player_id: player_id.clone(), action: PlayerAction::MultipleBlock });
+                }
                 // Rust bridging: BLACK_INK stands for ActingPlayer(MOVE) + UseSkill(blackInk)
                 // — the client offers the ink from the ordinary action modules and the player
                 // CONTINUES the declared move after the gaze (see the Move continuation in
@@ -267,6 +307,19 @@ impl Step for StepInitSelecting {
                 // coverage counts activations per action type via GameEvent::PlayerAction.
                 return self.execute_step(game, rng)
                     .with_event(GameEvent::PlayerAction { player_id: player_id.clone(), action: pa });
+            }
+            // Java: CLIENT_SYNCHRONOUS_MULTI_BLOCK (bb2025 shared StepInitSelecting:328-334) —
+            // publish BLOCK_TARGETS, changePlayerAction(MULTIPLE_BLOCK), dispatch, EXECUTE.
+            Action::MultiBlock { defender1_id, defender2_id } => {
+                if let Some(pid) = game.acting_player.player_id.clone() {
+                    util_server_steps::change_player_action(game, &pid, PlayerAction::MultipleBlock, false);
+                    self.dispatch_player_action = Some(PlayerAction::MultipleBlock);
+                    return self.execute_step(game, rng)
+                        .publish(StepParameter::BlockTargets(vec![
+                            defender1_id.clone(), defender2_id.clone(),
+                        ]));
+                }
+                return self.execute_step(game, rng);
             }
             // Java: CLIENT_PASS (bb2025 shared StepInitSelecting:256-277) — publish the target
             // coordinate (transformed for the away side), change the action to PASS (unless the
@@ -549,6 +602,26 @@ impl StepInitSelecting {
                     .with_prompt(AgentPrompt::BombRethrow { player_id: pid });
             }
         }
+        // MULTIPLE_BLOCK declaration window: the declared player must pick TWO targets — Java
+        // waits for CLIENT_SYNCHRONOUS_MULTI_BLOCK. (Same window also guarded in start() for
+        // the select-sequence re-entry.)
+        if game.acting_player.player_action == Some(PlayerAction::MultipleBlock) {
+            if let Some(pid) = game.acting_player.player_id.clone() {
+                if let Some(coord) = game.field_model.player_coordinate(&pid) {
+                    let inactive = game.inactive_team();
+                    let mut elig: Vec<String> =
+                        ffb_model::util::util_player::UtilPlayer::find_adjacent_blockable_players(
+                            game, inactive, coord,
+                        ).into_iter().cloned().collect();
+                    elig.sort_by_key(|id| {
+                        game.field_model.player_coordinate(id)
+                            .map(|c| (c.x, c.y)).unwrap_or((i32::MAX, i32::MAX))
+                    });
+                    return StepOutcome::cont().with_prompt(
+                        AgentPrompt::MultiBlockTargets { player_id: pid, eligible_players: elig });
+                }
+            }
+        }
         // Waiting: build activation prompt
         let eligible = crate::legal_actions::eligible_players_for_activation(game);
         StepOutcome::cont()
@@ -573,6 +646,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::HypnoticGaze => PlayerAction::Gaze,
         PlayerActionChoice::ThrowBomb => PlayerAction::ThrowBomb,
         PlayerActionChoice::HailMaryPass => PlayerAction::HailMaryPass,
+        PlayerActionChoice::MultipleBlock => PlayerAction::MultipleBlock,
         PlayerActionChoice::Treacherous => PlayerAction::Treacherous,
         PlayerActionChoice::BlackInk => PlayerAction::BlackInk,
         PlayerActionChoice::Swoop => PlayerAction::Swoop,

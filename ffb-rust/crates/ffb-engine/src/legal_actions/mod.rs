@@ -272,6 +272,32 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             }
         }
 
+        // Multiple Block (bb2020/bb2025): the client's isMultiBlockActionAvailable rule —
+        // canBlockTwoAtOnce (uncancelled) + standing + MORE THAN ONE adjacent blockable
+        // opponent. bb2016's multi-block is a different mechanism (MULTI_BLOCK_DEFENDER_ID on
+        // ordinary Block sequences) and never dispatches the multiblock step family, so the
+        // offer is bb2020/bb2025-only. Declaring it is two-phase like Java: ActingPlayer
+        // (MULTIPLE_BLOCK) then CLIENT_SYNCHRONOUS_MULTI_BLOCK with both targets.
+        if game.rules != Rules::Bb2016
+            && player.has_skill_property(
+                ffb_model::model::property::named_properties::NamedProperties::CAN_BLOCK_TWO_AT_ONCE,
+            )
+            && !player.has_skill_property(
+                ffb_model::model::property::named_properties::NamedProperties::PREVENT_REGULAR_BLOCK_ACTION,
+            )
+        {
+            let blockable = ffb_model::util::util_player::UtilPlayer::find_adjacent_blockable_players(
+                game, opponent_team, coord,
+            );
+            if blockable.len() > 1 {
+                actions.push(Action::ActivatePlayer {
+                    player_id: pid.clone(),
+                    player_action: PlayerActionChoice::MultipleBlock,
+                    block_defender_id: None,
+                });
+            }
+        }
+
         // Treacherous (bb2020+ star special): the client's isTreacherousAvailable rule —
         // unused canStabTeamMateForBall skill + an adjacent BLOCKABLE teammate carrying the
         // ball (bb2025 SelectLogicModule.isTreacherousAvailable: UtilCards.hasUnusedSkill…
@@ -406,6 +432,7 @@ pub fn eligible_players_for_activation(game: &Game) -> Vec<(PlayerId, Vec<ffb_mo
             PAC::KickTeamMate => PA::KickTeamMate,
             PAC::ThrowBomb => PA::ThrowBomb,
             PAC::HailMaryPass => PA::HailMaryPass,
+            PAC::MultipleBlock => PA::MultipleBlock,
             PAC::Treacherous => PA::Treacherous,
             PAC::BlackInk => PA::BlackInk,
             PAC::Punt => PA::Punt,

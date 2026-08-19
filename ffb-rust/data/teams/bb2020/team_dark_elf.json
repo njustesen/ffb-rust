@@ -16,7 +16,7 @@
       "position_id": "darkelf.witchelf"
     },
     {
-      "nr": 2,
+      "nr": 15,
       "position_id": "darkelf.blitzer"
     },
     {
@@ -69,6 +69,10 @@
     {
       "nr": 1,
       "star_id": "54496"
+    },
+    {
+      "nr": 2,
+      "star_id": "darkelf.Horkon"
     }
   ]
 }
