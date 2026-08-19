@@ -650,7 +650,7 @@ executes in BOTH engines (it had never executed in either). Workspace 14,540 pas
 
 ---
 
-## 6. Widen the state hash (USER-SELECTED 2026-08-19)
+## 6. Widen the state hash — ✅ COMPLETE 2026-08-19 (`04aef090` + ffb `b776e1150`), gate 30/30/30
 
 Goal: make the per-step hash see the state that hid 4+ bugs this session — above all the
 player's **ACTIVE bit** (invisible re-activations, lost deactivations), evaluated for the
@@ -681,10 +681,8 @@ Constraints:
          players fainting/boxing with a dead bit that survived into the next drive's Reserve state
          (seed 75 and the java=None/rust=None tails).
       RWATCH/RRETIRE probes removed (diff-verified). Workspace 14,547 / 0.
-- [ ] **FULL MATRIX GATE running in background** (bash id `bmgs7h3e3`, gate_activebit.txt). At
-      30/30/30 ×3: commit+push both repos (ffb-rust engine+hash; ParityRunner's stateString change
-      on ffb `t3-phase2-wip`). If RED: other rosters' ACTIVE-bit divergences — same recipe; the
-      trailing `,0/1` on each player part is the new signal.
+- [x] **GATE PASSED 30/30/30 ×3 with the widened hash** — no other roster surfaced a divergence
+      beyond the two engine fixes. Pushed: ffb-rust `04aef090`, ffb `b776e1150`.
 - [x] (was: burn-down list)
 - [x] OLD:  (they are the previously-invisible
       ACTIVE-bit divergences this tier exists to surface):
