@@ -848,7 +848,20 @@ Facts so far:
       CLIENT_PASS coordinate is RAW from Rust agents (transforming it threw the pass at the
       mirrored square, seed 85); regression seeds 52/85/91 all green; dark_elf/dwarf/goblin
       regressions green; 3 unit tests; workspace 14,258/0.
-- [ ] Find BLACK_INK's real client trigger (not in the UseSkill chain) and route it.
+- [x] BLACK_INK LIVE — **dark_elf bb2020 100/100 with 130 StepBlackInk dispatches** (renegades
+      100/100 w/ 3 stabs, dwarf/goblin/amazon regressions green). It WAS in the UseSkill chain
+      (Java :399, later than the first read). Pieces: UseSkill chain += BlackInk/AutoGazeZoat;
+      StepBlackInk (both editions) emits PlayerChoice{reason:BLACK_INK} at the victim dialog
+      (was a bare cont() that silently ended the game); random_agent answers with the mandatory
+      min-(x,y) SelectPlayer (ANIMAL_SAVAGERY rule; ParityRunner's PLAYER_CHOICE branch covers
+      the mode); PAC::BlackInk bridging = ActingPlayer(MOVE)+UseSkill, and the post-ink Move
+      CONTINUATION re-dispatches (start()'s !acted guard); Kiroth moved to nr 1 (LOS) so windows
+      and adjacency actually occur. THREE window lessons: (a) Java declares the specials INSIDE
+      the pass-block window — swallowing one forked used_skills, which the hash cannot see, and
+      the snapshot N diverged 100 steps later; (b) a window BLITZ against the SUSPENDED THROWER
+      re-fires CONFIRM_END_ACTION forever (Java 2M-iteration hang); (c) contract: in PASS_BLOCK
+      mode both harnesses shrink the action list to MOVE+Treacherous+BlackInk (Rust agent filter
+      + ParityRunner filterStaleActions early-return, PASS_BLOCK only).
 - [ ] Then batch the rest, edition-correct; full gate 30/30/30; update inventory; commit+push.
 
 ## Blocked — needs a tier decision from the user

@@ -296,6 +296,31 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             }
         }
 
+        // Black Ink (bb2020+ star special): the client's isBlackInkAvailable rule — unused
+        // canGazeAutomatically skill + an adjacent standing-or-prone, NOT-distracted opponent
+        // (LogicModule.isBlackInkAvailable). Declaring it maps to the client's
+        // ActingPlayer(MOVE)+UseSkill(blackInk) pair; the player continues the move after the
+        // gaze. Offer sits DIRECTLY AFTER Treacherous.
+        if player.has_skill(SkillId::BlackInk)
+            && !player.used_skills.contains(&SkillId::BlackInk)
+        {
+            let opponent_adjacent = opponent_team.players.iter().any(|op| {
+                game.field_model.player_coordinate(&op.id)
+                    .map(|oc| oc.is_adjacent(coord))
+                    .unwrap_or(false)
+                    && game.field_model.player_state(&op.id)
+                        .map(|os| (os.is_standing() || os.base() == PS_PRONE) && !os.is_distracted())
+                        .unwrap_or(false)
+            });
+            if opponent_adjacent {
+                actions.push(Action::ActivatePlayer {
+                    player_id: pid.clone(),
+                    player_action: PlayerActionChoice::BlackInk,
+                    block_defender_id: None,
+                });
+            }
+        }
+
         // Punt (BB2025): ball-carrier with Punt skill; once per drive
         if game.rules == Rules::Bb2025
             && !turn_data.punt_used
@@ -1206,6 +1231,27 @@ mod tests {
         }
         let a2 = legal_activate_player_actions(&game, TeamSide::Home);
         assert!(!has_action(&a2, "p1", PlayerActionChoice::Treacherous));
+    }
+
+    /// §9: Black Ink is offered under the CLIENT's rule (LogicModule.isBlackInkAvailable):
+    /// unused canGazeAutomatically skill + adjacent standing-or-prone NOT-distracted opponent.
+    #[test]
+    fn black_ink_offered_only_with_adjacent_undistracted_opponent() {
+        let mut game = make_game(Rules::Bb2020);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![SkillId::BlackInk]);
+        // no adjacent opponent → no offer
+        let a0 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a0, "p1", PlayerActionChoice::BlackInk));
+        add_player(&mut game, false, "o1", c(6, 5), PS_STANDING, vec![]);
+        let a1 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&a1, "p1", PlayerActionChoice::BlackInk),
+            "unused Black Ink + adjacent standing opponent must be offered");
+        // used skill withdraws it
+        if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == "p1") {
+            p.used_skills.insert(SkillId::BlackInk);
+        }
+        let a2 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a2, "p1", PlayerActionChoice::BlackInk));
     }
 
     #[test]

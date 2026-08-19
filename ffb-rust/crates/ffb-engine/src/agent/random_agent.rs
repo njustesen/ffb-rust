@@ -339,6 +339,22 @@ impl Agent for RandomAgent {
                     }
                     _ => true,
                 }).cloned().collect();
+                // Non-REGULAR window modes (PASS_BLOCK): the harness contract shrinks the
+                // action list to MOVE + the UseSkill specials. A window Block/Blitz/Foul was
+                // always a declare-then-deselect no-op, but its declaration is a live grenade:
+                // a window BLITZ against the SUSPENDED THROWER re-fires Java's
+                // CONFIRM_END_ACTION dialog forever (dark_elf bb2020 seed 61 i=217 — the Java
+                // harness hit its 2M-iteration cap). ParityRunner filters its snapshot with the
+                // identical rule so idx % N stays aligned.
+                let live_actions: Vec<PlayerAction> = if gs.game.turn_mode
+                    == ffb_model::enums::TurnMode::PassBlock
+                {
+                    live_actions.into_iter().filter(|a| matches!(a,
+                        PlayerAction::Move | PlayerAction::Treacherous | PlayerAction::BlackInk
+                    )).collect()
+                } else {
+                    live_actions
+                };
                 let action_idx = self.pick_action(live_actions.len());
                 let player_action = player_action_to_pac(&live_actions[action_idx]);
                 if std::env::var("FFB_TRACE").is_ok() {
@@ -788,6 +804,23 @@ impl Agent for RandomAgent {
             // engine-agnostic (Rust ids `home_02` ≠ Java `teamRenegadesParityHome2`, but board coords
             // match) so both engines lash out at the SAME team-mate and the shared block dice align.
             // Java ParityRunner's PLAYER_CHOICE handler mirrors this exact min-(x,y) pick.
+            // BLACK_INK is the second mandatory PlayerChoice: Kiroth's auto-gaze picks its
+            // victim with the same engine-agnostic min-(x,y) rule (ParityRunner's PLAYER_CHOICE
+            // handler mirrors it), and the step consumes a plain Action::SelectPlayer.
+            Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
+                if reason == "BLACK_INK" =>
+            {
+                let best = eligible_players.iter().min_by_key(|pid| {
+                    gs.game
+                        .field_model
+                        .player_coordinate(pid)
+                        .map(|c| (c.x, c.y))
+                        .unwrap_or((i32::MAX, i32::MAX))
+                });
+                Action::SelectPlayer {
+                    player_id: best.cloned().unwrap_or_default(),
+                }
+            }
             Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
                 if reason == "ANIMAL_SAVAGERY" =>
             {

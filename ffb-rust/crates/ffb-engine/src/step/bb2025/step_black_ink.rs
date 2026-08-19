@@ -127,8 +127,15 @@ impl StepBlackInk {
             if eligibles.len() == 1 {
                 self.player_id = Some(eligibles[0].clone());
             } else {
-                // More than one target: show dialog; random agent will decline next command
-                return StepOutcome::cont();
+                // More than one target: Java shows DialogPlayerChoiceParameter(BLACK_INK, …).
+                // Surface it as a PlayerChoice prompt; the harness contract answers with the
+                // MANDATORY min-(x,y) pick (ANIMAL_SAVAGERY rule) on both sides.
+                return StepOutcome::cont().with_prompt(
+                    ffb_model::prompts::AgentPrompt::PlayerChoice {
+                        eligible_players: eligibles,
+                        reason: "BLACK_INK".into(),
+                        descriptions: vec![],
+                    });
             }
         }
 

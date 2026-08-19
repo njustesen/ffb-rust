@@ -107,8 +107,17 @@ impl StepBlackInk {
                 SkillUse::REMOVE_TACKLEZONE,
             ));
             // Java: unlike StepBalefulHex, StepBlackInk has NO `eligiblePlayers.size() == 1`
-            // auto-select branch — it always shows the dialog and returns CONTINUE.
-            return StepOutcome::cont();
+            // auto-select branch — it always shows the dialog
+            // (DialogPlayerChoiceParameter(BLACK_INK, eligibles, max 1)) and returns CONTINUE.
+            // Surface it as a PlayerChoice prompt; the harness contract answers it with the
+            // MANDATORY min-(x,y) pick (the ANIMAL_SAVAGERY rule) on both sides, so the gaze
+            // actually resolves instead of a bare prompt-less park ending the game silently.
+            return StepOutcome::cont().with_prompt(
+                ffb_model::prompts::AgentPrompt::PlayerChoice {
+                    eligible_players: eligibles,
+                    reason: "BLACK_INK".into(),
+                    descriptions: vec![],
+                });
         }
 
         if let Some(ref target_id) = self.player_id.clone() {

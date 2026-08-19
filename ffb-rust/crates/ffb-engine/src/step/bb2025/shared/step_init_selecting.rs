@@ -67,9 +67,28 @@ impl Step for StepInitSelecting {
         // activated a DIFFERENT player while Java threw the pass (renegades bb2020 seed 91
         // i=94). BombRethrow is the generic "acting player must pass now" window — both agents
         // answer it with sendPassAction's exact contract.
-        if game.acting_player.player_action == Some(PlayerAction::PassMove) {
-            if let Some(pid) = game.acting_player.player_id.clone() {
-                return StepOutcome::cont().with_prompt(AgentPrompt::BombRethrow { player_id: pid });
+        let acted = game.acting_player.has_moved
+            || game.acting_player.has_fouled
+            || game.acting_player.has_blocked
+            || game.acting_player.has_passed
+            || game.acting_player.has_triggered_effect
+            || game.acting_player.forgone;
+        if !acted {
+            match game.acting_player.player_action {
+                Some(PlayerAction::PassMove) => {
+                    if let Some(pid) = game.acting_player.player_id.clone() {
+                        return StepOutcome::cont().with_prompt(AgentPrompt::BombRethrow { player_id: pid });
+                    }
+                }
+                // Post-Black-Ink continuation: the acting player still carries MOVE and Java's
+                // phase 2 simply moves them (sendMoveAction). Re-dispatch the MOVE so
+                // EndSelecting pushes the Move sequence and the agent gets the ordinary Move
+                // prompt — clearing here handed the activation to a different player.
+                Some(PlayerAction::Move) => {
+                    self.dispatch_player_action = Some(PlayerAction::Move);
+                    return self.execute_step(game, _rng);
+                }
+                _ => {}
             }
         }
         // Rust bridging for Java's UtilActingPlayer.changeActingPlayer: Java deactivates the
@@ -113,6 +132,20 @@ impl Step for StepInitSelecting {
                 // set the acting player with PASS_MOVE, then take the UseSkill chain's
                 // dispatch (Java StepInitSelecting:354 canStabTeamMateForBall → TREACHEROUS,
                 // forceGotoOnDispatch).
+                // Rust bridging: BLACK_INK stands for ActingPlayer(MOVE) + UseSkill(blackInk)
+                // — the client offers the ink from the ordinary action modules and the player
+                // CONTINUES the declared move after the gaze (see the Move continuation in
+                // start()).
+                if *player_action == PlayerActionChoice::BlackInk {
+                    game.original_bombardier = None;
+                    util_server_steps::change_player_action(game, player_id, PlayerAction::Move, false);
+                    game.defender_id = None;
+                    self.dispatch_player_action = Some(PlayerAction::BlackInk);
+                    self.force_goto_on_dispatch = true;
+                    Self::check_for_staller(game);
+                    return self.execute_step(game, rng)
+                        .with_event(GameEvent::PlayerAction { player_id: player_id.clone(), action: PlayerAction::BlackInk });
+                }
                 if *player_action == PlayerActionChoice::Treacherous {
                     game.original_bombardier = None;
                     util_server_steps::change_player_action(game, player_id, PlayerAction::PassMove, false);
@@ -299,6 +332,11 @@ impl Step for StepInitSelecting {
                         Some(PlayerAction::CatchOfTheDay)
                     } else if props.contains(&NP::CAN_BLAST_REMOTE_PLAYER) {
                         Some(PlayerAction::ThenIStartedBlastin)
+                    } else if props.contains(&NP::CAN_GAZE_AUTOMATICALLY) {
+                        // Java :399 — Black Ink sits later in the chain, after canAddBlockDie.
+                        Some(PlayerAction::BlackInk)
+                    } else if props.contains(&NP::CAN_GAZE_AUTOMATICALLY_THREE_SQUARES_AWAY) {
+                        Some(PlayerAction::AutoGazeZoat)
                     } else {
                         None
                     };

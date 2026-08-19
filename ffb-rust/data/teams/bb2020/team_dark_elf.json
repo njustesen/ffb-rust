@@ -12,7 +12,7 @@
   "team_value": 1085000,
   "players": [
     {
-      "nr": 1,
+      "nr": 11,
       "position_id": "darkelf.witchelf"
     },
     {
@@ -67,7 +67,7 @@
       "star_id": "39465"
     },
     {
-      "nr": 11,
+      "nr": 1,
       "star_id": "54496"
     }
   ]
