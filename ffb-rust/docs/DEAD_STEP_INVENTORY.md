@@ -79,6 +79,15 @@ a GENERATOR name; its sequence dispatches EndTurn/other ids).
 misses it), `CloudBurster` (live in bb2020 interceptions; needs a Cloud Burster carrier passing
 long — see the interception campaign).
 
+**2026-08-19 §9 additions — LIVE in the parity matrices, missed by the 3-seed uniform sweep:**
+`HailMaryPass` (dwarf bb2016 4 dispatches/100 via the drafted Barik Farblast, and bb2025 elf's
+roster-native HMP — this one surfaced TWO engine bugs at the full gate), `Treacherous`
+(renegades bb2020, 3 stabs/100 via Hakflem), `BlackInk` (dark_elf bb2020, 130 gazes/100 via
+LOS-Kiroth). All three are declared/driven through the CLIENT_USE_SKILL channel or the
+HAIL_MARY_PASS declaration route; sweep count stays 137/199 because their triggers are too rare
+at 3 seeds. Still genuinely dead: the Multiple Block family (+DispatchDumpOff), the scoring-gated
+five, the bb2025 star specials (no data drafted yet), and the plumbing ids.
+
 ---
 
 # Never-dispatched step inventory (2026-08-18)
