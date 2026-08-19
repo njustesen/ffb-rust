@@ -48,11 +48,11 @@
       "position_id": "darkelf.lineman"
     },
     {
-      "nr": 10,
+      "nr": 13,
       "position_id": "darkelf.lineman"
     },
     {
-      "nr": 11,
+      "nr": 14,
       "position_id": "darkelf.lineman"
     },
     {
@@ -60,5 +60,15 @@
       "position_id": "darkelf.lineman"
     }
   ],
-  "special_rules": []
+  "special_rules": [],
+  "stars": [
+    {
+      "nr": 10,
+      "star_id": "39465"
+    },
+    {
+      "nr": 11,
+      "star_id": "54496"
+    }
+  ]
 }

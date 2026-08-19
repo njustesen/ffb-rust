@@ -52,7 +52,7 @@
       "position_id": "37724"
     },
     {
-      "nr": 11,
+      "nr": 13,
       "position_id": "37724"
     },
     {
@@ -60,5 +60,11 @@
       "position_id": "37724"
     }
   ],
-  "special_rules": []
+  "special_rules": [],
+  "stars": [
+    {
+      "nr": 11,
+      "star_id": "39464"
+    }
+  ]
 }
