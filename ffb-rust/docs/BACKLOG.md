@@ -732,6 +732,37 @@ Method (per the old inventory + docs/COVERAGE_REPORT.md):
       drafts it (none do). Parity-event headline: 1,238 THROW_BOMB actions per 300 goblin games
       across the three editions (was 0 forever). Goblin 3×100 smoke before commit: see below.
 
+## 8. Uniform agent: HitAndRun + Kick Team-Mate (USER-SELECTED 2026-08-19)
+
+Goal: the two "uniform-agent gap" buckets from the §7 inventory — Hit-and-Run and the KTM family
+are LIVE, parity-verified mechanics that the uniform sweep cannot reach. Coverage-tool-only tier:
+no parity-path changes expected, but uniform_agent.rs lives in ffb-engine, so the goblin 3×100
+smoke gates the commit as usual.
+
+Found so far:
+- **HitAndRun root cause (confirmed in code):** uniform's `SkillUse` answer hardcodes
+  `UseSkill { skill_id: SkillId::Block }`. `StepEndBlocking::handle_command` matches the answer's
+  skill_id (`SkillId::HitAndRun` sets `use_hit_and_run`; anything else falls into the
+  add-block-die arm), so the Hit-and-Run offer is never answered and the step re-prompts.
+  Fix: resolve the prompt's `skill_name` via `SkillId::from_class_name` (the prompt sends the
+  Debug name, which normalizes) and echo it; fall back to Block.
+- **KTM hypothesis:** only ogre bb2020/bb2025 rosters carry Kick Team-Mate → a 3-seed sweep has
+  6 candidate games. Deep ogre-only uniform run (bb2025, 30 seeds) in flight to decide
+  agent-gap vs seed-depth-artifact before changing anything.
+
+- [x] SkillUse echo fixed (resolve skill_name via `SkillId::from_class_name`, fall back Block);
+      regression test `skill_use_answer_echoes_the_offered_skill`. Amazon bb2020 uniform 10
+      seeds → 6 `HitAndRun` dispatches (was 0 everywhere, forever).
+- [x] KTM resolved as a RECLASSIFICATION: the dedicated KTM StepIds are dispatched only by the
+      bb2016 generator; bb2020/bb2025 kicks ride the shared TTM sequence with IsKickedPlayer
+      (probe: 318 offers / 7 picks, kicks execute as InitThrowTeamMate; ogre bb2025 seed 1 parity
+      events carry 12 KickTeamMate actions). No bb2016 roster drafts the skill →
+      needs-specific-roster. Probes removed, diffs verified clean.
+- [x] TTM/KTM staleness filters ported into uniform's live_actions (bb2025 ttm_used; bb2016/
+      bb2020 also pass_used; kick: bb2016 blitz_used, else ktm_used).
+- [x] Round-2 sweep: **137/199 reached, 62 dead** — HitAndRun newly reached, nothing lost.
+      Inventory updated. Goblin 3×100 smoke + commit+push below.
+
 ## Blocked — needs a tier decision from the user
 
 - **Punt.** Plumbing is correct and dark_elf bb2025 is 100/100, but `InitPunt` dispatches zero times:

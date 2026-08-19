@@ -145,6 +145,25 @@ impl Agent for UniformAgent {
                     PlayerAction::Pass => !td.pass_used,
                     PlayerAction::HandOver => !td.hand_over_used,
                     PlayerAction::Foul => !td.foul_used,
+                    // Staleness filters mirrored from RandomAgent/ParityRunner.filterStaleActions:
+                    // TTM/KTM are once per team turn, and BB2016/BB2020 spend the team's PASS on a
+                    // throw (BB2016 spends the BLITZ on a kick). The turn-start snapshot can still
+                    // offer a second one after the first lands; the engine rejects the stale
+                    // declaration, wasting the activation.
+                    PlayerAction::ThrowTeamMate => {
+                        if gs.game.rules == ffb_model::enums::Rules::Bb2025 {
+                            !td.ttm_used
+                        } else {
+                            !td.ttm_used && !td.pass_used
+                        }
+                    }
+                    PlayerAction::KickTeamMate => {
+                        if gs.game.rules == ffb_model::enums::Rules::Bb2016 {
+                            !td.blitz_used
+                        } else {
+                            !td.ktm_used
+                        }
+                    }
                     _ => true,
                 }).cloned().collect();
                 if live_actions.is_empty() {
@@ -241,8 +260,18 @@ impl Agent for UniformAgent {
                 Action::BlockChoice { die_index: 0, target_id: None }
             }
             Some(AgentPrompt::ReRollOffer { .. }) => Action::UseReRoll { use_reroll: self.pick_bool() },
-            Some(AgentPrompt::SkillUse { .. }) =>
-                Action::UseSkill { skill_id: ffb_model::enums::SkillId::Block, use_skill: self.pick_bool() },
+            // The answer must ECHO the offered skill: StepEndBlocking::handle_command matches
+            // the answer's skill_id (HitAndRun sets use_hit_and_run, PutridRegurgitation sets
+            // use_putrid_regurgitation; anything else falls into the add-block-die arm), so the
+            // old hardcoded SkillId::Block could never answer a Hit-and-Run offer — the step
+            // re-prompted forever and `step=HitAndRun` stayed at ZERO in every uniform sweep
+            // while the mechanic ran fine under the parity agent (which echoes by skill_name).
+            // The prompt's skill_name is the Debug variant name, which from_class_name resolves.
+            Some(AgentPrompt::SkillUse { skill_name, .. }) => {
+                let skill_id = ffb_model::enums::SkillId::from_class_name(skill_name)
+                    .unwrap_or(ffb_model::enums::SkillId::Block);
+                Action::UseSkill { skill_id, use_skill: self.pick_bool() }
+            }
             Some(AgentPrompt::PilingOn { .. }) =>
                 Action::UseSkill { skill_id: ffb_model::enums::SkillId::Block, use_skill: self.pick_bool() },
             Some(AgentPrompt::ApothecaryChoice { player_id, .. }) =>
@@ -512,6 +541,28 @@ mod tests {
     /// lines across all 87 matchups. That silently understated every coverage number this agent
     /// reports — its entire purpose. (Same shape as the parity agent's Kick Team-Mate bug: an agent
     /// declaring an action it never supplies a target for.)
+    /// The SkillUse answer must echo the OFFERED skill's id. StepEndBlocking matches the
+    /// answer's skill_id — SkillId::HitAndRun sets `use_hit_and_run`, anything else falls into
+    /// the add-block-die arm — so the old hardcoded SkillId::Block answer left the Hit-and-Run
+    /// offer unanswered and the step re-prompted forever: `step=HitAndRun` was ZERO in every
+    /// uniform sweep while the mechanic ran fine under the parity agent.
+    #[test]
+    fn skill_use_answer_echoes_the_offered_skill() {
+        use ffb_model::enums::SkillId;
+        let mut gs = new_game(3);
+        gs.pending_prompt = Some(AgentPrompt::SkillUse {
+            player_id: "p1".into(),
+            skill_id: SkillId::HitAndRun as u16,
+            skill_name: format!("{:?}", SkillId::HitAndRun),
+        });
+        let mut agent = UniformAgent::new(3);
+        match agent.act(&gs) {
+            Action::UseSkill { skill_id, .. } => assert_eq!(skill_id, SkillId::HitAndRun,
+                "the answer must carry the offered skill, not a hardcoded Block"),
+            other => panic!("expected UseSkill, got {other:?}"),
+        }
+    }
+
     #[test]
     fn throw_team_mate_declaration_carries_the_thrown_player() {
         use ffb_model::enums::{PlayerAction, PS_STANDING, PlayerState, SkillId};

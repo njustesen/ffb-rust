@@ -7,11 +7,26 @@ Method identical to the 2026-08-18 sweep below: `FFB_DRIVE_TRACE=1 --uniform --a
 — the exact TTM bug shape from Finding 1 below — and a BombRethrow answer of EndTurn, which the
 `thrower==null` early return can never accept).
 
-| | 2026-08-18 | **2026-08-19** |
-|---|---|---|
-| StepId variants | 199 | 199 |
-| reached by the uniform sweep | 130 | **136** |
-| never reached | 69 | **63** |
+| | 2026-08-18 | 2026-08-19 am | **2026-08-19 pm** |
+|---|---|---|---|
+| StepId variants | 199 | 199 | 199 |
+| reached by the uniform sweep | 130 | 136 | **137** |
+| never reached | 69 | 63 | **62** |
+
+**2026-08-19 pm re-sweep** after two §8 findings:
+- **HitAndRun REACHED.** Root cause was the uniform agent's `SkillUse` answer hardcoding
+  `SkillId::Block`: `StepEndBlocking::handle_command` matches the answer's skill_id (HitAndRun
+  sets `use_hit_and_run`; anything else falls into the add-block-die arm), so the Hit-and-Run
+  offer was never answered and the step re-prompted. The answer now echoes the offered skill via
+  `SkillId::from_class_name(skill_name)`. Fixed in the same commit as this update.
+- **The KTM family is RECLASSIFIED, not fixed.** `InitKickTeamMate` / `KickTeamMate` /
+  `KickTeamMateDoubleRolled` / `EndKickTeamMate` are dispatched ONLY by the **bb2016** generator
+  (`generator/bb2016/kick_team_mate.rs`); bb2020/bb2025 kicks ride the SHARED Throw-Team-Mate
+  sequence with `IsKickedPlayer(true)` — a probe run showed uniform ogre bb2025 kicks executing
+  as `InitThrowTeamMate` (318 offers / 7 picks, and the parity events record 12 KickTeamMate
+  actions in ogre bb2025 seed 1 alone). The mechanic is LIVE; the dedicated ids are unreachable
+  because **no bb2016 roster drafts Kick Team-Mate** (only ogre bb2020/bb2025 carry it) →
+  needs-specific-roster, not an agent gap.
 
 Newly reached: the ENTIRE bomb family (`Bombardier`, `InitBomb`, `ResolveBomb`, `EndBomb`,
 `SpecialEffect`, `RecheckExplodeSkill`) plus `Intercept` and `SafeThrow` — all made live by the
@@ -24,10 +39,10 @@ per 300 goblin games** (three editions × 100 seeds) where every prior matrix ha
 `AssignTouchdowns InitPunt EndPunt PuntDirection PuntDistance` — Punt needs a turn-start ball
 carrier; AssignTouchdowns needs a touchdown.
 
-**Uniform-agent gaps (same shape as the TTM/bomb findings — the agent never *declares* it):**
-`HitAndRun InitKickTeamMate EndKickTeamMate KickTeamMate KickTeamMateDoubleRolled` — Hit-and-Run
-and Kick Team-Mate are LIVE, parity-verified mechanics under the parity agent; the uniform agent
-does not drive them. Candidate quick wins if the uniform tool's coverage number matters.
+**Uniform-agent gaps — RESOLVED 2026-08-19 pm (see table note above):**
+`HitAndRun` fixed (SkillUse echo); `InitKickTeamMate EndKickTeamMate KickTeamMate
+KickTeamMateDoubleRolled` reclassified to needs-specific-roster (bb2016-only ids; no bb2016
+roster drafts the skill — bb2020/bb2025 kicks run live through the shared TTM steps).
 
 **Needs a specific star/skill/inducement the parity teams do not draft:**
 `AllYouCanEat AutoGazeZoat BalefulHex BlackInk CatchOfTheDay DispatchDumpOff DoubleStrength
