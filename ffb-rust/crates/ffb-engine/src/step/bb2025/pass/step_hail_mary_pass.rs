@@ -169,12 +169,53 @@ impl StepHailMaryPass {
         // headless: Safe Pass dialog (dontDropFumbles) -- Phase ZT
         // When wired, using_safe_pass == Some(true) marks FUMBLE as SAVED_FUMBLE.
 
-        let is_fumble = self.roll == 1;
-        self.saved_fumble = is_fumble && self.using_safe_pass == Some(true);
+        // Java PassBehaviour(bb2025) :146-149: the roll is evaluated through the REAL pass
+        // mechanic against LONG_BOMB + the live modifiers — a roll whose modified result is <= 1
+        // is a FUMBLE even when the die is not a 1 (elf bb2025 seed 8 i=243: roll 5 under Very
+        // Sunny fumbled in Java; the old `roll == 1` shortcut called it INACCURATE and
+        // triple-scattered instead of bouncing at the thrower). ACCURATE converts to INACCURATE
+        // (a Hail Mary always deviates); the minimum reported/offered to the reroll dialog is
+        // Java :148's explicit `max(2, 2 + distance.mod2020 + sum(mods))`.
+        let (raw_result, java_min) = {
+            let thrower = game.thrower_id.clone().and_then(|id| game.player(&id)).cloned();
+            match thrower {
+                Some(t) => {
+                    let factory = PassModifierFactory::for_rules(game.rules);
+                    let ctx = PassContext::new(game, &t, PassingDistance::LongBomb, false);
+                    let mut modifiers: Vec<ffb_mechanics::modifiers::PassModifier> = factory.find_modifiers(&ctx)
+                        .into_iter()
+                        .map(|m| ffb_mechanics::modifiers::PassModifier::with_report(
+                            m.get_name(), m.get_report_string(), m.get_modifier(), m.get_type(),
+                        ))
+                        .collect();
+                    modifiers.extend(factory.find_card_modifiers(&ctx));
+                    let bomb_action = game.thrower_action
+                        == Some(ffb_model::enums::PlayerAction::HailMaryBomb);
+                    let mechanic = crate::mechanic::pass_mechanic_for(game.rules);
+                    let raw = mechanic.evaluate_pass_simple(
+                        &t, self.roll, PassingDistance::LongBomb, &modifiers, bomb_action);
+                    let min = std::cmp::max(2, 2 + PassingDistance::LongBomb.modifier_2020()
+                        + modifiers.iter().map(|m| m.get_modifier()).sum::<i32>());
+                    (raw, min)
+                }
+                None => (ffb_mechanics::pass_result::PassResult::FUMBLE, self.minimum_roll),
+            }
+        };
+        self.minimum_roll = java_min;
+        let is_fumble = matches!(raw_result,
+            ffb_mechanics::pass_result::PassResult::FUMBLE
+            | ffb_mechanics::pass_result::PassResult::SAVED_FUMBLE);
+        self.saved_fumble = raw_result == ffb_mechanics::pass_result::PassResult::SAVED_FUMBLE
+            || (is_fumble && self.using_safe_pass == Some(true));
 
-        // Java: AbstractStepWithReRoll — offer a re-roll on a fumbled roll not saved by Safe
-        // Pass, but only if this step hasn't already consumed one this action.
+        // Java PassBehaviour :159-176 — fumble reroll cascade: a skill reroll source for PASS
+        // (the Pass skill dialog, auto-used by both harnesses) FIRST, then the team reroll offer.
         if is_fumble && !self.saved_fumble && self.re_rolled_action.is_none() {
+            if let Some(source) = crate::step::abstract_step_with_re_roll::find_skill_reroll_source(game, REROLLED_ACTION_PASS) {
+                self.re_rolled_action = Some(REROLLED_ACTION_PASS.into());
+                self.re_roll_source = Some(source.name.clone());
+                return self.execute_step(game, rng);
+            }
             if let Some(prompt) = ask_for_reroll_if_available(game, REROLLED_ACTION_PASS, self.minimum_roll, true) {
                 self.re_rolled_action = Some(REROLLED_ACTION_PASS.into());
                 self.re_roll_source = Some("TRR".into());
@@ -206,13 +247,46 @@ impl StepHailMaryPass {
             None,      // stat_based_roll_modifier
         ));
 
+        // Java PassBehaviour :188-217 — the ball placement follows the result:
+        //   SAVED_FUMBLE → ball at the THROWER, not moving, GOTO;
+        //   FUMBLE       → ball at the THROWER (moving), publish SCATTER_BALL mode, GOTO;
+        //   INACCURATE   → ball at the PASS COORDINATE (MissedPass scatters from there), NEXT.
+        // Note the ball is relocated to the thrower even when the thrower did not carry it —
+        // the turn-start snapshot can offer a Hail Mary to a player who has since lost the ball,
+        // and Java still drops THE ball at the thrower (elf bb2025 seed 83 i=75).
+        let thrower_coord = game.thrower_id.as_deref()
+            .and_then(|id| game.field_model.player_coordinate(id));
+        let is_bomb = game.thrower_action == Some(ffb_model::enums::PlayerAction::HailMaryBomb);
         let label = self.goto_label_on_failure.clone();
-        if is_fumble {
-            // FUMBLE or SAVED_FUMBLE -> GOTO_LABEL
+        if is_fumble && self.saved_fumble {
+            if is_bomb {
+                game.field_model.bomb_coordinate = None;
+                game.field_model.bomb_moving = false;
+            } else {
+                game.field_model.ball_coordinate = thrower_coord;
+                game.field_model.ball_moving = false;
+            }
             StepOutcome::goto(&label)
-                .publish(StepParameter::PassFumble(!self.saved_fumble))
+                .publish(StepParameter::PassFumble(false))
+        } else if is_fumble {
+            if is_bomb {
+                game.field_model.bomb_coordinate = thrower_coord;
+                StepOutcome::goto(&label)
+                    .publish(StepParameter::PassFumble(true))
+            } else {
+                game.field_model.ball_coordinate = thrower_coord;
+                StepOutcome::goto(&label)
+                    .publish(StepParameter::PassFumble(true))
+                    .publish(StepParameter::CatchScatterThrowInMode(
+                        ffb_model::model::catch_scatter_throw_in_mode::CatchScatterThrowInMode::ScatterBall))
+            }
         } else {
-            // INACCURATE (roll 2-3) or ACCURATE converted to INACCURATE (roll 4+) -> NEXT_STEP
+            if is_bomb {
+                game.field_model.bomb_coordinate = thrower_coord;
+                game.field_model.bomb_moving = false;
+            } else {
+                game.field_model.ball_coordinate = game.pass_coordinate;
+            }
             StepOutcome::next()
                 .publish(StepParameter::PassFumble(false))
         }
@@ -251,9 +325,12 @@ mod tests {
     }
 
     #[test]
-    fn roll_4_or_higher_routes_to_next_step() {
-        for roll in [4, 5, 6] {
-            let mut game = make_game();
+    fn roll_5_or_higher_routes_to_next_step_for_pa2_thrower() {
+        // Java PassBehaviour :146-149 evaluates through the mechanic: PA2+ thrower, Long Bomb
+        // (modifier_2020 = 3): roll r → modified r-3; ACCURATE (→Inaccurate) needs r-3 >= 2 or
+        // a natural 6. Rolls 5 and 6 route to NextStep.
+        for roll in [5, 6] {
+            let mut game = make_game_with_thrower(2);
             let mut step = StepHailMaryPass::new("fail".into());
             step.roll = roll;
             let out = step.start(&mut game, &mut GameRng::new(0));
@@ -263,20 +340,22 @@ mod tests {
     }
 
     #[test]
-    fn roll_2_or_3_inaccurate_routes_to_next_step() {
-        // Java routing: INACCURATE -> NEXT_STEP (not GOTO_LABEL)
-        for roll in [2, 3] {
-            let mut game = make_game();
+    fn modified_result_of_one_or_less_is_a_fumble() {
+        // The elf bb2025 seed 8 lesson: a die that is not a 1 still FUMBLES when the modified
+        // result is <= 1 (Java bb2025 PassMechanic.evaluatePass). PA2 Long Bomb: rolls 2-4
+        // modify to <= 1 → FUMBLE → GOTO_LABEL.
+        for roll in [2, 3, 4] {
+            let mut game = make_game_with_thrower(2);
             let mut step = StepHailMaryPass::new("fail".into());
             step.roll = roll;
             let out = step.start(&mut game, &mut GameRng::new(0));
-            assert_eq!(out.action, StepAction::NextStep, "roll {} (INACCURATE) should route to NextStep", roll);
+            assert_eq!(out.action, StepAction::GotoLabel, "roll {} (modified <= 1) must FUMBLE", roll);
         }
     }
 
     #[test]
     fn roll_1_fumble_goto_failure_publishes_pass_fumble_true() {
-        let mut game = make_game();
+        let mut game = make_game_with_thrower(2);
         let mut step = StepHailMaryPass::new("fail".into());
         step.roll = 1;
         let out = step.start(&mut game, &mut GameRng::new(0));
@@ -289,7 +368,7 @@ mod tests {
     #[test]
     fn roll_1_with_safe_pass_is_saved_fumble_goto_label() {
         // SAVED_FUMBLE -> GOTO_LABEL (not NEXT_STEP), PassFumble(false)
-        let mut game = make_game();
+        let mut game = make_game_with_thrower(2);
         let mut step = StepHailMaryPass::new("fail".into());
         step.roll = 1;
         step.using_safe_pass = Some(true);
@@ -303,12 +382,33 @@ mod tests {
     #[test]
     fn accurate_roll_result_stored_as_inaccurate() {
         // Java line 149: ACCURATE -> INACCURATE conversion
-        let mut game = make_game();
+        let mut game = make_game_with_thrower(2);
         let mut step = StepHailMaryPass::new("fail".into());
         step.roll = 5;
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(step.result, Some(PassOutcome::Inaccurate),
             "ACCURATE roll should be stored as Inaccurate per Java line 149");
+    }
+
+    /// The elf seed 83 shape: a fumbled HMP by a Pass-skill thrower must consume the SKILL
+    /// reroll (Java PassBehaviour :163-172 shows the Pass dialog; both harnesses auto-use) and
+    /// roll a SECOND die.
+    #[test]
+    fn fumbled_hmp_uses_the_pass_skill_reroll_and_rolls_again() {
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = make_game_with_thrower(2);
+        if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == "thrower") {
+            p.starting_skills = vec![SkillWithValue::new(SkillId::Pass)];
+        }
+        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.acting_player.player_id = Some("thrower".into());
+        game.acting_player.player_action = Some(ffb_model::enums::PlayerAction::HailMaryPass);
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.roll = 2; // modified 2-3 <= 1 → FUMBLE for the PA2 thrower
+        let _ = step.start(&mut game, &mut GameRng::new(7));
+        assert_eq!(step.re_rolled_action.as_deref(), Some("PASS"),
+            "the fumble must trigger the reroll cascade");
+        assert_ne!(step.roll, 2, "the skill reroll must produce a fresh roll");
     }
 
     #[test]
@@ -320,7 +420,7 @@ mod tests {
 
     #[test]
     fn roll_cached_not_re_rolled() {
-        let mut game = make_game();
+        let mut game = make_game_with_thrower(2);
         let mut step = StepHailMaryPass::new("fail".into());
         step.roll = 6;
         let out = step.start(&mut game, &mut GameRng::new(0));
@@ -362,7 +462,7 @@ mod tests {
     #[test]
     fn accurate_roll_emits_pass_roll_report() {
         use ffb_model::report::report_id::ReportId;
-        let mut game = make_game();
+        let mut game = make_game_with_thrower(2);
         let mut step = StepHailMaryPass::new("fail".into());
         step.roll = 5;
         step.start(&mut game, &mut GameRng::new(0));
@@ -372,7 +472,7 @@ mod tests {
     #[test]
     fn fumble_roll_emits_pass_roll_report() {
         use ffb_model::report::report_id::ReportId;
-        let mut game = make_game();
+        let mut game = make_game_with_thrower(2);
         let mut step = StepHailMaryPass::new("fail".into());
         step.roll = 1;
         step.start(&mut game, &mut GameRng::new(0));
@@ -381,9 +481,9 @@ mod tests {
 
     #[test]
     fn pass_fumble_false_for_inaccurate_roll() {
-        let mut game = make_game();
+        let mut game = make_game_with_thrower(2);
         let mut step = StepHailMaryPass::new("fail".into());
-        step.roll = 3;
+        step.roll = 5;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassFumble(false))));
     }

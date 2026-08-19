@@ -199,7 +199,12 @@ impl Step for StepCatchScatterThrowIn {
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
-            StepParameter::CatcherId(v) => { self.catcher_id = v.clone(); true }
+            // NO CatcherId arm: Java's setParameter accepts only CATCH_SCATTER_THROW_IN_MODE and
+            // THROW_IN_COORDINATE — fCatcherId comes from its own dialogs or playerUnderBall
+            // (:299). Accepting the published CATCHER_ID (bug shape #5, extra clause) kept the
+            // PASS's intended receiver as a stale catcher: an inaccurate Hail Mary scattered to
+            // (11,7) was then "caught" by the original target standing at (10,7) — the ball
+            // teleported into a square it never visited (elf bb2025 seed 34 i=26).
             StepParameter::KickoffBounds(v) => { self.scatter_bounds = *v; true }
             StepParameter::CatchScatterThrowInMode(v) => {
                 self.catch_scatter_throw_in_mode = Some(*v);

@@ -862,7 +862,22 @@ Facts so far:
       re-fires CONFIRM_END_ACTION forever (Java 2M-iteration hang); (c) contract: in PASS_BLOCK
       mode both harnesses shrink the action list to MOVE+Treacherous+BlackInk (Rust agent filter
       + ParityRunner filterStaleActions early-return, PASS_BLOCK only).
-- [ ] Then batch the rest, edition-correct; full gate 30/30/30; update inventory; commit+push.
+- [x] **FULL GATE 30/30/30 in ALL THREE EDITIONS** (2026-08-19; bb2016 30/30, bb2020 30/30,
+      bb2025 29/30 in the matrix run + elf re-measured 100/100 after two engine fixes the gate
+      itself surfaced — the drafted stars + HMP route made bb2025 elf's roster-native Hail Mary
+      Pass live for the first time):
+      (a) Rust bb2025 StepHailMaryPass used the `roll==1` fumble shortcut; Java evaluates through
+      the REAL pass mechanic (modified result ≤ 1 = FUMBLE — roll 5 under Very Sunny fumbles),
+      with the Pass-skill/team reroll cascade and Java :188-217's ball placement (a fumbled HMP
+      drops THE ball at the thrower even when he never carried it — the turn-start snapshot can
+      offer HMP to a player who lost the ball).
+      (b) Rust StepCatchScatterThrowIn accepted the published CATCHER_ID (Java's setParameter
+      does NOT — fCatcherId comes from its own dialogs or playerUnderBall) — the stale intended
+      receiver "caught" a scattered ball in a square it never visited (bug shape #5).
+      Catch-path regressions green: elf 100/100, human/goblin bb2025 30/30, dwarf bb2016 30/30,
+      dark_elf bb2020 30/30.
+- [ ] Batch the remaining specials (needs bb2025 star DATA drafted from rules/star_players; Pro
+      reroll route; Horkon Multiple Block) — NEXT-TIER DECISION for the user.
 
 ## Blocked — needs a tier decision from the user
 
