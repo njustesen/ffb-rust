@@ -435,7 +435,7 @@ Work in this order; each needs the trigger verified as reachable *before* any ha
 
 ---
 
-## 5. Bomb chain — REOPENED and largely solved (IN PROGRESS, uncommitted)
+## 5. Bomb chain — ✅ COMPLETE 2026-08-19 (`7fa7b7ad` + ffb `bae96fcd2`), matrix 30/30/30
 
 The user chose the "phase-2 declaration route". **It is answered**, and the answer was not what the
 question assumed:
@@ -589,7 +589,12 @@ executes in BOTH engines (it had never executed in either). Workspace 14,540 pas
         list makes the ignores clause swallow the bb2016 flip. Tests:
         `same_team_ball_and_chain_block_flips_assist_marking`, `eligible_players_excludes_boxed_standing_player`.
       All probes removed (diff-verified); workspace 14,546 / 0.
-- [ ] **FULL MATRIX GATE running in background** (bash id `brkw294vp`,
+- [x] **FULL MATRIX GATE PASSED 2026-08-19: 30 green/0 red in bb2016, bb2020 AND bb2025 at seeds
+      1-100.** COMMITTED AND PUSHED per the user's directive: ffb-rust `7fa7b7ad` (30 files,
+      the whole §5 campaign); ffb repo `bae96fcd2` on branch `t3-phase2-wip` (ParityRunner only —
+      the other 7 modified files there remain local tracing diffs, as before). §5 is COMPLETE:
+      THROW_BOMB is a live, parity-verified mechanic in all three editions for the first time.
+- [x] (was: gate running) (bash id `brkw294vp`,
       output `...\scratchpad\gate_final.txt` via tasks output). At 30/30/30: COMMIT AND PUSH per
       the user's directive — ffb-rust changes in one commit (or a few logical ones); the
       ParityRunner.java + Xoshiro/etc harness changes stay in the ffb repo (commit only
