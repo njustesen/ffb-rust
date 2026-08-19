@@ -1,3 +1,68 @@
+# Never-dispatched step inventory — RE-MEASURED 2026-08-19
+
+Method identical to the 2026-08-18 sweep below: `FFB_DRIVE_TRACE=1 --uniform --all-rosters
+--all-editions --seeds 1-3 --no-abort` (261 games, Rust-only), `DRIVE step=` lines vs the 199
+`StepId` variants. Run AFTER the bomb-chain campaign (`7fa7b7ad`) and the ACTIVE-bit hash
+(`04aef090`), and after fixing two uniform-agent gaps (a THROW_BOMB declaration with no receiver
+— the exact TTM bug shape from Finding 1 below — and a BombRethrow answer of EndTurn, which the
+`thrower==null` early return can never accept).
+
+| | 2026-08-18 | **2026-08-19** |
+|---|---|---|
+| StepId variants | 199 | 199 |
+| reached by the uniform sweep | 130 | **136** |
+| never reached | 69 | **63** |
+
+Newly reached: the ENTIRE bomb family (`Bombardier`, `InitBomb`, `ResolveBomb`, `EndBomb`,
+`SpecialEffect`, `RecheckExplodeSkill`) plus `Intercept` and `SafeThrow` — all made live by the
+bomb/interception campaigns. Headline from the parity matrices: **1,238 THROW_BOMB activations
+per 300 goblin games** (three editions × 100 seeds) where every prior matrix had exactly zero.
+
+## The 63 still-dead steps, classified
+
+**Needs a SCORING agent (the standing blocked tier):**
+`AssignTouchdowns InitPunt EndPunt PuntDirection PuntDistance` — Punt needs a turn-start ball
+carrier; AssignTouchdowns needs a touchdown.
+
+**Uniform-agent gaps (same shape as the TTM/bomb findings — the agent never *declares* it):**
+`HitAndRun InitKickTeamMate EndKickTeamMate KickTeamMate KickTeamMateDoubleRolled` — Hit-and-Run
+and Kick Team-Mate are LIVE, parity-verified mechanics under the parity agent; the uniform agent
+does not drive them. Candidate quick wins if the uniform tool's coverage number matters.
+
+**Needs a specific star/skill/inducement the parity teams do not draft:**
+`AllYouCanEat AutoGazeZoat BalefulHex BlackInk CatchOfTheDay DispatchDumpOff DoubleStrength
+EatTeamMate HailMaryPass LookIntoMyEyes InitLookIntoMyEyes PileDriver QuickBite RaidingParty
+ThenIStartedBlastin EndThenIStartedBlastin ThrowARock ThrowKeg EndThrowKeg Treacherous
+WeatherMage WisdomOfTheWhiteDwarf Pro` — star-player specials, Dump Off, Hail Mary, Pro, kegs,
+cards. Unreachable until the drafted teams change.
+
+**Needs the Multiple Block skill (no parity roster drafts it):**
+`MultipleBlockFork BlockRollMultiple FoulAppearanceMultiple ApothecaryMultiple
+DauntlessMultiple StateMultipleRolls ReportStabInjury`
+
+**Needs an inducement/card/prayer path the harness declines:**
+`PlayCard Wizard MasterChef FanFactor PrayerRoll` (the harness buys no cards/wizards; FanFactor
+is a bb2016 start-step variant the shared start path does not dispatch).
+
+**Furious Outburst family (bb2025 star):**
+`InitFuriousOutburst FirstMoveFuriousOutburst SecondMoveFuriousOutburst EndFuriousOutburst`
+
+**Blitz/gaze SELECT sub-chain (edition/protocol shape — the folded agents bypass it):**
+`SelectBlitzTarget SelectBlitzTargetEnd SelectGazeTarget SelectGazeTargetEnd` — the harnesses
+declare blitzes as BLITZ (folded target), so the BLITZ_MOVE→BLITZ_SELECT dialog chain never runs;
+bb2020 gaze equivalents likewise (the parity path uses CLIENT_GAZE / GazeSelect instead).
+
+**Plumbing/no-op ids the driver never dispatches by that name:**
+`ConsumeParameter DropActingPlayer EndPlayerAction NoOp RevertEndTurn SetActingPlayerAndTeam
+KickoffScatterRollAskAfter Bombardier2` — sequence-internal or superseded ids (EndPlayerAction is
+a GENERATOR name; its sequence dispatches EndTurn/other ids).
+
+**Known seed-depth stragglers:** `Swoop` (live and parity-verified at deeper seeds; 3-seed sweep
+misses it), `CloudBurster` (live in bb2020 interceptions; needs a Cloud Burster carrier passing
+long — see the interception campaign).
+
+---
+
 # Never-dispatched step inventory (2026-08-18)
 
 Method: extract every `StepId` variant (199), then collect every `step=` line from

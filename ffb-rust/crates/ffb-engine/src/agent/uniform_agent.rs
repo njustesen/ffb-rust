@@ -84,7 +84,21 @@ impl Agent for UniformAgent {
             // Mirrors random_agent: answer the mid-sequence block-target ask by deselecting.
             Some(AgentPrompt::BlockTarget { .. }) => Action::EndPlayerAction,
             // Bomb re-throw window: decline, mirroring ParityRunner's INIT_PASSING case.
-            Some(AgentPrompt::BombRethrow { .. }) => Action::EndTurn,
+            // A decline cannot advance the re-throw park (the thrower==null early return swallows
+            // EndTurn) — the bomb must be thrown, like the parity agent does.
+            Some(AgentPrompt::BombRethrow { player_id }) => {
+                let pid = player_id.clone();
+                let side = if gs.game.home_playing { crate::legal_actions::TeamSide::Home } else { crate::legal_actions::TeamSide::Away };
+                let receivers = legal_pass_receivers(&gs.game, &pid, side);
+                let coord = if receivers.is_empty() {
+                    ffb_model::types::FieldCoordinate::new(self.pick(26) as i32, self.pick(14) as i32 + 1)
+                } else {
+                    let idx = self.pick(receivers.len());
+                    gs.game.field_model.player_coordinate(&receivers[idx])
+                        .expect("legal_pass_receivers returns on-pitch players")
+                };
+                Action::Pass { coord }
+            }
             Some(AgentPrompt::CoinChoice { .. }) => Action::CoinChoice { heads: self.pick_bool() },
             Some(AgentPrompt::ReceiveChoice { .. }) => Action::ReceiveChoice { receive: self.pick_bool() },
             Some(AgentPrompt::KickBall) => {
@@ -153,7 +167,10 @@ impl Agent for UniformAgent {
                         let receivers = legal_handoff_receivers(&gs.game, player_id, side);
                         if receivers.is_empty() { None } else { Some(receivers[self.pick(receivers.len())].clone()) }
                     }
-                    PlayerActionChoice::Pass => {
+                    // ThrowBomb rides the same receiver rule as a pass (mirrors the parity agent
+                    // and ParityRunner's sendConcreteAction) — same bug shape as the TTM arm below:
+                    // without a receiver the declaration deselects and the bomb chain never runs.
+                    PlayerActionChoice::Pass | PlayerActionChoice::ThrowBomb => {
                         let receivers = legal_pass_receivers(&gs.game, player_id, side);
                         if receivers.is_empty() { None } else { Some(receivers[self.pick(receivers.len())].clone()) }
                     }
