@@ -35,7 +35,38 @@ impl ServerUtilPlayer {
             return block_strength;
         }
         let defender_id = game.field_model.player_at(defender_coord);
-        let def_team_home = defender_id.map(|did| game.team_home.has_player(did)).unwrap_or(false);
+        let mut def_team_home = defender_id.map(|did| game.team_home.has_player(did)).unwrap_or(false);
+        // Java ServerUtilPlayer.findBlockStrength same-team clauses (a Ball & Chain player's
+        // compulsory block on a TEAM-MATE):
+        //   if (ignoresAssists && sameTeam) return attackerStrength;
+        //   if (attacker.hasSkillProperty(flipSameTeamOpponentToOtherTeam) && sameTeam)
+        //       defenderTeam = otherTeam(defender);
+        // "team-mates assist b&c ... to gain maximum block dice" — the marked-check for the
+        // assisted player's helpers flips to the OTHER team, so his own team-mates count as
+        // unmarked assists. Missing both, a Fanatic's same-team block rolled 2 dice where Java
+        // rolls 3 (goblin bb2025 seed 64 step 111), silently shifting the stream by one die.
+        {
+            use ffb_model::model::property::NamedProperties;
+            let same_team = attacker_id.zip(defender_id).map(|(a, d)| {
+                game.team_home.has_player(a) == game.team_home.has_player(d)
+            }).unwrap_or(false);
+            if same_team {
+                let assisted = attacker_id.and_then(|aid| game.player(aid));
+                let opponent = defender_id.and_then(|did| game.player(did));
+                // Edition-aware property reads: Ball & Chain registers ignoreBlockAssists only in
+                // bb2020/bb2025 and the flip only in bb2016 — the edition-agnostic union would make
+                // the ignores clause swallow the bb2016 flip.
+                let ignores = assisted.map(|p| p.has_skill_property_in(game.rules, NamedProperties::IGNORE_BLOCK_ASSISTS)).unwrap_or(false)
+                    || opponent.map(|p| p.has_skill_property_in(game.rules, NamedProperties::IGNORE_BLOCK_ASSISTS)).unwrap_or(false);
+                if ignores {
+                    return block_strength;
+                }
+                let flips = assisted.map(|p| p.has_skill_property_in(game.rules, NamedProperties::FLIP_SAME_TEAM_OPPONENT_TO_OTHER_TEAM)).unwrap_or(false);
+                if flips {
+                    def_team_home = !def_team_home;
+                }
+            }
+        }
         for (id, &coord) in &game.field_model.player_coordinates {
             if attacker_id.map(|a| a == id).unwrap_or(false) { continue; }
             let on_att_team = if att_team_home { game.team_home.has_player(id) } else { game.team_away.has_player(id) };
@@ -108,6 +139,39 @@ mod tests {
 
     fn make_game() -> Game {
         Game::new(empty_team("home"), empty_team("away"), Rules::Bb2020)
+    }
+
+    /// Java's same-team clauses: a Ball & Chain attacker (`flipSameTeamOpponentToOtherTeam`)
+    /// blocking a TEAM-MATE flips the marked-team, so his own teammates count as unmarked
+    /// assists — without the flip the same-team helpers "mark" each other and the assist is lost
+    /// (goblin bb2025 seed 64 step 111: a 3-die Fanatic block became 2 dice).
+    #[test]
+    fn same_team_ball_and_chain_block_flips_assist_marking() {
+        use ffb_model::model::SkillWithValue;
+        use ffb_model::enums::SkillId;
+        let mut game = make_game();
+        let mut fanatic = make_player("bc", 1);
+        fanatic.extra_skills.push(SkillWithValue::new(SkillId::BallAndChain));
+        game.team_home.players.push(fanatic);
+        game.team_home.players.push(make_player("victim", 2));
+        game.team_home.players.push(make_player("helper", 3));
+        for (id, x, y) in [("bc", 5, 5), ("victim", 6, 5), ("helper", 6, 6)] {
+            game.field_model.set_player_coordinate(id, FieldCoordinate::new(x, y));
+            game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+        }
+        // bb2020/bb2025 Ball & Chain registers ignoreBlockAssists: the same-team clause
+        // short-circuits to BARE strength — no assists on either side (this is what makes a
+        // ST7 Fanatic's team-mate block 3 dice in bb2025; goblin seed 64 step 111).
+        let st = ServerUtilPlayer::find_block_strength(
+            &game, FieldCoordinate::new(5, 5), 7, FieldCoordinate::new(6, 5));
+        assert_eq!(st, 7, "bb2020+ B&C same-team block ignores assists entirely");
+
+        // bb2016's B&C has NO ignoreBlockAssists but DOES have the flip: the marked-team for the
+        // helper becomes AWAY (empty), so the same-team helper is an unmarked assist: 7 + 1.
+        game.rules = Rules::Bb2016;
+        let st16 = ServerUtilPlayer::find_block_strength(
+            &game, FieldCoordinate::new(5, 5), 7, FieldCoordinate::new(6, 5));
+        assert_eq!(st16, 8, "bb2016 B&C same-team block counts the teammate assist via the flip");
     }
 
     #[test]

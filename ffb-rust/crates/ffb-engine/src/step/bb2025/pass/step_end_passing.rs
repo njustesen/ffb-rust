@@ -28,6 +28,13 @@ use crate::step::generator::bb2025::pass::{Pass, PassParams};
 pub struct StepEndPassing {
     /// Java: fInterceptorId
     pub interceptor_id: Option<String>,
+    /// Java: PassState.interceptionSuccessful — for a BOMB, whether the interception was an
+    /// OUTRIGHT catch (bb2020: only an easy intercept; bb2025: any success). Java's bb2020
+    /// StepIntercept publishes INTERCEPTOR_ID only inside its easyIntercept branch, so a plain
+    /// deflection never hands EndPassing an interceptor; Rust publishes the id unconditionally
+    /// (its ResolvePass needs it in place of Java's shared PassState), so this flag carries the
+    /// distinction instead.
+    pub interception_successful: bool,
     /// Java: fCatcherId
     pub catcher_id: Option<String>,
     /// Java: ballSnatcherId (from PlayerId parameter)
@@ -56,6 +63,7 @@ impl StepEndPassing {
     pub fn new() -> Self {
         Self {
             interceptor_id: None,
+            interception_successful: false,
             catcher_id: None,
             ball_snatcher_id: None,
             pass_accurate: false,
@@ -89,6 +97,10 @@ impl Step for StepEndPassing {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             // Java: consume(parameter) in all cases below
+            StepParameter::InterceptionSuccessful(v) => {
+                self.interception_successful = *v;
+                true
+            }
             StepParameter::InterceptorId(v) => { self.interceptor_id = v.clone(); true }
             StepParameter::CatcherId(v) => { self.catcher_id = v.clone(); true }
             StepParameter::PassAccurate(v) => { self.pass_accurate = *v; true }
@@ -182,7 +194,13 @@ impl StepEndPassing {
         //       else
         //         bombGenerator.pushSequence(new Bomb.SequenceParams(gs, fCatcherId, fPassFumble, dontDropFumble))
         if game.turn_mode.is_bomb_turn() {
-            let catcher_for_bomb = if self.interceptor_id.is_some() {
+            // Java: `if (StringTool.isProvided(fInterceptorId))` — and bb2020's StepIntercept only
+            // publishes INTERCEPTOR_ID for an EASY (outright-catch) intercept of the bomb; a plain
+            // deflection leaves it null, so the Bomb sequence runs catcher-less and the scattered
+            // bomb explodes where it lies. Rust publishes the id for every success (ResolvePass
+            // needs it), so gate on the outright-catch flag here instead (goblin bb2020 seed 45
+            // step 104: a deflected-then-dropped bomb handed the deflector a free re-throw).
+            let catcher_for_bomb = if self.interceptor_id.is_some() && self.interception_successful {
                 self.interceptor_id.clone()
             } else {
                 self.catcher_id.clone()
@@ -211,8 +229,16 @@ impl StepEndPassing {
         }
 
         // Java: completions SPP and passing yards — accurate, non-intercepted pass.
+        // Java additionally requires `UtilPlayer.hasBall(game, catcher)` — a bomb's catcher
+        // never holds the BALL, so an accurate bomb must not award a completion. PassAccurate is
+        // now published for accurate bombs too (StepPass), so this gate carries that exclusion.
+        let thrower_threw_bomb = matches!(
+            game.thrower_action,
+            Some(ffb_model::enums::PlayerAction::ThrowBomb)
+                | Some(ffb_model::enums::PlayerAction::HailMaryBomb)
+        );
         if self.pass_accurate && !self.pass_fumble && self.interceptor_id.is_none()
-            && !game.acting_player.suffering_animosity
+            && !game.acting_player.suffering_animosity && !thrower_threw_bomb
         {
             if let Some(ref thrower_id) = game.thrower_id.clone() {
                 let is_home = game.team_home.has_player(thrower_id);
@@ -558,6 +584,10 @@ mod tests {
         game.turn_mode = TurnMode::BombHome;
         let mut step = StepEndPassing::new();
         step.interceptor_id = Some("i1".into());
+        // Java hands the Bomb sequence the interceptor only when the interception was an
+        // OUTRIGHT catch (bb2020 publishes INTERCEPTOR_ID only for an easy intercept; bb2025 for
+        // any success) — mirrored by the interception_successful gate.
+        step.interception_successful = true;
         step.catcher_id = Some("c1".into());
         let out = step.start(&mut game, &mut GameRng::new(0));
         // bomb sequence init params should contain catcher CatcherId("i1")

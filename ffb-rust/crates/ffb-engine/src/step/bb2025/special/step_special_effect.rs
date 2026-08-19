@@ -190,8 +190,17 @@ impl StepSpecialEffect {
                 outcome = outcome.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
             }
             SpecialEffect::BOMB => {
-                // Sync original_bombardier to game state for apply_to() downstream.
-                game.original_bombardier = self.original_bombardier.clone();
+                // Java reads PassState.getOriginalBombardier() — whose Rust home is
+                // `game.original_bombardier` (set by the shared StepPass on the first throw).
+                // The old code read a `StepParameter::OriginalBombardier` that NOTHING publishes,
+                // so the bomber-hit turnover reset below never fired anywhere, and worse, it
+                // CLOBBERED game.original_bombardier with None here — starving StepEndBomb's
+                // acting-player restore. Prefer the game field; the parameter (if ever delivered)
+                // seeds it.
+                if self.original_bombardier.is_some() {
+                    game.original_bombardier = self.original_bombardier.clone();
+                }
+                let original_bombardier = game.original_bombardier.clone();
 
                 let bomb_from_home = matches!(game.turn_mode, TurnMode::BombHome | TurnMode::BombHomeBlitz);
                 let bomb_from_away = matches!(game.turn_mode, TurnMode::BombAway | TurnMode::BombAwayBlitz);
@@ -201,21 +210,36 @@ impl StepSpecialEffect {
                     || (bomb_from_away && game.team_away.has_player(&player_id));
 
                 // Java: if (!BOMB_TEAM_MATE_KNOCK_DOWN_CAUSES_TURNOVER) → suppressEndTurn = !(playerHitIsFromBombTeam && hasBall)
-                if !is_option_enabled(game, BOMB_TEAM_MATE_KNOCK_DOWN_CAUSES_TURNOVER) {
+                // BB2016's own StepSpecialEffect has NO option logic at all: hitting a player of the
+                // acting team ALWAYS ends the turn (non-fireball). Letting this bb2020+ option run
+                // for bb2016 suppressed that turnover -- goblin bb2016 seed 1 step 32: Java ends the
+                // away turn after the bomb caught its own away_02, Rust kept activating.
+                // BB2020's own StepSpecialEffect computes the suppression UNCONDITIONALLY
+                // (`suppressEndTurn = !(playerHitIsFromBombTeam && hasBall)`, no option read);
+                // only bb2025 gates it on !BOMB_TEAM_MATE_KNOCK_DOWN_CAUSES_TURNOVER (whose factory
+                // default is TRUE, so the bb2025 suppression normally never fires). Applying the
+                // bb2025 gate to bb2020 turned every own-team bomb hit into a turnover Java does
+                // not have (goblin bb2020 seed 10 step 4: Java's away turn continues).
+                let apply_suppression = match game.rules {
+                    ffb_model::enums::Rules::Bb2016 => false,
+                    ffb_model::enums::Rules::Bb2020 => true,
+                    _ => !is_option_enabled(game, BOMB_TEAM_MATE_KNOCK_DOWN_CAUSES_TURNOVER),
+                };
+                if apply_suppression {
                     let has_ball = game.field_model.ball_coordinate
                         .map(|b| b == coord)
                         .unwrap_or(false);
                     suppress_end_turn = !(player_hit_from_bomb_team && has_ball);
                 }
                 // Java: if player == originalBombardier && !bomberTurnoverIgnored → suppressEndTurn=false
-                if let Some(ref orig_id) = self.original_bombardier {
+                if let Some(ref orig_id) = original_bombardier {
                     if &player_id == orig_id && !is_option_enabled(game, BOMBER_PLACED_PRONE_IGNORES_TURNOVER) {
                         suppress_end_turn = false;
                     }
                 }
 
                 // Java: bombardierGetsSpp = bombardier team != player team && bombardier has grantsSppFromSpecialActionsCas
-                let bombardier_id = self.original_bombardier.as_deref();
+                let bombardier_id = original_bombardier.as_deref();
                 let bombardier_gets_spp = bombardier_id.map(|b_id| {
                     game.player(b_id).map(|bombardier| {
                         let bombardier_is_home = game.team_home.has_player(b_id);
@@ -225,34 +249,106 @@ impl StepSpecialEffect {
                     }).unwrap_or(false)
                 }).unwrap_or(false);
 
-                let injury_type_name = if bombardier_gets_spp { "InjuryTypeBombWithModifierForSpp" } else { "InjuryTypeBombWithModifier" };
+                // BB2016 has its own StepSpecialEffect that applies the PLAIN `InjuryTypeBomb`
+                // (bb2020's applies `InjuryTypeBombWithModifier`, bb2025's adds the ForSpp
+                // variant). The driver's glob imports resolve this step for EVERY edition, so a
+                // bb2016 bomb was rolling with the bb2020+ modifier: goblin bb2016 seed 1 step 17
+                // left the thrower Stunned where Java leaves him Prone, and the ball came to rest a
+                // square away. Edition-gate here rather than routing bb2016 to its own twin -- that
+                // twin does not apply the blast at all, and routing it regressed the very first
+                // bomb (step 2, which this shared step already matched).
+                let injury_type_name = if game.rules == ffb_model::enums::Rules::Bb2016 {
+                    "InjuryTypeBomb"
+                } else if bombardier_gets_spp {
+                    "InjuryTypeBombWithModifierForSpp"
+                } else {
+                    "InjuryTypeBombWithModifier"
+                };
                 let attacker_id = if bombardier_gets_spp { bombardier_id } else { None };
                 let ir = handle_injury_by_name(
                     game, rng, injury_type_name,
                     attacker_id, &player_id, coord, None, None, ApothecaryMode::SpecialEffect,
                 );
-                // Java: `new SteadyFootingContext(injuryResult, Collections.singletonList(command))`
-                // where `command = new DropPlayerFromBombCommand(player.getId(), SPECIAL_EFFECT,
-                // true, isActive, suppressEndTurn)`. Bug fix: this deferred command was
-                // previously dropped entirely.
-                let commands: Vec<std::sync::Arc<dyn crate::step::framework::DeferredCommand>> = vec![
-                    std::sync::Arc::new(DropPlayerFromBombCommand::new(
-                        player_id.clone(), ApothecaryMode::SpecialEffect, true, is_active, suppress_end_turn,
-                    )),
-                ];
-                let ctx = SteadyFootingContext::from_injury_result_with_commands(ir, commands);
-                outcome = outcome.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
+                if game.rules == ffb_model::enums::Rules::Bb2020 {
+                    // Java bb2020 StepSpecialEffect also publishes DIRECTLY (no SteadyFooting):
+                    //   publishParameter(INJURY_RESULT, handleInjury(new InjuryTypeBombWithModifier()));
+                    //   parameterSet = dropPlayer(player, SPECIAL_EFFECT, true);
+                    //   restore active on the non-bomber prone/stunned player;
+                    //   if (suppressEndTurn) parameterSet.remove(END_TURN);
+                    //   publishParameters(parameterSet);
+                    // The order matters exactly as in bb2016: the Ball & Chain chain injury is
+                    // published LAST and therefore APPLIED over the bomb's own result (goblin
+                    // bb2020 seed 10 step 4: the bombed Fanatics end Si/Bh from the chain's
+                    // casualty rolls in Java, not the shared-step Ko/Prone). The bb2020 Java class
+                    // has no ForSpp variant, so bombardier_gets_spp is not consulted.
+                    outcome = outcome.publish(StepParameter::InjuryResult(Box::new(ir)));
+                    let params = crate::step::util_server_injury::drop_player_rng(
+                        game, rng, &player_id, true, ApothecaryMode::SpecialEffect,
+                    );
+                    if let Some(new_state) = game.field_model.player_state(&player_id) {
+                        let is_orig_bomber = original_bombardier.as_deref()
+                            .map(|id| id.eq_ignore_ascii_case(&player_id))
+                            .unwrap_or(false);
+                        if !is_orig_bomber && new_state.is_prone_or_stunned() {
+                            game.field_model.set_player_state(&player_id, new_state.change_active(is_active));
+                        }
+                    }
+                    for p in params {
+                        if suppress_end_turn && matches!(p, StepParameter::EndTurn(_)) {
+                            continue;
+                        }
+                        outcome = outcome.publish(p);
+                    }
+                } else if game.rules == ffb_model::enums::Rules::Bb2016 {
+                    // Java bb2016 StepSpecialEffect publishes DIRECTLY, in this order:
+                    //   publishParameter(INJURY_RESULT, handleInjury(new InjuryTypeBomb(), ...));
+                    //   publishParameters(UtilServerInjury.dropPlayer(this, player, SPECIAL_EFFECT));
+                    // — no SteadyFooting, no deferred command. The order matters: dropPlayer's
+                    // Ball & Chain chain injury is published LAST, so the apothecary applies the
+                    // CHAIN result over the bomb's (goblin bb2016 seed 5 step 74: the bombed
+                    // Fanatic ends KO from the chain roll in Java; routing bb2016 through the
+                    // bb2025 SteadyFooting shape published the bomb injury last → Badly Hurt).
+                    outcome = outcome.publish(StepParameter::InjuryResult(Box::new(ir)));
+                    for p in crate::step::util_server_injury::drop_player_rng(
+                        game, rng, &player_id, false, ApothecaryMode::SpecialEffect,
+                    ) {
+                        outcome = outcome.publish(p);
+                    }
+                } else {
+                    // Java (bb2020+): `new SteadyFootingContext(injuryResult,
+                    // Collections.singletonList(command))` where `command =
+                    // new DropPlayerFromBombCommand(player.getId(), SPECIAL_EFFECT, true, isActive,
+                    // suppressEndTurn)`. Bug fix: this deferred command was previously dropped
+                    // entirely.
+                    let commands: Vec<std::sync::Arc<dyn crate::step::framework::DeferredCommand>> = vec![
+                        std::sync::Arc::new(DropPlayerFromBombCommand::new(
+                            player_id.clone(), ApothecaryMode::SpecialEffect, true, is_active, suppress_end_turn,
+                        )),
+                    ];
+                    let ctx = SteadyFootingContext::from_injury_result_with_commands(ir, commands);
+                    outcome = outcome.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
+                }
             }
         }
 
-        // Java: if isStanding { if actingTeam.hasPlayer && effect != FIREBALL && !suppressEndTurn → END_TURN=true }
-        if is_standing {
+        // Java (bb2020+): if isStanding { if actingTeam.hasPlayer && effect != FIREBALL &&
+        // !suppressEndTurn → END_TURN=true }
+        // Java (bb2016): NEITHER the isStanding gate NOR suppressEndTurn exists -- hitting a player
+        // of the acting team with a non-fireball effect ALWAYS ends the turn. Applying the bb2020+
+        // gates to bb2016 swallowed that turnover whenever the player hit was already prone:
+        // goblin bb2016 seed 1 step 32, Java ends the away turn after the bomb caught its own
+        // away_02, Rust kept activating.
+        let is_bb2016 = game.rules == ffb_model::enums::Rules::Bb2016;
+        if is_standing || is_bb2016 {
             let acting_team_has_player = match game.turn_mode {
                 TurnMode::BombHome | TurnMode::BombHomeBlitz => game.team_home.has_player(&player_id),
                 TurnMode::BombAway | TurnMode::BombAwayBlitz => game.team_away.has_player(&player_id),
                 _ => game.active_team().has_player(&player_id),
             };
-            if effect != SpecialEffect::FIREBALL && acting_team_has_player && !suppress_end_turn {
+            if effect != SpecialEffect::FIREBALL
+                && acting_team_has_player
+                && (is_bb2016 || !suppress_end_turn)
+            {
                 outcome = outcome.publish(StepParameter::EndTurn(true));
             }
         }
@@ -458,6 +554,26 @@ mod tests {
         step.roll_for_effect = false;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
+    }
+
+    /// BB2016's StepSpecialEffect has no `isStanding` gate: a bomb that catches a PRONE player of
+    /// the acting team still ends the turn. The bb2020+ gate swallowed that turnover.
+    #[test]
+    fn bb2016_bomb_on_prone_own_team_player_still_publishes_end_turn() {
+        let mut game = make_game();
+        game.rules = ffb_model::enums::Rules::Bb2016;
+        game.home_playing = true;
+        add_home_player(&mut game, "p1");
+        game.field_model.set_player_state("p1", PlayerState::new(ffb_model::enums::PS_PRONE));
+        let mut step = StepSpecialEffect::new("fail".into());
+        step.player_id = Some("p1".into());
+        step.special_effect = Some(SpecialEffect::BOMB);
+        step.roll_for_effect = false;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "bb2016: a bomb hitting the acting team's prone player must still end the turn"
+        );
     }
 
     #[test]

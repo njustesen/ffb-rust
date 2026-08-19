@@ -107,6 +107,9 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             // meant both agents declared a kick and then immediately deselected it, so the mechanic
             // never executed in ANY edition and every matrix was green because of it.
             | PlayerActionChoice::KickTeamMate
+            // THROW_BOMB: declares through the same ClientCommandPass as a pass; ParityRunner
+            // routes it to sendPassAction.
+            | PlayerActionChoice::ThrowBomb
     )
 }
 
@@ -281,6 +284,10 @@ impl Agent for RandomAgent {
                     // TTM, must not re-activate). Restricting to prone let the thrown player act again.
                     let ps = gs.game.field_model.player_state(pid);
                     let is_inactive = ps.map(|s| !s.is_active()).unwrap_or(false);
+                    if std::env::var("FFB_ACT_TRACE").is_ok() {
+                        eprintln!("RUST_ACT_PICK pid={} pick={} N={} inactive={} acts={:?}",
+                            pid, pick, remaining.len()+1, is_inactive, acts);
+                    }
                     if is_inactive {
                         // Rejected: decisionRng already consumed; excluded for the rest of the turn.
                         continue;
@@ -373,13 +380,23 @@ impl Agent for RandomAgent {
                             Some(receivers[ridx].clone())
                         }
                     }
-                    PlayerActionChoice::Pass => {
+                    // ThrowBomb rides the Pass arm: ParityRunner's sendConcreteAction routes
+                    // THROW_BOMB to the very same sendPassAction, so the candidate rule and the
+                    // single actionRng draw must match a pass exactly. Declaring a bomb with no
+                    // target left StepInitPassing parked with an unset thrower and NO prompt, and
+                    // the parity loop breaks silently on a prompt-less park -- the game simply
+                    // ended at the first bomb.
+                    PlayerActionChoice::Pass | PlayerActionChoice::ThrowBomb => {
                         let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
                         let receivers = legal_pass_receivers(&gs.game, player_id, side);
                         if receivers.is_empty() {
                             None
                         } else {
                             let ridx = self.pick_action(receivers.len());
+                            if std::env::var("FFB_ACT_TRACE").is_ok() {
+                                eprintln!("RPASSPICK pid={} n={} idx={} recv={}",
+                                    player_id, receivers.len(), ridx, receivers[ridx]);
+                            }
                             Some(receivers[ridx].clone())
                         }
                     }
@@ -915,6 +932,28 @@ impl Agent for RandomAgent {
             // ignores → the prompt re-fired forever (slann seed 3 half-2 kickoff: NO_PROGRESS → rust=None).
             // Decline like Java's ParityRunner (same pattern as the dark_elf PlayerChoice decline).
             Some(AgentPrompt::SwarmingPlayers { .. }) => Action::SelectPlayer { player_id: String::new() },
+            // Bomb re-throw window (TurnMode Bomb*). StepInitPassing.executeStep returns
+            // immediately while the thrower is unset, so a decline CANNOT advance the step --
+            // EndTurn and deselect both set their flag and are swallowed by that early return.
+            // The bomb must actually be thrown. 1:1 with ParityRunner's INIT_PASSING case, which
+            // calls the ordinary sendPassAction: same candidate rule (all on-pitch teammates,
+            // coordinate-sorted), same single actionRng draw, and the same empty-list fallback of
+            // 2 decisionRng draws for a random square.
+            Some(AgentPrompt::BombRethrow { player_id }) => {
+                let pid = player_id.clone();
+                let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
+                let receivers = legal_pass_receivers(&gs.game, &pid, side);
+                let coord = if receivers.is_empty() {
+                    let x = self.pick(26) as i32;
+                    let y = self.pick(14) as i32 + 1;
+                    ffb_model::types::FieldCoordinate::new(x, y)
+                } else {
+                    let idx = self.pick_action(receivers.len());
+                    gs.game.field_model.player_coordinate(&receivers[idx])
+                        .expect("legal_pass_receivers only returns on-pitch players")
+                };
+                Action::Pass { coord }
+            }
             // Confirm-only and informational prompts: single valid response, 0 RNG consumed.
             Some(AgentPrompt::KickoffReturn { .. })
             | Some(AgentPrompt::SetupError { .. })
@@ -1557,11 +1596,11 @@ mod rng_trace_tests {
             // every kick was declared and instantly deselected, so Kick Team-Mate never executed in
             // ANY edition and the matrices were green because of it.
             PlayerActionChoice::KickTeamMate,
+            PlayerActionChoice::ThrowBomb,
         ] {
             assert!(is_handled_acting_action(pa), "{pa:?} has a sendConcreteAction arm");
         }
         for pa in [
-            PlayerActionChoice::ThrowBomb,
             PlayerActionChoice::Stab,
             PlayerActionChoice::HypnoticGaze,
             PlayerActionChoice::Swoop,

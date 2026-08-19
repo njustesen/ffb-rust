@@ -248,15 +248,23 @@ impl StepPass {
             }
         }
         if is_fumble {
+            let mut out = StepOutcome::next()
+                .publish(StepParameter::PassFumble(true))
+                .publish(StepParameter::CatcherId(None));
             if is_bomb {
                 game.field_model.bomb_coordinate = thrower_coord;
             } else {
                 game.field_model.ball_coordinate = thrower_coord;
+                // Java publishes SCATTER_BALL ONLY in the non-bomb branch. Publishing it for a
+                // fumbled BOMB scattered the actual football (a d8 Java never rolls), which both
+                // moved the ball and shifted every later die by one -- goblin bb2016 seed 1 step 17:
+                // the armour roll landed on Java's next two dice, breaking AV and stunning the
+                // thrower where Java leaves him merely Prone.
+                out = out.publish(StepParameter::CatchScatterThrowInMode(
+                    CatchScatterThrowInMode::ScatterBall,
+                ));
             }
-            return StepOutcome::next()
-                .publish(StepParameter::PassFumble(true))
-                .publish(StepParameter::CatcherId(None))
-                .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall));
+            return out;
         }
         // INACCURATE or WILDLY_INACCURATE
         if is_bomb {

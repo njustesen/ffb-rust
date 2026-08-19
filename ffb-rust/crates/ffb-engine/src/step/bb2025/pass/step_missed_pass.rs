@@ -326,9 +326,14 @@ impl StepMissedPass {
         // Java: passes CatchScatterThrowInMode via publishParameter
         // (In the Java sequence, CATCH_SCATTER_THROW_IN_MODE and THROWIN_COORDINATE are published
         //  by this step when the ball lands out of bounds)
-        if out_of_bounds {
-            // Java: publishParameter(CATCH_SCATTER_THROW_IN_MODE, THROW_IN)
-            // Java: publishParameter(THROWIN_COORDINATE, game.getPassCoordinate())
+        if out_of_bounds && !is_bomb {
+            // Java's bb2020/bb2025 MissedPass publishes NOTHING — the out-of-bounds routing lives
+            // in StepResolvePass, which publishes ThrowIn for a BALL and BombOutOfBounds for a
+            // BOMB. This Rust-side publish stays for the ball path (measured green across all
+            // editions) but must never fire for a bomb: it threw the real ball in from the
+            // touchline after a wildly-inaccurate BOMB sailed out (goblin bb2020 seed 10 step 14:
+            // 4 extra dice — throw-in d8+2d6 + a scatter — and the ball teleported to (7,7)
+            // while Java's bomb simply vanished).
             let mut outcome = StepOutcome::next()
                 .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ThrowIn));
             if let Some(lvc) = self.last_valid_coordinate {

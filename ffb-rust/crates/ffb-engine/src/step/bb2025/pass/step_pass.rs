@@ -321,11 +321,17 @@ impl StepPass {
                 // StepPass to publish — but StepPass only published PassResultParam, so pass_accurate
                 // stayed false and every accurate pass fell through to the missed/inaccurate branch
                 // (CatchScatter, +1 to catch). Publish PassAccurate(true) so the receiver actually
-                // catches an accurate pass (seed 23 i=158). Bombs route through their own accurate
-                // branch, which does not read PassAccurate, so only publish it for a real ball pass.
+                // catches an accurate pass (seed 23 i=158).
+                // Bombs INCLUDED: Java's shared PassState.result == ACCURATE is what routes an
+                // accurate bomb to CATCH_ACCURATE_BOMB in StepResolvePass. Publishing
+                // `!is_bomb` here starved that branch, so an accurately thrown bomb was caught at
+                // +0 instead of the accurate -1 (goblin bb2016 seed 9 step 5: Java's catcher holds
+                // it on a 3, Rust's dropped it and the bomb exploded on the wrong square). The
+                // completion-SPP overcount this flag once protected against is now gated in
+                // StepEndPassing exactly where Java gates it (hasBall(catcher) — never a bomb).
                 StepOutcome::goto(&label)
                     .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Complete))
-                    .publish(StepParameter::PassAccurate(!is_bomb))
+                    .publish(StepParameter::PassAccurate(true))
             }
             PassResult::SAVED_FUMBLE => {
                 // Java: SAVED_FUMBLE routes through the SAME re-roll offers as FUMBLE — the
@@ -413,12 +419,22 @@ impl StepPass {
                         game.field_model.ball_moving = false;
                     }
                 }
-                StepOutcome::next()
+                let mut out = StepOutcome::next()
                     .publish(StepParameter::PassFumble(true))
                     .publish(StepParameter::DontDropFumble(false))
-                    .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall))
                     .publish(StepParameter::CatcherId(None))
-                    .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Fumble))
+                    .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Fumble));
+                // Java publishes SCATTER_BALL ONLY in the non-bomb branch (every edition's StepPass
+                // does). Publishing it for a fumbled BOMB scattered the actual football -- a d8 Java
+                // never rolls -- which both moved the ball and shifted every later die by one:
+                // goblin bb2016 seed 1 step 17, the armour roll landed on Java's next two dice,
+                // breaking AV and stunning the thrower where Java leaves him merely Prone.
+                if !is_bomb {
+                    out = out.publish(StepParameter::CatchScatterThrowInMode(
+                        CatchScatterThrowInMode::ScatterBall,
+                    ));
+                }
+                out
             }
             PassResult::INACCURATE | PassResult::WILDLY_INACCURATE => {
                 // Java: askForReRollIfAvailable before routing to missed pass
@@ -708,6 +724,41 @@ mod tests {
         step.pass_result = Some(PassResult::FUMBLE);
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.field_model.ball_coordinate, Some(FieldCoordinate::new(1, 7)));
+    }
+
+    /// Java publishes CATCH_SCATTER_THROW_IN_MODE=SCATTER_BALL only in the NON-bomb arm of the
+    /// fumble branch. Publishing it for a fumbled bomb scattered the real football (a d8 Java never
+    /// rolls), moving the ball and shifting every later die by one.
+    #[test]
+    fn fumbled_bomb_does_not_publish_scatter_ball() {
+        let mut game = make_game_with_thrower(3);
+        game.thrower_action = Some(ffb_model::enums::PlayerAction::ThrowBomb);
+        let mut step = make_step();
+        step.pass_result = Some(PassResult::FUMBLE);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            !out.published.iter().any(|p| matches!(
+                p,
+                StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall)
+            )),
+            "a fumbled BOMB must not scatter the ball"
+        );
+    }
+
+    /// The same branch must still scatter for an ordinary fumbled pass.
+    #[test]
+    fn fumbled_pass_still_publishes_scatter_ball() {
+        let mut game = make_game_with_thrower(3);
+        let mut step = make_step();
+        step.pass_result = Some(PassResult::FUMBLE);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            out.published.iter().any(|p| matches!(
+                p,
+                StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall)
+            )),
+            "a fumbled PASS must still scatter the ball"
+        );
     }
 
     #[test]

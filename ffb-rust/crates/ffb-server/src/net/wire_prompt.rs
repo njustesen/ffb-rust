@@ -342,6 +342,9 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
         // these purely via TurnMode with no dialog — the GUI client reacts to the mode change
         // itself, so there is no wire dialog to send.
         AgentPrompt::KickoffEventPlacement { .. } => None,
+        // Bomb re-throw window: Java's StepInitPassing shows no dialog either, it simply waits
+        // for a CLIENT_PASS naming the new target, so there is no wire dialog to send.
+        AgentPrompt::BombRethrow { .. } => None,
         AgentPrompt::BuyInducements { team_id, available, budget } =>
             Some(WireDialog::BuyInducements {
                 team_id: team_id.clone(),

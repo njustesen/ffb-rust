@@ -822,6 +822,12 @@ pub fn make_injury_type(name: &str) -> Box<dyn InjuryTypeServer> {
             Box::new(injuryType::injury_type_block_stunned::InjuryTypeBlockStunned::new()),
         "InjuryTypeBlockStunnedForSpp" =>
             Box::new(injuryType::injury_type_block_stunned_for_spp::InjuryTypeBlockStunnedForSpp::new()),
+        // Plain bb2016 bomb — NOT the WithModifier variants. Missing from this table, the name
+        // fell through to the generic InjuryTypeDropFall fallback, which skips the defender's
+        // Stunty injury interpretation (goblin bb2016 seed 9: injury 4+5=9 on a Stunty goblin is
+        // Badly Hurt in Java, but the fallback made it a plain KO).
+        "InjuryTypeBomb" =>
+            Box::new(injuryType::injury_type_bomb::InjuryTypeBomb::new()),
         "InjuryTypeBombWithModifier" | "bombWithModifier" =>
             Box::new(injuryType::injury_type_bomb_with_modifier::InjuryTypeBombWithModifier::new()),
         "InjuryTypeBombWithModifierForSpp" | "bombForSpp" =>

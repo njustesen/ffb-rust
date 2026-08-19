@@ -47,15 +47,15 @@ impl InjuryTypeServer for InjuryTypeBombWithModifier {
         self.ctx.defender_coordinate = Some(coord);
         self.ctx.apothecary_mode = apo_mode;
 
-        // Java: `boolean skipArmourRoll = pDefender.hasSkillProperty(placedProneCausesInjuryRoll);`
-        let skip_armour_roll = game.player(defender_id)
-            .map(|d| d.has_skill_property(NamedProperties::PLACED_PRONE_CAUSES_INJURY_ROLL))
-            .unwrap_or(false);
-        if skip_armour_roll {
-            self.ctx.armor_broken = true;
-        } else {
-            do_armor_roll(game, rng, &mut self.ctx, defender_id);
-        }
+        // Java's CURRENT AbstractInjuryTypeBombWithModifier rolls armour UNCONDITIONALLY and
+        // recomputes armorBroken from the roll — `injuryContext.setArmorRoll(diceRoller.rollArmour());
+        // injuryContext.setArmorBroken(diceInterpreter.isArmourBroken(...))` — which also OVERWRITES
+        // the Ball & Chain pre-break UtilServerInjury.handleInjury sets for placedProneCausesInjuryRoll
+        // defenders. The old skip-armour-roll translation matched an earlier Java version: it kept the
+        // pre-break, so a bombed Fanatic whose armour actually HELD (goblin bb2025 seed 4 step 10:
+        // 4+2+1 = 7 vs AV8) rolled a bomb INJURY instead of being placed Prone — Java leaves him
+        // Prone and rolls the (discarded) dropPlayer chain injury with the same two dice.
+        do_armor_roll(game, rng, &mut self.ctx, defender_id);
 
         let mut added_special_armor_modifier = false;
         if !self.ctx.armor_broken {

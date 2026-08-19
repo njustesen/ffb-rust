@@ -178,6 +178,13 @@ impl StepMoveBallAndChain {
             if let Some(bid) = block_defender_id {
                 // Java: actingPlayer.setCurrentMove(actingPlayer.getCurrentMove() + 1)
                 game.acting_player.current_move += 1;
+                // Java: actingPlayer.setGoingForIt(UtilPlayer.isNextMoveGoingForIt(game)) — a
+                // Ball & Chain mover whose compulsory block lands beyond MA is RUSHING it, and
+                // the downstream StepGoForIt rolls the rush d6 off this flag. Missing it, the
+                // Fanatic's over-MA block skipped Java's rush roll and desynced the stream
+                // (goblin bb2025 seed 87 step 17).
+                game.acting_player.goes_for_it =
+                    ffb_model::util::util_player::UtilPlayer::is_next_move_going_for_it(game);
                 outcome = outcome.publish(StepParameter::BlockDefenderId(bid));
                 let lbl = self.goto_label_on_end.clone();
                 return StepOutcome::goto(&lbl)

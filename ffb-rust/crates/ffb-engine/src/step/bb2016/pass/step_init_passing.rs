@@ -15,6 +15,7 @@ use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_mechanics::bb2016::pass_mechanic::PassMechanic;
 use ffb_mechanics::pass_mechanic::PassMechanic as PassMechanicTrait;
+use ffb_model::prompts::agent_prompt::AgentPrompt;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -44,7 +45,19 @@ impl StepInitPassing {
     }
 
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
+        // Bomb re-throw window -- see the mixed StepInitPassing for the full note. Java parks
+        // here with no dialog; the prompt only surfaces that wait so the agent can decline.
         if game.thrower_id.is_none() || game.thrower_action.is_none() {
+            if let Some(pid) = game.acting_player.player_id.clone() {
+                if matches!(
+                    game.turn_mode,
+                    TurnMode::BombHome | TurnMode::BombAway
+                        | TurnMode::BombHomeBlitz | TurnMode::BombAwayBlitz
+                ) {
+                    return StepOutcome::cont()
+                        .with_prompt(AgentPrompt::BombRethrow { player_id: pid });
+                }
+            }
             return StepOutcome::cont();
         }
         // Java: Player<?> catcher = game.getPlayerById(fCatcherId);

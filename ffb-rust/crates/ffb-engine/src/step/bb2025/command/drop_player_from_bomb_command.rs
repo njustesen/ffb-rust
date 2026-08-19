@@ -1,7 +1,7 @@
 use ffb_model::enums::ApothecaryMode;
 use ffb_model::model::game::Game;
 use crate::step::framework::{DeferredCommand, DeferredCommandId, StepParameter};
-use crate::step::util_server_injury::drop_player;
+use crate::step::util_server_injury::drop_player_rng;
 
 /// Drops a player hit by a bomb: runs injury, optionally suppresses the turnover, and preserves
 /// the active flag for non-bombardiers. Mirrors Java
@@ -29,10 +29,17 @@ impl DropPlayerFromBombCommand {
 impl DeferredCommand for DropPlayerFromBombCommand {
     fn id(&self) -> DeferredCommandId { DeferredCommandId::DropPlayerFromBomb }
 
-    fn execute(&self, game: &mut Game, _rng: &mut ffb_model::util::rng::GameRng) -> Vec<StepParameter> {
+    fn execute(&self, game: &mut Game, rng: &mut ffb_model::util::rng::GameRng) -> Vec<StepParameter> {
         // Java: UtilServerInjury.dropPlayer(step, player, apothecaryMode, eligibleForSafePairOfHands)
         // apothecary_mode deferred — dialog infra needed.
-        let mut params = drop_player(game, &self.player_id, self.eligible_for_safe_pair_of_hands);
+        // MUST be the rng-aware entry point: Java's dropPlayer rolls a full InjuryTypeBallAndChain
+        // injury when the dropped player has placedProneCausesInjuryRoll (a goblin Fanatic caught
+        // in a bomb blast). The rng-less drop_player silently skips that roll — goblin bb2016
+        // seed 7 step 33: Java rolled 2 extra injury dice for the Fanatic, so every later die was
+        // shifted and the streams silently desynced while the state hash still matched.
+        let mut params = drop_player_rng(
+            game, rng, &self.player_id, self.eligible_for_safe_pair_of_hands, self.apothecary_mode,
+        );
 
         // Java:
         //   PlayerState newState = game.getFieldModel().getPlayerState(player);

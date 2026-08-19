@@ -11,6 +11,8 @@
 /// Java: `@RulesCollection(BB2020, BB2025)`, extends `AbstractStep`.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::enums::TurnMode;
+use ffb_model::prompts::agent_prompt::AgentPrompt;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -53,8 +55,22 @@ impl StepInitPassing {
                 game.thrower_action = game.acting_player.player_action;
             }
         }
-        // Java: if (game.getThrower() == null || game.getThrowerAction() == null) { return; }
+        // Java's StepInitPassing simply PARKS here waiting for a client command. The bomb
+        // re-throw window (TurnMode BombHome/BombAway) is the one place nothing ever declared
+        // the action -- the engine made the bomb's catcher the acting player -- so no
+        // activation prompt is pending and the step would spin forever. Surface the wait so
+        // the agent can answer, mirroring ParityRunner's INIT_PASSING case.
         if game.thrower_id.is_none() || game.thrower_action.is_none() {
+            if let Some(pid) = game.acting_player.player_id.clone() {
+                if matches!(
+                    game.turn_mode,
+                    TurnMode::BombHome | TurnMode::BombAway
+                        | TurnMode::BombHomeBlitz | TurnMode::BombAwayBlitz
+                ) {
+                    return StepOutcome::cont()
+                        .with_prompt(AgentPrompt::BombRethrow { player_id: pid });
+                }
+            }
             return StepOutcome::cont();
         }
 

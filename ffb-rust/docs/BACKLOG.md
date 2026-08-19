@@ -435,6 +435,216 @@ Work in this order; each needs the trigger verified as reachable *before* any ha
 
 ---
 
+## 5. Bomb chain — REOPENED and largely solved (IN PROGRESS, uncommitted)
+
+The user chose the "phase-2 declaration route". **It is answered**, and the answer was not what the
+question assumed:
+
+> **Phase 2 is never reached for THROW_BOMB because the bomb re-throw has no declaration at all.**
+> After a bomb is caught, the ENGINE makes the catcher the acting player with `THROW_BOMB` in
+> `TurnMode.BOMB_HOME`/`BOMB_AWAY`. Nothing goes through phase 1, so the phase-1/phase-2 activation
+> loop is never entered for it. `StepInitPassing` then parks with a null thrower, and the harness
+> spun on `UNHANDLED_STEP: INIT_PASSING` (2500x).
+
+The decisive evidence was a harness-side probe printing `thrower/passCoord/actingPid/turnMode` at
+the unhandled step: `thrower=null passCoord=null actingAction=THROW_BOMB turnMode=BOMB_HOME`.
+
+**A decline is impossible here** — `StepInitPassing.executeStep` opens with
+`if (thrower == null || throwerAction == null) return;`, which is BEFORE the `fEndTurn` check, so
+`CLIENT_END_TURN` and a deselect both set their flag and are then swallowed. The only command that
+advances the step is `CLIENT_PASS`. The bomb must actually be thrown. (A first attempt to decline
+measured as a `STUCK_STEP` — the same stall wearing a different name.)
+
+### Landed (uncommitted — gate NOT yet run)
+- Harness (both sides, in lockstep): `THROW_BOMB` joins the handled-action set, `sendConcreteAction`
+  routes it to `sendPassAction`, and a new `case INIT_PASSING` throws the re-thrown bomb with the
+  SAME candidate rule and the SAME single `actionRng` draw as an ordinary pass.
+- Rust `AgentPrompt::BombRethrow` surfaces the otherwise prompt-less park (the parity loop
+  `break`s silently on `current_prompt().is_none()` — that is why the game just ended at the first
+  bomb, with no error). Both agents answer it via `legal_pass_receivers`.
+- **Engine bug 1** — `bb2016/move_/step_init_selecting.rs`: `ThrowBomb` was missing from the
+  `Pass | HandOver` target-threading arm, so the bomb carried no `TargetCoordinate`.
+- **Engine bug 2** — `bb2016/move_/step_end_selecting.rs`: Java groups
+  `PASS | HAIL_MARY_PASS | THROW_BOMB | HAIL_MARY_BOMB | HAND_OVER`; **both bomb variants were
+  missing**, so a declared bomb dispatched to nothing and the activation was a pure no-op
+  (`post_hash == pre_hash`). Regression test `dispatch_bomb_actions_push_pass_sequence`.
+
+Result on goblin bb2016 seed 1: first divergence moved **step 2 -> step 17**, and the bomb now
+executes in BOTH engines (it had never executed in either). Workspace 14,540 pass / 0 fail.
+
+### Next
+- [x] **Step 17 SOLVED — engine bug 3: a fumbled BOMB scattered the real football.**
+      `bb2025/pass/step_pass.rs` published `CatchScatterThrowInMode::ScatterBall` unconditionally in
+      the fumble branch; every edition's Java `StepPass` publishes it ONLY in the non-bomb arm. The
+      spurious d8 both moved the ball AND shifted every later die by one, so the armour roll landed
+      on Java's next two dice — breaking AV and STUNNING the thrower where Java leaves him Prone.
+      Tests `fumbled_bomb_does_not_publish_scatter_ball` + `fumbled_pass_still_publishes_scatter_ball`.
+      Frontier moved **step 17 -> step 32**.
+      **The wrong-file trap struck a 4th time**: `StepId::Pass` is NOT in the bb2016 override list, so
+      bb2016 runs the SHARED bb2025 `StepPass`. The first fix went into `bb2016/pass/step_pass.rs`
+      and changed nothing. ALWAYS grep the override block for the exact `StepId` before editing.
+      (The bb2016 file kept the same faithful correction; it is currently unrouted/dead.)
+- [x] **Two rejected hypotheses, recorded so they are not retried.** (a) Routing bb2016 to its own
+      `StepSpecialEffect` twin — measured WORSE (frontier 17 -> 2): that twin does not apply the blast
+      at all, while the shared step already matched. Reverted; `driver.rs` is untouched. (b) The
+      bomb INJURY TYPE (`InjuryTypeBomb` vs `InjuryTypeBombWithModifier`) — bb2016 Java does use the
+      plain type and the shared Rust step is edition-gated for it now, but it changed NOTHING
+      observable on this seed. The gate is faithful so it stays, but it was not the bug.
+- [x] **Step 32 SOLVED — engine bug 4: bb2016's bomb turnover was being swallowed.**
+      Java bb2016's `StepSpecialEffect` ends the turn whenever a NON-fireball effect hits a player of
+      the acting team — with **no `isStanding` gate and no `suppressEndTurn`**. The shared Rust step
+      applied both bb2020+ gates to bb2016, so a bomb that caught the thrower's own already-PRONE
+      team-mate never ended the turn (seed 1 step 32: Java ends the away turn, Rust kept activating).
+      Fixed by edition-gating both. Test `bb2016_bomb_on_prone_own_team_player_still_publishes_end_turn`.
+      **goblin bb2016 seed 1 is now GREEN (1/1).**
+- [x] **goblin bb2016 = 100/100 GREEN.** Five more fixes got there (user directive: continue until
+      ALL GREEN, then commit and push — the gate is `--edition all --seeds 1-100 --parallel 3` 30/30/30):
+      - **Bug 5 (seed 9 step 5):** an accurate BOMB's catch got no accurate modifier — StepPass
+        published `PassAccurate(!is_bomb)`, starving ResolvePass's `CatchAccurateBomb` branch (catch
+        at 4+ instead of 3+). Now `PassAccurate(true)` for bombs too; the completion-SPP overcount
+        that `!is_bomb` guarded against is gated in StepEndPassing exactly where Java gates it
+        (`hasBall(catcher)` — never true for a bomb).
+      - **Bug 6 (seed 9 step 61):** `handle_injury_by_name` had NO `"InjuryTypeBomb"` arm — the
+        bb2016 injury-type gate fell through to the generic DropFall fallback, skipping the Stunty
+        interpretation (injury 9 on a Stunty goblin is Badly Hurt, not KO).
+      - **Bug 7 (seed 3 step 6):** the bomb RE-THROW sequence was built with the bb2025 generator
+        (mixed StepEndBomb hardcodes it); bb2016 places MissedPass AFTER ResolvePass, bb2025 BEFORE,
+        so ResolvePass ran after the scatter and dragged the bomb back to the original target
+        square. Mixed EndBomb now pushes the bb2016 Pass sequence under bb2016 — Java uses the
+        per-ruleset SequenceGeneratorFactory here.
+      - **Bug 8 (seed 7 step 33):** `DropPlayerFromBombCommand` called the rng-LESS `drop_player`,
+        silently skipping the Ball & Chain chain-injury roll (2d6) Java's dropPlayer makes for a
+        `placedProneCausesInjuryRoll` player — the streams desynced invisibly (state hash blind).
+        Now `drop_player_rng`.
+      - **Bug 9 (seed 4 step 56):** a bomb CATCHER who re-threw was retired STANDING+INACTIVE at
+        the end of the activation and could never activate again (the ACTIVE bit is invisible to
+        the hash; found via JAVA_ACT_PICK/RUST_ACT_PICK pick-stream comparison — Rust rejected
+        home_10 as inactive turn after turn). TWO faithful pieces: (a) mixed StepEndBomb now hands
+        the acting slot back to `game.original_bombardier` before EndPlayerAction (the "PassState is
+        a stub" comment was stale — the field exists and is set); (b) `change_player_action_to_none`
+        now carries Java's THROW_BOMB carve-out (retire-inactive only when `!bombAction ||
+        (hasBombSkill && bombSkillUsed)`).
+      - **Bug 10 / harness (seed 5 step 74):** bb2016 Java's StepSpecialEffect publishes DIRECTLY
+        (`INJURY_RESULT` first, dropPlayer's params after), so the B&C chain injury is published
+        LAST and the apothecary applies the CHAIN result over the bomb's. The shared bb2025
+        SteadyFooting shape publishes in the opposite order. bb2016 now publishes directly in the
+        shared step (edition gate); bb2020+ keep the SteadyFootingContext shape (Java bb2025's own
+        fail() order matches Rust's).
+      - **Harness (seed 21 step 23):** the INIT_PASSING redraw is now gated on `thrower == null`
+        (the true re-throw park). A park with the thrower SET is an OUT-OF-RANGE declared
+        pass/bomb, whose established contract is END_TURN with zero dice (underworld seed 72);
+        redrawing unconditionally made Java re-pick until in range.
+- [x] **goblin bb2025 97/100, bb2020 10/10 (1-10), bb2016 100/100** — nine more fixes:
+      - bb2025 `BOMB_BOUNCES_ON_EMPTY_SQUARES` read raw (`is_enabled`) instead of
+        `get_option_with_default` — factory default is TRUE, so the empty-square bounce d8 never
+        rolled (seed 3 step 6). One engine test re-pinned the option off.
+      - `InjuryTypeBombWithModifier(+ForSpp)`: the old skip-armour-roll-for-B&C translation matched
+        an EARLIER Java version — current Java rolls armour UNCONDITIONALLY and recomputes
+        armorBroken (overwriting the B&C pre-break), placing a held-armour victim PRONE (seed 4).
+      - bb2020 arm in the shared `StepSpecialEffect`: direct publish order (bomb first, dropPlayer
+        chain last = applied), UNCONDITIONAL suppressEndTurn (no option gate — that's bb2025-only),
+        active-restore, END_TURN stripped from dropPlayer params when suppressed.
+      - bb2020: caught bomb explodes in hand on d6 4+ (`ReportBombExplodesAfterCatch`) — gated
+        into the shared InitBomb; bb2020 has NO bounce (gated out).
+      - The shared MissedPass's out-of-bounds ThrowIn publish is an invention (Java publishes
+        NOTHING there; ResolvePass routes OOB per kind) — kept for the ball path (measured green),
+        gated off for bombs (a wildly-inaccurate bomb OOB got the real ball thrown in, seed 10 bb2020).
+      - `StepSpecialEffect` read `StepParameter::OriginalBombardier` that NOTHING publishes — the
+        bomber-hit turnover reset never fired anywhere, and it CLOBBERED `game.original_bombardier`
+        with None. Now reads the game field; bb2025 InitSelecting mirrors Java's
+        `passState.setOriginalBombardier/reset()` at declaration.
+      - Mixed EndBomb bomber-restore now captures the bomber's PlayerState BEFORE
+        `change_player_action` (which stamps MOVING) — a bomber stunned by his own fumbled bomb
+        stood back up at retire (seed 65).
+      - bb2020 MightyBlow's injury predicate also excludes MB when the ARMOUR roll carried a
+        `blocksLikeChainsaw` modifier (Troll blocks the Looney; seed 5 step 241 KO-vs-Bh).
+      - `legal_activate_player_actions` lacked ParityRunner's ON-PITCH guard — a boxed/banned
+        player at (-1,-1) with a Standing base (banned Secret Weapon Bombardier) padded the
+        snapshot by one, shifting every pick modulo (seed 99; found via new JAVA_PPICK probe).
+      - Mixed StepMoveBallAndChain missed Java's `setGoingForIt(isNextMoveGoingForIt)` before the
+        compulsory block — an over-MA B&C block skipped the rush d6 (seed 87).
+- [x] **GOBLIN 100/100 IN ALL THREE EDITIONS (2026-08-19).** Final fixes:
+      - **Bomb interception is a pip harder** — StepIntercept's `is_bomb_flag` read the dead
+        `OriginalBombardier` parameter; now reads `game.original_bombardier` (fixed seeds 33+52 at
+        once). Edition-gated OFF for bb2016: its Java builds `InterceptionContext(..., false)`
+        hard-false, and bb2016 lacks the InitSelecting reset so the game field goes stale there
+        (this gate alone was the 100/100→15/100 collapse's second suspect — the real one was the
+        BOUNCE, below).
+      - **The InitBomb empty-square bounce is bb2025-ONLY** — bb2016's and bb2020's own Java
+        classes have no bounce. The earlier "bb2016 measured green with the bounce" note was wrong:
+        that measurement predated the option-default fix, when the bounce was dead everywhere.
+      - **bb2020: a deflected (non-easy) interception must NOT hand the Bomb sequence a catcher** —
+        Java bb2020 publishes INTERCEPTOR_ID only in its easyIntercept branch; Rust publishes the
+        id for every success (its ResolvePass needs it), so EndPassing now gates the bomb-catcher
+        choice on the new `interception_successful` flag (seed 45: a dropped deflection handed the
+        deflector a free re-throw). One EndPassing test updated to set the flag.
+      - **EndBomb bomber-restore refinements**: bb2016-gated write-back of a non-standing captured
+        state (its apothecary applies the KO via AcceptInjury BEFORE EndBomb runs, so the MOVING
+        stamp erased a fresh KO — seed 29); tightening the guard to other-holds-slot regressed
+        bb2025/bb2020 and was REVERTED (Java's None-acting case runs the restore).
+      - **Same-team block strength (Ball & Chain)**: Java's `findBlockStrength` same-team clauses
+        ported — `ignoresAssists && sameTeam → bare strength` (bb2020/25 B&C) and
+        `flipSameTeamOpponentToOtherTeam && sameTeam → assists marked by the OTHER team` (bb2016
+        B&C). Reads MUST be `has_skill_property_in(game.rules, ..)` — the edition-agnostic union
+        list makes the ignores clause swallow the bb2016 flip. Tests:
+        `same_team_ball_and_chain_block_flips_assist_marking`, `eligible_players_excludes_boxed_standing_player`.
+      All probes removed (diff-verified); workspace 14,546 / 0.
+- [ ] **FULL MATRIX GATE running in background** (bash id `brkw294vp`,
+      output `...\scratchpad\gate_final.txt` via tasks output). At 30/30/30: COMMIT AND PUSH per
+      the user's directive — ffb-rust changes in one commit (or a few logical ones); the
+      ParityRunner.java + Xoshiro/etc harness changes stay in the ffb repo (commit only
+      intended files: ffb-ai ParityRunner.java; leave the long-standing local tracing diffs in
+      the other 7 files uncommitted as before — check `git diff --stat` there first).
+      If RED: diagnose per the recipe; the bomb changes touch every Bombardier roster
+      (goblin/halfling/underworld/ogre/…) and the shared pass/injury/block paths touch EVERYONE.
+- [x] (superseded) goblin bb2025 seeds 33/52/64 detail
+- [x] OLD:  Seed 52 step 121 is traced: home_07's bomb →
+      caught → re-thrown INACCURATE → 3 scatters → **StepIntercept deflection on the scattered
+      bomb → catch → explode**; Java's chain ends the HOME turn 8 → away t8 has zero activations →
+      half ends (argue-the-call bans, half-2 kickoff). Rust never ends home turn 8 (h1t88 vs
+      h2t10). Suspect the deflected-bomb explosion path (DEFLECTED_BOMB mode) skips the END_TURN
+      publish, or the deflection sub-chain diverges. bb2020 needs 11-100; bb2016 needs a re-verify
+      after today's shared-file edits; then halfling/underworld (other Bombardier rosters) via the
+      full gate.
+- [ ] PROBES still in tree (all FFB_TRACE/FFB_ACT_TRACE-gated, remove before commit):
+      RPASSEVAL (step_pass), RMISSED25 (missed_pass), RINITBOMB (init_bomb), RRESOLVEBOMB
+      (resolve_bomb), RSTEADY/RSTEADY_SET (steady_footing), RAPO_SET (apothecary), RAPPLY/RAPPLY2
+      (injury_result.rs + injury.rs), RMBFILTER (injury_type_block), RUST_ACT_PICK/RPASSPICK
+      (random_agent — consider keeping, they mirror Java's DEBUG_ACT), JAVA_PPICK (ParityRunner —
+      keep, DEBUG_ACT-gated).
+- [x] (superseded detail)
+- [x] OLD-1/10-FRONTIER:  Seed 3 (bb2025) is fully traced:
+      - Step 4's bomb (Home7 → (12,7)) matches THROUGH the throw; note Rust offers a TRR
+        `ReRollOffer{action=CATCH}` on the failed bomb catch that Java does not appear to surface —
+        agent declines, verify it costs no dice.
+      - **Step 6's INACCURATE bomb (away_07): Java rolls pass + 3 scatters + a 4th d8 (bb2025
+        StepMissedPass line ~191, likely the occupied-square bounce) + 2 wizard rolls + armour —
+        Rust stops after the 3 scatters: the bomb never explodes and the turn ownership forks**
+        (J: h1t22 home / R: h1t12 away at i=7). Suspect the shared bb2025 missed-BOMB path never
+        hands the landed bomb to StepSpecialEffect (same family as bb2016 bug 3, different site).
+      - Old artifacts mislead: re-run before diffing — a stale seed_3_rust.jsonl cost three wrong
+        theories this session. `RUST_STEP` lines (FFB_TRACE=1) are the live truth.
+- [x] (superseded) goblin bb2016 seeds 1-10 frontier
+- [x] SUPERSEDED-DETAIL:  First fails: **seed 9 step 5** (turn 2, the
+      earliest — start here) and seed 8 step 53. Expected: the bomb chain has never run in either
+      engine, so there is a backlog of these. Same method: `FFB_TRACE=1`, diff the `JSTEP ... state=`
+      line against the jsonl `state` field, then read the rust_events chain around the bomb.
+      Remember `StepId::Pass`/`SpecialEffect` are NOT bb2016-overridden — the SHARED bb2025 files are
+      the live ones, and bb2016 differences belong behind an edition gate inside them.
+- [x] (history) The step-17 diagnosis: the two differing fields were the ball square and
+      Prone-vs-Stunned; Rust's re-throw target was VERIFIED IDENTICAL to Java's `(12,6)`,
+      which ruled out the agent and pointed at the extra scatter die.
+- [x] bb2020/bb2025 need NO equivalent fix. The driver override block is `if rules == Rules::Bb2016`
+      ONLY, so bb2020 runs the shared bb2025 steps (`step/bb2020/*selecting*.rs` are DEAD), and the
+      shared `bb2025/shared/step_end_selecting.rs:338` already groups all four
+      `Pass | HailMaryPass | ThrowBomb | HailMaryBomb`. bb2016 was the lone gap.
+- [ ] `HailMaryPass` rides the same route — re-check it once the bomb is green.
+- [ ] `uniform_agent` answers `BombRethrow` with `EndTurn`, which cannot advance the step. Harmless
+      for parity (coverage-only agent) but it will stall a coverage run — fix before using one.
+- [ ] Do NOT commit until `--edition all --seeds 1-100 --parallel 3` is 30/30/30.
+
+---
+
 ## Blocked — needs a tier decision from the user
 
 - **Punt.** Plumbing is correct and dark_elf bb2025 is 100/100, but `InitPunt` dispatches zero times:

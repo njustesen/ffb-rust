@@ -83,6 +83,8 @@ impl Agent for UniformAgent {
         match gs.current_prompt() {
             // Mirrors random_agent: answer the mid-sequence block-target ask by deselecting.
             Some(AgentPrompt::BlockTarget { .. }) => Action::EndPlayerAction,
+            // Bomb re-throw window: decline, mirroring ParityRunner's INIT_PASSING case.
+            Some(AgentPrompt::BombRethrow { .. }) => Action::EndTurn,
             Some(AgentPrompt::CoinChoice { .. }) => Action::CoinChoice { heads: self.pick_bool() },
             Some(AgentPrompt::ReceiveChoice { .. }) => Action::ReceiveChoice { receive: self.pick_bool() },
             Some(AgentPrompt::KickBall) => {

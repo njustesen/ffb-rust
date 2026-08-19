@@ -165,6 +165,13 @@ pub enum AgentPrompt {
     /// ParityRunner answers with EndTurn at APPLY_KICKOFF_RESULT, declining the placements.
     /// `mode` is the TurnMode's name (e.g. "QuickSnap").
     KickoffEventPlacement { team_id: String, mode: String },
+    /// The bomb re-throw window (TurnMode BombHome / BombAway). A player who catches a thrown
+    /// bomb becomes the acting player with THROW_BOMB and `StepInitPassing` PARKS with no
+    /// thrower, waiting for a client command naming the new target. Java models this with no
+    /// dialog at all -- the step simply waits -- so this prompt exists only to surface that wait
+    /// to the agent, exactly as `KickoffEventPlacement` does. ParityRunner answers it at
+    /// INIT_PASSING with EndTurn (declining the re-throw), and the Rust agent mirrors that.
+    BombRethrow { player_id: PlayerId },
 
     // ── Inducements ────────────────────────────────────────────────────────────
     BuyInducements {

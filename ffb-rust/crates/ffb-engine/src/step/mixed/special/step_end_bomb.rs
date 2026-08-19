@@ -81,6 +81,41 @@ impl StepEndBomb {
             // always `null` given the PassState stub above — so there is currently no
             // reachable call site to wire `ActingPlayer::set_must_complete_action(true)`
             // to in this translation (see `acting_player.rs` for the now-real field/methods).
+            // Java: `if (originalBomber != actingPlayer.getPlayer()) { changePlayerAction(
+            // originalBomber, THROW_BOMB); if (prone/stunned) changeActive(false); }` — the
+            // acting-player slot is handed BACK to the original bomber before EndPlayerAction, so
+            // the activation being ended is the BOMBER's, not the catcher's. Without this, a
+            // catcher who re-threw the bomb was retired STANDING+INACTIVE by the end of the
+            // activation and could never activate for the rest of the game half (goblin bb2016
+            // seed 4: home_10 caught+re-threw at turn 4; Java's harness picked him at step 56,
+            // Rust's engine rejected him as inactive and the activation streams forked).
+            // (`game.original_bombardier` is the Rust home of Java's PassState.originalBombardier;
+            // the older comment claiming PassState is an all-None stub predates it.)
+            if let Some(orig) = game.original_bombardier.clone() {
+                if game.acting_player.player_id.as_deref() != Some(orig.as_str()) {
+                    // Java captures the bomber's PlayerState BEFORE changePlayerAction — the
+                    // acting-player switch stamps the new acting player MOVING (UtilActingPlayer's
+                    // "show acting player as moving"), and Java's prone/stunned write puts the
+                    // CAPTURED state back with active=false. Reading the state after the switch
+                    // saw MOVING, skipped the write, and a bomber stunned by his own fumbled bomb
+                    // stood back up when the activation retired (goblin bb2025 seed 65 step 19).
+                    let pre_state = game.field_model.player_state(&orig);
+                    change_player_action(game, &orig, PlayerAction::ThrowBomb, false);
+                    if let Some(ps) = pre_state {
+                        if ps.is_prone_or_stunned() {
+                            game.field_model.set_player_state(&orig, ps.change_active(false));
+                        } else if game.rules == ffb_model::enums::Rules::Bb2016 && !ps.is_standing() {
+                            // bb2016 ONLY: its apothecary applies the injury via the AcceptInjury
+                            // answer BEFORE this step runs, so change_player_action's MOVING stamp
+                            // erased a fresh KO (goblin bb2016 seed 29 step 34 — the bomber's own
+                            // bomb KO'd him and he retired STANDING in the box). bb2020/bb2025's
+                            // ordering never has an applied KO here and measured GREEN without the
+                            // write-back (adding it unconditionally regressed both).
+                            game.field_model.set_player_state(&orig, ps);
+                        }
+                    }
+                }
+            }
             let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
                 feeding_allowed: false,
                 end_player_action: true,
@@ -101,7 +136,21 @@ impl StepEndBomb {
         game.home_playing = game.team_home.players.iter().any(|p| p.id == catcher_id);
         change_player_action(game, &catcher_id, PlayerAction::ThrowBomb, false);
 
-        let seq = Pass::build_sequence(&PassParams { target_coordinate: None, rules: game.rules, });
+        // Java pushes the re-throw sequence via the game's per-ruleset SequenceGeneratorFactory,
+        // so a bb2016 game gets the BB2016 Pass sequence. The step ORDER differs materially:
+        // bb2016 places MissedPass AFTER ResolvePass (an inaccurate goto skips ResolvePass
+        // entirely), while bb2025 places it BEFORE — so building the bb2025 sequence for a bb2016
+        // re-throw let ResolvePass run after the scatter and drag the bomb back to the original
+        // target square (goblin bb2016 seed 3 step 6: both engines scattered the inaccurate
+        // re-throw to the empty (18,6), then Rust's ResolvePass reset bomb_coordinate to (21,6)
+        // and rolled a catch for the player standing there).
+        let seq = if game.rules == ffb_model::enums::Rules::Bb2016 {
+            crate::step::generator::bb2016::pass::Pass::build_sequence(
+                &crate::step::generator::bb2016::pass::PassParams { target_coordinate: None },
+            )
+        } else {
+            Pass::build_sequence(&PassParams { target_coordinate: None, rules: game.rules })
+        };
 
         // Java: removePassCoordinate stays true so passCoordinate is cleared again here
         if remove_pass_coordinate {

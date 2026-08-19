@@ -202,6 +202,22 @@ impl StepInitBomb {
             }
             if self.explode_skill_used == Some(true) {
                 self.catcher_id = None;
+            } else if game.rules == ffb_model::enums::Rules::Bb2020 {
+                // BB2020's own StepInitBomb: a CAUGHT bomb explodes in the catcher's hands on a
+                // d6 of 4+ (`explodes = roll >= 4`, ReportBombExplodesAfterCatch) — rolled for
+                // every catch when the explode skill was not used. bb2025 has no such roll, so
+                // running the shared step for bb2020 skipped a die Java always rolls (goblin
+                // bb2020 seed 5 step 7) and never exploded a caught bomb.
+                let roll = rng.d6();
+                let explodes = roll >= 4;
+                game.report_list.add(
+                    ffb_model::report::report_bomb_explodes_after_catch::ReportBombExplodesAfterCatch::new(
+                        self.catcher_id.clone().unwrap_or_default(), explodes, roll,
+                    ),
+                );
+                if explodes {
+                    self.catcher_id = None;
+                }
             }
         }
 
@@ -214,7 +230,22 @@ impl StepInitBomb {
             }
             let mut catch_bomb = false;
             if let Some(bomb_coord) = self.bomb_coordinate {
-                let bounce_enabled = game.options.is_enabled(game_option_id::BOMB_BOUNCES_ON_EMPTY_SQUARES);
+                // Java: `game.getOptions().getOptionWithDefault(BOMB_BOUNCES_ON_EMPTY_SQUARES)`
+                // — the factory DEFAULT is true. Reading the raw store with `is_enabled` returned
+                // false whenever the option was simply unset, so the empty-square bounce d8 never
+                // rolled and the bomb exploded one square short (goblin bb2025 seed 3 step 6: Java
+                // bounced to a square adjacent to two players; Rust exploded at the landing square
+                // next to one, forking the wizard/armour dice and the turnover).
+                // ONLY bb2025's Java StepInitBomb has the bounce: bb2020's and bb2016's own
+                // classes have no bounce logic at all. (An earlier note claimed bb2016 measured
+                // green with the bounce — that measurement predated the option-default fix, when
+                // the raw `is_enabled` read made the bounce dead everywhere; once the factory
+                // default TRUE was honoured, bb2016 collapsed 100/100 → 15/100 on phantom bounce
+                // dice, e.g. seed 100 step 3.)
+                let bounce_enabled = game.rules == ffb_model::enums::Rules::Bb2025
+                    && game.options
+                    .get_option_with_default(game_option_id::GameOptionId::BOMB_BOUNCES_ON_EMPTY_SQUARES)
+                    .get_value_as_string() == "true";
                 if !self.pass_fumble && bounce_enabled && game.field_model.player_at(bomb_coord).is_none() {
                     let scatter_roll = rng.d8();
                     let direction = Direction::for_roll(scatter_roll).unwrap_or(Direction::North);
@@ -492,6 +523,9 @@ mod tests {
     fn no_catcher_reads_bomb_coordinate_from_field_model() {
         use ffb_model::types::FieldCoordinate;
         let mut game = make_game();
+        // Pin the bounce off: BOMB_BOUNCES_ON_EMPTY_SQUARES now correctly reads its factory
+        // default (true), and an empty-square bomb would bounce one square before resting.
+        game.options.set("bombBouncesOnEmptySquares", "false");
         game.field_model.bomb_coordinate = Some(FieldCoordinate::new(5, 7));
         let mut step = StepInitBomb::new("end".into());
         step.start(&mut game, &mut GameRng::new(0));

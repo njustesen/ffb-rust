@@ -300,9 +300,17 @@ impl ModificationAwareInjuryType for InjuryTypeBlock {
                             .and_then(SkillId::from_class_name)
                             .map(|id| id.properties().contains(&NamedProperties::AFFECTS_EITHER_ARMOUR_OR_INJURY_ON_BLOCK))
                             .unwrap_or(false);
-                        if affects_either_on_block
-                            && self.ctx.armor_modifiers.iter().any(|am| am.name == m.get_name())
-                        {
+                        // Java bb2020 MightyBlow's injury predicate is
+                        //   noneMatch(isRegisteredToSkillWithProperty(affectsEitherArmourOrInjuryOnBlock)
+                        //          || isRegisteredToSkillWithProperty(blocksLikeChainsaw))
+                        // over the ARMOUR modifiers — MB is also withheld from the injury when the
+                        // armour roll carried the defender's Chainsaw (+3) modifier (goblin bb2020
+                        // seed 5 step 241: a Troll blocks the Looney; the chainsaw +3 broke armour,
+                        // Java's injury stays 8 → KO, Rust added MB → 9 → Stunty → Badly Hurt).
+                        let armour_used_either_or = self.ctx.armor_modifiers.iter().any(|am| {
+                            am.name == m.get_name() || am.name == "Chainsaw"
+                        });
+                        if affects_either_on_block && armour_used_either_or {
                             continue;
                         }
                         self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), Some(attacker), defender, game.rules));

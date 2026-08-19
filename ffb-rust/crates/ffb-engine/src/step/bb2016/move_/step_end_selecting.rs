@@ -206,8 +206,14 @@ impl StepEndSelecting {
             }
         }
         match player_action {
+            // Java bb2016 StepEndSelecting groups PASS / HAIL_MARY_PASS / THROW_BOMB /
+            // HAIL_MARY_BOMB / HAND_OVER into one arm. The two bomb variants were missing here,
+            // so a declared bomb dispatched to NOTHING: the activation completed as a pure no-op
+            // (post_hash == pre_hash) while Java threw the bomb and ended the turn.
             PlayerAction::Pass
             | PlayerAction::HailMaryPass
+            | PlayerAction::ThrowBomb
+            | PlayerAction::HailMaryBomb
             | PlayerAction::HandOver => {
                 // Thread the chosen target square into the Pass generator so StepInitPassing
                 // receives TARGET_COORDINATE — same bug class as the FOUL dispatch: building with
@@ -447,6 +453,21 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert!(!out.pushes.is_empty(), "PASS should push Pass sequence");
+    }
+
+    /// Java bb2016 StepEndSelecting.dispatchPlayerAction groups THROW_BOMB and HAIL_MARY_BOMB
+    /// into the same arm as PASS. Both were missing, so a declared bomb dispatched to nothing and
+    /// the activation was a pure no-op (post_hash == pre_hash) while Java threw the bomb.
+    #[test]
+    fn dispatch_bomb_actions_push_pass_sequence() {
+        for pa in [PlayerAction::ThrowBomb, PlayerAction::HailMaryBomb] {
+            let mut game = make_game();
+            let mut step = StepEndSelecting::new();
+            step.dispatch_player_action = Some(pa);
+            let out = step.start(&mut game, &mut GameRng::new(0));
+            assert_eq!(out.action, StepAction::NextStep);
+            assert!(!out.pushes.is_empty(), "{pa:?} must push the Pass sequence, like Java");
+        }
     }
 
     #[test]

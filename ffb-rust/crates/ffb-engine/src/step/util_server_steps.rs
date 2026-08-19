@@ -152,7 +152,24 @@ pub fn change_player_action_to_none(game: &mut Game) {
                 let was_prone = game.acting_player.old_player_state
                     .map(|s| s.base() == PS_PRONE)
                     .unwrap_or(false);
-                let new_state = if game.acting_player.acted() {
+                // Java UtilActingPlayer.changeActingPlayer's hasActed branch carries a bomb
+                // carve-out: `hasActed && ((!isThrowBomb && !isHailMaryBomb) || (player HAS
+                // enableThrowBombAction && it is now USED))`. A player whose action is THROW_BOMB
+                // but who does NOT own the Bombardier skill is the bomb-catcher re-throwing a
+                // caught bomb — that throw is NOT his activation, so he must stay ACTIVE.
+                let is_bomb_action = matches!(
+                    game.acting_player.player_action,
+                    Some(ffb_model::enums::PlayerAction::ThrowBomb)
+                        | Some(ffb_model::enums::PlayerAction::HailMaryBomb)
+                );
+                let bombardier_spent = game.player(&old_id).map(|p| {
+                    use ffb_model::model::property::NamedProperties;
+                    p.has_skill_property(NamedProperties::ENABLE_THROW_BOMB_ACTION)
+                        && !p.has_unused_skill_with_property(NamedProperties::ENABLE_THROW_BOMB_ACTION)
+                }).unwrap_or(false);
+                let retire_inactive = game.acting_player.acted()
+                    && (!is_bomb_action || bombardier_spent);
+                let new_state = if retire_inactive {
                     state.change_base(PS_STANDING).change_active(false)
                 } else if game.acting_player.standing_up || was_prone {
                     state.change_base(PS_PRONE)

@@ -94,6 +94,17 @@ impl Step for StepInitSelecting {
             }
             Action::ActivatePlayer { player_id, player_action, block_defender_id } => {
                 let pa = pac_to_player_action(*player_action);
+                // Java CLIENT_ACTING_PLAYER: `if (playerAction.isBomb()) {
+                //   passState.setOriginalBombardier(playerId); ... } else { passState.reset(); }`
+                // — the Rust home of PassState.originalBombardier is game.original_bombardier
+                // (read by StepSpecialEffect's bomber-turnover reset and StepEndBomb's
+                // acting-player restore). Without the reset a bomber id lingered across
+                // unrelated later actions.
+                if matches!(pa, PlayerAction::ThrowBomb | PlayerAction::HailMaryBomb) {
+                    game.original_bombardier = Some(player_id.clone());
+                } else {
+                    game.original_bombardier = None;
+                }
                 util_server_steps::change_player_action(game, player_id, pa, false);
                 if let Some(def_id) = block_defender_id {
                     game.defender_id = Some(def_id.clone());

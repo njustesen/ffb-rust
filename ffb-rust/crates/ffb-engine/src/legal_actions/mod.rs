@@ -50,6 +50,14 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             Some(c) => c,
             None => continue, // off-pitch
         };
+        // Java ParityRunner.computeEligiblePlayers: `onPitch = x in 0..=25 && y in 0..=14` — a
+        // boxed player keeps a coordinate of (-1,-1) with a Standing-looking base (e.g. a banned
+        // Secret Weapon Bombardier), so the Some(coord) check above is NOT enough. Including him
+        // made Rust's turn-start snapshot one entry longer than Java's, shifting every pick's
+        // modulo for the rest of the turn (goblin bb2025 seed 99 step 23).
+        if coord.x < 0 || coord.x > 25 || coord.y < 0 || coord.y > 14 {
+            continue;
+        }
         let state = match state {
             Some(s) => s,
             None => continue,
@@ -1302,6 +1310,21 @@ mod tests {
         add_player(&mut game, true, "p3", c(4, 5), PS_STANDING, vec![]);
         let targets = legal_handoff_receivers(&game, "p1", TeamSide::Home);
         assert_eq!(targets, vec!["p3".to_string(), "p2".to_string()]);
+    }
+
+    #[test]
+    fn eligible_players_excludes_boxed_standing_player() {
+        // A banned/boxed player keeps a Standing-looking base at (-1,-1); ParityRunner's
+        // computeEligiblePlayers has an explicit on-pitch guard, and without it Rust's turn-start
+        // snapshot was one entry longer, shifting every pick modulo (goblin bb2025 seed 99).
+        let mut game = make_game(Rules::Bb2025);
+        game.home_playing = true;
+        add_player(&mut game, true, "boxed", FieldCoordinate::new(-1, -1), PS_STANDING, vec![]);
+        add_player(&mut game, true, "onpitch", FieldCoordinate::new(5, 5), PS_STANDING, vec![]);
+        let eligible = eligible_players_for_activation(&game);
+        assert!(!eligible.iter().any(|(id, _)| id == "boxed"),
+            "an off-pitch (boxed) player must not appear in the activation snapshot");
+        assert!(eligible.iter().any(|(id, _)| id == "onpitch"));
     }
 
     #[test]

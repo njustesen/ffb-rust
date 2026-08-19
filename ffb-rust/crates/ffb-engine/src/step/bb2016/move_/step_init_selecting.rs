@@ -231,7 +231,11 @@ impl Step for StepInitSelecting {
                         // absolute coordinate and dispatch a Pass with TARGET_COORDINATE, exactly like
                         // the Action::Pass command arm. Without this arm a Pass fell through to a bare
                         // cont() and the bb2016 pass sequence never started (amazon seed1 i=201 stall).
-                        PlayerAction::Pass | PlayerAction::HandOver => {
+                        // THROW_BOMB rides this arm too: ParityRunner routes it to the same
+                        // sendPassAction, so it also arrives carrying a receiver id and must
+                        // publish a TARGET_COORDINATE. Without it StepInitPassing parked with an
+                        // unset thrower and no prompt, and the parity loop ends the game silently.
+                        PlayerAction::Pass | PlayerAction::HandOver | PlayerAction::ThrowBomb => {
                             let coord_opt = game.field_model.player_coordinate(def);
                             self.dispatch_player_action = Some(pa);
                             let out = self.execute_step(game, rng);

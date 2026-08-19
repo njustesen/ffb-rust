@@ -142,7 +142,19 @@ impl StepIntercept {
         } else {
             // Java: modifierFactory.findModifiers(new InterceptionContext(game, pInterceptor, state.getResult(), isOriginalBombardier))
             let factory = InterceptionModifierFactory::for_rules(game.rules);
-            let is_bomb_flag = self.original_bombardier.is_some();
+            // Java: `StringTool.isProvided(passState.getOriginalBombardier())` — the Rust home of
+            // PassState.originalBombardier is game.original_bombardier. The step's own
+            // `original_bombardier` field is a parameter NOTHING publishes (same dead-parameter
+            // family as StepSpecialEffect's), so the bomb interception modifier never applied and
+            // Rust intercepted bombs a pip easier than Java (goblin bb2025 seed 52 step 121:
+            // roll 4 succeeded in Rust, failed in Java).
+            // …but NOT for bb2016: its Java StepIntercept builds
+            // `new InterceptionContext(game, pInterceptor, null, false)` — the bomb flag is
+            // hard-false — and bb2016 has no InitSelecting passState.reset(), so the Rust
+            // game.original_bombardier stays stale after any bomb and would poison every later
+            // ordinary interception (goblin bb2016 fell 100/100 → 15/100 before this gate).
+            let is_bomb_flag = game.rules != ffb_model::enums::Rules::Bb2016
+                && (self.original_bombardier.is_some() || game.original_bombardier.is_some());
             let mods = factory.find_applicable(game, interceptor, self.pass_result, is_bomb_flag);
             let skill_mods = factory.find_skill_modifiers(game, interceptor);
             let card_mods = factory.find_card_modifiers(game, interceptor);

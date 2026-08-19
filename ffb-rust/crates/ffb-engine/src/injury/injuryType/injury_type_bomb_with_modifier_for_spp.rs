@@ -38,15 +38,9 @@ impl InjuryTypeServer for InjuryTypeBombWithModifierForSpp {
         self.ctx.defender_coordinate = Some(coord);
         self.ctx.apothecary_mode = apo_mode;
 
-        // Java: `boolean skipArmourRoll = pDefender.hasSkillProperty(placedProneCausesInjuryRoll);`
-        let skip_armour_roll = game.player(defender_id)
-            .map(|d| d.has_skill_property(NamedProperties::PLACED_PRONE_CAUSES_INJURY_ROLL))
-            .unwrap_or(false);
-        if skip_armour_roll {
-            self.ctx.armor_broken = true;
-        } else {
-            do_armor_roll(game, rng, &mut self.ctx, defender_id);
-        }
+        // Java rolls armour UNCONDITIONALLY and recomputes armorBroken (see the non-ForSpp twin
+        // for the full note) — the old skip-armour-roll translation matched an earlier Java version.
+        do_armor_roll(game, rng, &mut self.ctx, defender_id);
 
         let mut added_special_armor_modifier = false;
         if !self.ctx.armor_broken {
