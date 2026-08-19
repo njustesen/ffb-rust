@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 /// A skill entry in a position or star player's skills array.
 /// Skills like Loner(4+) or Animosity(all) are serialized as objects.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum SkillEntry {
     Simple(String),

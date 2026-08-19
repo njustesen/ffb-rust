@@ -655,12 +655,23 @@ pub(crate) struct TeamFileJson {
     #[serde(default)]
     pub special_rules: Vec<String>,
     pub players: Vec<TeamFilePlayer>,
+    /// Star players fielded as extra rostered players (parity tier §9). Each entry names a
+    /// star from data/star_players/all_editions.json by id; gen_java_parity_data.py emits the
+    /// identical star into the Java roster/team XMLs, so both engines field the same player.
+    #[serde(default)]
+    pub stars: Vec<TeamFileStar>,
 }
 
 #[derive(serde::Deserialize)]
 pub(crate) struct TeamFilePlayer {
     pub nr: i32,
     pub position_id: String,
+}
+
+#[derive(serde::Deserialize)]
+pub(crate) struct TeamFileStar {
+    pub nr: i32,
+    pub star_id: String,
 }
 
 /// Locate `data/teams/<edition>/team_<race>.json` (env `FFB_TEAMS_DIR` overrides the root).
@@ -713,6 +724,45 @@ pub fn make_team_from_file(roster_name: &str, side: &str, edition: &str) -> Resu
             &rp,
         ));
     }
+
+    // Star players drafted by the spec's `stars` list — fielded as ordinary rostered players
+    // (no inducement phase; the Java sheets get the identical player from the SAME star data
+    // via gen_java_parity_data.py, so the two engines stay in lockstep).
+    for star_entry in &spec.stars {
+        let star = ffb_model::data::STAR_PLAYERS.star_players.iter()
+            .find(|s| s.id == star_entry.star_id)
+            .ok_or_else(|| format!("star id '{}' not found in data/star_players/all_editions.json",
+                star_entry.star_id))?;
+        let pos_json = ffb_model::data::roster_json::PositionJson {
+            id: star.id.clone(),
+            name: star.name.clone(),
+            display_name: star.display_name.clone(),
+            player_type: star.player_type.clone(),
+            quantity: star.quantity.unwrap_or(1),
+            cost: star.cost,
+            ma: star.ma,
+            st: star.st,
+            ag: star.ag,
+            pa: star.pa,
+            av: star.av,
+            skills: star.skills.clone(),
+            skill_categories: Default::default(),
+            keywords: vec![],
+        };
+        let rp = position_json_to_roster_position(&pos_json, &roster_json.id, roster_json.undead, edition_to_rules(edition));
+        players.push(Player::from_position(
+            format!("{side}_{:02}", star_entry.nr),
+            format!("{} {} {}", side, rp.name, star_entry.nr),
+            star_entry.nr,
+            &rp,
+        ));
+    }
+    // Keep the roster in squad-nr order regardless of spec-file order: Java's player list is
+    // nr-ordered, and the harness activation snapshots index into the list (idx % N), so an
+    // out-of-order list silently pairs the same idx with different players (dwarf bb2016 star
+    // pilot, seed 1 half 2: pick=8 N=10 gave Java nr 12 and Rust nr 13). gen_java_parity_data.py
+    // applies the same sort to the emitted team XML.
+    players.sort_by_key(|p| p.nr);
 
     Ok(Team {
         id: format!("{side}_{}", roster_json.id),
@@ -1383,6 +1433,29 @@ mod fumbbl_roster_tests {
             assert_eq!(team.fan_factor, 5, "{side} must match <fanFactor>5 in the Java team sheet");
             assert_eq!(team.rerolls, 3, "{side} must match <reRolls>3 in the Java team sheet");
         }
+    }
+
+    /// §9 star drafting: a team spec's `stars` list fields the star as an ordinary rostered
+    /// player, resolved from data/star_players/all_editions.json (the Java sheets get the
+    /// identical player via gen_java_parity_data.py). The list must come out nr-SORTED even
+    /// though stars are appended after the regular players: the harness activation snapshots
+    /// index by position (idx % N), so an out-of-order list pairs the same idx with different
+    /// players in the two engines (dwarf bb2016 pilot seed 1, half 2: pick=8 N=10 gave Java
+    /// nr 12 and Rust nr 13 — 5/10 seeds red until the sort).
+    #[test]
+    fn star_drafting_injects_the_star_nr_sorted() {
+        let team = make_team("dwarf", "home", "bb2016");
+        let barik = team.players.iter().find(|p| p.nr == 11)
+            .expect("bb2016 dwarf spec drafts dwarf.Farblast at nr 11");
+        assert!(barik.name.contains("Barik"), "nr 11 must be the star, got {}", barik.name);
+        assert!(
+            barik.starting_skills.iter().any(|s| s.skill_id == SkillId::HailMaryPass),
+            "Barik must carry Hail Mary Pass",
+        );
+        let nrs: Vec<i32> = team.players.iter().map(|p| p.nr).collect();
+        let mut sorted = nrs.clone();
+        sorted.sort();
+        assert_eq!(nrs, sorted, "players must be nr-sorted");
     }
 
     #[test]

@@ -763,6 +763,56 @@ Found so far:
 - [x] Round-2 sweep: **137/199 reached, 62 dead** — HitAndRun newly reached, nothing lost.
       Inventory updated. Goblin 3×100 smoke + commit+push below.
 
+## 9. Star/inducement drafting (USER-SELECTED 2026-08-19)
+
+Goal: unlock the 23 star/skill/inducement-gated dead steps from the §7 inventory (AllYouCanEat,
+AutoGazeZoat, BalefulHex, BlackInk, CatchOfTheDay, DispatchDumpOff, DoubleStrength, EatTeamMate,
+HailMaryPass, LookIntoMyEyes×2, PileDriver, Pro, QuickBite, RaidingParty, ThenIStartedBlastin×2,
+ThrowARock, ThrowKeg×2, Treacherous, WeatherMage, WisdomOfTheWhiteDwarf). Constraint: BOTH
+engines must field identical teams — the Java sheets come from `scripts/gen_java_parity_data.py`
+over `data/teams` + `data/rosters`; the audited standard rosters must NOT be altered.
+
+Facts so far:
+- Dump-off IS drafted (dark elf Runner, all editions) yet DispatchDumpOff is dead — either the
+  trigger (carrier with Dump-off gets blitzed) never fires under random play or there is an
+  engine/agent gap. Investigate separately: possibly a free fix with no drafting at all.
+- No standard roster carries Hail Mary Pass, Pro, Pile Driver, or Multiple Block — those and the
+  star specials need new fielded players.
+
+- [x] Pipeline investigated, mechanism DECIDED (2026-08-19): draft stars as EXTRA ROSTERED
+      PLAYERS, no inducement phase. `data/star_players/all_editions.json` holds 173 stars in
+      exactly the roster-position shape (type "Star", full stat block, `available_for`);
+      gen_java_parity_data.py currently SKIPS type Star/Infamous Staff when emitting roster XML,
+      and the Rust loader skips the same. Plan: add an optional `"stars": ["<star_id>"]` list to
+      a team spec; the gen script resolves it from the star file and emits the star as an extra
+      <position> (type Star) + <player>; Rust make_team injects the identical player. Parity
+      re-baselines that matchup (same teams both engines). Caveats: the star file is
+      bb2016 (race.Name ids) + bb2020 (numeric FUMBBL ids) era — the bb2025 star specials
+      (Blastin'/White Dwarf/Keg/etc.) have NO data yet and must be drafted from
+      rules/star_players/*.md in a later batch; skill names must resolve in BOTH engines
+      (check_skill_names discipline).
+      Ready-made pilots: dwarf.Farblast (bb2016 dwarf, Hail Mary Pass), 39465 Helmut Wulf
+      (bb2020 dark_elf/nippon/renegades, Pro), 54496 Kiroth (bb2020 dark_elf, Black Ink),
+      39464 Hakflem (bb2020 renegades, Treacherous), darkelf.Horkon (bb2016, Multiple Block).
+- [x] DispatchDumpOff investigated: NOT free and NOT star-gated — it is a MULTI-BLOCK-sequence
+      step (only generator/bb2020+bb2025 multi_block.rs push it); the ordinary window is
+      `StepId::DumpOff`, present in every block sequence and already reached. Moved to the
+      Multiple Block bucket in the inventory (unlocked by drafting darkelf.Horkon).
+- [x] `stars` spec plumbing implemented both sides (TeamFileJson.stars → STAR_PLAYERS lookup →
+      Player::from_position; gen script resolves team["stars"], emits the star <position
+      type=Star> + <player>). LESSON (new bug shape): the harness activation snapshots index by
+      list position (idx % N), so BOTH engines must list players in the identical order — the
+      spec edit put nr 13 before 12 and 5/10 seeds went red at the half-2 setup (pick=8 N=10 =
+      Java nr 12 / Rust nr 13). Both sides now nr-sort; test star_drafting_injects_the_star_nr_sorted.
+- [x] Pilot bb2016 dwarf + dwarf.Farblast at nr 11 (blocker 11→13): 10/10 GREEN vs Java — the
+      star drafts, plays, and his Secret Weapon ban matches (both Bariks + Deathrollers benched
+      in matching states). Seeds 1-100 running.
+- [ ] `step=HailMaryPass` still 0: HAIL_MARY_PASS is a DECLARED action (StepDispatchPassing
+      routes on PlayerAction::HailMaryPass) that neither harness ever declares — the familiar
+      shape. Needs a matched declaration route: legal_actions offer + Rust agent arm +
+      ParityRunner filterActions/sendConcreteAction case + jar rebuild.
+- [ ] Then batch the rest, edition-correct; full gate 30/30/30; update inventory; commit+push.
+
 ## Blocked — needs a tier decision from the user
 
 - **Punt.** Plumbing is correct and dark_elf bb2025 is 100/100, but `InitPunt` dispatches zero times:

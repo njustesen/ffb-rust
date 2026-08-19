@@ -52,7 +52,7 @@ def skill_xml(s) -> str:
     return f"<skill>{escape(s)}</skill>"
 
 
-def roster_xml(d: dict, roster_id: str) -> str:
+def roster_xml(d: dict, roster_id: str, drafted_star_ids: set = frozenset()) -> str:
     L = ['<?xml version="1.0" encoding="UTF-8"?>', "", f'<roster id="{roster_id}">']
     L.append(f"\t<name>{escape(d['name'])}</name>")
     L.append(f"\t<reRollCost>{d['reroll_cost']}</reRollCost>")
@@ -66,7 +66,7 @@ def roster_xml(d: dict, roster_id: str) -> str:
     if rp and any(p["id"] == rp for p in d["positions"]):
         L.append(f"\t<raisedPositionId>{escape(rp)}</raisedPositionId>")
     for p in d["positions"]:
-        if p.get("type") in ("Star", "Infamous Staff"):
+        if p.get("type") in ("Star", "Infamous Staff") and p["id"] not in drafted_star_ids:
             continue
         L.append(f'\t<position id="{escape(p["id"])}">')
         L.append(f"\t\t<quantity>{p['quantity']}</quantity>")
@@ -182,9 +182,36 @@ def main() -> int:
                 if not check:
                     tf.write_text(json.dumps(team, indent=2) + "\n", encoding="utf-8")
             roster_id = f"{race}.{edition}"
+            # Star players drafted by the spec's "stars" list are fielded as ordinary rostered
+            # players: the star's stat block from data/star_players/all_editions.json is emitted
+            # as an extra <position> (type Star) in the roster XML and an extra <player> in the
+            # team XML. The Rust side (make_team_from_file) injects the identical player from the
+            # SAME star data, so both engines stay in lockstep.
+            drafted_star_ids = set()
+            stars = team.get("stars") or []
+            if stars:
+                star_file = json.loads((ROOT / "data" / "star_players" /
+                                        "all_editions.json").read_text(encoding="utf-8"))
+                stars_by_id = {sp["id"]: sp for sp in star_file["star_players"]}
+                roster = dict(roster)
+                roster["positions"] = list(roster["positions"])
+                team = dict(team)
+                team["players"] = list(team["players"])
+                for entry in stars:
+                    sp = stars_by_id.get(entry["star_id"])
+                    if sp is None:
+                        raise SystemExit(f"{tf}: star id {entry['star_id']!r} not in all_editions.json")
+                    if not any(p["id"] == sp["id"] for p in roster["positions"]):
+                        roster["positions"].append(sp)
+                    drafted_star_ids.add(sp["id"])
+                    team["players"].append({"nr": entry["nr"], "position_id": sp["id"]})
+                # nr-sorted, matching the Rust side's players.sort_by_key(nr): the harness
+                # activation snapshots index by position, so both engines must list the
+                # players in the identical order.
+                team["players"] = sorted(team["players"], key=lambda p: p["nr"])
             for server in SERVER_DIRS:
                 emit(server / "rosters" / f"roster_{race}_{edition}.xml",
-                     roster_xml(roster, roster_id))
+                     roster_xml(roster, roster_id, drafted_star_ids))
                 for side in ("home", "away"):
                     emit(server / "teams" / f"team_{race}_parity{suffix}_{side}.xml",
                          team_xml(team, roster, roster_id, side, suffix))

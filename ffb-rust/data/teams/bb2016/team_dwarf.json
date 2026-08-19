@@ -52,7 +52,7 @@
       "position_id": "dwarf.blocker"
     },
     {
-      "nr": 11,
+      "nr": 13,
       "position_id": "dwarf.blocker"
     },
     {
@@ -60,5 +60,11 @@
       "position_id": "dwarf.blocker"
     }
   ],
-  "special_rules": []
+  "special_rules": [],
+  "stars": [
+    {
+      "nr": 11,
+      "star_id": "dwarf.Farblast"
+    }
+  ]
 }
