@@ -357,6 +357,8 @@ pub fn eligible_players_for_activation(game: &Game) -> Vec<(PlayerId, Vec<ffb_mo
             PAC::KickTeamMate => PA::KickTeamMate,
             PAC::ThrowBomb => PA::ThrowBomb,
             PAC::HailMaryPass => PA::HailMaryPass,
+            PAC::Treacherous => PA::Treacherous,
+            PAC::BlackInk => PA::BlackInk,
             PAC::Punt => PA::Punt,
             PAC::SecureTheBall => PA::SecureTheBall,
             // ParityRunner adds PlayerAction.GAZE for any canGazeDuringMove player; the two

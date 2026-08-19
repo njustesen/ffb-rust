@@ -816,6 +816,29 @@ Facts so far:
       with 4 live `step=HailMaryPass` dispatches** — first star special ever exercised. Tests:
       hail_mary_pass_offered_to_carrier_right_after_pass; legality test counts stars outside the
       1.1M budget (modeled induced star).
+- [x] bb2020 stars DRAFTED and green (committed): dark_elf + Helmut 39465 (Pro) @10 + Kiroth
+      54496 (Black Ink) @11; renegades + Hakflem 39464 (Treacherous) @11. Both matchups 10/10.
+- [x] DECLARED-ACTION route for Treacherous/BlackInk tried and REVERTED — wrong architecture.
+      Findings (hard-won, keep): (1) ParityRunner `getUnusedSkillWithProperty(Player,..)` returns
+      Optional<Skill> — `!= null` is ALWAYS true; use .isPresent() (round-2 0/10: every player
+      offered the specials). (2) The REAL client (bb2025 SelectLogicModule) never declares
+      TREACHEROUS etc.: it declares a normal action and follows with `sendUseSkill(skill, true)`;
+      Java StepInitSelecting:348-378 maps CLIENT_USE_SKILL by skill property →
+      fDispatchPlayerAction (canStabTeamMateForBall→TREACHEROUS, canMoveOpenTeamMate→
+      RAIDING_PARTY, canStealBallFromOpponent→LOOK_INTO_MY_EYES, canMakeOpponentMissTurn→
+      BALEFUL_HEX, canGetBallOnGround→CATCH_OF_THE_DAY, canBlastRemotePlayer→
+      THEN_I_STARTED_BLASTIN) + forceGotoOnDispatch — ONE channel unlocks the whole special
+      family. BLACK_INK is NOT in that chain (different trigger — find it). (3) Rust's shared
+      EndSelecting special arms push `.push_seq(special).push_seq(select)` and the SELECT seq ran
+      first in the live trace (special drained by end-of-activation gotos) — the arm comment
+      claims the opposite; when building the UseSkill route, verify/fix the push order against
+      Java's LIFO (last pushSequence runs first → special first).
+- [ ] Implement the CLIENT_USE_SKILL channel 1:1: Rust InitSelecting UseSkill arm gains the
+      6-property dispatch chain; agents/ParityRunner send ActingPlayer(normal action) + UseSkill
+      when the skill's availability rule holds (client's isTreacherousAvailable etc. — align the
+      rule text exactly both sides); fix EndSelecting push order; then Treacherous/BalefulHex/
+      RaidingParty/LookIntoMyEyes/CatchOfTheDay/Blastin become reachable for drafted stars.
+- [ ] Find BLACK_INK's real client trigger (not in the UseSkill chain) and route it.
 - [ ] Then batch the rest, edition-correct; full gate 30/30/30; update inventory; commit+push.
 
 ## Blocked — needs a tier decision from the user

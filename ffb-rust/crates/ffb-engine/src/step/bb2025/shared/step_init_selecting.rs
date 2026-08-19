@@ -418,6 +418,8 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::HypnoticGaze => PlayerAction::Gaze,
         PlayerActionChoice::ThrowBomb => PlayerAction::ThrowBomb,
         PlayerActionChoice::HailMaryPass => PlayerAction::HailMaryPass,
+        PlayerActionChoice::Treacherous => PlayerAction::Treacherous,
+        PlayerActionChoice::BlackInk => PlayerAction::BlackInk,
         PlayerActionChoice::Swoop => PlayerAction::Swoop,
         PlayerActionChoice::Punt => PlayerAction::Punt,
         PlayerActionChoice::BreatheFire => PlayerAction::BreatheFire,

@@ -113,6 +113,10 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             // HAIL_MARY_PASS: a distinct declared action for a canPassToAnySquare carrier;
             // rides the same ClientCommandPass/sendPassAction route as PASS.
             | PlayerActionChoice::HailMaryPass
+            // TREACHEROUS / BLACK_INK (bb2020+ star specials): declared with no folded target —
+            // the step finds its own victim.
+            | PlayerActionChoice::Treacherous
+            | PlayerActionChoice::BlackInk
     )
 }
 
@@ -998,6 +1002,8 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         PlayerAction::Foul       => PlayerActionChoice::Foul,
         PlayerAction::Pass | PlayerAction::DumpOff => PlayerActionChoice::Pass,
         PlayerAction::HailMaryPass => PlayerActionChoice::HailMaryPass,
+        PlayerAction::Treacherous => PlayerActionChoice::Treacherous,
+        PlayerAction::BlackInk => PlayerActionChoice::BlackInk,
         PlayerAction::HandOver      => PlayerActionChoice::HandOff,
         PlayerAction::SecureTheBall => PlayerActionChoice::SecureTheBall,
         PlayerAction::ThrowTeamMate | PlayerAction::ThrowTeamMateMove => PlayerActionChoice::ThrowTeamMate,

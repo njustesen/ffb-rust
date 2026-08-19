@@ -215,6 +215,11 @@ pub enum PlayerActionChoice {
     /// Hail Mary Pass — a DISTINCT declared action (Java PlayerAction.HAIL_MARY_PASS):
     /// StepDispatchPassing routes on it, so folding it into Pass can never reach the step.
     HailMaryPass,
+    /// Treacherous (bb2020+ star special): declared action; the step stabs an adjacent
+    /// teammate carrying the ball, then the activation continues via a fresh Select sequence.
+    Treacherous,
+    /// Black Ink (bb2020+ star special): declared action; auto-gazes an adjacent opponent.
+    BlackInk,
     Swoop,
     Punt,
     BreatheFire,
