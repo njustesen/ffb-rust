@@ -992,7 +992,13 @@ FIRES (vacuous-green check: grep traces/events)**, fix divergences Rust-side, ga
 
 Carriers (from rules/star_players/*.md; Java canonical skill names in quotes):
 - Batch A — CLIENT_USE_SKILL channel (plumbing exists from §9):
-  - [ ] Ivar Eriksson 215K 6/4/3+/4+/9+ (Block, Guard, Loner(4+), Tackle, "Raiding Party") → bb2025 human
+  - [x] Ivar Eriksson LIVE (2026-08-20, `bfb382c1` + harness commit): human bb2025 100/100 with
+        RaidingParty events in 99/100 games; full gate 30/30 ×3. Surfaced the missing GUARD
+        assist clause in find_block_strength (counts while marked). Port lessons: MoveSquare
+        dodge/GFI flags are FUNCTIONAL (resetState must updateMoveSquares); activation prompt
+        lists come from eligible_players_for_activation (its PAC→PA map too); a step whose next
+        wait publishes only MoveSquares leaves the answered PLAYER_CHOICE dialog set — the
+        harness clears it locally.
   - [ ] Boa Kon'ssstriktr 180K 6/3/3+/4+/9+ (Dodge, Fend, Hypnotic Gaze, Loner(4+), Prehensile Tail,
         Safe Pair of Hands, Sidestep, "Look Into My Eyes") → bb2025 lizardman
   - [ ] Estelle la Veneaux 190K 6/3/3+/4+/8+ (Disturbing Presence, Dodge, Guard, Loner(4+),
