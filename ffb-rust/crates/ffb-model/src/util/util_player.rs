@@ -718,7 +718,12 @@ impl UtilPlayer {
         for entry in &entries {
             let Some(ps) = game.field_model.player_state(&entry.id) else { continue };
             let base = ps.base();
-            let player_on_team_from_last_turn = entry.is_home != home_playing;
+            // Java (1:1): `player.getTeam() != pGame.getTeamHome() && pGame.isHomePlaying()`
+            // — ASYMMETRIC: it only shields AWAY players during a HOME turn start. A symmetric
+            // `is_home != home_playing` skipped the when-not-active enhancement removal for a
+            // hexed HOME player at the half boundary, leaving hasToMissTurn stuck and the player
+            // inactive at half-2 turn 1 (amazon bb2025 seed 70 i=158).
+            let player_on_team_from_last_turn = !entry.is_home && home_playing;
             let set_active = player_on_team_from_last_turn || !entry.has_to_miss_turn;
             let new_ps = if base == PS_BLOCKED || base == PS_MOVING || base == PS_FALLING || base == PS_HIT_ON_GROUND {
                 Some(ps.change_base(PS_STANDING).change_active(set_active))

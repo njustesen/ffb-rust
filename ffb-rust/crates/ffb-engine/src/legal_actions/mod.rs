@@ -396,6 +396,26 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             }
         }
 
+        // Baleful Hex (bb2025 star special): the client's isBalefulHexAvailable rule —
+        // unused canMakeOpponentMissTurn + any opponent within 5 Chebyshev steps.
+        // Offer sits DIRECTLY AFTER Look Into My Eyes; ParityRunner mirrors the position.
+        if player.has_skill(SkillId::BalefulHex)
+            && !player.used_skills.contains(&SkillId::BalefulHex)
+        {
+            let opponent_near = opponent_team.players.iter().any(|op| {
+                game.field_model.player_coordinate(&op.id)
+                    .map(|c| c.distance_in_steps(coord) <= 5)
+                    .unwrap_or(false)
+            });
+            if opponent_near {
+                actions.push(Action::ActivatePlayer {
+                    player_id: pid.clone(),
+                    player_action: PlayerActionChoice::BalefulHex,
+                    block_defender_id: None,
+                });
+            }
+        }
+
         // Black Ink (bb2020+ star special): the client's isBlackInkAvailable rule — unused
         // canGazeAutomatically skill + an adjacent standing-or-prone, NOT-distracted opponent
         // (LogicModule.isBlackInkAvailable). Declaring it maps to the client's
@@ -509,6 +529,7 @@ pub fn eligible_players_for_activation(game: &Game) -> Vec<(PlayerId, Vec<ffb_mo
             PAC::MultipleBlock => PA::MultipleBlock,
             PAC::RaidingParty => PA::RaidingParty,
             PAC::LookIntoMyEyes => PA::LookIntoMyEyes,
+            PAC::BalefulHex => PA::BalefulHex,
             PAC::Treacherous => PA::Treacherous,
             PAC::BlackInk => PA::BlackInk,
             PAC::Punt => PA::Punt,
@@ -1378,6 +1399,31 @@ mod tests {
         }
         let a2 = legal_activate_player_actions(&game, TeamSide::Home);
         assert!(!has_action(&a2, "boa", PlayerActionChoice::LookIntoMyEyes));
+    }
+
+    /// §11: Baleful Hex is offered under the CLIENT's rule (LogicModule.isBalefulHexAvailable):
+    /// unused canMakeOpponentMissTurn + any opponent within 5 Chebyshev steps.
+    #[test]
+    fn baleful_hex_offered_only_with_opponent_within_five() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "estelle", c(5, 5), PS_STANDING, vec![SkillId::BalefulHex]);
+        add_player(&mut game, false, "opp", c(12, 5), PS_STANDING, vec![]);
+        // opponent 7 steps away → no offer
+        let a0 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a0, "estelle", PlayerActionChoice::BalefulHex));
+        // opponent within 5 → offered
+        if let Some(op) = game.team_away.players.iter().map(|p| p.id.clone()).next() {
+            game.field_model.set_player_coordinate(&op, c(10, 5));
+        }
+        let a1 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&a1, "estelle", PlayerActionChoice::BalefulHex),
+            "unused Baleful Hex + opponent within 5 steps must be offered");
+        // used skill withdraws it
+        if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == "estelle") {
+            p.used_skills.insert(SkillId::BalefulHex);
+        }
+        let a2 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a2, "estelle", PlayerActionChoice::BalefulHex));
     }
 
     /// §9: Black Ink is offered under the CLIENT's rule (LogicModule.isBlackInkAvailable):

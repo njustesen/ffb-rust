@@ -428,6 +428,7 @@ fn choice_to_player_action(choice: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::MultipleBlock => PlayerAction::MultipleBlock,
         PlayerActionChoice::RaidingParty => PlayerAction::RaidingParty,
         PlayerActionChoice::LookIntoMyEyes => PlayerAction::LookIntoMyEyes,
+        PlayerActionChoice::BalefulHex => PlayerAction::BalefulHex,
         PlayerActionChoice::Treacherous => PlayerAction::Treacherous,
         PlayerActionChoice::BlackInk => PlayerAction::BlackInk,
         PlayerActionChoice::Swoop => PlayerAction::Swoop,

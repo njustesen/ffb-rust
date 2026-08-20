@@ -190,6 +190,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::MultipleBlock => PlayerAction::MultipleBlock,
         PlayerActionChoice::RaidingParty => PlayerAction::RaidingParty,
         PlayerActionChoice::LookIntoMyEyes => PlayerAction::LookIntoMyEyes,
+        PlayerActionChoice::BalefulHex => PlayerAction::BalefulHex,
         PlayerActionChoice::Treacherous => PlayerAction::Treacherous,
         PlayerActionChoice::BlackInk => PlayerAction::BlackInk,
         PlayerActionChoice::Swoop => PlayerAction::Swoop,

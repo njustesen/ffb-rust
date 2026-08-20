@@ -80,13 +80,18 @@ impl ServerUtilPlayer {
             for (oid, &ocoord) in &game.field_model.player_coordinates {
                 let on_def_team = if def_team_home { game.team_home.has_player(oid) } else { game.team_away.has_player(oid) };
                 if !on_def_team { continue; }
-                if defender_id.map(|d| d == oid).unwrap_or(false) { continue; }
                 if ocoord.is_adjacent(coord) {
                     let ostate = game.field_model.player_state(oid);
                     if ostate.map(|s| s.has_tacklezones()).unwrap_or(false) {
-                        opponents_other_than_defender += 1;
+                        // Java counts `defendingPlayersOtherThanBlocker` EXCLUDING the defender,
+                        // but streams the Guard-cancel check over ALL defensiveAssists — the
+                        // DEFENDER ITSELF cancels an assister's Guard (amazon bb2025: the
+                        // Defensive catcher being blocked cancels the adjacent star's Guard;
+                        // seed 3 i=6 Java -2 dice vs Rust 1).
+                        if !defender_id.map(|d| d == oid).unwrap_or(false) {
+                            opponents_other_than_defender += 1;
+                        }
                         // Java: `defensiveAssists ... anyMatch(skill.canCancel(assistsBlocksInTacklezones))`
-                        // — a marking defender with e.g. Defensive cancels the assister's Guard.
                         if game.player(oid)
                             .map(|p| p.has_skill_to_cancel_property_in(game.rules,
                                 ffb_model::model::property::NamedProperties::ASSISTS_BLOCKS_IN_TACKLEZONES))
@@ -211,6 +216,41 @@ mod tests {
         let st16 = ServerUtilPlayer::find_block_strength(
             &game, FieldCoordinate::new(5, 5), 7, FieldCoordinate::new(6, 5));
         assert_eq!(st16, 8, "bb2016 B&C same-team block counts the teammate assist via the flip");
+    }
+
+    #[test]
+    fn defender_with_defensive_cancels_guard_assist() {
+        // Java findBlockStrength: guardIsCanceled streams over ALL defensiveAssists —
+        // INCLUDING THE DEFENDER — so a Defensive defender cancels a marked Guard assister
+        // (amazon bb2025 seed 3 i=6: Java -2 dice, Rust rolled 1).
+        use ffb_model::model::SkillWithValue;
+        use ffb_model::enums::SkillId;
+        let mut game = make_game();
+        game.rules = Rules::Bb2025;
+        game.home_playing = true;
+        game.team_home.players.push(make_player("atk", 1));
+        let mut guard = make_player("guard", 2);
+        guard.extra_skills.push(SkillWithValue::new(SkillId::Guard));
+        game.team_home.players.push(guard);
+        let mut def = make_player("def", 1);
+        def.extra_skills.push(SkillWithValue::new(SkillId::Defensive));
+        game.team_away.players.push(def);
+        // marker keeps the assister engaged so only the Guard clause could count it
+        game.team_away.players.push(make_player("marker", 2));
+        for (id, x, y) in [("atk", 12, 8), ("guard", 12, 6), ("def", 13, 7), ("marker", 13, 6)] {
+            game.field_model.set_player_coordinate(id, FieldCoordinate::new(x, y));
+            game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+        }
+        let s = ServerUtilPlayer::find_block_strength(
+            &game, FieldCoordinate::new(12, 8), 3, FieldCoordinate::new(13, 7));
+        assert_eq!(s, 3, "Defensive on the DEFENDER cancels the marked Guard assist");
+        // without Defensive the Guard assist counts while marked
+        if let Some(p) = game.team_away.players.iter_mut().find(|p| p.id == "def") {
+            p.extra_skills.clear();
+        }
+        let s2 = ServerUtilPlayer::find_block_strength(
+            &game, FieldCoordinate::new(12, 8), 3, FieldCoordinate::new(13, 7));
+        assert_eq!(s2, 4, "marked Guard assister counts when nothing cancels it");
     }
 
     #[test]

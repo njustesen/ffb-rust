@@ -116,13 +116,17 @@ impl GameMechanicTrait for GameMechanic {
     }
 
     fn enhancements_to_remove_at_end_of_turn(&self) -> HashSet<String> {
-        // TODO: return WisdomOfTheWhiteDwarf enhancement name via SkillFactory
-        HashSet::new()
+        // Java: {WisdomOfTheWhiteDwarf} via SkillFactory.forClass(..).getName()
+        let mut set = HashSet::new();
+        set.insert("Wisdom of the White Dwarf".to_string());
+        set
     }
 
     fn enhancements_to_remove_at_end_of_turn_when_not_setting_active(&self) -> HashSet<String> {
-        // TODO: Constant.getEnhancementSkillsToRemoveAtEndOfTurnWhenNotSettingActive
-        HashSet::new()
+        // Java: Constant.getEnhancementSkillsToRemoveAtEndOfTurnWhenNotSettingActive = {BalefulHex}
+        let mut set = HashSet::new();
+        set.insert("Baleful Hex".to_string());
+        set
     }
 
     fn roll_for_chef_at_start_of_half(&self) -> bool { false }

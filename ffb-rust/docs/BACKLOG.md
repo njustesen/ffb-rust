@@ -1007,8 +1007,19 @@ Carriers (from rules/star_players/*.md; Java canonical skill names in quotes):
         is a DialogInformationOkay — ParityRunner's default routes unknown dialogs to the
         NON-SEEDED RandomStrategy, so INFORMATION_OKAY joined the clear-only group (Rust's
         agent acknowledges it with zero RNG draws; clearing is the deterministic mirror).
-  - [ ] Estelle la Veneaux 190K 6/3/3+/4+/8+ (Disturbing Presence, Dodge, Guard, Loner(4+),
-        Sidestep, "Baleful Hex") → bb2025 amazon
+  - [x] Estelle la Veneaux LIVE (2026-08-20): drafted @nr2 bb2025 amazon (catcher 2→13),
+        100/100 fresh Java logs, full gate 30/30 ×3, hex fires in 96/100 games (182
+        declarations). THREE engine fixes: (1) Java skill enhancements can grant BARE
+        PROPERTIES — hex success adds a hasToMissTurn temporary property to the target; the
+        model gained Player.temporary_properties (Java Player.temporaryProperties) and the
+        bb2020/bb2025 mechanic enhancement-removal sets were TODO-empty; (2) find_block_strength
+        guard-cancel streams over ALL defensiveAssists INCLUDING THE DEFENDER — a Defensive
+        defender cancels a marked Guard assist (only the marker COUNT excludes the defender);
+        (3) refreshPlayersForTurnStart's playerOnTeamFromLastTurn is the ASYMMETRIC
+        `team != home && isHomePlaying`, not `is_home != home_playing` — the symmetric form
+        left a hexed HOME player's enhancement stuck across the half boundary. Harness lesson:
+        --reuse-java after a draft change reds 90 seeds at step 1 — regenerate Java logs after
+        ANY data change.
   - [ ] Rodney Roachbait 70K 6/2/3+/4+/7+ (Catch, Diving Catch, Jump Up, Loner(4+), On the Ball,
         Sidestep, Stunty, Wrestle, "Catch of the Day") → bb2025 wood_elf (Woodland League)
   - [ ] Zzharg Madeye (Cannoneer, Hail Mary Pass, Loner, Nerves of Steel, Secret Weapon,

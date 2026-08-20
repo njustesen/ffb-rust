@@ -16,7 +16,7 @@
       "position_id": "amazon.catcher"
     },
     {
-      "nr": 2,
+      "nr": 13,
       "position_id": "amazon.catcher"
     },
     {
@@ -60,5 +60,11 @@
       "position_id": "amazon.linewoman"
     }
   ],
-  "special_rules": []
+  "special_rules": [],
+  "stars": [
+    {
+      "nr": 2,
+      "star_id": "amazon.Estelle"
+    }
+  ]
 }

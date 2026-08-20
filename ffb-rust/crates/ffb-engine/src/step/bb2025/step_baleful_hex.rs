@@ -142,8 +142,13 @@ impl StepBalefulHex {
             if eligibles.len() == 1 {
                 self.player_id = Some(eligibles[0].clone());
             } else {
-                // Multiple targets: show dialog; random agent will decline
-                return StepOutcome::cont();
+                // Java: DialogPlayerChoiceParameter(actingTeam, BALEFUL_HEX, eligible, null, 1)
+                return StepOutcome::cont().with_prompt(
+                    ffb_model::prompts::AgentPrompt::PlayerChoice {
+                        eligible_players: eligibles,
+                        reason: "BALEFUL_HEX".into(),
+                        descriptions: Vec::new(),
+                    });
             }
         }
 
@@ -190,6 +195,19 @@ impl StepBalefulHex {
                             state.change_confused(true).change_active(false),
                         );
                     }
+                    // Java: fieldModel.addSkillEnhancements(targetPlayer, skill) — Baleful Hex's
+                    // TemporaryEnhancements grant the bare hasToMissTurn PROPERTY, which
+                    // refreshPlayersForTurnStart reads to keep the target inactive through their
+                    // team's next turn (and removes when not setting active).
+                    if let Some(target) = game.player_mut(target_id) {
+                        target.add_temporary_properties(
+                            "Baleful Hex",
+                            &[ffb_model::model::property::NamedProperties::HAS_TO_MISS_TURN],
+                        );
+                    }
+                    // Java: UtilServerPlayerMove.updateMoveSquares(getGameState(), isJumping)
+                    let jumping = game.acting_player.jumping;
+                    crate::util::util_server_player_move::UtilServerPlayerMove::update_move_squares(game, jumping);
                 }
                 Self::mark_skill_used(game, &player_id);
             } else if self.re_rolled_action.is_none() {
@@ -315,6 +333,79 @@ mod tests {
         step.end_turn = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
+    }
+
+    /// Java StepBalefulHex success: changeConfused(true).changeActive(false) AND
+    /// fieldModel.addSkillEnhancements(target, skill) — the hasToMissTurn property grant is
+    /// what keeps the target inactive through refreshPlayersForTurnStart (amazon seed 1 i=11).
+    #[test]
+    fn successful_hex_grants_has_to_miss_turn_property() {
+        use ffb_model::model::property::NamedProperties;
+        let (mut game, _) = make_game_bh();
+        let tid = "victim".to_string();
+        game.team_away.players.push(make_player(&tid, None));
+        game.field_model.set_player_state(&tid, PlayerState::new(PS_STANDING).change_active(true));
+        game.field_model.set_player_coordinate(&tid, FieldCoordinate::new(12, 7));
+        let mut step = StepBalefulHex::new();
+        let mut rng = GameRng::new(seed_for_d6(6));
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::NextStep);
+        let ps = game.field_model.player_state(&tid).unwrap();
+        assert!(ps.is_confused() && !ps.is_active(), "target must be distracted+inactive");
+        let victim = game.player(&tid).unwrap();
+        assert!(victim.has_skill_property(NamedProperties::HAS_TO_MISS_TURN),
+            "target must carry the Baleful Hex hasToMissTurn enhancement");
+        // The enhancement is removed at the target team's turn start (when not set active),
+        // and only then — refresh with the TARGET team active keeps them inactive.
+        game.home_playing = false;
+        let mut wna = std::collections::HashSet::new();
+        wna.insert("Baleful Hex".to_string());
+        ffb_model::util::util_player::UtilPlayer::refresh_players_for_turn_start(
+            &mut game, &Default::default(), &wna);
+        let ps2 = game.field_model.player_state(&tid).unwrap();
+        assert!(!ps2.is_active(), "hexed player misses their team's next turn");
+        assert!(!game.player(&tid).unwrap().has_skill_property(NamedProperties::HAS_TO_MISS_TURN),
+            "enhancement removed once the missed turn starts");
+        // The turn after, they refresh back to active.
+        ffb_model::util::util_player::UtilPlayer::refresh_players_for_turn_start(
+            &mut game, &Default::default(), &wna);
+        assert!(game.field_model.player_state(&tid).unwrap().is_active());
+    }
+
+    /// Half-boundary regression (amazon bb2025 seed 70 i=158): a HOME player hexed on the
+    /// AWAY team's final turn of the half. Java's playerOnTeamFromLastTurn is the asymmetric
+    /// `team != home && isHomePlaying` — false for every HOME player — so the boundary refresh
+    /// (away still playing) already strips the enhancement; setup re-activates the player and
+    /// they start half 2 ACTIVE.
+    #[test]
+    fn home_victim_hexed_on_away_final_turn_starts_next_half_active() {
+        use ffb_model::model::property::NamedProperties;
+        let (mut game, _) = make_game_bh();
+        // flip the acting side: AWAY Estelle hexes a HOME victim
+        game.home_playing = false;
+        let victim = "hvictim".to_string();
+        game.team_home.players.push(make_player(&victim, None));
+        game.field_model.set_player_state(&victim, PlayerState::new(PS_STANDING).change_active(true));
+        game.field_model.set_player_coordinate(&victim, FieldCoordinate::new(15, 7));
+        if let Some(p) = game.player_mut(&victim) {
+            p.add_temporary_properties("Baleful Hex", &[NamedProperties::HAS_TO_MISS_TURN]);
+        }
+        game.field_model.set_player_state(&victim,
+            game.field_model.player_state(&victim).unwrap().change_confused(true).change_active(false));
+        // Half-boundary refresh: AWAY is still the playing team (no flip on fNewHalf).
+        let mut wna = std::collections::HashSet::new();
+        wna.insert("Baleful Hex".to_string());
+        ffb_model::util::util_player::UtilPlayer::refresh_players_for_turn_start(
+            &mut game, &Default::default(), &wna);
+        assert!(!game.player(&victim).unwrap().has_skill_property(NamedProperties::HAS_TO_MISS_TURN),
+            "boundary refresh strips the enhancement from the HOME victim");
+        // Setup re-places players STANDING+active; the half-2 turn-1 refresh must keep them so.
+        game.field_model.set_player_state(&victim, PlayerState::new(PS_STANDING).change_active(true));
+        game.home_playing = true;
+        ffb_model::util::util_player::UtilPlayer::refresh_players_for_turn_start(
+            &mut game, &Default::default(), &wna);
+        assert!(game.field_model.player_state(&victim).unwrap().is_active(),
+            "hexed-then-half-boundary player starts half 2 active");
     }
 
     #[test]

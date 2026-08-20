@@ -88,6 +88,11 @@ pub struct Player {
     pub extra_skills: Vec<SkillWithValue>,
     /// Skills granted temporarily (cards, prayers, etc.).
     pub temporary_skills: Vec<SkillWithValue>,
+    /// Java: Player.temporaryProperties — bare skill PROPERTIES granted by an enhancement
+    /// source without a carrier skill (e.g. Baleful Hex grants hasToMissTurn to its target).
+    /// (source, property) pairs; consulted by has_skill_property and removed with the source.
+    #[serde(default)]
+    pub temporary_properties: Vec<(String, String)>,
     /// Skills used this turn (reset at turn start).
     pub used_skills: HashSet<SkillId>,
 
@@ -298,9 +303,23 @@ impl Player {
         }
     }
 
-    /// Java: Player.removeEnhancements(source) — remove all stat mods AND skill grants for source.
+    /// Java: Player.addTemporaryProperties(source, properties).
+    pub fn add_temporary_properties(&mut self, source: &str, properties: &[&str]) {
+        for prop in properties {
+            self.temporary_properties.push((source.to_string(), (*prop).to_string()));
+        }
+    }
+
+    /// Java: Player.removeTemporaryProperties(source).
+    pub fn remove_temporary_properties(&mut self, source: &str) {
+        self.temporary_properties.retain(|(s, _)| s != source);
+    }
+
+    /// Java: Player.removeEnhancements(source) — remove all stat mods, properties AND skill
+    /// grants for source.
     pub fn remove_enhancements(&mut self, source: &str) {
         self.remove_temporary_stat_mods(source);
+        self.remove_temporary_properties(source);
         self.remove_prayer_skills(source);
     }
 
@@ -316,9 +335,11 @@ impl Player {
         self.all_skill_ids().any(|s| s == id)
     }
 
-    /// 1:1 translation of hasSkillProperty — checks if any of the player's skills has the given property.
+    /// 1:1 translation of hasSkillProperty — checks if any of the player's skills has the given
+    /// property. Java also unions Player.temporaryProperties (bare property grants).
     pub fn has_skill_property(&self, property: &str) -> bool {
         self.all_skill_ids().any(|id| id.properties().contains(&property))
+            || self.temporary_properties.iter().any(|(_, p)| p == property)
     }
 
     /// Edition-aware `hasSkillProperty`. Java resolves a skill's properties through the per-edition
@@ -327,6 +348,9 @@ impl Player {
     /// caller has a `Game`; `has_skill_property` keeps the edition-agnostic union for the many call
     /// sites that do not.
     pub fn has_skill_property_in(&self, rules: crate::enums::Rules, property: &str) -> bool {
+        if self.temporary_properties.iter().any(|(_, p)| p == property) {
+            return true;
+        }
         self.all_skill_ids().any(|id| id.properties_for(rules).contains(&property))
     }
 
@@ -511,6 +535,7 @@ impl Player {
             starting_skills: pos.skills.clone(),
             extra_skills: vec![],
             temporary_skills: vec![],
+            temporary_properties: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0,
             stat_injuries: vec![],
@@ -833,6 +858,7 @@ mod tests {
             starting_skills: vec![],
             extra_skills: vec![],
             temporary_skills: vec![],
+            temporary_properties: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0,
             stat_injuries: vec![],

@@ -186,6 +186,18 @@ impl Step for StepInitSelecting {
                     return self.execute_step(game, rng)
                         .with_event(GameEvent::PlayerAction { player_id: player_id.clone(), action: PlayerAction::BlackInk });
                 }
+                if *player_action == PlayerActionChoice::BalefulHex {
+                    // Java client: ActingPlayer + sendUseSkill(balefulHex); the server's
+                    // CLIENT_USE_SKILL chain dispatches BALEFUL_HEX with forceGoto.
+                    game.original_bombardier = None;
+                    util_server_steps::change_player_action(game, player_id, PlayerAction::Move, false);
+                    game.defender_id = None;
+                    self.dispatch_player_action = Some(PlayerAction::BalefulHex);
+                    self.force_goto_on_dispatch = true;
+                    Self::check_for_staller(game);
+                    return self.execute_step(game, rng)
+                        .with_event(GameEvent::PlayerAction { player_id: player_id.clone(), action: PlayerAction::BalefulHex });
+                }
                 if *player_action == PlayerActionChoice::LookIntoMyEyes {
                     // Java client: ActingPlayer + sendUseSkill(lookIntoMyEyes); the server's
                     // CLIENT_USE_SKILL chain dispatches LOOK_INTO_MY_EYES with forceGoto.
@@ -674,6 +686,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::MultipleBlock => PlayerAction::MultipleBlock,
         PlayerActionChoice::RaidingParty => PlayerAction::RaidingParty,
         PlayerActionChoice::LookIntoMyEyes => PlayerAction::LookIntoMyEyes,
+        PlayerActionChoice::BalefulHex => PlayerAction::BalefulHex,
         PlayerActionChoice::Treacherous => PlayerAction::Treacherous,
         PlayerActionChoice::BlackInk => PlayerAction::BlackInk,
         PlayerActionChoice::Swoop => PlayerAction::Swoop,

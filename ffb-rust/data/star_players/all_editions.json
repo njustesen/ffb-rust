@@ -4448,6 +4448,34 @@
       "available_for": [
         "Lizardman"
       ]
+    },
+    {
+      "id": "amazon.Estelle",
+      "name": "Estelle la Veneaux",
+      "display_name": "Estelle la Veneaux",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 190000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "shorthand": "EV",
+      "skills": [
+        "Disturbing Presence",
+        "Dodge",
+        "Guard",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Sidestep",
+        "Baleful Hex"
+      ],
+      "available_for": [
+        "Amazon"
+      ]
     }
   ]
 }

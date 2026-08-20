@@ -120,6 +120,7 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             // the step finds its own victim.
             | PlayerActionChoice::RaidingParty
             | PlayerActionChoice::LookIntoMyEyes
+            | PlayerActionChoice::BalefulHex
             | PlayerActionChoice::Treacherous
             | PlayerActionChoice::BlackInk
     )
@@ -848,6 +849,16 @@ impl Agent for RandomAgent {
                     player_id: eligible_players.get(idx).cloned().unwrap_or_default(),
                 }
             }
+            // Baleful Hex target choice: single actionRng pick over the dialog's list in
+            // the step's given order (Java's findPlayers = opponent team nr order).
+            Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
+                if reason == "BALEFUL_HEX" =>
+            {
+                let idx = self.pick_action(eligible_players.len().max(1));
+                Action::SelectPlayer {
+                    player_id: eligible_players.get(idx).cloned().unwrap_or_default(),
+                }
+            }
             Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
                 if reason == "BLACK_INK" =>
             {
@@ -1093,6 +1104,7 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         PlayerAction::HailMaryPass => PlayerActionChoice::HailMaryPass,
         PlayerAction::RaidingParty => PlayerActionChoice::RaidingParty,
         PlayerAction::LookIntoMyEyes => PlayerActionChoice::LookIntoMyEyes,
+        PlayerAction::BalefulHex => PlayerActionChoice::BalefulHex,
         PlayerAction::Treacherous => PlayerActionChoice::Treacherous,
         PlayerAction::MultipleBlock => PlayerActionChoice::MultipleBlock,
         PlayerAction::BlackInk => PlayerActionChoice::BlackInk,

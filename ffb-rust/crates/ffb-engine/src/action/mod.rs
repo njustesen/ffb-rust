@@ -227,6 +227,9 @@ pub enum PlayerActionChoice {
     /// Look Into My Eyes (bb2025 star special): steal the ball from an adjacent carrier.
     /// Declared as the client's ActingPlayer(MOVE) + UseSkill(canStealBallFromOpponent) pair.
     LookIntoMyEyes,
+    /// Baleful Hex (bb2025 star special): distract an opponent within 5 squares on a 2+.
+    /// Declared as the client's ActingPlayer(MOVE) + UseSkill(canMakeOpponentMissTurn) pair.
+    BalefulHex,
     /// Treacherous (bb2020+ star special): declared action; the step stabs an adjacent
     /// teammate carrying the ball, then the activation continues via a fresh Select sequence.
     Treacherous,
