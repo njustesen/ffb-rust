@@ -22,14 +22,9 @@ impl Step for StepNextStepAndRepeat {
     fn id(&self) -> StepId { StepId::NextStepAndRepeat }
 
     fn start(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        StepOutcome {
-            action: StepAction::NextStepAndRepeat,
-            goto_label: None,
-            published: vec![],
-            pushes: vec![],
-            events: vec![],
-            prompt: None,
-        }
+        let mut out = StepOutcome::next();
+        out.action = StepAction::NextStepAndRepeat;
+        out
     }
 
     fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {

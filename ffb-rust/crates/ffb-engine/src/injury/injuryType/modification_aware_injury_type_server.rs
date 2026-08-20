@@ -109,6 +109,10 @@ pub fn modification_aware_handle_injury<T: ModificationAwareInjuryType>(
     } else {
         None
     };
+    if std::env::var_os("FFB_MOD_PROBE").is_some() {
+        eprintln!("INJPROBE type={} attacker={:?} defender={} rng={}",
+            this.java_class_name(), attacker_id, defender_id, rng.call_count);
+    }
     // Java line 45: armourRoll(game, gameState, diceRoller, pAttacker, pDefender,
     //                          diceInterpreter, injuryContext, true)
     this.armour_roll(game, rng, attacker_id, defender_id, true);

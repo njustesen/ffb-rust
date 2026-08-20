@@ -69,6 +69,8 @@ pub enum Action {
     FollowUp { follow_up: bool },
     /// Move to one adjacent safe square after a block (HitAndRun skill). None = decline.
     HitAndRun { coord: Option<FieldCoordinate> },
+    /// Raiding Party: move the chosen open team-mate to this square (Java CLIENT_FIELD_COORDINATE).
+    RaidingPartyTarget { coord: FieldCoordinate },
     /// Move to one adjacent square before a block resolves (Trickster skill).
     TricksterMove { coord: FieldCoordinate },
     /// Java `ClientCommandSwoop` — the square a BB2016/BB2020 swooping player is steered toward.
@@ -218,6 +220,10 @@ pub enum PlayerActionChoice {
     /// Multiple Block (bb2020/bb2025): declared action; the player then picks TWO targets via
     /// CLIENT_SYNCHRONOUS_MULTI_BLOCK (AgentPrompt::MultiBlockTargets / Action::MultiBlock).
     MultipleBlock,
+    /// Raiding Party (bb2025 star special): move an open team-mate one square. Declared as
+    /// the client's ActingPlayer(MOVE) + UseSkill(canMoveOpenTeamMate) pair; the mover
+    /// continues the move afterwards.
+    RaidingParty,
     /// Treacherous (bb2020+ star special): declared action; the step stabs an adjacent
     /// teammate carrying the ball, then the activation continues via a fresh Select sequence.
     Treacherous,

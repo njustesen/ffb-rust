@@ -118,6 +118,7 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             | PlayerActionChoice::MultipleBlock
             // TREACHEROUS / BLACK_INK (bb2020+ star specials): declared with no folded target —
             // the step finds its own victim.
+            | PlayerActionChoice::RaidingParty
             | PlayerActionChoice::Treacherous
             | PlayerActionChoice::BlackInk
     )
@@ -835,6 +836,17 @@ impl Agent for RandomAgent {
             // BLACK_INK is the second mandatory PlayerChoice: Kiroth's auto-gaze picks its
             // victim with the same engine-agnostic min-(x,y) rule (ParityRunner's PLAYER_CHOICE
             // handler mirrors it), and the step consumes a plain Action::SelectPlayer.
+            // Raiding Party team-mate choice (multi-eligible only; the step auto-picks a lone
+            // candidate like Java). Contract with ParityRunner: single actionRng pick over the
+            // dialog's list in the step's given order (Java's findPlayers = team nr order).
+            Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
+                if reason == "RAIDING_PARTY" =>
+            {
+                let idx = self.pick_action(eligible_players.len().max(1));
+                Action::SelectPlayer {
+                    player_id: eligible_players.get(idx).cloned().unwrap_or_default(),
+                }
+            }
             Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
                 if reason == "BLACK_INK" =>
             {
@@ -913,6 +925,21 @@ impl Agent for RandomAgent {
             // its abort); ParityRunner.sendHitAndRunTarget mirrors this list, order and single
             // actionRng pick (AGENT_CONTRACT §6). Both harnesses used to abort here, which is why
             // the `HitAndRun` step never executed while the matrices stayed green.
+            // Raiding Party target square: MoveSquares published by StepRaidingParty; same
+            // contract as HitAndRun/Punt — coordinate-sorted, single actionRng pick, CANONICAL
+            // coordinate (the step stores it verbatim; ParityRunner sends the mirrored view and
+            // Java un-mirrors it).
+            Some(AgentPrompt::RaidingParty { player_id, squares }) => {
+                let mut squares = squares.clone();
+                squares.sort_by_key(|c| (c.x, c.y));
+                if squares.is_empty() {
+                    Action::EndTurn
+                } else {
+                    let idx = self.pick_action(squares.len());
+                    let _ = player_id;
+                    Action::RaidingPartyTarget { coord: squares[idx] }
+                }
+            }
             Some(AgentPrompt::HitAndRun { player_id, squares }) => {
                 let mut squares = squares.clone();
                 squares.sort_by_key(|c| (c.x, c.y));
@@ -1063,6 +1090,7 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         PlayerAction::Foul       => PlayerActionChoice::Foul,
         PlayerAction::Pass | PlayerAction::DumpOff => PlayerActionChoice::Pass,
         PlayerAction::HailMaryPass => PlayerActionChoice::HailMaryPass,
+        PlayerAction::RaidingParty => PlayerActionChoice::RaidingParty,
         PlayerAction::Treacherous => PlayerActionChoice::Treacherous,
         PlayerAction::MultipleBlock => PlayerActionChoice::MultipleBlock,
         PlayerAction::BlackInk => PlayerActionChoice::BlackInk,

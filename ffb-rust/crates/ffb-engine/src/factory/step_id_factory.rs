@@ -340,6 +340,7 @@ impl StepIdFactory {
             StepId::MultipleBlockFork        => "multiBlockFork",
             StepId::Mvp                      => "mvp",
             StepId::NextStep                 => "nextStep",
+            StepId::NextStepAndRepeat        => "nextStepAndRepeat",
             StepId::NoOp                     => "noOp",
             StepId::Pass                     => "pass",
             StepId::PassBlock                => "passBlock",

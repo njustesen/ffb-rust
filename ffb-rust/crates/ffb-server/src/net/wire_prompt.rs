@@ -285,6 +285,9 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
             Some(WireDialog::Move { player_id: player_id.clone(), squares: squares.clone() }),
         AgentPrompt::FollowUp { attacker_id, target_coord } =>
             Some(WireDialog::FollowUp { attacker_id: attacker_id.clone(), target_coord: *target_coord }),
+        // Raiding Party's square window rides the HitAndRun wire dialog shape (same payload).
+        AgentPrompt::RaidingParty { player_id, squares } =>
+            Some(WireDialog::HitAndRun { player_id: player_id.clone(), squares: squares.clone() }),
         AgentPrompt::HitAndRun { player_id, squares } =>
             Some(WireDialog::HitAndRun { player_id: player_id.clone(), squares: squares.clone() }),
         // The BB2016/BB2020 swoop-target ask has no Java dialog counterpart to wire yet.

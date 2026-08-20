@@ -188,6 +188,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::ThrowBomb => PlayerAction::ThrowBomb,
         PlayerActionChoice::HailMaryPass => PlayerAction::HailMaryPass,
         PlayerActionChoice::MultipleBlock => PlayerAction::MultipleBlock,
+        PlayerActionChoice::RaidingParty => PlayerAction::RaidingParty,
         PlayerActionChoice::Treacherous => PlayerAction::Treacherous,
         PlayerActionChoice::BlackInk => PlayerAction::BlackInk,
         PlayerActionChoice::Swoop => PlayerAction::Swoop,

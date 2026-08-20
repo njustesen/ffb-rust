@@ -981,7 +981,40 @@ ApothecaryMultiple DauntlessMultiple StateMultipleRolls ReportStabInjury Dispatc
 - [ ] Cosmetic: no `skillUse` GameEvent is emitted for the Old Pro dialog (coverage counts it
       as unexercised even when it fires); wire the event when coverage reporting needs it.
 
-## Blocked — needs a tier decision from the user## Blocked — needs a tier decision from the user
+## 11. bb2025 star-special batch (USER-SELECTED 2026-08-20)
+
+Goal: switch on the remaining star-special dead steps by ADDING bb2025 star data (the current
+`data/star_players/all_editions.json` lacks the bb2025-only stars entirely) and drafting one
+carrier per special into a hosting bb2025 team. Per star: add the data entry (skills must
+resolve in BOTH engines — canonical Java names verified below), draft at/near the LOS, rerun
+`scripts/gen_java_parity_data.py`, run the host matchup 1-100, **verify the special actually
+FIRES (vacuous-green check: grep traces/events)**, fix divergences Rust-side, gate.
+
+Carriers (from rules/star_players/*.md; Java canonical skill names in quotes):
+- Batch A — CLIENT_USE_SKILL channel (plumbing exists from §9):
+  - [ ] Ivar Eriksson 215K 6/4/3+/4+/9+ (Block, Guard, Loner(4+), Tackle, "Raiding Party") → bb2025 human
+  - [ ] Boa Kon'ssstriktr 180K 6/3/3+/4+/9+ (Dodge, Fend, Hypnotic Gaze, Loner(4+), Prehensile Tail,
+        Safe Pair of Hands, Sidestep, "Look Into My Eyes") → bb2025 lizardman
+  - [ ] Estelle la Veneaux 190K 6/3/3+/4+/8+ (Disturbing Presence, Dodge, Guard, Loner(4+),
+        Sidestep, "Baleful Hex") → bb2025 amazon
+  - [ ] Rodney Roachbait 70K 6/2/3+/4+/7+ (Catch, Diving Catch, Jump Up, Loner(4+), On the Ball,
+        Sidestep, Stunty, Wrestle, "Catch of the Day") → bb2025 wood_elf (Woodland League)
+  - [ ] Zzharg Madeye (Cannoneer, Hail Mary Pass, Loner, Nerves of Steel, Secret Weapon,
+        Thick Skull, "\"Blastin' Solves Everything\"") → bb2025 chaos_dwarf
+- Batch B — own step families:
+  - [ ] Cindy Piewhistle ("All You Can Eat" + bomb) → bb2025 halfling
+  - [ ] Guffle Pusmaw ("Quick Bite") → bb2025 nurgle
+  - [ ] Swiftvine Glimmershard ("Furious Outburst") → bb2025 wood_elf
+  - [ ] Thorsson Stoutmead ("Beer Barrel Bash!") → bb2025 dwarf
+  - [ ] Grombrindal ("Wisdom of the White Dwarf") → bb2025 dwarf or halfling
+- Batch C — already in data, just dormant:
+  - [ ] The Zoat ("Excuse Me, Are You a Zoat?" → AutoGazeZoat, bb2020 star already in
+        all_editions.json) → a bb2020 team
+
+Availability is league-rule based and the harness does not validate it — host wherever
+convenient (precedent: Farblast into bb2016 dwarf). Stars ride outside the 1.1M budget.
+
+## Blocked — needs a tier decision from the user
 
 - **Punt.** Plumbing is correct and dark_elf bb2025 is 100/100, but `InitPunt` dispatches zero times:
   Punt needs the carrier holding the ball at *turn start*, which the turn-start snapshot makes

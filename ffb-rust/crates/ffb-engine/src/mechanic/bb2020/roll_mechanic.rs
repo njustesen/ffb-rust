@@ -56,7 +56,7 @@ const ORDERED_INJURIES: [SeriousInjuryKind; 6] = [
 ];
 
 /// BB2020 `mapSIRoll`: returns a reduceable injury for this player, or the original.
-/// Java shuffles the reduceable list; Rust returns the first reduceable (no GameRng available here).
+/// Java shuffles the reduceable list via the shared Collections stream; so does Rust.
 fn map_si_roll_bb2020(game: &Game, ctx: &InjuryContext, si_roll: i32) -> Option<SeriousInjuryKind> {
     let original = serious_injury_bb2020(si_roll)?;
     let defender = ctx.defender_id.as_deref().and_then(|id| game.player(id));
@@ -83,7 +83,7 @@ fn map_si_roll_bb2020(game: &Game, ctx: &InjuryContext, si_roll: i32) -> Option<
         // had consumed a shuffle Java made and Rust did not.
         let mut reduceable = reduceable;
         ffb_model::util::java_random::collections_shuffle(
-            &mut reduceable, &mut game.collections_rng.borrow_mut());
+            &mut reduceable, &mut *game.collections_rng.lock());
         Some(reduceable[0])
     }
 }

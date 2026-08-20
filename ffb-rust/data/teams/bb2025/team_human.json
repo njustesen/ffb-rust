@@ -16,7 +16,7 @@
       "position_id": "human.ogre"
     },
     {
-      "nr": 2,
+      "nr": 13,
       "position_id": "human.blitzer"
     },
     {
@@ -60,5 +60,11 @@
       "position_id": "human.halfling_hopeful"
     }
   ],
-  "special_rules": []
+  "special_rules": [],
+  "stars": [
+    {
+      "nr": 2,
+      "star_id": "human.Ivar"
+    }
+  ]
 }

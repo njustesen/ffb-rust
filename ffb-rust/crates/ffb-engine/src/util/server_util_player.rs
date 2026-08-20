@@ -76,6 +76,7 @@ impl ServerUtilPlayer {
             if !state.map(|s| s.has_tacklezones()).unwrap_or(false) { continue; }
             if state.map(|s| s.is_eye_gouged()).unwrap_or(false) { continue; }
             let mut opponents_other_than_defender = 0i32;
+            let mut guard_is_canceled = false;
             for (oid, &ocoord) in &game.field_model.player_coordinates {
                 let on_def_team = if def_team_home { game.team_home.has_player(oid) } else { game.team_away.has_player(oid) };
                 if !on_def_team { continue; }
@@ -84,10 +85,48 @@ impl ServerUtilPlayer {
                     let ostate = game.field_model.player_state(oid);
                     if ostate.map(|s| s.has_tacklezones()).unwrap_or(false) {
                         opponents_other_than_defender += 1;
+                        // Java: `defensiveAssists ... anyMatch(skill.canCancel(assistsBlocksInTacklezones))`
+                        // — a marking defender with e.g. Defensive cancels the assister's Guard.
+                        if game.player(oid)
+                            .map(|p| p.has_skill_to_cancel_property_in(game.rules,
+                                ffb_model::model::property::NamedProperties::ASSISTS_BLOCKS_IN_TACKLEZONES))
+                            .unwrap_or(false)
+                        {
+                            guard_is_canceled = true;
+                        }
                     }
                 }
             }
-            if opponents_other_than_defender == 0 { block_strength += 1; }
+            // Java ServerUtilPlayer.findBlockStrength :59-69 — GUARD: an assister with
+            // assistsBlocksInTacklezones counts even while marked, unless the edition's
+            // allowsCancellingGuard applies (attacker on the acting team, non-Blitz turn mode)
+            // and a marking defender carries a Guard-cancelling skill. This clause was entirely
+            // missing: Ivar Eriksson (Guard) assisting while marked gave Java a die count Rust
+            // never matched (human bb2025 seed 8 i=9: Java 1-die block, Rust 2).
+            let has_guard = game.player(id)
+                .map(|p| p.has_skill_property(ffb_model::model::property::NamedProperties::ASSISTS_BLOCKS_IN_TACKLEZONES))
+                .unwrap_or(false);
+            let guard_cancel_applies = guard_is_canceled && {
+                use ffb_mechanics::skill_mechanic::SkillMechanic as SkillMechanicTrait;
+                let allows = match game.rules {
+                    ffb_model::enums::Rules::Bb2016 =>
+                        ffb_mechanics::bb2016::skill_mechanic::SkillMechanic::new()
+                            .allows_cancelling_guard(game.turn_mode),
+                    ffb_model::enums::Rules::Bb2020 =>
+                        ffb_mechanics::bb2020::skill_mechanic::SkillMechanic::new()
+                            .allows_cancelling_guard(game.turn_mode),
+                    _ =>
+                        ffb_mechanics::bb2025::skill_mechanic::SkillMechanic::new()
+                            .allows_cancelling_guard(game.turn_mode),
+                };
+                let attacker_on_acting_team = attacker_id
+                    .map(|a| game.team_home.has_player(a) == game.home_playing)
+                    .unwrap_or(false);
+                allows && attacker_on_acting_team
+            };
+            if (has_guard && !guard_cancel_applies) || opponents_other_than_defender == 0 {
+                block_strength += 1;
+            }
         }
         block_strength
     }

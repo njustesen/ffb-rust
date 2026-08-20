@@ -206,6 +206,10 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
             Some(ClientCommand::ClientBlock(ClientBlock { defender_id: target_id }))
         }
 
+        // Raiding Party target square: Java CLIENT_FIELD_COORDINATE, carried as a 1-square move.
+        Action::RaidingPartyTarget { coord } =>
+            Some(ClientCommand::ClientMove(ClientMove { move_squares: vec![coord] })),
+
         Action::HitAndRun { coord } => {
             // HitAndRun move uses the move command with the chosen square, or confirm if declining
             match coord {
@@ -422,6 +426,7 @@ fn choice_to_player_action(choice: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::ThrowBomb => PlayerAction::ThrowBomb,
         PlayerActionChoice::HailMaryPass => PlayerAction::HailMaryPass,
         PlayerActionChoice::MultipleBlock => PlayerAction::MultipleBlock,
+        PlayerActionChoice::RaidingParty => PlayerAction::RaidingParty,
         PlayerActionChoice::Treacherous => PlayerAction::Treacherous,
         PlayerActionChoice::BlackInk => PlayerAction::BlackInk,
         PlayerActionChoice::Swoop => PlayerAction::Swoop,

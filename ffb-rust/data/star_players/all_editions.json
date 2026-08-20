@@ -4391,6 +4391,33 @@
       "available_for": [
         "Wood Elf"
       ]
+    },
+    {
+      "id": "human.Ivar",
+      "name": "Ivar Eriksson",
+      "display_name": "Ivar Eriksson",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 215000,
+      "ma": 6,
+      "st": 4,
+      "ag": 3,
+      "pa": 4,
+      "av": 9,
+      "shorthand": "IE",
+      "skills": [
+        "Block",
+        "Guard",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Tackle",
+        "Raiding Party"
+      ],
+      "available_for": [
+        "Human"
+      ]
     }
   ]
 }

@@ -274,6 +274,7 @@ pub fn make_step(id: StepId) -> Box<dyn Step> {
         // ── Control / framework ──────────────────────────────────────────────
         StepId::GotoLabel              => Box::new(StepGotoLabel::new()),
         StepId::NextStep               => { use crate::step::step_next_step::StepNextStep; Box::new(StepNextStep::new()) }
+        StepId::NextStepAndRepeat      => { use crate::step::step_next_step_and_repeat::StepNextStepAndRepeat; Box::new(StepNextStepAndRepeat::new()) }
         StepId::NoOp                   => Box::new(NoOpStep(StepId::NoOp)),
         StepId::ResetToMove            => { use crate::step::step_reset_to_move::StepResetToMove; Box::new(StepResetToMove::new()) }
         // ── Block mechanics ──────────────────────────────────────────────────
@@ -639,7 +640,7 @@ impl DriverGameState {
         // this exact expression, so seeding ours identically makes both engines draw the same
         // permutations (prayer selection, per-player picks). Keep the constant in sync with
         // ParityRunner.
-        game.collections_rng = std::cell::RefCell::new(
+        game.collections_rng = ffb_model::model::game::CollectionsRng::new(
             ffb_model::util::java_random::JavaRandom::new((seed as i64) ^ 0x5EED_C011_3C71_04));
         DriverGameState {
             game, rng: GameRng::new(seed), stack: DriverStepStack::new_with_rules(rules),
@@ -1025,7 +1026,7 @@ mod tests {
             AssignTouchdowns, InitEndGame, Winnings, PlayerLoss, FanFactor, DedicatedFans, MasterChef,
             RiotousRookies, Prayer, Prayers, PrayerRoll, InitPunt, PuntDirection, PuntDistance, EndPunt,
             InitBomb, EndBomb, ResolveBomb, Bombardier2, SelectGazeTarget, SelectGazeTargetEnd, LookIntoMyEyes,
-            InitLookIntoMyEyes, ApothecaryMultiple, BlockRollMultiple, MultipleBlockFork, ReportStabInjury,
+            InitLookIntoMyEyes, ApothecaryMultiple, BlockRollMultiple, MultipleBlockFork, ReportStabInjury, NextStepAndRepeat,
             InitFeeding, EndFeeding, EatTeamMate, AllYouCanEat, InitFuriousOutburst, FirstMoveFuriousOutburst,
             SecondMoveFuriousOutburst, EndFuriousOutburst, SpecialEffect, ConsumeParameter, SetActingPlayerAndTeam,
             SetActingTeam, StateMultipleRolls, SteadyFooting, PickMeUp, PileDriver, CatchOfTheDay, RecheckExplodeSkill,
@@ -1033,7 +1034,7 @@ mod tests {
             EndThrowKeg, BlockStatistics, SelectBlitzTarget, SelectBlitzTargetEnd, RemoveTargetSelectionState,
             ResetToMove, PenaltyShootout, TrapDoor, Pro, RevertEndTurn, BloodLust, PlayCard, CloudBurster,
         ];
-        assert_eq!(ids.len(), 199, "StepId variant count changed - update this list and pin");
+        assert_eq!(ids.len(), 200, "StepId variant count changed - update this list and pin");
         for id in ids {
             assert_eq!(make_step(id).id(), id, "make_step({id:?}) built a step with a mismatched id");
         }

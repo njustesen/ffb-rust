@@ -93,7 +93,7 @@ pub struct Game {
     /// (e.g. bb2020 RollMechanic.mapSIRoll's Collections.shuffle of the reduceable
     /// serious-injury list) — interior mutability mirrors Java's global mutable field.
     #[serde(skip)]
-    pub collections_rng: std::cell::RefCell<crate::util::java_random::JavaRandom>,
+    pub collections_rng: CollectionsRng,
     /// Java: GameState.getKickingSwarmers / setKickingSwarmers — tracks how many
     /// kicking-team swarming players were placed during the Swarming kickoff result.
     pub kicking_swarmers: i32,
@@ -159,7 +159,7 @@ impl Game {
             last_defender_id: None,
             blitz_turn_state: None,
             prayer_state: PrayerState::new(),
-            collections_rng: std::cell::RefCell::new(crate::util::java_random::JavaRandom::default()),
+            collections_rng: CollectionsRng::default(),
             kicking_swarmers: 0,
             active_shadowers: Vec::new(),
             dialog_id: None,
@@ -568,5 +568,28 @@ mod tests {
         assert!(g.is_active(NamedProperties::FOUL_BREAKS_ARMOUR_WITHOUT_ROLL));
         g.turn_data_home.inducement_set.deactivate_card("Blatant Foul");
         assert!(!g.is_active(NamedProperties::FOUL_BREAKS_ARMOUR_WITHOUT_ROLL));
+    }
+}
+
+
+/// Java's `java.util.Collections` shared shuffle Random, mirrored per game (seeded by the
+/// driver and by ParityRunner identically). Mutex-wrapped so `&Game`-only paths (e.g. the
+/// bb2020 serious-injury remap inside the roll mechanic) can draw from the shared stream,
+/// while `Game` stays `Sync` for the ffb-server handlers; `Clone` clones the inner state.
+#[derive(Debug, Default)]
+pub struct CollectionsRng(std::sync::Mutex<crate::util::java_random::JavaRandom>);
+
+impl CollectionsRng {
+    pub fn new(rng: crate::util::java_random::JavaRandom) -> Self {
+        Self(std::sync::Mutex::new(rng))
+    }
+    pub fn lock(&self) -> std::sync::MutexGuard<'_, crate::util::java_random::JavaRandom> {
+        self.0.lock().unwrap()
+    }
+}
+
+impl Clone for CollectionsRng {
+    fn clone(&self) -> Self {
+        Self(std::sync::Mutex::new(self.0.lock().unwrap().clone()))
     }
 }

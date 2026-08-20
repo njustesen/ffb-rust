@@ -372,7 +372,7 @@ impl StepApplyKickoffResult {
         // the faithful equivalent — no HashMap-bucket emulation needed.
         let pick_prayer_roll = |game: &mut Game| -> i32 {
             let mut available: Vec<i32> = (1..=max_prayer_roll as i32).collect();
-            ffb_model::util::java_random::collections_shuffle(&mut available, &mut game.collections_rng.borrow_mut());
+            ffb_model::util::java_random::collections_shuffle(&mut available, &mut *game.collections_rng.lock());
             available[0]
         };
 

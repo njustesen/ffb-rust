@@ -29,6 +29,7 @@ pub mod phase;
 pub mod game;
 pub mod step_goto_label;
 pub mod step_next_step;
+pub mod step_next_step_and_repeat;
 pub mod step_reset_to_move;
 
 pub use framework::*;

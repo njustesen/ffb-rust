@@ -97,7 +97,7 @@ pub enum StepId {
     // common / misc
     NoOp,
     // control
-    GotoLabel, NextStep,
+    GotoLabel, NextStep, NextStepAndRepeat,
     // throw-team-mate (BB2020)
     AlwaysHungry, DispatchScatterPlayer, EndScatterPlayer, EndThrowTeamMate,
     InitScatterPlayer, InitThrowTeamMate, RightStuff, ThrowTeamMate, FumbleTtmPass,

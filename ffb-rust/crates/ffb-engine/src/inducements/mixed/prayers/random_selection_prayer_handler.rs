@@ -28,9 +28,9 @@ pub fn init_effect_random_selection(
 ) -> bool {
     // The selector draws from Java's Collections stream (`game.collections_rng`), never the dice
     // stream; the RefCell keeps the stream reachable from &Game-only paths (mapSIRoll).
-    let mut collections_rng = game.collections_rng.borrow().clone();
+    let mut collections_rng = game.collections_rng.lock().clone();
     let selected = selector.select_players(game, team_id, nr_of_players, &mut collections_rng, added_skills);
-    *game.collections_rng.borrow_mut() = collections_rng;
+    *game.collections_rng.lock() = collections_rng;
     for player_id in &selected {
         game.field_model.add_prayer_enhancement(player_id, prayer_name);
         apply_prayer_player_effect(game, player_id, prayer_name);

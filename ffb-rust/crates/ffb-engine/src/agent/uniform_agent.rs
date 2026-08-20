@@ -317,6 +317,13 @@ impl Agent for UniformAgent {
             }
             // Hit-and-run: decline is always a legal response alongside every offered square, so
             // it's included as an explicit option instead of only being the empty-squares case.
+            Some(AgentPrompt::RaidingParty { squares, .. }) => {
+                let mut squares = squares.clone();
+                squares.sort_by_key(|c| (c.x, c.y));
+                if squares.is_empty() { return Action::EndTurn; }
+                let idx = self.pick(squares.len());
+                Action::RaidingPartyTarget { coord: squares[idx] }
+            }
             Some(AgentPrompt::HitAndRun { squares, .. }) => {
                 let n_options = squares.len() + 1; // + 1 for "decline"
                 let idx = self.pick(n_options);

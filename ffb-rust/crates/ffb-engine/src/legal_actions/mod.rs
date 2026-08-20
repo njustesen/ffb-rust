@@ -322,6 +322,60 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             }
         }
 
+        // Raiding Party (bb2025 star special): the client's isRaidingPartyAvailable rule
+        // (LogicModule :200-237) — unused canMoveOpenTeamMate + an acting-team mate that is
+        // STANDING, within 5 steps, OPEN (no adjacent opponents with tacklezones) and has an
+        // adjacent EMPTY in-field square that itself neighbours an opponent. Offer sits
+        // DIRECTLY AFTER Treacherous; ParityRunner mirrors the same position.
+        if player.has_skill(SkillId::RaidingParty)
+            && !player.used_skills.contains(&SkillId::RaidingParty)
+        {
+            let own_team = if game.team_home.has_player(pid.as_str()) { &game.team_home } else { &game.team_away };
+            let eligible_mate = own_team.players.iter().any(|tm| {
+                let Some(tc) = game.field_model.player_coordinate(&tm.id) else { return false };
+                let Some(ts) = game.field_model.player_state(&tm.id) else { return false };
+                if !ts.is_standing() { return false; }
+                if tc.distance_in_steps(coord) > 5 { return false; }
+                let open = !opponent_team.players.iter().any(|op| {
+                    game.field_model.player_coordinate(&op.id)
+                        .map(|oc| oc.is_adjacent(tc)
+                            && game.field_model.player_state(&op.id)
+                                .map(|os| os.has_tacklezones()).unwrap_or(false))
+                        .unwrap_or(false)
+                });
+                if !open { return false; }
+                // an adjacent empty in-field square that neighbours an opponent
+                let mut sq = Vec::new();
+                for dx in -1i32..=1 { for dy in -1i32..=1 {
+                    if dx == 0 && dy == 0 { continue; }
+                    let n = ffb_model::types::FieldCoordinate::new(tc.x + dx, tc.y + dy);
+                    if ffb_model::types::FieldCoordinateBounds::FIELD.is_in_bounds(n) { sq.push(n); }
+                }}
+                sq.into_iter().any(|s| {
+                    game.field_model.player_at(s).is_none() && {
+                        let mut adj = Vec::new();
+                        for dx in -1i32..=1 { for dy in -1i32..=1 {
+                            if dx == 0 && dy == 0 { continue; }
+                            let n = ffb_model::types::FieldCoordinate::new(s.x + dx, s.y + dy);
+                            if ffb_model::types::FieldCoordinateBounds::FIELD.is_in_bounds(n) { adj.push(n); }
+                        }}
+                        adj.into_iter().any(|a| {
+                            game.field_model.player_at(a)
+                                .map(|oid| opponent_team.has_player(oid))
+                                .unwrap_or(false)
+                        })
+                    }
+                })
+            });
+            if eligible_mate {
+                actions.push(Action::ActivatePlayer {
+                    player_id: pid.clone(),
+                    player_action: PlayerActionChoice::RaidingParty,
+                    block_defender_id: None,
+                });
+            }
+        }
+
         // Black Ink (bb2020+ star special): the client's isBlackInkAvailable rule — unused
         // canGazeAutomatically skill + an adjacent standing-or-prone, NOT-distracted opponent
         // (LogicModule.isBlackInkAvailable). Declaring it maps to the client's
@@ -433,6 +487,7 @@ pub fn eligible_players_for_activation(game: &Game) -> Vec<(PlayerId, Vec<ffb_mo
             PAC::ThrowBomb => PA::ThrowBomb,
             PAC::HailMaryPass => PA::HailMaryPass,
             PAC::MultipleBlock => PA::MultipleBlock,
+            PAC::RaidingParty => PA::RaidingParty,
             PAC::Treacherous => PA::Treacherous,
             PAC::BlackInk => PA::BlackInk,
             PAC::Punt => PA::Punt,
@@ -1237,6 +1292,25 @@ mod tests {
 
     /// §9: Treacherous is offered under the CLIENT's rule (bb2025 SelectLogicModule
     /// isTreacherousAvailable): unused skill + an adjacent blockable teammate CARRYING the
+    /// Raiding Party (seed-1 i=27 shape): the actor is marked but a STANDING team-mate one
+    /// square away is OPEN and can step into an empty square beside an opponent.
+    #[test]
+    fn raiding_party_offered_with_open_movable_team_mate() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "ivar", c(12, 6), PS_STANDING, vec![SkillId::RaidingParty]);
+        add_player(&mut game, true, "mate", c(11, 7), PS_STANDING, vec![]);
+        add_player(&mut game, false, "opp1", c(13, 7), PS_STANDING, vec![]);
+        add_player(&mut game, false, "opp2", c(13, 8), PS_STANDING, vec![]);
+        let a = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&a, "ivar", PlayerActionChoice::RaidingParty),
+            "open mate at (11,7) can step to (12,8) beside opp2 — must be offered");
+        // Used skill withdraws the offer.
+        game.team_home.players.iter_mut().find(|p| p.id == "ivar").unwrap()
+            .used_skills.insert(SkillId::RaidingParty);
+        let a2 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a2, "ivar", PlayerActionChoice::RaidingParty));
+    }
+
     /// ball. No adjacent carrier → no offer; used skill → no offer.
     #[test]
     fn treacherous_offered_only_with_adjacent_ball_carrier() {
