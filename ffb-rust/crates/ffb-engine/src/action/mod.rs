@@ -224,6 +224,9 @@ pub enum PlayerActionChoice {
     /// the client's ActingPlayer(MOVE) + UseSkill(canMoveOpenTeamMate) pair; the mover
     /// continues the move afterwards.
     RaidingParty,
+    /// Look Into My Eyes (bb2025 star special): steal the ball from an adjacent carrier.
+    /// Declared as the client's ActingPlayer(MOVE) + UseSkill(canStealBallFromOpponent) pair.
+    LookIntoMyEyes,
     /// Treacherous (bb2020+ star special): declared action; the step stabs an adjacent
     /// teammate carrying the ball, then the activation continues via a fresh Select sequence.
     Treacherous,

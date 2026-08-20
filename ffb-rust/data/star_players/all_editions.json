@@ -4418,6 +4418,36 @@
       "available_for": [
         "Human"
       ]
+    },
+    {
+      "id": "lizardman.Boa",
+      "name": "Boa Kon'ssstriktr",
+      "display_name": "Boa Kon'ssstriktr",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 180000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 9,
+      "shorthand": "BK",
+      "skills": [
+        "Dodge",
+        "Fend",
+        "Hypnotic Gaze",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Prehensile Tail",
+        "Safe Pair of Hands",
+        "Sidestep",
+        "Look Into My Eyes"
+      ],
+      "available_for": [
+        "Lizardman"
+      ]
     }
   ]
 }

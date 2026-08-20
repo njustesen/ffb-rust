@@ -376,6 +376,26 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             }
         }
 
+        // Look Into My Eyes (bb2025 star special): the client's isLookIntoMyEyesAvailable rule
+        // — unused canStealBallFromOpponent + an adjacent BLOCKABLE opponent carrying the ball.
+        // Offer sits DIRECTLY AFTER Raiding Party; ParityRunner mirrors the same position.
+        if player.has_skill(SkillId::LookIntoMyEyes)
+            && !player.used_skills.contains(&SkillId::LookIntoMyEyes)
+        {
+            let carrier_adjacent = ffb_model::util::util_player::UtilPlayer::find_adjacent_blockable_players(
+                    game, opponent_team, coord,
+                )
+                .into_iter()
+                .any(|op_id| ffb_model::util::util_player::UtilPlayer::has_ball(game, op_id));
+            if carrier_adjacent {
+                actions.push(Action::ActivatePlayer {
+                    player_id: pid.clone(),
+                    player_action: PlayerActionChoice::LookIntoMyEyes,
+                    block_defender_id: None,
+                });
+            }
+        }
+
         // Black Ink (bb2020+ star special): the client's isBlackInkAvailable rule — unused
         // canGazeAutomatically skill + an adjacent standing-or-prone, NOT-distracted opponent
         // (LogicModule.isBlackInkAvailable). Declaring it maps to the client's
@@ -488,6 +508,7 @@ pub fn eligible_players_for_activation(game: &Game) -> Vec<(PlayerId, Vec<ffb_mo
             PAC::HailMaryPass => PA::HailMaryPass,
             PAC::MultipleBlock => PA::MultipleBlock,
             PAC::RaidingParty => PA::RaidingParty,
+            PAC::LookIntoMyEyes => PA::LookIntoMyEyes,
             PAC::Treacherous => PA::Treacherous,
             PAC::BlackInk => PA::BlackInk,
             PAC::Punt => PA::Punt,
@@ -1332,6 +1353,31 @@ mod tests {
         }
         let a2 = legal_activate_player_actions(&game, TeamSide::Home);
         assert!(!has_action(&a2, "p1", PlayerActionChoice::Treacherous));
+    }
+
+    /// §11: Look Into My Eyes is offered under the CLIENT's rule
+    /// (LogicModule.isLookIntoMyEyesAvailable): unused canStealBallFromOpponent + an
+    /// adjacent BLOCKABLE opponent carrying the ball.
+    #[test]
+    fn look_into_my_eyes_offered_only_with_adjacent_opponent_carrier() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "boa", c(5, 5), PS_STANDING, vec![SkillId::LookIntoMyEyes]);
+        add_player(&mut game, false, "opp", c(6, 5), PS_STANDING, vec![]);
+        // adjacent opponent NOT carrying → no offer
+        let a0 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a0, "boa", PlayerActionChoice::LookIntoMyEyes));
+        // opponent carries the ball → offered
+        game.field_model.ball_coordinate = Some(c(6, 5));
+        game.field_model.ball_in_play = true;
+        let a1 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&a1, "boa", PlayerActionChoice::LookIntoMyEyes),
+            "unused Look Into My Eyes + adjacent opponent carrier must be offered");
+        // used skill withdraws it
+        if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == "boa") {
+            p.used_skills.insert(SkillId::LookIntoMyEyes);
+        }
+        let a2 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a2, "boa", PlayerActionChoice::LookIntoMyEyes));
     }
 
     /// §9: Black Ink is offered under the CLIENT's rule (LogicModule.isBlackInkAvailable):

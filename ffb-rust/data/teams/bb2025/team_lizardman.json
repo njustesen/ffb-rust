@@ -16,7 +16,7 @@
       "position_id": "lizardman.kroxigor"
     },
     {
-      "nr": 2,
+      "nr": 12,
       "position_id": "lizardman.saurus"
     },
     {
@@ -56,5 +56,11 @@
       "position_id": "lizardman.skink"
     }
   ],
-  "special_rules": []
+  "special_rules": [],
+  "stars": [
+    {
+      "nr": 2,
+      "star_id": "lizardman.Boa"
+    }
+  ]
 }

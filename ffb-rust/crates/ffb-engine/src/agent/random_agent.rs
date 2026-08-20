@@ -119,6 +119,7 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             // TREACHEROUS / BLACK_INK (bb2020+ star specials): declared with no folded target —
             // the step finds its own victim.
             | PlayerActionChoice::RaidingParty
+            | PlayerActionChoice::LookIntoMyEyes
             | PlayerActionChoice::Treacherous
             | PlayerActionChoice::BlackInk
     )
@@ -1091,6 +1092,7 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         PlayerAction::Pass | PlayerAction::DumpOff => PlayerActionChoice::Pass,
         PlayerAction::HailMaryPass => PlayerActionChoice::HailMaryPass,
         PlayerAction::RaidingParty => PlayerActionChoice::RaidingParty,
+        PlayerAction::LookIntoMyEyes => PlayerActionChoice::LookIntoMyEyes,
         PlayerAction::Treacherous => PlayerActionChoice::Treacherous,
         PlayerAction::MultipleBlock => PlayerActionChoice::MultipleBlock,
         PlayerAction::BlackInk => PlayerActionChoice::BlackInk,

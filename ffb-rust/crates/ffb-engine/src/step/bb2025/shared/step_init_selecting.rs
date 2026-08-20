@@ -186,6 +186,18 @@ impl Step for StepInitSelecting {
                     return self.execute_step(game, rng)
                         .with_event(GameEvent::PlayerAction { player_id: player_id.clone(), action: PlayerAction::BlackInk });
                 }
+                if *player_action == PlayerActionChoice::LookIntoMyEyes {
+                    // Java client: ActingPlayer + sendUseSkill(lookIntoMyEyes); the server's
+                    // CLIENT_USE_SKILL chain dispatches LOOK_INTO_MY_EYES with forceGoto.
+                    game.original_bombardier = None;
+                    util_server_steps::change_player_action(game, player_id, PlayerAction::Move, false);
+                    game.defender_id = None;
+                    self.dispatch_player_action = Some(PlayerAction::LookIntoMyEyes);
+                    self.force_goto_on_dispatch = true;
+                    Self::check_for_staller(game);
+                    return self.execute_step(game, rng)
+                        .with_event(GameEvent::PlayerAction { player_id: player_id.clone(), action: PlayerAction::LookIntoMyEyes });
+                }
                 if *player_action == PlayerActionChoice::RaidingParty {
                     // Java client: sendActingPlayer(player, MOVE) then sendUseSkill(raidingSkill)
                     // (BlockLogicExtension/MoveLogicModule); the server's CLIENT_USE_SKILL chain
@@ -661,6 +673,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::HailMaryPass => PlayerAction::HailMaryPass,
         PlayerActionChoice::MultipleBlock => PlayerAction::MultipleBlock,
         PlayerActionChoice::RaidingParty => PlayerAction::RaidingParty,
+        PlayerActionChoice::LookIntoMyEyes => PlayerAction::LookIntoMyEyes,
         PlayerActionChoice::Treacherous => PlayerAction::Treacherous,
         PlayerActionChoice::BlackInk => PlayerAction::BlackInk,
         PlayerActionChoice::Swoop => PlayerAction::Swoop,

@@ -999,8 +999,14 @@ Carriers (from rules/star_players/*.md; Java canonical skill names in quotes):
         lists come from eligible_players_for_activation (its PAC→PA map too); a step whose next
         wait publishes only MoveSquares leaves the answered PLAYER_CHOICE dialog set — the
         harness clears it locally.
-  - [ ] Boa Kon'ssstriktr 180K 6/3/3+/4+/9+ (Dodge, Fend, Hypnotic Gaze, Loner(4+), Prehensile Tail,
-        Safe Pair of Hands, Sidestep, "Look Into My Eyes") → bb2025 lizardman
+  - [x] Boa Kon'ssstriktr LIVE (2026-08-20): drafted @nr2 bb2025 lizardman, 100/100 on fresh
+        Java logs, full gate 30/30 ×3. StepLookIntoMyEyes was already fully ported — only
+        offers/declaration/data were dead. Vacuous-green check: the condition (activation while
+        adjacent to the ball carrier) is genuinely RARE — 1 declaration in 100 games (seed 13)
+        is the expected exposure, not a wiring failure. Harness lesson: the LIME failure notice
+        is a DialogInformationOkay — ParityRunner's default routes unknown dialogs to the
+        NON-SEEDED RandomStrategy, so INFORMATION_OKAY joined the clear-only group (Rust's
+        agent acknowledges it with zero RNG draws; clearing is the deterministic mirror).
   - [ ] Estelle la Veneaux 190K 6/3/3+/4+/8+ (Disturbing Presence, Dodge, Guard, Loner(4+),
         Sidestep, "Baleful Hex") → bb2025 amazon
   - [ ] Rodney Roachbait 70K 6/2/3+/4+/7+ (Catch, Diving Catch, Jump Up, Loner(4+), On the Ball,
