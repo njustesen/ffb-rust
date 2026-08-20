@@ -2,6 +2,7 @@
 ///
 /// Valid for Stab. Replaces the entire injury roll with a fresh re-roll.
 /// Gate: injury is not already a casualty (RE_ROLL_INJURY).
+use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
 use ffb_model::model::SkillUse;
 use ffb_model::util::rng::GameRng;
@@ -9,7 +10,7 @@ use crate::injury::InjuryContext;
 use crate::injury::modification::{InjuryContextModification, ModificationParams};
 
 pub struct MasterAssassinModification {
-    skill_id: Option<u16>,
+    skill_id: Option<SkillId>,
 }
 
 impl MasterAssassinModification {
@@ -23,8 +24,8 @@ impl Default for MasterAssassinModification {
 impl InjuryContextModification for MasterAssassinModification {
     fn skill_use(&self) -> SkillUse { SkillUse::RE_ROLL_INJURY }
     fn valid_types(&self) -> &'static [&'static str] { &["Stab"] }
-    fn skill_id(&self) -> Option<u16> { self.skill_id }
-    fn set_skill_id(&mut self, id: u16) { self.skill_id = Some(id); }
+    fn skill_id(&self) -> Option<SkillId> { self.skill_id }
+    fn set_skill_id(&mut self, id: SkillId) { self.skill_id = Some(id); }
 
     fn try_injury_modification(&self, _game: &Game, ctx: &InjuryContext, _injury_type_name: &str) -> bool {
         !ctx.is_casualty()

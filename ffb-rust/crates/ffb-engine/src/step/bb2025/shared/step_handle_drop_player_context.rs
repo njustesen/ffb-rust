@@ -26,6 +26,14 @@ pub struct StepHandleDropPlayerContext {
     // AbstractStepWithReRoll stubs
     pub re_rolled_action: Option<String>,
     pub re_roll_source: Option<String>,
+    /// Java: playerId — the acting player offered the conditional-reroll SkillUse dialog.
+    pub player_id: Option<String>,
+    /// Java: skill — the modification's skill (e.g. Old Pro), from the modified context.
+    pub skill: Option<ffb_model::enums::SkillId>,
+    /// Java: setParameter(SUCCESSFUL_PRO) applies immediately (it has gameState access);
+    /// Rust's set_parameter has no game, so the verdict is stored and applied at the next
+    /// execute (the step was push_self'd below the PRO sequence, so it re-runs right after).
+    pub pending_pro: Option<bool>,
 }
 
 impl StepHandleDropPlayerContext {
@@ -34,6 +42,9 @@ impl StepHandleDropPlayerContext {
             drop_player_context: None,
             re_rolled_action: None,
             re_roll_source: None,
+            player_id: None,
+            skill: None,
+            pending_pro: None,
         }
     }
 }
@@ -50,16 +61,47 @@ impl Step for StepHandleDropPlayerContext {
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // Java: clientCommandUseSkill → addReport(new ReportSkillUse(playerId, skill, skillUsed, ...))
+        // Java handleCommand CLIENT_USE_SKILL (:81-101): report the choice with the modified
+        // context's SkillUse; USING a conditional-reroll skill (Old Pro) pushes a PRO
+        // sub-sequence and resumes this step afterwards; USING an unconditional one swaps to
+        // the alternate context immediately.
         if let Action::UseSkill { skill_id, use_skill } = action {
-            let player_id = game.acting_player.player_id.clone();
-            let skill_use = if *use_skill { SkillUse::WOULD_NOT_HELP } else { SkillUse::WOULD_NOT_HELP };
+            // Both harness agents answer the SkillUse dialog with a PLACEHOLDER skill id
+            // (SkillId::Block, "engine identifies the skill from step state") — the real skill
+            // is the one stored when the dialog was shown, exactly Java's `skill` field.
+            let skill = self.skill.unwrap_or(*skill_id);
+            let modified_skill_use = self.drop_player_context.as_ref()
+                .and_then(|c| c.injury_result.as_ref())
+                .and_then(|ir| ir.injury_context().modified_injury_context.as_ref())
+                .and_then(|m| m.skill_use_modification);
+            let player_id = self.player_id.clone().or_else(|| game.acting_player.player_id.clone());
             game.report_list.add(ReportSkillUse::new(
-                player_id,
-                *skill_id,
+                player_id.clone(),
+                skill,
                 *use_skill,
-                skill_use,
+                modified_skill_use.unwrap_or(SkillUse::WOULD_NOT_HELP),
             ));
+            if *use_skill {
+                let requires_conditional =
+                    crate::injury::modification::modification_for_skill(skill, game.rules)
+                        .map(|m| m.requires_conditional_re_roll_skill())
+                        .unwrap_or(false);
+                if requires_conditional {
+                    // Java: pushCurrentStepOnStack(); push Sequence[PRO(PLAYER_ID)]; NEXT_STEP.
+                    use crate::step::generator::sequence::Sequence;
+                    let mut seq = Sequence::new();
+                    seq.add(StepId::Pro, vec![StepParameter::PlayerId(player_id.clone().unwrap_or_default())]);
+                    let mut out = StepOutcome::next();
+                    out.push_self = true;
+                    return out.push_seq(seq.build());
+                } else {
+                    // Java: player.markUsed(skill) + successfulSkillUse(injuryResult).
+                    if let Some(pid) = player_id.as_deref() {
+                        if let Some(p) = game.player_mut(pid) { p.used_skills.insert(skill); }
+                    }
+                    self.successful_skill_use(game);
+                }
+            }
         }
         self.execute_step(game, rng)
     }
@@ -68,6 +110,12 @@ impl Step for StepHandleDropPlayerContext {
         match param {
             StepParameter::DropPlayerContext(ctx) => {
                 self.drop_player_context = Some(ctx.clone());
+                true
+            }
+            // Java: SUCCESSFUL_PRO applies markUsed + successfulSkillUse in setParameter
+            // (gameState in scope there); Rust stores the verdict and applies at re-execute.
+            StepParameter::SuccessfulPro(v) => {
+                self.pending_pro = Some(*v);
                 true
             }
             _ => false,
@@ -83,7 +131,66 @@ impl Step for StepHandleDropPlayerContext {
 }
 
 impl StepHandleDropPlayerContext {
-    fn execute_step(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    /// Java: `successfulSkillUse(InjuryResult)` — replay the modified context's reports,
+    /// swap the injury result to the alternate context, and take over its end-turn flag.
+    fn successful_skill_use(&mut self, game: &mut Game) {
+        if let Some(ctx) = self.drop_player_context.as_mut() {
+            if let Some(ir) = ctx.injury_result.as_mut() {
+                ir.swap_to_alternate_context(game);
+            }
+            ctx.end_turn = ctx.modified_injury_ends_turn;
+        }
+    }
+
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java setParameter(SUCCESSFUL_PRO) — applied here because Rust's set_parameter has no
+        // game access; the PRO sub-sequence finished and this step was resumed via push_self.
+        if let Some(successful) = self.pending_pro.take() {
+            if successful {
+                if let (Some(pid), Some(skill)) = (self.player_id.clone(), self.skill) {
+                    if let Some(p) = game.player_mut(&pid) { p.used_skills.insert(skill); }
+                }
+                self.successful_skill_use(game);
+            } else if let Some(ctx) = self.drop_player_context.as_mut() {
+                if let Some(ir) = ctx.injury_result.as_mut() {
+                    ir.injury_context_mut().modified_injury_context = None;
+                }
+            }
+        }
+
+        // Java :128: a pending ModifiedInjuryContext (an InjuryContextModification fired, e.g.
+        // Old Pro) — report the original injury, then offer the SkillUse dialog and WAIT.
+        {
+            let needs_dialog = self.drop_player_context.as_ref()
+                .and_then(|c| c.injury_result.as_ref())
+                .map(|ir| ir.injury_context().modified_injury_context.is_some()
+                    && !ir.is_already_reported())
+                .unwrap_or(false);
+            if needs_dialog {
+                let mut event = None;
+                let mut skill = None;
+                if let Some(ctx) = self.drop_player_context.as_mut() {
+                    if let Some(ir) = ctx.injury_result.as_mut() {
+                        event = ir.report(game);
+                        skill = ir.injury_context().modified_injury_context.as_ref()
+                            .and_then(|m| m.used_skill_id);
+                    }
+                }
+                // Java: playerId = game.getActingPlayer().getPlayerId(); skill = modified.getUsedSkill().
+                self.player_id = game.acting_player.player_id.clone();
+                self.skill = skill;
+                let skill = skill.unwrap_or(ffb_model::enums::SkillId::OldPro);
+                let mut out = StepOutcome::cont().with_prompt(
+                    ffb_model::prompts::AgentPrompt::SkillUse {
+                        player_id: self.player_id.clone().unwrap_or_default(),
+                        skill_id: skill as u16,
+                        skill_name: format!("{:?}", skill),
+                    });
+                if let Some(e) = event { out = out.with_event(e); }
+                return out;
+            }
+        }
+
         let ctx = match &self.drop_player_context {
             Some(c) => c,
             None => return StepOutcome::next(),
@@ -92,9 +199,6 @@ impl StepHandleDropPlayerContext {
             Some(r) => r,
             None => return StepOutcome::next(),
         };
-
-        // Java: if (injuryResult.injuryContext().getModifiedInjuryContext() != null && !injuryResult.isAlreadyReported())
-        // ModifiedInjuryContext not yet ported — skip that branch entirely.
 
         let mut out = StepOutcome::next();
 
@@ -235,6 +339,60 @@ mod tests {
 
     fn make_injury_result() -> Box<InjuryResult> {
         Box::new(InjuryResult::new(ApothecaryMode::Defender))
+    }
+
+    #[test]
+    fn modified_injury_context_offers_skill_use_then_pushes_pro_and_swaps() {
+        // Java StepHandleDropPlayerContext: a pending ModifiedInjuryContext (Old Pro fired in
+        // the injury pipeline) → report + DialogSkillUseParameter (CONTINUE); CLIENT_USE_SKILL
+        // with a conditional-reroll skill pushes a PRO sub-sequence; SUCCESSFUL_PRO(true) marks
+        // the skill used and swaps the injury result to the alternate context.
+        use ffb_model::prompts::AgentPrompt;
+        let mut game = make_game();
+        add_player(&mut game, "h1");
+        game.acting_player.player_id = Some("h1".into());
+
+        let mut ctx = InjuryContext::new(ApothecaryMode::Attacker);
+        ctx.defender_id = Some("h1".into());
+        ctx.armor_broken = true;
+        ctx.injury = Some(ffb_model::enums::PlayerState::new(ffb_model::enums::PS_KNOCKED_OUT));
+        let mut modified = ctx.clone();
+        modified.armor_broken = false;
+        modified.injury = Some(ffb_model::enums::PlayerState::new(ffb_model::enums::PS_PRONE));
+        modified.used_skill_id = Some(SkillId::OldPro);
+        ctx.modified_injury_context = Some(Box::new(modified));
+
+        let mut dpc = make_dpc("h1");
+        dpc.injury_result = Some(Box::new(InjuryResult {
+            injury_context: ctx,
+            knocked_out: false, rip: false, already_reported: false, pre_regeneration: true,
+        }));
+        let mut step = StepHandleDropPlayerContext::new();
+        step.set_parameter(&StepParameter::DropPlayerContext(dpc));
+
+        // Phase 1: dialog offered, step waits.
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(matches!(out.prompt, Some(AgentPrompt::SkillUse { .. })));
+        assert_eq!(step.skill, Some(SkillId::OldPro));
+
+        // Phase 2: coach uses the (conditional-reroll) skill → PRO sub-sequence + push_self.
+        let out = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Block, use_skill: true },
+            &mut game, &mut GameRng::new(0));
+        assert!(out.push_self, "the step must resume after the PRO sequence");
+        assert!(out.pushes.iter().flatten().any(|s| s.step_id == StepId::Pro),
+            "a PRO step must be pushed");
+
+        // Phase 3: StepPro published SUCCESSFUL_PRO(true) → swap to the alternate context.
+        assert!(step.set_parameter(&StepParameter::SuccessfulPro(true)));
+        step.start(&mut game, &mut GameRng::new(0));
+        let ir = step.drop_player_context.as_ref().unwrap().injury_result.as_ref().unwrap();
+        assert!(ir.injury_context().modified_injury_context.is_none());
+        assert!(!ir.injury_context().armor_broken,
+            "the injury result must now BE the alternate (armour-saved) context");
+        assert!(game.player("h1").unwrap().used_skills.contains(&SkillId::OldPro),
+            "Old Pro must be marked used");
     }
 
     fn make_dpc(player_id: &str) -> Box<DropPlayerContext> {

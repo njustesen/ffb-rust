@@ -3,6 +3,7 @@
 /// Valid for Block. Adds +1 to either the armour roll OR the injury roll (attacker choice).
 /// When used for injury, checks there is no overlap with the skill's own armour modifiers
 /// (to avoid double-counting), then switches skill_use to ADD_INJURY_MODIFIER.
+use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
 use ffb_model::model::SkillUse;
 use ffb_model::util::rng::GameRng;
@@ -10,7 +11,7 @@ use crate::injury::InjuryContext;
 use crate::injury::modification::{InjuryContextModification, ModificationParams};
 
 pub struct AvOrInjModification {
-    skill_id: Option<u16>,
+    skill_id: Option<SkillId>,
 }
 
 impl AvOrInjModification {
@@ -32,8 +33,8 @@ impl Default for AvOrInjModification {
 impl InjuryContextModification for AvOrInjModification {
     fn skill_use(&self) -> SkillUse { SkillUse::ADD_ARMOUR_MODIFIER }
     fn valid_types(&self) -> &'static [&'static str] { &["Block"] }
-    fn skill_id(&self) -> Option<u16> { self.skill_id }
-    fn set_skill_id(&mut self, id: u16) { self.skill_id = Some(id); }
+    fn skill_id(&self) -> Option<SkillId> { self.skill_id }
+    fn set_skill_id(&mut self, id: SkillId) { self.skill_id = Some(id); }
 
     fn try_armour_roll_modification(&self, params: &ModificationParams) -> bool {
         self.base_try_armour(params)

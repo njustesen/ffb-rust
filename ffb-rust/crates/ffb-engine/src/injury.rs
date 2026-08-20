@@ -90,7 +90,7 @@ pub struct InjuryContext {
     /// Java: ModifiedInjuryContext.modification — which phase was modified.
     pub modification: InjuryModification,
     /// Java: ModifiedInjuryContext.usedSkill — skill that caused the modification (stored as id).
-    pub used_skill_id: Option<u16>,
+    pub used_skill_id: Option<ffb_model::enums::SkillId>,
     /// Java: ModifiedInjuryContext.skillUse — how the skill was used.
     pub skill_use_modification: Option<SkillUse>,
 }
@@ -215,7 +215,7 @@ impl InjuryContext {
 
     // Java: ModifiedInjuryContext.setModification / setUsedSkill / setSkillUse
     pub fn set_modification(&mut self, m: InjuryModification) { self.modification = m; }
-    pub fn set_used_skill_id(&mut self, id: u16) { self.used_skill_id = Some(id); }
+    pub fn set_used_skill_id(&mut self, id: ffb_model::enums::SkillId) { self.used_skill_id = Some(id); }
     pub fn set_skill_use_modification(&mut self, su: SkillUse) { self.skill_use_modification = Some(su); }
 
     // Java: InjuryContext.setInjuryRoll(int[])
@@ -265,6 +265,37 @@ impl InjuryResult {
     pub fn report(&mut self, game: &mut ffb_model::model::game::Game) -> Option<ffb_model::events::GameEvent> {
         let mechanic = crate::mechanic::state_mechanic_for(game.rules);
         mechanic.report_injury(game, self)
+    }
+
+    /// Java: `InjuryResult.swapToAlternateContext(IStep, Game)` — replace the current context
+    /// with the modified one (set by an InjuryContextModification such as Old Pro), clear
+    /// `already_reported` so the alternate outcome gets its own report, then run the
+    /// ignoreFirstArmourBreak (Force Shield) handling exactly like Java.
+    pub fn swap_to_alternate_context(&mut self, game: &mut Game) {
+        if let Some(modified) = self.injury_context.modified_injury_context.take() {
+            self.injury_context = *modified;
+            self.already_reported = false;
+            // Java: handleIgnoringArmourBreaks(step, defender, game)
+            if self.injury_context.armor_broken && self.injury_context.armor_roll.is_some() {
+                let ignores = self.injury_context.defender_id.as_deref()
+                    .and_then(|id| game.player(id))
+                    .map(|p| p.has_skill_property(ffb_model::model::property::named_properties::NamedProperties::IGNORE_FIRST_ARMOUR_BREAK))
+                    .unwrap_or(false);
+                if ignores {
+                    self.injury_context.armor_broken = false;
+                    self.injury_context.injury = Some(PlayerState::new(PS_PRONE));
+                    self.injury_context.send_to_box_reason = None;
+                    self.injury_context.send_to_box_half = 0;
+                    self.injury_context.send_to_box_turn = 0;
+                    self.injury_context.apothecary_status = ApothecaryStatus::NoApothecary;
+                    self.injury_context.serious_injury = None;
+                    self.injury_context.serious_injury_decay = None;
+                    if let Some(defender_id) = self.injury_context.defender_id.clone() {
+                        crate::util::util_server_cards::UtilServerCards::deactivate_card_for_player(game, &defender_id);
+                    }
+                }
+            }
+        }
     }
 
     /// Java: InjuryResult.applyTo(IStep) — applies injury outcome to game state.
@@ -417,6 +448,12 @@ pub trait InjuryTypeServer {
     /// Java: InjuryType class simple name — used by InjuryContextModification.isValidType().
     /// Implementations should return the Java class simple name (e.g. "Block", "Foul", "Stab").
     fn java_class_name(&self) -> &'static str { "" }
+    /// Java: InjuryType.isChainsaw() — true for Chainsaw, ChainsawForSpp, FoulWithChainsaw,
+    /// FoulForSppWithChainsaw. Routes the injury-modification lookup to the DEFENDER when the
+    /// attacker is null (a chainsaw kickback injures its own wielder).
+    fn is_chainsaw(&self) -> bool { false }
+    /// Java: InjuryType.isVomitLike() — true for BreatheFire, BreatheFireForSpp, ProjectileVomit.
+    fn is_vomit_like(&self) -> bool { false }
     /// Java: InjuryType.isCausedByOpponent() — whether an opposing player caused this injury.
     fn is_caused_by_opponent(&self) -> bool { false }
     /// Java: InjuryType.isWorthSpps() — whether the attacker earns a casualty SPP.
@@ -491,11 +528,22 @@ pub fn do_injury_roll_for_player_no_stunty(rng: &mut GameRng, ctx: &mut InjuryCo
 }
 
 fn do_injury_roll_for_player_impl(rng: &mut GameRng, ctx: &mut InjuryContext, game: &Game, defender_id: &str, apply_stunty: bool) {
-    use ffb_model::enums::{Rules, SkillId};
-    use ffb_model::model::property::named_properties::NamedProperties;
     let d1 = rng.d6();
     let d2 = rng.d6();
     ctx.injury_roll = Some([d1, d2]);
+    interpret_and_set_injury(rng, ctx, game, defender_id, apply_stunty);
+}
+
+/// Java: `InjuryTypeServer.setInjury(pDefender, gameState, diceRoller, injuryContext)` —
+/// interpret the EXISTING `injury_roll` (no fresh d6s) and set `ctx.injury`, rolling the
+/// casualty dice (+ Decay's second pair, bb2016) when the interpretation is a casualty.
+/// Used directly by the InjuryContextModification alternate-context path (Java
+/// ModificationAwareInjuryTypeServer :73), where the modification re-rolled or re-modified
+/// the injury dice and only the interpretation must run again.
+pub fn interpret_and_set_injury(rng: &mut GameRng, ctx: &mut InjuryContext, game: &Game, defender_id: &str, apply_stunty: bool) {
+    use ffb_model::enums::{Rules, SkillId};
+    use ffb_model::model::property::named_properties::NamedProperties;
+    let [d1, d2] = ctx.injury_roll.unwrap_or([0, 0]);
     let modifier_sum: i32 = ctx.injury_modifiers.iter().map(|m| m.value).sum();
     let total = d1 + d2 + modifier_sum;
     let outcome = if let Some(defender) = game.player(defender_id) {

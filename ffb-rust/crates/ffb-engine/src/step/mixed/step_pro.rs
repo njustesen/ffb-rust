@@ -61,16 +61,23 @@ impl StepPro {
         }
 
         // Java: if (doRoll) { successful = useReRoll(this, ReRollSources.PRO, player) }
-        // ReRollSources.PRO internally rolls D6 >= minimumProRoll()
+        // RollMechanic.useReRoll's PRO branch first checks `canRerollOncePerTurn &&
+        // !playerState.hasUsedPro()` — only then does it mark usedPro and roll. Without the
+        // gate, a DECLINED team-reroll offer re-entered executeStep with doRoll=true and
+        // rolled a SECOND Pro die Java never rolls (dark_elf bb2020 seed 3 i=2: the first
+        // Pro roll already set the usedPro bit, so Java's re-execute is roll-free).
         if do_roll {
-            // Java: RollMechanic.useReRoll marks `changeUsedPro(true)` unconditionally
-            // (before rolling) once Pro is eligible to be used this turn, regardless of
-            // whether the subsequent skill roll succeeds or fails.
-            if let Some(state) = game.field_model.player_state(&player_id) {
+            use ffb_model::model::property::named_properties::NamedProperties;
+            let state = game.field_model.player_state(&player_id).unwrap_or_default();
+            let available = game.player(&player_id)
+                .map(|p| p.has_skill_property(NamedProperties::CAN_REROLL_ONCE_PER_TURN))
+                .unwrap_or(false)
+                && !state.has_used_pro();
+            if available {
                 game.field_model.set_player_state(&player_id, state.change_used_pro(true));
+                let roll = rng.d6();
+                successful = roll >= MINIMUM_PRO_ROLL;
             }
-            let roll = rng.d6();
-            successful = roll >= MINIMUM_PRO_ROLL;
         }
 
         // Java: if (!successful && getReRolledAction() != OLD_PRO) → ask for reroll
@@ -141,7 +148,9 @@ mod tests {
             id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
             player_type: PlayerType::Regular, gender: PlayerGender::Male,
             movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
-            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            // Java useReRoll(PRO) requires canRerollOncePerTurn — the step's roll is gated on it.
+            starting_skills: vec![ffb_model::model::skill_def::SkillWithValue::new(ffb_model::enums::SkillId::Pro)],
+            extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
             is_big_guy: false,

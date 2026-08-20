@@ -4,6 +4,7 @@
 /// modify_armour_internal: re-roll 2d6 armour. skill_use = RE_ROLL_ARMOUR.
 /// Concrete subclasses provide valid_types; this file also serves as a concrete type
 /// via new() → Block valid type for the case where no subtype overrides it.
+use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
 use ffb_model::model::SkillUse;
 use ffb_model::util::rng::GameRng;
@@ -11,7 +12,7 @@ use crate::injury::InjuryContext;
 use crate::injury::modification::{InjuryContextModification, ModificationParams};
 
 pub struct RerollArmourModification {
-    skill_id: Option<u16>,
+    skill_id: Option<SkillId>,
     valid_types: &'static [&'static str],
 }
 
@@ -29,8 +30,8 @@ impl Default for RerollArmourModification {
 impl InjuryContextModification for RerollArmourModification {
     fn skill_use(&self) -> SkillUse { SkillUse::RE_ROLL_ARMOUR }
     fn valid_types(&self) -> &'static [&'static str] { self.valid_types }
-    fn skill_id(&self) -> Option<u16> { self.skill_id }
-    fn set_skill_id(&mut self, id: u16) { self.skill_id = Some(id); }
+    fn skill_id(&self) -> Option<SkillId> { self.skill_id }
+    fn set_skill_id(&mut self, id: SkillId) { self.skill_id = Some(id); }
 
     fn try_armour_roll_modification(&self, params: &ModificationParams) -> bool {
         !params.new_context.armor_broken

@@ -143,7 +143,11 @@ impl ModificationAwareInjuryType for InjuryTypeBlock {
         if self.ctx.armor_broken {
             return;
         }
-        if !(roll && self.roll_armour) {
+        // `roll_armour` is a Rust-side variant flag (some Block variants never roll armour
+        // themselves); it only gates the FRESH-dice path. Java's armourRoll always runs the
+        // modifier scan — `roll=false` (the InjuryContextModification alternate-context path)
+        // re-evaluates the EXISTING armor_roll dice under the freshly rebuilt modifiers.
+        if roll && !self.roll_armour {
             return;
         }
 
@@ -165,7 +169,13 @@ impl ModificationAwareInjuryType for InjuryTypeBlock {
         // false), so it's added directly here rather than via `ArmorModifierFactory`.
         let chainsaw_modifier = Modifier::new("Chainsaw", 3, game.rules);
 
-        do_armor_roll(game, rng, &mut self.ctx, defender_id);
+        // Java: `if (roll) injuryContext.setArmorRoll(diceRoller.rollArmour());` then an
+        // unconditional `setArmorBroken(diceInterpreter.isArmourBroken(...))`.
+        if roll {
+            do_armor_roll(game, rng, &mut self.ctx, defender_id);
+        } else {
+            recalc_armor_broken_claws_aware(game, &mut self.ctx, defender_id);
+        }
 
         if has_chainsaw && !skills_stack_against_chainsaw {
             self.ctx.add_armor_modifier(chainsaw_modifier);

@@ -4,6 +4,7 @@
 /// ProjectileVomit, Stab). Re-rolls the injury. allowed = always true (same-team ok).
 /// Gate: not casualty, OR spotted foul (injury dice equal + foul type), OR
 /// (same team + not AnimalSavagery + not stunned + has tacklezones).
+use ffb_model::enums::SkillId;
 use ffb_model::enums::ApothecaryMode;
 use ffb_model::model::game::Game;
 use ffb_model::model::SkillUse;
@@ -12,7 +13,7 @@ use crate::injury::InjuryContext;
 use crate::injury::modification::{InjuryContextModification, ModificationParams};
 
 pub struct SavageMaulingModification {
-    skill_id: Option<u16>,
+    skill_id: Option<SkillId>,
 }
 
 impl SavageMaulingModification {
@@ -37,8 +38,8 @@ const VALID: &[&str] = &["Block", "BlockStunned", "BlockProne", "Foul", "FoulFor
 impl InjuryContextModification for SavageMaulingModification {
     fn skill_use(&self) -> SkillUse { SkillUse::RE_ROLL_INJURY }
     fn valid_types(&self) -> &'static [&'static str] { VALID }
-    fn skill_id(&self) -> Option<u16> { self.skill_id }
-    fn set_skill_id(&mut self, id: u16) { self.skill_id = Some(id); }
+    fn skill_id(&self) -> Option<SkillId> { self.skill_id }
+    fn set_skill_id(&mut self, id: SkillId) { self.skill_id = Some(id); }
 
     fn allowed_for_attacker_and_defender_teams(&self, _game: &Game, _ctx: &InjuryContext) -> bool {
         true

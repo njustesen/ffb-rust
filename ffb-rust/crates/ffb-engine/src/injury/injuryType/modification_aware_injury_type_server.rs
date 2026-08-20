@@ -8,9 +8,9 @@
 /// `injury_roll()` methods. Free function `modification_aware_handle_injury()` implements
 /// the template and each concrete type delegates its `handle_injury()` to it.
 ///
-/// The InjuryContextModification path (alternate context for Claws/MB interactions) is not
-/// yet ported — requires `Player::get_unused_injury_modification()` from the full modifier
-/// factory stack.
+/// The InjuryContextModification path (Old Pro etc.) is LIVE: the lookup is
+/// `crate::injury::modification::unused_injury_modification` (Java
+/// Player.getUnusedInjuryModification) and the alternate context resolves inline below.
 use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE};
 use ffb_model::model::player::Player;
 use ffb_model::types::FieldCoordinate;
@@ -77,8 +77,9 @@ pub trait ModificationAwareInjuryType: InjuryTypeServer {
 /// Template-method implementation of InjuryTypeServer::handle_injury() for all
 /// ModificationAwareInjuryType implementors.
 ///
-/// Java: ModificationAwareInjuryTypeServer.handleInjury() lines 32–62 (minus
-/// the InjuryContextModification alternate-context path, lines 47–57).
+/// Java: ModificationAwareInjuryTypeServer.handleInjury() lines 32–62, including the
+/// InjuryContextModification alternate-context path (lines 47–57) and the injury-side
+/// modification (lines 70–75).
 pub fn modification_aware_handle_injury<T: ModificationAwareInjuryType>(
     this: &mut T,
     game: &Game,
@@ -99,14 +100,71 @@ pub fn modification_aware_handle_injury<T: ModificationAwareInjuryType>(
         ctx.apothecary_mode = apo_mode;
     }
 
+    // Java lines 36-41: the injury modification comes from the ATTACKER's unused skills;
+    // when there is no attacker (a chainsaw kickback / vomit self-hit), from the DEFENDER's.
+    let modification = if let Some(aid) = attacker_id {
+        crate::injury::modification::unused_injury_modification(game, aid, this.java_class_name())
+    } else if this.is_chainsaw() || this.is_vomit_like() {
+        crate::injury::modification::unused_injury_modification(game, defender_id, this.java_class_name())
+    } else {
+        None
+    };
     // Java line 45: armourRoll(game, gameState, diceRoller, pAttacker, pDefender,
     //                          diceInterpreter, injuryContext, true)
     this.armour_roll(game, rng, attacker_id, defender_id, true);
+
+    // Java lines 47-57: the modification produces an ALTERNATE context (e.g. Old Pro's
+    // single-armour-die reroll); the alternate is fully resolved NOW (armour re-evaluation with
+    // roll=false + its own injury roll) so StepHandleDropPlayerContext can offer the coach the
+    // choice between the two finished outcomes.
+    if let Some(m) = &modification {
+        let type_name = this.java_class_name();
+        let modified = {
+            // modify_armour needs &mut InjuryContext — take it through the trait accessor.
+            let ctx = this.injury_context_mut();
+            m.modify_armour(game, rng, ctx, type_name)
+        };
+        if modified {
+            // Swap the alternate context into `self` so the same armour_roll/injury_roll
+            // implementations run against it (Java passes the context explicitly).
+            let mut original = this.injury_context_mut().modified_injury_context.take()
+                .map(|b| *b)
+                .unwrap_or_else(|| this.injury_context().clone());
+            std::mem::swap(this.injury_context_mut(), &mut original);
+            // `original` now holds the ORIGINAL context; `self` holds the alternate.
+            this.injury_context_mut().armor_broken = false;
+            this.armour_roll(game, rng, attacker_id, defender_id, false);
+            if this.injury_context().armor_broken {
+                this.injury_roll(game, rng, attacker_id, defender_id);
+            } else {
+                this.saved_by_armour();
+            }
+            std::mem::swap(this.injury_context_mut(), &mut original);
+            // `original` now holds the resolved ALTERNATE context again.
+            this.injury_context_mut().modified_injury_context = Some(Box::new(original));
+        }
+    }
 
     // Java lines 67–79: private injury() helper
     if this.injury_context().armor_broken {
         // Java line 68: injuryRoll(...)
         this.injury_roll(game, rng, attacker_id, defender_id);
+
+        // Java lines 70-75: injury-side modification — re-interpret the modified injury roll
+        // (Java: setInjury(pDefender, gameState, diceRoller, modifiedCtx)).
+        if let Some(m) = &modification {
+            let type_name = this.java_class_name();
+            let modified = {
+                let ctx = this.injury_context_mut();
+                m.modify_injury(game, rng, ctx, type_name)
+            };
+            if modified {
+                if let Some(mut alt) = this.injury_context_mut().modified_injury_context.take() {
+                    crate::injury::interpret_and_set_injury(rng, &mut alt, game, defender_id, true);
+                    this.injury_context_mut().modified_injury_context = Some(alt);
+                }
+            }
+        }
     } else {
         // Java line 77–79: savedByArmour(currentInjuryContext)
         this.saved_by_armour();

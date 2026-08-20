@@ -4,6 +4,7 @@
 /// Rust: trait with default method implementations; each concrete type overrides the hooks
 /// it needs. The generic type parameter T (params) is replaced by ModificationParams
 /// passed directly — OldPro stores its extra state as struct fields.
+use ffb_model::enums::SkillId;
 use ffb_model::enums::PlayerAction;
 use ffb_model::model::SkillUse;
 use ffb_model::injury::context::InjuryModification;
@@ -36,8 +37,8 @@ pub trait InjuryContextModification: Send + Sync {
 
     /// Java: getSkill() / setSkill() — the skill that owns this modification.
     /// Stored as numeric ID to avoid lifetime complexity.
-    fn skill_id(&self) -> Option<u16>;
-    fn set_skill_id(&mut self, id: u16);
+    fn skill_id(&self) -> Option<SkillId>;
+    fn set_skill_id(&mut self, id: SkillId);
 
     // ── Armour modification pipeline ─────────────────────────────────────────
 

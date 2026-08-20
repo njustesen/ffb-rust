@@ -27,7 +27,7 @@ impl PrayerHandler for BadHabitsHandler {
     /// Java: initEffect — rolls D3, selects that many opponent RESERVE players, marks prayer, grants Loner (2+).
     fn init_effect(&self, prayer_state: &mut PrayerState, game: &mut Game, rng: &mut GameRng, team_id: &str) -> bool {
         let d3_roll = rng.d3();
-        bad_habits_handler::init_effect(prayer_state, game, rng, team_id, d3_roll, &OpponentPlayerSelector::new())
+        bad_habits_handler::init_effect(prayer_state, game, rng, team_id, d3_roll, &OpponentPlayerSelector::new(), &[ffb_model::enums::SkillId::Loner])
     }
 
     fn remove_effect_internal(&self, _prayer_state: &mut PrayerState, game: &mut Game, team_id: &str) {

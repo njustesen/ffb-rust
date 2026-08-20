@@ -150,8 +150,8 @@ mod tests {
         impl InjuryContextModification for BlockModification {
             fn skill_use(&self) -> ffb_model::model::SkillUse { ffb_model::model::SkillUse::ADD_ARMOUR_MODIFIER }
             fn valid_types(&self) -> &'static [&'static str] { &["Block"] }
-            fn skill_id(&self) -> Option<u16> { None }
-            fn set_skill_id(&mut self, _id: u16) {}
+            fn skill_id(&self) -> Option<ffb_model::enums::SkillId> { None }
+            fn set_skill_id(&mut self, _id: ffb_model::enums::SkillId) {}
         }
 
         let mut sb = SkillBehaviour::new();

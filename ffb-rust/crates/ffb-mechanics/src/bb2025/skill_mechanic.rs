@@ -40,7 +40,13 @@ impl SkillMechanicTrait for SkillMechanic {
     fn eligible_for_pro(&self, game: &Game, player: &Player, original_bombardier: Option<&str>) -> bool {
         let player_state = game.field_model.player_state(&player.id).unwrap_or_default();
         let acting = &game.acting_player;
-        (!acting.standing_up || acting.has_acted)
+        // Java: `!isStandingUp() || hasActedIgnoringNegativeTraits()` — the latter is computed
+        // from the sub-flags (moved/fouled/blocked/passed + non-negative-trait used skills), NOT
+        // the stored has_acted field, which stays false for a blitzer that moved and blocked
+        // (dark_elf bb2020 seed 5 i=49: a stood-up Helmut's blitz-block never offered Old Pro).
+        (!acting.standing_up
+            || acting.has_moved || acting.has_fouled || acting.has_blocked || acting.has_passed
+            || acting.has_acted)
             && !player_state.is_prone_or_stunned()
             && !player_state.is_stunned()
             && acting.player_id.as_deref() == Some(&player.id)

@@ -21,6 +21,7 @@ impl InjuryTypeFoulForSpp {
 impl Default for InjuryTypeFoulForSpp { fn default() -> Self { Self::new() } }
 
 impl InjuryTypeServer for InjuryTypeFoulForSpp {
+    fn java_class_name(&self) -> &'static str { "FoulForSpp" }
     fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,
         coord: FieldCoordinate, from_coord: Option<FieldCoordinate>, old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode) {
         modification_aware_handle_injury(self, game, rng, attacker_id, defender_id, coord, from_coord, old_ctx, apo_mode);

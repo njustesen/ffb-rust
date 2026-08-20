@@ -89,8 +89,11 @@ pub struct Game {
     /// `PlayerSelector.selectPlayers`). The parity harness seeds Java's field per game by
     /// reflection; the driver seeds this identically, so both engines draw the same permutations.
     /// Not serialised — it is reconstructed by the driver from the game seed.
+    /// RefCell: Java's shared shuffle stream is reachable from &Game-only paths too
+    /// (e.g. bb2020 RollMechanic.mapSIRoll's Collections.shuffle of the reduceable
+    /// serious-injury list) — interior mutability mirrors Java's global mutable field.
     #[serde(skip)]
-    pub collections_rng: crate::util::java_random::JavaRandom,
+    pub collections_rng: std::cell::RefCell<crate::util::java_random::JavaRandom>,
     /// Java: GameState.getKickingSwarmers / setKickingSwarmers — tracks how many
     /// kicking-team swarming players were placed during the Swarming kickoff result.
     pub kicking_swarmers: i32,
@@ -156,7 +159,7 @@ impl Game {
             last_defender_id: None,
             blitz_turn_state: None,
             prayer_state: PrayerState::new(),
-            collections_rng: crate::util::java_random::JavaRandom::default(),
+            collections_rng: std::cell::RefCell::new(crate::util::java_random::JavaRandom::default()),
             kicking_swarmers: 0,
             active_shadowers: Vec::new(),
             dialog_id: None,

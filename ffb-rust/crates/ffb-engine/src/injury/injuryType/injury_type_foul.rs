@@ -23,6 +23,7 @@ impl InjuryTypeFoul {
 impl Default for InjuryTypeFoul { fn default() -> Self { Self::new() } }
 
 impl InjuryTypeServer for InjuryTypeFoul {
+    fn java_class_name(&self) -> &'static str { "Foul" }
     fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,
         coord: FieldCoordinate, from_coord: Option<FieldCoordinate>, old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode) {
         modification_aware_handle_injury(self, game, rng, attacker_id, defender_id, coord, from_coord, old_ctx, apo_mode);
@@ -35,7 +36,7 @@ impl InjuryTypeServer for InjuryTypeFoul {
     fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::Fouled) }
 }
 impl ModificationAwareInjuryType for InjuryTypeFoul {
-    fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
+    fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str, roll: bool) {
         // Add foul-assist armor modifier based on net offensive - defensive assists
         if let Some(aid) = attacker_id {
             let off = UtilPlayer::find_offensive_foul_assists(game, aid, defender_id) as i32;
@@ -77,7 +78,12 @@ impl ModificationAwareInjuryType for InjuryTypeFoul {
             // Java InjuryTypeFoul.armourRoll rolls with the foul-assist (+chainsaw) modifiers and
             // checks `isArmourBroken` FIRST; only `if (!injuryContext.isArmorBroken())` does it then
             // add the general skill-based armour modifiers (Dirty Player) and re-check.
-            do_armor_roll(game, rng, &mut self.ctx, defender_id);
+            // roll=false (InjuryContextModification alternate path) re-evaluates the EXISTING dice.
+            if roll {
+                do_armor_roll(game, rng, &mut self.ctx, defender_id);
+            } else {
+                crate::injury::recalc_armor_broken(game, &mut self.ctx, defender_id);
+            }
             // Java `InjuryTypeFoul.armourRoll:75-91`, ported in full. Only when the base roll did
             // NOT break armour does Java add the general skill-based armour modifiers and re-check.
             // The chief one on a foul is Dirty Player (registered to

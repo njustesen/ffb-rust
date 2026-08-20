@@ -20,7 +20,7 @@
       "position_id": "darkelf.blitzer"
     },
     {
-      "nr": 3,
+      "nr": 10,
       "position_id": "darkelf.assassin"
     },
     {
@@ -63,7 +63,7 @@
   "special_rules": [],
   "stars": [
     {
-      "nr": 10,
+      "nr": 3,
       "star_id": "39465"
     },
     {

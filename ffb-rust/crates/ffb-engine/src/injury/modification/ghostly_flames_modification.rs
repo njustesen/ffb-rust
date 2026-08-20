@@ -3,11 +3,12 @@
 /// Valid for Chainsaw. Gate: armor not broken, acting player is blitzing AND is the
 /// attacker AND has tacklezones. prepareArmourParams strips chainsaw-specific static
 /// modifiers before applying GhostlyFlames's own modifier.
+use ffb_model::enums::SkillId;
 use ffb_model::model::SkillUse;
 use crate::injury::modification::{InjuryContextModification, ModificationParams};
 
 pub struct GhostlyFlamesModification {
-    skill_id: Option<u16>,
+    skill_id: Option<SkillId>,
 }
 
 impl GhostlyFlamesModification {
@@ -21,8 +22,8 @@ impl Default for GhostlyFlamesModification {
 impl InjuryContextModification for GhostlyFlamesModification {
     fn skill_use(&self) -> SkillUse { SkillUse::INCREASE_CHAINSAW_DAMAGE }
     fn valid_types(&self) -> &'static [&'static str] { &["Chainsaw"] }
-    fn skill_id(&self) -> Option<u16> { self.skill_id }
-    fn set_skill_id(&mut self, id: u16) { self.skill_id = Some(id); }
+    fn skill_id(&self) -> Option<SkillId> { self.skill_id }
+    fn set_skill_id(&mut self, id: SkillId) { self.skill_id = Some(id); }
 
     /// Java: !armorBroken && isBlitzing && actingPlayer == attacker && hasTacklezones.
     fn try_armour_roll_modification(&self, params: &ModificationParams) -> bool {

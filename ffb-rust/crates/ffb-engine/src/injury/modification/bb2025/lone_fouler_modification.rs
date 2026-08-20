@@ -2,6 +2,7 @@
 ///
 /// Extends RerollArmourModification for foul injury types. Extra gate: no offensive or
 /// defensive foul assists.
+use ffb_model::enums::SkillId;
 use ffb_model::model::SkillUse;
 use ffb_model::util::util_player::UtilPlayer;
 use crate::injury::modification::{InjuryContextModification, ModificationParams};
@@ -24,8 +25,8 @@ impl Default for LoneFoulerModification {
 impl InjuryContextModification for LoneFoulerModification {
     fn skill_use(&self) -> SkillUse { self.inner.skill_use() }
     fn valid_types(&self) -> &'static [&'static str] { VALID }
-    fn skill_id(&self) -> Option<u16> { self.inner.skill_id() }
-    fn set_skill_id(&mut self, id: u16) { self.inner.set_skill_id(id); }
+    fn skill_id(&self) -> Option<SkillId> { self.inner.skill_id() }
+    fn set_skill_id(&mut self, id: SkillId) { self.inner.set_skill_id(id); }
 
     /// Java: no offensive OR defensive assists AND super.tryArmourRollModification (not broken).
     fn try_armour_roll_modification(&self, params: &ModificationParams) -> bool {

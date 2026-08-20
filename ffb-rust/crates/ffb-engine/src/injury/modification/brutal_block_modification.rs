@@ -2,13 +2,14 @@
 ///
 /// Valid for Block injury type. Applies when acting player has tacklezones and the
 /// injury is not a casualty. Adds +1 to the injury roll (ADD_INJURY_MODIFIER).
+use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
 use ffb_model::model::SkillUse;
 use crate::injury::InjuryContext;
 use crate::injury::modification::{InjuryContextModification, ModificationParams};
 
 pub struct BrutalBlockModification {
-    skill_id: Option<u16>,
+    skill_id: Option<SkillId>,
 }
 
 impl BrutalBlockModification {
@@ -22,8 +23,8 @@ impl Default for BrutalBlockModification {
 impl InjuryContextModification for BrutalBlockModification {
     fn skill_use(&self) -> SkillUse { SkillUse::ADD_INJURY_MODIFIER }
     fn valid_types(&self) -> &'static [&'static str] { &["Block"] }
-    fn skill_id(&self) -> Option<u16> { self.skill_id }
-    fn set_skill_id(&mut self, id: u16) { self.skill_id = Some(id); }
+    fn skill_id(&self) -> Option<SkillId> { self.skill_id }
+    fn set_skill_id(&mut self, id: SkillId) { self.skill_id = Some(id); }
 
     fn try_injury_modification(&self, game: &Game, ctx: &InjuryContext, _injury_type_name: &str) -> bool {
         !ctx.is_casualty() && self.acting_player_has_tacklezones(game)

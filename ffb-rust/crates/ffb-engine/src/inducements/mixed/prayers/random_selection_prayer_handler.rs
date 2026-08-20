@@ -27,11 +27,10 @@ pub fn init_effect_random_selection(
     added_skills: &[SkillId],
 ) -> bool {
     // The selector draws from Java's Collections stream (`game.collections_rng`), never the dice
-    // stream, so take it out of `game` for the call and put it back — the same split-borrow the
-    // prayer_state handling uses.
-    let mut collections_rng = std::mem::take(&mut game.collections_rng);
+    // stream; the RefCell keeps the stream reachable from &Game-only paths (mapSIRoll).
+    let mut collections_rng = game.collections_rng.borrow().clone();
     let selected = selector.select_players(game, team_id, nr_of_players, &mut collections_rng, added_skills);
-    game.collections_rng = collections_rng;
+    *game.collections_rng.borrow_mut() = collections_rng;
     for player_id in &selected {
         game.field_model.add_prayer_enhancement(player_id, prayer_name);
         apply_prayer_player_effect(game, player_id, prayer_name);

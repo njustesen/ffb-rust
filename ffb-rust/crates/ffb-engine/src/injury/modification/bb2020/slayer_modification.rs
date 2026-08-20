@@ -1,6 +1,7 @@
 /// Translation of com.fumbbl.ffb.server.injury.modification.bb2020.SlayerModification.
 ///
 /// Extends AvOrInjModification. Extra gate: defender has Strength >= 5.
+use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
 use ffb_model::model::SkillUse;
 use crate::injury::InjuryContext;
@@ -29,8 +30,8 @@ impl Default for SlayerModification {
 impl InjuryContextModification for SlayerModification {
     fn skill_use(&self) -> SkillUse { SkillUse::ADD_ARMOUR_MODIFIER }
     fn valid_types(&self) -> &'static [&'static str] { &["Block"] }
-    fn skill_id(&self) -> Option<u16> { self.base.skill_id() }
-    fn set_skill_id(&mut self, id: u16) { self.base.set_skill_id(id); }
+    fn skill_id(&self) -> Option<SkillId> { self.base.skill_id() }
+    fn set_skill_id(&mut self, id: SkillId) { self.base.set_skill_id(id); }
 
     fn try_armour_roll_modification(&self, params: &ModificationParams) -> bool {
         self.base.base_try_armour(params)

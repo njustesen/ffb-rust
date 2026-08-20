@@ -1,13 +1,14 @@
 /// Translation of com.fumbbl.ffb.server.injury.modification.bb2025.ToxinConnoisseurModification.
 ///
 /// Valid for Stab and StabForSpp (BB2025). Gate: not a casualty. ADD_INJURY_MODIFIER.
+use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
 use ffb_model::model::SkillUse;
 use crate::injury::InjuryContext;
 use crate::injury::modification::InjuryContextModification;
 
 pub struct ToxinConnoisseurModification {
-    skill_id: Option<u16>,
+    skill_id: Option<SkillId>,
 }
 
 impl ToxinConnoisseurModification {
@@ -21,8 +22,8 @@ impl Default for ToxinConnoisseurModification {
 impl InjuryContextModification for ToxinConnoisseurModification {
     fn skill_use(&self) -> SkillUse { SkillUse::ADD_INJURY_MODIFIER }
     fn valid_types(&self) -> &'static [&'static str] { &["Stab", "StabForSpp"] }
-    fn skill_id(&self) -> Option<u16> { self.skill_id }
-    fn set_skill_id(&mut self, id: u16) { self.skill_id = Some(id); }
+    fn skill_id(&self) -> Option<SkillId> { self.skill_id }
+    fn set_skill_id(&mut self, id: SkillId) { self.skill_id = Some(id); }
 
     fn try_injury_modification(&self, _game: &Game, ctx: &InjuryContext, _injury_type_name: &str) -> bool {
         !ctx.is_casualty()

@@ -21,7 +21,13 @@ pub fn animation_type() -> AnimationType {
 }
 
 pub fn init_effect(prayer_state: &mut PrayerState, game: &mut Game, rng: &mut GameRng, team_id: &str, selector: &dyn PlayerSelector) -> bool {
-    init_effect_random_selection(prayer_state, game, rng, team_id, PRAYER_NAME, AFFECTED_PLAYERS, selector, &[SkillId::Stab])
+    // Java's addedSkills() is Collections.emptySet() for this handler (only bb2025
+    // BadHabitsHandler overrides it) — passing the granted skill here wrongly shrank the
+    // eligible list and desynced the SHARED Collections-shuffle stream (dark_elf bb2020
+    // seed 31: Rust shuffled 7 Stiletto candidates where Java shuffled 8 — the assassin
+    // already carrying Stab stays eligible in Java — so the next Cheering-Fans prayer
+    // pick diverged: Rust IRON_MAN vs Java roll 16).
+    init_effect_random_selection(prayer_state, game, rng, team_id, PRAYER_NAME, AFFECTED_PLAYERS, selector, &[])
 }
 
 pub fn remove_effect_internal(game: &mut Game, team_id: &str, selector: &dyn PlayerSelector) {

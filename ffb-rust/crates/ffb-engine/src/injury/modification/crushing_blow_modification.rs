@@ -1,9 +1,10 @@
 /// Translation of com.fumbbl.ffb.server.injury.modification.CrushingBlowModification.
+use ffb_model::enums::SkillId;
 use ffb_model::model::SkillUse;
 use crate::injury::modification::{InjuryContextModification, ModificationParams};
 
 pub struct CrushingBlowModification {
-    skill_id: Option<u16>,
+    skill_id: Option<SkillId>,
 }
 
 impl CrushingBlowModification {
@@ -17,8 +18,8 @@ impl Default for CrushingBlowModification {
 impl InjuryContextModification for CrushingBlowModification {
     fn skill_use(&self) -> SkillUse { SkillUse::ADD_ARMOUR_MODIFIER }
     fn valid_types(&self) -> &'static [&'static str] { &["Block"] }
-    fn skill_id(&self) -> Option<u16> { self.skill_id }
-    fn set_skill_id(&mut self, id: u16) { self.skill_id = Some(id); }
+    fn skill_id(&self) -> Option<SkillId> { self.skill_id }
+    fn set_skill_id(&mut self, id: SkillId) { self.skill_id = Some(id); }
 
     /// Java: (!armorBroken || (armorBroken && mbUsed)) && hasTacklezones.
     /// mbUsed = true when a MightyBlow modifier (affectsEitherArmourOrInjuryOnBlock) is present.

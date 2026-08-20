@@ -31,8 +31,13 @@ pub fn init_effect(
     team_id: &str,
     d3_roll: i32,
     selector: &dyn PlayerSelector,
+    added_skills: &[SkillId],
 ) -> bool {
-    init_effect_random_selection(prayer_state, game, rng, team_id, PRAYER_NAME, affected_players(d3_roll), selector, &[SkillId::Loner])
+    // Java: addedSkills() differs per edition — bb2020 BadHabitsHandler inherits the EMPTY
+    // default; only bb2025's override returns {the hasToRollToUseTeamReroll skill}. The list
+    // feeds the eligibility filter AND therefore the SHARED Collections-shuffle stream, so the
+    // wrong set desyncs every later shuffle-driven pick.
+    init_effect_random_selection(prayer_state, game, rng, team_id, PRAYER_NAME, affected_players(d3_roll), selector, added_skills)
 }
 
 pub fn remove_effect_internal(game: &mut Game, team_id: &str, selector: &dyn PlayerSelector) {
@@ -67,7 +72,7 @@ mod tests {
         let mut state = PrayerState::new();
         let mut game = make_game();
         let stub = StubPlayerSelector;
-        assert!(init_effect(&mut state, &mut game, &mut GameRng::new(0), "home", 2, &stub));
+        assert!(init_effect(&mut state, &mut game, &mut GameRng::new(0), "home", 2, &stub, &[SkillId::Loner]));
     }
 
     #[test]

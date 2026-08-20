@@ -436,7 +436,7 @@ impl StepApplyKickoffResult {
                         None => true,
                     })
                     .collect();
-                ffb_model::util::java_random::collections_shuffle(&mut available, &mut game.collections_rng);
+                ffb_model::util::java_random::collections_shuffle(&mut available, &mut game.collections_rng.borrow_mut());
                 available[0]
             };
             let mut out = StepOutcome::next();

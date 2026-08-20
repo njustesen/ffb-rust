@@ -16,6 +16,8 @@ impl InjuryTypeChainsaw { pub fn new() -> Self { Self { ctx: InjuryContext::new(
 impl Default for InjuryTypeChainsaw { fn default() -> Self { Self::new() } }
 
 impl InjuryTypeServer for InjuryTypeChainsaw {
+    fn java_class_name(&self) -> &'static str { "Chainsaw" }
+    fn is_chainsaw(&self) -> bool { true }
     fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,
         coord: FieldCoordinate, from_coord: Option<FieldCoordinate>, old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode) {
         modification_aware_handle_injury(self, game, rng, attacker_id, defender_id, coord, from_coord, old_ctx, apo_mode);
@@ -34,7 +36,7 @@ impl InjuryTypeServer for InjuryTypeChainsaw {
     }
 }
 impl ModificationAwareInjuryType for InjuryTypeChainsaw {
-    fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
+    fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, roll: bool) {
         // Java: `UtilCards.hasUnusedSkillWithProperty(pDefender, ignoresArmourModifiersFromSkills)`
         // (e.g. Iron Hard Skin) suppresses the Chainsaw +3 armor modifier.
         let defender_ignores = game.player(defender_id)
@@ -44,7 +46,13 @@ impl ModificationAwareInjuryType for InjuryTypeChainsaw {
         if !defender_ignores && !self.ctx.armor_modifiers.iter().any(|m| m.name == "Chainsaw") {
             self.ctx.add_armor_modifier(ARMOR_CHAINSAW_3);
         }
-        do_armor_roll(game, rng, &mut self.ctx, defender_id);
+        // Java: `if (roll) setArmorRoll(rollArmour())` then an unconditional armour-broken
+        // re-evaluation — roll=false is the InjuryContextModification alternate-context path.
+        if roll {
+            do_armor_roll(game, rng, &mut self.ctx, defender_id);
+        } else {
+            crate::injury::recalc_armor_broken(game, &mut self.ctx, defender_id);
+        }
     }
     fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str) {
         // Java: `factory.findInjuryModifiers(game, injuryContext, pAttacker, pDefender, isStab(),

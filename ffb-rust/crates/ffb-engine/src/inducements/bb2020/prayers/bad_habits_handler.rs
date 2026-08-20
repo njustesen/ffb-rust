@@ -23,7 +23,7 @@ impl PrayerHandler for BadHabitsHandler {
     fn get_name(&self) -> &'static str { "BadHabitsHandler" }
     fn init_effect(&self, prayer_state: &mut PrayerState, game: &mut Game, rng: &mut GameRng, team_id: &str) -> bool {
         let d3_roll = rng.d3();
-        base::init_effect(prayer_state, game, rng, team_id, d3_roll, &OpponentPlayerSelector::new())
+        base::init_effect(prayer_state, game, rng, team_id, d3_roll, &OpponentPlayerSelector::new(), &[])
     }
     fn remove_effect_internal(&self, _prayer_state: &mut PrayerState, game: &mut Game, team_id: &str) {
         base::remove_effect_internal(game, team_id, &OpponentPlayerSelector::new());

@@ -19,6 +19,8 @@ pub fn animation_type() -> AnimationType {
 
 /// Java: initEffect — selects 1 RESERVE player on the praying team, marks prayer, grants MightyBlow.
 pub fn init_effect(prayer_state: &mut PrayerState, game: &mut Game, rng: &mut GameRng, team_id: &str, selector: &dyn PlayerSelector) -> bool {
+    // Java KnuckleDustersHandler is a SelectPlayerPrayerHandler (dialog) whose eligibility
+    // uses skillsFromEnhancement = {Mighty Blow}; this random-selection port keeps that set.
     init_effect_random_selection(prayer_state, game, rng, team_id, PRAYER_NAME, 1, selector, &[SkillId::MightyBlow])
 }
 

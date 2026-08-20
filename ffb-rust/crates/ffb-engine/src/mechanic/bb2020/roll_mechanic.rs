@@ -75,8 +75,15 @@ fn map_si_roll_bb2020(game: &Game, ctx: &InjuryContext, si_roll: i32) -> Option<
     if reduceable.is_empty() || reduceable.contains(&original) {
         Some(original)
     } else {
-        // Java: Collections.shuffle(reduceable); return reduceable.get(0)
-        // No GameRng here — return first reduceable deterministically
+        // Java: Collections.shuffle(injuriesWithReduceableStats); return get(0).
+        // The shuffle draws from the SHARED per-game Collections stream (the same one the
+        // Cheering-Fans prayer pick uses) — skipping it here shifted every later shuffle:
+        // dark_elf bb2020 seed 31 picked IRON_MAN at a mid-game Cheering Fans where Java
+        // picked a different prayer, because a serious-injury remap earlier in the drive
+        // had consumed a shuffle Java made and Rust did not.
+        let mut reduceable = reduceable;
+        ffb_model::util::java_random::collections_shuffle(
+            &mut reduceable, &mut game.collections_rng.borrow_mut());
         Some(reduceable[0])
     }
 }

@@ -3,7 +3,7 @@
 /// Re-rolls a single armour die. Gate: Pro re-roll is available, armour roll exists,
 /// and (armorBroken == selfInflicted OR spottedFoul).
 /// requiresConditionalReRollSkill = true.
-use ffb_model::enums::ApothecaryMode;
+use ffb_model::enums::{ApothecaryMode, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::model::SkillUse;
 use ffb_model::util::rng::GameRng;
@@ -13,7 +13,7 @@ use crate::injury::modification::old_pro_modification_params::OldProModification
 use crate::util::util_server_re_roll::UtilServerReRoll;
 
 pub struct OldProModification {
-    skill_id: Option<u16>,
+    skill_id: Option<SkillId>,
 }
 
 impl OldProModification {
@@ -74,8 +74,8 @@ impl InjuryContextModification for OldProModification {
     fn skill_use(&self) -> SkillUse { SkillUse::RE_ROLL_SINGLE_ARMOUR_DIE }
     fn valid_types(&self) -> &'static [&'static str] { VALID }
     fn requires_conditional_re_roll_skill(&self) -> bool { true }
-    fn skill_id(&self) -> Option<u16> { self.skill_id }
-    fn set_skill_id(&mut self, id: u16) { self.skill_id = Some(id); }
+    fn skill_id(&self) -> Option<SkillId> { self.skill_id }
+    fn set_skill_id(&mut self, id: SkillId) { self.skill_id = Some(id); }
 
     fn allowed_for_attacker_and_defender_teams(&self, _game: &Game, _ctx: &InjuryContext) -> bool {
         true
@@ -91,6 +91,16 @@ impl InjuryContextModification for OldProModification {
         injury_type_name: &'static str,
     ) -> bool {
         if injury_ctx.armor_roll.is_none() {
+            return false;
+        }
+        // Java base modifyArmour :40 — a defender with an unused ignoresArmourModifiersFromSkills
+        // skill (Iron Hard Skin) blocks the whole modification.
+        let defender_ignores = injury_ctx.defender_id.as_deref()
+            .and_then(|id| game.player(id))
+            .map(|p| p.has_unused_skill_with_property(
+                ffb_model::model::property::named_properties::NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS))
+            .unwrap_or(false);
+        if defender_ignores {
             return false;
         }
         let spotted_foul = Self::is_spotted_foul(injury_ctx, injury_type_name);
@@ -123,13 +133,12 @@ impl InjuryContextModification for OldProModification {
             roll[replace_index] = if self_inflicted { 1 } else { 6 };
         }
 
-        // Recalculate armor_broken
+        // Java base modifyArmourInternal :59 — recalc through DiceInterpreter.isArmourBroken
+        // (armour WITH modifiers, edition predicate, current context modifiers). The old inline
+        // recalc used base `p.armour` and the generic strict predicate — a [5,5] with a -1
+        // Defensive Assist on AV9 evaluated unbroken where Java breaks (dark_elf bb2020 seed 17).
         if let Some(defender_id) = new_ctx.defender_id.clone() {
-            let armor_value = game.player(&defender_id).map(|p| p.armour).unwrap_or(7);
-            if let Some(roll) = new_ctx.armor_roll {
-                use ffb_mechanics::mechanics::armor_broken;
-                new_ctx.armor_broken = armor_broken(armor_value, roll, &new_ctx.armor_modifiers);
-            }
+            crate::injury::recalc_armor_broken(game, &mut new_ctx, &defender_id);
         }
 
         // armourModificationCantHelp: !spottedFoul && (armorBroken == selfInflicted)
@@ -137,19 +146,19 @@ impl InjuryContextModification for OldProModification {
             return false;
         }
 
+        // Java base modifyArmourInternal :66 — the alternate context's armour modifiers are
+        // CLEARED before the real reroll; armourRoll(roll=false) later rebuilds them fresh.
+        new_ctx.clear_armor_modifiers();
+
         // applyArmourModification: roll new die, insert, add report
         let new_value = rng.die(6);
         if let Some(ref mut roll) = new_ctx.armor_roll {
             roll[replace_index] = new_value;
         }
 
-        // Recalculate armor_broken after rolling new die
+        // Java base modifyArmourInternal :68 — recalc with the cleared modifier set.
         if let Some(defender_id) = new_ctx.defender_id.clone() {
-            let armor_value = game.player(&defender_id).map(|p| p.armour).unwrap_or(7);
-            if let Some(roll) = new_ctx.armor_roll {
-                use ffb_mechanics::mechanics::armor_broken;
-                new_ctx.armor_broken = armor_broken(armor_value, roll, &new_ctx.armor_modifiers);
-            }
+            crate::injury::recalc_armor_broken(game, &mut new_ctx, &defender_id);
         }
 
         new_ctx.set_modification(ffb_model::injury::context::InjuryModification::ARMOUR);
@@ -173,7 +182,12 @@ mod tests {
     fn make() -> OldProModification { OldProModification::new() }
 
     fn make_game() -> Game {
-        Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        // Java hasPrerequisite → isProReRollAvailable → eligibleForPro requires the Pro user
+        // to BE the acting player, in a Pro-allowing turn mode.
+        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.acting_player.player_id = Some("att".into());
+        game
     }
 
     fn add_player_with_pro(game: &mut Game, home: bool, id: &str) {

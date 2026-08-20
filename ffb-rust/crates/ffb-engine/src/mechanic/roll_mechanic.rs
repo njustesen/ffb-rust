@@ -87,10 +87,33 @@ pub trait RollMechanic: Send + Sync {
 
     // ── Concrete (shared across all editions) ─────────────────────────────────
 
-    /// Java: isProReRollAvailable — player has Pro and hasn't used it yet.
-    fn is_pro_re_roll_available(&self, _game: &Game, player: &Player) -> bool {
-        player.has_skill_property(NamedProperties::CAN_REROLL_ONCE_PER_TURN)
-            && !player.used_skills.contains(&SkillId::Pro)
+    /// Java: RollMechanic.isProReRollAvailable — `eligibleForPro(game, player, bomber)
+    /// && canRerollOncePerTurn && !playerState.hasUsedPro()`.
+    ///
+    /// The eligibleForPro gate matters: it requires the player to BE the acting player
+    /// (and standing, and a Pro-allowing turn mode). Without it, a mirror match where BOTH
+    /// nr-3 players are Helmut Wulf fired the block DEFENDER's Old Pro on the attacker's
+    /// both-down fall (dark_elf bb2020 seed 2 i=14: an extra reroll d6 Java never rolled,
+    /// because home_03 is not the acting player). Note Java checks the transient
+    /// `playerState.hasUsedPro()` BIT (cleared per activation), not the per-drive
+    /// used-skills set.
+    fn is_pro_re_roll_available(&self, game: &Game, player: &Player) -> bool {
+        use ffb_mechanics::skill_mechanic::SkillMechanic as SkillMechanicTrait;
+        let eligible = match game.rules {
+            ffb_model::enums::Rules::Bb2016 =>
+                ffb_mechanics::bb2016::skill_mechanic::SkillMechanic::new()
+                    .eligible_for_pro(game, player, game.original_bombardier.as_deref()),
+            ffb_model::enums::Rules::Bb2020 =>
+                ffb_mechanics::bb2020::skill_mechanic::SkillMechanic::new()
+                    .eligible_for_pro(game, player, game.original_bombardier.as_deref()),
+            _ =>
+                ffb_mechanics::bb2025::skill_mechanic::SkillMechanic::new()
+                    .eligible_for_pro(game, player, game.original_bombardier.as_deref()),
+        };
+        let state = game.field_model.player_state(&player.id).unwrap_or_default();
+        eligible
+            && player.has_skill_property(NamedProperties::CAN_REROLL_ONCE_PER_TURN)
+            && !state.has_used_pro()
     }
 
     /// Java: isSingleUseReRollAvailable — single-use re-rolls remain on TurnData.

@@ -729,6 +729,18 @@ impl UtilPlayer {
             } else {
                 None
             };
+            // Java UtilPlayer.refreshPlayersForTurnStart :420-425 — the transient usedPro BIT is
+            // cleared for EVERY player at each turn start (even when no state change applies).
+            // Without this, a Pro roll in one activation left the bit set for the rest of the
+            // game and Old Pro's hasPrerequisite (isProReRollAvailable → !hasUsedPro) never
+            // fired again (dark_elf bb2020 seed 97 i=34: Helmut's second foul skipped the
+            // modification Java made).
+            let new_ps = match new_ps {
+                Some(nps) if nps.has_used_pro() => Some(nps.change_used_pro(false)),
+                Some(nps) => Some(nps),
+                None if ps.has_used_pro() => Some(ps.change_used_pro(false)),
+                None => None,
+            };
             if let Some(new_ps) = new_ps {
                 game.field_model.set_player_state(&entry.id, new_ps);
             }

@@ -937,11 +937,49 @@ ApothecaryMultiple DauntlessMultiple StateMultipleRolls ReportStabInjury Dispatc
       RE_ROLL_BLOCK_FOR_TARGETS handler (first needsSelection roll → die index 0; decline
       DialogReRollForTargetsParameter). Tests: multi_block_dice_count_folds_assists,
       acting_team_resolution_applies_attacker_ko. ffb-engine 7242/0.
-- [ ] Full 3-edition gate with the MB fixes (in flight), then commit+push both repos.
-- [ ] Pro route + verify dark_elf bb2020 (Helmut already fielded): StepHandleDropPlayerContext
-      skill→modification lookup + SkillUse dialog + StepId::Pro push (documented gap at bb2020
-      step_handle_drop_player_context.rs:21).
+- [x] Full 3-edition gate with the MB fixes: 30/30 ×3, committed `316c774a` + pushed. A follow-up
+      wave the same day fixed three more reds the MB drafts surfaced (apothecary factory default,
+      MB assist fold, bb2016 HMP natural-1 — see the commit).
+- [x] Pro route LIVE (2026-08-20, dark_elf bb2020 100/100 + full gate 30/30 ×3). The whole
+      InjuryContextModification pipeline now runs: registry `modification_for_skill` +
+      `unused_injury_modification` (Java Player.getUnusedInjuryModification; 16 behaviours
+      mapped), modification machinery converted u16→SkillId, and
+      `modification_aware_handle_injury` executes Java :36-57/:70-75 (attacker lookup, defender
+      fallback when is_chainsaw/is_vomit_like — Helmut's kickback; alternate context resolved via
+      std::mem::swap with armour_roll(roll=false) re-evaluation — block/chainsaw/foul now
+      re-interpret EXISTING dice instead of bailing; modify_injury re-interprets via the new
+      `interpret_and_set_injury` split of do_injury_roll). Live HandleDropPlayerContext: report +
+      SkillUse dialog (Continue), UseSkill → push Sequence[Pro] + push_self (agents send a
+      PLACEHOLDER SkillId::Block — self.skill is authoritative), SUCCESSFUL_PRO stored as
+      pending_pro and applied at re-execute (set_parameter has no game — the ApothecaryMultiple
+      lesson again), swap_to_alternate_context ported onto injury::InjuryResult.
+      **VACUOUS-GREEN LESSON**: the first "100/100 with Pro fielded" had ZERO OldPro events —
+      Helmut at nr10 never swung; moved to nr3 (assassin→10) and the board LIT UP with 5 real
+      engine bugs:
+      (1) eligibleForPro used the bare `acting.has_acted` field — Java's
+      hasActedIgnoringNegativeTraits is computed from moved/fouled/blocked/passed sub-flags;
+      (2) StepPro's post-decline re-execute rolled a SECOND Pro die — Java's useReRoll(PRO)
+      gates on `canRerollOncePerTurn && !hasUsedPro`;
+      (3) OldPro modify_armour skipped Java's base-pipeline steps: DiceInterpreter-equivalent
+      recalc (armour WITH modifiers + edition predicate — bb2020 breaks on >=) and the
+      CLEAR-armour-modifiers before the reroll;
+      (4) the transient usedPro BIT is cleared for every player at each TURN START
+      (UtilPlayer.refreshPlayersForTurnStart :420-425) — Rust kept it for the game, so Old Pro
+      offered once per game instead of once per turn-context;
+      (5) **the SHARED Collections-shuffle stream is fed by list SIZES**: Rust's Stiletto
+      selector passed added_skills=[Stab] where Java's RandomSelectionPrayerHandler.addedSkills
+      is EMPTY (only bb2025 BadHabits overrides) → 7-element shuffle vs Java's 8 → every later
+      shuffle-driven pick diverged (seed 31: the next Cheering-Fans prayer became IRON_MAN).
+      Companion fixes: bb2020 mapSIRoll now Collections-shuffles the reduceable SI list
+      (previously "first reduceable"); `game.collections_rng` is now RefCell<JavaRandom> so
+      &Game-only paths (the SI remap) can draw. Debug tooling that cracked it: simulating
+      java.util.Random + Collections.shuffle in python and brute-forcing the shuffle-size
+      HISTORY that reproduces each engine's observed permutation ([16,8] Java vs [16,7] Rust).
+      Tests: 3 lookup tests, modified_injury_context_offers_skill_use_then_pushes_pro_and_swaps;
+      engine 7247/0, model 1160/0, mechanics 2796/0.
 - [ ] Inventory update (multiblock family reached; ReportStabInjury/StateMultipleRolls status).
+- [ ] Cosmetic: no `skillUse` GameEvent is emitted for the Old Pro dialog (coverage counts it
+      as unexercised even when it fires); wire the event when coverage reporting needs it.
 
 ## Blocked — needs a tier decision from the user## Blocked — needs a tier decision from the user
 
