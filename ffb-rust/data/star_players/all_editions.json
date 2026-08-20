@@ -4476,6 +4476,37 @@
       "available_for": [
         "Amazon"
       ]
+    },
+    {
+      "id": "woodelf.Rodney",
+      "name": "Rodney Roachbait",
+      "display_name": "Rodney Roachbait",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 70000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 4,
+      "av": 7,
+      "shorthand": "RR",
+      "skills": [
+        "Catch",
+        "Diving Catch",
+        "Jump Up",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "On the Ball",
+        "Sidestep",
+        "Stunty",
+        "Wrestle",
+        "Catch of the Day"
+      ],
+      "available_for": [
+        "Wood Elf"
+      ]
     }
   ]
 }

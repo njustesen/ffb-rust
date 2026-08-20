@@ -1020,8 +1020,10 @@ Carriers (from rules/star_players/*.md; Java canonical skill names in quotes):
         left a hexed HOME player's enhancement stuck across the half boundary. Harness lesson:
         --reuse-java after a draft change reds 90 seeds at step 1 — regenerate Java logs after
         ANY data change.
-  - [ ] Rodney Roachbait 70K 6/2/3+/4+/7+ (Catch, Diving Catch, Jump Up, Loner(4+), On the Ball,
-        Sidestep, Stunty, Wrestle, "Catch of the Day") → bb2025 wood_elf (Woodland League)
+  - [x] Rodney Roachbait LIVE (2026-08-20): drafted @nr2 bb2025 wood_elf (wardancer 2→12),
+        100/100 fresh Java logs, full gate 30/30 ×3, CotD fires in 53/100 games. Step was
+        already a full port — only offers/declaration/data were dead; zero engine fixes
+        needed (the RaidingParty/LIME/BalefulHex plumbing pattern applied cleanly).
   - [ ] Zzharg Madeye (Cannoneer, Hail Mary Pass, Loner, Nerves of Steel, Secret Weapon,
         Thick Skull, "\"Blastin' Solves Everything\"") → bb2025 chaos_dwarf
 - Batch B — own step families:

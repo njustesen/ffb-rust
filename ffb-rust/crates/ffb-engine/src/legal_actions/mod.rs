@@ -416,6 +416,25 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             }
         }
 
+        // Catch of the Day (bb2025 star special): the client's isCatchOfTheDayAvailable rule —
+        // unused canGetBallOnGround + ball on the ground (isBallMoving) within 3 steps.
+        // Offer sits DIRECTLY AFTER Baleful Hex; ParityRunner mirrors the position.
+        if player.has_skill(SkillId::CatchOfTheDay)
+            && !player.used_skills.contains(&SkillId::CatchOfTheDay)
+        {
+            let ball_near = game.field_model.ball_moving
+                && game.field_model.ball_coordinate
+                    .map(|bc| bc.distance_in_steps(coord) <= 3)
+                    .unwrap_or(false);
+            if ball_near {
+                actions.push(Action::ActivatePlayer {
+                    player_id: pid.clone(),
+                    player_action: PlayerActionChoice::CatchOfTheDay,
+                    block_defender_id: None,
+                });
+            }
+        }
+
         // Black Ink (bb2020+ star special): the client's isBlackInkAvailable rule — unused
         // canGazeAutomatically skill + an adjacent standing-or-prone, NOT-distracted opponent
         // (LogicModule.isBlackInkAvailable). Declaring it maps to the client's
@@ -530,6 +549,7 @@ pub fn eligible_players_for_activation(game: &Game) -> Vec<(PlayerId, Vec<ffb_mo
             PAC::RaidingParty => PA::RaidingParty,
             PAC::LookIntoMyEyes => PA::LookIntoMyEyes,
             PAC::BalefulHex => PA::BalefulHex,
+            PAC::CatchOfTheDay => PA::CatchOfTheDay,
             PAC::Treacherous => PA::Treacherous,
             PAC::BlackInk => PA::BlackInk,
             PAC::Punt => PA::Punt,
@@ -1424,6 +1444,38 @@ mod tests {
         }
         let a2 = legal_activate_player_actions(&game, TeamSide::Home);
         assert!(!has_action(&a2, "estelle", PlayerActionChoice::BalefulHex));
+    }
+
+    /// §11: Catch of the Day is offered under the CLIENT's rule
+    /// (LogicModule.isCatchOfTheDayAvailable): unused canGetBallOnGround + loose ball
+    /// (isBallMoving) within 3 steps.
+    #[test]
+    fn catch_of_the_day_offered_only_with_loose_ball_within_three() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "rodney", c(5, 5), PS_STANDING, vec![SkillId::CatchOfTheDay]);
+        add_player(&mut game, false, "opp", c(15, 5), PS_STANDING, vec![]);
+        // loose ball 4 steps away → no offer
+        game.field_model.ball_coordinate = Some(c(9, 5));
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = true;
+        let a0 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a0, "rodney", PlayerActionChoice::CatchOfTheDay));
+        // within 3 → offered
+        game.field_model.ball_coordinate = Some(c(8, 5));
+        let a1 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&a1, "rodney", PlayerActionChoice::CatchOfTheDay),
+            "unused Catch of the Day + loose ball within 3 must be offered");
+        // carried ball (not moving) → no offer
+        game.field_model.ball_moving = false;
+        let a2 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a2, "rodney", PlayerActionChoice::CatchOfTheDay));
+        // used skill withdraws it
+        game.field_model.ball_moving = true;
+        if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == "rodney") {
+            p.used_skills.insert(SkillId::CatchOfTheDay);
+        }
+        let a3 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a3, "rodney", PlayerActionChoice::CatchOfTheDay));
     }
 
     /// §9: Black Ink is offered under the CLIENT's rule (LogicModule.isBlackInkAvailable):

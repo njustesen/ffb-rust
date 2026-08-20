@@ -121,6 +121,7 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             | PlayerActionChoice::RaidingParty
             | PlayerActionChoice::LookIntoMyEyes
             | PlayerActionChoice::BalefulHex
+            | PlayerActionChoice::CatchOfTheDay
             | PlayerActionChoice::Treacherous
             | PlayerActionChoice::BlackInk
     )
@@ -1105,6 +1106,7 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         PlayerAction::RaidingParty => PlayerActionChoice::RaidingParty,
         PlayerAction::LookIntoMyEyes => PlayerActionChoice::LookIntoMyEyes,
         PlayerAction::BalefulHex => PlayerActionChoice::BalefulHex,
+        PlayerAction::CatchOfTheDay => PlayerActionChoice::CatchOfTheDay,
         PlayerAction::Treacherous => PlayerActionChoice::Treacherous,
         PlayerAction::MultipleBlock => PlayerActionChoice::MultipleBlock,
         PlayerAction::BlackInk => PlayerActionChoice::BlackInk,

@@ -230,6 +230,9 @@ pub enum PlayerActionChoice {
     /// Baleful Hex (bb2025 star special): distract an opponent within 5 squares on a 2+.
     /// Declared as the client's ActingPlayer(MOVE) + UseSkill(canMakeOpponentMissTurn) pair.
     BalefulHex,
+    /// Catch of the Day (bb2025 star special): grab the loose ball within 3 squares on a 3+.
+    /// Declared as the client's ActingPlayer(MOVE) + UseSkill(canGetBallOnGround) pair.
+    CatchOfTheDay,
     /// Treacherous (bb2020+ star special): declared action; the step stabs an adjacent
     /// teammate carrying the ball, then the activation continues via a fresh Select sequence.
     Treacherous,

@@ -16,7 +16,7 @@
       "position_id": "woodelf.wardancer"
     },
     {
-      "nr": 2,
+      "nr": 12,
       "position_id": "woodelf.wardancer"
     },
     {
@@ -56,5 +56,11 @@
       "position_id": "woodelf.lineman"
     }
   ],
-  "special_rules": []
+  "special_rules": [],
+  "stars": [
+    {
+      "nr": 2,
+      "star_id": "woodelf.Rodney"
+    }
+  ]
 }
