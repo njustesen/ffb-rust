@@ -49,11 +49,20 @@ impl StepEndThenIStartedBlastin {
                     None => game.turn_mode = TurnMode::Regular,
                 }
             }
-            // Java: pushes EndPlayerAction sequence onto stack
-            // We publish the parameters for the EndPlayerAction generator
-            StepOutcome::next()
-                .publish(StepParameter::EndPlayerAction(self.end_player_action))
-                .publish(StepParameter::EndTurn(self.end_turn))
+            // Java: getGameState().getStepStack().clear() + push EndPlayerAction sequence.
+            // Merely publishing the parameters left the activation formally OPEN — nobody
+            // consumed them, so the star stayed ACTIVE after his shot (chaos_dwarf bb2025
+            // seed 6 i=90: Java a01 inactive, Rust active).
+            use crate::step::generator::bb2025::EndPlayerAction;
+            use crate::step::generator::bb2025::end_player_action::EndPlayerActionParams;
+            let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
+                feeding_allowed: false,
+                end_player_action: self.end_player_action,
+                end_turn: self.end_turn,
+                check_forgo: false,
+                rules: game.rules,
+            });
+            StepOutcome::next().with_clear_stack().push_seq(seq)
         } else {
             // Java: updateMoveSquares + updateDiceDecorations (view-only; no-op in headless)
             StepOutcome::next()
@@ -141,8 +150,9 @@ mod tests {
         let mut rng = GameRng::new(0);
         let out = step.start(&mut game, &mut rng);
         assert_eq!(out.action, StepAction::NextStep);
-        let has_end_turn_true = out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true)));
-        assert!(has_end_turn_true, "should publish EndTurn(true)");
+        // Java clears the stack and pushes the EndPlayerAction sequence directly.
+        assert!(out.clear_stack, "should clear the step stack");
+        assert!(!out.pushes.is_empty(), "should push the EndPlayerAction sequence");
     }
 
     #[test]
@@ -153,8 +163,8 @@ mod tests {
         let mut rng = GameRng::new(0);
         let out = step.start(&mut game, &mut rng);
         assert_eq!(out.action, StepAction::NextStep);
-        let has_epa = out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(_)));
-        assert!(has_epa, "prone player should trigger end sequence parameters");
+        assert!(out.clear_stack && !out.pushes.is_empty(),
+            "prone player should clear the stack and push the EndPlayerAction sequence");
     }
 
     #[test]

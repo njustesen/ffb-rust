@@ -4507,6 +4507,35 @@
       "available_for": [
         "Wood Elf"
       ]
+    },
+    {
+      "id": "chaosdwarf.Zzharg",
+      "name": "Zzharg Madeye",
+      "display_name": "Zzharg Madeye",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 4,
+      "st": 4,
+      "ag": 4,
+      "pa": 3,
+      "av": 10,
+      "shorthand": "ZM",
+      "skills": [
+        "Cannoneer",
+        "Hail Mary Pass",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Nerves of Steel",
+        "Secret Weapon",
+        "Thick Skull",
+        "\"Blastin' Solves Everything\""
+      ],
+      "available_for": [
+        "Chaos Dwarf"
+      ]
     }
   ]
 }

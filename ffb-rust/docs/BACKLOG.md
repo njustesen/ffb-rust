@@ -1024,8 +1024,26 @@ Carriers (from rules/star_players/*.md; Java canonical skill names in quotes):
         100/100 fresh Java logs, full gate 30/30 ×3, CotD fires in 53/100 games. Step was
         already a full port — only offers/declaration/data were dead; zero engine fixes
         needed (the RaidingParty/LIME/BalefulHex plumbing pattern applied cleanly).
-  - [ ] Zzharg Madeye (Cannoneer, Hail Mary Pass, Loner, Nerves of Steel, Secret Weapon,
-        Thick Skull, "\"Blastin' Solves Everything\"") → bb2025 chaos_dwarf
+  - [x] Zzharg Madeye LIVE (2026-08-21): drafted @nr2 bb2025 chaos_dwarf (bull centaur 2→12),
+        100/100 fresh Java logs, full gate 30/30 ×3, Blastin' fires in 98/100 games. — BATCH A
+        COMPLETE. Two engine fixes: (1) StepEndThenIStartedBlastin only PUBLISHED
+        EndPlayerAction/EndTurn — nobody consumed them, so the star stayed ACTIVE after his
+        shot; Java clears the stack and PUSHES the EndPlayerAction sequence. (2) Java
+        ActingPlayer.markSkillUsed puts the skill in the ACTING PLAYER's used set — that set is
+        what makes hasActed() true, which is what deactivates the player on activation end;
+        Rust only marked the Player. New two-phase target-wait contract
+        (AgentPrompt::BlastinTarget, no Java dialog): initial pick = STANDING opponents within
+        3 of the star; roll-2 replacement = either team within 3 of the ORIGINAL target, star
+        excluded, OPPOSING coach picks; coordinate-sorted single actionRng pick, EndTurn when
+        empty. Harness lessons: RE_ROLL_PROPERTIES decline left a stale dialog spinning on a
+        CONTINUE-after-fail step; the fix must clear ONLY IF SAME OBJECT — the injection can
+        synchronously run the whole turn end and show the half-boundary ARGUE_THE_CALL dialog,
+        which an unconditional clear wiped (END_TURN stuck 501 iters).
+- Follow-up (found during Zzharg): `StepOutcome::clear_stack` is a DEAD FLAG — the driver
+  never consumes it, so every `with_clear_stack()` site (LIME blitz-cancel, reset-to-move,
+  EndThenIStartedBlastin) is inert. Parity holds today because those steps sit last in their
+  sequences, but Java's `getStepStack().clear()` also wipes OUTER stale steps. Wire the flag
+  through the driver 1:1 as its own item with its own full gate.
 - Batch B — own step families:
   - [ ] Cindy Piewhistle ("All You Can Eat" + bomb) → bb2025 halfling
   - [ ] Guffle Pusmaw ("Quick Bite") → bb2025 nurgle

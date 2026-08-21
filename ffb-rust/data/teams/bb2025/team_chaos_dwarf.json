@@ -16,7 +16,7 @@
       "position_id": "chaosdwarf.minotaur"
     },
     {
-      "nr": 2,
+      "nr": 12,
       "position_id": "chaosdwarf.bullcentaur"
     },
     {
@@ -56,5 +56,11 @@
       "position_id": "chaosdwarf.hobgoblin"
     }
   ],
-  "special_rules": []
+  "special_rules": [],
+  "stars": [
+    {
+      "nr": 2,
+      "star_id": "chaosdwarf.Zzharg"
+    }
+  ]
 }

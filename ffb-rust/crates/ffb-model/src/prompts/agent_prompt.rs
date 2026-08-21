@@ -81,6 +81,17 @@ pub enum AgentPrompt {
         player_id: PlayerId,
         squares: Vec<FieldCoordinate>,
     },
+    /// "Blastin' Solves Everything" target wait (Java: TurnMode THEN_I_STARTED_BLASTIN, no
+    /// dialog — the client answers with CLIENT_TARGET_SELECTED). Fired at BOTH waits: the
+    /// initial pick (source = the acting star, opponents only) and the roll-2 replacement
+    /// pick (source = the original target, either team, acting player excluded — the
+    /// opposing coach chooses). `candidates` comes from the STEP per the client's
+    /// isValidTarget; answer = coordinate-sorted single actionRng pick → Action::SelectPlayer,
+    /// or EndTurn when empty.
+    BlastinTarget {
+        player_id: PlayerId,
+        candidates: Vec<PlayerId>,
+    },
     TricksterMove {
         player_id: PlayerId,
         squares: Vec<FieldCoordinate>,

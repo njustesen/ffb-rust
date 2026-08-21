@@ -317,6 +317,12 @@ impl Agent for UniformAgent {
             }
             // Hit-and-run: decline is always a legal response alongside every offered square, so
             // it's included as an explicit option instead of only being the empty-squares case.
+            // Blastin' target wait: uniform pick over the candidate list.
+            Some(AgentPrompt::BlastinTarget { candidates, .. }) => {
+                if candidates.is_empty() { return Action::EndTurn; }
+                let idx = self.pick(candidates.len());
+                Action::SelectPlayer { player_id: candidates[idx].clone() }
+            }
             Some(AgentPrompt::RaidingParty { squares, .. }) => {
                 let mut squares = squares.clone();
                 squares.sort_by_key(|c| (c.x, c.y));

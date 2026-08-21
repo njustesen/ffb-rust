@@ -122,6 +122,7 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             | PlayerActionChoice::LookIntoMyEyes
             | PlayerActionChoice::BalefulHex
             | PlayerActionChoice::CatchOfTheDay
+            | PlayerActionChoice::ThenIStartedBlastin
             | PlayerActionChoice::Treacherous
             | PlayerActionChoice::BlackInk
     )
@@ -750,6 +751,21 @@ impl Agent for RandomAgent {
             // i=100 before play passes to the other team at i=101.)
             // Picking a target here instead would roll block dice Java never rolls.
             Some(AgentPrompt::BlockTarget { .. }) => Action::EndTurn,
+            // Blastin' target wait: coordinate-sorted candidates, single actionRng pick →
+            // SelectPlayer (CLIENT_TARGET_SELECTED). Empty list → EndTurn (client END_MOVE).
+            Some(AgentPrompt::BlastinTarget { candidates, .. }) => {
+                if candidates.is_empty() {
+                    Action::EndTurn
+                } else {
+                    let mut sorted: Vec<&String> = candidates.iter().collect();
+                    sorted.sort_by_key(|pid| {
+                        gs.game.field_model.player_coordinate(pid)
+                            .map(|c| (c.x, c.y)).unwrap_or((99, 99))
+                    });
+                    let idx = self.pick_action(sorted.len());
+                    Action::SelectPlayer { player_id: sorted[idx].clone() }
+                }
+            }
             // Interception: pick a candidate, coordinate-sorted, with ONE actionRng draw
             // (AGENT_CONTRACT §6). `ParityRunner.sendInterceptorChoice` mirrors this list, order and
             // draw. The candidate set comes from the ENGINE's own `UtilPassing.findInterceptors` on
@@ -1107,6 +1123,7 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         PlayerAction::LookIntoMyEyes => PlayerActionChoice::LookIntoMyEyes,
         PlayerAction::BalefulHex => PlayerActionChoice::BalefulHex,
         PlayerAction::CatchOfTheDay => PlayerActionChoice::CatchOfTheDay,
+        PlayerAction::ThenIStartedBlastin => PlayerActionChoice::ThenIStartedBlastin,
         PlayerAction::Treacherous => PlayerActionChoice::Treacherous,
         PlayerAction::MultipleBlock => PlayerActionChoice::MultipleBlock,
         PlayerAction::BlackInk => PlayerActionChoice::BlackInk,

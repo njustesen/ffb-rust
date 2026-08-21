@@ -435,6 +435,27 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             }
         }
 
+        // "Blastin' Solves Everything" (bb2025 star special): the client's
+        // isThenIStartedBlastinAvailable rule — unused canBlastRemotePlayer + any opponent
+        // within 3 Chebyshev steps. Offer sits DIRECTLY AFTER Catch of the Day; ParityRunner
+        // mirrors the position.
+        if player.has_skill(SkillId::BlastinSolvesEverything)
+            && !player.used_skills.contains(&SkillId::BlastinSolvesEverything)
+        {
+            let opponent_near = opponent_team.players.iter().any(|op| {
+                game.field_model.player_coordinate(&op.id)
+                    .map(|c| c.distance_in_steps(coord) <= 3)
+                    .unwrap_or(false)
+            });
+            if opponent_near {
+                actions.push(Action::ActivatePlayer {
+                    player_id: pid.clone(),
+                    player_action: PlayerActionChoice::ThenIStartedBlastin,
+                    block_defender_id: None,
+                });
+            }
+        }
+
         // Black Ink (bb2020+ star special): the client's isBlackInkAvailable rule — unused
         // canGazeAutomatically skill + an adjacent standing-or-prone, NOT-distracted opponent
         // (LogicModule.isBlackInkAvailable). Declaring it maps to the client's
@@ -550,6 +571,7 @@ pub fn eligible_players_for_activation(game: &Game) -> Vec<(PlayerId, Vec<ffb_mo
             PAC::LookIntoMyEyes => PA::LookIntoMyEyes,
             PAC::BalefulHex => PA::BalefulHex,
             PAC::CatchOfTheDay => PA::CatchOfTheDay,
+            PAC::ThenIStartedBlastin => PA::ThenIStartedBlastin,
             PAC::Treacherous => PA::Treacherous,
             PAC::BlackInk => PA::BlackInk,
             PAC::Punt => PA::Punt,
@@ -1476,6 +1498,32 @@ mod tests {
         }
         let a3 = legal_activate_player_actions(&game, TeamSide::Home);
         assert!(!has_action(&a3, "rodney", PlayerActionChoice::CatchOfTheDay));
+    }
+
+    /// §11: "Blastin' Solves Everything" is offered under the CLIENT's rule
+    /// (LogicModule.isThenIStartedBlastinAvailable): unused canBlastRemotePlayer + any
+    /// opponent within 3 Chebyshev steps.
+    #[test]
+    fn blastin_offered_only_with_opponent_within_three() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "zzharg", c(5, 5), PS_STANDING, vec![SkillId::BlastinSolvesEverything]);
+        add_player(&mut game, false, "opp", c(9, 5), PS_STANDING, vec![]);
+        // opponent 4 steps away → no offer
+        let a0 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a0, "zzharg", PlayerActionChoice::ThenIStartedBlastin));
+        // within 3 → offered
+        if let Some(op) = game.team_away.players.iter().map(|p| p.id.clone()).next() {
+            game.field_model.set_player_coordinate(&op, c(8, 5));
+        }
+        let a1 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&a1, "zzharg", PlayerActionChoice::ThenIStartedBlastin),
+            "unused Blastin + opponent within 3 steps must be offered");
+        // used skill withdraws it
+        if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == "zzharg") {
+            p.used_skills.insert(SkillId::BlastinSolvesEverything);
+        }
+        let a2 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a2, "zzharg", PlayerActionChoice::ThenIStartedBlastin));
     }
 
     /// §9: Black Ink is offered under the CLIENT's rule (LogicModule.isBlackInkAvailable):

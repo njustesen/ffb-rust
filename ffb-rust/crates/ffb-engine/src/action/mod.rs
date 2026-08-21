@@ -233,6 +233,9 @@ pub enum PlayerActionChoice {
     /// Catch of the Day (bb2025 star special): grab the loose ball within 3 squares on a 3+.
     /// Declared as the client's ActingPlayer(MOVE) + UseSkill(canGetBallOnGround) pair.
     CatchOfTheDay,
+    /// "Blastin' Solves Everything" (bb2025 star special): shoot a standing opponent within
+    /// 3 squares. Declared as ActingPlayer(MOVE) + UseSkill(canBlastRemotePlayer).
+    ThenIStartedBlastin,
     /// Treacherous (bb2020+ star special): declared action; the step stabs an adjacent
     /// teammate carrying the ball, then the activation continues via a fresh Select sequence.
     Treacherous,

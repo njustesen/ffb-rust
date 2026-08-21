@@ -473,6 +473,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::LookIntoMyEyes => PlayerAction::LookIntoMyEyes,
         PlayerActionChoice::BalefulHex => PlayerAction::BalefulHex,
         PlayerActionChoice::CatchOfTheDay => PlayerAction::CatchOfTheDay,
+        PlayerActionChoice::ThenIStartedBlastin => PlayerAction::ThenIStartedBlastin,
         PlayerActionChoice::Treacherous => PlayerAction::Treacherous,
         PlayerActionChoice::BlackInk => PlayerAction::BlackInk,
         PlayerActionChoice::Swoop => PlayerAction::Swoop,

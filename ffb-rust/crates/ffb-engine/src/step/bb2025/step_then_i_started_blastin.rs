@@ -167,7 +167,13 @@ impl StepThenIStartedBlastin {
         if game.turn_mode != TurnMode::ThenIStartedBlastin {
             self.old_turn_mode = game.last_turn_mode;
             game.turn_mode = TurnMode::ThenIStartedBlastin;
-            return StepOutcome::cont();
+            // Java shows no dialog here — the client answers the turn-mode wait with
+            // CLIENT_TARGET_SELECTED. The agents need an explicit ask.
+            return StepOutcome::cont().with_prompt(
+                ffb_model::prompts::AgentPrompt::BlastinTarget {
+                    player_id: acting_id.clone(),
+                    candidates: Self::find_target_candidates(game),
+                });
         }
 
         // Java: actingPlayer.markSkillUsed(skill)
@@ -218,6 +224,42 @@ impl StepThenIStartedBlastin {
         self.fail(game, rng).with_event(tisb_event)
     }
 
+    /// Client ThenIStartedBlastinLogicModule.isValidTarget: source = the acting star while
+    /// the playing team has the acting player, else the ORIGINAL target; candidates are
+    /// STANDING players within 3 steps; opponents only in the first phase, either team in the
+    /// replacement phase; the acting player himself is never selectable (clicking him opens
+    /// his action menu instead).
+    fn find_target_candidates(game: &Game) -> Vec<String> {
+        let Some(acting_id) = game.acting_player.player_id.clone() else { return vec![] };
+        let playing_team_has_acting_player = if game.home_playing {
+            game.team_home.player(&acting_id).is_some()
+        } else {
+            game.team_away.player(&acting_id).is_some()
+        };
+        let source_id = if playing_team_has_acting_player {
+            acting_id.clone()
+        } else {
+            match game.defender_id.clone() { Some(d) => d, None => acting_id.clone() }
+        };
+        let Some(source_coord) = game.field_model.player_coordinate(&source_id) else { return vec![] };
+        let acting_team_home = game.team_home.player(&acting_id).is_some();
+        game.team_home.players.iter().map(|p| (&p.id, true))
+            .chain(game.team_away.players.iter().map(|p| (&p.id, false)))
+            .filter(|(pid, is_home)| {
+                if **pid == acting_id { return false; }
+                let Some(c) = game.field_model.player_coordinate(pid) else { return false };
+                if c.distance_in_steps(source_coord) > 3 { return false; }
+                let standing = game.field_model.player_state(pid)
+                    .map(|st| st.base() == ffb_model::enums::PS_STANDING)
+                    .unwrap_or(false);
+                if !standing { return false; }
+                // (player.getTeam() != actingTeam) || !playingTeamHasActingPLayer
+                *is_home != acting_team_home || !playing_team_has_acting_player
+            })
+            .map(|(pid, _)| pid.clone())
+            .collect()
+    }
+
     /// Java: `fail()` — if roll == 1: hit self (fumble); else: flip home_playing + Continue.
     fn fail(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         if self.roll == 1 {
@@ -227,7 +269,14 @@ impl StepThenIStartedBlastin {
             StepOutcome::next()
         } else {
             game.home_playing = !game.home_playing;
-            StepOutcome::cont()
+            // Java: the OPPOSING coach now picks the replacement victim (within 3 of the
+            // original target, either team, not the star) via CLIENT_TARGET_SELECTED.
+            let acting_id = game.acting_player.player_id.clone().unwrap_or_default();
+            StepOutcome::cont().with_prompt(
+                ffb_model::prompts::AgentPrompt::BlastinTarget {
+                    player_id: acting_id,
+                    candidates: Self::find_target_candidates(game),
+                })
         }
     }
 
@@ -283,6 +332,13 @@ impl StepThenIStartedBlastin {
     }
 
     fn mark_skill_used(game: &mut Game, player_id: &str, skill_id: SkillId) {
+        // Java ActingPlayer.markSkillUsed: the skill lands in the ACTING PLAYER's
+        // fUsedSkills — that set is what makes hasActed() true, and hasActed() is what
+        // deactivates the star when the activation ends (chaos_dwarf bb2025 seed 6 i=90:
+        // Zzharg stayed ACTIVE after his shot without it).
+        if game.acting_player.player_id.as_deref() == Some(player_id) {
+            game.acting_player.used_skills.insert(skill_id);
+        }
         let is_home = game.team_home.player(player_id).is_some();
         if is_home {
             if let Some(p) = game.team_home.player_mut(player_id) {
