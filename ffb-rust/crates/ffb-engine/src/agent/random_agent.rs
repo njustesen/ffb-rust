@@ -123,6 +123,7 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             | PlayerActionChoice::BalefulHex
             | PlayerActionChoice::CatchOfTheDay
             | PlayerActionChoice::ThenIStartedBlastin
+            | PlayerActionChoice::AllYouCanEat
             | PlayerActionChoice::Treacherous
             | PlayerActionChoice::BlackInk
     )
@@ -419,7 +420,11 @@ impl Agent for RandomAgent {
                     // ended at the first bomb.
                     // HAIL_MARY_PASS rides it too: ParityRunner routes the declaration to the
                     // same sendPassAction (same candidates, same single actionRng draw).
+                    // ALL_YOU_CAN_EAT delegates to THROW_BOMB and declares through the same
+                    // route — Java's phase-2 keys on the ACTING action (already the delegate),
+                    // so its sendPassAction fires identically; the folded target must too.
                     PlayerActionChoice::Pass | PlayerActionChoice::ThrowBomb
+                    | PlayerActionChoice::AllYouCanEat
                     | PlayerActionChoice::HailMaryPass => {
                         let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
                         let receivers = legal_pass_receivers(&gs.game, player_id, side);
@@ -1124,6 +1129,7 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         PlayerAction::BalefulHex => PlayerActionChoice::BalefulHex,
         PlayerAction::CatchOfTheDay => PlayerActionChoice::CatchOfTheDay,
         PlayerAction::ThenIStartedBlastin => PlayerActionChoice::ThenIStartedBlastin,
+        PlayerAction::AllYouCanEat => PlayerActionChoice::AllYouCanEat,
         PlayerAction::Treacherous => PlayerActionChoice::Treacherous,
         PlayerAction::MultipleBlock => PlayerActionChoice::MultipleBlock,
         PlayerAction::BlackInk => PlayerActionChoice::BlackInk,

@@ -236,6 +236,9 @@ pub enum PlayerActionChoice {
     /// "Blastin' Solves Everything" (bb2025 star special): shoot a standing opponent within
     /// 3 squares. Declared as ActingPlayer(MOVE) + UseSkill(canBlastRemotePlayer).
     ThenIStartedBlastin,
+    /// All You Can Eat (bb2020+ star special): commit to TWO Throw Bomb actions. Declared as
+    /// a plain ActingPlayer action; the acting player stores its DELEGATE (ThrowBomb).
+    AllYouCanEat,
     /// Treacherous (bb2020+ star special): declared action; the step stabs an adjacent
     /// teammate carrying the ball, then the activation continues via a fresh Select sequence.
     Treacherous,

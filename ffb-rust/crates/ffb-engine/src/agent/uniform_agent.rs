@@ -189,7 +189,11 @@ impl Agent for UniformAgent {
                     // ThrowBomb rides the same receiver rule as a pass (mirrors the parity agent
                     // and ParityRunner's sendConcreteAction) — same bug shape as the TTM arm below:
                     // without a receiver the declaration deselects and the bomb chain never runs.
+                    // ALL_YOU_CAN_EAT delegates to THROW_BOMB and declares through the same
+                    // route — Java's phase-2 keys on the ACTING action (already the delegate),
+                    // so its sendPassAction fires identically; the folded target must too.
                     PlayerActionChoice::Pass | PlayerActionChoice::ThrowBomb
+                    | PlayerActionChoice::AllYouCanEat
                     | PlayerActionChoice::HailMaryPass => {
                         let receivers = legal_pass_receivers(&gs.game, player_id, side);
                         if receivers.is_empty() { None } else { Some(receivers[self.pick(receivers.len())].clone()) }

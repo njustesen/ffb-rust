@@ -1045,7 +1045,22 @@ Carriers (from rules/star_players/*.md; Java canonical skill names in quotes):
   sequences, but Java's `getStepStack().clear()` also wipes OUTER stale steps. Wire the flag
   through the driver 1:1 as its own item with its own full gate.
 - Batch B — own step families:
-  - [ ] Cindy Piewhistle ("All You Can Eat" + bomb) → bb2025 halfling
+  - [x] Cindy Piewhistle LIVE (2026-08-21): drafted @nr2 bb2025 halfling, 100/100 fresh Java
+        logs, full gate 30/30 ×3, All You Can Eat fires in 89/100 games. SIX engine fixes:
+        (1) PlayerAction DELEGATE resolution — ALL_YOU_CAN_EAT("allYouCanEat", 39, ..,
+        THROW_BOMB) stores its delegate in changeActingPlayer, so everything downstream sees a
+        plain bomb; (2) StepEndBomb's two-bomb chain was collapsed away in the PassState-stub
+        era — ported 1:1 (markUsed + mustCompleteAction + second Pass sequence; then
+        push_self + StepAllYouCanEat for the 4+ sent-off roll); (3) StepAllYouCanEat read the
+        stub-era thrower_id proxy (cleared by EndBomb) instead of game.original_bombardier —
+        the sent-off roll silently never rolled; (4) the MIXED Accurate pass modifier
+        (bb2020/bb2025, -1 on QUICK/SHORT, !ttm) was missing — an old test even asserted
+        "Accurate should not appear in BB2025"; (5) mixed Cannoneer (-1 LONG/LONG_BOMB)
+        likewise missing; (6) the AYCE-failure eject pushed [EjectPlayer, Bribes] but Java's
+        raw LIFO pushes run BRIBES (the argue-the-call d6) FIRST — Rust ejected without
+        arguing, one die behind. Also widened StepInitPassing's BombRethrow prompt to ANY
+        thrower==null park (ParityRunner's INIT_PASSING contract), covering the second AYCE
+        bomb's fresh Pass sequence.
   - [ ] Guffle Pusmaw ("Quick Bite") → bb2025 nurgle
   - [ ] Swiftvine Glimmershard ("Furious Outburst") → bb2025 wood_elf
   - [ ] Thorsson Stoutmead ("Beer Barrel Bash!") → bb2025 dwarf

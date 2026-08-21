@@ -264,10 +264,17 @@ impl Step for StepInitSelecting {
                 // (read by StepSpecialEffect's bomber-turnover reset and StepEndBomb's
                 // acting-player restore). Without the reset a bomber id lingered across
                 // unrelated later actions.
-                if matches!(pa, PlayerAction::ThrowBomb | PlayerAction::HailMaryBomb) {
+                if pa.is_bomb() {
                     game.original_bombardier = Some(player_id.clone());
+                    // Java: `if (playerAction == PlayerAction.ALL_YOU_CAN_EAT)
+                    //          passState.setThrowTwoBombs(true);` — commit to two bombs.
+                    if pa == PlayerAction::AllYouCanEat {
+                        game.throw_two_bombs = Some(true);
+                    }
                 } else {
+                    // Java: passState.reset() on a non-bomb declaration.
                     game.original_bombardier = None;
+                    game.throw_two_bombs = None;
                 }
                 util_server_steps::change_player_action(game, player_id, pa, false);
                 if let Some(def_id) = block_defender_id {
@@ -284,7 +291,10 @@ impl Step for StepInitSelecting {
                     player_action,
                     PlayerActionChoice::Block | PlayerActionChoice::Blitz
                 );
-                self.dispatch_player_action = Some(pa);
+                // Java dispatch reads actingPlayer.getPlayerAction() (the DELEGATE) unless
+                // forceDispatch set the raw action; ALL_YOU_CAN_EAT therefore dispatches as
+                // THROW_BOMB (EndSelecting has no ALL_YOU_CAN_EAT case in Java either).
+                self.dispatch_player_action = Some(pa.delegate().unwrap_or(pa));
                 // A prone Blitz/Block declared with NO target: Java resolves the target BEFORE the
                 // stand-up (Blitz via SelectBlitzTarget; a plain Block reaches StepInitBlocking's
                 // no-defender branch), so a null-target block/blitz ends the turn with the player still
@@ -713,6 +723,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::BalefulHex => PlayerAction::BalefulHex,
         PlayerActionChoice::CatchOfTheDay => PlayerAction::CatchOfTheDay,
         PlayerActionChoice::ThenIStartedBlastin => PlayerAction::ThenIStartedBlastin,
+        PlayerActionChoice::AllYouCanEat => PlayerAction::AllYouCanEat,
         PlayerActionChoice::Treacherous => PlayerAction::Treacherous,
         PlayerActionChoice::BlackInk => PlayerAction::BlackInk,
         PlayerActionChoice::Swoop => PlayerAction::Swoop,

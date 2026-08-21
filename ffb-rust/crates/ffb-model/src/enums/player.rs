@@ -519,6 +519,17 @@ impl PlayerAction {
         matches!(self, PlayerAction::ThrowBomb | PlayerAction::HailMaryBomb | PlayerAction::AllYouCanEat)
     }
 
+    /// Java: PlayerAction.getDelegate() — ALL_YOU_CAN_EAT is declared as its own action but
+    /// delegates to THROW_BOMB (`ALL_YOU_CAN_EAT("allYouCanEat", 39, ..., THROW_BOMB)`), so
+    /// UtilServerGame.changeActingPlayer stores THROW_BOMB and all downstream bomb machinery
+    /// reuses. It is the only delegated action in the Java enum.
+    pub fn delegate(self) -> Option<PlayerAction> {
+        match self {
+            PlayerAction::AllYouCanEat => Some(PlayerAction::ThrowBomb),
+            _ => None,
+        }
+    }
+
     pub fn is_putrid(self) -> bool {
         self.is_putrid_block() || self == PlayerAction::PutridRegurgitationMove
     }

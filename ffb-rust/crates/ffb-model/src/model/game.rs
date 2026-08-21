@@ -58,6 +58,11 @@ pub struct Game {
     /// Java: GameState.getPassState().getOriginalBombardier() — player ID of the bombardier
     /// who fired a bomb this turn; set by bomb-pass steps, cleared at start_turn().
     pub original_bombardier: Option<PlayerId>,
+    /// Java: PassState.throwTwoBombs — the All You Can Eat tri-state. Some(true) = committed
+    /// to two Throw Bomb actions, first not yet thrown; Some(false) = second bomb thrown,
+    /// the 4+ sent-off roll is pending; None = not in an All You Can Eat action.
+    #[serde(default)]
+    pub throw_two_bombs: Option<bool>,
     pub waiting_for_opponent: bool,
     pub timeout_possible: bool,
     pub timeout_enforced: bool,
@@ -145,6 +150,7 @@ impl Game {
             thrower_action: None,
             pass_coordinate: None,
             original_bombardier: None,
+            throw_two_bombs: None,
             waiting_for_opponent: false,
             timeout_possible: false,
             timeout_enforced: false,
@@ -332,6 +338,7 @@ impl Game {
     pub fn start_turn(&mut self) {
         self.pass_coordinate = None;
         self.original_bombardier = None;
+        self.throw_two_bombs = None;
         self.acting_player.clear();
         self.turn_data_home.reset_for_turn();
         self.turn_data_away.reset_for_turn();

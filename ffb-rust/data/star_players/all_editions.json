@@ -4536,6 +4536,35 @@
       "available_for": [
         "Chaos Dwarf"
       ]
+    },
+    {
+      "id": "halfling.Cindy",
+      "name": "Cindy Piewhistle",
+      "display_name": "Cindy Piewhistle",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 100000,
+      "ma": 5,
+      "st": 2,
+      "ag": 3,
+      "pa": 3,
+      "av": 7,
+      "shorthand": "CP",
+      "skills": [
+        "Accurate",
+        "Bombardier",
+        "Dodge",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Secret Weapon",
+        "Stunty",
+        "All You Can Eat"
+      ],
+      "available_for": [
+        "Halfling"
+      ]
     }
   ]
 }

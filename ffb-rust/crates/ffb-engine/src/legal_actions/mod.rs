@@ -217,6 +217,21 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
                 player_action: PlayerActionChoice::ThrowBomb,
                 block_defender_id: None,
             });
+
+            // All You Can Eat (bb2020+ star special): the client's isAllYouCanEatAvailable
+            // rule — Throw Bomb available + REGULAR turn mode + unused
+            // canUseThrowBombActionTwice. Offer sits DIRECTLY AFTER ThrowBomb; ParityRunner
+            // mirrors the position.
+            if game.turn_mode == ffb_model::enums::TurnMode::Regular
+                && player.has_skill(SkillId::AllYouCanEat)
+                && !player.used_skills.contains(&SkillId::AllYouCanEat)
+            {
+                actions.push(Action::ActivatePlayer {
+                    player_id: pid.clone(),
+                    player_action: PlayerActionChoice::AllYouCanEat,
+                    block_defender_id: None,
+                });
+            }
         }
 
         // ThrowTeamMate: player must have ThrowTeamMate skill and an adjacent teammate.
@@ -572,6 +587,7 @@ pub fn eligible_players_for_activation(game: &Game) -> Vec<(PlayerId, Vec<ffb_mo
             PAC::BalefulHex => PA::BalefulHex,
             PAC::CatchOfTheDay => PA::CatchOfTheDay,
             PAC::ThenIStartedBlastin => PA::ThenIStartedBlastin,
+            PAC::AllYouCanEat => PA::AllYouCanEat,
             PAC::Treacherous => PA::Treacherous,
             PAC::BlackInk => PA::BlackInk,
             PAC::Punt => PA::Punt,
@@ -1524,6 +1540,37 @@ mod tests {
         }
         let a2 = legal_activate_player_actions(&game, TeamSide::Home);
         assert!(!has_action(&a2, "zzharg", PlayerActionChoice::ThenIStartedBlastin));
+    }
+
+    /// §11: All You Can Eat is offered under the CLIENT's rule
+    /// (LogicModule.isAllYouCanEatAvailable): Throw Bomb available + REGULAR turn mode +
+    /// unused canUseThrowBombActionTwice.
+    #[test]
+    fn all_you_can_eat_offered_only_with_bombardier_and_unused_skill() {
+        let mut game = make_game(Rules::Bb2025);
+        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        add_player(&mut game, true, "cindy", c(5, 5), PS_STANDING,
+            vec![SkillId::Bombardier, SkillId::AllYouCanEat]);
+        add_player(&mut game, false, "opp", c(15, 5), PS_STANDING, vec![]);
+        let a0 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&a0, "cindy", PlayerActionChoice::ThrowBomb));
+        assert!(has_action(&a0, "cindy", PlayerActionChoice::AllYouCanEat),
+            "Bombardier + unused All You Can Eat in REGULAR mode must be offered");
+        // used skill withdraws only the AYCE offer
+        if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == "cindy") {
+            p.used_skills.insert(SkillId::AllYouCanEat);
+        }
+        let a1 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&a1, "cindy", PlayerActionChoice::ThrowBomb));
+        assert!(!has_action(&a1, "cindy", PlayerActionChoice::AllYouCanEat));
+        // pass slot used withdraws both
+        if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == "cindy") {
+            p.used_skills.clear();
+        }
+        game.turn_data_home.pass_used = true;
+        let a2 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a2, "cindy", PlayerActionChoice::ThrowBomb));
+        assert!(!has_action(&a2, "cindy", PlayerActionChoice::AllYouCanEat));
     }
 
     /// §9: Black Ink is offered under the CLIENT's rule (LogicModule.isBlackInkAvailable):

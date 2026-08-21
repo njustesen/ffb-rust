@@ -140,6 +140,32 @@ impl PassModifierFactory {
                     // Java: bb2016.Accurate registers PassModifier("Accurate", -1, REGULAR).
                     result.push(PassModifier::new("Accurate", -1, ModifierType::REGULAR));
                 }
+                SkillId::Accurate => {
+                    // Java: mixed.Accurate (bb2020/bb2025) registers PassModifier("Accurate", -1,
+                    // REGULAR) with predicate: distance ∈ {QUICK_PASS, SHORT_PASS} && !isTtm.
+                    // The mixed form was missing entirely — no bb2025 mirror roster carried
+                    // Accurate until Cindy Piewhistle, whose Quick-Pass bomb rolled 3 and went
+                    // INACCURATE in Rust while Java's (3 - 1 ≥ target) was ACCURATE
+                    // (halfling seed 1 i=43).
+                    if !context.ttm
+                        && matches!(context.distance,
+                            PassingDistance::QuickPass | PassingDistance::ShortPass)
+                    {
+                        result.push(PassModifier::new("Accurate", -1, ModifierType::REGULAR));
+                    }
+                }
+                SkillId::Cannoneer => {
+                    // Java: mixed.Cannoneer (bb2020/bb2025) registers PassModifier("Cannoneer",
+                    // -1, REGULAR) with predicate: distance ∈ {LONG_PASS, LONG_BOMB} && !isTtm.
+                    // Also previously missing (Zzharg carries it but never threw long in the
+                    // mirror seeds).
+                    if !context.ttm
+                        && matches!(context.distance,
+                            PassingDistance::LongPass | PassingDistance::LongBomb)
+                    {
+                        result.push(PassModifier::new("Cannoneer", -1, ModifierType::REGULAR));
+                    }
+                }
                 SkillId::StrongArm if rules == Rules::Bb2016 => {
                     // Java: bb2016.StrongArm registers PassModifier("Strong Arm", -1, REGULAR)
                     // with predicate: distance != QUICK_PASS.
@@ -311,14 +337,37 @@ mod tests {
         assert_eq!(mods.iter().find(|m| m.get_name() == "Accurate").unwrap().get_modifier(), -1);
     }
 
+    /// Java mixed.Accurate is @RulesCollection(BB2020, BB2025): -1 on QUICK/SHORT, never on
+    /// TTM or longer distances. (An older test asserted Accurate was bb2016-only — wrong: it
+    /// silently cost Cindy Piewhistle her Quick-Pass bomb accuracy, halfling seed 1 i=43.)
     #[test]
-    fn find_skill_modifiers_accurate_not_in_bb2025() {
+    fn find_skill_modifiers_accurate_mixed_short_distances_only() {
         let g = make_game(Rules::Bb2025, Weather::Nice);
         let p = player_with_skill("h1", SkillId::Accurate, 4);
         let factory = PassModifierFactory::for_rules(Rules::Bb2025);
         let ctx = PassContext::new(&g, &p, PassingDistance::ShortPass, false);
         let mods = factory.find_skill_modifiers(&ctx);
-        assert!(!mods.iter().any(|m| m.get_name() == "Accurate"), "Accurate should not appear in BB2025");
+        assert!(mods.iter().any(|m| m.get_name() == "Accurate" && m.get_modifier() == -1),
+            "mixed Accurate applies to SHORT_PASS in BB2025");
+        let ctx_long = PassContext::new(&g, &p, PassingDistance::LongPass, false);
+        assert!(!factory.find_skill_modifiers(&ctx_long).iter().any(|m| m.get_name() == "Accurate"),
+            "mixed Accurate does not apply to LONG_PASS");
+        let ctx_ttm = PassContext::new(&g, &p, PassingDistance::QuickPass, true);
+        assert!(!factory.find_skill_modifiers(&ctx_ttm).iter().any(|m| m.get_name() == "Accurate"),
+            "mixed Accurate does not apply to TTM");
+    }
+
+    /// Java mixed.Cannoneer (BB2020/BB2025): -1 on LONG_PASS/LONG_BOMB, never on TTM.
+    #[test]
+    fn find_skill_modifiers_cannoneer_long_distances_only() {
+        let g = make_game(Rules::Bb2025, Weather::Nice);
+        let p = player_with_skill("h1", SkillId::Cannoneer, 4);
+        let factory = PassModifierFactory::for_rules(Rules::Bb2025);
+        let ctx_long = PassContext::new(&g, &p, PassingDistance::LongBomb, false);
+        assert!(factory.find_skill_modifiers(&ctx_long).iter()
+            .any(|m| m.get_name() == "Cannoneer" && m.get_modifier() == -1));
+        let ctx_short = PassContext::new(&g, &p, PassingDistance::ShortPass, false);
+        assert!(!factory.find_skill_modifiers(&ctx_short).iter().any(|m| m.get_name() == "Cannoneer"));
     }
 
     #[test]

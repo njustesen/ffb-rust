@@ -116,6 +116,65 @@ impl StepEndBomb {
                     }
                 }
             }
+            // Java StepEndBomb :114-134 — the All You Can Eat two-bomb chain.
+            //   skill = originalBomber.getSkillWithProperty(canUseThrowBombActionTwice)
+            //   threwOnlyFirstBomb = toPrimitive(state.getThrowTwoBombs())
+            let bomber_id = game.original_bombardier.clone().unwrap_or_default();
+            let bomber_has_skill = game.player(&bomber_id)
+                .map(|p| p.has_skill(ffb_model::enums::SkillId::AllYouCanEat))
+                .unwrap_or(false);
+            let bomber_skill_unused = game.player(&bomber_id)
+                .map(|p| !p.used_skills.contains(&ffb_model::enums::SkillId::AllYouCanEat))
+                .unwrap_or(false);
+            let bomber_has_tacklezones = game.field_model.player_state(&bomber_id)
+                .map(|s| s.has_tacklezones())
+                .unwrap_or(false);
+            let threw_only_first_bomb = game.throw_two_bombs == Some(true);
+
+            if !self.end_turn && threw_only_first_bomb && bomber_has_skill
+                && bomber_skill_unused && bomber_has_tacklezones
+            {
+                // Java: markUsed + setMustCompleteAction(true) + setThrowTwoBombs(false)
+                //       + Pass.pushSequence — the SECOND Throw Bomb Special Action.
+                if let Some(p) = game.player_mut(&bomber_id) {
+                    p.used_skills.insert(ffb_model::enums::SkillId::AllYouCanEat);
+                }
+                game.acting_player.must_complete_action = true;
+                game.throw_two_bombs = Some(false);
+                let seq = Pass::build_sequence(
+                    &PassParams {
+                        target_coordinate: None,
+                        rules: game.rules,
+                    });
+                game.pass_coordinate = None;
+                game.thrower_id = None;
+                game.thrower_action = None;
+                return StepOutcome::next().push_seq(seq);
+            }
+            if game.throw_two_bombs.is_some() && bomber_has_skill {
+                if game.throw_two_bombs == Some(true) && bomber_skill_unused {
+                    if let Some(p) = game.player_mut(&bomber_id) {
+                        p.used_skills.insert(ffb_model::enums::SkillId::AllYouCanEat);
+                    }
+                }
+                if game.throw_two_bombs == Some(false) {
+                    // Second bomb thrown: roll the 4+ sent-off check. Java:
+                    //   state.setThrowTwoBombs(null); removePassCoordinate = false;
+                    //   pushCurrentStepOnStack(); stack.push(ALL_YOU_CAN_EAT)
+                    // — EndBomb resumes after the roll (throw_two_bombs now None) and takes
+                    // the plain EndPlayerAction path below. removePassCoordinate=false: the
+                    // pass coordinate is deliberately KEPT across the roll.
+                    game.throw_two_bombs = None;
+                    let seq = vec![crate::step::generator::sequence::SequenceStep::new(StepId::AllYouCanEat)];
+                    game.thrower_id = None;
+                    game.thrower_action = None;
+                    let mut out = StepOutcome::next().push_seq(seq);
+                    out.push_self = true;
+                    return out;
+                }
+                // throw_two_bombs == Some(true) but conditions above failed (end_turn / no
+                // tacklezones): Java pushes EndPlayerAction like the default path.
+            }
             let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
                 feeding_allowed: false,
                 end_player_action: true,
@@ -226,6 +285,51 @@ mod tests {
         }
         game.field_model.set_player_coordinate(id, FieldCoordinate::new(5, 5));
         game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+    }
+
+    /// The All You Can Eat two-bomb chain (Java StepEndBomb :114-134).
+    #[test]
+    fn all_you_can_eat_two_bomb_chain() {
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::SkillWithValue;
+        // Phase 1: first bomb resolved, throw_two_bombs = Some(true) → mark used, flip to
+        // Some(false), push the SECOND Pass sequence (no EndPlayerAction yet).
+        let mut game = make_game();
+        add_player(&mut game, "home", "cindy");
+        if let Some(pl) = game.team_home.player_mut("cindy") {
+            pl.starting_skills.push(SkillWithValue { skill_id: SkillId::AllYouCanEat, value: None });
+        }
+        game.acting_player.player_id = Some("cindy".into());
+        game.acting_player.player_action = Some(PlayerAction::ThrowBomb);
+        game.original_bombardier = Some("cindy".into());
+        game.throw_two_bombs = Some(true);
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(20, 10));
+        game.field_model.ball_in_play = true;
+        let mut step = StepEndBomb::new();
+        step.bomb_exploded = true;
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(game.throw_two_bombs, Some(false), "committed second bomb pending");
+        assert!(game.acting_player.must_complete_action);
+        assert!(game.team_home.player("cindy").unwrap().used_skills.contains(&SkillId::AllYouCanEat));
+        assert!(!out.pushes.is_empty());
+        assert_eq!(out.pushes[0][0].step_id, StepId::InitPassing, "second bomb = Pass sequence");
+
+        // Phase 2: second bomb resolved, throw_two_bombs = Some(false) → clear to None,
+        // push StepAllYouCanEat (the 4+ sent-off roll) and re-push self.
+        let mut step2 = StepEndBomb::new();
+        step2.bomb_exploded = true;
+        let out2 = step2.start(&mut game, &mut rng);
+        assert_eq!(game.throw_two_bombs, None);
+        assert!(out2.push_self, "EndBomb resumes after the sent-off roll");
+        assert_eq!(out2.pushes[0][0].step_id, StepId::AllYouCanEat);
+
+        // Phase 3 (the resumed run): no pending bombs → plain EndPlayerAction retirement.
+        let mut step3 = StepEndBomb::new();
+        step3.bomb_exploded = true;
+        let out3 = step3.start(&mut game, &mut rng);
+        assert!(!out3.push_self);
+        assert_eq!(out3.pushes[0][0].step_id, StepId::RemoveTargetSelectionState);
     }
 
     #[test]

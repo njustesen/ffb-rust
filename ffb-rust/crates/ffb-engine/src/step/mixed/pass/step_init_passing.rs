@@ -62,11 +62,22 @@ impl StepInitPassing {
         // the agent can answer, mirroring ParityRunner's INIT_PASSING case.
         if game.thrower_id.is_none() || game.thrower_action.is_none() {
             if let Some(pid) = game.acting_player.player_id.clone() {
-                if matches!(
-                    game.turn_mode,
-                    TurnMode::BombHome | TurnMode::BombAway
-                        | TurnMode::BombHomeBlitz | TurnMode::BombAwayBlitz
-                ) {
+                // ParityRunner's INIT_PASSING case answers ANY thrower==null park with
+                // sendPassAction — its gate is the unset thrower, not the turn mode. The
+                // bomb re-throw window (Bomb* modes) was the first such park; the second
+                // All You Can Eat bomb is another (REGULAR mode, acting action THROW_BOMB,
+                // fresh Pass sequence pushed by StepEndBomb with no folded target —
+                // halfling seed 5 i=14 parked promptless and the game ended early).
+                let acting_is_bomb = game.acting_player.player_action
+                    .map(|a| a.is_bomb())
+                    .unwrap_or(false);
+                if acting_is_bomb
+                    || matches!(
+                        game.turn_mode,
+                        TurnMode::BombHome | TurnMode::BombAway
+                            | TurnMode::BombHomeBlitz | TurnMode::BombAwayBlitz
+                    )
+                {
                     return StepOutcome::cont()
                         .with_prompt(AgentPrompt::BombRethrow { player_id: pid });
                 }

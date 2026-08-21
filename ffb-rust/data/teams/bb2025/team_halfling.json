@@ -16,7 +16,7 @@
       "position_id": "halfling.treeman"
     },
     {
-      "nr": 2,
+      "nr": 15,
       "position_id": "halfling.treeman"
     },
     {
@@ -68,5 +68,11 @@
       "position_id": "halfling.halfling"
     }
   ],
-  "special_rules": []
+  "special_rules": [],
+  "stars": [
+    {
+      "nr": 2,
+      "star_id": "halfling.Cindy"
+    }
+  ]
 }

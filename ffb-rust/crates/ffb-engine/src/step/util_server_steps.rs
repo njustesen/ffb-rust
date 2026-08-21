@@ -99,6 +99,10 @@ fn retire_old_acting_player(game: &mut Game) {
 }
 
 pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerAction, jumping: bool) {
+    // Java UtilServerGame.changeActingPlayer: `if (pPlayerAction.getDelegate() != null)
+    // actualAction = pPlayerAction.getDelegate();` — a declared ALL_YOU_CAN_EAT is stored as
+    // THROW_BOMB, so the pass/bomb dispatch and every downstream site see a plain bomb action.
+    let action = action.delegate().unwrap_or(action);
     if !player_id.is_empty() {
         // Java UtilActingPlayer.changeActingPlayer gates the used-skills / blocked-moving resets on
         // `if (changed)` — i.e. only when the acting player actually CHANGES. Capture that before

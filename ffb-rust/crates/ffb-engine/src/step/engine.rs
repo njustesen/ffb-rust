@@ -2750,6 +2750,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> ffb_model::enums::PlayerActi
         PlayerActionChoice::BalefulHex => PA::BalefulHex,
         PlayerActionChoice::CatchOfTheDay => PA::CatchOfTheDay,
         PlayerActionChoice::ThenIStartedBlastin => PA::ThenIStartedBlastin,
+        PlayerActionChoice::AllYouCanEat => PA::AllYouCanEat,
         PlayerActionChoice::Treacherous => PA::Treacherous,
         PlayerActionChoice::BlackInk => PA::BlackInk,
         PlayerActionChoice::Swoop      => PA::Swoop,

@@ -35,9 +35,13 @@ impl StepAllYouCanEat {
 
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: Player<?> player = game.getPlayerById(getGameState().getPassState().getOriginalBombardier())
-        // PassState is a stub; use game.thrower_id as a proxy for the original bombardier.
+        // — game.original_bombardier is the Rust home of PassState.originalBombardier. The old
+        // thrower_id proxy dated from the PassState-stub era and is CLEARED by StepEndBomb right
+        // before this step is pushed, so the sent-off roll was silently skipped (halfling seed 5
+        // i=14: Java rolled the 4+ check, Rust rolled nothing).
         let player_id = self.original_bombardier
             .clone()
+            .or_else(|| game.original_bombardier.clone())
             .or_else(|| game.thrower_id.clone())
             .unwrap_or_default();
         if player_id.is_empty() {
@@ -109,11 +113,14 @@ impl StepAllYouCanEat {
             if !success {
                 // Java: stack.push(EJECT_PLAYER(GOTO_LABEL_ON_END=END_BOMB))
                 //       stack.push(BRIBES(GOTO_LABEL_ON_END=END_BOMB))
-                // LIFO: Bribes executes first, then EjectPlayer.
+                // Raw LIFO pushes: BRIBES lands on top and runs FIRST (the argue-the-call d6),
+                // then EjectPlayer. Rust's push_sequence executes vec[0] first, so the vec
+                // order is [Bribes, EjectPlayer] — it was inverted, ejecting without the
+                // argue roll and running one game die behind Java (halfling seed 28 i=77).
                 let label_param = vec![StepParameter::GotoLabelOnEnd(labels::END_BOMB.into())];
                 let seq = vec![
-                    SequenceStep::with_params(StepId::EjectPlayer, label_param.clone()),
-                    SequenceStep::with_params(StepId::Bribes, label_param),
+                    SequenceStep::with_params(StepId::Bribes, label_param.clone()),
+                    SequenceStep::with_params(StepId::EjectPlayer, label_param),
                 ];
                 return outcome_base.push_seq(seq);
             }
@@ -122,11 +129,11 @@ impl StepAllYouCanEat {
         }
 
         // do_roll == false means re-roll declined → treat as failure
-        // Java: if (!success) push EjectPlayer + Bribes
+        // Java: if (!success) push EjectPlayer + Bribes — raw LIFO pushes: Bribes runs first.
         let label_param = vec![StepParameter::GotoLabelOnEnd(labels::END_BOMB.into())];
         let seq = vec![
-            SequenceStep::with_params(StepId::EjectPlayer, label_param.clone()),
-            SequenceStep::with_params(StepId::Bribes, label_param),
+            SequenceStep::with_params(StepId::Bribes, label_param.clone()),
+            SequenceStep::with_params(StepId::EjectPlayer, label_param),
         ];
         StepOutcome::next().push_seq(seq)
     }
@@ -225,8 +232,10 @@ mod tests {
         }
         let seq = pushed_seq.expect("expected at least one failing roll in 100 seeds");
         assert_eq!(seq.len(), 2);
-        assert_eq!(seq[0].step_id, StepId::EjectPlayer);
-        assert_eq!(seq[1].step_id, StepId::Bribes);
+        // Java raw-LIFO-pushes EJECT_PLAYER then BRIBES, so BRIBES runs FIRST (the argue
+        // roll) — push_sequence executes vec[0] first, hence Bribes leads the vec.
+        assert_eq!(seq[0].step_id, StepId::Bribes);
+        assert_eq!(seq[1].step_id, StepId::EjectPlayer);
     }
 
     #[test]
