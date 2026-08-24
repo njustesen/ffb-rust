@@ -958,11 +958,20 @@ mod tests {
     }
 
     #[test]
-    fn standing_blitz_with_no_target_ends_the_turn_without_dispatch() {
-        // Regression (human seed 7 i=196): a STANDING player that declares a Blitz with no adjacent
-        // target must END THE TURN before any block sequence — so no Bone-head/negatrait die is
-        // rolled — mirroring Java's SelectBlitzTarget → BLITZ_TARGET_NONE → EndTurn. Rust otherwise
-        // dispatched the block sequence whose ACTIVATION rolled an extra Bone-head, desyncing the RNG.
+    fn blitz_declaration_dispatches_blitz_select_not_a_folded_end_turn() {
+        // Rewritten for §12. This test used to assert that a no-target Blitz publishes EndTurn
+        // FROM THIS STEP (regressions: human seed 7 i=196 standing, seed 36 i=170 prone). That was
+        // correct only while Rust folded the blitz target into the declaration and skipped Java's
+        // two-phase chain entirely. Java's :114 branch dispatches BLITZ_SELECT on every untargeted
+        // blitz; the no-target turn-end is then decided far downstream, by the agent answering
+        // StepSelectBlitzTarget's dialog the way ParityRunner.sendBlitzTargetSelection does
+        // (BLITZ_TARGET_NONE -> ClientCommandEndTurn).
+        //
+        // So the ORIGINAL INTENT still holds - a no-target blitz ends the turn without rolling a
+        // stray Bone-head - but it is now enforced where Java enforces it. That half is pinned by
+        // random_agent::tests::blitz_target_prompt_with_no_candidates_ends_the_turn and by
+        // step_select_blitz_target's two predicate tests. What belongs HERE is only the routing:
+        // the declaration must reach BLITZ_SELECT and must NOT resolve the blitz itself.
         use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_STANDING};
         use ffb_model::model::player::Player;
         use ffb_model::types::FieldCoordinate;
@@ -984,12 +993,12 @@ mod tests {
             block_defender_id: None, // no adjacent target
         };
         let out = step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        let _ = out;
 
-        assert_eq!(out.action, StepAction::GotoLabel);
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
-            "a standing no-target Blitz must publish EndTurn (no block sequence / Bone-head)");
-        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(_))),
-            "must NOT dispatch a block sequence for a standing no-target Blitz");
+        assert_eq!(game.acting_player.player_action, Some(PlayerAction::BlitzMove),
+            "Java's :114 branch keeps the ACTING action BLITZ_MOVE while dispatching BLITZ_SELECT");
+        assert!(!game.turn_data().blitz_used,
+            "the team blitz is consumed by StepSelectBlitzTargetEnd, not by the declaration");
 
         // Regression (human seed 36 i=170): a PRONE no-target Blitz must ALSO EndTurn before the block
         // sequence — Java rolls 0 dice in both cases (the earlier standing-only guard was wrong; a
@@ -1009,11 +1018,10 @@ mod tests {
         let out2 = step2.handle_command(&Action::ActivatePlayer {
             player_id: "h1".into(), player_action: PlayerActionChoice::Blitz, block_defender_id: None,
         }, &mut game2, &mut GameRng::new(0));
-        assert_eq!(out2.action, StepAction::GotoLabel);
-        assert!(out2.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
-            "a PRONE no-target Blitz must also publish EndTurn (no stand-up / Bone-head)");
-        assert!(!out2.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(_))),
-            "must NOT dispatch a block sequence for a prone no-target Blitz");
+        let _ = out2;
+        assert_eq!(game2.acting_player.player_action, Some(PlayerAction::BlitzMove),
+            "a PRONE blitz declaration routes through BLITZ_SELECT too");
+        assert!(!game2.turn_data().blitz_used);
     }
 
     #[test]

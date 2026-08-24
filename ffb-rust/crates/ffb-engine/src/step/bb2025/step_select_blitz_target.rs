@@ -289,6 +289,16 @@ mod tests {
         Game::new(home, away, Rules::Bb2025)
     }
 
+    fn blitz_test_player(id: &str) -> ffb_model::model::player::Player {
+        use ffb_model::enums::{PlayerGender, PlayerType};
+        ffb_model::model::player::Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            ..Default::default()
+        }
+    }
+
     #[test]
     fn start_returns_next_step() {
         let mut game = make_game();
@@ -304,6 +314,69 @@ mod tests {
         let action = Action::SelectPlayer { player_id: "p1".into() };
         step.handle_command(&action, &mut game, &mut GameRng::new(0));
         assert_eq!(step.selected_player_id.as_deref(), Some("p1"));
+    }
+
+    /// Java gates the dialog on `hasStandingOpponents` - ANY in-bounds opponent that
+    /// `canBeBlocked` - while the harness's `pickBlockTarget` candidate list is ADJACENCY-based.
+    /// The port collapsed both into the adjacency list, so a blitzer with no neighbour took the
+    /// skip() path where Java shows the dialog and the harness answers it with EndTurn (lineman
+    /// bb2025 seed 14). Pin the two predicates apart: a DISTANT standing opponent must still
+    /// produce the prompt, with an EMPTY candidate list.
+    #[test]
+    fn distant_standing_opponent_prompts_with_no_candidates() {
+        use ffb_model::enums::{PlayerState, PS_STANDING};
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.team_home.players.push(blitz_test_player("h1"));
+        game.team_away.players.push(blitz_test_player("a1"));
+
+        let attacker = "h1".to_string();
+        let far_opponent = "a1".to_string();
+        game.acting_player.player_id = Some(attacker.clone());
+        game.field_model.set_player_coordinate(&attacker, FieldCoordinate::new(2, 2));
+        game.field_model.set_player_state(&attacker, PlayerState::new(PS_STANDING));
+        // Far away: in bounds and blockable, but NOT adjacent.
+        game.field_model.set_player_coordinate(&far_opponent, FieldCoordinate::new(20, 10));
+        game.field_model.set_player_state(&far_opponent, PlayerState::new(PS_STANDING));
+
+        let mut step = StepSelectBlitzTarget::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        assert_eq!(out.action, StepAction::Continue, "Java shows the dialog and waits");
+        match out.prompt {
+            Some(AgentPrompt::BlitzTarget { ref eligible_players, .. }) => {
+                assert!(eligible_players.is_empty(),
+                    "candidates are adjacency-based, so a distant opponent is not one");
+            }
+            other => panic!("expected a BlitzTarget prompt, got {other:?}"),
+        }
+        assert!(game.field_model.target_selection_state.is_none(),
+            "the skip() path must NOT be taken while a blockable opponent exists");
+    }
+
+    /// The mirror case: with no blockable opponent anywhere, Java DOES skip.
+    #[test]
+    fn no_blockable_opponent_anywhere_skips() {
+        use ffb_model::enums::{PlayerState, PS_STANDING};
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.team_home.players.push(blitz_test_player("h1"));
+        game.team_away.players.push(blitz_test_player("a1"));
+
+        let attacker = "h1".to_string();
+        game.acting_player.player_id = Some(attacker.clone());
+        game.field_model.set_player_coordinate(&attacker, FieldCoordinate::new(2, 2));
+        game.field_model.set_player_state(&attacker, PlayerState::new(PS_STANDING));
+        // Every away player stays off the field (no coordinate), so none is in bounds.
+
+        let mut step = StepSelectBlitzTarget::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.field_model.target_selection_state.as_ref()
+            .map(|ts| ts.is_skipped()).unwrap_or(false));
     }
 
     #[test]

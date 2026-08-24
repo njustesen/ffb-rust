@@ -213,4 +213,53 @@ mod tests {
         assert!(game.turn_data().blitz_used);
         assert!(game.acting_player.has_moved);
     }
+
+    /// Java :109-115 does FOUR things on the skip path, and this test used to assert only the
+    /// last two - so it stayed green while the branch pushed nothing and the step silently
+    /// became the terminus of the blitz sequence (lineman bb2025 seed 14: the whole game ended
+    /// at the first no-target blitz, 10 steps against Java's 874). Pin the push itself.
+    #[test]
+    fn skipped_state_pushes_select_and_restores_blitz_move() {
+        let mut step = StepSelectBlitzTargetEnd::new();
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        game.acting_player.player_id = Some("home_1".into());
+
+        let mut tss = TargetSelectionState::default();
+        tss.skip();
+        game.field_model.target_selection_state = Some(tss);
+
+        let out = step.start(&mut game, &mut rng);
+
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "skip path must push the Select sequence");
+        assert_eq!(
+            out.pushes[0].first().map(|s| s.step_id),
+            Some(StepId::InitSelecting),
+            "the pushed sequence is Select, which begins with InitSelecting",
+        );
+        assert_eq!(game.acting_player.player_action, Some(PlayerAction::BlitzMove));
+    }
+
+    /// The SELECTED path has the same push requirement, for the same reason.
+    #[test]
+    fn selected_state_pushes_select_sequence() {
+        let mut step = StepSelectBlitzTargetEnd::new();
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        game.acting_player.player_id = Some("home_1".into());
+
+        let mut tss = TargetSelectionState::default();
+        tss.select();
+        game.field_model.target_selection_state = Some(tss);
+
+        let out = step.start(&mut game, &mut rng);
+
+        assert!(!out.pushes.is_empty(), "selected path must push the Select sequence");
+        assert_eq!(
+            out.pushes[0].first().map(|s| s.step_id),
+            Some(StepId::InitSelecting),
+        );
+        assert_eq!(game.acting_player.player_action, Some(PlayerAction::BlitzMove));
+    }
 }

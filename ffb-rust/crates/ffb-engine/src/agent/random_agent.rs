@@ -1378,6 +1378,44 @@ mod tests {
     use super::*;
     use crate::step::new_game;
 
+    /// ParityRunner.sendBlitzTargetSelection answers an unanswerable blitz window with
+    /// ClientCommandEndTurn ("BLITZ_TARGET_NONE ... ending turn for acting player"). The engine
+    /// opens that window whenever ANY in-bounds opponent can be blocked, while these candidates
+    /// are only the ADJACENT ones - so an empty list is routine, not impossible as the code once
+    /// claimed. It must be EndTurn and NOT EndPlayerAction: ending only the action left Rust
+    /// playing on with the rest of the team while Java's turn was already over (lineman bb2025
+    /// seed 14, where Java flipped to the away team at step 11 and Rust activated home_09).
+    #[test]
+    fn blitz_target_prompt_with_no_candidates_ends_the_turn() {
+        let mut gs = new_game(1);
+        let mut agent = RandomAgent::new(1);
+        gs.pending_prompt = Some(AgentPrompt::BlitzTarget {
+            attacker_id: "home_01".into(),
+            eligible_players: Vec::new(),
+        });
+        assert_eq!(agent.act(&gs), Action::EndTurn);
+    }
+
+    /// The non-empty case still spends exactly ONE actionRng draw, at the stream position the
+    /// harness uses, and picks from the coordinate-sorted candidate list.
+    #[test]
+    fn blitz_target_prompt_picks_one_candidate() {
+        let mut gs = new_game(1);
+        let mut agent = RandomAgent::new(1);
+        gs.pending_prompt = Some(AgentPrompt::BlitzTarget {
+            attacker_id: "home_01".into(),
+            eligible_players: vec!["away_01".into(), "away_02".into()],
+        });
+        let before = agent.action_rng_count;
+        match agent.act(&gs) {
+            Action::SelectPlayer { player_id } => {
+                assert!(player_id == "away_01" || player_id == "away_02");
+            }
+            other => panic!("expected SelectPlayer, got {other:?}"),
+        }
+        assert_eq!(agent.action_rng_count, before + 1, "exactly one actionRng draw");
+    }
+
     /// The full boundary loop (current_prompt → act → apply) drives the pregame to idle, and the
     /// agent's decision draws match a reference decision RNG seeded per the contract — validating
     /// the agent RNG contract on coin/receive FIRST, before rule prompts exist (plan risk item).
