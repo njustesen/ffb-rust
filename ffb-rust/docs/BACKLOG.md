@@ -1673,3 +1673,45 @@ NEXT: use the per-CALL-safe instruments. Compare `rng_calls` from the RUST_STEP 
 against Java's own call counter at the same step index, and use FFB_DRIVE_TRACE +
 JIDSTATE to find the first step where the two engines run a DIFFERENT step, rather than
 trying to align dice streams.
+
+**§12 chaos_dwarf seed 7 ROOT-CAUSE LOCATION FOUND (2026-08-24) - it is an ACTION-CHOICE
+divergence at i=19, not a resolution divergence, and two earlier readings were wrong.**
+
+First, a tooling correction that invalidates the last two entries' step-level claims:
+**the `parity/<matchup>/seed_N_rust.jsonl` files on disk are STALE.** They are not rewritten
+when a run aborts, so they can show a previous run's game. Both the "steps 18-21 are
+byte-identical including the blitz at i=19" claim and the seed-14 "Rust ran 272 steps"
+reading came from stale files. Read `RUST_STEP` from a live `FFB_TRACE=1` run instead;
+only the JAVA jsonl is regenerated per run.
+
+Live trace, chaos_dwarf seed 7 (Rust) against the Java log:
+
+    i=19  java Activate(Away2, BLITZ)          rust Activate(away_02, ThenIStartedBlastin)
+    i=20  java Activate(Away1, MOVE)           rust Activate(away_01, Blitz)
+    i=21  java Activate(Away3, PASS)           rust Activate(away_03, Pass)
+
+So the engines pick DIFFERENT ACTIONS for the SAME PLAYER at i=19. Everything downstream -
+the "second blitz in one turn", the foul-vs-pass dice mismatch, the d6/d8 ordering - is a
+consequence of that one choice, not an independent bug. Note the resolution machinery is
+fine: the i=20 blitz is dispatched straight through InitSelecting -> EndSelecting with NO
+SelectBlitzTarget/SelectBlitzTargetEnd in the drive trace, because by then it is a
+FOLDED-target blitz again.
+
+The state string confirms the knock-on: `f` is `blitz_used,foul_used,hand_over_used,
+pass_used` per team, and away reads `0000` at i=20 and `1000` at i=21 - the team blitzes
+twice, the failure mode `state_hash.rs:58` already documents.
+
+**What this means for the section's central assumption.** The scoping note above argued the
+matrices should not move because "Java picks the target at SELECT_BLITZ_TARGET, which sits
+before the negatrait rolls, and Rust's agent picks it at activation, also before the
+negatraits - same relative position, one actionRng draw either way". An action-choice
+divergence at i=19 is exactly what a shifted draw position looks like, so that assumption
+is now the prime suspect and must be MEASURED, not reasoned about. lineman staying 100/100
+does not clear it: lineman has no negatrait carriers, and the negatrait rolls are precisely
+what sits between the two candidate draw positions.
+
+NEXT: instrument the AGENT's draw sequence, not the dice. Log every actionRng/decisionRng
+draw with its consumer around i=18-19 on chaos_dwarf seed 7 and compare the count and order
+against a main-branch run of the same seed, which is green. The question to answer is
+narrow: does declaring a blitz still consume the same number of draws, at the same point,
+as it did before the chain went live?
