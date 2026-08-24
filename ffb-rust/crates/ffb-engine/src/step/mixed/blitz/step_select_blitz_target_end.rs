@@ -81,6 +81,25 @@ impl StepSelectBlitzTargetEnd {
                     crate::step::util_server_steps::change_player_action(
                         game, &pid, PlayerAction::BlitzMove, false);
                 }
+                // Restore the blitz target as THE defender before the second pass begins.
+                //
+                // Animal Savagery's lash-out overwrites `game.defender_id` with its team-mate
+                // victim, saving the old value by publishing GAZE_VICTIM_ID. That save is picked
+                // up by StepEndSelecting, which hands it back through its dispatch params so
+                // StepInitMoving can write it to `game.defender_id` again. On the FOLDED path one
+                // EndSelecting instance both receives the publish and dispatches, so the round
+                // trip completes. On the CHAIN path there are two passes and two instances: the
+                // publish lands on the first, while the BLITZ_MOVE dispatch is done by a fresh
+                // one created by the Select sequence pushed just below - which never saw it. The
+                // blitzer then blocked its own team-mate's square and the Frenzy follow-up was
+                // skipped for an unblockable "defender" (bb2020 skaven seed 1: main throws a
+                // second BlockRoll, the branch does not).
+                //
+                // No parameter plumbing is needed to fix it: THIS step already holds the
+                // authoritative target in the TargetSelectionState, so set it directly.
+                if let Some(sel) = ts.get_selected_player_id().cloned() {
+                    game.defender_id = Some(sel);
+                }
                 // Java `StepSelectBlitzTargetEnd:94`: a blitzer SUFFERING BLOOD LUST with a
                 // bloodlustAction does NOT continue the blitz - it drops the blitz target and is
                 // re-dispatched into a plain MOVE sequence to go and feed. Rust only had the else
