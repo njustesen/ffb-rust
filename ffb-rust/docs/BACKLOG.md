@@ -2591,3 +2591,36 @@ pre-change failing-seed SET I cannot prove it did not swap one failure for anoth
 
 NEXT: vampire seed 1 again from scratch with `rng=` in view - find which of main's five dice the
 branch never rolls, using the contiguous FFB_SEQ method rather than any filtered view.
+
+**§12 vampire NARROWED (iter 57): a failed-Blood-Lust blitzer never blocks.**
+
+RNG-step diff, vampire seed 1, normalised to ignore the cosmetic `pa=` label (it differs
+throughout - main says Blitz where the chain says BlitzMove - and `player_action` is not hashed,
+so comparing it raw hides the real first difference at entry 7 instead of 95):
+
+    main[94] BloodLust          122->123 home_03      brch[94] BloodLust 122->123 home_03
+    main[95] BlockRoll          123->125 home_03      brch[95] BloodLust 123->124 away_03
+    main[96] DropFallingPlayers 125->127 home_03
+
+Entries 1-94 are identical. Main's blitzer rolls Blood Lust, FAILS it (that is the only site that
+sets `suffering_blood_lust`), and still goes on to BLOCK - BlockRoll plus DropFallingPlayers, the
+4 extra dice. The branch's activation simply ends and play moves to away_03.
+
+**My iteration-56 Blood Lust arm is NOT the cause - verified, not assumed.** Disabling it with a
+`false &&` guard leaves entry 95 exactly as it was (`BloodLust away_03`, no block), so the missing
+block predates that port. The arm is restored unchanged.
+
+The drive trace for the branch's activation is
+`BloodLust JumpUp StandUp SelectBlitzTargetEnd InitSelecting ResetFumblerooskie EndSelecting
+InitMoving EndMoving` - so SBTEnd pushes Select, the second pass takes the USE_ALTERNATE_LABEL
+jump to END_SELECTING, EndSelecting dispatches a MOVE (InitMoving/EndMoving) rather than the
+blitz block, and the activation ends. On main there is no second pass at all; the folded blitz
+blocks directly.
+
+Since Java blocks here too (main is green), Java's SBTEnd must take its ELSE arm, which means
+Java's `bloodlustAction` is NULL for this blitz. Worth checking what Rust puts in
+`self.bloodlust_action` and where BLOODLUST_ACTION is published.
+
+NEXT: find why EndSelecting dispatches MOVE instead of the blitz block on the second pass after a
+FAILED Blood Lust. Compare against a SUCCESSFUL-Blood-Lust blitz in the same game, which does
+block on the branch - the difference between those two activations is the bug.
