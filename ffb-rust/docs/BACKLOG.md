@@ -1943,3 +1943,36 @@ the team being scanned (`inactive_team()` vs the acting `side`) or the moment of
 NEXT: build MAIN with the same `rng=` drive trace and diff the i=47 window step-by-step against
 the branch. That shows directly whether main's blitz reaches a block at all, and if not, which
 step diverts it - rather than inferring it from draw counts.
+
+**§12 goblin (iter 36): the predicate-mismatch theory is DISPROVEN. The branch makes a blitz
+HAPPEN that must not happen at all.**
+
+Measured, both lists computed at the SAME moment inside StepSelectBlitzTarget:
+
+    CMP attacker=home_01 home_playing=true engine=["away_02","away_01","away_03"] agent=["away_02","away_01","away_03"]
+    CMP attacker=away_03 home_playing=false engine=["home_01","home_03"]           agent=["home_01","home_03"]
+
+`standing_opponents` (engine, feeds the prompt) and `legal_block_targets` (agent, main's folded
+path) return IDENTICAL lists, same order, on every blitz. The 0-vs-3 disagreement suspected last
+iteration does not exist.
+
+What the branch-vs-main drive traces actually show for goblin seed 1 i=47:
+
+    main:    Activate(home_01, Blitz) -> ResetFumblerooskie, EndSelecting, RemoveTargetSelectionState,
+             InitFeeding ... EndFeeding.  NO InitActivation, NO negatraits, NO block. rng 52->53.
+    branch:  full chain, target picked from 3 candidates, InitMoving/InitBlocking/BlockRoll/
+             BlockChoice - a REAL BLOCK. rng 52->56.
+
+main is GREEN on this seed, so Java also does nothing here. **The correct behaviour at i=47 is
+that the blitz does nothing and the turn ends; the branch is wrong to resolve a block.** That
+inverts the framing of the last few entries: this is not a missing draw or a mismatched
+candidate list, it is the chain running a blitz that Java declines to run.
+
+Note main DOES still fold a target for Blitz (`| PlayerActionChoice::Blitz` is in the
+Block/StandUpBlitz arm on main, confirmed by diff), so main is not skipping target selection in
+general - something specific to this activation makes it a no-op there.
+
+NEXT: find why the blitz is a no-op on main/Java. Probe main at that activation for
+`block_defender_id`, `turn_data.blitz_used` and the acting player's flags, and check whether the
+agent even offers Blitz legally at that point. The candidate list is now ruled out, so the
+answer is in the legality/turn-data state, not in target selection.
