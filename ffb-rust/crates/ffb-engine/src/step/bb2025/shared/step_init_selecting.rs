@@ -91,7 +91,18 @@ impl Step for StepInitSelecting {
         {
             self.dispatch_player_action = Some(PlayerAction::BlitzMove);
             self.force_goto_on_dispatch = true;
-            return self.execute_step(game, _rng);
+            // Java `StepInitSelecting:238`, case CLIENT_BLOCK - the command that carries a blitz's
+            // SECOND phase - publishes USE_ALTERNATE_LABEL=true. The Select sequence that
+            // StepSelectBlitzTargetEnd pushes begins
+            //     ... GOTO_LABEL(goto=NEXT, alternate=END_SELECTING) BONE_HEAD[NEXT] REALLY_STUPID ...
+            // so that flag makes the GOTO_LABEL jump straight to END_SELECTING and SKIP the whole
+            // negatrait block. Without it the activation runs in BOTH passes of the chain and a
+            // negatrait carrier rolls Bone Head / Really Stupid twice per blitz - measured as +3
+            // actionRng calls on one goblin Troll blitz (goblin seed 1 i=47: main 52->53,
+            // branch 52->56). Java queues the activation twice exactly as Rust does; this publish
+            // is what stops the second one from rolling.
+            return self.execute_step(game, _rng)
+                .publish(StepParameter::UseAlternateLabel(true));
         }
 
         if !acted {
