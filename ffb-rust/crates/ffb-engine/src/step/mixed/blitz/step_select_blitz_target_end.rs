@@ -12,6 +12,7 @@ use ffb_model::enums::PlayerAction;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
+use crate::step::generator::bb2025::select::{Select, SelectParams};
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
 /// Java: `StepSelectBlitzTargetEnd` (mixed/blitz, BB2020 + BB2025).
@@ -52,11 +53,25 @@ impl StepSelectBlitzTargetEnd {
                 game.field_model.target_selection_state = None;
                 return StepOutcome::next();
             } else if ts.is_selected() {
-                // Java: if (bloodlust && bloodlustAction != null) push Move sequence
-                // Java: else changePlayerAction(BLITZ_MOVE), push Select
-                // Java: game.getTurnData().setBlitzUsed(true)
+                // Java: changePlayerAction(actingPlayer, BLITZ_MOVE, false) then
+                //       Select.pushSequence(new Select.SequenceParams(gameState, false)),
+                //       then game.getTurnData().setBlitzUsed(true).
+                // The Select push is the LOOP-BACK: re-entering StepInitSelecting with a
+                // non-null targetSelectionState takes the ordinary BLITZ_MOVE path and runs the
+                // real move + block. Without it this step was the terminus of the whole blitz
+                // sequence and the driver stalled (lineman bb2025 0/20, rust_total 0.07s) - the
+                // same publish-only shape as StepEndThrowKeg and StepEndThenIStartedBlastin.
+                if let Some(pid) = game.acting_player.player_id.clone() {
+                    crate::step::util_server_steps::change_player_action(
+                        game, &pid, PlayerAction::BlitzMove, false);
+                }
                 game.turn_data_mut().blitz_used = true;
-                return StepOutcome::next();
+                let seq = Select::build_sequence(&SelectParams {
+                    update_persistence: false,
+                    is_blitz_move: false,
+                    ..Default::default()
+                });
+                return StepOutcome::next().push_seq(seq);
             } else if ts.is_skipped() {
                 // Java: changePlayerAction(BLITZ_MOVE), push Select, setBlitzUsed, setHasMoved
                 game.turn_data_mut().blitz_used = true;

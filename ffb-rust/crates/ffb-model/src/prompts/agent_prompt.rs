@@ -20,6 +20,18 @@ pub enum AgentPrompt {
     BlockTarget {
         attacker_id: PlayerId,
     },
+    /// Java: `StepSelectBlitzTarget` CONTINUEs on a `DialogSelectBlitzTargetParameter`, waiting
+    /// for `CLIENT_TARGET_SELECTED`. Distinct from `BlockTarget`, which is the mid-sequence
+    /// "no defender" ask that both agents answer by deselecting - this one carries the real
+    /// candidate list and expects a pick.
+    ///
+    /// Candidates and order match `ParityRunner.pickBlockTarget`: ADJACENT opponents whose state
+    /// base is STANDING or MOVING (NOT hasTackleZones, no confused check), coordinate-sorted,
+    /// answered with exactly ONE actionRng draw.
+    BlitzTarget {
+        attacker_id: PlayerId,
+        eligible_players: Vec<PlayerId>,
+    },
     // ── Block ──────────────────────────────────────────────────────────────────
     BlockChoice {
         attacker_id: PlayerId,

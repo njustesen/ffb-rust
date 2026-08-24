@@ -327,6 +327,15 @@ impl Agent for UniformAgent {
                 let idx = self.pick(candidates.len());
                 Action::SelectPlayer { player_id: candidates[idx].clone() }
             }
+            // Java: StepSelectBlitzTarget's target wait. Candidates arrive coordinate-sorted
+            // (ParityRunner.pickBlockTarget order); answer with exactly ONE actionRng draw so the
+            // stream position matches the harness. Empty cannot happen - the step skips instead -
+            // but deselect defensively rather than panicking.
+            Some(AgentPrompt::BlitzTarget { eligible_players, .. }) => {
+                if eligible_players.is_empty() { return Action::EndPlayerAction; }
+                let idx = self.pick(eligible_players.len());
+                Action::SelectPlayer { player_id: eligible_players[idx].clone() }
+            }
             Some(AgentPrompt::FuriousOutburstSquare { squares, .. }) => {
                 let mut squares = squares.clone();
                 squares.sort_by_key(|c| (c.x, c.y));

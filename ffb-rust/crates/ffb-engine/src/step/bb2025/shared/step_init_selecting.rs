@@ -196,6 +196,29 @@ impl Step for StepInitSelecting {
                 // UseSkill("Excuse Me, Are You a Zoat?"), exactly like BLACK_INK — Java's
                 // CLIENT_USE_SKILL chain dispatches AUTO_GAZE_ZOAT with forceGotoOnDispatch and
                 // never calls changeActingPlayer, so the declared action stays MOVE.
+                // Java StepInitSelecting :114 —
+                //   if (playerAction == BLITZ_MOVE && targetSelectionState == null) {
+                //     fDispatchPlayerAction = BLITZ_SELECT;
+                //     changeActingPlayer(pid, BLITZ_MOVE, jumping);   // acting action stays BLITZ_MOVE
+                //     forceGotoOnDispatch = true;
+                //   }
+                // This branch was entirely missing, which is why Rust never dispatched
+                // SelectBlitzTarget/SelectBlitzTargetEnd on ANY blitz while Java runs them ~750
+                // times per 100 games (docs/BACKLOG.md §12). The target is no longer folded into
+                // the declaration: StepSelectBlitzTarget asks for it, at the same point in the
+                // actionRng stream (before the negatrait rolls) as the old activation-time pick.
+                if *player_action == PlayerActionChoice::Blitz
+                    && game.field_model.target_selection_state.is_none()
+                {
+                    game.original_bombardier = None;
+                    util_server_steps::change_player_action(game, player_id, PlayerAction::BlitzMove, false);
+                    game.defender_id = None;
+                    self.dispatch_player_action = Some(PlayerAction::BlitzSelect);
+                    self.force_goto_on_dispatch = true;
+                    Self::check_for_staller(game);
+                    return self.execute_step(game, rng)
+                        .with_event(GameEvent::PlayerAction { player_id: player_id.clone(), action: PlayerAction::BlitzMove });
+                }
                 if *player_action == PlayerActionChoice::AutoGazeZoat {
                     game.original_bombardier = None;
                     util_server_steps::change_player_action(game, player_id, PlayerAction::Move, false);

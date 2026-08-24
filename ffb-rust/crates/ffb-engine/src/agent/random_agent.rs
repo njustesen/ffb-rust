@@ -389,8 +389,12 @@ impl Agent for RandomAgent {
                 // For Block/Blitz: pick target from adjacent opponents
                 // For Foul: pick foul target from adjacent prone/stunned opponents (1 actionRng call)
                 let block_defender_id = match player_action {
+                    // BLITZ no longer folds its target. Java routes an untargeted BLITZ_MOVE
+                    // through BLITZ_SELECT, and StepSelectBlitzTarget asks for the target with the
+                    // SAME single actionRng draw at the SAME stream position (before the negatrait
+                    // rolls). Folding it here as well would spend the draw twice. BACKLOG §12.
+                    PlayerActionChoice::Blitz => None,
                     PlayerActionChoice::Block
-                    | PlayerActionChoice::Blitz
                     | PlayerActionChoice::StandUpBlitz => {
                         let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
                         let targets = legal_block_targets(&gs.game, player_id, side);
@@ -826,6 +830,15 @@ impl Agent for RandomAgent {
             // seed-1 run logs exactly `UNHANDLED_STEP: INIT_BLOCKING`, and Java consumes ONE die at
             // i=100 before play passes to the other team at i=101.)
             // Picking a target here instead would roll block dice Java never rolls.
+            // Java: StepSelectBlitzTarget's target wait. Candidates arrive coordinate-sorted
+            // (ParityRunner.pickBlockTarget order); answer with exactly ONE actionRng draw so the
+            // stream position matches the harness. Empty cannot happen - the step skips instead -
+            // but deselect defensively rather than panicking.
+            Some(AgentPrompt::BlitzTarget { eligible_players, .. }) => {
+                if eligible_players.is_empty() { return Action::EndPlayerAction; }
+                let idx = self.pick_action(eligible_players.len());
+                Action::SelectPlayer { player_id: eligible_players[idx].clone() }
+            }
             Some(AgentPrompt::BlockTarget { .. }) => Action::EndTurn,
             // Blastin' target wait: coordinate-sorted candidates, single actionRng pick →
             // SelectPlayer (CLIENT_TARGET_SELECTED). Empty list → EndTurn (client END_MOVE).

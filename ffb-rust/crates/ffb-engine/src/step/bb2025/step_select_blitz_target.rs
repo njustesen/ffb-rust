@@ -16,6 +16,9 @@ use ffb_model::model::skill_use::SkillUse;
 use ffb_model::report::mixed::report_select_blitz_target::ReportSelectBlitzTarget;
 use ffb_model::report::report_id::ReportId;
 use ffb_model::report::report_skill_use::ReportSkillUse;
+use ffb_model::enums::TurnMode;
+use ffb_model::model::target_selection_state::TargetSelectionState;
+use ffb_model::prompts::AgentPrompt;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -138,8 +141,16 @@ impl Step for StepSelectBlitzTarget {
 }
 
 impl StepSelectBlitzTarget {
-    fn execute_step(&self, game: &Game) -> StepOutcome {
+    /// Java `StepSelectBlitzTarget.executeStep`. The whole body used to be
+    /// `StepOutcome::next()` under a "stub" note, which is why Rust never dispatched this step at
+    /// all: the blitz target was folded into the declaration instead and the chain was skipped.
+    /// Java runs it on EVERY blitz (~750 selections per 100 games).
+    fn execute_step(&self, game: &mut Game) -> StepOutcome {
+        // Java: getResult().setNextAction(StepAction.CONTINUE) up front; each branch below
+        // overrides it.
         if self.end_player_action || self.end_turn {
+            // Java: turnMode = lastTurnMode; stepStack.clear(); push EndPlayerAction sequence.
+            if let Some(ltm) = game.last_turn_mode { game.turn_mode = ltm; }
             let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
                 feeding_allowed: false,
                 end_player_action: true,
@@ -147,10 +158,100 @@ impl StepSelectBlitzTarget {
                 check_forgo: self.check_forgo,
                 rules: game.rules,
             });
-            return StepOutcome::next().push_seq(seq);
+            return StepOutcome::next().with_clear_stack().push_seq(seq);
         }
-        // Stub: skill-based sequence generators (BlackInk, BalefulHex, etc.) not translated
-        StepOutcome::next()
+
+        let acting_id = match game.acting_player.player_id.clone() {
+            Some(id) => id,
+            None => return StepOutcome::next(),
+        };
+
+        match self.selected_player_id.clone() {
+            // Java: selectedPlayerId == null -> either ask, or skip when nobody can be blitzed.
+            None => {
+                let targets = Self::standing_opponents(game, &acting_id);
+                if targets.is_empty() {
+                    // Java: setTargetSelectionState(new TargetSelectionState().skip()); NEXT_STEP
+                    let mut ts = TargetSelectionState::default();
+                    ts.skip();
+                    game.field_model.target_selection_state = Some(ts);
+                    return StepOutcome::next();
+                }
+                // Java: game.setTurnMode(TurnMode.SELECT_BLITZ_TARGET);
+                //       showDialog(new DialogSelectBlitzTargetParameter()); CONTINUE
+                // A bare cont() here would be the driver's stall shape, so carry the wait as a
+                // real prompt. Candidates and order match ParityRunner.pickBlockTarget exactly:
+                // adjacent opponents whose base is STANDING or MOVING (NOT hasTackleZones, no
+                // confused check), coordinate-sorted, answered with ONE actionRng pick.
+                if game.turn_mode != TurnMode::SelectBlitzTarget {
+                    game.last_turn_mode = Some(game.turn_mode);
+                    game.turn_mode = TurnMode::SelectBlitzTarget;
+                }
+                StepOutcome::cont().with_prompt(AgentPrompt::BlitzTarget {
+                    attacker_id: acting_id,
+                    eligible_players: targets,
+                })
+            }
+            Some(selected) if selected == acting_id => {
+                // Java: selecting the acting player himself cancels the selection.
+                if let Some(ltm) = game.last_turn_mode { game.turn_mode = ltm; }
+                let mut ts = TargetSelectionState::default();
+                ts.cancel();
+                game.field_model.target_selection_state = Some(ts);
+                StepOutcome::goto(&self.goto_label_on_end)
+            }
+            Some(selected) => {
+                // Java: only an OPPOSING player is a legal target.
+                if game.inactive_team().player(&selected).is_none() {
+                    return StepOutcome::cont();
+                }
+                if let Some(ltm) = game.last_turn_mode { game.turn_mode = ltm; }
+                // Java: playerState.addSelectedBlitzTarget()
+                if let Some(st) = game.field_model.player_state(&selected) {
+                    game.field_model.set_player_state(&selected, st.add_selected_blitz_target());
+                }
+                // Java: new TargetSelectionState(selectedPlayerId); commit() when the acting
+                // player hasActed(); then .select().
+                let mut ts = TargetSelectionState::new(selected.clone());
+                if game.acting_player.acted() {
+                    ts.commit();
+                }
+                ts.select();
+                for skill in self.used_skill.iter() {
+                    ts.add_used_skill(*skill);
+                }
+                game.field_model.target_selection_state = Some(ts);
+                // Java also sets game.defenderId via the downstream block; keep the folded-target
+                // channel in sync so the BlitzBlock sequence finds its defender.
+                game.defender_id = Some(selected);
+                StepOutcome::next()
+            }
+        }
+    }
+
+    /// Java `hasStandingOpponents` / ParityRunner.pickBlockTarget candidate rule: ADJACENT
+    /// opponents whose state base is STANDING or MOVING. Coordinate-sorted so a single
+    /// `actionRng` pick lands on the same player in both engines.
+    fn standing_opponents(game: &Game, acting_id: &str) -> Vec<String> {
+        let Some(coord) = game.field_model.player_coordinate(acting_id) else { return Vec::new() };
+        let opponent_team = game.inactive_team();
+        let mut out: Vec<String> = opponent_team.players.iter()
+            .filter(|op| {
+                game.field_model.player_coordinate(&op.id)
+                    .map(|oc| oc.is_adjacent(coord))
+                    .unwrap_or(false)
+                    && game.field_model.player_state(&op.id)
+                        .map(|s| s.can_be_blocked())
+                        .unwrap_or(false)
+            })
+            .map(|op| op.id.clone())
+            .collect();
+        out.sort_by_key(|pid| {
+            game.field_model.player_coordinate(pid)
+                .map(|c| (c.x, c.y))
+                .unwrap_or((i32::MAX, i32::MAX))
+        });
+        out
     }
 }
 
