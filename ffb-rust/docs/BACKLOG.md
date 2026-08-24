@@ -2700,3 +2700,28 @@ NEXT: pick ONE bb2020 red with an early divergence (skaven seed 1 step 23, or li
 step 20) and run the branch-vs-main comparison that works - normalised RNG-step diff first, then
 the contiguous FFB_SEQ stream. Do NOT theorise from generator differences again; two BB2020
 theories have now failed on measurement.
+
+**§12 BB2020 RE-GATE: 24 GREEN / 6 RED (was 17/13).**
+
+    NEWLY GREEN (7): lizardman 74->100, orc 57->100, nurgle 61->100, human 72->100,
+                     slann 72->100, slann_fumbbl 71->100, ogre 31->100, halfling stayed
+    STILL RED (6):   vampire 53, chaos_pact 87, renegades 89, skaven 89, underworld 94,
+                     goblin 99 (seed 85 step 4)
+
+Porting the negatrait FAILED marker to the BB2020 behaviour files recovered seven rosters,
+mirroring what the same fix did for twelve BB2025 rosters. BB2020 is still short of the 30/30 it
+had on main, so the branch remains NOT MERGEABLE.
+
+**vampire is red in BOTH editions** (bb2025 57, bb2020 53) with the same first-divergence shape,
+which supports the iteration-58 conclusion that it is one bug in the chain's second pass when
+`suffering_blood_lust` is true - not two edition-specific ones.
+
+**Next suspect, by the same pattern:** iteration 39 established that bb2020's AnimalSavagery (2
+sites), FoulAppearance (1) and UnchannelledFury (1) all call `targetSelectionState.failed()` in
+Java. Only bone_head and really_stupid have been ported, in either edition. The remaining four
+reds that are NOT vampire are all 87-99, i.e. a handful of seeds each, which is what a rarer
+negatrait would look like.
+
+NEXT: check whether the bb2020 animal_savagery / foul_appearance / unchannelled_fury behaviours
+have live failure sites (in bb2025 these files were EMPTY STUBS with the logic in the step files -
+verify before editing), port the marker where Java has it, and re-gate. BB2016 still unmeasured.
