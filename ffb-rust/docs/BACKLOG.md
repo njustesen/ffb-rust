@@ -1607,3 +1607,36 @@ NEXT: verify by counting negatrait dice per blitz against Java on chaos_dwarf se
 likely the negatrait steps are no-ops once the activation has already rolled them, or the
 second push is not a full Select. Do NOT re-measure lineman as evidence for this; use a
 negatrait roster.
+
+**§12 negatrait-double-roll hypothesis: DISPROVEN 2026-08-24.**
+
+The mechanism looked airtight. `StepEndSelecting`'s `PlayerAction::Blitz` arm carries an
+explicit compensating bridge that prepends `ActivationSequenceBuilder` (Bone Head, Really
+Stupid, Take Root, Unchannelled Fury, Blood Lust, Animal Savagery) plus a repositioned
+FOUL_APPEARANCE, and its own comment says why: *"Rust's random agent picks the blitz and
+its target in a single Action::ActivatePlayer, so StepInitSelecting force-gotos straight
+here and SelectBlitzTarget is skipped. Without restoring its activation the blitzer never
+rolls Bone Head."* With the real chain live that premise is false, so the block should
+have been rolling twice - matching the green set exactly.
+
+Measured instead of assumed, and it is a NO-OP. chaos_dwarf bb2025 seeds 1-100:
+
+    with the bridge:    79/100, failing 7 12 13 28 31 35 36 38 41 44 45 48 55 59 60 64 65 76 82 83 93
+    bridge removed:     79/100, failing 7 12 13 28 31 35 36 38 41 44 45 48 55 59 60 64 65 76 82 83 93
+
+Bit-for-bit the same seed set, not merely the same count - which is the only reason this
+is a safe conclusion, since a same-count comparison has already been measured misleading
+once in this repo. The bridge's own comment explains the no-op: *"whichever fires first
+marks the activation, and the other bails out"* - the activation marking already makes the
+second copy inert. The bridge is dead weight under the new architecture but it is NOT the
+bug, and it has been REVERTED rather than left removed, since removing it changes nothing
+and the comment records real regressions it was built for.
+
+So the negatrait correlation in the 4-green/26-red split still needs explaining. What is
+NOT yet ruled out: the negatrait steps' effect on the ACTING PLAYER STATE across the two
+passes (the chain re-enters Select, so a negatrait that ends the activation may now be
+evaluated against different state), and the second `blitz_used` write in the same arm.
+NEXT: stop reasoning from the correlation and diff the actual dice streams for one failing
+chaos_dwarf seed - seed 7's first divergence is at step 21, and steps 18-21 including the
+blitz at i=19 are byte-identical in both logs, so the divergence is in RESOLVING i=21's
+PASS, not in the blitz itself. That detail already argues against every blitz-dice theory.
