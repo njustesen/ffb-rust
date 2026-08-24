@@ -236,6 +236,12 @@ impl Step for StepInitSelecting {
                 // times per 100 games (docs/BACKLOG.md §12). The target is no longer folded into
                 // the declaration: StepSelectBlitzTarget asks for it, at the same point in the
                 // actionRng stream (before the negatrait rolls) as the old activation-time pick.
+                if std::env::var("FFB_TSS_PROBE").is_ok()
+                    && *player_action == PlayerActionChoice::Blitz
+                {
+                    eprintln!("TSSPROBE blitz_declared pid={player_id} tss={:?}",
+                        game.field_model.target_selection_state.as_ref().map(|t| t.get_status()));
+                }
                 if *player_action == PlayerActionChoice::Blitz
                     && game.field_model.target_selection_state.is_none()
                 {
@@ -243,6 +249,9 @@ impl Step for StepInitSelecting {
                     util_server_steps::change_player_action(game, player_id, PlayerAction::BlitzMove, false);
                     game.defender_id = None;
                     self.dispatch_player_action = Some(PlayerAction::BlitzSelect);
+                    if std::env::var("FFB_TSS_PROBE").is_ok() {
+                        eprintln!("TSSPROBE routed_to_BLITZ_SELECT pid={player_id}");
+                    }
                     self.force_goto_on_dispatch = true;
                     Self::check_for_staller(game);
                     return self.execute_step(game, rng)

@@ -1758,3 +1758,44 @@ NEXT: find where Java clears targetSelectionState at end of activation and make 
 same, rather than tightening the hoisted guard - the guard is Java-faithful, the missing
 clear is not. Verify by re-running chaos_dwarf seed 7 and checking `arc` matches main at the
 away_03 pick, then re-gate.
+
+**§12 progress 2026-08-24 (iter 30): stale-state hypothesis DISPROVEN, real frontier isolated.**
+
+The previous entry's fix direction was wrong and was NOT implemented - verified first. A probe
+at the declaration point prints `tss` for every blitz declared on chaos_dwarf seed 7:
+
+    TSSPROBE blitz_declared pid=away_02 tss=None
+    TSSPROBE blitz_declared pid=away_01 tss=None
+    TSSPROBE blitz_declared pid=home_03 tss=None      (all of them: tss=None)
+
+So `targetSelectionState` is NEVER stale at a declaration, Rust's `StepRemoveTargetSelectionState`
+is a faithful port of Java's and does clear it, and there is nothing to fix there.
+
+**What is actually happening.** Probing further in:
+
+    away_02:  blitz_declared -> routed_to_BLITZ_SELECT -> SelectBlitzTarget ENTERED -> prompt (2 candidates)
+    away_01:  blitz_declared -> routed_to_BLITZ_SELECT -> (nothing)          -> NO prompt
+
+`away_01` IS routed - `dispatch_player_action = BLITZ_SELECT`, `force_goto_on_dispatch = true` -
+but `StepSelectBlitzTarget` is never entered. The drive trace shows the very next step after the
+routing is `InitActivation`, i.e. the ORDINARY Select sequence simply carried on: the goto to
+END_SELECTING never happened and the chain was never pushed. That blitz therefore spends no
+target draw, which is exactly the one missing `actionRng` call (branch arc=41 vs main arc=42)
+that shifts the later pick index and reds the roster.
+
+So the bug is in `StepInitSelecting::execute_step`'s dispatch handling, not in the state
+lifecycle. Reading that function, the `dispatch_player_action` block still contains the OLD
+folded-target guard `if matches!(dispatch, PlayerAction::Blitz) && game.defender_id.is_none()`
+-> EndTurn. It cannot fire for the new path (dispatch is `BlitzSelect`, not `Blitz`), so
+something else in that block is swallowing the BlitzSelect dispatch for some blitzers and not
+others.
+
+NEXT: instrument `execute_step`'s dispatch block itself - print which branch it takes for a
+BlitzSelect dispatch, and what `acting_player`/`defender_id`/`standing_up` look like for
+away_01 versus away_02. The difference between a blitzer that reaches the chain and one that
+does not is the whole bug.
+
+CAUTION: `FFB_TSS_PROBE` probes are currently live in step_init_selecting.rs,
+step_select_blitz_target.rs and step_end_selecting.rs and MUST be removed before any gate. The
+step_end_selecting probe arm is also UNRELIABLE - it failed to print for home_03 even though
+that blitz did reach the chain - so do not read anything into its absence.
