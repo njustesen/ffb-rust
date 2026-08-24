@@ -46,8 +46,36 @@ SecondMoveFuriousOutburst StateMultipleRolls Swoop ThenIStartedBlastin Treachero
 `AssignTouchdowns InitPunt EndPunt PuntDirection PuntDistance`
 
 **Blitz/gaze SELECT sub-chain — 4:** `SelectBlitzTarget SelectBlitzTargetEnd SelectGazeTarget
-SelectGazeTargetEnd`. Both harnesses declare a folded-target BLITZ, so the BLITZ_MOVE→BLITZ_SELECT
-dialog chain never runs. Recurring bug shape #2 (lockstep decline) by construction.
+SelectGazeTargetEnd`.
+
+**CORRECTED 2026-08-24 — the old "both harnesses decline in lockstep" note was WRONG.** Measured:
+**JAVA RUNS THIS CHAIN CONSTANTLY** — ~750 `JAVA_BLITZ_TARGET` selections per 100 games
+(dark_elf and dwarf bb2025 traces both). ParityRunner declares `BLITZ → BLITZ_MOVE` with NO folded
+target and answers the resulting wait with `ClientCommandTargetSelected`; it has handlers for
+`SELECT_BLITZ_TARGET` both as a STEP (:805) and as a DIALOG (:859). **RUST NEVER DISPATCHES IT** —
+a drive trace of the same matchup shows only `InitSelecting` / `EndSelecting` /
+`RemoveTargetSelectionState`, because Rust folds the blitz target into the `ActivatePlayer`
+declaration (`block_defender_id`) and dispatches straight to the block.
+
+So this is NOT a lockstep decline: **the two engines take different code paths for every single
+blitz**, and the matrices are 100/100 anyway because both spend exactly one `actionRng` target
+pick and arrive at the same board state. The state hash cannot see the difference — the same class
+of blind spot as the ACTIVE bit and `ttm_used`/`ktm_used`.
+
+Consequences worth knowing before touching it:
+- `StepSelectBlitzTargetEnd` is where Java **consumes the team blitz** (`setBlitzUsed`). Rust
+  replicates that effect elsewhere (`step/action/common/mod.rs`), which is why parity holds.
+- Anything that only happens inside the chain is therefore UNTESTED in Rust — including the
+  Foul-Appearance-on-blitz-target path (`bb2020/bb2025 FoulAppearanceBehaviour` both call
+  `setBlitzUsed(true)` from inside it) and the gaze variants.
+
+**Scope estimate — this is a multi-iteration project, not a single item.** Switching it on means
+changing the Rust blitz declaration to Java's two-phase form (declare `BLITZ_MOVE` with no folded
+target → `SelectBlitzTarget` wait → `TargetSelected` → `SelectBlitzTargetEnd`), which touches
+`legal_actions`, both agents, `InitSelecting`/`EndSelecting` dispatch, the two steps, and moves
+blitz consumption. Blitzes are the most frequent action in the game, so it perturbs every roster's
+RNG stream and should be expected to red the whole matrix until re-greened. High fidelity value,
+high risk — worth doing deliberately with fresh context, not as a tail-end change.
 
 **bb2016 Kick Team-Mate — 4:** `InitKickTeamMate KickTeamMate KickTeamMateDoubleRolled
 EndKickTeamMate`. bb2016-generator-only ids; no bb2016 roster drafts the skill (bb2020/bb2025 kicks
