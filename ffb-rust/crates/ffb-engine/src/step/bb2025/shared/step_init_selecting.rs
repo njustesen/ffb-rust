@@ -236,12 +236,6 @@ impl Step for StepInitSelecting {
                 // times per 100 games (docs/BACKLOG.md §12). The target is no longer folded into
                 // the declaration: StepSelectBlitzTarget asks for it, at the same point in the
                 // actionRng stream (before the negatrait rolls) as the old activation-time pick.
-                if std::env::var("FFB_TSS_PROBE").is_ok()
-                    && *player_action == PlayerActionChoice::Blitz
-                {
-                    eprintln!("TSSPROBE blitz_declared pid={player_id} tss={:?}",
-                        game.field_model.target_selection_state.as_ref().map(|t| t.get_status()));
-                }
                 if *player_action == PlayerActionChoice::Blitz
                     && game.field_model.target_selection_state.is_none()
                 {
@@ -249,9 +243,6 @@ impl Step for StepInitSelecting {
                     util_server_steps::change_player_action(game, player_id, PlayerAction::BlitzMove, false);
                     game.defender_id = None;
                     self.dispatch_player_action = Some(PlayerAction::BlitzSelect);
-                    if std::env::var("FFB_TSS_PROBE").is_ok() {
-                        eprintln!("TSSPROBE routed_to_BLITZ_SELECT pid={player_id}");
-                    }
                     self.force_goto_on_dispatch = true;
                     Self::check_for_staller(game);
                     return self.execute_step(game, rng)
@@ -747,7 +738,18 @@ impl StepInitSelecting {
                 // BLITZ_SELECT dispatches to); Rust skips SelectBlitzTarget and dispatches Blitz
                 // straight to the block, so without this a prone blitzer with an adjacent target (no
                 // move) never stood up. force_goto only skips StandUp for an already-standing player.
-                let mut outcome = if standing_up {
+                //
+                // §12: this standing_up carve-out is one more bridge built on "Rust skips
+                // SelectBlitzTarget", and BLITZ_SELECT must be exempt from it. Java's :114 sets
+                // forceGotoOnDispatch = true unconditionally. A prone blitzer still stands up:
+                // NOT inside the SelectBlitzTarget sequence (the BB2025 ActivationSequenceBuilder
+                // deliberately omits JUMP_UP/STAND_UP) but in the full Select sequence that
+                // StepSelectBlitzTargetEnd pushes on the second pass, which carries both. Leaving
+                // BLITZ_SELECT
+                // inside the carve-out returned next(), the ordinary Select sequence carried on
+                // into InitActivation, the chain was never pushed, and that blitz spent no target
+                // draw - the single missing actionRng call behind the 26-red gate.
+                let mut outcome = if standing_up && dispatch != PlayerAction::BlitzSelect {
                     StepOutcome::next()
                 } else {
                     StepOutcome::goto(label)
@@ -1157,12 +1159,19 @@ mod tests {
             "target-less ThrowBomb must NOT dispatch a passing sequence");
     }
 
+    /// Rewritten for §12. This used to assert that a prone Blitz proceeds via `next()` so the
+    /// ordinary Select sequence's StandUp runs, which was right only while Rust skipped
+    /// SelectBlitzTarget and dispatched the block directly. Java's :114 sets
+    /// forceGotoOnDispatch = true unconditionally, so a prone blitzer GOTOs like any other and
+    /// stands up later - in the full Select sequence StepSelectBlitzTargetEnd pushes on the
+    /// second pass (the BB2025 SelectBlitzTarget sequence itself omits JUMP_UP/STAND_UP).
+    ///
+    /// Keeping the old carve-out returned next(), so the ordinary Select sequence carried on into
+    /// InitActivation, the chain was never pushed, and the blitz spent no target draw - the one
+    /// missing actionRng call behind the 26-red bb2025 gate (chaos_dwarf 79 -> 94 when fixed).
     #[test]
-    fn activate_prone_player_blitz_with_target_runs_standup_via_next() {
+    fn activate_prone_player_blitz_dispatches_blitz_select_and_gotos() {
         use ffb_model::enums::{PS_PRONE, PlayerState};
-        // A prone player activated for a Blitz WITH a target must proceed via next() so the Select
-        // sequence's StandUp runs (Java reaches it through SelectBlitzTarget). Without this the
-        // force_goto for Block/Blitz jumped straight to the block and the prone blitzer never stood up.
         let mut game = make_game();
         game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE));
         // NOTE: the acting player must NOT already be "p1" — Java sets standingUp only inside
@@ -1176,8 +1185,11 @@ mod tests {
         };
         let out = step.handle_command(&action, &mut game, &mut GameRng::new(0));
         assert!(game.acting_player.standing_up, "prone blitz with a target sets standing_up");
-        assert_eq!(out.action, StepAction::NextStep, "prone blitz proceeds to StandUp via next()");
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(_))));
+        assert_eq!(out.action, StepAction::GotoLabel,
+            "BLITZ_SELECT gotos even when standing_up - the chain does the stand-up");
+        assert!(out.published.iter().any(|p|
+            matches!(p, StepParameter::DispatchPlayerAction(Some(PlayerAction::BlitzSelect)))),
+            "a prone blitz must still route through BLITZ_SELECT");
     }
 
     #[test]

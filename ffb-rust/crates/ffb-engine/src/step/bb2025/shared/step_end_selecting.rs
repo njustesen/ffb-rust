@@ -315,11 +315,6 @@ impl StepEndSelecting {
 
         match player_action {
             // ── BLITZ_SELECT ──────────────────────────────────────────────────
-            PlayerAction::BlitzSelect if std::env::var("FFB_TSS_PROBE").is_ok() => {
-                eprintln!("TSSPROBE EndSelecting BLITZ_SELECT pushing chain");
-                let seq = SelectBlitzTarget::build_sequence(game.rules);
-                StepOutcome::next().push_seq(seq)
-            }
             PlayerAction::BlitzSelect => {
                 // Java: selectBlitzTarget.pushSequence(new SequenceGenerator.SequenceParams(getGameState()))
                 let seq = SelectBlitzTarget::build_sequence(game.rules);

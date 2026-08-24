@@ -164,17 +164,9 @@ impl StepSelectBlitzTarget {
         let acting_id = match game.acting_player.player_id.clone() {
             Some(id) => id,
             None => {
-                if std::env::var("FFB_TSS_PROBE").is_ok() {
-                    eprintln!("TSSPROBE exit NO_ACTING_PLAYER");
-                }
                 return StepOutcome::next();
             }
         };
-        if std::env::var("FFB_TSS_PROBE").is_ok() {
-            eprintln!("TSSPROBE enter attacker={acting_id} selected={:?} epa={} et={} has_standing={}",
-                self.selected_player_id, self.end_player_action, self.end_turn,
-                Self::has_standing_opponents(game));
-        }
 
         match self.selected_player_id.clone() {
             // Java: selectedPlayerId == null -> either ask, or skip when nobody can be blitzed.
@@ -188,9 +180,6 @@ impl StepSelectBlitzTarget {
                 // seed 14, where Java ends the turn on a no-target blitz and Rust played on.
                 let targets = Self::standing_opponents(game, &acting_id);
                 if !Self::has_standing_opponents(game) {
-                    if std::env::var("FFB_TSS_PROBE").is_ok() {
-                        eprintln!("TSSPROBE exit SKIP attacker={acting_id}");
-                    }
                     // Java: setTargetSelectionState(new TargetSelectionState().skip()); NEXT_STEP
                     let mut ts = TargetSelectionState::default();
                     ts.skip();
@@ -206,9 +195,6 @@ impl StepSelectBlitzTarget {
                 if game.turn_mode != TurnMode::SelectBlitzTarget {
                     game.last_turn_mode = Some(game.turn_mode);
                     game.turn_mode = TurnMode::SelectBlitzTarget;
-                }
-                if std::env::var("FFB_TSS_PROBE").is_ok() {
-                    eprintln!("TSSPROBE prompt attacker={acting_id} n_candidates={}", targets.len());
                 }
                 StepOutcome::cont().with_prompt(AgentPrompt::BlitzTarget {
                     attacker_id: acting_id,
