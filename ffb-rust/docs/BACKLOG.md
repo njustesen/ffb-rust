@@ -1828,3 +1828,35 @@ the earlier campaign. Use the method that WORKED: run the same seed on the branc
 and compare `RUST_ACT_PICK` (N / idx / arc / drc) plus the `state=` string. Do NOT compare
 Rust against the Java log - display names, step alignment and dice positions are all
 non-comparable across engines, which produced three wrong root causes in this section.
+
+**§12 goblin frontier (2026-08-24): a blitz costs THREE EXTRA actionRng draws.**
+
+Branch-vs-main on goblin seed 1 (the method that works - same engine, same seed, one variable):
+
+    i=47  BOTH: rng_calls=52  Activate(home_01, Blitz)   identical state
+    i=48  main: rng_calls=53      branch: rng_calls=56    identical state
+
+So resolving that single blitz costs main 1 actionRng draw and the branch 4. Note this is the
+OPPOSITE sign to the chaos_dwarf bug just fixed, which was one draw SHORT - so the chain has
+at least two independent stream defects, and being green is not simply "push the chain
+everywhere".
+
+The knock-on is visible in the agent's candidate lists (RUST_ACT_PICK extended with `list=`):
+
+    pick 50  main [Move, Block, Blitz, Foul]        branch [Move, Block, Blitz]
+    pick 55  main [Move, Foul, ThrowTeamMate]       branch [Move]
+
+Identical `arc`/`drc` at pick 50, so the lists themselves shrank: FOUL disappears first, then
+FOUL and THROW_TEAM_MATE together. That is a state difference, not an RNG one, and it points
+at the turn-data used-flags (`f` in the state string is
+`blitz_used,foul_used,hand_over_used,pass_used` per team) or at the fouler/thrower
+availability predicates.
+
+Both observations have to be explained by the same change, and the goblin roster is the one
+that fields a Troll (Always Hungry / Really Stupid, Throw Team-Mate) - so the extra draws most
+likely come from the blitz chain re-running an activation sub-sequence for a big guy, or from
+the target prompt being asked more than once per blitz.
+
+NEXT: count BlitzTarget prompts per blitz declaration on goblin seed 1. If one blitz produces
+more than one prompt, the extra draws are the duplicate answers; if not, instrument which
+consumer spends the 3 draws between i=47 and i=48 (`FFB_DRIVE_TRACE` bracketing that window).
