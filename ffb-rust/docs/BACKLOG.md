@@ -2442,3 +2442,37 @@ reset, and compare the calls between the previous activation and the blitz. The 
 certainly clears the acting player (`change_player_action_to_none`, or the `:114` branch's
 `changeActingPlayer`) where the folded path re-dispatches the same id. Fix by matching Java's
 `changed` semantics on that path - do NOT add a special case to preserve `current_move`.
+
+**§12 iter 52 - NO CONCLUSION. Two of my own readings this iteration were artifacts.**
+
+Probed `ActingPlayer::set_player` on both builds. Filtered to away_03 on khemri seed 38:
+
+    main    SP old=None            new=away_03 action=Blitz     same=false cm_before=0
+            SP old=Some("away_03") new=away_03 action=BlitzMove same=true  cm_before=4
+    branch  SP old=None            new=away_03 action=BlitzMove same=false cm_before=0
+            SP old=Some("away_03") new=away_03 action=BlitzMove same=true  cm_before=0
+            SP old=Some("away_03") new=away_03 action=Blitz     same=true  cm_before=0
+            SP old=Some("away_03") new=away_03 action=BlitzMove same=true  cm_before=1
+
+**Artifact 1 - filtering.** Those main lines are adjacent only AFTER filtering to away_03; ~49
+lines for other players sit between them. They may well be two DIFFERENT activations, so
+"cm climbed 0 to 4 during the blitz" is NOT established. Same class of mistake as the trace
+windows: a filtered view is not a contiguous view.
+
+**Artifact 2 - a dead file.** Chasing what raises `current_move`, I probed
+`bb2025/move_/step_move.rs`, then read `driver.rs:469` as routing `StepId::Move` to the bb2016
+implementation and re-probed THAT - which produced ZERO lines. The truth is line 127 with the
+`use crate::step::bb2025::move_::*` glob at line 60: the bb2025 file IS the live one, and 469 is
+an edition-gated branch that bb2025 never takes. The bb2016 probe printing nothing was correct
+behaviour, not evidence.
+
+So the only thing genuinely established this iteration is a NEGATIVE: the declaration action
+differs (main `Blitz`, branch `BlitzMove`, the latter matching Java's :114), and `set_player`'s
+reset gate is Java-faithful on both. Where main's blitzer gets `cm=3` at `StepInitBlocking` is
+still unknown.
+
+NEXT: stop filtering. Emit ONE probe stream with a global sequence number covering set_player,
+StepMove and InitBlocking, dump the raw contiguous region between the blitz declaration and its
+InitBlocking on each build, and read it unfiltered. Also worth re-checking: the iteration-48
+`cm=4` vs `cm=1` GoForIt reading came from a filtered `grep -n away_03` too and should be
+re-confirmed the same way before any fix is built on it.
