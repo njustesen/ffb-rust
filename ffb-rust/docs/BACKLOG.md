@@ -2624,3 +2624,25 @@ Java's `bloodlustAction` is NULL for this blitz. Worth checking what Rust puts i
 NEXT: find why EndSelecting dispatches MOVE instead of the blitz block on the second pass after a
 FAILED Blood Lust. Compare against a SUCCESSFUL-Blood-Lust blitz in the same game, which does
 block on the branch - the difference between those two activations is the bug.
+
+**§12 vampire (iter 58): the failing activation identified precisely.**
+
+Probing `StepEndSelecting`, home_03 has TWO blitzes in vampire seed 1:
+
+    blitz A   dispatch=BlitzSelect bl=false   then  dispatch=BlitzMove bl=false   -> BLOCKS
+    blitz B   dispatch=BlitzSelect bl=false   then  dispatch=BlitzMove bl=TRUE    -> no block
+
+(`bl` = `acting_player.suffering_blood_lust`, which is set ONLY by `fail_blood_lust`.) So the
+chain handles a blitz whose Blood Lust succeeds correctly and loses the one whose Blood Lust
+fails. Its second pass dispatches BLITZ_MOVE, the pushed sequence runs `InitMoving -> EndMoving`
+with no dice and no block, and the activation ends. Main blocks in both cases.
+
+So the bug is confined to: **second pass of the blitz chain when `suffering_blood_lust` is true**.
+
+NOT the cause, verified this session: the iteration-56 Blood Lust arm in SBTEnd (disabling it
+changes nothing), the negatrait FAILED marker, the stand-up cost, and the USE_ALTERNATE_LABEL
+publish (vampire sat at exactly 57/100 across gates 2-6, i.e. through all of them).
+
+**Scope note.** §12's remit is all three editions and only bb2025 has been gated (29/30). bb2016
+and bb2020 have NOT been measured since the chain went live, and a regression there would be
+worth more than the last vampire seed. Measuring bb2020 next while vampire waits.
