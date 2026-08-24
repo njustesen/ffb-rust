@@ -2476,3 +2476,43 @@ StepMove and InitBlocking, dump the raw contiguous region between the blitz decl
 InitBlocking on each build, and read it unfiltered. Also worth re-checking: the iteration-48
 `cm=4` vs `cm=1` GoForIt reading came from a filtered `grep -n away_03` too and should be
 re-confirmed the same way before any fix is built on it.
+
+**§12 ROOT CAUSE CONFIRMED (iter 53): the BLITZ_SELECT branch RETURNS EARLY and skips the
+STAND-UP MOVEMENT COST.**
+
+Read contiguously this time (one `FFB_SEQ` stream over set_player / StepMove / InitBlocking, NO
+filtering). Main, khemri seed 38, consecutive lines:
+
+    SEQ SP old=None new=away_03 action=Blitz same=false cm=0     <- declaration
+    SEQ IB attacker=away_03 defender=home_01 pa=Blitz cm=3       <- reaches the block at cm=3
+    SEQ SP old=away_03 new=away_03 action=BlitzMove same=true cm=4
+
+No `SM` line between the declaration and the block, so the 0 -> 3 is NOT movement. It is the
+stand-up cost: `step/bb2025/shared/step_init_selecting.rs:431` runs
+
+    if pa.is_moving() || game.acting_player.standing_up { ... if !has_free {
+        game.acting_player.current_move = 3.min(ma);   // MINIMUM_MOVE_TO_STAND_UP
+
+for a prone activation. away_03 is prone with MA 3, so it stands up, owes `cm=3`, and `3 > ma=3`
+is false... but the GFI check runs after GoForIt's own `+1`, giving 4 > 3 -> ROLL.
+
+**The branch never gets there.** Its `:114` BLITZ_SELECT branch (line ~250) does
+`return self.execute_step(...)`, and the stand-up cost block is at line ~431 - the early return
+skips it, so a prone blitzer starts its block at `cm=0` and no GFI is due. Java's `:114` does NOT
+return: it sets the dispatch and falls through to the shared tail of the CLIENT_ACTING_PLAYER
+case (`checkForStaller()`, then the isMoving/isStandingUp block), which is exactly the code Rust
+is jumping over.
+
+This single early return explains the whole khemri/necromantic/khemri_fumbbl family, and very
+likely halfling (its divergence is literally StandUp/GoForIt/FallDown) and vampire.
+
+**Attempted and REVERTED this iteration:** inserted a call to an
+`apply_standing_up_move_cost(game, player_id)` helper that does not exist yet. The block to
+extract is ~50 lines (has_free/ma, the MOVING base write, the current_move + goes_for_it update,
+and the move-squares refresh that follows) and could not be extracted safely in the remaining
+budget. Tree reverted and verified building.
+
+NEXT: extract that block verbatim into a helper, call it from BOTH the normal tail and the
+BLITZ_SELECT branch, and re-measure khemri seed 38 first (it should roll the GFI and produce
+block dice [6]), then halfling and vampire, then re-gate. Do NOT hand-write a shortened version
+of the cost - the block's comments record four separate regressions it already guards.
