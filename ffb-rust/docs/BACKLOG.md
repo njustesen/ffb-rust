@@ -2646,3 +2646,32 @@ publish (vampire sat at exactly 57/100 across gates 2-6, i.e. through all of the
 **Scope note.** §12's remit is all three editions and only bb2025 has been gated (29/30). bb2016
 and bb2020 have NOT been measured since the chain went live, and a regression there would be
 worth more than the last vampire seed. Measuring bb2020 next while vampire waits.
+
+**§12 BB2020 GATE: 17 GREEN / 13 RED - the branch has REGRESSED BB2020. DO NOT MERGE.**
+
+    RED: ogre 31, goblin 39, vampire 53, orc 57, nurgle 61, chaos_pact 62, renegades 65,
+         slann_fumbbl 71, human 72, slann 72, lizardman 74, skaven 89, underworld 94
+
+Verified against main rather than trusting the memory note that bb2020 was 30/30:
+
+    MAIN bb2020 goblin 1-20: 20/20      branch: 39/100
+    MAIN bb2020 ogre   1-20: 20/20      branch: 31/100
+
+So this is a real regression introduced by the blitz chain, not a pre-existing state.
+
+**This is the single most important result of the section, and gating only bb2025 hid it.**
+bb2025 reached 29/30 while bb2020 fell from 30/30 to 17/30. The `:114` BLITZ_SELECT routing lives
+in `bb2025/shared/step_init_selecting.rs`, which BB2020 also runs, so every chain change has been
+landing on BB2020 unmeasured for ~25 iterations.
+
+**Prime suspect (to verify, not assume):** `StepEndSelecting`'s BlitzSelect arm builds
+`SelectBlitzTarget::build_sequence(game.rules)` from the BB2025 generator. A separate
+`generator/bb2020/select_blitz_target.rs` exists and is deliberately DIFFERENT - its own header
+notes BB2025's ActivationSequenceBuilder has STEADY_FOOTING and omits FOUL_APPEARANCE / DUMP_OFF /
+JUMP_UP / STAND_UP, none of which matches BB2020. If the chain pushes the BB2025 sequence for a
+BB2020 game, every BB2020 blitz runs the wrong activation.
+
+NEXT: check which generator the BlitzSelect arm actually resolves for Rules::Bb2020, and whether
+the bb2020 SelectBlitzTarget generator is reachable at all. Fix the routing, re-gate BB2020, and
+gate BB2016 too - it has never been measured on this branch either. Vampire's last 43 seeds are
+now the LOWEST priority item in this section.
