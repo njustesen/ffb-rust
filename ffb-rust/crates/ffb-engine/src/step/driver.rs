@@ -786,7 +786,13 @@ impl DriverGameState {
 
     pub fn apply_action(&mut self, action: Action) {
         let mut entry = self.current.take().expect("apply_action() with no waiting step");
+        let def_before_cmd = self.game.defender_id.clone();
         let mut outcome = entry.step.handle_command(&action, &mut self.game, &mut self.rng);
+        if std::env::var_os("FFB_DEFCHG").is_some() && self.game.defender_id != def_before_cmd {
+            eprintln!("DEFCHG(cmd) step={:?} {:?} -> {:?} (acting={:?} pa={:?})",
+                entry.step.id(), def_before_cmd, self.game.defender_id,
+                self.game.acting_player.player_id, self.game.acting_player.player_action);
+        }
         let pushed_len: usize = outcome.pushes.iter().map(|s| s.len()).sum();
         self.apply_effects(&mut entry, &mut outcome);
         self.pending_prompt = None;
@@ -836,9 +842,15 @@ impl DriverGameState {
             // differing entry IS the divergence. Windows bounded by RUST_STEP have produced three
             // wrong root causes in the §12 work (docs/BACKLOG.md).
             let rng_before_step = self.rng.call_count;
+            let def_before_step = self.game.defender_id.clone();
             let mut outcome = match self.forwarded.take() {
                 Some(cmd) => {
                     let mut o = entry.step.handle_command(&cmd, &mut self.game, &mut self.rng);
+                    if std::env::var_os("FFB_DEFCHG").is_some() && self.game.defender_id != def_before_step {
+                        eprintln!("DEFCHG(fwd) step={:?} {:?} -> {:?} (acting={:?} pa={:?})",
+                            entry.step.id(), def_before_step, self.game.defender_id,
+                            self.game.acting_player.player_id, self.game.acting_player.player_action);
+                    }
                     // Same as apply_action: a forwarded command's outcome carries events, pushed
                     // sequences, and published parameters too — dropping them silently diverged
                     // from every other dispatch path.
@@ -855,6 +867,11 @@ impl DriverGameState {
                 }
                 None => entry.step.start(&mut self.game, &mut self.rng),
             };
+            if std::env::var_os("FFB_DEFCHG").is_some() && self.game.defender_id != def_before_step {
+                eprintln!("DEFCHG step={:?} {:?} -> {:?} (acting={:?} pa={:?})",
+                    entry.step.id(), def_before_step, self.game.defender_id,
+                    self.game.acting_player.player_id, self.game.acting_player.player_action);
+            }
             if std::env::var_os("FFB_RNG_STEPS").is_some() && self.rng.call_count != rng_before_step {
                 self.rng_step_seq += 1;
                 eprintln!("RNGSTEP {} step={:?} {}->{} pid={:?} pa={:?}", self.rng_step_seq,

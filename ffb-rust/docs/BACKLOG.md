@@ -2850,3 +2850,40 @@ NEXT: instrument every production write to `game.defender_id` (the non-test set 
 init_blocking, init_fouling, init_moving's gaze victim, diving_tackle, tentacles, init_kick_team_mate)
 and find which one fires between the SEL line and the IB2 line for that activation. A temporary
 setter shim would be cleaner than six separate probes.
+
+**§12 BB2020 skaven FULL CAUSAL CHAIN (iter 65): Animal Savagery's lash-out steals the blitz
+target, and the restore never happens on the chain path.**
+
+Added a driver-level watch (`FFB_DEFCHG=1`) that reports every change to `game.defender_id` with
+the step that made it - far better than hunting writers, since it also covers the
+`handle_command` / `apply_action` paths where the agent's answers land (the first version only
+watched `start()` and saw nothing but clears).
+
+    DEFCHG(cmd) SelectBlitzTarget None -> Some("home_02")           acting=away_01 pa=BlitzMove
+    DEFCHG(cmd) AnimalSavagery Some("home_02") -> Some("away_02")   acting=away_01 pa=BlitzMove
+    DEFCHG      EndBlocking Some("away_02") -> None
+
+So the blitz target is selected correctly, then `StepAnimalSavagery`'s lash-out overwrites
+`game.defender_id` with its TEAM-MATE victim, and that is what `StepInitBlocking` and the Frenzy
+check later read.
+
+**This is not a missing port.** Java does the same overwrite, but saves the old value first:
+
+    // AnimalSavageryBehaviour.lashOut
+    if (StringTool.isProvided(game.getDefenderId())) {
+        step.publishParameter(StepParameter.from(StepParameterKey.GAZE_VICTIM_ID, game.getDefenderId()));
+    }
+    game.setDefenderId(player.getId());
+
+and Rust's `lash_out` publishes `GazeVictimId` identically. The SAVE works; the RESTORE does not.
+`StepInitMoving` is what consumes GAZE_VICTIM_ID and writes it back to `game.defender_id`
+(`bb2016/move_/step_init_moving.rs:178`), and a published parameter is delivered to the steps on
+the stack AT PUBLISH TIME. On the folded path the BlitzBlock sequence with its InitMoving is
+already below; on the chain path the stack holds the SelectBlitzTarget sequence, which has no
+consumer, so the value is published into nothing and the blitz target is lost.
+
+NEXT: find how Java's stack has a GAZE_VICTIM_ID consumer below SelectBlitzTarget at that moment -
+check whether its SelectBlitzTarget sequence carries a step that accepts the key, or whether
+StepSelectBlitzTargetEnd should restore from it. Fix the restore, then re-measure bb2020 skaven
+seed 1 (expect the second BlockRoll at entry 22) and re-gate. Note this bug needs Animal Savagery
+AND a blitz in the same activation, which is why it survived to be a 87-99 residue.
