@@ -1860,3 +1860,52 @@ the target prompt being asked more than once per blitz.
 NEXT: count BlitzTarget prompts per blitz declaration on goblin seed 1. If one blitz produces
 more than one prompt, the extra draws are the duplicate answers; if not, instrument which
 consumer spends the 3 draws between i=47 and i=48 (`FFB_DRIVE_TRACE` bracketing that window).
+
+**§12 goblin: the blitz ACTIVATION BLOCK RUNS TWICE (2026-08-24, iter 33).**
+
+Not duplicate prompts - that was checked first and ruled out: one declaration produces exactly
+one `BlitzTarget` prompt and one answer, on every blitz in goblin seed 1.
+
+The drive trace for the i=47 blitz shows the duplication directly:
+
+    RUST_STEP i=47 rng_calls=52  Activate(home_01, Blitz)
+      InitActivation AnimalSavagery SteadyFooting HandleDropPlayerContext PlaceBall
+      Apothecary CatchScatterThrowIn GotoLabel BoneHead ReallyStupid
+      SelectBlitzTargetEnd
+      InitSelecting
+      InitActivation AnimalSavagery SteadyFooting HandleDropPlayerContext PlaceBall
+      Apothecary CatchScatterThrowIn GotoLabel BoneHead ReallyStupid TakeRoot
+      UnchannelledFury BloodLust FoulAppearance GotoLabel JumpUp StandUp
+    RUST_STEP i=48 rng_calls=56
+
+Pass 1 is the activation inside the SelectBlitzTarget sequence; pass 2 is the full Select that
+StepSelectBlitzTargetEnd pushes. BONE_HEAD and REALLY_STUPID execute in both. On a Troll that
+is the +3 actionRng calls.
+
+**But the duplication is Java-FAITHFUL in structure**, which is the important correction here.
+`generator/bb2025/SelectBlitzTarget.java` is:
+
+    SELECT_BLITZ_TARGET [SELECT]
+    ActivationSequenceBuilder.create().withFailureLabel(END_BLITZING).addTo(sequence)
+    JUMP_UP / STAND_UP
+    SELECT_BLITZ_TARGET_END [END_BLITZING]
+
+and `generator/bb2020/Select.java` (the one SBTEnd pushes) also contains BONE_HEAD,
+REALLY_STUPID, TAKE_ROOT, WILD_ANIMAL, BLOOD_LUST, JUMP_UP, STAND_UP. So Java queues the
+activation twice as well. (This also corrects the previous entry's claim that the BB2025 chain
+omits JUMP_UP/STAND_UP - the ActivationSequenceBuilder omits them, the GENERATOR adds them.)
+
+So Rust is not queuing anything Java does not queue. The dice must be suppressed on one of the
+two passes by a guard Rust lacks. `ReallyStupidBehaviour` (bb2020, shared) has exactly ONE
+early-out before the roll:
+
+    if (!game.getTurnMode().checkNegatraits()) { NEXT_STEP; return false; }
+
+and Java restores `lastTurnMode` at selection time (StepSelectBlitzTarget:232), so it is NOT
+obviously false during pass 1. Measured: Java rolls ReallyStupid **44 times** in goblin seed 1.
+
+OPEN QUESTION, and the next measurement: which pass does Java actually roll on. Count Rust's
+ACTUAL ReallyStupid ROLLS (not step executions - the step runs for every activation whether or
+not the player has the skill; branch executes it 271 times) on branch versus main, and compare
+both against Java's 44. Then find every TurnMode whose `checkNegatraits()` is false and check
+what Rust's equivalent gate does during each pass.
