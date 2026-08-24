@@ -3228,3 +3228,34 @@ NEXT: count PickUp step EXECUTIONS per activation on both builds and identify wh
 belongs to (print the stack depth alongside). The chain runs the pre-label prefix of its pushed
 Select sequence in addition to the folded path's PickUp - that is the shape to confirm or refute,
 and it is testable directly rather than by position arithmetic.
+
+**§12 goblin bb2020 ROOT CAUSE (iter 77): main's i=4 blitz NEVER BLOCKS; the branch's does.**
+
+Step sequences for the SAME activation (`i=4 Activate(away_03,Blitz)`), whole window, no
+truncation:
+
+    main    PickUp(18)  CatchScatterThrowIn(2)  InitSelecting(19)  EndSelecting(0)
+
+    branch  CatchScatterThrowIn(9)  SelectBlitzTargetEnd(0)  InitSelecting(19)  EndSelecting(0)
+            InitBlocking(50)  PickUp(41)  CatchScatterThrowIn(40)  CatchScatterThrowIn(40)
+            PickUp(18)  CatchScatterThrowIn(2)  InitSelecting(19)  EndSelecting(0)
+
+Main runs FOUR steps and never reaches `InitBlocking` - its blitz resolves without a block, the
+shape of a declaration that finds no valid target and simply ends. The branch runs the whole
+chain and then a real block, and the extra `CatchScatterThrowIn` that starts the divergence is
+part of that block's `PickUp` pair at stack depth 40-41, which main never executes.
+
+So this is NOT a movement bug, a follow-up bug, or a position bug - all three were eliminated by
+measurement in iterations 73-76, and the "one square further" reading was a sampling artefact
+(iteration 76). It is the same family as vampire: **the chain blocks where main does not.**
+
+Main's four-step window ends with `PickUp CatchScatterThrowIn` then straight to the next
+activation, which is what a MOVE looks like, so main's declaration is being resolved as a
+no-target blitz.
+
+NEXT: find why main's blitz has no target where the chain's does. The chain asks
+`StepSelectBlitzTarget` and takes the agent's answer; the folded path computes
+`legal_block_targets` at activation and passes `block_defender_id`. If that list is empty on main
+for this activation while the chain's `standing_opponents` is not, the two predicates disagree
+again - the same split that iteration 24 fixed for `hasStandingOpponents`, worth re-checking for
+BB2020 specifically since only the BB2025 step was touched then.
