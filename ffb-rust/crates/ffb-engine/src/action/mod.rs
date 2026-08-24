@@ -229,6 +229,7 @@ pub enum PlayerActionChoice {
     RaidingParty,
     FuriousOutburst,
     ThrowKeg,
+    WisdomOfTheWhiteDwarf,
     /// Look Into My Eyes (bb2025 star special): steal the ball from an adjacent carrier.
     /// Declared as the client's ActingPlayer(MOVE) + UseSkill(canStealBallFromOpponent) pair.
     LookIntoMyEyes,

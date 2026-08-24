@@ -20,7 +20,7 @@
       "position_id": "dwarf.blitzer"
     },
     {
-      "nr": 3,
+      "nr": 13,
       "position_id": "dwarf.blitzer"
     },
     {
@@ -64,6 +64,10 @@
     {
       "nr": 2,
       "star_id": "dwarf.Thorsson"
+    },
+    {
+      "nr": 3,
+      "star_id": "dwarf.Grombrindal"
     }
   ]
 }

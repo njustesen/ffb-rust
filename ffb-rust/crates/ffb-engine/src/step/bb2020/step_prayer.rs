@@ -151,20 +151,15 @@ impl StepPrayer {
                     } else if let Some((player_id, skills)) = h.skill_dialog(game) {
                         // Java: `UtilServerDialog.showDialog(gameState, new DialogSelectSkillParameter(
                         //      player.getId(), skills, SkillChoiceMode.INTENSIVE_TRAINING), false)`.
-                        // The skills are already in Java's order (sorted by name); the prompt groups
-                        // them by category because that is the shape `AgentPrompt::SelectSkill` takes.
+                        // The skills are already in Java's order (sorted by name) and the dialog
+                        // carries them as a FLAT list, so pass them straight through.
                         self.player_id = Some(player_id.clone());
-                        let rules = game.rules;
-                        let mut available: Vec<(ffb_model::enums::SkillCategory, Vec<u16>)> = Vec::new();
-                        for s in &skills {
-                            let cat = s.category_and_name_for(rules).0;
-                            match available.iter_mut().find(|(c, _)| *c == cat) {
-                                Some((_, v)) => v.push(*s as u16),
-                                None => available.push((cat, vec![*s as u16])),
-                            }
-                        }
                         StepOutcome::cont().with_prompt(
-                            ffb_model::prompts::AgentPrompt::SelectSkill { player_id, available })
+                            ffb_model::prompts::AgentPrompt::SelectSkill {
+                                player_id,
+                                skill_ids: skills.iter().map(|s| *s as u16).collect(),
+                                reason: "INTENSIVE_TRAINING".into(),
+                            })
                     } else if let Some(mode) = h.dialog_choice_mode() {
                         // Java: `SelectPlayerPrayerHandler.createDialog` →
                         // `UtilServerDialog.showDialog(gameState, new DialogPlayerChoiceParameter(

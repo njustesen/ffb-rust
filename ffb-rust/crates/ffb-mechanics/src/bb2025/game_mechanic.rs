@@ -122,9 +122,17 @@ impl GameMechanicTrait for GameMechanic {
     }
 
     fn enhancements_to_remove_at_end_of_turn(&self) -> HashSet<String> {
-        // Java: {WisdomOfTheWhiteDwarf} via SkillFactory.forClass(..).getName()
+        // Java: {WisdomOfTheWhiteDwarf} mapped via `Skill::enhancementSourceName`, NOT getName():
+        //   .map(skillFactory::forClass).map(Skill::enhancementSourceName)
+        // The two enhancement families key differently and the difference is load-bearing —
+        // `FieldModel.addWisdomSkill` tags the grant with `wisdomSkill.enhancementSourceName()`
+        // ("Granted by Wisdom of the White Dwarf") while `addSkillEnhancements` (Baleful Hex)
+        // tags with `skill.getName()`. Using the plain skill name here matched nothing, so a
+        // granted Break Tackle/Dauntless/Mighty Blow/Sure Feet NEVER EXPIRED: it survived every
+        // later turn and silently changed dodge targets (dwarf bb2025 seed 14 i=184 — Java failed
+        // the dodge on a 5, Rust passed it three turns after the grant).
         let mut set = HashSet::new();
-        set.insert("Wisdom of the White Dwarf".to_string());
+        set.insert("Granted by Wisdom of the White Dwarf".to_string());
         set
     }
 
@@ -226,5 +234,33 @@ mod tests {
         // bb2025 adds "You will loose all SPP earned during this game"
         let msgs = GameMechanic.concession_dialog_messages(false);
         assert_eq!(msgs.len(), 5);
+    }
+}
+
+#[cfg(test)]
+mod wisdom_enhancement_key_tests {
+    use super::*;
+    use crate::game_mechanic::GameMechanic as _;
+
+    /// Java maps this set with `Skill::enhancementSourceName`, NOT `Skill::getName`, and the two
+    /// enhancement families genuinely key differently: `FieldModel.addWisdomSkill` tags the grant
+    /// with `enhancementSourceName()` while `addSkillEnhancements` (Baleful Hex) tags with
+    /// `getName()`. Holding the plain skill name here matched nothing, so a granted skill NEVER
+    /// EXPIRED and kept altering dodge targets turns later (dwarf bb2025 seed 14 i=184).
+    #[test]
+    fn end_of_turn_removal_uses_the_enhancement_source_name() {
+        let set = GameMechanic.enhancements_to_remove_at_end_of_turn();
+        assert!(set.contains("Granted by Wisdom of the White Dwarf"),
+            "must key on Skill::enhancementSourceName");
+        assert!(!set.contains("Wisdom of the White Dwarf"),
+            "the plain skill name is NOT the tag addWisdomSkill uses");
+    }
+
+    /// Baleful Hex is the other direction: Java's Constant set maps with `Skill::getName`, which
+    /// is what `addSkillEnhancements` tags with. Pinned so the two are never "unified" by mistake.
+    #[test]
+    fn when_not_setting_active_removal_uses_the_plain_skill_name() {
+        let set = GameMechanic.enhancements_to_remove_at_end_of_turn_when_not_setting_active();
+        assert!(set.contains("Baleful Hex"));
     }
 }

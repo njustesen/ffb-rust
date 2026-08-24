@@ -138,6 +138,9 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             // ClientCommandThrowKeg(target), the latter publishing TARGET_PLAYER_ID. Rust folds
             // the pair into one ActivatePlayer carrying the target.
             | PlayerActionChoice::ThrowKeg
+            // WISDOM_OF_THE_WHITE_DWARF: declared as ActingPlayer(MOVE) +
+            // ClientCommandUseTeamMatesWisdom, mirroring BLACK_INK's command pair.
+            | PlayerActionChoice::WisdomOfTheWhiteDwarf
     )
 }
 
@@ -937,6 +940,27 @@ impl Agent for RandomAgent {
                     player_id: eligible_players.get(idx).cloned().unwrap_or_default(),
                 }
             }
+            // Wisdom of the White Dwarf team-mate choice. MANDATORY (Java's dialog is built with
+            // minSelects = 1), so an empty selection re-fires it forever. StepWisdomOfTheWhiteDwarf
+            // builds `wisePlayers` from UtilPlayer.findStandingOrPronePlayers, whose order is not a
+            // documented contract, so COORDINATE-SORT before the single actionRng pick — exactly
+            // what ParityRunner's WISDOM arm does.
+            Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
+                if reason == "WISDOM" =>
+            {
+                let mut cands: Vec<String> = eligible_players.clone();
+                cands.sort_by_key(|pid| {
+                    gs.game.field_model.player_coordinate(pid)
+                        .map(|c| (c.x, c.y))
+                        .unwrap_or((i32::MAX, i32::MAX))
+                });
+                if cands.is_empty() {
+                    Action::SelectPlayer { player_id: String::new() }
+                } else {
+                    let idx = self.pick_action(cands.len());
+                    Action::SelectPlayer { player_id: cands[idx].clone() }
+                }
+            }
             // Furious Outburst stab-target choice. UNLIKE the other star dialogs the list order
             // is NOT a contract here: Java's StepInitFuriousOutburst collects `eligiblePlayers`
             // into a HashSet and hands `foundPlayers.toArray(..)` to the dialog, so its order is
@@ -1131,15 +1155,17 @@ impl Agent for RandomAgent {
             // RNG - the old arm burned one call and answered `Acknowledge`, which the step ignores.
             // Sorting here rather than trusting the prompt's order keeps the answer correct however
             // the prompt groups the skills by category.
-            Some(AgentPrompt::SelectSkill { available, .. }) => {
+            Some(AgentPrompt::SelectSkill { skill_ids, .. }) => {
                 let rules = gs.game.rules;
                 // The prompt carries skills as u16 discriminants; `SkillFactory` is the registry
                 // that can turn them back into `SkillId`s (Java: `SkillFactory.getSkills()`).
                 let factory = ffb_model::factory::skill_factory::SkillFactory::new();
                 let all: Vec<SkillId> = factory.get_skills().collect();
-                let first = available
+                // The list already arrives name-sorted from Java, so index 0 IS the answer;
+                // min-by-name is kept as the explicit contract so a differently-ordered call
+                // site can never silently change which skill is taken.
+                let first = skill_ids
                     .iter()
-                    .flat_map(|(_, ids)| ids.iter())
                     .filter_map(|id| all.iter().copied().find(|s| *s as u16 == *id))
                     .min_by_key(|s| s.category_and_name_for(rules).1);
                 match first {
@@ -1233,6 +1259,7 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         PlayerAction::RaidingParty => PlayerActionChoice::RaidingParty,
         PlayerAction::FuriousOutburst => PlayerActionChoice::FuriousOutburst,
         PlayerAction::ThrowKeg => PlayerActionChoice::ThrowKeg,
+        PlayerAction::WisdomOfTheWhiteDwarf => PlayerActionChoice::WisdomOfTheWhiteDwarf,
         PlayerAction::LookIntoMyEyes => PlayerActionChoice::LookIntoMyEyes,
         PlayerAction::BalefulHex => PlayerActionChoice::BalefulHex,
         PlayerAction::CatchOfTheDay => PlayerActionChoice::CatchOfTheDay,
@@ -1258,7 +1285,7 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         PlayerAction::MultipleBlock | PlayerAction::KickEmBlock => PlayerActionChoice::Block,
         PlayerAction::KickEmBlitz => PlayerActionChoice::Blitz,
         // Special actions with no direct PAC equivalent — default to Move
-        PlayerAction::Treacherous | PlayerAction::WisdomOfTheWhiteDwarf
+        PlayerAction::Treacherous
         | PlayerAction::RaidingParty | PlayerAction::MaximumCarnage | PlayerAction::BalefulHex
         | PlayerAction::AllYouCanEat | PlayerAction::BlackInk | PlayerAction::CatchOfTheDay
         | PlayerAction::ThenIStartedBlastin | PlayerAction::TheFlashingBlade
@@ -1285,6 +1312,11 @@ mod furious_outburst_declaration_tests {
     #[test]
     fn throw_keg_is_a_handled_acting_action() {
         assert!(is_handled_acting_action(PlayerActionChoice::ThrowKeg));
+    }
+
+    #[test]
+    fn wisdom_is_a_handled_acting_action() {
+        assert!(is_handled_acting_action(PlayerActionChoice::WisdomOfTheWhiteDwarf));
     }
 }
 
@@ -1473,15 +1505,13 @@ mod tests {
     /// Training prayer granted nothing (lineman bb2020 seed 50).
     #[test]
     fn select_skill_prompt_answers_the_name_first_skill_with_no_rng() {
-        use ffb_model::enums::SkillCategory;
         let mut gs = new_game(1);
-        // Offered out of name order, and split across groups, to prove neither matters.
+        // Offered OUT of name order to prove the min-by-name contract holds even if a call site
+        // ever hands over an unsorted list (Java's two call sites both sort by name).
         gs.pending_prompt = Some(AgentPrompt::SelectSkill {
             player_id: "home_02".into(),
-            available: vec![
-                (SkillCategory::General, vec![SkillId::Tackle as u16, SkillId::Block as u16]),
-                (SkillCategory::General, vec![SkillId::Fend as u16]),
-            ],
+            skill_ids: vec![SkillId::Tackle as u16, SkillId::Block as u16, SkillId::Fend as u16],
+            reason: "INTENSIVE_TRAINING".into(),
         });
         let mut agent = RandomAgent::new_parity(1);
         let before = agent.decision_rng_count;

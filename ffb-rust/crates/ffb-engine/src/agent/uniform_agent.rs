@@ -362,13 +362,24 @@ impl Agent for UniformAgent {
             // comment on this prompt notes the same gap). Acknowledge is the safe fallback;
             // flagged via last_unhandled_prompt so a coverage harness can see this prompt is
             // effectively unactionable today rather than silently treating it as "handled".
-            Some(AgentPrompt::SelectSkill { available, .. }) => {
-                let choices = legal_skill_choices(available);
-                if !choices.is_empty() {
-                    let _ = self.pick(choices.len());
+            Some(AgentPrompt::SelectSkill { skill_ids, .. }) => {
+                // The prompt now carries Java's FLAT, name-sorted skill list, so the ids map
+                // straight back through SkillFactory — the old "no lookup table back to SkillId"
+                // gap that forced an Acknowledge is gone. Answer index 0 (lowest name), 0 rng,
+                // the same contract RandomAgent and ParityRunner use.
+                let factory = ffb_model::factory::skill_factory::SkillFactory::new();
+                let all: Vec<ffb_model::enums::SkillId> = factory.get_skills().collect();
+                let rules = gs.game.rules;
+                match skill_ids.iter()
+                    .filter_map(|id| all.iter().copied().find(|s| *s as u16 == *id))
+                    .min_by_key(|s| s.category_and_name_for(rules).1)
+                {
+                    Some(skill_id) => Action::SelectSkill { skill_id },
+                    None => {
+                        self.mark_unhandled("SelectSkill");
+                        Action::Acknowledge
+                    }
                 }
-                self.mark_unhandled("SelectSkill");
-                Action::Acknowledge
             }
             // BuyInducements / BuyPrayersAndInducements: actually attempt purchases (uniformly
             // sampled from every affordable subset), instead of RandomAgent's hardcoded

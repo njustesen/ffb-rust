@@ -186,6 +186,22 @@ impl Step for StepInitSelecting {
                     return self.execute_step(game, rng)
                         .with_event(GameEvent::PlayerAction { player_id: player_id.clone(), action: PlayerAction::BlackInk });
                 }
+                // Rust bridging: WISDOM_OF_THE_WHITE_DWARF stands for
+                // ActingPlayer(MOVE) + ClientCommandUseTeamMatesWisdom. Java's StepInitSelecting
+                // handles CLIENT_USE_TEAM_MATES_WISDOM by setting ONLY the dispatch action
+                // (fDispatchPlayerAction = WISDOM_OF_THE_WHITE_DWARF, forceGotoOnDispatch = true)
+                // — it never calls changeActingPlayer, so the declared action stays MOVE. Same
+                // shape as the BLACK_INK bridging above.
+                if *player_action == PlayerActionChoice::WisdomOfTheWhiteDwarf {
+                    game.original_bombardier = None;
+                    util_server_steps::change_player_action(game, player_id, PlayerAction::Move, false);
+                    game.defender_id = None;
+                    self.dispatch_player_action = Some(PlayerAction::WisdomOfTheWhiteDwarf);
+                    self.force_goto_on_dispatch = true;
+                    Self::check_for_staller(game);
+                    return self.execute_step(game, rng)
+                        .with_event(GameEvent::PlayerAction { player_id: player_id.clone(), action: PlayerAction::WisdomOfTheWhiteDwarf });
+                }
                 if *player_action == PlayerActionChoice::ThenIStartedBlastin {
                     // Java client: ActingPlayer + sendUseSkill(blastin); the server's
                     // CLIENT_USE_SKILL chain dispatches THEN_I_STARTED_BLASTIN with forceGoto.
@@ -734,6 +750,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::ThenIStartedBlastin => PlayerAction::ThenIStartedBlastin,
         PlayerActionChoice::FuriousOutburst => PlayerAction::FuriousOutburst,
         PlayerActionChoice::ThrowKeg => PlayerAction::ThrowKeg,
+        PlayerActionChoice::WisdomOfTheWhiteDwarf => PlayerAction::WisdomOfTheWhiteDwarf,
         PlayerActionChoice::AllYouCanEat => PlayerAction::AllYouCanEat,
         PlayerActionChoice::Treacherous => PlayerAction::Treacherous,
         PlayerActionChoice::BlackInk => PlayerAction::BlackInk,

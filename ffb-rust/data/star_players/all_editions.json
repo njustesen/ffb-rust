@@ -4658,6 +4658,40 @@
         "Ogre",
         "Bretonnian"
       ]
+    },
+    {
+      "id": "dwarf.Grombrindal",
+      "name": "Grombrindal",
+      "display_name": "Grombrindal",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 170000,
+      "ma": 5,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 10,
+      "shorthand": "GB",
+      "skills": [
+        "Block",
+        "Break Tackle",
+        "Dauntless",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Mighty Blow",
+        "Stand Firm",
+        "Sure Feet",
+        "Thick Skull",
+        "Wisdom of the White Dwarf"
+      ],
+      "available_for": [
+        "Dwarf",
+        "Halfling",
+        "Gnome",
+        "Bretonnian"
+      ]
     }
   ]
 }

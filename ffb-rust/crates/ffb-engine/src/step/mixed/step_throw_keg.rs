@@ -84,9 +84,14 @@ impl StepThrowKeg {
                 return self.fail(game, rng);
             }
         } else {
-            // Java: actingPlayer.markSkillUsed(skill)
+            // Java: `actingPlayer.markSkillUsed(skill)` — the ACTING PLAYER's used-skill set,
+            // NOT just the Player's. That set is what makes `ActingPlayer.hasActed()` true, which
+            // is what deactivates the player when the activation ends: marking only the Player
+            // left Thorsson ACTIVE after his keg (dwarf bb2025 seed 14 i=80: Java `a01:...,0` vs
+            // Rust `a01:...,1`). Exactly the Zzharg / EndThenIStartedBlastin lesson.
             if let Some(sid) = skill {
                 game.mark_skill_used(&acting_player_id, sid);
+                game.acting_player.used_skills.insert(sid);
             }
         }
 

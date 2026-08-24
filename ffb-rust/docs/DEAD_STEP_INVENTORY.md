@@ -1,5 +1,11 @@
 # Never-dispatched step inventory — RE-MEASURED 2026-08-19
 
+**2026-08-24 update (4) — `WisdomOfTheWhiteDwarf` REACHED.** Grombrindal drafted into the bb2025
+dwarf parity team alongside Thorsson, plus the CLIENT_USE_TEAM_MATES_WISDOM declaration channel and
+a reshaped `AgentPrompt::SelectSkill` (Java's flat, name-sorted list) wired in both engines. 245
+executions across 99 of 100 dwarf mirror games. Adjusted for this and the three earlier updates the
+2026-08-19 pm counts read **145 reached / 54 never reached**.
+
 **2026-08-24 update (3) — `ThrowKeg` and `EndThrowKeg` REACHED.** Thorsson Stoutmead drafted
 into the bb2025 dwarf parity team plus the two-command THROW_KEG declaration channel wired in both
 engines. 273 executions across 100 of 100 dwarf mirror games. Adjusted for this, Furious Outburst
@@ -68,7 +74,7 @@ roster drafts the skill — bb2020/bb2025 kicks run live through the shared TTM 
 `AllYouCanEat AutoGazeZoat BalefulHex BlackInk CatchOfTheDay DoubleStrength
 EatTeamMate HailMaryPass LookIntoMyEyes InitLookIntoMyEyes PileDriver RaidingParty
 ThenIStartedBlastin EndThenIStartedBlastin ThrowARock Treacherous
-WeatherMage WisdomOfTheWhiteDwarf Pro`  (`ThrowKeg`/`EndThrowKeg` removed 2026-08-24 — LIVE) — star-player specials, Dump Off, Hail Mary, Pro, kegs,
+WeatherMage Pro`  (`WisdomOfTheWhiteDwarf` removed 2026-08-24 — LIVE)  (`ThrowKeg`/`EndThrowKeg` removed 2026-08-24 — LIVE) — star-player specials, Dump Off, Hail Mary, Pro, kegs,
 cards. Unreachable until the drafted teams change.
 
 **Needs the Multiple Block skill (no parity roster drafts it):**

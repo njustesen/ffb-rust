@@ -383,12 +383,15 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
             Some(WireDialog::PlayerChoice { eligible_players: eligible_players.clone(), reason: reason.clone(), descriptions: descriptions.clone() }),
         AgentPrompt::SelectPosition { available_positions } =>
             Some(WireDialog::SelectPosition { available_positions: available_positions.clone() }),
-        AgentPrompt::SelectSkill { player_id, available } =>
+        // Java's DialogSelectSkillParameter carries a FLAT skill list plus a SkillChoiceMode;
+        // the wire shape's per-category grouping has no Java counterpart, so emit one group
+        // carrying the whole list and put the mode in `category`.
+        AgentPrompt::SelectSkill { player_id, skill_ids, reason } =>
             Some(WireDialog::SelectSkill {
                 player_id: player_id.clone(),
-                available: available.iter().map(|(cat, ids)| WireSkillCategoryChoice {
-                    category: format!("{:?}", cat), skill_ids: ids.clone(),
-                }).collect(),
+                available: vec![WireSkillCategoryChoice {
+                    category: reason.clone(), skill_ids: skill_ids.clone(),
+                }],
             }),
         AgentPrompt::SelectWeather { options } =>
             Some(WireDialog::SelectWeather { options: options.iter().map(|w| format!("{:?}", w)).collect() }),
@@ -511,7 +514,7 @@ mod tests {
     #[test]
     fn select_skill_prompt_converts() {
         let prompt = AgentPrompt::SelectSkill {
-            player_id: "p1".into(), available: vec![(SkillCategory::General, vec![1, 2])],
+            player_id: "p1".into(), skill_ids: vec![1, 2], reason: "INTENSIVE_TRAINING".into(),
         };
         let json = jsn(&prompt_to_wire(&prompt).unwrap());
         assert!(json.contains("\"dialogId\":\"SELECT_SKILL\""));

@@ -1173,7 +1173,69 @@ Carriers (from rules/star_players/*.md; Java canonical skill names in quotes):
         defaults to `TurnMode::StartGame`, not Regular — the second fixture trap after
         "PS_STANDING does not imply the ACTIVE bit". Default Game state does not resemble a live
         turn; any rule keyed on turn mode or state bits needs the fixture set explicitly.
-  - [ ] Grombrindal ("Wisdom of the White Dwarf") → bb2025 dwarf or halfling
+  - [x] Grombrindal ("Wisdom of the White Dwarf") LIVE (2026-08-24): drafted @nr3 bb2025 dwarf
+        (blitzer 3 → 13, benched, alongside Thorsson @nr2), 100/100 on fresh Java logs, full gate
+        30/30 ×3. **245 Wisdom executions in 99/100 games** (and the keg rose to 283 in 98/100),
+        both engines matching exactly. Progression 0 → 52 → 91 → 98 → 100. **BATCH B COMPLETE.**
+        THE SHARED CHANNEL WAS THE REAL WORK. Java has ONE
+        `DialogSelectSkillParameter(playerId, List<Skill>, SkillChoiceMode)` serving TWO mechanics
+        — the Intensive Training prayer (INTENSIVE_TRAINING) and Wisdom
+        (WISDOM_OF_THE_WHITE_DWARF) — answered by ClientCommandSkillSelection (Java reuses the
+        CLIENT_PRAYER_SELECTION command id). Both call sites pass a FLAT list sorted by skill NAME.
+        Rust modelled it as `available: Vec<(SkillCategory, Vec<u16>)>`, a category grouping with
+        NO Java counterpart, and the consequences were visible in the code itself: step_prayer had
+        to BUILD the grouping ("the prompt groups them by category because that is the shape
+        AgentPrompt::SelectSkill takes" — the step bending to the prompt, not to Java); both
+        agents immediately flattened and re-sorted it; uniform_agent gave up entirely, answering
+        Acknowledge because "the prompt's ids are raw Java-side u16s with no lookup table back to
+        SkillId anywhere in the codebase" (false — SkillFactory is exactly that, and random_agent
+        already used it); and step_wisdom parked on a bare `cont()`, the stall shape. Reshaping
+        the variant to Java's actual form (player_id, skill_ids, reason) fixed a stall, deleted an
+        invented data structure and un-stubbed a second agent in one change.
+        THREE ENGINE BUGS, each with a regression test:
+        1. **The WISDOM PlayerChoice had a harness arm but no Rust agent arm.** Rust answered the
+           MANDATORY dialog (minSelects=1) with an empty selection, skipped the grant, then took a
+           different move square because Java had spent an actionRng draw it had not (seed 2 i=5).
+           LESSON: every dialog needs TWO arms and the failure is quiet — the mechanic still
+           appears to run on both sides and surfaces only as a downstream position difference.
+        2. **StepThrowKeg marked the PLAYER's used-skill set, not the ACTING PLAYER's.** Java's
+           `actingPlayer.markSkillUsed(skill)` is what makes hasActed() true, which is what
+           deactivates the player at activation end — Thorsson stayed ACTIVE after his keg and
+           could be activated again (seed 14 i=80: Java `a01:...,0` vs Rust `a01:...,1`). This is a
+           bug in the code THIS CAMPAIGN shipped one iteration earlier, and iteration 3 gated
+           30/30/30 with it present: a green gate bounds the seeds tested, not the code. Same
+           Zzharg lesson recurring; `Game::mark_skill_used` sounds complete but is half of Java's.
+        3. **GRANTED SKILLS NEVER EXPIRED — the most consequential bug of the campaign so far.**
+           Java's two enhancement families key their removal DIFFERENTLY and the difference is
+           load-bearing: `FieldModel.addWisdomSkill` tags the grant with
+           `wisdomSkill.enhancementSourceName()` ("Granted by Wisdom of the White Dwarf") while
+           `addSkillEnhancements` (Baleful Hex) tags with `skill.getName()`. Accordingly
+           `GameMechanic.enhancementsToRemoveAtEndOfTurn` maps via **Skill::enhancementSourceName**,
+           NOT getName(). Rust's set (bb2020 AND bb2025) held the plain skill name — its own
+           comment said "via SkillFactory.forClass(..).getName()", so the original author read the
+           wrong mapper. The key matched nothing, so a granted Break Tackle / Dauntless /
+           Mighty Blow / Sure Feet survived EVERY later turn instead of expiring at end of turn: a
+           permanent silent buff. Seed 14 showed it as a dodge Java failed on a 5 and Rust passed,
+           three home turns after the grant (i=151 grant, i=184 dodge). Pinned with tests in both
+           editions INCLUDING a negative assertion that the plain name is not used, plus a
+           companion test pinning Baleful Hex's opposite convention so the two are never "unified".
+        HARNESS: `SELECT_SKILL` had NO arm in ParityRunner, so it fell through to the
+        **non-seeded RandomStrategy** — the default's own comment calls that "silent
+        nondeterminism for parity". That affected the Intensive Training prayer too, which is
+        already reachable today; it now has a deterministic arm (lowest skill name, zero rng)
+        matching both Rust agents. Also added the WISDOM PlayerChoice arm (coordinate-sorted
+        single actionRng pick — findStandingOrPronePlayers' order is not a documented contract),
+        the isWisdomAvailable offer after THROW_KEG, and the ActingPlayer(MOVE) +
+        ClientCommandUseTeamMatesWisdom pair (Java sets only the DISPATCH action here and never
+        calls changeActingPlayer, so the declared action stays MOVE).
+        PROCESS: a data edit must refresh BOTH halves — rebuild the Rust binary (data is
+        `include_str!`-compiled) AND rerun gen_java_parity_data.py. I drafted Grombrindal, rebuilt
+        Rust but forgot the XML, and got 0/100 at step 0 on every seed: Rust offered 4 actions
+        where Java offered 3, so the shared draw hit x%4 vs x%3. Iteration 2 hit the same trap in
+        the opposite direction. Either way it looks exactly like a mass engine divergence.
+        GATE NOTE: the combined `--edition all` run died silently twice (15 and 43 matchups, all
+        green, no GATE line, no error). Neither counts as a measurement. Running the three
+        editions as SEPARATE invocations completed cleanly every time — prefer that.
 - Batch C — already in data, just dormant:
   - [ ] The Zoat ("Excuse Me, Are You a Zoat?" → AutoGazeZoat, bb2020 star already in
         all_editions.json) → a bb2020 team

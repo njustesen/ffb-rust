@@ -248,9 +248,24 @@ pub enum AgentPrompt {
     SelectPosition {
         available_positions: Vec<String>,
     },
+    /// Java: `DialogSelectSkillParameter(playerId, List<Skill> skills, SkillChoiceMode)` —
+    /// choose ONE skill from a flat list. Shared by two mechanics: the Intensive Training prayer
+    /// (`SkillChoiceMode.INTENSIVE_TRAINING`) and Wisdom of the White Dwarf
+    /// (`WISDOM_OF_THE_WHITE_DWARF`). Answered by `ClientCommandSkillSelection` (Java reuses the
+    /// `CLIENT_PRAYER_SELECTION` command id for both).
+    ///
+    /// `skill_ids` arrives in JAVA'S OWN ORDER, which both call sites sort by skill NAME
+    /// (`Comparator.comparing(Skill::getName)`), so index 0 is a genuine contract.
+    ///
+    /// This used to be `available: Vec<(SkillCategory, Vec<u16>)>` — a Rust-only category
+    /// grouping with no Java counterpart, which `step_prayer` had to build ("the prompt groups
+    /// them by category because that is the shape AgentPrompt::SelectSkill takes") and which both
+    /// agents immediately flattened and re-sorted. Java's dialog carries a flat list.
     SelectSkill {
         player_id: PlayerId,
-        available: Vec<(SkillCategory, Vec<u16>)>,
+        skill_ids: Vec<u16>,
+        /// Java `SkillChoiceMode` name, e.g. "INTENSIVE_TRAINING".
+        reason: String,
     },
     SelectWeather {
         options: Vec<Weather>,
@@ -338,10 +353,10 @@ mod tests {
 
     #[test]
     fn serde_select_skill_prompt() {
-        use crate::enums::SkillCategory;
         let p = AgentPrompt::SelectSkill {
             player_id: "p1".into(),
-            available: vec![(SkillCategory::General, vec![1, 2, 3])],
+            skill_ids: vec![1, 2, 3],
+            reason: "INTENSIVE_TRAINING".into(),
         };
         let json = serde_json::to_string(&p).unwrap();
         let back: AgentPrompt = serde_json::from_str(&json).unwrap();

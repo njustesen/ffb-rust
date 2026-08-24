@@ -37,7 +37,7 @@ use crate::step::framework::{StepId, StepParameter};
 
 /// Java: `Constant.getGrantAbleSkills` — the fixed set of skills Wisdom of the White Dwarf may
 /// grant, with an optional configured value (Mighty Blow carries value "1").
-fn grant_able_skills() -> Vec<(SkillId, Option<&'static str>)> {
+pub(crate) fn grant_able_skills() -> Vec<(SkillId, Option<&'static str>)> {
     vec![
         (SkillId::BreakTackle, None),
         (SkillId::Dauntless, None),
@@ -130,10 +130,17 @@ impl StepWisdomOfTheWhiteDwarf {
             if gain_able_skills.len() == 1 {
                 self.granted_skill = Some(gain_able_skills[0].0);
             } else {
-                // client-only: DialogSelectSkillParameter(WISDOM_OF_THE_WHITE_DWARF) — no
-                // AgentPrompt variant carries an arbitrary SkillId list yet (matches the
-                // established stub precedent in step_pick_me_up.rs / intensive_training_handler.rs).
-                return StepOutcome::cont();
+                // Java: UtilServerDialog.showDialog(new DialogSelectSkillParameter(target.getId(),
+                //         gainAbleSkills.map(getSkill), SkillChoiceMode.WISDOM_OF_THE_WHITE_DWARF))
+                // then `return` (CONTINUE, waiting for CLIENT_PRAYER_SELECTION).
+                // The old bare `cont()` was the driver's stall shape: nothing was ever asked, so
+                // the sequence could not advance. `gain_able_skills` is already in Java's order —
+                // sorted by skill NAME — so index 0 is a genuine contract for the answer.
+                return StepOutcome::cont().with_prompt(AgentPrompt::SelectSkill {
+                    player_id: target_id.clone(),
+                    skill_ids: gain_able_skills.iter().map(|(id, _)| *id as u16).collect(),
+                    reason: "WISDOM_OF_THE_WHITE_DWARF".into(),
+                });
             }
         }
 

@@ -500,6 +500,17 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             });
         }
 
+        // Wisdom of the White Dwarf (bb2020+ star special): the client's isWisdomAvailable rule,
+        // which delegates to GameMechanic.isWisdomAvailable. Offer sits DIRECTLY AFTER
+        // Beer Barrel Bash; ParityRunner mirrors the position.
+        if is_wisdom_available(game, pid.as_str()) {
+            actions.push(Action::ActivatePlayer {
+                player_id: pid.clone(),
+                player_action: PlayerActionChoice::WisdomOfTheWhiteDwarf,
+                block_defender_id: None,
+            });
+        }
+
         // Black Ink (bb2020+ star special): the client's isBlackInkAvailable rule — unused
         // canGazeAutomatically skill + an adjacent standing-or-prone, NOT-distracted opponent
         // (LogicModule.isBlackInkAvailable). Declaring it maps to the client's
@@ -681,6 +692,39 @@ pub fn legal_throw_keg_targets(game: &Game, thrower_id: &str) -> Vec<PlayerId> {
     out
 }
 
+/// Java `mechanics/bb2025/GameMechanic.isWisdomAvailable(Game, Player)`:
+///   unused `canGrantSkillsToTeamMates`, and among the STANDING-OR-PRONE team-mates within 2
+///   squares at least one that is ACTIVE and is missing at least one grantable skill
+///   (Constant.getGrantAbleSkills: Break Tackle, Dauntless, Mighty Blow, Sure Feet).
+/// The client wrapper additionally requires `!actingPlayer.hasActed()`; the offer list is built
+/// for players that have not acted this activation, so that clause is implicit here.
+pub fn is_wisdom_available(game: &Game, player_id: &str) -> bool {
+    let Some(player) = game.player(player_id) else { return false };
+    if !player.has_skill(SkillId::WisdomOfTheWhiteDwarf)
+        || player.used_skills.contains(&SkillId::WisdomOfTheWhiteDwarf)
+    {
+        return false;
+    }
+    let Some(coord) = game.field_model.player_coordinate(player_id) else { return false };
+    let own_team = if game.team_home.player(player_id).is_some() {
+        &game.team_home
+    } else {
+        &game.team_away
+    };
+    let grantable = crate::step::bb2025::step_wisdom_of_the_white_dwarf::grant_able_skills();
+    own_team.players.iter().any(|mate| {
+        if mate.id == player_id { return false; }
+        let Some(mc) = game.field_model.player_coordinate(&mate.id) else { return false };
+        if mc.distance_in_steps(coord) > 2 { return false; }
+        let state_ok = game.field_model.player_state(&mate.id)
+            .map(|s| s.is_active() && (s.base() == ffb_model::enums::PS_STANDING
+                || s.base() == PS_PRONE))
+            .unwrap_or(false);
+        if !state_ok { return false; }
+        grantable.iter().any(|(id, _)| !mate.all_skill_ids().any(|owned| owned == *id))
+    })
+}
+
 /// The `(player, actions)` eligibility list for the `ActivatePlayer` prompt — the same
 /// per-player action enumeration as `legal_activate_player_actions` (which Java
 /// `ParityRunner.computeEligiblePlayers` mirrors), grouped per player and mapped into model
@@ -715,6 +759,7 @@ pub fn eligible_players_for_activation(game: &Game) -> Vec<(PlayerId, Vec<ffb_mo
             PAC::ThenIStartedBlastin => PA::ThenIStartedBlastin,
             PAC::FuriousOutburst => PA::FuriousOutburst,
             PAC::ThrowKeg => PA::ThrowKeg,
+            PAC::WisdomOfTheWhiteDwarf => PA::WisdomOfTheWhiteDwarf,
             PAC::AllYouCanEat => PA::AllYouCanEat,
             PAC::Treacherous => PA::Treacherous,
             PAC::BlackInk => PA::BlackInk,
@@ -1650,6 +1695,47 @@ mod tests {
     fn activate(game: &mut Game, id: &str) {
         let s = game.field_model.player_state(id).unwrap().change_active(true);
         game.field_model.set_player_state(id, s);
+    }
+
+    /// §11: Wisdom of the White Dwarf is offered under GameMechanic.isWisdomAvailable — unused
+    /// canGrantSkillsToTeamMates plus an ACTIVE, standing-or-prone team-mate within 2 squares
+    /// that is missing at least one grantable skill.
+    #[test]
+    fn wisdom_offered_only_with_an_eligible_team_mate_within_two() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "grombrindal", c(5, 5), PS_STANDING,
+                   vec![SkillId::WisdomOfTheWhiteDwarf]);
+        activate(&mut game, "grombrindal");
+        // team-mate 3 squares away → no offer
+        add_player(&mut game, true, "mate", c(8, 5), PS_STANDING, vec![]);
+        activate(&mut game, "mate");
+        assert!(!is_wisdom_available(&game, "grombrindal"));
+        // within 2 → offered
+        game.field_model.set_player_coordinate("mate", c(7, 5));
+        assert!(is_wisdom_available(&game, "grombrindal"),
+            "an active team-mate within 2 missing a grantable skill must enable it");
+        let a = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&a, "grombrindal", PlayerActionChoice::WisdomOfTheWhiteDwarf));
+        // used skill withdraws it (ONCE_PER_GAME in bb2025)
+        if let Some(pl) = game.team_home.players.iter_mut().find(|pl| pl.id == "grombrindal") {
+            pl.used_skills.insert(SkillId::WisdomOfTheWhiteDwarf);
+        }
+        assert!(!is_wisdom_available(&game, "grombrindal"));
+    }
+
+    /// A team-mate that already owns every grantable skill cannot be a target, so the offer
+    /// disappears even though the team-mate is adjacent and active.
+    #[test]
+    fn wisdom_withdrawn_when_the_only_team_mate_owns_every_grantable_skill() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "grombrindal", c(5, 5), PS_STANDING,
+                   vec![SkillId::WisdomOfTheWhiteDwarf]);
+        activate(&mut game, "grombrindal");
+        add_player(&mut game, true, "mate", c(6, 5), PS_STANDING,
+                   vec![SkillId::BreakTackle, SkillId::Dauntless, SkillId::MightyBlow,
+                        SkillId::SureFeet]);
+        activate(&mut game, "mate");
+        assert!(!is_wisdom_available(&game, "grombrindal"));
     }
 
     /// §11: Beer Barrel Bash! is offered under the CLIENT's rule
