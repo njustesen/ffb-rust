@@ -1399,3 +1399,18 @@ The one that produced all eight findings of the interception campaign:
   normally there (`currentMove=3 MA=6`). Suspect the prone / stand-up variant: compare what
   `EndSelecting` pushes for BLITZ_MOVE when the blitzer must stand up first, and check whether
   `standing_up` is still set from the pre-select pass.
+
+**§12 divergence CONFIRMED as the PRONE blitzer (2026-08-24).** Java's own trace settles it:
+`currentMove=3 MA=6`, and 3 is `MINIMUM_MOVE_TO_STAND_UP` — seed 3's blitzer stood up. The Rust
+step ORDER shows where the difference lives: on the failing seed the activation steps
+(`InitActivation`, `AnimalSavagery`, `SteadyFooting`, …) run AFTER `InitMoving`, whereas Java's
+sequence is `SELECT_BLITZ_TARGET → ActivationSequenceBuilder → JUMP_UP → STAND_UP →
+SELECT_BLITZ_TARGET_END` — the stand-up belongs INSIDE the select sequence, which is exactly the
+order the PASSING seed shows (BoneHead/ReallyStupid/… → JumpUp → StandUp → SelectBlitzTargetEnd).
+
+So for a prone blitzer Rust stands the player up in the MOVE sequence instead of the SELECT
+sequence. Two things to check: (a) whether the new BLITZ_SELECT routing branch in
+`StepInitSelecting` must preserve `standing_up` — Java calls
+`changeActingPlayer(.., playerAction, isJumping())` and its pre-stand block is gated on
+`playerAction.isMoving() || isStandingUp()`, and BLITZ_MOVE *is* moving; and (b) whether the
+`JumpUp`/`StandUp` steps inside Rust's SelectBlitzTarget sequence actually stand him up.
