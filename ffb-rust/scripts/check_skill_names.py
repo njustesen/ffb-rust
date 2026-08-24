@@ -75,6 +75,42 @@ def main() -> int:
                         print(f"FAIL {edition}/{jf.stem}/{pos['id']}: {name!r} "
                               f"not resolvable in Java {rules}")
                         failures += 1
+    # -- Drafted STAR players ------------------------------------------------
+    # The roster loop above deliberately skips `type in ("Star", "Infamous Staff")` positions,
+    # which was fine while no star was fielded. Every star in a team spec's `stars` list IS
+    # fielded, as an ordinary rostered player, by gen_java_parity_data.py - so its skill names go
+    # through the very same exact-match SkillFactory.forName. Rust's from_class_name is LENIENT
+    # (lowercases and strips non-alphanumerics), so a misspelled star skill resolves in Rust and
+    # is SILENTLY DROPPED in Java: the exact shape of the slann_fumbbl "Bone-Head" divergence.
+    # Verified against a real case rather than assumed: temporarily drafting star 39459 (Grak)
+    # into a bb2016 team makes this check FAIL on "Bone Head" (bb2020+ spelling; bb2016 Java has
+    # "Bone-Head") and "Two for One" (no bb2016 class at all). His "Kick Team-mate" is FINE -
+    # forName is case-insensitive, so the lowercase m resolves. That is the whole point of
+    # checking against the extracted Java names instead of eyeballing spellings.
+    star_file = json.loads((ROOT / "data" / "star_players" / "all_editions.json")
+                           .read_text(encoding="utf-8"))
+    stars_by_id = {sp["id"]: sp for sp in star_file["star_players"]}
+    star_checked = 0
+    for edition, rules in EDITION_TO_RULES.items():
+        valid = names[rules]
+        for tf in sorted((ROOT / "data" / "teams" / edition).glob("team_*.json")):
+            team = json.loads(tf.read_text(encoding="utf-8"))
+            for entry in team.get("stars") or []:
+                sp = stars_by_id.get(entry["star_id"])
+                if sp is None:
+                    print(f"FAIL {edition}/{tf.stem}: star id {entry['star_id']!r} "
+                          f"not in all_editions.json")
+                    failures += 1
+                    continue
+                star_checked += 1
+                for s in sp.get("skills", []):
+                    name = s["name"] if isinstance(s, dict) else s
+                    if name.lower() not in valid:
+                        print(f"FAIL {edition}/{tf.stem}/star {sp['id']} ({sp['name']}): "
+                              f"{name!r} not resolvable in Java {rules}")
+                        failures += 1
+    print(f"{star_checked} drafted star players audited")
+
     print(f"\n{failures} unresolvable skill names")
     return 1 if failures else 0
 
