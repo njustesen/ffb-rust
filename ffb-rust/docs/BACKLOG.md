@@ -2182,3 +2182,27 @@ so it is most likely a second-order effect of that change rather than the FAILED
 NEXT: fix the vampire one first - it is precise (consume the team blitz when the chain's first
 pass ends the activation, matching where main/Java set it) and the three undead-family 99s at
 seed 38 step 31 may share it. Then re-measure halfling separately.
+
+**§12 vampire: the blitz_used theory is WRONG (iter 43). Retracted before it was implemented.**
+
+The previous entry read `f0000,0000` at i=102 as "the team blitz was never consumed". It is not:
+`f` is printed per team as `f<home>,<away>` and i=102 is the AWAY team's turn, so the HOME group
+reads 0000 simply because **turn data resets at the turn boundary**. Nothing was lost.
+
+Two further checks, both negative:
+- Probing `StepSelectBlitzTargetEnd` shows every entry with `tss=SELECTED blitz_used=false`, but
+  that is the value BEFORE the branch runs - the step sets it immediately after. `home_03`
+  appearing twice is two DIFFERENT TURNS, not a re-declared blitz.
+- Rust has no blitz refund at all: `grep -rn "unused_blitz"` in step_init_selecting returns
+  nothing, and the only `blitz_used = false` writes are in unrelated bb2016/GoForIt paths. So
+  nothing is clearing the flag either.
+
+Confirmed and still standing: on vampire seed 1 the branch and main produce **identical dice** -
+all 129 RNG-steps match, the only difference being the cosmetic `pa=` label, and `player_action`
+is not hashed. So the step-101 failure is a state divergence with NO dice divergence, and it has
+NOT been identified.
+
+NEXT: compare the full `state=` STRING at i=100..102 between branch and main (main is green so
+main == Java). The Java jsonl carries `state: None`, so main is the only available reference.
+That names the differing field directly instead of inferring it from flags - which has now
+misfired twice on this roster.
