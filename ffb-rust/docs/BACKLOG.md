@@ -3118,3 +3118,28 @@ NEXT: establish which of the two prompts produces the movement and what square i
 builds - print the chosen square alongside `RUST_SMA`, not just the candidate count. If the branch
 moves on the SECOND prompt where main moves on its only one, the fix is to stop the chain issuing
 the first prompt at all rather than to change what the agent answers.
+
+**§12 goblin bb2020 (iter 73): every AGENT move choice is identical - the extra square is
+ENGINE-side.**
+
+Diffed the full agent move trace (722 lines main, 752 branch). Every `RUST_PICK` - candidate
+count, chosen index and target square - matches, in order. The only difference is the extra
+`RUST_SMA` prompts already reported, and they produce NO pick at all:
+
+    main[4] RUST_SMA pid=away_10 N=6
+    brch[4] RUST_SMA pid=home_01 N=3        <-- extra prompt, no RUST_PICK follows it
+    brch[5] RUST_SMA pid=away_10 N=6
+
+So the agent answers those extra prompts with `Action::Block` (its `current_activation_is_blitz`
+arm), draws nothing, and picks nothing. The 30 extra lines are exactly the extra prompts.
+
+That rules out the agent: it is not choosing a different square, and it is not spending a draw.
+The blitzer nevertheless ends on (13,8) instead of (12,8) (iteration 71), so the displacement is
+performed by the ENGINE - a pushback, a follow-up, or the block's own movement. Note the agent
+declines follow-up unconditionally (`Action::FollowUp { follow_up: false }`), so if a follow-up is
+happening on the chain path it is happening WITHOUT the agent being asked.
+
+NEXT: check whether the FollowUp prompt is issued at all on each build for that blitz - count
+`AgentPrompt::FollowUp` occurrences per activation. An engine that follows up without asking would
+move the attacker exactly one square into the vacated square, which is precisely the observed
+delta.
