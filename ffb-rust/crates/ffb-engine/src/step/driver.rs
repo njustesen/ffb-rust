@@ -614,6 +614,7 @@ pub struct DriverGameState {
     current: Option<DriverStepEntry>,
     forwarded: Option<Action>,
     pub(crate) pending_prompt: Option<AgentPrompt>,
+    rng_step_seq: u32,
     /// True exactly when the most recently dispatched outcome was
     /// `StepAction::Continue` — i.e. the step is waiting for an external
     /// command (whether or not that wait is surfaced as an `AgentPrompt`).
@@ -644,7 +645,7 @@ impl DriverGameState {
             ffb_model::util::java_random::JavaRandom::new((seed as i64) ^ 0x5EED_C011_3C71_04));
         DriverGameState {
             game, rng: GameRng::new(seed), stack: DriverStepStack::new_with_rules(rules),
-            current: None, forwarded: None, pending_prompt: None,
+            current: None, forwarded: None, pending_prompt: None, rng_step_seq: 0,
             waiting_for_command: false, events: Vec::new(),
             initial_hash: String::new(),
         }
@@ -829,6 +830,12 @@ impl DriverGameState {
             if std::env::var_os("FFB_DRIVE_TRACE").is_some() {
                 eprintln!("DRIVE step={:?} stack_len={} forwarded={} rng={}", entry.step.id(), self.stack.len(), self.forwarded.is_some(), self.rng.call_count);
             }
+            // FFB_RNG_STEPS: a GLOBAL, ordered list of every step that actually consumed engine
+            // dice, printed as `RNGSTEP <n> step=<id> <from>-><to>`. Unlike a drive-trace window
+            // this needs no alignment: two builds can be diffed line for line and the first
+            // differing entry IS the divergence. Windows bounded by RUST_STEP have produced three
+            // wrong root causes in the §12 work (docs/BACKLOG.md).
+            let rng_before_step = self.rng.call_count;
             let mut outcome = match self.forwarded.take() {
                 Some(cmd) => {
                     let mut o = entry.step.handle_command(&cmd, &mut self.game, &mut self.rng);
@@ -848,6 +855,11 @@ impl DriverGameState {
                 }
                 None => entry.step.start(&mut self.game, &mut self.rng),
             };
+            if std::env::var_os("FFB_RNG_STEPS").is_some() && self.rng.call_count != rng_before_step {
+                self.rng_step_seq += 1;
+                eprintln!("RNGSTEP {} step={:?} {}->{}", self.rng_step_seq, entry.step.id(),
+                    rng_before_step, self.rng.call_count);
+            }
             let pushed_len: usize = outcome.pushes.iter().map(|s| s.len()).sum();
             self.apply_effects(&mut entry, &mut outcome);
             if outcome.push_self {

@@ -2006,3 +2006,40 @@ NEXT: stop using windows. Instrument both builds to print ONE line per blitz - a
 defender, whether a block sequence was pushed, and the engine rng delta across the whole
 activation - then compare the first N blitzes until the first one that differs. That is
 alignment-proof and answers directly what the branch does differently on a blitz.
+
+**§12 GOBLIN ROOT CAUSE (iter 38): the chain's blitzer NEVER MOVES - it blocks immediately.**
+
+Found with a new alignment-proof instrument, `FFB_RNG_STEPS=1`, which prints a GLOBAL ordered
+list of every step that actually consumed engine dice (`RNGSTEP <n> step=<id> <from>-><to>`).
+Two builds diff line for line and the first differing entry IS the divergence - no windows, no
+truncation, nothing to align. Both goblin seed 1 lists are 113 lines and agree through entry 33:
+
+    RNGSTEP 33 step=ReallyStupid 52->53          (identical in both)
+
+    main    34 MoveDodge      53->54     branch  34 BlockRoll          53->54
+            35 MoveBallAndChain 54->55           35 DropFallingPlayers 54->56
+            36 ReallyStupid   55->56             36 MoveDodge          56->58
+            37 Foul           56->58             37 MoveBallAndChain   58->59
+            38 ReallyStupid   58->59
+            39 BlockRoll      59->61
+            40 DropFallingPlayers 61->65
+
+On main the blitzer MOVES first (MoveDodge, MoveBallAndChain) and blocks several steps later,
+with a 2-die BlockRoll (59->61). On the branch it goes straight to a 1-die BlockRoll (53->54) -
+no movement at all, and a different die count because the block happens from the unmoved square
+with different assists.
+
+A Move sequence IS pushed on the branch (InitMoving/EndMoving appear in the drive trace) but it
+spends no dice, so the blitzer is simply never given anywhere to go. Java's blitz is two client
+commands - CLIENT_BLITZ_MOVE carrying a move path, then CLIENT_BLOCK - and on main the agent
+folds BOTH the target and the move into the activation. The chain removed the folded target but
+nothing restored the MOVE half.
+
+This also explains the roster pattern better than "negatraits" did: rosters whose blitzers
+routinely move before blocking diverge hardest, and it is consistent with the +3 dice (a
+2-die block plus dodge/B&C rolls versus a 1-die block).
+
+NEXT: give the blitzer its move. After the target is selected, the second pass must prompt for
+the BLITZ_MOVE path the way ParityRunner does (sendMoveAction for a BLITZ_MOVE acting action),
+so the move happens before the block. Check where InitMoving gets its move stack on main's
+folded path and reproduce that after the chain.
