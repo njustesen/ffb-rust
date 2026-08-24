@@ -2269,3 +2269,26 @@ team. Treat it as unproven.
 NEXT: khemri seed 38 is the cheapest case (99/100, one seed, three rosters share it). Instrument
 the block resolution for that single blitz and compare which defender is blocked and what the
 block result is applied as, branch vs main.
+
+**§12 khemri seed 38 NARROWED (iter 46): the block dice VALUE differs, so the stream is offset
+INSIDE the blitz activation.**
+
+Instrumented `StepBlockRoll` (dice + count + chosen index) and `StepBlockChoice` (result) on both
+builds. The first two blocks of the game are identical; the third is not:
+
+    main    BR attacker=away_03 defender=home_01 nr=1 dice=[6] idx=0   -> BC result=Pow
+    branch  BR attacker=away_03 defender=home_01 nr=1 dice=[3] idx=0   -> BC result=Pushback
+
+Same attacker, same defender, same die COUNT, same chosen index (the agent always picks index 0,
+matching `ParityRunner.sendBlockChoice(0)` - no RNG in the choice). Only the die VALUE differs,
+6 vs 3, which is why the defender ends Prone on main and Standing on the branch and why exactly
+one state field differed.
+
+So this is NOT a block-resolution bug and NOT a target-selection bug: the RNG stream is already
+offset by the time that block rolls. The state strings are byte-identical through i=31 and the
+blitz IS i=31, so the extra/missing draw happens INSIDE that one activation, between its start
+and its block roll - the same class as the goblin `arc` offset, but on the engine dice stream.
+
+NEXT: diff the `FFB_RNG_STEPS` lists for khemri seed 38 branch-vs-main (main needs the trace
+patched in temporarily, as before) and read the FIRST differing entry - that names the step that
+spends the extra die. Do not infer it from the block; the block is downstream.
