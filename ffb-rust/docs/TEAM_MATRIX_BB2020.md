@@ -10,7 +10,7 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `amazon` | 🟢 100/100 |  |  |
 | `chaos` | 🟢 100/100 |  |  |
 | `chaos_dwarf` | 🟢 100/100 |  |  |
-| `chaos_pact` | 🔴 87/100 | seed 4, step 83, java a04510adfff96d95 vs rust b26f3d1fe05c1660 | FUMBBL-legacy roster |
+| `chaos_pact` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `dark_elf` | 🟢 100/100 |  |  |
 | `dark_elf_league_fumbbl` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `dwarf` | 🟢 100/100 |  |  |
@@ -28,13 +28,13 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `nurgle` | 🟢 100/100 |  |  |
 | `ogre` | 🟢 100/100 |  |  |
 | `orc` | 🟢 100/100 |  |  |
-| `renegades` | 🔴 89/100 | seed 4, step 195, java 894130b0fb7bee19 vs rust 4af4f2223afb199f |  |
-| `skaven` | 🔴 89/100 | seed 1, step 23, java a6b83bed7c01a921 vs rust f59f3b0035f24485 |  |
+| `renegades` | 🟢 100/100 |  |  |
+| `skaven` | 🟢 100/100 |  |  |
 | `slann` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `slann_fumbbl` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `undead` | 🟢 100/100 |  |  |
-| `underworld` | 🔴 94/100 | seed 14, step 47, java d54031161ade94af vs rust 05743f4afbb4662d |  |
+| `underworld` | 🟢 100/100 |  |  |
 | `vampire` | 🔴 53/100 | seed 1, step 112, java 27ade05510b05c7b vs rust 399c7210bd550b2f |  |
 | `wood_elf` | 🟢 100/100 |  |  |
 
-**24 green / 6 red of 30.**
+**28 green / 2 red of 30.**

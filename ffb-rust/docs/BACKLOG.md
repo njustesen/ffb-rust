@@ -2969,3 +2969,22 @@ NEXT: probe `self.gaze_victim_id` at EndSelecting's BlitzMove dispatch on both b
 it is Some on main and None on the branch. If confirmed, carry the value across the pass boundary
 the way Java does - check whether Java's SelectBlitzTargetEnd re-publishes it, or whether the
 value should be restored to `game.defender_id` before the second pass begins.
+
+**§12 BB2020 RE-GATE 2: 28 GREEN / 2 RED (was 24/6).**
+
+    NEWLY GREEN (4): chaos_pact 87->100, renegades 89->100, skaven 89->100, underworld 94->100
+    STILL RED (2):   goblin 99/100 (seed 85 step 4), vampire 53/100 (seed 1 step 112)
+
+The SBTEnd defender restore took every roster whose residue was the Animal-Savagery-steals-the-
+blitz-target bug. Both editions are now within two rosters of main's 30/30:
+
+    bb2025  29 green / 1 red   (vampire 57)
+    bb2020  28 green / 2 red   (vampire 53, goblin 99)
+
+**vampire is the shared blocker** and is the same bug in both editions (chain second pass with
+`suffering_blood_lust`; five separate fixes have left it at exactly 57/53). **goblin bb2020 seed
+85 diverges at STEP 4**, which is the earliest divergence seen in this section by a wide margin -
+that makes it the cheapest remaining item and worth taking before vampire.
+
+NEXT: goblin bb2020 seed 85. A step-4 divergence is in the opening turn, so the contiguous
+FFB_SEQ / normalised RNG-step diff should name it almost immediately.
