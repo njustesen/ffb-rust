@@ -433,6 +433,7 @@ fn choice_to_player_action(choice: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::MultipleBlock => PlayerAction::MultipleBlock,
         PlayerActionChoice::RaidingParty => PlayerAction::RaidingParty,
         PlayerActionChoice::FuriousOutburst => PlayerAction::FuriousOutburst,
+        PlayerActionChoice::ThrowKeg => PlayerAction::ThrowKeg,
         PlayerActionChoice::LookIntoMyEyes => PlayerAction::LookIntoMyEyes,
         PlayerActionChoice::BalefulHex => PlayerAction::BalefulHex,
         PlayerActionChoice::CatchOfTheDay => PlayerAction::CatchOfTheDay,

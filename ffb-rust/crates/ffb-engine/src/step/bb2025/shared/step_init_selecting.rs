@@ -638,6 +638,15 @@ impl StepInitSelecting {
                             target_params.push(StepParameter::ThrownPlayerId(Some(def)));
                             target_params.push(StepParameter::IsKickedPlayer(true));
                         }
+                        // Java: CLIENT_THROW_KEG publishes TARGET_PLAYER_ID (NOT defenderId) and
+                        // sets fDispatchPlayerAction = THROW_KEG; StepEndSelecting reads
+                        // target_player_id straight into ThrowKeg.SequenceParams. Java declares the
+                        // keg in TWO commands — ActingPlayer(THROW_KEG) then
+                        // ClientCommandThrowKeg(target) — and Rust folds them into one
+                        // ActivatePlayer, so unfold the target back onto TARGET_PLAYER_ID here.
+                        PlayerAction::ThrowKeg => {
+                            target_params.push(StepParameter::TargetPlayerId(Some(def)));
+                        }
                         _ => {}
                     }
                 }
@@ -724,6 +733,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::CatchOfTheDay => PlayerAction::CatchOfTheDay,
         PlayerActionChoice::ThenIStartedBlastin => PlayerAction::ThenIStartedBlastin,
         PlayerActionChoice::FuriousOutburst => PlayerAction::FuriousOutburst,
+        PlayerActionChoice::ThrowKeg => PlayerAction::ThrowKeg,
         PlayerActionChoice::AllYouCanEat => PlayerAction::AllYouCanEat,
         PlayerActionChoice::Treacherous => PlayerAction::Treacherous,
         PlayerActionChoice::BlackInk => PlayerAction::BlackInk,

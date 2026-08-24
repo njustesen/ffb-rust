@@ -484,6 +484,22 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             });
         }
 
+        // Beer Barrel Bash! (bb2020+ star special): the client's isThrowKegAvailable rule
+        // (LogicModule.java) — REGULAR turn mode, base STANDING, unused canThrowKeg. Note the
+        // rule itself has NO target clause; the target is chosen afterwards, in the client's
+        // THROW_KEG state, from opponents within 3 (ThrowKegLogicModule.isValidTarget). Offer
+        // sits DIRECTLY AFTER Furious Outburst; ParityRunner mirrors the position.
+        if is_throw_keg_available(game, pid.as_str()) {
+            actions.push(Action::ActivatePlayer {
+                player_id: pid.clone(),
+                player_action: PlayerActionChoice::ThrowKeg,
+                // Folded target, filled in by the agent: Java declares in TWO commands
+                // (ActingPlayer(THROW_KEG) then ClientCommandThrowKeg(target)), both landing in
+                // StepInitSelecting, which publishes TARGET_PLAYER_ID.
+                block_defender_id: None,
+            });
+        }
+
         // Black Ink (bb2020+ star special): the client's isBlackInkAvailable rule — unused
         // canGazeAutomatically skill + an adjacent standing-or-prone, NOT-distracted opponent
         // (LogicModule.isBlackInkAvailable). Declaring it maps to the client's
@@ -612,6 +628,59 @@ pub fn is_furious_outburst_available(game: &Game, player_id: &str) -> bool {
         .is_empty()
 }
 
+/// Java `LogicModule.isThrowKegAvailable(Player)`:
+///   `game.getTurnMode() == TurnMode.REGULAR
+///    && playerState.getBase() == PlayerState.STANDING
+///    && UtilCards.hasUnusedSkillWithProperty(player, canThrowKeg)`
+///
+/// Deliberately has NO target clause — that matches Java. The target is picked afterwards from
+/// `ThrowKegLogicModule.isValidTarget` (distance <= 3, STANDING, opposing team); when no such
+/// target exists the agents DESELECT rather than declare, the same treatment `sendFoulAction`
+/// gives a foul whose victim has moved.
+pub fn is_throw_keg_available(game: &Game, player_id: &str) -> bool {
+    if game.turn_mode != ffb_model::enums::TurnMode::Regular {
+        return false;
+    }
+    let Some(player) = game.player(player_id) else { return false };
+    if !player.has_skill(SkillId::BeerBarrelBash)
+        || player.used_skills.contains(&SkillId::BeerBarrelBash)
+    {
+        return false;
+    }
+    game.field_model.player_state(player_id)
+        .map(|s| s.base() == ffb_model::enums::PS_STANDING)
+        .unwrap_or(false)
+}
+
+/// Java `ThrowKegLogicModule.isValidTarget`: `distance <= 3 && base == STANDING
+/// && player.getTeam() != game.getActingTeam()`. Coordinate-sorted so both engines pick the
+/// same target from a single actionRng draw (ParityRunner sorts identically).
+pub fn legal_throw_keg_targets(game: &Game, thrower_id: &str) -> Vec<PlayerId> {
+    let Some(coord) = game.field_model.player_coordinate(thrower_id) else { return Vec::new() };
+    let opponent_team = if game.team_home.player(thrower_id).is_some() {
+        &game.team_away
+    } else {
+        &game.team_home
+    };
+    let mut out: Vec<PlayerId> = opponent_team.players.iter()
+        .filter(|op| {
+            game.field_model.player_coordinate(&op.id)
+                .map(|oc| oc.distance_in_steps(coord) <= 3)
+                .unwrap_or(false)
+                && game.field_model.player_state(&op.id)
+                    .map(|s| s.base() == ffb_model::enums::PS_STANDING)
+                    .unwrap_or(false)
+        })
+        .map(|op| op.id.clone())
+        .collect();
+    out.sort_by_key(|pid| {
+        game.field_model.player_coordinate(pid)
+            .map(|c| (c.x, c.y))
+            .unwrap_or((i32::MAX, i32::MAX))
+    });
+    out
+}
+
 /// The `(player, actions)` eligibility list for the `ActivatePlayer` prompt — the same
 /// per-player action enumeration as `legal_activate_player_actions` (which Java
 /// `ParityRunner.computeEligiblePlayers` mirrors), grouped per player and mapped into model
@@ -645,6 +714,7 @@ pub fn eligible_players_for_activation(game: &Game) -> Vec<(PlayerId, Vec<ffb_mo
             PAC::CatchOfTheDay => PA::CatchOfTheDay,
             PAC::ThenIStartedBlastin => PA::ThenIStartedBlastin,
             PAC::FuriousOutburst => PA::FuriousOutburst,
+            PAC::ThrowKeg => PA::ThrowKeg,
             PAC::AllYouCanEat => PA::AllYouCanEat,
             PAC::Treacherous => PA::Treacherous,
             PAC::BlackInk => PA::BlackInk,
@@ -1580,6 +1650,59 @@ mod tests {
     fn activate(game: &mut Game, id: &str) {
         let s = game.field_model.player_state(id).unwrap().change_active(true);
         game.field_model.set_player_state(id, s);
+    }
+
+    /// §11: Beer Barrel Bash! is offered under the CLIENT's rule
+    /// (LogicModule.isThrowKegAvailable): REGULAR turn mode, base STANDING, unused canThrowKeg.
+    /// Deliberately has NO target clause — that matches Java; the target is picked separately.
+    #[test]
+    fn throw_keg_offered_under_the_client_rule() {
+        let mut game = make_game(Rules::Bb2025);
+        // Game::new defaults to TurnMode::StartGame; isThrowKegAvailable requires REGULAR.
+        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        add_player(&mut game, true, "thorsson", c(5, 5), PS_STANDING, vec![SkillId::BeerBarrelBash]);
+        assert!(is_throw_keg_available(&game, "thorsson"),
+            "no adjacent opponent is required by the client rule");
+        let a = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&a, "thorsson", PlayerActionChoice::ThrowKeg));
+        // used skill withdraws it (ONCE_PER_DRIVE)
+        if let Some(pl) = game.team_home.players.iter_mut().find(|pl| pl.id == "thorsson") {
+            pl.used_skills.insert(SkillId::BeerBarrelBash);
+        }
+        assert!(!is_throw_keg_available(&game, "thorsson"));
+    }
+
+    /// A prone thrower cannot bash, and neither can one outside REGULAR turn mode.
+    #[test]
+    fn throw_keg_requires_standing_and_regular_turn_mode() {
+        let mut game = make_game(Rules::Bb2025);
+        // Game::new defaults to TurnMode::StartGame; isThrowKegAvailable requires REGULAR.
+        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        add_player(&mut game, true, "thorsson", c(5, 5), PS_STANDING, vec![SkillId::BeerBarrelBash]);
+        assert!(is_throw_keg_available(&game, "thorsson"));
+        game.field_model.set_player_state("thorsson", ffb_model::enums::PlayerState::new(PS_PRONE));
+        assert!(!is_throw_keg_available(&game, "thorsson"));
+        game.field_model.set_player_state("thorsson", ffb_model::enums::PlayerState::new(PS_STANDING));
+        game.turn_mode = ffb_model::enums::TurnMode::Blitz;
+        assert!(!is_throw_keg_available(&game, "thorsson"));
+    }
+
+    /// Java `ThrowKegLogicModule.isValidTarget`: distance <= 3, base STANDING, OPPOSING team.
+    /// Coordinate-sorted so a single actionRng draw lands on the same target as ParityRunner.
+    #[test]
+    fn throw_keg_targets_are_opposing_standing_and_within_three() {
+        let mut game = make_game(Rules::Bb2025);
+        // Game::new defaults to TurnMode::StartGame; isThrowKegAvailable requires REGULAR.
+        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        add_player(&mut game, true, "thorsson", c(5, 5), PS_STANDING, vec![SkillId::BeerBarrelBash]);
+        add_player(&mut game, true, "mate", c(6, 5), PS_STANDING, vec![]);          // own team
+        add_player(&mut game, false, "far", c(9, 5), PS_STANDING, vec![]);          // 4 steps
+        add_player(&mut game, false, "prone", c(6, 6), PS_PRONE, vec![]);           // not standing
+        add_player(&mut game, false, "near_b", c(7, 5), PS_STANDING, vec![]);
+        add_player(&mut game, false, "near_a", c(6, 4), PS_STANDING, vec![]);
+        let targets = legal_throw_keg_targets(&game, "thorsson");
+        assert_eq!(targets, vec!["near_a".to_string(), "near_b".to_string()],
+            "opposing + standing + within 3, sorted by (x, y)");
     }
 
     /// §11: Furious Outburst is offered under the CLIENT's rule

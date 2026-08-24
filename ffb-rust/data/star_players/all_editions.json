@@ -4627,6 +4627,37 @@
         "Halfling",
         "Gnome"
       ]
+    },
+    {
+      "id": "dwarf.Thorsson",
+      "name": "Thorsson Stoutmead",
+      "display_name": "Thorsson Stoutmead",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 170000,
+      "ma": 6,
+      "st": 3,
+      "ag": 4,
+      "pa": 3,
+      "av": 8,
+      "shorthand": "TS",
+      "skills": [
+        "Block",
+        "Drunkard",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Thick Skull",
+        "Beer Barrel Bash!"
+      ],
+      "available_for": [
+        "Dwarf",
+        "Human",
+        "Norse",
+        "Ogre",
+        "Bretonnian"
+      ]
     }
   ]
 }

@@ -1135,7 +1135,44 @@ Carriers (from rules/star_players/*.md; Java canonical skill names in quotes):
         directly, so it passed while the real path was broken — a test pinning the wrong thing.
         And `PS_STANDING` does NOT imply the ACTIVE bit (a separate bit set by the turn-start
         refresh), which is a fixture trap for any rule checking isActive().
-  - [ ] Thorsson Stoutmead ("Beer Barrel Bash!") → bb2025 dwarf
+  - [x] Thorsson Stoutmead ("Beer Barrel Bash!") LIVE (2026-08-24): drafted @nr2 bb2025 dwarf
+        (blitzer 2 → 12, benched), 100/100 on fresh Java logs, full gate 30/30 ×3.
+        `ThrowKeg` + `EndThrowKeg` both live: **273 executions in 100/100 games**, both engines
+        agreeing exactly (273 JAVA_KEG_PICK vs 273 Rust declarations, plus 59 matched no-target
+        deselects). Progression 100/100 VACUOUS → 0 → 100 real.
+        DATA TRAP: the canonical Java skill name is **"Beer Barrel Bash!" WITH the trailing
+        exclamation mark** (skill/mixed/special/BeerBarrelBash), while rules/star_players spells
+        it without one. Second name mismatch in three iterations after "On The Ball" (capital T)
+        — the rules markdown is NOT a source for Java skill names, always read the Skill class.
+        DECLARATION SHAPE (differs from every previous star): the client sends TWO commands —
+        `sendActingPlayer(player, THROW_KEG)` to enter ClientStateId.THROW_KEG, then
+        `sendThrowKeg(target)` once the coach clicks. BOTH land in StepInitSelecting, and the
+        second publishes **TARGET_PLAYER_ID (not defenderId)**, which StepEndSelecting reads
+        straight into ThrowKeg.SequenceParams. Rust folds the pair into ONE ActivatePlayer
+        carrying the target and unfolds it back onto TARGET_PLAYER_ID at dispatch. Targets are
+        ThrowKegLogicModule.isValidTarget (<=3 steps, STANDING, opposing team), coordinate-sorted,
+        single actionRng draw on both sides; both agents DESELECT when no valid target exists
+        (the client would have no square to click, so the declaration never completes).
+        Offer rule is LogicModule.isThrowKegAvailable — REGULAR turn mode, base STANDING, unused
+        canThrowKeg — and deliberately has NO target clause, matching Java.
+        ONE engine bug, a REPEAT of a known shape:
+        1. **StepEndThrowKeg was PUBLISH-ONLY.** Java calls
+           `endPlayerActionGenerator.pushSequence(new EndPlayerAction.SequenceParams(gameState,
+           false, true, endTurn))`; Rust merely published EndPlayerAction/EndTurn under a comment
+           claiming "the driver owns the sequence stack". Nothing consumes those parameters and
+           EndThrowKeg is the LAST step of the keg sequence, so the stack emptied with the
+           activation still open and the driver STALLED (Continue with no prompt) — every dwarf
+           bb2025 game ended at the first keg (seed 1 i=88; rust_total collapsed ~9s → 1.4s,
+           0/100). This is the SAME publish-only shape as StepEndThenIStartedBlastin's Zzharg
+           fix; it survived because the keg mechanic had never once executed. Unlike the Blastin
+           step, Java's keg end-step does NOT clear the step stack — verified, not assumed.
+        TEST LESSONS (second time in two iterations that a passing test pinned the wrong thing):
+        two PRE-EXISTING step_end_throw_keg tests asserted on the PUBLISHED EndTurn parameter,
+        i.e. they pinned the publish-only bug itself, and passed the whole time because the keg
+        never ran. Rewritten to assert end_turn reaches the PUSHED sequence. And `Game::new`
+        defaults to `TurnMode::StartGame`, not Regular — the second fixture trap after
+        "PS_STANDING does not imply the ACTIVE bit". Default Game state does not resemble a live
+        turn; any rule keyed on turn mode or state bits needs the fixture set explicitly.
   - [ ] Grombrindal ("Wisdom of the White Dwarf") → bb2025 dwarf or halfling
 - Batch C — already in data, just dormant:
   - [ ] The Zoat ("Excuse Me, Are You a Zoat?" → AutoGazeZoat, bb2020 star already in

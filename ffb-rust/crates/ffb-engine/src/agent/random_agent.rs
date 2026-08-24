@@ -133,6 +133,11 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             // Rust deselected and re-picked), which is the same shape that kept Kick Team-Mate
             // dead in every edition.
             | PlayerActionChoice::FuriousOutburst
+            // THROW_KEG ("Beer Barrel Bash!"): declared in TWO commands, both handled by
+            // StepInitSelecting — ClientCommandActingPlayer(THROW_KEG) then
+            // ClientCommandThrowKeg(target), the latter publishing TARGET_PLAYER_ID. Rust folds
+            // the pair into one ActivatePlayer carrying the target.
+            | PlayerActionChoice::ThrowKeg
     )
 }
 
@@ -456,6 +461,22 @@ impl Agent for RandomAgent {
                     // what ParityRunner.sendThrowTeamMateAction sends for both. Picking a target for
                     // the throw only meant a declared KICK carried no thrown player at all, so the
                     // sequence stalled and the kick silently never resolved.
+                    // Beer Barrel Bash!: the client declares in two steps — ActingPlayer(THROW_KEG)
+                    // puts the client in its THROW_KEG state, then the coach clicks a target and
+                    // ClientCommandThrowKeg carries it. Both land in StepInitSelecting, so the
+                    // folded target here IS that second command. Candidates are
+                    // ThrowKegLogicModule.isValidTarget (<=3 steps, STANDING, opposing team),
+                    // coordinate-sorted, 1 actionRng — identical to ParityRunner's arm.
+                    // Empty → None → deselect below (Java has no valid click either).
+                    PlayerActionChoice::ThrowKeg => {
+                        let targets = crate::legal_actions::legal_throw_keg_targets(&gs.game, player_id);
+                        if targets.is_empty() {
+                            None
+                        } else {
+                            let tidx = self.pick_action(targets.len());
+                            Some(targets[tidx].clone())
+                        }
+                    }
                     PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate => {
                         let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
                         let targets = legal_throw_team_mate_targets(&gs.game, player_id, side);
@@ -499,6 +520,16 @@ impl Agent for RandomAgent {
                 // which ends the turn). The player-pick decisionRng and the action-pick actionRng are
                 // already consumed (Java picks player+action before sendFoulAction deselects), and the
                 // player is already in `used_this_turn`, so re-picking chooses a different player.
+                // A THROW_KEG with no valid target: the client would have no square to click, so
+                // the coach never sends ClientCommandThrowKeg and the declaration never completes.
+                // ParityRunner deselects in the same situation; without this the sequence would
+                // run with a null TARGET_PLAYER_ID.
+                if matches!(player_action, PlayerActionChoice::ThrowKeg) && block_defender_id.is_none() {
+                    if std::env::var("FFB_TRACE").is_ok() {
+                        eprintln!("RUST_KEG_DESELECT pid={player_id} (no valid keg target)");
+                    }
+                    continue 'reselect;
+                }
                 if matches!(player_action, PlayerActionChoice::Foul) && block_defender_id.is_none() {
                     if std::env::var("FFB_TRACE").is_ok() {
                         eprintln!("RUST_FOUL_DESELECT pid={player_id} (no legal foul target)");
@@ -1201,6 +1232,7 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         PlayerAction::HailMaryPass => PlayerActionChoice::HailMaryPass,
         PlayerAction::RaidingParty => PlayerActionChoice::RaidingParty,
         PlayerAction::FuriousOutburst => PlayerActionChoice::FuriousOutburst,
+        PlayerAction::ThrowKeg => PlayerActionChoice::ThrowKeg,
         PlayerAction::LookIntoMyEyes => PlayerActionChoice::LookIntoMyEyes,
         PlayerAction::BalefulHex => PlayerActionChoice::BalefulHex,
         PlayerAction::CatchOfTheDay => PlayerActionChoice::CatchOfTheDay,
@@ -1226,7 +1258,7 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         PlayerAction::MultipleBlock | PlayerAction::KickEmBlock => PlayerActionChoice::Block,
         PlayerAction::KickEmBlitz => PlayerActionChoice::Blitz,
         // Special actions with no direct PAC equivalent — default to Move
-        PlayerAction::Treacherous | PlayerAction::WisdomOfTheWhiteDwarf | PlayerAction::ThrowKeg
+        PlayerAction::Treacherous | PlayerAction::WisdomOfTheWhiteDwarf
         | PlayerAction::RaidingParty | PlayerAction::MaximumCarnage | PlayerAction::BalefulHex
         | PlayerAction::AllYouCanEat | PlayerAction::BlackInk | PlayerAction::CatchOfTheDay
         | PlayerAction::ThenIStartedBlastin | PlayerAction::TheFlashingBlade
@@ -1246,6 +1278,13 @@ mod furious_outburst_declaration_tests {
     #[test]
     fn furious_outburst_is_a_handled_acting_action() {
         assert!(is_handled_acting_action(PlayerActionChoice::FuriousOutburst));
+    }
+
+    /// Same list, same trap: THROW_KEG is declared in two commands but is still a handled
+    /// acting action — leaving it out would declare and instantly deselect every keg.
+    #[test]
+    fn throw_keg_is_a_handled_acting_action() {
+        assert!(is_handled_acting_action(PlayerActionChoice::ThrowKeg));
     }
 }
 

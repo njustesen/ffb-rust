@@ -1,5 +1,10 @@
 # Never-dispatched step inventory — RE-MEASURED 2026-08-19
 
+**2026-08-24 update (3) — `ThrowKeg` and `EndThrowKeg` REACHED.** Thorsson Stoutmead drafted
+into the bb2025 dwarf parity team plus the two-command THROW_KEG declaration channel wired in both
+engines. 273 executions across 100 of 100 dwarf mirror games. Adjusted for this, Furious Outburst
+and QuickBite, the 2026-08-19 pm counts read **144 reached / 55 never reached**.
+
 **2026-08-24 update (2) — the whole `FuriousOutburst` family REACHED.**
 `InitFuriousOutburst`, `FirstMoveFuriousOutburst`, `SecondMoveFuriousOutburst` and
 `EndFuriousOutburst` all went live when Swiftvine Glimmershard was drafted into the bb2025
@@ -62,8 +67,8 @@ roster drafts the skill — bb2020/bb2025 kicks run live through the shared TTM 
 **Needs a specific star/skill/inducement the parity teams do not draft:**
 `AllYouCanEat AutoGazeZoat BalefulHex BlackInk CatchOfTheDay DoubleStrength
 EatTeamMate HailMaryPass LookIntoMyEyes InitLookIntoMyEyes PileDriver RaidingParty
-ThenIStartedBlastin EndThenIStartedBlastin ThrowARock ThrowKeg EndThrowKeg Treacherous
-WeatherMage WisdomOfTheWhiteDwarf Pro` — star-player specials, Dump Off, Hail Mary, Pro, kegs,
+ThenIStartedBlastin EndThenIStartedBlastin ThrowARock Treacherous
+WeatherMage WisdomOfTheWhiteDwarf Pro`  (`ThrowKeg`/`EndThrowKeg` removed 2026-08-24 — LIVE) — star-player specials, Dump Off, Hail Mary, Pro, kegs,
 cards. Unreachable until the drafted teams change.
 
 **Needs the Multiple Block skill (no parity roster drafts it):**

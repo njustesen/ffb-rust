@@ -475,6 +475,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::CatchOfTheDay => PlayerAction::CatchOfTheDay,
         PlayerActionChoice::ThenIStartedBlastin => PlayerAction::ThenIStartedBlastin,
         PlayerActionChoice::FuriousOutburst => PlayerAction::FuriousOutburst,
+        PlayerActionChoice::ThrowKeg => PlayerAction::ThrowKeg,
         PlayerActionChoice::AllYouCanEat => PlayerAction::AllYouCanEat,
         PlayerActionChoice::Treacherous => PlayerAction::Treacherous,
         PlayerActionChoice::BlackInk => PlayerAction::BlackInk,
