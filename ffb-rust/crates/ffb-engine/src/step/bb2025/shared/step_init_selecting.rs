@@ -255,6 +255,10 @@ impl Step for StepInitSelecting {
                     game.defender_id = None;
                     self.dispatch_player_action = Some(PlayerAction::BlitzSelect);
                     self.force_goto_on_dispatch = true;
+                    // Java's :114 arm does NOT return - it falls through to the shared tail of the
+                    // CLIENT_ACTING_PLAYER case. Run that tail here (see the helper's note): without
+                    // it a prone blitzer skips the stand-up movement cost and owes no GO FOR IT.
+                    Self::apply_moving_activation_updates(game, player_id, PlayerAction::BlitzMove);
                     Self::check_for_staller(game);
                     return self.execute_step(game, rng)
                         .with_event(GameEvent::PlayerAction { player_id: player_id.clone(), action: PlayerAction::BlitzMove });
@@ -418,53 +422,7 @@ impl Step for StepInitSelecting {
                 // — computes per-square dodging/GFI flags for the fresh activation. Without this
                 // the MoveSquare table stays empty, StepInitMoving never sets
                 // acting_player.dodging, and no dodge is ever rolled.
-                if pa.is_moving() || game.acting_player.standing_up {
-                    // Java StepInitSelecting: on a standing-up (was PRONE) activation without
-                    // canStandUpForFree, the stand-up consumes min(MINIMUM_MOVE_TO_STAND_UP=3, MA) of
-                    // movement — set current_move so the player can only move MA-3 more squares. Without
-                    // this a stood-up ball carrier ran its FULL MA (3 extra squares), diverging its final
-                    // position (seed 11 i=237: home_07 ended (14,2) in Rust vs (11,2) in Java).
-                    if game.acting_player.standing_up {
-                        let has_free = game.player(player_id)
-                            .map(|p| p.has_skill_property(NamedProperties::CAN_STAND_UP_FOR_FREE))
-                            .unwrap_or(false);
-                        let ma = game.player(player_id).map(|p| p.movement_with_modifiers()).unwrap_or(0);
-                        // A free stand-up (MA >= MINIMUM_MOVE_TO_STAND_UP=3, or canStandUpForFree) always
-                        // succeeds — apply STANDING now, BEFORE the activation's negatrait rolls (Bloodlust
-                        // etc.), so a failed negatrait that gotos the failure label and skips StepStandUp does
-                        // not leave the player prone. Java rolls the negatrait with the player already standing
-                        // (Bloodlust prone=false for a MA6 Vampire; vampire seed 1 i=43: a prone Vampire failing
-                        // Bloodlust ends STANDING in Java but stayed PRONE in Rust). MA<3 players still roll to
-                        // stand up in StepStandUp, so they are not pre-stood here.
-                        // The base is MOVING, not STANDING: Java's changeActingPlayer already put the
-                        // freshly activated player in MOVING ("show acting player as moving") and its
-                        // StepStandUp never writes STANDING on success — only a FAILED stand-up writes
-                        // PRONE. MOVING is Java's "standing" for every isStanding() test, and the acting
-                        // player must still read MOVING later in the activation: StepEndBlocking's
-                        // canMoveAfterBlock (Hit and Run) and canFoulAfterBlock (Pile Driver) both gate on
-                        // `playerState.getBase() == MOVING`, so writing STANDING here silently disabled
-                        // both for every player that stood up (amazon bb2020 seed 3 i=7: home_03's Hit
-                        // and Run window never opened in Rust while Java drove the move).
-                        if has_free || ma >= 3 {
-                            if let Some(ps) = game.field_model.player_state(player_id) {
-                                game.field_model.set_player_state(player_id, ps.change_base(ffb_model::enums::PS_MOVING));
-                            }
-                        }
-                        if !has_free {
-                            game.acting_player.current_move = 3.min(ma);
-                            // Java: actingPlayer.setGoingForIt(UtilPlayer.isNextMoveGoingForIt(game)).
-                            // When standing up consumes all remaining MA (e.g. MA-3 player), the next
-                            // move is a rush; without this flag update_move_squares' is_next_move_possible
-                            // returns false (extra_move=0 → current_move < MA) and CLEARS the freshly
-                            // computed move squares — so StepInitMoving reads an empty table and never
-                            // sets dodging/going_for_it (necromantic seed 38 i=116: away_03's stand-up
-                            // rush+dodge was skipped, desyncing the RNG stream).
-                            game.acting_player.goes_for_it =
-                                ffb_model::util::util_player::UtilPlayer::is_next_move_going_for_it(game);
-                        }
-                    }
-                    crate::util::UtilServerPlayerMove::update_move_squares(game, game.acting_player.jumping);
-                }
+                Self::apply_moving_activation_updates(game, player_id, pa);
                 // Java: checkForStaller() called after CLIENT_ACTIVATE_PLAYER
                 Self::check_for_staller(game);
                 // Java: UtilServerGame.changePlayerAction syncs the activation to clients;
@@ -620,6 +578,66 @@ impl Step for StepInitSelecting {
 impl StepInitSelecting {
     /// Java: `checkForStaller()` — if game is already marked stalling (game.stalling==true),
     /// emit `ReportStallerDetected` for the acting player (unless they are forgone).
+    /// Java `StepInitSelecting`, shared tail of the CLIENT_ACTING_PLAYER case: after the
+    /// declaration branch (whichever it took) Java runs `updateMoveSquares` and, for a
+    /// standing-up activation, charges the stand-up its movement.
+    ///
+    /// Extracted so the BLITZ_SELECT branch can run it too. That branch RETURNS EARLY, and Java
+    /// does not - its `:114` arm sets the dispatch and falls through to exactly this code. The
+    /// early return skipped the stand-up cost, so a prone blitzer reached its block with
+    /// `current_move = 0` instead of `min(3, MA)`, owed no GO FOR IT, and the die Java spends on
+    /// that rush was consumed by the block instead (khemri seed 38: block dice [6] vs [3], i.e.
+    /// Pow vs Pushback and a defender left Standing).
+    fn apply_moving_activation_updates(game: &mut Game, player_id: &str, pa: PlayerAction) {
+        if pa.is_moving() || game.acting_player.standing_up {
+            // Java StepInitSelecting: on a standing-up (was PRONE) activation without
+            // canStandUpForFree, the stand-up consumes min(MINIMUM_MOVE_TO_STAND_UP=3, MA) of
+            // movement — set current_move so the player can only move MA-3 more squares. Without
+            // this a stood-up ball carrier ran its FULL MA (3 extra squares), diverging its final
+            // position (seed 11 i=237: home_07 ended (14,2) in Rust vs (11,2) in Java).
+            if game.acting_player.standing_up {
+                let has_free = game.player(player_id)
+                    .map(|p| p.has_skill_property(NamedProperties::CAN_STAND_UP_FOR_FREE))
+                    .unwrap_or(false);
+                let ma = game.player(player_id).map(|p| p.movement_with_modifiers()).unwrap_or(0);
+                // A free stand-up (MA >= MINIMUM_MOVE_TO_STAND_UP=3, or canStandUpForFree) always
+                // succeeds — apply STANDING now, BEFORE the activation's negatrait rolls (Bloodlust
+                // etc.), so a failed negatrait that gotos the failure label and skips StepStandUp does
+                // not leave the player prone. Java rolls the negatrait with the player already standing
+                // (Bloodlust prone=false for a MA6 Vampire; vampire seed 1 i=43: a prone Vampire failing
+                // Bloodlust ends STANDING in Java but stayed PRONE in Rust). MA<3 players still roll to
+                // stand up in StepStandUp, so they are not pre-stood here.
+                // The base is MOVING, not STANDING: Java's changeActingPlayer already put the
+                // freshly activated player in MOVING ("show acting player as moving") and its
+                // StepStandUp never writes STANDING on success — only a FAILED stand-up writes
+                // PRONE. MOVING is Java's "standing" for every isStanding() test, and the acting
+                // player must still read MOVING later in the activation: StepEndBlocking's
+                // canMoveAfterBlock (Hit and Run) and canFoulAfterBlock (Pile Driver) both gate on
+                // `playerState.getBase() == MOVING`, so writing STANDING here silently disabled
+                // both for every player that stood up (amazon bb2020 seed 3 i=7: home_03's Hit
+                // and Run window never opened in Rust while Java drove the move).
+                if has_free || ma >= 3 {
+                    if let Some(ps) = game.field_model.player_state(player_id) {
+                        game.field_model.set_player_state(player_id, ps.change_base(ffb_model::enums::PS_MOVING));
+                    }
+                }
+                if !has_free {
+                    game.acting_player.current_move = 3.min(ma);
+                    // Java: actingPlayer.setGoingForIt(UtilPlayer.isNextMoveGoingForIt(game)).
+                    // When standing up consumes all remaining MA (e.g. MA-3 player), the next
+                    // move is a rush; without this flag update_move_squares' is_next_move_possible
+                    // returns false (extra_move=0 → current_move < MA) and CLEARS the freshly
+                    // computed move squares — so StepInitMoving reads an empty table and never
+                    // sets dodging/going_for_it (necromantic seed 38 i=116: away_03's stand-up
+                    // rush+dodge was skipped, desyncing the RNG stream).
+                    game.acting_player.goes_for_it =
+                        ffb_model::util::util_player::UtilPlayer::is_next_move_going_for_it(game);
+                }
+            }
+            crate::util::UtilServerPlayerMove::update_move_squares(game, game.acting_player.jumping);
+        }
+    }
+
     fn check_for_staller(game: &mut Game) {
         if game.stalling {
             let player_id = game.acting_player.player_id.clone();
