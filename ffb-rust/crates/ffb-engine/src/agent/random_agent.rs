@@ -719,6 +719,13 @@ impl Agent for RandomAgent {
             // opens a CLIENT_SWOOP target dialog that the parity harness (ParityRunner) has no
             // handler for → the SWOOP step gets STUCK and the game force-ends (goblin seed 3 i=194).
             // Declining lands the thrown player normally; ParityRunner declines Swoop identically.
+            // Quick Bite (BB2020/BB2025): Java ParityRunner answers the SKILL_USE dialog with
+            // always-use (contract §7, and QuickBite is not in its decline list). StepQuickBite
+            // dispatches on the SENT skill's canAttackOpponentForBallAfterCatch property, so the
+            // generic Block placeholder below would be ignored and the dialog would refire forever
+            // — echo the real skill, exactly like the HitAndRun arm above.
+            Some(AgentPrompt::SkillUse { skill_name, .. }) if skill_name == "QuickBite" =>
+                Action::UseSkill { skill_id: SkillId::QuickBite, use_skill: true },
             Some(AgentPrompt::SkillUse { skill_name, .. }) if skill_name == "Swoop" =>
                 Action::UseSkill { skill_id: SkillId::Swoop, use_skill: false },
             // Skill use: AGENT_CONTRACT §7 — ALWAYS use, deterministically, 0 rng. Java ParityRunner

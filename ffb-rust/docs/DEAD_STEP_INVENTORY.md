@@ -1,5 +1,11 @@
 # Never-dispatched step inventory — RE-MEASURED 2026-08-19
 
+**2026-08-24 update — `QuickBite` REACHED.** Guffle Pusmaw drafted into the bb2025 nurgle parity
+team (`docs/BACKLOG.md` §11 Batch B). The step itself was a full port; only the OFFER was dead —
+it returned a bare `next()` where Java shows a dialog and CONTINUEs. It now fires in 5 of 100
+nurgle mirror games. **Not re-swept:** the counts in the table below are still the 2026-08-19 pm
+measurement; adjusted for this one id they read **138 reached / 61 never reached**.
+
 Method identical to the 2026-08-18 sweep below: `FFB_DRIVE_TRACE=1 --uniform --all-rosters
 --all-editions --seeds 1-3 --no-abort` (261 games, Rust-only), `DRIVE step=` lines vs the 199
 `StepId` variants. Run AFTER the bomb-chain campaign (`7fa7b7ad`) and the ACTIVE-bit hash
@@ -46,7 +52,7 @@ roster drafts the skill — bb2020/bb2025 kicks run live through the shared TTM 
 
 **Needs a specific star/skill/inducement the parity teams do not draft:**
 `AllYouCanEat AutoGazeZoat BalefulHex BlackInk CatchOfTheDay DoubleStrength
-EatTeamMate HailMaryPass LookIntoMyEyes InitLookIntoMyEyes PileDriver QuickBite RaidingParty
+EatTeamMate HailMaryPass LookIntoMyEyes InitLookIntoMyEyes PileDriver RaidingParty
 ThenIStartedBlastin EndThenIStartedBlastin ThrowARock ThrowKeg EndThrowKeg Treacherous
 WeatherMage WisdomOfTheWhiteDwarf Pro` — star-player specials, Dump Off, Hail Mary, Pro, kegs,
 cards. Unreachable until the drafted teams change.

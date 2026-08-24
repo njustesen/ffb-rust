@@ -4565,6 +4565,37 @@
       "available_for": [
         "Halfling"
       ]
+    },
+    {
+      "id": "nurgle.Guffle",
+      "name": "Guffle Pusmaw",
+      "display_name": "Guffle Pusmaw",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 5,
+      "st": 4,
+      "ag": 4,
+      "pa": 6,
+      "av": 10,
+      "shorthand": "GP",
+      "skills": [
+        "Foul Appearance",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Monstrous Mouth",
+        "Nerves of Steel",
+        "On The Ball",
+        "Plague Ridden",
+        "Quick Bite"
+      ],
+      "available_for": [
+        "Nurgle",
+        "Chaos Chosen",
+        "Chaos Renegades"
+      ]
     }
   ]
 }

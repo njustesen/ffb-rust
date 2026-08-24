@@ -1061,7 +1061,27 @@ Carriers (from rules/star_players/*.md; Java canonical skill names in quotes):
         arguing, one die behind. Also widened StepInitPassing's BombRethrow prompt to ANY
         thrower==null park (ParityRunner's INIT_PASSING contract), covering the second AYCE
         bomb's fresh Pass sequence.
-  - [ ] Guffle Pusmaw ("Quick Bite") → bb2025 nurgle
+  - [x] Guffle Pusmaw ("Quick Bite") LIVE (2026-08-24): drafted @nr2 bb2025 nurgle (warrior
+        2 → 13), 100/100 on fresh Java logs, full gate 30/30 ×3, Quick Bite fires in 5/100
+        games (both teams' Guffles). Baseline after the draft was 96/100 — TWO engine fixes:
+        (1) **the offer was dead.** Java shows a DialogSkillUseParameter (1 opponent) or a
+        DialogPlayerChoiceParameter(QUICK_BITE) (2+) and CONTINUEs; Rust returned a bare
+        `next()` behind a "client-only … headless falls through" comment — recurring bug
+        shape #3, so nothing ever declared it (seed 32 i=4: Java spent 2 dice on the bite's
+        armour roll that Rust never rolled). Ported both dialogs, added a
+        `SelectPlayer{""}` decline arm (ParityRunner's PLAYER_CHOICE default sends an empty
+        selection — without it a declined choice re-prompts forever) and a QuickBite arm in
+        random_agent echoing the real skill (the HitAndRun lesson: the generic
+        `SkillId::Block` placeholder fails the step's property check and refires the dialog).
+        (2) **wrong Java constructor overload.** Java passes the 7-arg
+        `DropPlayerContext(injury, false, false, null, catcherId, QUICK_BITE, true)` whose
+        LAST argument is `requiresArmourBreak`; Rust called the `with_injury` shorthand whose
+        4th argument is `eligibleForSafePairOfHands`, so it set the wrong flag and left
+        `requiresArmourBreak` false — the drop step then knocked the catcher down on an
+        UNBROKEN armour roll (seed 32 i=5: Java a00 Standing, Rust a00 Prone). Also ported
+        the missing TOUCHBACK branch (`turnMode == KICKOFF && !bounds.isInBounds(ball)`),
+        which Rust had dropped entirely. Data lesson: the canonical Java skill name is
+        **"On The Ball"** (capital T), not the rulebook's "On the Ball".
   - [ ] Swiftvine Glimmershard ("Furious Outburst") → bb2025 wood_elf
   - [ ] Thorsson Stoutmead ("Beer Barrel Bash!") → bb2025 dwarf
   - [ ] Grombrindal ("Wisdom of the White Dwarf") → bb2025 dwarf or halfling

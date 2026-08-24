@@ -16,7 +16,7 @@
       "position_id": "nurgle.beast"
     },
     {
-      "nr": 2,
+      "nr": 13,
       "position_id": "nurgle.warrior"
     },
     {
@@ -63,5 +63,11 @@
   "special_rules": [
     "Favoured of Nurgle",
     "Brawlin' Brutes"
+  ],
+  "stars": [
+    {
+      "nr": 2,
+      "star_id": "nurgle.Guffle"
+    }
   ]
 }
