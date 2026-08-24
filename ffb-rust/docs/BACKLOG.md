@@ -3143,3 +3143,31 @@ NEXT: check whether the FollowUp prompt is issued at all on each build for that 
 `AgentPrompt::FollowUp` occurrences per activation. An engine that follows up without asking would
 move the attacker exactly one square into the vacated square, which is precisely the observed
 delta.
+
+**§12 goblin bb2020 (iter 74): follow-up RULED OUT. The blitzer's PRE-BLOCK position differs.**
+
+Probed `StepFollowup`'s decision on both builds. For the blitz in question it is identical:
+
+    main    FU att=away_03 choice=Some(true) prevent=Some(false) force=Some(false) defpos=(12,8)
+    branch  FU att=away_03 choice=Some(true) prevent=Some(false) force=Some(false) defpos=(12,8)
+
+Both take the automated follow-up (the agent is never asked, on either build), to the same square.
+So the extra square is not a follow-up difference.
+
+Combining this with the previous two iterations gives a tight box:
+
+- entry state at the activation: IDENTICAL (iter 70b)
+- every agent move pick: IDENTICAL (iter 73)
+- follow-up decision: IDENTICAL (iter 74)
+- yet at `StepPickUp`, which runs BEFORE the block resolution, the blitzer is at (13,8) on the
+  branch and (12,8) on main (iter 71)
+
+So the divergence is in the blitzer's APPROACH - where it stands when the block sequence starts -
+and it is produced without an agent choice and without a die. The extra Move prompt the chain
+issues (iter 72) is answered with `Action::Block` and moves nothing, so it is not the mover
+either.
+
+NEXT: trace the blitzer's coordinate step by step through that one activation on both builds -
+print pid and coordinate at every step of the BlitzMove/BlitzBlock sequences (the FFB_DEFCHG watch
+pattern, applied to `player_coordinate` of the acting player). The step that first differs is the
+answer; do not infer it from any single suspect again, three have now been eliminated.
