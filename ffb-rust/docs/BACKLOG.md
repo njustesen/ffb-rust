@@ -1414,3 +1414,26 @@ sequence. Two things to check: (a) whether the new BLITZ_SELECT routing branch i
 `changeActingPlayer(.., playerAction, isJumping())` and its pre-stand block is gated on
 `playerAction.isMoving() || isStandingUp()`, and BLITZ_MOVE *is* moving; and (b) whether the
 `JumpUp`/`StandUp` steps inside Rust's SelectBlitzTarget sequence actually stand him up.
+
+**CORRECTION (2026-08-24): it is NOT the prone blitzer.** The previous note inferred that from
+Java's `currentMove=3 MA=6`, reading 3 as `MINIMUM_MOVE_TO_STAND_UP`. A probe disproves it:
+
+    BZPROBE EndSelecting BlitzMove seq_len=28 first=Some(InitMoving) standing_up=false prone=Some(false)
+
+The blitzer is standing, not standing up, and `EndSelecting` pushes a perfectly ordinary 28-step
+BlitzMove sequence starting with `InitMoving` — identical to the passing seed. `currentMove=3` was
+just movement already spent, not a stand-up cost. Another reminder that an inference from a single
+number is not a diagnosis.
+
+**The REAL finding: stack RESIDUE.** `InitMoving` reports `stack_len=43` while the pushed sequence
+is only 28, so ~15 steps were ALREADY on the stack when the loop-back pushed BlitzMove. The
+passing seed shows 27 (i.e. 28 minus the running step) with no residue. Those leftover steps are
+what run as `InitActivation`/`AnimalSavagery`/… after `InitMoving`, and they are why the blitz
+never reaches its block.
+
+NEXT: find who leaves ~15 steps behind. Most likely the SelectBlitzTarget sequence is not fully
+consumed before `SelectBlitzTargetEnd` pushes Select — Java's `StepSelectBlitzTarget` CLEARS the
+step stack on its end-turn/end-action path (`getGameState().getStepStack().clear()`), and Rust's
+`with_clear_stack()` is only applied on that same path. Check whether the SELECTED path also needs
+to clear, and note that `StepOutcome::clear_stack` was itself recorded as a DEAD FLAG in the Zzharg
+work (BACKLOG §11) — verify the driver actually consumes it before relying on it.

@@ -540,6 +540,14 @@ impl StepEndSelecting {
                     BlitzMoveParams::default()
                 };
                 let seq = BlitzMove::build_sequence(&params);
+                if std::env::var("FFB_BZ_PROBE").is_ok() {
+                    eprintln!("BZPROBE EndSelecting BlitzMove seq_len={} first={:?} standing_up={} prone={:?}",
+                        seq.len(), seq.first().map(|s| s.step_id),
+                        game.acting_player.standing_up,
+                        game.acting_player.player_id.as_deref()
+                            .and_then(|id| game.field_model.player_state(id))
+                            .map(|s| s.is_prone()));
+                }
                 StepOutcome::next().push_seq(seq)
             }
 
