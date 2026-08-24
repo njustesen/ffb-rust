@@ -15,7 +15,7 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `dark_elf_league_fumbbl` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `dwarf` | 🟢 100/100 |  |  |
 | `elf` | 🟢 100/100 |  |  |
-| `goblin` | 🔴 21/100 | seed 1, step 47, java 472f8eb3f87dba82 vs rust b40ae2a694746919 |  |
+| `goblin` | 🔴 21/100 | seed 1, step 47, java 472f8eb3f87dba82 vs rust ac6bba42f5d3041c |  |
 | `halfling` | 🔴 11/100 | seed 1, step 132, java 4b1af0d38bc6313a vs rust b944c82d06d5b4a5 |  |
 | `high_elf` | 🟢 100/100 |  |  |
 | `human` | 🔴 77/100 | seed 2, step 29, java f270bb663a11b2fa vs rust 24b2a232ed138f7d |  |
@@ -25,15 +25,15 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `necromantic` | 🔴 99/100 | seed 38, step 31, java 5f128b4de9e10f5d vs rust 0aa1e030aeb63678 |  |
 | `nippon` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `norse` | 🔴 65/100 | seed 2, step 207, java 95758552bebe7034 vs rust fcdfa2ba0bf04382 |  |
-| `nurgle` | 🔴 49/100 | seed 2, step 50, java 7c308c987e83895a vs rust 8af30a96b74e548a |  |
+| `nurgle` | 🔴 50/100 | seed 2, step 53, java 7c308c987e83895a vs rust 8fa47dc68bef177a |  |
 | `ogre` | 🔴 34/100 | seed 4, step 144, java 77d290f76c75fb3c vs rust bd40b8fbfe1106fd |  |
-| `orc` | 🔴 49/100 | seed 2, step 46, java 58fbd01b96174d8c vs rust cd88faf3439bba8e |  |
+| `orc` | 🔴 48/100 | seed 2, step 46, java 58fbd01b96174d8c vs rust cd88faf3439bba8e |  |
 | `renegades` | 🔴 23/100 | seed 1, step 136, java b4519eaad4ce811f vs rust 1e399284a75bea84 |  |
 | `skaven` | 🔴 67/100 | seed 4, step 160, java 06e610107af62255 vs rust 0b6766894dacabde |  |
-| `slann` | 🔴 66/100 | seed 1, step 86, java c8bc846a79966c08 vs rust 59fda22dd4b70be0 | FUMBBL-legacy roster |
+| `slann` | 🔴 66/100 | seed 1, step 86, java c8bc846a79966c08 vs rust 3eee7c1c5a15b18e | FUMBBL-legacy roster |
 | `slann_fumbbl` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `undead` | 🔴 28/100 | seed 1, step 69, java 3684833ce8518463 vs rust 0c2c720a11b84d1a |  |
-| `underworld` | 🔴 50/100 | seed 2, step 246, java 717ed62bdee3516f vs rust 30e45d9ab3edeacd |  |
+| `underworld` | 🔴 51/100 | seed 2, step 246, java 717ed62bdee3516f vs rust 30e45d9ab3edeacd |  |
 | `vampire` | 🔴 57/100 | seed 1, step 101, java d6e94c8b690ae5cb vs rust 0ff55adfbf43a908 |  |
 | `wood_elf` | 🟢 100/100 |  |  |
 

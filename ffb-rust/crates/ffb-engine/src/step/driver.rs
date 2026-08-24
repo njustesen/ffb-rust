@@ -827,7 +827,7 @@ impl DriverGameState {
             // dice/agent trace): one line per step the driver runs. This is the primary tool for
             // diagnosing silent stalls and premature game-ends in headless runs.
             if std::env::var_os("FFB_DRIVE_TRACE").is_some() {
-                eprintln!("DRIVE step={:?} stack_len={} forwarded={}", entry.step.id(), self.stack.len(), self.forwarded.is_some());
+                eprintln!("DRIVE step={:?} stack_len={} forwarded={} rng={}", entry.step.id(), self.stack.len(), self.forwarded.is_some(), self.rng.call_count);
             }
             let mut outcome = match self.forwarded.take() {
                 Some(cmd) => {

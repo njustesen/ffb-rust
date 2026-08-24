@@ -1909,3 +1909,37 @@ ACTUAL ReallyStupid ROLLS (not step executions - the step runs for every activat
 not the player has the skill; branch executes it 271 times) on branch versus main, and compare
 both against Java's 44. Then find every TurnMode whose `checkNegatraits()` is false and check
 what Rust's equivalent gate does during each pass.
+
+**§12 GATE 3 (after USE_ALTERNATE_LABEL): bb2025 10 GREEN / 20 RED - IDENTICAL to gate 2.**
+Only nurgle 49->50, underworld 50->51, orc 49->48 moved. The fix is Java-faithful and removes a
+real divergence (Rust rolled the activation on both passes of the chain; Java publishes
+USE_ALTERNATE_LABEL on the second-phase command so its GOTO_LABEL skips the negatrait block),
+but it is measurably NEUTRAL and is not the goblin bug. Kept on fidelity grounds, not results.
+
+**Where goblin's extra dice actually go.** `FFB_DRIVE_TRACE` now prints the engine RNG counter
+per step (`rng=`), which localises spend exactly. For the i=47 blitz on goblin seed 1:
+
+    InitActivation .. GotoLabel .. BoneHead                rng=52
+    ReallyStupid                                           rng=52  -> SelectBlitzTargetEnd rng=53
+    InitSelecting .. GotoLabel                             rng=53   (pass 2 skips to
+    ResetFumblerooskie / EndSelecting                      rng=53    ResetFumblerooskie - the
+    InitMoving / EndMoving / InitBlocking                  rng=53    alternate label WORKS)
+    GoForIt .. BlockRoll                                   rng=53
+    BlockChoice                                            rng=54   (block dice)
+    ... continues to 56 by i=48
+
+So the branch's blitz RESOLVES A BLOCK (block dice at BlockChoice, plus two more draws after),
+while main spends exactly ONE die across the same activation and then ends the turn. The chain
+is finding a target where main's folded path found none: the BlitzTarget prompt for home_01
+offers **3 candidates**.
+
+**What is NOT yet explained.** `legal_block_targets` (agent, used by main) and
+`StepSelectBlitzTarget::standing_opponents` (engine, used by the prompt) are logically
+IDENTICAL - adjacent, `can_be_blocked()`, coordinate-sorted - so a 0-vs-3 disagreement should
+not be possible from the predicates alone. Do not theorise further: the difference is either
+the team being scanned (`inactive_team()` vs the acting `side`) or the moment of evaluation
+(agent at activation time, engine inside the chain after InitActivation).
+
+NEXT: build MAIN with the same `rng=` drive trace and diff the i=47 window step-by-step against
+the branch. That shows directly whether main's blitz reaches a block at all, and if not, which
+step diverts it - rather than inferring it from draw counts.
