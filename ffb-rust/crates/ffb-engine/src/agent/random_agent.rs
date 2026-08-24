@@ -141,6 +141,8 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             // WISDOM_OF_THE_WHITE_DWARF: declared as ActingPlayer(MOVE) +
             // ClientCommandUseTeamMatesWisdom, mirroring BLACK_INK's command pair.
             | PlayerActionChoice::WisdomOfTheWhiteDwarf
+            // AUTO_GAZE_ZOAT: declared as ActingPlayer(MOVE) + UseSkill(zoat), like BLACK_INK.
+            | PlayerActionChoice::AutoGazeZoat
     )
 }
 
@@ -940,6 +942,26 @@ impl Agent for RandomAgent {
                     player_id: eligible_players.get(idx).cloned().unwrap_or_default(),
                 }
             }
+            // "Excuse Me, Are You a Zoat?" gaze-target choice. ParityRunner has no arm for this
+            // dialog either, so without one BOTH sides would fall to a default — Java's being the
+            // NON-SEEDED RandomStrategy. Coordinate-sort then a single actionRng pick, matching
+            // the harness arm; board coordinates are engine-agnostic.
+            Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
+                if reason == "AUTO_GAZE_ZOAT" =>
+            {
+                let mut cands: Vec<String> = eligible_players.clone();
+                cands.sort_by_key(|pid| {
+                    gs.game.field_model.player_coordinate(pid)
+                        .map(|c| (c.x, c.y))
+                        .unwrap_or((i32::MAX, i32::MAX))
+                });
+                if cands.is_empty() {
+                    Action::SelectPlayer { player_id: String::new() }
+                } else {
+                    let idx = self.pick_action(cands.len());
+                    Action::SelectPlayer { player_id: cands[idx].clone() }
+                }
+            }
             // Wisdom of the White Dwarf team-mate choice. MANDATORY (Java's dialog is built with
             // minSelects = 1), so an empty selection re-fires it forever. StepWisdomOfTheWhiteDwarf
             // builds `wisePlayers` from UtilPlayer.findStandingOrPronePlayers, whose order is not a
@@ -1260,6 +1282,7 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         PlayerAction::FuriousOutburst => PlayerActionChoice::FuriousOutburst,
         PlayerAction::ThrowKeg => PlayerActionChoice::ThrowKeg,
         PlayerAction::WisdomOfTheWhiteDwarf => PlayerActionChoice::WisdomOfTheWhiteDwarf,
+        PlayerAction::AutoGazeZoat => PlayerActionChoice::AutoGazeZoat,
         PlayerAction::LookIntoMyEyes => PlayerActionChoice::LookIntoMyEyes,
         PlayerAction::BalefulHex => PlayerActionChoice::BalefulHex,
         PlayerAction::CatchOfTheDay => PlayerActionChoice::CatchOfTheDay,

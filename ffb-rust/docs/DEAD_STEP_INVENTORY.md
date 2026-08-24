@@ -1,5 +1,11 @@
 # Never-dispatched step inventory — RE-MEASURED 2026-08-19
 
+**2026-08-24 update (5) — `AutoGazeZoat` REACHED; §11 star batch COMPLETE.** Zolcath the Zoat
+drafted into the bb2025 dark_elf parity team (NOT bb2020 — the step and generator are bb2025-only)
+plus the ActingPlayer(MOVE)+UseSkill declaration and an AUTO_GAZE_ZOAT PlayerChoice arm on both
+sides. 182 executions across 100 of 100 games, zero engine bugs. Adjusted for this and the four
+earlier updates the 2026-08-19 pm counts read **146 reached / 53 never reached**.
+
 **2026-08-24 update (4) — `WisdomOfTheWhiteDwarf` REACHED.** Grombrindal drafted into the bb2025
 dwarf parity team alongside Thorsson, plus the CLIENT_USE_TEAM_MATES_WISDOM declaration channel and
 a reshaped `AgentPrompt::SelectSkill` (Java's flat, name-sorted list) wired in both engines. 245
@@ -71,10 +77,10 @@ KickTeamMateDoubleRolled` reclassified to needs-specific-roster (bb2016-only ids
 roster drafts the skill — bb2020/bb2025 kicks run live through the shared TTM steps).
 
 **Needs a specific star/skill/inducement the parity teams do not draft:**
-`AllYouCanEat AutoGazeZoat BalefulHex BlackInk CatchOfTheDay DoubleStrength
+`AllYouCanEat BalefulHex BlackInk CatchOfTheDay DoubleStrength
 EatTeamMate HailMaryPass LookIntoMyEyes InitLookIntoMyEyes PileDriver RaidingParty
 ThenIStartedBlastin EndThenIStartedBlastin ThrowARock Treacherous
-WeatherMage Pro`  (`WisdomOfTheWhiteDwarf` removed 2026-08-24 — LIVE)  (`ThrowKeg`/`EndThrowKeg` removed 2026-08-24 — LIVE) — star-player specials, Dump Off, Hail Mary, Pro, kegs,
+WeatherMage Pro`  (`WisdomOfTheWhiteDwarf`, `AutoGazeZoat` removed 2026-08-24 — LIVE)  (`ThrowKeg`/`EndThrowKeg` removed 2026-08-24 — LIVE) — star-player specials, Dump Off, Hail Mary, Pro, kegs,
 cards. Unreachable until the drafted teams change.
 
 **Needs the Multiple Block skill (no parity roster drafts it):**

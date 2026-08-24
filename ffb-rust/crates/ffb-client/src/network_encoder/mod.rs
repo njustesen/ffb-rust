@@ -435,6 +435,7 @@ fn choice_to_player_action(choice: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::FuriousOutburst => PlayerAction::FuriousOutburst,
         PlayerActionChoice::ThrowKeg => PlayerAction::ThrowKeg,
         PlayerActionChoice::WisdomOfTheWhiteDwarf => PlayerAction::WisdomOfTheWhiteDwarf,
+        PlayerActionChoice::AutoGazeZoat => PlayerAction::AutoGazeZoat,
         PlayerActionChoice::LookIntoMyEyes => PlayerAction::LookIntoMyEyes,
         PlayerActionChoice::BalefulHex => PlayerAction::BalefulHex,
         PlayerActionChoice::CatchOfTheDay => PlayerAction::CatchOfTheDay,

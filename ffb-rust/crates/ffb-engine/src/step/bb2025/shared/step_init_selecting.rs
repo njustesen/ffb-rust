@@ -192,6 +192,20 @@ impl Step for StepInitSelecting {
                 // (fDispatchPlayerAction = WISDOM_OF_THE_WHITE_DWARF, forceGotoOnDispatch = true)
                 // — it never calls changeActingPlayer, so the declared action stays MOVE. Same
                 // shape as the BLACK_INK bridging above.
+                // Rust bridging: AUTO_GAZE_ZOAT stands for ActingPlayer(MOVE) +
+                // UseSkill("Excuse Me, Are You a Zoat?"), exactly like BLACK_INK — Java's
+                // CLIENT_USE_SKILL chain dispatches AUTO_GAZE_ZOAT with forceGotoOnDispatch and
+                // never calls changeActingPlayer, so the declared action stays MOVE.
+                if *player_action == PlayerActionChoice::AutoGazeZoat {
+                    game.original_bombardier = None;
+                    util_server_steps::change_player_action(game, player_id, PlayerAction::Move, false);
+                    game.defender_id = None;
+                    self.dispatch_player_action = Some(PlayerAction::AutoGazeZoat);
+                    self.force_goto_on_dispatch = true;
+                    Self::check_for_staller(game);
+                    return self.execute_step(game, rng)
+                        .with_event(GameEvent::PlayerAction { player_id: player_id.clone(), action: PlayerAction::AutoGazeZoat });
+                }
                 if *player_action == PlayerActionChoice::WisdomOfTheWhiteDwarf {
                     game.original_bombardier = None;
                     util_server_steps::change_player_action(game, player_id, PlayerAction::Move, false);
@@ -751,6 +765,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::FuriousOutburst => PlayerAction::FuriousOutburst,
         PlayerActionChoice::ThrowKeg => PlayerAction::ThrowKeg,
         PlayerActionChoice::WisdomOfTheWhiteDwarf => PlayerAction::WisdomOfTheWhiteDwarf,
+        PlayerActionChoice::AutoGazeZoat => PlayerAction::AutoGazeZoat,
         PlayerActionChoice::AllYouCanEat => PlayerAction::AllYouCanEat,
         PlayerActionChoice::Treacherous => PlayerAction::Treacherous,
         PlayerActionChoice::BlackInk => PlayerAction::BlackInk,

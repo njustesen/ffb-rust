@@ -16,7 +16,7 @@
       "position_id": "darkelf.witchelf"
     },
     {
-      "nr": 2,
+      "nr": 12,
       "position_id": "darkelf.witchelf"
     },
     {
@@ -56,5 +56,11 @@
       "position_id": "darkelf.lineman"
     }
   ],
-  "special_rules": []
+  "special_rules": [],
+  "stars": [
+    {
+      "nr": 2,
+      "star_id": "39558"
+    }
+  ]
 }

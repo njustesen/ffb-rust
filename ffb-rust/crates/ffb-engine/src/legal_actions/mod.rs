@@ -511,6 +511,18 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             });
         }
 
+        // "Excuse Me, Are You a Zoat?" (bb2025 star special): the client's
+        // isAutoGazeZoatAvailable rule — unused canGazeAutomaticallyThreeSquaresAway plus an
+        // opponent WITH TACKLE ZONES within 3 that is not already distracted. Offer sits
+        // DIRECTLY AFTER Wisdom; ParityRunner mirrors the position.
+        if is_auto_gaze_zoat_available(game, pid.as_str()) {
+            actions.push(Action::ActivatePlayer {
+                player_id: pid.clone(),
+                player_action: PlayerActionChoice::AutoGazeZoat,
+                block_defender_id: None,
+            });
+        }
+
         // Black Ink (bb2020+ star special): the client's isBlackInkAvailable rule — unused
         // canGazeAutomatically skill + an adjacent standing-or-prone, NOT-distracted opponent
         // (LogicModule.isBlackInkAvailable). Declaring it maps to the client's
@@ -725,6 +737,40 @@ pub fn is_wisdom_available(game: &Game, player_id: &str) -> bool {
     })
 }
 
+/// Java `LogicModule.isAutoGazeZoatAvailable(Player)`:
+///   `UtilCards.hasUnusedSkillWithProperty(player, canGazeAutomaticallyThreeSquaresAway)
+///    && Arrays.stream(UtilPlayer.findPlayersWithTackleZones(game, otherTeam, coord, 3))
+///        .anyMatch(opponent -> !fieldModel.getPlayerState(opponent).isDistracted())`
+///
+/// NOTE the property is `canGazeAutomaticallyThreeSquaresAway`, NOT `canGazeAutomatically` —
+/// the latter is Black Ink's, and both live on the same UseSkill dispatch chain in
+/// `StepInitSelecting` (Java :399 Black Ink, :407 the Zoat).
+pub fn is_auto_gaze_zoat_available(game: &Game, player_id: &str) -> bool {
+    let Some(player) = game.player(player_id) else { return false };
+    if !player.has_skill_property(
+        ffb_model::model::property::named_properties::NamedProperties::CAN_GAZE_AUTOMATICALLY_THREE_SQUARES_AWAY)
+    {
+        return false;
+    }
+    // "unused": the once-per-game skill must not already be spent.
+    if player.used_skills.contains(&SkillId::ExcuseMeAreYouAZoat) {
+        return false;
+    }
+    let Some(coord) = game.field_model.player_coordinate(player_id) else { return false };
+    let opponent_team = if game.team_home.player(player_id).is_some() {
+        &game.team_away
+    } else {
+        &game.team_home
+    };
+    opponent_team.players.iter().any(|op| {
+        let Some(oc) = game.field_model.player_coordinate(&op.id) else { return false };
+        if oc.distance_in_steps(coord) > 3 { return false; }
+        game.field_model.player_state(&op.id)
+            .map(|s| s.has_tacklezones() && !s.is_distracted())
+            .unwrap_or(false)
+    })
+}
+
 /// The `(player, actions)` eligibility list for the `ActivatePlayer` prompt — the same
 /// per-player action enumeration as `legal_activate_player_actions` (which Java
 /// `ParityRunner.computeEligiblePlayers` mirrors), grouped per player and mapped into model
@@ -760,6 +806,7 @@ pub fn eligible_players_for_activation(game: &Game) -> Vec<(PlayerId, Vec<ffb_mo
             PAC::FuriousOutburst => PA::FuriousOutburst,
             PAC::ThrowKeg => PA::ThrowKeg,
             PAC::WisdomOfTheWhiteDwarf => PA::WisdomOfTheWhiteDwarf,
+            PAC::AutoGazeZoat => PA::AutoGazeZoat,
             PAC::AllYouCanEat => PA::AllYouCanEat,
             PAC::Treacherous => PA::Treacherous,
             PAC::BlackInk => PA::BlackInk,
@@ -1695,6 +1742,55 @@ mod tests {
     fn activate(game: &mut Game, id: &str) {
         let s = game.field_model.player_state(id).unwrap().change_active(true);
         game.field_model.set_player_state(id, s);
+    }
+
+    /// §11 Batch C: "Excuse Me, Are You a Zoat?" is offered under the CLIENT's
+    /// isAutoGazeZoatAvailable rule — unused canGazeAutomaticallyThreeSquaresAway plus an
+    /// opponent WITH TACKLE ZONES within 3 that is not already distracted.
+    #[test]
+    fn auto_gaze_zoat_offered_only_with_an_undistracted_opponent_within_three() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "zolcath", c(5, 5), PS_STANDING,
+                   vec![SkillId::ExcuseMeAreYouAZoat]);
+        activate(&mut game, "zolcath");
+        // opponent 4 steps away → no offer
+        add_player(&mut game, false, "opp", c(9, 5), PS_STANDING, vec![]);
+        assert!(!is_auto_gaze_zoat_available(&game, "zolcath"));
+        // within 3 → offered
+        game.field_model.set_player_coordinate("opp", c(8, 5));
+        assert!(is_auto_gaze_zoat_available(&game, "zolcath"));
+        let a = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&a, "zolcath", PlayerActionChoice::AutoGazeZoat));
+        // an ALREADY-DISTRACTED opponent does not count
+        // is_distracted() == confused || hypnotized; set the hypnotized bit directly.
+        game.field_model.set_player_state("opp",
+            ffb_model::enums::PlayerState::new(PS_STANDING | 0x00800));
+        assert!(!is_auto_gaze_zoat_available(&game, "zolcath"),
+            "a distracted opponent cannot be gazed again");
+        game.field_model.set_player_state("opp",
+            ffb_model::enums::PlayerState::new(PS_STANDING));
+        // used skill withdraws it (ONCE_PER_GAME)
+        if let Some(pl) = game.team_home.players.iter_mut().find(|pl| pl.id == "zolcath") {
+            pl.used_skills.insert(SkillId::ExcuseMeAreYouAZoat);
+        }
+        assert!(!is_auto_gaze_zoat_available(&game, "zolcath"));
+    }
+
+    /// The Zoat keys on `canGazeAutomaticallyThreeSquaresAway`; BLACK INK keys on
+    /// `canGazeAutomatically`. Both sit on the SAME CLIENT_USE_SKILL dispatch chain in
+    /// StepInitSelecting (Java :399 Black Ink, :407 the Zoat), so mixing them up would silently
+    /// route one mechanic into the other. Pin that they are distinct offers.
+    #[test]
+    fn auto_gaze_zoat_and_black_ink_are_distinct_offers() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "zolcath", c(5, 5), PS_STANDING,
+                   vec![SkillId::ExcuseMeAreYouAZoat]);
+        activate(&mut game, "zolcath");
+        add_player(&mut game, false, "opp", c(6, 5), PS_STANDING, vec![]);
+        let a = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&a, "zolcath", PlayerActionChoice::AutoGazeZoat));
+        assert!(!has_action(&a, "zolcath", PlayerActionChoice::BlackInk),
+            "the Zoat must not be offered as Black Ink");
     }
 
     /// §11: Wisdom of the White Dwarf is offered under GameMechanic.isWisdomAvailable — unused

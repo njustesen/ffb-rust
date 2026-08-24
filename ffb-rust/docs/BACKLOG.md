@@ -1237,8 +1237,38 @@ Carriers (from rules/star_players/*.md; Java canonical skill names in quotes):
         green, no GATE line, no error). Neither counts as a measurement. Running the three
         editions as SEPARATE invocations completed cleanly every time — prefer that.
 - Batch C — already in data, just dormant:
-  - [ ] The Zoat ("Excuse Me, Are You a Zoat?" → AutoGazeZoat, bb2020 star already in
-        all_editions.json) → a bb2020 team
+  - [x] Zolcath the Zoat ("Excuse Me, Are You a Zoat?" → AutoGazeZoat) LIVE (2026-08-24):
+        **182 executions in 100/100 games**, dark_elf bb2025 100/100 on the FIRST run, full gate
+        30/30 ×3, **ZERO engine bugs** — the step was fully ported and only the offer and
+        declaration were missing, exactly like Rodney Roachbait in Batch A. **§11 COMPLETE.**
+        **CORRECTION to this entry as written:** it said "bb2020 star … → a bb2020 team", but
+        `AutoGazeZoat` — step AND generator — exists ONLY in bb2025 in both engines
+        (`step/bb2025/StepAutoGazeZoat.java`, `generator/bb2025/AutoGazeZoat.java`). A bb2020 host
+        would never have reached the step. Drafted into **bb2025 dark_elf** @nr2 instead (witchelf
+        2 → 12; he is available_for Dark Elf, and nr2 is an LOS jersey so opponents are within 3
+        every drive). The skill IS registered for both editions, but in bb2020
+        `canGazeAutomatically` is consumed by Black Ink / SelectGazeTarget instead.
+        THE NEAR-MISS TO KNOW: the Zoat keys on **canGazeAutomaticallyThreeSquaresAway** while
+        BLACK INK keys on **canGazeAutomatically**, and both sit on the SAME CLIENT_USE_SKILL
+        dispatch chain in StepInitSelecting (Java :399 Black Ink, :407 the Zoat). Confusing them
+        silently routes one mechanic into the other; pinned with a test asserting the Zoat is
+        offered as AutoGazeZoat and NOT as BlackInk.
+        Declared like Black Ink: ActingPlayer(MOVE) + ClientCommandUseSkill(zoat), Java setting
+        only the DISPATCH action with forceGotoOnDispatch and never calling changeActingPlayer.
+        Target dialog is a PlayerChoice(AUTO_GAZE_ZOAT) which had NO ParityRunner arm (→ the
+        non-seeded RandomStrategy); added coordinate-sorted single-actionRng arms on BOTH sides.
+        Firing evidence: 182 Rust declarations vs 181 JAVA_ZOAT_PICK dialogs — the step
+        auto-picks when only one target is eligible, so the two counts agree.
+        SIGNAL: the first four iterations each exposed engine bugs because they touched NEW
+        plumbing (dialogs, sequences, enhancements); this one reused a route Black Ink had already
+        proven and found none. **The bugs cluster where the plumbing is novel, not where the star
+        is exotic.**
+        FOLLOW-UP (not this iteration): Rust's `SkillId::ExcuseMeAreYouAZoat.properties()`
+        registers BOTH edition properties unconditionally (`canGainGaze` for bb2020 AND
+        `canGazeAutomaticallyThreeSquaresAway` for bb2025) where Java splits them across two
+        edition-specific Skill classes. Inert today because bb2020 has no AUTO_GAZE_ZOAT dispatch,
+        but it is the same shape as the bb2016-only `canGazeDuringMove` trap already recorded in
+        legal_actions (an ungated property regressed vampire bb2025 from 0 to 100 fails).
 
 Availability is league-rule based and the harness does not validate it — host wherever
 convenient (precedent: Farblast into bb2016 dwarf). Stars ride outside the 1.1M budget.
