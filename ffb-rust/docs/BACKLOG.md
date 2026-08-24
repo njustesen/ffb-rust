@@ -3091,3 +3091,30 @@ in the allowance it starts with.
 NEXT: compare the blitzer's move path for that activation - the squares it is given and the
 square it stops on - on both builds. The chain answers the blitz Move prompt through a different
 route than the folded path, so the candidate squares or the stop condition are the place to look.
+
+**§12 goblin bb2020 (iter 72): the chain emits an EXTRA Move prompt per blitz.**
+
+Agent-side trace, same seed, filtered to the move windows:
+
+    main    RUST_ACT_PICK away_03 ... action=Blitz arc=7 drc=8
+            RUST_SMA pid=away_03 N=6                      <-- ONE move prompt
+
+    branch  RUST_SMA pid=home_01 N=3                      <-- extra prompt, no main counterpart
+            RUST_ACT_PICK away_03 ... action=Blitz arc=7 drc=8
+            RUST_SMA pid=away_03 N=5                      <-- EXTRA prompt (answered with Block)
+            RUST_SMA pid=away_03 N=6                      <-- the one main also has
+
+So every blitz on the chain path gets an additional `AgentPrompt::Move` that the folded path never
+issues. The first is consumed by the agent's `current_activation_is_blitz` arm, which answers
+`Action::Block` without drawing, so `arc` still matches at the declaration (7 on both) - but the
+step sequence around it is not the same, and the blitzer ends one square further along, on the
+ball (iteration 71).
+
+Note this is the two-pass structure showing up on the agent boundary: pass one prompts and is
+answered with the block, pass two prompts again and is answered with a real move. On the folded
+path there is a single pass and a single prompt.
+
+NEXT: establish which of the two prompts produces the movement and what square it picks, on both
+builds - print the chosen square alongside `RUST_SMA`, not just the candidate count. If the branch
+moves on the SECOND prompt where main moves on its only one, the fix is to stop the chain issuing
+the first prompt at all rather than to change what the agent answers.
