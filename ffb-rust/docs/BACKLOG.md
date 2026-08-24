@@ -2206,3 +2206,32 @@ NEXT: compare the full `state=` STRING at i=100..102 between branch and main (ma
 main == Java). The Java jsonl carries `state: None`, so main is the only available reference.
 That names the differing field directly instead of inferring it from flags - which has now
 misfired twice on this roster.
+
+**§12 vampire ROOT CAUSE (iter 44): the failed Blood Lust does not FEED during a blitz.**
+
+Found by diffing the full `state=` string against main (main is green, so main == Java). Both
+engines are byte-identical through i=101 and differ in exactly ONE player field at i=102:
+
+    i=101  main  pa00:11,5,Standing,5/5/4/10,1     brch  pa00:11,5,Standing,5/5/4/10,1
+    i=102  main  pa00:11,6,Prone,5/5/4/10,1        brch  pa00:11,5,Standing,5/5/4/10,1
+
+Every other player field, the ball, the score, the weather and all four used-flags match. So
+after home_03's blitz, main moves player 00 one square and knocks it PRONE while the branch
+leaves it untouched.
+
+Crucially this happens with **no dice difference at all** - the whole 129-entry RNG-step list is
+identical and the blitz spends exactly one die (the Blood Lust roll) in both. A dice-free
+relocate-and-knockdown of a player on the acting team is the Blood Lust THRALL BITE: a vampire
+that fails Blood Lust feeds on an adjacent thrall, which ends up prone. The drive trace already
+shows Rust HAS the machinery (`InitFeeding` / `EndFeeding` steps run elsewhere in the game).
+
+So: when a blitz's activation fails Blood Lust inside the chain, the feeding half is skipped.
+That fits everything measured, including why vampire is the only roster showing this shape.
+
+NEXT: confirm by checking whether `InitFeeding`/`EndFeeding` execute after the failed Blood Lust
+on main but not on the branch for this activation (drive trace, whole-game counts, not a window),
+then find where the chain's failure path bypasses feeding - the Select sequence
+StepSelectBlitzTargetEnd pushes has feeding in it, so the likely culprit is the goto to
+END_BLITZING skipping past it. Note `EndPlayerAction::build_sequence` takes a `feeding_allowed`
+flag - StepSelectBlitzTarget passes `feeding_allowed: false`, which is worth checking against
+Java first.
