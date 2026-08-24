@@ -1482,3 +1482,28 @@ NEXT: instrument `StepSelectBlitzTargetEnd`'s SELECTED branch itself — print
 (b) something between the push and `InitSelecting` resets the action (`changeActingPlayer` clears
 state — see the `reset_blocked_and_moving_players` precedent); (c) those three are the OTHER
 team's blitzes and the acting player is swapped before the Select sequence runs.
+
+**§12 handoff instrumented (2026-08-24): the write is CORRECT; the loss is after the push.**
+
+    BZPROBE SBTEnd SELECTED pid_before=Some("away_02") pid_after=Some("away_02") pa_after=Some(BlitzMove)   x4
+    BZPROBE SBTEnd SELECTED pid_before=Some("home_03") pid_after=Some("home_03") pa_after=Some(BlitzMove)   x2
+    BZPROBE SBTEnd SELECTED pid_before=Some("home_01") ... pa_after=Some(BlitzMove)                          x1
+    BZPROBE SBTEnd SELECTED pid_before=Some("home_02") ... pa_after=Some(BlitzMove)                          x1
+
+All eight set `BlitzMove` on a valid acting player, so candidate (a) from the previous note — the
+`if let Some(pid)` guard being skipped — is RULED OUT. The action is lost between
+`StepOutcome::next().push_seq(select_seq)` here and `StepInitSelecting` reading it.
+
+**New signal: `away_02` appears FOUR times.** A player should blitz once per turn and this step
+sets `blitz_used`, so repeats mean the failed blitzes are being RE-DECLARED — the activation never
+completes, the player stays available, and the agent offers Blitz again. That reframes the 8-vs-5
+gap: it is likely 5 real blitzes plus 3 retries of ones that died, not 8 distinct blitzes of which
+3 fail. Confirm by logging the turn number alongside each SBTEnd.
+
+NEXT: find out whether the pushed Select sequence RUNS at all for the lost three. Log a counter in
+`StepInitSelecting::start` unconditionally (not just the BlitzMove arm) and compare its count
+against the 8 SBTEnd pushes; if Select ran but `pa` was not BlitzMove, something between the push
+and the read resets it (`changeActingPlayer` clears state — cf. `reset_blocked_and_moving_players`);
+if Select did NOT run, the push itself is being dropped, which would point at the driver's handling
+of `push_seq` from a step that is the last in its own sequence — exactly the position
+`SelectBlitzTargetEnd` occupies.

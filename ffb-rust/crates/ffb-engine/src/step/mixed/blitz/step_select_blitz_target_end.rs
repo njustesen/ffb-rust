@@ -65,9 +65,14 @@ impl StepSelectBlitzTargetEnd {
                 // real move + block. Without it this step was the terminus of the whole blitz
                 // sequence and the driver stalled (lineman bb2025 0/20, rust_total 0.07s) - the
                 // same publish-only shape as StepEndThrowKeg and StepEndThenIStartedBlastin.
+                let before = game.acting_player.player_id.clone();
                 if let Some(pid) = game.acting_player.player_id.clone() {
                     crate::step::util_server_steps::change_player_action(
                         game, &pid, PlayerAction::BlitzMove, false);
+                }
+                if std::env::var("FFB_BZ_PROBE").is_ok() {
+                    eprintln!("BZPROBE SBTEnd SELECTED pid_before={:?} pid_after={:?} pa_after={:?}",
+                        before, game.acting_player.player_id, game.acting_player.player_action);
                 }
                 game.turn_data_mut().blitz_used = true;
                 let seq = Select::build_sequence(&SelectParams {
