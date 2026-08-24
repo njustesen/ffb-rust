@@ -2385,3 +2385,33 @@ FOLLOWING prompt. Before writing it, verify against main how many Move prompts a
 actually receives and whether `game.defender_id` survives to `StepInitBlocking` on the chain path
 (probe it at InitBlocking on both builds) - the answer decides whether the block needs to be
 issued explicitly at all.
+
+**§12 iter 50 - VERIFIED: the blitz approach move is ENGINE-side, not agent-side.**
+
+Probed the agent's Move prompt and `StepInitBlocking` on both builds, same blitz (khemri seed 38,
+away_03):
+
+    main    IB attacker=away_03 defender=home_01 pa=Blitz cm=3    <-- reaches the block at cm=3
+            MV pid=away_03 n=7 pa=BlitzMove cm=4 blitzflag=true    <-- prompt AFTER the block
+
+    branch  MV pid=away_03 n=6 pa=BlitzMove cm=0 blitzflag=true    <-- prompt BEFORE, answered Block
+            IB attacker=away_03 defender=home_01 pa=Blitz cm=0     <-- reaches the block at cm=0
+            MV pid=away_03 n=7 pa=BlitzMove cm=1 blitzflag=false
+
+Two things are now established that were only guesses before:
+
+1. **On main the agent is NEVER prompted to move before the blitz's block.** `current_move` goes
+   from 0 to 3 with no `MV` line in between, so the approach movement is performed by the ENGINE
+   during the blitz-move phase - it is not something the agent supplies. That is why iteration
+   49's "let the agent move instead of blocking" was the wrong shape and measured 0/20.
+2. **`game.defender_id` DOES survive to `StepInitBlocking` on the chain path** (`defender=home_01`
+   in both). So the explicit `Action::Block` the agent issues is not what supplies the target -
+   the engine already has it.
+
+Both builds also get a Move prompt AFTER the block (main at cm=4, branch at cm=1), so the prompt
+count is the same; only the movement before the block differs.
+
+NEXT: find the engine code that advances the blitzer from cm=0 to cm=3 on the folded path -
+almost certainly the blitz-move phase consuming a move stack toward the defender - and establish
+why the chain path reaches `StepInitBlocking` without it having run. The fix belongs in the
+engine sequence, not in the agent.
