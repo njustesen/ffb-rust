@@ -1537,3 +1537,31 @@ pushes — if a clear lands between an SBTEnd push and the next `InitSelecting`,
 and the fix is to keep the blitz's Select push from being sequenced behind a pending
 EndPlayerAction (Java's `StepSelectBlitzTargetEnd` pushes Select directly onto the step stack;
 compare how Rust's `push_seq` orders against what is already there).
+
+**§12 hypothesis DISPROVED (2026-08-24) — the push is DROPPED, nothing clears the action.**
+Ordered probe output on failing seed 3 (SBTEnd pushes interleaved with InitSelecting entries):
+
+    SBTEnd SELECTED home_03 pa_after=Some(BlitzMove)        <- NO InitSelecting follows
+    SBTEnd SELECTED home_01 pa_after=Some(BlitzMove)        <- NO InitSelecting follows
+    SBTEnd SELECTED away_02 pa_after=Some(BlitzMove)  ->  InitSelecting enter pa=Some(BlitzMove)
+    SBTEnd SELECTED home_03 ...                       ->  InitSelecting enter pa=Some(BlitzMove)
+    SBTEnd SELECTED away_02 ...                       ->  InitSelecting enter pa=Some(BlitzMove)
+    SBTEnd SELECTED away_02 ...                       ->  InitSelecting enter pa=Some(BlitzMove)
+    SBTEnd SELECTED home_02 ...                       ->  InitSelecting enter pa=Some(BlitzMove)
+
+**No `CLEAR_ACTION pa=Some(BlitzMove)` line exists anywhere in the run**, so the EndPlayerAction
+theory is dead: nothing clears the acting action. The 289 `pa=None` entries are ordinary
+activations, not the lost blitzes. What actually happens is that for the first pushes the Select
+sequence **never runs at all** — the `push_seq` is dropped.
+
+That is state-dependent, not blanket: the first two are dropped and the later five run. So the
+question is what differs about the stack at that moment. `SelectBlitzTargetEnd` is the LAST step of
+its own sequence (labelled `END_BLITZING`), which is exactly the position where a `push_seq`
+returned alongside `StepAction::NextStep` could be discarded while the driver unwinds the finished
+sequence.
+
+NEXT: instrument the DRIVER, not the steps — log every `push_seq` it receives with the current
+stack depth and whether it is honoured, then compare the two dropped pushes against the five that
+survive. Related known trap: `StepOutcome::clear_stack` was found to be a DEAD FLAG in the Zzharg
+work (the driver never consumed it), so the driver's handling of outcome side-channels from a
+terminal step is already suspect and is the right place to look.
