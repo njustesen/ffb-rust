@@ -2083,3 +2083,35 @@ it only exists once the chain runs. Exactly the class of bug this tier is meant 
 NEXT: port `targetSelectionState.failed()` into the Rust negatrait behaviours (Really Stupid,
 Bone Head, Animal Savagery, Foul Appearance, Unchannelled Fury) for every edition that has the
 Java call, guarded the same way Java guards it, then re-measure goblin and re-gate.
+
+**§12 GATE 4 (after the negatrait FAILED fixes): bb2025 22 GREEN / 8 RED (was 10/20).**
+
+    NEWLY GREEN (12): chaos 60->100, chaos_dwarf 94->100, chaos_pact 35->100, goblin 21->100,
+                      human 77->100, lizardman 70->100, norse 65->100, ogre 34->100,
+                      orc 48->100, renegades 23->100, slann 66->100, underworld 51->100
+    STILL RED (8):    halfling 27 (seed 2 step 49), undead 28 (seed 1 step 69),
+                      vampire 57 (seed 1 step 101), khemri 99 / khemri_fumbbl 99 /
+                      necromantic 99 (ALL seed 38 step 31), nurgle 99 (seed 99 step 156),
+                      skaven 99 (seed 73 step 148)
+
+The single fix pair carried twelve rosters, several from deep red (ogre 34, renegades 23,
+chaos_pact 35). That is the signature of a genuine shared root cause rather than a seed-level
+patch, and it confirms the negatrait/blitz interaction was the dominant defect in this tier.
+
+**The remaining 8 split cleanly into two groups:**
+
+- FIVE are ONE seed short (khemri, khemri_fumbbl, necromantic, nurgle, skaven). The three
+  undead-family rosters share an IDENTICAL first divergence - seed 38 step 31 - so they are one
+  bug, not three.
+- THREE are still deep: halfling 27, undead 28, vampire 57.
+
+**Prime suspect for the deep three, and it is already known and written down:** the negatrait
+FAILED marker was ported ONLY into `really_stupid` and `bone_head`. The other bb2025 behaviours
+that call `targetSelectionState.failed()` in Java are `animal_savagery`, `foul_appearance` and
+`unchannelled_fury` - and BLOOD_LUST must be checked too. vampire is the Blood Lust roster and
+halfling/undead field the Treemen/big guys whose negatraits are exactly the unported ones.
+
+NEXT: check whether bb2025 `BloodLustBehaviour.java` also calls `failed()`, then port the marker
+into every remaining bb2025 negatrait behaviour using the same helper, matching each one's own
+failure shape rather than assuming the really_stupid shape. Re-measure vampire and halfling
+first (fastest signal), then re-gate.
