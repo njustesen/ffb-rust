@@ -2887,3 +2887,29 @@ check whether its SelectBlitzTarget sequence carries a step that accepts the key
 StepSelectBlitzTargetEnd should restore from it. Fix the restore, then re-measure bb2020 skaven
 seed 1 (expect the second BlockRoll at entry 22) and re-gate. Note this bug needs Animal Savagery
 AND a blitz in the same activation, which is why it survived to be a 87-99 residue.
+
+**§12 iter 66 - REVISION of the iteration-65 conclusion: the GAZE_VICTIM_ID restore is NOT the
+bug. The branch LASHES OUT where main does not.**
+
+Iteration 65 concluded the save-and-restore of `game.defender_id` around Animal Savagery's
+lash-out was failing on the chain path. Re-checking the evidence before fixing it:
+
+- Both engines roll Animal Savagery for away_01 at the SAME stream position and value
+  (`AnimalSavagery 31->32`, identical in the normalised RNG-step diff).
+- Main's `defender_id` is NEVER overwritten - the iteration-63 probe reads `def=home_02` at
+  EndBlocking, the correct blitz target.
+- The branch's IS overwritten, by `AnimalSavagery`, to a team-mate.
+
+So main does not lash out at all on that roll, and the branch does. The publish/restore machinery
+is a red herring: nothing needs restoring on main because nothing is taken. Java's `lashOut` is
+only reached when the Animal Savagery roll FAILS.
+
+Same die, opposite outcome, so the difference is in how the roll is EVALUATED - a modifier or a
+threshold that differs on the chain path. Note Java's candidate set explicitly folds the current
+defender in when it is a team-mate and adjacent
+(`if (team.hasPlayer(game.getDefender()) && playerCoordinate.isAdjacent(defenderCoordinate))`),
+which is why the stolen id is specifically a team-mate.
+
+NEXT: probe StepAnimalSavagery's roll evaluation on both builds for that activation - the roll,
+the target number, the modifiers, and which branch it takes. The FFB_DEFCHG watch committed last
+iteration stays useful and is not affected by this revision.
