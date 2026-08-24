@@ -2115,3 +2115,29 @@ NEXT: check whether bb2025 `BloodLustBehaviour.java` also calls `failed()`, then
 into every remaining bb2025 negatrait behaviour using the same helper, matching each one's own
 failure shape rather than assuming the really_stupid shape. Re-measure vampire and halfling
 first (fastest signal), then re-gate.
+
+**§12 correction to the gate-4 "prime suspect" note (same day).** Checked before porting:
+
+    bb2025 BloodLustBehaviour.java      targetSelectionState.failed() count: 0
+    bb2025 TakeRootBehaviour.java       targetSelectionState.failed() count: 0
+    bb2025 AnimalSavageryBehaviour.java 2
+    bb2025 FoulAppearanceBehaviour.java 1
+    bb2025 UnchannelledFuryBehaviour.java 1
+
+**Blood Lust and Take Root do NOT mark the state failed**, which weakens the suspicion recorded
+above: vampire is the Blood Lust roster and halfling's Treemen are the Take Root carriers, so the
+unported FAILED marker probably does NOT explain vampire 57 or halfling 27. Do not port on that
+theory and call it a fix - measure those two first.
+
+Also found while looking: the bb2025 `skill_behaviour/bb2025/*_behaviour.rs` files for
+unchannelled_fury / animal_savagery / foul_appearance are EMPTY REGISTRATION STUBS (~40 lines,
+no hook). The live failure logic is in the STEP files instead:
+`step/mixed/shared/step_animal_savagery.rs` (3 EndPlayerAction sites vs Java's 2 failed() calls),
+`step/mixed/step_unchannelled_fury.rs` (1 site, matches Java's 1). So porting the marker there
+needs each site matched to Java individually - the counts do not line up for animal savagery, and
+a blanket edit would be a guess.
+
+NEXT (revised): run the `FFB_RNG_STEPS` branch-vs-main diff on vampire seed 1 (first divergence
+step 101) and halfling seed 2 (step 49) to find what those actually are, BEFORE porting anything
+else. The three undead-family 99s (khemri, khemri_fumbbl, necromantic, all seed 38 step 31) are a
+separate single bug and are the cheapest remaining win.
