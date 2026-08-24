@@ -3259,3 +3259,35 @@ NEXT: find why main's blitz has no target where the chain's does. The chain asks
 for this activation while the chain's `standing_opponents` is not, the two predicates disagree
 again - the same split that iteration 24 fixed for `hasStandingOpponents`, worth re-checking for
 BB2020 specifically since only the BB2025 step was touched then.
+
+**§12 iter 78 - the target predicates AGREE, and iteration 77's "main never blocks" is ANOTHER
+window artefact.**
+
+Computed both candidate lists at the same point for the failing activation:
+
+    CMP2 att=away_03 engine=["home_03"] agent=["home_03"] has_standing=true
+
+`standing_opponents` and `legal_block_targets` return the same single target, so the
+predicate-split theory (the iteration-24 `hasStandingOpponents` shape) does NOT apply here, and
+nothing needs porting to BB2020 on that account.
+
+That also refutes the previous entry. If both engines have a target, main's blitz must block - and
+the RNG-step diff says exactly that: `main[11] BlockRoll 21->22 away_03`. The four-step main
+window in iteration 77 simply did not contain the block, which makes it the FOURTH
+window-bounded reading in this section to produce a wrong conclusion. The RUST_STEP-bracketed
+window is not a safe unit even when printed in full, because a single activation's steps do not
+all fall between consecutive RUST_STEP lines.
+
+**What is solid, from the RNG-step diff alone** (the instrument that has never misled here):
+
+    main[11] BlockRoll           21->22 away_03
+    brch[11] CatchScatterThrowIn 21->22 away_03
+    brch[12] BlockRoll           22->23 away_03
+
+Both engines block; the branch spends one extra die on a scatter FIRST. That scatter follows the
+`PickUp` inside the BlitzBlock sequence, and PickUp only rolls when the acting player stands on
+the ball - so at that specific step the branch's blitzer is on the ball square and main's is not.
+
+NEXT: probe ONLY the BlitzBlock `PickUp` (stack depth ~41) on both builds - player id, coordinate
+and ball coordinate - so both samples are taken at the identical step. That is the one comparison
+that has not yet been made cleanly, and it decides whether the position genuinely differs there.
