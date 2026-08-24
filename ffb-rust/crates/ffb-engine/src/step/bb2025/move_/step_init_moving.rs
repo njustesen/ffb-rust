@@ -77,6 +77,11 @@ impl Step for StepInitMoving {
             // Java: CLIENT_BLOCK → dispatchPlayerAction(BLITZ/KICK_EM_BLITZ)
             // Guard: (BLITZ_MOVE || KICK_EM_BLITZ) && !hasBlocked || PUTRID_REGURGITATION_BLITZ
             Action::Block { .. } => {
+                if std::env::var("FFB_BZ_PROBE").is_ok() {
+                    eprintln!("BZPROBE InitMoving Block pa={:?} has_blocked={} tss={:?}",
+                        player_action, has_blocked,
+                        game.field_model.target_selection_state.as_ref().map(|t| t.get_status()));
+                }
                 let is_blitz_dispatch = matches!(player_action,
                     Some(PlayerAction::BlitzMove) | Some(PlayerAction::KickEmBlitz)
                     | Some(PlayerAction::PutridRegurgitationBlitz))
