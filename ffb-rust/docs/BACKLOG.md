@@ -3065,3 +3065,29 @@ blitzer stops.
 NEXT: print the blitzer's coordinate and `current_move` at the start and end of away_03's blitz on
 both builds, plus the ball position. If the final square differs, work back to the movement
 decision; if it does not, the PickUp trigger itself differs.
+
+**§12 goblin bb2020 seed 85 ROOT CAUSE (iter 71): the chain's blitzer ends ONE SQUARE FURTHER,
+onto the ball.**
+
+Probed `StepPickUp` on both builds. The blitz in question is away_03's:
+
+    main   PU pid=away_03 coord=(12,8) ball=(13,8) cm=0    <-- adjacent to the ball, no pick-up
+    brch   PU pid=away_03 coord=(13,8) ball=(13,8) cm=0    <-- ON the ball -> pick-up -> scatter
+
+That is the whole extra die: PickUp fires only when the player stands on the ball's square, and
+the branch's blitzer stops one square further along. Everything downstream (the extra
+CatchScatterThrowIn, the shifted BlockRoll, the step-4 divergence) follows from that single
+square.
+
+Also visible, and harmless: the branch runs an extra PickUp STEP during home_01's blitz
+(`coord=(12,7) ball=(13,8)`) that main does not. It spends no die because that player is not on
+the ball, which is why the RNG-step lists still matched through entry 10 - a reminder that "the
+dice match" does not mean "the same steps ran".
+
+Both engines enter this activation with byte-identical state (iteration 70b) and the same
+`current_move=0` at PickUp, so the difference is in the movement the blitz itself performs, not
+in the allowance it starts with.
+
+NEXT: compare the blitzer's move path for that activation - the squares it is given and the
+square it stops on - on both builds. The chain answers the blitz Move prompt through a different
+route than the folded path, so the candidate squares or the stop condition are the place to look.
