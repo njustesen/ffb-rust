@@ -29,7 +29,7 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `ogre` | 🟢 100/100 |  |  |
 | `orc` | 🟢 100/100 |  |  |
 | `renegades` | 🟢 100/100 |  |  |
-| `skaven` | 🔴 99/100 | seed 73, step 148, java dd3fe4700a468c82 vs rust 592e0f697cd7780a |  |
+| `skaven` | 🟢 100/100 |  |  |
 | `slann` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `slann_fumbbl` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `undead` | 🟢 100/100 |  |  |
@@ -37,4 +37,4 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `vampire` | 🔴 57/100 | seed 1, step 101, java d6e94c8b690ae5cb vs rust 0ff55adfbf43a908 |  |
 | `wood_elf` | 🟢 100/100 |  |  |
 
-**28 green / 2 red of 30.**
+**29 green / 1 red of 30.**

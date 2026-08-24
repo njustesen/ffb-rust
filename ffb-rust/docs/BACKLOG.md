@@ -2541,3 +2541,19 @@ NEXT: vampire, using the method that finally worked - one unfiltered `FFB_SEQ` s
 CONTIGUOUSLY, over the steps that can move a player and change its base (Pushback,
 DropFallingPlayers, the stand-up MOVING write in the new helper). The fact that vampire alone
 resisted all four blitz-chain fixes suggests its bug may not be in the chain at all.
+
+**§12 GATE 6: bb2025 29 GREEN / 1 RED. Only vampire (57/100, seed 1 step 101) remains.**
+
+Progress across the section: 4 -> 10 -> 10 -> 22 -> 28 -> 29 green.
+
+skaven went green from the SBTEnd end_turn sequence push. Every roster except vampire is now
+100/100 with the full two-phase blitz chain live.
+
+**vampire has been 57/100 at gates 2, 3, 4, 5 AND 6** - not one of the five fixes moved it by a
+single seed. Combined with its signature (dice byte-identical to main, a single differing player
+field, no dice change at the divergence) that is strong evidence it is NOT a blitz-chain bug and
+was simply never green on this branch for an unrelated reason.
+
+Worth checking FIRST, before more digging: whether vampire is red on MAIN too. If it is, this is
+a pre-existing failure the chain merely inherited, and §12 is effectively complete at 29/30 with
+vampire belonging to its own backlog item.
