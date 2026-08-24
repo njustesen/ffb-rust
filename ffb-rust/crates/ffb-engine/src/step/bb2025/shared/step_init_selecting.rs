@@ -73,6 +73,35 @@ impl Step for StepInitSelecting {
             || game.acting_player.has_passed
             || game.acting_player.has_triggered_effect
             || game.acting_player.forgone;
+        if std::env::var("FFB_BZ_PROBE").is_ok() {
+            eprintln!("BZPROBE ISel TOP pa={:?} acted={} mv={} fl={} bl={} ps={} tr={} fg={} tss={}",
+                game.acting_player.player_action, acted,
+                game.acting_player.has_moved, game.acting_player.has_fouled,
+                game.acting_player.has_blocked, game.acting_player.has_passed,
+                game.acting_player.has_triggered_effect, game.acting_player.forgone,
+                game.field_model.target_selection_state.is_some());
+        }
+        // Post-BLITZ_SELECT continuation. StepSelectBlitzTargetEnd sets the acting action back to
+        // BLITZ_MOVE and pushes the Select sequence, which re-enters this step with the target
+        // already chosen. Java's :114 guard is `BLITZ_MOVE && targetSelectionState == null`, so on
+        // this SECOND pass the state is non-null and Java falls through to the ordinary dispatch,
+        // running the real move + block. Crucially Java does NOT consult hasActed anywhere on this
+        // path: a mid-flight blitz is CONTINUED, never re-activated.
+        //
+        // This check therefore has to sit ABOVE the `!acted` gate below, which is a Rust-side
+        // construct with no Java counterpart. While it was nested inside that gate it swallowed
+        // the blitz of any player who had legally MOVED before declaring it - has_moved makes
+        // `acted` true, so the step asked for a fresh activation and the blitz died having done
+        // nothing. Measured on lineman bb2025 seed 3: 8 blitzes reached SelectBlitzTargetEnd but
+        // only the 5 with has_moved=false were continued; the other 3 were lost exactly here.
+        if game.acting_player.player_action == Some(PlayerAction::BlitzMove)
+            && game.field_model.target_selection_state.is_some()
+        {
+            self.dispatch_player_action = Some(PlayerAction::BlitzMove);
+            self.force_goto_on_dispatch = true;
+            return self.execute_step(game, _rng);
+        }
+
         if !acted {
             if std::env::var("FFB_BZ_PROBE").is_ok() {
                 eprintln!("BZPROBE InitSelecting enter pa={:?}", game.acting_player.player_action);
@@ -118,14 +147,6 @@ impl Step for StepInitSelecting {
                 // move + block. Without this arm the re-entered step asked for a NEW activation
                 // instead and the blitz ended having done nothing (lineman bb2025 seed 1 i=1:
                 // Java blocks and spends a die, Rust spends none).
-                Some(PlayerAction::BlitzMove) => {
-                    if std::env::var("FFB_BZ_PROBE").is_ok() {
-                        eprintln!("BZPROBE InitSelecting continuation HIT pa=BlitzMove");
-                    }
-                    self.dispatch_player_action = Some(PlayerAction::BlitzMove);
-                    self.force_goto_on_dispatch = true;
-                    return self.execute_step(game, _rng);
-                }
                 _ => {}
             }
         }

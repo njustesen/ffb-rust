@@ -80,6 +80,10 @@ impl StepSelectBlitzTargetEnd {
                     is_blitz_move: false,
                     ..Default::default()
                 });
+                if std::env::var("FFB_BZ_PROBE").is_ok() {
+                    eprintln!("BZPROBE SBTEnd PUSHSEQ {:?}",
+                        seq.iter().map(|s| format!("{:?}", s.step_id)).collect::<Vec<_>>());
+                }
                 return StepOutcome::next().push_seq(seq);
             } else if ts.is_skipped() {
                 // Java: changePlayerAction(BLITZ_MOVE), push Select, setBlitzUsed, setHasMoved
