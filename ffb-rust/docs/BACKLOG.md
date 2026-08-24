@@ -2823,3 +2823,30 @@ pass re-entering with a stale value.
 
 NEXT: log every write to `game.defender_id` for that one activation (it is a plain field - a
 setter shim or a grep of assignment sites will do) and find which write leaves a teammate there.
+
+**§12 BB2020 skaven (iter 64): `game.defender_id` is CORRECT at selection and WRONG by
+StepInitBlocking - the corrupting write is in between.**
+
+Two probes, bb2020 skaven seed 1, the failing blitz is away_01's:
+
+    SEL  attacker=away_01 selected=home_02 home_playing=false      <- selection is CORRECT
+    IB2  att=away_01 pa=Blitz param=Some("away_02")
+                            prev_game_def=Some("away_02") -> away_02   <- already wrong on arrival
+
+`StepSelectBlitzTarget` picks home_02 (an opponent, matching main exactly for every blitz in the
+game), and by the time `StepInitBlocking` runs, `game.defender_id` is away_02 - a TEAMMATE - and
+the step's `block_defender_id` param agrees with it, so the param is downstream of the same bad
+value rather than an independent stale copy.
+
+Note away_01 appears TWICE: the Blitz with the wrong defender, then a later `pa=Block` with the
+correct home_02. So the value is not permanently wrong - something overwrites it for the blitz
+window specifically.
+
+Ruled out this iteration: `StepPushback` never writes `game.defender_id` outside tests (all 12
+matches are p1/p2/d1 fixtures), and `StepInitBlocking`'s own write is the legitimate Java
+`:220` port and simply copies what it was handed.
+
+NEXT: instrument every production write to `game.defender_id` (the non-test set is small -
+init_blocking, init_fouling, init_moving's gaze victim, diving_tackle, tentacles, init_kick_team_mate)
+and find which one fires between the SEL line and the IB2 line for that activation. A temporary
+setter shim would be cleaner than six separate probes.
