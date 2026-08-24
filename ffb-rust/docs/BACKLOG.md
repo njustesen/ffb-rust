@@ -2725,3 +2725,25 @@ negatrait would look like.
 NEXT: check whether the bb2020 animal_savagery / foul_appearance / unchannelled_fury behaviours
 have live failure sites (in bb2025 these files were EMPTY STUBS with the logic in the step files -
 verify before editing), port the marker where Java has it, and re-gate. BB2016 still unmeasured.
+
+**§12 iter 61: the remaining-negatraits suspect is EXHAUSTED - checked, nothing to port.**
+
+There are no `skill_behaviour/bb2020/{animal_savagery,foul_appearance,unchannelled_fury}` files at
+all; that logic lives in shared step files used by both editions, and they already mark the state
+failed, with counts matching Java exactly:
+
+    step/mixed/shared/step_animal_savagery.rs   2 marks   (Java bb2020/bb2025: 2)
+    step/mixed/step_foul_appearance.rs          1 mark    (Java: 1)
+    step/mixed/step_unchannelled_fury.rs        1 mark    (Java: 1)
+
+So the six remaining BB2020 reds are NOT a missing FAILED marker. Verified before editing rather
+than after, which is the right way round for this class of change.
+
+Remaining BB2020 reds: vampire 53 (same bug as bb2025 - chain second pass with
+`suffering_blood_lust`), and chaos_pact 87 / renegades 89 / skaven 89 / underworld 94 / goblin 99.
+
+NEXT: skaven bb2020 seed 1 diverges at step 23 - the earliest of the non-vampire reds and
+therefore the cheapest to trace. Note BB2025 skaven was fixed by the SBTEnd end_turn sequence
+push, and that step is the SHARED `mixed/blitz` file, so the fix is already live for BB2020 -
+whatever remains is something else. Use the normalised RNG-step diff, then the contiguous
+FFB_SEQ stream.
