@@ -90,6 +90,16 @@ impl Step for StepEndMoving {
     fn id(&self) -> StepId { StepId::EndMoving }
 
     fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // A DISPATCH_PLAYER_ACTION published by an EARLIER step must be honoured here. The
+        // blitz path arrives this way: StepInitMoving answers CLIENT_BLOCK by publishing
+        // DispatchPlayerAction(Blitz) and GOTOing END_MOVING, so this step is entered through
+        // `start`, not `handle_command`. `start` went straight to execute_step and never looked
+        // at the field, so the dispatch was silently dropped and the blitz ended without a block
+        // (lineman bb2025 seed 1 i=1). Java's generator marks this exact spot: "may insert
+        // endTurn or block sequence at this point".
+        if self.dispatch_player_action.is_some() {
+            return self.do_dispatch_player_action(game, rng);
+        }
         self.execute_step(game, rng)
     }
 
@@ -158,7 +168,8 @@ impl StepEndMoving {
                 let jumping = game.acting_player.jumping;
                 change_player_action(game, pid, dispatch_action, jumping);
             }
-            if let Some(seq) = self.push_sequence_for_player_action(dispatch_action, game.rules) {
+            let defender = game.defender_id.clone();
+            if let Some(seq) = self.push_sequence_for_player_action(dispatch_action, game.rules, defender) {
                 return StepOutcome::next().push_seq(seq);
             }
         }
@@ -250,7 +261,7 @@ impl StepEndMoving {
                     || action == PlayerAction::HandOver)
                     && !has_ball;
                 if !action.is_moving() && !pass_or_handover_no_ball {
-                    if let Some(seq) = self.push_sequence_for_player_action(action, game.rules) {
+                    if let Some(seq) = self.push_sequence_for_player_action(action, game.rules, game.defender_id.clone()) {
                         return StepOutcome::next().push_seq(seq);
                     }
                 }
@@ -339,6 +350,7 @@ impl StepEndMoving {
         &self,
         action: PlayerAction,
         rules: ffb_model::enums::Rules,
+        block_defender_id: Option<String>,
     ) -> Option<Vec<crate::step::framework::SequenceStep>> {
         match action {
             // Java: VICIOUS_VINES | BLOCK → Block sequence
@@ -353,7 +365,13 @@ impl StepEndMoving {
             | PlayerAction::BlitzMove
             | PlayerAction::PutridRegurgitationMove
             | PlayerAction::KickEmBlitz => {
+                // Java EndSelecting passes fBlockDefenderId into BlitzBlock.SequenceParams;
+                // StepInitBlocking only ever learns the defender from the BLOCK_DEFENDER_ID step
+                // parameter that the generator adds from it. Building with ..Default::default()
+                // left it None, so the blitz block ran with no defender, rolled nothing and ended
+                // the turn (lineman bb2025 seed 1 i=1: rng_calls stayed 12).
                 Some(BlitzBlock::build_sequence(&BlitzBlockParams {
+                    block_defender_id,
                     using_chainsaw: self.using_chainsaw,
                     ..Default::default()
                 }))
