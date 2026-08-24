@@ -2795,3 +2795,31 @@ than this step.
 NEXT: print the defender's PlayerState base immediately after the first block on both builds. If
 the branch has it knocked down where main has it merely pushed, work backwards from the block
 resolution; if the states match, the bug is in how `can_be_blocked` is evaluated here.
+
+**§12 BB2020 skaven ROOT CAUSE (iter 63): `game.defender_id` points at a TEAMMATE at
+StepEndBlocking on the chain path.**
+
+Probed the defender at `StepEndBlocking` on both builds, bb2020 skaven seed 1. The first three
+blocks agree exactly; the fourth is the failing blitz:
+
+    main    att=away_01 pa=Blitz def=home_02 defbase=1 pushed=true   -> opponent, blockable
+    brch    att=away_01 pa=Blitz def=away_02 defbase=3 pushed=true   -> OWN TEAMMATE, not blockable
+
+(Only line 4 is a valid comparison - the games have diverged by line 5, so the later rows are not
+comparable and were not read as such.)
+
+So `defender_can_be_blocked` is false for the honest reason that the defender being tested is not
+the player that was blocked at all: it is a member of the ATTACKER's own team. The Frenzy
+follow-up is then correctly skipped for an incorrect defender, which is why every other term of
+`force_second_block` looked healthy.
+
+This also revises the iteration-62 note: the first block's EFFECT is not necessarily different -
+what differs is which player `game.defender_id` names by the time EndBlocking runs.
+
+`StepSelectBlitzTarget` sets `game.defender_id = Some(selected)` and `StepInitSelecting`'s :114
+branch clears it to None before dispatching BLITZ_SELECT, so the chain owns this field on a path
+main never takes. Likely candidates: a pushback/chain-push victim overwriting it, or the second
+pass re-entering with a stale value.
+
+NEXT: log every write to `game.defender_id` for that one activation (it is a plain field - a
+setter shim or a grep of assignment sites will do) and find which write leaves a teammate there.
