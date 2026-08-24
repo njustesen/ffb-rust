@@ -2141,3 +2141,44 @@ NEXT (revised): run the `FFB_RNG_STEPS` branch-vs-main diff on vampire seed 1 (f
 step 101) and halfling seed 2 (step 49) to find what those actually are, BEFORE porting anything
 else. The three undead-family 99s (khemri, khemri_fumbbl, necromantic, all seed 38 step 31) are a
 separate single bug and are the cheapest remaining win.
+
+**§12 remaining reds, measured (iter 42). Two DIFFERENT bugs, neither is the unported FAILED marker.**
+
+Method: `FFB_RNG_STEPS` branch-vs-main on the two deep reds.
+
+**VAMPIRE (57/100, seed 1 step 101) - the dice are IDENTICAL.** The whole 129-line RNG-step list
+matches main line for line except the acting-action label:
+
+    main   RNGSTEP 7 step=BloodLust 12->13 pid=away_03 pa=Some(Blitz)
+    branch RNGSTEP 7 step=BloodLust 12->13 pid=away_03 pa=Some(BlitzMove)
+
+`player_action` is NOT part of the state hash (checked `state_hash.rs`), so that label is
+cosmetic and the divergence is NOT in the dice at all. The state string at the failure shows what
+it IS:
+
+    i=101 chosen=Activate(home_03,Blitz)  rng_calls=122  f0000,0000
+    i=102 turn ended, active=away         rng_calls=123  f0000,0000   <-- blitz_used STILL FALSE
+
+A blitz was declared, spent one die (the Blood Lust roll), and the turn ended with the team blitz
+NOT consumed. `f` is `blitz_used,foul_used,hand_over_used,pass_used`, so this is a state-hash
+divergence with no dice divergence - the team can blitz again.
+
+On main that flag is set by `StepEndSelecting`'s `PlayerAction::Blitz` dispatch arm
+(`turn_data_mut().blitz_used = true`). On the branch a blitz routes through BLITZ_SELECT and only
+reaches that arm on the SECOND pass, so a negatrait that ends the activation during the FIRST
+pass never gets there. Note Blood Lust does NOT mark the target state failed (verified last
+iteration), so this is not the FAILED path - it is the blitz-consumed bookkeeping.
+
+**HALFLING (27/100, seed 2 step 49) - a REAL dice divergence**, and a different one:
+
+    main   21 StandUp  44->45 pid=away_01 pa=Blitz     23 StandUp 46->47   24 GoForIt 47->48
+                                                       25 FallDown 48->52
+    branch 21 StandUp  44->45 pid=away_01 pa=BlitzMove  (23-25 differ)
+
+A prone halfling blitzer's StandUp/GoForIt/FallDown sequence diverges. Halflings are the Take
+Root / Treemen roster and this is the prone-blitzer path the standing_up carve-out fix touched,
+so it is most likely a second-order effect of that change rather than the FAILED marker.
+
+NEXT: fix the vampire one first - it is precise (consume the team blitz when the chain's first
+pass ends the activation, matching where main/Java set it) and the three undead-family 99s at
+seed 38 step 31 may share it. Then re-measure halfling separately.
