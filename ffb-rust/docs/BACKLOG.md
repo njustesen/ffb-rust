@@ -2773,3 +2773,25 @@ when the block came through the chain. Suspect the same class as the other five 
 that reads the acting action (BLITZ vs BLITZ_MOVE) or a publish-only push. Check bb2025 skaven
 too: it is GREEN, so either it has no Frenzy carrier in those seeds or the path differs by
 edition - worth knowing which before fixing.
+
+**§12 BB2020 skaven NARROWED (iter 62b): the failing conjunct is `defender_can_be_blocked`.**
+
+Probed every term of `force_second_block` on the branch (bb2020 skaven seed 1):
+
+    FSB pid=home_01 pa=Blitz cm=1 skill=true can_blk=true  adj=true tz=true pushed=true moveleft=true => TRUE
+    FSB pid=away_01 pa=Blitz cm=4 skill=true can_blk=FALSE adj=true tz=true pushed=true moveleft=true => false
+
+Every other term holds - the Frenzy skill is unused, the attacker is adjacent with tackle zones,
+the defender WAS pushed, and there is movement left (so this is NOT the `current_move` class of
+bug again). The single false term is `defender_can_be_blocked`, i.e. the defender's PlayerState
+after the first block is not STANDING/MOVING on the branch while it must be on main - main throws
+its second BlockRoll from the same position with the same preceding dice.
+
+So the first block's dice are identical but its EFFECT on the defender differs. That is the same
+signature as the khemri case (identical dice, different applied result), which turned out to be
+one missing roll upstream shifting the meaning of a die - so the real cause may still be earlier
+than this step.
+
+NEXT: print the defender's PlayerState base immediately after the first block on both builds. If
+the branch has it knocked down where main has it merely pushed, work backwards from the block
+resolution; if the states match, the bug is in how `can_be_blocked` is evaluated here.
