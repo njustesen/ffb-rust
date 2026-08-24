@@ -3197,3 +3197,34 @@ established (iteration 70), and the entry state at i=4 is byte-identical (iterat
 NEXT: pair the observations by ACTIVATION, not by first-occurrence. Print the activation index
 alongside the PickUp probe (or bracket by the RUST_STEP i= that declares the blitz) and re-compare
 - only then decide whether any position actually differs.
+
+**§12 goblin bb2020 (iter 76): paired by activation - and the contradiction resolves as a SAMPLING
+difference, not a position difference.**
+
+Interleaving `RUST_STEP` with the PickUp probe pairs them correctly this time. Both builds are at
+the SAME activation:
+
+    main   STEP i=4 Activate(away_03,Blitz)  ->  PU away_03 coord=(12,8) ball=(13,8)
+    brch   STEP i=4 Activate(away_03,Blitz)  ->  PU away_03 coord=(13,8) ball=(13,8)
+                                                 (+ an extra PU for home_01's blitz at i=2)
+
+That looks like a position difference, but it cannot be one: the i=4 state string is
+byte-identical (iteration 70b) and the `FFB_POSCHG` watch records NO coordinate change for
+away_03 during the activation (iteration 75). Two independent measurements say the board and the
+player agree.
+
+**The reconciliation, and a standing trap re-confirmed:** the state-string labels are POSITIONAL
+INDICES, not player ids (already in memory). `a03` in the state is NOT `away_03` - the i=4 state
+shows `a02:13,8` and `a03:20,5`, so the id-to-slot mapping cannot be read off it. And the
+interleaved view only proves both PU lines fall between STEP i=4 and STEP i=5; it does NOT prove
+they were sampled at the same POINT in the activation. The branch runs an extra PickUp step
+(iteration 71), so the two samples are almost certainly taken at different moments - one in the
+Move sequence, one in the BlitzBlock sequence.
+
+So the real difference remains WHICH PickUp steps run, not where the player stands. The extra
+`CatchScatterThrowIn` follows the extra PickUp.
+
+NEXT: count PickUp step EXECUTIONS per activation on both builds and identify which sequence each
+belongs to (print the stack depth alongside). The chain runs the pre-label prefix of its pushed
+Select sequence in addition to the folded path's PickUp - that is the shape to confirm or refute,
+and it is testable directly rather than by position arithmetic.
