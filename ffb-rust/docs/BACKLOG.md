@@ -2043,3 +2043,43 @@ NEXT: give the blitzer its move. After the target is selected, the second pass m
 the BLITZ_MOVE path the way ParityRunner does (sendMoveAction for a BLITZ_MOVE acting action),
 so the move happens before the block. Check where InitMoving gets its move stack on main's
 folded path and reproduce that after the chain.
+
+**§12 RETRACTION + REAL GOBLIN ROOT CAUSE (iter 39): a FAILED negatrait does not abort the blitz.**
+
+**Retracted: "the chain's blitzer never moves" (previous entry) is WRONG.** `RNGSTEP` had no
+player id, so `MoveDodge 53->54` on main was attributed to the blitz; with `pid=`/`pa=` added it
+belongs to **away_03**, a different activation. The harness settles the movement question anyway:
+`ParityRunner.sendMoveAction` case BLITZ_MOVE for bb2025 injects `ClientCommandBlock` with the
+already-chosen target and NO move ("the target was already chosen at SELECT_BLITZ_TARGET"), so
+Java's blitzer does not pre-move either. Blocking immediately is CORRECT.
+
+With attribution the real divergence is unmistakable - same die, same stream position:
+
+    main    33 ReallyStupid 52->53 pid=home_01 pa=Blitz       -> activation ENDS. away_03 Move,
+                                                                 away_04 Move, away_01 Foul run,
+                                                                 and home_01 only resumes at 38.
+    branch  33 ReallyStupid 52->53 pid=home_01 pa=BlitzMove   -> 34 BlockRoll 53->54 immediately.
+
+The Really Stupid roll FAILS in both. On main the activation is over. On the branch the blitz
+carries on and throws a block.
+
+**Why.** Java's negatrait behaviours mark the blitz dead on failure:
+
+    bb2020/ReallyStupidBehaviour.java:110    targetSelectionState.failed();
+    bb2020/BoneHeadBehaviour.java:92         targetSelectionState.failed();
+    bb2020/AnimalSavageryBehaviour.java:149  targetSelectionState.failed();
+    bb2020/FoulAppearanceBehaviour.java:109  targetSelectionState.failed();
+    bb2020/UnchannelledFuryBehaviour.java:183 targetSelectionState.failed();
+
+`StepSelectBlitzTargetEnd` then takes its `isFailed()` branch and pushes END_MOVING with
+END_PLAYER_ACTION=true. Rust never does this: `skill_behaviour/bb2025/really_stupid_behaviour.rs`
+contains ZERO references to `target_selection_state`, and the bb2025 bone-head behaviour only
+calls `commit()`, never `failed()`. So SBTEnd still sees SELECTED, pushes Select, and the blitz
+proceeds.
+
+This is invisible on main because main has no live targetSelectionState during the activation -
+it only exists once the chain runs. Exactly the class of bug this tier is meant to find.
+
+NEXT: port `targetSelectionState.failed()` into the Rust negatrait behaviours (Really Stupid,
+Bone Head, Animal Savagery, Foul Appearance, Unchannelled Fury) for every edition that has the
+Java call, guarded the same way Java guards it, then re-measure goblin and re-gate.

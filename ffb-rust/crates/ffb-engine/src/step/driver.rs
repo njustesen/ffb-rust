@@ -857,8 +857,9 @@ impl DriverGameState {
             };
             if std::env::var_os("FFB_RNG_STEPS").is_some() && self.rng.call_count != rng_before_step {
                 self.rng_step_seq += 1;
-                eprintln!("RNGSTEP {} step={:?} {}->{}", self.rng_step_seq, entry.step.id(),
-                    rng_before_step, self.rng.call_count);
+                eprintln!("RNGSTEP {} step={:?} {}->{} pid={:?} pa={:?}", self.rng_step_seq,
+                    entry.step.id(), rng_before_step, self.rng.call_count,
+                    self.game.acting_player.player_id, self.game.acting_player.player_action);
             }
             let pushed_len: usize = outcome.pushes.iter().map(|s| s.len()).sum();
             self.apply_effects(&mut entry, &mut outcome);
