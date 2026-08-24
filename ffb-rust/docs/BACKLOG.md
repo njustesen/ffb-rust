@@ -2913,3 +2913,28 @@ which is why the stolen id is specifically a team-mate.
 NEXT: probe StepAnimalSavagery's roll evaluation on both builds for that activation - the roll,
 the target number, the modifiers, and which branch it takes. The FFB_DEFCHG watch committed last
 iteration stays useful and is not affected by this revision.
+
+**§12 iter 66b - the threshold is NOT the difference; the LASH-OUT VICTIM probably is.**
+
+Checked before probing further: `good_conditions_for_savagery` already returns true for BOTH
+`Blitz` and `BlitzMove`, so the chain's different acting-action label cannot change
+`minimum_roll_confusion`. Both engines roll one die at the same stream position with the same
+value and the same target, so `successful` must agree.
+
+That makes "main does not lash out" the wrong reading of the DEFCHG evidence. A likelier account
+fits every observation: **both** engines lash out, but pick DIFFERENT victims. Main picks
+`home_02` - which is already the blitz target - so `game.defender_id` does not visibly change and
+the watch shows nothing; the branch picks `away_02`, a team-mate, which does change it and breaks
+the later Frenzy check.
+
+That also explains why the engine dice streams stay identical through the lash-out: the victim is
+chosen from a candidate list, and if that choice is made by the agent it spends an actionRng draw,
+which `FFB_RNG_STEPS` does not track (it watches the ENGINE rng only).
+
+Java builds the candidate set as adjacent blockable players of `team`, then explicitly folds in
+`game.getDefender()` when it is on that team and adjacent - so which players are in the list, and
+in what order, is exactly where an off-by-one could land on a team-mate instead of the target.
+
+NEXT: probe the lash-out candidate list and the chosen victim on both builds (list contents, order
+and index), not just the resulting defender_id. If the lists differ, compare how each is built; if
+only the index differs, it is an actionRng offset and the cause is upstream again.
