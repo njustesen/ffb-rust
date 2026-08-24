@@ -1715,3 +1715,46 @@ draw with its consumer around i=18-19 on chaos_dwarf seed 7 and compare the coun
 against a main-branch run of the same seed, which is green. The question to answer is
 narrow: does declaring a blitz still consume the same number of draws, at the same point,
 as it did before the chain went live?
+
+**§12 ROOT CAUSE (2026-08-24): a blitz whose targetSelectionState is STALE skips the chain
+and loses its actionRng draw. Plus a retraction.**
+
+**RETRACTED: the previous entry's "action-choice divergence at i=19" is WRONG.** It compared
+the Rust `chosen=` string against the JAVA log's `chosen=` string at the same `i`. Those are
+not comparable: green main produces `Activate(away_02,ThenIStartedBlastin)` where the Java
+log says `Activate(...Away2,BLITZ)` and `Activate(away_03,Foul)` where Java says `PASS`, and
+main PASSES seed 7 (verified 1/1). Only state hashes are compared, and the display names and
+step alignment differ between engines. Three separate cross-engine comparison artifacts have
+now produced confident wrong answers in this section: dice positions (per-call vs per-die),
+stale rust jsonl, and now `chosen=` strings. **Compare BRANCH against MAIN - same engine,
+same seed, one variable - not Rust against Java.**
+
+Doing that gives a clean, one-variable result. `RUST_ACT_PICK` for away_03 on chaos_dwarf
+seed 7:
+
+    branch:  N=3 idx=1 action=Pass  arc=41 drc=25
+    main:    N=3 idx=2 action=Foul  arc=42 drc=25
+
+Identical candidate list size, identical decisionRng count, identical pre-state (both
+`f0000,1000 b13,8,true r2,2`). The ONLY difference is `arc`: **the branch is exactly ONE
+actionRng draw behind**, which moves the pick index from 2 to 1 and changes the action.
+
+**Where the draw is lost.** The blitz at i=20 runs `InitSelecting -> EndSelecting` with NO
+SelectBlitzTarget/SelectBlitzTargetEnd in the drive trace at all - it is dispatched as a
+folded-target blitz. That happens because `StepInitSelecting`'s hoisted continuation fires on
+`pa == BLITZ_MOVE && target_selection_state.is_some()`, and the state left over from the
+PREVIOUS activation is still there. Java's guard is the mirror image - `:114` routes to
+BLITZ_SELECT when the state is NULL - and Java clears it between activations
+(RemoveTargetSelectionState). So in Rust a stale state makes the next blitz bypass the whole
+chain: no dialog, no target draw, stream one short.
+
+This also explains the shape of the gate. lineman/amazon/dark_elf/nippon are green not
+because they lack negatraits per se, but because they field no star or big-guy action that
+leaves a targetSelectionState behind for the next activation to trip over. On chaos_dwarf the
+setup is literally i=19 ThenIStartedBlastin (a blitz-family star action) followed by i=20
+Blitz.
+
+NEXT: find where Java clears targetSelectionState at end of activation and make Rust do the
+same, rather than tightening the hoisted guard - the guard is Java-faithful, the missing
+clear is not. Verify by re-running chaos_dwarf seed 7 and checking `arc` matches main at the
+away_03 pick, then re-gate.
