@@ -2938,3 +2938,34 @@ in what order, is exactly where an off-by-one could land on a team-mate instead 
 NEXT: probe the lash-out candidate list and the chosen victim on both builds (list contents, order
 and index), not just the resulting defender_id. If the lists differ, compare how each is built; if
 only the index differs, it is an actionRng offset and the cause is upstream again.
+
+**§12 iter 67 - iteration 66's revision was WRONG; iteration 65 was right. The restore IS the bug.**
+
+Probed the lash-out candidates on BOTH builds. The failing activation is identical:
+
+    main    AS acting=away_01 n=1 players=["away_02"] cur_def=Some("home_02")
+    branch  AS acting=away_01 n=1 players=["away_02"] cur_def=Some("home_02")
+
+So main lashes out at the same team-mate, with the same current defender, and still reaches
+EndBlocking with `def=home_02` (iteration 63). Both engines TAKE the defender; only main GIVES IT
+BACK. Iteration 66's "the branch lashes out where main does not" was wrong - I inferred it from
+DEFCHG showing no change on main, when the correct reading is that main's change was undone
+before anything observed it.
+
+**The mechanism, now visible in the code.** `StepEndSelecting` accepts `GazeVictimId`
+(`step_end_selecting.rs:147`) and forwards it into the dispatch params - including
+`BlitzMoveParams { gaze_victim_id: self.gaze_victim_id.clone(), .. }` at :536 - and
+`StepInitMoving` writes it back to `game.defender_id`. That is the restore path, and it works on
+the folded path because ONE EndSelecting instance both receives the publish and performs the
+dispatch.
+
+On the chain path there are TWO passes and therefore two EndSelecting INSTANCES: the publish from
+Animal Savagery lands on the first-pass instance (on the stack inside the SelectBlitzTarget
+sequence), while the BlitzMove dispatch is performed by a fresh instance created by the Select
+sequence that StepSelectBlitzTargetEnd pushes - which never saw the parameter. Note the forward
+is also gated on `with_param`, so a defaulted `BlitzMoveParams` would drop it too.
+
+NEXT: probe `self.gaze_victim_id` at EndSelecting's BlitzMove dispatch on both builds to confirm
+it is Some on main and None on the branch. If confirmed, carry the value across the pass boundary
+the way Java does - check whether Java's SelectBlitzTargetEnd re-publishes it, or whether the
+value should be restored to `game.defender_id` before the second pass begins.
