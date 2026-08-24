@@ -1565,3 +1565,45 @@ stack depth and whether it is honoured, then compare the two dropped pushes agai
 survive. Related known trap: `StepOutcome::clear_stack` was found to be a DEAD FLAG in the Zzharg
 work (the driver never consumed it), so the driver's handling of outcome side-channels from a
 terminal step is already suspect and is the right place to look.
+
+**§12 GATE RESULT 2026-08-24: bb2025 4 GREEN / 26 RED. DO NOT MERGE.**
+
+    GREEN: lineman 100, amazon 100, dark_elf 100, nippon 100
+    RED (worst first): halfling 14, goblin 23, renegades 25, undead 27,
+      chaos_pact 34, ogre 34, orc 48, nurgle 49, underworld 54, vampire 55,
+      norse 63, chaos 64, slann 65, skaven 68, lizardman 72, human 75,
+      chaos_dwarf 79, dark_elf_league_fumbbl 97, slann_fumbbl 97,
+      dwarf 98, high_elf 98, necromantic 98, elf 99, khemri 99,
+      khemri_fumbbl 99, wood_elf 99
+
+This corrects the optimistic re-scope recorded earlier in this section. The original
+"expect the whole matrix to red" estimate was walked back to "a bounded fidelity change,
+the matrices should not move" once it was clear most steps were already built. The steps
+being built was true; the conclusion drawn from it was not. lineman 100/100 was a
+GENUINELY passing measurement that was not REPRESENTATIVE, because the one thing lineman
+lacks is the thing that breaks.
+
+**The green set is the whole clue: lineman, amazon, dark_elf and nippon are exactly the
+rosters with NO negatrait carriers.** Every roster with Bone Head / Really Stupid / Take
+Root / Animal Savagery / Blood Lust / Unchannelled Fury is red, and the depth of the red
+tracks how many such players the roster fields (halfling and goblin, all treemen and
+trolls, are worst; the elf rosters with one lone big guy are 98-99).
+
+**Hypothesis — the activation negatraits roll TWICE per blitz.** The sequence
+StepSelectBlitzTargetEnd pushes is a FULL Select, and it was dumped from a live run as:
+
+    InitSelecting InitActivation AnimalSavagery SteadyFooting HandleDropPlayerContext
+    PlaceBall Apothecary CatchScatterThrowIn GotoLabel BoneHead ReallyStupid TakeRoot
+    UnchannelledFury BloodLust FoulAppearance GotoLabel JumpUp StandUp
+    ResetFumblerooskie EndSelecting
+
+The BLITZ_SELECT sequence pushed earlier ALSO contains the ActivationSequenceBuilder
+negatrait rolls. So a blitz runs the negatrait block once before the target dialog and
+again after it, spending dice Java spends once. A player with no negatrait rolls nothing
+either time, which is exactly why four rosters are unaffected.
+
+NEXT: verify by counting negatrait dice per blitz against Java on chaos_dwarf seed 7
+(first divergence step 21, the earliest in the matrix), then find Java's guard - most
+likely the negatrait steps are no-ops once the activation has already rolled them, or the
+second push is not a full Select. Do NOT re-measure lineman as evidence for this; use a
+negatrait roster.
