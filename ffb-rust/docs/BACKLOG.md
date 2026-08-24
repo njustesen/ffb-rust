@@ -1507,3 +1507,33 @@ and the read resets it (`changeActingPlayer` clears state — cf. `reset_blocked
 if Select did NOT run, the push itself is being dropped, which would point at the driver's handling
 of `push_seq` from a step that is the last in its own sequence — exactly the position
 `SelectBlitzTargetEnd` occupies.
+
+**§12 mechanism HYPOTHESIS (2026-08-24) — testable, not yet proven.**
+
+Aggregating every `InitSelecting` entry on failing seed 3 (not a sample):
+
+    289  BZPROBE InitSelecting enter pa=None
+      5  BZPROBE InitSelecting enter pa=Some(BlitzMove)
+
+So for the three lost blitzes `StepInitSelecting` is entered with the acting action **already
+cleared**, even though `SelectBlitzTargetEnd` demonstrably set `BlitzMove` on a valid acting player
+immediately before pushing Select.
+
+`change_player_action_to_none` is called from `step_init_selecting.rs:172` and from
+`step_end_feeding.rs` (:80, :139) — and the drive trace shows an EndPlayerAction sequence
+(`RemoveTargetSelectionState → ResetFumblerooskie → InitFeeding → StallingPlayer → …`) running
+around the failing blitzes. **Hypothesis: for those three an EndPlayerAction sequence was already
+pending on the stack and ran before the pushed Select, clearing the action; `InitSelecting` then
+reads `pa=None` and asks for a fresh activation, so the blitz dies and the agent re-declares it —
+which is exactly why `away_02` shows up four times.**
+
+Note this partially REHABILITATES the earlier "stack residue" idea. That was retracted because the
+push probe showed a clean 28-step `BlitzMove` push — true, but residue sitting BELOW the pushed
+sequence is untouched by that observation. The retraction of the `stack_len` arithmetic still
+stands; the residue conclusion may be right by a different route.
+
+TEST: log `change_player_action_to_none` (all three call sites) and correlate against the SBTEnd
+pushes — if a clear lands between an SBTEnd push and the next `InitSelecting`, the hypothesis holds
+and the fix is to keep the blitz's Select push from being sequenced behind a pending
+EndPlayerAction (Java's `StepSelectBlitzTargetEnd` pushes Select directly onto the step stack;
+compare how Rust's `push_seq` orders against what is already there).
