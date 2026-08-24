@@ -17,6 +17,22 @@ use ffb_model::model::game::Game;
 /// NOTE: unlike bb2016/bb2020's version, BB2025's standing-up branch ALSO sets `changeConfused(true)`:
 /// `playerState.changeBase(PlayerState.PRONE).changeConfused(true).changeActive(false)` — bb2016/2020
 /// only do `changeBase(PRONE).changeActive(false)` (no confused) when standing up.
+/// Java: the FAILURE branch of every negatrait behaviour calls
+/// `game.getFieldModel().getTargetSelectionState().failed()` right before publishing
+/// END_PLAYER_ACTION (`bb2025/ReallyStupidBehaviour`, `BoneHeadBehaviour`,
+/// `AnimalSavageryBehaviour`, `FoulAppearanceBehaviour`, `UnchannelledFuryBehaviour`).
+///
+/// It only matters while a blitz is mid-chain, which is why it was never needed before: the
+/// marker is what makes `StepSelectBlitzTargetEnd` take its `is_failed()` branch and end the
+/// activation. Without it SBTEnd still sees SELECTED, pushes the Select sequence, and the
+/// blitzer throws a block Java never throws - measured on goblin bb2025 seed 1, where a FAILED
+/// Really Stupid roll ends home_01's activation in Java but produced an immediate BlockRoll here.
+pub fn mark_target_selection_failed(game: &mut Game) {
+    if let Some(ref mut ts) = game.field_model.target_selection_state {
+        ts.failed();
+    }
+}
+
 pub fn cancel_negatrait_player_action(game: &mut Game, player_id: &str) {
     match game.acting_player.player_action {
         Some(PlayerAction::Blitz) | Some(PlayerAction::BlitzMove)

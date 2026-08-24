@@ -98,8 +98,21 @@ impl StepSelectBlitzTargetEnd {
                 game.acting_player.has_moved = true;
                 return StepOutcome::next().push_seq(seq);
             } else if ts.is_failed() {
-                // Java: push END_MOVING(end_player_action=true)
-                return StepOutcome::next().publish(StepParameter::EndPlayerAction(true));
+                // Java: `sequence.add(END_MOVING, END_PLAYER_ACTION=true); stepStack.push(...)`.
+                // Rust only PUBLISHED the parameter and pushed nothing, which is the publish-only
+                // stall shape (same as StepEndThrowKeg / EndThenIStartedBlastin): with nothing on
+                // the stack to consume it the drive falls through and the game ends early.
+                //
+                // The bug was invisible until now because this branch was UNREACHABLE - nothing
+                // ever set the state to FAILED. Once the negatrait behaviours started marking it
+                // (Java does this in every negatrait FAILURE branch) the dead branch went live and
+                // goblin collapsed to 1/20, which is how it was found.
+                let seq = vec![crate::step::framework::SequenceStep {
+                    step_id: StepId::EndMoving,
+                    label: None,
+                    params: vec![StepParameter::EndPlayerAction(true)],
+                }];
+                return StepOutcome::next().push_seq(seq);
             }
         }
 

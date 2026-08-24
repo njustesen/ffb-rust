@@ -120,6 +120,7 @@ impl StepModifierTrait for ReallyStupidStepModifier {
                     Some(SkillId::ReallyStupid.class_name().to_string()),
                 ));
                 cancel_negatrait_player_action(game, &player_id);
+            crate::step::action::common::mark_target_selection_failed(game);
                 state.outcome = Some(
                     StepOutcome::goto(&state.goto_label_on_failure)
                         .with_event(confusion_event)
@@ -171,6 +172,7 @@ impl StepModifierTrait for ReallyStupidStepModifier {
                 return false;
             }
             cancel_negatrait_player_action(game, &player_id);
+            crate::step::action::common::mark_target_selection_failed(game);
             state.outcome = Some(
                 StepOutcome::goto(&state.goto_label_on_failure)
                     .with_event(confusion_event)
@@ -178,6 +180,7 @@ impl StepModifierTrait for ReallyStupidStepModifier {
             );
         } else {
             cancel_negatrait_player_action(game, &player_id);
+            crate::step::action::common::mark_target_selection_failed(game);
             state.outcome = Some(
                 StepOutcome::goto(&state.goto_label_on_failure)
                     .with_event(confusion_event)
