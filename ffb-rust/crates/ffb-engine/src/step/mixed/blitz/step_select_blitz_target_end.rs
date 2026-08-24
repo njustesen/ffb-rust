@@ -86,10 +86,30 @@ impl StepSelectBlitzTargetEnd {
                 }
                 return StepOutcome::next().push_seq(seq);
             } else if ts.is_skipped() {
-                // Java: changePlayerAction(BLITZ_MOVE), push Select, setBlitzUsed, setHasMoved
+                // Java (:109-115) does FOUR things here, and Rust used to do only the last two -
+                // the comment already said "changePlayerAction(BLITZ_MOVE), push Select" but
+                // neither was implemented. Without the push this step is the terminus of the
+                // whole blitz sequence, exactly the publish-only stall shape the SELECTED branch
+                // above was fixed for: on lineman bb2025 seed 14 the game simply ENDED at the
+                // first no-target blitz (10 steps, rust_total 0.004s, Java ran 874).
+                //
+                // The skip path is reached when the declared blitzer has no adjacent blockable
+                // opponent (Java harness prints BLITZ_TARGET_NONE). The blitz is still SPENT:
+                // blitz_used and has_moved are set, and re-entering Select with a non-null (but
+                // skipped) targetSelectionState takes the ordinary BLITZ_MOVE dispatch, so the
+                // player still gets their move.
+                if let Some(pid) = game.acting_player.player_id.clone() {
+                    crate::step::util_server_steps::change_player_action(
+                        game, &pid, PlayerAction::BlitzMove, false);
+                }
+                let seq = Select::build_sequence(&SelectParams {
+                    update_persistence: false,
+                    is_blitz_move: false,
+                    ..Default::default()
+                });
                 game.turn_data_mut().blitz_used = true;
                 game.acting_player.has_moved = true;
-                return StepOutcome::next();
+                return StepOutcome::next().push_seq(seq);
             } else if ts.is_failed() {
                 // Java: push END_MOVING(end_player_action=true)
                 return StepOutcome::next().publish(StepParameter::EndPlayerAction(true));

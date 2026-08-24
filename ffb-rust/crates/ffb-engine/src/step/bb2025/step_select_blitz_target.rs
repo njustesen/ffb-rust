@@ -169,8 +169,15 @@ impl StepSelectBlitzTarget {
         match self.selected_player_id.clone() {
             // Java: selectedPlayerId == null -> either ask, or skip when nobody can be blitzed.
             None => {
+                // Java gates the dialog on `hasStandingOpponents`, which is NOT adjacency-based:
+                // it is "ANY opponent anywhere in bounds whose state canBeBlocked". The harness's
+                // pickBlockTarget candidate list IS adjacency-based, and the two are deliberately
+                // different predicates. Collapsing them into one (the earlier port used the
+                // adjacency list for both) made Rust take the skip() path in positions where Java
+                // shows the dialog and the harness answers it with EndTurn - lineman bb2025
+                // seed 14, where Java ends the turn on a no-target blitz and Rust played on.
                 let targets = Self::standing_opponents(game, &acting_id);
-                if targets.is_empty() {
+                if !Self::has_standing_opponents(game) {
                     // Java: setTargetSelectionState(new TargetSelectionState().skip()); NEXT_STEP
                     let mut ts = TargetSelectionState::default();
                     ts.skip();
@@ -229,7 +236,21 @@ impl StepSelectBlitzTarget {
         }
     }
 
-    /// Java `hasStandingOpponents` / ParityRunner.pickBlockTarget candidate rule: ADJACENT
+    /// Java `hasStandingOpponents`: ANY opponent in bounds whose state `canBeBlocked`. No
+    /// adjacency, no ordering - this only decides whether the dialog is shown at all. The
+    /// candidate list the agent picks from is the separate, adjacency-based
+    /// `standing_opponents` below (ParityRunner.pickBlockTarget).
+    fn has_standing_opponents(game: &Game) -> bool {
+        let opponent_team = game.inactive_team();
+        opponent_team.players.iter().any(|op| {
+            game.field_model.player_coordinate(&op.id)
+                .map(|c| ffb_model::types::FieldCoordinateBounds::FIELD.is_in_bounds(c)).unwrap_or(false)
+                && game.field_model.player_state(&op.id)
+                    .map(|s| s.can_be_blocked()).unwrap_or(false)
+        })
+    }
+
+    /// ParityRunner.pickBlockTarget candidate rule / ParityRunner.pickBlockTarget candidate rule: ADJACENT
     /// opponents whose state base is STANDING or MOVING. Coordinate-sorted so a single
     /// `actionRng` pick lands on the same player in both engines.
     fn standing_opponents(game: &Game, acting_id: &str) -> Vec<String> {

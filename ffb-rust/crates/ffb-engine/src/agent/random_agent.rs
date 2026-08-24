@@ -842,10 +842,17 @@ impl Agent for RandomAgent {
             // Picking a target here instead would roll block dice Java never rolls.
             // Java: StepSelectBlitzTarget's target wait. Candidates arrive coordinate-sorted
             // (ParityRunner.pickBlockTarget order); answer with exactly ONE actionRng draw so the
-            // stream position matches the harness. Empty cannot happen - the step skips instead -
-            // but deselect defensively rather than panicking.
+            // stream position matches the harness.
+            //
+            // Empty DOES happen, and the earlier "cannot happen - the step skips instead" note was
+            // wrong: the engine shows this dialog whenever ANY in-bounds opponent can be blocked,
+            // while these candidates are only the ADJACENT ones, so a blitzer with no neighbour
+            // gets an empty list. ParityRunner.sendBlitzTargetSelection answers exactly that case
+            // with ClientCommandEndTurn ("BLITZ_TARGET_NONE ... ending turn for acting player"),
+            // and it must be EndTurn rather than EndPlayerAction - ending only the action left
+            // Rust playing on with the rest of the team while Java's turn was over.
             Some(AgentPrompt::BlitzTarget { eligible_players, .. }) => {
-                if eligible_players.is_empty() { return Action::EndPlayerAction; }
+                if eligible_players.is_empty() { return Action::EndTurn; }
                 let idx = self.pick_action(eligible_players.len());
                 Action::SelectPlayer { player_id: eligible_players[idx].clone() }
             }
