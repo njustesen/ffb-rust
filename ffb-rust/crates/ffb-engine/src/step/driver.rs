@@ -787,7 +787,17 @@ impl DriverGameState {
     pub fn apply_action(&mut self, action: Action) {
         let mut entry = self.current.take().expect("apply_action() with no waiting step");
         let def_before_cmd = self.game.defender_id.clone();
+        let pos_before_cmd = self.game.acting_player.player_id.clone()
+            .and_then(|p| self.game.field_model.player_coordinate(&p)).map(|c| (c.x, c.y));
         let mut outcome = entry.step.handle_command(&action, &mut self.game, &mut self.rng);
+        if std::env::var_os("FFB_POSCHG").is_some() {
+            let now = self.game.acting_player.player_id.clone()
+                .and_then(|p| self.game.field_model.player_coordinate(&p)).map(|c| (c.x, c.y));
+            if now != pos_before_cmd {
+                eprintln!("POSCHG(cmd) step={:?} pid={:?} {:?} -> {:?}", entry.step.id(),
+                    self.game.acting_player.player_id, pos_before_cmd, now);
+            }
+        }
         if std::env::var_os("FFB_DEFCHG").is_some() && self.game.defender_id != def_before_cmd {
             eprintln!("DEFCHG(cmd) step={:?} {:?} -> {:?} (acting={:?} pa={:?})",
                 entry.step.id(), def_before_cmd, self.game.defender_id,
@@ -843,10 +853,20 @@ impl DriverGameState {
             // wrong root causes in the §12 work (docs/BACKLOG.md).
             let rng_before_step = self.rng.call_count;
             let def_before_step = self.game.defender_id.clone();
+            let pos_before_step = self.game.acting_player.player_id.clone()
+                .and_then(|p| self.game.field_model.player_coordinate(&p)).map(|c| (c.x, c.y));
             let mut outcome = match self.forwarded.take() {
                 Some(cmd) => {
                     let mut o = entry.step.handle_command(&cmd, &mut self.game, &mut self.rng);
-                    if std::env::var_os("FFB_DEFCHG").is_some() && self.game.defender_id != def_before_step {
+                    if std::env::var_os("FFB_POSCHG").is_some() {
+                let now = self.game.acting_player.player_id.clone()
+                    .and_then(|p| self.game.field_model.player_coordinate(&p)).map(|c| (c.x, c.y));
+                if now != pos_before_step {
+                    eprintln!("POSCHG step={:?} pid={:?} {:?} -> {:?}", entry.step.id(),
+                        self.game.acting_player.player_id, pos_before_step, now);
+                }
+            }
+            if std::env::var_os("FFB_DEFCHG").is_some() && self.game.defender_id != def_before_step {
                         eprintln!("DEFCHG(fwd) step={:?} {:?} -> {:?} (acting={:?} pa={:?})",
                             entry.step.id(), def_before_step, self.game.defender_id,
                             self.game.acting_player.player_id, self.game.acting_player.player_action);

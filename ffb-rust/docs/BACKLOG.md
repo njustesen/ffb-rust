@@ -3171,3 +3171,29 @@ NEXT: trace the blitzer's coordinate step by step through that one activation on
 print pid and coordinate at every step of the BlitzMove/BlitzBlock sequences (the FFB_DEFCHG watch
 pattern, applied to `player_coordinate` of the acting player). The step that first differs is the
 answer; do not infer it from any single suspect again, three have now been eliminated.
+
+**§12 goblin bb2020 (iter 75): the blitzer DOES NOT MOVE on the branch - and the "one square
+further" comparison was probably mis-paired.**
+
+Added a driver-level coordinate watch (`FFB_POSCHG=1`, same shape as FFB_DEFCHG, covering both the
+`start()` and command paths). For away_03 the ONLY lines are the acting player being assigned:
+
+    POSCHG(cmd) InitSelecting pid=away_03 None -> Some((13,8))
+    POSCHG(cmd) InitSelecting pid=away_03 None -> Some((12,8))
+    POSCHG(cmd) InitSelecting pid=away_03 None -> Some((12,7))
+
+`None -> Some(..)` is the acting-player slot being filled, not movement. There is NO
+coordinate change during any step of away_03's activations on the branch, so the blitzer does not
+move at all - which cannot be reconciled with "the branch's blitzer ends one square further".
+
+**The likely error is mine.** Iteration 71 compared the FIRST `away_03` PickUp line on each build
+and read (13,8) vs (12,8) as the same activation. away_03 has SEVERAL activations here (the lines
+above show it acting from (13,8), (12,8) and (12,7)), so those two lines may simply be different
+activations - the same filtered-view trap already recorded twice in this section.
+
+What still stands: the extra `CatchScatterThrowIn` die is real and its position in the stream is
+established (iteration 70), and the entry state at i=4 is byte-identical (iteration 70b).
+
+NEXT: pair the observations by ACTIVATION, not by first-occurrence. Print the activation index
+alongside the PickUp probe (or bracket by the RUST_STEP i= that declares the blitz) and re-compare
+- only then decide whether any position actually differs.
