@@ -2988,3 +2988,31 @@ that makes it the cheapest remaining item and worth taking before vampire.
 
 NEXT: goblin bb2020 seed 85. A step-4 divergence is in the opening turn, so the contiguous
 FFB_SEQ / normalised RNG-step diff should name it almost immediately.
+
+**§12 BB2020 goblin seed 85 (iter 69): the chain rolls an EXTRA CatchScatterThrowIn.**
+
+Normalised RNG-step diff. Entries 1-10 identical, then:
+
+    main[11] BlockRoll            21->22 away_03
+    brch[11] CatchScatterThrowIn  21->22 away_03      <-- extra die
+    brch[12] BlockRoll            22->23 away_03
+
+The branch spends a die on a ball scatter/bounce that main does not spend at all in that window,
+which shifts every later die by one - hence a step-4 divergence from a single extra roll.
+
+**Why this one survives the alternate-label fix.** The Select sequence the chain pushes is
+
+    InitSelecting InitActivation AnimalSavagery SteadyFooting HandleDropPlayerContext
+    PlaceBall Apothecary CatchScatterThrowIn GOTO_LABEL BoneHead ReallyStupid ...
+
+and `USE_ALTERNATE_LABEL` jumps from the GOTO_LABEL onward. CatchScatterThrowIn sits BEFORE that
+label, so it runs on BOTH passes of the chain while the negatraits after it run only once. If a
+bounce is pending when the second pass starts, it is rolled twice.
+
+This is the same "activation runs twice" family as the negatrait double-roll, but the existing
+guard cannot reach it - the guard is positional (a label jump), not per-step.
+
+NEXT: confirm which pass rolls the extra die (probe CatchScatterThrowIn with the pass it is in),
+then find how Java avoids it - either its first pass consumes the bounce so the second finds
+nothing pending, or the pre-label prefix is not re-run at all. Do not assume the second pass is
+the culprit; the extra roll appears BEFORE the block, so it may be the first.
