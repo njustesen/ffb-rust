@@ -2322,3 +2322,38 @@ NEXT: compare `acting_player.current_move` (and `has_moved`) at `InitBlocking` f
 activation, branch vs main. If it differs, find where main's folded path advances it and mirror
 that in the chain. halfling seed 2's StandUp/GoForIt/FallDown divergence is very likely the same
 bug, and vampire seed 1 should be re-checked against it too.
+
+**§12 khemri EXACT CAUSE (iter 48): the chain's blitzer has `current_move = 1` where main has 4,
+so no Go For It is due. AND THIS UN-RETRACTS ITERATION 38.**
+
+Probed `StepGoForIt`'s inputs on both builds for the same blitz (khemri seed 38, away_03):
+
+    main    pa=Blitz is_blitz=true gfi=true cm=4 ma=3   -> 4 > 3  -> ROLLS the GFI
+    branch  pa=Blitz is_blitz=true gfi=true cm=1 ma=3   -> 1 <= 3 -> no roll
+
+Same player, same MA, same `goes_for_it`, same acting action. The ONLY difference is
+`current_move`: main's blitzer has moved three squares before blocking, the branch's has not.
+Everything measured in the last three iterations - the missing GoForIt entry, the block die 6 vs
+3, Pow vs Pushback, the defender left Standing, the single differing state field - is that one
+counter.
+
+**Correction, and it reverses a previous correction.** Iteration 38 concluded "the chain's
+blitzer never moves". Iteration 39 RETRACTED that, on the grounds that
+`ParityRunner.sendMoveAction` case BLITZ_MOVE injects `ClientCommandBlock` with no move. That
+retraction was wrong: the harness snippet describes what Java does at ITS `INIT_MOVING` window,
+which is not evidence about the movement Rust's own agent performs earlier. The measurement
+settles it - main's blitzer reaches the block with `cm=4`, main is GREEN on this seed, so Java's
+blitzer accumulates that movement too. **Iteration 38 was right.**
+
+The mechanism is in the agent, and it is branch-only code: `random_agent.rs`'s Move-prompt
+handler has a `current_activation_is_blitz` special case that answers the blitz's Move prompt
+with an immediate `Action::Block`, so the blitzer never moves and `current_move` stays 1. Main
+has no such branch - its agent moves the blitzer normally and blocks afterwards.
+
+Note `current_move` is NOT in the state hash, which is why this stayed invisible until it changed
+a DIE (the GFI). Same blind-spot class as the ACTIVE bit and `ttm_used`.
+
+NEXT: let the blitz's Move prompt move the player as a normal move, and issue the block after the
+movement rather than instead of it. Then re-measure khemri seed 38, halfling seed 2 (its
+StandUp/GoForIt/FallDown divergence is very likely the same counter) and vampire seed 1, and
+re-gate.
