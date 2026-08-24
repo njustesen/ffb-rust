@@ -2675,3 +2675,28 @@ NEXT: check which generator the BlitzSelect arm actually resolves for Rules::Bb2
 the bb2020 SelectBlitzTarget generator is reachable at all. Fix the routing, re-gate BB2020, and
 gate BB2016 too - it has never been measured on this branch either. Vampire's last 43 seeds are
 now the LOWEST priority item in this section.
+
+**§12 BB2020: routing the chain to the bb2020 generator is NOT the fix (iter 59, reverted).**
+
+The BB2025 and BB2020 SelectBlitzTarget generators really are different - BB2020's activation
+carries FOUL_APPEARANCE and DUMP_OFF and adds JUMP_UP/STAND_UP itself, while BB2025 has
+STEADY_FOOTING and appends JUMP_UP/STAND_UP after the builder - so pushing the BB2025 sequence
+for a BB2020 game looked like an obvious cause.
+
+Measured, gated the same way the GAZE_SELECT arm already gates:
+
+    bb2020 goblin 1-20   before 6/20   after 6/20
+    bb2020 ogre   1-20   before 6/20   after 5/20
+    bb2025 lineman 1-20  20/20 (unaffected)
+
+Neutral to slightly worse, so REVERTED, and the revert re-measured at 6/20 to confirm. This
+matches the standing lesson that `step/bb2020/*.rs` is mostly DEAD and staler than the shared
+files - routing to it has now measured no-better three times.
+
+So BB2020's 17/30 is caused by something else in the chain. The shared `:114` routing runs for
+BB2020 too, and BB2020 was never gated while ~25 iterations of chain changes landed on it.
+
+NEXT: pick ONE bb2020 red with an early divergence (skaven seed 1 step 23, or lizardman seed 5
+step 20) and run the branch-vs-main comparison that works - normalised RNG-step diff first, then
+the contiguous FFB_SEQ stream. Do NOT theorise from generator differences again; two BB2020
+theories have now failed on measurement.
