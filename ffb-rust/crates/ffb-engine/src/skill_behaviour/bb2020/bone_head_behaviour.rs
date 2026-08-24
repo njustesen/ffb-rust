@@ -214,6 +214,7 @@ impl StepModifierTrait for BoneHeadStepModifier {
             if cancel_as_failure {
                 let confusion_event = GameEvent::ConfusionRoll { player_id: player_id.clone(), roll: 1, confused: true };
                 cancel_bb2020_bone_head(game, &player_id);
+            crate::step::action::common::mark_target_selection_failed(game);
                 state.outcome = Some(
                     StepOutcome::goto(&state.goto_label_on_failure)
                         .with_event(confusion_event)
@@ -270,6 +271,7 @@ impl StepModifierTrait for BoneHeadStepModifier {
                 return false;
             }
             cancel_bb2020_bone_head(game, &player_id);
+            crate::step::action::common::mark_target_selection_failed(game);
             state.outcome = Some(
                 StepOutcome::goto(&state.goto_label_on_failure)
                     .with_event(confusion_event)
@@ -277,6 +279,7 @@ impl StepModifierTrait for BoneHeadStepModifier {
             );
         } else {
             cancel_bb2020_bone_head(game, &player_id);
+            crate::step::action::common::mark_target_selection_failed(game);
             state.outcome = Some(
                 StepOutcome::goto(&state.goto_label_on_failure)
                     .with_event(confusion_event)
