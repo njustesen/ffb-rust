@@ -2357,3 +2357,31 @@ NEXT: let the blitz's Move prompt move the player as a normal move, and issue th
 movement rather than instead of it. Then re-measure khemri seed 38, halfling seed 2 (its
 StandUp/GoForIt/FallDown divergence is very likely the same counter) and vampire seed 1, and
 re-gate.
+
+**§12 iter 49: the naive "let the blitzer move" fix is WRONG. Measured, reverted.**
+
+Removed the agent's `current_activation_is_blitz` immediate-Block special case so the blitz's
+Move prompt would be answered as an ordinary move (the diagnosis from iter 48 says the blitzer
+must reach the block with `current_move` advanced).
+
+    khemri seed 38  : first divergence moved EARLIER, step 31 -> step 13
+    khemri 1-20     : 20/20 -> 0/20
+
+Reverted immediately; khemri 1-20 is back to 20/20 and the tree is clean. The diagnosis is not
+in doubt - `cm=1` vs `cm=4` is measured - but this is not the way to fix it.
+
+**Why it probably fails.** On the FOLDED path the agent never issues an explicit Block for a
+blitz: it answers the Move prompt with a move and the engine blocks on its own because
+`game.defender_id` is already set from the activation command. On the CHAIN path
+`StepInitSelecting`'s :114 branch explicitly does `game.defender_id = None` before dispatching
+BLITZ_SELECT, and although `StepSelectBlitzTarget` sets it again on selection, something between
+there and the block evidently leaves the engine without a defender - which is exactly why the
+immediate-Block special case was written in the first place. Simply deleting it removes the only
+thing issuing the block.
+
+NEXT (refined): do not choose between moving and blocking - do BOTH, in order. Answer the blitz's
+first Move prompt with a real move, keep the blitz marker set, and issue `Action::Block` on the
+FOLLOWING prompt. Before writing it, verify against main how many Move prompts a blitz activation
+actually receives and whether `game.defender_id` survives to `StepInitBlocking` on the chain path
+(probe it at InitBlocking on both builds) - the answer decides whether the block needs to be
+issued explicitly at all.
