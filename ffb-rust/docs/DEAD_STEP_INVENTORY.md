@@ -84,8 +84,37 @@ ride the shared TTM steps and ARE live). A roster/draft change, not an engine fi
 **Inducements / cards / wizard / prayers — 5:** `PlayCard Wizard MasterChef FanFactor PrayerRoll`.
 Needs the harness to actually BUY inducements on both sides.
 
-**Star/skill specials no drafted team carries — 5:** `DoubleStrength EatTeamMate PileDriver
-ThrowARock WeatherMage`
+**"Star/skill specials no drafted team carries" — WRONG ON ALL FIVE, reclassified 2026-08-24.**
+None of these is a star special and none is waiting on a carrier. Traced to their Java homes:
+
+| id | Java home | real status |
+|---|---|---|
+| `PileDriver` | `mixed/foul/StepPileDriver` | **UNDECLARED — actionable, see below** |
+| `DoubleStrength` | `mixed/multiblock/StepDoubleStrength` | multi-block family (Horkon IS drafted; needs the situation) |
+| `EatTeamMate` | `action/ttm/StepEatTeamMate` | rare/structural, NOT a bug — see below |
+| `ThrowARock` | `bb2025/inducements/StepThrowARock` | inducement — belongs in the group below |
+| `WeatherMage` | `mixed/inducements/StepWeatherMage` | inducement — belongs in the group below |
+
+so the inducement group is really **7**, not 5.
+
+**`PileDriver` is the next concrete target.** It is declared by `ClientCommandPileDriver`
+(`CLIENT_PILE_DRIVER`, carrying a target player id) and handled in `StepEndBlocking` — literally
+the arm next to the `CLIENT_USE_SKILL` Hit-and-Run one. **`ParityRunner` contains zero references
+to it: no sender at all.** So neither engine ever declares it — textbook bug shape #2, and
+structurally identical to Hit and Run before its fix. Measured, not assumed: a 20-game ogre bb2025
+drive trace has **4,868 `Foul` dispatches and 0 `PileDriver`**, so this is undeclared rather than
+rare. The Hit-and-Run playbook applies directly.
+
+**`EatTeamMate` is NOT a bug — do not chase it.** It is the `GOTO_LABEL_ON_FAILURE` target of the
+TTM sequence (an Always Hungry throw that fails), and Rust's TTM generator carries the label and
+step correctly, mirroring Java. It never fires for two legitimate reasons:
+- **bb2025: structurally unreachable.** The BB2025 Ogre Blocker has NO Always Hungry — verified
+  against the official team page (`rules/teams/Ogre.md`: Bone Head, Mighty Blow, Thick Skull,
+  Throw Team-mate). Our roster data is CORRECT; the edition removed the skill. 255 TTM throws in
+  20 ogre games produce 255 `AlwaysHungry` dispatches that all auto-succeed.
+- **bb2016/bb2020: genuinely rare.** Those rosters do carry Always Hungry (trolls, treemen), but a
+  20-game bb2016 goblin trace throws only **4** times, so ~0.7 expected eats. Needs many more
+  seeds on a team whose Always Hungry big guy throws often, not an engine fix.
 
 **Pro — 1:** `Pro`. Dispatches from ONE site (StepHandleDropPlayerContext) and Rust's bb2020 file
 documents the gap as unwired — see BACKLOG §10, which calls it "a live landmine, not a safe stub".
