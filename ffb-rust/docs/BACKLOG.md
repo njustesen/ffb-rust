@@ -1640,3 +1640,36 @@ NEXT: stop reasoning from the correlation and diff the actual dice streams for o
 chaos_dwarf seed - seed 7's first divergence is at step 21, and steps 18-21 including the
 blitz at i=19 are byte-identical in both logs, so the divergence is in RESOLVING i=21's
 PASS, not in the blitz itself. That detail already argues against every blitz-dice theory.
+
+**§12 dice-diff attempt on chaos_dwarf seed 7: INCONCLUSIVE, and a repeat of a known trap.**
+
+`FFB_DICE_TRACE=1` + `scripts/dicediff.py` reports:
+
+    java dice: 128   rust dice: 139
+    FIRST DIFF at index 25: java d6=1 (pos 26)  rust d8=1 (pos 26)
+
+with every VALUE matching either side of it and only the die TYPE differing (Java d6 where
+Rust rolls d8, and Java's d8 arriving five positions later). That reads like a clean
+ordering bug, and the Java callers around pos 25-31 look like a coherent story - foul
+armour, argue-the-call, block dice, block armour, then the bounce - against a Rust drive
+trace whose d8 is `CatchScatterThrowIn` after `Pass`.
+
+**It does not hold up.** Those same Java callers include `DiceRoller.rollBlockDice` via
+`rollDice:84`/`rollDice:90`, i.e. calls that return SEVERAL dice at once. Java's trace
+positions are per-CALL while Rust's are per-DIE, so the two index spaces are not
+comparable and `dicediff`'s alignment past the first multi-die call is an artifact. This
+is the exact failure mode already recorded in memory ("use rng_calls + FFB_DRIVE_TRACE +
+JIDSTATE, NOT DICE_TRACE global pos"), and it produced a confident, wrong-looking story
+here too. The 128-vs-139 total is explained by the same thing and is not evidence of 11
+extra Rust rolls.
+
+NOTHING is concluded about the cause. What IS established and still stands:
+- chaos_dwarf seed 7 steps 18-21 are byte-identical in both logs, INCLUDING the blitz at
+  i=19, and the first divergent state hash is at i=22 - so the break is in resolving
+  i=21's PASS, not in a blitz.
+- the negatrait bridge is not involved (disproven above, identical failing seed sets).
+
+NEXT: use the per-CALL-safe instruments. Compare `rng_calls` from the RUST_STEP line
+against Java's own call counter at the same step index, and use FFB_DRIVE_TRACE +
+JIDSTATE to find the first step where the two engines run a DIFFERENT step, rather than
+trying to align dice streams.
