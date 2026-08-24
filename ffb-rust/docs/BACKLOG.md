@@ -1273,6 +1273,68 @@ Carriers (from rules/star_players/*.md; Java canonical skill names in quotes):
 Availability is league-rule based and the harness does not validate it — host wherever
 convenient (precedent: Farblast into bb2016 dwarf). Stars ride outside the 1.1M budget.
 
+## 12. Blitz/gaze SELECT sub-chain — the last substantial engine-fidelity gap (SCOPED 2026-08-24)
+
+`SelectBlitzTarget SelectBlitzTargetEnd SelectGazeTarget SelectGazeTargetEnd`. Everything below is
+measured or read from source, not assumed.
+
+**The gap.** Java runs a two-phase blitz declaration on EVERY blitz; Rust folds the target into the
+declaration and skips the chain entirely. Both spend exactly one `actionRng` target pick and reach
+the same board state, so the matrices are 100/100 and the state hash cannot see the difference —
+the same blind-spot class as the ACTIVE bit and `ttm_used`/`ktm_used`, but on the most frequent
+action in the game. Measured: ~750 `JAVA_BLITZ_TARGET` selections per 100 games (dark_elf and dwarf
+bb2025), versus a Rust drive trace of the same matchup showing only `InitSelecting` /
+`EndSelecting` / `RemoveTargetSelectionState`.
+
+**Java's flow** (bb2025; bb2020 is the twin):
+1. Client sends `ClientCommandActingPlayer(pid, BLITZ_MOVE)`.
+2. `StepInitSelecting` :114 — `if (playerAction == BLITZ_MOVE && targetSelectionState == null)`
+   → `fDispatchPlayerAction = BLITZ_SELECT`, `changeActingPlayer(pid, BLITZ_MOVE, jumping)`
+   (the ACTING action stays BLITZ_MOVE), `forceGotoOnDispatch = true`.
+3. `StepEndSelecting` case `BLITZ_SELECT` → pushes the SelectBlitzTarget sequence:
+   `SELECT_BLITZ_TARGET [SELECT]` → ActivationSequenceBuilder (the negatrait rolls) → `JUMP_UP` →
+   `STAND_UP` → `SELECT_BLITZ_TARGET_END [END_BLITZING]`.
+4. `StepSelectBlitzTarget` CONTINUEs waiting for the target; on selection it sets
+   `TurnMode.SELECT_BLITZ_TARGET`, adds the blitz-target bit to the victim's PlayerState, builds a
+   `TargetSelectionState(...).select()` (committing it when the acting player `hasActed()`), emits
+   `ReportSelectBlitzTarget`, and applies any used skill's enhancements (Frenzy/Claws for blitz).
+   With no standing opponents it instead sets `TargetSelectionState().skip()` and NEXT_STEPs.
+5. Second pass: `targetSelectionState != null`, so BLITZ_MOVE dispatches normally to BlitzMove.
+6. `StepSelectBlitzTargetEnd` is where Java **consumes the team blitz** (`setBlitzUsed`).
+
+**What Rust already has — MOST OF IT.** An earlier estimate in this campaign called this
+"high risk, expect the whole matrix to red, multi-iteration" on the assumption that steps needed
+porting. That was wrong and is corrected here: `PlayerAction::BlitzSelect` exists;
+`StepEndSelecting` already has a fully-ported, UNIT-TESTED `BlitzSelect` arm that pushes
+`SelectBlitzTarget::build_sequence`; both generators, both step files, the dialog parameter and the
+report are all present.
+
+**What is actually missing — three things:**
+1. **The routing branch.** `StepInitSelecting` has ZERO references to `BlitzSelect`. Add Java's
+   :114 branch (untargeted BLITZ_MOVE → dispatch BLITZ_SELECT, force goto).
+2. **The step body is a stub.** `bb2025/step_select_blitz_target.rs::execute_step` returns
+   `StepOutcome::next()` where Java returns CONTINUE and waits. It needs the real body from (4)
+   above: the wait+prompt, the skip path, the cancel path, the TargetSelectionState, the
+   blitz-target state bit, the report, and the used-skill enhancements.
+3. **The agents.** They must declare Blitz with NO folded target (so `targetSelectionState` is
+   null on arrival) and answer the new target prompt.
+
+**Why the RNG stream should survive — the key insight.** In Java the target is picked by
+`SELECT_BLITZ_TARGET`, which sits BEFORE the ActivationSequenceBuilder negatrait rolls in the
+sequence. In Rust today the agent picks the blitz target at ACTIVATION time, also before the
+negatraits. Same relative position, one `actionRng` draw either way — which is exactly why parity
+currently holds despite the different code paths. Keep the draw where it is in stream order and the
+matrices should not move. That makes this a bounded fidelity change rather than a re-green
+campaign, though it still touches every roster's most common action, so gate all three editions.
+
+**Answer contract:** `ParityRunner.sendBlitzTargetSelection` → `pickBlockTarget` — adjacent
+opponents whose state base is STANDING or MOVING (NOT hasTackleZones, no confused check),
+coordinate-sorted, single `actionRng` pick; it already has handlers for `SELECT_BLITZ_TARGET` as
+BOTH a step (:805) and a dialog (:859), so the Java side needs no work.
+
+**Gaze twins:** `SelectGazeTarget`/`SelectGazeTargetEnd` are the same shape for bb2020 hypnotic
+gaze — do the blitz pair first, then mirror.
+
 ## Blocked — needs a tier decision from the user
 
 - **Punt.** Plumbing is correct and dark_elf bb2025 is 100/100, but `InitPunt` dispatches zero times:
