@@ -2516,3 +2516,28 @@ NEXT: extract that block verbatim into a helper, call it from BOTH the normal ta
 BLITZ_SELECT branch, and re-measure khemri seed 38 first (it should roll the GFI and produce
 block dice [6]), then halfling and vampire, then re-gate. Do NOT hand-write a shortened version
 of the cost - the block's comments record four separate regressions it already guards.
+
+**§12 GATE 5 (after the shared-activation-tail fix): bb2025 28 GREEN / 2 RED (was 22/8).**
+
+    NEWLY GREEN (6): halfling 27->100, undead 28->100, khemri 99->100,
+                     khemri_fumbbl 99->100, necromantic 99->100, nurgle 99->100
+    STILL RED (2):   skaven 99/100 (seed 73 step 148), vampire 57/100 (seed 1 step 101)
+
+One early `return` was worth six rosters, including both deep reds that had resisted several
+iterations (halfling 27, undead 28). The three undead-family rosters that shared an identical
+first divergence went green together, as predicted from that shared signature.
+
+Progress of this section: 4 green (gate 1) -> 10 (gate 2) -> 10 (gate 3) -> 22 (gate 4) -> 28.
+
+**skaven 99/100** is a single seed and has never been investigated - cheapest remaining item.
+
+**vampire 57/100 is UNCHANGED across every gate** (57 at gate 2, 3, 4 and 5), which is itself
+informative: none of the four fixes touched it. Its measured signature is unlike the others -
+the dice streams are byte-identical to main across all 129 RNG-steps, and the divergence is a
+single player field at i=102 (main moves player 00 one square and knocks it Prone; the branch
+leaves it Standing at 11,5). A state change with NO dice change.
+
+NEXT: vampire, using the method that finally worked - one unfiltered `FFB_SEQ` stream, read
+CONTIGUOUSLY, over the steps that can move a player and change its base (Pushback,
+DropFallingPlayers, the stand-up MOVING write in the new helper). The fact that vampire alone
+resisted all four blitz-chain fixes suggests its bug may not be in the chain at all.
