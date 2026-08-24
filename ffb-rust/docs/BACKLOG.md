@@ -1799,3 +1799,32 @@ CAUTION: `FFB_TSS_PROBE` probes are currently live in step_init_selecting.rs,
 step_select_blitz_target.rs and step_end_selecting.rs and MUST be removed before any gate. The
 step_end_selecting probe arm is also UNRELIABLE - it failed to print for home_03 even though
 that blitz did reach the chain - so do not read anything into its absence.
+
+**§12 GATE 2 (2026-08-24, after the standing_up fix): bb2025 10 GREEN / 20 RED (was 4/26).**
+
+    NEWLY GREEN: dwarf 98->100, elf 99->100, high_elf 98->100, wood_elf 99->100,
+                 dark_elf_league_fumbbl 97->100, slann_fumbbl 97->100
+    STILL GREEN: lineman, amazon, dark_elf, nippon
+    IMPROVED:    chaos_dwarf 79->94, human 75->77, norse 63->65, slann 65->66,
+                 necromantic 98->99, vampire 55->57, undead 27->28, renegades 25->23(-)
+    FLAT/WORSE:  halfling 14->11, goblin 23->21, chaos 64->60, underworld 54->50,
+                 lizardman 72->70, ogre 34->34, chaos_pact 34->35, nurgle 49->49,
+                 orc 48->49, skaven 68->67, khemri 99->99, khemri_fumbbl 99->99
+
+Read this as one clear signal plus noise: every roster that was ONE OR TWO seeds short went
+green, which is what fixing a single missing actionRng draw should do. The deeply-red rosters
+moved by a few seeds in both directions, which on a 100-seed sample after a stream-position
+change is reshuffling, not evidence either way - the same "diff the failing SEED SETS, not the
+count" caution that already applies here.
+
+**The remaining reds cluster hard.** Worst first: halfling 11, goblin 21, renegades 23,
+undead 28, ogre 34, chaos_pact 35. Those are the Throw-Team-Mate and big-guy rosters - the
+ones whose activations are richest in negatraits and in actions that are themselves
+blitz-family or that push their own sub-sequences. The four permanently-green rosters remain
+exactly the ones with none of that.
+
+NEXT: goblin seed 1, first divergence step 47 - early, and the roster is well understood from
+the earlier campaign. Use the method that WORKED: run the same seed on the branch and on main
+and compare `RUST_ACT_PICK` (N / idx / arc / drc) plus the `state=` string. Do NOT compare
+Rust against the Java log - display names, step alignment and dice positions are all
+non-comparable across engines, which produced three wrong root causes in this section.
