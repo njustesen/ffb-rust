@@ -1378,3 +1378,24 @@ The one that produced all eight findings of the interception campaign:
 - Piping the parity binary's stdout through `grep` can lose the `PARITY: n/m` line — redirect to a file
   first, then grep the file.
 
+
+### §12 progress log (branch `wip/blitz-select-chain`)
+
+- `a05fe892` — chain WORKS: lineman bb2025 **0/20 → 6/20**. Full Java flow now runs
+  (SelectBlitzTarget → negatraits → JumpUp → StandUp → SelectBlitzTargetEnd → Select →
+  InitSelecting → EndSelecting → InitMoving → EndMoving → InitBlocking → EndBlocking).
+  Five fixes, each traced not guessed: the InitSelecting BLITZ_SELECT routing branch; the real
+  `step_select_blitz_target` body (was a stub returning `next()`); the post-BLITZ_SELECT
+  continuation arm; `SelectBlitzTargetEnd`'s Select loop-back; the agent issuing the block at the
+  Move prompt; `StepEndMoving::start` honouring a published `DispatchPlayerAction`; and threading
+  `game.defender_id` into `BlitzBlockParams`.
+- **Recurring shape in this area:** the capability existed and was CORRECT but was unreachable
+  from the entry point the path actually uses (`EndMoving::start` vs `handle_command`;
+  `BlitzBlock` defender via step parameter vs `..Default::default()`). Probe, don't read.
+- **NEXT LEAD (14 seeds still failing, e.g. seed 3 at step 6):** the failing blitzes take a
+  DIFFERENT sequence. On the passing seed 1, `EndSelecting` pushes a 27-step sequence and
+  `InitMoving` prompts for a Move; on seed 3 it pushes **43** steps and `InitMoving` falls straight
+  through into `InitActivation` with no prompt, so the blitz ends before blocking. Java blocks
+  normally there (`currentMove=3 MA=6`). Suspect the prone / stand-up variant: compare what
+  `EndSelecting` pushes for BLITZ_MOVE when the blitzer must stand up first, and check whether
+  `standing_up` is still set from the pre-select pass.
