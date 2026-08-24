@@ -1976,3 +1976,33 @@ NEXT: find why the blitz is a no-op on main/Java. Probe main at that activation 
 `block_defender_id`, `turn_data.blitz_used` and the acting player's flags, and check whether the
 agent even offers Blitz legally at that point. The candidate list is now ruled out, so the
 answer is in the legality/turn-data state, not in target selection.
+
+**§12 RETRACTION (iter 37): "main's blitz does nothing / Java declines to run it" is WRONG.**
+
+That claim came from reading a `head -20` slice of main's i=47 drive-trace window and seeing no
+block. The window is 51 lines. More importantly, probing main at the Blitz dispatch guard shows
+blitzes there are perfectly normal:
+
+    MP blitz dispatch pid=Some("away_03") def=Some("home_03") blitz_used=false standing_up=false
+    MP blitz dispatch pid=Some("home_01") def=Some("away_01") blitz_used=false standing_up=true
+    ... 9 blitz dispatches, all with a defender
+
+and main runs 10 `InitBlocking` in the game (branch runs 12). So main folds a target and blocks;
+it does NOT decline blitzes. The previous entry's inversion of the framing was unfounded.
+
+**Method note - THREE truncation/alignment errors in this section now.** A `head -20` on a
+51-line window, a truncated probe head that produced "away_01 still doesn't enter the chain",
+and the stale-jsonl reads. Aggregate counts over a whole game (`grep -c`) are reliable;
+windows bounded by `RUST_STEP i=N` are NOT, because the DRIVE lines around a RUST_STEP boundary
+do not map cleanly onto that one activation's resolution. Prefer counts, or bound the
+comparison at the FIRST divergence.
+
+**What still stands, and it is little:** on goblin seed 1 the games are identical through i=46
+and diverge at i=47, where both engines choose `Activate(home_01, Blitz)`; across that
+activation main spends 1 engine die and the branch spends 4. The candidate lists are identical
+(iter 36, verified). Everything else about goblin is currently unexplained.
+
+NEXT: stop using windows. Instrument both builds to print ONE line per blitz - attacker,
+defender, whether a block sequence was pushed, and the engine rng delta across the whole
+activation - then compare the first N blitzes until the first one that differs. That is
+alignment-proof and answers directly what the branch does differently on a blitz.
