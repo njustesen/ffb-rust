@@ -2747,3 +2747,29 @@ therefore the cheapest to trace. Note BB2025 skaven was fixed by the SBTEnd end_
 push, and that step is the SHARED `mixed/blitz` file, so the fix is already live for BB2020 -
 whatever remains is something else. Use the normalised RNG-step diff, then the contiguous
 FFB_SEQ stream.
+
+**§12 BB2020 skaven ROOT CAUSE (iter 62): the chain's blitz loses its FRENZY follow-up block.**
+
+Normalised RNG-step diff, bb2020 skaven seed 1. Entries 1-21 identical, then:
+
+    main[21] BlockRoll          34->36 away_01     brch[21] BlockRoll      34->36 away_01
+    main[22] BlockRoll          36->38 away_01     brch[22] AnimalSavagery 36->37 home_01
+    main[23] DropFallingPlayers 38->42 away_01     brch[23] AnimalSavagery 37->38 away_01
+                                                   brch[24] BlockRoll      38->40 away_01
+
+Main throws TWO consecutive BlockRolls for away_01 - the second is the Frenzy follow-up after a
+push - then resolves the armour/injury. The branch throws ONE and the activation ends; away_01's
+next block is a whole activation later.
+
+So on the chain path a blitz that pushes with Frenzy never gets its second block. That fits the
+remaining BB2020 reds being 87-99: Frenzy-plus-push during a blitz is a per-game-rare combination,
+where a missing negatrait marker was per-activation common.
+
+Note this is a BLOCK-SEQUENCE continuation, not a declaration problem: the first block happens
+correctly and the dice up to it are identical.
+
+NEXT: find where the Frenzy follow-up block is pushed (StepEndBlocking) and why it does not fire
+when the block came through the chain. Suspect the same class as the other five fixes - a guard
+that reads the acting action (BLITZ vs BLITZ_MOVE) or a publish-only push. Check bb2025 skaven
+too: it is GREEN, so either it has no Frenzy carrier in those seeds or the path differs by
+edition - worth knowing which before fixing.
