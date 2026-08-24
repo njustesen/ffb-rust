@@ -1,3 +1,73 @@
+# Never-dispatched step inventory
+
+## RE-MEASURED 2026-08-24 — and the instrument itself was wrong
+
+Fresh sweep, same method as before: `FFB_DRIVE_TRACE=1 --uniform --all-rosters --all-editions
+--seeds 1-3 --no-abort` (5.73M `DRIVE step=` lines) diffed against the **200** `StepId` variants.
+
+| | 2026-08-19 pm | **2026-08-24** |
+|---|---|---|
+| StepId variants | 199 | **200** |
+| reached by the uniform sweep | 137 | **144** |
+| never reached by the sweep | 62 | **56** |
+| of those, PROVEN LIVE in the parity matrices | — | **24** |
+| **genuinely dead** | — | **32** |
+
+**THE UNIFORM 3-SEED SWEEP SYSTEMATICALLY UNDER-REPORTS LIVENESS. Do not use it alone.**
+It reports 56 ids as never-reached, but 24 of them have direct, counted evidence of executing in
+the parity matrices — including `AutoGazeZoat` (182 executions per 100 dark_elf games),
+the whole `FuriousOutburst` family (241 per 100 wood_elf games) and `QuickBite` (5 per 100 nurgle
+games), all verified this week. This is not new: the 2026-08-19 entry below already recorded the
+same failure for §9's `HailMaryPass` / `Treacherous` / `BlackInk`, and §10's Multiple Block family
+was still filed under "no parity roster drafts it" months after Horkon Heartripper was drafted
+into bb2020 dark_elf and those ids were observed dispatching.
+
+Two independent causes, both structural:
+1. **3 seeds is far too few for rare triggers.** Quick Bite needs the star to be marking an
+   opponent who catches the ball — 5 games in 100. At 3 seeds it is invisible.
+2. **The uniform agent is a different agent.** It has its own `act()` and its own action
+   filtering; it does not reproduce the parity agent's declaration choices, and the campaign's
+   drafted stars are tuned for the parity matrices, not for it.
+
+**Method going forward:** treat the sweep as an UPPER BOUND on deadness and subtract anything with
+counted parity evidence. A per-id claim of "dead" needs both sources to agree.
+
+### The 24 the sweep missed (live, with counted parity evidence)
+
+`ApothecaryMultiple AutoGazeZoat BlackInk BlockRollMultiple CatchOfTheDay CloudBurster
+DauntlessMultiple DispatchDumpOff EndFuriousOutburst EndThenIStartedBlastin
+FirstMoveFuriousOutburst FoulAppearanceMultiple HailMaryPass InitFuriousOutburst
+InitLookIntoMyEyes LookIntoMyEyes MultipleBlockFork QuickBite ReportStabInjury
+SecondMoveFuriousOutburst StateMultipleRolls Swoop ThenIStartedBlastin Treacherous`
+
+### The 32 that are genuinely dead, classified
+
+**Needs a SCORING agent (the standing blocked tier) — 5:**
+`AssignTouchdowns InitPunt EndPunt PuntDirection PuntDistance`
+
+**Blitz/gaze SELECT sub-chain — 4:** `SelectBlitzTarget SelectBlitzTargetEnd SelectGazeTarget
+SelectGazeTargetEnd`. Both harnesses declare a folded-target BLITZ, so the BLITZ_MOVE→BLITZ_SELECT
+dialog chain never runs. Recurring bug shape #2 (lockstep decline) by construction.
+
+**bb2016 Kick Team-Mate — 4:** `InitKickTeamMate KickTeamMate KickTeamMateDoubleRolled
+EndKickTeamMate`. bb2016-generator-only ids; no bb2016 roster drafts the skill (bb2020/bb2025 kicks
+ride the shared TTM steps and ARE live). A roster/draft change, not an engine fix.
+
+**Inducements / cards / wizard / prayers — 5:** `PlayCard Wizard MasterChef FanFactor PrayerRoll`.
+Needs the harness to actually BUY inducements on both sides.
+
+**Star/skill specials no drafted team carries — 5:** `DoubleStrength EatTeamMate PileDriver
+ThrowARock WeatherMage`
+
+**Pro — 1:** `Pro`. Dispatches from ONE site (StepHandleDropPlayerContext) and Rust's bb2020 file
+documents the gap as unwired — see BACKLOG §10, which calls it "a live landmine, not a safe stub".
+
+**Plumbing / no-op ids the driver never dispatches by that name — 8:** `Bombardier2
+ConsumeParameter DropActingPlayer EndPlayerAction KickoffScatterRollAskAfter NoOp RevertEndTurn
+SetActingPlayerAndTeam` — sequence-internal or superseded (EndPlayerAction is a GENERATOR name).
+
+---
+
 # Never-dispatched step inventory — RE-MEASURED 2026-08-19
 
 **2026-08-24 update (5) — `AutoGazeZoat` REACHED; §11 star batch COMPLETE.** Zolcath the Zoat
