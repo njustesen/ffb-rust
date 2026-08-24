@@ -97,13 +97,24 @@ None of these is a star special and none is waiting on a carrier. Traced to thei
 
 so the inducement group is really **7**, not 5.
 
-**`PileDriver` is the next concrete target.** It is declared by `ClientCommandPileDriver`
-(`CLIENT_PILE_DRIVER`, carrying a target player id) and handled in `StepEndBlocking` — literally
-the arm next to the `CLIENT_USE_SKILL` Hit-and-Run one. **`ParityRunner` contains zero references
-to it: no sender at all.** So neither engine ever declares it — textbook bug shape #2, and
-structurally identical to Hit and Run before its fix. Measured, not assumed: a 20-game ogre bb2025
-drive trace has **4,868 `Foul` dispatches and 0 `PileDriver`**, so this is undeclared rather than
-rare. The Hit-and-Run playbook applies directly.
+**`PileDriver` — CORRECTED AGAIN (same day). It is NOT actionable; it has NO LEGAL CARRIER.**
+The line above originally called it "the next concrete target" on the strength of the harness gap
+alone. The harness gap is real — `ClientCommandPileDriver` (`CLIENT_PILE_DRIVER`) is handled in
+`StepEndBlocking` right next to the Hit-and-Run arm, and `ParityRunner` has zero references to it,
+so neither engine ever declares it. But a sender alone could never make it fire:
+
+Java gates the offer on `canFoulAfterBlock`, registered ONLY by `bb2020/PileDriver` and
+`bb2025/PileDriver`. **Nothing in the data carries that skill** — checked every roster position in
+all three editions, every one of the 179 star players, and the three FUMBBL-imported rosters
+(which would be the likeliest source, since they come from real levelled teams). Pile Driver is a
+randomly-rollable STRENGTH ADVANCEMENT (`bb2020/core_rules/03_skills_and_traits.md`, the 4-6/3
+row), not a starting skill on any position or star, and the parity teams model starting skills
+only.
+
+So `PileDriver` sits with the bb2016 Kick Team-Mate ids: reachable only by inventing roster data,
+which the rule-legal drafting discipline forbids. The 4,868-fouls-and-zero-dispatches measurement
+was correct but proved the wrong thing — it showed the step never fires, not that a sender would
+make it fire.
 
 **`EatTeamMate` is NOT a bug — do not chase it.** It is the `GOTO_LABEL_ON_FAILURE` target of the
 TTM sequence (an Always Hungry throw that fails), and Rust's TTM generator carries the label and
@@ -118,6 +129,26 @@ step correctly, mirroring Java. It never fires for two legitimate reasons:
 
 **Pro — 1:** `Pro`. Dispatches from ONE site (StepHandleDropPlayerContext) and Rust's bb2020 file
 documents the gap as unwired — see BACKLOG §10, which calls it "a live landmine, not a safe stub".
+
+### What this leaves — read this before picking the next item
+
+After three consecutive corrections (Multiple Block already live; the "no carrier" five all
+misfiled; `PileDriver` above), the honest shape of the remaining frontier is that **most of it is
+not un-wired code — it is unreachable-by-legal-data or blocked on a decision.** Grouping by what
+would actually be needed:
+
+| what it needs | ids |
+|---|---|
+| a USER TIER DECISION (scoring agent) | 5 — `AssignTouchdowns InitPunt EndPunt PuntDirection PuntDistance` |
+| INVENTING roster data (forbidden) | 5 — `PileDriver` + the 4 bb2016 KTM ids |
+| the harness to BUY INDUCEMENTS | 7 — `PlayCard Wizard MasterChef FanFactor PrayerRoll ThrowARock WeatherMage` |
+| a real ENGINE CHANGE (the one big fidelity win) | 4 — the blitz/gaze select sub-chain |
+| a rare in-game SITUATION, no fix needed | 2 — `DoubleStrength` (multi-block), `EatTeamMate` |
+| nothing — they are not dispatched by that name | 8 — the plumbing group below |
+
+**The blitz/gaze select sub-chain is the only substantial engine-fidelity work left in this tier**,
+and it is scoped above as a deliberate multi-iteration project. Everything else needs either a
+decision, a data-legality call, or harness inducement support.
 
 **Plumbing / no-op ids the driver never dispatches by that name — 8:** `Bombardier2
 ConsumeParameter DropActingPlayer EndPlayerAction KickoffScatterRollAskAfter NoOp RevertEndTurn
