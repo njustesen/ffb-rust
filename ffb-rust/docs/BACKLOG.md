@@ -1437,3 +1437,23 @@ step stack on its end-turn/end-action path (`getGameState().getStepStack().clear
 `with_clear_stack()` is only applied on that same path. Check whether the SELECTED path also needs
 to clear, and note that `StepOutcome::clear_stack` was itself recorded as a DEAD FLAG in the Zzharg
 work (BACKLOG §11) — verify the driver actually consumes it before relying on it.
+
+**§12 status after the residue hunt (2026-08-24).** The blitz path is STRUCTURALLY IDENTICAL
+between a passing and a failing seed: both lineman bb2025 seed 1 and seed 3 enter `InitMoving`
+with `pa=Some(BlitzMove)` exactly **13** times. So the two-phase declaration, the select sequence,
+the loop-back and the block dispatch all behave the same; what remains is SITUATIONAL, not a
+missing piece of the chain.
+
+Two measurement cautions learned here, both of which cost a wrong turn:
+- `stack_len` in `FFB_DRIVE_TRACE` is not a simple depth you can subtract. The 27-vs-43 reading
+  led to a "residue" theory that the push probe contradicted (`seq_len=28`, ordinary `InitMoving`
+  first, identical to the passing seed). Do not diagnose from that counter alone.
+- Sampling the FIRST few probe lines is meaningless here: a single seed produces ~1,023
+  `InitMoving` entries. Filter to the case of interest (`pa=Some(BlitzMove)`) and COUNT before
+  concluding anything.
+
+NEXT: stop sampling and diff. Take failing seed 3, find the FIRST diverging activation by
+`rng_calls` (it is i=6, where Java spends 3 dice — block + 2 armour — and Rust spends 0), then dump
+only that activation's probe lines from both engines. The blitz at i=6 selects
+`def=teamLinemanParityAway1` in Java; check whether Rust's `SelectBlitzTarget` offers the same
+single candidate (`JAVA_BLOCK_PICK N=1`) and whether its block then finds a defender.
