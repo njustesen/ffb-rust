@@ -74,6 +74,9 @@ impl Step for StepInitSelecting {
             || game.acting_player.has_triggered_effect
             || game.acting_player.forgone;
         if !acted {
+            if std::env::var("FFB_BZ_PROBE").is_ok() {
+                eprintln!("BZPROBE InitSelecting enter pa={:?}", game.acting_player.player_action);
+            }
             match game.acting_player.player_action {
                 Some(PlayerAction::PassMove) => {
                     if let Some(pid) = game.acting_player.player_id.clone() {
@@ -116,6 +119,9 @@ impl Step for StepInitSelecting {
                 // instead and the blitz ended having done nothing (lineman bb2025 seed 1 i=1:
                 // Java blocks and spends a die, Rust spends none).
                 Some(PlayerAction::BlitzMove) => {
+                    if std::env::var("FFB_BZ_PROBE").is_ok() {
+                        eprintln!("BZPROBE InitSelecting continuation HIT pa=BlitzMove");
+                    }
                     self.dispatch_player_action = Some(PlayerAction::BlitzMove);
                     self.force_goto_on_dispatch = true;
                     return self.execute_step(game, _rng);

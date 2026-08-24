@@ -1457,3 +1457,28 @@ NEXT: stop sampling and diff. Take failing seed 3, find the FIRST diverging acti
 only that activation's probe lines from both engines. The blitz at i=6 selects
 `def=teamLinemanParityAway1` in Java; check whether Rust's `SelectBlitzTarget` offers the same
 single candidate (`JAVA_BLOCK_PICK N=1`) and whether its block then finds a defender.
+
+**§12 NARROWED to an exact discrepancy (2026-08-24): 8 → 5.** Probes on failing lineman bb2025
+seed 3:
+
+    BZPROBE SBTEnd ... tss=Some(SELECTED) defender=Some(...)   x8   (all SELECTED, all with a defender)
+    BZPROBE InitSelecting enter pa=Some(BlitzMove)             x5
+    BZPROBE InitSelecting continuation HIT pa=BlitzMove        x5
+    BZPROBE EndSelecting BlitzMove seq_len=28 ...              x5
+
+So **eight** blitzes select a target and reach `StepSelectBlitzTargetEnd` on the SELECTED branch,
+but only **five** arrive at `StepInitSelecting` carrying `BlitzMove` — three lose the action
+between `SelectBlitzTargetEnd` setting it and the pushed Select sequence reading it. Those three
+are the failing blitzes: they fall through to a fresh activation and never block.
+
+The prone theory is dead for good: all five EndSelecting pushes in this seed are byte-identical
+(`standing_up=false prone=Some(false)`), and there are only five lines total, so this is not the
+earlier sampling error.
+
+NEXT: instrument `StepSelectBlitzTargetEnd`'s SELECTED branch itself — print
+`game.acting_player.player_id` and the action IMMEDIATELY BEFORE and AFTER
+`change_player_action(.., BlitzMove, ..)`, and again after `push_seq`. Candidates for the loss:
+(a) `player_id` is None for those three so the change is skipped (the `if let Some(pid)` guard);
+(b) something between the push and `InitSelecting` resets the action (`changeActingPlayer` clears
+state — see the `reset_blocked_and_moving_players` precedent); (c) those three are the OTHER
+team's blitzes and the acting player is swapped before the Select sequence runs.

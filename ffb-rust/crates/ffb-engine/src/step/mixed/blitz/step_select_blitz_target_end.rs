@@ -38,6 +38,10 @@ impl StepSelectBlitzTargetEnd {
         //   if failed → push END_MOVING(end_player_action=true)
 
         let tss = game.field_model.target_selection_state.clone();
+        if std::env::var("FFB_BZ_PROBE").is_ok() {
+            eprintln!("BZPROBE SBTEnd end_turn={} tss={:?} defender={:?}",
+                self.end_turn, tss.as_ref().map(|t| t.get_status()), game.defender_id);
+        }
 
         if self.end_turn {
             // Java: EndPlayerAction.pushSequence(true, true, endTurn)
