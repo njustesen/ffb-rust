@@ -2235,3 +2235,37 @@ StepSelectBlitzTargetEnd pushes has feeding in it, so the likely culprit is the 
 END_BLITZING skipping past it. Note `EndPlayerAction::build_sequence` takes a `feeding_allowed`
 flag - StepSelectBlitzTarget passes `feeding_allowed: false`, which is worth checking against
 Java first.
+
+**§12 khemri/necromantic/khemri_fumbbl (99/100, seed 38 step 31) - SAME SHAPE AS VAMPIRE.**
+
+State-string diff against main, seed 38, both runs 289 steps and byte-identical until:
+
+    i=31  away_03 declares a Blitz
+    i=32  main  h00:11,6,Prone,4/5/5/10,1
+          brch  h00:11,6,Standing,4/5/5/10,1
+
+Exactly ONE player field differs, at the SAME coordinates - so this is not a different pushback
+square and not a different victim: **nobody else is knocked down instead**. The blitz's block
+simply leaves the defender standing.
+
+Vampire seed 1 step 101 is the same shape (main knocks player 00 down, branch does not), and
+halfling seed 2 step 49 is a StandUp/GoForIt/FallDown divergence. All three of the shapes now
+measured involve a player that should end up PRONE and does not, around a blitz.
+
+Also worth noting for whoever picks this up: the vampire dice streams are IDENTICAL end to end
+(129 RNG-steps, only cosmetic pa= labels differ) even though the games diverge at i=102. A
+knockdown that costs no dice, and a divergence that never shows up in the dice, both point at
+the knockdown being applied as STATE rather than rolled.
+
+Method note: whole-game `grep -c` aggregates are NOT valid once the games diverge (branch 167
+steps vs main 138 on vampire), so the InitFeeding 170-vs-139 count measured this iteration proves
+nothing. Aggregates are only comparable while the runs are the same length; the state-string
+prefix diff is the reliable tool and is what found all three of these.
+
+DEPRIORITISED: the vampire feeding hypothesis from the previous entry is NOT confirmed - the
+thrall-bite reading does not survive the fact that the affected player (a00) is on the OPPOSING
+team. Treat it as unproven.
+
+NEXT: khemri seed 38 is the cheapest case (99/100, one seed, three rosters share it). Instrument
+the block resolution for that single blitz and compare which defender is blocked and what the
+block result is applied as, branch vs main.
