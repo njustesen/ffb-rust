@@ -4596,6 +4596,37 @@
         "Chaos Chosen",
         "Chaos Renegades"
       ]
+    },
+    {
+      "id": "woodelf.Swiftvine",
+      "name": "Swiftvine Glimmershard",
+      "display_name": "Swiftvine Glimmershard",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 110000,
+      "ma": 7,
+      "st": 2,
+      "ag": 3,
+      "pa": 5,
+      "av": 7,
+      "shorthand": "SG",
+      "skills": [
+        "Disturbing Presence",
+        "Fend",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Sidestep",
+        "Stab",
+        "Stunty",
+        "Furious Outburst"
+      ],
+      "available_for": [
+        "Wood Elf",
+        "Halfling",
+        "Gnome"
+      ]
     }
   ]
 }

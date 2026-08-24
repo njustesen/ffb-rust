@@ -1082,7 +1082,59 @@ Carriers (from rules/star_players/*.md; Java canonical skill names in quotes):
         the missing TOUCHBACK branch (`turnMode == KICKOFF && !bounds.isInBounds(ball)`),
         which Rust had dropped entirely. Data lesson: the canonical Java skill name is
         **"On The Ball"** (capital T), not the rulebook's "On the Ball".
-  - [ ] Swiftvine Glimmershard ("Furious Outburst") → bb2025 wood_elf
+  - [x] Swiftvine Glimmershard ("Furious Outburst") LIVE (2026-08-24): drafted @nr3 bb2025
+        wood_elf (treeman 3 → 13, benched), 100/100 on fresh Java logs, full gate 30/30 ×3.
+        FOUR dead ids switched on at once (InitFuriousOutburst, FirstMove/SecondMove,
+        EndFuriousOutburst). Emphatically live: **241 executions in 95/100 games**, both engines
+        agreeing exactly (241 JAVA_FO_PICK vs 241 Rust declarations, plus 30 matched stale-offer
+        deselects). Progression 100/100 VACUOUS → 2 → 7 → 64 → 100 real.
+        The mechanic was dead in THREE independent places, which is why no earlier sweep caught
+        it: (a) neither engine OFFERED the action (it is a PlayerAction, FURIOUS_OUTPBURST — the
+        typo is Java's — declared by the client as a plain sendActingPlayer and dispatched from
+        StepEndSelecting; Rust legal_actions had the other seven bb2025 star specials but not
+        this one, and ParityRunner's hand-maintained offer list did not either); (b)
+        StepInitFuriousOutburst returned a bare `cont()` behind a "client-only … headless falls
+        through" comment — the driver's STALL shape, so even a declared action would hang; (c)
+        both move steps did the same (they publish MoveSquares and wait for
+        CLIENT_FIELD_COORDINATE).
+        THREE engine/agent bugs, each with a regression test:
+        1. **Declared then instantly deselected.** `is_handled_acting_action` (Rust's mirror of
+           ParityRunner.isHandledActingAction) omitted it, so Rust declared the action and threw
+           it away while Java carried it out (seed 1 i=23). SAME SHAPE that kept Kick Team-Mate
+           dead in every edition — the two lists are hand-maintained on both sides and nothing
+           cross-checks them.
+        2. **`blitzUsed` never consumed.** Furious Outburst counts as the team's Blitz Action;
+           StepEndFuriousOutburst sets it, but gated on the BARE `has_acted` field where Java's
+           `hasActed()` is COMPUTED (hasMoved||hasFouled||hasBlocked||…). The stab sets
+           has_blocked, never the bare flag (seed 1 i=24: Java `f0000,1100` vs Rust `f0000,0100`),
+           so the star could outburst every turn. Fixed at all 3 sites (bb2020+bb2025 end steps,
+           FirstMove's wasted-skill report) — `acting_player.acted()` already existed for exactly
+           this and its doc comment already warned the bare field is wrong here.
+        3. **Stale turn-start offer → STOCK-JAVA NPE.** ParityRunner.computeEligiblePlayers
+           snapshots eligibility at TURN START, but the blitz gets spent (and targets walk away)
+           later in the turn. Declaring a stale outburst CRASHES the stock engine: every abort
+           path in the bb2025 sequence jumps to the `END` label, which IS StepEndFuriousOutburst,
+           and that step dereferences
+           `fieldModel.getTargetSelectionState().getSelectedPlayerId()` unconditionally
+           (NullPointerException at StepEndFuriousOutburst:71 — it killed the batched JVM at seed
+           65 i=190, state `f1000,0000`, so seeds 65-100 reported `java=None` and looked like 36
+           separate bugs). The real client never reaches it because SelectLogicModule
+           re-evaluates isFuriousOutburstAvailable at CLICK time. Both agents now re-check at
+           DECLARATION time and deselect — the same treatment sendFoulAction gives a foul whose
+           victim has moved. The rule is factored into
+           `legal_actions::is_furious_outburst_available` so the offer and the re-check cannot
+           drift apart. **This is a latent crash in the shipped Java server, not just a harness
+           quirk** — left unfixed here because ffb-common/ffb-server engine code is off-limits.
+        Contract note: Java's `findEligiblePlayers` returns a **HashSet**, so the dialog's player
+        order is identity-hash order and is NOT a contract (unlike BALEFUL_HEX/RAIDING_PARTY).
+        Both sides COORDINATE-SORT before the single actionRng pick, following the
+        pickBlockTarget/ANIMAL_SAVAGERY precedent. The move steps' abort is also NOT EndTurn:
+        Java's step has no CLIENT_END_TURN handler, only a null-action CLIENT_ACTING_PLAYER, so
+        an empty square list ends the PLAYER ACTION on both sides.
+        Test lessons: the pre-existing `marks_blitz_used_when_has_acted` test set `has_acted`
+        directly, so it passed while the real path was broken — a test pinning the wrong thing.
+        And `PS_STANDING` does NOT imply the ACTIVE bit (a separate bit set by the turn-start
+        refresh), which is a fixture trap for any rule checking isActive().
   - [ ] Thorsson Stoutmead ("Beer Barrel Bash!") → bb2025 dwarf
   - [ ] Grombrindal ("Wisdom of the White Dwarf") → bb2025 dwarf or halfling
 - Batch C — already in data, just dormant:

@@ -327,6 +327,15 @@ impl Agent for UniformAgent {
                 let idx = self.pick(candidates.len());
                 Action::SelectPlayer { player_id: candidates[idx].clone() }
             }
+            Some(AgentPrompt::FuriousOutburstSquare { squares, .. }) => {
+                let mut squares = squares.clone();
+                squares.sort_by_key(|c| (c.x, c.y));
+                // Java's step has NO CLIENT_END_TURN handler — a null-action
+                // CLIENT_ACTING_PLAYER is its only abort, so mirror that, not EndTurn.
+                if squares.is_empty() { return Action::EndPlayerAction; }
+                let idx = self.pick(squares.len());
+                Action::FuriousOutburstSquare { coord: squares[idx] }
+            }
             Some(AgentPrompt::RaidingParty { squares, .. }) => {
                 let mut squares = squares.clone();
                 squares.sort_by_key(|c| (c.x, c.y));

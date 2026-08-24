@@ -20,7 +20,7 @@
       "position_id": "woodelf.wardancer"
     },
     {
-      "nr": 3,
+      "nr": 13,
       "position_id": "woodelf.treeman"
     },
     {
@@ -61,6 +61,10 @@
     {
       "nr": 2,
       "star_id": "woodelf.Rodney"
+    },
+    {
+      "nr": 3,
+      "star_id": "woodelf.Swiftvine"
     }
   ]
 }

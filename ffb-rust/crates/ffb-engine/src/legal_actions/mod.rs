@@ -471,6 +471,19 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             }
         }
 
+        // Furious Outburst (bb2025 star special): the client's isFuriousOutburstAvailable rule
+        // (LogicModule.java) — the player's state is ACTIVE and STANDING, the team's blitz is
+        // not yet used, the skill is unused, and there is a BLOCKABLE opponent within 3
+        // Chebyshev steps. Offer sits DIRECTLY AFTER "Blastin' Solves Everything";
+        // ParityRunner mirrors the position.
+        if is_furious_outburst_available(game, pid.as_str()) {
+            actions.push(Action::ActivatePlayer {
+                player_id: pid.clone(),
+                player_action: PlayerActionChoice::FuriousOutburst,
+                block_defender_id: None,
+            });
+        }
+
         // Black Ink (bb2020+ star special): the client's isBlackInkAvailable rule — unused
         // canGazeAutomatically skill + an adjacent standing-or-prone, NOT-distracted opponent
         // (LogicModule.isBlackInkAvailable). Declaring it maps to the client's
@@ -555,6 +568,50 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
     actions
 }
 
+/// Java `LogicModule.isFuriousOutburstAvailable(Player)`:
+///   `playerState != null && playerState.isActive()
+///    && playerState.getBase() == PlayerState.STANDING
+///    && !game.getTurnData().isBlitzUsed()
+///    && player.hasUnusedSkillProperty(canTeleportBeforeAndAfterAvRollAttack)
+///    && ArrayTool.isProvided(UtilPlayer.findBlockablePlayers(game, opponentTeam, coord, 3))`
+///
+/// Factored out of the offer list because the AGENT must re-check it at DECLARATION time: the
+/// turn-start eligible snapshot goes stale (the blitz gets spent, targets walk away), and
+/// declaring a stale Furious Outburst makes STOCK JAVA THROW — every abort path in the bb2025
+/// sequence jumps to the `END` label, which IS `StepEndFuriousOutburst`, and that step
+/// dereferences `fieldModel.getTargetSelectionState().getSelectedPlayerId()` unconditionally.
+/// The real client re-evaluates this rule at click time; both parity agents now do the same.
+pub fn is_furious_outburst_available(game: &Game, player_id: &str) -> bool {
+    let Some(player) = game.player(player_id) else { return false };
+    if !player.has_skill(SkillId::FuriousOutburst)
+        || player.used_skills.contains(&SkillId::FuriousOutburst)
+    {
+        return false;
+    }
+    let state_ok = game.field_model.player_state(player_id)
+        .map(|s| s.is_active() && s.base() == ffb_model::enums::PS_STANDING)
+        .unwrap_or(false);
+    if !state_ok {
+        return false;
+    }
+    let blitz_used = if game.home_playing {
+        game.turn_data_home.blitz_used
+    } else {
+        game.turn_data_away.blitz_used
+    };
+    if blitz_used {
+        return false;
+    }
+    let Some(coord) = game.field_model.player_coordinate(player_id) else { return false };
+    let opponent_team = if game.team_home.player(player_id).is_some() {
+        &game.team_away
+    } else {
+        &game.team_home
+    };
+    !ffb_model::util::util_player::UtilPlayer::find_blockable_players(game, opponent_team, coord, 3)
+        .is_empty()
+}
+
 /// The `(player, actions)` eligibility list for the `ActivatePlayer` prompt — the same
 /// per-player action enumeration as `legal_activate_player_actions` (which Java
 /// `ParityRunner.computeEligiblePlayers` mirrors), grouped per player and mapped into model
@@ -587,6 +644,7 @@ pub fn eligible_players_for_activation(game: &Game) -> Vec<(PlayerId, Vec<ffb_mo
             PAC::BalefulHex => PA::BalefulHex,
             PAC::CatchOfTheDay => PA::CatchOfTheDay,
             PAC::ThenIStartedBlastin => PA::ThenIStartedBlastin,
+            PAC::FuriousOutburst => PA::FuriousOutburst,
             PAC::AllYouCanEat => PA::AllYouCanEat,
             PAC::Treacherous => PA::Treacherous,
             PAC::BlackInk => PA::BlackInk,
@@ -1514,6 +1572,69 @@ mod tests {
         }
         let a3 = legal_activate_player_actions(&game, TeamSide::Home);
         assert!(!has_action(&a3, "rodney", PlayerActionChoice::CatchOfTheDay));
+    }
+
+    /// `add_player` builds a bare `PS_STANDING` state; the ACTIVE bit is a SEPARATE bit that the
+    /// turn-start refresh sets in a real game. `isFuriousOutburstAvailable` tests it explicitly,
+    /// so the fixtures below have to set it too.
+    fn activate(game: &mut Game, id: &str) {
+        let s = game.field_model.player_state(id).unwrap().change_active(true);
+        game.field_model.set_player_state(id, s);
+    }
+
+    /// §11: Furious Outburst is offered under the CLIENT's rule
+    /// (LogicModule.isFuriousOutburstAvailable): ACTIVE + STANDING, the team blitz not yet used,
+    /// unused canTeleportBeforeAndAfterAvRollAttack, and a BLOCKABLE opponent within 3 steps.
+    #[test]
+    fn furious_outburst_offered_only_under_the_client_rule() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "swiftvine", c(5, 5), PS_STANDING, vec![SkillId::FuriousOutburst]);
+        activate(&mut game, "swiftvine");
+        add_player(&mut game, false, "opp", c(9, 5), PS_STANDING, vec![]);
+        // opponent 4 steps away → no offer
+        let a0 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a0, "swiftvine", PlayerActionChoice::FuriousOutburst));
+        // within 3 → offered
+        game.field_model.set_player_coordinate("opp", c(8, 5));
+        let a1 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&a1, "swiftvine", PlayerActionChoice::FuriousOutburst),
+            "unused Furious Outburst + blockable opponent within 3 must be offered");
+        // used skill withdraws it
+        if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == "swiftvine") {
+            p.used_skills.insert(SkillId::FuriousOutburst);
+        }
+        let a2 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a2, "swiftvine", PlayerActionChoice::FuriousOutburst));
+    }
+
+    /// The blitz clause is the one that goes stale mid-turn, and declaring a stale Furious
+    /// Outburst makes STOCK JAVA throw (StepEndFuriousOutburst dereferences a null
+    /// targetSelectionState on every abort path). Both the offer and the agents' declaration-time
+    /// re-check go through `is_furious_outburst_available`, so this pins the clause once.
+    #[test]
+    fn furious_outburst_withdrawn_once_the_blitz_is_used() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "swiftvine", c(5, 5), PS_STANDING, vec![SkillId::FuriousOutburst]);
+        activate(&mut game, "swiftvine");
+        add_player(&mut game, false, "opp", c(6, 5), PS_STANDING, vec![]);
+        assert!(is_furious_outburst_available(&game, "swiftvine"));
+        game.turn_data_home.blitz_used = true;
+        assert!(!is_furious_outburst_available(&game, "swiftvine"),
+            "a spent team blitz must withdraw the offer");
+        let a = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a, "swiftvine", PlayerActionChoice::FuriousOutburst));
+    }
+
+    /// A prone star cannot outburst (the client requires base == STANDING).
+    #[test]
+    fn furious_outburst_requires_a_standing_star() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "swiftvine", c(5, 5), PS_STANDING, vec![SkillId::FuriousOutburst]);
+        activate(&mut game, "swiftvine");
+        add_player(&mut game, false, "opp", c(6, 5), PS_STANDING, vec![]);
+        assert!(is_furious_outburst_available(&game, "swiftvine"));
+        game.field_model.set_player_state("swiftvine", ffb_model::enums::PlayerState::new(PS_PRONE));
+        assert!(!is_furious_outburst_available(&game, "swiftvine"));
     }
 
     /// §11: "Blastin' Solves Everything" is offered under the CLIENT's rule

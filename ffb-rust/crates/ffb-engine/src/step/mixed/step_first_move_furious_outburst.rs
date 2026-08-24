@@ -67,7 +67,13 @@ impl StepFirstMoveFuriousOutburst {
     fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
         if self.end_player_action {
             // Java: if (actingPlayer.hasActed()) getResult().addReport(new ReportSkillWasted(actingPlayer.getPlayerId(), skill))
-            if game.acting_player.has_acted {
+            // Java: `actingPlayer.hasActed()` — a COMPUTED predicate
+            // (hasMoved||hasFouled||hasBlocked||hasPassed||hasTriggeredEffect||!usedSkills.isEmpty()
+            // ||isForgone), not a stored flag. The Furious Outburst stab sets has_blocked, never the
+            // bare `has_acted` field, so reading the field skipped `setBlitzUsed(true)` entirely —
+            // Java `f0000,1100` vs Rust `f0000,0100` (wood_elf bb2025 seed 1 i=24). `acted()` is the
+            // documented mirror; the bare field alone is always wrong here.
+            if game.acting_player.acted() {
                 let player_id = game.acting_player.player_id.clone();
                 let skill = player_id.as_deref()
                     .and_then(|pid| game.player(pid))
@@ -112,7 +118,20 @@ impl StepFirstMoveFuriousOutburst {
                     .map(|pid| game.field_model.ball_coordinate == game.field_model.player_coordinate(pid))
                     .unwrap_or(false);
             }
-            return StepOutcome::cont();
+            // Java: getResult().setNextAction(StepAction.CONTINUE) with the eligible squares
+            // published as MoveSquares — the step waits for a CLIENT_FIELD_COORDINATE naming one.
+            // There is NO dialog, so the wait must be carried by an explicit prompt: a bare
+            // `cont()` here is the driver's stall shape and the sequence would hang.
+            let squares: Vec<FieldCoordinate> = {
+                let mut v: Vec<FieldCoordinate> = self.eligible_squares.iter().cloned().collect();
+                v.sort_by_key(|c| (c.x, c.y));
+                v
+            };
+            return StepOutcome::cont().with_prompt(
+                ffb_model::prompts::AgentPrompt::FuriousOutburstSquare {
+                    player_id: game.acting_player.player_id.clone().unwrap_or_default(),
+                    squares,
+                });
         }
 
         // Java: second pass — perform the teleport
@@ -167,21 +186,18 @@ impl Step for StepFirstMoveFuriousOutburst {
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         match action {
-            // Java: CLIENT_FIELD_COORDINATE
-            Action::Move { path } => {
-                if let Some(&coord) = path.first() {
-                    if self.eligible_squares.contains(&coord) {
-                        self.coordinate = Some(coord);
-                    }
+            // Java: CLIENT_FIELD_COORDINATE — accepted only when the square is in
+            // `eligibleSquares`; anything else leaves the step waiting.
+            Action::FuriousOutburstSquare { coord } => {
+                if self.eligible_squares.contains(coord) {
+                    self.coordinate = Some(*coord);
                 }
             }
-            // Java: CLIENT_ACTING_PLAYER with null action → endPlayerAction
-            Action::ActivatePlayer { player_action: _, ..
-} => {
-                // Java: if clientCommandActingPlayer.getPlayerAction() == null → endPlayerAction
-                // In Rust we use EndTurn as the cancel signal
-            }
-            Action::EndTurn => { self.end_player_action = true; }
+            // Java: CLIENT_ACTING_PLAYER with a null action → endPlayerAction. That is the
+            // step's ONLY abort — it has no CLIENT_END_TURN handler — so the agents answer an
+            // empty square list with EndPlayerAction, and ParityRunner injects the matching
+            // null-action ClientCommandActingPlayer.
+            Action::EndPlayerAction => { self.end_player_action = true; }
             _ => {}
         }
         self.execute_step(game)

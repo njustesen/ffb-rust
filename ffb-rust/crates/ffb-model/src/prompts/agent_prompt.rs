@@ -77,6 +77,12 @@ pub enum AgentPrompt {
     /// Raiding Party target-square window (Java: MoveSquares published + CLIENT_FIELD_COORDINATE
     /// wait, turn mode RAIDING_PARTY). Same answer contract as PuntTarget/HitAndRun:
     /// coordinate-sorted squares, single actionRng pick.
+    /// Java: StepFirstMove/SecondMoveFuriousOutburst publish their eligible squares as
+    /// MoveSquares and wait for a `ClientCommandFieldCoordinate` naming one. No dialog.
+    FuriousOutburstSquare {
+        player_id: PlayerId,
+        squares: Vec<FieldCoordinate>,
+    },
     RaidingParty {
         player_id: PlayerId,
         squares: Vec<FieldCoordinate>,

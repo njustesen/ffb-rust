@@ -71,6 +71,9 @@ pub enum Action {
     HitAndRun { coord: Option<FieldCoordinate> },
     /// Raiding Party: move the chosen open team-mate to this square (Java CLIENT_FIELD_COORDINATE).
     RaidingPartyTarget { coord: FieldCoordinate },
+    /// Java: `ClientCommandFieldCoordinate` answering StepFirstMove/SecondMoveFuriousOutburst's
+    /// MoveSquare wait (the star teleports next to her stab target, then away again).
+    FuriousOutburstSquare { coord: FieldCoordinate },
     /// Move to one adjacent square before a block resolves (Trickster skill).
     TricksterMove { coord: FieldCoordinate },
     /// Java `ClientCommandSwoop` — the square a BB2016/BB2020 swooping player is steered toward.
@@ -224,6 +227,7 @@ pub enum PlayerActionChoice {
     /// the client's ActingPlayer(MOVE) + UseSkill(canMoveOpenTeamMate) pair; the mover
     /// continues the move afterwards.
     RaidingParty,
+    FuriousOutburst,
     /// Look Into My Eyes (bb2025 star special): steal the ball from an adjacent carrier.
     /// Declared as the client's ActingPlayer(MOVE) + UseSkill(canStealBallFromOpponent) pair.
     LookIntoMyEyes,

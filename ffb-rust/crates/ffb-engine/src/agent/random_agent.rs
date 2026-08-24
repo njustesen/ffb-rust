@@ -126,6 +126,13 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             | PlayerActionChoice::AllYouCanEat
             | PlayerActionChoice::Treacherous
             | PlayerActionChoice::BlackInk
+            // FURIOUS_OUTPBURST (bb2025 star special): declared as a plain
+            // ClientCommandActingPlayer with no folded target — StepInitFuriousOutburst shows its
+            // own stab-target dialog. Omitting it here made both engines DECLARE the action and
+            // then instantly deselect it (wood_elf bb2025 seed 1 i=23: Java carried it out while
+            // Rust deselected and re-picked), which is the same shape that kept Kick Team-Mate
+            // dead in every edition.
+            | PlayerActionChoice::FuriousOutburst
     )
 }
 
@@ -495,6 +502,27 @@ impl Agent for RandomAgent {
                 if matches!(player_action, PlayerActionChoice::Foul) && block_defender_id.is_none() {
                     if std::env::var("FFB_TRACE").is_ok() {
                         eprintln!("RUST_FOUL_DESELECT pid={player_id} (no legal foul target)");
+                    }
+                    continue 'reselect;
+                }
+
+                // Same staleness as the no-target FOUL above, and it is not merely a parity
+                // issue: the turn-start eligible snapshot can still offer FURIOUS_OUTPBURST after
+                // the team's blitz has been spent, or after the star's targets have moved out of
+                // range. Declaring it then makes STOCK JAVA CRASH — every abort path in the
+                // bb2025 FuriousOutburst sequence jumps to the `END` label, which IS
+                // StepEndFuriousOutburst, and that step dereferences
+                // `fieldModel.getTargetSelectionState().getSelectedPlayerId()` unconditionally
+                // (NullPointerException, ffb-server StepEndFuriousOutburst:71 — it killed the
+                // batched JVM mid-run at wood_elf bb2025 seed 65 i=190, `f1000,0000`).
+                // The real client never reaches it because SelectLogicModule re-evaluates
+                // isFuriousOutburstAvailable at click time; ParityRunner's sendConcreteAction now
+                // does the same and deselects, so mirror it here.
+                if matches!(player_action, PlayerActionChoice::FuriousOutburst)
+                    && !crate::legal_actions::is_furious_outburst_available(&gs.game, &player_id)
+                {
+                    if std::env::var("FFB_TRACE").is_ok() {
+                        eprintln!("RUST_FO_DESELECT pid={player_id} (stale turn-start offer)");
                     }
                     continue 'reselect;
                 }
@@ -878,6 +906,28 @@ impl Agent for RandomAgent {
                     player_id: eligible_players.get(idx).cloned().unwrap_or_default(),
                 }
             }
+            // Furious Outburst stab-target choice. UNLIKE the other star dialogs the list order
+            // is NOT a contract here: Java's StepInitFuriousOutburst collects `eligiblePlayers`
+            // into a HashSet and hands `foundPlayers.toArray(..)` to the dialog, so its order is
+            // identity-hash order and differs run to run. COORDINATE-SORT first, then a single
+            // actionRng pick — board coordinates are engine-agnostic, so ParityRunner's
+            // FURIOUS_OUTBURST arm lands on the same target.
+            Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
+                if reason == "FURIOUS_OUTBURST" =>
+            {
+                let mut cands: Vec<String> = eligible_players.clone();
+                cands.sort_by_key(|pid| {
+                    gs.game.field_model.player_coordinate(pid)
+                        .map(|c| (c.x, c.y))
+                        .unwrap_or((i32::MAX, i32::MAX))
+                });
+                if cands.is_empty() {
+                    Action::SelectPlayer { player_id: String::new() }
+                } else {
+                    let idx = self.pick_action(cands.len());
+                    Action::SelectPlayer { player_id: cands[idx].clone() }
+                }
+            }
             // Baleful Hex target choice: single actionRng pick over the dialog's list in
             // the step's given order (Java's findPlayers = opponent team nr order).
             Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
@@ -970,6 +1020,24 @@ impl Agent for RandomAgent {
             // contract as HitAndRun/Punt — coordinate-sorted, single actionRng pick, CANONICAL
             // coordinate (the step stores it verbatim; ParityRunner sends the mirrored view and
             // Java un-mirrors it).
+            // Furious Outburst teleport squares (FIRST_MOVE and SECOND_MOVE both use this
+            // prompt): StepFirstMove/SecondMoveFuriousOutburst publish their eligible squares as
+            // MoveSquares and wait for a CLIENT_FIELD_COORDINATE naming one. Same contract as
+            // RaidingParty below — coordinate-sorted, single actionRng pick, CANONICAL coordinate
+            // (ParityRunner.sendFuriousOutburstSquare sends the mirrored view and Java un-mirrors).
+            // NOTE the abort differs from RaidingParty: Java's step has no CLIENT_END_TURN handler,
+            // only a null-action CLIENT_ACTING_PLAYER, so an empty list ends the PLAYER ACTION.
+            Some(AgentPrompt::FuriousOutburstSquare { player_id, squares }) => {
+                let mut squares = squares.clone();
+                squares.sort_by_key(|c| (c.x, c.y));
+                if squares.is_empty() {
+                    Action::EndPlayerAction
+                } else {
+                    let idx = self.pick_action(squares.len());
+                    let _ = player_id;
+                    Action::FuriousOutburstSquare { coord: squares[idx] }
+                }
+            }
             Some(AgentPrompt::RaidingParty { player_id, squares }) => {
                 let mut squares = squares.clone();
                 squares.sort_by_key(|c| (c.x, c.y));
@@ -1132,6 +1200,7 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         PlayerAction::Pass | PlayerAction::DumpOff => PlayerActionChoice::Pass,
         PlayerAction::HailMaryPass => PlayerActionChoice::HailMaryPass,
         PlayerAction::RaidingParty => PlayerActionChoice::RaidingParty,
+        PlayerAction::FuriousOutburst => PlayerActionChoice::FuriousOutburst,
         PlayerAction::LookIntoMyEyes => PlayerActionChoice::LookIntoMyEyes,
         PlayerAction::BalefulHex => PlayerActionChoice::BalefulHex,
         PlayerAction::CatchOfTheDay => PlayerActionChoice::CatchOfTheDay,
@@ -1161,8 +1230,22 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         | PlayerAction::RaidingParty | PlayerAction::MaximumCarnage | PlayerAction::BalefulHex
         | PlayerAction::AllYouCanEat | PlayerAction::BlackInk | PlayerAction::CatchOfTheDay
         | PlayerAction::ThenIStartedBlastin | PlayerAction::TheFlashingBlade
-        | PlayerAction::ViciousVines | PlayerAction::FuriousOutburst | PlayerAction::Chomp
+        | PlayerAction::ViciousVines | PlayerAction::Chomp
         | PlayerAction::Incorporeal | PlayerAction::Forgo => PlayerActionChoice::Move,
+    }
+}
+
+#[cfg(test)]
+mod furious_outburst_declaration_tests {
+    use super::*;
+
+    /// `is_handled_acting_action` mirrors `ParityRunner.isHandledActingAction`. Omitting a star
+    /// action here makes the agent DECLARE it and then instantly deselect, so the mechanic never
+    /// executes while the matrices stay green — the exact shape that kept Kick Team-Mate dead in
+    /// every edition, and that kept Furious Outburst dead until wood_elf bb2025 seed 1 i=23.
+    #[test]
+    fn furious_outburst_is_a_handled_acting_action() {
+        assert!(is_handled_acting_action(PlayerActionChoice::FuriousOutburst));
     }
 }
 

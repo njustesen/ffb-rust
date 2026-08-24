@@ -110,7 +110,20 @@ impl StepSecondMoveFuriousOutburst {
             self.with_ball = game.acting_player.player_id.as_deref()
                 .map(|pid| game.field_model.ball_coordinate == game.field_model.player_coordinate(pid))
                 .unwrap_or(false);
-            return StepOutcome::cont();
+            // Java: getResult().setNextAction(StepAction.CONTINUE) with the eligible squares
+            // published as MoveSquares — the step waits for a CLIENT_FIELD_COORDINATE naming one.
+            // There is NO dialog, so the wait must be carried by an explicit prompt: a bare
+            // `cont()` here is the driver's stall shape and the sequence would hang.
+            let squares: Vec<FieldCoordinate> = {
+                let mut v: Vec<FieldCoordinate> = self.eligible_squares.iter().cloned().collect();
+                v.sort_by_key(|c| (c.x, c.y));
+                v
+            };
+            return StepOutcome::cont().with_prompt(
+                ffb_model::prompts::AgentPrompt::FuriousOutburstSquare {
+                    player_id: game.acting_player.player_id.clone().unwrap_or_default(),
+                    squares,
+                });
         }
 
         let coord = self.coordinate.unwrap();
@@ -144,8 +157,9 @@ impl Step for StepSecondMoveFuriousOutburst {
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         match action {
-            Action::Move { path } => {
-                if let Some(&coord) = path.first() {
+            Action::FuriousOutburstSquare { coord: fo_coord } => {
+                {
+                    let coord = *fo_coord;
                     if self.eligible_squares.contains(&coord) {
                         self.coordinate = Some(coord);
                     }

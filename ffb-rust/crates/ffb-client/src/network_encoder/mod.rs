@@ -210,6 +210,11 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
         Action::RaidingPartyTarget { coord } =>
             Some(ClientCommand::ClientMove(ClientMove { move_squares: vec![coord] })),
 
+        // Furious Outburst teleport square (first and second move): Java
+        // CLIENT_FIELD_COORDINATE, carried as a 1-square move like Raiding Party above.
+        Action::FuriousOutburstSquare { coord } =>
+            Some(ClientCommand::ClientMove(ClientMove { move_squares: vec![coord] })),
+
         Action::HitAndRun { coord } => {
             // HitAndRun move uses the move command with the chosen square, or confirm if declining
             match coord {
@@ -427,6 +432,7 @@ fn choice_to_player_action(choice: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::HailMaryPass => PlayerAction::HailMaryPass,
         PlayerActionChoice::MultipleBlock => PlayerAction::MultipleBlock,
         PlayerActionChoice::RaidingParty => PlayerAction::RaidingParty,
+        PlayerActionChoice::FuriousOutburst => PlayerAction::FuriousOutburst,
         PlayerActionChoice::LookIntoMyEyes => PlayerAction::LookIntoMyEyes,
         PlayerActionChoice::BalefulHex => PlayerAction::BalefulHex,
         PlayerActionChoice::CatchOfTheDay => PlayerAction::CatchOfTheDay,

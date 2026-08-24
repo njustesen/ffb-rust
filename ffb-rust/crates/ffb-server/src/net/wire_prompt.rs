@@ -288,6 +288,11 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
         // Raiding Party's square window rides the HitAndRun wire dialog shape (same payload).
         AgentPrompt::RaidingParty { player_id, squares } =>
             Some(WireDialog::HitAndRun { player_id: player_id.clone(), squares: squares.clone() }),
+        // Furious Outburst's two teleport waits carry a square list with no Java dialog of
+        // their own (the step publishes MoveSquares), so they ride the same square-picker wire
+        // shape as Raiding Party above.
+        AgentPrompt::FuriousOutburstSquare { player_id, squares } =>
+            Some(WireDialog::HitAndRun { player_id: player_id.clone(), squares: squares.clone() }),
         AgentPrompt::HitAndRun { player_id, squares } =>
             Some(WireDialog::HitAndRun { player_id: player_id.clone(), squares: squares.clone() }),
         // The BB2016/BB2020 swoop-target ask has no Java dialog counterpart to wire yet.

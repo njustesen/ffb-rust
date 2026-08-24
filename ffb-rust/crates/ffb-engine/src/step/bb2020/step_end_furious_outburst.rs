@@ -64,7 +64,13 @@ impl StepEndFuriousOutburst {
         game.field_model.target_selection_state = None;
 
         // Java: if (actingPlayer.hasActed()) { markSkillUsed(canTeleportBeforeAndAfterAvRollAttack); setBlitzUsed(true) }
-        if game.acting_player.has_acted {
+        // Java: `actingPlayer.hasActed()` — a COMPUTED predicate
+        // (hasMoved||hasFouled||hasBlocked||hasPassed||hasTriggeredEffect||!usedSkills.isEmpty()
+        // ||isForgone), not a stored flag. The Furious Outburst stab sets has_blocked, never the
+        // bare `has_acted` field, so reading the field skipped `setBlitzUsed(true)` entirely —
+        // Java `f0000,1100` vs Rust `f0000,0100` (wood_elf bb2025 seed 1 i=24). `acted()` is the
+        // documented mirror; the bare field alone is always wrong here.
+        if game.acting_player.acted() {
             if let Some(pid) = game.acting_player.player_id.as_deref() {
                 let pid = pid.to_owned();
                 let sid = game.player(&pid).and_then(|p| UtilCards::get_unused_skill_with_property(
@@ -130,10 +136,30 @@ mod tests {
         assert!(game.turn_data().blitz_used);
     }
 
+    /// Java's `actingPlayer.hasActed()` is COMPUTED
+    /// (hasMoved||hasFouled||hasBlocked||hasPassed||hasTriggeredEffect||!usedSkills.isEmpty()
+    /// ||isForgone), not a stored flag. The Furious Outburst stab sets `has_blocked` and NEVER the
+    /// bare `has_acted` field, so reading the field skipped `setBlitzUsed(true)` on the real path
+    /// and the star could outburst every turn (wood_elf bb2025 seed 1 i=24: Java `f0000,1100` vs
+    /// Rust `f0000,0100`). The sibling test above sets `has_acted` directly and so never
+    /// exercised this — which is exactly why the bug survived with tests passing.
+    #[test]
+    fn marks_blitz_used_from_the_computed_acted_predicate_not_the_bare_flag() {
+        let mut game = make_game();
+        game.acting_player.has_acted = false;
+        game.acting_player.has_blocked = true;
+        assert!(game.acting_player.acted(), "the stab makes the COMPUTED predicate true");
+        let mut step = StepEndFuriousOutburst::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.turn_data().blitz_used,
+            "Furious Outburst counts as the team's Blitz Action");
+    }
+
     #[test]
     fn does_not_mark_blitz_used_when_not_acted() {
         let mut game = make_game();
         game.acting_player.has_acted = false;
+        assert!(!game.acting_player.acted(), "no sub-flag may be set either");
         let mut step = StepEndFuriousOutburst::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.turn_data().blitz_used);

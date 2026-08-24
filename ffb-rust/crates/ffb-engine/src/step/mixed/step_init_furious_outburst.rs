@@ -93,8 +93,26 @@ impl StepInitFuriousOutburst {
                 let found = Self::find_eligible_players(game, &acting_id);
                 if !found.is_empty() {
                     self.eligible_players.extend(found);
-                    // client-only: DialogPlayerChoiceParameter(FURIOUS_OUTBURST) — headless falls through
-                    return StepOutcome::cont();
+                    // Java: UtilServerDialog.showDialog(DialogPlayerChoiceParameter(actingTeam,
+                    //       PlayerChoiceMode.FURIOUS_OUTBURST, foundPlayers, null, 1), false)
+                    //       + setNextAction(CONTINUE).
+                    // The old bare `cont()` was the driver's stall shape: nothing was ever asked,
+                    // so the sequence could not advance. `foundPlayers` is a Java HashSet, so its
+                    // order is NOT a contract — the answer contract (shared with ParityRunner's
+                    // FURIOUS_OUTBURST arm) coordinate-sorts before picking.
+                    let mut eligibles: Vec<String> =
+                        self.eligible_players.iter().cloned().collect();
+                    eligibles.sort_by_key(|pid| {
+                        game.field_model.player_coordinate(pid)
+                            .map(|c| (c.x, c.y))
+                            .unwrap_or((i32::MAX, i32::MAX))
+                    });
+                    return StepOutcome::cont().with_prompt(
+                        ffb_model::prompts::AgentPrompt::PlayerChoice {
+                            eligible_players: eligibles,
+                            reason: "FURIOUS_OUTBURST".into(),
+                            descriptions: Vec::new(),
+                        });
                 }
             }
         }
@@ -146,6 +164,17 @@ impl Step for StepInitFuriousOutburst {
                         self.target_id = Some(pid.clone());
                     }
                     _ => {}
+                }
+            }
+            // Java: the same CLIENT_PLAYER_CHOICE branch. Both parity agents answer a
+            // DialogPlayerChoiceParameter with `Action::SelectPlayer` (empty string = declined),
+            // so the dialog this step now shows arrives in that shape.
+            Action::SelectPlayer { player_id } => {
+                if player_id.is_empty() {
+                    // Java: !StringTool.isProvided(playerId) → endPlayerAction
+                    self.end_player_action = true;
+                } else if self.eligible_players.contains(player_id.as_str()) {
+                    self.target_id = Some(player_id.clone());
                 }
             }
             Action::EndTurn => { self.end_turn = true; }

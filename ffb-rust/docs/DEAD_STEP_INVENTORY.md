@@ -1,5 +1,14 @@
 # Never-dispatched step inventory — RE-MEASURED 2026-08-19
 
+**2026-08-24 update (2) — the whole `FuriousOutburst` family REACHED.**
+`InitFuriousOutburst`, `FirstMoveFuriousOutburst`, `SecondMoveFuriousOutburst` and
+`EndFuriousOutburst` all went live when Swiftvine Glimmershard was drafted into the bb2025
+wood_elf parity team (`docs/BACKLOG.md` §11 Batch B) AND the declaration channel was wired in both
+engines — the steps were ported, but nothing offered the action and the init/move steps returned
+prompt-less `cont()`s. 241 executions across 95 of 100 wood_elf mirror games. Adjusted for this
+and QuickBite the 2026-08-19 pm counts read **142 reached / 57 never reached**; the
+"Furious Outburst family (bb2025 star)" group below is now empty.
+
 **2026-08-24 update — `QuickBite` REACHED.** Guffle Pusmaw drafted into the bb2025 nurgle parity
 team (`docs/BACKLOG.md` §11 Batch B). The step itself was a full port; only the OFFER was dead —
 it returned a bare `next()` where Java shows a dialog and CONTINUEs. It now fires in 5 of 100
@@ -68,8 +77,10 @@ block sequence and IS reached. The dark elf Runner's Dump-off itself is live.
 `PlayCard Wizard MasterChef FanFactor PrayerRoll` (the harness buys no cards/wizards; FanFactor
 is a bb2016 start-step variant the shared start path does not dispatch).
 
-**Furious Outburst family (bb2025 star):**
-`InitFuriousOutburst FirstMoveFuriousOutburst SecondMoveFuriousOutburst EndFuriousOutburst`
+**Furious Outburst family (bb2025 star) — ✅ RESOLVED 2026-08-24, all four now LIVE:**
+~~`InitFuriousOutburst FirstMoveFuriousOutburst SecondMoveFuriousOutburst EndFuriousOutburst`~~
+Swiftvine Glimmershard drafted into bb2025 wood_elf + the declaration channel wired in both
+engines; 241 executions in 95/100 games. See the 2026-08-24 note at the top.
 
 **Blitz/gaze SELECT sub-chain (edition/protocol shape — the folded agents bypass it):**
 `SelectBlitzTarget SelectBlitzTargetEnd SelectGazeTarget SelectGazeTargetEnd` — the harnesses
