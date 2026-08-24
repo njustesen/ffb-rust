@@ -3016,3 +3016,29 @@ NEXT: confirm which pass rolls the extra die (probe CatchScatterThrowIn with the
 then find how Java avoids it - either its first pass consumes the bounce so the second finds
 nothing pending, or the pre-label prefix is not re-run at all. Do not assume the second pass is
 the culprit; the extra roll appears BEFORE the block, so it may be the first.
+
+**§12 iter 70 - CORRECTION: the extra CatchScatterThrowIn is NOT the activation prefix running
+twice.**
+
+Iteration 69 explained the extra die as the pre-GOTO_LABEL prefix of the Select sequence running
+on both chain passes, since `USE_ALTERNATE_LABEL` only skips from the label onward. That was a
+guess from sequence layout, and it is wrong.
+
+Locating the roll precisely - the CatchScatterThrowIn whose rng goes 21->22 - puts it at
+`stack_len=40`, immediately followed by `Stab stack_len=39`:
+
+    DRIVE step=CatchScatterThrowIn stack_len=40 rng=21
+    DRIVE step=Stab               stack_len=39 rng=22
+
+`... PickUp CatchScatterThrowIn Stab BlockChainsaw ...` is the BLITZBLOCK sequence, not the
+activation. So the extra die is spent INSIDE away_03's block resolution, right after PickUp -
+a ball bounce during the block that main never rolls.
+
+Entries 1-10 of the RNG-step diff are identical, so the two engines agree through home_01's
+blitz; then away_03's blitz resolves differently with no preceding dice difference. That is the
+same signature as khemri and skaven: a STATE divergence carried into a later activation, not an
+extra roll appearing from nowhere.
+
+NEXT: compare the ball state (position, carrier, `b` field of the state string) and away_03's
+position at the START of its activation on both builds. Something set by home_01's blitz - most
+likely where the ball ended up after that block - differs without costing a die.
