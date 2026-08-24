@@ -2292,3 +2292,33 @@ and its block roll - the same class as the goblin `arc` offset, but on the engin
 NEXT: diff the `FFB_RNG_STEPS` lists for khemri seed 38 branch-vs-main (main needs the trace
 patched in temporarily, as before) and read the FIRST differing entry - that names the step that
 spends the extra die. Do not infer it from the block; the block is downstream.
+
+**§12 khemri/necromantic/khemri_fumbbl ROOT CAUSE (iter 47): the chain's blitzer SKIPS ITS GO
+FOR IT roll.**
+
+`FFB_RNG_STEPS` diff, khemri seed 38, branch vs main. Entries 1-14 are identical; entry 15 is not:
+
+    main    13 FallDown  27->29 away_02 Move      branch  13 FallDown  27->29 away_02 Move
+            14 Foul      29->31 home_01 Foul              14 Foul      29->31 home_01 Foul
+            15 GoForIt   31->32 away_03 Blitz             15 BlockRoll 31->32 away_03 Blitz
+            16 BlockRoll 32->33 away_03 Blitz             16 BlockRoll 32->33 away_03 Block
+            17 DropFallingPlayers 33->35                  17 DropFallingPlayers 33->35
+
+Main rolls a GO FOR IT for the blitzer and THEN the block; the branch has no GoForIt entry at
+all, so its block consumes the die main spent on the GFI. That is the whole 6-vs-3 difference
+measured last iteration, and everything downstream (Pow vs Pushback, the defender left Standing,
+the single differing state field) follows from it.
+
+**Why this is the same family as the other reds.** A blitz costs a square of movement, so a
+blitzer that has already used its MA must roll GFI before blocking. The branch not rolling it
+means the blitzer's movement accounting differs on the chain path - most likely
+`acting_player.current_move` is not advanced (or is reset) when the blitz goes through
+BLITZ_SELECT, so the engine thinks the player still has movement left and no GFI is due. Note
+this is NOT the retracted "blitzer never moves" claim: the blitzer does not pre-move in either
+engine (`ParityRunner.sendMoveAction` case BLITZ_MOVE injects `ClientCommandBlock` with no move).
+What differs is the movement COUNTER, not an actual move.
+
+NEXT: compare `acting_player.current_move` (and `has_moved`) at `InitBlocking` for that
+activation, branch vs main. If it differs, find where main's folded path advances it and mirror
+that in the chain. halfling seed 2's StandUp/GoForIt/FallDown divergence is very likely the same
+bug, and vampire seed 1 should be re-checked against it too.
