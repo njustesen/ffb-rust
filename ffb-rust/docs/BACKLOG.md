@@ -2415,3 +2415,30 @@ NEXT: find the engine code that advances the blitzer from cm=0 to cm=3 on the fo
 almost certainly the blitz-move phase consuming a move stack toward the defender - and establish
 why the chain path reaches `StepInitBlocking` without it having run. The fix belongs in the
 engine sequence, not in the agent.
+
+**§12 iter 51: the blitzer does NOT move on main either - `current_move` is INHERITED.**
+
+Probing `StepMove`'s increment on main for the same activation shows every away_03 increment
+carries `pa=Some(Move)` and NOT one carries `BlitzMove` or `Blitz`. Since `StepInitBlocking`
+converts BLITZ_MOVE -> BLITZ (and the IB probe reads `pa=Blitz`), a blitz-phase move would have
+printed `pa=BlitzMove`. **So main's blitzer performs no movement during the blitz.**
+
+That corrects the framing of iterations 48-50 (and re-retires iteration 38's "the blitzer never
+moves" - neither engine moves it). What actually differs is where `current_move` comes FROM:
+
+    ActingPlayer::set_player resets current_move = 0 ONLY when the player id CHANGES
+    (`if !same_id`), which mirrors Java's UtilActingPlayer.changeActingPlayer `if (changed)`.
+
+So on main the blitz re-dispatches a player who was ALREADY the acting player - `same_id` is
+true, nothing is reset, and the blitz inherits the `cm=3` that player accumulated. On the chain
+path the acting player evidently changes (or is cleared) somewhere between, so `set_player` sees
+a genuine change and zeroes it, and the blitz starts at `cm=0`.
+
+That single inherited counter is the whole khemri failure: `cm=3 > ma=3` makes main roll the GFI,
+`cm=0` makes the branch skip it, and the die main spends there is consumed by the block instead.
+
+NEXT: probe `ActingPlayer::set_player` on both builds, printing old id, new id and whether it
+reset, and compare the calls between the previous activation and the blitz. The chain almost
+certainly clears the acting player (`change_player_action_to_none`, or the `:114` branch's
+`changeActingPlayer`) where the folded path re-dispatches the same id. Fix by matching Java's
+`changed` semantics on that path - do NOT add a special case to preserve `current_move`.
