@@ -73,14 +73,6 @@ impl Step for StepInitSelecting {
             || game.acting_player.has_passed
             || game.acting_player.has_triggered_effect
             || game.acting_player.forgone;
-        if std::env::var("FFB_BZ_PROBE").is_ok() {
-            eprintln!("BZPROBE ISel TOP pa={:?} acted={} mv={} fl={} bl={} ps={} tr={} fg={} tss={}",
-                game.acting_player.player_action, acted,
-                game.acting_player.has_moved, game.acting_player.has_fouled,
-                game.acting_player.has_blocked, game.acting_player.has_passed,
-                game.acting_player.has_triggered_effect, game.acting_player.forgone,
-                game.field_model.target_selection_state.is_some());
-        }
         // Post-BLITZ_SELECT continuation. StepSelectBlitzTargetEnd sets the acting action back to
         // BLITZ_MOVE and pushes the Select sequence, which re-enters this step with the target
         // already chosen. Java's :114 guard is `BLITZ_MOVE && targetSelectionState == null`, so on
@@ -103,9 +95,6 @@ impl Step for StepInitSelecting {
         }
 
         if !acted {
-            if std::env::var("FFB_BZ_PROBE").is_ok() {
-                eprintln!("BZPROBE InitSelecting enter pa={:?}", game.acting_player.player_action);
-            }
             match game.acting_player.player_action {
                 Some(PlayerAction::PassMove) => {
                     if let Some(pid) = game.acting_player.player_id.clone() {

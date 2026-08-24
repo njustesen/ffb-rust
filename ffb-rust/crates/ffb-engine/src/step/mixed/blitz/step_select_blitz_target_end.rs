@@ -38,10 +38,6 @@ impl StepSelectBlitzTargetEnd {
         //   if failed → push END_MOVING(end_player_action=true)
 
         let tss = game.field_model.target_selection_state.clone();
-        if std::env::var("FFB_BZ_PROBE").is_ok() {
-            eprintln!("BZPROBE SBTEnd end_turn={} tss={:?} defender={:?}",
-                self.end_turn, tss.as_ref().map(|t| t.get_status()), game.defender_id);
-        }
 
         if self.end_turn {
             // Java: EndPlayerAction.pushSequence(true, true, endTurn)
@@ -65,14 +61,9 @@ impl StepSelectBlitzTargetEnd {
                 // real move + block. Without it this step was the terminus of the whole blitz
                 // sequence and the driver stalled (lineman bb2025 0/20, rust_total 0.07s) - the
                 // same publish-only shape as StepEndThrowKeg and StepEndThenIStartedBlastin.
-                let before = game.acting_player.player_id.clone();
                 if let Some(pid) = game.acting_player.player_id.clone() {
                     crate::step::util_server_steps::change_player_action(
                         game, &pid, PlayerAction::BlitzMove, false);
-                }
-                if std::env::var("FFB_BZ_PROBE").is_ok() {
-                    eprintln!("BZPROBE SBTEnd SELECTED pid_before={:?} pid_after={:?} pa_after={:?}",
-                        before, game.acting_player.player_id, game.acting_player.player_action);
                 }
                 game.turn_data_mut().blitz_used = true;
                 let seq = Select::build_sequence(&SelectParams {
@@ -80,10 +71,6 @@ impl StepSelectBlitzTargetEnd {
                     is_blitz_move: false,
                     ..Default::default()
                 });
-                if std::env::var("FFB_BZ_PROBE").is_ok() {
-                    eprintln!("BZPROBE SBTEnd PUSHSEQ {:?}",
-                        seq.iter().map(|s| format!("{:?}", s.step_id)).collect::<Vec<_>>());
-                }
                 return StepOutcome::next().push_seq(seq);
             } else if ts.is_skipped() {
                 // Java (:109-115) does FOUR things here, and Rust used to do only the last two -

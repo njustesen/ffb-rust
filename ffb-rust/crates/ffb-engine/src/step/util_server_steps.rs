@@ -194,10 +194,6 @@ pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerActi
 /// (The Java bomb-action exception on the hasActed branch is not modelled: it only
 /// matters for Bombardiers keeping their throw after moving.)
 pub fn change_player_action_to_none(game: &mut Game) {
-    if std::env::var("FFB_BZ_PROBE").is_ok() {
-        eprintln!("BZPROBE CLEAR_ACTION pid={:?} pa={:?}",
-            game.acting_player.player_id, game.acting_player.player_action);
-    }
     use ffb_model::enums::{PS_MOVING, PS_PRONE, PS_STANDING};
     if let Some(old_id) = game.acting_player.player_id.clone() {
         if let Some(state) = game.field_model.player_state(&old_id) {

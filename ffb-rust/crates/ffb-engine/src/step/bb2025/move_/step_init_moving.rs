@@ -77,11 +77,6 @@ impl Step for StepInitMoving {
             // Java: CLIENT_BLOCK → dispatchPlayerAction(BLITZ/KICK_EM_BLITZ)
             // Guard: (BLITZ_MOVE || KICK_EM_BLITZ) && !hasBlocked || PUTRID_REGURGITATION_BLITZ
             Action::Block { .. } => {
-                if std::env::var("FFB_BZ_PROBE").is_ok() {
-                    eprintln!("BZPROBE InitMoving Block pa={:?} has_blocked={} tss={:?}",
-                        player_action, has_blocked,
-                        game.field_model.target_selection_state.as_ref().map(|t| t.get_status()));
-                }
                 let is_blitz_dispatch = matches!(player_action,
                     Some(PlayerAction::BlitzMove) | Some(PlayerAction::KickEmBlitz)
                     | Some(PlayerAction::PutridRegurgitationBlitz))
@@ -226,12 +221,6 @@ impl StepInitMoving {
     }
 
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        if std::env::var("FFB_BZ_PROBE").is_ok() {
-            eprintln!("BZPROBE InitMoving enter epa={} et={} gaze={:?} mstack={} pa={:?} moved={}",
-                self.end_player_action, self.end_turn, self.gaze_victim_id.is_some(),
-                self.move_stack.len(), game.acting_player.player_action,
-                game.acting_player.has_moved);
-        }
         // Java: if (fEndTurn) → publish END_TURN + CHECK_FORGO, GOTO fGotoLabelOnEnd
         if self.end_turn {
             let label = self.goto_label_on_end.clone();
