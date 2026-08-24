@@ -2557,3 +2557,37 @@ was simply never green on this branch for an unrelated reason.
 Worth checking FIRST, before more digging: whether vampire is red on MAIN too. If it is, this is
 a pre-existing failure the chain merely inherited, and §12 is effectively complete at 29/30 with
 vampire belonging to its own backlog item.
+
+**§12 vampire (iter 56): ported Java's Blood Lust arm in SBTEnd. NEUTRAL - not the fix.**
+
+First, a correction: an earlier entry claimed vampire's dice were "byte-identical to main". With
+`rng=` in the step trace that is plainly false - at i=102 main is at rng=127 and the branch at
+123, so main spends FIVE dice on the i=101 blitz and the branch ONE. The earlier reading came
+from an RNGSTEP diff taken several fixes ago and should not have been carried forward.
+
+Also checked before digging: vampire is GREEN on main (1-20 = 20/20), so this IS a branch
+regression, not something the chain inherited.
+
+The branch's blitz after its Blood Lust roll runs
+`JumpUp StandUp SelectBlitzTargetEnd InitSelecting ResetFumblerooskie EndSelecting InitMoving
+EndMoving` - the second pass takes the USE_ALTERNATE_LABEL jump straight to END_SELECTING and the
+activation ends without ever blocking.
+
+Java `StepSelectBlitzTargetEnd:94` has an arm Rust lacked entirely:
+
+    if (actingPlayer.isSufferingBloodLust() && bloodlustAction != null) {
+        ... removeSelectedBlitzTarget, setDefenderId(null),
+            changePlayerAction(bloodlustAction), Move.pushSequence(...)
+    } else { changePlayerAction(BLITZ_MOVE); Select.pushSequence(...); }
+
+Ported it (drop the blitz-target marker, clear the defender, re-dispatch to the bloodlust action,
+push a MOVE sequence instead of Select). Result: vampire 1-100 stays at **57/100**, and seed 1
+still fails. So the port is real and Java-faithful but is NOT the vampire bug.
+
+KEPT rather than reverted, on the same basis as the USE_ALTERNATE_LABEL publish: it is a faithful
+port of a live Java branch, it regresses nothing (lineman 1-20 20/20, khemri 1-20 20/20,
+ffb-engine 7287/0), and the seed COUNT is unchanged. Caveat recorded honestly: without the
+pre-change failing-seed SET I cannot prove it did not swap one failure for another.
+
+NEXT: vampire seed 1 again from scratch with `rng=` in view - find which of main's five dice the
+branch never rolls, using the contiguous FFB_SEQ method rather than any filtered view.

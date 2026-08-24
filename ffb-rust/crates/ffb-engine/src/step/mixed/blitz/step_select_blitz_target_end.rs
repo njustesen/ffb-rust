@@ -81,6 +81,36 @@ impl StepSelectBlitzTargetEnd {
                     crate::step::util_server_steps::change_player_action(
                         game, &pid, PlayerAction::BlitzMove, false);
                 }
+                // Java `StepSelectBlitzTargetEnd:94`: a blitzer SUFFERING BLOOD LUST with a
+                // bloodlustAction does NOT continue the blitz - it drops the blitz target and is
+                // re-dispatched into a plain MOVE sequence to go and feed. Rust only had the else
+                // arm, so a blood-lust blitzer was pushed back through Select, took the
+                // USE_ALTERNATE_LABEL jump straight to END_SELECTING and ended its activation
+                // without ever blocking: vampire seed 1 i=101 spent 1 die where Java spends 5, and
+                // the defender it should have knocked down stayed Standing.
+                if game.acting_player.suffering_blood_lust && self.bloodlust_action.is_some() {
+                    if let Some(sel) = game.field_model.target_selection_state.as_ref()
+                        .and_then(|ts| ts.get_selected_player_id().cloned())
+                    {
+                        if let Some(ps) = game.field_model.player_state(&sel) {
+                            game.field_model.set_player_state(&sel, ps.remove_selected_blitz_target());
+                        }
+                    }
+                    game.defender_id = None;
+                    if let Some(pid) = game.acting_player.player_id.clone() {
+                        if let Some(bl) = self.bloodlust_action {
+                            crate::step::util_server_steps::change_player_action(game, &pid, bl, false);
+                        }
+                    }
+                    game.turn_data_mut().blitz_used = true;
+                    let seq = crate::step::generator::bb2025::move_::Move::build_sequence(
+                        &crate::step::generator::bb2025::move_::MoveParams {
+                            bloodlust_action: self.bloodlust_action,
+                            rules: game.rules,
+                            ..Default::default()
+                        });
+                    return StepOutcome::next().push_seq(seq);
+                }
                 game.turn_data_mut().blitz_used = true;
                 let seq = Select::build_sequence(&SelectParams {
                     update_persistence: false,
