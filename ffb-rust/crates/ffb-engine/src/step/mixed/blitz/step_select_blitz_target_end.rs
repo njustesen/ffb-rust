@@ -40,10 +40,26 @@ impl StepSelectBlitzTargetEnd {
         let tss = game.field_model.target_selection_state.clone();
 
         if self.end_turn {
-            // Java: EndPlayerAction.pushSequence(true, true, endTurn)
-            // Publish end player action and proceed — full generator push not yet ported
+            // Java: `game.setDefenderId(null); endGenerator.pushSequence(
+            //         new EndPlayerAction.SequenceParams(gameState, true, true, endTurn))`
+            // - feedingAllowed=true, endPlayerAction=true, endTurn.
+            //
+            // Rust only PUBLISHED the parameter and pushed nothing, and the comment here said so
+            // ("full generator push not yet ported"). That is the publish-only stall shape: with
+            // an empty step stack the driver has nothing left to run and the GAME ENDS. It only
+            // became reachable once the chain started routing blitzes through this step - skaven
+            // seed 73 stopped at step 148 where Java played 262, right after a failed Animal
+            // Savagery set end_turn on the way to END_BLITZING.
             game.defender_id = None; // Java: game.setDefenderId(null)
-            return StepOutcome::next().publish(StepParameter::EndPlayerAction(true));
+            let seq = crate::step::generator::bb2025::end_player_action::EndPlayerAction::build_sequence(
+                &crate::step::generator::bb2025::end_player_action::EndPlayerActionParams {
+                    feeding_allowed: true,
+                    end_player_action: true,
+                    end_turn: self.end_turn,
+                    check_forgo: false,
+                    rules: game.rules,
+                });
+            return StepOutcome::next().push_seq(seq);
         }
 
         if let Some(ref ts) = tss {
@@ -163,15 +179,22 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
     }
 
+    /// Java pushes an EndPlayerAction SEQUENCE here (feedingAllowed=true, endPlayerAction=true,
+    /// endTurn) and clears the defender. This test used to assert only that the parameter was
+    /// PUBLISHED, which is exactly what let the publish-only stall survive: with nothing pushed
+    /// the driver's stack empties and the game ends (skaven seed 73 stopped at step 148 against
+    /// Java's 262). Pin the push.
     #[test]
-    fn end_turn_publishes_end_player_action() {
+    fn end_turn_pushes_end_player_action_sequence() {
         let mut step = StepSelectBlitzTargetEnd::new();
         step.end_turn = true;
         let mut game = make_game();
+        game.defender_id = Some("away_01".into());
         let mut rng = GameRng::new(0);
         let out = step.start(&mut game, &mut rng);
         assert_eq!(out.action, StepAction::NextStep);
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))));
+        assert!(!out.pushes.is_empty(), "end_turn must push the EndPlayerAction sequence");
+        assert!(game.defender_id.is_none(), "Java: game.setDefenderId(null)");
     }
 
     #[test]
