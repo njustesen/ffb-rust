@@ -107,6 +107,19 @@ impl Step for StepInitSelecting {
                     self.dispatch_player_action = Some(PlayerAction::Move);
                     return self.execute_step(game, _rng);
                 }
+                // Post-BLITZ_SELECT continuation. StepSelectBlitzTargetEnd sets the acting action
+                // back to BLITZ_MOVE and pushes the Select sequence, which lands here with the
+                // target already chosen. Java's StepInitSelecting :114 guard is
+                // `BLITZ_MOVE && targetSelectionState == null`, so on this SECOND pass the state
+                // is non-null and it falls through to the ordinary dispatch, running the real
+                // move + block. Without this arm the re-entered step asked for a NEW activation
+                // instead and the blitz ended having done nothing (lineman bb2025 seed 1 i=1:
+                // Java blocks and spends a die, Rust spends none).
+                Some(PlayerAction::BlitzMove) => {
+                    self.dispatch_player_action = Some(PlayerAction::BlitzMove);
+                    self.force_goto_on_dispatch = true;
+                    return self.execute_step(game, _rng);
+                }
                 _ => {}
             }
         }

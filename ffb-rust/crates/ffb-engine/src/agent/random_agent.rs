@@ -648,10 +648,20 @@ impl Agent for RandomAgent {
                 if gs.game.turn_mode == ffb_model::enums::TurnMode::PassBlock {
                     return Action::EndPlayerAction;
                 }
-                // A blitz block reaches the follow-up Move/INIT_MOVING prompt; the stock harness
-                // always deselects there, so mark the blitzer as already moved and fall through
-                // to the always-deselect check below.
+                // Blitz: with the two-phase declaration the target was chosen at
+                // SELECT_BLITZ_TARGET (which spent the actionRng pick) and the acting action is
+                // now BLITZ_MOVE, so this Move prompt is where the BLOCK is issued — exactly what
+                // ParityRunner does: "the target was already chosen at SELECT_BLITZ_TARGET;
+                // CLIENT_BLOCK with a targetSelectionState dispatches as BLITZ". Deselecting here
+                // (the old folded-declaration behaviour) ended the blitz having done nothing.
                 if self.current_activation_is_blitz {
+                    if let Some(def) = gs.game.field_model.target_selection_state.as_ref()
+                        .and_then(|ts| ts.get_selected_player_id().cloned())
+                    {
+                        self.current_activation_is_blitz = false;
+                        self.moved_this_activation = true;
+                        return Action::Block { defender_id: def };
+                    }
                     self.current_activation_is_blitz = false;
                     self.moved_this_activation = true;
                 }
