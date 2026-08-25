@@ -3436,3 +3436,37 @@ NEXT: probe `suffering_blood_lust` AND `player_action` at StepInitBlocking on bo
 activation, paired by RNG call count. That distinguishes the two candidates directly instead of
 reasoning about which one it "must" be - the last four iterations were each wrong about the
 mechanism until measured.
+
+**§12 vampire ROOT CAUSE FOUND (iter 83) - and the first fix attempt HANGS. Reverted.**
+
+The blood-lust guard in `StepInitBlocking` is NOT involved: probing both its terms shows it fires
+ZERO times on the branch. What the counts show instead:
+
+    main   InitBlocking executions: 7   GRD rng=110 pid=home_03 pa=Blitz bl=true action_is_move=false => guard=false
+    brch   InitBlocking executions: 6   (never reaches it for that activation)
+
+Main arrives at InitBlocking WITH the blood-lust flag set and blocks anyway. The branch never gets
+there. So iterations 81-82's whole line was wrong - the guard reads convincingly in source but is
+never reached.
+
+The real cause is a DIFFERENT blood-lust early-out, in `bb2025/move_/step_init_moving.rs`:
+
+    if game.acting_player.suffering_blood_lust {
+        return StepOutcome::goto(&label).publish(StepParameter::EndPlayerAction(true));
+    }
+
+Its own comment shows it was written for a plain MOVE - "the vampire stays put... then feeds",
+added because Rust's harness would otherwise prompt and move a vampire Java leaves standing. On
+the chain path a BLITZ also passes through here (the second pass dispatches BLITZ_MOVE), and
+`EndPlayerAction(true)` kills the block the blitz still owes. The folded path never reaches this
+step for its block, which is why main is unaffected.
+
+**Attempted fix, REVERTED:** letting a `BlitzMove`/`KickEmBlitz` skip the move WITHOUT publishing
+`EndPlayerAction`. The engine then HANGS - vampire bb2020 seed 1 produces no PARITY line at all
+and the process has to be killed. Without the end-player-action the activation never terminates,
+so the driver loops. Reverted and re-verified: seed 1 is back to its normal step-112 failure.
+
+NEXT: the blitz still needs to END its activation after the block, so the fix must let the
+sequence continue to the block and end afterwards - not simply drop the terminator. Look at what
+the FOLDED path publishes to end a blitz activation and mirror that ordering, or gate the skip so
+the blitz's move is bypassed inside the move sequence rather than by aborting it.
