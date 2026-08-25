@@ -78,16 +78,50 @@ Recorded LIVE 100/100 in the star campaigns. `CatchOfTheDay` was in this list at
 it at 10, which is direct evidence the category is a sampling artifact rather than a set of gaps.
 **Verify each on its own star's roster with 30+ seeds before treating any as dead.**
 
-### F. Unclassified — the actual new frontier (4)
-`EatTeamMate` `ReportStabInjury` `StateMultipleRolls` `KickoffScatterRollAskAfter`
+### F. Was "unclassified" — now RESOLVED (4), measured 2026-08-25
 
-`EatTeamMate` has 8 Rust push/reference sites (vampire feeding); `ReportStabInjury` and
-`StateMultipleRolls` are multiblock leftovers from §10, whose family otherwise reached at 10
-seeds. These four are the only entries here that are neither explained nor blocked, and are where
-the next dead-step iteration should start.
+`EatTeamMate` `KickoffScatterRollAskAfter` `StateMultipleRolls` `ReportStabInjury`
+
+- **`EatTeamMate` is LIVE — not dead.** Measured **10 fires in 315 `AlwaysHungry` rolls** across
+  all 17 Always-Hungry roster/edition pairs at 100 seeds (3.2%, against the ~1/36 the rules
+  predict: fail the Always Hungry roll AND fail the thrown player's escape roll). It never
+  appeared at 10 seeds. `FFB_RNG_STEPS` confirms every `AlwaysHungry` dispatch consumes dice, so
+  the mechanic was working the whole time. **Third false "dead" caused by sampling.**
+- **`KickoffScatterRollAskAfter` is option-gated, not dead.** `bb2025/Kickoff.java:39-43` picks it
+  over `KICKOFF_SCATTER_ROLL` only when the game option `ASK_FOR_KICK_AFTER_ROLL` is enabled.
+  Parity games leave it off, so the sibling runs instead - and the sibling IS reached. Reaching
+  this means changing a game option, not fixing code.
+- **`StateMultipleRolls` is a Rust modelling artifact.** In Java `StepStateMultipleRolls` is not a
+  sequence step at all: it is the hook *state* class of
+  `AbstractStepModifierMultipleBlock<StepFoulAppearanceMultiple, StepStateMultipleRolls>`. No Java
+  code pushes it, because it is not pushable. Rust gave it a `StepId` and a driver entry, so it
+  can never dispatch. Cleanup, not fidelity.
+- **`ReportStabInjury` is dead by HARNESS LOCKSTEP - and is drivable.** This is the fifth
+  instance of the TTM/KTM/interception/bomb shape. `StepMultipleBlockFork` (both engines) groups
+  multi-block targets by `BlockKind` and gives the STAB group its own sequence ending
+  `STAB -> HANDLE_DROP_PLAYER_CONTEXT -> REPORT_STAB_INJURY`. Rust builds that sequence correctly
+  and has tests for it. It never runs because **no target is ever marked STAB**:
+  - `ParityRunner:1940-1941` hard-codes `BlockKind.BLOCK` for both targets.
+  - Rust's `StepParameter::BlockTargets` carries only player IDs and reconstructs every target as
+    `BlockKind::BLOCK` (`step_multiple_block_fork.rs:212`), so the kind cannot survive the
+    parameter even if the harness sent it.
+
+  Only ONE drafted team can produce it: bb2020 `dark_elf`, the sole hirer of **Horkon
+  Heartripper**, the only star with both Multiple Block and Stab. Measured there at 100 seeds: 33
+  `MultipleBlockFork`, 99 `BlockRollMultiple`, 66 `ApothecaryMultiple`, 39 `FoulAppearanceMultiple`,
+  1014 `Stab` - and 0 `ReportStabInjury`.
+
+  **To drive it:** (1) make Rust's `BlockTargets` parameter carry the per-target `BlockKind`
+  instead of hard-coding BLOCK; (2) teach BOTH harnesses, in lockstep, to choose STAB for a
+  stab-capable blocker. Expect real engine bugs, as the previous four did.
 
 ## Summary
 
-Of the 33, **17 are closed** (A vestigial + B data-blocked + C blocked-on-decision), **6 are
-almost certainly sampling artifacts** (E), **6 are one known campaign** (D inducements), and
-**4 are genuinely open** (F).
+Of the 33: **21 are closed** (6 vestigial in both engines + 6 unreachable by data + 5 blocked on
+the scoring tier decision + 2 option/modelling artifacts + `StateMultipleRolls`,
+`KickoffScatterRollAskAfter`), **7 are sampling artifacts of live mechanics** (the 6 star specials
++ `EatTeamMate`, now proven), **6 are the known inducement campaign**, and **1 is drivable now**:
+`ReportStabInjury`.
+
+**The one actionable item on this whole frontier is `ReportStabInjury`.** Everything else is
+closed, blocked on a user decision, or already alive.
