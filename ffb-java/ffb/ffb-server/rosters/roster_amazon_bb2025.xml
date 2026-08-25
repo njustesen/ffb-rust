@@ -108,4 +108,26 @@
 			<keyword>Human</keyword>
 		</keywords>
 	</position>
+	<position id="amazon.Estelle">
+		<quantity>1</quantity>
+		<name>Estelle la Veneaux</name>
+		<displayName>Estelle la Veneaux</displayName>
+		<type>Star</type>
+		<cost>190000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Disturbing Presence</skill>
+			<skill>Dodge</skill>
+			<skill>Guard</skill>
+			<skill value="4">Loner</skill>
+			<skill>Sidestep</skill>
+			<skill>Baleful Hex</skill>
+		</skillList>
+		<skillCategoryList>
+		</skillCategoryList>
+	</position>
 </roster>

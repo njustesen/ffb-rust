@@ -137,4 +137,52 @@
 			<keyword>Treeman</keyword>
 		</keywords>
 	</position>
+	<position id="woodelf.Rodney">
+		<quantity>1</quantity>
+		<name>Rodney Roachbait</name>
+		<displayName>Rodney Roachbait</displayName>
+		<type>Star</type>
+		<cost>70000</cost>
+		<movement>6</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Catch</skill>
+			<skill>Diving Catch</skill>
+			<skill>Jump Up</skill>
+			<skill value="4">Loner</skill>
+			<skill>On the Ball</skill>
+			<skill>Sidestep</skill>
+			<skill>Stunty</skill>
+			<skill>Wrestle</skill>
+			<skill>Catch of the Day</skill>
+		</skillList>
+		<skillCategoryList>
+		</skillCategoryList>
+	</position>
+	<position id="woodelf.Swiftvine">
+		<quantity>1</quantity>
+		<name>Swiftvine Glimmershard</name>
+		<displayName>Swiftvine Glimmershard</displayName>
+		<type>Star</type>
+		<cost>110000</cost>
+		<movement>7</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Disturbing Presence</skill>
+			<skill>Fend</skill>
+			<skill value="4">Loner</skill>
+			<skill>Sidestep</skill>
+			<skill>Stab</skill>
+			<skill>Stunty</skill>
+			<skill>Furious Outburst</skill>
+		</skillList>
+		<skillCategoryList>
+		</skillCategoryList>
+	</position>
 </roster>

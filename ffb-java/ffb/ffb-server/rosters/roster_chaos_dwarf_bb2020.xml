@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="chaos_dwarf.bb2020">
+	<name>Chaos Dwarf</name>
+	<reRollCost>70000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="chaosdwarf.hobgoblin">
+		<quantity>16</quantity>
+		<name>Hobgoblin Lineman</name>
+		<displayName>Hobgoblin Lineman</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList/>
+		<skillCategoryList>
+			<normal>General</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaosdwarf.hobgoblinsneakystabba">
+		<quantity>2</quantity>
+		<name>Hobgoblin Sneaky Stabba</name>
+		<displayName>Hobgoblin Sneaky Stabba</displayName>
+		<type>Regular</type>
+		<cost>70000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Shadowing</skill>
+			<skill>Stab</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaosdwarf.blocker">
+		<quantity>4</quantity>
+		<name>Chaos Dwarf Blocker</name>
+		<displayName>Chaos Dwarf Blocker</displayName>
+		<type>Regular</type>
+		<cost>70000</cost>
+		<movement>4</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Iron Hard Skin</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaosdwarf.chaosdwarfflamesmith">
+		<quantity>2</quantity>
+		<name>Chaos Dwarf Flamesmith</name>
+		<displayName>Chaos Dwarf Flamesmith</displayName>
+		<type>Regular</type>
+		<cost>80000</cost>
+		<movement>5</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Brawler</skill>
+			<skill>Breathe Fire</skill>
+			<skill>Disturbing Presence</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaosdwarf.bullcentaur">
+		<quantity>2</quantity>
+		<name>Bull Centaur Blitzer</name>
+		<displayName>Bull Centaur Blitzer</displayName>
+		<type>Regular</type>
+		<cost>130000</cost>
+		<movement>6</movement>
+		<strength>4</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Sprint</skill>
+			<skill>Sure Feet</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaosdwarf.minotaur">
+		<quantity>1</quantity>
+		<name>Minotaur</name>
+		<displayName>Minotaur</displayName>
+		<type>Big Guy</type>
+		<cost>150000</cost>
+		<movement>5</movement>
+		<strength>5</strength>
+		<agility>4</agility>
+		<passing>0</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Frenzy</skill>
+			<skill>Horns</skill>
+			<skill value="4">Loner</skill>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Thick Skull</skill>
+			<skill>Unchannelled Fury</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+</roster>

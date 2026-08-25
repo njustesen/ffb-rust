@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="dark_elf.bb2020">
+	<name>Dark Elf</name>
+	<reRollCost>50000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="darkelf.lineman">
+		<quantity>12</quantity>
+		<name>Dark Elf Lineman</name>
+		<displayName>Dark Elf Lineman</displayName>
+		<type>Regular</type>
+		<cost>70000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList/>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="darkelf.runner">
+		<quantity>2</quantity>
+		<name>Runner</name>
+		<displayName>Runner</displayName>
+		<type>Regular</type>
+		<cost>80000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>3</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dump-Off</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<normal>Passing</normal>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="darkelf.blitzer">
+		<quantity>4</quantity>
+		<name>Blitzer</name>
+		<displayName>Blitzer</displayName>
+		<type>Regular</type>
+		<cost>100000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Block</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Passing</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="darkelf.assassin">
+		<quantity>2</quantity>
+		<name>Assassin</name>
+		<displayName>Assassin</displayName>
+		<type>Regular</type>
+		<cost>85000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>5</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Shadowing</skill>
+			<skill>Stab</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Passing</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="darkelf.witchelf">
+		<quantity>2</quantity>
+		<name>Witch Elf</name>
+		<displayName>Witch Elf</displayName>
+		<type>Regular</type>
+		<cost>110000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>5</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Frenzy</skill>
+			<skill>Jump Up</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Passing</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="39465">
+		<quantity>1</quantity>
+		<name>Helmut Wulf</name>
+		<displayName>Helmut Wulf</displayName>
+		<type>Star</type>
+		<cost>140000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>0</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Chainsaw</skill>
+			<skill value="4">Loner</skill>
+			<skill>Old Pro</skill>
+			<skill>Pro</skill>
+			<skill>Secret Weapon</skill>
+			<skill>Stand Firm</skill>
+		</skillList>
+		<skillCategoryList>
+		</skillCategoryList>
+	</position>
+	<position id="54496">
+		<quantity>1</quantity>
+		<name>Kiroth Krakeneye</name>
+		<displayName>Kiroth Krakeneye</displayName>
+		<type>Star</type>
+		<cost>160000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>3</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Black Ink</skill>
+			<skill>Disturbing Presence</skill>
+			<skill>Foul Appearance</skill>
+			<skill value="4">Loner</skill>
+			<skill>On the Ball</skill>
+			<skill>Tackle</skill>
+			<skill>Tentacles</skill>
+		</skillList>
+		<skillCategoryList>
+		</skillCategoryList>
+	</position>
+	<position id="darkelf.Horkon">
+		<quantity>1</quantity>
+		<name>Horkon Heartripper</name>
+		<displayName>Horkon Heartripper</displayName>
+		<type>Star</type>
+		<cost>210000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>-1</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Loner</skill>
+			<skill>Dodge</skill>
+			<skill>Leap</skill>
+			<skill>Multiple Block</skill>
+			<skill>Shadowing</skill>
+			<skill>Stab</skill>
+		</skillList>
+		<skillCategoryList>
+		</skillCategoryList>
+	</position>
+</roster>

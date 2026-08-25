@@ -135,4 +135,28 @@
 			<keyword>Elf</keyword>
 		</keywords>
 	</position>
+	<position id="39558">
+		<quantity>1</quantity>
+		<name>Zolcath the Zoat</name>
+		<displayName>Zolcath the Zoat</displayName>
+		<type>Star</type>
+		<cost>230000</cost>
+		<movement>5</movement>
+		<strength>5</strength>
+		<agility>4</agility>
+		<passing>5</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>"Excuse Me, Are You a Zoat?"</skill>
+			<skill>Disturbing Presence</skill>
+			<skill>Juggernaut</skill>
+			<skill value="4">Loner</skill>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Prehensile Tail</skill>
+			<skill>Regeneration</skill>
+			<skill>Sure Feet</skill>
+		</skillList>
+		<skillCategoryList>
+		</skillCategoryList>
+	</position>
 </roster>

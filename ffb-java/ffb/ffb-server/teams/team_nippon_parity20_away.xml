@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamNipponParity20Away">
+
+	<coach>Away</coach>
+	<name>Nippon Parity20 Away</name>
+	<race>Nippon</race>
+	<rosterId>nippon.bb2020</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1090000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamNipponParity20Away1">
+		<name>Ninja 1</name>
+		<gender>male</gender>
+		<positionId>43574</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamNipponParity20Away2">
+		<name>Ninja 2</name>
+		<gender>male</gender>
+		<positionId>43574</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamNipponParity20Away3">
+		<name>Samurai 3</name>
+		<gender>male</gender>
+		<positionId>43572</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamNipponParity20Away4">
+		<name>Samurai 4</name>
+		<gender>male</gender>
+		<positionId>43572</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamNipponParity20Away5">
+		<name>Samurai 5</name>
+		<gender>male</gender>
+		<positionId>43572</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamNipponParity20Away6">
+		<name>Samurai 6</name>
+		<gender>male</gender>
+		<positionId>43572</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamNipponParity20Away7">
+		<name>Warrior Monk 7</name>
+		<gender>male</gender>
+		<positionId>43573</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamNipponParity20Away8">
+		<name>Warrior Monk 8</name>
+		<gender>male</gender>
+		<positionId>43573</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamNipponParity20Away9">
+		<name>Ashigaru 9</name>
+		<gender>male</gender>
+		<positionId>43571</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamNipponParity20Away10">
+		<name>Ashigaru 10</name>
+		<gender>male</gender>
+		<positionId>43571</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamNipponParity20Away11">
+		<name>Ashigaru 11</name>
+		<gender>male</gender>
+		<positionId>43571</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamNipponParity20Away12">
+		<name>Ashigaru 12</name>
+		<gender>male</gender>
+		<positionId>43571</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

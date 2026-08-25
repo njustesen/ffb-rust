@@ -170,4 +170,27 @@
 			<keyword>Minotaur</keyword>
 		</keywords>
 	</position>
+	<position id="chaosdwarf.Zzharg">
+		<quantity>1</quantity>
+		<name>Zzharg Madeye</name>
+		<displayName>Zzharg Madeye</displayName>
+		<type>Star</type>
+		<cost>130000</cost>
+		<movement>4</movement>
+		<strength>4</strength>
+		<agility>4</agility>
+		<passing>3</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Cannoneer</skill>
+			<skill>Hail Mary Pass</skill>
+			<skill value="4">Loner</skill>
+			<skill>Nerves of Steel</skill>
+			<skill>Secret Weapon</skill>
+			<skill>Thick Skull</skill>
+			<skill>"Blastin' Solves Everything"</skill>
+		</skillList>
+		<skillCategoryList>
+		</skillCategoryList>
+	</position>
 </roster>

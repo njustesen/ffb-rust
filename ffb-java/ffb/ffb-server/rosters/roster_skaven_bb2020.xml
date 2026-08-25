@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="skaven.bb2020">
+	<name>Skaven</name>
+	<reRollCost>60000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="skaven.lineman">
+		<quantity>16</quantity>
+		<name>Skaven Clanrat Lineman</name>
+		<displayName>Skaven Clanrat Lineman</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList/>
+		<skillCategoryList>
+			<normal>General</normal>
+			<double>Agility</double>
+			<double>Mutation</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="skaven.thrower">
+		<quantity>2</quantity>
+		<name>Thrower</name>
+		<displayName>Thrower</displayName>
+		<type>Regular</type>
+		<cost>85000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>2</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Pass</skill>
+			<skill>Sure Hands</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Passing</normal>
+			<double>Agility</double>
+			<double>Mutation</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="skaven.gutterrunner">
+		<quantity>4</quantity>
+		<name>Gutter Runner</name>
+		<displayName>Gutter Runner</displayName>
+		<type>Regular</type>
+		<cost>85000</cost>
+		<movement>9</movement>
+		<strength>2</strength>
+		<agility>2</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dodge</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Mutation</double>
+			<double>Passing</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="skaven.blitzer">
+		<quantity>2</quantity>
+		<name>Blitzer</name>
+		<displayName>Blitzer</displayName>
+		<type>Regular</type>
+		<cost>90000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Block</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Mutation</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="skaven.ratogre">
+		<quantity>1</quantity>
+		<name>Rat Ogre</name>
+		<displayName>Rat Ogre</displayName>
+		<type>Big Guy</type>
+		<cost>150000</cost>
+		<movement>6</movement>
+		<strength>5</strength>
+		<agility>4</agility>
+		<passing>0</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Animal Savagery</skill>
+			<skill>Frenzy</skill>
+			<skill value="4">Loner</skill>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Prehensile Tail</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+</roster>

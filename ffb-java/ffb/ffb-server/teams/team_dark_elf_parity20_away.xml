@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamDarkElfParity20Away">
+
+	<coach>Away</coach>
+	<name>Dark Elf Parity20 Away</name>
+	<race>Dark Elf</race>
+	<rosterId>dark_elf.bb2020</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1085000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>5000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamDarkElfParity20Away1">
+		<name>Kiroth Krakeneye 1</name>
+		<gender>male</gender>
+		<positionId>54496</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamDarkElfParity20Away2">
+		<name>Horkon Heartripper 2</name>
+		<gender>male</gender>
+		<positionId>darkelf.Horkon</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamDarkElfParity20Away3">
+		<name>Helmut Wulf 3</name>
+		<gender>male</gender>
+		<positionId>39465</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamDarkElfParity20Away4">
+		<name>Runner 4</name>
+		<gender>male</gender>
+		<positionId>darkelf.runner</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamDarkElfParity20Away5">
+		<name>Dark Elf Lineman 5</name>
+		<gender>male</gender>
+		<positionId>darkelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamDarkElfParity20Away6">
+		<name>Dark Elf Lineman 6</name>
+		<gender>male</gender>
+		<positionId>darkelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamDarkElfParity20Away7">
+		<name>Dark Elf Lineman 7</name>
+		<gender>male</gender>
+		<positionId>darkelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamDarkElfParity20Away8">
+		<name>Dark Elf Lineman 8</name>
+		<gender>male</gender>
+		<positionId>darkelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamDarkElfParity20Away9">
+		<name>Dark Elf Lineman 9</name>
+		<gender>male</gender>
+		<positionId>darkelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamDarkElfParity20Away10">
+		<name>Assassin 10</name>
+		<gender>male</gender>
+		<positionId>darkelf.assassin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamDarkElfParity20Away11">
+		<name>Witch Elf 11</name>
+		<gender>male</gender>
+		<positionId>darkelf.witchelf</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamDarkElfParity20Away12">
+		<name>Dark Elf Lineman 12</name>
+		<gender>male</gender>
+		<positionId>darkelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamDarkElfParity20Away13">
+		<name>Dark Elf Lineman 13</name>
+		<gender>male</gender>
+		<positionId>darkelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="14" id="teamDarkElfParity20Away14">
+		<name>Dark Elf Lineman 14</name>
+		<gender>male</gender>
+		<positionId>darkelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="15" id="teamDarkElfParity20Away15">
+		<name>Blitzer 15</name>
+		<gender>male</gender>
+		<positionId>darkelf.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

@@ -25,9 +25,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamDarkElfParity25Home2">
-		<name>Witch Elf 2</name>
+		<name>Zolcath the Zoat 2</name>
 		<gender>male</gender>
-		<positionId>darkelf.witchelf</positionId>
+		<positionId>39558</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -91,6 +91,13 @@
 		<name>Dark Elf Lineman 11</name>
 		<gender>male</gender>
 		<positionId>darkelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamDarkElfParity25Home12">
+		<name>Witch Elf 12</name>
+		<gender>male</gender>
+		<positionId>darkelf.witchelf</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

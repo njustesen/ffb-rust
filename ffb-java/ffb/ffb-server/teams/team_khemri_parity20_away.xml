@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamKhemriParity20Away">
+
+	<coach>Away</coach>
+	<name>Khemri Parity20 Away</name>
+	<race>Khemri</race>
+	<rosterId>khemri.bb2020</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1090000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamKhemriParity20Away1">
+		<name>Tomb Guardian 1</name>
+		<gender>male</gender>
+		<positionId>khemri.tombguardian</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamKhemriParity20Away2">
+		<name>Tomb Guardian 2</name>
+		<gender>male</gender>
+		<positionId>khemri.tombguardian</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamKhemriParity20Away3">
+		<name>Tomb Guardian 3</name>
+		<gender>male</gender>
+		<positionId>khemri.tombguardian</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamKhemriParity20Away4">
+		<name>Tomb Guardian 4</name>
+		<gender>male</gender>
+		<positionId>khemri.tombguardian</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamKhemriParity20Away5">
+		<name>Anointed Blitzer 5</name>
+		<gender>male</gender>
+		<positionId>khemri.anointedblitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamKhemriParity20Away6">
+		<name>Anointed Blitzer 6</name>
+		<gender>male</gender>
+		<positionId>khemri.anointedblitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamKhemriParity20Away7">
+		<name>Anointed Thrower 7</name>
+		<gender>male</gender>
+		<positionId>khemri.anointedthrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamKhemriParity20Away8">
+		<name>Anointed Thrower 8</name>
+		<gender>male</gender>
+		<positionId>khemri.anointedthrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamKhemriParity20Away9">
+		<name>Skeleton Lineman 9</name>
+		<gender>male</gender>
+		<positionId>khemri.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamKhemriParity20Away10">
+		<name>Skeleton Lineman 10</name>
+		<gender>male</gender>
+		<positionId>khemri.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamKhemriParity20Away11">
+		<name>Skeleton Lineman 11</name>
+		<gender>male</gender>
+		<positionId>khemri.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamKhemriParity20Away12">
+		<name>Skeleton Lineman 12</name>
+		<gender>male</gender>
+		<positionId>khemri.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

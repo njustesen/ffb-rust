@@ -25,16 +25,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamWoodElfParity25Away2">
-		<name>Wardancer 2</name>
+		<name>Rodney Roachbait 2</name>
 		<gender>male</gender>
-		<positionId>woodelf.wardancer</positionId>
+		<positionId>woodelf.Rodney</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamWoodElfParity25Away3">
-		<name>Loren Forest Treeman 3</name>
+		<name>Swiftvine Glimmershard 3</name>
 		<gender>male</gender>
-		<positionId>woodelf.treeman</positionId>
+		<positionId>woodelf.Swiftvine</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -91,6 +91,20 @@
 		<name>Wood Elf Lineman 11</name>
 		<gender>male</gender>
 		<positionId>woodelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamWoodElfParity25Away12">
+		<name>Wardancer 12</name>
+		<gender>male</gender>
+		<positionId>woodelf.wardancer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamWoodElfParity25Away13">
+		<name>Loren Forest Treeman 13</name>
+		<gender>male</gender>
+		<positionId>woodelf.treeman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

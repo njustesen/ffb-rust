@@ -13,7 +13,7 @@
 		<name>Mummy</name>
 		<displayName>Mummy</displayName>
 		<type>Regular</type>
-		<cost>110000</cost>
+		<cost>120000</cost>
 		<movement>3</movement>
 		<strength>5</strength>
 		<agility>1</agility>
@@ -99,7 +99,7 @@
 		<name>Skeleton</name>
 		<displayName>Skeleton</displayName>
 		<type>Regular</type>
-		<cost>30000</cost>
+		<cost>40000</cost>
 		<movement>5</movement>
 		<strength>3</strength>
 		<agility>2</agility>

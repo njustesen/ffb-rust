@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamOgreParity20Home">
+
+	<coach>Home</coach>
+	<name>Ogre Parity20 Home</name>
+	<race>Ogre</race>
+	<rosterId>ogre.bb2020</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1085000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>5000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamOgreParity20Home1">
+		<name>Ogre Runt Punter 1</name>
+		<gender>male</gender>
+		<positionId>ogre.ogre</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamOgreParity20Home2">
+		<name>Ogre Blocker 2</name>
+		<gender>male</gender>
+		<positionId>ogre.ogreblocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamOgreParity20Home3">
+		<name>Ogre Blocker 3</name>
+		<gender>male</gender>
+		<positionId>ogre.ogreblocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamOgreParity20Home4">
+		<name>Ogre Blocker 4</name>
+		<gender>male</gender>
+		<positionId>ogre.ogreblocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamOgreParity20Home5">
+		<name>Ogre Blocker 5</name>
+		<gender>male</gender>
+		<positionId>ogre.ogreblocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamOgreParity20Home6">
+		<name>Gnoblar Lineman 6</name>
+		<gender>male</gender>
+		<positionId>ogre.gnoblarlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamOgreParity20Home7">
+		<name>Gnoblar Lineman 7</name>
+		<gender>male</gender>
+		<positionId>ogre.gnoblarlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamOgreParity20Home8">
+		<name>Gnoblar Lineman 8</name>
+		<gender>male</gender>
+		<positionId>ogre.gnoblarlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamOgreParity20Home9">
+		<name>Gnoblar Lineman 9</name>
+		<gender>male</gender>
+		<positionId>ogre.gnoblarlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamOgreParity20Home10">
+		<name>Gnoblar Lineman 10</name>
+		<gender>male</gender>
+		<positionId>ogre.gnoblarlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamOgreParity20Home11">
+		<name>Gnoblar Lineman 11</name>
+		<gender>male</gender>
+		<positionId>ogre.gnoblarlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamOgreParity20Home12">
+		<name>Gnoblar Lineman 12</name>
+		<gender>male</gender>
+		<positionId>ogre.gnoblarlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamOgreParity20Home13">
+		<name>Gnoblar Lineman 13</name>
+		<gender>male</gender>
+		<positionId>ogre.gnoblarlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

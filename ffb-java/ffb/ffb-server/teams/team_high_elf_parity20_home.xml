@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamHighElfParity20Home">
+
+	<coach>Home</coach>
+	<name>High Elf Parity20 Home</name>
+	<race>High Elf</race>
+	<rosterId>high_elf.bb2020</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1070000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>20000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamHighElfParity20Home1">
+		<name>Thrower 1</name>
+		<gender>male</gender>
+		<positionId>highelf.thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamHighElfParity20Home2">
+		<name>Blitzer 2</name>
+		<gender>male</gender>
+		<positionId>highelf.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamHighElfParity20Home3">
+		<name>Catcher 3</name>
+		<gender>male</gender>
+		<positionId>highelf.catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamHighElfParity20Home4">
+		<name>Lineman 4</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamHighElfParity20Home5">
+		<name>Lineman 5</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamHighElfParity20Home6">
+		<name>Lineman 6</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamHighElfParity20Home7">
+		<name>Lineman 7</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamHighElfParity20Home8">
+		<name>Lineman 8</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamHighElfParity20Home9">
+		<name>Lineman 9</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamHighElfParity20Home10">
+		<name>Lineman 10</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamHighElfParity20Home11">
+		<name>Lineman 11</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamHighElfParity20Home12">
+		<name>Lineman 12</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

@@ -114,4 +114,28 @@
 			<keyword>Lizardman</keyword>
 		</keywords>
 	</position>
+	<position id="lizardman.Boa">
+		<quantity>1</quantity>
+		<name>Boa Kon'ssstriktr</name>
+		<displayName>Boa Kon'ssstriktr</displayName>
+		<type>Star</type>
+		<cost>180000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Fend</skill>
+			<skill>Hypnotic Gaze</skill>
+			<skill value="4">Loner</skill>
+			<skill>Prehensile Tail</skill>
+			<skill>Safe Pair of Hands</skill>
+			<skill>Sidestep</skill>
+			<skill>Look Into My Eyes</skill>
+		</skillList>
+		<skillCategoryList>
+		</skillCategoryList>
+	</position>
 </roster>

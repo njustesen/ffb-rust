@@ -128,4 +128,27 @@
 			<keyword>Spawn</keyword>
 		</keywords>
 	</position>
+	<position id="nurgle.Guffle">
+		<quantity>1</quantity>
+		<name>Guffle Pusmaw</name>
+		<displayName>Guffle Pusmaw</displayName>
+		<type>Star</type>
+		<cost>150000</cost>
+		<movement>5</movement>
+		<strength>4</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Foul Appearance</skill>
+			<skill value="4">Loner</skill>
+			<skill>Monstrous Mouth</skill>
+			<skill>Nerves of Steel</skill>
+			<skill>On The Ball</skill>
+			<skill>Plague Ridden</skill>
+			<skill>Quick Bite</skill>
+		</skillList>
+		<skillCategoryList>
+		</skillCategoryList>
+	</position>
 </roster>

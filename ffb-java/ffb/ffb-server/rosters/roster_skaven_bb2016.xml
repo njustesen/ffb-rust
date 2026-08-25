@@ -10,7 +10,7 @@
 		<name>Rat Ogre</name>
 		<displayName>Rat Ogre</displayName>
 		<type>Big Guy</type>
-		<cost>160000</cost>
+		<cost>150000</cost>
 		<movement>6</movement>
 		<strength>5</strength>
 		<agility>2</agility>

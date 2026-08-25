@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="chaos_pact.bb2020">
+	<name>Chaos Pact</name>
+	<reRollCost>70000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="chaospact.renegadehumanlineman">
+		<quantity>12</quantity>
+		<name>Renegade Human Lineman</name>
+		<displayName>Renegade Human Lineman</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList/>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaospact.renegadehumanthrower">
+		<quantity>1</quantity>
+		<name>Renegade Human Thrower</name>
+		<displayName>Renegade Human Thrower</displayName>
+		<type>Regular</type>
+		<cost>75000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>3</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill value="all">Animosity</skill>
+			<skill>Pass</skill>
+			<skill>Safe Pair of Hands</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<normal>Passing</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaospact.renegadegoblin">
+		<quantity>1</quantity>
+		<name>Renegade Goblin</name>
+		<displayName>Renegade Goblin</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>6</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill value="all">Animosity</skill>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>Mutation</normal>
+			<double>General</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaospact.renegadeorc">
+		<quantity>1</quantity>
+		<name>Renegade Orc</name>
+		<displayName>Renegade Orc</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>5</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill value="all">Animosity</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaospact.renegadeskaven">
+		<quantity>1</quantity>
+		<name>Renegade Skaven</name>
+		<displayName>Renegade Skaven</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill value="all">Animosity</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaospact.renegadedarkelf">
+		<quantity>1</quantity>
+		<name>Renegade Dark Elf</name>
+		<displayName>Renegade Dark Elf</displayName>
+		<type>Regular</type>
+		<cost>75000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>2</agility>
+		<passing>3</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill value="all">Animosity</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<double>Passing</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaospact.renegadetroll">
+		<quantity>1</quantity>
+		<name>Renegade Troll</name>
+		<displayName>Renegade Troll</displayName>
+		<type>BigGuy</type>
+		<cost>115000</cost>
+		<movement>4</movement>
+		<strength>5</strength>
+		<agility>5</agility>
+		<passing>5</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Always Hungry</skill>
+			<skill value="4">Loner</skill>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Projectile Vomit</skill>
+			<skill>Really Stupid</skill>
+			<skill>Regeneration</skill>
+			<skill>Throw Team-mate</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaospact.renegadeogre">
+		<quantity>1</quantity>
+		<name>Renegade Ogre</name>
+		<displayName>Renegade Ogre</displayName>
+		<type>BigGuy</type>
+		<cost>140000</cost>
+		<movement>5</movement>
+		<strength>5</strength>
+		<agility>4</agility>
+		<passing>5</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Bone Head</skill>
+			<skill value="4">Loner</skill>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Thick Skull</skill>
+			<skill>Throw Team-mate</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaospact.minotaur">
+		<quantity>1</quantity>
+		<name>Renegade Minotaur</name>
+		<displayName>Renegade Minotaur</displayName>
+		<type>Regular</type>
+		<cost>150000</cost>
+		<movement>5</movement>
+		<strength>5</strength>
+		<agility>4</agility>
+		<passing>0</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Frenzy</skill>
+			<skill>Horns</skill>
+			<skill value="4">Loner</skill>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Thick Skull</skill>
+			<skill>Unchannelled Fury</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaospact.renegaderatogre">
+		<quantity>1</quantity>
+		<name>Renegade Rat Ogre</name>
+		<displayName>Renegade Rat Ogre</displayName>
+		<type>BigGuy</type>
+		<cost>150000</cost>
+		<movement>6</movement>
+		<strength>5</strength>
+		<agility>4</agility>
+		<passing>0</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Animal Savagery</skill>
+			<skill>Frenzy</skill>
+			<skill value="4">Loner</skill>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Prehensile Tail</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+</roster>

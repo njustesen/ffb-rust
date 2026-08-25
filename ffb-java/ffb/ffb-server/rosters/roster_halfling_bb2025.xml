@@ -121,4 +121,27 @@
 			<keyword>Treeman</keyword>
 		</keywords>
 	</position>
+	<position id="halfling.Cindy">
+		<quantity>1</quantity>
+		<name>Cindy Piewhistle</name>
+		<displayName>Cindy Piewhistle</displayName>
+		<type>Star</type>
+		<cost>100000</cost>
+		<movement>5</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>3</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Accurate</skill>
+			<skill>Bombardier</skill>
+			<skill>Dodge</skill>
+			<skill value="4">Loner</skill>
+			<skill>Secret Weapon</skill>
+			<skill>Stunty</skill>
+			<skill>All You Can Eat</skill>
+		</skillList>
+		<skillCategoryList>
+		</skillCategoryList>
+	</position>
 </roster>

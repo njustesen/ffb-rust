@@ -163,4 +163,25 @@
 			<keyword>Ogre</keyword>
 		</keywords>
 	</position>
+	<position id="human.Ivar">
+		<quantity>1</quantity>
+		<name>Ivar Eriksson</name>
+		<displayName>Ivar Eriksson</displayName>
+		<type>Star</type>
+		<cost>215000</cost>
+		<movement>6</movement>
+		<strength>4</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Guard</skill>
+			<skill value="4">Loner</skill>
+			<skill>Tackle</skill>
+			<skill>Raiding Party</skill>
+		</skillList>
+		<skillCategoryList>
+		</skillCategoryList>
+	</position>
 </roster>

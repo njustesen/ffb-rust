@@ -82,7 +82,7 @@
 		<displayName>Catcher</displayName>
 		<type>Regular</type>
 		<cost>90000</cost>
-		<movement>9</movement>
+		<movement>8</movement>
 		<strength>2</strength>
 		<agility>4</agility>
 		<passing>4</passing>

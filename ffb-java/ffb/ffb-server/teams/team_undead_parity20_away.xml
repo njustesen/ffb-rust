@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamUndeadParity20Away">
+
+	<coach>Away</coach>
+	<name>Undead Parity20 Away</name>
+	<race>Undead</race>
+	<rosterId>undead.bb2020</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1055000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>35000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamUndeadParity20Away1">
+		<name>Mummy 1</name>
+		<gender>male</gender>
+		<positionId>undead.mummy</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamUndeadParity20Away2">
+		<name>Wight Blitzer 2</name>
+		<gender>male</gender>
+		<positionId>undead.wight</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamUndeadParity20Away3">
+		<name>Wight Blitzer 3</name>
+		<gender>male</gender>
+		<positionId>undead.wight</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamUndeadParity20Away4">
+		<name>Ghoul Runner 4</name>
+		<gender>male</gender>
+		<positionId>undead.ghoul</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamUndeadParity20Away5">
+		<name>Ghoul Runner 5</name>
+		<gender>male</gender>
+		<positionId>undead.ghoul</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamUndeadParity20Away6">
+		<name>Ghoul Runner 6</name>
+		<gender>male</gender>
+		<positionId>undead.ghoul</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamUndeadParity20Away7">
+		<name>Ghoul Runner 7</name>
+		<gender>male</gender>
+		<positionId>undead.ghoul</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamUndeadParity20Away8">
+		<name>Zombie Lineman 8</name>
+		<gender>male</gender>
+		<positionId>undead.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamUndeadParity20Away9">
+		<name>Zombie Lineman 9</name>
+		<gender>male</gender>
+		<positionId>undead.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamUndeadParity20Away10">
+		<name>Zombie Lineman 10</name>
+		<gender>male</gender>
+		<positionId>undead.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamUndeadParity20Away11">
+		<name>Zombie Lineman 11</name>
+		<gender>male</gender>
+		<positionId>undead.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamUndeadParity20Away12">
+		<name>Zombie Lineman 12</name>
+		<gender>male</gender>
+		<positionId>undead.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamUndeadParity20Away13">
+		<name>Zombie Lineman 13</name>
+		<gender>male</gender>
+		<positionId>undead.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

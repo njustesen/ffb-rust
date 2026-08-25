@@ -25,9 +25,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamHalflingParity25Home2">
-		<name>Athel Forest Treeman 2</name>
+		<name>Cindy Piewhistle 2</name>
 		<gender>male</gender>
-		<positionId>halfling.treeman</positionId>
+		<positionId>halfling.Cindy</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -112,6 +112,13 @@
 		<name>Halfling Hopeful 14</name>
 		<gender>male</gender>
 		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="15" id="teamHalflingParity25Home15">
+		<name>Athel Forest Treeman 15</name>
+		<gender>male</gender>
+		<positionId>halfling.treeman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

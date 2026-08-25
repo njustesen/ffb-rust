@@ -88,14 +88,21 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="11" id="teamDwarfParity16Away11">
-		<name>Blocker 11</name>
+		<name>Barik Farblast 11</name>
 		<gender>male</gender>
-		<positionId>dwarf.blocker</positionId>
+		<positionId>dwarf.Farblast</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="12" id="teamDwarfParity16Away12">
 		<name>Blocker 12</name>
+		<gender>male</gender>
+		<positionId>dwarf.blocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamDwarfParity16Away13">
+		<name>Blocker 13</name>
 		<gender>male</gender>
 		<positionId>dwarf.blocker</positionId>
 		<skillList/>

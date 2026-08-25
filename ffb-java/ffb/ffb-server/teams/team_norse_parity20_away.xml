@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamNorseParity20Away">
+
+	<coach>Away</coach>
+	<name>Norse Parity20 Away</name>
+	<race>Norse</race>
+	<rosterId>norse.bb2020</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1055000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>35000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamNorseParity20Away1">
+		<name>Yhetee 1</name>
+		<gender>male</gender>
+		<positionId>norse.yhetee</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamNorseParity20Away2">
+		<name>Ulfwerener 2</name>
+		<gender>male</gender>
+		<positionId>norse.ulfwerener</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamNorseParity20Away3">
+		<name>Ulfwerener 3</name>
+		<gender>male</gender>
+		<positionId>norse.ulfwerener</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamNorseParity20Away4">
+		<name>Valkyrie 4</name>
+		<gender>male</gender>
+		<positionId>norse.valkyrie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamNorseParity20Away5">
+		<name>Norse Berzerker 5</name>
+		<gender>male</gender>
+		<positionId>norse.norseberzerker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamNorseParity20Away6">
+		<name>Beer Boar 6</name>
+		<gender>male</gender>
+		<positionId>norse.beerboar</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamNorseParity20Away7">
+		<name>Beer Boar 7</name>
+		<gender>male</gender>
+		<positionId>norse.beerboar</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamNorseParity20Away8">
+		<name>Norse Raider Lineman 8</name>
+		<gender>male</gender>
+		<positionId>norse.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamNorseParity20Away9">
+		<name>Norse Raider Lineman 9</name>
+		<gender>male</gender>
+		<positionId>norse.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamNorseParity20Away10">
+		<name>Norse Raider Lineman 10</name>
+		<gender>male</gender>
+		<positionId>norse.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamNorseParity20Away11">
+		<name>Norse Raider Lineman 11</name>
+		<gender>male</gender>
+		<positionId>norse.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamNorseParity20Away12">
+		<name>Norse Raider Lineman 12</name>
+		<gender>male</gender>
+		<positionId>norse.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

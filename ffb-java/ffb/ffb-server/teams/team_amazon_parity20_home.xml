@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamAmazonParity20Home">
+
+	<coach>Home</coach>
+	<name>Amazon Parity20 Home</name>
+	<race>Amazon</race>
+	<rosterId>amazon.bb2020</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1060000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>30000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamAmazonParity20Home1">
+		<name>Jaguar Warrior Blocker 1</name>
+		<gender>male</gender>
+		<positionId>amazon.jaguarwarriorblocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamAmazonParity20Home2">
+		<name>Jaguar Warrior Blocker 2</name>
+		<gender>male</gender>
+		<positionId>amazon.jaguarwarriorblocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamAmazonParity20Home3">
+		<name>Piranha Warrior Blitzer 3</name>
+		<gender>male</gender>
+		<positionId>amazon.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamAmazonParity20Home4">
+		<name>Piranha Warrior Blitzer 4</name>
+		<gender>male</gender>
+		<positionId>amazon.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamAmazonParity20Home5">
+		<name>Python Warrior Thrower 5</name>
+		<gender>male</gender>
+		<positionId>amazon.thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamAmazonParity20Home6">
+		<name>Python Warrior Thrower 6</name>
+		<gender>male</gender>
+		<positionId>amazon.thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamAmazonParity20Home7">
+		<name>Eagle Warrior Linewoman 7</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamAmazonParity20Home8">
+		<name>Eagle Warrior Linewoman 8</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamAmazonParity20Home9">
+		<name>Eagle Warrior Linewoman 9</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamAmazonParity20Home10">
+		<name>Eagle Warrior Linewoman 10</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamAmazonParity20Home11">
+		<name>Eagle Warrior Linewoman 11</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamAmazonParity20Home12">
+		<name>Eagle Warrior Linewoman 12</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

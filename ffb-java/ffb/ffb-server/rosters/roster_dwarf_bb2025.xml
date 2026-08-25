@@ -145,4 +145,50 @@
 			<keyword>Special</keyword>
 		</keywords>
 	</position>
+	<position id="dwarf.Thorsson">
+		<quantity>1</quantity>
+		<name>Thorsson Stoutmead</name>
+		<displayName>Thorsson Stoutmead</displayName>
+		<type>Star</type>
+		<cost>170000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>3</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Drunkard</skill>
+			<skill value="4">Loner</skill>
+			<skill>Thick Skull</skill>
+			<skill>Beer Barrel Bash!</skill>
+		</skillList>
+		<skillCategoryList>
+		</skillCategoryList>
+	</position>
+	<position id="dwarf.Grombrindal">
+		<quantity>1</quantity>
+		<name>Grombrindal</name>
+		<displayName>Grombrindal</displayName>
+		<type>Star</type>
+		<cost>170000</cost>
+		<movement>5</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Break Tackle</skill>
+			<skill>Dauntless</skill>
+			<skill value="4">Loner</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Stand Firm</skill>
+			<skill>Sure Feet</skill>
+			<skill>Thick Skull</skill>
+			<skill>Wisdom of the White Dwarf</skill>
+		</skillList>
+		<skillCategoryList>
+		</skillCategoryList>
+	</position>
 </roster>

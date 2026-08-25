@@ -6,7 +6,7 @@
 	<name>Undead Parity16 Away</name>
 	<race>Undead</race>
 	<rosterId>undead.bb2016</rosterId>
-	<reRolls>3</reRolls>
+	<reRolls>2</reRolls>
 	<fanFactor>2</fanFactor>
 	<dedicatedFans>0</dedicatedFans>
 	<apothecaries>0</apothecaries>

@@ -123,4 +123,27 @@
 			<double>Passing</double>
 		</skillCategoryList>
 	</position>
+	<position id="dwarf.Farblast">
+		<quantity>1</quantity>
+		<name>Barik Farblast</name>
+		<displayName>Barik Farblast</displayName>
+		<type>Star</type>
+		<cost>60000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>-1</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Loner</skill>
+			<skill>Hail Mary Pass</skill>
+			<skill>Pass</skill>
+			<skill>Secret Weapon</skill>
+			<skill>Strong Arm</skill>
+			<skill>Sure Hands</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+		</skillCategoryList>
+	</position>
 </roster>

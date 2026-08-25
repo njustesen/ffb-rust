@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamDarkElfLeagueFumbblParity20Home">
+
+	<coach>Home</coach>
+	<name>Dark Elf Parity20 Home</name>
+	<race>Dark Elf</race>
+	<rosterId>dark_elf_league_fumbbl.bb2020</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1085000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>5000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamDarkElfLeagueFumbblParity20Home1">
+		<name>Witch Elf 1</name>
+		<gender>male</gender>
+		<positionId>37738</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamDarkElfLeagueFumbblParity20Home2">
+		<name>Blitzer 2</name>
+		<gender>male</gender>
+		<positionId>37736</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamDarkElfLeagueFumbblParity20Home3">
+		<name>Assassin 3</name>
+		<gender>male</gender>
+		<positionId>37737</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamDarkElfLeagueFumbblParity20Home4">
+		<name>Runner 4</name>
+		<gender>male</gender>
+		<positionId>37735</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamDarkElfLeagueFumbblParity20Home5">
+		<name>Dark Elf Lineman 5</name>
+		<gender>male</gender>
+		<positionId>37734</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamDarkElfLeagueFumbblParity20Home6">
+		<name>Dark Elf Lineman 6</name>
+		<gender>male</gender>
+		<positionId>37734</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamDarkElfLeagueFumbblParity20Home7">
+		<name>Dark Elf Lineman 7</name>
+		<gender>male</gender>
+		<positionId>37734</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamDarkElfLeagueFumbblParity20Home8">
+		<name>Dark Elf Lineman 8</name>
+		<gender>male</gender>
+		<positionId>37734</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamDarkElfLeagueFumbblParity20Home9">
+		<name>Dark Elf Lineman 9</name>
+		<gender>male</gender>
+		<positionId>37734</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamDarkElfLeagueFumbblParity20Home10">
+		<name>Dark Elf Lineman 10</name>
+		<gender>male</gender>
+		<positionId>37734</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamDarkElfLeagueFumbblParity20Home11">
+		<name>Dark Elf Lineman 11</name>
+		<gender>male</gender>
+		<positionId>37734</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamDarkElfLeagueFumbblParity20Home12">
+		<name>Dark Elf Lineman 12</name>
+		<gender>male</gender>
+		<positionId>37734</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

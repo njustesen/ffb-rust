@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="ogre.bb2020">
+	<name>Ogre</name>
+	<reRollCost>70000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="ogre.gnoblarlineman">
+		<quantity>16</quantity>
+		<name>Gnoblar Lineman</name>
+		<displayName>Gnoblar Lineman</displayName>
+		<type>Regular</type>
+		<cost>15000</cost>
+		<movement>5</movement>
+		<strength>1</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>6</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+			<skill>Side Step</skill>
+			<skill>Stunty</skill>
+			<skill>Titchy</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>General</double>
+		</skillCategoryList>
+	</position>
+	<position id="ogre.ogre">
+		<quantity>1</quantity>
+		<name>Ogre Runt Punter</name>
+		<displayName>Ogre Runt Punter</displayName>
+		<type>Regular</type>
+		<cost>145000</cost>
+		<movement>5</movement>
+		<strength>5</strength>
+		<agility>4</agility>
+		<passing>4</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Bone Head</skill>
+			<skill>Kick Team-mate</skill>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Passing</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+		</skillCategoryList>
+	</position>
+	<position id="ogre.ogreblocker">
+		<quantity>5</quantity>
+		<name>Ogre Blocker</name>
+		<displayName>Ogre Blocker</displayName>
+		<type>Regular</type>
+		<cost>140000</cost>
+		<movement>5</movement>
+		<strength>5</strength>
+		<agility>4</agility>
+		<passing>5</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Bone Head</skill>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Thick Skull</skill>
+			<skill>Throw Team-mate</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+</roster>

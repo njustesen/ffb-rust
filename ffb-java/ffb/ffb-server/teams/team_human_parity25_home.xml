@@ -25,9 +25,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamHumanParity25Home2">
-		<name>Human Blitzer 2</name>
+		<name>Ivar Eriksson 2</name>
 		<gender>male</gender>
-		<positionId>human.blitzer</positionId>
+		<positionId>human.Ivar</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -98,6 +98,13 @@
 		<name>Halfling Hopeful 12</name>
 		<gender>male</gender>
 		<positionId>human.halfling_hopeful</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamHumanParity25Home13">
+		<name>Human Blitzer 13</name>
+		<gender>male</gender>
+		<positionId>human.blitzer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

@@ -25,9 +25,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamLizardmanParity25Away2">
-		<name>Saurus Blocker 2</name>
+		<name>Boa Kon'ssstriktr 2</name>
 		<gender>male</gender>
-		<positionId>lizardman.saurus</positionId>
+		<positionId>lizardman.Boa</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -91,6 +91,13 @@
 		<name>Skink Lineman 11</name>
 		<gender>male</gender>
 		<positionId>lizardman.skink</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamLizardmanParity25Away12">
+		<name>Saurus Blocker 12</name>
+		<gender>male</gender>
+		<positionId>lizardman.saurus</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

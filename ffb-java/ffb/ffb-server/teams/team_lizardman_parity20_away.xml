@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamLizardmanParity20Away">
+
+	<coach>Away</coach>
+	<name>Lizardman Parity20 Away</name>
+	<race>Lizardman</race>
+	<rosterId>lizardman.bb2020</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1090000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamLizardmanParity20Away1">
+		<name>Kroxigor 1</name>
+		<gender>male</gender>
+		<positionId>lizardman.kroxigor</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamLizardmanParity20Away2">
+		<name>Saurus Blocker 2</name>
+		<gender>male</gender>
+		<positionId>lizardman.saurus</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamLizardmanParity20Away3">
+		<name>Saurus Blocker 3</name>
+		<gender>male</gender>
+		<positionId>lizardman.saurus</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamLizardmanParity20Away4">
+		<name>Chameleon Skink 4</name>
+		<gender>male</gender>
+		<positionId>lizardman.chameleonskink</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamLizardmanParity20Away5">
+		<name>Skink Runner Lineman 5</name>
+		<gender>male</gender>
+		<positionId>lizardman.skink</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamLizardmanParity20Away6">
+		<name>Skink Runner Lineman 6</name>
+		<gender>male</gender>
+		<positionId>lizardman.skink</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamLizardmanParity20Away7">
+		<name>Skink Runner Lineman 7</name>
+		<gender>male</gender>
+		<positionId>lizardman.skink</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamLizardmanParity20Away8">
+		<name>Skink Runner Lineman 8</name>
+		<gender>male</gender>
+		<positionId>lizardman.skink</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamLizardmanParity20Away9">
+		<name>Skink Runner Lineman 9</name>
+		<gender>male</gender>
+		<positionId>lizardman.skink</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamLizardmanParity20Away10">
+		<name>Skink Runner Lineman 10</name>
+		<gender>male</gender>
+		<positionId>lizardman.skink</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamLizardmanParity20Away11">
+		<name>Skink Runner Lineman 11</name>
+		<gender>male</gender>
+		<positionId>lizardman.skink</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamLizardmanParity20Away12">
+		<name>Skink Runner Lineman 12</name>
+		<gender>male</gender>
+		<positionId>lizardman.skink</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="chaos.bb2020">
+	<name>Chaos</name>
+	<reRollCost>60000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="chaos.beastmanrunnerlineman">
+		<quantity>16</quantity>
+		<name>Beastman Runner Lineman</name>
+		<displayName>Beastman Runner Lineman</displayName>
+		<type>Regular</type>
+		<cost>60000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Horns</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaos.chosenblocker">
+		<quantity>4</quantity>
+		<name>Chosen Blocker</name>
+		<displayName>Chosen Blocker</displayName>
+		<type>Regular</type>
+		<cost>100000</cost>
+		<movement>5</movement>
+		<strength>4</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>10</armour>
+		<skillList/>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaos.chaostroll">
+		<quantity>1</quantity>
+		<name>Chaos Troll</name>
+		<displayName>Chaos Troll</displayName>
+		<type>BigGuy</type>
+		<cost>115000</cost>
+		<movement>4</movement>
+		<strength>5</strength>
+		<agility>5</agility>
+		<passing>5</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Always Hungry</skill>
+			<skill value="4">Loner</skill>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Projectile Vomit</skill>
+			<skill>Really Stupid</skill>
+			<skill>Regeneration</skill>
+			<skill>Throw Team-mate</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Mutation</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaos.chaosogre">
+		<quantity>1</quantity>
+		<name>Chaos Ogre</name>
+		<displayName>Chaos Ogre</displayName>
+		<type>BigGuy</type>
+		<cost>140000</cost>
+		<movement>5</movement>
+		<strength>5</strength>
+		<agility>4</agility>
+		<passing>5</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Bone Head</skill>
+			<skill value="4">Loner</skill>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Thick Skull</skill>
+			<skill>Throw Team-mate</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Mutation</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+		</skillCategoryList>
+	</position>
+	<position id="chaos.minotaur">
+		<quantity>1</quantity>
+		<name>Minotaur</name>
+		<displayName>Minotaur</displayName>
+		<type>Big Guy</type>
+		<cost>150000</cost>
+		<movement>5</movement>
+		<strength>5</strength>
+		<agility>4</agility>
+		<passing>0</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Frenzy</skill>
+			<skill>Horns</skill>
+			<skill value="4">Loner</skill>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Thick Skull</skill>
+			<skill>Unchannelled Fury</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Mutation</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+		</skillCategoryList>
+	</position>
+</roster>

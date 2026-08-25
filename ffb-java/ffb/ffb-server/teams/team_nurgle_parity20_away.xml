@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamNurgleParity20Away">
+
+	<coach>Away</coach>
+	<name>Nurgle Parity20 Away</name>
+	<race>Nurgle</race>
+	<rosterId>nurgle.bb2020</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1090000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamNurgleParity20Away1">
+		<name>Rotspawn 1</name>
+		<gender>male</gender>
+		<positionId>nurgle.rotspawn</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamNurgleParity20Away2">
+		<name>Bloater 2</name>
+		<gender>male</gender>
+		<positionId>nurgle.bloater</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamNurgleParity20Away3">
+		<name>Bloater 3</name>
+		<gender>male</gender>
+		<positionId>nurgle.bloater</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamNurgleParity20Away4">
+		<name>Bloater 4</name>
+		<gender>male</gender>
+		<positionId>nurgle.bloater</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamNurgleParity20Away5">
+		<name>Pestigor 5</name>
+		<gender>male</gender>
+		<positionId>nurgle.pestigor</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamNurgleParity20Away6">
+		<name>Pestigor 6</name>
+		<gender>male</gender>
+		<positionId>nurgle.pestigor</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamNurgleParity20Away7">
+		<name>Rotter Lineman 7</name>
+		<gender>male</gender>
+		<positionId>nurgle.rotter</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamNurgleParity20Away8">
+		<name>Rotter Lineman 8</name>
+		<gender>male</gender>
+		<positionId>nurgle.rotter</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamNurgleParity20Away9">
+		<name>Rotter Lineman 9</name>
+		<gender>male</gender>
+		<positionId>nurgle.rotter</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamNurgleParity20Away10">
+		<name>Rotter Lineman 10</name>
+		<gender>male</gender>
+		<positionId>nurgle.rotter</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamNurgleParity20Away11">
+		<name>Rotter Lineman 11</name>
+		<gender>male</gender>
+		<positionId>nurgle.rotter</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamNurgleParity20Away12">
+		<name>Rotter Lineman 12</name>
+		<gender>male</gender>
+		<positionId>nurgle.rotter</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamNurgleParity20Away13">
+		<name>Rotter Lineman 13</name>
+		<gender>male</gender>
+		<positionId>nurgle.rotter</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

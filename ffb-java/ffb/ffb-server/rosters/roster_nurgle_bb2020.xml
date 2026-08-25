@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="nurgle.bb2020">
+	<name>Nurgle</name>
+	<reRollCost>70000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>false</apothecary>
+	<position id="nurgle.rotter">
+		<quantity>12</quantity>
+		<name>Rotter Lineman</name>
+		<displayName>Rotter Lineman</displayName>
+		<type>Regular</type>
+		<cost>35000</cost>
+		<movement>5</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Decay</skill>
+			<skill>Plague Ridden</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="nurgle.pestigor">
+		<quantity>4</quantity>
+		<name>Pestigor</name>
+		<displayName>Pestigor</displayName>
+		<type>Regular</type>
+		<cost>75000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Horns</skill>
+			<skill>Plague Ridden</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="nurgle.bloater">
+		<quantity>4</quantity>
+		<name>Bloater</name>
+		<displayName>Bloater</displayName>
+		<type>Regular</type>
+		<cost>115000</cost>
+		<movement>4</movement>
+		<strength>4</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Disturbing Presence</skill>
+			<skill>Foul Appearance</skill>
+			<skill>Plague Ridden</skill>
+			<skill>Regeneration</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+		</skillCategoryList>
+	</position>
+	<position id="nurgle.rotspawn">
+		<quantity>1</quantity>
+		<name>Rotspawn</name>
+		<displayName>Rotspawn</displayName>
+		<type>Regular</type>
+		<cost>140000</cost>
+		<movement>4</movement>
+		<strength>5</strength>
+		<agility>5</agility>
+		<passing>0</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Disturbing Presence</skill>
+			<skill>Foul Appearance</skill>
+			<skill value="4">Loner</skill>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Plague Ridden</skill>
+			<skill>Really Stupid</skill>
+			<skill>Regeneration</skill>
+			<skill>Tentacles</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Mutation</double>
+		</skillCategoryList>
+	</position>
+</roster>
