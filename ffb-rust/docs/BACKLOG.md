@@ -3767,7 +3767,32 @@ instrument stopped seeing them, and `action Move` was inflated by the same 608. 
       does not score - blocked on the tier decision), so a naive `rc` check would make every gate
       red forever. The honest fix is probably to split "required" into "required" vs "blocked on a
       decision" and fail only on the former.
-- [ ] `GFI rolls | 0 | **MISSING**` - PRE-EXISTING, not from §12 (already missing at `316c774aa`).
-      Zero GO FOR IT rolls in 100 lineman games across ~26k moves. Either both agents stop at MA
-      by construction, or rushing is unreachable. Same shape as the KTM/TTM lockstep-abandonment
-      class and worth driving; verify the trigger is reachable BEFORE any harness plumbing.
+- [x] `GFI rolls | 0 | **MISSING**` - **ROOT-CAUSED 2026-08-25. Both agents move exactly ONE
+      SQUARE PER ACTIVATION, and that single fact explains TWO permanently-missing coverage
+      items.**
+
+      Measured, not inferred: in 100 lineman games `player_moved_events` = 26278 and
+      `activations.Move` = 26278 - exactly 1:1. Every Move activation yields exactly one move.
+
+      It is a deliberate lockstep design in BOTH harnesses, not a bug:
+        - Rust `random_agent.rs` sets `moved_this_activation` and answers the SECOND Move prompt
+          with `EndPlayerAction` ("one move per activation, then deselect"), with a test pinning it.
+        - Java `ParityRunner.sendMoveAction` picks ONE adjacent square, commented as mirroring
+          `legal_move_targets()`.
+      `legal_move_targets` DOES offer rush squares (it caps at `ma + STANDARD_GFI_SQUARES`), so the
+      engine is willing - nothing ever accumulates enough `current_move` to need a GO FOR IT.
+
+      **Consequences, both structural rather than engine defects:**
+        - `GFI rolls` can never be non-zero: reaching MA needs MA+1 moves in one activation.
+        - `touchdowns` can never be non-zero either - a carrier advances one square per turn, so
+          it cannot cross the pitch. This is the SAME root cause as the item already parked under
+          "Blocked - needs a tier decision", which is currently described only as "the random agent
+          does not score". That description is incomplete: the agent cannot traverse, not merely
+          decline to score.
+
+      **This is a GOAL-level decision, not a bug to fix in-loop.** Teaching both agents multi-square
+      movement in lockstep would change the actionRng stream of EVERY activation in EVERY matchup -
+      far larger than any campaign so far, and it would re-open all 90 matrices at once. It is also
+      the one change that would unlock the entire scoring/Punt family (AssignTouchdowns, InitPunt,
+      EndPunt, PuntDirection, PuntDistance) plus GFI in a single move. Recommend deciding it
+      together with the scoring tier rather than separately.
