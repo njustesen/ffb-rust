@@ -96,7 +96,7 @@ it at 10, which is direct evidence the category is a sampling artifact rather th
   `AbstractStepModifierMultipleBlock<StepFoulAppearanceMultiple, StepStateMultipleRolls>`. No Java
   code pushes it, because it is not pushable. Rust gave it a `StepId` and a driver entry, so it
   can never dispatch. Cleanup, not fidelity.
-- **`ReportStabInjury` is dead by HARNESS LOCKSTEP - and is drivable.** This is the fifth
+- **`ReportStabInjury` — ✅ DRIVEN AND LIVE 2026-08-25** (34 dispatches / 100 seeds of dark_elf bb2020, gate 30/30/30; Rust `24b39a81f`, harness `niels/ffb 14ccfb123`). It *was* dead by HARNESS LOCKSTEP. This is the fifth
   instance of the TTM/KTM/interception/bomb shape. `StepMultipleBlockFork` (both engines) groups
   multi-block targets by `BlockKind` and gives the STAB group its own sequence ending
   `STAB -> HANDLE_DROP_PLAYER_CONTEXT -> REPORT_STAB_INJURY`.
@@ -143,5 +143,19 @@ the scoring tier decision + 2 option/modelling artifacts + `StateMultipleRolls`,
 + `EatTeamMate`, now proven), **6 are the known inducement campaign**, and **1 is drivable now**:
 `ReportStabInjury`.
 
-**The one actionable item on this whole frontier is `ReportStabInjury`.** Everything else is
-closed, blocked on a user decision, or already alive.
+**`ReportStabInjury` is now LIVE (2026-08-25), and with it the frontier has no actionable items
+left.** Everything remaining is closed, blocked on a user decision, or already alive.
+
+It took three separately-gated steps, and splitting them is why it landed clean:
+  1. `1284d943f` - BLOCK_TARGETS carries `BlockTarget` (the kind survives the parameter),
+  2. `864910484` - BB2020's fork keeps its STAB group and drops BB2025's PICK_UP,
+  3. `24b39a81f` + `niels/ffb 14ccfb123` - both harnesses offer the STAB alternative in lockstep.
+
+The previous four campaigns of this shape (TTM, KTM, interception, bomb) each surfaced 6-12 Rust
+engine bugs. This one surfaced none, because each prerequisite was measured on its own before the
+next was added.
+
+**What remains on the frontier is one GOAL-level decision, not a bug list:** both agents move
+exactly ONE SQUARE PER ACTIVATION (measured 1:1, `player_moved_events == activations.Move`), which
+alone makes GFI and touchdowns - and therefore the whole scoring/Punt family - structurally
+unreachable. See BACKLOG.
