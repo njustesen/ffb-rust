@@ -16,6 +16,9 @@ public abstract class PlayerSelector {
 		List<Player<?>> selected = new ArrayList<>();
 		List<Player<?>> available = eligiblePlayers(determineTeam(team, game), game, skills);
 
+		if (System.getenv("FFB_TRACE") != null) {
+			System.err.println("JAVA_PSEL n=" + available.size() + " ids=" + available.stream().map(com.fumbbl.ffb.model.Player::getId).collect(java.util.stream.Collectors.toList()));
+		}
 		for (int i = 0; i < Math.min(amount, available.size()); i++) {
 			Collections.shuffle(available);
 			selected.add(available.remove(0));

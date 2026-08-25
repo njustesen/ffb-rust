@@ -135,9 +135,10 @@ public final class StepKickoffScatterRoll extends AbstractStep {
 			? getGameState().getDiceRoller().rollKickScatterDistance() // D3 when Kick is used
 			: getGameState().getDiceRoller().rollScatterDistance();    // D6 otherwise
 
+		System.err.println("JAVA_SCATTER_PRE half=" + game.getHalf() + " start=" + fKickoffStartCoordinate + " dir=" + fScatterDirection + " dist=" + fScatterDistance);
 		FieldCoordinate ballCoordinateEnd = UtilServerCatchScatterThrowIn.findScatterCoordinate(fKickoffStartCoordinate,
 			fScatterDirection, fScatterDistance);
-		System.err.println("JAVA_SCATTER_START half=" + game.getHalf() + " start=" + fKickoffStartCoordinate + " dir=" + fScatterDirection + " dist=" + fScatterDistance + " end=" + ballCoordinateEnd);
+		System.err.println("JAVA_SCATTER_END half=" + game.getHalf() + " end=" + ballCoordinateEnd);
 		getResult().addReport(
 			new ReportKickoffScatter(ballCoordinateEnd, fScatterDirection, rollScatterDirection, fScatterDistance));
 

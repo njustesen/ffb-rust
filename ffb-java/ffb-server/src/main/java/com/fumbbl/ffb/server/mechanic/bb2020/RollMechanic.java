@@ -13,7 +13,6 @@ import com.fumbbl.ffb.report.ReportReRoll;
 import com.fumbbl.ffb.server.DiceInterpreter;
 import com.fumbbl.ffb.server.DiceRoller;
 import com.fumbbl.ffb.server.GameState;
-import com.fumbbl.ffb.ReRollOptions;
 import com.fumbbl.ffb.server.step.HasIdForSingleUseReRoll;
 import com.fumbbl.ffb.server.step.IStep;
 import com.fumbbl.ffb.server.step.StepResult;
@@ -416,10 +415,5 @@ public class RollMechanic extends com.fumbbl.ffb.server.mechanic.RollMechanic {
 		}
 
 		return Math.max(strength, 1);
-	}
-
-	@Override
-	public ReRollOptions findReRollOptions(GameState gameState, Player<?> player, ReRolledAction reRolledAction, Skill reRollSkill) {
-		throw new UnsupportedOperationException("Not supported in this ruleset");
 	}
 }

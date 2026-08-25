@@ -68,7 +68,7 @@ public class Xoshiro256StarStar implements Fortuna.IDiceRoller {
             StackTraceElement[] stack = Thread.currentThread().getStackTrace();
             StringBuilder caller = new StringBuilder();
             int printed = 0;
-            for (int i = 2; i < Math.min(stack.length, 20) && printed < 5; i++) {
+            for (int i = 2; i < Math.min(stack.length, 30) && printed < 12; i++) {
                 String cls = stack[i].getClassName();
                 if (cls.contains("Xoshiro") || cls.contains("Thread")) continue;
                 caller.append(cls.substring(cls.lastIndexOf('.') + 1))
@@ -80,5 +80,9 @@ public class Xoshiro256StarStar implements Fortuna.IDiceRoller {
             System.err.println("DICE_TRACE pos=" + callCount + " sides=" + sides + " result=" + result + " caller=" + caller.toString().trim());
         }
         return result;
+    }
+
+    public int getCallCount() {
+        return callCount;
     }
 }

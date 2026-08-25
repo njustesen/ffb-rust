@@ -9,7 +9,7 @@ import com.fumbbl.ffb.FactoryType;
 import com.fumbbl.ffb.KeywordChoiceMode;
 import com.fumbbl.ffb.PlayerState;
 import com.fumbbl.ffb.PositionChoiceMode;
-import com.fumbbl.ffb.ReRollSource;
+import com.fumbbl.ffb.ReRollSources;
 import com.fumbbl.ffb.ReRolledActions;
 import com.fumbbl.ffb.RulesCollection;
 import com.fumbbl.ffb.SeriousInjury;
@@ -40,7 +40,6 @@ import com.fumbbl.ffb.net.commands.ClientCommandPositionSelection;
 import com.fumbbl.ffb.net.commands.ClientCommandUseApothecary;
 import com.fumbbl.ffb.net.commands.ClientCommandUseInducement;
 import com.fumbbl.ffb.net.commands.ClientCommandUseReRoll;
-import com.fumbbl.ffb.net.commands.ClientCommandUseSkill;
 import com.fumbbl.ffb.report.ReportApothecaryChoice;
 import com.fumbbl.ffb.report.ReportInducement;
 import com.fumbbl.ffb.report.mixed.ReportApothecaryRoll;
@@ -174,16 +173,14 @@ public class StepApothecary extends AbstractStep {
 									fInjuryResult.injuryContext().setSeriousInjury(null);
 								} else {
 									ApothecaryStatus newStatus = ApothecaryType.forPlayer(game, player,
-										fInjuryResult.injuryContext().getPlayerState()).isEmpty() ? ApothecaryStatus.NO_APOTHECARY :
-										ApothecaryStatus.DO_REQUEST;
+										fInjuryResult.injuryContext().getPlayerState()).isEmpty() ? ApothecaryStatus.NO_APOTHECARY : ApothecaryStatus.DO_REQUEST;
 									fInjuryResult.injuryContext().setApothecaryStatus(newStatus);
 								}
 							}
 							fInjuryResult.passedRegeneration();
 						} else if (inducementType == null) {
 							ApothecaryStatus newStatus = ApothecaryType.forPlayer(game, player,
-								fInjuryResult.injuryContext().getPlayerState()).isEmpty() ? ApothecaryStatus.NO_APOTHECARY :
-								ApothecaryStatus.DO_REQUEST;
+								fInjuryResult.injuryContext().getPlayerState()).isEmpty() ? ApothecaryStatus.NO_APOTHECARY : ApothecaryStatus.DO_REQUEST;
 							fInjuryResult.injuryContext().setApothecaryStatus(newStatus);
 							fInjuryResult.passedRegeneration();
 						}
@@ -193,18 +190,19 @@ public class StepApothecary extends AbstractStep {
 				case CLIENT_USE_RE_ROLL:
 					ClientCommandUseReRoll clientCommandUseReRoll = (ClientCommandUseReRoll) pReceivedCommand.getCommand();
 					if (clientCommandUseReRoll.getReRolledAction() == ReRolledActions.REGENERATION) {
-						commandStatus = rerollRegen(clientCommandUseReRoll.getReRollSource(), game);
-					}
-					break;
-				case CLIENT_USE_SKILL:
-					ClientCommandUseSkill commandUseSkill = (ClientCommandUseSkill) pReceivedCommand.getCommand();
-					if (commandUseSkill.getSkill().hasSkillProperty(NamedProperties.canRerollSingleDieOncePerPeriod)) {
-						if (commandUseSkill.isSkillUsed()) {
-							commandStatus = rerollRegen(commandUseSkill.getSkill().getRerollSource(ReRolledActions.SINGLE_DIE), game);
-						} else {
-							fInjuryResult.passedRegeneration();
-							commandStatus = StepCommandStatus.EXECUTE_STEP;
+						if (clientCommandUseReRoll.getReRollSource() == ReRollSources.TEAM_RE_ROLL) {
+							Player<?> player = injuredPlayer();
+							if (UtilServerReRoll.useReRoll(this, ReRollSources.TEAM_RE_ROLL, player)) {
+								if (UtilServerInjury.handleRegeneration(this, player, fInjuryResult.injuryContext().getPlayerState(),
+									true)) {
+									fInjuryResult.injuryContext().setInjury(game.getFieldModel().getPlayerState(player));
+									fInjuryResult.injuryContext().setApothecaryStatus(ApothecaryStatus.RESULT_CHOICE);
+									fInjuryResult.injuryContext().setSeriousInjury(null);
+								}
+							}
 						}
+						fInjuryResult.passedRegeneration();
+						commandStatus = StepCommandStatus.EXECUTE_STEP;
 					}
 					break;
 				case CLIENT_KEYWORD_SELECTION:
@@ -240,20 +238,6 @@ public class StepApothecary extends AbstractStep {
 			executeStep();
 		}
 		return commandStatus;
-	}
-
-	private StepCommandStatus rerollRegen(ReRollSource rerollSource, Game game) {
-		Player<?> player = injuredPlayer();
-		if (UtilServerReRoll.useReRoll(this, rerollSource, player)) {
-			if (UtilServerInjury.handleRegeneration(this, player, fInjuryResult.injuryContext().getPlayerState(),
-				true)) {
-				fInjuryResult.injuryContext().setInjury(game.getFieldModel().getPlayerState(player));
-				fInjuryResult.injuryContext().setApothecaryStatus(ApothecaryStatus.RESULT_CHOICE);
-				fInjuryResult.injuryContext().setSeriousInjury(null);
-			}
-		}
-		fInjuryResult.passedRegeneration();
-		return StepCommandStatus.EXECUTE_STEP;
 	}
 
 	@Override
@@ -372,7 +356,7 @@ public class StepApothecary extends AbstractStep {
 		if (playerState != null) {
 			Player<?> defender = game.getPlayerById(defenderId);
 			Player<?> attacker = game.getPlayerById(fInjuryResult.injuryContext().getAttackerId());
-			if (playerState.isSi() && attacker != null) {
+					if (playerState.isSi() && attacker != null) {
 				Set<Keyword> availableKeywords =
 					attacker.getPosition().getKeywords().stream().filter(Keyword::isCanGetEvenWith)
 						.collect(Collectors.toSet());

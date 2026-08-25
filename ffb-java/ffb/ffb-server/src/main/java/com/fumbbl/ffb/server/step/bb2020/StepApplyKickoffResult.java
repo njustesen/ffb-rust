@@ -449,6 +449,9 @@ public final class StepApplyKickoffResult extends AbstractStep {
 			if (prayerAvailable) {
 				Collections.shuffle(availablePrayerRolls);
 				int roll = availablePrayerRolls.remove(0);
+				if (System.getenv("FFB_TRACE") != null) {
+					System.err.println("JAVA_PRAYERPICK side=home shuffled=" + availablePrayerRolls + " pick=" + roll);
+				}
 				sequence.add(StepId.PRAYER,
 					StepParameter.from(StepParameterKey.PRAYER_ROLL, roll),
 					StepParameter.from(StepParameterKey.TEAM_ID, teamId));
@@ -463,6 +466,9 @@ public final class StepApplyKickoffResult extends AbstractStep {
 			if (prayerAvailable) {
 				Collections.shuffle(availablePrayerRolls);
 				int roll = availablePrayerRolls.remove(0);
+				if (System.getenv("FFB_TRACE") != null) {
+					System.err.println("JAVA_PRAYERPICK side=away shuffled=" + availablePrayerRolls + " pick=" + roll);
+				}
 				sequence.add(StepId.PRAYER,
 					StepParameter.from(StepParameterKey.PRAYER_ROLL, roll),
 					StepParameter.from(StepParameterKey.TEAM_ID, teamId));

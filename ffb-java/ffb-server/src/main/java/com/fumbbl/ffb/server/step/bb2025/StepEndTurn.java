@@ -219,7 +219,7 @@ public class StepEndTurn extends AbstractStep {
 	}
 
 	private void reRollArgue(Team team, boolean friendsWithTheRef, String playerId, TurnData turnData,
-	                         InducementType briberyReRoll) {
+		InducementType briberyReRoll) {
 		Inducement inducement = turnData.getInducementSet().getInducementMapping().get(briberyReRoll);
 		inducement.setUses(inducement.getUses() + 1);
 		turnData.getInducementSet().addInducement(inducement);
@@ -230,6 +230,11 @@ public class StepEndTurn extends AbstractStep {
 	private void executeStep() {
 
 		Game game = getGameState().getGame();
+		if (System.getenv("FFB_ET_TRACE") != null) System.err.println("JAVA_ET within=" + fWithinSecretWeaponHandling
+			+ " td=" + fTouchdown + " newHalf=" + fNewHalf + " argueA=" + fArgueTheCallChoiceAway
+			+ " argueH=" + fArgueTheCallChoiceHome + " bribesA=" + fBribesChoiceAway + " bribesH=" + fBribesChoiceHome
+			+ " nextPushed=" + fNextSequencePushed + " ones=" + playerIdsNaturalOnes.size()
+			+ " mode=" + game.getTurnMode() + " sots=" + useStarOfTheShow);
 		game.getFieldModel().clearMultiBlockTargets();
 		UtilServerDialog.hideDialog(getGameState());
 		getGameState().getPassState().reset();
@@ -292,6 +297,7 @@ public class StepEndTurn extends AbstractStep {
 
 			fEndGame = false;
 			fNewHalf = UtilServerSteps.checkEndOfHalf(getGameState());
+			if (System.getenv("FFB_ET_TRACE") != null) System.err.println("JAVA_ET2 newHalf=" + fNewHalf + " td=" + fTouchdown);
 
 			if (!fNextSequencePushed) {
 
@@ -464,12 +470,17 @@ public class StepEndTurn extends AbstractStep {
 			}
 		}
 
+		if (System.getenv("FFB_ET_TRACE") != null) System.err.println("JAVA_ET3 gate argueH=" + fArgueTheCallChoiceHome
+			+ " argueA=" + fArgueTheCallChoiceAway + " bribesH=" + fBribesChoiceHome + " bribesA=" + fBribesChoiceAway
+			+ " endGame=" + fEndGame);
 		if (fEndGame || ((fArgueTheCallChoiceHome != null) && (fArgueTheCallChoiceAway != null)
 			&& (fBribesChoiceHome != null) && (fBribesChoiceAway != null))) {
 
 			if (!fEndGame && fRemoveUsedSecretWeapons) {
 				removeUsedSecretWeapons();
 			}
+
+			getGameState().restoreWeather(fNewHalf || fTouchdown);
 
 			List<KnockoutRecovery> knockoutRecoveries = new ArrayList<>();
 			List<HeatExhaustion> heatExhaustions = new ArrayList<>();
@@ -491,10 +502,7 @@ public class StepEndTurn extends AbstractStep {
 				deactivateEffectsAndPrayers(InducementDuration.UNTIL_END_OF_DRIVE, isHomeTurnEnding);
 				Arrays.stream(game.getPlayers())
 					.filter(player -> player.hasActiveEnhancement(KickoffResult.DODGY_SNACK.getName()))
-					.forEach(player -> {
-						game.getFieldModel().removeSkillEnhancements(player, KickoffResult.DODGY_SNACK.getName());
-						getGameState().updatePlayerMarkings();
-					});
+					.forEach(player -> game.getFieldModel().removeSkillEnhancements(player, KickoffResult.DODGY_SNACK.getName()));
 				removeReRollsLastingForDrive(true);
 				removeReRollsLastingForDrive(false);
 				UtilServerGame.prepareForSetup(game);
@@ -533,6 +541,7 @@ public class StepEndTurn extends AbstractStep {
 			updateFumbblGame(getGameState(), fNewHalf, fTouchdown);
 
 			getResult().setNextAction(StepAction.NEXT_STEP);
+			if (System.getenv("FFB_ET_TRACE") != null) System.err.println("JAVA_ET4 done NEXT_STEP");
 
 		}
 
@@ -575,7 +584,7 @@ public class StepEndTurn extends AbstractStep {
 	}
 
 	private int getFaintingCount(Game game, List<KnockoutRecovery> knockoutRecoveries,
-	                             List<HeatExhaustion> heatExhaustions, List<Player<?>> unzappedPlayers) {
+		List<HeatExhaustion> heatExhaustions, List<Player<?>> unzappedPlayers) {
 		int faintingCount = 0;
 		if (fNewHalf || fTouchdown) {
 
@@ -744,7 +753,7 @@ public class StepEndTurn extends AbstractStep {
 	}
 
 	private void recoverKnockout(Player<?> pPlayer, InducementType reRollKOsInducement,
-	                             List<KnockoutRecovery> playerRecoveries) {
+		List<KnockoutRecovery> playerRecoveries) {
 		if (pPlayer != null) {
 			String playerId = pPlayer.getId();
 			int recoveryRoll = getGameState().getDiceRoller().rollKnockoutRecovery();

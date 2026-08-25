@@ -75,15 +75,36 @@ public class HeadlessFantasyFootballServer extends FantasyFootballServer {
         if (debugLog == null) {
             // Anonymous subclass: override isLogging() so nothing is ever written.
             // The DebugLog constructor is safe with a null logFile and /tmp as base path.
+            //
+            // FFB_SERVER_DEBUG=1 turns it back ON. `GameState.executeStep` already calls
+            // `logCurrentStep(IServerLogLevel.DEBUG, this)` for EVERY step the server runs, which is
+            // the only way to see the steps inside a single action — ParityRunner's own probes only
+            // fire at loop tops (steps that wait for a client command), so internally-chained steps
+            // are invisible to them.
+            final boolean serverDebug = System.getenv("FFB_SERVER_DEBUG") != null;
+            if (serverDebug) {
+                System.err.println("JSTEPALL debugLog created");
+            }
             debugLog = new DebugLog(
                 this,
                 null,
                 new File(System.getProperty("java.io.tmpdir")),
-                IServerLogLevel.NO_LOGGING
+                serverDebug ? IServerLogLevel.DEBUG : IServerLogLevel.NO_LOGGING
             ) {
                 @Override
                 public boolean isLogging(int pLogLevel) {
-                    return false;
+                    return serverDebug && pLogLevel <= IServerLogLevel.DEBUG;
+                }
+
+                // DebugLog's own writer needs a log FILE; with none configured its output goes
+                // nowhere. Send just the per-step line to stderr, where the parity harness's other
+                // probes already go, so it can be diffed against Rust's FFB_DRIVE_TRACE.
+                @Override
+                public void logCurrentStep(int pLogLevel, com.fumbbl.ffb.server.GameState pGameState) {
+                    if (serverDebug && pGameState != null && pGameState.getCurrentStep() != null) {
+                        System.err.println("JSTEPALL step=" + pGameState.getCurrentStep().getId()
+                            + " dice=" + pGameState.getDiceRoller().getCallCount());
+                    }
                 }
             };
         }

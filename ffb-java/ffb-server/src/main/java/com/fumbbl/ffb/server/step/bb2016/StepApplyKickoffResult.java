@@ -353,6 +353,15 @@ public final class StepApplyKickoffResult extends AbstractStep {
 			getResult().setAnimation(new Animation(AnimationType.KICKOFF_BRILLIANT_COACHING));
 		}
 
+		if (System.getenv("FFB_TRACE") != null) {
+			System.err.println("JAVA_XRR rollH=" + rollHome + " rollA=" + rollAway
+				+ " fameH=" + gameResult.getTeamResultHome().getFame()
+				+ " fameA=" + gameResult.getTeamResultAway().getFame()
+				+ " ffH=" + fanFavouritesHome + " ffA=" + fanFavouritesAway
+				+ " totH=" + totalHome + " totA=" + totalAway
+				+ " specH=" + gameResult.getTeamResultHome().getSpectators()
+				+ " specA=" + gameResult.getTeamResultAway().getSpectators());
+		}
 		boolean homeGainsReRoll = (totalHome >= totalAway);
 		if (homeGainsReRoll) {
 			game.getTurnDataHome().setReRolls(game.getTurnDataHome().getReRolls() + 1);

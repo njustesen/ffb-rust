@@ -36,6 +36,10 @@ public class DiceRoller {
 		return fGameState;
 	}
 
+	public int getCallCount() {
+		return getGameState().getServer().getFortuna().getCallCount();
+	}
+
 	public int rollDice(int pType) {
 		Fortuna fortuna = getGameState().getServer().getFortuna();
 		List<DiceCategory> testRollList = testRolls.get("General");
@@ -47,7 +51,23 @@ public class DiceRoller {
 				}
 			}
 		}
-		return fortuna.getDieRoll(pType);
+		int roll = fortuna.getDieRoll(pType);
+		if (System.getProperty("ffb.parityDebug") != null) {
+			StackTraceElement caller = Thread.currentThread().getStackTrace()[2];
+			StringBuilder deep = new StringBuilder();
+			if (System.getProperty("ffb.parityDebugDeep") != null) {
+				StackTraceElement[] st = Thread.currentThread().getStackTrace();
+				int shown = 0;
+				for (int i = 3; i < st.length && shown < 6; i++) {
+					if (!st[i].getClassName().startsWith("com.fumbbl")) continue;
+					deep.append(" <- ").append(st[i].getClassName().substring(st[i].getClassName().lastIndexOf('.') + 1))
+						.append('.').append(st[i].getMethodName()).append(':').append(st[i].getLineNumber());
+					shown++;
+				}
+			}
+			System.err.println("JAVA_DIE rng=" + fortuna.getCallCount() + " d" + pType + "=" + roll + " from=" + caller.getClassName() + "." + caller.getMethodName() + ":" + caller.getLineNumber() + deep);
+		}
+		return roll;
 	}
 	
 	public int rollDice(DiceCategory category) {	
@@ -157,6 +177,9 @@ public class DiceRoller {
 	}
 
 	public int[] rollBlockDice(int pNrOfDice) {
+		if (System.getProperty("ffb.parityDebug") != null) {
+			System.err.println("JAVA_BLOCKROLL nDice=" + pNrOfDice + " rng=" + getCallCount());
+		}
 		return rollDice(Math.abs(pNrOfDice), new BlockDiceCategory());
 	}
 

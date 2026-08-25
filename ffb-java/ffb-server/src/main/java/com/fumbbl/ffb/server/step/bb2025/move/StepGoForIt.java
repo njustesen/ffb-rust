@@ -140,6 +140,9 @@ public class StepGoForIt extends AbstractStepWithReRoll {
 
 		boolean goForItAfterBlock = actingPlayer.getPlayer().hasSkillProperty(NamedProperties.goForItAfterBlock);
 		boolean runGfi = (goForItAfterBlock == fBallandChainGfi);
+		if (System.getProperty("ffb.parityDebug") != null) {
+			System.err.println("JAVA_GFI pid=" + actingPlayer.getPlayerId() + " action=" + actingPlayer.getPlayerAction() + " currentMove=" + actingPlayer.getCurrentMove() + " MA=" + actingPlayer.getPlayer().getMovementWithModifiers() + " runGfi=" + runGfi + " goingForIt=" + actingPlayer.isGoingForIt() + " ballChain=" + fBallandChainGfi + " rng=" + getGameState().getDiceRoller().getCallCount());
+		}
 
 		if (runGfi) {
 			if ((PlayerAction.BLITZ == actingPlayer.getPlayerAction()) && (getReRolledAction() == null)) {

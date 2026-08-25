@@ -39,6 +39,8 @@ import com.fumbbl.ffb.server.step.IStep;
 import com.fumbbl.ffb.server.step.StepId;
 import com.fumbbl.ffb.server.util.UtilServerSetup;
 import com.fumbbl.ffb.util.UtilBox;
+import com.fumbbl.ffb.util.UtilPassing;
+import com.fumbbl.ffb.net.commands.ClientCommandInterceptorChoice;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -73,6 +75,7 @@ public class ParityRunner {
 
     /** Verbose stderr diagnostics, enabled with -Dffb.parityDebug=true. */
     private static final boolean DEBUG = Boolean.getBoolean("ffb.parityDebug");
+    private static final boolean DEBUG_ACT = System.getenv("FFB_ACT_TRACE") != null;
 
     /**
      * Parity tier (see ffb-rust AGENT_CONTRACT.md):
@@ -108,6 +111,10 @@ public class ParityRunner {
     // True once the blitz block command was sent for the current activation —
     // prevents re-sending CLIENT_BLOCK when INIT_SELECTING re-enters after the block.
     private boolean blitzBlockSent = false;
+    // BB2016 blitz is a 3-command dance: CLIENT_ACTING_PLAYER(BLITZ_MOVE) → CLIENT_BLITZ_MOVE(path)
+    // → CLIENT_BLOCK(target). This tracks whether the CLIENT_BLITZ_MOVE half has been sent for the
+    // current activation (reset at each new phase-1 pick, alongside blitzBlockSent).
+    private boolean bb2016BlitzMoveSent = false;
 
     private static final class PendingStep {
         int i;
@@ -221,12 +228,50 @@ public class ParityRunner {
 
     // ── Game loop ─────────────────────────────────────────────────────────────
 
+    /**
+     * `java.util.Collections.shuffle(List)` (the ONE-ARG overload) draws from a private static
+     * `Random` inside `java.util.Collections`, seeded from system entropy — so it is
+     * non-deterministic WITHIN JAVA: the same parity seed can produce a different result on two
+     * runs, and no Rust port could mirror it.
+     *
+     * The engine reaches it in BB2020 via
+     * `StepApplyKickoffResult.handleCheeringFans` -> `Collections.shuffle(availablePrayerRolls)`,
+     * which picks which Prayer to Nuffle the winning team receives. That path fires in a MIRROR
+     * match because it compares two D6 rolls, not team values. (Same call in bb2020/bb2025
+     * `StepPrayers`, `bb2025/StepThrowARock`, `bb2020/StepAssignTouchdowns` — currently
+     * unreachable here, but the same hazard.)
+     *
+     * Rather than disable the feature, make Java reproducible: seed that shared field per game
+     * from the parity seed. The engine is NOT modified — this is reflection from the harness, and
+     * needs `--add-opens java.base/java.util=ALL-UNNAMED` (added by ffb-parity's runner.rs).
+     * Rust reproduces the identical permutation with
+     * `ffb_model::util::java_random::{JavaRandom, collections_shuffle}`, which are 1:1 ports of
+     * `java.util.Random` and `Collections.shuffle` pinned in tests against real JVM output.
+     *
+     * NOTE: this is a SHARED stream for the whole game, like the dice stream — every shuffle call
+     * draws from it in order, so Rust must shuffle at the same points and in the same sequence.
+     */
+    private static void seedCollectionsShuffleRng(long seed) {
+        try {
+            java.lang.reflect.Field f = java.util.Collections.class.getDeclaredField("r");
+            f.setAccessible(true);
+            f.set(null, new java.util.Random(seed ^ 0x5EEDC0113C7104L));
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            // Loud, not silent: without this the run is non-deterministic and any "green" result
+            // for a matchup that reaches a shuffle site is meaningless.
+            System.err.println("FATAL: could not seed java.util.Collections' shuffle RNG: " + e
+                + " — run the JVM with --add-opens java.base/java.util=ALL-UNNAMED");
+            throw new IllegalStateException("Collections shuffle RNG not seeded", e);
+        }
+    }
+
     public void run(GameState gameState, String homeTeamId, String awayTeamId, long seed) {
         Game game = gameState.getGame();
 
         this.currentSeed = seed;
         this.decisionRng = new Xoshiro256StarStar(seed ^ 0xDEADBEEFCAFE0001L);
         this.actionRng = new Xoshiro256StarStar(seed ^ 0xC0FFEE_ACE0_0001L);
+        seedCollectionsShuffleRng(seed);
         String initialHash = stateHash(game);
         out.println(String.format(
             "{\"i\":0,\"type\":\"game_start\",\"home\":\"%s\",\"away\":\"%s\",\"seed\":%d,\"state_hash\":\"%s\"}",
@@ -314,6 +359,7 @@ public class ParityRunner {
 
         int scoreHome = game.getGameResult().getScoreHome();
         int scoreAway = game.getGameResult().getScoreAway();
+        if (System.getenv("FFB_TRACE") != null) { System.err.println("JAVA_END state=" + stateString(game)); }
         out.println(String.format(
             "{\"i\":%d,\"type\":\"game_end\",\"home_score\":%d,\"away_score\":%d,\"state_hash\":\"%s\"}",
             stepIndex, scoreHome, scoreAway, endHash));
@@ -347,6 +393,78 @@ public class ParityRunner {
 
             case APPLY_KICKOFF_RESULT:
                 MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
+                break;
+
+            case SWOOP:
+                sendSwoopTarget(game, gameState);
+                break;
+
+            case INIT_PUNT:
+                sendPuntTarget(game, gameState);
+                break;
+
+            // Bomb re-throw window (TurnMode BOMB_HOME / BOMB_AWAY): after a bomb is caught the
+            // catcher becomes the acting player with THROW_BOMB and StepInitPassing PARKS with a
+            // null thrower, waiting for a client command naming the new target. NOTHING DECLARED
+            // this action -- the engine set it -- so the phase-1/phase-2 activation loop is never
+            // entered for it, and the step spun forever as UNHANDLED_STEP. That is the whole reason
+            // "phase 2 is never reached for THROW_BOMB": the re-throw has no declaration at all.
+            case INIT_PASSING: {
+                // StepInitPassing.executeStep RETURNS IMMEDIATELY while the thrower is unset, so a
+                // decline is impossible here: neither CLIENT_END_TURN nor a deselect can advance the
+                // step (both set their flag and are then swallowed by that early return). The only
+                // command that advances it is CLIENT_PASS, which sets thrower = acting player. So the
+                // bomb must actually be thrown, using the SAME candidate rule and the SAME single
+                // actionRng draw as an ordinary pass -- Rust's agent mirrors it on the BombRethrow
+                // prompt via legal_pass_receivers.
+                // Gate on thrower==null: that is the RE-THROW park (no CLIENT_PASS seen yet).
+                // A park with the thrower SET is an OUT-OF-RANGE declared pass/bomb --
+                // InitPassing's CLIENT_PASS/TARGET_COORDINATE handlers set the thrower before the
+                // range check refuses to advance -- and the established contract for that park is
+                // END_TURN (zero dice), which Rust's InitPassing refusal also produces (underworld
+                // seed 72). Redrawing unconditionally made Java re-pick an out-of-range target
+                // until it landed in range (goblin bb2016 seed 21: two rejected picks, then a
+                // full bomb chain Rust never ran).
+                ActingPlayer bombAp = game.getActingPlayer();
+                if (game.getThrower() == null && bombAp != null && bombAp.getPlayerId() != null) {
+                    sendPassAction(game, gameState, bombAp.getPlayerId());
+                } else {
+                    MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
+                }
+                break;
+            }
+
+            case HIT_AND_RUN:
+                sendHitAndRunTarget(game, gameState);
+                break;
+
+            case THEN_I_STARTED_BLASTIN:
+                // Turn-mode wait, no dialog: the coach answers with CLIENT_TARGET_SELECTED.
+                // Fires for BOTH waits — the initial pick (source = the acting star,
+                // opponents only) and the roll-2 replacement pick (source = the ORIGINAL
+                // target, either team, star excluded; the opposing coach chooses). Candidate
+                // rule mirrors the client's ThenIStartedBlastinLogicModule.isValidTarget;
+                // answer contract mirrors the Rust agent: coordinate-sorted, single
+                // actionRng pick, EndTurn when empty.
+                sendBlastinTarget(game, gameState);
+                break;
+
+            case RAIDING_PARTY:
+                // Square wait (no dialog): StepRaidingParty published the eligible squares as
+                // MoveSquares and waits for CLIENT_FIELD_COORDINATE. Same contract as
+                // sendPuntTarget/sendHitAndRunTarget: coordinate-sorted, single actionRng pick,
+                // mirrored for the away coach (the server un-mirrors).
+                sendRaidingPartyTarget(game, gameState);
+                break;
+
+            case FIRST_MOVE_FURIOUS_OUTBURST:
+            case SECOND_MOVE_FURIOUS_OUTBURST:
+                // Square waits (no dialog), exactly like RAIDING_PARTY above:
+                // StepFirstMoveFuriousOutburst publishes the empty squares adjacent to the stab
+                // target as MoveSquares and waits for CLIENT_FIELD_COORDINATE; the second move
+                // publishes the squares within 3 of the new position and waits again. Same
+                // contract: coordinate-sorted, single actionRng pick, mirrored for the away coach.
+                sendFuriousOutburstSquare(game, gameState);
                 break;
 
             case INIT_SELECTING: {
@@ -400,6 +518,8 @@ public class ParityRunner {
                         decisionRngAdvances++;
                         Object[] entry = remaining.remove(pi);
                         String playerId = (String) entry[0];
+                        if (DEBUG_ACT) System.err.println("JAVA_PPICK pid=" + playerId + " pick=" + pi
+                            + " N=" + (remaining.size() + 1));
                         PlayerAction[] actions = (PlayerAction[]) entry[1];
                         usedThisTurn.add(playerId);
                         if (tier >= 3) {
@@ -421,15 +541,229 @@ public class ParityRunner {
                             PlayerAction[] live = filterStaleActions(game, actions);
                             int ai = (int) Long.remainderUnsigned(actionRng.nextLong(), live.length);
                             action = live[ai];
+                            if (DEBUG_ACT) {
+                                StringBuilder sb = new StringBuilder();
+                                for (PlayerAction a : live) { if (sb.length() > 0) sb.append(','); sb.append(a); }
+                                System.err.println("JAVA_ACT_PICK pid=" + playerId + " N=" + live.length
+                                    + " idx=" + ai + " action=" + action + " live=[" + sb + "]"
+                                    + " snapshot=" + actions.length);
+                            }
                         } else {
                             action = actions[0];
+                        }
+                        // sendConcreteAction handles only MOVE/STAND_UP/BLOCK/BLITZ*/FOUL*/PASS*/
+                        // HAND_OVER*/THROW_TEAM_MATE*; everything else hits its `default:` arm and is
+                        // immediately DESELECTED without touching the game state. Recording a step for
+                        // such an activation logged a phantom no-op step (identical pre/post hash) that
+                        // the Rust agent, which re-picks inside its own loop, never produces -- shifting
+                        // every later step index by one (goblin bb2016 seed 1 i=2: the Bombardier's
+                        // THROW_BOMB). Skip it the same way an inactive pick is skipped above: the
+                        // decisionRng/actionRng calls are already consumed and the player is already in
+                        // usedThisTurn, so the next iteration simply picks someone else.
+                        if (!isHandledActingAction(action)) {
+                            System.err.println("UNHANDLED_ACTING_ACTION_AT_PICK: " + action + " pid=" + playerId
+                                + " -- deselecting, no step logged");
+                            continue;
                         }
                         String chosen = "Activate(" + playerId + "," + action.toString() + ")";
                         recordStep(game, chosen, gameState.getDiceRoller().getCallCount());
                         blitzBlockSent = false;
+                        bb2016BlitzMoveSent = false;
                         // BLITZ is declared as BLITZ_MOVE: StepInitSelecting dispatches it to
                         // BLITZ_SELECT (target selection sets blitzUsed), then the block is
                         // sent from phase 2 once the target selection state exists.
+                        // TREACHEROUS declares as the client's command pair: the acting player
+                        // is set with PASS_MOVE (a ball action Treacherous itself adds to the
+                        // menu), then CLIENT_USE_SKILL(treacherous) — StepInitSelecting's skill
+                        // chain turns that into fDispatchPlayerAction=TREACHEROUS+forceGoto.
+                        // BLACK_INK declares as ActingPlayer(MOVE) + UseSkill(blackInk); the
+                        // engine dispatches BLACK_INK via the InitSelecting skill chain, and the
+                        // player continues the MOVE afterwards (phase 2 sendMoveAction).
+                        if (action == PlayerAction.BLACK_INK) {
+                            Player<?> bPlayer = game.getPlayerById(playerId);
+                            com.fumbbl.ffb.model.skill.Skill blackInk =
+                                bPlayer.getSkillWithProperty(com.fumbbl.ffb.model.property.NamedProperties.canGazeAutomatically);
+                            MatchRunner.inject(gameState, new ClientCommandActingPlayer(playerId, PlayerAction.MOVE, false));
+                            MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(
+                                blackInk, true, playerId, null, false));
+                            break;
+                        }
+                        if (action == PlayerAction.THEN_I_STARTED_BLASTIN) {
+                            Player<?> zPlayer = game.getPlayerById(playerId);
+                            java.util.Optional<com.fumbbl.ffb.model.skill.Skill> blastin =
+                                com.fumbbl.ffb.util.UtilCards.getUnusedSkillWithProperty(zPlayer,
+                                    com.fumbbl.ffb.model.property.NamedProperties.canBlastRemotePlayer);
+                            MatchRunner.inject(gameState, new ClientCommandActingPlayer(playerId, PlayerAction.MOVE, false));
+                            if (blastin.isPresent()) {
+                                MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(
+                                    blastin.get(), true, playerId, null, false));
+                            }
+                            break;
+                        }
+                        if (action == PlayerAction.CATCH_OF_THE_DAY) {
+                            Player<?> cPlayer = game.getPlayerById(playerId);
+                            java.util.Optional<com.fumbbl.ffb.model.skill.Skill> cotd =
+                                com.fumbbl.ffb.util.UtilCards.getUnusedSkillWithProperty(cPlayer,
+                                    com.fumbbl.ffb.model.property.NamedProperties.canGetBallOnGround);
+                            MatchRunner.inject(gameState, new ClientCommandActingPlayer(playerId, PlayerAction.MOVE, false));
+                            if (cotd.isPresent()) {
+                                MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(
+                                    cotd.get(), true, playerId, null, false));
+                            }
+                            break;
+                        }
+                        if (action == PlayerAction.BALEFUL_HEX) {
+                            Player<?> bPlayer = game.getPlayerById(playerId);
+                            java.util.Optional<com.fumbbl.ffb.model.skill.Skill> hex =
+                                com.fumbbl.ffb.util.UtilCards.getUnusedSkillWithProperty(bPlayer,
+                                    com.fumbbl.ffb.model.property.NamedProperties.canMakeOpponentMissTurn);
+                            MatchRunner.inject(gameState, new ClientCommandActingPlayer(playerId, PlayerAction.MOVE, false));
+                            if (hex.isPresent()) {
+                                MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(
+                                    hex.get(), true, playerId, null, false));
+                            }
+                            break;
+                        }
+                        if (action == PlayerAction.LOOK_INTO_MY_EYES) {
+                            Player<?> lPlayer = game.getPlayerById(playerId);
+                            // getUnusedSkillWithProperty(Player,..) returns Optional — never null-check it.
+                            java.util.Optional<com.fumbbl.ffb.model.skill.Skill> lime =
+                                com.fumbbl.ffb.util.UtilCards.getUnusedSkillWithProperty(lPlayer,
+                                    com.fumbbl.ffb.model.property.NamedProperties.canStealBallFromOpponent);
+                            MatchRunner.inject(gameState, new ClientCommandActingPlayer(playerId, PlayerAction.MOVE, false));
+                            if (lime.isPresent()) {
+                                MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(
+                                    lime.get(), true, playerId, null, false));
+                            }
+                            break;
+                        }
+                        if (action == PlayerAction.AUTO_GAZE_ZOAT) {
+                            // Declared exactly like BLACK_INK: ActingPlayer(MOVE) then
+                            // ClientCommandUseSkill(zoat). Java's CLIENT_USE_SKILL chain keys on
+                            // canGazeAutomaticallyThreeSquaresAway and dispatches AUTO_GAZE_ZOAT
+                            // with forceGotoOnDispatch, never calling changeActingPlayer.
+                            Player<?> zPlayer = game.getPlayerById(playerId);
+                            java.util.Optional<com.fumbbl.ffb.model.skill.Skill> zoat =
+                                com.fumbbl.ffb.util.UtilCards.getUnusedSkillWithProperty(zPlayer,
+                                    com.fumbbl.ffb.model.property.NamedProperties.canGazeAutomaticallyThreeSquaresAway);
+                            MatchRunner.inject(gameState, new ClientCommandActingPlayer(playerId, PlayerAction.MOVE, false));
+                            if (zoat.isPresent()) {
+                                MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(
+                                    zoat.get(), true, playerId, null, false));
+                            }
+                            break;
+                        }
+                        if (action == PlayerAction.WISDOM_OF_THE_WHITE_DWARF) {
+                            // The client offers WISDOM from the ordinary action modules and sends
+                            // sendUseWisdom() -> ClientCommandUseTeamMatesWisdom. Java's
+                            // StepInitSelecting handles it by setting ONLY the dispatch action
+                            // (fDispatchPlayerAction = WISDOM_OF_THE_WHITE_DWARF,
+                            // forceGotoOnDispatch = true) and never calls changeActingPlayer, so
+                            // the declared action stays MOVE. Same command pair as BLACK_INK;
+                            // Rust folds it into one ActivatePlayer and bridges identically.
+                            MatchRunner.inject(gameState,
+                                new ClientCommandActingPlayer(playerId, PlayerAction.MOVE, false));
+                            MatchRunner.inject(gameState,
+                                new com.fumbbl.ffb.net.commands.ClientCommandUseTeamMatesWisdom());
+                            break;
+                        }
+                        if (action == PlayerAction.THROW_KEG) {
+                            // The client declares a keg in TWO commands: sendActingPlayer(player,
+                            // THROW_KEG) puts it in ClientStateId.THROW_KEG, then the coach clicks a
+                            // target and sendThrowKeg(target) follows. Both are handled by
+                            // StepInitSelecting, the second publishing TARGET_PLAYER_ID.
+                            // Targets are ThrowKegLogicModule.isValidTarget: distance <= 3, base
+                            // STANDING, opposing team. Coordinate-sorted, single actionRng pick —
+                            // Rust's agent folds the same pair into one ActivatePlayer carrying the
+                            // target and draws identically.
+                            FieldModel kegFm = game.getFieldModel();
+                            FieldCoordinate kegCoord = playerCoordinate(game, playerId);
+                            Team kegOpponent = game.isHomePlaying() ? game.getTeamAway() : game.getTeamHome();
+                            List<Player<?>> kegTargets = new ArrayList<>();
+                            if (kegCoord != null) {
+                                for (Player<?> op : kegOpponent.getPlayers()) {
+                                    FieldCoordinate oc = kegFm.getPlayerCoordinate(op);
+                                    PlayerState ops = kegFm.getPlayerState(op);
+                                    if (oc == null || ops == null) continue;
+                                    if (oc.distanceInSteps(kegCoord) <= 3
+                                            && ops.getBase() == PlayerState.STANDING) {
+                                        kegTargets.add(op);
+                                    }
+                                }
+                            }
+                            sortPlayersByCoordinate(kegTargets, kegFm);
+                            if (kegTargets.isEmpty()) {
+                                // No square the coach could click — the declaration never completes.
+                                if (DEBUG) System.err.println("JAVA_KEG_DESELECT pid=" + playerId
+                                    + " (no valid keg target)");
+                                MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));
+                                break;
+                            }
+                            int kegIdx = (int) Long.remainderUnsigned(actionRng.nextLong(), kegTargets.size());
+                            Player<?> kegTarget = kegTargets.get(kegIdx);
+                            if (DEBUG) System.err.println("JAVA_KEG_PICK pid=" + playerId + " N="
+                                + kegTargets.size() + " idx=" + kegIdx + " target=" + kegTarget.getId());
+                            MatchRunner.inject(gameState,
+                                new ClientCommandActingPlayer(playerId, PlayerAction.THROW_KEG, false));
+                            MatchRunner.inject(gameState,
+                                new com.fumbbl.ffb.net.commands.ClientCommandThrowKeg(kegTarget.getId()));
+                            break;
+                        }
+                        if (action == PlayerAction.FURIOUS_OUTPBURST) {
+                            // The turn-start eligible snapshot goes STALE: the team's blitz can be
+                            // spent, or the star's targets can walk out of range, between the
+                            // snapshot and this declaration. Declaring it anyway makes the STOCK
+                            // ENGINE THROW — every abort path in the bb2025 FuriousOutburst
+                            // sequence jumps to the `END` label, which IS StepEndFuriousOutburst,
+                            // and that step dereferences
+                            // fieldModel.getTargetSelectionState().getSelectedPlayerId()
+                            // unconditionally (NPE at StepEndFuriousOutburst:71; it killed the
+                            // batched JVM at wood_elf bb2025 seed 65 i=190, state `f1000,0000`).
+                            // The real client never gets there because SelectLogicModule
+                            // re-evaluates isFuriousOutburstAvailable at click time. Re-check it
+                            // here and DESELECT when it no longer holds — the same treatment
+                            // sendFoulAction gives a foul whose victim has moved. Rust's agent
+                            // mirrors this in random_agent's 'reselect loop.
+                            Player<?> foPlayer = game.getPlayerById(playerId);
+                            FieldModel foFm = game.getFieldModel();
+                            PlayerState foPs = (foPlayer == null) ? null : foFm.getPlayerState(foPlayer);
+                            FieldCoordinate foCoord = (foPlayer == null) ? null : foFm.getPlayerCoordinate(foPlayer);
+                            Team foOpponent = game.isHomePlaying() ? game.getTeamAway() : game.getTeamHome();
+                            boolean stillAvailable = foPlayer != null && foPs != null && foCoord != null
+                                && foPs.isActive() && foPs.getBase() == PlayerState.STANDING
+                                && !game.getTurnData().isBlitzUsed()
+                                && com.fumbbl.ffb.util.UtilCards.hasUnusedSkillWithProperty(foPlayer,
+                                    com.fumbbl.ffb.model.property.NamedProperties.canTeleportBeforeAndAfterAvRollAttack)
+                                && com.fumbbl.ffb.util.ArrayTool.isProvided(
+                                    com.fumbbl.ffb.util.UtilPlayer.findBlockablePlayers(game, foOpponent, foCoord, 3));
+                            if (!stillAvailable) {
+                                if (DEBUG) System.err.println("JAVA_FO_DESELECT pid=" + playerId
+                                    + " (stale turn-start offer)");
+                                MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));
+                                break;
+                            }
+                            MatchRunner.inject(gameState,
+                                new ClientCommandActingPlayer(playerId, PlayerAction.FURIOUS_OUTPBURST, false));
+                            break;
+                        }
+                        if (action == PlayerAction.RAIDING_PARTY) {
+                            Player<?> rPlayer = game.getPlayerById(playerId);
+                            com.fumbbl.ffb.model.skill.Skill raiding =
+                                rPlayer.getSkillWithProperty(com.fumbbl.ffb.model.property.NamedProperties.canMoveOpenTeamMate);
+                            MatchRunner.inject(gameState, new ClientCommandActingPlayer(playerId, PlayerAction.MOVE, false));
+                            MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(
+                                raiding, true, playerId, null, false));
+                            break;
+                        }
+                        if (action == PlayerAction.TREACHEROUS) {
+                            Player<?> tPlayer = game.getPlayerById(playerId);
+                            com.fumbbl.ffb.model.skill.Skill treacherous =
+                                tPlayer.getSkillWithProperty(com.fumbbl.ffb.model.property.NamedProperties.canStabTeamMateForBall);
+                            MatchRunner.inject(gameState, new ClientCommandActingPlayer(playerId, PlayerAction.PASS_MOVE, false));
+                            MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(
+                                treacherous, true, playerId, null, false));
+                            break;
+                        }
                         PlayerAction declared = (action == PlayerAction.BLITZ) ? PlayerAction.BLITZ_MOVE : action;
                         MatchRunner.inject(gameState, new ClientCommandActingPlayer(playerId, declared, false));
                         break;
@@ -502,9 +836,15 @@ public class ParityRunner {
     // ── Dialog handling ───────────────────────────────────────────────────────
 
     private void handleDialog(IDialogParameter dialog, Game game, GameState gameState) {
+        if (System.getenv("FFB_DLG_TRACE") != null) System.err.println("JAVA_DLG " + dialog.getId()
+            + " mode=" + game.getTurnMode());
         switch (dialog.getId()) {
 
             // ── Informational / clear-only dialogs ──────────────────────────
+            // INFORMATION_OKAY (e.g. Look Into My Eyes failure notice) is purely
+            // informational — the step has already NEXT_STEPped. Rust's agent
+            // acknowledges it without an RNG draw; clearing mirrors that exactly.
+            case INFORMATION_OKAY:
             case KICKOFF_RETURN:
             case SETUP_ERROR:
             case SWARMING_ERROR:
@@ -530,6 +870,16 @@ public class ParityRunner {
                 decisionRngAdvances++;
                 boolean receive = Long.remainderUnsigned(decisionRng.nextLong(), 2L) == 0;
                 MatchRunner.inject(gameState, new ClientCommandReceiveChoice(receive));
+                break;
+            }
+
+            // -- Interception: pick a candidate, coordinate-sorted, 1 actionRng pick --
+            // Mirrors Rust's AgentPrompt::Interception arm exactly. The candidate set comes from the
+            // ENGINE's own UtilPassing.findInterceptors - the same call StepIntercept makes - so the
+            // harness cannot drift from the engine it is testing. Sorted by COORDINATE, never by id:
+            // the two engines' player ids differ.
+            case INTERCEPTION: {
+                sendInterceptorChoice(game, gameState);
                 break;
             }
 
@@ -617,6 +967,57 @@ public class ParityRunner {
                 break;
             }
 
+            case PETTY_CASH: {
+                // bb2016 StepPettyCash blocks on a ClientCommandPettyCash whenever a team's
+                // treasury is >= 50k and FORCE_TREASURY_TO_PETTY_CASH is off (goblin 80k,
+                // halfling 180k). Transfer 0 — deterministic, no RNG, and matches
+                // RandomStrategy.respondToDialog(PETTY_CASH). The step raises the dialog once
+                // per team, so it MUST be injected for the team named in the dialog parameter,
+                // otherwise UtilServerSteps.checkCommandIsFromHomePlayer keeps crediting the
+                // home team and the other team's dialog re-fires forever.
+                String pcTeamId = getDialogTeamId(dialog);
+                com.fumbbl.ffb.net.commands.ClientCommandPettyCash pcCmd =
+                    new com.fumbbl.ffb.net.commands.ClientCommandPettyCash(0);
+                if (pcTeamId != null) {
+                    MatchRunner.injectForTeam(gameState, pcCmd, pcTeamId.equals(game.getTeamHome().getId()));
+                } else {
+                    MatchRunner.inject(gameState, pcCmd);
+                }
+                break;
+            }
+
+            case RE_ROLL_BLOCK_FOR_TARGETS: {
+                // Multi-block die selection (DialogReRollBlockForTargetsParameter, shown by
+                // StepBlockRollMultiple): pick DIE INDEX 0 for the first still-unselected
+                // target, no pro (-1), no reroll — mirrors Rust's headless auto-select-0.
+                // The Dauntless/FoulAppearance variant (DialogReRollForTargetsParameter)
+                // declines with a null-source UseReRollForTarget — mirrors Rust's
+                // ReRollForTargets arm.
+                if (dialog instanceof com.fumbbl.ffb.dialog.DialogReRollBlockForTargetsParameter) {
+                    com.fumbbl.ffb.dialog.DialogReRollBlockForTargetsParameter bt =
+                        (com.fumbbl.ffb.dialog.DialogReRollBlockForTargetsParameter) dialog;
+                    com.fumbbl.ffb.model.BlockRoll pick = null;
+                    for (com.fumbbl.ffb.model.BlockRoll roll : bt.getBlockRolls()) {
+                        if (roll.needsSelection()) { pick = roll; break; }
+                    }
+                    if (pick != null) {
+                        MatchRunner.inject(gameState,
+                            new com.fumbbl.ffb.net.commands.ClientCommandBlockOrReRollChoiceForTarget(
+                                pick.getTargetId(), 0, -1, null));
+                    } else {
+                        game.setDialogParameter(null);
+                    }
+                } else if (dialog instanceof com.fumbbl.ffb.dialog.DialogReRollForTargetsParameter) {
+                    com.fumbbl.ffb.dialog.DialogReRollForTargetsParameter rt =
+                        (com.fumbbl.ffb.dialog.DialogReRollForTargetsParameter) dialog;
+                    MatchRunner.inject(gameState,
+                        new com.fumbbl.ffb.net.commands.ClientCommandUseReRollForTarget(
+                            rt.getReRolledAction(), null, null));
+                } else {
+                    game.setDialogParameter(null);
+                }
+                break;
+            }
             case RE_ROLL:
             case RE_ROLL_PROPERTIES: {
                 // Always decline — deterministic. No game RNG consumed for the declined roll.
@@ -632,6 +1033,17 @@ public class ParityRunner {
                     break;
                 }
                 injectCaptured(dialog, game, gameState);
+                // Clear the answered dialog ONLY if it is still the same object: a step that
+                // stays on CONTINUE after the decline (StepThenIStartedBlastin.fail() roll=2
+                // -> flip + CONTINUE) never hides it, so the stale RE_ROLL_PROPERTIES re-fired
+                // 500x (chaos_dwarf bb2025 seed 6 i=90). But the injection can synchronously
+                // run the WHOLE turn end and show a NEW dialog (the half-boundary
+                // ARGUE_THE_CALL) - clearing unconditionally wiped that and stuck END_TURN
+                // for 501 iters (seed 2). Same lesson as RAIDING_PARTY, plus the same-object
+                // guard.
+                if (game.getDialogParameter() == dialog) {
+                    game.setDialogParameter(null);
+                }
                 break;
             }
 
@@ -657,12 +1069,49 @@ public class ParityRunner {
                     // (renegades seed 81: STUCK_STEP PLACE_BALL → java=None). Rust's StepPlaceBall
                     // auto-declines it (dialog not ported), so decline here too → the ball scatters
                     // in both engines and no PLACE_BALL dialog is entered.
+                    // Swoop: optional TTM deflection. Using it enters a CLIENT_SWOOP target dialog
+                    // the ParityRunner cannot drive → the SWOOP step gets STUCK and the game
+                    // force-ends (goblin seed 3 i=194: a thrown Doom Diver). Decline (like
+                    // SafePairOfHands) so the thrown player lands normally in both engines.
                     String skillName = (su.getSkill() == null) ? null : su.getSkill().getClass().getSimpleName();
                     boolean useSkill = (skillName == null)
                         || (!"DumpOff".equals(skillName) && !"PrimalSavagery".equals(skillName)
-                            && !"SafePairOfHands".equals(skillName));
+                            && !"SafePairOfHands".equals(skillName) && !"Swoop".equals(skillName));
                     comm.clearCaptured();
                     comm.sendUseSkill(su.getSkill(), useSkill, su.getPlayerId());
+                    injectCaptured(dialog, game, gameState);
+                } else {
+                    game.setDialogParameter(null);
+                }
+                break;
+            }
+
+            case SELECT_SKILL: {
+                // DialogSelectSkillParameter — shared by the Intensive Training prayer and
+                // Wisdom of the White Dwarf. WITHOUT this arm the dialog fell through to the
+                // default, i.e. the NON-SEEDED RandomStrategy: silent nondeterminism for parity.
+                // Both Java call sites hand over a FLAT list already sorted by skill name
+                // (Comparator.comparing(Skill::getName)), so answer the lowest name with ZERO rng
+                // — the same contract both Rust agents use (min-by-name over the prompt's ids).
+                if (dialog instanceof com.fumbbl.ffb.dialog.DialogSelectSkillParameter) {
+                    com.fumbbl.ffb.dialog.DialogSelectSkillParameter ssp =
+                        (com.fumbbl.ffb.dialog.DialogSelectSkillParameter) dialog;
+                    com.fumbbl.ffb.model.skill.Skill best = null;
+                    if (ssp.getSkills() != null) {
+                        for (com.fumbbl.ffb.model.skill.Skill s : ssp.getSkills()) {
+                            if (s == null) continue;
+                            if (best == null || s.getName().compareTo(best.getName()) < 0) {
+                                best = s;
+                            }
+                        }
+                    }
+                    if (best == null) {
+                        game.setDialogParameter(null);
+                        break;
+                    }
+                    if (DEBUG) System.err.println("JAVA_SELECT_SKILL pick=" + best.getName());
+                    comm.clearCaptured();
+                    comm.sendSkillSelection(ssp.getPlayerId(), best);
                     injectCaptured(dialog, game, gameState);
                 } else {
                     game.setDialogParameter(null);
@@ -714,6 +1163,8 @@ public class ParityRunner {
                     String[] playerIds = argueParam.getPlayerIds();
                     String teamId = getDialogTeamId(dialog);
                     String firstPlayer = (playerIds != null && playerIds.length > 0) ? playerIds[0] : null;
+                    if (DEBUG) System.err.println("JAVA_ARGUE_DIALOG team=" + teamId
+                        + " ids=" + java.util.Arrays.toString(playerIds));
                     com.fumbbl.ffb.net.commands.ClientCommandArgueTheCall argueCmd =
                         firstPlayer != null
                             ? new com.fumbbl.ffb.net.commands.ClientCommandArgueTheCall(firstPlayer)
@@ -754,7 +1205,8 @@ public class ParityRunner {
                         // Must pick at least one player for MVP — pick the first available player object.
                         Player<?> mvpPlayer = game.getPlayerById(pids[0]);
                         selection = (mvpPlayer != null) ? new Player[]{ mvpPlayer } : new Player[0];
-                    } else if (mode == PlayerChoiceMode.ANIMAL_SAVAGERY && pids != null && pids.length > 0) {
+                    } else if ((mode == PlayerChoiceMode.ANIMAL_SAVAGERY
+                            || mode == PlayerChoiceMode.BLACK_INK) && pids != null && pids.length > 0) {
                         // Animal Savagery is MANDATORY (min=1, max=1): a confused player with ≥2
                         // adjacent team-mates MUST lash out at exactly one. Declining with an empty
                         // selection re-fires the dialog → STUCK_STEP. Pick the team-mate with the MIN
@@ -776,6 +1228,158 @@ public class ParityRunner {
                             }
                         }
                         selection = (best != null) ? new Player[]{ best } : new Player[0];
+                    } else if (mode == PlayerChoiceMode.BALEFUL_HEX && pids != null && pids.length > 0) {
+                        // Baleful Hex target choice: single actionRng pick over the dialog's
+                        // list in its given order (the step's findPlayers = opponent team nr
+                        // order) — identical contract to the Rust agent's BALEFUL_HEX arm.
+                        int bhIdx = (int) Long.remainderUnsigned(actionRng.nextLong(), pids.length);
+                        Player<?> bhPick = game.getPlayerById(pids[bhIdx]);
+                        selection = (bhPick != null) ? new Player[]{ bhPick } : new Player[0];
+                    } else if (mode == PlayerChoiceMode.RAIDING_PARTY && pids != null && pids.length > 0) {
+                        // Raiding Party team-mate choice: single actionRng pick over the dialog's
+                        // list in its given order (the step's findPlayers = team nr order) —
+                        // identical contract to the Rust agent's RAIDING_PARTY PlayerChoice arm.
+                        // The step's square phase sets NO new dialog (it publishes MoveSquares and
+                        // CONTINUEs), so the answered PLAYER_CHOICE stays set server-side; clear it
+                        // locally or the runner re-answers the stale dialog forever.
+                        int rpIdx = (int) Long.remainderUnsigned(actionRng.nextLong(), pids.length);
+                        Player<?> rpPick = game.getPlayerById(pids[rpIdx]);
+                        if (DEBUG) System.err.println("JAVA_RP_PICK N=" + pids.length + " idx=" + rpIdx
+                            + " pid=" + pids[rpIdx]);
+                        Player[] rpSelection = (rpPick != null) ? new Player[]{ rpPick } : new Player[0];
+                        ClientCommandPlayerChoice rpCmd = new ClientCommandPlayerChoice(mode, rpSelection);
+                        try {
+                            if (teamId != null) {
+                                MatchRunner.injectForTeam(gameState, rpCmd,
+                                    teamId.equals(game.getTeamHome().getId()));
+                            } else {
+                                MatchRunner.inject(gameState, rpCmd);
+                            }
+                        } catch (RuntimeException e) {
+                            // fall through to clearing the dialog below
+                        }
+                        game.setDialogParameter(null);
+                        break;
+                    } else if (mode == PlayerChoiceMode.AUTO_GAZE_ZOAT && pids != null && pids.length > 0) {
+                        // Zoat gaze-target choice. Without an arm this fell to the default, i.e.
+                        // the NON-SEEDED RandomStrategy. Coordinate-sort then a single actionRng
+                        // pick — identical contract to the Rust agent's AUTO_GAZE_ZOAT arm.
+                        List<Player<?>> zCands = new ArrayList<>();
+                        for (String pid : pids) {
+                            Player<?> cand = game.getPlayerById(pid);
+                            if (cand != null) zCands.add(cand);
+                        }
+                        sortPlayersByCoordinate(zCands, game.getFieldModel());
+                        Player[] zSelection = new Player[0];
+                        if (!zCands.isEmpty()) {
+                            int zIdx = (int) Long.remainderUnsigned(actionRng.nextLong(), zCands.size());
+                            if (DEBUG) System.err.println("JAVA_ZOAT_PICK N=" + zCands.size()
+                                + " idx=" + zIdx + " pid=" + zCands.get(zIdx).getId());
+                            zSelection = new Player[]{ zCands.get(zIdx) };
+                        }
+                        ClientCommandPlayerChoice zCmd = new ClientCommandPlayerChoice(mode, zSelection);
+                        try {
+                            if (teamId != null) {
+                                MatchRunner.injectForTeam(gameState, zCmd,
+                                    teamId.equals(game.getTeamHome().getId()));
+                            } else {
+                                MatchRunner.inject(gameState, zCmd);
+                            }
+                        } catch (RuntimeException e) {
+                            game.setDialogParameter(null);
+                        }
+                        break;
+                    } else if (mode == PlayerChoiceMode.WISDOM && pids != null && pids.length > 0) {
+                        // Wisdom of the White Dwarf team-mate choice (minSelects = 1, so an empty
+                        // selection re-fires the dialog forever). StepWisdomOfTheWhiteDwarf builds
+                        // wisePlayers from UtilPlayer.findStandingOrPronePlayers, whose order is
+                        // not a documented contract, so COORDINATE-SORT before the single
+                        // actionRng pick — board coordinates are engine-agnostic, and Rust's
+                        // WISDOM arm sorts identically.
+                        List<Player<?>> wiseCands = new ArrayList<>();
+                        for (String pid : pids) {
+                            Player<?> cand = game.getPlayerById(pid);
+                            if (cand != null) wiseCands.add(cand);
+                        }
+                        sortPlayersByCoordinate(wiseCands, game.getFieldModel());
+                        Player[] wiseSelection = new Player[0];
+                        if (!wiseCands.isEmpty()) {
+                            int wIdx = (int) Long.remainderUnsigned(actionRng.nextLong(), wiseCands.size());
+                            if (DEBUG) System.err.println("JAVA_WISDOM_PICK N=" + wiseCands.size()
+                                + " idx=" + wIdx + " pid=" + wiseCands.get(wIdx).getId());
+                            wiseSelection = new Player[]{ wiseCands.get(wIdx) };
+                        }
+                        ClientCommandPlayerChoice wCmd = new ClientCommandPlayerChoice(mode, wiseSelection);
+                        try {
+                            if (teamId != null) {
+                                MatchRunner.injectForTeam(gameState, wCmd,
+                                    teamId.equals(game.getTeamHome().getId()));
+                            } else {
+                                MatchRunner.inject(gameState, wCmd);
+                            }
+                        } catch (RuntimeException e) {
+                            game.setDialogParameter(null);
+                        }
+                        break;
+                    } else if (mode == PlayerChoiceMode.FURIOUS_OUTBURST && pids != null && pids.length > 0) {
+                        // Furious Outburst stab-target choice. UNLIKE the other star dialogs the
+                        // list order here is NOT a contract: StepInitFuriousOutburst builds
+                        // `eligiblePlayers` as a HashSet and hands `foundPlayers.toArray(..)` to the
+                        // dialog, so the order is identity-hash order. COORDINATE-SORT first, then a
+                        // single actionRng pick — board coordinates are engine-agnostic, so Rust's
+                        // FURIOUS_OUTBURST arm lands on the same target. Like RAIDING_PARTY, the
+                        // step's square phase sets NO new dialog (it publishes MoveSquares and
+                        // CONTINUEs), so the answered PLAYER_CHOICE stays set server-side; clear it
+                        // locally or the runner re-answers the stale dialog forever.
+                        List<Player<?>> foCands = new ArrayList<>();
+                        for (String pid : pids) {
+                            Player<?> cand = game.getPlayerById(pid);
+                            if (cand != null) foCands.add(cand);
+                        }
+                        sortPlayersByCoordinate(foCands, game.getFieldModel());
+                        Player[] foSelection = new Player[0];
+                        if (!foCands.isEmpty()) {
+                            int foIdx = (int) Long.remainderUnsigned(actionRng.nextLong(), foCands.size());
+                            if (DEBUG) System.err.println("JAVA_FO_PICK N=" + foCands.size() + " idx=" + foIdx
+                                + " pid=" + foCands.get(foIdx).getId());
+                            foSelection = new Player[]{ foCands.get(foIdx) };
+                        }
+                        ClientCommandPlayerChoice foCmd = new ClientCommandPlayerChoice(mode, foSelection);
+                        try {
+                            if (teamId != null) {
+                                MatchRunner.injectForTeam(gameState, foCmd,
+                                    teamId.equals(game.getTeamHome().getId()));
+                            } else {
+                                MatchRunner.inject(gameState, foCmd);
+                            }
+                        } catch (RuntimeException e) {
+                            // fall through to clearing the dialog below
+                        }
+                        game.setDialogParameter(null);
+                        break;
+                    } else if ((mode == PlayerChoiceMode.IRON_MAN
+                            || mode == PlayerChoiceMode.KNUCKLE_DUSTERS
+                            || mode == PlayerChoiceMode.BLESSED_STATUE_OF_NUFFLE)
+                            && pids != null && pids.length > 0) {
+                        // Prayers to Nuffle that pick a player (Iron Man, Knuckle Dusters, Blessed
+                        // Statue of Nuffle) show a MANDATORY DialogPlayerChoiceParameter (minSelects=1):
+                        // declining with an empty selection re-fires the dialog forever, so the step
+                        // never completes and every loop top reports UNHANDLED_STEP: PRAYER until the
+                        // 500-iteration cap - the Java game is then garbage and the comparison fails at
+                        // step 0 (lineman bb2020 seed 26, and the same seed in human/ogre).
+                        // Pick the LOWEST PLAYER NUMBER: these prayers choose among RESERVES, which have
+                        // no board coordinates, so the min-(x,y) rule used for Animal Savagery cannot
+                        // apply. Player numbers are engine-agnostic (both teams are built from the same
+                        // spec), so Rust's agent picks the same player.
+                        Player<?> lowest = null;
+                        for (String pid : pids) {
+                            Player<?> p = game.getPlayerById(pid);
+                            if (p == null) continue;
+                            if (lowest == null || p.getNr() < lowest.getNr()) {
+                                lowest = p;
+                            }
+                        }
+                        selection = (lowest != null) ? new Player[]{ lowest } : new Player[0];
                     } else {
                         selection = new Player[0];
                     }
@@ -898,7 +1502,8 @@ public class ParityRunner {
         long hashLong = fnv1a64(canonicalStr.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         String hash = String.format("%016x", hashLong);
         if (DEBUG) {
-            System.err.println("JSTEP i=" + stepIndex + " rng_calls=" + callCount + " chosen=" + chosen + " state=" + canonicalStr);
+            System.err.println("JSTEP i=" + stepIndex + " rng_calls=" + callCount + " mode=" + game.getTurnMode()
+                + " chosen=" + chosen + " state=" + canonicalStr);
         }
         if (System.getenv("FFB_IDSTATE") != null) {
             StringBuilder sb = new StringBuilder("JIDSTATE i=" + stepIndex + " ");
@@ -912,6 +1517,17 @@ public class ParityRunner {
             System.err.println(sb.toString());
         }
         pending.add(new PendingStep(stepIndex++, turn, half, active, hash, chosen));
+    }
+
+    /** Per-team once-per-turn flags, fixed order: blitz, foul, hand-over, pass.
+     *  ttm/ktm are absent because TurnData exposes no accessor and it is engine code, not harness.
+     *  Must stay byte-identical with ffb-rust `state_hash.rs`. */
+    private static String turnFlags(com.fumbbl.ffb.model.TurnData td) {
+        if (td == null) return "0000";
+        return (td.isBlitzUsed() ? "1" : "0")
+             + (td.isFoulUsed() ? "1" : "0")
+             + (td.isHandOverUsed() ? "1" : "0")
+             + (td.isPassUsed() ? "1" : "0");
     }
 
     public static String stateString(Game game) {
@@ -937,6 +1553,11 @@ public class ParityRunner {
         sb.append('a').append(active);
         sb.append('s').append(scoreHome).append(',').append(scoreAway);
         sb.append(" b").append(bx).append(',').append(by).append(',').append(inPlay ? "true" : "false");
+        sb.append(" f").append(turnFlags(game.getTurnDataHome())).append(',').append(turnFlags(game.getTurnDataAway()));
+        sb.append(" r").append(game.getTurnDataHome().getReRolls()).append(',').append(game.getTurnDataAway().getReRolls());
+        sb.append(" ap").append(actingPlayerPart(game));
+        sb.append(" w").append(game.getFieldModel().getWeather() != null ? game.getFieldModel().getWeather().getName() : "-");
+        sb.append(" tm").append(game.getTurnMode() != null ? game.getTurnMode().getName() : "-");
         sb.append(" p");
         for (int i = 0; i < playerParts.size(); i++) {
             if (i > 0) sb.append('|');
@@ -973,6 +1594,11 @@ public class ParityRunner {
         sb.append('a').append(active);
         sb.append('s').append(scoreHome).append(',').append(scoreAway);
         sb.append(" b").append(bx).append(',').append(by).append(',').append(inPlay == 1 ? "true" : "false");
+        sb.append(" f").append(turnFlags(game.getTurnDataHome())).append(',').append(turnFlags(game.getTurnDataAway()));
+        sb.append(" r").append(game.getTurnDataHome().getReRolls()).append(',').append(game.getTurnDataAway().getReRolls());
+        sb.append(" ap").append(actingPlayerPart(game));
+        sb.append(" w").append(game.getFieldModel().getWeather() != null ? game.getFieldModel().getWeather().getName() : "-");
+        sb.append(" tm").append(game.getTurnMode() != null ? game.getTurnMode().getName() : "-");
         sb.append(" p");
         for (int i = 0; i < playerParts.size(); i++) {
             if (i > 0) sb.append('|');
@@ -982,6 +1608,30 @@ public class ParityRunner {
         String canonical = sb.toString();
         long hash = fnv1a64(canonical.getBytes(StandardCharsets.UTF_8));
         return String.format("%016x", hash);
+    }
+
+    /** `h03,2` — the acting player's index in the same ordering addPlayersFromTeam uses (sorted by
+     *  squad number, first 11 per team) plus its spent movement; `-` when nobody is activated.
+     *  Must stay byte-identical with ffb-rust `state_hash.rs::acting_player_part`. */
+    private static String actingPlayerPart(Game game) {
+        ActingPlayer actingPlayer = game.getActingPlayer();
+        String pid = (actingPlayer != null) ? actingPlayer.getPlayerId() : null;
+        if (pid == null || pid.isEmpty()) return "-";
+        int currentMove = actingPlayer.getCurrentMove();
+        Team[] teams = { game.getTeamHome(), game.getTeamAway() };
+        String[] prefixes = { "h", "a" };
+        for (int t = 0; t < 2; t++) {
+            if (teams[t] == null) continue;
+            List<Player<?>> players = new ArrayList<>(java.util.Arrays.asList(teams[t].getPlayers()));
+            players.sort(java.util.Comparator.comparingInt(Player::getNr));
+            if (players.size() > 11) players = players.subList(0, 11);
+            for (int i = 0; i < players.size(); i++) {
+                if (pid.equals(players.get(i).getId())) {
+                    return String.format("%s%02d,%d", prefixes[t], i, currentMove);
+                }
+            }
+        }
+        return "?," + currentMove;
     }
 
     private static void addPlayersFromTeam(Team team, FieldModel fm, List<String> out, String prefix) {
@@ -998,7 +1648,15 @@ public class ParityRunner {
             int x = onPitch ? coord.getX() : -1;
             int y = onPitch ? coord.getY() : -1;
             String state = playerStateStr(ps);
-            out.add(String.format("%s%02d:%d,%d,%s", prefix, i, x, y, state));
+            // Effective stats (base + temporary modifiers). Must stay byte-identical with
+            // ffb-rust `state_hash.rs::collect_player_parts`.
+            // Trailing ACTIVE bit: the hash was blind to it, and it decides whether a player can
+            // be activated at all — several re-activation/lost-deactivation bugs stayed invisible
+            // for whole games (thrown players re-acting, bomb catchers retired for the half).
+            int activeBit = (ps != null && ps.isActive()) ? 1 : 0;
+            out.add(String.format("%s%02d:%d,%d,%s,%d/%d/%d/%d,%d", prefix, i, x, y, state,
+                p.getMovementWithModifiers(), p.getStrengthWithModifiers(),
+                p.getAgilityWithModifiers(), p.getArmourWithModifiers(), activeBit));
         }
     }
 
@@ -1010,9 +1668,12 @@ public class ParityRunner {
             case PlayerState.PRONE:          return "Prone";
             case PlayerState.STUNNED:        return "Stunned";
             case PlayerState.KNOCKED_OUT:    return "Ko";
-            case PlayerState.BADLY_HURT:     return "Injured";
-            case PlayerState.SERIOUS_INJURY: return "Injured";
-            case PlayerState.RIP:            return "Injured";
+            // The three casualty states used to collapse to one "Injured" label, so the compared
+            // hash could not tell a DEAD player from a bruised one. Must stay in lockstep with
+            // ffb-rust `crates/ffb-model/src/util/state_hash.rs::player_state_str`.
+            case PlayerState.BADLY_HURT:     return "Bh";
+            case PlayerState.SERIOUS_INJURY: return "Si";
+            case PlayerState.RIP:            return "Rip";
             case PlayerState.RESERVE:        return "Reserve";
             default:                         return "Reserve";
         }
@@ -1055,6 +1716,29 @@ public class ParityRunner {
             case BLITZ_MOVE:
             case BLITZ_SELECT:
             case STAND_UP_BLITZ: {
+                // BB2016 has no SELECT_BLITZ_TARGET step. Drive the bb2016 3-command blitz: the
+                // folded Rust agent blitzes an ADJACENT target (no pre-move), so send a 0-square
+                // CLIENT_BLITZ_MOVE (enter the blitz in place) then CLIENT_BLOCK(target). The target
+                // is picked with the SAME adjacent/coord-sorted/actionRng logic as the folded agent
+                // (pickBlockTarget), matching the RNG order (player, action, target).
+                if (isBb2016(game)) {
+                    FieldCoordinate bcoord = playerCoordinate(game, pid);
+                    if (!bb2016BlitzMoveSent) {
+                        bb2016BlitzMoveSent = true;
+                        FieldCoordinate cmdFrom = game.isHomePlaying() ? bcoord : bcoord.transform();
+                        MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandBlitzMove(
+                            pid, cmdFrom, new FieldCoordinate[]{}));
+                    } else {
+                        Player<?> btarget = pickBlockTarget(game, pid);
+                        if (btarget == null) {
+                            MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));
+                        } else {
+                            MatchRunner.inject(gameState, new ClientCommandBlock(
+                                pid, btarget.getId(), false, false, false, false, false));
+                        }
+                    }
+                    break;
+                }
                 // Blitz block: the target was already chosen at SELECT_BLITZ_TARGET (which
                 // consumed the actionRng pick); CLIENT_BLOCK with a targetSelectionState
                 // dispatches as BLITZ. After the block, end the activation with CONFIRM.
@@ -1076,7 +1760,12 @@ public class ParityRunner {
                 break;
             case PASS:
             case PASS_MOVE:
+            case THROW_BOMB:
+            case HAIL_MARY_PASS:
                 sendPassAction(game, gameState, pid);
+                break;
+            case MULTIPLE_BLOCK:
+                sendSynchronousMultiBlock(game, gameState, pid);
                 break;
             case HAND_OVER:
             case HAND_OVER_MOVE:
@@ -1084,6 +1773,11 @@ public class ParityRunner {
                 break;
             case THROW_TEAM_MATE:
             case THROW_TEAM_MATE_MOVE:
+            // A kick uses the same declaration command and the same candidate rule: every
+            // edition's TtmMechanic.canBeKicked is canBeThrown() plus STANDING (plus not-rooted and
+            // own-team), which is exactly what sendThrowTeamMateAction already computes.
+            case KICK_TEAM_MATE:
+            case KICK_TEAM_MATE_MOVE:
                 sendThrowTeamMateAction(game, gameState, pid);
                 break;
             default:
@@ -1219,6 +1913,53 @@ public class ParityRunner {
     }
 
     /**
+     * Multiple Block targets: TWO distinct picks from the coordinate-sorted adjacent blockable
+     * opponents (first idx % N, second idx % (N-1)) — mirrors Rust's MultiBlockTargets arm.
+     * With fewer than two targets left (both KO'd since the turn-start snapshot) deselect like
+     * any stale declaration.
+     */
+    private void sendSynchronousMultiBlock(Game game, GameState gameState, String playerId) {
+        FieldModel fm = game.getFieldModel();
+        FieldCoordinate coord = playerCoordinate(game, playerId);
+        Team opponent = game.isHomePlaying() ? game.getTeamAway() : game.getTeamHome();
+        java.util.List<Player<?>> targets = new java.util.ArrayList<>();
+        if (coord != null) {
+            targets.addAll(java.util.Arrays.asList(
+                com.fumbbl.ffb.util.UtilPlayer.findAdjacentBlockablePlayers(game, opponent, coord)));
+        }
+        sortPlayersByCoordinate(targets, fm);
+        if (targets.size() < 2) {
+            MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));
+            return;
+        }
+        int i1 = (int) Long.remainderUnsigned(actionRng.nextLong(), targets.size());
+        Player<?> d1 = targets.remove(i1);
+        int i2 = (int) Long.remainderUnsigned(actionRng.nextLong(), targets.size());
+        Player<?> d2 = targets.remove(i2);
+        // SynchronousMultiBlockLogicModule offers the STAB alternative exactly when the acting
+        // player has providesMultipleBlockAlternative (registered by Stab in every edition);
+        // otherwise it auto-selects BlockKind.BLOCK. Mirror that ENGINE property rather than an
+        // invented rule, and take the alternative for the FIRST-drawn target only, so one
+        // multiblock exercises BOTH the block group and the stab group. Deterministic: NO extra
+        // actionRng draw - two are already spent above and a third would desync the stream.
+        // Rust mirror: RandomAgent's MultiBlockTargets arm.
+        // The BLOCKER is this method's own playerId parameter, not game.getActingPlayer() -
+        // the acting player is not yet committed at this point. Rust mirrors it by reading the
+        // MultiBlockTargets prompt's player_id.
+        com.fumbbl.ffb.model.Player<?> mbActor = game.getPlayerById(playerId);
+        boolean canStab = mbActor != null && mbActor.hasSkillProperty(
+            com.fumbbl.ffb.model.property.NamedProperties.providesMultipleBlockAlternative);
+        com.fumbbl.ffb.model.BlockKind kind1 = canStab
+            ? com.fumbbl.ffb.model.BlockKind.STAB
+            : com.fumbbl.ffb.model.BlockKind.BLOCK;
+        java.util.List<com.fumbbl.ffb.model.BlockTarget> blockTargets = new java.util.ArrayList<>();
+        blockTargets.add(new com.fumbbl.ffb.model.BlockTarget(d1.getId(), kind1, fm.getPlayerState(d1)));
+        blockTargets.add(new com.fumbbl.ffb.model.BlockTarget(d2.getId(), com.fumbbl.ffb.model.BlockKind.BLOCK, fm.getPlayerState(d2)));
+        if (DEBUG) System.err.println("JAVA_MB pid=" + playerId + " d1=" + d1.getId() + " d2=" + d2.getId());
+        MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandSynchronousMultiBlock(blockTargets));
+    }
+
+    /**
      * Hand-over receiver: adjacent teammates (any state — mirrors Rust's HandOver
      * branch which has no state filter), coordinate-sorted, 1 actionRng pick.
      */
@@ -1251,11 +1992,202 @@ public class ParityRunner {
 
     /**
      * Throw Team-Mate — pick the thrown player (phase 1). Candidate set mirrors Rust's
-     * legal_throw_team_mate_targets: adjacent STANDING teammates with the canBeThrown property
-     * (Right Stuff), coordinate-sorted, 1 actionRng pick. Empty → deselect (the human-Ogre / no
+     * legal_throw_team_mate_targets: adjacent STANDING teammates for whom Player.canBeThrown()
+     * holds (Right Stuff; in BB2020 only at ST<=3), coordinate-sorted, 1 actionRng pick. Empty → deselect (the human-Ogre / no
      * throwable-teammate case). The target square is chosen later, at the INIT_THROW_TEAM_MATE
      * waiting state (sendThrowTeamMateTarget).
      */
+    /**
+     * Swoop target (BB2016/BB2020 SWOOP step). Java's mixed StepSwoop ends its execute with
+     * UtilServerPlayerSwoop.updateSwoopSquares and WAITS for a CLIENT_SWOOP naming one of the (at
+     * most four) orthogonally adjacent squares — there is no decline, unlike BB2025's optional skill
+     * offer. Without a handler here the step never advanced and the game was abandoned on
+     * STUCK_STEP: SWOOP, which is exactly what a thrown BB2020 goblin Doom Diver produced once
+     * BB2020 could throw at all.
+     *
+     * Candidate set + order + the single actionRng pick mirror Rust's SwoopTarget prompt handling in
+     * random_agent.rs: the swoop squares the engine itself published, coordinate-sorted.
+     */
+    /**
+     * Punt target (BB2025 INIT_PUNT step). StepInitPunt publishes the legal punt squares as
+     * MoveSquares and then WAITS for a CLIENT_FIELD_COORDINATE naming one. There was no handler at
+     * all, so the runner fell through to the UNHANDLED_STEP default (inject END_TURN) and the punt
+     * was aborted — which, with the Rust agent aborting in lockstep, is why the entire Punt step
+     * family (InitPunt, PuntDirection, PuntDistance, EndPunt) never executed while the matrices
+     * stayed green.
+     *
+     * Candidate set + order + the single actionRng pick mirror Rust's PuntTarget prompt handling in
+     * random_agent.rs: the punt squares the engine itself published, coordinate-sorted.
+     */
+    private void sendRaidingPartyTarget(Game game, GameState gameState) {
+        ActingPlayer actingPlayer = game.getActingPlayer();
+        String pid = (actingPlayer == null) ? null : actingPlayer.getPlayerId();
+        FieldModel fm = game.getFieldModel();
+        List<FieldCoordinate> squares = new ArrayList<>();
+        for (com.fumbbl.ffb.MoveSquare ms : fm.getMoveSquares()) {
+            squares.add(ms.getCoordinate());
+        }
+        squares.sort(Comparator.comparingInt(FieldCoordinate::getX).thenComparingInt(FieldCoordinate::getY));
+        if (squares.isEmpty()) {
+            MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
+            return;
+        }
+        int idx = (int) Long.remainderUnsigned(actionRng.nextLong(), squares.size());
+        FieldCoordinate target = squares.get(idx);
+        if (DEBUG) System.err.println("JAVA_RP_SQ pid=" + pid + " N=" + squares.size() + " idx=" + idx
+            + " target=" + target);
+        boolean isHome = pid != null && game.getTeamHome().getPlayerById(pid) != null;
+        MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandFieldCoordinate(
+            isHome ? target : target.transform()));
+    }
+
+    /**
+     * Furious Outburst square waits (FIRST_MOVE / SECOND_MOVE). Identical contract to
+     * sendRaidingPartyTarget: the step publishes its eligible squares as MoveSquares and waits
+     * for CLIENT_FIELD_COORDINATE, so the answer is a coordinate-sorted single actionRng pick,
+     * mirrored for the away coach (the server un-mirrors).
+     */
+    private void sendFuriousOutburstSquare(Game game, GameState gameState) {
+        ActingPlayer actingPlayer = game.getActingPlayer();
+        String pid = (actingPlayer == null) ? null : actingPlayer.getPlayerId();
+        FieldModel fm = game.getFieldModel();
+        List<FieldCoordinate> squares = new ArrayList<>();
+        for (com.fumbbl.ffb.MoveSquare ms : fm.getMoveSquares()) {
+            squares.add(ms.getCoordinate());
+        }
+        squares.sort(Comparator.comparingInt(FieldCoordinate::getX).thenComparingInt(FieldCoordinate::getY));
+        if (squares.isEmpty()) {
+            // Java's step accepts a null-action CLIENT_ACTING_PLAYER as "end the player action",
+            // which is what the Rust agent's empty-square answer maps to.
+            MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));
+            return;
+        }
+        int idx = (int) Long.remainderUnsigned(actionRng.nextLong(), squares.size());
+        FieldCoordinate target = squares.get(idx);
+        if (DEBUG) System.err.println("JAVA_FO_SQ pid=" + pid + " N=" + squares.size() + " idx=" + idx
+            + " target=" + target);
+        boolean isHome = pid != null && game.getTeamHome().getPlayerById(pid) != null;
+        MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandFieldCoordinate(
+            isHome ? target : target.transform()));
+    }
+
+    private void sendBlastinTarget(Game game, GameState gameState) {
+        ActingPlayer actingPlayer = game.getActingPlayer();
+        Player<?> actor = (actingPlayer == null) ? null : actingPlayer.getPlayer();
+        if (actor == null) {
+            MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
+            return;
+        }
+        FieldModel fm = game.getFieldModel();
+        boolean playingHasActor = game.playingTeamHasActingPLayer();
+        FieldCoordinate source = playingHasActor
+            ? fm.getPlayerCoordinate(actor)
+            : fm.getPlayerCoordinate(game.getDefender());
+        List<Player<?>> candidates = new ArrayList<>();
+        for (Player<?> cand : game.getPlayers()) {
+            if (cand == actor) continue;
+            FieldCoordinate cc = fm.getPlayerCoordinate(cand);
+            if (cc == null || source == null || cc.distanceInSteps(source) > 3) continue;
+            com.fumbbl.ffb.PlayerState ps = fm.getPlayerState(cand);
+            if (ps == null || ps.getBase() != com.fumbbl.ffb.PlayerState.STANDING) continue;
+            if (cand.getTeam() == game.getActingTeam() && playingHasActor) continue;
+            candidates.add(cand);
+        }
+        if (candidates.isEmpty()) {
+            MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
+            return;
+        }
+        candidates.sort(Comparator
+            .comparingInt((Player<?> cand) -> fm.getPlayerCoordinate(cand).getX())
+            .thenComparingInt(cand -> fm.getPlayerCoordinate(cand).getY()));
+        int idx = (int) Long.remainderUnsigned(actionRng.nextLong(), candidates.size());
+        Player<?> target = candidates.get(idx);
+        if (DEBUG) System.err.println("JAVA_BLASTIN_TARGET N=" + candidates.size() + " idx=" + idx
+            + " pid=" + target.getId() + " phase=" + (playingHasActor ? "initial" : "replacement"));
+        // The command must come from the PLAYING coach (initial: acting team; replacement:
+        // the opposing coach after the home_playing flip).
+        MatchRunner.injectForTeam(gameState,
+            new com.fumbbl.ffb.net.commands.ClientCommandTargetSelected(target.getId()),
+            game.isHomePlaying());
+        return;
+    }
+
+    private void sendPuntTarget(Game game, GameState gameState) {
+        ActingPlayer actingPlayer = game.getActingPlayer();
+        String pid = (actingPlayer == null) ? null : actingPlayer.getPlayerId();
+        FieldModel fm = game.getFieldModel();
+        List<FieldCoordinate> squares = new ArrayList<>();
+        for (com.fumbbl.ffb.MoveSquare ms : fm.getMoveSquares()) {
+            squares.add(ms.getCoordinate());
+        }
+        squares.sort(Comparator.comparingInt(FieldCoordinate::getX).thenComparingInt(FieldCoordinate::getY));
+        if (squares.isEmpty()) {
+            MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
+            return;
+        }
+        int idx = (int) Long.remainderUnsigned(actionRng.nextLong(), squares.size());
+        FieldCoordinate target = squares.get(idx);
+        if (DEBUG) System.err.println("JAVA_PUNT pid=" + pid + " N=" + squares.size() + " idx=" + idx
+            + " target=" + target);
+        boolean isHome = pid != null && game.getTeamHome().getPlayerById(pid) != null;
+        MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandFieldCoordinate(
+            isHome ? target : target.transform()));
+    }
+
+    /**
+     * Hit And Run move window (BB2020/BB2025 HIT_AND_RUN step). StepHitAndRun publishes the eligible
+     * squares as MoveSquares and WAITS for a CLIENT_FIELD_COORDINATE naming one (CLIENT_END_TURN is
+     * its abort). There was no handler, so the runner fell through to the UNHANDLED_STEP default and
+     * aborted the move — and with the Rust agent aborting in lockstep, the `HitAndRun` step never
+     * executed while the matrices stayed green.
+     *
+     * Same candidate/order/single-actionRng-pick contract as sendPuntTarget and sendSwoopTarget.
+     */
+    private void sendHitAndRunTarget(Game game, GameState gameState) {
+        ActingPlayer actingPlayer = game.getActingPlayer();
+        String pid = (actingPlayer == null) ? null : actingPlayer.getPlayerId();
+        FieldModel fm = game.getFieldModel();
+        List<FieldCoordinate> squares = new ArrayList<>();
+        for (com.fumbbl.ffb.MoveSquare ms : fm.getMoveSquares()) {
+            squares.add(ms.getCoordinate());
+        }
+        squares.sort(Comparator.comparingInt(FieldCoordinate::getX).thenComparingInt(FieldCoordinate::getY));
+        if (squares.isEmpty()) {
+            MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
+            return;
+        }
+        int idx = (int) Long.remainderUnsigned(actionRng.nextLong(), squares.size());
+        FieldCoordinate target = squares.get(idx);
+        if (DEBUG) System.err.println("JAVA_HITRUN pid=" + pid + " N=" + squares.size() + " idx=" + idx
+            + " target=" + target);
+        boolean isHome = pid != null && game.getTeamHome().getPlayerById(pid) != null;
+        MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandFieldCoordinate(
+            isHome ? target : target.transform()));
+    }
+
+    private void sendSwoopTarget(Game game, GameState gameState) {
+        ActingPlayer actingPlayer = game.getActingPlayer();
+        String pid = (actingPlayer == null) ? null : actingPlayer.getPlayerId();
+        FieldModel fm = game.getFieldModel();
+        List<FieldCoordinate> squares = new ArrayList<>();
+        for (com.fumbbl.ffb.MoveSquare ms : fm.getMoveSquares()) {
+            squares.add(ms.getCoordinate());
+        }
+        squares.sort(Comparator.comparingInt(FieldCoordinate::getX).thenComparingInt(FieldCoordinate::getY));
+        if (squares.isEmpty()) {
+            // Nothing legal to send; end the turn rather than spin (the Rust agent does the same).
+            MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
+            return;
+        }
+        int idx = (int) Long.remainderUnsigned(actionRng.nextLong(), squares.size());
+        FieldCoordinate target = squares.get(idx);
+        if (DEBUG) System.err.println("JAVA_SWOOP pid=" + pid + " N=" + squares.size() + " idx=" + idx
+            + " target=" + target);
+        boolean isHome = pid != null && game.getTeamHome().getPlayerById(pid) != null;
+        MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandSwoop(
+            pid, isHome ? target : target.transform()));
+    }
+
     private void sendThrowTeamMateAction(Game game, GameState gameState, String playerId) {
         FieldModel fm = game.getFieldModel();
         FieldCoordinate coord = playerCoordinate(game, playerId);
@@ -1267,7 +2199,12 @@ public class ParityRunner {
         List<Player<?>> targets = new ArrayList<>();
         for (Player<?> tp : team.getPlayers()) {
             if (tp.getId().equals(playerId)) continue;
-            if (!tp.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canBeThrown)) continue;
+            // Player.canBeThrown() — the engine's own predicate, the one every edition's TtmMechanic
+            // uses. Testing the raw canBeThrown PROPERTY instead (as this did) silently disabled
+            // Throw Team-Mate for the whole BB2020 ruleset: bb2020's RightStuff registers
+            // canBeThrownIfStrengthIs3orLess, not canBeThrown, so the candidate list was always
+            // empty and StepThrowTeamMate never ran in a BB2020 game.
+            if (!tp.canBeThrown()) continue;
             FieldCoordinate tc = fm.getPlayerCoordinate(tp);
             PlayerState ts = fm.getPlayerState(tp);
             if (tc == null || ts == null) continue;
@@ -1282,9 +2219,20 @@ public class ParityRunner {
         }
         int idx = (int) Long.remainderUnsigned(actionRng.nextLong(), targets.size());
         String thrownId = targets.get(idx).getId();
-        if (DEBUG) System.err.println("JAVA_TTM pid=" + playerId + " N=" + targets.size() + " idx=" + idx + " thrown=" + thrownId);
+        // A KICK declares through this same command — StepInitSelecting reads
+        // ClientCommandThrowTeamMate.isKicked() and publishes IS_KICKED_PLAYER, which is how
+        // StepEndSelecting learns to build the TTM sequence as a kick. Sending the command without
+        // the flag made the engine resolve a declared KICK_TEAM_MATE as a plain throw: it spent the
+        // team's PASS instead of its ktmUsed slot, so Java and Rust offered different actions for
+        // the rest of the turn (ogre bb2020 seed 7 i=111).
+        ActingPlayer ap = game.getActingPlayer();
+        PlayerAction declared = (ap == null) ? null : ap.getPlayerAction();
+        boolean kicked = declared == PlayerAction.KICK_TEAM_MATE
+            || declared == PlayerAction.KICK_TEAM_MATE_MOVE;
+        if (DEBUG) System.err.println("JAVA_TTM pid=" + playerId + " N=" + targets.size() + " idx=" + idx
+            + " thrown=" + thrownId + " kicked=" + kicked);
         MatchRunner.inject(gameState,
-            new com.fumbbl.ffb.net.commands.ClientCommandThrowTeamMate(playerId, thrownId));
+            new com.fumbbl.ffb.net.commands.ClientCommandThrowTeamMate(playerId, thrownId, kicked));
     }
 
     /**
@@ -1380,6 +2328,20 @@ public class ParityRunner {
     private static PlayerAction[] filterStaleActions(Game game, PlayerAction[] actions) {
         TurnData td = game.isHomePlaying() ? game.getTurnDataHome() : game.getTurnDataAway();
         List<PlayerAction> live = new ArrayList<>();
+        // Non-REGULAR window modes (PASS_BLOCK): the harness contract shrinks the list to
+        // MOVE + the UseSkill specials. A window Block/Blitz/Foul was always a
+        // declare-then-deselect no-op, and a window BLITZ against the SUSPENDED THROWER
+        // re-fires CONFIRM_END_ACTION forever (dark_elf bb2020 seed 61: this harness hit its
+        // 2M-iteration cap). Rust's RandomAgent applies the identical filter so idx % N stays
+        // aligned.
+        if (game.getTurnMode() == com.fumbbl.ffb.TurnMode.PASS_BLOCK) {
+            for (PlayerAction a : actions) {
+                if (a == PlayerAction.MOVE || a == PlayerAction.TREACHEROUS || a == PlayerAction.BLACK_INK) {
+                    live.add(a);
+                }
+            }
+            return live.toArray(new PlayerAction[0]);
+        }
         for (PlayerAction a : actions) {
             boolean keep;
             switch (a) {
@@ -1389,6 +2351,7 @@ public class ParityRunner {
                     keep = !td.isBlitzUsed();
                     break;
                 case PASS:
+                case HAIL_MARY_PASS:
                     keep = !td.isPassUsed();
                     break;
                 case HAND_OVER:
@@ -1398,10 +2361,29 @@ public class ParityRunner {
                     keep = !td.isFoulUsed();
                     break;
                 case THROW_TEAM_MATE:
-                    keep = !td.isTtmUsed();
+                    // BB2016 spends the team's PASS action on a Throw Team-Mate: bb2016
+                    // ThrowTeamMateBehaviour does turnData.setPassUsed(true), and bb2016
+                    // StepInitSelecting REJECTS CLIENT_THROW_TEAM_MATE while
+                    // `!game.getTurnData().isPassUsed()` is false. Filtering only on isTtmUsed() let
+                    // this runner re-declare a second TTM in the same turn forever - the step never
+                    // advanced and the game died on STUCK_STEP: INIT_SELECTING (ogre bb2016 seed 1:
+                    // TTMs declared at i=2 and i=6, then ~500 spins). Later editions keep the
+                    // separate ttmUsed flag.
+                    //
+                    // BB2020 does the same as BB2016: `bb2020/ThrowTeamMateBehaviour` calls
+                    // setPassUsed(true), and `bb2020/TtmMechanic.isTtmAvailable` is literally
+                    // `!turnData.isPassUsed()`. Only BB2025 tracks TTM on its own flag. Excluding
+                    // BB2020 here reproduced the bb2016 symptom exactly, once BB2020 could throw at
+                    // all: the runner re-declared a TTM whose command StepInitSelecting then
+                    // refused, and 9 of 10 ogre bb2020 seeds died on
+                    // `STUCK_STEP: INIT_SELECTING unadvanced for 501 iters`.
+                    keep = isBb2025(game) ? !td.isTtmUsed() : (!td.isTtmUsed() && !td.isPassUsed());
                     break;
                 case KICK_TEAM_MATE:
-                    keep = !td.isKtmUsed();
+                    // BB2016 spends the team's BLITZ on a Kick Team-Mate
+                    // (bb2016/TtmMechanic.isKtmAvailable is !turnData.isBlitzUsed()); BB2020 and
+                    // BB2025 track it on their own flag.
+                    keep = isBb2016(game) ? !td.isBlitzUsed() : !td.isKtmUsed();
                     break;
                 default:
                     keep = true;
@@ -1564,9 +2546,25 @@ public class ParityRunner {
                     }
                 }
 
-                // Pass: player carries the ball
-                if (!td.isPassUsed() && ballCoord != null && ballCoord.equals(coord)) {
+                // Pass: player carries the ball. Mirrors Rust eligible_players_for_activation:
+                // a player whose skills prevent a regular pass (My Ball / No Ball →
+                // preventRegularPassAction) is NOT offered PASS — the engine forbids it, so the
+                // eligible list must exclude it or the two agents' turn-start snapshots diverge in
+                // size, shifting the shared actionRng modulo (high_elf seed 14 i=46: the My Ball
+                // Dragon Prince carrier got a 5-action snapshot here vs Rust's 4, so idx%N picked
+                // BLOCK in Rust but MOVE in Java).
+                if (!td.isPassUsed() && ballCoord != null && ballCoord.equals(coord)
+                        && !p.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.preventRegularPassAction)) {
                     actions.add(PlayerAction.PASS);
+                }
+
+                // Hail Mary Pass: a canPassToAnySquare carrier declares HAIL_MARY_PASS as its
+                // own action. Offered DIRECTLY AFTER PASS — Rust's
+                // eligible_players_for_activation inserts it at the same slot, and the two
+                // turn-start snapshots must match in length and order.
+                if (!td.isPassUsed() && ballCoord != null && ballCoord.equals(coord)
+                        && p.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canPassToAnySquare)) {
+                    actions.add(PlayerAction.HAIL_MARY_PASS);
                 }
 
                 // Hand-off: player carries ball and adjacent teammate
@@ -1588,6 +2586,16 @@ public class ParityRunner {
                 if (!td.isBombUsed()
                         && p.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.enableThrowBombAction)) {
                     actions.add(PlayerAction.THROW_BOMB);
+
+                    // All You Can Eat (bb2020+ star special): the client's
+                    // isAllYouCanEatAvailable rule — Throw Bomb available + REGULAR turn mode
+                    // + unused canUseThrowBombActionTwice. Offered DIRECTLY AFTER THROW_BOMB
+                    // — Rust matches the slot.
+                    if (game.getTurnMode() == TurnMode.REGULAR
+                            && com.fumbbl.ffb.util.UtilCards.hasUnusedSkillWithProperty(p,
+                                com.fumbbl.ffb.model.property.NamedProperties.canUseThrowBombActionTwice)) {
+                        actions.add(PlayerAction.ALL_YOU_CAN_EAT);
+                    }
                 }
 
                 // ThrowTeamMate: TTM skill + adjacent teammate
@@ -1598,12 +2606,190 @@ public class ParityRunner {
                     }
                 }
 
-                // KickTeamMate (BB2025 only): KTM skill + adjacent teammate
-                if (isBb2025(game) && !td.isKtmUsed()
+                // KickTeamMate: KTM skill + adjacent teammate. Available in EVERY edition —
+                // skill/mixed/KickTeamMate is registered for BB2020 and BB2025, skill/bb2016 for
+                // BB2016, and all three TtmMechanics implement isKtmAvailable. Restricting this to
+                // BB2025 left the mechanic unreachable in BB2020 even though the BB2020 ogre roster
+                // carries the skill — the same shape of harness-side blind spot that kept BB2020
+                // Throw Team-Mate dead. BB2016 spends the blitz instead of a ktmUsed flag.
+                boolean ktmAvailable = isBb2016(game) ? !td.isBlitzUsed() : !td.isKtmUsed();
+                if (ktmAvailable
                         && p.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canKickTeamMates)) {
                     if (hasAdjacentTeammate(p, coord, team.getPlayers(), fm)) {
                         actions.add(PlayerAction.KICK_TEAM_MATE);
                     }
+                }
+
+                // Multiple Block (bb2020/bb2025): the client's isMultiBlockActionAvailable rule
+                // — canBlockTwoAtOnce (uncancelled) + standing + MORE THAN ONE adjacent
+                // blockable opponent. bb2016's multi-block is a different mechanism, so the
+                // offer is bb2020/bb2025-only. Rust inserts it at the same slot.
+                if (!isBb2016(game)
+                        && com.fumbbl.ffb.util.UtilCards.hasSkillWithProperty(p,
+                            com.fumbbl.ffb.model.property.NamedProperties.canBlockTwoAtOnce)
+                        && !p.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.preventRegularBlockAction)
+                        && com.fumbbl.ffb.util.UtilPlayer.findAdjacentBlockablePlayers(game, opponent, coord).length > 1) {
+                    actions.add(PlayerAction.MULTIPLE_BLOCK);
+                }
+
+                // Treacherous (bb2020+ star special): the client's isTreacherousAvailable rule —
+                // unused canStabTeamMateForBall skill + an adjacent BLOCKABLE teammate carrying
+                // the ball (bb2025 SelectLogicModule). Declared as the client's command pair:
+                // ClientCommandActingPlayer(PASS_MOVE) + ClientCommandUseSkill(treacherous).
+                // Offered DIRECTLY AFTER KICK_TEAM_MATE — Rust inserts it at the same slot.
+                if (com.fumbbl.ffb.util.UtilCards.hasUnusedSkillWithProperty(p,
+                        com.fumbbl.ffb.model.property.NamedProperties.canStabTeamMateForBall)
+                        && java.util.Arrays.stream(com.fumbbl.ffb.util.UtilPlayer.findAdjacentBlockablePlayers(
+                                game, team, coord))
+                            .anyMatch(tp -> com.fumbbl.ffb.util.UtilPlayer.hasBall(game, tp))) {
+                    actions.add(PlayerAction.TREACHEROUS);
+                }
+
+                // Raiding Party (bb2025 star special): the client's isRaidingPartyAvailable
+                // rule (LogicModule) — unused canMoveOpenTeamMate + an acting-team mate that is
+                // STANDING, within 5 steps, OPEN (no adjacent opponents with tacklezones) and
+                // has an adjacent EMPTY in-field square that itself neighbours an opponent.
+                // Offered DIRECTLY AFTER TREACHEROUS — Rust inserts it at the same slot.
+                if (com.fumbbl.ffb.util.UtilCards.hasUnusedSkillWithProperty(p,
+                        com.fumbbl.ffb.model.property.NamedProperties.canMoveOpenTeamMate)
+                        && java.util.Arrays.stream(team.getPlayers()).anyMatch(tm -> {
+                            FieldCoordinate tc = fm.getPlayerCoordinate(tm);
+                            if (tc == null) return false;
+                            com.fumbbl.ffb.PlayerState ts = fm.getPlayerState(tm);
+                            if (ts == null || ts.getBase() != com.fumbbl.ffb.PlayerState.STANDING) return false;
+                            if (tc.distanceInSteps(coord) > 5) return false;
+                            if (com.fumbbl.ffb.util.ArrayTool.isProvided(
+                                    com.fumbbl.ffb.util.UtilPlayer.findAdjacentPlayersWithTacklezones(
+                                        game, opponent, tc, false))) return false;
+                            return java.util.Arrays.stream(fm.findAdjacentCoordinates(tc,
+                                    com.fumbbl.ffb.FieldCoordinateBounds.FIELD, 1, false))
+                                .anyMatch(sq -> {
+                                    java.util.List<Player<?>> onSq = fm.getPlayers(sq);
+                                    if (onSq != null && !onSq.isEmpty()) return false;
+                                    return java.util.Arrays.stream(fm.findAdjacentCoordinates(sq,
+                                            com.fumbbl.ffb.FieldCoordinateBounds.FIELD, 1, false))
+                                        .anyMatch(adj -> {
+                                            java.util.List<Player<?>> occ = fm.getPlayers(adj);
+                                            return occ != null && !occ.isEmpty()
+                                                && !team.hasPlayer(occ.get(0));
+                                        });
+                                });
+                        })) {
+                    actions.add(PlayerAction.RAIDING_PARTY);
+                }
+
+                // Look Into My Eyes (bb2025 star special): the client's
+                // isLookIntoMyEyesAvailable rule — unused canStealBallFromOpponent + an
+                // adjacent BLOCKABLE opponent carrying the ball. Offered DIRECTLY AFTER
+                // RAIDING_PARTY — Rust inserts it at the same slot.
+                if (com.fumbbl.ffb.util.UtilCards.hasUnusedSkillWithProperty(p,
+                        com.fumbbl.ffb.model.property.NamedProperties.canStealBallFromOpponent)
+                        && java.util.Arrays.stream(com.fumbbl.ffb.util.UtilPlayer.findAdjacentBlockablePlayers(
+                                game, opponent, coord))
+                            .anyMatch(op -> com.fumbbl.ffb.util.UtilPlayer.hasBall(game, op))) {
+                    actions.add(PlayerAction.LOOK_INTO_MY_EYES);
+                }
+
+                // Baleful Hex (bb2025 star special): the client's isBalefulHexAvailable
+                // rule — unused canMakeOpponentMissTurn + any opponent within 5 Chebyshev
+                // steps. Offered DIRECTLY AFTER LOOK_INTO_MY_EYES — Rust matches the slot.
+                if (com.fumbbl.ffb.util.UtilCards.hasUnusedSkillWithProperty(p,
+                        com.fumbbl.ffb.model.property.NamedProperties.canMakeOpponentMissTurn)
+                        && java.util.Arrays.stream(opponent.getPlayers()).anyMatch(op -> {
+                            FieldCoordinate oc = fm.getPlayerCoordinate(op);
+                            return oc != null && oc.distanceInSteps(coord) <= 5;
+                        })) {
+                    actions.add(PlayerAction.BALEFUL_HEX);
+                }
+
+                // Catch of the Day (bb2025 star special): the client's
+                // isCatchOfTheDayAvailable rule — unused canGetBallOnGround + loose ball
+                // (isBallMoving) within 3 steps. Offered DIRECTLY AFTER BALEFUL_HEX — Rust
+                // matches the slot.
+                if (com.fumbbl.ffb.util.UtilCards.hasUnusedSkillWithProperty(p,
+                        com.fumbbl.ffb.model.property.NamedProperties.canGetBallOnGround)
+                        && fm.isBallMoving() && fm.getBallCoordinate() != null
+                        && fm.getBallCoordinate().distanceInSteps(coord) <= 3) {
+                    actions.add(PlayerAction.CATCH_OF_THE_DAY);
+                }
+
+                // "Blastin' Solves Everything" (bb2025 star special): the client's
+                // isThenIStartedBlastinAvailable rule — unused canBlastRemotePlayer + any
+                // opponent within 3 steps. Offered DIRECTLY AFTER CATCH_OF_THE_DAY — Rust
+                // matches the slot.
+                if (com.fumbbl.ffb.util.UtilCards.hasUnusedSkillWithProperty(p,
+                        com.fumbbl.ffb.model.property.NamedProperties.canBlastRemotePlayer)
+                        && java.util.Arrays.stream(opponent.getPlayers()).anyMatch(op -> {
+                            FieldCoordinate oc = fm.getPlayerCoordinate(op);
+                            return oc != null && oc.distanceInSteps(coord) <= 3;
+                        })) {
+                    actions.add(PlayerAction.THEN_I_STARTED_BLASTIN);
+                }
+
+                // Furious Outburst (bb2025 star special): the client's
+                // isFuriousOutburstAvailable rule — ACTIVE + STANDING, the team blitz not yet
+                // used, unused canTeleportBeforeAndAfterAvRollAttack, and a blockable opponent
+                // within 3 steps. Offered DIRECTLY AFTER THEN_I_STARTED_BLASTIN — Rust inserts
+                // it at the same slot.
+                if (ps.isActive() && ps.getBase() == PlayerState.STANDING
+                        && !td.isBlitzUsed()
+                        && com.fumbbl.ffb.util.UtilCards.hasUnusedSkillWithProperty(p,
+                            com.fumbbl.ffb.model.property.NamedProperties.canTeleportBeforeAndAfterAvRollAttack)
+                        && com.fumbbl.ffb.util.ArrayTool.isProvided(
+                            com.fumbbl.ffb.util.UtilPlayer.findBlockablePlayers(game, opponent, coord, 3))) {
+                    actions.add(PlayerAction.FURIOUS_OUTPBURST);
+                }
+
+                // Beer Barrel Bash! (bb2020+ star special): the client's isThrowKegAvailable rule
+                // — REGULAR turn mode, base STANDING, unused canThrowKeg. The rule itself has NO
+                // target clause (the target is clicked afterwards in the client's THROW_KEG
+                // state), so sendConcreteAction below deselects when no valid target exists.
+                // Offered DIRECTLY AFTER FURIOUS_OUTPBURST — Rust inserts it at the same slot.
+                if (game.getTurnMode() == TurnMode.REGULAR
+                        && ps.getBase() == PlayerState.STANDING
+                        && com.fumbbl.ffb.util.UtilCards.hasUnusedSkillWithProperty(p,
+                            com.fumbbl.ffb.model.property.NamedProperties.canThrowKeg)) {
+                    actions.add(PlayerAction.THROW_KEG);
+                }
+
+                // Wisdom of the White Dwarf (bb2020+ star special): the client's
+                // isWisdomAvailable rule, which delegates to GameMechanic.isWisdomAvailable —
+                // unused canGrantSkillsToTeamMates plus a STANDING-or-PRONE, ACTIVE team-mate
+                // within 2 squares that is missing at least one grantable skill. Offered
+                // DIRECTLY AFTER THROW_KEG — Rust inserts it at the same slot.
+                if (coord != null
+                        && ((com.fumbbl.ffb.mechanics.GameMechanic) game.getMechanic(
+                                com.fumbbl.ffb.mechanics.Mechanic.Type.GAME))
+                            .isWisdomAvailable(game, p)) {
+                    actions.add(PlayerAction.WISDOM_OF_THE_WHITE_DWARF);
+                }
+
+                // "Excuse Me, Are You a Zoat?" (bb2025 star special): the client's
+                // isAutoGazeZoatAvailable rule — unused canGazeAutomaticallyThreeSquaresAway
+                // plus an opponent WITH TACKLE ZONES within 3 that is not already distracted.
+                // Note the property is NOT canGazeAutomatically (that is Black Ink's); both sit
+                // on the same CLIENT_USE_SKILL dispatch chain in StepInitSelecting.
+                // Offered DIRECTLY AFTER WISDOM_OF_THE_WHITE_DWARF — Rust matches the slot.
+                if (coord != null
+                        && com.fumbbl.ffb.util.UtilCards.hasUnusedSkillWithProperty(p,
+                            com.fumbbl.ffb.model.property.NamedProperties.canGazeAutomaticallyThreeSquaresAway)
+                        && java.util.Arrays.stream(com.fumbbl.ffb.util.UtilPlayer.findPlayersWithTackleZones(
+                                game, opponent, coord, 3))
+                            .anyMatch(op -> !fm.getPlayerState(op).isDistracted())) {
+                    actions.add(PlayerAction.AUTO_GAZE_ZOAT);
+                }
+
+                // Black Ink (bb2020+ star special): the client's isBlackInkAvailable rule —
+                // unused canGazeAutomatically skill + an adjacent standing-or-prone,
+                // NOT-distracted opponent. Declared as ActingPlayer(MOVE) +
+                // ClientCommandUseSkill; the player continues the move after the gaze.
+                // Offered DIRECTLY AFTER TREACHEROUS — Rust inserts it at the same slot.
+                if (com.fumbbl.ffb.util.UtilCards.hasUnusedSkillWithProperty(p,
+                        com.fumbbl.ffb.model.property.NamedProperties.canGazeAutomatically)
+                        && java.util.Arrays.stream(com.fumbbl.ffb.util.UtilPlayer.findAdjacentStandingOrPronePlayers(
+                                game, opponent, coord))
+                            .anyMatch(op -> !fm.getPlayerState(op).isDistracted())) {
+                    actions.add(PlayerAction.BLACK_INK);
                 }
 
                 // Punt (BB2025 only): Punt skill, ball carrier, ball in play
@@ -1613,10 +2799,16 @@ public class ParityRunner {
                     actions.add(PlayerAction.PUNT);
                 }
 
-                // SecureTheBall (BB2025 only): ball moving through this player's square
+                // SecureTheBall (BB2025 only): ball moving through this player's square.
+                // Mirror Rust eligible_players_for_activation: a player with the Unsteady trait
+                // (NamedProperties.preventSecureTheBallAction) may NOT Secure the Ball. Without this
+                // the harness offered SecureTheBall to an Unsteady Flesh Golem that Rust omits, so
+                // the two agents' eligible lists differed in size and the shared actionRng picked a
+                // different action (necromantic seed 83 i=142: home_03 SECURE_THE_BALL vs HandOff).
                 if (isBb2025(game) && fm.isBallInPlay() && fm.isBallMoving()
                         && ballCoord != null && ballCoord.equals(coord)
-                        && !td.isSecureTheBallUsed()) {
+                        && !td.isSecureTheBallUsed()
+                        && !p.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.preventSecureTheBallAction)) {
                     actions.add(PlayerAction.SECURE_THE_BALL);
                 }
 
@@ -1680,6 +2872,10 @@ public class ParityRunner {
 
     private static boolean isBb2025(Game game) {
         return game.getOptions().getRulesVersion() == com.fumbbl.ffb.RulesCollection.Rules.BB2025;
+    }
+
+    private static boolean isBb2016(Game game) {
+        return game.getOptions().getRulesVersion() == com.fumbbl.ffb.RulesCollection.Rules.BB2016;
     }
 
     /** True if two coordinates are 8-directionally adjacent (distance ≤ 1, not same square). */
@@ -1809,6 +3005,50 @@ public class ParityRunner {
 
     // ── Dialog team resolution ────────────────────────────────────────────────
 
+    /**
+     * The PlayerActions sendConcreteAction actually carries out. Anything else falls through to its
+     * `default:` arm, which deselects without changing the game state.
+     */
+    private static boolean isHandledActingAction(PlayerAction pa) {
+        switch (pa) {
+            case MOVE:
+            case STAND_UP:
+            case BLOCK:
+            case BLITZ:
+            case BLITZ_MOVE:
+            case BLITZ_SELECT:
+            case STAND_UP_BLITZ:
+            case FOUL:
+            case FOUL_MOVE:
+            case PASS:
+            case PASS_MOVE:
+            case HAND_OVER:
+            case HAND_OVER_MOVE:
+            case THROW_TEAM_MATE:
+            case THROW_TEAM_MATE_MOVE:
+            case KICK_TEAM_MATE:
+            case KICK_TEAM_MATE_MOVE:
+            case THROW_BOMB:
+            case HAIL_MARY_PASS:
+            case TREACHEROUS:
+            case BLACK_INK:
+            case MULTIPLE_BLOCK:
+            case RAIDING_PARTY:
+            case LOOK_INTO_MY_EYES:
+            case BALEFUL_HEX:
+            case CATCH_OF_THE_DAY:
+            case THEN_I_STARTED_BLASTIN:
+            case ALL_YOU_CAN_EAT:
+            case FURIOUS_OUTPBURST:
+            case THROW_KEG:
+            case WISDOM_OF_THE_WHITE_DWARF:
+            case AUTO_GAZE_ZOAT:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     private static String getDialogTeamId(IDialogParameter dialog) {
         if (dialog instanceof com.fumbbl.ffb.dialog.DialogBlockRollPropertiesParameter) {
             return ((com.fumbbl.ffb.dialog.DialogBlockRollPropertiesParameter) dialog).getChoosingTeamId();
@@ -1824,6 +3064,9 @@ public class ParityRunner {
         }
         if (dialog instanceof com.fumbbl.ffb.dialog.DialogBribesParameter) {
             return ((com.fumbbl.ffb.dialog.DialogBribesParameter) dialog).getTeamId();
+        }
+        if (dialog instanceof com.fumbbl.ffb.dialog.DialogPettyCashParameter) {
+            return ((com.fumbbl.ffb.dialog.DialogPettyCashParameter) dialog).getTeamId();
         }
         return null;
     }
@@ -1842,4 +3085,41 @@ public class ParityRunner {
     private static String escJson(String s) {
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
+
+    /**
+     * Interception target: every player UtilPassing.findInterceptors returns (the ENGINE's own
+     * predicate, the same call StepIntercept makes), coordinate-sorted, 1 actionRng pick.
+     * Mirrors Rust's AgentPrompt::Interception handling in random_agent.rs.
+     */
+    private void sendInterceptorChoice(Game game, GameState gameState) {
+        Player<?>[] found = UtilPassing.findInterceptors(game,
+            game.getPlayerById(game.getThrowerId()), game.getPassCoordinate());
+        java.util.List<Player<?>> candidates = new java.util.ArrayList<>();
+        if (found != null) {
+            for (Player<?> p : found) {
+                if (p != null) {
+                    candidates.add(p);
+                }
+            }
+        }
+        if (candidates.isEmpty()) {
+            MatchRunner.inject(gameState, new ClientCommandInterceptorChoice(null, null));
+            return;
+        }
+        candidates.sort((a, b) -> {
+            FieldCoordinate ca = game.getFieldModel().getPlayerCoordinate(a);
+            FieldCoordinate cb = game.getFieldModel().getPlayerCoordinate(b);
+            int ax = ca != null ? ca.getX() : Integer.MAX_VALUE;
+            int bx = cb != null ? cb.getX() : Integer.MAX_VALUE;
+            if (ax != bx) {
+                return Integer.compare(ax, bx);
+            }
+            int ay = ca != null ? ca.getY() : Integer.MAX_VALUE;
+            int by = cb != null ? cb.getY() : Integer.MAX_VALUE;
+            return Integer.compare(ay, by);
+        });
+        int idx = (int) Long.remainderUnsigned(actionRng.nextLong(), candidates.size());
+        MatchRunner.inject(gameState, new ClientCommandInterceptorChoice(candidates.get(idx).getId(), null));
+    }
+
 }

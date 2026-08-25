@@ -65,9 +65,11 @@ public final class StepSpectators extends AbstractStep {
 
 		int fanRollHome = getGameState().getDiceRoller().rollFanFactor();
 		teamResultHome.setFanFactor(game.getTeamHome().getDedicatedFans() + fanRollHome);
+		System.err.println("SPECTATORS: fanRollHome=" + fanRollHome + " fanFactorHome=" + teamResultHome.getFanFactor());
 
 		int fanRollAway = getGameState().getDiceRoller().rollFanFactor();
 		teamResultAway.setFanFactor(game.getTeamAway().getDedicatedFans() + fanRollAway);
+		System.err.println("SPECTATORS: fanRollAway=" + fanRollAway + " fanFactorAway=" + teamResultAway.getFanFactor());
 
 		getResult().addReport(new ReportFanFactor(game.getTeamHome().getId(), fanRollHome, game.getTeamHome().getDedicatedFans()));
 		getResult().addReport(new ReportFanFactor(game.getTeamAway().getId(), fanRollAway, game.getTeamAway().getDedicatedFans()));

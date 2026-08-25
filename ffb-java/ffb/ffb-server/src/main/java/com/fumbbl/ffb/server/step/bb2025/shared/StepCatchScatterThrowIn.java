@@ -530,6 +530,10 @@ public class StepCatchScatterThrowIn extends AbstractStepWithReRoll {
 				roll = getGameState().getDiceRoller().rollSkill();
 			}
 			boolean successful = DiceInterpreter.getInstance().isSkillRollSuccessful(roll, minimumRoll);
+			if (System.getenv("FFB_TRACE") != null) {
+				System.err.println("JAVA_CATCH catcher=" + fCatcherId + " roll=" + roll + " min=" + minimumRoll
+					+ " ok=" + successful + " mode=" + fCatchScatterThrowInMode);
+			}
 			getResult().addReport(new ReportCatchRoll(state.catcher.getId(), successful, roll, minimumRoll, reRolled || evaluate,
 				catchModifiers.toArray(new CatchModifier[0]), fCatchScatterThrowInMode.isBomb()));
 			evaluate = false;
@@ -686,7 +690,6 @@ public class StepCatchScatterThrowIn extends AbstractStepWithReRoll {
 		FieldCoordinate ballCoordinateStart = game.getFieldModel().getBallCoordinate();
 		FieldCoordinate ballCoordinateEnd = UtilServerCatchScatterThrowIn.findScatterCoordinate(ballCoordinateStart,
 			direction, 1);
-		System.err.println("BOUNCE_BALL: roll=" + roll + " dir=" + direction + " from=" + ballCoordinateStart + " to=" + ballCoordinateEnd);
 		FieldCoordinate lastValidCoordinate = fScatterBounds.isInBounds(ballCoordinateEnd) ? ballCoordinateEnd
 			: ballCoordinateStart;
 		getResult().addReport(new ReportScatterBall(new Direction[]{direction}, new int[]{roll}, false));

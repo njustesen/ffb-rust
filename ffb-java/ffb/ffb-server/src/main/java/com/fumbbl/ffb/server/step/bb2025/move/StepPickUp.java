@@ -234,8 +234,12 @@ public class StepPickUp extends AbstractStepWithReRoll {
 				minimumRoll = mechanic.minimumRollPickup(player, pickupModifiers);
 			}
 			int roll = getGameState().getDiceRoller().rollSkill();
+			int pickupCc = getGameState().getDiceRoller().getCallCount();
 			boolean successful = DiceInterpreter.getInstance().isSkillRollSuccessful(roll, minimumRoll);
 			boolean reRolled = ((getReRolledAction() == ReRolledActions.PICK_UP) && (getReRollSource() != null));
+			Game pickupGame = getGameState().getGame();
+			FieldCoordinate pickupCoord = pickupGame.getFieldModel().getBallCoordinate();
+			System.err.println("JPICKUP pid=" + player.getId() + " dest=(" + (pickupCoord != null ? pickupCoord.getX() + "," + pickupCoord.getY() : "?,?") + ") min_roll=" + minimumRoll + " roll=" + roll + " success=" + successful + " cc=" + pickupCc);
 			getResult().addReport(new ReportPickupRoll(player.getId(), successful, roll,
 				minimumRoll, reRolled, pickupModifiers.toArray(new PickupModifier[0]), secureTheBall));
 			if (successful) {

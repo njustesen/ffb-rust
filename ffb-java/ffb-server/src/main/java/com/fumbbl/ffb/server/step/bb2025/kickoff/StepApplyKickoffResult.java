@@ -753,33 +753,29 @@ public final class StepApplyKickoffResult extends AbstractStep {
 		}
 
 		getResult().addReport(new ReportKickoffDodgySnack(rollHome, rollAway, playerIds));
+		Sequence sequence = new Sequence(getGameState());
 
-		boolean update = false;
 		if (playerHome != null) {
-			update |= dodgySnackEffect(game, playerHome);
+			insertSteps(game, playerHome);
 		}
 
 		if (playerAway != null) {
-			update |= dodgySnackEffect(game, playerAway);
+			insertSteps(game, playerAway);
 		}
 
-		if (update) {
-			getGameState().updatePlayerMarkings();
-		}
+		getGameState().getStepStack().push(sequence.getSequence());
 		getResult().setNextAction(StepAction.NEXT_STEP);
 	}
 
-	private boolean dodgySnackEffect(Game game, Player<?> player) {
+	private void insertSteps(Game game, Player<?> player) {
 		int roll = getGameState().getDiceRoller().rollDice(6);
 		getResult().addReport(new ReportDodgySnackRoll(roll, player.getId()));
 		if (roll == 1) {
 			FieldModel fieldModel = game.getFieldModel();
 			fieldModel.setPlayerState(player, fieldModel.getPlayerState(player).changeBase(PlayerState.RESERVE));
 			UtilBox.putPlayerIntoBox(game, player);
-			return false;
 		} else {
 			game.getFieldModel().addEnhancements(player, KickoffResult.DODGY_SNACK.getName());
-			return true;
 		}
 	}
 
@@ -797,6 +793,7 @@ public final class StepApplyKickoffResult extends AbstractStep {
 		List<String> affectedPlayers = new ArrayList<>();
 
 		int stunned = getGameState().getDiceRoller().rollDice(3);
+		System.err.println("PI: rollHome=" + rollHome + " rollAway=" + rollAway + " fanFactorHome=" + gameResult.getTeamResultHome().getFanFactor() + " fanFactorAway=" + gameResult.getTeamResultAway().getFanFactor() + " totalHome=" + totalHome + " totalAway=" + totalAway + " stun_count=" + stunned);
 
 		if (totalHome <= totalAway) {
 			affectedPlayers.addAll(stunPlayers(game.getTeamHome(), game.getFieldModel(), stunned));

@@ -117,6 +117,11 @@ public class StepPassBlock extends AbstractStep {
 	private void executeStep() {
 
 		Game game = getGameState().getGame();
+		if (Boolean.getBoolean("ffb.parityDebug")) {
+			System.err.println("JPASSBLOCK thrower=" + (game.getThrower() == null ? "null" : game.getThrower().getId())
+				+ " action=" + game.getThrowerAction() + " mode=" + game.getTurnMode()
+				+ " oldMode=" + fOldTurnMode);
+		}
 		if (game.getThrower() == null) {
 			return;
 		}

@@ -9,35 +9,6 @@ public class ChangeList {
 	private final List<VersionChangeList> versions = new ArrayList<>();
 
 	public ChangeList() {
-		versions.add(new VersionChangeList("3.2.3")
-			.addBugfix("Weather Mage effect only lasted until end of drive/opponents next turn")
-			.addBugfix(
-				"On Linux JVMs past 1.8 it was not possible to close the actions menu by clicking the active player again")
-			.addBugfix(
-				"Apply confusion flag if player is prone and fails the respective check (Bone Head, Really Stupid, Animal Savagery)")
-			.addBugfix("Ball & Chain hit by bomb did roll for armour")
-			.addBugfix("Dodgy Snack did not trigger auto marking update")
-			.addBugfix("Multiblock did not generate spp")
-			.addBugfix("Punt: If direction or distance put the ball out of bounds re-rolling the result did not reset the ball being in bounds")
-			.addBugfix("Blessing of Nuffle: Description text was incorrect")
-			.addBugfix("With JVMs newer than 8, range rulers did not show the required roll anymore")
-			.addBugfix("Gaining additional Hatred results in duplication of existing Hatred skill listings")
-			.addBugfix("Bloodlust: When opting to move instead of fouling directly due to failed Bloodlust the game crashed")
-			.addBugfix("Missing Zoat and Spite keywords caused Hatred/Getting Even to show Unknown")
-		);
-
-		versions.add(new VersionChangeList("3.2.2")
-			.addBugfix("All prayer rolls resulted in Blessing of Nuffle")
-		);
-
-		versions.add(new VersionChangeList("3.2.1")
-			.addBugfix("Disabling timeout button also disabled the turn timer")
-			.addBugfix(
-				"All ruleset: Touchback with only no ball players could result in the ball not being available for the drive")
-			.addBehaviorChange(
-				"All ruleset: In case of a touchback with no players or only no ball players placing the ball in a field does not bounce it anymore")
-			.addBugfix("\"Did not stall\" message was displayed even if there was no potential stalling")
-		);
 
 		versions.add(new VersionChangeList("3.2.0")
 			.addBugfix("Banned coach does not affect Brilliant Coaching roll")
@@ -51,13 +22,6 @@ public class ChangeList {
 			.addFeature("Wisdom of the White Dwarf (Star Grombrindal)")
 			.addImprovement("Set antialiasing for non-menu text components (mainly affecting Linux environments")
 			.addBugfix("Player Markings for 2020 skills caused false positives in 2025 games")
-			.addBugfix("Blessing of Nuffle was not applied randomly (and still used the old name)")
-			.addBugfix("Thinking Man's Troll could not be used on regeneration re-rolls")
-			.addBugfix("Kaboom! did not work on bouncing bomb")
-			.addBugfix("Fumblerooski was not reverted when player was held in place by tentacles")
-			.addBugfix("Arm Bar against non-dodge players caused a second re-roll option in case of a failed dodge")
-			.addFeature("Added game option to turn off timeouts")
-			.addBugfix("Timeout did not work for first turn of a drive")
 		);
 
 		versions.add(new VersionChangeList("3.1.2")

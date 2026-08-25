@@ -30,12 +30,11 @@ import java.awt.image.BufferedImage;
  */
 public class DialogReRollProperties extends Dialog implements ActionListener, KeyListener {
 
-	private JButton buttonFallbackReRoll;
-	private final JButton buttonTeamReRoll;
-	private final JButton buttonProReRoll;
-	private final JButton buttonNoReRoll;
+	private final JButton fButtonTeamReRoll;
+	private final JButton fButtonProReRoll;
+	private final JButton fButtonNoReRoll;
 	private JButton buttonSkillReRoll, buttonModifyingSkill;
-	private JCheckBox proFallbackMascot, proFallbackTrr;
+	private JCheckBox fallbackToTrr, proFallbackMascot, proFallbackTrr;
 	private final DialogReRollPropertiesParameter dialogParameter;
 	private ReRollSource fReRollSource;
 	private boolean useSkill;
@@ -49,26 +48,21 @@ public class DialogReRollProperties extends Dialog implements ActionListener, Ke
 		dialogParameter = pDialogParameter;
 
 		DialogExtensionMascot mascotExtension = new DialogExtensionMascot();
-		ReRollSource trrSource = mascotExtension.teamReRollSource(pDialogParameter);
+		ReRollSource trrSource = mascotExtension.teamReRollText(pDialogParameter);
 
 		willUseMascot = trrSource == ReRollSources.MASCOT;
 
-		String trrSourceText = trrSource.getName(getClient().getGame());
-		if (willUseMascot) {
-			trrSourceText += " (No Team Re-Roll)";
-		}
+		fButtonTeamReRoll = new JButton(dimensionProvider(), trrSource.getName(getClient().getGame()));
+		fButtonTeamReRoll.addActionListener(this);
+		fButtonTeamReRoll.addKeyListener(this);
+		fButtonTeamReRoll.setMnemonic((int) 'T');
+		fButtonTeamReRoll.setAlignmentY(Box.TOP_ALIGNMENT);
 
-		buttonTeamReRoll = new JButton(dimensionProvider(), trrSourceText);
-		buttonTeamReRoll.addActionListener(this);
-		buttonTeamReRoll.addKeyListener(this);
-		buttonTeamReRoll.setMnemonic((int) 'T');
-		buttonTeamReRoll.setAlignmentY(Box.TOP_ALIGNMENT);
-
-		buttonProReRoll = new JButton(dimensionProvider(), "Pro Re-Roll");
-		buttonProReRoll.addActionListener(this);
-		buttonProReRoll.addKeyListener(this);
-		buttonProReRoll.setMnemonic((int) 'P');
-		buttonProReRoll.setAlignmentY(Box.TOP_ALIGNMENT);
+		fButtonProReRoll = new JButton(dimensionProvider(), "Pro Re-Roll");
+		fButtonProReRoll.addActionListener(this);
+		fButtonProReRoll.addKeyListener(this);
+		fButtonProReRoll.setMnemonic((int) 'P');
+		fButtonProReRoll.setAlignmentY(Box.TOP_ALIGNMENT);
 
 		if (pDialogParameter.getReRollSkill() != null) {
 			buttonSkillReRoll = new JButton(dimensionProvider(), pDialogParameter.getReRollSkill().getName());
@@ -86,11 +80,11 @@ public class DialogReRollProperties extends Dialog implements ActionListener, Ke
 			buttonModifyingSkill.setAlignmentY(Box.TOP_ALIGNMENT);
 		}
 
-		buttonNoReRoll = new JButton(dimensionProvider(), "No Re-Roll");
-		buttonNoReRoll.addActionListener(this);
-		buttonNoReRoll.addKeyListener(this);
-		buttonNoReRoll.setMnemonic((int) 'N');
-		buttonNoReRoll.setAlignmentY(Box.TOP_ALIGNMENT);
+		fButtonNoReRoll = new JButton(dimensionProvider(), "No Re-Roll");
+		fButtonNoReRoll.addActionListener(this);
+		fButtonNoReRoll.addKeyListener(this);
+		fButtonNoReRoll.setMnemonic((int) 'N');
+		fButtonNoReRoll.setAlignmentY(Box.TOP_ALIGNMENT);
 
 		StringBuilder message = new StringBuilder();
 
@@ -148,21 +142,22 @@ public class DialogReRollProperties extends Dialog implements ActionListener, Ke
 		buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.X_AXIS));
 		buttonPanel.setAlignmentY(Box.TOP_ALIGNMENT);
 		if (willUseMascot) {
-			JPanel mascotPanel = mascotExtension.wrapperPanel(buttonTeamReRoll);
+			JPanel mascotPanel = new JPanel();
+			mascotPanel.setLayout(new BoxLayout(mascotPanel, BoxLayout.Y_AXIS));
+			mascotPanel.setAlignmentX(Box.CENTER_ALIGNMENT);
+			mascotPanel.setAlignmentY(Box.TOP_ALIGNMENT);
+			fButtonTeamReRoll.setAlignmentX(Box.CENTER_ALIGNMENT);
+			mascotPanel.add(fButtonTeamReRoll);
+			if (dialogParameter.hasProperty(ReRollProperty.TRR)) {
+				fallbackToTrr = mascotExtension.checkBox( "TRR fallback", KeyEvent.VK_F, Color.BLACK, dimensionProvider(),
+					this, this);
+				fallbackToTrr.setSelected(true);
+				mascotPanel.add(fallbackToTrr);
+			}
 			buttonPanel.add(mascotPanel);
 			buttonPanel.add(Box.createHorizontalStrut(5));
-			if (dialogParameter.hasProperty(ReRollProperty.TRR)) {
-				buttonFallbackReRoll = new JButton(dimensionProvider(), ReRollSources.MASCOT.getName(getClient().getGame()) + " (or Team-ReRoll)");
-				buttonFallbackReRoll.addActionListener(this);
-				buttonFallbackReRoll.addKeyListener(this);
-				buttonFallbackReRoll.setMnemonic((int) 'F');
-				buttonFallbackReRoll.setAlignmentY(Box.TOP_ALIGNMENT);
-				JPanel fallbackPanel = mascotExtension.wrapperPanel(buttonFallbackReRoll);
-				buttonPanel.add(fallbackPanel);
-				buttonPanel.add(Box.createHorizontalStrut(5));
-			}
 		} else if (dialogParameter.hasProperty(ReRollProperty.TRR)) {
-			buttonPanel.add(mascotExtension.wrapperPanel(buttonTeamReRoll));
+			buttonPanel.add(mascotExtension.wrapperPanel(fButtonTeamReRoll));
 			buttonPanel.add(Box.createHorizontalStrut(5));
 		}
 		if (dialogParameter.hasProperty(ReRollProperty.PRO)) {
@@ -173,8 +168,8 @@ public class DialogReRollProperties extends Dialog implements ActionListener, Ke
 				proPanel.setAlignmentX(Box.CENTER_ALIGNMENT);
 				proPanel.setAlignmentY(Box.TOP_ALIGNMENT);
 				buttonPanel.add(proPanel);
-				buttonProReRoll.setAlignmentX(Box.CENTER_ALIGNMENT);
-				proPanel.add(buttonProReRoll);
+				fButtonProReRoll.setAlignmentX(Box.CENTER_ALIGNMENT);
+				proPanel.add(fButtonProReRoll);
 				if (willUseMascot) {
 					proFallbackMascot = mascotExtension.checkBox("Mascot", KeyEvent.VK_A, Color.BLACK, dimensionProvider(),
 						this, this);
@@ -188,7 +183,7 @@ public class DialogReRollProperties extends Dialog implements ActionListener, Ke
 				}
 				buttonPanel.add(Box.createHorizontalStrut(5));
 			} else {
-				buttonPanel.add(mascotExtension.wrapperPanel(buttonProReRoll));
+				buttonPanel.add(mascotExtension.wrapperPanel(fButtonProReRoll));
 				buttonPanel.add(Box.createHorizontalStrut(5));
 			}
 		}
@@ -200,7 +195,7 @@ public class DialogReRollProperties extends Dialog implements ActionListener, Ke
 			buttonPanel.add(mascotExtension.wrapperPanel(buttonModifyingSkill));
 			buttonPanel.add(Box.createHorizontalStrut(5));
 		}
-		buttonPanel.add(mascotExtension.wrapperPanel(buttonNoReRoll));
+		buttonPanel.add(mascotExtension.wrapperPanel(fButtonNoReRoll));
 		buttonPanel.setBorder(BorderFactory.createEmptyBorder(0, 5, 5, 5));
 
 		getContentPane().setLayout(new BoxLayout(getContentPane(), BoxLayout.Y_AXIS));
@@ -218,22 +213,15 @@ public class DialogReRollProperties extends Dialog implements ActionListener, Ke
 	}
 
 	public void actionPerformed(ActionEvent pActionEvent) {
-		if (pActionEvent.getSource() == buttonTeamReRoll) {
-			if (willUseMascot) {
-				fReRollSource = ReRollSources.MASCOT;
-			} else {
-				fReRollSource = ReRollSources.TEAM_RE_ROLL;
-			}
+		if (pActionEvent.getSource() == fButtonTeamReRoll) {
+			determineTeamReRollSource();
 		}
-		if (pActionEvent.getSource() == buttonFallbackReRoll) {
-			fReRollSource = ReRollSources.MASCOT_TRR;
-		}
-		if (pActionEvent.getSource() == buttonProReRoll) {
+		if (pActionEvent.getSource() == fButtonProReRoll) {
 			if (getDialogParameter().hasProperty(ReRollProperty.PRO)) {
 				determineProReRollSource();
 			}
 		}
-		if (pActionEvent.getSource() == buttonNoReRoll) {
+		if (pActionEvent.getSource() == fButtonNoReRoll) {
 			fReRollSource = null;
 		}
 		if (pActionEvent.getSource() == buttonSkillReRoll) {
@@ -253,7 +241,7 @@ public class DialogReRollProperties extends Dialog implements ActionListener, Ke
 			}
 			return;
 		}
-		if (pActionEvent.getSource() == proFallbackTrr) {
+		if (pActionEvent.getSource() == fallbackToTrr || pActionEvent.getSource() == proFallbackTrr) {
 			return;
 		}
 		if (getCloseListener() != null) {
@@ -288,16 +276,7 @@ public class DialogReRollProperties extends Dialog implements ActionListener, Ke
 		boolean keyHandled = true;
 		switch (pKeyEvent.getKeyCode()) {
 			case KeyEvent.VK_T:
-					if (willUseMascot) {
-						fReRollSource = ReRollSources.MASCOT;
-					} else {
-						fReRollSource = ReRollSources.TEAM_RE_ROLL;
-					}
-				break;
-			case KeyEvent.VK_F:
-				if (buttonFallbackReRoll != null) {
-					fReRollSource = ReRollSources.MASCOT_TRR;
-				}
+				determineTeamReRollSource();
 				break;
 			case KeyEvent.VK_P:
 				if (getDialogParameter().hasProperty(ReRollProperty.PRO)) {
@@ -319,6 +298,12 @@ public class DialogReRollProperties extends Dialog implements ActionListener, Ke
 				} else {
 					keyHandled = false;
 				}
+				break;
+			case KeyEvent.VK_F:
+				if (fallbackToTrr != null) {
+					fallbackToTrr.setSelected(!fallbackToTrr.isSelected());
+				}
+				keyHandled = false;
 				break;
 			case KeyEvent.VK_A:
 				if (proFallbackMascot != null) {
@@ -345,6 +330,18 @@ public class DialogReRollProperties extends Dialog implements ActionListener, Ke
 			if (getCloseListener() != null) {
 				getCloseListener().dialogClosed(this);
 			}
+		}
+	}
+
+	private void determineTeamReRollSource() {
+		if (willUseMascot) {
+			if (fallbackToTrr != null && fallbackToTrr.isSelected()) {
+				fReRollSource = ReRollSources.MASCOT_TRR;
+			} else {
+				fReRollSource = ReRollSources.MASCOT;
+			}
+		} else {
+			fReRollSource = ReRollSources.TEAM_RE_ROLL;
 		}
 	}
 

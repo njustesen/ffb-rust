@@ -107,9 +107,7 @@ public class StepPuntDistance extends AbstractStepWithReRoll {
 
 		distance = getGameState().getDiceRoller().rollDice(6);
 		FieldCoordinate ballIndicatorCoordinate = coordinateFrom.move(direction, distance);
-		if (FieldCoordinateBounds.FIELD.isInBounds(ballIndicatorCoordinate)) {
-			fieldModel.setOutOfBounds(false);
-		} else {
+		if (!FieldCoordinateBounds.FIELD.isInBounds(ballIndicatorCoordinate)) {
 			ballIndicatorCoordinate = findLastSquareOnPitch(distance - 1);
 			fieldModel.setOutOfBounds(true);
 		}

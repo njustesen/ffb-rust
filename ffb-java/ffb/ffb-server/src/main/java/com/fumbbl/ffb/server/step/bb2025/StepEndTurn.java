@@ -230,6 +230,11 @@ public class StepEndTurn extends AbstractStep {
 	private void executeStep() {
 
 		Game game = getGameState().getGame();
+		if (System.getenv("FFB_ET_TRACE") != null) System.err.println("JAVA_ET within=" + fWithinSecretWeaponHandling
+			+ " td=" + fTouchdown + " newHalf=" + fNewHalf + " argueA=" + fArgueTheCallChoiceAway
+			+ " argueH=" + fArgueTheCallChoiceHome + " bribesA=" + fBribesChoiceAway + " bribesH=" + fBribesChoiceHome
+			+ " nextPushed=" + fNextSequencePushed + " ones=" + playerIdsNaturalOnes.size()
+			+ " mode=" + game.getTurnMode() + " sots=" + useStarOfTheShow);
 		game.getFieldModel().clearMultiBlockTargets();
 		UtilServerDialog.hideDialog(getGameState());
 		getGameState().getPassState().reset();
@@ -292,6 +297,7 @@ public class StepEndTurn extends AbstractStep {
 
 			fEndGame = false;
 			fNewHalf = UtilServerSteps.checkEndOfHalf(getGameState());
+			if (System.getenv("FFB_ET_TRACE") != null) System.err.println("JAVA_ET2 newHalf=" + fNewHalf + " td=" + fTouchdown);
 
 			if (!fNextSequencePushed) {
 
@@ -464,6 +470,9 @@ public class StepEndTurn extends AbstractStep {
 			}
 		}
 
+		if (System.getenv("FFB_ET_TRACE") != null) System.err.println("JAVA_ET3 gate argueH=" + fArgueTheCallChoiceHome
+			+ " argueA=" + fArgueTheCallChoiceAway + " bribesH=" + fBribesChoiceHome + " bribesA=" + fBribesChoiceAway
+			+ " endGame=" + fEndGame);
 		if (fEndGame || ((fArgueTheCallChoiceHome != null) && (fArgueTheCallChoiceAway != null)
 			&& (fBribesChoiceHome != null) && (fBribesChoiceAway != null))) {
 
@@ -532,6 +541,7 @@ public class StepEndTurn extends AbstractStep {
 			updateFumbblGame(getGameState(), fNewHalf, fTouchdown);
 
 			getResult().setNextAction(StepAction.NEXT_STEP);
+			if (System.getenv("FFB_ET_TRACE") != null) System.err.println("JAVA_ET4 done NEXT_STEP");
 
 		}
 

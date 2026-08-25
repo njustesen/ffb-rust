@@ -108,6 +108,4 @@ public abstract class RollMechanic implements Mechanic {
 		boolean successfulDauntless, boolean doubleTargetStrength, int defenderStrength);
 
 	public abstract int getAttackerBaseStrength(Game game, Player<?> attacker, Player<?> defender, boolean isMultiBlock);
-
-	public abstract com.fumbbl.ffb.ReRollOptions findReRollOptions(GameState gameState, Player<?> player, ReRolledAction reRolledAction, Skill reRollSkill);
 }

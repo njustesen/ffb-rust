@@ -10,7 +10,6 @@ public enum GameOptionId implements INamedObject {
 	CHECK_OWNERSHIP("checkOwnership"), TEST_MODE("testMode"),
 	OVERTIME("overtime"), TURNTIME("turntime"),
 	ALLOW_CONCESSIONS("allowConcessions"),
-	TIMEOUT_ALLOWED("timeoutAllowed"),
 
 	PETTY_CASH("pettyCash"),
 	INDUCEMENTS("inducements"),

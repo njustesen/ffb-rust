@@ -19,6 +19,7 @@ public class Fortuna {
 	/** Pluggable RNG interface for deterministic testing and parity testing. */
 	public interface IDiceRoller {
 		int getDieRoll(int sides);
+		default int getCallCount() { return -1; }
 	}
 
 	private IDiceRoller delegate;
@@ -26,6 +27,13 @@ public class Fortuna {
 	/** Replace Fortuna's AES-based RNG with a seeded delegate (e.g. Xoshiro256**). */
 	public void setDelegate(IDiceRoller delegate) {
 		this.delegate = delegate;
+	}
+
+	public int getCallCount() {
+		if (delegate != null) {
+			return delegate.getCallCount();
+		}
+		return -1;
 	}
 
 

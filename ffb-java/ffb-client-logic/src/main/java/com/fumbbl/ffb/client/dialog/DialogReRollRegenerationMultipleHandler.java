@@ -1,7 +1,6 @@
 package com.fumbbl.ffb.client.dialog;
 
 import com.fumbbl.ffb.ClientMode;
-import com.fumbbl.ffb.ReRolledActions;
 import com.fumbbl.ffb.StatusType;
 import com.fumbbl.ffb.client.FantasyFootballClient;
 import com.fumbbl.ffb.dialog.DialogId;
@@ -40,13 +39,7 @@ public class DialogReRollRegenerationMultipleHandler extends DialogHandler {
 		hideDialog();
 		if (testDialogHasId(dialog, DialogId.RE_ROLL_REGENERATION_MULTIPLE)) {
 			DialogReRollRegenerationMultiple reRollDialog = (DialogReRollRegenerationMultiple) dialog;
-			if (!parameter.getReRollOptions().isEmpty()) {
-				getClient().getCommunication().sendUseReRollForTarget(ReRolledActions.REGENERATION,
-					reRollDialog.getReRollSource(), reRollDialog.getSelectedTarget());
-			} else {
-				getClient().getCommunication().sendUseInducement(parameter.getInducementType(),
-					reRollDialog.getSelectedTarget());
-			}
+			getClient().getCommunication().sendUseInducement(parameter.getInducementType(), reRollDialog.getSelectedTarget());
 		}
 	}
 }

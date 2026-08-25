@@ -22,7 +22,17 @@ public class StatsMechanic extends com.fumbbl.ffb.mechanics.StatsMechanic {
 
 	@Override
 	public boolean armourIsBroken(int armour, int[] roll, InjuryContext context, Game game) {
-		return (reduceArmour(context, armour, 8) <= (roll[0] + roll[1] + context.getArmorModifierTotal(game)));
+		boolean broken = (reduceArmour(context, armour, 8) <= (roll[0] + roll[1] + context.getArmorModifierTotal(game)));
+		if (System.getProperty("ffb.parityDebug") != null) {
+			StringBuilder mods = new StringBuilder();
+			for (com.fumbbl.ffb.modifiers.ArmorModifier m : context.getArmorModifiers()) {
+				mods.append(m.getName()).append(",");
+			}
+			System.err.println("JAVA_AVBROKE def=" + context.getDefenderId() + " armour=" + armour
+				+ " reduced=" + reduceArmour(context, armour, 8) + " roll=[" + roll[0] + "," + roll[1] + "]"
+				+ " modTotal=" + context.getArmorModifierTotal(game) + " mods=" + mods + " broken=" + broken);
+		}
+		return broken;
 	}
 
 	@Override

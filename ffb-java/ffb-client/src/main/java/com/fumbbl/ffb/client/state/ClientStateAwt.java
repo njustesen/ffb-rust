@@ -47,8 +47,6 @@ public abstract class ClientStateAwt<T extends LogicModule> extends ClientState<
 
 	private Player<?> fPopupMenuPlayer;
 
-	protected boolean menuOpen;
-
 	public ClientStateAwt(FantasyFootballClientAwt pClient, T logicModule) {
 		super(pClient, logicModule);
 		setClickable(true);
@@ -61,11 +59,9 @@ public abstract class ClientStateAwt<T extends LogicModule> extends ClientState<
 		UserInterface userInterface = getClient().getUserInterface();
 		userInterface.getDialogManager().updateDialog();
 		UtilClientCursor.setDefaultCursor(userInterface);
-		menuOpen = false;
 	}
 
 	public void tearDown() {
-		menuOpen = false;
 		UtilClientCursor.setDefaultCursor(getClient().getUserInterface());
 		super.tearDown();
 	}
@@ -168,6 +164,9 @@ public abstract class ClientStateAwt<T extends LogicModule> extends ClientState<
 	}
 
 	public void mouseReleased(MouseEvent pMouseEvent) {
+		if (getClient().getCurrentMouseButton() != pMouseEvent.getButton()) {
+			return;
+		}
 		getClient().setCurrentMouseButton(MouseEvent.NOBUTTON);
 		FieldCoordinate coordinate = coordinateConverter.getFieldCoordinate(pMouseEvent);
 		if ((getClient().getGame() != null) && (coordinate != null)) {
@@ -202,17 +201,11 @@ public abstract class ClientStateAwt<T extends LogicModule> extends ClientState<
 						if (logicModule.endPlayerActivation()) {
 							getClient().getUserInterface().getFieldComponent().refresh();
 						}
-						menuOpen = false;
 					} else if (player.isPresent() && (pMouseEvent.getButton() != MouseEvent.BUTTON3 ||
 						ALLOW_RIGHT_CLICK_ON_PLAYER.contains(rightClickProperty))) {
-						if (!menuOpen) {
-							clickOnPlayer(player.get());
-						} else {
-							menuOpen = false;
-						}
+						clickOnPlayer(player.get());
 					} else if (pMouseEvent.getButton() != MouseEvent.BUTTON3 ||
 						IClientPropertyValue.SETTING_RIGHT_CLICK_LEGACY_MODE.equals(rightClickProperty)) {
-						menuOpen = false;
 						clickOnField(coordinate);
 					}
 				}
@@ -253,7 +246,6 @@ public abstract class ClientStateAwt<T extends LogicModule> extends ClientState<
 				Dimension dimension =
 					pitchDimensionProvider.mapToLocal(coordinate.getX() + offsetX, coordinate.getY() + offsetY, false);
 				fPopupMenu.show(getClient().getUserInterface().getFieldComponent(), dimension.width, dimension.height);
-				menuOpen = true;
 			}
 		}
 	}
@@ -314,7 +306,6 @@ public abstract class ClientStateAwt<T extends LogicModule> extends ClientState<
 			logicModule.perform(player, action);
 		}
 		postPerform(pMenuKey);
-		menuOpen = false;
 	}
 
 	private void switchPopup(Player<?> player) {
