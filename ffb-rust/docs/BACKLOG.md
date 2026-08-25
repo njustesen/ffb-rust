@@ -3480,3 +3480,23 @@ every blitz - the ids that had never executed in any edition when this section s
 
 bb2020 stands at 28/30 from its last gate (vampire, goblin). The vampire fix is edition-shared and
 already measures 20/20 there, so only goblin seed 85 should remain. Re-gating now.
+
+**§12 BB2020 GATE: 29 GREEN / 1 RED. Only goblin seed 85 remains.**
+
+    17 -> 24 -> 28 -> 29 green since BB2020 was first measured.
+
+vampire went 53 -> 100 from the shared blood-lust fix, exactly as predicted from it being one
+cross-edition bug. Current standing:
+
+    bb2025  30 / 0     FULL PARITY
+    bb2020  29 / 1     goblin seed 85 step 4
+    bb2016  NEVER GATED on this branch
+
+**BB2016 is now the priority over goblin's single seed.** BB2020 was at 30/30 on main and this
+branch silently took it to 17/30 for ~25 iterations purely because only one edition was being
+gated; BB2016 has had the same exposure and zero measurement. An unmeasured edition is worth far
+more than one known seed, and the same mistake should not be repeated twice in one section.
+
+NEXT: gate BB2016 1-100. Then goblin seed 85, whose investigation is fully recorded above and
+resumable (extra CatchScatterThrowIn after a PickUp, both engines block, candidate lists agree,
+nothing moves the blitzer; open question is which sequence each PickUp belongs to).

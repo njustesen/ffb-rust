@@ -34,7 +34,7 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `slann_fumbbl` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `undead` | 🟢 100/100 |  |  |
 | `underworld` | 🟢 100/100 |  |  |
-| `vampire` | 🔴 53/100 | seed 1, step 112, java 27ade05510b05c7b vs rust 399c7210bd550b2f |  |
+| `vampire` | 🟢 100/100 |  |  |
 | `wood_elf` | 🟢 100/100 |  |  |
 
-**28 green / 2 red of 30.**
+**29 green / 1 red of 30.**
