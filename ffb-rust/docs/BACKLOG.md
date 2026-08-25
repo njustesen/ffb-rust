@@ -3526,3 +3526,15 @@ NEXT: confirm by probing a BB2016 blitz for a missing `block_defender_id`, then 
 agent's folding so BB2016 keeps its folded target while BB2020/BB2025 use the chain. Re-gate ALL
 THREE editions afterwards - BB2025 30/30 and BB2020 29/30 must be re-verified, not assumed to
 survive an agent change.
+
+**§12 BB2016 RE-GATE: 30 GREEN / 0 RED.** Recovered from 0/30 by edition-gating the agent's
+blitz-target folding. Standing:
+
+    bb2016  30 / 0   (re-gated after the fix)
+    bb2025  30 / 0   (measured BEFORE the agent change - must be re-verified)
+    bb2020  29 / 1   (measured BEFORE the agent change - must be re-verified; goblin seed 85)
+
+BB2025 and BB2020 are NOT confirmed at those numbers any more. The agent is shared by all three
+editions and the gating change touched the blitz path every roster uses, so both matrices are
+re-run before any of this is called finished. Assuming they survive is exactly the reasoning that
+hid the BB2020 and BB2016 regressions for ~25 iterations each.
