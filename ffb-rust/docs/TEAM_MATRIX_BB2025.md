@@ -1,6 +1,6 @@
 # Team-Parity Matrix — BB2025 (hand-drafted teams)
 
-Run 2026-08-24 — mirror matchups, tier 3, seeds 1-100,
+Run 2026-08-25 — mirror matchups, tier 3, seeds 1-100,
 teams from `data/teams/bb2025/` (see docs/TEAM_DRAFTS_BB2025.md), Java XMLs from scripts/gen_java_parity_data.py.
 Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 
@@ -34,7 +34,7 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `slann_fumbbl` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `undead` | 🟢 100/100 |  |  |
 | `underworld` | 🟢 100/100 |  |  |
-| `vampire` | 🔴 57/100 | seed 1, step 101, java d6e94c8b690ae5cb vs rust 0ff55adfbf43a908 |  |
+| `vampire` | 🟢 100/100 |  |  |
 | `wood_elf` | 🟢 100/100 |  |  |
 
-**29 green / 1 red of 30.**
+**30 green / 0 red of 30.**

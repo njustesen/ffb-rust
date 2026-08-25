@@ -3470,3 +3470,13 @@ NEXT: the blitz still needs to END its activation after the block, so the fix mu
 sequence continue to the block and end afterwards - not simply drop the terminator. Look at what
 the FOLDED path publishes to end a blitz activation and mirror that ordering, or gate the skip so
 the blitz's move is bypassed inside the move sequence rather than by aborting it.
+
+**§12 BB2025 GATE: 30 GREEN / 0 RED. FULL PARITY with the two-phase blitz chain LIVE.**
+
+    4 -> 10 -> 10 -> 22 -> 28 -> 29 -> 30 green across the section's gates.
+
+Every BB2025 roster is 100/100 with `SelectBlitzTarget` / `SelectBlitzTargetEnd` dispatching on
+every blitz - the ids that had never executed in any edition when this section started.
+
+bb2020 stands at 28/30 from its last gate (vampire, goblin). The vampire fix is edition-shared and
+already measures 20/20 there, so only goblin seed 85 should remain. Re-gating now.
