@@ -7,6 +7,16 @@ use crate::step::framework::{SequenceStep, Step, StepOutcome, StepParameter};
 use crate::step::framework::{StepAction, StepId};
 
 /// Java: parameterToConsume fixed set for bb2025 (no UsingStab — stab not in multiple block).
+/// Java: `parameterToConsume`. BB2020 adds USING_STAB (its fork has a STAB group); BB2025 does
+/// not, because BB2025 has no stab in a multiple block. Everything else is identical.
+fn params_to_consume_for(rules: ffb_model::enums::Rules) -> Vec<std::mem::Discriminant<StepParameter>> {
+    let mut v = params_to_consume();
+    if rules == ffb_model::enums::Rules::Bb2020 {
+        v.push(std::mem::discriminant(&StepParameter::UsingStab(false)));
+    }
+    v
+}
+
 fn params_to_consume() -> Vec<std::mem::Discriminant<StepParameter>> {
     vec![
         std::mem::discriminant(&StepParameter::BlockRoll(vec![])),
@@ -55,6 +65,92 @@ pub struct StepMultipleBlockFork {
 }
 
 impl StepMultipleBlockFork {
+    /// 1:1 port of `bb2020/multiblock/StepMultipleBlockFork.executeStep()`.
+    ///
+    /// Differences from the BB2025 body, all load-bearing:
+    ///   - targets are grouped by `BlockKind`; only the BLOCK group drives the main sequence,
+    ///   - the per-target loop has NO `PICK_UP` (that entry is BB2025-only),
+    ///   - the STAB group gets one sequence PER TARGET, in reverse order, ending
+    ///     `STAB -> HANDLE_DROP_PLAYER_CONTEXT -> REPORT_STAB_INJURY`, publishing USING_STAB.
+    ///
+    /// `REPORT_STAB_INJURY` hangs off that last branch and has no other route into a game
+    /// (docs/DEAD_STEP_INVENTORY.md).
+    fn execute_step_bb2020(&self, game: &mut Game) -> StepOutcome {
+        use ffb_model::model::block_kind::BlockKind;
+        use ffb_model::model::block_target::BlockTarget;
+
+        let kind_of = |t: &BlockTarget| t.get_kind().unwrap_or(BlockKind::BLOCK);
+        let block_group: Vec<BlockTarget> =
+            self.targets.iter().filter(|t| kind_of(t) == BlockKind::BLOCK).cloned().collect();
+        let stab_group: Vec<BlockTarget> =
+            self.targets.iter().filter(|t| kind_of(t) == BlockKind::STAB).cloned().collect();
+
+        let mut outcome = StepOutcome::next();
+
+        if !block_group.is_empty() {
+            let mut seq: Vec<SequenceStep> = Vec::new();
+            seq.push(SequenceStep::with_params(
+                StepId::DauntlessMultiple,
+                vec![StepParameter::BlockTargets(block_group.clone())],
+            ));
+            seq.push(SequenceStep::new(StepId::DoubleStrength));
+            for target in &block_group {
+                let id = match target.get_player_id() { Some(i) => i.clone(), None => continue };
+                seq.push(SequenceStep::with_params(
+                    StepId::SetDefender,
+                    vec![StepParameter::BlockDefenderId(id)],
+                ));
+                seq.push(SequenceStep::new(StepId::Trickster));
+                seq.push(SequenceStep::new(StepId::CatchScatterThrowIn));
+            }
+            seq.push(SequenceStep::with_params(
+                StepId::BlockRollMultiple,
+                vec![
+                    StepParameter::BlockTargets(block_group.clone()),
+                    StepParameter::ParametersToConsume(params_to_consume_for(game.rules)),
+                ],
+            ));
+            outcome = outcome.push_seq(seq);
+        }
+
+        // Java: Collections.reverse(stabGroup); then one pushed sequence per target.
+        if !stab_group.is_empty() {
+            for target in stab_group.iter().rev() {
+                let id = match target.get_player_id() { Some(i) => i.clone(), None => continue };
+                let seq = vec![
+                    SequenceStep::with_params(
+                        StepId::SetDefender,
+                        vec![StepParameter::BlockDefenderId(id.clone())],
+                    ),
+                    SequenceStep::new(StepId::Trickster),
+                    SequenceStep::new(StepId::CatchScatterThrowIn),
+                    SequenceStep::with_params(
+                        StepId::Stab,
+                        vec![StepParameter::GotoLabelOnSuccess("NEXT".into())],
+                    ),
+                    SequenceStep::new(StepId::HandleDropPlayerContext),
+                    SequenceStep {
+                        step_id: StepId::ReportStabInjury,
+                        label: Some("NEXT".into()),
+                        params: vec![StepParameter::PlayerId(id.clone())],
+                    },
+                    SequenceStep::with_params(
+                        StepId::ConsumeParameter,
+                        vec![StepParameter::ParametersToConsume(params_to_consume_for(game.rules))],
+                    ),
+                ];
+                outcome = outcome.push_seq(seq);
+                if let Some(state) = target.get_original_player_state() {
+                    outcome = outcome.publish(StepParameter::OldDefenderState(state));
+                }
+                outcome = outcome.publish(StepParameter::UsingStab(true));
+            }
+        }
+
+        outcome
+    }
+
+
     pub fn new(targets: Vec<ffb_model::model::block_target::BlockTarget>) -> Self {
         Self { targets }
     }
@@ -98,7 +194,14 @@ impl Step for StepMultipleBlockFork {
 }
 
 impl StepMultipleBlockFork {
-    fn execute_step(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        // BB2020's fork groups targets by BlockKind and gives the STAB group its own per-target
+        // sequences; BB2025's has no stab in a multiple block and runs every target through the
+        // block path. Edition-gate INSIDE this shared step - the bb2020 twin is dead code
+        // (driver.rs globs bb2025::mutliblock::*), so routing to it would change nothing.
+        if game.rules == ffb_model::enums::Rules::Bb2020 {
+            return self.execute_step_bb2020(game);
+        }
         let mut seq: Vec<SequenceStep> = Vec::new();
 
         seq.push(SequenceStep::with_params(
@@ -142,6 +245,64 @@ mod tests {
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
+    }
+
+    fn bb2020_game() -> Game {
+        Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020)
+    }
+
+    /// BB2020's fork gives the STAB group its own sequence per target, ending in
+    /// REPORT_STAB_INJURY - the only route that step has into a game. Rust routed every edition
+    /// through the BB2025 body, which has no stab group at all, so BB2020 silently lost it.
+    #[test]
+    fn bb2020_stab_target_gets_a_report_stab_injury_sequence() {
+        use ffb_model::model::block_kind::BlockKind;
+        use ffb_model::model::block_target::BlockTarget;
+
+        let mut game = bb2020_game();
+        let step = StepMultipleBlockFork::new(vec![
+            BlockTarget::block("blocked"),
+            BlockTarget::new("stabbed", BlockKind::STAB, None),
+        ]);
+        let out = step.execute_step(&mut game, &mut GameRng::new(0));
+
+        let stab_seq = out.pushes.iter()
+            .find(|s| s.iter().any(|e| e.step_id == StepId::ReportStabInjury))
+            .expect("the STAB target must get a ReportStabInjury sequence");
+        let ids: Vec<_> = stab_seq.iter().map(|e| e.step_id).collect();
+        assert_eq!(ids, vec![
+            StepId::SetDefender, StepId::Trickster, StepId::CatchScatterThrowIn,
+            StepId::Stab, StepId::HandleDropPlayerContext, StepId::ReportStabInjury,
+            StepId::ConsumeParameter,
+        ], "Java bb2020 order");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::UsingStab(true))));
+
+        // The BLOCK target still drives the main sequence, and it has NO PickUp in BB2020.
+        let block_seq = out.pushes.iter()
+            .find(|s| s.iter().any(|e| e.step_id == StepId::BlockRollMultiple))
+            .expect("the BLOCK group must still drive a block sequence");
+        assert!(!block_seq.iter().any(|e| e.step_id == StepId::PickUp),
+            "PICK_UP is BB2025-only; bb2020/Block fork has none");
+    }
+
+    /// BB2025 is unchanged: no grouping, no stab branch, and it KEEPS its PickUp. This pins the
+    /// edition split rather than one side of it.
+    #[test]
+    fn bb2025_has_no_stab_branch_and_keeps_pick_up() {
+        use ffb_model::model::block_kind::BlockKind;
+        use ffb_model::model::block_target::BlockTarget;
+
+        let mut game = make_game();
+        let step = StepMultipleBlockFork::new(vec![
+            BlockTarget::block("a"),
+            BlockTarget::new("b", BlockKind::STAB, None),
+        ]);
+        let out = step.execute_step(&mut game, &mut GameRng::new(0));
+
+        assert!(!out.pushes.iter().flatten().any(|e| e.step_id == StepId::ReportStabInjury),
+            "BB2025 has no stab in a multiple block");
+        assert!(out.pushes.iter().flatten().any(|e| e.step_id == StepId::PickUp),
+            "BB2025 keeps its PICK_UP");
     }
 
     #[test]
