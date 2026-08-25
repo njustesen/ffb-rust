@@ -3727,3 +3727,18 @@ This is the second time in this campaign that one edition-gated field hid two be
 gate is flipped, enumerate every entry it controls before measuring.
 
 Full three-edition gate running.
+
+### §12 COMPLETE — merged to main 2026-08-25
+
+Final gate on the merged build: **bb2016 30/0, bb2020 30/0, bb2025 30/0** (90/90).
+ffb-engine 7292/0, ffb-model 1165/0, ffb-mechanics 2796/0.
+Fast-forward merge of `wip/blitz-select-chain` (99 commits) → `main` at `5bc7d86fb`. Not pushed.
+
+`SelectBlitzTarget` and `SelectBlitzTargetEnd` now execute on every blitz in all three editions;
+they had never executed in ANY edition before this work. ~16 Rust engine bugs fixed, each a 1:1
+Java port that only the chain could expose.
+
+Next items in this file remain: the two "Blocked — tier decision" entries (Punt/agent-scoring,
+state-hash ACTIVE bit), the gaze twins (`SelectGazeTarget`/`SelectGazeTargetEnd`, the same
+never-dispatched shape as the blitz twins and the obvious next §), inducement purchasing (7 ids),
+and `PileDriver` + bb2016 KTM (blocked on data legality).
