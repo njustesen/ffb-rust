@@ -3406,3 +3406,33 @@ than weakening the guard. `StepInitMoving`'s `Action::Block` arm currently calls
 `dispatch_player_action(PlayerAction::Blitz)` without touching `acting_player.player_action` -
 check what Java's dispatch does there and mirror it. Then re-measure vampire seed 1 in BOTH
 editions and re-gate.
+
+**§12 iter 82 - the planned fix would have DIVERGED from Java. The difference must be the FLAG,
+not the action.**
+
+Checked Java before implementing "make the blitz dispatch set the acting action to BLITZ":
+
+    StepInitMoving (bb2025) case CLIENT_BLOCK -> dispatchPlayerAction(PlayerAction.BLITZ)
+    private StepCommandStatus dispatchPlayerAction(PlayerAction pPlayerAction) {
+        publishParameter(new StepParameter(DISPATCH_PLAYER_ACTION, pPlayerAction));
+        getResult().setNextAction(GOTO_LABEL_AND_REPEAT, fGotoLabelOnEnd);
+        return SKIP_STEP;
+    }
+
+It publishes and gotos - it does NOT call changePlayerAction. So Java's acting action is STILL
+BLITZ_MOVE when StepInitBlocking runs, and Java's guard at :199 would fire for a blood-lust
+blitzer exactly as the branch's does. Writing that fix would have made Rust diverge from Java to
+make one seed pass.
+
+Blood Lust's threshold is also action-independent (`good_conditions` covers BOTH `Blitz` and
+`BlitzMove`, like Animal Savagery), so the roll outcome cannot differ from the label either.
+
+Therefore the guard's OTHER term is where the two builds must differ: `suffering_blood_lust`. It
+is set only by `fail_blood_lust` and cleared per activation by `set_player` on a genuine player
+change. If the branch reaches InitBlocking with the flag TRUE where main has it FALSE, the guard
+fires on one and not the other with no action-label difference required.
+
+NEXT: probe `suffering_blood_lust` AND `player_action` at StepInitBlocking on both builds for that
+activation, paired by RNG call count. That distinguishes the two candidates directly instead of
+reasoning about which one it "must" be - the last four iterations were each wrong about the
+mechanism until measured.
