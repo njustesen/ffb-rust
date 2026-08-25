@@ -3319,3 +3319,31 @@ NEXT: decide which order Java uses. Java's blitz is CLIENT_BLITZ_MOVE then CLIEN
 phase before the block is structurally right - the question is whether Java's move phase runs a
 PickUp for a blitzer that has not actually moved. If it does not, the fix is to suppress the move
 sequence's PickUp when the blitzer's move stack is empty, not to reorder anything.
+
+**§12 iter 80 - goblin DEPRIORITISED (1 seed), vampire promoted (≈45 seeds x 2 editions).**
+
+Java's `generator/bb2020/BlitzMove.java` DOES contain `PICK_UP` (line 40, after MOVE / GO_FOR_IT /
+MOVE_DODGE / SHADOWING), so a PickUp in the blitz move phase is structurally normal and the
+"suppress the move-sequence PickUp" plan from the previous entry is not obviously right. Java's
+harness injects CLIENT_BLOCK at INIT_MOVING, which dispatches BLITZ before the rest of that
+sequence runs, so whether Java's PICK_UP executes at all depends on the dispatch - not yet
+established.
+
+**Priority call.** goblin bb2020 is 99/100 - ONE seed - and has taken about ten iterations, with
+four wrong conclusions along the way (all from window-bounded or mis-paired readings). vampire is
+57/100 in bb2025 and 53/100 in bb2020: roughly ninety failing games against goblin's one, and it
+is the SAME bug in both editions. Continuing on goblin ahead of it is poor value, so vampire is
+now the active item.
+
+Goblin's state is fully recorded above and is resumable: the extra die is a `CatchScatterThrowIn`
+following a `PickUp`, the two engines run that PickUp at different points in the stream (branch
+rng=21 before the block, main rng=22), both engines DO block, the candidate lists agree, and
+nothing moves the blitzer. The open question is purely which sequence each PickUp belongs to.
+
+**Method note worth keeping:** pairing samples by RNG CALL COUNT (iteration 79) is the only
+cross-build pairing that has held up. Order-of-appearance and RUST_STEP-bracketed windows have
+now produced four wrong answers between them.
+
+NEXT: vampire. Its signature (iteration 58) is the chain's second pass with
+`suffering_blood_lust` true, where the branch ends the activation without the block Java throws.
+Use the RNG-step diff plus rng-paired probes only.
