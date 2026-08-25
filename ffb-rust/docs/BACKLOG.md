@@ -3291,3 +3291,31 @@ the ball - so at that specific step the branch's blitzer is on the ball square a
 NEXT: probe ONLY the BlitzBlock `PickUp` (stack depth ~41) on both builds - player id, coordinate
 and ball coordinate - so both samples are taken at the identical step. That is the one comparison
 that has not yet been made cleanly, and it decides whether the position genuinely differs there.
+
+**§12 goblin bb2020 MECHANISM (iter 79): the chain runs PickUp BEFORE the block; main runs it
+AFTER.**
+
+Probed `StepPickUp` with the RNG call count attached, so the two builds pair by STREAM POSITION
+rather than by order of appearance - the pairing method that finally holds:
+
+    both   PU3 rng=21 pid=away_10 coord=(21,7) ball=(13,8)      <-- identical, confirms alignment
+    brch   PU3 rng=21 pid=away_03 coord=(13,8) ball=(13,8)      <-- ON the ball, BEFORE the block
+    main   PU3 rng=22 pid=away_03 coord=(12,8) ball=(13,8)      <-- NOT on the ball, AFTER it
+
+Main's PickUp is at rng=22 because its BlockRoll (21->22) has already happened; the branch's is at
+rng=21, before any block die. So this is an ORDERING difference, and the position difference is a
+CONSEQUENCE of it: at the earlier moment the blitzer still stands on the ball square, so PickUp
+rolls a scatter that main never rolls.
+
+**Why the order differs.** The chain's second pass dispatches BLITZ_MOVE, so the blitzer runs a
+MOVE sequence - which contains PickUp / CatchScatterThrowIn - and only then blocks. Main's folded
+path dispatches BLITZ straight into BlitzBlock, whose own PickUp sits after the block dice.
+
+That also reconciles the last few entries: `FFB_POSCHG` saw no movement because the blitzer does
+not move; iteration 71's "(13,8) vs (12,8)" was two different MOMENTS, exactly as iteration 76
+suspected; and both engines do block, as the RNG-step diff always said.
+
+NEXT: decide which order Java uses. Java's blitz is CLIENT_BLITZ_MOVE then CLIENT_BLOCK, so a move
+phase before the block is structurally right - the question is whether Java's move phase runs a
+PickUp for a blitzer that has not actually moved. If it does not, the fix is to suppress the move
+sequence's PickUp when the blitzer's move stack is empty, not to reorder anything.
