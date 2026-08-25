@@ -3347,3 +3347,28 @@ now produced four wrong answers between them.
 NEXT: vampire. Its signature (iteration 58) is the chain's second pass with
 `suffering_blood_lust` true, where the branch ends the activation without the block Java throws.
 Use the RNG-step diff plus rng-paired probes only.
+
+**§12 vampire CONFIRMED IDENTICAL IN BOTH EDITIONS (iter 80b).**
+
+RNG-step diff, vampire bb2020 seed 1 (normalised). Entries 1-87 identical, then:
+
+    main[88] BlockRoll 110->112 pid=home_03      <-- blocks, 2 dice
+    brch[88] BloodLust 110->111 pid=away_03      <-- no block, play moves on
+
+That is the SAME shape already measured for bb2025 seed 1 (iteration 57): a blitzer rolls Blood
+Lust, and main goes on to block while the branch ends the activation. So vampire is one bug
+affecting both editions, worth ~45 seeds each, and is now the only substantive item left in this
+section.
+
+Both editions therefore reduce to: **the chain's blitz does not block when the acting player is
+suffering Blood Lust.**
+
+Candidate already tested and NOT the cause (iteration 57, bb2025): the SBTEnd Blood Lust arm added
+in iteration 56 - disabling it with a `false &&` guard left the missing block exactly as it was.
+That test has NOT been repeated for bb2020, and should be, since the arm is edition-shared but the
+surrounding sequences are not.
+
+NEXT: repeat the arm-disable experiment on bb2020 seed 1 and read entry 88. If the block is still
+missing, the arm is exonerated in both editions and the cause is upstream in how the second pass
+is dispatched for a blood-lust blitzer; if the block returns, the arm is wrong for bb2020 and its
+Java condition needs re-checking per edition.
