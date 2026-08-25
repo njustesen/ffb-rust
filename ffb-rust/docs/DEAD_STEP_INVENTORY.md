@@ -99,8 +99,20 @@ it at 10, which is direct evidence the category is a sampling artifact rather th
 - **`ReportStabInjury` is dead by HARNESS LOCKSTEP - and is drivable.** This is the fifth
   instance of the TTM/KTM/interception/bomb shape. `StepMultipleBlockFork` (both engines) groups
   multi-block targets by `BlockKind` and gives the STAB group its own sequence ending
-  `STAB -> HANDLE_DROP_PLAYER_CONTEXT -> REPORT_STAB_INJURY`. Rust builds that sequence correctly
-  and has tests for it. It never runs because **no target is ever marked STAB**:
+  `STAB -> HANDLE_DROP_PLAYER_CONTEXT -> REPORT_STAB_INJURY`.
+
+  **CORRECTION (same day):** the first version of this entry credited Rust with building that
+  sequence correctly. That is true only of `step/bb2020/multiblock/step_multiple_block_fork.rs`,
+  which is a DEAD TWIN - `driver.rs:61` globs `bb2025::mutliblock::*`, so every edition runs the
+  BB2025 fork. Reading the bb2020 file to describe live behaviour is exactly the mistake
+  `feedback_bb2020_reason_from_live_path` warns about, and it was made here.
+
+  The stab group is **BB2020-only in Java too**: `bb2020/.../StepMultipleBlockFork.java` groups a
+  `BlockKind.STAB` bucket, `bb2025/.../StepMultipleBlockFork.java` has none (the live Rust file
+  even says so at line 9: "no UsingStab - stab not in multiple block"). So Rust's shared fork
+  correctly mirrors BB2025 and **silently drops BB2020's stab path**.
+
+  It never runs because of TWO independent blockers, both of which must be fixed:
   - `ParityRunner:1940-1941` hard-codes `BlockKind.BLOCK` for both targets.
   - Rust's `StepParameter::BlockTargets` carries only player IDs and reconstructs every target as
     `BlockKind::BLOCK` (`step_multiple_block_fork.rs:212`), so the kind cannot survive the
@@ -111,9 +123,17 @@ it at 10, which is direct evidence the category is a sampling artifact rather th
   `MultipleBlockFork`, 99 `BlockRollMultiple`, 66 `ApothecaryMultiple`, 39 `FoulAppearanceMultiple`,
   1014 `Stab` - and 0 `ReportStabInjury`.
 
-  **To drive it:** (1) make Rust's `BlockTargets` parameter carry the per-target `BlockKind`
-  instead of hard-coding BLOCK; (2) teach BOTH harnesses, in lockstep, to choose STAB for a
-  stab-capable blocker. Expect real engine bugs, as the previous four did.
+  **To drive it, in this order:**
+  1. **Model.** `StepParameter::BlockTargets` is `Vec<String>`; Java's `BLOCK_TARGETS` is
+     `List<BlockTarget>`, and `BlockTarget` (already ported faithfully, with `kind`) is discarded.
+     Until the parameter carries the kind, any stab group is vacuous by construction.
+  2. **Routing.** Edition-gate BB2020's stab group INTO the live shared fork - never by routing to
+     the dead bb2020 twin (the rule that blocker 1 of the gaze twins established).
+  3. **Harness.** Teach BOTH harnesses in lockstep to choose STAB for a stab-capable blocker
+     (`ParityRunner:1940-1941` hard-codes `BlockKind.BLOCK`). Needs a jar rebuild.
+
+  Steps 1-2 are Rust-only and behaviour-neutral (they cannot change a stream while every target is
+  BLOCK); step 3 makes it live. Expect real engine bugs then, as the previous four did.
 
 ## Summary
 
