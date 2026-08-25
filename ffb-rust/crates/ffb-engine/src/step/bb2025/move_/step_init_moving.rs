@@ -391,6 +391,48 @@ mod tests {
         Game::new(home, away, Rules::Bb2025)
     }
 
+    /// §12: a blitzer suffering Blood Lust must still throw its BLOCK. The early-out here was
+    /// written for a plain MOVE ("no move, then feed"), but the blitz chain routes a BLITZ through
+    /// this step too, and publishing END_PLAYER_ACTION killed the block - vampire was 57/100
+    /// (bb2025) and 53/100 (bb2020) until this was fixed.
+    ///
+    /// Simply dropping the terminator is NOT the fix and must not be re-introduced: with no
+    /// END_PLAYER_ACTION the activation never ends and the driver loops forever (measured - the
+    /// engine hangs). The blitzer dispatches BLITZ instead, so the block sequence runs and ends
+    /// the activation itself.
+    #[test]
+    fn blood_lust_blitzer_dispatches_block_instead_of_ending_the_action() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("h1".into());
+        game.acting_player.player_action = Some(PlayerAction::BlitzMove);
+        game.acting_player.suffering_blood_lust = true;
+        game.defender_id = Some("a1".into());
+        let mut step = StepInitMoving::new("end".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert!(out.published.iter().any(|p|
+            matches!(p, StepParameter::DispatchPlayerAction(Some(PlayerAction::Blitz)))),
+            "a blood-lust blitzer must dispatch BLITZ so the block still happens");
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))),
+            "it must NOT end the player action - the block sequence ends the activation");
+    }
+
+    /// The plain-MOVE case this guard exists for is unchanged: no dispatch, and the activation
+    /// ends here. Without this the fix above could silently widen to every blood-lust move.
+    #[test]
+    fn blood_lust_plain_move_still_ends_the_player_action() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("h1".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        game.acting_player.suffering_blood_lust = true;
+        let mut step = StepInitMoving::new("end".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))));
+        assert!(!out.published.iter().any(|p|
+            matches!(p, StepParameter::DispatchPlayerAction(_))));
+    }
+
     #[test]
     fn end_turn_goes_to_label_with_end_turn_and_check_forgo() {
         let mut game = make_game();
