@@ -89,6 +89,14 @@ def write_report(edition: str, keys, results, seeds: str, total_seeds: int) -> t
     green = red = 0
     for k in keys:
         r = results[k]
+        # Green is PARITY only. Failing on rc != 0 was tried and REVERTED (2026-08-25): ffb-parity
+        # exits 1 when the coverage checklist has required items missing, but that checklist is
+        # calibrated for BB2025 lineman and reads zero for dodge/pickup/block on BB2016 even though
+        # those obviously occur - measured bb2016 0/30 green under the strict rule while parity was
+        # 100/100 everywhere. The instrument, not the engine, is wrong there.
+        #
+        # rc is still SURFACED below instead of being silently dropped, because ignoring it hid
+        # `action Blitz` falling 668 -> 0 when the blitz-select chain landed (BACKLOG).
         ok = r["passed"] == total_seeds
         green += ok
         red += not ok
@@ -100,6 +108,10 @@ def write_report(edition: str, keys, results, seeds: str, total_seeds: int) -> t
     lines += ["", f"**{green} green / {red} red of {len(keys)}.**", ""]
     doc = ROOT / "docs" / f"TEAM_MATRIX_{edition.upper()}.md"
     doc.write_text("\n".join(lines), encoding="utf-8")
+    cov_flags = [k for k in keys if results[k].get("rc") not in (0, None)]
+    if cov_flags:
+        print(f"  NOTE: {len(cov_flags)} matchup(s) exited non-zero (coverage checklist, not parity): "
+              + ", ".join(cov_flags[:6]) + (" ..." if len(cov_flags) > 6 else ""))
     print(f"wrote {doc}: {green} green / {red} red")
     return green, red
 

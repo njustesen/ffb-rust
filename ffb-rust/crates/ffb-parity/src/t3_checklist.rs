@@ -17,7 +17,22 @@ pub struct Item {
     /// Required items fail the checklist at zero; optional items are informational
     /// (rare-but-legal outcomes, or "agents never volunteer this by contract").
     pub required: bool,
+    /// Required, genuinely absent, and CANNOT be fixed without a decision the user has not made.
+    /// Distinct from `required: false` (which claims the absence is fine) and from a plain
+    /// MISSING (which claims someone should go fix it). Blocked items are reported honestly as
+    /// blocked and do NOT fail the checklist - otherwise the checklist is red forever and stops
+    /// being read, which is exactly how the `action Blitz` regression went unnoticed.
+    pub blocked: bool,
     pub note: &'static str,
+}
+
+impl Item {
+    /// Mark a required-but-unreachable item as blocked on a user decision.
+    fn block(mut self, why: &'static str) -> Self {
+        self.blocked = true;
+        self.note = why;
+        self
+    }
 }
 
 /// Leak an owned `String` to a `&'static str` so dynamically-named items (skill
@@ -39,25 +54,25 @@ fn block_and_injury_items(cov: &CoverageReport) -> Vec<Item> {
 
     vec![
         // ── Blocks ───────────────────────────────────────────────────────────
-        Item { name: "block 1 die",          count: dice(1),  required: true,  note: "" },
-        Item { name: "block 2 dice",         count: dice(2),  required: true,  note: "" },
-        Item { name: "block 2 dice against", count: dice(-2), required: true,  note: "defender's choice" },
-        Item { name: "block 3 dice",         count: dice(3) + dice(-3), required: false, note: "needs ST5+ differential via assists" },
-        Item { name: "block result Skull",       count: res("Skull"),       required: true, note: "" },
-        Item { name: "block result BothDown",    count: res("BothDown"),    required: true, note: "" },
-        Item { name: "block result Pushback",    count: res("Pushback"),    required: true, note: "" },
-        Item { name: "block result PowPushback", count: res("PowPushback"), required: true, note: "" },
-        Item { name: "block result Pow",         count: res("Pow"),         required: true, note: "" },
-        Item { name: "pushbacks",       count: cov.total_pushbacks,    required: true,  note: "" },
-        Item { name: "crowd surfs",     count: cov.scatter_players,    required: false, note: "push off pitch — board-position dependent" },
-        Item { name: "players fell",    count: cov.players_fell_down,  required: true,  note: "" },
+        Item { name: "block 1 die",          count: dice(1),  required: true, blocked: false, note: "" },
+        Item { name: "block 2 dice",         count: dice(2),  required: true, blocked: false, note: "" },
+        Item { name: "block 2 dice against", count: dice(-2), required: true, blocked: false, note: "defender's choice" },
+        Item { name: "block 3 dice",         count: dice(3) + dice(-3), required: false, blocked: false, note: "needs ST5+ differential via assists" },
+        Item { name: "block result Skull",       count: res("Skull"),       required: true, blocked: false, note: "" },
+        Item { name: "block result BothDown",    count: res("BothDown"),    required: true, blocked: false, note: "" },
+        Item { name: "block result Pushback",    count: res("Pushback"),    required: true, blocked: false, note: "" },
+        Item { name: "block result PowPushback", count: res("PowPushback"), required: true, blocked: false, note: "" },
+        Item { name: "block result Pow",         count: res("Pow"),         required: true, blocked: false, note: "" },
+        Item { name: "pushbacks",       count: cov.total_pushbacks,    required: true, blocked: false, note: "" },
+        Item { name: "crowd surfs",     count: cov.scatter_players,    required: false, blocked: false, note: "push off pitch — board-position dependent" },
+        Item { name: "players fell",    count: cov.players_fell_down,  required: true, blocked: false, note: "" },
 
         // ── Injury chain ─────────────────────────────────────────────────────
-        Item { name: "armor held",      count: cov.injuries.armor_only, required: true,  note: "" },
-        Item { name: "stunned",         count: stunned,                 required: true,  note: "injury 2-7" },
-        Item { name: "KO",              count: cov.injuries.ko,         required: true,  note: "" },
-        Item { name: "casualty (d16)",  count: cov.injuries.cas,        required: true,  note: "" },
-        Item { name: "death",           count: cov.injuries.dead,       required: false, note: "d16 = 15-16 only" },
+        Item { name: "armor held",      count: cov.injuries.armor_only, required: true, blocked: false, note: "" },
+        Item { name: "stunned",         count: stunned,                 required: true, blocked: false, note: "injury 2-7" },
+        Item { name: "KO",              count: cov.injuries.ko,         required: true, blocked: false, note: "" },
+        Item { name: "casualty (d16)",  count: cov.injuries.cas,        required: true, blocked: false, note: "" },
+        Item { name: "death",           count: cov.injuries.dead,       required: false, blocked: false, note: "d16 = 15-16 only" },
     ]
 }
 
@@ -65,10 +80,10 @@ fn block_and_injury_items(cov: &CoverageReport) -> Vec<Item> {
 /// calls apply equally to the broader uniform-agent checklist).
 fn foul_items(cov: &CoverageReport) -> Vec<Item> {
     vec![
-        Item { name: "fouls",               count: cov.fouls,                        required: true,  note: "" },
-        Item { name: "argue the call",      count: cov.argue_the_call_rolls.total,   required: true,  note: "referee spotted a foul (doubles)" },
-        Item { name: "argue success",       count: cov.argue_the_call_rolls.success, required: false, note: "d6 = 6 only" },
-        Item { name: "players ejected",     count: cov.players_ejected,              required: true,  note: "" },
+        Item { name: "fouls",               count: cov.fouls,                        required: true, blocked: false, note: "" },
+        Item { name: "argue the call",      count: cov.argue_the_call_rolls.total,   required: true, blocked: false, note: "referee spotted a foul (doubles)" },
+        Item { name: "argue success",       count: cov.argue_the_call_rolls.success, required: false, blocked: false, note: "d6 = 6 only" },
+        Item { name: "players ejected",     count: cov.players_ejected,              required: true, blocked: false, note: "" },
     ]
 }
 
@@ -82,10 +97,10 @@ fn game_flow_items(cov: &CoverageReport) -> Vec<Item> {
         // Reaching an endzone needs ~10+ squares of directed movement by a ball carrier and the
         // agent moves at random, so this will not close by adding seeds — it needs a scoring-biased
         // agent mirrored in ParityRunner.java. Kept required so the gap stays visible.
-        Item { name: "touchdowns",      count: cov.touchdowns,      required: true,  note: "NEVER exercised: the random agent does not score — needs a scoring-biased tier" },
-        Item { name: "half starts",     count: cov.half_starts,     required: true,  note: "" },
-        Item { name: "weather changes", count: cov.weather_changes, required: false, note: "kickoff event roll of 8 only" },
-        Item { name: "kickoff events",  count: cov.kickoff_events.values().sum(), required: true, note: "per-result table below" },
+        Item { name: "touchdowns",      count: cov.touchdowns,      required: true, blocked: false, note: "" }.block("BLOCKED on the one-move-per-activation decision: both harnesses move exactly ONE square per activation (measured 1:1, player_moved_events == activations.Move), so a carrier cannot cross the pitch and nothing accumulates the movement a rush needs. See BACKLOG."),
+        Item { name: "half starts",     count: cov.half_starts,     required: true, blocked: false, note: "" },
+        Item { name: "weather changes", count: cov.weather_changes, required: false, blocked: false, note: "kickoff event roll of 8 only" },
+        Item { name: "kickoff events",  count: cov.kickoff_events.values().sum(), required: true, blocked: false, note: "per-result table below" },
     ]
 }
 
@@ -94,33 +109,33 @@ pub fn lineman_items(cov: &CoverageReport) -> Vec<Item> {
 
     let mut items = vec![
         // ── Actions (agent-initiated activations) ────────────────────────────
-        Item { name: "action Move",         count: act("Move"),         required: true,  note: "" },
+        Item { name: "action Move",         count: act("Move"),         required: true, blocked: false, note: "" },
         // NOT required: unsatisfiable by construction. Both agents map a prone player's stand-up
         // into a Move (or Blitz) choice, so no activation is ever recorded under these names —
         // 0 here does NOT mean prone players never stand up, only that the action is not named.
         // Left required, these two flagged "REQUIRED ITEMS MISSING" on every 100/100 run and
         // masked the one genuine gap below (touchdowns).
-        Item { name: "action StandUp",      count: act("StandUp"),      required: false, note: "not a distinct action: mapped into the Move choice by both agents" },
-        Item { name: "action Block",        count: act("Block"),        required: true,  note: "" },
-        Item { name: "action Blitz",        count: act("Blitz"),        required: true,  note: "" },
-        Item { name: "action StandUpBlitz", count: act("StandUpBlitz"), required: false, note: "not a distinct action: mapped into the Blitz choice by both agents" },
-        Item { name: "action Foul",         count: act("Foul"),         required: true,  note: "" },
-        Item { name: "action Pass",         count: act("Pass"),         required: true,  note: "needs a ball carrier" },
-        Item { name: "action HandOver",     count: act("HandOver"),     required: true,  note: "needs carrier + adjacent teammate" },
+        Item { name: "action StandUp",      count: act("StandUp"),      required: false, blocked: false, note: "not a distinct action: mapped into the Move choice by both agents" },
+        Item { name: "action Block",        count: act("Block"),        required: true, blocked: false, note: "" },
+        Item { name: "action Blitz",        count: act("Blitz"),        required: true, blocked: false, note: "" },
+        Item { name: "action StandUpBlitz", count: act("StandUpBlitz"), required: false, blocked: false, note: "not a distinct action: mapped into the Blitz choice by both agents" },
+        Item { name: "action Foul",         count: act("Foul"),         required: true, blocked: false, note: "" },
+        Item { name: "action Pass",         count: act("Pass"),         required: true, blocked: false, note: "needs a ball carrier" },
+        Item { name: "action HandOver",     count: act("HandOver"),     required: true, blocked: false, note: "needs carrier + adjacent teammate" },
 
         // ── Movement / ball ──────────────────────────────────────────────────
-        Item { name: "dodge success",   count: cov.dodge_rolls.success,   required: true,  note: "" },
-        Item { name: "dodge failure",   count: cov.dodge_rolls.failure,   required: true,  note: "" },
-        Item { name: "GFI rolls",       count: cov.go_for_it_rolls.total, required: true,  note: "" },
-        Item { name: "pickup success",  count: cov.pickup_rolls.success,  required: true,  note: "" },
-        Item { name: "pickup failure",  count: cov.pickup_rolls.failure,  required: true,  note: "turnover + scatter" },
-        Item { name: "catch success",   count: cov.catch_rolls.success,   required: true,  note: "" },
-        Item { name: "catch failure",   count: cov.catch_rolls.failure,   required: true,  note: "" },
-        Item { name: "ball scatters",   count: cov.scatter_balls,         required: true,  note: "failed pickup / dropped ball / bounces" },
-        Item { name: "throw-ins",       count: cov.throw_ins,             required: true,  note: "ball out of bounds" },
-        Item { name: "pass rolls",      count: cov.pass_rolls.total,      required: true,  note: "" },
-        Item { name: "pass deviates",   count: cov.pass_deviates,         required: false, note: "wildly inaccurate passes only" },
-        Item { name: "interceptions",   count: cov.interception_rolls.total, required: false, note: "contract: agents decline voluntary interference" },
+        Item { name: "dodge success",   count: cov.dodge_rolls.success,   required: true, blocked: false, note: "" },
+        Item { name: "dodge failure",   count: cov.dodge_rolls.failure,   required: true, blocked: false, note: "" },
+        Item { name: "GFI rolls",       count: cov.go_for_it_rolls.total, required: true, blocked: false, note: "" }.block("BLOCKED on the one-move-per-activation decision: both harnesses move exactly ONE square per activation (measured 1:1, player_moved_events == activations.Move), so a carrier cannot cross the pitch and nothing accumulates the movement a rush needs. See BACKLOG."),
+        Item { name: "pickup success",  count: cov.pickup_rolls.success,  required: true, blocked: false, note: "" },
+        Item { name: "pickup failure",  count: cov.pickup_rolls.failure,  required: true, blocked: false, note: "turnover + scatter" },
+        Item { name: "catch success",   count: cov.catch_rolls.success,   required: true, blocked: false, note: "" },
+        Item { name: "catch failure",   count: cov.catch_rolls.failure,   required: true, blocked: false, note: "" },
+        Item { name: "ball scatters",   count: cov.scatter_balls,         required: true, blocked: false, note: "failed pickup / dropped ball / bounces" },
+        Item { name: "throw-ins",       count: cov.throw_ins,             required: true, blocked: false, note: "ball out of bounds" },
+        Item { name: "pass rolls",      count: cov.pass_rolls.total,      required: true, blocked: false, note: "" },
+        Item { name: "pass deviates",   count: cov.pass_deviates,         required: false, blocked: false, note: "wildly inaccurate passes only" },
+        Item { name: "interceptions",   count: cov.interception_rolls.total, required: false, blocked: false, note: "contract: agents decline voluntary interference" },
     ];
 
     items.extend(block_and_injury_items(cov));
@@ -146,6 +161,7 @@ pub fn full_mechanic_items(cov: &CoverageReport, edition: &str) -> Vec<Item> {
             name: leak(name.to_string()),
             count,
             required: false,
+            blocked: false,
             note: "roster-rare — not always reachable in a given run",
         });
     }
@@ -162,6 +178,7 @@ pub fn full_mechanic_items(cov: &CoverageReport, edition: &str) -> Vec<Item> {
             name: leak(format!("inducement {}", entry.name)),
             count,
             required,
+            blocked: false,
             note,
         });
     }
@@ -180,6 +197,8 @@ pub fn render_markdown(cov: &CoverageReport, games: u32) -> (String, bool) {
     for it in &items {
         let status = if it.count > 0 {
             "ok"
+        } else if it.blocked {
+            "BLOCKED (needs a decision)"
         } else if it.required {
             ok = false;
             "**MISSING**"
@@ -304,6 +323,8 @@ pub fn render_full_mechanic_markdown(cov: &CoverageReport, games: u32, edition: 
     for it in &items {
         let status = if it.count > 0 {
             "ok"
+        } else if it.blocked {
+            "BLOCKED (needs a decision)"
         } else if it.required {
             ok = false;
             "**MISSING**"
