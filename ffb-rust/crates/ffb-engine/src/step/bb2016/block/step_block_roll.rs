@@ -166,7 +166,20 @@ impl StepBlockRoll {
             // Java: publishParameter(BLOCK_RESULT, fBlockResult)
             // Java: getResult().setNextAction(StepAction.NEXT_STEP)
             let block_result = self.block_result.unwrap();
+            // Coverage instrument: mirror the BB2025 twin's BlockRoll event. This is a LIVE
+            // edition override, so without it BB2016 reported the whole block family - `block N
+            // dice`, every `block result *`, and the counters derived from them - as ZERO while
+            // blocks obviously happened.
             return StepOutcome::next()
+                .with_event(ffb_model::events::GameEvent::BlockRoll {
+                    attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
+                    defender_id: game.defender_id.clone().unwrap_or_default(),
+                    nr_of_dice: self.nr_of_dice,
+                    dice: self.block_roll.clone(),
+                    selected_index: self.dice_index as i32,
+                    own_choice: self.nr_of_dice >= 0,
+                    rerolled: self.re_roll.re_roll_source.is_some(),
+                })
                 .publish(StepParameter::NrOfDice(self.nr_of_dice))
                 .publish(StepParameter::BlockRoll(self.block_roll.clone()))
                 .publish(StepParameter::DiceIndex(self.dice_index))

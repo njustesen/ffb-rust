@@ -272,6 +272,14 @@ impl StepPushback {
             // player pushed onto its square arrives), so drain in REVERSE push order.
             let pushes: Vec<(String, FieldCoordinate)> =
                 self.pushback_stack.drain(..).rev().collect();
+            // Coverage instrument: mirror the BB2025 twin's Pushback event. Built BEFORE the
+            // pushes are applied, since `pushes` is drained. Without it BB2016 reported
+            // `pushbacks` as ZERO. LIVE edition override, not a dead twin.
+            let pushback_event = ffb_model::events::GameEvent::Pushback {
+                attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
+                defender_id: game.defender_id.clone().unwrap_or_default(),
+                squares: pushes.iter().map(|(_, c)| *c).collect(),
+            };
             let mut extra: Vec<StepParameter> = Vec::new();
             for (player_id, coord) in pushes {
                 extra.extend(push_player(game, &player_id, coord));
@@ -280,6 +288,7 @@ impl StepPushback {
             self.starting_pushback_square = None;
 
             let mut outcome = StepOutcome::next()
+                .with_event(pushback_event)
                 .publish(StepParameter::DefenderPushed(true))
                 .publish(StepParameter::StartingPushbackSquare(None));
             for p in extra { outcome = outcome.publish(p); }

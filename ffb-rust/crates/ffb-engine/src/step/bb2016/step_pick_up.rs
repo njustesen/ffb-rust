@@ -165,9 +165,26 @@ impl StepPickUp {
             vec![],
         ));
 
+        // Coverage instrument: mirror the BB2025 twin's PickupRoll/BallPickedUp events. This is a
+        // LIVE edition override, so without them BB2016 reported `pickup success`/`pickup failure`
+        // as ZERO while pickups obviously happened. Emission points match BB2025 exactly - success,
+        // the re-roll OFFER (where a failed initial roll is counted), and the final failure.
+        let pickup_event = ffb_model::events::GameEvent::PickupRoll {
+            player_id: player_id.to_owned(),
+            target: minimum_roll,
+            roll: self.roll,
+            success: successful,
+            rerolled: already_rerolled_for_report,
+        };
+
         if successful {
             game.field_model.ball_moving = false;
-            return StepOutcome::next();
+            let picked_up = ffb_model::events::GameEvent::BallPickedUp {
+                player_id: player_id.to_owned(),
+                coord: game.field_model.ball_coordinate
+                    .unwrap_or(ffb_model::types::FieldCoordinate::new(-1, -1)),
+            };
+            return StepOutcome::next().with_event(pickup_event).with_event(picked_up);
         }
 
         // Failure — attempt re-roll on first failure
@@ -192,11 +209,11 @@ impl StepPickUp {
             if let Some(prompt) = ask_for_reroll_if_available(game, "PICKUP", minimum_roll, false) {
                 self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
                 self.roll = 0;
-                return StepOutcome::cont().with_prompt(prompt);
+                return StepOutcome::cont().with_prompt(prompt).with_event(pickup_event);
             }
         }
 
-        self.fail_pick_up()
+        self.fail_pick_up().with_event(pickup_event)
     }
 
     fn fail_pick_up(&self) -> StepOutcome {

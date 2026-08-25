@@ -99,6 +99,12 @@ impl StepFallDown {
         let is_pass_block = game.turn_mode == TurnMode::PassBlock;
 
         let mut outcome = StepOutcome::next();
+        // Coverage instrument: mirror the BB2025 twin's PlayerFellDown event. Without it BB2016
+        // reported `players fell` as ZERO. This is a LIVE edition override, not a dead twin.
+        outcome = outcome.with_event(ffb_model::events::GameEvent::PlayerFellDown {
+            player_id: player_id.clone(),
+            coord,
+        });
         for p in drop_params {
             outcome = outcome.publish(p);
         }
