@@ -3500,3 +3500,29 @@ more than one known seed, and the same mistake should not be repeated twice in o
 NEXT: gate BB2016 1-100. Then goblin seed 85, whose investigation is fully recorded above and
 resumable (extra CatchScatterThrowIn after a PickUp, both engines block, candidate lists agree,
 nothing moves the blitzer; open question is which sequence each PickUp belongs to).
+
+**§12 BB2016 GATE: 0 GREEN / 30 RED. The branch has BROKEN BB2016 COMPLETELY. DO NOT MERGE.**
+
+    Every roster 0-3/100, and almost all diverge at STEP 1 (the very first activation).
+    Verified against main: MAIN bb2016 human 1-5 = 5/5. So this is the branch, not pre-existing.
+
+This is a worse regression than the BB2020 one, and it was found the same way - by gating an
+edition that had never been measured. The lesson from iteration 86 stands doubled: gating one
+edition proves nothing about the others, and this branch has now silently broken TWO of the three
+while BB2025 looked perfect.
+
+**Likely cause, to verify not assume.** BB2016 has NO SelectBlitzTarget concept at all - the
+harness says so explicitly ("BB2016 has no SELECT_BLITZ_TARGET step. Drive the bb2016 3-command
+blitz: CLIENT_BLITZ_MOVE then CLIENT_BLOCK") and BB2016 has its own `step_init_selecting`. But the
+AGENT is shared across all three editions, and this branch changed it to STOP FOLDING the blitz
+target (`PlayerActionChoice::Blitz => None` in `compute_follow_up`) because the chain now asks for
+it separately. BB2016 never gets a chain prompt, so its blitz would be left with no target at all
+- which fits a step-1 divergence on essentially every roster.
+
+The same exposure applies to every other shared change on this branch: the agent's Move-prompt
+blitz arm, the negatrait FAILED marker, the SBTEnd defender restore, the blood-lust dispatch.
+
+NEXT: confirm by probing a BB2016 blitz for a missing `block_defender_id`, then edition-gate the
+agent's folding so BB2016 keeps its folded target while BB2020/BB2025 use the chain. Re-gate ALL
+THREE editions afterwards - BB2025 30/30 and BB2020 29/30 must be re-verified, not assumed to
+survive an agent change.
