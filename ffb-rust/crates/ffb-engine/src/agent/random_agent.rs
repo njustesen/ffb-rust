@@ -955,7 +955,7 @@ impl Agent for RandomAgent {
             // coordinate-sorted adjacent blockables — first idx % N, second idx % (N-1) —
             // exactly ParityRunner's sendSynchronousMultiBlock. With fewer than two targets
             // (both KO'd since the turn-start snapshot) deselect like any stale declaration.
-            Some(AgentPrompt::MultiBlockTargets { eligible_players, .. }) => {
+            Some(AgentPrompt::MultiBlockTargets { player_id: blocker_id, eligible_players }) => {
                 if eligible_players.len() < 2 {
                     return Action::EndPlayerAction;
                 }
@@ -964,13 +964,30 @@ impl Agent for RandomAgent {
                 let d1 = pool.remove(i1);
                 let i2 = self.pick_action(pool.len());
                 let d2 = pool.remove(i2);
+                // Java's SynchronousMultiBlockLogicModule offers the STAB alternative exactly
+                // when the acting player has `providesMultipleBlockAlternative` (registered by
+                // Stab in every edition); otherwise it auto-selects BlockKind.BLOCK. Use that
+                // ENGINE property rather than an invented rule, and take the alternative for the
+                // FIRST-drawn target only - that way one multiblock exercises BOTH the block group
+                // and the stab group. Deterministic: NO extra actionRng draw, because ParityRunner
+                // already spends exactly two here and a third would desync the stream.
+                // The BLOCKER is the prompt's own player_id - mirroring ParityRunner's
+                // sendSynchronousMultiBlock(game, gameState, playerId) parameter. acting_player is
+                // not yet committed at this continuation prompt, so reading it here found nobody
+                // and the stab alternative was never offered.
+                let can_stab = gs.game.player(blocker_id)
+                    .map(|p| p.has_skill_property(
+                        ffb_model::model::property::named_properties::NamedProperties::PROVIDES_MULTIPLE_BLOCK_ALTERNATIVE))
+                    .unwrap_or(false);
+                let kind1 = if can_stab {
+                    ffb_model::model::block_kind::BlockKind::STAB
+                } else {
+                    ffb_model::model::block_kind::BlockKind::BLOCK
+                };
                 Action::MultiBlock {
-                    // ParityRunner: new BlockTarget(dN.getId(), BlockKind.BLOCK, fm.getPlayerState(dN)).
-                    // The kind is a CLIENT choice (Java's SynchronousMultiBlockLogicModule maps the
-                    // STAB ClientAction to BlockKind.STAB); neither harness offers it yet, so both
-                    // targets are BLOCK and this is byte-identical to the old two-id action.
+                    // ParityRunner: new BlockTarget(dN.getId(), kind, fm.getPlayerState(dN)).
                     targets: vec![
-                        ffb_model::model::block_target::BlockTarget::new(d1.clone(), ffb_model::model::block_kind::BlockKind::BLOCK,
+                        ffb_model::model::block_target::BlockTarget::new(d1.clone(), kind1,
                             gs.game.field_model.player_state(&d1)),
                         ffb_model::model::block_target::BlockTarget::new(d2.clone(), ffb_model::model::block_kind::BlockKind::BLOCK,
                             gs.game.field_model.player_state(&d2)),
