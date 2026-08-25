@@ -563,13 +563,18 @@ impl CoverageReport {
 
 pub fn player_action_name(action: &PlayerAction) -> &'static str {
     match action {
-        PlayerAction::Move | PlayerAction::BlitzMove | PlayerAction::HandOverMove
+        PlayerAction::Move | PlayerAction::HandOverMove
         | PlayerAction::PassMove | PlayerAction::FoulMove | PlayerAction::GazeMove
         | PlayerAction::KickTeamMateMove | PlayerAction::ThrowTeamMateMove
         | PlayerAction::PuntMove | PlayerAction::PutridRegurgitationMove => "Move",
         PlayerAction::Block | PlayerAction::PutridRegurgitationBlock
         | PlayerAction::KickEmBlock => "Block",
-        PlayerAction::Blitz | PlayerAction::BlitzSelect
+        // BlitzMove belongs HERE, not with Move. Java's StepInitSelecting :114 does
+        // changeActingPlayer(pid, BLITZ_MOVE) when it dispatches BLITZ_SELECT, so once the
+        // blitz-select chain went live (BACKLOG §12) every blitz DECLARATION started reporting
+        // BLITZ_MOVE. Lumping that with Move drove `action Blitz` to zero - the checklist's own
+        // vacuous-green guard - while inflating `action Move` by the same amount.
+        PlayerAction::Blitz | PlayerAction::BlitzSelect | PlayerAction::BlitzMove
         | PlayerAction::PutridRegurgitationBlitz | PlayerAction::KickEmBlitz => "Blitz",
         PlayerAction::StandUpBlitz => "StandUpBlitz",
         PlayerAction::Pass => "Pass",
