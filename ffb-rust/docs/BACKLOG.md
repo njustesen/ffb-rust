@@ -3538,3 +3538,10 @@ BB2025 and BB2020 are NOT confirmed at those numbers any more. The agent is shar
 editions and the gating change touched the blitz path every roster uses, so both matrices are
 re-run before any of this is called finished. Assuming they survive is exactly the reasoning that
 hid the BB2020 and BB2016 regressions for ~25 iterations each.
+
+**§12 BB2025 RE-GATE (after the agent gating change): 30 GREEN / 0 RED - re-confirmed.**
+
+    bb2016  30 / 0   confirmed
+    bb2025  30 / 0   confirmed (re-run after the agent change, not assumed)
+    bb2020  29 / 1   still pending re-verification
+
