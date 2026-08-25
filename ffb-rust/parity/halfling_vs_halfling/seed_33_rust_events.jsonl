@@ -1,7 +1,0 @@
-{"type":"startHalf","half":1}
-{"type":"kickoffScatter","start":{"x":20,"y":5},"direction":7,"distance":4}
-{"type":"kickoffResultEvent","result":"CheeringFans"}
-{"type":"cheeringFans","home_roll":5,"away_roll":5}
-{"type":"kickoffScatter","start":{"x":5,"y":5},"direction":3,"distance":4}
-{"type":"kickoffResultEvent","result":"SolidDefence"}
-{"type":"solidDefenceRoll","team_id":"home_halfling.lrb6","roll":3,"amount":6}

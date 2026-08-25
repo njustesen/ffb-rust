@@ -1,7 +1,0 @@
-{"type":"startHalf","half":1}
-{"type":"kickoffScatter","start":{"x":20,"y":5},"direction":5,"distance":4}
-{"type":"kickoffResultEvent","result":"CheeringFans"}
-{"type":"cheeringFans","home_roll":4,"away_roll":3}
-{"type":"kickoffScatter","start":{"x":5,"y":5},"direction":2,"distance":4}
-{"type":"kickoffResultEvent","result":"WeatherChange"}
-{"type":"weatherChange","weather":"Nice"}

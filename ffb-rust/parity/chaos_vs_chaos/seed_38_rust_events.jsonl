@@ -1,8 +1,0 @@
-{"type":"startHalf","half":1}
-{"type":"kickoffScatter","start":{"x":5,"y":5},"direction":5,"distance":6}
-{"type":"kickoffResultEvent","result":"CheeringFans"}
-{"type":"cheeringFans","home_roll":5,"away_roll":4}
-{"type":"kickoffScatter","start":{"x":20,"y":5},"direction":8,"distance":2}
-{"type":"kickoffResultEvent","result":"BrilliantCoaching"}
-{"type":"kickoffExtraReRoll","team_id":"home_chaos.lrb6"}
-{"type":"kickoffExtraReRoll","team_id":"away_chaos.lrb6"}

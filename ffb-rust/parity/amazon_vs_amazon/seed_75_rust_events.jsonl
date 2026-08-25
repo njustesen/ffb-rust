@@ -1,7 +1,0 @@
-{"type":"startHalf","half":1}
-{"type":"kickoffScatter","start":{"x":5,"y":5},"direction":7,"distance":2}
-{"type":"kickoffResultEvent","result":"TimeOut"}
-{"type":"kickoffTimeout","turn_number":0,"turn_modifier":1}
-{"type":"kickoffScatter","start":{"x":20,"y":5},"direction":2,"distance":3}
-{"type":"kickoffResultEvent","result":"WeatherChange"}
-{"type":"weatherChange","weather":"Nice"}

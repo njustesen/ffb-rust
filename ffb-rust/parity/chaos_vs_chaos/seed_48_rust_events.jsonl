@@ -1,7 +1,0 @@
-{"type":"startHalf","half":1}
-{"type":"kickoffScatter","start":{"x":5,"y":5},"direction":2,"distance":0}
-{"type":"kickoffResultEvent","result":"DodgySnack"}
-{"type":"kickoffDodgySnack","roll_home":1,"roll_away":5,"player_ids":["home_07"]}
-{"type":"dodgySnackRoll","player_id":"home_07","roll":3}
-{"type":"kickoffScatter","start":{"x":20,"y":5},"direction":7,"distance":2}
-{"type":"kickoffResultEvent","result":"GetTheRef"}

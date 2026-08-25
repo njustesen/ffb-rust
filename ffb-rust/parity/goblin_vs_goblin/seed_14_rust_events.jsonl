@@ -1,6 +1,0 @@
-{"type":"startHalf","half":1}
-{"type":"kickoffScatter","start":{"x":20,"y":5},"direction":4,"distance":3}
-{"type":"kickoffResultEvent","result":"HighKick"}
-{"type":"kickoffScatter","start":{"x":5,"y":5},"direction":7,"distance":5}
-{"type":"kickoffResultEvent","result":"SolidDefence"}
-{"type":"solidDefenceRoll","team_id":"home_goblin.lrb6","roll":2,"amount":5}

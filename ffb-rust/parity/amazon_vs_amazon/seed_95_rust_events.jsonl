@@ -1,5 +1,0 @@
-{"type":"startHalf","half":1}
-{"type":"kickoffScatter","start":{"x":20,"y":5},"direction":4,"distance":2}
-{"type":"kickoffResultEvent","result":"Charge"}
-{"type":"kickoffScatter","start":{"x":5,"y":5},"direction":5,"distance":6}
-{"type":"kickoffResultEvent","result":"HighKick"}

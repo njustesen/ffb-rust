@@ -1,7 +1,0 @@
-{"type":"startHalf","half":1}
-{"type":"kickoffScatter","start":{"x":5,"y":5},"direction":5,"distance":4}
-{"type":"kickoffResultEvent","result":"Charge"}
-{"type":"kickoffScatter","start":{"x":20,"y":5},"direction":4,"distance":1}
-{"type":"kickoffResultEvent","result":"DodgySnack"}
-{"type":"kickoffDodgySnack","roll_home":5,"roll_away":4,"player_ids":["away_10"]}
-{"type":"dodgySnackRoll","player_id":"away_10","roll":6}

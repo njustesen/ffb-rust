@@ -1,8 +1,0 @@
-{"type":"startHalf","half":1}
-{"type":"kickoffScatter","start":{"x":20,"y":5},"direction":1,"distance":3}
-{"type":"kickoffResultEvent","result":"DodgySnack"}
-{"type":"kickoffDodgySnack","roll_home":4,"roll_away":2,"player_ids":["away_05"]}
-{"type":"dodgySnackRoll","player_id":"away_05","roll":3}
-{"type":"kickoffScatter","start":{"x":5,"y":5},"direction":7,"distance":4}
-{"type":"kickoffResultEvent","result":"BrilliantCoaching"}
-{"type":"kickoffExtraReRoll","team_id":"away_amazon.lrb6"}

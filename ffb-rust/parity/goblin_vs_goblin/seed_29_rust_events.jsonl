@@ -1,7 +1,0 @@
-{"type":"startHalf","half":1}
-{"type":"kickoffScatter","start":{"x":20,"y":5},"direction":7,"distance":5}
-{"type":"kickoffResultEvent","result":"BrilliantCoaching"}
-{"type":"kickoffExtraReRoll","team_id":"away_goblin.lrb6"}
-{"type":"kickoffScatter","start":{"x":5,"y":5},"direction":2,"distance":2}
-{"type":"kickoffResultEvent","result":"QuickSnap"}
-{"type":"quickSnapRoll","team_id":"away_goblin.lrb6","roll":1,"amount":4}

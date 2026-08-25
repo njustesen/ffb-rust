@@ -1,5 +1,0 @@
-{"type":"game_start","i":0,"home":"halfling","away":"halfling","seed":28,"state_hash":"384ccaed1d572749"}
-{"type":"step","i":1,"turn":2,"half":1,"active":"away","dialog":"None","state_hash":"a63c36bfec0353a0","actions":["EndTurn"],"chosen":"Activate(away_02,Move)","dice":[],"post_hash":"4d6653389973ef7c"}
-{"type":"step","i":2,"turn":2,"half":1,"active":"away","dialog":"None","state_hash":"4d6653389973ef7c","actions":["EndTurn"],"chosen":"Activate(away_09,Move)","dice":[],"post_hash":"4b98416e49af4ff8"}
-{"type":"step","i":3,"turn":2,"half":1,"active":"away","dialog":"None","state_hash":"4b98416e49af4ff8","actions":["EndTurn"],"chosen":"Activate(away_01,ThrowTeamMate)","dice":[],"post_hash":"4b98416e49af4ff8"}
-{"type":"game_end","i":4,"home_score":0,"away_score":0,"state_hash":"4b98416e49af4ff8"}

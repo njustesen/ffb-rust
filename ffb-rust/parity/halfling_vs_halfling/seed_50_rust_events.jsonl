@@ -1,6 +1,0 @@
-{"type":"startHalf","half":1}
-{"type":"kickoffScatter","start":{"x":20,"y":5},"direction":8,"distance":4}
-{"type":"kickoffResultEvent","result":"HighKick"}
-{"type":"kickoffScatter","start":{"x":5,"y":5},"direction":2,"distance":4}
-{"type":"kickoffResultEvent","result":"WeatherChange"}
-{"type":"weatherChange","weather":"SwelteringHeat"}
