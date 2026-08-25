@@ -46,7 +46,10 @@ pub enum Action {
     /// Stab an adjacent opponent (no block dice; direct armor/injury roll).
     Stab { defender_id: PlayerId },
     /// Declare Multiple Block against two adjacent targets (BB2020+, requires MultipleBlock skill).
-    MultiBlock { defender1_id: PlayerId, defender2_id: PlayerId },
+    /// Java `ClientCommandSynchronousMultiBlock(List<BlockTarget>)` - each target carries its
+    /// own `BlockKind` and the defender's ORIGINAL PlayerState, both of which BB2020's fork needs
+    /// (it groups on the kind and republishes the state as OLD_DEFENDER_STATE).
+    MultiBlock { targets: Vec<ffb_model::model::block_target::BlockTarget> },
     /// Choose which block die result to apply.
     /// `target_id` is `Some` in multi-block sequences (CLIENT_BLOCK_OR_RE_ROLL_CHOICE_FOR_TARGET).
     BlockChoice { die_index: usize, target_id: Option<String> },

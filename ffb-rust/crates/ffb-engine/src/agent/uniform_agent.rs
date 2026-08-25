@@ -305,7 +305,18 @@ impl Agent for UniformAgent {
                 let d1 = pool.remove(i1);
                 let i2 = self.pick(pool.len());
                 let d2 = pool.remove(i2);
-                Action::MultiBlock { defender1_id: d1, defender2_id: d2 }
+                Action::MultiBlock {
+                    // ParityRunner: new BlockTarget(dN.getId(), BlockKind.BLOCK, fm.getPlayerState(dN)).
+                    // The kind is a CLIENT choice (Java's SynchronousMultiBlockLogicModule maps the
+                    // STAB ClientAction to BlockKind.STAB); neither harness offers it yet, so both
+                    // targets are BLOCK and this is byte-identical to the old two-id action.
+                    targets: vec![
+                        ffb_model::model::block_target::BlockTarget::new(d1.clone(), ffb_model::model::block_kind::BlockKind::BLOCK,
+                            gs.game.field_model.player_state(&d1)),
+                        ffb_model::model::block_target::BlockTarget::new(d2.clone(), ffb_model::model::block_kind::BlockKind::BLOCK,
+                            gs.game.field_model.player_state(&d2)),
+                    ],
+                }
             }
             Some(AgentPrompt::PlayerChoice { eligible_players, .. }) => {
                 if eligible_players.is_empty() { return Action::Acknowledge; }

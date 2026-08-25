@@ -4,7 +4,7 @@ use crate::model::player::PlayerId;
 use super::block_kind::BlockKind;
 
 /// 1:1 translation of com.fumbbl.ffb.model.BlockTarget.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockTarget {
     pub player_id: Option<PlayerId>,
     pub kind: Option<BlockKind>,

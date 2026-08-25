@@ -432,18 +432,14 @@ impl Step for StepInitSelecting {
             }
             // Java: CLIENT_SYNCHRONOUS_MULTI_BLOCK (bb2025 shared StepInitSelecting:328-334) —
             // publish BLOCK_TARGETS, changePlayerAction(MULTIPLE_BLOCK), dispatch, EXECUTE.
-            Action::MultiBlock { defender1_id, defender2_id } => {
+            Action::MultiBlock { targets } => {
                 if let Some(pid) = game.acting_player.player_id.clone() {
                     util_server_steps::change_player_action(game, &pid, PlayerAction::MultipleBlock, false);
                     self.dispatch_player_action = Some(PlayerAction::MultipleBlock);
                     return self.execute_step(game, rng)
-                        // Java publishes the client command's `List<BlockTarget>` verbatim. The
-                        // agent does not yet choose a kind, so both are BLOCK - exactly what the
-                        // old `Vec<String>` shape hard-coded, and what ParityRunner:1940-41 sends.
-                        .publish(StepParameter::BlockTargets(vec![
-                            ffb_model::model::block_target::BlockTarget::block(defender1_id.clone()),
-                            ffb_model::model::block_target::BlockTarget::block(defender2_id.clone()),
-                        ]));
+                        // Java: publishParameter(BLOCK_TARGETS, command.getSelectedTargets()) -
+                        // the client's list, verbatim, kinds and original states included.
+                        .publish(StepParameter::BlockTargets(targets.clone()));
                 }
                 return self.execute_step(game, rng);
             }

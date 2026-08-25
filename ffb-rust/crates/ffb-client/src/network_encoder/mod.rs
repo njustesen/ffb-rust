@@ -187,9 +187,10 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
 
         Action::Acknowledge => None,
 
-        Action::MultiBlock { defender1_id, defender2_id: _ } => {
+        Action::MultiBlock { targets } => {
             // Use first defender for the primary block command; server handles both
-            Some(ClientCommand::ClientBlock(ClientBlock { defender_id: defender1_id }))
+            let defender_id = targets.first().and_then(|t| t.get_player_id().cloned())?;
+            Some(ClientCommand::ClientBlock(ClientBlock { defender_id }))
         }
 
         Action::Stab { defender_id } => {
