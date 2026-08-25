@@ -6,7 +6,7 @@ use super::activation_sequence_builder::ActivationSequenceBuilder;
 
 #[derive(Debug, Clone)]
 pub struct MultiBlockParams {
-    pub block_targets: Vec<String>,
+    pub block_targets: Vec<ffb_model::model::block_target::BlockTarget>,
     /// Edition this sequence is built for; only BB2020 differs (no STEADY_FOOTING in the activation).
     pub rules: ffb_model::enums::Rules,
 }

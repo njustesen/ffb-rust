@@ -40,17 +40,17 @@ impl MultiBlock {
         // FOUL_APPEARANCE_MULTIPLE
         seq.add(StepId::FoulAppearanceMultiple, vec![
             StepParameter::GotoLabelOnFailure(labels::END_BLOCKING.into()),
-            StepParameter::BlockTargets(params.block_targets.clone()),
+            StepParameter::BlockTargets(params.block_targets.iter().cloned().map(ffb_model::model::block_target::BlockTarget::block).collect()),
         ]);
         // DISPATCH_DUMP_OFF
         seq.add(StepId::DispatchDumpOff, vec![
-            StepParameter::BlockTargets(params.block_targets.clone()),
+            StepParameter::BlockTargets(params.block_targets.iter().cloned().map(ffb_model::model::block_target::BlockTarget::block).collect()),
         ]);
         // BLOCK_STATISTICS
         seq.add(StepId::BlockStatistics, vec![StepParameter::Increment(size)]);
         // MULTIPLE_BLOCK_FORK
         seq.add(StepId::MultipleBlockFork, vec![
-            StepParameter::BlockTargets(params.block_targets.clone()),
+            StepParameter::BlockTargets(params.block_targets.iter().cloned().map(ffb_model::model::block_target::BlockTarget::block).collect()),
         ]);
         // PLACE_BALL
         seq.add(StepId::PlaceBall, vec![]);

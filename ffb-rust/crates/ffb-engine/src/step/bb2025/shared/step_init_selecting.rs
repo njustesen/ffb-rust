@@ -437,8 +437,12 @@ impl Step for StepInitSelecting {
                     util_server_steps::change_player_action(game, &pid, PlayerAction::MultipleBlock, false);
                     self.dispatch_player_action = Some(PlayerAction::MultipleBlock);
                     return self.execute_step(game, rng)
+                        // Java publishes the client command's `List<BlockTarget>` verbatim. The
+                        // agent does not yet choose a kind, so both are BLOCK - exactly what the
+                        // old `Vec<String>` shape hard-coded, and what ParityRunner:1940-41 sends.
                         .publish(StepParameter::BlockTargets(vec![
-                            defender1_id.clone(), defender2_id.clone(),
+                            ffb_model::model::block_target::BlockTarget::block(defender1_id.clone()),
+                            ffb_model::model::block_target::BlockTarget::block(defender2_id.clone()),
                         ]));
                 }
                 return self.execute_step(game, rng);

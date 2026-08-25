@@ -263,7 +263,7 @@ impl Step for StepDauntlessMultiple {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             StepParameter::BlockTargets(ids) => {
-                self.block_targets.extend(ids.iter().cloned());
+                self.block_targets.extend(ids.iter().filter_map(|t| t.get_player_id().cloned()));
                 true
             }
             StepParameter::PlayerIdToRemove(id) => {

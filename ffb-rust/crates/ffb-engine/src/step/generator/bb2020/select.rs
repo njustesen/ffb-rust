@@ -8,7 +8,7 @@ use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
 pub struct SelectParams {
     pub update_persistence: bool,
     pub is_blitz_move: bool,
-    pub block_targets: Vec<String>,
+    pub block_targets: Vec<ffb_model::model::block_target::BlockTarget>,
 }
 
 pub struct Select;

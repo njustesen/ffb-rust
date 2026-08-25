@@ -12,7 +12,7 @@ pub struct SelectParams {
     pub is_blitz_move: bool,
     /// Java `blockTargets` — defender IDs threaded to END_SELECTING (here as strings, matching
     /// the bb2020 sibling convention, since `BlockTarget` isn't threaded through this step layer).
-    pub block_targets: Vec<String>,
+    pub block_targets: Vec<ffb_model::model::block_target::BlockTarget>,
     /// Edition this sequence is built for; only BB2020 differs (no STEADY_FOOTING in the activation).
     pub rules: ffb_model::enums::Rules,
 }
@@ -150,7 +150,7 @@ mod tests {
         let params = SelectParams { block_targets: vec!["p1".into()], ..Default::default() };
         let steps = Select::build_sequence(&params);
         let end = steps.iter().find(|s| s.step_id == StepId::EndSelecting).unwrap();
-        assert!(end.params.iter().any(|p| matches!(p, StepParameter::BlockTargets(v) if v == &vec!["p1".to_string()])));
+        assert!(end.params.iter().any(|p| matches!(p, StepParameter::BlockTargets(v) if v.iter().filter_map(|t| t.get_player_id().cloned()).collect::<Vec<_>>() == vec!["p1".to_string()])));
     }
 
     /// `bb2020/SelectBlitzTarget.java:35` rolls FOUL_APPEARANCE after BLOOD_LUST and before

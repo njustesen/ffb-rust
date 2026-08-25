@@ -102,9 +102,7 @@ impl StepMultipleBlockFork {
             seq.push(SequenceStep::with_params(
                 StepId::DauntlessMultiple,
                 vec![StepParameter::BlockTargets(
-                    block_group.iter()
-                        .filter_map(|t| t.get_player_id().cloned())
-                        .collect(),
+                    block_group.iter().map(|t| (*t).clone()).collect(),
                 )],
             ));
 
@@ -125,9 +123,7 @@ impl StepMultipleBlockFork {
                 StepId::BlockRollMultiple,
                 vec![
                     StepParameter::BlockTargets(
-                        block_group.iter()
-                            .filter_map(|t| t.get_player_id().cloned())
-                            .collect(),
+                        block_group.iter().map(|t| (*t).clone()).collect(),
                     ),
                     StepParameter::ParametersToConsume(params_to_consume()),
                 ],
@@ -209,7 +205,7 @@ impl Step for StepMultipleBlockFork {
             StepParameter::BlockTargets(ids) => {
                 // BlockTargets in Rust carries player IDs; reconstruct BlockTargets with BLOCK kind.
                 for pid in ids {
-                    self.targets.push(BlockTarget::new(pid.clone(), BlockKind::BLOCK, None));
+                    self.targets.push(pid.clone());
                 }
                 true
             }

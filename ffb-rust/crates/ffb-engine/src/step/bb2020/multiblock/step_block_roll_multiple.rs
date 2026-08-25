@@ -475,8 +475,12 @@ impl Step for StepBlockRollMultiple {
             // Java: init(StepParameterSet) → BLOCK_TARGETS: add BlockRoll per target
             StepParameter::BlockTargets(ids) => {
                 self.block_rolls.extend(
-                    ids.iter().enumerate().map(|(i, pid)| {
-                        BlockRoll::new_with(pid.as_str(), None, i as i32)
+                    ids.iter().enumerate().map(|(i, target)| {
+                        BlockRoll::new_with(
+                            target.get_player_id().map(|p| p.as_str()).unwrap_or(""),
+                            None,
+                            i as i32,
+                        )
                     })
                 );
                 true

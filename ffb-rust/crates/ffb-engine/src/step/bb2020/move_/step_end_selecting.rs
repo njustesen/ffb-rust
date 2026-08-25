@@ -81,7 +81,7 @@ pub struct StepEndSelecting {
     /// Java: fNumDice
     pub num_dice: i32,
     /// Java: blockTargets
-    pub block_targets: Vec<String>,
+    pub block_targets: Vec<ffb_model::model::block_target::BlockTarget>,
     /// Java: targetPlayerId
     pub target_player_id: Option<String>,
     /// Java: ballAndChainRrSetting
@@ -326,7 +326,9 @@ impl StepEndSelecting {
             PlayerAction::MultipleBlock => {
                 let seq = if with_parameter {
                     MultiBlock::build_sequence(&MultiBlockParams {
-                        block_targets: self.block_targets.clone(),
+                        // the BB2020 MultiBlock generator still keys on ids
+                        block_targets: self.block_targets.iter()
+                            .filter_map(|t| t.get_player_id().cloned()).collect(),
                     })
                 } else {
                     MultiBlock::build_sequence(&MultiBlockParams::default())
@@ -654,7 +656,7 @@ mod tests {
             .expect("should push a Select sequence containing EndSelecting");
         let end_selecting = select_seq.iter().find(|s| s.step_id == StepId::EndSelecting).unwrap();
         assert!(
-            end_selecting.params.iter().any(|p| matches!(p, StepParameter::BlockTargets(v) if v == &vec!["defA".to_string(), "defB".to_string()])),
+            end_selecting.params.iter().any(|p| matches!(p, StepParameter::BlockTargets(v) if v.iter().filter_map(|t| t.get_player_id().cloned()).collect::<Vec<_>>() == vec!["defA".to_string(), "defB".to_string()])),
             "block_targets should be forwarded to the Select sequence's EndSelecting step"
         );
     }

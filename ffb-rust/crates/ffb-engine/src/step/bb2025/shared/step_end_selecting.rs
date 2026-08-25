@@ -87,7 +87,9 @@ pub struct StepEndSelecting {
     /// Java: checkForgo
     pub check_forgo: bool,
     /// Java: blockTargets (List<BlockTarget> — here stored as defender IDs)
-    pub block_targets: Vec<String>,
+    /// Java `StepEndSelecting.fBlockTargets` is `List<BlockTarget>` - each carries its own
+    /// `BlockKind`, which BB2020's multiple-block STAB group is grouped by.
+    pub block_targets: Vec<ffb_model::model::block_target::BlockTarget>,
 }
 
 impl StepEndSelecting {

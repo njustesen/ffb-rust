@@ -236,7 +236,10 @@ pub enum StepParameter {
     // ── block parameters ─────────────────────────────────────────────────────
     BlockResult(ffb_model::enums::BlockResult),
     BlockRoll(Vec<i32>),
-    BlockTargets(Vec<String>),
+    /// Java: `StepParameterKey.BLOCK_TARGETS` carries `List<BlockTarget>` - each target has its
+    /// own `BlockKind`. Modelling this as `Vec<String>` silently discarded the kind, which is
+    /// what BB2020's multiple-block STAB group is grouped by (see docs/DEAD_STEP_INVENTORY.md).
+    BlockTargets(Vec<ffb_model::model::block_target::BlockTarget>),
     NrOfDice2(i32),
     NumDice(i32),
     AskForBlockKind(bool),

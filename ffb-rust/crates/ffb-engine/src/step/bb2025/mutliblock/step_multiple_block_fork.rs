@@ -48,12 +48,14 @@ fn params_to_consume() -> Vec<std::mem::Discriminant<StepParameter>> {
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.mutliblock.StepMultipleBlockFork`.
 pub struct StepMultipleBlockFork {
-    /// Java: targets (List<BlockTarget>) — stored as player IDs until BlockTarget is ported
-    pub targets: Vec<String>,
+    /// Java: `targets` is `List<BlockTarget>` — each carries its own `BlockKind`. BB2020's fork
+    /// groups on that kind to build a STAB bucket; BB2025's (this one) has no stab in a multiple
+    /// block, but the kind must survive the parameter either way.
+    pub targets: Vec<ffb_model::model::block_target::BlockTarget>,
 }
 
 impl StepMultipleBlockFork {
-    pub fn new(targets: Vec<String>) -> Self {
+    pub fn new(targets: Vec<ffb_model::model::block_target::BlockTarget>) -> Self {
         Self { targets }
     }
 }
@@ -80,7 +82,7 @@ impl Step for StepMultipleBlockFork {
             // Java setParameter: PLAYER_ID_TO_REMOVE → remove the matching target
             // (consume() is mirrored separately via consumes_parameter below).
             StepParameter::PlayerIdToRemove(v) => {
-                if let Some(pos) = self.targets.iter().position(|t| t == v) {
+                if let Some(pos) = self.targets.iter().position(|t| t.get_player_id().map(|p| p == v).unwrap_or(false)) {
                     self.targets.remove(pos);
                 }
                 true
@@ -106,9 +108,10 @@ impl StepMultipleBlockFork {
         seq.push(SequenceStep::new(StepId::DoubleStrength));
 
         for target in &self.targets {
+            let target_id = match target.get_player_id() { Some(id) => id.clone(), None => continue };
             seq.push(SequenceStep::with_params(
                 StepId::SetDefender,
-                vec![StepParameter::BlockDefenderId(target.clone())],
+                vec![StepParameter::BlockDefenderId(target_id)],
             ));
             seq.push(SequenceStep::new(StepId::Trickster));
             seq.push(SequenceStep::with_params(
@@ -165,7 +168,7 @@ mod tests {
     fn new_stores_targets() {
         let step = StepMultipleBlockFork::new(vec!["a".into(), "b".into()]);
         assert_eq!(step.targets.len(), 2);
-        assert_eq!(step.targets[0], "a");
+        assert_eq!(step.targets[0].get_player_id().map(|p| p.as_str()), Some("a"));
     }
 
     #[test]

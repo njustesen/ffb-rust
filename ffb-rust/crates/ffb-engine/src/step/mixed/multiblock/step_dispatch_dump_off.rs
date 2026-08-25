@@ -63,7 +63,7 @@ impl Step for StepDispatchDumpOff {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             StepParameter::BlockTargets(ids) => {
-                self.targets.extend(ids.iter().cloned());
+                self.targets.extend(ids.iter().filter_map(|t| t.get_player_id().cloned()));
                 true
             }
             StepParameter::PlayerIdToRemove(id) => {
