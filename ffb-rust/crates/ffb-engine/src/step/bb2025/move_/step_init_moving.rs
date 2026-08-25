@@ -330,6 +330,30 @@ impl StepInitMoving {
         // moved to (11,8)+dodge vs Java staying at (12,7)). Skip straight to END_MOVING so the move
         // steps (Move/GoForIt/MoveDodge) are bypassed and the sequence proceeds to feeding.
         if game.acting_player.suffering_blood_lust {
+            // §12: this early-out was written for a plain MOVE, where "no move, then feed" IS the
+            // whole activation. On the chain path a BLITZ reaches this step too - its second pass
+            // dispatches BLITZ_MOVE - and a blitzer still owes its BLOCK. Ending the player action
+            // here killed it: vampire seed 1 in BOTH editions has main reaching StepInitBlocking
+            // with the blood-lust flag set and blocking anyway (7 InitBlocking executions to the
+            // branch's 6), while the branch never got there.
+            //
+            // Simply dropping the EndPlayerAction is NOT the fix - the activation then has no
+            // terminator at all and the driver loops forever (measured: the engine hangs). The
+            // blitzer instead takes the same route the agent's Block answer would have taken,
+            // dispatching BLITZ so the block sequence runs and ends the activation itself. The
+            // vampire still takes no MOVE, which is the behaviour this guard exists to preserve.
+            if matches!(game.acting_player.player_action,
+                        Some(PlayerAction::BlitzMove) | Some(PlayerAction::KickEmBlitz))
+                && !game.acting_player.has_blocked
+                && game.defender_id.is_some()
+            {
+                let dispatch = if game.acting_player.player_action == Some(PlayerAction::KickEmBlitz) {
+                    PlayerAction::KickEmBlitz
+                } else {
+                    PlayerAction::Blitz
+                };
+                return self.dispatch_player_action(dispatch);
+            }
             let label = self.goto_label_on_end.clone();
             return StepOutcome::goto(&label)
                 .publish(StepParameter::EndPlayerAction(true));
