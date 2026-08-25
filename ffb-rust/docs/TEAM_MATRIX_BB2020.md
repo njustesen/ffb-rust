@@ -15,7 +15,7 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `dark_elf_league_fumbbl` | 🟢 100/100 |  | FUMBBL-legacy roster |
 | `dwarf` | 🟢 100/100 |  |  |
 | `elf` | 🟢 100/100 |  |  |
-| `goblin` | 🔴 99/100 | seed 85, step 4, java 81290dd86512813c vs rust e43829d412738763 |  |
+| `goblin` | 🟢 100/100 |  |  |
 | `halfling` | 🟢 100/100 |  |  |
 | `high_elf` | 🟢 100/100 |  |  |
 | `human` | 🟢 100/100 |  |  |
@@ -37,4 +37,4 @@ Reds are RECORDED, not fixed (scope of the 2026-08-08 team-creation task).
 | `vampire` | 🟢 100/100 |  |  |
 | `wood_elf` | 🟢 100/100 |  |  |
 
-**29 green / 1 red of 30.**
+**30 green / 0 red of 30.**

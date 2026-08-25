@@ -3651,3 +3651,79 @@ preceding pick-up roll on either build, which means the ball was *already loose*
 possession changes (not dice) and find the step that drops it on the branch and not on
 main. Every previous attempt has instrumented dice; the divergence may not be a dice
 question at all.
+
+### §12 iteration 95 — goblin bb2020 seed 85 SOLVED: a shared generator built with the wrong edition
+
+**Root cause: `step_end_moving.rs` pushed the blitz-block sequence without passing `rules`.**
+
+The `FFB_BALLCHG` diagnostic (added to `driver.rs` alongside FFB_DEFCHG/FFB_POSCHG; it prints
+every step that moves the ball or flips its loose/in-play flags) answered the question in one
+run — but not the way iteration 79 framed it. The drive trace around the extra scatter reads:
+
+    DRIVE InitMoving   stack_len=27 rng=21
+    DRIVE EndMoving    stack_len=0  rng=21     <-- InitMoving DID goto END_MOVING, correctly
+    DRIVE InitBlocking stack_len=50 rng=21     <-- the BLOCK sequence
+    ... GoForIt SteadyFooting FoulAppearance DumpOff BlockStatistics Dauntless Horns Trickster
+    DRIVE PickUp             stack_len=41 rng=21
+    DRIVE CatchScatterThrowIn stack_len=40 rng=21
+    BALLCHG CatchScatterThrowIn (13,8) -> (12,9) rng=22 acting=away_03
+
+**Iteration 79's mechanism was wrong.** The PickUp is not in the move sequence and the order is
+not a move-phase-before-block artifact: `StepInitMoving` correctly gotos `END_MOVING` on the
+BLOCK command (Java `dispatchPlayerAction` → `GOTO_LABEL_AND_REPEAT fGotoLabelOnEnd`, which
+skips the sequence's own PICK_UP). The PickUp is **inside the block sequence**, and
+`bb2020/Block.java` has none there: it goes `TRICKSTER → CATCH_SCATTER_THROW_IN → STAB`.
+
+The `Horns` entry in the trace is the tell — BB2020's own generator has no Horns, so BB2020 was
+running the **shared BB2025** generator. That is the established pattern and is fine; the shared
+generator edition-gates the early PICK_UP on `params.rules != Rules::Bb2020`. But
+`BlitzBlockParams::default()` is `Rules::Bb2025`, and this push site built with
+`..Default::default()` — so the gate never fired. `rules` is already a parameter of
+`push_sequence_for_player_action`, threaded in for exactly this purpose, and the sibling push
+site in `step_end_selecting.rs` already passes it. One field, two arms (BLOCK and BLITZ).
+
+**Why it hid until now** — the same shape as the recorded "compensating bridge whose premise the
+chain invalidates": the folded blitz reached the generator through `step_end_selecting.rs`,
+which passes `rules` correctly. Only the chain routes a blitz through `EndMoving`. And it needed
+a goblin: the blitzer had to be standing on a loose ball for the spurious PICK_UP to roll
+anything at all.
+
+Fix + `bb2020_block_sequences_have_no_pick_up_before_the_block_dice`, which counts PickUps before
+BLOCK_ROLL and pins BB2025 at 1 as well as BB2020 at 0 — the gate, not just the absence. (A
+first draft asserting "no PICK_UP anywhere" failed correctly: BB2020 *does* have a later,
+post-follow-up PickUp that `block.rs` already covers.)
+
+Seed 85 green. ffb-engine 7291/0. Full three-edition gate running.
+
+**Lesson (recorded to memory):** a shared generator with edition gates is only as correct as its
+least careful call site, and `..Default::default()` silently supplies an edition. Every push site
+that builds an edition-gated sequence must pass `rules` explicitly — grep the call sites when
+adding such a gate rather than trusting the one path that was measured.
+
+### §12 iteration 95b — the `rules` fix was a HALF FIX; the other half was a missing FOUL_APPEARANCE
+
+Passing `rules` at the EndMoving push site greened goblin seed 85 but took BB2020 from 29 to
+**27**: dark_elf 15/100, necromantic 70/100, nurgle 2/100 (seed 1 step 1). Exactly the recorded
+"half-fix measures worse" shape - and the giveaway was that all three are **Foul Appearance**
+matchups.
+
+`params.rules` gates TWO entries in the shared BlitzBlock generator, not one. Passing it correctly
+dropped the spurious PICK_UP *and* dropped FOUL_APPEARANCE - because `bb2020/BlitzBlock.java`
+deliberately omits it there. BB2020 rolls Foul Appearance a phase EARLIER, in
+`bb2020/SelectBlitzTarget.java:35-36` (followed by DUMP_OFF); `bb2025/SelectBlitzTarget.java` has
+neither. Rust's shared select generator had neither either - so the roll existed only by accident,
+supplied by the block sequence that was being built with the wrong edition. Removing the accident
+without adding the real thing deleted the roll outright.
+
+Fix: the shared `select_blitz_target.rs` now adds FOUL_APPEARANCE + DUMP_OFF when
+`rules == Bb2020`, 1:1 with the Java generator. **BB2020 back to 30/30.**
+
+Isolation note: reverting the plain-BLOCK arm alone left the reds at an identical 27/3, which
+proved the regression was the BLITZ arm and that the BLOCK arm is parity-neutral across 3000
+BB2020 games. The BLOCK arm is kept anyway - `bb2020/Block.java` genuinely has no early PICK_UP,
+and the regression test asserts both arms.
+
+This is the second time in this campaign that one edition-gated field hid two behaviours. When a
+gate is flipped, enumerate every entry it controls before measuring.
+
+Full three-edition gate running.

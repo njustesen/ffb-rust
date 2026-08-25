@@ -357,6 +357,11 @@ impl StepEndMoving {
             PlayerAction::ViciousVines | PlayerAction::Block => {
                 Some(Block::build_sequence(&BlockParams {
                     using_chainsaw: self.using_chainsaw,
+                    // Same edition gate as the BlitzBlock arm below: `bb2020/Block.java` has no
+                    // PICK_UP before the block dice (it has a later, post-follow-up one), and the
+                    // shared BB2025 generator's Default is BB2025. Measured parity-neutral across
+                    // 3000 BB2020 games with and without; kept because it is what Java does.
+                    rules,
                     ..Default::default()
                 }))
             }
@@ -373,6 +378,12 @@ impl StepEndMoving {
                 Some(BlitzBlock::build_sequence(&BlitzBlockParams {
                     block_defender_id,
                     using_chainsaw: self.using_chainsaw,
+                    // The shared BB2025 BlitzBlock generator edition-gates two entries on this
+                    // field (PICK_UP and the primary blitz's FOUL_APPEARANCE); its Default is
+                    // BB2025, so omitting it silently gave a BB2020 blitz the BB2025 sequence.
+                    // `rules` is threaded into this function for exactly that reason, and the
+                    // sibling push site in step_end_selecting.rs already passes it.
+                    rules,
                     ..Default::default()
                 }))
             }
@@ -930,5 +941,38 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert!(!out.pushes.is_empty(), "KickTeamMateMove should still push Move sequence despite blitz_used");
+    }
+
+    /// §12: BB2020's Block/BlitzBlock sequences have no PICK_UP **before the block dice** -
+    /// `bb2020/Block.java` goes TRICKSTER -> CATCH_SCATTER_THROW_IN -> STAB. (They do have one
+    /// later, after the follow-up; that entry is BB2020-only and is asserted in block.rs.) The
+    /// shared BB2025 generators edition-gate the early entry on `params.rules`, whose Default is
+    /// BB2025, and this push site omitted the field even though `rules` is threaded into the
+    /// function for exactly that purpose.
+    ///
+    /// It stayed invisible until the blitz chain: the folded blitz reached the generator through
+    /// step_end_selecting.rs, which does pass `rules`. The chain routes through EndMoving instead,
+    /// so a BB2020 blitzer got a BB2025 PICK_UP - and a goblin blitzer standing on the loose ball
+    /// rolled a scatter Java never rolls (goblin bb2020 seed 85, the last red of the campaign).
+    #[test]
+    fn bb2020_block_sequences_have_no_pick_up_before_the_block_dice() {
+        use crate::step::framework::StepId;
+
+        let pick_ups_before_block_roll = |action: PlayerAction, rules: Rules| {
+            let steps = StepEndMoving::default()
+                .push_sequence_for_player_action(action, rules, Some("def".into()))
+                .expect("sequence must be built");
+            let block_roll = steps.iter().position(|s| s.step_id == StepId::BlockRoll)
+                .expect("every block sequence must contain BLOCK_ROLL");
+            steps[..block_roll].iter().filter(|s| s.step_id == StepId::PickUp).count()
+        };
+
+        for action in [PlayerAction::Block, PlayerAction::Blitz] {
+            assert_eq!(pick_ups_before_block_roll(action, Rules::Bb2020), 0,
+                "BB2020 {action:?} must not pick up before the block dice");
+            // The BB2025 sequence does, so this pins the gate rather than the absence.
+            assert_eq!(pick_ups_before_block_roll(action, Rules::Bb2025), 1,
+                "BB2025 {action:?} must still pick up before the block dice");
+        }
     }
 }

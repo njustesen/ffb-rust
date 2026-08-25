@@ -855,6 +855,15 @@ impl DriverGameState {
             let def_before_step = self.game.defender_id.clone();
             let pos_before_step = self.game.acting_player.player_id.clone()
                 .and_then(|p| self.game.field_model.player_coordinate(&p)).map(|c| (c.x, c.y));
+            // FFB_BALLCHG: every step that changes the ball's position or its loose/in-play
+            // flags, printed as `BALLCHG step=<id> <before> -> <after>`. The dice-based traces
+            // answer "which step rolled"; this one answers "what put the ball there", which is
+            // the question when a scatter fires with no pick-up roll in front of it.
+            let ball_before_step = (
+                self.game.field_model.ball_coordinate.map(|c| (c.x, c.y)),
+                self.game.field_model.ball_moving,
+                self.game.field_model.ball_in_play,
+            );
             let mut outcome = match self.forwarded.take() {
                 Some(cmd) => {
                     let mut o = entry.step.handle_command(&cmd, &mut self.game, &mut self.rng);
@@ -891,6 +900,18 @@ impl DriverGameState {
                 eprintln!("DEFCHG step={:?} {:?} -> {:?} (acting={:?} pa={:?})",
                     entry.step.id(), def_before_step, self.game.defender_id,
                     self.game.acting_player.player_id, self.game.acting_player.player_action);
+            }
+            if std::env::var_os("FFB_BALLCHG").is_some() {
+                let ball_now = (
+                    self.game.field_model.ball_coordinate.map(|c| (c.x, c.y)),
+                    self.game.field_model.ball_moving,
+                    self.game.field_model.ball_in_play,
+                );
+                if ball_now != ball_before_step {
+                    eprintln!("BALLCHG step={:?} {:?} -> {:?} (rng={} acting={:?})",
+                        entry.step.id(), ball_before_step, ball_now,
+                        self.rng.call_count, self.game.acting_player.player_id);
+                }
             }
             if std::env::var_os("FFB_RNG_STEPS").is_some() && self.rng.call_count != rng_before_step {
                 self.rng_step_seq += 1;
