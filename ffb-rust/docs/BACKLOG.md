@@ -3762,7 +3762,19 @@ instrument stopped seeing them, and `action Move` was inflated by the same 608. 
 `ab2fcbab1`.
 
 **Open, deliberately not fixed here:**
-- [ ] Decide whether the matrix gate should fail on `rc != 0`. It would have caught the above the
+- [x] **Decided and measured 2026-08-25: the gate must NOT fail on `rc != 0`, and the reason is
+      that the instrument is wrong, not the engine.** Under a strict rule the gate read bb2016
+      **0/30**, bb2020 18/30, bb2025 10/30 while parity was 100/100 everywhere. The checklist is
+      calibrated for BB2025 lineman and reports `dodge success/failure`, `pickup success/failure`
+      and the whole `block N dice` family as ZERO on BB2016, where they demonstrably occur. Same
+      class as the BlitzMove->Move mapping bug. `rc` is now PRINTED as a note instead
+      (`5894b6c22`), so the discrepancy is visible without a wrong instrument failing the gate.
+- [ ] **NEW: make the coverage checklist edition-aware.** It is BB2025-lineman-calibrated and
+      silently reads zero for core mechanics on BB2016 - so BB2016 has effectively had NO coverage
+      instrument this whole time. Find which GameEvents BB2016 emits for dodge/pickup/block and
+      either map them or build a per-edition item set. Until then, treat any BB2016 coverage number
+      as unmeasured rather than as evidence of a gap.
+- [x] ~~Decide whether the matrix gate should fail on `rc != 0`.~~ It would have caught the above the
       day it landed. The risk is the reverse: `touchdowns` is permanently MISSING (the random agent
       does not score - blocked on the tier decision), so a naive `rc` check would make every gate
       red forever. The honest fix is probably to split "required" into "required" vs "blocked on a
