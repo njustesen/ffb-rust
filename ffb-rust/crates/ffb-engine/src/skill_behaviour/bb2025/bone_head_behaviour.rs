@@ -107,7 +107,7 @@ impl StepModifierTrait for BoneHeadStepModifier {
             if cancel_as_failure {
                 let confusion_event = GameEvent::ConfusionRoll { player_id: player_id.clone(), roll: 1, confused: true };
                 cancel_negatrait_player_action(game, &player_id);
-            crate::step::action::common::mark_target_selection_failed(game);
+                crate::step::action::common::mark_target_selection_failed(game);
                 state.outcome = Some(
                     StepOutcome::goto(&state.goto_label_on_failure)
                         .with_event(confusion_event)
@@ -267,5 +267,48 @@ mod tests {
         assert_eq!(outcome.action, StepAction::NextStep, "already-used skill must silently pass through");
         assert!(!game.report_list.has_report(ReportId::CONFUSION_ROLL),
             "no roll (and thus no report) should occur when the skill was already used this action");
+    }
+
+    /// §12: a failed Bone Head must mark the pending TARGET SELECTION as FAILED, not just cancel
+    /// the player action. Java's `cancelPlayerAction` runs inside the blitz-target chain, whose
+    /// SelectBlitzTargetEnd then branches on the selection status; leaving the state UNSET made
+    /// the chain take the "selected" arm after a failed negatrait and block with a cancelled
+    /// action. Same fix is applied at all three cancel sites here and in ReallyStupid (bb2025)
+    /// and their bb2020 twins.
+    #[test]
+    fn declined_reroll_marks_the_target_selection_failed() {
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::model::target_selection_state::{TargetSelectionState, TargetSelectionStatus};
+
+        let mut game = test_game();
+        game.team_home.players.push(Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: ffb_model::enums::PlayerType::Regular,
+            gender: ffb_model::enums::PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::BoneHead, value: None }],
+            ..Default::default()
+        });
+        game.acting_player.player_id = Some("p1".into());
+        game.field_model.target_selection_state = Some(TargetSelectionState::new("def"));
+
+        let m = BoneHeadStepModifier;
+        let mut hook = StepBoneHeadHookState {
+            goto_label_on_failure: "FAIL".into(),
+            // the re-roll was offered for BONE_HEAD and DECLINED (no source) -> cancel as failure
+            re_rolled_action: Some("BONE_HEAD".into()),
+            re_roll_source: None,
+            outcome: None,
+            updated_re_rolled_action: None,
+            updated_re_roll_source: None,
+        };
+        m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hook);
+
+        assert_eq!(
+            game.field_model.target_selection_state.as_ref().map(|ts| ts.status),
+            Some(TargetSelectionStatus::FAILED),
+            "a cancelled negatrait action must fail the pending target selection"
+        );
     }
 }
