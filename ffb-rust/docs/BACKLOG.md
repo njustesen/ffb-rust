@@ -3808,3 +3808,24 @@ instrument stopped seeing them, and `action Move` was inflated by the same 608. 
       the one change that would unlock the entire scoring/Punt family (AssignTouchdowns, InitPunt,
       EndPunt, PuntDirection, PuntDistance) plus GFI in a single move. Recommend deciding it
       together with the scoring tier rather than separately.
+
+
+### throw-ins: correctly implemented, rare because the GAMES are unrealistic (2026-08-25)
+
+Measured across rosters (bb2025, 100 seeds): lineman 2, wood_elf 2, orc 0, skaven 0 - against
+~320 ball scatters each. It was the ONLY item failing 32 of 90 matchups at full parity.
+
+**Do NOT demote it to optional.** Both throw-in sources are implemented and correct:
+  - bounce out of bounds -> `step_catch_scatter_throw_in` sets `out_of_bounds`, and when the
+    bounds are FIELD (not kickoff) publishes ThrowIn; kickoff bounds give a touchback instead;
+  - crowd push -> `step_pushback` nulls the ball and publishes CatchScatterThrowInMode::ThrowIn
+    plus ThrowInCoordinate when the pushed-out defender was the carrier.
+
+The ball does reach the edges - 15.6% of ball positions sit within one square of a sideline. What
+almost never happens is a BALL CARRIER being pushed out, or a loose ball bouncing outward near a
+sideline, because both need the ball to travel. With one square of movement per activation the
+carrier barely moves and play stays compressed mid-pitch.
+
+So `throw-ins` is the THIRD symptom of the one-move-per-activation root cause, alongside `GFI
+rolls` and `touchdowns`. It is an honest signal that the test games are unrealistic and should go
+green on its own once movement is fixed. Hiding it would remove the indicator.
