@@ -3372,3 +3372,37 @@ NEXT: repeat the arm-disable experiment on bb2020 seed 1 and read entry 88. If t
 missing, the arm is exonerated in both editions and the cause is upstream in how the second pass
 is dispatched for a blood-lust blitzer; if the block returns, the arm is wrong for bb2020 and its
 Java condition needs re-checking per edition.
+
+**§12 vampire ROOT CAUSE (iter 81): the blood-lust guard in StepInitBlocking fires because the
+chain arrives with BLITZ_MOVE where main arrives with BLITZ.**
+
+Two measurements this iteration:
+
+1. The SBTEnd Blood Lust arm is exonerated in bb2020 as well - disabling it leaves entry 88 as
+   `BloodLust away_03` with no block, exactly as before. It is not the cause in EITHER edition.
+2. Probing the agent's Move prompt shows **no Move prompt ever occurs with `suffering_blood_lust`
+   true** - the blood-lust blitzer never gets asked anything, so the activation ends before the
+   agent is involved.
+
+That points at a guard, and there is exactly one. `bb2025/block/step_init_blocking.rs`:
+
+    let action_is_move = matches!(player_action, Some(Move) | Some(BlitzMove));
+    if game.acting_player.suffering_blood_lust && action_is_move {
+        return StepOutcome::goto(&label);          // skip the block entirely
+    }
+
+**Rust's guard is a FAITHFUL port** - Java `bb2025/block/StepInitBlocking.java:199` is
+`else if (actingPlayer.isSufferingBloodLust() && (playerAction == MOVE || playerAction ==
+BLITZ_MOVE))` -> same goto. So the guard is not the bug.
+
+The bug is WHICH ACTION reaches it. Java converts BLITZ_MOVE -> BLITZ at `:236`, which is AFTER
+that guard, so Java must already hold BLITZ by the time InitBlocking runs - its CLIENT_BLOCK
+dispatch sets it. Main matches (folded path dispatches BLITZ). The chain arrives still holding
+BLITZ_MOVE, the guard fires, and the blitz ends with no block - which is precisely the measured
+symptom in both editions.
+
+NEXT: make the blitz block dispatch change the acting action to BLITZ, as Java's does, rather
+than weakening the guard. `StepInitMoving`'s `Action::Block` arm currently calls
+`dispatch_player_action(PlayerAction::Blitz)` without touching `acting_player.player_action` -
+check what Java's dispatch does there and mirror it. Then re-measure vampire seed 1 in BOTH
+editions and re-gate.
