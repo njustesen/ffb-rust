@@ -3572,3 +3572,37 @@ NEXT: goblin bb2020 seed 85 - the last item. State is fully recorded above (extr
 CatchScatterThrowIn after a PickUp; both engines block; candidate lists agree; nothing moves the
 blitzer; the two PickUps sit at different stream positions, branch rng=21 before the block and
 main rng=22 after). Open question: which sequence each PickUp belongs to.
+
+**§12 goblin seed 85 (iter 92): both paths push the SAME BlitzBlock body - and an unresolved
+contradiction is recorded here rather than guessed at.**
+
+Dumped the sequence the chain pushes at `StepEndMoving`:
+
+    InitBlocking GoForIt SteadyFooting FoulAppearance DumpOff BlockStatistics Dauntless Horns
+    Trickster PickUp CatchScatterThrowIn Stab BlockChainsaw ... BlockRoll BlockChoice ...
+
+`PickUp` / `CatchScatterThrowIn` sit BEFORE `BlockRoll`, and main's folded path extends its
+activation prefix onto the SAME `BlitzBlock::build_sequence`, so both engines run that PickUp
+before their block. That kills the "different sequence" explanation.
+
+**The contradiction, stated plainly.** Three measurements cannot all be true of the same moment:
+
+1. `PickUp` probe, paired by rng: branch away_03 at (13,8) ON the ball; main away_03 at (12,8).
+2. `FFB_POSCHG`: away_03's coordinate NEVER changes during the activation on the branch.
+3. The i=4 state string is byte-identical, so both engines enter the activation the same.
+
+If the blitzer never moves and both start identically, it cannot be standing on a different square
+at the same step. Something in how these three are being read is still wrong - most likely the two
+PickUp samples are still not the same step despite the rng pairing, since main's rng=22 sample
+comes AFTER a BlockRoll that the sequence says should follow PickUp.
+
+**Assessment.** This is ONE seed (goblin bb2020 85/100 -> 99/100 overall) and has now absorbed
+~14 iterations across two stints, with five theories disproven: predicate split, movement,
+follow-up, position, sequence composition. The other 89 matchups are green. It is the last blocker
+to merging, so it cannot simply be dropped - but it deserves a fresh angle rather than more of the
+same probing.
+
+NEXT (fresh angle): stop instrumenting the blitz. Instead run goblin bb2020 seed 85 with
+`FFB_RNG_STEPS` on BOTH builds and diff from entry 1 with the rng RANGES aligned, then take the
+FIRST entry whose `pid` differs rather than whose step differs - the acting player at the extra
+scatter may not be who it appears to be, which would explain all three observations at once.
