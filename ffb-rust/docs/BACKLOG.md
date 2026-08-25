@@ -3742,3 +3742,32 @@ Next items in this file remain: the two "Blocked — tier decision" entries (Pun
 state-hash ACTIVE bit), the gaze twins (`SelectGazeTarget`/`SelectGazeTargetEnd`, the same
 never-dispatched shape as the blitz twins and the obvious next §), inducement purchasing (7 ids),
 and `PileDriver` + bb2016 KTM (blocked on data legality).
+
+### Coverage instrument: the gate cannot see it (found 2026-08-25)
+
+`ffb-parity` has a coverage checklist that exits 1 with
+`PARITY: N/N games match, but required coverage items are MISSING` - a built-in guard against
+exactly the vacuous-green failure this project keeps hitting (TTM, KTM, interception, bomb,
+Multiple Block, and now ReportStabInjury).
+
+**`scripts/run_team_matrix.py` ignores it.** It scores a matchup green on
+`passed == total_seeds` by counting `✓ seed` lines, and it *captures* the child's `returncode`
+into `r["rc"]` without ever reading it. So every gate run in this campaign - all of them 30/30/30 -
+was green while individual matchups were exiting 1 on missing coverage.
+
+That blindness hid a regression I introduced in §12: `action Blitz` fell 668 -> 0 the moment the
+blitz-select chain went live, because Java's `:114` reports the activation as BLITZ_MOVE and
+`player_action_name` lumped BlitzMove in with Move. Blitzes never stopped happening; the
+instrument stopped seeing them, and `action Move` was inflated by the same 608. Fixed in
+`ab2fcbab1`.
+
+**Open, deliberately not fixed here:**
+- [ ] Decide whether the matrix gate should fail on `rc != 0`. It would have caught the above the
+      day it landed. The risk is the reverse: `touchdowns` is permanently MISSING (the random agent
+      does not score - blocked on the tier decision), so a naive `rc` check would make every gate
+      red forever. The honest fix is probably to split "required" into "required" vs "blocked on a
+      decision" and fail only on the former.
+- [ ] `GFI rolls | 0 | **MISSING**` - PRE-EXISTING, not from §12 (already missing at `316c774aa`).
+      Zero GO FOR IT rolls in 100 lineman games across ~26k moves. Either both agents stop at MA
+      by construction, or rushing is unreachable. Same shape as the KTM/TTM lockstep-abandonment
+      class and worth driving; verify the trigger is reachable BEFORE any harness plumbing.
