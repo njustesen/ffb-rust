@@ -151,11 +151,26 @@ impl StepMoveDodge {
             mod_names,
         ));
 
+        // Coverage instrument: the BB2025 twin emits one DodgeRoll GameEvent per resolved roll,
+        // and this BB2016 override - a LIVE edition override, not a dead twin - never did. The
+        // parity coverage checklist aggregates the Rust engine's GameEvents, so BB2016 reported
+        // `dodge success`/`dodge failure` as ZERO for every run while dodges obviously happened.
+        // Events are not compared between engines and are not in the state hash, so this is
+        // observability only.
+        let dodge_event = ffb_model::events::GameEvent::DodgeRoll {
+            player_id: player_id.clone().unwrap_or_default(),
+            target: minimum_roll,
+            roll: self.dodge_roll,
+            success: successful,
+            rerolled: re_rolled,
+        };
+
         if successful {
             let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
                 .map(|a| a.name == "DODGE").unwrap_or(false)
                 && self.re_roll_state.re_roll_source.is_some();
             return StepOutcome::next()
+                .with_event(dodge_event)
                 .publish(StepParameter::ReRollUsed(self.re_roll_used || re_rolled))
                 .publish(StepParameter::UsingBreakTackle(self.using_break_tackle));
         }
@@ -179,16 +194,21 @@ impl StepMoveDodge {
             if let Some(prompt) = ask_for_reroll_if_available(game, "DODGE", minimum_roll, false) {
                 self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
                 self.dodge_roll = 0;
-                return StepOutcome::cont().with_prompt(prompt);
+                // Emit the FAILED initial roll here, exactly as the BB2025 twin does when it
+                // offers the re-roll prompt. This is where a failed dodge is actually counted:
+                // the later declined-re-roll exit returns before a roll is resolved, so without
+                // this `dodge failure` stayed at zero while `dodge success` was correct.
+                return StepOutcome::cont().with_prompt(prompt).with_event(dodge_event);
             }
         }
 
         // Java: if (UtilGameOption.isOptionEnabled(game, GameOptionId.STAND_FIRM_NO_DROP_ON_FAILED_DODGE))
         if game.options.is_enabled("standFirmNoDropOnFailedDodge") {
             return StepOutcome::next()
+                .with_event(dodge_event)
                 .publish(StepParameter::EndPlayerAction(true));
         }
-        self.fail_dodge()
+        self.fail_dodge().with_event(dodge_event)
     }
 
     /// Computes the minimum dodge roll and the reporting-string names of the applicable
