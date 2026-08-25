@@ -3606,3 +3606,48 @@ NEXT (fresh angle): stop instrumenting the blitz. Instead run goblin bb2020 seed
 `FFB_RNG_STEPS` on BOTH builds and diff from entry 1 with the rng RANGES aligned, then take the
 FIRST entry whose `pid` differs rather than whose step differs - the acting player at the extra
 scatter may not be who it appears to be, which would explain all three observations at once.
+
+### §12 iteration 94 — goblin bb2020 seed 85: pid-first diff is a dead end; test debt closed instead
+
+**The planned fresh angle produced nothing.** Iteration 92's plan was to diff the
+`FFB_RNG_STEPS` lists by `pid` rather than by step, on the theory that the acting player
+at the extra scatter might not be who it appears to be. Ran it (main 89 entries, branch
+94). The first *pid* difference is at entry 14 — but only because the branch has one
+extra entry earlier that shifts the whole list by one:
+
+    main[12] DropFallingPlayers 22->24 away_03      brch[12] BlockRoll            22->23 away_03
+    main[13] HandleDropPlayerCtx 24->26 away_03     brch[13] DropFallingPlayers   23->25 away_03
+    main[14] MoveDodge          26->28 away_02      brch[14] HandleDropPlayerCtx  25->27 away_03
+    main[15] Pass               28->29 away_06      brch[15] MoveDodge           27->28 away_02
+
+The pid *sequence* is identical on both builds. Shifted by one, every row lines up, and
+both streams are back at rng 28->29 on `Pass`/`away_06` two entries later. So the acting
+player is exactly who it appeared to be, and this is still the same single extra
+`CatchScatterThrowIn` at rng 21->22 that entries 1-93 already described. **Theory 6
+disproven.** No angle from the recorded list survives.
+
+Status unchanged: 89/90 (bb2016 30/0, bb2025 30/0, bb2020 29/1), goblin bb2020 seed 85
+the only red. Not merge-ready — main is 30/30 on that matchup.
+
+**Closed two real test-debt gaps instead** (the operating rule is that every fix lands
+with a colocated regression test; two of this campaign's fixes had not):
+
+1. `0e1be5613` — blood-lust blitzer dispatch (iteration 84) had **no** test.
+   `blood_lust_blitzer_dispatches_block_instead_of_ending_the_action` pins the dispatch
+   *and* pins that `END_PLAYER_ACTION` is not published, with the measured trap recorded
+   in the comment: dropping the terminator without dispatching hangs the driver. A
+   companion test pins the plain-MOVE case the guard was written for, so the fix cannot
+   silently widen.
+2. `4b26330c0` — the negatrait `mark_target_selection_failed` (iteration 60) was applied
+   at 12 call sites with no test naming the behaviour.
+   `declined_reroll_marks_the_target_selection_failed` drives the deterministic
+   declined-re-roll arm. Also fixed the indentation the original insertion left behind.
+
+ffb-engine 7290/0.
+
+**Next angle for seed 85:** stop diffing the two builds. The extra scatter fires with no
+preceding pick-up roll on either build, which means the ball was *already loose* when
+`CatchScatterThrowIn` ran on the branch. Ask what put it there — instrument ball
+possession changes (not dice) and find the step that drops it on the branch and not on
+main. Every previous attempt has instrumented dice; the divergence may not be a dice
+question at all.
