@@ -393,8 +393,16 @@ impl Agent for RandomAgent {
                     // through BLITZ_SELECT, and StepSelectBlitzTarget asks for the target with the
                     // SAME single actionRng draw at the SAME stream position (before the negatrait
                     // rolls). Folding it here as well would spend the draw twice. BACKLOG §12.
-                    PlayerActionChoice::Blitz => None,
-                    PlayerActionChoice::Block
+                    // BB2016 has NO SelectBlitzTarget step at all - ParityRunner drives it as a
+                    // 3-command blitz (CLIENT_BLITZ_MOVE then CLIENT_BLOCK) and BB2016 has its own
+                    // StepInitSelecting, so no chain prompt ever arrives to supply the target.
+                    // Leaving it unfolded there strands every BB2016 blitz with no defender:
+                    // measured 0/30 rosters, diverging at STEP 1 on nearly all of them, against a
+                    // green main. The agent is shared by all three editions, so the change has to
+                    // be gated rather than global.
+                    PlayerActionChoice::Blitz if gs.game.rules != ffb_model::enums::Rules::Bb2016 => None,
+                    PlayerActionChoice::Blitz
+                    | PlayerActionChoice::Block
                     | PlayerActionChoice::StandUpBlitz => {
                         let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
                         let targets = legal_block_targets(&gs.game, player_id, side);
