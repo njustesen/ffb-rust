@@ -3545,3 +3545,30 @@ hid the BB2020 and BB2016 regressions for ~25 iterations each.
     bb2025  30 / 0   confirmed (re-run after the agent change, not assumed)
     bb2020  29 / 1   still pending re-verification
 
+
+**§12 ALL THREE EDITIONS VERIFIED ON ONE BUILD: 89 / 90 matchups green.**
+
+    bb2016  30 / 0
+    bb2025  30 / 0
+    bb2020  29 / 1     goblin seed 85 step 4  <-- the ONLY remaining red
+
+The two-phase blitz chain is LIVE in every edition: `SelectBlitzTarget` and
+`SelectBlitzTargetEnd` now dispatch on every blitz, where at the start of this section they had
+never executed in ANY edition. This is the first time all three matrices have been measured
+against the same build.
+
+Engine bugs fixed to get here, each a 1:1 Java port with the chain as the thing that exposed
+them: the `:114` BLITZ_SELECT routing, the SelectBlitzTarget body, the skip-path Select push, the
+`hasStandingOpponents` / `pickBlockTarget` predicate split, the standing_up carve-out, the shared
+activation tail (stand-up movement cost), USE_ALTERNATE_LABEL, the negatrait FAILED marker in
+BB2025 and BB2020, SBTEnd's end_turn sequence push, SBTEnd's defender restore, the Blood Lust
+SBTEnd arm, and the blood-lust blitz dispatch in StepInitMoving - plus the BB2016 agent gating.
+
+**Still NOT merge-ready.** goblin bb2020 seed 85 is one seed but it is a real divergence, and
+main is 30/30 there. The branch must reach 90/90 before merging, or the regression is knowingly
+shipped.
+
+NEXT: goblin bb2020 seed 85 - the last item. State is fully recorded above (extra
+CatchScatterThrowIn after a PickUp; both engines block; candidate lists agree; nothing moves the
+blitzer; the two PickUps sit at different stream positions, branch rng=21 before the block and
+main rng=22 after). Open question: which sequence each PickUp belongs to.
