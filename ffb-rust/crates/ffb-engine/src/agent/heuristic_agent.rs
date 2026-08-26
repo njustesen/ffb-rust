@@ -65,7 +65,13 @@ const W: usize = 26;
 const H: usize = 15;
 const CELLS: usize = W * H;
 /// §20.3 — how many players get the real search rather than the proxy.
-const TIER2: usize = 3;
+///
+/// Chosen as 3 when one ActivatePlayer cost 4136 µs. After §20's rewrite it costs ~192, and the
+/// cap had become a distortion rather than an economy: a player outside it contributes ONE
+/// placeholder option standing in for its whole destination space, so it collects the probability
+/// mass that should have been spread over a dozen squares and gets over-sampled against players
+/// whose destinations are enumerated. 16 covers every player who can ever be eligible.
+const TIER2: usize = 16;
 /// How many destinations each moving player offers as separate, samplable options.
 const DEST_OPTIONS: usize = 6;
 
@@ -976,17 +982,35 @@ fn value_at(f: &Features, i: usize, m: &Mover) -> (f32, Rule) {
     (f.support[s][i] * sideline * exposure, Rule::Support)
 }
 
-/// The signed weight of arriving at `i` — §5.3's `p·V − (1−p)·c`, plus the rush aversion.
-#[inline]
-fn arrival_weight(f: &Features, r: &Reach, i: usize, m: &Mover) -> f32 {
+/// The signed weight of arriving at `i`, and the terms behind it.
+///
+/// The parts are returned as well as the total because "why that square?" is the first question
+/// anyone asks of a movement decision, and the total alone cannot answer it.
+struct Arrival {
+    w: f32,
+    p_arrive: f32,
+    v: f32,
+    gfi: i32,
+}
+
+fn arrival_parts(f: &Features, r: &Reach, i: usize, m: &Mover) -> Arrival {
     let pa = r.p_arrive(i);
     let gfi = r.cell[i].gfi as i32;
     if m.is_carrier && endzone_distance(coord_of(i), m.home) == 0 {
         // A touchdown ends the drive: there is no "after" to lose, so only the rush is priced.
-        return pa - rush_penalty(gfi, true);
+        return Arrival { w: pa - rush_penalty(gfi, true), p_arrive: pa, v: 1.0, gfi };
     }
     let (v, _) = value_at(f, i, m);
-    pa * v - (1.0 - pa) * c_turnover(m.unactivated, gfi, m.is_carrier) - rush_penalty(gfi, m.is_carrier)
+    let w = pa * v
+        - (1.0 - pa) * c_turnover(m.unactivated, gfi, m.is_carrier)
+        - rush_penalty(gfi, m.is_carrier);
+    Arrival { w, p_arrive: pa, v, gfi }
+}
+
+/// §5.3's `p·V − (1−p)·c`, plus the rush aversion.
+#[inline]
+fn arrival_weight(f: &Features, r: &Reach, i: usize, m: &Mover) -> f32 {
+    arrival_parts(f, r, i, m).w
 }
 
 /// Best destination for a plain move.
@@ -1683,11 +1707,18 @@ impl HeuristicAgent {
                                 let onto_ball = f.ball_loose && f.ball == Some(c);
                                 let kind =
                                     if onto_ball { PlanKind::Pickup } else { PlanKind::Move };
-                                let note = if onto_ball {
-                                    format!("pick up ball at {},{}", c.x, c.y)
-                                } else {
-                                    format!("to {},{} ({} sq)", c.x, c.y, path.len())
-                                };
+                                let ar = arrival_parts(f, r, i, m);
+                                let note = format!(
+                                    "{}{},{} · {} sq · arrive {:.0}% · V {:.2}{} · w {:+.3}",
+                                    if onto_ball { "PICK UP at " } else { "to " },
+                                    c.x,
+                                    c.y,
+                                    path.len(),
+                                    100.0 * ar.p_arrive,
+                                    ar.v,
+                                    if ar.gfi > 0 { format!(" · {} rush", ar.gfi) } else { String::new() },
+                                    ar.w
+                                );
                                 push(w, None, kind, path, Rule::ScoreAdvance, note);
                             }
                         }
@@ -1698,7 +1729,7 @@ impl HeuristicAgent {
                             PlanKind::Move,
                             Vec::new(),
                             Rule::ScoreAdvance,
-                            "destination decided at the Move prompt".to_string(),
+                            "no search ran for this player (§20.3 tier 1)".to_string(),
                         ),
                     }
                 }
@@ -2293,20 +2324,51 @@ impl HeuristicAgent {
 
                 const DIRS: [(i32, i32); 8] =
                     [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)];
+
+                // The scatter is not the only way to give the ball away. On a **Weather Change**
+                // kickoff result (2d6 = 8, so 5/36) that rolls **Nice** (4–10, so 30/36), the ball
+                // takes THREE further single-square d8 scatters and `StepApplyKickoffResult` re-tests
+                // the half bounds after each one — any step that leaves the half is a touchback. So
+                // the real risk of a square is its scatter risk plus 25/216 of a three-step random
+                // walk falling out, which is why a square that looks perfectly safe is not.
+                const P_GUST: f32 = 25.0 / 216.0;
+                // q[k] = probability a k-step uniform-d8 walk from this square stays inside the
+                // half at every step. Built by iteration rather than enumerating 8^3 paths per
+                // candidate square.
+                let inside = |x: i32, y: i32| x >= x0 && x <= x1 && y >= 0 && y <= YMAX;
+                let mut q = vec![1.0f32; CELLS];
+                for _ in 0..3 {
+                    let mut next = vec![0.0f32; CELLS];
+                    for x in x0..=x1 {
+                        for y in 0..=YMAX {
+                            let mut acc = 0.0f32;
+                            for (dx, dy) in DIRS {
+                                let (nx, ny) = (x + dx, y + dy);
+                                if inside(nx, ny) {
+                                    acc += q[ix(nx, ny)];
+                                }
+                            }
+                            next[ix(x, y)] = acc / 8.0;
+                        }
+                    }
+                    q = next;
+                }
+
                 for x in x0..=x1 {
                     for y in 0..=YMAX {
-                        let mut safe = 0;
+                        let mut acc = 0.0f32;
                         let mut total = 0;
                         for (dx, dy) in DIRS {
                             for d in 1..=dmax {
                                 total += 1;
                                 let (ex, ey) = (x + dx * d, y + dy * d);
-                                if ex >= x0 && ex <= x1 && ey >= 0 && ey <= YMAX {
-                                    safe += 1;
+                                if inside(ex, ey) {
+                                    // survived the scatter; now survive a possible gust
+                                    acc += (1.0 - P_GUST) + P_GUST * q[ix(ex, ey)];
                                 }
                             }
                         }
-                        let p_safe = safe as f32 / total as f32;
+                        let p_safe = acc / total as f32;
                         // Squared: a touchback does not merely waste the kick, it gifts possession.
                         let mut best = f32::MAX;
                         for (ax, ay) in &aims {
@@ -2320,7 +2382,10 @@ impl HeuristicAgent {
                             w,
                             Rule::Flat,
                             p_safe,
-                            format!("{},{}  {:.0}% stays in", x, y, 100.0 * p_safe),
+                            format!(
+                                "{},{} · {:.0}% no touchback (scatter + gust)",
+                                x, y, 100.0 * p_safe
+                            ),
                         );
                     }
                 }

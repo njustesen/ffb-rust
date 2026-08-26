@@ -127,6 +127,10 @@ def main():
 
     pitch, (pw, ph) = pitch_uri()
 
+    # "No decision" is true of the prompt but useless on its own: the destination WAS chosen, at the
+    # activation. Track the step that chose it, per player, so a replayed prompt can point back to
+    # the decision that produced it rather than leaving the reader to hunt for it.
+    decided_at = {}
     steps = []
     for r in recs:
         sn = r['snap']
@@ -141,8 +145,24 @@ def main():
                 'y': o['why'],
                 'a': anchor(o['action'], ps),
             })
+        # remember who decided what, and where
+        if r['options']:
+            ch = r['options'][r['chosen']] if r['chosen'] < len(r['options']) else None
+            if ch and ch['action'].get('type') == 'activatePlayer':
+                decided_at[ch['action']['player_id']] = {
+                    's': r['i'],
+                    'l': describe(ch['action']),
+                    'n': ch.get('note', ''),
+                }
+        src = None
+        if not r['options']:
+            who = sn.get('act_id')
+            if who and who in decided_at:
+                src = decided_at[who]
+
         steps.append({
             'i': r['i'],
+            'src': src,
             'side': r['side'],
             'pr': r['prompt'],
             'ch': r['chosen'],

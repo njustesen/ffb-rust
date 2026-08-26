@@ -1309,7 +1309,49 @@ fn describe_action(a: &ffb_engine::action::Action) -> String {
         A::SelectPlayer { player_id } => format!("SelectPlayer({player_id})"),
         A::EndPlayerAction => "EndPlayerAction".into(),
         A::EndTurn => "EndTurn".into(),
-        other => format!("{other:?}").chars().take(48).collect(),
+        A::PlacePlayer { player_id, coord } => {
+            format!("PlacePlayer({player_id} -> {},{})", coord.x, coord.y)
+        }
+        A::ConfirmSetup => "ConfirmSetup".into(),
+        A::KickBall { coord } => format!("KickBall({},{})", coord.x, coord.y),
+        A::Touchback { player_id } => format!("Touchback({player_id})"),
+        A::Block { defender_id } => format!("Block({defender_id})"),
+        A::Stab { defender_id } => format!("Stab({defender_id})"),
+        A::Foul { target_id } => format!("Foul({target_id})"),
+        A::HandOff { receiver_id } => format!("HandOff({receiver_id})"),
+        A::Pass { coord } => format!("Pass(-> {},{})", coord.x, coord.y),
+        A::Intercept { attempt } => format!("Intercept({attempt})"),
+        A::UseSkill { skill_id, use_skill } => format!("UseSkill({skill_id:?}, {use_skill})"),
+        A::CoinChoice { heads } => {
+            format!("CoinChoice({})", if *heads { "heads" } else { "tails" })
+        }
+        A::ReceiveChoice { receive } => {
+            format!("ReceiveChoice({})", if *receive { "receive" } else { "kick" })
+        }
+        A::RaidingPartyTarget { coord } => {
+            format!("RaidingPartyTarget({},{})", coord.x, coord.y)
+        }
+        A::HitAndRun { coord } => match coord {
+            Some(c) => format!("HitAndRun({},{})", c.x, c.y),
+            None => "HitAndRun(decline)".into(),
+        },
+        A::Acknowledge => "Acknowledge".into(),
+        // Generous, and only a backstop: the arms above cover everything these games produce.
+        // The old 48-char cut was a SEQ-trace nicety that silently truncated the dump mid-word.
+        other => format!("{other:?}").chars().take(200).collect(),
+    }
+}
+
+/// The block die faces by name. `Action::BlockChoice` carries only an index, so the face has to
+/// come from the prompt that offered it.
+fn die_face(d: i32) -> &'static str {
+    match d {
+        1 => "Skull",
+        2 => "Both Down",
+        3 | 4 => "Push",
+        5 => "Defender Stumbles",
+        6 => "Defender Down",
+        _ => "?",
     }
 }
 
@@ -1410,6 +1452,14 @@ pub fn run_heuristic_game(
         } else {
             String::new()
         };
+        let dump_dice: Option<Vec<i32>> = if dump_path.is_some() {
+            match engine.current_prompt() {
+                Some(AgentPrompt::BlockChoice { dice, .. }) => Some(dice.clone()),
+                _ => None,
+            }
+        } else {
+            None
+        };
         let t0 = if timed { Some(std::time::Instant::now()) } else { None };
         let action = if matches!(side, TeamSide::Home) {
             home_agent.act(&engine)
@@ -1424,7 +1474,17 @@ pub fn run_heuristic_game(
                 prompt: dump_prompt,
                 chosen: ag.last_chosen,
                 options: ag.last_options.clone(),
-                taken: describe_action(&action),
+                taken: {
+                    let mut t = describe_action(&action);
+                    if let (Some(dice), ffb_engine::action::Action::BlockChoice { die_index, .. }) =
+                        (&dump_dice, &action)
+                    {
+                        if let Some(d) = dice.get(*die_index) {
+                            t = format!("BlockChoice(die {die_index} = {})", die_face(*d));
+                        }
+                    }
+                    t
+                },
                 snap: sn,
             });
         }
