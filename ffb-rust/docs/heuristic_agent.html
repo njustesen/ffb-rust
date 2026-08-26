@@ -1661,6 +1661,72 @@ referee_spots_foul = armor[0] == armor[1];              <span class="c">// doubl
           <div class="cap">The engine is 36–80 ms per game; the agent is 680–1150 ms. Scoring is 93–95% of the total, so the whole overrun is the agent's — and the engine is already comfortably inside what the entire budget allowed.</div>
         </div>
 
+        <h3>Is the split honest? Residual 0.03%</h3>
+        <p>A fair challenge: does <code>agent_ns</code> really contain only the agent? A whole-loop timer
+        settles it — <code>agent + engine + residual</code> must equal the wall clock, so nothing can hide
+        outside the two brackets.</p>
+        <div class="card scroll">
+          <table>
+            <thead><tr><th>Arm</th><th class="num">loop ms/game</th><th class="num">agent</th><th class="num">engine</th><th class="num">residual</th></tr></thead>
+            <tbody>
+              <tr><td>UNIFORM</td><td class="num">719.3</td><td class="num">680.6</td><td class="num">38.4</td><td class="num good"><b>0.2 (0.03%)</b></td></tr>
+              <tr><td>ARGMAX</td><td class="num">1090.8</td><td class="num">1012.1</td><td class="num">78.3</td><td class="num good"><b>0.4 (0.04%)</b></td></tr>
+            </tbody>
+          </table>
+          <div class="cap">The accounting is complete: agent_ns brackets exactly act(), engine_ns exactly apply(), and the loop guards plus the event extend are the 0.03%.</div>
+        </div>
+        <div class="note amber"><span class="dot"></span><div>
+          <p><b>One thing that split does include, and should be named.</b> <code>act()</code> calls into
+          <em>engine</em> code — <code>legal_block_targets</code>, <code>legal_pass_receivers</code>,
+          <code>find_block_strength</code>, <code>find_*_foul_assists</code> — some of which run their own
+          searches. That work counts as the agent's, which is right: the agent chose to ask.</p>
+          <p>What it does <b>not</b> include is engine <em>execution</em> — step dispatch, dice, state
+          mutation — all of which sits inside <code>apply()</code>. So "93–95% agent" means 93–95%
+          <b>deciding</b> against 5–7% <b>doing</b>.</p>
+        </div></div>
+
+        <h3>Why per-decision cost differs between arms</h3>
+        <p>The arms enumerate and score identically — only the sampling differs — so an average ranging from
+        1245 to 2402 µs per decision needs explaining. Timing per <b>prompt class</b>, 40 games each:</p>
+        <div class="card scroll">
+          <table>
+            <thead><tr><th>Prompt class</th><th class="num">UNIFORM n/game</th><th class="num">UNIFORM µs each</th><th class="num">ARGMAX n/game</th><th class="num">ARGMAX µs each</th></tr></thead>
+            <tbody>
+              <tr><td><b>ActivatePlayer</b></td><td class="num">90.4</td><td class="num bad"><b>6725</b></td><td class="num">206.3</td><td class="num bad"><b>4136</b></td></tr>
+              <tr><td><b>Move</b></td><td class="num">150.5</td><td class="num"><b>481</b></td><td class="num">492.9</td><td class="num"><b>320</b></td></tr>
+              <tr><td>BlitzTarget</td><td class="num">9.5</td><td class="num">11</td><td class="num">9.1</td><td class="num">11</td></tr>
+              <tr><td>BlockChoice</td><td class="num">2.1</td><td class="num">6</td><td class="num">24.0</td><td class="num">6</td></tr>
+              <tr><td>ReRollOffer</td><td class="num">19.5</td><td class="num">6</td><td class="num">14.4</td><td class="num">5</td></tr>
+              <tr><td>Pushback</td><td class="num">1.4</td><td class="num">3</td><td class="num">18.1</td><td class="num">3</td></tr>
+              <tr><td>FollowUp</td><td class="num">1.4</td><td class="num">3</td><td class="num">17.9</td><td class="num">3</td></tr>
+              <tr><td>TeamSetup</td><td class="num">46.6</td><td class="num">2</td><td class="num">81.7</td><td class="num">2</td></tr>
+              <tr><td>everything else</td><td class="num">~6</td><td class="num">≤1</td><td class="num">~8</td><td class="num">≤1</td></tr>
+              <tr style="background:var(--panel2)"><td><b>ActivatePlayer share of agent time</b></td><td class="num bad" colspan="2"><b>89.3%</b></td><td class="num bad" colspan="2"><b>84.3%</b></td></tr>
+              <tr style="background:var(--panel2)"><td><b>Move share</b></td><td class="num" colspan="2">10.6%</td><td class="num" colspan="2">15.6%</td></tr>
+              <tr style="background:var(--panel2)"><td><b>All 13 other classes combined</b></td><td class="num good" colspan="2"><b>&lt;0.1%</b></td><td class="num good" colspan="2"><b>&lt;0.1%</b></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><b>Two effects, both real.</b></p>
+        <p><b>The mix changes the average.</b> Argmax makes 879 decisions a game against uniform's 331, and
+        the extra ones are the <em>cheap</em> ones: it blocks 24 times a game against 2, and each block brings
+        a <code>BlockChoice</code>, a <code>FollowUp</code> and often a <code>Pushback</code> — all 3–6 µs.
+        Averaging over a longer tail of trivial decisions pulls the mean down without anything getting
+        faster.</p>
+        <p><b>And <code>ActivatePlayer</code> is genuinely cheaper in the sharper arm</b> — 4136 µs against
+        6725. That is the <code>any_unused</code> filter interacting with turn length. Uniform turns over
+        constantly, so it gets 2.7 activation prompts per team-turn and they cluster at the <em>start</em> of a
+        turn with all eleven players eligible — eleven Dijkstras. Argmax gets 5.9 prompts per turn and reaches
+        deep into them, where most players have already acted and are filtered out, so later prompts run two
+        or three Dijkstras instead of eleven.</p>
+        <div class="note"><span class="dot"></span><div>
+          <p><b>The optimisation target is unambiguous.</b> <code>ActivatePlayer</code> is 84–89% of all agent
+          time at 4–7 ms a prompt; <code>Move</code> is another 10–16%; the remaining thirteen prompt classes
+          together are under a tenth of one percent. At ~11 players and ~6.7 ms that is roughly <b>600 µs per
+          player</b> just to build and score one player's reach — for a 60-to-200 node search. Nothing outside
+          these two prompts is worth touching.</p>
+        </div></div>
+
         <h3>Why — and it is exactly what was predicted</h3>
         <p><b>None of P5, P6 or P7 is implemented.</b> §15 listed the caching work; §16 built the play logic
         without it. The measured cost is the predicted cost of that choice. Four causes, in expected order of

@@ -3187,13 +3187,78 @@ them badly here, because the sharper arms produce ~70% more events per game and 
 every bit of the overrun is the agent's, and the engine — the thing doing the actual Blood Bowl — is
 already comfortably inside what the whole budget allowed.
 
-### 18.3 Why — and it is exactly what was predicted
+### 18.3 Is the split honest? Residual 0.03%
+
+A fair challenge: does `agent_ns` really contain only the agent? A whole-loop timer settles it —
+`agent + engine + residual` must equal the wall clock, so nothing can hide outside the two brackets.
+
+| Arm | loop ms/game | agent | engine | **residual** |
+|---|---|---|---|---|
+| UNIFORM | 719.3 | 680.6 | 38.4 | **0.2 (0.03%)** |
+| ARGMAX | 1090.8 | 1012.1 | 78.3 | **0.4 (0.04%)** |
+
+So the accounting is complete: `agent_ns` brackets exactly `act()`, `engine_ns` exactly `apply()`,
+and the loop guards (`is_finished`, `current_prompt`, `active_side`) plus the event `extend` are the
+0.03%.
+
+**One thing that split does include, and should be named.** `act()` calls into *engine* code —
+`legal_block_targets`, `legal_pass_receivers`, `legal_throw_team_mate_targets`,
+`ServerUtilPlayer::find_block_strength`, `UtilPlayer::find_*_foul_assists` — some of which run their
+own searches. That work is counted as the agent's, which is right: the agent chose to ask. What it
+does **not** include is engine *execution* — step dispatch, dice, state mutation — all of which is
+inside `apply()`. So "93–95% agent" means 93–95% *deciding*, against 5–7% *doing*.
+
+### 18.4 Why per-decision cost differs between arms
+
+The arms enumerate and score identically — only the sampling differs — so an average that ranges
+from 1245 to 2402 µs per decision needs explaining. Timing per **prompt class**, 40 games each:
+
+| Prompt class | UNIFORM n/game | UNIFORM µs each | ARGMAX n/game | ARGMAX µs each |
+|---|---|---|---|---|
+| **ActivatePlayer** | 90.4 | **6725** | 206.3 | **4136** |
+| **Move** | 150.5 | **481** | 492.9 | **320** |
+| BlitzTarget | 9.5 | 11 | 9.1 | 11 |
+| BlockChoice | 2.1 | 6 | 24.0 | 6 |
+| ReRollOffer | 19.5 | 6 | 14.4 | 5 |
+| Pushback | 1.4 | 3 | 18.1 | 3 |
+| FollowUp | 1.4 | 3 | 17.9 | 3 |
+| TeamSetup | 46.6 | 2 | 81.7 | 2 |
+| everything else | ~6 | ≤1 | ~8 | ≤1 |
+
+| Share of agent time | UNIFORM | ARGMAX |
+|---|---|---|
+| `ActivatePlayer` | **89.3%** | **84.3%** |
+| `Move` | 10.6% | 15.6% |
+| all 13 other classes combined | **<0.1%** | **<0.1%** |
+
+**Two effects, both real.**
+
+**The mix changes the average.** Argmax makes 879 decisions a game against uniform's 331, and the
+extra ones are the *cheap* ones: it blocks 24 times a game against 2, and each block brings a
+`BlockChoice`, a `FollowUp` and often a `Pushback` — all 3–6 µs. Averaging over a longer tail of
+trivial decisions pulls the mean down without anything getting faster.
+
+**And `ActivatePlayer` is genuinely cheaper in the sharper arm** — 4136 µs against 6725. That is the
+`any_unused` filter interacting with turn length. Uniform turns over constantly, so it gets 2.7
+activation prompts per team-turn and they cluster at the *start* of a turn with all eleven players
+still eligible — eleven Dijkstras. Argmax gets 5.9 prompts per turn and reaches deep into them, where
+most players have already acted and are filtered out, so the later prompts run two or three
+Dijkstras instead of eleven.
+
+**The optimisation target is unambiguous.** `ActivatePlayer` is 84–89% of all agent time at 4–7 ms a
+prompt; `Move` is another 10–16%; the remaining thirteen prompt classes together are under a tenth of
+one percent. At ~11 players and ~6.7 ms that is roughly **600 µs per player** just to build and score
+one player's reach — for a 60-to-200 node search, which is where the naive Dijkstra below shows up.
+Nothing outside these two prompts is worth touching.
+
+### 18.5 Why — and it is exactly what was predicted
 
 **None of P5, P6 or P7 is implemented.** §15 listed the caching work; §16 built the play logic
 without it. The measured cost is the predicted cost of that decision, and the four causes are, in
 expected order of size:
 
-1. **`reachable` is called O(players) times per activation prompt, and never cached.** §6.5.1's Move
+1. **`reachable` is called O(players) times per activation prompt, and never cached.** §18.4
+   measures this directly: `ActivatePlayer` is 84–89% of all agent time. §6.5.1's Move
    branch runs a Dijkstra per eligible player, and the Blitz branch runs another — up to **22
    Dijkstras for a single `ActivatePlayer`**. This is D5, which §14 "fixed" in the *spec* by
    specifying a two-tier scorer, and which this build does not do.
@@ -3211,7 +3276,7 @@ Nothing here is surprising and nothing here is deep. It is one caching layer, sp
 items that were deliberately deferred, and the measurement now says what deferring them costs:
 **roughly an order of magnitude.**
 
-### 18.4 What it does not block
+### 18.6 What it does not block
 
 At ~1.2 s per game a 100-seed matrix run costs about two minutes, which is why none of this got in
 the way of §16 or §17. It matters for two things and no others: a coverage sweep across 30 rosters ×

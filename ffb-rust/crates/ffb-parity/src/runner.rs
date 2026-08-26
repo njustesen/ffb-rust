@@ -1274,6 +1274,32 @@ pub fn run_uniform_game(
     (all_events, score_home, score_away, unhandled_prompts)
 }
 
+/// Prompt-variant name, for the per-class timing breakdown.
+fn prompt_class(p: &AgentPrompt) -> &'static str {
+    match p {
+        AgentPrompt::ActivatePlayer { .. } => "ActivatePlayer",
+        AgentPrompt::Move { .. } => "Move",
+        AgentPrompt::BlockChoice { .. } => "BlockChoice",
+        AgentPrompt::BlockChoiceProperties { .. } => "BlockChoiceProperties",
+        AgentPrompt::BlitzTarget { .. } => "BlitzTarget",
+        AgentPrompt::BlockTarget { .. } => "BlockTarget",
+        AgentPrompt::Pushback { .. } => "Pushback",
+        AgentPrompt::FollowUp { .. } => "FollowUp",
+        AgentPrompt::ReRollOffer { .. } => "ReRollOffer",
+        AgentPrompt::SkillUse { .. } => "SkillUse",
+        AgentPrompt::Interception { .. } => "Interception",
+        AgentPrompt::KickBall => "KickBall",
+        AgentPrompt::Touchback { .. } => "Touchback",
+        AgentPrompt::CoinChoice { .. } => "CoinChoice",
+        AgentPrompt::ReceiveChoice { .. } => "ReceiveChoice",
+        AgentPrompt::TeamSetup { .. } => "TeamSetup",
+        AgentPrompt::ApothecaryChoice { .. } => "ApothecaryChoice",
+        AgentPrompt::PlayerChoice { .. } => "PlayerChoice",
+        AgentPrompt::KickoffEventPlacement { .. } => "KickoffEventPlacement",
+        _ => "other",
+    }
+}
+
 /// Run a complete game with `HeuristicAgent` on BOTH sides at the given temperature scale.
 ///
 /// `temp_scale = 1.0` is the §8 table. A very large scale makes every softmax uniform over the
@@ -1307,10 +1333,24 @@ pub fn run_heuristic_game(
     let mut agent_ns: u128 = 0;
     let mut engine_ns: u128 = 0;
     let mut decisions: u64 = 0;
+    // Per-prompt-class accounting. The arms score identically, so a difference in the AVERAGE
+    // cost per decision can only come from a different MIX of decisions -- this is what proves
+    // that rather than asserting it. Also a whole-loop timer, so `agent + engine + residual`
+    // has to add up to the wall clock and nothing can hide outside the two brackets.
+    let mut per_class: std::collections::BTreeMap<&'static str, (u64, u128)> = Default::default();
+    let loop_start = std::time::Instant::now();
     for _ in 0..200_000 {
         if engine.is_finished() { break; }
         if engine.current_prompt().is_none() { break; }
         let side = engine.active_side();
+        let class: &'static str = if timed {
+            match engine.current_prompt() {
+                Some(p) => prompt_class(p),
+                None => "none",
+            }
+        } else {
+            ""
+        };
         let t0 = if timed { Some(std::time::Instant::now()) } else { None };
         let action = if matches!(side, TeamSide::Home) {
             home_agent.act(&engine)
@@ -1318,8 +1358,12 @@ pub fn run_heuristic_game(
             away_agent.act(&engine)
         };
         if let Some(t) = t0 {
-            agent_ns += t.elapsed().as_nanos();
+            let d = t.elapsed().as_nanos();
+            agent_ns += d;
             decisions += 1;
+            let e = per_class.entry(class).or_insert((0, 0));
+            e.0 += 1;
+            e.1 += d;
         }
         let t1 = if timed { Some(std::time::Instant::now()) } else { None };
         let r = engine.apply(side, action);
@@ -1330,6 +1374,23 @@ pub fn run_heuristic_game(
         }
     }
     if timed {
+        let total_ns = loop_start.elapsed().as_nanos();
+        let residual = total_ns.saturating_sub(agent_ns + engine_ns);
+        eprintln!(
+            "HTOTAL seed={seed} loop_ms={:.1} agent_ms={:.1} engine_ms={:.1}              residual_ms={:.1} residual_pct={:.2}%",
+            total_ns as f64 / 1e6,
+            agent_ns as f64 / 1e6,
+            engine_ns as f64 / 1e6,
+            residual as f64 / 1e6,
+            100.0 * residual as f64 / total_ns.max(1) as f64,
+        );
+        for (k, (n, ns)) in &per_class {
+            eprintln!(
+                "HCLASS seed={seed} class={k} n={n} total_ms={:.2} us_each={:.1}",
+                *ns as f64 / 1e6,
+                *ns as f64 / 1e3 / (*n).max(1) as f64,
+            );
+        }
         eprintln!(
             "HTIME seed={seed} decisions={decisions} agent_ms={:.1} engine_ms={:.1}              agent_us_per_decision={:.1} agent_share={:.1}%",
             agent_ns as f64 / 1e6,
