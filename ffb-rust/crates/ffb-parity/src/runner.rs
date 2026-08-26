@@ -1274,6 +1274,27 @@ pub fn run_uniform_game(
     (all_events, score_home, score_away, unhandled_prompts)
 }
 
+/// One-line description of the agent's answer, for the FFB_SEQ decision trace.
+fn describe_action(a: &ffb_engine::action::Action) -> String {
+    use ffb_engine::action::Action as A;
+    match a {
+        A::ActivatePlayer { player_id, player_action, block_defender_id } => format!(
+            "Activate({player_id}, {player_action:?}{})",
+            block_defender_id.as_ref().map(|t| format!(", target={t}")).unwrap_or_default()),
+        A::Move { path } => format!(
+            "Move({} squares -> {})", path.len(),
+            path.last().map(|c| format!("{},{}", c.x, c.y)).unwrap_or_default()),
+        A::BlockChoice { die_index, .. } => format!("BlockChoice(die {die_index})"),
+        A::PushTo { coord } => format!("PushTo({},{})", coord.x, coord.y),
+        A::FollowUp { follow_up } => format!("FollowUp({follow_up})"),
+        A::UseReRoll { use_reroll } => format!("UseReRoll({use_reroll})"),
+        A::SelectPlayer { player_id } => format!("SelectPlayer({player_id})"),
+        A::EndPlayerAction => "EndPlayerAction".into(),
+        A::EndTurn => "EndTurn".into(),
+        other => format!("{other:?}").chars().take(48).collect(),
+    }
+}
+
 /// Prompt-variant name, for the per-class timing breakdown.
 fn prompt_class(p: &AgentPrompt) -> &'static str {
     match p {
@@ -1351,12 +1372,22 @@ pub fn run_heuristic_game(
         } else {
             ""
         };
+        let seq = std::env::var_os("FFB_SEQ").is_some();
+        let seq_class: &'static str = if seq {
+            engine.current_prompt().map(prompt_class).unwrap_or("none")
+        } else {
+            ""
+        };
         let t0 = if timed { Some(std::time::Instant::now()) } else { None };
         let action = if matches!(side, TeamSide::Home) {
             home_agent.act(&engine)
         } else {
             away_agent.act(&engine)
         };
+        if seq {
+            eprintln!("SEQ {:>6} {:<22} -> {}", format!("{:?}", side), seq_class,
+                      describe_action(&action));
+        }
         if let Some(t) = t0 {
             let d = t.elapsed().as_nanos();
             agent_ns += d;

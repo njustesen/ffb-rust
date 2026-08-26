@@ -3282,3 +3282,94 @@ At ~1.2 s per game a 100-seed matrix run costs about two minutes, which is why n
 the way of §16 or §17. It matters for two things and no others: a coverage sweep across 30 rosters ×
 3 editions × 100 seeds would take hours rather than minutes, and any future search would be paying
 this per node. Fix P5–P7 before either.
+
+---
+
+## 19. Against the targets
+
+§10.3's benchmark table, plus the two rates asked for during §16, measured on the **greedy** arm,
+100 games, both teams combined (the units §10.3 was written in).
+
+| Metric | Target | Baseline (§0.5) | **Measured** | |
+|---|---|---|---|---|
+| Touchdowns / game | > 1.5 | 0.00 | **1.76** | ✅ |
+| Mean squares per activation | > 3 | 0.95 | **4.85** | ✅ |
+| Optimal block-die pick | > 90% | 62.4% | **99.4%** | ✅ |
+| Skulls kept with a better die | < 5 | 23 | **0** | ✅ |
+| Fouls / game | 0–2 | 6.35 | **0.37** | ✅ |
+| GFI rolls / game | 0–10 | 114.9 | **11.16** | ≈ |
+| Failed dodges / game | < 2 | 3.6 | **12.62** | ❌ |
+| Completions / game | > 1 | ~0 | **0.00** | ❌ |
+| Interceptions / game | > 0.1 | ~0 | **0.00** | ❌ |
+| Agent time / game | < 100 ms | — | **1149 ms** | ❌ |
+| Distinct steps dispatched | > 190/200 | 167/200 | *not measured* | — |
+
+**Six of ten hit, one marginal, three missed, one unmeasured.**
+
+### 19.1 One of those targets was the wrong metric
+
+**"Failed dodges < 2 per game" is a bad target and I should not have written it.** It is trivially
+satisfied by not moving: the uniform arm posts 5.3 because it barely goes anywhere. The greedy arm
+posts 12.62 because it moves 993 squares a game against 518 and therefore dodges 32 times against
+19. The **per-dodge** failure rate is 39% in both arms, because that is dice.
+
+The metric that actually means something is **turnovers per team-turn**, and on that the agent is
+where it should be:
+
+| | UNIFORM | GREEDY |
+|---|---|---|
+| Turnovers / game | 19.7 | **10.3** |
+| **% of turns ending in a turnover** | **58%** | **29%** |
+| Players still unactivated at a turnover | 8.45 | 7.16 |
+
+Replace the failed-dodge row in §10.3 with turnovers-per-turn.
+
+### 19.2 The blitz is declared 7.8 times a game and never blocks
+
+Auditing the event stream for whether a declaration produces a `block`:
+
+| | declared / game | produced a block | rate |
+|---|---|---|---|
+| `Block` | 22.02 | 22.02 | **100%** |
+| `BlitzMove` | 7.84 | **0.00** | **0.0%** |
+
+Zero. Both sharp arms, 100 games each. **Every blitz the agent declares wastes the team's
+once-per-turn blitz.** This is the same shape as the Kick-Team-Mate and Throw-Team-Mate bugs in this
+repo's history: an action declared and then abandoned.
+
+The decision trace shows the mechanism:
+
+```
+Away ActivatePlayer  -> Activate(away_03, Blitz, target=home_02)
+Away BlitzTarget     -> SelectPlayer(home_03)          <- a DIFFERENT player
+Away Move            -> Move(4 squares -> 14,11)
+Away Move            -> Move(2 squares -> 14,13)
+Away Move            -> EndPlayerAction                <- no block, ever
+```
+
+Two distinct defects, both mine:
+
+1. **The folded target and the `BlitzTarget` answer disagree.** §6.5.2's Blitz branch picks a victim
+   and folds it into the declaration; the engine then asks again via `BlitzTarget`, and that handler
+   re-picks from `eligible_players` with a different rule. They chose `home_02` and `home_03`.
+2. **The `Move` handler does not know it is in a blitz.** It scores destinations by `V` alone, so it
+   walks the blitzer wherever the value model likes and never ends adjacent to the victim — after
+   which there is nothing to block and it declines.
+
+The fix is to give the blitz an explicit two-part plan: pick the victim once, then constrain the
+movement to squares adjacent to that victim (`legal_blitz_move_targets` already computes exactly
+that set), and stop treating the blitz's movement as ordinary movement.
+
+This is now the top open item. Fixing it should also move the passing numbers, because a blitz that
+lands is a knockdown the agent currently pays for and never receives.
+
+### 19.3 The three remaining misses
+
+- **Passing is dead** (0.00 completions, 0.00 interceptions). `p_complete` is a hard-coded `0.6` and
+  the carrier's `c_turnover` carries a ×1.4, so every pass scores negative and is never chosen. Needs
+  the real range-ruler probability from `PassModifierFactory`. It is also the reason the sharp arms
+  cover 36 event types where the sampled arm covers 37.
+- **Agent time is 11.5× the budget** — §18, and entirely the missing caching layer (P5–P7).
+- **Dead-step coverage is unmeasured.** The 167/200 figure predates all of this; nobody has re-run
+  the `StepId` inventory against the heuristic agent. It should move — scoring alone unlocks five
+  category-C steps — but that is a prediction, not a measurement.

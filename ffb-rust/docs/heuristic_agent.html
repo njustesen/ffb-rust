@@ -1756,6 +1756,94 @@ referee_spots_foul = armor[0] == armor[1];              <span class="c">// doubl
         either.</p>
       </section>
 
+      <!-- 19 -->
+      <section id="s19">
+        <div class="sec-head"><span class="idx">§19</span><h2>Against the targets</h2></div>
+        <p class="sec-desc">§10.3's benchmark table plus the two rates asked for during §16, measured on the
+        <b>greedy</b> arm, 100 games, both teams combined.</p>
+        <div class="card scroll">
+          <table>
+            <thead><tr><th>Metric</th><th class="num">Target</th><th class="num">Baseline</th><th class="num">Measured</th><th class="num">&nbsp;</th></tr></thead>
+            <tbody>
+              <tr><td>Touchdowns / game</td><td class="num">&gt; 1.5</td><td class="num bad">0.00</td><td class="num good"><b>1.76</b></td><td class="num good">&#10003;</td></tr>
+              <tr><td>Mean squares per activation</td><td class="num">&gt; 3</td><td class="num bad">0.95</td><td class="num good"><b>4.85</b></td><td class="num good">&#10003;</td></tr>
+              <tr><td>Optimal block-die pick</td><td class="num">&gt; 90%</td><td class="num bad">62.4%</td><td class="num good"><b>99.4%</b></td><td class="num good">&#10003;</td></tr>
+              <tr><td>Skulls kept with a better die</td><td class="num">&lt; 5</td><td class="num bad">23</td><td class="num good"><b>0</b></td><td class="num good">&#10003;</td></tr>
+              <tr><td>Fouls / game</td><td class="num">0&ndash;2</td><td class="num bad">6.35</td><td class="num good"><b>0.37</b></td><td class="num good">&#10003;</td></tr>
+              <tr><td>GFI rolls / game</td><td class="num">0&ndash;10</td><td class="num bad">114.9</td><td class="num"><b>11.16</b></td><td class="num warn">&asymp;</td></tr>
+              <tr><td>Failed dodges / game</td><td class="num">&lt; 2</td><td class="num">3.6</td><td class="num bad"><b>12.62</b></td><td class="num bad">&#10007;</td></tr>
+              <tr><td>Completions / game</td><td class="num">&gt; 1</td><td class="num">~0</td><td class="num bad"><b>0.00</b></td><td class="num bad">&#10007;</td></tr>
+              <tr><td>Interceptions / game</td><td class="num">&gt; 0.1</td><td class="num">~0</td><td class="num bad"><b>0.00</b></td><td class="num bad">&#10007;</td></tr>
+              <tr><td>Agent time / game</td><td class="num">&lt; 100 ms</td><td class="num">&mdash;</td><td class="num bad"><b>1149 ms</b></td><td class="num bad">&#10007;</td></tr>
+              <tr><td>Distinct steps dispatched</td><td class="num">&gt; 190/200</td><td class="num">167/200</td><td class="num"><i>not measured</i></td><td class="num">&mdash;</td></tr>
+            </tbody>
+          </table>
+          <div class="cap"><b>Six of ten hit, one marginal, three missed, one unmeasured.</b></div>
+        </div>
+
+        <h3>One of those targets was the wrong metric</h3>
+        <div class="note amber"><span class="dot"></span><div>
+          <p><b>"Failed dodges &lt; 2 per game" is a bad target and I should not have written it.</b> It is
+          trivially satisfied by not moving &mdash; the uniform arm posts 5.3 because it barely goes anywhere.
+          The greedy arm posts 12.62 because it moves 993 squares a game against 518 and therefore dodges 32
+          times against 19. The <b>per-dodge</b> failure rate is 39% in both arms, because that is dice.</p>
+        </div></div>
+        <div class="card scroll">
+          <table>
+            <thead><tr><th>The metric that means something</th><th class="num">UNIFORM</th><th class="num">GREEDY</th></tr></thead>
+            <tbody>
+              <tr><td>Turnovers / game</td><td class="num bad">19.7</td><td class="num good"><b>10.3</b></td></tr>
+              <tr><td><b>% of turns ending in a turnover</b></td><td class="num bad"><b>58%</b></td><td class="num good"><b>29%</b></td></tr>
+              <tr><td>Players unactivated at a turnover</td><td class="num">8.45</td><td class="num">7.16</td></tr>
+            </tbody>
+          </table>
+          <div class="cap">Replace the failed-dodge row in §10.3 with turnovers-per-turn.</div>
+        </div>
+
+        <h3>The blitz is declared 7.8 times a game and never blocks</h3>
+        <div class="card scroll">
+          <table>
+            <thead><tr><th>&nbsp;</th><th class="num">declared / game</th><th class="num">produced a block</th><th class="num">rate</th></tr></thead>
+            <tbody>
+              <tr><td><code>Block</code></td><td class="num">22.02</td><td class="num good">22.02</td><td class="num good"><b>100%</b></td></tr>
+              <tr><td><code>BlitzMove</code></td><td class="num">7.84</td><td class="num bad"><b>0.00</b></td><td class="num bad"><b>0.0%</b></td></tr>
+            </tbody>
+          </table>
+          <div class="cap">Zero, in both sharp arms over 100 games each. Every blitz declared wastes the team's once-per-turn blitz &mdash; the same shape as the Kick-Team-Mate and Throw-Team-Mate bugs in this repo's history.</div>
+        </div>
+        <div class="card"><pre>Away ActivatePlayer  -&gt; Activate(away_03, Blitz, target=home_02)
+Away BlitzTarget     -&gt; SelectPlayer(home_03)          <span class="c">&lt;- a DIFFERENT player</span>
+Away Move            -&gt; Move(4 squares -&gt; 14,11)
+Away Move            -&gt; Move(2 squares -&gt; 14,13)
+Away Move            -&gt; EndPlayerAction                <span class="c">&lt;- no block, ever</span></pre></div>
+        <div class="note red"><span class="dot"></span><div>
+          <p>Two distinct defects, both mine.</p>
+          <p><b>1. The folded target and the <code>BlitzTarget</code> answer disagree.</b> §6.5.2's Blitz
+          branch picks a victim and folds it into the declaration; the engine then asks again, and that
+          handler re-picks with a different rule. They chose <code>home_02</code> and
+          <code>home_03</code>.</p>
+          <p><b>2. The <code>Move</code> handler does not know it is in a blitz.</b> It scores destinations by
+          <code>V</code> alone, so it walks the blitzer wherever the value model likes, never ends adjacent to
+          the victim, and then declines.</p>
+          <p><b>Fix:</b> pick the victim once, then constrain the movement to squares adjacent to it &mdash;
+          <code>legal_blitz_move_targets</code> already computes exactly that set &mdash; and stop treating a
+          blitz's movement as ordinary movement. <b>Top open item.</b></p>
+        </div></div>
+
+        <h3>The three remaining misses</h3>
+        <ul>
+          <li><b>Passing is dead</b> (0.00 completions, 0.00 interceptions). <code>p_complete</code> is a
+            hard-coded <code>0.6</code> and the carrier's <code>c_turnover</code> carries a &times;1.4, so
+            every pass scores negative. Needs the real range-ruler probability &mdash; and it is also why the
+            sharp arms cover 36 event types where the sampled arm covers 37.</li>
+          <li><b>Agent time is 11.5&times; the budget</b> &mdash; §18, entirely the missing caching layer
+            (P5&ndash;P7).</li>
+          <li><b>Dead-step coverage is unmeasured.</b> The 167/200 figure predates all of this. It should move
+            &mdash; scoring alone unlocks five category-C steps &mdash; but that is a prediction, not a
+            measurement.</li>
+        </ul>
+      </section>
+
       <footer>
         <span>FFB-Rust · <code class="mono">docs/HEURISTIC_AGENT.md</code></span>
         <span>Design specification — not yet implemented</span>
@@ -1774,7 +1862,7 @@ const SECTIONS = [
   ['s7','Worked examples','7'], ['s8','Temperature table','8'],
   ['s9','Performance budget','9'], ['s10','Testing & calibration','10'],
   ['s11','Parity implications','11'], ['s12','Implementation plan','12'], ['s13','Open questions','13'],
-  ['s14','Review backlog','14'], ['s15','Proposed — round two','15'], ['s16','The experiment','16'], ['s17','Per-agent results','17'], ['s18','Runtime cost','18'],
+  ['s14','Review backlog','14'], ['s15','Proposed — round two','15'], ['s16','The experiment','16'], ['s17','Per-agent results','17'], ['s18','Runtime cost','18'], ['s19','Against the targets','19'],
 ];
 document.getElementById('rail').innerHTML = SECTIONS.map(([id,label,n])=>
   `<li><a href="#${id}" data-t="${id}"><span class="n">${n}</span><span>${label}</span></a></li>`).join('');
