@@ -4210,3 +4210,75 @@ The behaviour asked for is there and verified over 200 games:
 Rare in open play, common when the clock has made running useless — and priced by the engine's own
 range ruler and fumble grading throughout. The cost is ~4% of touchdowns against `wide-noball`,
 which remains available as a mode for anyone who wants the stronger, ball-move-free agent.
+
+---
+
+## 28. Move-then-give: the play is real, the engine cannot offer it
+
+The review note was exactly right about Blood Bowl:
+
+> A move + handoff to a non-activated unit enables double movement (two players) with the ball. The
+> same for passing; moving → passing → catching → moving (and potentially a handoff chain here)
+> allows for really long plays that are necessary to score in turn 7 or 8.
+
+`HandOverMove` and `PassMove` are precisely that: the carrier moves his full MA + 2 **first**, gives
+the ball at the end of it, and the receiver — if he still holds his activation — then moves his own.
+The ball travels `carrier's move + 1 + receiver's move` in one turn, about double what running can
+manage, which is the only way to cross a pitch in the two turns left at the end of a half.
+
+**This engine's `legal_actions` never offers it.** Instrumented over six games, the actions presented
+for a ball carrier are only ever:
+
+```
+101 × HandOver        0 × HandOverMove
+108 × Pass            0 × PassMove
+```
+
+and `legal_actions/mod.rs` contains **zero** occurrences of `HandOverMove` or `PassMove`. The
+hand-off option is gated on a team-mate being **already adjacent**, with the receiver folded into
+the declaration, and the engine resolves the give immediately — no movement phase is ever emitted.
+`StepInitMoving` does contain the machinery to dispatch a give from a `Move` prompt, but nothing
+reaches it, because no declaration ever produces the `…Move` player action.
+
+Declaring it bare does not help: the other two agents both fold the receiver in, and the code
+comments record why — *"Declaring a bomb with no target left StepInitPassing parked with an unset
+thrower and NO prompt."* Measured, a bare `HandOff` declaration silently consumes the activation
+and does nothing at all.
+
+### 28.1 What that cost, and what it explains
+
+Two more variants were measured against `wide-noball` before the cause was found:
+
+| | change | games | result |
+|---|---|---|---|
+| v10 | run-up enumerated, receiver folded in | 3200 | **−8.63 SE** |
+| v11 | …plus two real bugs fixed (below) | 3200 | **−7.18 SE** |
+
+Both are far worse than v9's −1.46, and for a simple reason: the agent was **pricing the ball as
+though the carrier had run up**, while the engine gave the ball away from where he stood. A
+systematic over-valuation of every hand-off.
+
+Two genuine bugs were found on the way and are worth recording even though the branch was reverted:
+
+- **`w * p_arrive` is a sign error.** Right for a positive weight, backwards for a negative one:
+  multiplying −0.6 by an arrival chance of 0.4 gives −0.24, so a *riskier* run-up made a *bad* plan
+  look better. Risk has to be §5.3's `p·w − (1−p)·c` at every scale.
+- **`pass_weight` looked the thrower up through `acting_player.player_id`**, which during activation
+  enumeration is the previous player or nothing, so the lookup failed and every pass was silently
+  dropped — passes measured 0.00 per game.
+
+### 28.2 Where this leaves passing
+
+This is the same shape as §24.1's blitz: the rules permit the play, the engine's declaration route
+does not, and parity comes first so the engine is not touched. It is now the *second* confirmed case
+where the agent's ceiling is set by the action set rather than by the policy.
+
+It also finally explains §27's negative result. Every valuation there was trying to make an immediate
+one-square give pay for a catch roll. It cannot, and no weighting will make it — the play that pays
+is the one the engine does not offer. **Passing cannot be made to improve this agent until
+`legal_actions` emits `HandOverMove` and `PassMove`.**
+
+The build therefore keeps §27's state: ball-moves priced for what the engine can actually do, ~4%
+of touchdowns worse than `wide-noball`, and behaving as asked — rare in open play, concentrated in
+turns 5–8. The engine gap is the thing to fix, and it belongs in the parity backlog rather than in
+the agent.
