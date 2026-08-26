@@ -3612,3 +3612,115 @@ read the rasters. That is worth 7.6 ms/game on its own: `BlockChoice` 86 → 7.6
 - **Dead-step coverage is still unmeasured** against this agent; the 167/200 figure predates all of
   it. Event-type coverage moved 36 → 40, which is a hint, not the measurement.
 - **The parity gate has never been run on this branch.**
+
+---
+
+## 22. Per-agent report
+
+Every column below is **one agent's own numbers**. Nothing is combined across the two teams.
+
+Four runs of 100 seeds each, `human` vs `human`, bb2025, greedy arm = `temp_scale 0` (argmax),
+random arm = `temp_scale 1e6` (uniform sampling over the identical option set):
+
+| run | home | away | feeds |
+|---|---|---|---|
+| `r_self` | greedy | greedy | the two self-play columns |
+| `r_gh` | greedy | random | pooled by **agent** |
+| `r_ga` | random | greedy | pooled by **agent** |
+| `r_unif` | random | random | the random baseline |
+
+`r_gh` and `r_ga` are pooled by agent rather than by colour, so the home/away asymmetry cancels and
+the vs-random columns are 200 games each.
+
+### 22.1 Per game, per agent
+
+| | GREEDY home *(self)* | GREEDY away *(self)* | GREEDY *(vs random)* | RANDOM *(vs greedy)* |
+|---|---|---|---|---|
+| games | 100 | 100 | 200 | 200 |
+| **Touchdowns** | **0.99** | **1.16** | **0.89** | **0.01** |
+| Wins | 0.28 | 0.35 | **0.76** | 0.01 |
+| Draws | 0.37 | 0.37 | 0.23 | 0.23 |
+| Losses | 0.35 | 0.28 | **0.01** | 0.76 |
+| | | | | |
+| Activations | 111.79 | 112.33 | 112.13 | 54.94 |
+| Squares moved | 386.84 | 417.48 | 349.21 | 168.30 |
+| Team turns | 17.83 | 17.91 | 17.74 | 16.90 |
+| | | | | |
+| Blocks thrown | 16.88 | 15.41 | 15.22 | 6.50 |
+| Blitzes declared | 3.59 | 3.17 | 1.75 | 3.31 |
+| Blitzes that blocked | 2.96 | 2.76 | 1.55 | 2.27 |
+| Fouls | 0.09 | 0.19 | 0.17 | 0.66 |
+| Own players ejected | 0.02 | 0.02 | 0.04 | 0.14 |
+| | | | | |
+| Injuries inflicted | 12.25 | 12.47 | 12.45 | 7.44 |
+| KOs inflicted | 0.92 | 0.92 | 1.11 | 0.55 |
+| Casualties inflicted | 0.75 | 0.81 | 1.01 | 0.42 |
+| | | | | |
+| GFI rolls | 0.31 | 0.84 | 0.49 | 1.28 |
+| Dodge rolls | 9.63 | 10.17 | 7.18 | 10.36 |
+| Pickup attempts | 0.74 | 1.95 | 1.43 | 3.04 |
+| Balls picked up | 0.43 | 1.27 | 0.81 | 1.81 |
+| **Passes thrown** | **0.00** | **0.00** | **0.00** | 4.21 |
+| Hand-offs | 0.08 | 0.14 | 0.10 | 1.51 |
+
+Head-to-head over 200 games: **152 wins, 46 draws, 2 losses** for the greedy agent. The draws are
+almost all 0–0.
+
+### 22.2 Derived rates, per agent
+
+| | GREEDY home | GREEDY away | GREEDY *(vs random)* | RANDOM |
+|---|---|---|---|---|
+| Squares per activation | 3.46 | 3.72 | 3.11 | 3.06 |
+| **Blitz follow-through** | 82.5% | 87.1% | **88.3%** | 68.6% |
+| Pickup success | 58.1% | 65.1% | 56.8% | 59.4% |
+| **Skulls kept with a better die** | **0.00** | **0.00** | **0.00** | 0.31 |
+| Matches a fixed die order † | 87.4% | 88.9% | 90.3% | 57.5% |
+| Casualties per block | 4.4% | 5.3% | 6.6% | 6.5% |
+
+† **This row is weaker evidence than it looks.** The fixed order ranks Both Down above a Push, which
+is only right for an attacker who has Block. §6.3 scores that die *contextually* — 0.70 with Block,
+0.10 without — so a correct context-dependent pick is scored as a miss here. The unambiguous row is
+the one above it: **the greedy agent never once kept a Skull when a better die was on the table**,
+across 400 agent-games; the random arm does it 0.31 times a game.
+
+### 22.3 Runtime, per agent
+
+| | GREEDY | RANDOM |
+|---|---|---|
+| decisions / game | 836 | 410 |
+| **µs per decision** | **97.0** | **95.6** |
+| agent ms / game *(one agent)* | **40.5** | 19.6 |
+| agent ms / game *(both, self-play)* | 81.1 | 39.2 |
+| engine ms / game *(both)* | 82.8 | 33.7 |
+
+**95.6 against 97.0 µs per decision** is the cleanest confirmation that the §1 contract holds: this
+is one program with one parameter, not two programs. The random arm is cheaper *per game* only
+because it makes half as many decisions — it ends its turns sooner — not because it does less work
+per decision.
+
+### 22.4 Three things the table says that are worth acting on
+
+**Passing is dead, and the random arm proves it is the weights and not the plumbing.** The identical
+enumeration throws 4.21 passes and 1.51 hand-offs a game when sampled uniformly; the greedy arm
+throws **zero**. So `legal_pass_receivers`, the plan, and the engine's dispatch all work — the
+option is enumerated and then priced out. `pass_weight`'s distance-banded `p_complete` cannot beat
+the carrier's ×1.4 turnover cost at any range. It needs the real range ruler.
+
+**The greedy agent loses the ball race against random.** It scores *fewer* touchdowns against random
+(0.89) than against itself (0.99 / 1.16), which should not happen against a weaker opponent. The
+mechanism is visible one row down: random attempts 3.04 pickups a game and secures 1.81, against the
+greedy agent's 1.43 and 0.81. Random blankets the ball by accident and then does nothing with it
+(0.01 touchdowns), and a ball the greedy agent never holds is a ball it cannot score with. Ball
+contest is under-weighted.
+
+**Random's blitz follows through 68.6% of the time**, and that reframes §19.2. Measured: old
+heuristic **0.0%**, random **68.6%**, new heuristic **82–88%**. So the old agent was not merely
+missing a feature, it was *far below chance* — a uniform sampler over the same options did four
+times better than it did.
+
+The likely mechanism, and this part is read from the code rather than measured:
+`StepInitMoving` auto-dispatches a blitz on `EndPlayerAction` when the player action is `BlitzMove`,
+`has_blocked` is false and `defender_id` is set, so an agent that answers `BlitzTarget` and then
+stops collects most of the value without trying. Why the old agent fell *below* that floor is not
+re-diagnosed here — it is fixed, and the explicit `Action::Block` no longer depends on the
+auto-dispatch either way. Worth a look if the mechanic ever regresses.
