@@ -1844,6 +1844,183 @@ Away Move            -&gt; EndPlayerAction                <span class="c">&lt;- 
         </ul>
       </section>
 
+      <!-- 20 -->
+      <section id="s20">
+        <div class="sec-head"><span class="idx">§20</span><h2>Ten ways to make it faster</h2></div>
+        <p class="sec-desc">1149 ms of agent time per game against a 100 ms budget. The measurement says where
+        every microsecond is, and it is a list about two prompts.</p>
+        <div class="card scroll">
+          <table>
+            <thead><tr><th>&nbsp;</th><th class="num">share of agent time</th><th class="num">per prompt</th><th class="num">per game</th></tr></thead>
+            <tbody>
+              <tr><td><code>ActivatePlayer</code></td><td class="num bad"><b>84–89%</b></td><td class="num">4136–6725 µs</td><td class="num">853 ms</td></tr>
+              <tr><td><code>Move</code></td><td class="num">10–16%</td><td class="num">320–481 µs</td><td class="num">158 ms</td></tr>
+              <tr><td>all 13 other prompt classes</td><td class="num good"><b>&lt; 0.1%</b></td><td class="num">≤ 11 µs</td><td class="num">&lt; 1 ms</td></tr>
+            </tbody>
+          </table>
+          <div class="cap">Savings marked with a figure are reasoned from this breakdown, not measured.</div>
+        </div>
+
+        <div class="pgrid"><details class="pp" data-g="Faster">
+    <summary>
+      <span class="pid">20.1</span>
+      <span class="pt">Move &rarr; Move never makes sense &mdash; end the activation eagerly</span>
+      <span class="pmeta"><span class="vf">high value</span><span class="eff">&minus;10%</span></span>
+    </summary>
+    <div class="pb"><p><b>Measured: 35.7% of all <code>Move</code> prompts are a consecutive Move-then-Move with nothing in
+  between</b> &mdash; 2049 of 5746 over ten games. Mean 2.07 move <em>answers</em> per moving activation, with
+  a tail out to seven. Every one is a full ~200-option re-plan reaching the same place a single longer path
+  would have reached.</p>
+  <div class="scroll"><table><thead><tr><th>Sequence</th><th>New options?</th></tr></thead><tbody>
+  <tr><td>Move &rarr; Move</td><td><b>No.</b> Same options, worse path. Never correct</td></tr>
+  <tr><td>Move &rarr; Pass / Hand-off</td><td>Yes &mdash; a throw is not a move</td></tr>
+  <tr><td>Move onto the ball &rarr; Move</td><td>Yes &mdash; it is a carrier now; the value model changed</td></tr>
+  <tr><td>Blitz: Move &rarr; Block &rarr; Move</td><td>Yes &mdash; the board changed underneath it</td></tr>
+  <tr><td>Stand up &rarr; Move</td><td>Yes &mdash; it could not move before</td></tr>
+  </tbody></table></div>
+  <div class="fix"><b>Fix:</b> a small state machine on the activation, not a scoring decision. After a plain
+  move with no acquisition and no block, the next <code>Move</code> prompt is answered
+  <code>EndPlayerAction</code> for free. Removes ~2050 re-plans and makes the ~1780 end-of-activation answers
+  free too &mdash; about two thirds of all Move cost.</div></div>
+  </details><details class="pp" data-g="Faster">
+    <summary>
+      <span class="pid">20.2</span>
+      <span class="pt">Plan once at declaration; replay it afterwards</span>
+      <span class="pmeta"><span class="eff">&minus;8%</span></span>
+    </summary>
+    <div class="pb"><p>The <code>ActivatePlayer</code> scorer already ran <code>reachable</code> for the player it chose and
+  already knows the destination and path. The <code>Move</code> prompt then throws that away and recomputes
+  it.</p>
+  <div class="fix"><b>Fix:</b> cache the winning <code>(player, action, destination, path)</code> from the
+  activation decision and serve the following <code>Move</code> prompt from it. One Dijkstra and one value
+  sweep saved per activation, and it composes with 20.1.</div></div>
+  </details><details class="pp" data-g="Faster">
+    <summary>
+      <span class="pid">20.3</span>
+      <span class="pt">Two-tier activation scoring &mdash; the fix the spec already specifies</span>
+      <span class="pmeta"><span class="eff">&minus;55% of ActivatePlayer</span></span>
+    </summary>
+    <div class="pb"><p>§6.5.1 says: cheap proxy for every eligible player, full search for the top three. The build does
+  neither &mdash; it runs <code>reachable</code> per player in the Move branch <b>and again</b> in the Blitz
+  branch, up to <b>22 Dijkstras for one prompt</b>.</p>
+  <div class="fix"><b>Fix:</b> the proxy needs no search at all &mdash; carrier or not, marked or not, prone or
+  not, best block dice from where it stands, distance to the ball, and the best of its eight adjacent squares.
+  That resolves every rule in §6.5.1 except "free mover".</div></div>
+  </details><details class="pp" data-g="Faster">
+    <summary>
+      <span class="pid">20.4</span>
+      <span class="pt">Rasterize the value field once per position change</span>
+      <span class="pmeta"><span class="eff">&minus;60% of the remainder</span></span>
+    </summary>
+    <div class="pb"><p><code>value_of</code> is called per square, ~200 times per <code>Move</code> prompt and again for
+  every activation candidate. But <b>most of <code>V</code> does not depend on who is moving</b>:
+  <code>threat</code>, <code>lane</code>, <code>sideline</code>, the cage geometry and the distances to ball
+  and carrier are properties of the <em>square</em>. Only <code>advance</code>, <code>urgency</code> and the
+  MA cap are mover-specific, and those are closed forms.</p>
+  <div class="fix"><b>Fix:</b> precompute two <code>[f32; 26*15]</code> rasters, one per side, whenever
+  positions change. Per-square scoring becomes an array read plus three multiplies.</div></div>
+  </details><details class="pp" data-g="Faster">
+    <summary>
+      <span class="pid">20.5</span>
+      <span class="pt">Rasterize the threat map specifically</span>
+      <span class="pmeta"></span>
+    </summary>
+    <div class="pb"><p>The worst offender inside 20.4, worth naming separately: <code>threat_on</code> walks <b>all 22 players
+  for every square</b>, so scoring a 200-square prompt costs ~4400 player visits &mdash; and
+  <code>path_share</code> walks them again for the <code>Screen</code> intent. One pass fills the raster;
+  every read after is O(1). This is P5 and B6, still unimplemented.</p></div>
+  </details><details class="pp" data-g="Faster">
+    <summary>
+      <span class="pid">20.6</span>
+      <span class="pt">Give the Dijkstra real data structures</span>
+      <span class="pmeta"><span class="eff">3&times; inside reachable</span></span>
+    </summary>
+    <div class="pb"><p><code>reachable</code> uses a <code>HashMap&lt;FieldCoordinate, …&gt;</code> for the visited set, a
+  <b>linear scan over the frontier</b> to find the minimum (O(n²) in ~200 nodes), and clones the whole path
+  <code>Vec</code> on every improvement.</p>
+  <div class="fix"><b>Fix:</b> a flat <code>[…; 390]</code> array indexed <code>y*26+x</code>, a
+  <code>BinaryHeap</code>, and back-pointers &mdash; reconstructing the path exactly once, for the destination
+  actually chosen.</div></div>
+  </details><details class="pp" data-g="Faster">
+    <summary>
+      <span class="pid">20.7</span>
+      <span class="pt">Cache and lazily build the board features</span>
+      <span class="pmeta"></span>
+    </summary>
+    <div class="pb"><p><code>Board::new()</code> rebuilds the tackle-zone map, row prefixes and carrier scan on <b>every</b>
+  <code>act()</code> &mdash; including the ~60 prompts a game (<code>BlockChoice</code>, <code>FollowUp</code>,
+  <code>Pushback</code>, <code>ReRollOffer</code>) that never read any of it. Key it on a positions stamp
+  (P5/B3) and build each part on first use. During one team's turn the opponent does not move at all, so most
+  of it is invariant for the whole turn.</p></div>
+  </details><details class="pp" data-g="Faster">
+    <summary>
+      <span class="pid">20.8</span>
+      <span class="pt">Memoize <code>block_target_weight</code> per (attacker, defender)</span>
+      <span class="pmeta"></span>
+    </summary>
+    <div class="pb"><p>It calls <code>find_block_strength</code> twice, and that function runs a <b>nested player × player
+  loop</b> for the Guard-cancel rule &mdash; roughly 484 iterations per call. It is invoked from the
+  <code>Block</code> branch, the <code>Blitz</code> branch and the <code>BlitzTarget</code> handler, often for
+  the same pair several times in one prompt. A small memo table keyed on the pair, cleared with the positions
+  stamp.</p></div>
+  </details><details class="pp" data-g="Faster">
+    <summary>
+      <span class="pid">20.9</span>
+      <span class="pt">Make the action space whole plans, not fragments</span>
+      <span class="pmeta"><span class="vf">high value</span><span class="eff">fixes two bugs too</span></span>
+    </summary>
+    <div class="pb"><p>The generalisation of 20.1, and the most valuable item here because it is a <b>correctness</b> fix as
+  much as a speed one. Enumerate an activation as <code>(player, plan)</code>:</p>
+  <pre>Block(victim)                    Foul(victim)
+MoveTo(sq)                       MoveTo(sq) + Pass(receiver)
+Blitz(victim, via sq)            MoveTo(sq) + HandOff(receiver)
+Pickup(ball) + MoveTo(sq)        StandUp + MoveTo(sq)</pre>
+  <p>The engine's follow-up prompts are then <b>replayed from the plan</b> instead of re-decided: one scoring
+  pass per activation instead of the current 3.4. And it makes two things expressible that currently are
+  not:</p>
+  <ul>
+    <li><b>move-then-pass</b>, which the fragmented design cannot represent at all &mdash; the reason passing
+      is dead (§19.3);</li>
+    <li><b>blitz-to-a-specific-victim</b>, with the movement constrained to squares adjacent to the chosen
+      victim &mdash; the reason the blitz never blocks (§19.2).</li>
+  </ul>
+  <div class="fix">Two bugs and a speed-up from one restructuring. <b>This is the item to do first if only one
+  gets done.</b></div></div>
+  </details><details class="pp" data-g="Faster">
+    <summary>
+      <span class="pid">20.10</span>
+      <span class="pt">Prune before scoring, and skip the trivial</span>
+      <span class="pmeta"></span>
+    </summary>
+    <div class="pb"><ul>
+    <li><b>Admissible bound.</b> With a sharp temperature, any option more than ~10·T below the maximum carries
+      under 1e-4 of the probability. Compute an optimistic <code>p_arrive_upper × V_upper</code> per
+      destination straight off the raster, fully score only the top K, and put the rest in one sampled tail
+      bucket that keeps the &epsilon;-floor's guarantee intact.</li>
+    <li><b>Short-circuit trivia.</b> Return immediately when an option set has one element instead of running
+      softmax over it; reuse scratch buffers rather than allocating a <code>HashMap</code> and a path
+      <code>Vec</code> per <code>reachable</code> call.</li>
+  </ul></div>
+  </details></div>
+
+        <h3>Expected total</h3>
+        <p>The three structural items — 20.3, 20.4 and 20.6 — carry most of it, and all three are things §15
+        listed and §16 deliberately skipped.</p>
+        <div class="card scroll">
+          <table>
+            <thead><tr><th>&nbsp;</th><th class="num">est. agent ms / game</th></tr></thead>
+            <tbody>
+              <tr><td>now</td><td class="num bad"><b>1149</b></td></tr>
+              <tr><td>+ 20.3 two-tier</td><td class="num">~520</td></tr>
+              <tr><td>+ 20.4 / 20.5 rasters</td><td class="num">~250</td></tr>
+              <tr><td>+ 20.6 Dijkstra structures</td><td class="num">~180</td></tr>
+              <tr><td>+ 20.1 / 20.2 eager end and plan reuse</td><td class="num good"><b>~130</b></td></tr>
+            </tbody>
+          </table>
+          <div class="cap">That lands within ~30% of the 100 ms budget without 20.7–20.10, which are then the margin. And 20.9 is worth doing regardless of the clock, because it is what makes passing and blitzing work at all.</div>
+        </div>
+      </section>
+
       <footer>
         <span>FFB-Rust · <code class="mono">docs/HEURISTIC_AGENT.md</code></span>
         <span>Design specification — not yet implemented</span>
@@ -1862,7 +2039,7 @@ const SECTIONS = [
   ['s7','Worked examples','7'], ['s8','Temperature table','8'],
   ['s9','Performance budget','9'], ['s10','Testing & calibration','10'],
   ['s11','Parity implications','11'], ['s12','Implementation plan','12'], ['s13','Open questions','13'],
-  ['s14','Review backlog','14'], ['s15','Proposed — round two','15'], ['s16','The experiment','16'], ['s17','Per-agent results','17'], ['s18','Runtime cost','18'], ['s19','Against the targets','19'],
+  ['s14','Review backlog','14'], ['s15','Proposed — round two','15'], ['s16','The experiment','16'], ['s17','Per-agent results','17'], ['s18','Runtime cost','18'], ['s19','Against the targets','19'], ['s20','Making it faster','20'],
 ];
 document.getElementById('rail').innerHTML = SECTIONS.map(([id,label,n])=>
   `<li><a href="#${id}" data-t="${id}"><span class="n">${n}</span><span>${label}</span></a></li>`).join('');

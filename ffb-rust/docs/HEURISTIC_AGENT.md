@@ -3373,3 +3373,153 @@ lands is a knockdown the agent currently pays for and never receives.
 - **Dead-step coverage is unmeasured.** The 167/200 figure predates all of this; nobody has re-run
   the `StepId` inventory against the heuristic agent. It should move — scoring alone unlocks five
   category-C steps — but that is a prediction, not a measurement.
+
+---
+
+## 20. Ten ways to make it faster
+
+1149 ms of agent time per game against a 100 ms budget (§18). The measurement says where every
+microsecond is:
+
+| | share of agent time | per prompt | per game |
+|---|---|---|---|
+| `ActivatePlayer` | **84–89%** | 4136–6725 µs | 853 ms |
+| `Move` | 10–16% | 320–481 µs | 158 ms |
+| all 13 other prompt classes | **< 0.1%** | ≤ 11 µs | < 1 ms |
+
+So this is a list about two prompts. Savings marked *(est.)* are reasoned from the cost breakdown,
+not measured.
+
+### 20.1 Move → Move never makes sense — end the activation eagerly
+
+**Measured: 35.7% of all `Move` prompts are a consecutive Move-then-Move with nothing in between** —
+2049 of 5746 over ten games. Mean 2.07 move *answers* per moving activation, with a tail out to
+seven. Every one of those is a full ~200-option re-plan that reaches the same place a single longer
+path would have reached.
+
+Moving twice is moving once to the final square. The activation should answer its first `Move`
+prompt with the whole path and then **end immediately**, without scoring anything, unless the
+activation state actually changed in a way that opens options it did not have before:
+
+| Sequence | New options? |
+|---|---|
+| Move → Move | **No.** Same options, worse path. Never correct |
+| Move → Pass / Hand-off | Yes — a throw is not a move |
+| Move onto the ball → Move | Yes — it is a carrier now; the value model changed |
+| Blitz: Move → Block → Move | Yes — the board changed underneath it |
+| Stand up → Move | Yes — it could not move before |
+
+So the rule is a small state machine on the activation, not a scoring decision: after a plain move
+with no acquisition and no block, the next `Move` prompt is answered `EndPlayerAction` for free.
+Removes ~2050 re-plans and makes the ~1780 end-of-activation answers free as well — together about
+two thirds of all `Move` cost. **(est. −10% of total)**
+
+### 20.2 Plan once at declaration; replay it afterwards
+
+The `ActivatePlayer` scorer already ran `reachable` for the player it chose and already knows the
+destination and the path. Then the `Move` prompt throws that away and computes it again. Cache the
+winning `(player, action, destination, path)` from the activation decision and serve the following
+`Move` prompt from it. One Dijkstra and one value sweep saved per activation, and it composes with
+20.1. **(est. −8%)**
+
+### 20.3 Two-tier activation scoring — the fix the spec already specifies
+
+§6.5.1 says: cheap proxy for every eligible player, full search for the top three. The build does
+neither — it runs `reachable` per player in the Move branch **and again** in the Blitz branch, up to
+22 Dijkstras for one prompt. The proxy needs no search at all: carrier or not, marked or not, prone
+or not, best block dice from where it already stands, distance to the ball, and the best of its eight
+adjacent squares. That resolves every rule in §6.5.1 except "free mover". **(est. −55% of
+`ActivatePlayer`)**
+
+### 20.4 Rasterize the value field once per position change
+
+`value_of` is called per square, ~200 times per `Move` prompt and again for every candidate in the
+activation scorer. But **most of `V` does not depend on who is moving**: `threat`, `lane`,
+`sideline`, the cage geometry, the distance to the ball and to the carrier are all properties of the
+*square*. Only `advance`, `urgency` and the MA cap are mover-specific, and those are closed forms.
+
+Precompute two `[f32; 26*15]` rasters (one per side) whenever positions change, and make per-square
+scoring an array read plus three multiplies. **(est. −60% of what is left after 20.3)**
+
+### 20.5 Rasterize the threat map specifically
+
+The worst offender inside 20.4, and worth naming separately: `threat_on` walks **all 22 players for
+every square**, so scoring a 200-square prompt costs ~4400 player visits — and `path_share` walks
+them again for the `Screen` intent. One pass over the players fills the raster; every read after that
+is O(1). This is P5 and B6, still unimplemented.
+
+### 20.6 Give the Dijkstra real data structures
+
+`reachable` currently uses a `HashMap<FieldCoordinate, …>` for the visited set, a **linear scan over
+the frontier** to find the minimum (so O(n²) in the ~200 nodes), and clones the whole path `Vec` on
+every improvement. Replace with a flat `[…; 390]` array indexed `y*26+x`, a `BinaryHeap`, and
+back-pointers — reconstructing the path exactly once, for the destination actually chosen.
+**(est. 3× inside `reachable`)**
+
+### 20.7 Cache and lazily build the board features
+
+`Board::new()` rebuilds the tackle-zone map, the row prefixes and the carrier scan on **every**
+`act()` call — including the ~60 prompts a game (`BlockChoice`, `FollowUp`, `Pushback`, `ReRollOffer`)
+that never read any of it. Key it on a positions stamp (P5/B3) and build each part on first use.
+During one team's turn the opponent does not move at all, so most of it is invariant for the whole
+turn.
+
+### 20.8 Memoize `block_target_weight` per (attacker, defender)
+
+It calls `ServerUtilPlayer::find_block_strength` twice, and that function runs a **nested
+player × player loop** for the Guard-cancel rule — roughly 484 iterations per call. It is invoked
+from the `Block` branch, the `Blitz` branch and the `BlitzTarget` handler, often for the same pair
+several times in one prompt. A small memo table keyed on the pair, cleared with the positions stamp.
+
+### 20.9 Make the action space whole plans, not fragments
+
+The generalisation of 20.1, and the most valuable item here because it is a **correctness** fix as
+much as a speed one. Enumerate an activation as `(player, plan)`:
+
+```
+Block(victim)                    Foul(victim)
+MoveTo(sq)                       MoveTo(sq) + Pass(receiver)
+Blitz(victim, via sq)            MoveTo(sq) + HandOff(receiver)
+Pickup(ball) + MoveTo(sq)        StandUp + MoveTo(sq)
+```
+
+The engine's follow-up prompts are then **replayed from the plan** instead of re-decided: one
+scoring pass per activation instead of the current 3.4.
+
+And it makes two things expressible that currently are not:
+
+- **move-then-pass**, which the fragmented design cannot represent at all — the reason passing is
+  dead (§19.3);
+- **blitz-to-a-specific-victim**, where the movement is constrained to squares adjacent to the chosen
+  victim — the reason the blitz never blocks (§19.2).
+
+Two bugs and a speed-up from one restructuring. This is the item to do first if only one gets done.
+
+### 20.10 Prune before scoring, and skip the trivial
+
+Two cheap wins on top:
+
+- **Admissible bound.** With a sharp temperature, any option more than ~10·T below the maximum
+  carries under 1e-4 of the probability. Compute an optimistic `p_arrive_upper × V_upper` per
+  destination straight off the raster, fully score only the top K, and put the rest in a single
+  sampled tail bucket that keeps the ε-floor's guarantee intact.
+- **Short-circuit trivia.** Return immediately when an option set has one element instead of running
+  softmax over it; reuse scratch buffers rather than allocating a `HashMap` and a path `Vec` per
+  `reachable` call.
+
+### 20.11 Expected total
+
+The three structural items — 20.3, 20.4 and 20.6 — carry most of it, and they are all things §15
+already listed and §16 deliberately skipped:
+
+| | est. agent ms / game |
+|---|---|
+| now | **1149** |
+| + 20.3 two-tier | ~520 |
+| + 20.4 / 20.5 rasters | ~250 |
+| + 20.6 Dijkstra structures | ~180 |
+| + 20.1 / 20.2 eager end and plan reuse | **~130** |
+
+That lands within ~30% of the 100 ms budget without 20.7–20.10, which are then the margin. And
+20.9 is worth doing regardless of the clock, because it is what makes passing and blitzing work at
+all.
