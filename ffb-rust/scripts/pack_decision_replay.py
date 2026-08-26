@@ -135,6 +135,7 @@ def main():
         for i, o in enumerate(r['options']):
             opts.append({
                 'l': describe(o['action']),
+                'n': o.get('note', ''),
                 'p': round(o['p'], 5),
                 'w': round(o['w'], 4),
                 'y': o['why'],
@@ -145,6 +146,7 @@ def main():
             'side': r['side'],
             'pr': r['prompt'],
             'ch': r['chosen'],
+            'tk': r.get('taken', ''),
             'hl': sn['hl'], 't': sn['t'], 'hs': sn['hs'], 'aw': sn['aw'],
             'act': sn.get('act_id'),
             'b': [sn['bx'], sn['by']] if (sn.get('bx') is not None and sn.get('bp')) else None,

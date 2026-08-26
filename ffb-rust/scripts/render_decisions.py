@@ -25,7 +25,7 @@ SQ = 30
 ICON = 28
 OX = OY = 1
 COLS, ROWS = 26, 15
-PANEL = 268
+PANEL = 344
 FOOT = 26
 
 PS_PRONE, PS_STUNNED = 0x3, 0x4
@@ -133,13 +133,19 @@ def anchors(rec):
 
 
 def heat(p_norm):
-    """Low probability -> cool blue, high -> hot amber. Alpha rises with probability."""
+    """Red = the agent thought this unlikely, green = likely, yellow between.
+
+    Interpolated in two legs so the midpoint is a true yellow; a direct red-to-green blend passes
+    through a muddy olive that reads as neither.
+    """
     p = max(0.0, min(1.0, p_norm))
-    r = int(60 + 195 * p)
-    g = int(90 + 110 * p)
-    b = int(230 - 200 * p)
-    a = int(60 + 150 * p)
-    return (r, g, b, a)
+    if p < 0.5:
+        u = p / 0.5
+        r, g, b = 214, int(48 + 158 * u), 42
+    else:
+        u = (p - 0.5) / 0.5
+        r, g, b = int(214 - 142 * u), int(206 - 26 * u), int(42 + 30 * u)
+    return (r, g, b, int(76 + 122 * p))
 
 
 def describe(a):
@@ -184,6 +190,17 @@ def team_key(im, dd, x0, y, sn, font):
             if ic is not None:
                 im.alpha_composite(ic.resize((18, 18)), (x0, y + k * 20))
         dd.text((x0 + 24, y + 3 + k * 20), label, font=font, fill=(200, 205, 215))
+
+
+def taken_line(dd, x0, y, rec, font):
+    """What was actually sent to the engine. Shown even when nothing was scored: a prompt answered
+    from the activation plan still DID something, and the reader needs to see what."""
+    dd.text((x0, y), 'ACTION SENT', font=font, fill=(110, 116, 126))
+    t = (rec.get('taken') or '-')
+    for k in range(2):
+        chunk = t[k*42:(k+1)*42]
+        if chunk:
+            dd.text((x0, y + 14 + k*13), chunk, font=font, fill=(240, 176, 80))
 
 
 def render(rec, pitch, font, fontb, overlay=False):
@@ -267,6 +284,7 @@ def render(rec, pitch, font, fontb, overlay=False):
         dd.text((x0, 138), 'Nothing was scored, so there', font=font, fill=(120, 122, 130))
         dd.text((x0, 152), 'is no distribution to show.', font=font, fill=(120, 122, 130))
         team_key(im, dd, x0, pitch.height - 46, sn, font)
+        taken_line(dd, x0, pitch.height - 100, rec, font)
         dd.text((8, pitch.height + 6),
                 'colour intensity = probability mass on that square   |   white outline = the '
                 'option sampled   |   gold dot = icon substituted   |   graphics: FFB Java client',
@@ -275,21 +293,26 @@ def render(rec, pitch, font, fontb, overlay=False):
 
     order = sorted(range(len(rec['options'])), key=lambda i: -rec['options'][i]['p'])
     y = 86
-    for i in order[:20]:
+    for i in order[:22]:
         o = rec['options'][i]
         mark = '>' if i == rec['chosen'] else ' '
         col = (255, 255, 255) if i == rec['chosen'] else (185, 190, 200)
         bar = int(round(60 * (o['p'] / pmax)))
         dd.rectangle([x0, y + 4, x0 + bar, y + 10], fill=heat(o['p'] / pmax)[:3])
-        dd.text((x0 + 64, y), '%s%4.1f%% %s' % (mark, 100 * o['p'], describe(o['action'])[:34]),
-                font=font, fill=col)
+        txt = describe(o['action'])
+        nt = o.get('note') or ''
+        # Skip a note that only repeats the label (block/foul/pass already say their target).
+        if nt and not all(w in txt for w in nt.split()):
+            txt += '  ' + nt
+        dd.text((x0 + 64, y), '%s%4.1f%% %s' % (mark, 100 * o['p'], txt[:42]), font=font, fill=col)
         y += 15
-        if y > pitch.height - 20:
+        if y > pitch.height - 116:
             break
-    if len(rec['options']) > 20:
-        dd.text((x0, y), '  ... %d more' % (len(rec['options']) - 20), font=font,
+    if len(rec['options']) > 22:
+        dd.text((x0, y), '  ... %d more' % (len(rec['options']) - 22), font=font,
                 fill=(120, 120, 130))
     team_key(im, dd, x0, pitch.height - 46, sn, font)
+    taken_line(dd, x0, pitch.height - 100, rec, font)
 
     dd.text((8, pitch.height + 6),
             'colour intensity = probability mass on that square   |   white outline = the option '

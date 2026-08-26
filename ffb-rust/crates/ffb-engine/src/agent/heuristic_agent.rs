@@ -66,6 +66,8 @@ const H: usize = 15;
 const CELLS: usize = W * H;
 /// §20.3 — how many players get the real search rather than the proxy.
 const TIER2: usize = 3;
+/// How many destinations each moving player offers as separate, samplable options.
+const DEST_OPTIONS: usize = 6;
 
 #[inline]
 fn ix(x: i32, y: i32) -> usize {
@@ -223,6 +225,10 @@ pub struct ScoredOption {
     pub p: f32,
     /// Which §6 rule produced the weight.
     pub why: String,
+    /// What this option means, where the `Action` alone does not say. Six destinations for one
+    /// Move declaration all serialise to the same `activatePlayer`; a block die choice serialises
+    /// as a bare index. The note carries the difference.
+    pub note: String,
 }
 
 pub struct Weighted {
@@ -231,6 +237,8 @@ pub struct Weighted {
     pub weight: f32,
     pub why: Rule,
     pub why_value: f32,
+    /// See `ScoredOption::note`. Empty when the action speaks for itself.
+    pub note: String,
 }
 
 #[derive(Default)]
@@ -243,7 +251,11 @@ pub struct Scored {
 impl Scored {
     #[inline]
     fn push(&mut self, action: Action, weight: f32, why: Rule, why_value: f32) {
-        self.options.push(Weighted { action, weight, why, why_value });
+        self.options.push(Weighted { action, weight, why, why_value, note: String::new() });
+    }
+    #[inline]
+    fn push_note(&mut self, action: Action, weight: f32, why: Rule, why_value: f32, note: String) {
+        self.options.push(Weighted { action, weight, why, why_value, note });
     }
     fn clear(&mut self) {
         self.options.clear();
@@ -736,21 +748,29 @@ impl PartialOrd for HeapItem {
     }
 }
 
-/// Dijkstra over −log(p_step), capped at the player's REAL remaining budget: a prone player has
-/// already spent `STAND_UP_COST`, and at MA ≤ 3 the whole activation is gated behind a roll.
+/// Where a search starts and how much movement it has left.
 ///
-/// Flat arrays plus a binary heap (§20.6). The engine's own pathfinder is untouched — this is the
-/// agent's own model of where it could go and how likely each arrival is.
-fn reach(f: &Features, g: &Game, player_id: &str, team_rr: bool, sc: &mut Scratch) -> Option<Reach> {
+/// Split out of `reach` so a second leg can start somewhere the player is not yet standing — the
+/// loose ball, say — with the movement the first leg did not spend. `spent` is what makes the GFI
+/// test right across a multi-leg route: leg two's step counter restarts at zero, so leg one's cost
+/// has to be carried in.
+#[derive(Clone, Copy)]
+struct Budget {
+    start: FieldCoordinate,
+    ma: i32,
+    spent: i32,
+    cap: i32,
+    gate: f32,
+}
+
+fn budget_of(g: &Game, player_id: &str) -> Option<Budget> {
     let start = g.field_model.player_coordinate(player_id)?;
     if !on_pitch(start.x, start.y) {
         return None;
     }
     let player = g.player(player_id)?;
-    let home = g.team_home.has_player(player_id);
     let ma_base = player.movement_with_modifiers();
     let prone = g.field_model.player_state(player_id).map(|s| s.is_prone()).unwrap_or(false);
-
     let (ma, gate) = if prone {
         if ma_base <= STAND_UP_COST {
             (0, p_roll(4))
@@ -766,9 +786,33 @@ fn reach(f: &Features, g: &Game, player_id: &str, team_rr: bool, sc: &mut Scratc
         0
     };
     let cap = (ma + 2 - spent).max(0);
-    if cap <= 0 {
+    Some(Budget { start, ma, spent, cap, gate })
+}
+
+/// Dijkstra over −log(p_step), capped at the player's REAL remaining budget: a prone player has
+/// already spent `STAND_UP_COST`, and at MA ≤ 3 the whole activation is gated behind a roll.
+///
+/// Flat arrays plus a binary heap (§20.6). The engine's own pathfinder is untouched — this is the
+/// agent's own model of where it could go and how likely each arrival is.
+fn reach(f: &Features, g: &Game, player_id: &str, team_rr: bool, sc: &mut Scratch) -> Option<Reach> {
+    let b = budget_of(g, player_id)?;
+    reach_with(f, g, player_id, &b, team_rr, sc)
+}
+
+fn reach_with(
+    f: &Features,
+    g: &Game,
+    player_id: &str,
+    b: &Budget,
+    team_rr: bool,
+    sc: &mut Scratch,
+) -> Option<Reach> {
+    let (start, ma, spent, cap, gate) = (b.start, b.ma, b.spent, b.cap, b.gate);
+    if cap <= 0 || !on_pitch(start.x, start.y) {
         return None;
     }
+    let player = g.player(player_id)?;
+    let home = g.team_home.has_player(player_id);
 
     let ag = player.agility_with_modifiers();
     let gt = gfi_target(weather_of(g));
@@ -972,6 +1016,24 @@ fn best_move(f: &Features, r: &Reach, m: &Mover) -> (f32, Option<usize>) {
     }
 }
 
+/// The best K destinations, weight-ordered.
+///
+/// `best_move` returns only the argmax, which is right for a forced re-plan but wrong for the
+/// activation menu: it made the destination invisible to sampling and to any reader. Ties break on
+/// the flat index so the order is deterministic (§9).
+fn top_moves(f: &Features, r: &Reach, m: &Mover, k: usize) -> Vec<(f32, usize)> {
+    let mut v: Vec<(f32, usize)> = r
+        .order
+        .iter()
+        .map(|&idx| (arrival_weight(f, r, idx as usize, m), idx as usize))
+        .collect();
+    v.sort_by(|a, b| {
+        b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal).then(a.1.cmp(&b.1))
+    });
+    v.truncate(k);
+    v
+}
+
 /// §20.3 tier-1 proxy: a search-free estimate of what a player could be worth this activation.
 /// No Dijkstra — the eight adjacent squares exactly, plus an admissible ceiling over everything
 /// inside MA+2 read straight off the rasters.
@@ -1064,6 +1126,8 @@ struct Candidate {
     kind: PlanKind,
     path: Vec<FieldCoordinate>,
     why: Rule,
+    /// Shown to a reader; the engine never sees it.
+    note: String,
 }
 
 // ─────────────────────────────────────────────────────────────────── the agent
@@ -1177,6 +1241,7 @@ impl HeuristicAgent {
                 w: o.weight,
                 p: ps[i],
                 why: format!("{:?}", o.why),
+                note: o.note.clone(),
             });
         }
     }
@@ -1400,9 +1465,13 @@ impl HeuristicAgent {
         }
         recycle(&mut self.sc, r);
         if path.first().map(|c| squares.contains(c)).unwrap_or(false) {
+            // A re-plan that ends on the loose ball is a PICKUP, not a plain move: the value model
+            // changes the moment the player has the ball, so the activation must be allowed to
+            // continue rather than end (§20.1's exception).
+            let ends_on_ball = path.last().map(|c| f.ball_loose && f.ball == Some(*c)).unwrap_or(false);
             self.plan = Some(Plan {
                 player: player_id,
-                kind: PlanKind::Move,
+                kind: if ends_on_ball { PlanKind::Pickup } else { PlanKind::Move },
                 path: Vec::new(),
                 delivered: true,
                 fired: false,
@@ -1525,6 +1594,7 @@ impl HeuristicAgent {
                 (&c.pid, &c.live, &c.m, c.w_player, c.proxy),
                 r.as_ref(),
                 novelty,
+                team_rr,
                 &mut cands,
             );
             if let Some(r) = r {
@@ -1536,7 +1606,7 @@ impl HeuristicAgent {
             return Action::EndTurn;
         }
         for c in &cands {
-            self.buf.push(
+            self.buf.push_note(
                 Action::ActivatePlayer {
                     player_id: c.player.clone(),
                     player_action: c.pac,
@@ -1545,6 +1615,7 @@ impl HeuristicAgent {
                 c.weight,
                 c.why,
                 c.weight,
+                c.note.clone(),
             );
         }
         // Ending the turn banks what the team has: zero gain, zero risk.
@@ -1576,56 +1647,77 @@ impl HeuristicAgent {
         parts: (&str, &[PlayerAction], &Mover, f32, f32),
         r: Option<&Reach>,
         novelty: f32,
+        team_rr: bool,
         out: &mut Vec<Candidate>,
     ) {
         let (pid, live, m, w_player, proxy) = parts;
         for pa in live {
             let pac = player_action_to_pac(pa);
             let floor = self.coverage_floor(&format!("{:?}", pac));
-            let mut push = |w: f32, target: Option<String>, kind: PlanKind, path, why| {
-                out.push(Candidate {
-                    weight: w_player * w.max(floor) + novelty,
-                    player: pid.to_string(),
-                    pac,
-                    target,
-                    kind,
-                    path,
-                    why,
-                });
-            };
+            let mut push =
+                |w: f32, target: Option<String>, kind: PlanKind, path, why, note: String| {
+                    out.push(Candidate {
+                        weight: w_player * w.max(floor) + novelty,
+                        player: pid.to_string(),
+                        pac,
+                        target,
+                        kind,
+                        path,
+                        why,
+                        note,
+                    });
+                };
 
             match pac {
                 PlayerActionChoice::Move | PlayerActionChoice::StandUp => {
                     match r {
                         Some(r) => {
-                            let (w, dest) = best_move(f, r, m);
-                            match dest {
-                                Some(i) => {
-                                    let mut p = Vec::new();
-                                    r.path_to(i, &mut p);
-                                    let kind = if f.ball_loose && f.ball == Some(coord_of(i)) {
-                                        PlanKind::Pickup
-                                    } else {
-                                        PlanKind::Move
-                                    };
-                                    push(w, None, kind, p, Rule::ScoreAdvance);
-                                }
-                                None => push(0.02, None, PlanKind::Move, Vec::new(), Rule::Support),
+                            let tops = top_moves(f, r, m, DEST_OPTIONS);
+                            if tops.is_empty() {
+                                push(0.02, None, PlanKind::Move, Vec::new(), Rule::Support, String::new());
+                            }
+                            for (w, i) in tops {
+                                let mut path = Vec::new();
+                                r.path_to(i, &mut path);
+                                let c = coord_of(i);
+                                let onto_ball = f.ball_loose && f.ball == Some(c);
+                                let kind =
+                                    if onto_ball { PlanKind::Pickup } else { PlanKind::Move };
+                                let note = if onto_ball {
+                                    format!("pick up ball at {},{}", c.x, c.y)
+                                } else {
+                                    format!("to {},{} ({} sq)", c.x, c.y, path.len())
+                                };
+                                push(w, None, kind, path, Rule::ScoreAdvance, note);
                             }
                         }
                         // tier 1: the proxy stands in, discounted for being optimistic
-                        None => {
-                            push(proxy * 0.8, None, PlanKind::Move, Vec::new(), Rule::ScoreAdvance)
-                        }
+                        None => push(
+                            proxy * 0.8,
+                            None,
+                            PlanKind::Move,
+                            Vec::new(),
+                            Rule::ScoreAdvance,
+                            "destination decided at the Move prompt".to_string(),
+                        ),
                     }
                 }
                 PlayerActionChoice::Block => {
                     for t in legal_block_targets(g, pid, side) {
                         let w = block_weight(f, g, pid, &t, m.str_);
-                        push(w, Some(t), PlanKind::Immediate, Vec::new(), Rule::DiceCount);
+                        push(
+                            w,
+                            Some(t.clone()),
+                            PlanKind::Immediate,
+                            Vec::new(),
+                            Rule::DiceCount,
+                            format!("block {}", t),
+                        );
                     }
                 }
                 PlayerActionChoice::Blitz | PlayerActionChoice::StandUpBlitz => {
+                    let ball_route = f.ball.filter(|_| f.ball_loose);
+                    let mut scratch2 = Scratch::default();
                     // §20.9 — a blitz is "reach this victim, THEN hit it". The victim is folded into
                     // the declaration so the BlitzTarget answer agrees, and the path is constrained
                     // to a square adjacent to it so there is something to block on arrival.
@@ -1654,9 +1746,10 @@ impl HeuristicAgent {
                             push(
                                 dice * 0.85,
                                 Some(oid.clone()),
-                                PlanKind::Blitz { victim: oid },
+                                PlanKind::Blitz { victim: oid.clone() },
                                 Vec::new(),
                                 Rule::DiceCount,
+                                format!("blitz {} (already adjacent)", oid),
                             );
                             continue;
                         }
@@ -1687,13 +1780,93 @@ impl HeuristicAgent {
                             let w = bp * dice
                                 - (1.0 - bp) * c_turnover(m.unactivated, gfi, m.is_carrier)
                                 - rush_penalty(gfi, m.is_carrier);
+                            let vc = coord_of(i);
                             push(
                                 w,
                                 Some(oid.clone()),
-                                PlanKind::Blitz { victim: oid },
+                                PlanKind::Blitz { victim: oid.clone() },
                                 p,
                                 Rule::DiceCount,
+                                format!("blitz {} via {},{}", oid, vc.x, vc.y),
                             );
+                        }
+
+                        // Second leg: collect the loose ball, then carry on to the victim. The
+                        // straight-shot route above is blind to the ball, so without this a blitzer
+                        // will happily run past it. Priced as p(reach ball) × p(pickup) ×
+                        // p(reach victim from there) × dice, with the ball itself worth having.
+                        if let (Some(ball), Some(bud)) = (ball_route, budget_of(g, pid)) {
+                            let bi2 = ixc(ball);
+                            if r.reached(bi2) && !adjacent_to_victim(f, g, ball, &oid) {
+                                let c1 = r.cell[bi2].cost as i32;
+                                let leg2 = Budget {
+                                    start: ball,
+                                    ma: bud.ma,
+                                    spent: bud.spent + c1,
+                                    cap: bud.cap - c1,
+                                    gate: 1.0,
+                                };
+                                if leg2.cap > 0 {
+                                    if let Some(r2) =
+                                        reach_with(f, g, pid, &leg2, team_rr, &mut scratch2)
+                                    {
+                                        let mut bp2 = 0.0f32;
+                                        let mut bj = None;
+                                        for n in oc.neighbours() {
+                                            if !on_pitch(n.x, n.y) {
+                                                continue;
+                                            }
+                                            let j = ixc(n);
+                                            if f.occupied(j) || !r2.reached(j) {
+                                                continue;
+                                            }
+                                            let pa = r2.p_arrive(j);
+                                            if pa > bp2 {
+                                                bp2 = pa;
+                                                bj = Some(j);
+                                            }
+                                        }
+                                        if let Some(j) = bj {
+                                            let p1 = r.p_arrive(bi2);
+                                            let tgt = (m.ag + f.tz[side_idx(m.home)][bi2] as i32)
+                                                .max(2);
+                                            let raw = p_roll(tgt);
+                                            let p_pick = if m.sure_hands {
+                                                p_with_reroll(raw, 1.0)
+                                            } else {
+                                                raw
+                                            };
+                                            let p_all = p1 * p_pick * bp2;
+                                            let gfi =
+                                                r.cell[bi2].gfi as i32 + r2.cell[j].gfi as i32;
+                                            // Carrying the ball into a block is worth more than the
+                                            // block alone, and losing it costs the carrier premium.
+                                            let w = p_all * (dice + 0.55)
+                                                - (1.0 - p_all)
+                                                    * c_turnover(m.unactivated, gfi, true)
+                                                - rush_penalty(gfi, true);
+                                            let mut p2 = Vec::new();
+                                            r2.path_to(j, &mut p2);
+                                            let mut full = Vec::new();
+                                            r.path_to(bi2, &mut full);
+                                            full.extend(p2);
+                                            let vc = coord_of(j);
+                                            push(
+                                                w,
+                                                Some(oid.clone()),
+                                                PlanKind::Blitz { victim: oid.clone() },
+                                                full,
+                                                Rule::Pickup,
+                                                format!(
+                                                    "blitz {} via BALL {},{} then {},{}",
+                                                    oid, ball.x, ball.y, vc.x, vc.y
+                                                ),
+                                            );
+                                        }
+                                        recycle(&mut scratch2, r2);
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1703,9 +1876,10 @@ impl HeuristicAgent {
                         push(
                             w,
                             Some(t.clone()),
-                            PlanKind::Foul { victim: t },
+                            PlanKind::Foul { victim: t.clone() },
                             Vec::new(),
                             Rule::Flat,
+                            format!("foul {}", t),
                         );
                     }
                 }
@@ -1719,9 +1893,10 @@ impl HeuristicAgent {
                         push(
                             w,
                             Some(rcv.clone()),
-                            PlanKind::HandOff { receiver: rcv },
+                            PlanKind::HandOff { receiver: rcv.clone() },
                             Vec::new(),
                             Rule::Flat,
+                            format!("hand off to {}", rcv),
                         );
                     }
                 }
@@ -1734,18 +1909,33 @@ impl HeuristicAgent {
                         push(
                             w,
                             Some(rcv.clone()),
-                            PlanKind::Pass { receiver: rcv },
+                            PlanKind::Pass { receiver: rcv.clone() },
                             Vec::new(),
                             Rule::Flat,
+                            format!("pass to {}", rcv),
                         );
                     }
                 }
                 PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate => {
                     for t in legal_throw_team_mate_targets(g, pid, side) {
-                        push(0.35, Some(t), PlanKind::Immediate, Vec::new(), Rule::Flat);
+                        push(
+                            0.35,
+                            Some(t.clone()),
+                            PlanKind::Immediate,
+                            Vec::new(),
+                            Rule::Flat,
+                            format!("throw team-mate to {}", t),
+                        );
                     }
                 }
-                _ => push(0.40, None, PlanKind::Immediate, Vec::new(), Rule::Flat),
+                _ => push(
+                    0.40,
+                    None,
+                    PlanKind::Immediate,
+                    Vec::new(),
+                    Rule::Flat,
+                    String::new(),
+                ),
             }
         }
     }
@@ -1908,11 +2098,12 @@ impl HeuristicAgent {
                     if !own_choice {
                         w = 1.0 - w;
                     }
-                    self.buf.push(
+                    self.buf.push_note(
                         Action::BlockChoice { die_index: i, target_id: None },
                         w,
                         Rule::Face,
                         *d as f32,
+                        format!("{} ({})", block_die_name(*d as i32), if own_choice { "ours" } else { "theirs" }),
                     );
                 }
                 if self.buf.options.is_empty() {
@@ -2064,22 +2255,76 @@ impl HeuristicAgent {
             }
 
             // ── kickoff placement (§6.27) ───────────────────────────────────
+            //
+            // A touchback hands the ball straight to the receivers, so the dominant term is the
+            // chance of avoiding one — and that is exactly computable rather than a guess.
+            // `StepKickoffScatterRoll` rolls a d8 direction and a d6 distance (a **d3** when the
+            // kicker has Kick), and tests the touchback on the RAW endpoint before walking the ball
+            // back onto the pitch. So enumerating the 48 (or 24) equally likely outcomes gives the
+            // true probability for every candidate square.
             AgentPrompt::KickBall => {
-                let home = g.home_playing;
-                let los = if home { 13 } else { 12 };
-                for x_raw in 0..13 {
-                    for y in 1..=13 {
-                        let x = if home { x_raw + 13 } else { x_raw };
-                        let c = FieldCoordinate::new(x, y);
-                        let deep = ((c.x - los).abs() as f32 / 12.0).min(1.0);
-                        let mut w = 0.5 + 0.30 * deep;
-                        if y <= 1 || y >= 13 || c.x <= 1 || c.x >= 24 {
-                            w -= 0.55;
+                // Home kicking → the ball must land in HALF_AWAY (x 13..25); away → HALF_HOME.
+                let home_kicking = g.home_playing;
+                let (x0, x1) = if home_kicking { (13, XMAX) } else { (0, 12) };
+                // The receiving team's own endzone — the far end of their half.
+                let ez_x = if home_kicking { XMAX } else { 0 };
+
+                // Kick halves the scatter, which is what makes a deep corner kick affordable.
+                let has_kick = g
+                    .field_model
+                    .player_coordinates
+                    .iter()
+                    .filter(|(id, &c)| {
+                        on_pitch(c.x, c.y) && g.team_home.has_player(id) == home_kicking
+                    })
+                    .any(|(id, _)| g.player(id).map(|p| p.has_skill(SkillId::Kick)).unwrap_or(false));
+                let dmax = if has_kick { 3 } else { 6 };
+
+                // Aim: the middle of the receiving half. With Kick, three squares toward an endzone
+                // corner — both corners are offered, they are mirror images.
+                let cx = (x0 + x1) / 2;
+                let cy = YMAX / 2;
+                let aims: Vec<(i32, i32)> = if has_kick {
+                    let ax = cx + 3 * (ez_x - cx).signum();
+                    vec![(ax, cy - 3), (ax, cy + 3)]
+                } else {
+                    vec![(cx, cy)]
+                };
+
+                const DIRS: [(i32, i32); 8] =
+                    [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)];
+                for x in x0..=x1 {
+                    for y in 0..=YMAX {
+                        let mut safe = 0;
+                        let mut total = 0;
+                        for (dx, dy) in DIRS {
+                            for d in 1..=dmax {
+                                total += 1;
+                                let (ex, ey) = (x + dx * d, y + dy * d);
+                                if ex >= x0 && ex <= x1 && ey >= 0 && ey <= YMAX {
+                                    safe += 1;
+                                }
+                            }
                         }
-                        self.buf.push(Action::KickBall { coord: c }, w, Rule::Flat, w);
+                        let p_safe = safe as f32 / total as f32;
+                        // Squared: a touchback does not merely waste the kick, it gifts possession.
+                        let mut best = f32::MAX;
+                        for (ax, ay) in &aims {
+                            let dx = (x - ax) as f32;
+                            let dy = (y - ay) as f32;
+                            best = best.min(dx * dx / 16.0 + dy * dy / 9.0);
+                        }
+                        let w = p_safe * p_safe * (-best).exp();
+                        self.buf.push_note(
+                            Action::KickBall { coord: FieldCoordinate::new(x, y) },
+                            w,
+                            Rule::Flat,
+                            p_safe,
+                            format!("{},{}  {:.0}% stays in", x, y, 100.0 * p_safe),
+                        );
                     }
                 }
-                let i = self.sample(0.06);
+                let i = self.sample(0.10);
                 self.take(i)
             }
 
@@ -2130,6 +2375,28 @@ impl HeuristicAgent {
 }
 
 // ─────────────────────────────────────────────────────────────────── helpers
+
+/// The block die faces, by the names a player uses. `BlockChoice { die_index }` carries only an
+/// index, which tells a reader nothing about what was actually on the table.
+/// Is `c` already next to the victim? If so there is no second leg to plan — the straight-shot
+/// route above already covers it.
+fn adjacent_to_victim(_f: &Features, g: &Game, c: FieldCoordinate, victim: &str) -> bool {
+    g.field_model
+        .player_coordinate(victim)
+        .map(|v| c.distance_in_steps(v) == 1)
+        .unwrap_or(false)
+}
+
+fn block_die_name(d: i32) -> &'static str {
+    match d {
+        1 => "Skull",
+        2 => "Both Down",
+        3 | 4 => "Push",
+        5 => "Defender Stumbles",
+        6 => "Defender Down",
+        _ => "?",
+    }
+}
 
 fn has_negatrait(p: &ffb_model::model::player::Player) -> bool {
     p.has_skill(SkillId::BoneHead)

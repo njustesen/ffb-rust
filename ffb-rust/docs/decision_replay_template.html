@@ -60,6 +60,12 @@
   .opt .pct{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-dim)}
   .opt.chosen .pct{color:var(--accent);font-weight:600}
   .opt .lab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-dim)}
+  .opt .nt{color:var(--ink-faint)}
+  .opt.chosen .nt{color:var(--accent)}
+  .taken{padding:10px 12px;border-top:1px solid var(--line);background:var(--surface2)}
+  .taken .k{font-family:var(--cond);font-size:11px;letter-spacing:.11em;text-transform:uppercase;
+            color:var(--ink-faint);display:block}
+  .taken .v{font-family:var(--mono);font-size:11.5px;color:var(--accent);word-break:break-word}
   .opt.chosen .lab{color:var(--ink)}
   .opt .bar{position:absolute;left:0;top:0;bottom:0;opacity:.16;pointer-events:none}
   .none{padding:22px 14px;color:var(--ink-dim);font-size:13.5px}
@@ -126,6 +132,7 @@
     <div class="panel">
       <div class="panel-head"><span class="t">Options considered</span><span class="n" id="v-n"></span></div>
       <div class="opts" id="opts"></div>
+      <div class="taken"><span class="k">Action sent to the engine</span><span class="v" id="v-taken">—</span></div>
     </div>
   </div>
 
@@ -148,7 +155,7 @@
   </div>
 
   <div class="keys">
-    <span><span class="swatch" id="sw-heat"></span>probability mass on a square (low &rarr; high)</span>
+    <span><span class="swatch" id="sw-heat"></span>probability mass on a square (<span style="color:#d6302a">unlikely</span> &rarr; <span style="color:#48c860">likely</span>)</span>
     <span><span class="swatch" style="background:transparent;border:2px solid #f0a020"></span>option sampled</span>
     <span><span class="swatch" style="background:var(--home)"></span>home</span>
     <span><span class="swatch" style="background:var(--away)"></span>away</span>
@@ -182,10 +189,15 @@
   var pitch = new Image(), icons = {}, ready = 0, need = 1;
   var cur = 0, playing = null;
 
+  // Red = the agent thought this was unlikely, green = likely, yellow between. Interpolated in
+  // two legs so the midpoint is a true yellow rather than the muddy olive a direct red-to-green
+  // blend gives.
   function heat(t){
     t = Math.max(0, Math.min(1, t));
-    var r = Math.round(75 + 165*t), g = Math.round(127 + 33*t), b = Math.round(214 - 182*t);
-    return 'rgba(' + r + ',' + g + ',' + b + ',' + (0.24 + 0.52*t).toFixed(3) + ')';
+    var r, g, b;
+    if (t < 0.5){ var u = t/0.5;      r = 214;              g = Math.round(48 + 158*u); b = 42; }
+    else        { var u = (t-0.5)/0.5; r = Math.round(214 - 142*u); g = Math.round(206 - 26*u); b = Math.round(42 + 30*u); }
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + (0.30 + 0.48*t).toFixed(3) + ')';
   }
 
   // build the heat legend swatch from the same ramp the board uses
@@ -291,7 +303,8 @@
     var box = document.getElementById('opts');
     if (!s.o.length){
       box.innerHTML = '<div class="none"><b>No decision</b>Answered from the activation plan, or by '
-        + 'a fixed rule. Nothing was scored, so there is no distribution to show.</div>';
+        + 'a fixed rule. Nothing was scored, so there is no distribution to show &mdash; but the '
+        + 'action that was sent is below.</div>';
     } else {
       var idx = s.o.map(function(_, i){ return i; })
                    .sort(function(a, b){ return s.o[b].p - s.o[a].p; });
@@ -302,15 +315,25 @@
           + '  w=' + o.w + '">'
           + '<span class="bar" style="width:' + w + '%;background:' + heat(o.p / pmaxOpt(s)) + '"></span>'
           + '<span class="pct">' + (100*o.p).toFixed(1) + '%</span>'
-          + '<span class="lab">' + esc(o.l) + '</span></div>');
+          + '<span class="lab">' + esc(o.l)
+          + (showNote(o) ? ' <span class="nt">' + esc(o.n) + '</span>' : '') + '</span></div>');
       }
       box.innerHTML = out.join('');
     }
     box.scrollTop = 0;
+    document.getElementById('v-taken').textContent = s.tk || '\u2014';
 
     scrub.value = cur;
     var t = ticks.children;
     for (var q = 0; q < t.length; q++) t[q].classList.toggle('cur', q === cur);
+  }
+
+  // A note that only repeats the label is noise: block/foul/pass options already name their target.
+  function showNote(o){
+    if (!o.n) return false;
+    var w = o.n.split(' ');
+    for (var i = 0; i < w.length; i++) if (o.l.indexOf(w[i]) < 0) return true;
+    return false;
   }
 
   function pmaxOpt(s){

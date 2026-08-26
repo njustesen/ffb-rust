@@ -1066,6 +1066,9 @@ pub struct DecisionRec {
     pub prompt: String,
     pub chosen: usize,
     pub options: Vec<ffb_engine::agent::ScoredOption>,
+    /// What was actually sent to the engine. Recorded even when `options` is empty: a prompt
+    /// answered from the activation plan still DID something, and a reader needs to see what.
+    pub taken: String,
     pub snap: GameSnap,
 }
 
@@ -1421,6 +1424,7 @@ pub fn run_heuristic_game(
                 prompt: dump_prompt,
                 chosen: ag.last_chosen,
                 options: ag.last_options.clone(),
+                taken: describe_action(&action),
                 snap: sn,
             });
         }
