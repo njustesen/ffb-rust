@@ -2021,6 +2021,109 @@ Pickup(ball) + MoveTo(sq)        StandUp + MoveTo(sq)</pre>
         </div>
       </section>
 
+      <!-- 21 -->
+      <section id="s21">
+        <div class="sec-head"><span class="idx">&sect;21</span><h2>All ten, measured</h2></div>
+        <p class="sec-desc">All ten items of &sect;20 are implemented, <b>agent-side only</b>. Every change is
+        inside <code>agent/heuristic_agent.rs</code> &mdash; the engine's own pathfinder,
+        <code>legal_actions</code> and <code>util</code> are read but never modified, so engine parity is
+        untouched.</p>
+
+        <div class="card scroll">
+          <table>
+            <thead><tr><th>100 games, greedy, logging off</th><th class="num">before</th><th class="num">after</th><th class="num">&nbsp;</th></tr></thead>
+            <tbody>
+              <tr><td><b>agent &mdash; deciding</b></td><td class="num bad">1149 ms/game</td><td class="num good"><b>81.1 ms/game</b></td><td class="num good"><b>14.2&times;</b></td></tr>
+              <tr><td><code>ActivatePlayer</code></td><td class="num bad">4136 &micro;s</td><td class="num good"><b>192 &micro;s</b></td><td class="num good">21.5&times;</td></tr>
+              <tr><td><code>Move</code></td><td class="num">320 &micro;s</td><td class="num good"><b>75 &micro;s</b></td><td class="num good">4.3&times;</td></tr>
+              <tr><td><code>BlockChoice</code>, <code>Pushback</code>, <code>FollowUp</code>, <code>BlitzTarget</code></td><td class="num">~11 &micro;s</td><td class="num">5&ndash;11 &micro;s</td><td class="num">unchanged</td></tr>
+              <tr><td>engine &mdash; executing</td><td class="num">&mdash;</td><td class="num">82.8 ms/game</td><td class="num">&mdash;</td></tr>
+              <tr><td>residual (harness)</td><td class="num">&mdash;</td><td class="num">0.6 ms/game</td><td class="num">0.4%</td></tr>
+              <tr><td><b>whole loop</b></td><td class="num">&mdash;</td><td class="num"><b>164.5 ms/game</b></td><td class="num">&mdash;</td></tr>
+            </tbody>
+          </table>
+          <div class="cap">The agent was 93&ndash;95% of the loop; it is now <b>49%</b>, marginally less than the engine that executes its choices. Against the &sect;10.3 budget of 100 ms it is now <b>inside</b>, with room.</div>
+        </div>
+
+        <div class="note"><span class="dot"></span><div>
+          <p><b>Units, because they are easy to misread.</b> Both figures cover <b>one full game with both
+          agents summed</b>, and the two timers are disjoint &mdash; <code>agent_ns</code> wraps
+          <code>agent.act()</code> and nothing else, <code>engine_ns</code> wraps
+          <code>engine.apply()</code> and nothing else.</p>
+          <pre>t0 = now(); action = agent.act(&amp;engine);      agent_ns  += t0.elapsed();  <span class="c">// decision only</span>
+t1 = now(); r      = engine.apply(side, action); engine_ns += t1.elapsed();  <span class="c">// execution only</span></pre>
+          <p>Per agent the decision half is <b>~40.5 ms/game</b>; per decision it is <b>97 &micro;s to decide
+          and 99 &micro;s to execute</b>.</p>
+        </div></div>
+
+        <h3>Play got better, it did not merely survive</h3>
+        <div class="card scroll">
+          <table>
+            <thead><tr><th>&nbsp;</th><th class="num">before</th><th class="num">after</th><th class="num">target</th></tr></thead>
+            <tbody>
+              <tr><td>Touchdowns / game</td><td class="num">1.76</td><td class="num good"><b>2.15</b></td><td class="num good">&gt; 1.5 &#10003;</td></tr>
+              <tr><td><b>Blitz follow-through</b></td><td class="num bad"><b>0.0%</b></td><td class="num good"><b>84.4%</b></td><td class="num good">&#10003;</td></tr>
+              <tr><td>Fouls / game</td><td class="num">0.37</td><td class="num good"><b>0.29</b></td><td class="num good">0&ndash;2 &#10003;</td></tr>
+              <tr><td>GFI rolls / game</td><td class="num warn">11.16</td><td class="num good"><b>1.02</b></td><td class="num good">0&ndash;10 &#10003;</td></tr>
+              <tr><td>Squares / activation</td><td class="num">4.85</td><td class="num">3.60</td><td class="num good">&gt; 3 &#10003;</td></tr>
+              <tr><td>Distinct event types</td><td class="num">36</td><td class="num good"><b>40</b></td><td class="num">&mdash;</td></tr>
+              <tr><td>Completions / game</td><td class="num bad">0.00</td><td class="num bad">0.00</td><td class="num bad">&gt; 1 &#10007;</td></tr>
+            </tbody>
+          </table>
+          <div class="cap">Fewer squares per activation but more touchdowns: the movement is better aimed, not merely longer.</div>
+        </div>
+
+        <h3>&sect;20.9 is what fixed the blitz</h3>
+        <p>The blitz was declared 7.8 times a game and produced a block <b>zero</b> times (&sect;19.2). Two
+        defects: the folded target and the <code>BlitzTarget</code> answer disagreed, and the
+        <code>Move</code> handler did not know it was in a blitz. The plan model fixes both at once &mdash;
+        the victim is chosen once, the path is constrained to a square adjacent to it, and on arrival the
+        agent sends the <code>Action::Block</code> that <code>StepInitMoving</code> dispatches as the blitz.
+        <b>0.0% &rarr; 84.4%</b>, worth 5.6 extra blocks a game that were previously paid for and never
+        received.</p>
+
+        <h3>Three bugs measurement caught and reasoning did not</h3>
+        <div class="note red"><span class="dot"></span><div>
+          <p><b>1. The "admissible bound" in &sect;20.10 was admissible, but its <i>ranking</i> was not.</b>
+          Sorting destinations by <code>p_arrive</code> and keeping the top 24 keeps every one-square shuffle
+          (p = 1.0) and discards the six-square scoring runs (p &asymp; 0.3) &mdash; exactly the moves that
+          score. <b>Touchdowns fell 1.76 &rarr; 0.19.</b> After &sect;20.4's rasters the full value
+          computation is a handful of multiplies over ~90 squares, so the pruning was buying nothing and
+          paying for it in touchdowns. Removed; the code now carries the post-mortem so nobody re-adds it.</p>
+          <p><b>2. <code>StepInitMoving</code> guards every folded dispatch and falls <i>through</i> when the
+          guard fails</b>, re-emitting the same <code>Move</code> prompt. Resending a rejected terminal action
+          spun forever. Each is now gated on the engine's own condition and latched so it is attempted at most
+          once per activation.</p>
+          <p><b>3. The all-players-used backstop went missing in the rewrite.</b> An activation that ends
+          without moving leaves the engine's eligible list unchanged, so <code>used_this_turn</code> is the
+          only thing making progress; without it the driver livelocked.</p>
+          <p>Both hangs presented identically &mdash; 200,000 decisions, <code>ActivatePlayer</code> and
+          <code>Move</code> alternating &mdash; and neither was visible from reading the code.</p>
+        </div></div>
+
+        <h3>One item measurement rewrote</h3>
+        <div class="note amber"><span class="dot"></span><div>
+          <p>&sect;20.7 said "cache the board features". Caching alone made the cheap prompts <b>worse</b>:
+          building the rasters for a <code>BlockChoice</code> took it from 11 &micro;s to <b>86 &micro;s</b>,
+          and <code>BlockChoice</code> reads none of them. The fix is the three tiers &sect;20.7 actually
+          specified &mdash; prompts that read nothing about the board, prompts that read only the cheap core
+          (tackle zones, occupancy, who has the ball), and the two that read the rasters. Worth 7.6 ms/game on
+          its own: <code>BlockChoice</code> 86 &rarr; 7.6 &micro;s, <code>Pushback</code> 78 &rarr; 5.4,
+          <code>FollowUp</code> 80 &rarr; 4.6.</p>
+        </div></div>
+
+        <h3>Still open</h3>
+        <ul>
+          <li><b>Passing is dead</b> &mdash; 0.00 completions. The plan structure now <i>expresses</i>
+            move-then-pass and the engine dispatches it, but <code>pass_weight</code>'s distance-banded
+            <code>p_complete</code> keeps every pass negative against the carrier's &times;1.4 turnover cost.
+            It needs the real range ruler, not a wider band.</li>
+          <li><b>Dead-step coverage is still unmeasured</b> against this agent; 167/200 predates all of it.
+            Event-type coverage moved 36 &rarr; 40, which is a hint, not the measurement.</li>
+          <li><b>The parity gate has never been run on this branch.</b></li>
+        </ul>
+      </section>
+
       <footer>
         <span>FFB-Rust · <code class="mono">docs/HEURISTIC_AGENT.md</code></span>
         <span>Design specification — not yet implemented</span>
@@ -2039,7 +2142,7 @@ const SECTIONS = [
   ['s7','Worked examples','7'], ['s8','Temperature table','8'],
   ['s9','Performance budget','9'], ['s10','Testing & calibration','10'],
   ['s11','Parity implications','11'], ['s12','Implementation plan','12'], ['s13','Open questions','13'],
-  ['s14','Review backlog','14'], ['s15','Proposed — round two','15'], ['s16','The experiment','16'], ['s17','Per-agent results','17'], ['s18','Runtime cost','18'], ['s19','Against the targets','19'], ['s20','Making it faster','20'],
+  ['s14','Review backlog','14'], ['s15','Proposed — round two','15'], ['s16','The experiment','16'], ['s17','Per-agent results','17'], ['s18','Runtime cost','18'], ['s19','Against the targets','19'], ['s20','Making it faster','20'], ['s21','All ten, measured','21'],
 ];
 document.getElementById('rail').innerHTML = SECTIONS.map(([id,label,n])=>
   `<li><a href="#${id}" data-t="${id}"><span class="n">${n}</span><span>${label}</span></a></li>`).join('');

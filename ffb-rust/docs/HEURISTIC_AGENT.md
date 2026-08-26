@@ -3523,3 +3523,92 @@ already listed and §16 deliberately skipped:
 That lands within ~30% of the 100 ms budget without 20.7–20.10, which are then the margin. And
 20.9 is worth doing regardless of the clock, because it is what makes passing and blitzing work at
 all.
+
+---
+
+## 21. All ten, measured
+
+All ten of §20 are implemented, **agent-side only**. Every change is inside
+`crates/ffb-engine/src/agent/heuristic_agent.rs`, which is the agent boundary; the engine's own
+pathfinder, `legal_actions` and `util` are read but never modified, so engine parity is untouched.
+
+### 21.1 The headline
+
+100 games, greedy arm, both agents, all logging disabled:
+
+| | before | after | |
+|---|---|---|---|
+| **agent — deciding** | 1149 ms/game | **81.1 ms/game** | **14.2×** |
+| `ActivatePlayer` | 4136 µs | **192 µs** | 21.5× |
+| `Move` | 320 µs | **75 µs** | 4.3× |
+| `BlockChoice`, `Pushback`, `FollowUp`, `BlitzTarget` | ~11 µs | 5–11 µs | unchanged |
+| **engine — executing** | — | 82.8 ms/game | |
+| residual (harness) | — | 0.6 ms/game | 0.4% |
+| **whole loop** | — | **164.5 ms/game** | |
+
+The agent was 93–95% of the loop. It is now **49%** — marginally less than the engine that executes
+its choices. Against the §10.3 budget of 100 ms it is now **inside**, with room.
+
+Units, because they are easy to misread: both figures cover **one full game with both agents
+summed**, and the two timers are disjoint — `agent_ns` wraps `agent.act()` and nothing else,
+`engine_ns` wraps `engine.apply()` and nothing else. Per agent the decision half is ~40.5 ms/game;
+per decision it is **97 µs to decide and 99 µs to execute**.
+
+### 21.2 Play got better, it did not merely survive
+
+| | before | after | target |
+|---|---|---|---|
+| Touchdowns / game | 1.76 | **2.15** | > 1.5 ✅ |
+| **Blitz follow-through** | **0.0%** | **84.4%** | — ✅ |
+| Fouls / game | 0.37 | **0.29** | 0–2 ✅ |
+| GFI rolls / game | 11.16 | **1.02** | 0–10 ✅ |
+| Squares / activation | 4.85 | 3.60 | > 3 ✅ |
+| Distinct event types | 36 | **40** | — |
+| Completions / game | 0.00 | 0.00 | > 1 ❌ |
+
+Fewer squares per activation but more touchdowns: the movement is better aimed, not merely longer.
+
+### 21.3 §20.9 is what fixed the blitz
+
+The blitz was declared 7.8 times a game and produced a block **zero** times (§19.2). Two defects:
+the folded target and the `BlitzTarget` answer disagreed, and the `Move` handler did not know it was
+in a blitz. The plan model fixes both at once — the victim is chosen once, the path is constrained
+to a square adjacent to it, and on arrival the agent sends the `Action::Block` that `StepInitMoving`
+dispatches as the blitz. **0.0% → 84.4%**, worth 5.6 extra blocks a game that were previously paid
+for and never received.
+
+### 21.4 Three bugs that measurement caught and reasoning did not
+
+**The "admissible bound" in §20.10 was admissible, but its *ranking* was not.** Sorting destinations
+by `p_arrive` and keeping the top 24 keeps every one-square shuffle (p = 1.0) and discards the
+six-square scoring runs (p ≈ 0.3) — exactly the moves that score. **Touchdowns fell 1.76 → 0.19.**
+After §20.4's rasters the full value computation is a handful of multiplies over ~90 squares, so the
+pruning was buying nothing and paying for it in touchdowns. Removed; the code now carries the
+post-mortem so nobody re-adds it.
+
+**`StepInitMoving` guards every folded dispatch and falls *through* when the guard fails**,
+re-emitting the same `Move` prompt. Resending a rejected terminal action spun forever. Each is now
+gated on the engine's own condition and latched so it is attempted at most once per activation.
+
+**The all-players-used backstop went missing in the rewrite.** An activation that ends without
+moving leaves the engine's eligible list unchanged, so `used_this_turn` is the only thing making
+progress; without the backstop the driver livelocked. Both hangs presented identically — 200,000
+decisions, `ActivatePlayer` and `Move` alternating — and neither was visible from reading the code.
+
+### 21.5 One item measurement rewrote
+
+§20.7 said "cache the board features". Caching alone made the cheap prompts *worse*: building the
+rasters for a `BlockChoice` took it from 11 µs to **86 µs**, and `BlockChoice` reads none of them.
+The fix is the three tiers §20.7 actually specified — prompts that read nothing about the board,
+prompts that read only the cheap core (tackle zones, occupancy, who has the ball), and the two that
+read the rasters. That is worth 7.6 ms/game on its own: `BlockChoice` 86 → 7.6 µs, `Pushback`
+78 → 5.4 µs, `FollowUp` 80 → 4.6 µs.
+
+### 21.6 Still open
+
+- **Passing is dead** — 0.00 completions. The plan structure now *expresses* move-then-pass, and the
+  engine dispatches it, but `pass_weight`'s distance-banded `p_complete` keeps every pass negative
+  against the carrier's ×1.4 turnover cost. It needs the real range ruler, not a wider band.
+- **Dead-step coverage is still unmeasured** against this agent; the 167/200 figure predates all of
+  it. Event-type coverage moved 36 → 40, which is a hint, not the measurement.
+- **The parity gate has never been run on this branch.**
