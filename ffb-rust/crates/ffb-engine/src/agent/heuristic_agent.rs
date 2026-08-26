@@ -5,15 +5,38 @@
 //!
 //! The `temp_scale` constructor argument multiplies every temperature in the table. It exists so
 //! the *same* agent — the same enumeration, the same option sets, the same code path — can be run
-//! as a uniform sampler by setting it very large. That makes "heuristics vs random over an
-//! identical action space" a one-parameter A/B rather than a comparison between two different
-//! programs.
+//! as a uniform sampler by setting it very large, or as true argmax by setting it to zero. That
+//! makes "heuristics vs random over an identical action space" a one-parameter A/B rather than a
+//! comparison between two different programs.
 //!
 //! Long-tail prompts (inducements, kickoff events, apothecary, the star specials) fall through to
 //! `UniformAgent`, which is identical in both arms of that A/B, so the comparison isolates exactly
 //! the decisions this agent scores.
+//!
+//! # Performance structure (docs §20)
+//!
+//! Measurement put 84–89% of agent time in `ActivatePlayer` and 10–16% in `Move`, with the other
+//! thirteen prompt classes under a tenth of one percent combined. Everything below is shaped by
+//! that, and lives **entirely inside the agent** — the engine's own pathfinder, `legal_actions`
+//! and `util` are read but never modified:
+//!
+//! - **§20.1** a plain move never needs a second `Move` prompt: moving twice reaches the same
+//!   square as moving once, so the activation ends for free unless the state genuinely changed.
+//! - **§20.2** the activation decision *is* the plan; the prompts that follow replay it.
+//! - **§20.3** two-tier activation scoring: a search-free proxy for every eligible player, the
+//!   real search only for the best few.
+//! - **§20.4/§20.5** the mover-independent parts of the value model are rasterised once per
+//!   position change — exposure, lane, the support intents.
+//! - **§20.6** flat arrays, a binary heap and back-pointers instead of a `HashMap`, a linear
+//!   frontier scan and a path clone per improvement.
+//! - **§20.7** the whole feature block is cached on a positions stamp.
+//! - **§20.8** block strength is memoised per (attacker, defender) pair.
+//! - **§20.9** the action space is whole *plans*, which is also what makes a blitz actually block
+//!   and a pass reachable after moving.
+//! - **§20.10** an admissible bound prunes the destination set before full scoring.
 
-use std::collections::HashMap;
+use std::cell::RefCell;
+use std::collections::{BinaryHeap, HashMap, HashSet};
 
 use rand_core::{RngCore, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
@@ -38,8 +61,30 @@ const STAND_UP_COST: i32 = 3;
 const EPS: f32 = 0.02;
 const XMAX: i32 = 25;
 const YMAX: i32 = 14;
+const W: usize = 26;
+const H: usize = 15;
+const CELLS: usize = W * H;
+/// §20.3 — how many players get the real search rather than the proxy.
+const TIER2: usize = 3;
 
-// ─────────────────────────────────────────────────────────────────── primitives
+#[inline]
+fn ix(x: i32, y: i32) -> usize {
+    (y as usize) * W + (x as usize)
+}
+#[inline]
+fn ixc(c: FieldCoordinate) -> usize {
+    ix(c.x, c.y)
+}
+#[inline]
+fn on_pitch(x: i32, y: i32) -> bool {
+    x >= 0 && x <= XMAX && y >= 0 && y <= YMAX
+}
+#[inline]
+fn coord_of(i: usize) -> FieldCoordinate {
+    FieldCoordinate::new((i % W) as i32, (i / W) as i32)
+}
+
+// ───────────────────────────────────────────────────────────────── primitives
 
 #[inline]
 fn p_roll(target: i32) -> f32 {
@@ -64,385 +109,14 @@ fn dodge_target(rules: Rules, ag: i32, tz_on_dest: i32) -> i32 {
 /// `GoForItModifierFactory::minimum_roll_going_for_it` — base 2, **Blizzard +1 in every edition**.
 #[inline]
 fn gfi_target(weather: Weather) -> i32 {
-    if weather == Weather::Blizzard { 3 } else { 2 }
-}
-
-// ─────────────────────────────────────────────────────────────── option scoring
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Rule {
-    ScoreTouchdown,
-    ScoreAdvance,
-    Pickup,
-    Cage,
-    Mark,
-    Screen,
-    Retreat,
-    EndActivation,
-    DiceCount,
-    Face,
-    Reroll,
-    Skill,
-    Activation,
-    CoverageFloor,
-    Novelty,
-    Flat,
-}
-
-pub struct Weighted {
-    pub action: Action,
-    /// Signed desirability — §5.3 subtracts an expected turnover cost, so a bad option is negative.
-    pub weight: f32,
-    pub why: Rule,
-    pub why_value: f32,
-}
-
-#[derive(Default)]
-pub struct Scored {
-    pub options: Vec<Weighted>,
-    /// Set whenever the candidate set was capped. Never silently truncate.
-    pub truncated: bool,
-}
-
-impl Scored {
-    fn push(&mut self, action: Action, weight: f32, why: Rule, why_value: f32) {
-        self.options.push(Weighted { action, weight, why, why_value });
+    if weather == Weather::Blizzard {
+        3
+    } else {
+        2
     }
-    fn clear(&mut self) {
-        self.options.clear();
-        self.truncated = false;
-    }
-}
-
-// ───────────────────────────────────────────────────────────────── board facts
-
-struct Board<'a> {
-    g: &'a Game,
-    rules: Rules,
-    weather: Weather,
-    /// Opposing tackle zones on each square, indexed for the HOME side then the AWAY side.
-    tz: [Vec<u8>; 2],
-    /// Opponent count per row, prefix-summed along x, per side. `row_prefix[side][y][x]` =
-    /// number of players NOT on `side` in row `y` at column `< x`.
-    row_prefix: [Vec<u16>; 2],
-    ball: Option<FieldCoordinate>,
-    /// The ball is ON THE GROUND, unheld. In this engine `ball_moving == true` means loose,
-    /// NOT in flight -- see legal_actions "loose ball 4 steps away" / "carried ball (not
-    /// moving)". An earlier build read it the other way round and gated the Pickup intent on
-    /// `carried && nobody carrying`, a condition that can never hold, so the agent never once
-    /// valued picking the ball up.
-    ball_loose: bool,
-    /// A player is holding the ball.
-    ball_carried: bool,
-    carrier: Option<String>,
 }
 
 #[inline]
-fn idx(c: FieldCoordinate) -> usize {
-    (c.y as usize) * 26 + (c.x as usize)
-}
-
-#[inline]
-fn on_pitch(x: i32, y: i32) -> bool {
-    (0..=XMAX).contains(&x) && (0..=YMAX).contains(&y)
-}
-
-impl<'a> Board<'a> {
-    fn new(g: &'a Game) -> Self {
-        let mut tz = [vec![0u8; 26 * 15], vec![0u8; 26 * 15]];
-        let mut row_prefix = [vec![0u16; 15 * 27], vec![0u16; 15 * 27]];
-
-        for (id, &c) in &g.field_model.player_coordinates {
-            if !on_pitch(c.x, c.y) {
-                continue;
-            }
-            let is_home = g.team_home.has_player(id);
-            let standing = g
-                .field_model
-                .player_state(id)
-                .map(|s| s.has_tacklezones())
-                .unwrap_or(false);
-            // tz[0] = zones threatening a HOME player => produced by AWAY players.
-            if standing {
-                let side = if is_home { 0 } else { 1 };
-                for n in c.neighbours() {
-                    if on_pitch(n.x, n.y) {
-                        tz[1 - side][idx(n)] += 1;
-                    }
-                }
-            }
-            // row_prefix[0] counts opponents-of-home => away players.
-            let opp_of = if is_home { 1usize } else { 0usize };
-            for x in (c.x + 1)..=26 {
-                row_prefix[opp_of][(c.y as usize) * 27 + x as usize] += 1;
-            }
-        }
-
-        let ball = g.field_model.ball_coordinate;
-        let in_play = g.field_model.ball_in_play && ball.map(|c| on_pitch(c.x, c.y)).unwrap_or(false);
-        let ball_loose = in_play && g.field_model.ball_moving;
-        let ball_carried = in_play && !g.field_model.ball_moving;
-        let carrier = ball.filter(|_| ball_carried).and_then(|b| {
-            g.field_model
-                .player_at(b)
-                .filter(|id| g.field_model.player_coordinate(id) == Some(b))
-                .cloned()
-        });
-
-        Board { g, rules: g.rules, weather: g.field_model.weather, tz, row_prefix,
-                ball, ball_loose, ball_carried, carrier }
-    }
-
-    fn is_home(&self, id: &str) -> bool {
-        self.g.team_home.has_player(id)
-    }
-
-    /// Opposing tackle zones on `c` from the point of view of a player on `home` side.
-    #[inline]
-    fn tz_against(&self, c: FieldCoordinate, home: bool) -> i32 {
-        self.tz[if home { 0 } else { 1 }][idx(c)] as i32
-    }
-
-    /// Opponents of `home` in row `y` strictly between `x0` and `x1`.
-    fn opponents_between(&self, home: bool, y: i32, x0: i32, x1: i32) -> i32 {
-        if !(0..=YMAX).contains(&y) {
-            return 0;
-        }
-        let (lo, hi) = if x0 <= x1 { (x0, x1) } else { (x1, x0) };
-        let p = &self.row_prefix[if home { 1 } else { 0 }];
-        let row = (y as usize) * 27;
-        let a = p[row + (lo.clamp(0, 26)) as usize];
-        let b = p[row + (hi.clamp(0, 26)) as usize];
-        (b as i32 - a as i32).max(0)
-    }
-
-    fn occupied(&self, c: FieldCoordinate) -> bool {
-        self.g.field_model.player_at(c).is_some()
-    }
-
-    fn standing(&self, id: &str) -> bool {
-        self.g
-            .field_model
-            .player_state(id)
-            .map(|s| s.has_tacklezones())
-            .unwrap_or(false)
-    }
-}
-
-fn endzone_x(home: bool) -> i32 {
-    if home { XMAX } else { 0 }
-}
-
-fn endzone_distance(c: FieldCoordinate, home: bool) -> i32 {
-    (c.x - endzone_x(home)).abs()
-}
-
-// ───────────────────────────────────────────────────────── reachability (§4.2)
-
-#[derive(Clone)]
-struct Reach {
-    coord: FieldCoordinate,
-    cost: i32,
-    gfi: i32,
-    p_arrive: f32,
-    path: Vec<FieldCoordinate>,
-}
-
-/// Dijkstra over −log(p_step), capped at the player's REAL remaining budget (P4: a prone player
-/// has already spent `STAND_UP_COST`, and at MA ≤ 3 the activation is gated behind a roll).
-fn reachable(b: &Board, player_id: &str, team_rr: bool) -> Vec<Reach> {
-    let start = match b.g.field_model.player_coordinate(player_id) {
-        Some(c) => c,
-        None => return vec![],
-    };
-    let player = match b.g.player(player_id) {
-        Some(p) => p,
-        None => return vec![],
-    };
-    let home = b.is_home(player_id);
-    let ma_base = player.movement_with_modifiers();
-    let prone = b
-        .g
-        .field_model
-        .player_state(player_id)
-        .map(|s| s.is_prone())
-        .unwrap_or(false);
-
-    let (ma, gate) = if prone {
-        if ma_base <= STAND_UP_COST {
-            (0, p_roll(4))
-        } else {
-            (ma_base - STAND_UP_COST, 1.0)
-        }
-    } else {
-        (ma_base, 1.0)
-    };
-    // MA ALREADY SPENT this activation. `reachable` is called again every time the engine
-    // re-prompts Move mid-activation; without this the player gets a fresh MA + 2 budget each
-    // time and the path length compounds. Measured before the fix: an MA-6 lineman moving up to
-    // FIFTEEN squares in one activation (max is 8), ~5 rushes per activation, 28.9 failed GFI
-    // per game, and a turnover ending almost every turn after ~2 activations.
-    let spent = if b.g.acting_player.player_id.as_deref() == Some(player_id) {
-        b.g.acting_player.current_move.max(0)
-    } else {
-        0
-    };
-    let cap = (ma + 2 - spent).max(0);
-    if cap <= 0 {
-        return vec![];
-    }
-
-    let ag = player.agility_with_modifiers();
-    let gt = gfi_target(b.weather);
-    let has_dodge = player.has_skill(SkillId::Dodge);
-    let has_sure_feet = player.has_skill(SkillId::SureFeet);
-
-    // (−log p, cost, coord)
-    let mut best: HashMap<FieldCoordinate, (f32, i32, i32, Vec<FieldCoordinate>, bool)> = HashMap::new();
-    best.insert(start, (0.0, 0, 0, Vec::new(), false));
-    let mut frontier: Vec<FieldCoordinate> = vec![start];
-    let mut done: Vec<FieldCoordinate> = Vec::new();
-
-    while !frontier.is_empty() {
-        // pick the lowest −log p not yet expanded
-        let mut bi = 0usize;
-        for (i, c) in frontier.iter().enumerate() {
-            if best[c].0 < best[&frontier[bi]].0 {
-                bi = i;
-            }
-        }
-        let cur = frontier.swap_remove(bi);
-        done.push(cur);
-        let (clog, ccost, cgfi, cpath, crr_used) = best[&cur].clone();
-        if ccost >= cap {
-            continue;
-        }
-        let leaving_tz = b.tz_against(cur, home) > 0;
-
-        for n in cur.neighbours() {
-            if !on_pitch(n.x, n.y) || b.occupied(n) {
-                continue;
-            }
-            let ncost = ccost + 1;
-            if ncost > cap {
-                continue;
-            }
-            let mut p_step = 1.0f32;
-            let mut rr_used = crr_used;
-            if leaving_tz {
-                let t = dodge_target(b.rules, ag, b.tz_against(n, home));
-                let raw = p_roll(t);
-                if has_dodge {
-                    p_step *= p_with_reroll(raw, 1.0);
-                } else if team_rr && !rr_used {
-                    p_step *= p_with_reroll(raw, 1.0);
-                    rr_used = true;
-                } else {
-                    p_step *= raw;
-                }
-            }
-            let ngfi = if ncost + spent > ma { cgfi + 1 } else { cgfi };
-            if ncost + spent > ma {
-                let raw = p_roll(gt);
-                if has_sure_feet {
-                    p_step *= p_with_reroll(raw, 1.0);
-                } else if team_rr && !rr_used {
-                    p_step *= p_with_reroll(raw, 1.0);
-                    rr_used = true;
-                } else {
-                    p_step *= raw;
-                }
-            }
-            let nlog = clog - p_step.max(1e-9).ln();
-            let better = match best.get(&n) {
-                None => true,
-                Some((l, c0, _, _, _)) => nlog < *l - 1e-9 || ((nlog - *l).abs() < 1e-9 && ncost < *c0),
-            };
-            if better {
-                let mut np = cpath.clone();
-                np.push(n);
-                let seen = done.contains(&n);
-                best.insert(n, (nlog, ncost, ngfi, np, rr_used));
-                if !seen && !frontier.contains(&n) {
-                    frontier.push(n);
-                }
-            }
-        }
-    }
-
-    // DETERMINISM: `best` is a HashMap, and HashMap iteration order is randomised per process.
-    // Returning it unsorted made the option list -- and therefore every argmax tie-break --
-    // vary between runs of the SAME seed, which showed up as the same game producing different
-    // scores and occasionally livelocking. 9 forbids hash iteration in a scoring path for
-    // exactly this reason; sort by coordinate before anything downstream sees it.
-    let mut out: Vec<Reach> = best
-        .into_iter()
-        .filter(|(c, _)| *c != start)
-        .map(|(c, (l, cost, gfi, path, _))| Reach {
-            coord: c,
-            cost,
-            gfi,
-            p_arrive: (-l).exp() * gate,
-            path,
-        })
-        .collect();
-    out.sort_by_key(|r| (r.coord.x, r.coord.y));
-    out
-}
-
-// ──────────────────────────────────────────────────────── threat + value (§5)
-
-/// P1: a team declares ONE blitz per turn, so at most one opponent can actually *hit* a square.
-/// The block term is a `max`; everyone else contributes only a small marking term.
-fn threat_on(b: &Board, sq: FieldCoordinate, home: bool, victim_str: i32) -> f32 {
-    let opp_blitz_spent = if home {
-        b.g.turn_data_away.blitz_used
-    } else {
-        b.g.turn_data_home.blitz_used
-    };
-
-    let mut block_term: f32 = 0.0;
-    let mut reach_terms: Vec<f32> = Vec::new();
-
-    for (id, &c) in &b.g.field_model.player_coordinates {
-        if b.is_home(id) == home || !b.standing(id) || !on_pitch(c.x, c.y) {
-            continue;
-        }
-        let opp = match b.g.player(id) {
-            Some(p) => p,
-            None => continue,
-        };
-        let d = c.distance_in_steps(sq);
-        let adjacent_now = d == 1;
-        let ma = opp.movement_with_modifiers();
-        // rolls the opponent needs to end adjacent: leaving our tackle zones costs one.
-        let steps_needed = (d - 1).max(0);
-        let reach_factor = if adjacent_now {
-            1.0
-        } else if steps_needed <= ma {
-            let marked = b.tz_against(c, !home) > 0;
-            if marked { 0.55 } else { 1.0 }
-        } else if steps_needed <= ma + 2 {
-            0.25
-        } else {
-            0.0
-        };
-        if reach_factor == 0.0 {
-            continue;
-        }
-        let sf = strength_factor(opp.strength_with_modifiers(), victim_str);
-        // Only an already-adjacent opponent can block without spending the blitz.
-        if adjacent_now || !opp_blitz_spent {
-            block_term = block_term.max(reach_factor * sf);
-        }
-        reach_terms.push(reach_factor);
-    }
-
-    reach_terms.sort_by(|a, c| c.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
-    let mark_term: f32 = 0.18 * reach_terms.iter().skip(1).take(2).sum::<f32>();
-    block_term + mark_term
-}
-
 fn strength_factor(att: i32, def: i32) -> f32 {
     if att > 2 * def {
         1.4
@@ -457,247 +131,941 @@ fn strength_factor(att: i32, def: i32) -> f32 {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
-enum Intent {
-    Score,
-    Pickup,
-    Cage,
-    Mark,
-    Screen,
-    Retreat,
-}
-
-impl Intent {
-    /// P2: `lane` is corridor-to-the-endzone geometry — meaningful only where running is the point.
-    fn uses_lane(self) -> bool {
-        matches!(self, Intent::Score | Intent::Pickup)
+/// P(2d6 >= need).
+fn p_2d6_at_least(need: i32) -> f32 {
+    if need <= 2 {
+        return 1.0;
     }
-    fn rule(self) -> Rule {
-        match self {
-            Intent::Score => Rule::ScoreAdvance,
-            Intent::Pickup => Rule::Pickup,
-            Intent::Cage => Rule::Cage,
-            Intent::Mark => Rule::Mark,
-            Intent::Screen => Rule::Screen,
-            Intent::Retreat => Rule::Retreat,
-        }
+    if need > 12 {
+        return 0.0;
     }
-}
-
-struct Ctx {
-    home: bool,
-    is_carrier: bool,
-    ma: i32,
-    ag: i32,
-    sure_hands: bool,
-    str_: i32,
-    d_now: i32,
-    turns_left: i32,
-    side_step: bool,
-    unactivated: f32,
-}
-
-fn urgency(d_sq: i32, ma: i32, turns_left: i32) -> f32 {
-    let tts = ((d_sq as f32) / (ma.max(1) as f32)).ceil() as i32;
-    let slack = turns_left - tts;
-    (1.0 - slack as f32 / 3.0).clamp(0.0, 1.0)
-}
-
-fn value_of(b: &Board, sq: FieldCoordinate, cx: &Ctx) -> (f32, Intent) {
-    let d_sq = endzone_distance(sq, cx.home);
-
-    // ---- base_intent, max over intents ------------------------------------
-    let mut best = (0.10f32, Intent::Retreat);
-
-    if cx.is_carrier {
-        let v = if d_sq == 0 {
-            1.0
-        } else {
-            let max_gain = cx.d_now.min(cx.ma + 2).max(1);
-            let advance = ((cx.d_now - d_sq) as f32 / max_gain as f32).clamp(0.0, 1.0);
-            let base = 0.15 + 0.85 * advance;
-            base * (0.75 + 0.5 * urgency(d_sq, cx.ma, cx.turns_left))
-        };
-        if v > best.0 {
-            best = (v, Intent::Score);
-        }
-    } else {
-        // Pickup -- the single highest-value thing on the board when the ball is loose.
-        // BB2025 pickup target is AG + tackle zones on the ball square (min 2).
-        if b.ball_loose && Some(sq) == b.ball {
-            let tgt = (cx.ag + b.tz_against(sq, cx.home)).max(2);
-            let raw = p_roll(tgt);
-            let p = if cx.sure_hands { p_with_reroll(raw, 1.0) } else { raw };
-            let v = 0.55 + 0.45 * p;
-            if v > best.0 {
-                best = (v, Intent::Pickup);
+    let mut ways = 0;
+    for a in 1..=6 {
+        for b in 1..=6 {
+            if a + b >= need {
+                ways += 1;
             }
         }
-        // Cage — P4/A9: weighted by which side the threat is on.
-        if let Some(car) = &b.carrier {
-            if b.is_home(car) == cx.home {
-                if let Some(cc) = b.g.field_model.player_coordinate(car) {
-                    let dx = (sq.x - cc.x).abs();
-                    let dy = (sq.y - cc.y).abs();
-                    if dx == 1 && dy == 1 {
-                        let t = threat_on(b, sq, cx.home, cx.str_).min(2.0) / 2.0;
-                        let v = 0.35 + 0.40 * t;
-                        if v > best.0 {
-                            best = (v, Intent::Cage);
+    }
+    ways as f32 / 36.0
+}
+
+/// §5.3 — the expected cost of failing, which ends the team turn.
+#[inline]
+fn c_turnover(unactivated: f32, gfi: i32, carries_ball: bool) -> f32 {
+    (0.20 + 0.55 * unactivated)
+        * if carries_ball { 1.4 } else { 1.0 }
+        * (1.0 + 0.15 * gfi as f32)
+}
+
+/// Risk aversion on rushes, over and above the expectation in `c_turnover`. A turnover forfeits the
+/// rest of the drive, not one square, and that compounding is invisible to a single-step mean.
+#[inline]
+fn rush_penalty(gfi: i32, carries_ball: bool) -> f32 {
+    if gfi <= 0 {
+        return 0.0;
+    }
+    (if carries_ball { 0.10 } else { 0.40 }) * gfi as f32
+}
+
+#[inline]
+fn endzone_x(home: bool) -> i32 {
+    if home {
+        XMAX
+    } else {
+        0
+    }
+}
+#[inline]
+fn endzone_distance(c: FieldCoordinate, home: bool) -> i32 {
+    (c.x - endzone_x(home)).abs()
+}
+#[inline]
+fn side_idx(home: bool) -> usize {
+    if home {
+        0
+    } else {
+        1
+    }
+}
+#[inline]
+fn weather_of(g: &Game) -> Weather {
+    g.field_model.weather
+}
+
+// ─────────────────────────────────────────────────────────────── option scoring
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Rule {
+    ScoreTouchdown,
+    ScoreAdvance,
+    Pickup,
+    Support,
+    EndActivation,
+    DiceCount,
+    Face,
+    Reroll,
+    Skill,
+    Flat,
+}
+
+pub struct Weighted {
+    pub action: Action,
+    /// SIGNED desirability — §5.3 subtracts an expected turnover cost, so a bad option is negative.
+    pub weight: f32,
+    pub why: Rule,
+    pub why_value: f32,
+}
+
+#[derive(Default)]
+pub struct Scored {
+    pub options: Vec<Weighted>,
+    /// Set whenever the candidate set was capped (§20.10). Never silently truncate.
+    pub truncated: bool,
+}
+
+impl Scored {
+    #[inline]
+    fn push(&mut self, action: Action, weight: f32, why: Rule, why_value: f32) {
+        self.options.push(Weighted { action, weight, why, why_value });
+    }
+    fn clear(&mut self) {
+        self.options.clear();
+        self.truncated = false;
+    }
+}
+
+// ────────────────────────────────────────── cached board features (§20.4–§20.8)
+
+/// Occupancy: 0 = empty, 1 = home, 2 = away; the high bit marks "has tackle zones".
+const OCC_NONE: u8 = 0;
+const OCC_HOME: u8 = 1;
+const OCC_AWAY: u8 = 2;
+const OCC_TZ: u8 = 0x80;
+
+/// Everything about a board position that more than one prompt wants to know. Built once per
+/// position (§20.7) and read-only afterwards — the one mutable part is the block-strength memo,
+/// which sits behind a `RefCell` so every reader can hold a shared borrow.
+struct Features {
+    stamp: u64,
+    /// Opposing tackle zones on each square. Index 0 = zones threatening a HOME player.
+    tz: [Vec<u8>; 2],
+    occ: Vec<u8>,
+    /// Opponents-of-`side` in row y at column < x, prefix-summed. Index 0 = opponents of home.
+    row_prefix: [Vec<u16>; 2],
+    /// §20.5 rasterised threat, split so the mover's own strength applies at read time with no
+    /// loss of exactness: the best single blitzer's reach factor, that blitzer's strength, and the
+    /// small marking term from the next two.
+    threat_reach: [Vec<f32>; 2],
+    threat_str: [Vec<i8>; 2],
+    threat_mark: [Vec<f32>; 2],
+    /// §20.4 value of a square to a NON-carrier: max(Cage, Mark, Screen, Retreat). Entirely
+    /// mover-independent, so it is a raster rather than a per-square computation.
+    support: [Vec<f32>; 2],
+    /// §20.4 corridor openness toward that side's endzone.
+    lane: [Vec<f32>; 2],
+    ball: Option<FieldCoordinate>,
+    ball_loose: bool,
+    ball_carried: bool,
+    carrier: Option<String>,
+    /// Per side: players still able to act this turn, as a fraction of 11.
+    unactivated: [f32; 2],
+    /// §20.8 — `find_block_strength` runs a nested player×player loop for the Guard-cancel rule.
+    block_memo: RefCell<HashMap<(u32, u32), i32>>,
+    /// Whether `threat`, `lane` and `support` were actually computed. Only `Move` and
+    /// `ActivatePlayer` read them, and they are almost all of the build cost, so the other prompt
+    /// classes get a cheap core and leave the rasters at their neutral fill (§20.7).
+    heavy: bool,
+}
+
+/// Order-independent position hash. `player_coordinates` is a `HashMap`, so this must not depend on
+/// iteration order — a wrapping sum of per-player hashes does not.
+fn positions_stamp(g: &Game) -> u64 {
+    let mut acc: u64 = 0;
+    for (id, &c) in &g.field_model.player_coordinates {
+        let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+        for b in id.as_bytes() {
+            h ^= *b as u64;
+            h = h.wrapping_mul(0x100_0000_01b3);
+        }
+        h ^= ((c.x as u64) << 8) ^ (c.y as u64);
+        let st = g.field_model.player_state(id).map(|s| s.id() as u64).unwrap_or(0);
+        h = h.wrapping_mul(31).wrapping_add(st);
+        acc = acc.wrapping_add(h);
+    }
+    let b = g
+        .field_model
+        .ball_coordinate
+        .map(|c| ((c.x as u64) << 16) | c.y as u64)
+        .unwrap_or(0xffff);
+    acc ^= b << 20;
+    acc = acc.wrapping_mul(31).wrapping_add(g.field_model.ball_moving as u64);
+    acc = acc.wrapping_mul(31).wrapping_add(g.field_model.ball_in_play as u64);
+    acc = acc.wrapping_mul(31).wrapping_add(g.half as u64);
+    acc = acc.wrapping_mul(31).wrapping_add(g.turn_data_home.turn_nr as u64);
+    acc = acc.wrapping_mul(31).wrapping_add(g.turn_data_away.turn_nr as u64);
+    acc = acc.wrapping_mul(31).wrapping_add(g.home_playing as u64);
+    acc
+}
+
+fn pid_key(id: &str) -> u32 {
+    let mut h: u32 = 2166136261;
+    for b in id.as_bytes() {
+        h ^= *b as u32;
+        h = h.wrapping_mul(16777619);
+    }
+    h
+}
+
+impl Features {
+    fn build(g: &Game, stamp: u64, heavy: bool) -> Features {
+        let mut occ = vec![OCC_NONE; CELLS];
+        let mut tz = [vec![0u8; CELLS], vec![0u8; CELLS]];
+        let mut row_prefix = [vec![0u16; H * (W + 1)], vec![0u16; H * (W + 1)]];
+        let mut unact = [0f32; 2];
+
+        for (id, &c) in &g.field_model.player_coordinates {
+            if !on_pitch(c.x, c.y) {
+                continue;
+            }
+            let is_home = g.team_home.has_player(id);
+            let st = g.field_model.player_state(id);
+            let standing = st.map(|s| s.has_tacklezones()).unwrap_or(false);
+            let s = side_idx(is_home);
+            occ[ixc(c)] =
+                (if is_home { OCC_HOME } else { OCC_AWAY }) | if standing { OCC_TZ } else { 0 };
+            if standing {
+                for n in c.neighbours() {
+                    if on_pitch(n.x, n.y) {
+                        tz[1 - s][ixc(n)] += 1;
+                    }
+                }
+            }
+            // Opponents-of-home are the away players, so they fill row_prefix[0].
+            let opp_of = 1 - s;
+            for x in (c.x + 1)..=(W as i32) {
+                row_prefix[opp_of][(c.y as usize) * (W + 1) + x as usize] += 1;
+            }
+            if st.map(|s| s.is_active()).unwrap_or(false) {
+                unact[s] += 1.0 / 11.0;
+            }
+        }
+
+        let ball = g.field_model.ball_coordinate;
+        let in_play = g.field_model.ball_in_play && ball.map(|c| on_pitch(c.x, c.y)).unwrap_or(false);
+        // `ball_moving` means LOOSE ON THE GROUND, not in flight.
+        let ball_loose = in_play && g.field_model.ball_moving;
+        let ball_carried = in_play && !g.field_model.ball_moving;
+        let carrier = ball.filter(|_| ball_carried).and_then(|b| {
+            g.field_model
+                .player_at(b)
+                .filter(|id| g.field_model.player_coordinate(id) == Some(b))
+                .cloned()
+        });
+
+        let mut f = Features {
+            stamp,
+            tz,
+            occ,
+            row_prefix,
+            threat_reach: [vec![0.0; CELLS], vec![0.0; CELLS]],
+            threat_str: [vec![3; CELLS], vec![3; CELLS]],
+            threat_mark: [vec![0.0; CELLS], vec![0.0; CELLS]],
+            support: [vec![0.10; CELLS], vec![0.10; CELLS]],
+            lane: [vec![1.0; CELLS], vec![1.0; CELLS]],
+            ball,
+            ball_loose,
+            ball_carried,
+            carrier,
+            unactivated: [unact[0].min(1.0), unact[1].min(1.0)],
+            block_memo: RefCell::new(HashMap::new()),
+            heavy,
+        };
+        if heavy {
+            f.build_threat(g);
+            f.build_lane();
+            f.build_support(g);
+        }
+        f
+    }
+
+    #[inline]
+    fn tz_against(&self, c: FieldCoordinate, home: bool) -> i32 {
+        self.tz[side_idx(home)][ixc(c)] as i32
+    }
+
+    #[inline]
+    fn occupied(&self, i: usize) -> bool {
+        self.occ[i] & 0x7f != OCC_NONE
+    }
+
+    fn opponents_between(&self, home: bool, y: i32, x0: i32, x1: i32) -> i32 {
+        if y < 0 || y > YMAX {
+            return 0;
+        }
+        let (lo, hi) = if x0 <= x1 { (x0, x1) } else { (x1, x0) };
+        let p = &self.row_prefix[side_idx(home)];
+        let row = (y as usize) * (W + 1);
+        let a = p[row + lo.clamp(0, W as i32) as usize] as i32;
+        let b = p[row + hi.clamp(0, W as i32) as usize] as i32;
+        (b - a).max(0)
+    }
+
+    /// §20.5 / P1. One pass over the players fills the raster; every read afterwards is O(1).
+    /// Only ONE opponent can blitz per turn, so the block term is a `max` over opponents and
+    /// everyone else contributes only a small marking term.
+    fn build_threat(&mut self, g: &Game) {
+        for s in 0..2 {
+            let victim_home = s == 0;
+            let opp_blitz_spent = if victim_home {
+                g.turn_data_away.blitz_used
+            } else {
+                g.turn_data_home.blitz_used
+            };
+            let mut second = vec![0.0f32; CELLS];
+            let mut third = vec![0.0f32; CELLS];
+
+            for (id, &c) in &g.field_model.player_coordinates {
+                if !on_pitch(c.x, c.y) || g.team_home.has_player(id) == victim_home {
+                    continue;
+                }
+                if !g.field_model.player_state(id).map(|st| st.has_tacklezones()).unwrap_or(false) {
+                    continue;
+                }
+                let opp = match g.player(id) {
+                    Some(p) => p,
+                    None => continue,
+                };
+                let ma = opp.movement_with_modifiers();
+                let ostr = opp.strength_with_modifiers();
+                let marked_now = self.tz[1 - s][ixc(c)] > 0;
+                let r = ma + 3;
+                for y in (c.y - r).max(0)..=(c.y + r).min(YMAX) {
+                    for x in (c.x - r).max(0)..=(c.x + r).min(XMAX) {
+                        let d = c.distance_in_steps(FieldCoordinate::new(x, y));
+                        let steps = (d - 1).max(0);
+                        let reach = if d == 1 {
+                            1.0
+                        } else if steps <= ma {
+                            // a player who is himself marked is unlikely to leave freely
+                            if marked_now {
+                                0.55
+                            } else {
+                                1.0
+                            }
+                        } else if steps <= ma + 2 {
+                            0.25
+                        } else {
+                            continue;
+                        };
+                        let i = ix(x, y);
+                        // The block term needs a blitz unless the opponent already stands adjacent.
+                        if (d == 1 || !opp_blitz_spent) && reach > self.threat_reach[s][i] {
+                            self.threat_reach[s][i] = reach;
+                            self.threat_str[s][i] = ostr as i8;
                         }
-                    } else if dx <= 1 && dy <= 1 && (dx + dy) > 0 {
-                        if 0.35 > best.0 {
-                            best = (0.35, Intent::Cage);
+                        if reach > second[i] {
+                            third[i] = second[i];
+                            second[i] = reach;
+                        } else if reach > third[i] {
+                            third[i] = reach;
+                        }
+                    }
+                }
+            }
+            for i in 0..CELLS {
+                self.threat_mark[s][i] = 0.18 * (second[i] + third[i]);
+            }
+        }
+    }
+
+    /// §20.4 corridor openness: opponents within ±2 rows between the square and the endzone.
+    fn build_lane(&mut self) {
+        for s in 0..2 {
+            let home = s == 0;
+            let ez = endzone_x(home);
+            for y in 0..H as i32 {
+                for x in 0..W as i32 {
+                    let mut corridor = 0;
+                    for dy in -2..=2 {
+                        corridor += self.opponents_between(home, y + dy, x, ez);
+                    }
+                    self.lane[s][ix(x, y)] = 1.0 / (1.0 + 0.35 * corridor as f32);
+                }
+            }
+        }
+    }
+
+    /// §20.4 the mover-independent support intents: Cage, Mark, Screen, Retreat.
+    fn build_support(&mut self, g: &Game) {
+        // Screen: how many of the opponent's straight approaches to our ball pass near a square.
+        let mut screen_hits = [vec![0u16; CELLS], vec![0u16; CELLS]];
+        let mut screen_tot = [0u16; 2];
+        for s in 0..2 {
+            let my_home = s == 0;
+            let target = self
+                .carrier
+                .as_ref()
+                .filter(|c| g.team_home.has_player(c) == my_home)
+                .and_then(|c| g.field_model.player_coordinate(c))
+                .or(self.ball.filter(|_| self.ball_loose));
+            let target = match target {
+                Some(t) => t,
+                None => continue,
+            };
+            for (id, &c) in &g.field_model.player_coordinates {
+                if !on_pitch(c.x, c.y) || g.team_home.has_player(id) == my_home {
+                    continue;
+                }
+                if !g.field_model.player_state(id).map(|st| st.has_tacklezones()).unwrap_or(false) {
+                    continue;
+                }
+                let d_ot = c.distance_in_steps(target);
+                if d_ot == 0 || d_ot > 12 {
+                    continue;
+                }
+                screen_tot[s] += 1;
+                // Squares on a shortest-ish approach: going via them costs at most one extra step.
+                for y in 0..H as i32 {
+                    for x in 0..W as i32 {
+                        let sq = FieldCoordinate::new(x, y);
+                        let d_os = c.distance_in_steps(sq);
+                        let d_st = sq.distance_in_steps(target);
+                        if d_st >= 1 && d_os + d_st <= d_ot + 1 {
+                            screen_hits[s][ix(x, y)] += 1;
                         }
                     }
                 }
             }
         }
-        // Mark
-        let mut mark_best = 0.0f32;
-        for n in sq.neighbours() {
-            if !on_pitch(n.x, n.y) {
-                continue;
-            }
-            if let Some(oid) = b.g.field_model.player_at(n) {
-                if b.is_home(oid) == cx.home || !b.standing(oid) {
-                    continue;
-                }
-                let is_enemy_carrier = b.carrier.as_deref() == Some(oid.as_str());
-                let active = b
-                    .g
-                    .field_model
-                    .player_state(oid)
-                    .map(|s| s.is_active())
-                    .unwrap_or(true);
-                let mut mv: f32 = if is_enemy_carrier { 1.0 } else { 0.30 };
-                if !active {
-                    mv = mv.max(0.45);
-                }
-                mark_best = mark_best.max(mv);
-            }
-        }
-        if mark_best > 0.0 {
-            let v = 0.50 * mark_best;
-            if v > best.0 {
-                best = (v, Intent::Mark);
-            }
-        }
-        // Screen — P3: obstruct the opponent's shortest paths to our carrier / the loose ball.
-        if let Some(target) = b
-            .carrier
-            .as_ref()
-            .filter(|c| b.is_home(c) == cx.home)
-            .and_then(|c| b.g.field_model.player_coordinate(c))
-            .or(b.ball.filter(|_| b.ball_loose))
-        {
-            let share = path_share(b, sq, target, cx.home);
-            if share > 0.0 {
-                let v = 0.45 * share;
-                if v > best.0 {
-                    best = (v, Intent::Screen);
+
+        for s in 0..2 {
+            let my_home = s == 0;
+            let own_carrier = self
+                .carrier
+                .as_ref()
+                .filter(|c| g.team_home.has_player(c) == my_home)
+                .and_then(|c| g.field_model.player_coordinate(c));
+            let opp_occ = if my_home { OCC_AWAY } else { OCC_HOME };
+
+            for y in 0..H as i32 {
+                for x in 0..W as i32 {
+                    let i = ix(x, y);
+                    let sq = FieldCoordinate::new(x, y);
+                    let mut best = 0.10f32; // Retreat floor
+
+                    // Cage — weighted by which side the threat is actually on (A9).
+                    if let Some(cc) = own_carrier {
+                        let dx = (x - cc.x).abs();
+                        let dy = (y - cc.y).abs();
+                        if dx <= 1 && dy <= 1 && dx + dy > 0 {
+                            if dx == 1 && dy == 1 {
+                                let t = self.threat_reach[s][i].min(2.0) / 2.0;
+                                best = best.max(0.35 + 0.40 * t);
+                            } else {
+                                best = best.max(0.35);
+                            }
+                        }
+                    }
+
+                    // Mark — the best adjacent opposing player worth standing next to.
+                    let mut mark_best = 0.0f32;
+                    for n in sq.neighbours() {
+                        if !on_pitch(n.x, n.y) {
+                            continue;
+                        }
+                        let o = self.occ[ixc(n)];
+                        if o & 0x7f != opp_occ || o & OCC_TZ == 0 {
+                            continue;
+                        }
+                        let is_carrier = self.ball_carried && Some(n) == self.ball;
+                        let mut mv: f32 = if is_carrier { 1.0 } else { 0.30 };
+                        if let Some(oid) = g.field_model.player_at(n) {
+                            let spent = !g
+                                .field_model
+                                .player_state(oid)
+                                .map(|st| st.is_active())
+                                .unwrap_or(true);
+                            if spent {
+                                mv = mv.max(0.45);
+                            }
+                        }
+                        mark_best = mark_best.max(mv);
+                    }
+                    if mark_best > 0.0 {
+                        best = best.max(0.50 * mark_best);
+                    }
+
+                    // Screen — a line between the ball and the threat, not a huddle (P3).
+                    if screen_tot[s] > 0 {
+                        let share = screen_hits[s][i] as f32 / screen_tot[s] as f32;
+                        if share > 0.0 {
+                            best = best.max(0.45 * share);
+                        }
+                    }
+
+                    self.support[s][i] = best;
                 }
             }
         }
     }
 
-    let (base, intent) = best;
+    /// Exposure at a square for a mover of the given strength. Exact despite being rasterised: the
+    /// reach factor and the blitzer's strength are stored apart, so `strength_factor` applies here.
+    #[inline]
+    fn exposure(&self, i: usize, home: bool, mover_str: i32) -> f32 {
+        let s = side_idx(home);
+        let block =
+            self.threat_reach[s][i] * strength_factor(self.threat_str[s][i] as i32, mover_str);
+        1.0 / (1.0 + block + self.threat_mark[s][i])
+    }
 
-    // ---- modifiers, scoped to the intent (P2) ------------------------------
+    /// §20.8 — memoised on the pair for the lifetime of this position.
+    fn block_strength(
+        &self,
+        g: &Game,
+        att: &str,
+        att_c: FieldCoordinate,
+        att_str: i32,
+        def: &str,
+        def_c: FieldCoordinate,
+    ) -> i32 {
+        let k = (pid_key(att), pid_key(def));
+        if let Some(v) = self.block_memo.borrow().get(&k) {
+            return *v;
+        }
+        let v = crate::util::server_util_player::ServerUtilPlayer::find_block_strength(
+            g, att_c, att_str, def_c,
+        );
+        self.block_memo.borrow_mut().insert(k, v);
+        v
+    }
+}
+
+// ────────────────────────────────────────────── reachability (§4.2, §20.6)
+
+#[derive(Clone, Copy)]
+struct ReachCell {
+    /// −log(p_arrive), quantised so the heap ordering is integral and therefore deterministic.
+    key: u32,
+    cost: u8,
+    gfi: u8,
+    prev: u16,
+    seen: bool,
+}
+
+const KEY_SCALE: f32 = 4096.0;
+const NO_PREV: u16 = u16::MAX;
+const UNREACHED: ReachCell =
+    ReachCell { key: u32::MAX, cost: 0, gfi: 0, prev: NO_PREV, seen: false };
+
+/// Reusable working memory. §20.10 — allocated once and handed back after every search rather than
+/// building a fresh `HashMap` and path `Vec` per call.
+#[derive(Default)]
+struct Scratch {
+    cell: Vec<ReachCell>,
+    order: Vec<u16>,
+    heap: BinaryHeap<HeapItem>,
+    path: Vec<FieldCoordinate>,
+}
+
+struct Reach {
+    cell: Vec<ReachCell>,
+    order: Vec<u16>,
+    start: usize,
+    gate: f32,
+}
+
+impl Reach {
+    #[inline]
+    fn p_arrive(&self, i: usize) -> f32 {
+        (-(self.cell[i].key as f32) / KEY_SCALE).exp() * self.gate
+    }
+    #[inline]
+    fn reached(&self, i: usize) -> bool {
+        self.cell[i].key != u32::MAX
+    }
+    /// Back-pointer walk. §20.6: done exactly once, for the destination actually chosen, instead of
+    /// cloning a path `Vec` on every improvement.
+    fn path_to(&self, mut i: usize, out: &mut Vec<FieldCoordinate>) {
+        out.clear();
+        while i != self.start {
+            out.push(coord_of(i));
+            let p = self.cell[i].prev;
+            if p == NO_PREV {
+                out.clear();
+                return;
+            }
+            i = p as usize;
+        }
+        out.reverse();
+    }
+}
+
+#[derive(PartialEq, Eq)]
+struct HeapItem {
+    key: u32,
+    cost: u8,
+    idx: u16,
+}
+impl Ord for HeapItem {
+    fn cmp(&self, o: &Self) -> std::cmp::Ordering {
+        // min-heap on (key, cost, idx); idx keeps ties deterministic
+        o.key.cmp(&self.key).then(o.cost.cmp(&self.cost)).then(o.idx.cmp(&self.idx))
+    }
+}
+impl PartialOrd for HeapItem {
+    fn partial_cmp(&self, o: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(o))
+    }
+}
+
+/// Dijkstra over −log(p_step), capped at the player's REAL remaining budget: a prone player has
+/// already spent `STAND_UP_COST`, and at MA ≤ 3 the whole activation is gated behind a roll.
+///
+/// Flat arrays plus a binary heap (§20.6). The engine's own pathfinder is untouched — this is the
+/// agent's own model of where it could go and how likely each arrival is.
+fn reach(f: &Features, g: &Game, player_id: &str, team_rr: bool, sc: &mut Scratch) -> Option<Reach> {
+    let start = g.field_model.player_coordinate(player_id)?;
+    if !on_pitch(start.x, start.y) {
+        return None;
+    }
+    let player = g.player(player_id)?;
+    let home = g.team_home.has_player(player_id);
+    let ma_base = player.movement_with_modifiers();
+    let prone = g.field_model.player_state(player_id).map(|s| s.is_prone()).unwrap_or(false);
+
+    let (ma, gate) = if prone {
+        if ma_base <= STAND_UP_COST {
+            (0, p_roll(4))
+        } else {
+            (ma_base - STAND_UP_COST, 1.0)
+        }
+    } else {
+        (ma_base, 1.0)
+    };
+    let spent = if g.acting_player.player_id.as_deref() == Some(player_id) {
+        g.acting_player.current_move.max(0)
+    } else {
+        0
+    };
+    let cap = (ma + 2 - spent).max(0);
+    if cap <= 0 {
+        return None;
+    }
+
+    let ag = player.agility_with_modifiers();
+    let gt = gfi_target(weather_of(g));
+    let has_dodge = player.has_skill(SkillId::Dodge);
+    let has_sure_feet = player.has_skill(SkillId::SureFeet);
+    let s = side_idx(home);
+
+    let mut cell = std::mem::take(&mut sc.cell);
+    let mut order = std::mem::take(&mut sc.order);
+    let mut heap = std::mem::take(&mut sc.heap);
+    cell.clear();
+    cell.resize(CELLS, UNREACHED);
+    order.clear();
+    heap.clear();
+
+    let si = ixc(start);
+    cell[si] = ReachCell { key: 0, cost: 0, gfi: 0, prev: NO_PREV, seen: false };
+    heap.push(HeapItem { key: 0, cost: 0, idx: si as u16 });
+
+    while let Some(HeapItem { key, cost, idx }) = heap.pop() {
+        let i = idx as usize;
+        if cell[i].seen || key > cell[i].key {
+            continue;
+        }
+        cell[i].seen = true;
+        if i != si {
+            order.push(idx);
+        }
+        if cost as i32 >= cap {
+            continue;
+        }
+        let c = coord_of(i);
+        let leaving_tz = f.tz[s][i] > 0;
+        // The team re-roll is worth its full value on the FIRST roll of a path and nothing after.
+        let first_roll = cell[i].key == 0;
+
+        for n in c.neighbours() {
+            if !on_pitch(n.x, n.y) {
+                continue;
+            }
+            let j = ixc(n);
+            if f.occupied(j) {
+                continue;
+            }
+            let ncost = cost + 1;
+            if ncost as i32 > cap {
+                continue;
+            }
+            let mut p_step = 1.0f32;
+            let mut used_rr = false;
+            if leaving_tz {
+                let t = dodge_target(g.rules, ag, f.tz[s][j] as i32);
+                let raw = p_roll(t);
+                if has_dodge {
+                    p_step *= p_with_reroll(raw, 1.0);
+                } else if team_rr && first_roll {
+                    p_step *= p_with_reroll(raw, 1.0);
+                    used_rr = true;
+                } else {
+                    p_step *= raw;
+                }
+            }
+            let gfi_here = ncost as i32 + spent > ma;
+            if gfi_here {
+                let raw = p_roll(gt);
+                if has_sure_feet || (team_rr && first_roll && !used_rr) {
+                    p_step *= p_with_reroll(raw, 1.0);
+                } else {
+                    p_step *= raw;
+                }
+            }
+            let nkey = key + (-(p_step.max(1e-6).ln()) * KEY_SCALE) as u32;
+            if nkey < cell[j].key {
+                cell[j] = ReachCell {
+                    key: nkey,
+                    cost: ncost,
+                    gfi: cell[i].gfi + gfi_here as u8,
+                    prev: idx,
+                    seen: false,
+                };
+                heap.push(HeapItem { key: nkey, cost: ncost, idx: j as u16 });
+            }
+        }
+    }
+
+    // §9's determinism rule: the output order must not depend on heap tie-breaking.
+    order.sort_unstable();
+    sc.heap = heap;
+    Some(Reach { cell, order, start: si, gate })
+}
+
+/// Hand the buffers back so the next search reuses the allocation (§20.10).
+fn recycle(sc: &mut Scratch, r: Reach) {
+    sc.cell = r.cell;
+    sc.order = r.order;
+}
+
+// ────────────────────────────────────────────────────── value model (§5, §20.4)
+
+struct Mover {
+    home: bool,
+    is_carrier: bool,
+    ma: i32,
+    ag: i32,
+    str_: i32,
+    sure_hands: bool,
+    side_step: bool,
+    d_now: i32,
+    turns_left: i32,
+    unactivated: f32,
+}
+
+#[inline]
+fn urgency(d_sq: i32, ma: i32, turns_left: i32) -> f32 {
+    let tts = ((d_sq as f32) / (ma.max(1) as f32)).ceil() as i32;
+    (1.0 - (turns_left - tts) as f32 / 3.0).clamp(0.0, 1.0)
+}
+
+/// §20.4 — the mover-dependent part only. Everything else is an array read.
+fn value_at(f: &Features, i: usize, m: &Mover) -> (f32, Rule) {
+    let sq = coord_of(i);
+    let d_sq = endzone_distance(sq, m.home);
+    let s = side_idx(m.home);
+
     let sideline = if sq.y == 0 || sq.y == YMAX {
-        if cx.side_step { 1.0 } else { 0.25 }
-    } else if cx.is_carrier && (sq.y == 1 || sq.y == YMAX - 1) {
+        if m.side_step {
+            1.0
+        } else {
+            0.25
+        }
+    } else if m.is_carrier && (sq.y == 1 || sq.y == YMAX - 1) {
         0.6
     } else {
         1.0
     };
-    let exposure = 1.0 / (1.0 + threat_on(b, sq, cx.home, cx.str_));
-    let lane = if intent.uses_lane() {
-        let ez = endzone_x(cx.home);
-        let mut corridor = 0;
-        for dy in -2..=2 {
-            corridor += b.opponents_between(cx.home, sq.y + dy, sq.x, ez);
+    let exposure = f.exposure(i, m.home, m.str_);
+
+    if m.is_carrier {
+        let base = if d_sq == 0 {
+            1.0
+        } else {
+            // A3: measure the gain against what THIS activation could reach, not the whole pitch.
+            let max_gain = m.d_now.min(m.ma + 2).max(1);
+            let advance = ((m.d_now - d_sq) as f32 / max_gain as f32).clamp(0.0, 1.0);
+            (0.15 + 0.85 * advance) * (0.75 + 0.5 * urgency(d_sq, m.ma, m.turns_left))
+        };
+        let v = base * sideline * exposure * f.lane[s][i];
+        return (v, if d_sq == 0 { Rule::ScoreTouchdown } else { Rule::ScoreAdvance });
+    }
+
+    // Pickup — the single highest-value thing on the board while the ball is loose.
+    if f.ball_loose && Some(sq) == f.ball {
+        let tgt = (m.ag + f.tz[s][i] as i32).max(2);
+        let raw = p_roll(tgt);
+        let p = if m.sure_hands { p_with_reroll(raw, 1.0) } else { raw };
+        let v = (0.55 + 0.45 * p) * sideline * exposure * f.lane[s][i];
+        return (v, Rule::Pickup);
+    }
+
+    // The support intents are mover-independent and pre-rastered; no lane (P2).
+    (f.support[s][i] * sideline * exposure, Rule::Support)
+}
+
+/// The signed weight of arriving at `i` — §5.3's `p·V − (1−p)·c`, plus the rush aversion.
+#[inline]
+fn arrival_weight(f: &Features, r: &Reach, i: usize, m: &Mover) -> f32 {
+    let pa = r.p_arrive(i);
+    let gfi = r.cell[i].gfi as i32;
+    if m.is_carrier && endzone_distance(coord_of(i), m.home) == 0 {
+        // A touchdown ends the drive: there is no "after" to lose, so only the rush is priced.
+        return pa - rush_penalty(gfi, true);
+    }
+    let (v, _) = value_at(f, i, m);
+    pa * v - (1.0 - pa) * c_turnover(m.unactivated, gfi, m.is_carrier) - rush_penalty(gfi, m.is_carrier)
+}
+
+/// Best destination for a plain move.
+///
+/// §20.10 originally pruned this to the `TOPK_DEST` destinations with the highest `p_arrive`, on the
+/// theory that `V ≤ 1` makes `p_arrive` an admissible bound. **It measured a disaster** — 1.76
+/// touchdowns per game fell to 0.19 — and the reason is that the bound is admissible but the
+/// *ranking* is not: a one-square shuffle arrives with p = 1.0 while a six-square scoring run
+/// arrives with p ≈ 0.3, so the top-K by arrival probability is almost exactly the set of moves that
+/// go nowhere. The long runs that score were cut before they were ever scored.
+///
+/// After §20.4's rasters, the full value computation is a handful of multiplies, so the whole
+/// reachable set — around ninety squares — costs a couple of microseconds to score properly. The
+/// pruning was buying nothing and paying for it in touchdowns.
+fn best_move(f: &Features, r: &Reach, m: &Mover) -> (f32, Option<usize>) {
+    let mut best = (f32::MIN, None);
+    for &idx in &r.order {
+        let i = idx as usize;
+        let w = arrival_weight(f, r, i, m);
+        if w > best.0 {
+            best = (w, Some(i));
         }
-        1.0 / (1.0 + 0.35 * corridor as f32)
-    } else {
-        1.0
+    }
+    match best.1 {
+        Some(_) => (best.0, best.1),
+        None => (0.0, None),
+    }
+}
+
+/// §20.3 tier-1 proxy: a search-free estimate of what a player could be worth this activation.
+/// No Dijkstra — the eight adjacent squares exactly, plus an admissible ceiling over everything
+/// inside MA+2 read straight off the rasters.
+fn proxy_value(f: &Features, g: &Game, pid: &str, m: &Mover) -> f32 {
+    let c = match g.field_model.player_coordinate(pid) {
+        Some(c) => c,
+        None => return 0.0,
     };
-
-    (base * sideline * exposure * lane, intent)
-}
-
-/// Fraction of the opponent's straight-line approaches to `target` that pass near `sq`.
-/// A cheap stand-in for "how many shortest paths run through here": an opponent contributes
-/// when `sq` lies between it and the target and is close to that line.
-fn path_share(b: &Board, sq: FieldCoordinate, target: FieldCoordinate, home: bool) -> f32 {
-    let mut total = 0f32;
-    let mut through = 0f32;
-    for (id, &c) in &b.g.field_model.player_coordinates {
-        if b.is_home(id) == home || !b.standing(id) || !on_pitch(c.x, c.y) {
-            continue;
-        }
-        let d_ot = c.distance_in_steps(target);
-        if d_ot == 0 || d_ot > 12 {
-            continue;
-        }
-        total += 1.0;
-        let d_os = c.distance_in_steps(sq);
-        let d_st = sq.distance_in_steps(target);
-        // `sq` is on a shortest-ish path when going via it costs no more than one extra step.
-        if d_os + d_st <= d_ot + 1 && d_st >= 1 {
-            through += 1.0;
+    let mut best = 0.0f32;
+    for n in c.neighbours() {
+        if on_pitch(n.x, n.y) {
+            let i = ixc(n);
+            if !f.occupied(i) {
+                best = best.max(value_at(f, i, m).0);
+            }
         }
     }
-    if total == 0.0 {
-        0.0
-    } else {
-        through / total
+    let r = m.ma + 2;
+    let s = side_idx(m.home);
+    let mut ceiling = 0.0f32;
+    for y in (c.y - r).max(0)..=(c.y + r).min(YMAX) {
+        for x in (c.x - r).max(0)..=(c.x + r).min(XMAX) {
+            let i = ix(x, y);
+            if f.occupied(i) {
+                continue;
+            }
+            let v: f32 = if m.is_carrier {
+                let d_sq = endzone_distance(FieldCoordinate::new(x, y), m.home);
+                let max_gain = m.d_now.min(m.ma + 2).max(1);
+                let adv = ((m.d_now - d_sq) as f32 / max_gain as f32).clamp(0.0, 1.0);
+                (0.15 + 0.85 * adv) * f.lane[s][i]
+            } else if f.ball_loose && f.ball == Some(FieldCoordinate::new(x, y)) {
+                0.9
+            } else {
+                f.support[s][i]
+            };
+            if v > ceiling {
+                ceiling = v;
+            }
+        }
     }
+    // The ceiling is optimistic by construction, so discount it rather than trust it.
+    best.max(0.55 * ceiling)
 }
 
-/// §5.3 — the expected cost of failing, which ends the team turn.
-fn c_turnover(cx: &Ctx, gfi: i32, carries_ball: bool) -> f32 {
-    (0.20 + 0.55 * cx.unactivated)
-        * if carries_ball { 1.4 } else { 1.0 }
-        * (1.0 + 0.15 * gfi as f32)
+// ────────────────────────────────────────────────────────── plans (§20.9, §20.1)
+
+/// What the activation is actually FOR. The engine's follow-up prompts replay this instead of
+/// re-deciding, which is both the speed win and the reason a blitz now lands.
+#[derive(Clone, Debug, PartialEq)]
+enum PlanKind {
+    /// Plain movement. Once the path is delivered the activation is DONE — moving twice reaches
+    /// the same square as moving once (§20.1).
+    Move,
+    /// Movement onto the loose ball. Picking it up changes the value model, so the activation may
+    /// legitimately continue afterwards.
+    Pickup,
+    /// Move adjacent to the victim, then send the block that dispatches the blitz. Without the
+    /// second half the blitz is declared and abandoned: 7.8 per game, 0% follow-through (§19.2).
+    Blitz { victim: String },
+    /// Move adjacent to the victim, then foul it.
+    Foul { victim: String },
+    /// Move, then throw. `Move → Pass` is the case the fragmented action space could not express
+    /// at all (§19.3).
+    Pass { receiver: String },
+    HandOff { receiver: String },
+    /// Declared and resolved without a movement phase.
+    Immediate,
 }
 
-/// RISK AVERSION on rushes, over and above the expectation in `c_turnover`.
-///
-/// The plain expectation says a 5-in-6 rush for a small gain is a marginally positive trade, and
-/// on that basis the agent rushed on ~34% of its movement decisions -- ~95 GFI rolls and ~16
-/// failed rushes per game, which is what was ending nearly every turn. The expectation is not the
-/// whole story: a turnover forfeits the REST OF THE DRIVE, not just the value of one square, and
-/// that compounding is invisible to a single-step mean. So a rush has to clear a bar, not merely
-/// break even.
-///
-/// The carrier pays much less: pushing for a touchdown is exactly when the variance is worth it.
-fn rush_penalty(gfi: i32, carries_ball: bool) -> f32 {
-    if gfi <= 0 {
-        return 0.0;
-    }
-    // Tuned against the measured rate: at 0.22 the agent still took ~25 rushes a game, well
-    // above the 0-10 a competent coach uses. A rush is a 1-in-6 chance of ending the drive, and
-    // for a player with no ball it is almost never worth that.
-    let per = if carries_ball { 0.10 } else { 0.40 };
-    per * gfi as f32
+#[derive(Clone, Debug)]
+struct Plan {
+    player: String,
+    kind: PlanKind,
+    /// Remaining squares of the planned path, in order.
+    path: Vec<FieldCoordinate>,
+    /// Set once the path has been handed to the engine.
+    delivered: bool,
+    /// Set once the plan's terminal action has been attempted, so it is never resent.
+    fired: bool,
 }
 
-// ────────────────────────────────────────────────────────────────── the agent
+/// One enumerated (player, plan) candidate — §20.9's action space.
+struct Candidate {
+    weight: f32,
+    player: String,
+    pac: PlayerActionChoice,
+    /// Folded into the declaration so the declaration and the follow-up prompt agree (§19.2).
+    target: Option<String>,
+    kind: PlanKind,
+    path: Vec<FieldCoordinate>,
+    why: Rule,
+}
+
+// ─────────────────────────────────────────────────────────────────── the agent
 
 pub struct HeuristicAgent {
     rng: Xoshiro256StarStar,
-    /// Multiplies every temperature. 1.0 = the §8 table; a very large value = uniform sampling
-    /// over the identical option set, which is the control arm of the §16 experiment.
+    /// Multiplies every temperature. 1.0 = the §8 table; a very large value = uniform sampling over
+    /// the identical option set; 0.0 = true argmax with no RNG consumed at all.
     temp_scale: f32,
     fallback: UniformAgent,
     buf: Scored,
-    /// Live dispatch counts driving the §6.5.2 coverage floor.
+    feat: Option<Features>,
+    plan: Option<Plan>,
+    sc: Scratch,
     seen_action: HashMap<String, u32>,
-    /// P8 — coarse board buckets already visited this run.
     seen_bucket: HashMap<u64, u32>,
     last_turn_key: Option<(i32, i32, bool)>,
-    used_this_turn: std::collections::HashSet<String>,
+    used_this_turn: HashSet<String>,
 }
 
 impl HeuristicAgent {
@@ -707,10 +1075,13 @@ impl HeuristicAgent {
             temp_scale,
             fallback: UniformAgent::new(seed),
             buf: Scored::default(),
+            feat: None,
+            plan: None,
+            sc: Scratch::default(),
             seen_action: HashMap::new(),
             seen_bucket: HashMap::new(),
             last_turn_key: None,
-            used_this_turn: std::collections::HashSet::new(),
+            used_this_turn: HashSet::new(),
         }
     }
 
@@ -718,20 +1089,17 @@ impl HeuristicAgent {
     pub fn new_uniform(seed: u64) -> Self {
         Self::new(seed, 1.0e6)
     }
-
-    /// Pure argmax -- no RNG consumed, fully deterministic for a given board.
+    /// Pure argmax — no RNG consumed, fully deterministic for a given board.
     pub fn new_argmax(seed: u64) -> Self {
         Self::new(seed, 0.0)
     }
+
+    // ── sampling ───────────────────────────────────────────────────────────
 
     fn unit(&mut self) -> f32 {
         (self.rng.next_u64() >> 11) as f32 / (1u64 << 53) as f32
     }
 
-    /// True argmax: no RNG consumed at all, ties broken by option order (which is
-    /// deterministic -- `reachable` sorts by coordinate and every other enumeration walks a
-    /// Vec). `temp_scale <= 0.0` selects this. Distinct from a very small temperature, which
-    /// still draws from the RNG and still samples among near-equal weights.
     fn argmax(&self) -> usize {
         let mut bi = 0usize;
         let mut bw = f32::MIN;
@@ -746,33 +1114,24 @@ impl HeuristicAgent {
 
     fn sample(&mut self, t_base: f32) -> usize {
         let n = self.buf.options.len();
-        if n == 0 {
+        // §20.10 — nothing to decide, so do not pay for a softmax or consume a draw.
+        if n <= 1 {
             return 0;
         }
         if self.temp_scale <= 0.0 {
             return self.argmax();
         }
         let t = (t_base * self.temp_scale).max(1e-6);
-        let max = self
-            .buf
-            .options
-            .iter()
-            .map(|o| o.weight)
-            .fold(f32::MIN, f32::max);
-        let mut cum: Vec<f32> = Vec::with_capacity(n);
+        let max = self.buf.options.iter().map(|o| o.weight).fold(f32::MIN, f32::max);
+        let eps = if self.temp_scale < 0.1 { 0.0 } else { EPS };
+        if eps > 0.0 && self.unit() < eps {
+            return ((self.rng.next_u64() as usize) % n).min(n - 1);
+        }
         let mut acc = 0.0f32;
+        let mut cum: Vec<f32> = Vec::with_capacity(n);
         for o in &self.buf.options {
             acc += ((o.weight - max) / t).exp();
             cum.push(acc);
-        }
-        // e-floor: every enumerated option keeps non-zero probability. Switched OFF in the
-        // greedy arm (temp_scale < 0.1), where the point is to see what the weights alone do
-        // with no exploration at all -- at eps = 0.02 roughly one decision in fifty would be a
-        // uniform random pick, which is not "deterministic" in any useful sense.
-        let eps = if self.temp_scale < 0.1 { 0.0 } else { EPS };
-        let r = self.unit();
-        if r < eps {
-            return ((self.rng.next_u64() as usize) % n).min(n - 1);
         }
         let r = self.unit() * acc;
         cum.partition_point(|&c| c < r).min(n - 1)
@@ -782,8 +1141,14 @@ impl HeuristicAgent {
         self.buf.options.swap_remove(i).action
     }
 
+    // ── bookkeeping ────────────────────────────────────────────────────────
+
     fn refresh_turn(&mut self, g: &Game) {
-        let turn_nr = if g.home_playing { g.turn_data_home.turn_nr } else { g.turn_data_away.turn_nr };
+        let turn_nr = if g.home_playing {
+            g.turn_data_home.turn_nr
+        } else {
+            g.turn_data_away.turn_nr
+        };
         let key = (g.half, turn_nr, g.home_playing);
         if self.last_turn_key != Some(key) {
             self.last_turn_key = Some(key);
@@ -791,24 +1156,15 @@ impl HeuristicAgent {
         }
     }
 
-    /// P8 — a coarse board descriptor, counted per run.
-    fn bucket(&self, b: &Board) -> u64 {
-        let ballz = b.ball.map(|c| (c.x / 5) as u64 * 4 + (c.y / 4) as u64).unwrap_or(31);
-        let carried = b.carrier.is_some() as u64;
-        let turn = (b.g.turn_data_home.turn_nr.max(b.g.turn_data_away.turn_nr) / 3) as u64;
-        let w = b.weather as u64;
-        ballz | (carried << 6) | (turn << 8) | (w << 12) | ((b.g.half as u64) << 16)
+    fn bucket(&self, f: &Features, g: &Game) -> u64 {
+        let ballz = f.ball.map(|c| (c.x / 5) as u64 * 4 + (c.y / 4) as u64).unwrap_or(31);
+        let carried = f.carrier.is_some() as u64;
+        let turn = (g.turn_data_home.turn_nr.max(g.turn_data_away.turn_nr) / 3) as u64;
+        ballz | (carried << 6) | (turn << 8) | ((weather_of(g) as u64) << 12) | ((g.half as u64) << 16)
     }
 
-    /// 6.5.2's live coverage floor: push any action that has not dispatched yet this run, so a
-    /// stronger policy cannot silently stop exercising a mechanic.
-    ///
-    /// It is a coverage tool and it costs play strength BY CONSTRUCTION -- it deliberately makes
-    /// the agent take actions its own weights rate as bad. Measured: with the floor on, fouls sat
-    /// at ~3 per game no matter how the foul weight was priced, because the floor was overriding
-    /// a correctly-computed 0.003 with 0.35. So it is off in the sharp arms, which exist to
-    /// measure how well the weights play, and on in the sampling arms, which exist to measure
-    /// coverage. That is the trade 6.5.2 describes, made explicit.
+    /// §6.5.2's live coverage floor — a coverage tool that costs play strength by construction, so
+    /// it is off in the sharp arms and on in the sampling arms.
     fn coverage_floor(&self, key: &str) -> f32 {
         if self.temp_scale < 0.1 {
             return 0.0;
@@ -816,7 +1172,517 @@ impl HeuristicAgent {
         let seen = *self.seen_action.get(key).unwrap_or(&0);
         0.35 * (1.0 - (seen as f32 / 4.0).min(1.0))
     }
+
+    fn mover_of(&self, g: &Game, f: &Features, pid: &str) -> Option<Mover> {
+        let p = g.player(pid)?;
+        let c = g.field_model.player_coordinate(pid)?;
+        let home = g.team_home.has_player(pid);
+        let td = if home { &g.turn_data_home } else { &g.turn_data_away };
+        Some(Mover {
+            home,
+            is_carrier: f.ball_carried && f.ball == Some(c),
+            ma: p.movement_with_modifiers(),
+            ag: p.agility_with_modifiers(),
+            str_: p.strength_with_modifiers(),
+            sure_hands: p.has_skill(SkillId::SureHands),
+            side_step: p.has_skill(SkillId::SideStep),
+            d_now: endzone_distance(c, home),
+            turns_left: (8 - td.turn_nr).max(0),
+            unactivated: f.unactivated[side_idx(home)],
+        })
+    }
+
+    // ── Move: replay the plan (§20.1, §20.2, §20.9) ────────────────────────
+
+    fn handle_move(
+        &mut self,
+        g: &Game,
+        f: &Features,
+        player_id: String,
+        squares: Vec<FieldCoordinate>,
+    ) -> Action {
+        if squares.is_empty() {
+            self.plan = None;
+            return Action::EndPlayerAction;
+        }
+
+        if let Some(mut pl) = self.plan.take() {
+            if pl.player == player_id {
+                if !pl.path.is_empty() {
+                    // Deliver the whole remaining path in ONE answer; the engine walks it.
+                    if squares.contains(&pl.path[0]) {
+                        let path = std::mem::take(&mut pl.path);
+                        pl.delivered = true;
+                        self.plan = Some(pl);
+                        return Action::Move { path };
+                    }
+                    // The board moved under the plan — fall through and re-decide.
+                } else if !pl.fired {
+                    // Movement done. Now the plan's terminal action, if it has one.
+                    //
+                    // `StepInitMoving` guards each of these dispatches and falls THROUGH when the
+                    // guard fails, re-emitting this same prompt. Resending a rejected action would
+                    // therefore spin forever, so each one is gated on the engine's own condition
+                    // and latched with `fired` so it is attempted at most once per activation.
+                    let here = g.field_model.player_coordinate(&player_id);
+                    let pa_now = g.acting_player.player_action;
+                    let adjacent_to = |v: &str| {
+                        here.zip(g.field_model.player_coordinate(v))
+                            .map(|(a, b)| a.distance_in_steps(b) == 1)
+                            .unwrap_or(false)
+                    };
+                    match &pl.kind {
+                        PlanKind::Blitz { victim } => {
+                            let dispatchable = matches!(
+                                pa_now,
+                                Some(PlayerAction::BlitzMove) | Some(PlayerAction::KickEmBlitz)
+                            ) && !g.acting_player.has_blocked;
+                            if dispatchable && adjacent_to(victim) {
+                                let defender_id = victim.clone();
+                                pl.fired = true;
+                                self.plan = Some(pl);
+                                return Action::Block { defender_id };
+                            }
+                        }
+                        PlanKind::Foul { victim } => {
+                            let dispatchable = pa_now == Some(PlayerAction::FoulMove)
+                                && !g.acting_player.has_fouled;
+                            if dispatchable && adjacent_to(victim) {
+                                let target_id = victim.clone();
+                                pl.fired = true;
+                                self.plan = Some(pl);
+                                return Action::Foul { target_id };
+                            }
+                        }
+                        PlanKind::Pass { receiver } => {
+                            let dispatchable = matches!(
+                                pa_now,
+                                Some(PlayerAction::PassMove)
+                                    | Some(PlayerAction::Pass)
+                                    | Some(PlayerAction::HailMaryPass)
+                            );
+                            if let (true, Some(coord)) =
+                                (dispatchable, g.field_model.player_coordinate(receiver))
+                            {
+                                pl.fired = true;
+                                self.plan = Some(pl);
+                                return Action::Pass { coord };
+                            }
+                        }
+                        PlanKind::HandOff { receiver } => {
+                            let dispatchable = matches!(
+                                pa_now,
+                                Some(PlayerAction::HandOverMove) | Some(PlayerAction::HandOver)
+                            );
+                            if dispatchable && g.field_model.player_coordinate(receiver).is_some() {
+                                let receiver_id = receiver.clone();
+                                pl.fired = true;
+                                self.plan = Some(pl);
+                                return Action::HandOff { receiver_id };
+                            }
+                        }
+                        PlanKind::Move | PlanKind::Immediate => {
+                            // §20.1 — Move → Move never makes sense. A plain move that has ALREADY
+                            // been delivered has no options it did not already have, so end without
+                            // scoring anything. A plan that never carried a path (a tier-1 proxy
+                            // pick, §20.3) still has to decide where to go, so it falls through.
+                            if pl.delivered {
+                                return Action::EndPlayerAction;
+                            }
+                        }
+                        // A pickup genuinely changed the value model; re-decide below.
+                        PlanKind::Pickup => {}
+                    }
+                    // The terminal action was not dispatchable here. Nothing else this activation
+                    // can do that it could not already do, so end rather than re-plan — unless the
+                    // plan never got a path in the first place, which still needs deciding.
+                    if !matches!(pl.kind, PlanKind::Pickup | PlanKind::Move) && pl.delivered {
+                        return Action::EndPlayerAction;
+                    }
+                } else if !matches!(pl.kind, PlanKind::Pickup) {
+                    // The terminal action has already been sent; the activation is over. A blitz is
+                    // the one case with something legitimate left to do — the board changed under it
+                    // — so it re-plans its post-block movement.
+                    if !matches!(pl.kind, PlanKind::Blitz { .. }) {
+                        return Action::EndPlayerAction;
+                    }
+                }
+            }
+        }
+
+        // No usable plan: interrupted, pushed, or a prompt the activation did not predict.
+        let m = match self.mover_of(g, f, &player_id) {
+            Some(m) => m,
+            None => return Action::EndPlayerAction,
+        };
+        let td = if m.home { &g.turn_data_home } else { &g.turn_data_away };
+        let team_rr = td.rerolls > 0 && !td.reroll_used;
+        let r = match reach(f, g, &player_id, team_rr, &mut self.sc) {
+            Some(r) => r,
+            None => return Action::EndPlayerAction,
+        };
+        let (w, dest) = best_move(f, &r, &m);
+        let mut path = Vec::new();
+        if let Some(i) = dest {
+            if w > 0.0 {
+                r.path_to(i, &mut self.sc.path);
+                path = self.sc.path.clone();
+            }
+        }
+        recycle(&mut self.sc, r);
+        if path.first().map(|c| squares.contains(c)).unwrap_or(false) {
+            self.plan = Some(Plan {
+                player: player_id,
+                kind: PlanKind::Move,
+                path: Vec::new(),
+                delivered: true,
+                fired: false,
+            });
+            return Action::Move { path };
+        }
+        Action::EndPlayerAction
+    }
+
+    // ── ActivatePlayer: the joint (player, plan) choice ─────────────────────
+
+    fn handle_activate(
+        &mut self,
+        g: &Game,
+        f: &Features,
+        eligible: Vec<(String, Vec<PlayerAction>)>,
+    ) -> Action {
+        self.refresh_turn(g);
+        if eligible.is_empty() {
+            return Action::EndTurn;
+        }
+        let any_unused = eligible.iter().any(|(pid, _)| !self.used_this_turn.contains(pid));
+        // Every eligible player has already had its activation decided this turn. Re-offering them
+        // is how the driver livelocks: an activation that ends without moving leaves the engine's
+        // eligible list unchanged, so `used_this_turn` is the only thing that makes progress.
+        if !any_unused {
+            return Action::EndTurn;
+        }
+        let home = g.home_playing;
+        let side = if home { TeamSide::Home } else { TeamSide::Away };
+        let td = if home { &g.turn_data_home } else { &g.turn_data_away };
+        let team_rr = td.rerolls > 0 && !td.reroll_used;
+        let bucket = self.bucket(f, g);
+        let novelty = if self.temp_scale >= 0.1
+            && self.seen_bucket.get(&bucket).copied().unwrap_or(0) == 0
+        {
+            0.08
+        } else {
+            0.0
+        };
+
+        // ---- tier 1: search-free proxy for every eligible player (§20.3) ----
+        struct Cand1 {
+            pid: String,
+            live: Vec<PlayerAction>,
+            m: Mover,
+            w_player: f32,
+            proxy: f32,
+        }
+        let mut c1: Vec<Cand1> = Vec::new();
+        for (pid, actions) in &eligible {
+            if self.used_this_turn.contains(pid) {
+                continue;
+            }
+            let st = match g.field_model.player_state(pid) {
+                Some(s) => s,
+                None => continue,
+            };
+            let live: Vec<PlayerAction> =
+                actions.iter().filter(|a| action_is_live(a, td, g.rules)).cloned().collect();
+            if live.is_empty() {
+                continue;
+            }
+            let m = match self.mover_of(g, f, pid) {
+                Some(m) => m,
+                None => continue,
+            };
+            let c = match g.field_model.player_coordinate(pid) {
+                Some(c) => c,
+                None => continue,
+            };
+            let proxy = proxy_value(f, g, pid, &m);
+            let marked = f.tz[side_idx(home)][ixc(c)] > 0;
+            let can_fetch = f.ball_loose
+                && f.ball.map(|b| c.distance_in_steps(b) <= m.ma + 2).unwrap_or(false);
+            let mut w_player = if m.is_carrier && marked {
+                0.95
+            } else if can_fetch {
+                0.92
+            } else if m.is_carrier {
+                0.88
+            } else if st.is_prone() && marked {
+                0.70
+            } else if proxy > 0.25 {
+                0.45
+            } else {
+                0.30
+            };
+            if g.player(pid).map(has_negatrait).unwrap_or(false) {
+                w_player *= 0.55;
+            }
+            c1.push(Cand1 { pid: pid.clone(), live, m, w_player, proxy });
+        }
+        if c1.is_empty() {
+            return Action::EndTurn;
+        }
+        // Deterministic order first, then rank by the proxy so ties never depend on hash order.
+        c1.sort_by(|a, b| a.pid.cmp(&b.pid));
+        let mut rank: Vec<usize> = (0..c1.len()).collect();
+        rank.sort_by(|&a, &b| {
+            (c1[b].w_player * c1[b].proxy.max(0.05))
+                .partial_cmp(&(c1[a].w_player * c1[a].proxy.max(0.05)))
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(c1[a].pid.cmp(&c1[b].pid))
+        });
+        let tier2: HashSet<usize> = rank.iter().take(TIER2).copied().collect();
+
+        // ---- tier 2: one search per top player, shared by every plan (§20.2, §20.3) ----
+        let mut cands: Vec<Candidate> = Vec::new();
+        for (ci, c) in c1.iter().enumerate() {
+            let r = if tier2.contains(&ci) {
+                reach(f, g, &c.pid, team_rr, &mut self.sc)
+            } else {
+                None
+            };
+            self.build_plans(
+                g,
+                f,
+                side,
+                (&c.pid, &c.live, &c.m, c.w_player, c.proxy),
+                r.as_ref(),
+                novelty,
+                &mut cands,
+            );
+            if let Some(r) = r {
+                recycle(&mut self.sc, r);
+            }
+        }
+
+        if cands.is_empty() {
+            return Action::EndTurn;
+        }
+        for c in &cands {
+            self.buf.push(
+                Action::ActivatePlayer {
+                    player_id: c.player.clone(),
+                    player_action: c.pac,
+                    block_defender_id: c.target.clone(),
+                },
+                c.weight,
+                c.why,
+                c.weight,
+            );
+        }
+        // Ending the turn banks what the team has: zero gain, zero risk.
+        self.buf.push(Action::EndTurn, 0.0, Rule::EndActivation, 0.0);
+
+        let i = self.sample(0.18);
+        if i < cands.len() {
+            let c = cands.swap_remove(i);
+            self.plan = Some(Plan {
+                player: c.player.clone(),
+                kind: c.kind,
+                path: c.path,
+                delivered: false,
+                fired: false,
+            });
+            self.used_this_turn.insert(c.player);
+            *self.seen_action.entry(format!("{:?}", c.pac)).or_insert(0) += 1;
+            *self.seen_bucket.entry(bucket).or_insert(0) += 1;
+        }
+        self.take(i)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn build_plans(
+        &self,
+        g: &Game,
+        f: &Features,
+        side: TeamSide,
+        parts: (&str, &[PlayerAction], &Mover, f32, f32),
+        r: Option<&Reach>,
+        novelty: f32,
+        out: &mut Vec<Candidate>,
+    ) {
+        let (pid, live, m, w_player, proxy) = parts;
+        for pa in live {
+            let pac = player_action_to_pac(pa);
+            let floor = self.coverage_floor(&format!("{:?}", pac));
+            let mut push = |w: f32, target: Option<String>, kind: PlanKind, path, why| {
+                out.push(Candidate {
+                    weight: w_player * w.max(floor) + novelty,
+                    player: pid.to_string(),
+                    pac,
+                    target,
+                    kind,
+                    path,
+                    why,
+                });
+            };
+
+            match pac {
+                PlayerActionChoice::Move | PlayerActionChoice::StandUp => {
+                    match r {
+                        Some(r) => {
+                            let (w, dest) = best_move(f, r, m);
+                            match dest {
+                                Some(i) => {
+                                    let mut p = Vec::new();
+                                    r.path_to(i, &mut p);
+                                    let kind = if f.ball_loose && f.ball == Some(coord_of(i)) {
+                                        PlanKind::Pickup
+                                    } else {
+                                        PlanKind::Move
+                                    };
+                                    push(w, None, kind, p, Rule::ScoreAdvance);
+                                }
+                                None => push(0.02, None, PlanKind::Move, Vec::new(), Rule::Support),
+                            }
+                        }
+                        // tier 1: the proxy stands in, discounted for being optimistic
+                        None => {
+                            push(proxy * 0.8, None, PlanKind::Move, Vec::new(), Rule::ScoreAdvance)
+                        }
+                    }
+                }
+                PlayerActionChoice::Block => {
+                    for t in legal_block_targets(g, pid, side) {
+                        let w = block_weight(f, g, pid, &t, m.str_);
+                        push(w, Some(t), PlanKind::Immediate, Vec::new(), Rule::DiceCount);
+                    }
+                }
+                PlayerActionChoice::Blitz | PlayerActionChoice::StandUpBlitz => {
+                    // §20.9 — a blitz is "reach this victim, THEN hit it". The victim is folded into
+                    // the declaration so the BlitzTarget answer agrees, and the path is constrained
+                    // to a square adjacent to it so there is something to block on arrival.
+                    let mut foes: Vec<String> = g
+                        .field_model
+                        .player_coordinates
+                        .iter()
+                        .filter(|(oid, &oc)| {
+                            on_pitch(oc.x, oc.y)
+                                && g.team_home.has_player(oid) != m.home
+                                && f.occ[ixc(oc)] & OCC_TZ != 0
+                        })
+                        .map(|(oid, _)| oid.clone())
+                        .collect();
+                    foes.sort();
+                    let here = g.field_model.player_coordinate(pid);
+                    for oid in foes {
+                        let oc = match g.field_model.player_coordinate(&oid) {
+                            Some(c) => c,
+                            None => continue,
+                        };
+                        let dice = block_weight(f, g, pid, &oid, m.str_);
+                        if here.map(|h| h.distance_in_steps(oc) == 1).unwrap_or(false) {
+                            // Already adjacent: no movement needed, but spending the once-per-turn
+                            // blitz on what a plain Block would do is a small waste.
+                            push(
+                                dice * 0.85,
+                                Some(oid.clone()),
+                                PlanKind::Blitz { victim: oid },
+                                Vec::new(),
+                                Rule::DiceCount,
+                            );
+                            continue;
+                        }
+                        let r = match r {
+                            Some(r) => r,
+                            None => continue,
+                        };
+                        let mut bp = 0.0f32;
+                        let mut bi = None;
+                        for n in oc.neighbours() {
+                            if !on_pitch(n.x, n.y) {
+                                continue;
+                            }
+                            let i = ixc(n);
+                            if f.occupied(i) || !r.reached(i) {
+                                continue;
+                            }
+                            let pa = r.p_arrive(i);
+                            if pa > bp {
+                                bp = pa;
+                                bi = Some(i);
+                            }
+                        }
+                        if let Some(i) = bi {
+                            let mut p = Vec::new();
+                            r.path_to(i, &mut p);
+                            let gfi = r.cell[i].gfi as i32;
+                            let w = bp * dice
+                                - (1.0 - bp) * c_turnover(m.unactivated, gfi, m.is_carrier)
+                                - rush_penalty(gfi, m.is_carrier);
+                            push(
+                                w,
+                                Some(oid.clone()),
+                                PlanKind::Blitz { victim: oid },
+                                p,
+                                Rule::DiceCount,
+                            );
+                        }
+                    }
+                }
+                PlayerActionChoice::Foul => {
+                    for t in legal_foul_targets(g, pid, side) {
+                        let w = foul_weight(f, g, pid, &t, m);
+                        push(
+                            w,
+                            Some(t.clone()),
+                            PlanKind::Foul { victim: t },
+                            Vec::new(),
+                            Rule::Flat,
+                        );
+                    }
+                }
+                PlayerActionChoice::HandOff => {
+                    for rcv in legal_handoff_receivers(g, pid, side) {
+                        let w = g
+                            .field_model
+                            .player_coordinate(&rcv)
+                            .map(|c| 0.88 * value_at(f, ixc(c), m).0)
+                            .unwrap_or(0.05);
+                        push(
+                            w,
+                            Some(rcv.clone()),
+                            PlanKind::HandOff { receiver: rcv },
+                            Vec::new(),
+                            Rule::Flat,
+                        );
+                    }
+                }
+                PlayerActionChoice::Pass
+                | PlayerActionChoice::ThrowBomb
+                | PlayerActionChoice::HailMaryPass
+                | PlayerActionChoice::AllYouCanEat => {
+                    for rcv in legal_pass_receivers(g, pid, side) {
+                        let w = pass_weight(f, g, pid, &rcv, m);
+                        push(
+                            w,
+                            Some(rcv.clone()),
+                            PlanKind::Pass { receiver: rcv },
+                            Vec::new(),
+                            Rule::Flat,
+                        );
+                    }
+                }
+                PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate => {
+                    for t in legal_throw_team_mate_targets(g, pid, side) {
+                        push(0.35, Some(t), PlanKind::Immediate, Vec::new(), Rule::Flat);
+                    }
+                }
+                _ => push(0.40, None, PlanKind::Immediate, Vec::new(), Rule::Flat),
+            }
+        }
+    }
 }
+
+// ─────────────────────────────────────────────────────────────────── act()
 
 impl Agent for HeuristicAgent {
     fn act(&mut self, gs: &GameState) -> Action {
@@ -828,256 +1694,95 @@ impl Agent for HeuristicAgent {
             None => return Action::Acknowledge,
         };
 
+        // §20.7 — build the feature block at most once per board position, then take it out of
+        // `self` for the duration of the decision so the borrow checker stays satisfied without
+        // any unsafe aliasing.
+        // Three tiers, cheapest first: prompts that read nothing about the board, prompts that
+        // read only the cheap core (tackle zones, occupancy, who has the ball), and the two that
+        // read the value rasters. Measurement is what forced the middle tier — building the rasters
+        // for a `BlockChoice` took it from 11 µs to 86 µs, and it does not read one of them.
+        let needs_features = matches!(
+            prompt,
+            AgentPrompt::Move { .. }
+                | AgentPrompt::ActivatePlayer { .. }
+                | AgentPrompt::BlitzTarget { .. }
+                | AgentPrompt::BlockChoice { .. }
+                | AgentPrompt::Pushback { .. }
+                | AgentPrompt::FollowUp { .. }
+                | AgentPrompt::ReRollOffer { .. }
+        );
+        if !needs_features {
+            return self.act_boardless(gs, g, prompt);
+        }
+        let needs_heavy =
+            matches!(prompt, AgentPrompt::Move { .. } | AgentPrompt::ActivatePlayer { .. });
+        let stamp = positions_stamp(g);
+        let usable = self
+            .feat
+            .as_ref()
+            .map(|f| f.stamp == stamp && (f.heavy || !needs_heavy))
+            .unwrap_or(false);
+        if !usable {
+            self.feat = Some(Features::build(g, stamp, needs_heavy));
+        }
+        let f = self.feat.take().expect("features just built");
+        let action = self.act_with_features(gs, g, &f, prompt);
+        self.feat = Some(f);
+        action
+    }
+}
+
+impl HeuristicAgent {
+    fn act_with_features(
+        &mut self,
+        gs: &GameState,
+        g: &Game,
+        f: &Features,
+        prompt: AgentPrompt,
+    ) -> Action {
         match prompt {
-            // ── movement: the whole path in one answer (§4.1b, §6.6) ────────
-            AgentPrompt::Move { player_id, squares } => {
-                if squares.is_empty() {
+            AgentPrompt::Move { player_id, squares } => self.handle_move(g, f, player_id, squares),
+
+            AgentPrompt::ActivatePlayer { eligible_players } => {
+                self.handle_activate(g, f, eligible_players)
+            }
+
+            // §19.2 defect 1 — answer from the plan so the declaration and this prompt agree.
+            AgentPrompt::BlitzTarget { attacker_id, eligible_players } => {
+                if eligible_players.is_empty() {
                     return Action::EndPlayerAction;
                 }
-                let b = Board::new(g);
-                let home = b.is_home(&player_id);
-                let player = match g.player(&player_id) {
-                    Some(p) => p,
-                    None => return Action::EndPlayerAction,
-                };
-                let start = match g.field_model.player_coordinate(&player_id) {
-                    Some(c) => c,
-                    None => return Action::EndPlayerAction,
-                };
-                let td = if home { &g.turn_data_home } else { &g.turn_data_away };
-                let team_rr = td.rerolls > 0 && !td.reroll_used;
-                let cx = Ctx {
-                    home,
-                    is_carrier: b.carrier.as_deref() == Some(player_id.as_str()),
-                    ma: player.movement_with_modifiers(),
-                    ag: player.agility_with_modifiers(),
-                    sure_hands: player.has_skill(SkillId::SureHands),
-                    str_: player.strength_with_modifiers(),
-                    d_now: endzone_distance(start, home),
-                    turns_left: (8 - if home { g.turn_data_home.turn_nr } else { g.turn_data_away.turn_nr }).max(0),
-                    side_step: player.has_skill(SkillId::SideStep),
-                    unactivated: unactivated_share(g, home),
-                };
-
-                let reach = reachable(&b, &player_id, team_rr);
-                for r in &reach {
-                    if r.path.is_empty() || !squares.contains(&r.path[0]) {
-                        continue;
+                if let Some(pl) = &self.plan {
+                    if pl.player == attacker_id {
+                        if let PlanKind::Blitz { victim } = &pl.kind {
+                            if eligible_players.contains(victim) {
+                                return Action::SelectPlayer { player_id: victim.clone() };
+                            }
+                        }
                     }
-                    let (v, intent) = value_of(&b, r.coord, &cx);
-                    let scores = cx.is_carrier && endzone_distance(r.coord, home) == 0;
-                    // A touchdown ends the drive, so there is no turnover term to subtract --
-                    // but it is still an OPTION, scored and sampled like every other. An earlier
-                    // build hard-returned here, which bypassed the softmax entirely and therefore
-                    // survived any temperature: the "uniform" control arm scored touchdowns it
-                    // had never sampled. Every decision must go through the buffer.
-                    let (w, rule) = if scores {
-                        (r.p_arrive - rush_penalty(r.gfi, true), Rule::ScoreTouchdown)
-                    } else {
-                        (
-                            r.p_arrive * v
-                                - (1.0 - r.p_arrive) * c_turnover(&cx, r.gfi, cx.is_carrier)
-                                - rush_penalty(r.gfi, cx.is_carrier),
-                            intent.rule(),
-                        )
-                    };
-                    self.buf.push(Action::Move { path: r.path.clone() }, w, rule, v);
                 }
-                // Declining banks what we have: zero gain, zero risk => weight 0.0 (§6.6).
-                self.buf.push(Action::EndPlayerAction, 0.0, Rule::EndActivation, 0.0);
-                let i = self.sample(0.06);
-                if std::env::var_os("FFB_HEUR_TRACE").is_some() {
-                    let o = &self.buf.options[i];
-                    let cost = match &o.action {
-                        Action::Move { path } => path.len() as i32,
-                        _ => 0,
-                    };
-                    let nopt = self.buf.options.len();
-                    let bestw = self.buf.options.iter().map(|x| x.weight).fold(f32::MIN, f32::max);
-                    let gfi = match &o.action {
-                        Action::Move { path } => path.len() as i32
-                            - (cx.ma - b.g.acting_player.current_move.max(0)).max(0),
-                        _ => 0,
-                    };
-                    eprintln!("HMOVE carrier={} loose={} cost={} gfi={} w={:.3} best={:.3} why={:?} nopt={} unact={:.3} cto={:.3} spent={}",
-                        cx.is_carrier, b.ball_loose, cost, gfi.max(0),
-                        o.weight, bestw, o.why, nopt, cx.unactivated,
-                        c_turnover(&cx, gfi.max(0), cx.is_carrier),
-                        b.g.acting_player.current_move);
+                let astr = g.player(&attacker_id).map(|p| p.strength_with_modifiers()).unwrap_or(3);
+                let mut ep = eligible_players;
+                ep.sort();
+                for did in &ep {
+                    let w = block_weight(f, g, &attacker_id, did, astr);
+                    self.buf.push(
+                        Action::SelectPlayer { player_id: did.clone() },
+                        w,
+                        Rule::DiceCount,
+                        w,
+                    );
                 }
+                let i = self.sample(0.15);
                 self.take(i)
             }
 
-            // ── activation: (player, action, target) ────────────────────────
-            AgentPrompt::ActivatePlayer { eligible_players } => {
-                self.refresh_turn(g);
-                if eligible_players.is_empty() {
-                    return Action::EndTurn;
-                }
-                let b = Board::new(g);
-                let home = g.home_playing;
-                let side = if home { TeamSide::Home } else { TeamSide::Away };
-                let td = if home { &g.turn_data_home } else { &g.turn_data_away };
-                let team_rr = td.rerolls > 0 && !td.reroll_used;
-                let bucket = self.bucket(&b);
-                let novelty = if self.temp_scale >= 0.1
-                    && self.seen_bucket.get(&bucket).copied().unwrap_or(0) == 0
-                {
-                    0.08
-                } else {
-                    0.0
-                };
-
-                // Backstop: if every eligible player has already acted this turn, end it.
-                if eligible_players
-                    .iter()
-                    .all(|(pid, _)| self.used_this_turn.contains(pid))
-                {
-                    return Action::EndTurn;
-                }
-                // Progress guarantee. The 0.30 `used_this_turn` factor is a preference, and a
-                // preference is not enough for a near-argmax policy: if a used player still
-                // outscores every unused one it is re-picked forever and the turn never ends
-                // (observed as a hang in the greedy arm). Skip used players outright while any
-                // unused one is eligible; the soft factor then only ever applies when the
-                // engine re-offers a player with nobody else left.
-                let any_unused = eligible_players
-                    .iter()
-                    .any(|(pid, _)| !self.used_this_turn.contains(pid));
-                let mut any = false;
-                for (pid, actions) in &eligible_players {
-                    if any_unused && self.used_this_turn.contains(pid) {
-                        continue;
-                    }
-                    let st = match g.field_model.player_state(pid) {
-                        Some(s) => s,
-                        None => continue,
-                    };
-                    if st.is_prone() && !st.is_active() {
-                        continue;
-                    }
-                    let player = match g.player(pid) {
-                        Some(p) => p,
-                        None => continue,
-                    };
-                    let live: Vec<PlayerAction> = actions
-                        .iter()
-                        .filter(|a| action_is_live(a, td, g.rules))
-                        .cloned()
-                        .collect();
-                    if live.is_empty() {
-                        continue;
-                    }
-                    let start = match g.field_model.player_coordinate(pid) {
-                        Some(c) => c,
-                        None => continue,
-                    };
-                    let cx = Ctx {
-                        home,
-                        is_carrier: b.carrier.as_deref() == Some(pid.as_str()),
-                        ma: player.movement_with_modifiers(),
-                        ag: player.agility_with_modifiers(),
-                        sure_hands: player.has_skill(SkillId::SureHands),
-                        str_: player.strength_with_modifiers(),
-                        d_now: endzone_distance(start, home),
-                        turns_left: (8 - td.turn_nr).max(0),
-                        side_step: player.has_skill(SkillId::SideStep),
-                        unactivated: unactivated_share(g, home),
-                    };
-                    // tier 1 proxy: best of the eight adjacent squares (§6.5.1)
-                    let mut proxy = 0.0f32;
-                    for n in start.neighbours() {
-                        if on_pitch(n.x, n.y) && !b.occupied(n) {
-                            proxy = proxy.max(value_of(&b, n, &cx).0);
-                        }
-                    }
-                    let marked = b.tz_against(start, home) > 0;
-                    // Can this player actually get to the loose ball this activation?
-                    let can_fetch = b.ball_loose
-                        && b.ball
-                            .map(|bc| start.distance_in_steps(bc) <= cx.ma + 2)
-                            .unwrap_or(false);
-                    let mut w_player = if cx.is_carrier && marked {
-                        0.95
-                    } else if can_fetch {
-                        // Possession is the game. Nothing else on the board is worth more than
-                        // the player who can pick the ball up.
-                        0.92
-                    } else if cx.is_carrier {
-                        0.88
-                    } else if st.is_prone() && marked {
-                        0.70
-                    } else if proxy > 0.25 {
-                        0.45
-                    } else {
-                        0.30
-                    };
-                    if self.used_this_turn.contains(pid) {
-                        w_player *= 0.30;
-                    }
-                    if has_negatrait(player) {
-                        w_player *= 0.55;
-                    }
-
-                    for pa in &live {
-                        let pac = player_action_to_pac(pa);
-                        // EVERY (target) is its own option. An earlier build returned only the
-                        // argmax target from `score_action`, which meant the target was chosen
-                        // greedily at any temperature -- a heuristic the temperature knob could
-                        // not switch off, and a deviation from 6.5's joint (player, action,
-                        // target) choice.
-                        for (target, mut w_action, rule) in
-                            score_action_candidates(&b, g, pid, pac, side, &cx, team_rr, proxy)
-                        {
-                            // P4: a negatrait failure voids the whole activation.
-                            if has_negatrait(player) {
-                                w_action *= 0.66;
-                            }
-                            let key = format!("{:?}", pac);
-                            w_action = w_action.max(self.coverage_floor(&key));
-                            let w = w_player * w_action + novelty;
-                            self.buf.push(
-                                Action::ActivatePlayer {
-                                    player_id: pid.clone(),
-                                    player_action: pac,
-                                    block_defender_id: target,
-                                },
-                                w,
-                                rule,
-                                w_action,
-                            );
-                            any = true;
-                        }
-                    }
-                }
-                if !any {
-                    return Action::EndTurn;
-                }
-                // Ending the turn banks what the team already has: zero further gain, zero
-                // further risk, so its weight is 0.0 on the same scale as everything else --
-                // exactly as the decline option is in 6.6. The old
-                // `0.05 + 0.90 * (1 - best)` assumed activation weights ran close to 1.0; the
-                // real product `w_player * w_action` runs around 0.15, which made EndTurn ~0.83
-                // and ended every turn after a single activation (measured: 11 activations per
-                // GAME instead of ~270). Termination does not depend on this weight: the engine
-                // empties the eligible list as players are used, and the all-used guard above
-                // is the backstop.
-                self.buf.push(Action::EndTurn, 0.0, Rule::EndActivation, 0.0);
-
-                let i = self.sample(0.18);
-                let act = self.take(i);
-                if let Action::ActivatePlayer { player_id, player_action, .. } = &act {
-                    self.used_this_turn.insert(player_id.clone());
-                    *self.seen_action.entry(format!("{:?}", player_action)).or_insert(0) += 1;
-                }
-                *self.seen_bucket.entry(bucket).or_insert(0) += 1;
-                act
-            }
+            AgentPrompt::BlockTarget { .. } => Action::EndPlayerAction,
 
             // ── block dice (§6.3) ───────────────────────────────────────────
             AgentPrompt::BlockChoice { attacker_id, defender_id, dice, own_choice, .. } => {
-                let b = Board::new(g);
-                let def_has_ball = b.carrier.as_deref() == Some(defender_id.as_str());
+                let def_has_ball =
+                    f.ball_carried && f.ball == g.field_model.player_coordinate(&defender_id);
                 let att = g.player(&attacker_id);
                 let def = g.player(&defender_id);
                 let att_block = att.map(|p| p.has_skill(SkillId::Block)).unwrap_or(false);
@@ -1103,7 +1808,13 @@ impl Agent for HeuristicAgent {
                             let def_down = !def_block;
                             match (att_down, def_down) {
                                 (false, true) => 0.70,
-                                (true, true) => if def_has_ball { 0.50 } else { 0.30 },
+                                (true, true) => {
+                                    if def_has_ball {
+                                        0.50
+                                    } else {
+                                        0.30
+                                    }
+                                }
                                 (true, false) => 0.10,
                                 (false, false) => 0.35,
                             }
@@ -1134,47 +1845,32 @@ impl Agent for HeuristicAgent {
                 self.take(i)
             }
 
-            // ── block target (§6.2) ─────────────────────────────────────────
-            AgentPrompt::BlitzTarget { attacker_id, eligible_players } => {
-                if eligible_players.is_empty() {
-                    return Action::EndPlayerAction;
-                }
-                let b = Board::new(g);
-                for did in &eligible_players {
-                    let w = block_target_weight(&b, g, &attacker_id, did);
-                    self.buf.push(Action::SelectPlayer { player_id: did.clone() }, w, Rule::DiceCount, w);
-                }
-                let i = self.sample(0.15);
-                self.take(i)
-            }
-
-            AgentPrompt::BlockTarget { .. } => Action::EndPlayerAction,
-
             // ── pushback (§6.13) ────────────────────────────────────────────
             AgentPrompt::Pushback { attacker_id, defender_id, squares } => {
                 if squares.is_empty() {
                     return Action::Acknowledge;
                 }
-                let b = Board::new(g);
-                let def_home = b.is_home(&defender_id);
-                let def_has_ball = b.carrier.as_deref() == Some(defender_id.as_str());
+                let def_home = g.team_home.has_player(&defender_id);
+                let def_has_ball =
+                    f.ball_carried && f.ball == g.field_model.player_coordinate(&defender_id);
                 let att_c = g.field_model.player_coordinate(&attacker_id);
-                let mut sorted = squares.clone();
+                let mut sorted = squares;
                 sorted.sort_by_key(|c| (c.x, c.y));
                 for sq in &sorted {
                     let off = !on_pitch(sq.x, sq.y);
                     let mut w = if off {
-                        if def_has_ball { 1.0 } else { 0.95 }
+                        if def_has_ball {
+                            1.0
+                        } else {
+                            0.95
+                        }
                     } else if sq.y == 0 || sq.y == YMAX {
                         0.55
                     } else {
                         0.20
                     };
-                    // pushing the defender away from their own endzone is good for us
                     if let Some(a) = att_c {
-                        let before = endzone_distance(a, !def_home);
-                        let after = endzone_distance(*sq, !def_home);
-                        if after > before {
+                        if endzone_distance(*sq, !def_home) > endzone_distance(a, !def_home) {
                             w *= 1.3;
                         }
                     }
@@ -1186,18 +1882,15 @@ impl Agent for HeuristicAgent {
 
             // ── follow-up (§6.10) ───────────────────────────────────────────
             AgentPrompt::FollowUp { attacker_id, target_coord } => {
-                let b = Board::new(g);
-                let home = b.is_home(&attacker_id);
-                let carries = b.carrier.as_deref() == Some(attacker_id.as_str());
+                let home = g.team_home.has_player(&attacker_id);
                 let cur = g.field_model.player_coordinate(&attacker_id);
+                let carries = f.ball_carried && f.ball == cur;
                 let mut w: f32 = 0.5;
                 if carries {
                     w -= 0.45;
                 }
                 if let Some(c) = cur {
-                    let tz_now = b.tz_against(c, home);
-                    let tz_then = b.tz_against(target_coord, home);
-                    if tz_then > tz_now {
+                    if f.tz_against(target_coord, home) > f.tz_against(c, home) {
                         w -= 0.35;
                     }
                 }
@@ -1213,12 +1906,16 @@ impl Agent for HeuristicAgent {
 
             // ── re-roll (§6.14) ─────────────────────────────────────────────
             AgentPrompt::ReRollOffer { action, .. } => {
-                let b = Board::new(g);
                 let home = g.home_playing;
                 let td = if home { &g.turn_data_home } else { &g.turn_data_away };
+                let we_carry = f
+                    .carrier
+                    .as_ref()
+                    .map(|c| g.team_home.has_player(c) == home)
+                    .unwrap_or(false);
                 let consequence = match action.as_str() {
                     "GFI" | "DODGE" | "PICKUP" | "CATCH" | "JUMP" | "ESCAPE" => {
-                        if b.carrier.as_ref().map(|c| b.is_home(c) == home).unwrap_or(false) {
+                        if we_carry {
                             0.85
                         } else {
                             0.55
@@ -1230,21 +1927,31 @@ impl Agent for HeuristicAgent {
                 };
                 let scarcity = if td.rerolls > 0 {
                     let base = 0.45 + 0.55 * (td.rerolls as f32 / 3.0).min(1.0);
-                    if td.turn_nr >= 7 { base * 1.35 } else { base }
+                    if td.turn_nr >= 7 {
+                        base * 1.35
+                    } else {
+                        base
+                    }
                 } else {
                     0.0
                 };
                 let w_use = (consequence * 0.833 * scarcity).clamp(0.0, 1.0);
                 self.buf.push(Action::UseReRoll { use_reroll: true }, w_use, Rule::Reroll, w_use);
-                self.buf.push(Action::UseReRoll { use_reroll: false }, 1.0 - w_use, Rule::Reroll, 1.0 - w_use);
+                self.buf.push(Action::UseReRoll { use_reroll: false }, 1.0 - w_use, Rule::Reroll, 0.0);
                 let i = self.sample(0.20);
                 self.take(i)
             }
 
+            other => self.act_boardless(gs, g, other),
+        }
+    }
+
+    /// Prompts that read nothing about the board, so §20.7 never builds it for them.
+    fn act_boardless(&mut self, gs: &GameState, g: &Game, prompt: AgentPrompt) -> Action {
+        match prompt {
             // ── skill use (§6.16) ───────────────────────────────────────────
             AgentPrompt::SkillUse { skill_name, .. } => {
-                let skill_id = ffb_model::enums::SkillId::from_class_name(&skill_name)
-                    .unwrap_or(ffb_model::enums::SkillId::Block);
+                let skill_id = SkillId::from_class_name(&skill_name).unwrap_or(SkillId::Block);
                 let w_use = match skill_name.as_str() {
                     "Dodge" => 0.95,
                     "Juggernaut" => 0.80,
@@ -1254,8 +1961,18 @@ impl Agent for HeuristicAgent {
                     "QuickBite" | "AnimalSavagery" => 0.85,
                     _ => 0.50,
                 };
-                self.buf.push(Action::UseSkill { skill_id, use_skill: true }, w_use, Rule::Skill, w_use);
-                self.buf.push(Action::UseSkill { skill_id, use_skill: false }, 1.0 - w_use, Rule::Skill, 1.0 - w_use);
+                self.buf.push(
+                    Action::UseSkill { skill_id, use_skill: true },
+                    w_use,
+                    Rule::Skill,
+                    w_use,
+                );
+                self.buf.push(
+                    Action::UseSkill { skill_id, use_skill: false },
+                    1.0 - w_use,
+                    Rule::Skill,
+                    0.0,
+                );
                 let i = self.sample(0.20);
                 self.take(i)
             }
@@ -1272,11 +1989,11 @@ impl Agent for HeuristicAgent {
             // ── kickoff placement (§6.27) ───────────────────────────────────
             AgentPrompt::KickBall => {
                 let home = g.home_playing;
+                let los = if home { 13 } else { 12 };
                 for x_raw in 0..13 {
                     for y in 1..=13 {
                         let x = if home { x_raw + 13 } else { x_raw };
                         let c = FieldCoordinate::new(x, y);
-                        let los = if home { 13 } else { 12 };
                         let deep = ((c.x - los).abs() as f32 / 12.0).min(1.0);
                         let mut w = 0.5 + 0.30 * deep;
                         if y <= 1 || y >= 13 || c.x <= 1 || c.x >= 24 {
@@ -1293,15 +2010,16 @@ impl Agent for HeuristicAgent {
                 if eligible_players.is_empty() {
                     return Action::Acknowledge;
                 }
-                let mut sorted = eligible_players.clone();
+                let mut sorted = eligible_players;
                 sorted.sort_by(|a, b| a.0.cmp(&b.0));
+                let los = if g.home_playing { 12 } else { 13 };
                 for (pid, coord) in &sorted {
-                    let ma = g.player(pid).map(|p| p.movement_with_modifiers()).unwrap_or(6);
+                    let p = g.player(pid);
+                    let ma = p.map(|q| q.movement_with_modifiers()).unwrap_or(6);
                     let mut w = 0.3 + 0.4 * (ma as f32 / 9.0).min(1.0);
-                    if g.player(pid).map(|p| p.has_skill(SkillId::SureHands)).unwrap_or(false) {
+                    if p.map(|q| q.has_skill(SkillId::SureHands)).unwrap_or(false) {
                         w += 0.3;
                     }
-                    let los = if g.home_playing { 12 } else { 13 };
                     if (coord.x - los).abs() <= 1 {
                         w -= 0.5;
                     }
@@ -1321,7 +2039,7 @@ impl Agent for HeuristicAgent {
             AgentPrompt::ReceiveChoice { .. } => {
                 let w = if g.half == 1 { 0.65 } else { 0.85 };
                 self.buf.push(Action::ReceiveChoice { receive: true }, w, Rule::Flat, w);
-                self.buf.push(Action::ReceiveChoice { receive: false }, 1.0 - w, Rule::Flat, 1.0 - w);
+                self.buf.push(Action::ReceiveChoice { receive: false }, 1.0 - w, Rule::Flat, 0.0);
                 let i = self.sample(0.30);
                 self.take(i)
             }
@@ -1334,22 +2052,7 @@ impl Agent for HeuristicAgent {
     }
 }
 
-// ───────────────────────────────────────────────────────────────────── helpers
-
-fn unactivated_share(g: &Game, home: bool) -> f32 {
-    let team = if home { &g.team_home } else { &g.team_away };
-    let n = team
-        .players
-        .iter()
-        .filter(|p| {
-            g.field_model
-                .player_state(&p.id)
-                .map(|s| s.is_active())
-                .unwrap_or(false)
-        })
-        .count();
-    (n as f32 / 11.0).clamp(0.0, 1.0)
-}
+// ─────────────────────────────────────────────────────────────────── helpers
 
 fn has_negatrait(p: &ffb_model::model::player::Player) -> bool {
     p.has_skill(SkillId::BoneHead)
@@ -1409,13 +2112,12 @@ fn push_squares(g: &Game, att: &str, def: &str) -> Vec<FieldCoordinate> {
 }
 
 fn can_surf(g: &Game, att: &str, def: &str) -> bool {
-    push_squares(g, att, def)
-        .iter()
-        .any(|c| !on_pitch(c.x, c.y))
+    push_squares(g, att, def).iter().any(|c| !on_pitch(c.x, c.y))
 }
 
-/// Assist-resolved dice count, then the §2.4 table plus context.
-fn block_target_weight(b: &Board, g: &Game, att: &str, def: &str) -> f32 {
+/// Assist-resolved dice count through the §2.4 table, plus context. §20.8 memoises the two
+/// `find_block_strength` calls, each of which runs a nested player×player loop.
+fn block_weight(f: &Features, g: &Game, att: &str, def: &str, att_str: i32) -> f32 {
     let (ac, dc) = match (
         g.field_model.player_coordinate(att),
         g.field_model.player_coordinate(def),
@@ -1423,14 +2125,12 @@ fn block_target_weight(b: &Board, g: &Game, att: &str, def: &str) -> f32 {
         (Some(a), Some(d)) => (a, d),
         _ => return 0.05,
     };
-    let ap = match g.player(att) { Some(p) => p, None => return 0.05 };
-    let dp = match g.player(def) { Some(p) => p, None => return 0.05 };
-    let a_str = crate::util::server_util_player::ServerUtilPlayer::find_block_strength(
-        g, ac, ap.strength_with_modifiers(), dc,
-    );
-    let d_str = crate::util::server_util_player::ServerUtilPlayer::find_block_strength(
-        g, dc, dp.strength_with_modifiers(), ac,
-    );
+    let (ap, dp) = match (g.player(att), g.player(def)) {
+        (Some(a), Some(d)) => (a, d),
+        _ => return 0.05,
+    };
+    let a_str = f.block_strength(g, att, ac, att_str, def, dc);
+    let d_str = f.block_strength(g, def, dc, dp.strength_with_modifiers(), att, ac);
     let n = if a_str > 2 * d_str {
         3
     } else if a_str > d_str {
@@ -1445,225 +2145,90 @@ fn block_target_weight(b: &Board, g: &Game, att: &str, def: &str) -> f32 {
     let mut w: f32 = match n {
         3 => 0.90,
         2 => 0.60,
-        1 => if ap.has_skill(SkillId::Block) { 0.40 } else { 0.25 },
+        1 => {
+            if ap.has_skill(SkillId::Block) {
+                0.40
+            } else {
+                0.25
+            }
+        }
         -2 => 0.10,
         _ => 0.025,
     };
-    let has_ball = b.carrier.as_deref() == Some(def);
+    let has_ball = f.ball_carried && f.ball == Some(dc);
     if has_ball {
         w *= 1.35;
     }
     if can_surf(g, att, def) {
         w *= if has_ball { 1.9 } else { 1.5 };
     }
-    if dp.has_skill(SkillId::Block) && !ap.has_skill(SkillId::Block) && !ap.has_skill(SkillId::Wrestle) {
+    if dp.has_skill(SkillId::Block)
+        && !ap.has_skill(SkillId::Block)
+        && !ap.has_skill(SkillId::Wrestle)
+    {
         w *= 0.70;
     }
     w.clamp(0.01, 1.0)
 }
 
-/// 6.5.2 -- every (target) a declared action could carry, each as its OWN option.
-///
-/// Returning only the argmax (as an earlier build did) bakes a greedy target choice in at any
-/// temperature, which the temperature knob cannot switch off and which 6.5 does not specify:
-/// the activation choice is JOINT over (player, action, target).
-fn score_action_candidates(
-    b: &Board,
-    g: &Game,
-    pid: &str,
-    pac: PlayerActionChoice,
-    side: TeamSide,
-    cx: &Ctx,
-    team_rr: bool,
-    proxy: f32,
-) -> Vec<(Option<String>, f32, Rule)> {
-    match pac {
-        PlayerActionChoice::Move | PlayerActionChoice::StandUp => {
-            let mut best = proxy;
-            for r in reachable(b, pid, team_rr) {
-                let (v, _) = value_of(b, r.coord, cx);
-                let w = r.p_arrive * v
-                    - (1.0 - r.p_arrive) * c_turnover(cx, r.gfi, cx.is_carrier)
-                    - rush_penalty(r.gfi, cx.is_carrier);
-                best = best.max(w);
-            }
-            vec![(None, best.max(0.05), Rule::ScoreAdvance)]
-        }
-        PlayerActionChoice::Block => {
-            // A plain Block needs the victim to be adjacent ALREADY, and costs the team nothing.
-            let targets = legal_block_targets(g, pid, side);
-            if targets.is_empty() {
-                return vec![(None, 0.02, Rule::DiceCount)];
-            }
-            targets
-                .into_iter()
-                .map(|t| {
-                    let w = block_target_weight(b, g, pid, &t);
-                    (Some(t), w, Rule::DiceCount)
-                })
-                .collect()
-        }
-        PlayerActionChoice::Blitz | PlayerActionChoice::StandUpBlitz => {
-            // A Blitz MOVES then blocks, and spends the team's one blitz for the turn. An earlier
-            // build scored it from the same branch as Block, so the two were numerically
-            // identical and a near-argmax policy always took whichever the engine happened to
-            // offer first -- which was Block, giving 17 blocks and only 9 blitzes per game while
-            // the ball went nowhere. Score what a blitz is actually for: reaching a victim that a
-            // plain block cannot.
-            let mut out: Vec<(Option<String>, f32, Rule)> = Vec::new();
-            let reach = reachable(b, pid, team_rr);
-            let here = g.field_model.player_coordinate(pid);
-            for (oid, &oc) in &g.field_model.player_coordinates {
-                if b.is_home(oid) == cx.home || !b.standing(oid) {
-                    continue;
-                }
-                let adjacent_now = here.map(|h| h.distance_in_steps(oc) == 1).unwrap_or(false);
-                // best arrival probability among squares adjacent to this opponent
-                let p_reach = if adjacent_now {
-                    1.0
-                } else {
-                    reach
-                        .iter()
-                        .filter(|r| r.coord.distance_in_steps(oc) == 1)
-                        .map(|r| r.p_arrive)
-                        .fold(0.0f32, f32::max)
-                };
-                if p_reach <= 0.0 {
-                    continue;
-                }
-                let dice = block_target_weight(b, g, pid, oid);
-                // Spending the once-per-turn blitz on someone a plain block already reaches is a
-                // waste of the blitz, so discount that case.
-                let waste = if adjacent_now { 0.85 } else { 1.0 };
-                out.push((Some(oid.clone()), p_reach * dice * waste, Rule::DiceCount));
-            }
-            if out.is_empty() {
-                return vec![(None, 0.02, Rule::DiceCount)];
-            }
-            out.sort_by(|a, c| a.0.cmp(&c.0));
-            out
-        }
-        PlayerActionChoice::Foul => {
-            // A foul was a flat 0.30, with no ejection risk and no notion of whether the victim
-            // was worth it -- so the sharper the policy, the more it fouled (6.35 per game at
-            // argmax). Price it properly: the chance of actually hurting the victim, times how
-            // much that victim matters, times the risk of losing the player and the turn to the
-            // referee. On a skill-less roster with nothing worth fouling, this lands near zero,
-            // which is correct.
-            let targets = legal_foul_targets(g, pid, side);
-            if targets.is_empty() {
-                return vec![(None, 0.02, Rule::Flat)];
-            }
-            let bribes = if cx.home { g.team_home.bribes } else { g.team_away.bribes };
-            // An ejection costs us a player for the REST OF THE MATCH. A bribe usually saves him.
-            let eject_cost = if bribes > 0 { 0.07 } else { 0.45 };
-            // Mild preference for fouling late, once the turn's real work is banked.
-            let timing = if cx.unactivated <= 3.0 / 11.0 { 1.0 } else { 0.85 };
-            targets
-                .into_iter()
-                .map(|t| {
-                    let av = g.player(&t).map(|q| q.armour_with_modifiers()).unwrap_or(8);
-                    // FOUL ASSISTS. A foul's armour roll gets +1 per net offensive assist
-                    // (`foul_assist_armor_modifier`, ±1..7), which is the entire reason to pick
-                    // one victim over another -- and the reason to foul at all. Scoring the foul
-                    // from AV alone, as an earlier build did, made every victim look identical
-                    // and every foul look bad, so the agent could not learn to foul the player it
-                    // had three team-mates standing over. These are the engine's own functions,
-                    // the same two `InjuryTypeFoul::armour_roll` calls.
-                    let off = ffb_model::util::util_player::UtilPlayer::find_offensive_foul_assists(
-                        g, pid, &t,
-                    ) as i32;
-                    let def = ffb_model::util::util_player::UtilPlayer::find_defensive_foul_assists(
-                        g, pid, &t,
-                    ) as i32;
-                    let net = off - def;
-                    // P(2d6 + net > AV)
-                    let need = av - net;
-                    let p_break = if need <= 1 {
-                        0.97
-                    } else if need >= 12 {
-                        0.03
-                    } else {
-                        let fails: i32 = (2..=need.min(12))
-                            .map(|k| 6 - (k - 7).abs())
-                            .map(|c| c.max(0))
-                            .sum();
-                        (1.0 - fails as f32 / 36.0).clamp(0.03, 0.97)
-                    };
-                    let victim = if b.carrier.as_deref() == Some(t.as_str()) {
-                        1.0
-                    } else if b
-                        .ball
-                        .zip(g.field_model.player_coordinate(&t))
-                        .map(|(bc, tc)| bc.distance_in_steps(tc) <= 1)
-                        .unwrap_or(false)
-                    {
-                        0.7
-                    } else {
-                        0.35
-                    };
-                    // The referee spots a foul on DOUBLES -- of the armour roll, then of the
-                    // injury roll if the armour broke (`step_referee.rs`: `armor[0] == armor[1]`,
-                    // then `injury[0] == injury[1]`). So ejection risk is a fixed ~1/6 rising
-                    // slightly with the chance of actually hurting the victim, and NOTHING the
-                    // agent chooses can lower it. It is a cost to pay or avoid, not to manage.
-                    let p_eject = 0.167 + p_break * (5.0 / 6.0) * 0.167;
-                    // An expectation, not a stack of multipliers. Stacked multipliers made a
-                    // well-assisted foul score the same as an unassisted one -- both ~0.01 -- so
-                    // the agent never fouled at all and the assist term could not express itself.
-                    let w = (p_break * victim - p_eject * eject_cost) * timing;
-                    (Some(t), w, Rule::Flat)
-                })
-                .collect()
-        }
-        PlayerActionChoice::HandOff => {
-            let recv = legal_handoff_receivers(g, pid, side);
-            if recv.is_empty() {
-                return vec![(None, 0.02, Rule::Flat)];
-            }
-            recv.into_iter()
-                .map(|r| {
-                    let w = g
-                        .field_model
-                        .player_coordinate(&r)
-                        .map(|c| 0.88 * value_of(b, c, cx).0)
-                        .unwrap_or(0.05);
-                    (Some(r), w, Rule::Flat)
-                })
-                .collect()
-        }
-        PlayerActionChoice::Pass
-        | PlayerActionChoice::ThrowBomb
-        | PlayerActionChoice::HailMaryPass
-        | PlayerActionChoice::AllYouCanEat => {
-            let recv = legal_pass_receivers(g, pid, side);
-            if recv.is_empty() {
-                return vec![(None, 0.02, Rule::Flat)];
-            }
-            recv.into_iter()
-                .map(|r| {
-                    let w = g
-                        .field_model
-                        .player_coordinate(&r)
-                        .map(|c| {
-                            let v = value_of(b, c, cx).0;
-                            let p_complete = 0.6f32;
-                            p_complete * v - (1.0 - p_complete) * c_turnover(cx, 0, true)
-                        })
-                        .unwrap_or(0.05);
-                    (Some(r), w, Rule::Flat)
-                })
-                .collect()
-        }
-        PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate => {
-            let t = legal_throw_team_mate_targets(g, pid, side);
-            if t.is_empty() {
-                return vec![(None, 0.02, Rule::Flat)];
-            }
-            t.into_iter().map(|x| (Some(x), 0.35, Rule::Flat)).collect()
-        }
-        _ => vec![(None, 0.40, Rule::Flat)],
-    }
+/// An expectation, not a stack of multipliers: what the foul buys minus what it risks. Foul assists
+/// modify the ARMOUR roll (+1 per net offensive assist), which is the whole reason to prefer one
+/// victim over another — and the reason to foul at all.
+fn foul_weight(f: &Features, g: &Game, att: &str, def: &str, m: &Mover) -> f32 {
+    let av = g.player(def).map(|q| q.armour_with_modifiers()).unwrap_or(8);
+    let off =
+        ffb_model::util::util_player::UtilPlayer::find_offensive_foul_assists(g, att, def) as i32;
+    let dfn =
+        ffb_model::util::util_player::UtilPlayer::find_defensive_foul_assists(g, att, def) as i32;
+    let p_break = p_2d6_at_least(av - (off - dfn) + 1).clamp(0.03, 0.97);
+    let victim = if f.ball_carried && f.ball == g.field_model.player_coordinate(def) {
+        1.0
+    } else if f
+        .ball
+        .zip(g.field_model.player_coordinate(def))
+        .map(|(b, t)| b.distance_in_steps(t) <= 1)
+        .unwrap_or(false)
+    {
+        0.7
+    } else {
+        0.35
+    };
+    let bribes = if m.home { g.team_home.bribes } else { g.team_away.bribes };
+    let eject_cost = if bribes > 0 { 0.07 } else { 0.45 };
+    // The referee spots a foul on DOUBLES — armour, then injury if the armour broke. Fixed at about
+    // 1/6, rising with the chance of hurting the victim, and nothing the agent chooses lowers it.
+    let p_eject = 0.167 + p_break * (5.0 / 6.0) * 0.167;
+    let timing = if m.unactivated <= 3.0 / 11.0 { 1.0 } else { 0.85 };
+    (p_break * victim - p_eject * eject_cost) * timing
+}
+
+/// A fumble is a turnover on the spot, so the pass has to be an expectation too. The completion
+/// estimate is distance-banded rather than the full range ruler, which is a known approximation.
+fn pass_weight(f: &Features, g: &Game, thrower: &str, rcv: &str, m: &Mover) -> f32 {
+    let (tc, rc) = match (
+        g.field_model.player_coordinate(thrower),
+        g.field_model.player_coordinate(rcv),
+    ) {
+        (Some(a), Some(b)) => (a, b),
+        _ => return 0.02,
+    };
+    let d = tc.distance_in_steps(rc);
+    let base = match d {
+        0..=3 => 0.83,
+        4..=6 => 0.72,
+        7..=10 => 0.58,
+        _ => 0.42,
+    };
+    let bad_weather = matches!(weather_of(g), Weather::Blizzard | Weather::PouringRain);
+    let p_throw = if bad_weather { base * 0.8 } else { base };
+    let i = ixc(rc);
+    let tz = f.tz[side_idx(m.home)][i] as i32;
+    let p_catch = p_roll((m.ag + tz).max(2));
+    let p_complete = p_throw * p_catch;
+    let scores = endzone_distance(rc, m.home) == 0;
+    let v = if scores { 1.0 } else { value_at(f, i, m).0 };
+    p_complete * v * (if scores { 1.5 } else { 1.0 })
+        - (1.0 - p_complete) * c_turnover(m.unactivated, 0, true)
 }
 
 #[cfg(test)]
@@ -1677,20 +2242,19 @@ mod tests {
         assert!((p_roll(6) - 0.1667).abs() < 1e-3);
     }
 
-    /// D1 / P-round: the GFI target is 3+ in a Blizzard, in EVERY edition.
+    /// D1: the GFI target is 3+ in a Blizzard, in EVERY edition.
     #[test]
     fn gfi_target_is_three_in_a_blizzard() {
         assert_eq!(gfi_target(Weather::Blizzard), 3);
         assert_eq!(gfi_target(Weather::Nice), 2);
     }
 
-    /// A5: a free skill re-roll turns a 4+ into 0.75.
     #[test]
     fn reroll_composition() {
         assert!((p_with_reroll(p_roll(4), 1.0) - 0.75).abs() < 1e-3);
     }
 
-    /// P4: standing up costs 3 MA, so a prone MA-6 player reaches five squares, not eight.
+    /// P4: standing up costs 3 MA.
     #[test]
     fn stand_up_cost_is_three() {
         assert_eq!(STAND_UP_COST, 3);
@@ -1699,22 +2263,76 @@ mod tests {
     /// A1: a risky move is worth less early in the turn than late.
     #[test]
     fn turnover_cost_falls_as_the_turn_empties() {
-        let mk = |un: f32| Ctx { home: true, is_carrier: false, ma: 6, ag: 3, sure_hands: false,
-                                 str_: 3, d_now: 12, turns_left: 8, side_step: false, unactivated: un };
-        let early = mk(10.0 / 11.0);
-        let late = mk(1.0 / 11.0);
-        assert!(c_turnover(&early, 0, false) > c_turnover(&late, 0, false));
+        assert!(c_turnover(10.0 / 11.0, 0, false) > c_turnover(1.0 / 11.0, 0, false));
     }
 
     /// A3: the same gain scores the same from deep and from close.
     #[test]
     fn advance_is_measured_against_what_the_activation_can_reach() {
-        let far = 24i32;
-        let near = 12i32;
         let ma = 6i32;
         let gain = 6i32;
-        let a_far = (gain as f32) / (far.min(ma + 2).max(1) as f32);
-        let a_near = (gain as f32) / (near.min(ma + 2).max(1) as f32);
-        assert!((a_far - a_near).abs() < 1e-6);
+        let far = (gain as f32) / (24i32.min(ma + 2).max(1) as f32);
+        let near = (gain as f32) / (12i32.min(ma + 2).max(1) as f32);
+        assert!((far - near).abs() < 1e-6);
+    }
+
+    /// The rush penalty must make a non-carrier's second rush clearly unattractive while leaving
+    /// the carrier free to push for a touchdown.
+    #[test]
+    fn rush_penalty_is_much_harsher_for_a_non_carrier() {
+        assert!(rush_penalty(2, false) > 3.0 * rush_penalty(2, true));
+        assert_eq!(rush_penalty(0, false), 0.0);
+    }
+
+    /// §20.6 — the flat-index helpers must round-trip over the whole pitch.
+    #[test]
+    fn cell_index_round_trips() {
+        for y in 0..H as i32 {
+            for x in 0..W as i32 {
+                assert_eq!(coord_of(ix(x, y)), FieldCoordinate::new(x, y));
+            }
+        }
+    }
+
+    /// P(2d6 >= n): 7+ is 21/36, 2+ certain, 13+ impossible.
+    #[test]
+    fn two_dice_table() {
+        assert!((p_2d6_at_least(7) - 21.0 / 36.0).abs() < 1e-6);
+        assert_eq!(p_2d6_at_least(2), 1.0);
+        assert_eq!(p_2d6_at_least(13), 0.0);
+    }
+
+    /// Foul assists must raise the chance of breaking armour — the whole point of picking a victim.
+    #[test]
+    fn foul_assists_raise_the_break_chance() {
+        let unassisted = p_2d6_at_least(8 + 1);
+        let assisted = p_2d6_at_least(8 - 3 + 1);
+        assert!(assisted > unassisted * 1.5);
+    }
+
+    /// §20.6 — the heap must be a MIN-heap on the quantised −log p key.
+    #[test]
+    fn heap_pops_the_cheapest_first() {
+        let mut h = BinaryHeap::new();
+        h.push(HeapItem { key: 500, cost: 2, idx: 7 });
+        h.push(HeapItem { key: 100, cost: 1, idx: 3 });
+        h.push(HeapItem { key: 900, cost: 3, idx: 9 });
+        assert_eq!(h.pop().unwrap().key, 100);
+        assert_eq!(h.pop().unwrap().key, 500);
+        assert_eq!(h.pop().unwrap().key, 900);
+    }
+
+    /// §20.1 — the plan kinds that end the activation for free are exactly the ones with no
+    /// terminal action left to send.
+    #[test]
+    fn only_terminal_free_plans_end_eagerly() {
+        let ends = |k: &PlanKind| matches!(k, PlanKind::Move | PlanKind::Immediate);
+        assert!(ends(&PlanKind::Move));
+        assert!(ends(&PlanKind::Immediate));
+        assert!(!ends(&PlanKind::Pickup));
+        assert!(!ends(&PlanKind::Blitz { victim: "x".into() }));
+        assert!(!ends(&PlanKind::Pass { receiver: "x".into() }));
+        assert!(!ends(&PlanKind::HandOff { receiver: "x".into() }));
+        assert!(!ends(&PlanKind::Foul { victim: "x".into() }));
     }
 }
