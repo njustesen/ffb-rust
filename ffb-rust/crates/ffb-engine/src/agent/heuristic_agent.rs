@@ -304,6 +304,9 @@ struct Features {
     ball_loose: bool,
     ball_carried: bool,
     carrier: Option<String>,
+    /// Where OUR carrier stands, per side. The receiver intent needs it and `value_at` has no
+    /// `Game` to look it up from.
+    carrier_at: [Option<FieldCoordinate>; 2],
     /// Per side: players still able to act this turn, as a fraction of 11.
     unactivated: [f32; 2],
     /// §20.8 — `find_block_strength` runs a nested player×player loop for the Guard-cancel rule.
@@ -413,10 +416,20 @@ impl Features {
             ball_loose,
             ball_carried,
             carrier,
+            carrier_at: [None, None],
             unactivated: [unact[0].min(1.0), unact[1].min(1.0)],
             block_memo: RefCell::new(HashMap::new()),
             heavy,
         };
+        // Cheap, and the receiver intent needs it, so it is not gated behind `heavy`.
+        for side in 0..2 {
+            let my_home = side == 0;
+            f.carrier_at[side] = f
+                .carrier
+                .as_ref()
+                .filter(|c| g.team_home.has_player(c) == my_home)
+                .and_then(|c| g.field_model.player_coordinate(c));
+        }
         if heavy {
             f.build_threat(g);
             f.build_lane();
@@ -928,6 +941,7 @@ struct Mover {
     str_: i32,
     sure_hands: bool,
     side_step: bool,
+    has_catch: bool,
     d_now: i32,
     turns_left: i32,
     unactivated: f32,
@@ -965,7 +979,17 @@ fn value_at(f: &Features, i: usize, m: &Mover) -> (f32, Rule) {
             // A3: measure the gain against what THIS activation could reach, not the whole pitch.
             let max_gain = m.d_now.min(m.ma + 2).max(1);
             let advance = ((m.d_now - d_sq) as f32 / max_gain as f32).clamp(0.0, 1.0);
-            (0.15 + 0.85 * advance) * (0.75 + 0.5 * urgency(d_sq, m.ma, m.turns_left))
+            // If the endzone is out of reach in the turns the half has left, running there cannot
+            // score and must not be priced as though it could. `urgency` alone gets this backwards:
+            // it saturates at 1.0 exactly when the score becomes impossible, INCREASING the value
+            // of a pointless advance. The ground still has some worth (field position, the next
+            // drive), which is what the residual is for. This is also what lets a rescue pass win -
+            // it now competes against a correctly-valued run rather than an inflated one.
+            let tts = ((d_sq as f32) / (m.ma.max(1) as f32)).ceil() as i32;
+            let reachable_in_time = if tts <= m.turns_left { 1.0 } else { 0.25 };
+            (0.15 + 0.85 * advance)
+                * (0.75 + 0.5 * urgency(d_sq, m.ma, m.turns_left))
+                * reachable_in_time
         };
         let v = base * sideline * exposure * f.lane[s][i];
         return (v, if d_sq == 0 { Rule::ScoreTouchdown } else { Rule::ScoreAdvance });
@@ -980,8 +1004,32 @@ fn value_at(f: &Features, i: usize, m: &Mover) -> (f32, Rule) {
         return (v, Rule::Pickup);
     }
 
-    // The support intents are mover-independent and pre-rastered; no lane (P2).
-    (f.support[s][i] * sideline * exposure, Rule::Support)
+    // RECEIVER: could he catch here, and then run it in next turn? That is worth far more than
+    // standing in a screen, and it is the only thing that ever gives a pass somewhere to go.
+    // Scaled by how well he actually catches — an accurate pass is caught on AG−1.
+    let mut support = f.support[s][i];
+    if let Some(cc) = f.carrier_at[s] {
+        let dx = (sq.x - cc.x).abs();
+        let dy = (sq.y - cc.y).abs();
+        // The range table tops out below 14 in each axis; anything beyond cannot be thrown at all.
+        let throwable = dx < 14 && dy < 14 && (dx.max(dy) > 0);
+        // Could he cover the remaining ground himself on the following turn?
+        let can_run_it_in = d_sq <= m.ma + 2;
+        // And is this actually a RECEIVER position - ahead of the ball, not beside it? Without
+        // this the intent fired on half the pitch and pulled the whole team off the cage:
+        // measured, touchdowns fell 2.26 -> 1.94 while passes rose 0.00 -> 0.11.
+        let ahead_of_ball = d_sq < endzone_distance(cc, m.home);
+        if throwable && can_run_it_in && ahead_of_ball {
+            let raw = p_roll((m.ag - 1 + f.tz[s][i] as i32).max(2));
+            let catch_q = if m.has_catch { p_with_reroll(raw, 1.0) } else { raw };
+            let closeness =
+                1.0 - (d_sq as f32 / (m.ma + 2).max(1) as f32).clamp(0.0, 1.0) * 0.35;
+            // Deliberately below a threatened cage (0.75): escorting the ball beats running a
+            // route when the carrier is under pressure.
+            support = support.max(0.30 * catch_q + 0.20 * closeness);
+        }
+    }
+    (support * sideline * exposure, Rule::Support)
 }
 
 /// The signed weight of arriving at `i`, and the terms behind it.
@@ -1415,6 +1463,7 @@ impl HeuristicAgent {
             str_: p.strength_with_modifiers(),
             sure_hands: p.has_skill(SkillId::SureHands),
             side_step: p.has_skill(SkillId::SideStep),
+            has_catch: p.has_skill(SkillId::Catch),
             d_now: endzone_distance(c, home),
             turns_left: (8 - td.turn_nr).max(0),
             unactivated: f.unactivated[side_idx(home)],
@@ -2388,7 +2437,7 @@ impl HeuristicAgent {
                             Vec::new(),
                             None,
                             Rule::Flat,
-                            format!("pass to {}", rcv),
+                            format!("pass to {}{}", rcv, pass_note(g, pid, &rcv, m)),
                         );
                     }
                 }
@@ -3098,6 +3147,32 @@ fn foul_weight(f: &Features, g: &Game, att: &str, def: &str, m: &Mover) -> f32 {
 /// The one approximation left is the modifier list: the engine assembles real `PassModifier`s from
 /// tackle zones, weather and skills, and this passes an empty list and then charges +1 per opposing
 /// tackle zone on the thrower, which is the dominant term.
+/// A short tag saying why a pass is, or is not, worth throwing — the arithmetic that decides it is
+/// the turns-to-score comparison, and it is invisible in the weight alone.
+fn pass_note(g: &Game, thrower: &str, rcv: &str, m: &Mover) -> String {
+    let (tc, rc) = match (
+        g.field_model.player_coordinate(thrower),
+        g.field_model.player_coordinate(rcv),
+    ) {
+        (Some(a), Some(b)) => (a, b),
+        _ => return String::new(),
+    };
+    let ma_t = m.ma.max(1);
+    let own = (endzone_distance(tc, m.home) + ma_t - 1) / ma_t;
+    let rcv_ma = g.player(rcv).map(|p| p.movement_with_modifiers()).unwrap_or(6).max(1);
+    let theirs = (endzone_distance(rc, m.home) + rcv_ma - 1) / rcv_ma;
+    let left = m.turns_left;
+    if own > left {
+        if theirs <= left {
+            format!(" · RESCUE: {own} turns to run it in, {left} left — he needs {theirs}")
+        } else {
+            format!(" · drive lost: {own} turns needed, {left} left, he needs {theirs}")
+        }
+    } else {
+        format!(" · can still run it in: {own} turns, {left} left")
+    }
+}
+
 fn pass_weight(f: &Features, g: &Game, thrower: &str, rcv: &str, m: &Mover) -> Option<f32> {
     let (tc, rc) = (
         g.field_model.player_coordinate(thrower)?,
@@ -3130,6 +3205,7 @@ fn pass_weight(f: &Features, g: &Game, thrower: &str, rcv: &str, m: &Mover) -> O
         str_: rp.strength_with_modifiers(),
         sure_hands: rp.has_skill(SkillId::SureHands),
         side_step: rp.has_skill(SkillId::SideStep),
+        has_catch: rp.has_skill(SkillId::Catch),
         // As if he had just received it: distance measured from the thrower, so the advance term
         // reads as ground the ball gained.
         d_now: endzone_distance(tc, m.home),
@@ -3137,20 +3213,35 @@ fn pass_weight(f: &Features, g: &Game, thrower: &str, rcv: &str, m: &Mover) -> O
         unactivated: m.unactivated,
     };
     let scores = endzone_distance(rc, m.home) == 0;
-    let v = if scores { 1.0 } else { value_at(f, i, &rm).0 };
+    let mut v = if scores { 1.0 } else { value_at(f, i, &rm).0 };
+
+    // Can the carrier still run it in before the half ends? A player covers about MA a turn once
+    // dodging and rushing are accounted for, so this is turns-to-score against turns remaining.
+    let ma_t = m.ma.max(1);
+    let own_tts = (m.d_now + ma_t - 1) / ma_t;
+    let rcv_ma = rm.ma.max(1);
+    let rcv_tts = (endzone_distance(rc, m.home) + rcv_ma - 1) / rcv_ma;
+    let hopeless = own_tts > m.turns_left;
+    // A completion that leaves somebody who CAN still make it turns a dead drive into a live one.
+    let rescues = hopeless && rcv_tts <= m.turns_left;
+    if rescues {
+        v = v.max(0.85);
+    }
+    // And a drive that was going to score nothing has little left to lose, which the generic
+    // turnover cost — priced off how many players are still unactivated — cannot see.
+    let risk = c_turnover(m.unactivated, 0, false) * if hopeless { 0.30 } else { 1.0 };
+
     if std::env::var_os("FFB_PASS_TRACE2").is_some() {
         eprintln!(
-            "PW dist={:?} tgt={} tzT={} pThrow={:.2} tzR={} pCatch={:.2} pC={:.2} v={:.2} cto={:.2}",
-            dist, base_target, tz_on_thrower, p_throw, tz_on_rcv, p_catch,
-            p_complete, v, c_turnover(m.unactivated, 0, false)
+            "PW dist={:?} tgt={} pThrow={:.2} pCatch={:.2} pC={:.2} v={:.2} risk={:.2} \
+             ownTts={} rcvTts={} left={} hopeless={} rescues={}",
+            dist, base_target, p_throw, p_catch, p_complete, v, risk,
+            own_tts, rcv_tts, m.turns_left, hopeless, rescues
         );
     }
     // NOT the carrier premium: the incompletion is already the loss of the ball, and charging ×1.4
     // on top of it made no pass positive at any range.
-    Some(
-        p_complete * v * (if scores { 1.5 } else { 1.0 })
-            - (1.0 - p_complete) * c_turnover(m.unactivated, 0, false),
-    )
+    Some(p_complete * v * (if scores { 1.5 } else { 1.0 }) - (1.0 - p_complete) * risk)
 }
 
 #[cfg(test)]

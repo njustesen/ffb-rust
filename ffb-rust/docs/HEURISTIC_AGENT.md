@@ -4054,3 +4054,83 @@ legal **next** squares — the adjacent ones — not the set of legal destinatio
 `path.first()` against it; the rewrite filtered *destinations* against it, so only one-square moves
 survived and no carrier ever reached an endzone. The destination set must not be filtered by
 `squares` at all; the path's first square is what has to be legal.
+
+---
+
+## 26. Passing, made possible
+
+§24.3 left passing dead for a positional reason, not a pricing one: `v` for the receiver's square
+was ~0.07 because cage, mark and screen all pull team-mates *toward* the ball, so there was never
+anybody worth throwing to. Three changes, and they only work together.
+
+### 26.1 A receiver intent
+
+A non-carrier standing where he could **catch and then run it in next turn** is worth more than one
+standing in a screen — and worth more still if he can actually catch. The square must be
+
+- inside the range table (`dx < 14 && dy < 14`), so the throw is legal at all;
+- within `MA + 2` of the endzone, so he could cover the rest himself; and
+- **ahead of the ball**, which is what makes it a receiver position rather than a spot beside it.
+
+Weighted `0.30 · p(catch) + 0.20 · closeness`, where `p(catch)` is the real AG−1 accurate-pass target
+with a Catch re-roll if he has the skill.
+
+That third condition was learned the hard way. Without it the intent fired across half the pitch and
+pulled the whole team off the cage:
+
+| | touchdowns | passes / game |
+|---|---|---|
+| before | 2.26 | 0.00 |
+| receiver intent, unconstrained | **1.94** | 0.11 |
+| …restricted to ahead-of-ball, and weakened | **2.26** | 0.08 |
+
+### 26.2 A pass that rescues an unscoreable drive
+
+When the carrier cannot reach the endzone in the turns the half has left, running is worth nothing
+and a completion is the only path to a score. The expectation has to say so:
+
+- if a receiver **can** still make it when the carrier cannot, the value of success rises to at
+  least 0.85 — the pass converts a dead drive into a live one;
+- and the cost of the turnover falls to 30%, because a drive that was going to score zero has
+  little left to lose. The generic `c_turnover`, priced off how many players are still unactivated,
+  cannot see that.
+
+Measured over the pass options priced in one run: **56.4% of rescue passes are positive**, against
+**0.4% of normal ones**. The agent passes when passing is the answer and not otherwise.
+
+### 26.3 The run had to be repriced too
+
+Even so, rescue passes lost — because the carrier's own move did not know the drive was hopeless
+either. `urgency` gets this exactly backwards: it saturates at 1.0 precisely when the score becomes
+impossible, *raising* the value of a pointless advance. Runs that cannot reach the endzone in time
+are now damped to 25% of their advance value, which leaves the ground worth something for field
+position but stops it competing with the only move that can still score.
+
+| | touchdowns | passes / game |
+|---|---|---|
+| WIDE before | 2.26 | 0.00 |
+| WIDE after | 2.14 | **0.30** |
+| DEEP before | 1.89 | 0.00 |
+| DEEP after | 1.82 | **0.19** |
+
+### 26.4 It passes when it should, and only then
+
+Every pass thrown across 100 games, by turn (8 is the last of the half):
+
+| turn | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|
+| passes | 7 | 16 | 5 | 2 |
+
+**Zero before turn 5; 77% in turns 6–8.** That is the requirement met exactly — the agent throws
+when the clock has made running useless, and never as a first resort. The cost is 0.12 touchdowns
+in wide and 0.07 in deep, about one standard error at n = 100.
+
+The pass options in the viewers now carry the arithmetic behind the decision, e.g.
+`pass to away_07 · RESCUE: 5 turns to run it in, 3 left — he needs 2`.
+
+### 26.5 A measurement trap worth recording
+
+`FFB_HEUR_DUMP` writes with `fs::write` once per game, so the file holds **only the last seed**. Two
+counts earlier in this work were quoted as "over 20 games" when they were one game. Trace output on
+stderr does accumulate across seeds; the dump does not. The viewers only ever want one game, so this
+stays as it is — but it is not a multi-game source.
