@@ -1402,6 +1402,8 @@ pub fn run_heuristic_game(
     edition: &str,
     temp_scale: f32,
     away_scale: Option<f32>,
+    mode: ffb_engine::agent::Mode,
+    mode_away: ffb_engine::agent::Mode,
 ) -> (Vec<GameEvent>, i32, i32) {
     use ffb_engine::agent::{Agent, HeuristicAgent};
 
@@ -1412,8 +1414,9 @@ pub fn run_heuristic_game(
     options.extend_from_slice(BASELINE_SETUP_OPTIONS);
     let mut engine = GameState::new_full_pregame(home, away, rules, seed, &options);
 
-    let mut home_agent = HeuristicAgent::new(seed, temp_scale);
-    let mut away_agent = HeuristicAgent::new(seed ^ 0xFFFF_FFFF, away_scale.unwrap_or(temp_scale));
+    let mut home_agent = HeuristicAgent::with_mode(seed, temp_scale, mode);
+    let mut away_agent =
+        HeuristicAgent::with_mode(seed ^ 0xFFFF_FFFF, away_scale.unwrap_or(temp_scale), mode_away);
 
     let mut all_events: Vec<GameEvent> = Vec::new();
     // `FFB_HEUR_TIME=1` separates AGENT time from ENGINE time. Wall-clock per game confounds the

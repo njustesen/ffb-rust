@@ -2235,6 +2235,120 @@ t1 = now(); r      = engine.apply(side, action); engine_ns += t1.elapsed();  <sp
         </div></div>
       </section>
 
+      <!-- 23 -->
+      <section id="s23">
+        <div class="sec-head"><span class="idx">&sect;23</span><h2>Wide and deep</h2></div>
+        <p class="sec-desc">Two search shapes over <b>identical weights</b>. Same primitives, same value
+        model, same temperature knob &mdash; only the shape of the search differs, which is what makes them
+        comparable at all.</p>
+
+        <div class="card scroll"><table>
+          <thead><tr><th>&nbsp;</th><th>what one decision is</th></tr></thead>
+          <tbody>
+            <tr><td><b>WIDE</b></td><td>the whole joint action space: every player &times; action &times; target &times; destination, drawn once</td></tr>
+            <tr><td><b>DEEP</b></td><td>a chain &mdash; pick the player, then that player's action-and-target, then walk the move <b>one square at a time</b>, deciding again at every step</td></tr>
+          </tbody>
+        </table>
+        <div class="cap">Selected with <code>--mode wide|deep</code>; <code>--mode-away</code> gives the two sides different shapes so they can play each other.</div></div>
+
+        <h3>Branching factor</h3>
+        <div class="card scroll"><table>
+          <thead><tr><th>&nbsp;</th><th class="num">prompts</th><th class="num">decisions</th><th class="num">options / decision</th><th class="num">median</th><th class="num">max</th><th class="num">options examined</th></tr></thead>
+          <tbody>
+            <tr><td><b>WIDE</b></td><td class="num">504</td><td class="num">213</td><td class="num bad"><b>1055.3</b></td><td class="num">1239</td><td class="num">2188</td><td class="num bad"><b>224,772</b></td></tr>
+            <tr><td><b>DEEP</b></td><td class="num">731</td><td class="num">667</td><td class="num good"><b>8.9</b></td><td class="num">9</td><td class="num">195</td><td class="num good"><b>5,957</b></td></tr>
+          </tbody>
+        </table>
+        <div class="cap">One sampled game, seed 7. Deep faces a branching factor <b>119&times; smaller</b> and examines <b>37&times; fewer options</b> across the game, paying with 3.1&times; as many decisions.</div></div>
+
+        <h3>Time</h3>
+        <div class="card scroll"><table>
+          <thead><tr><th>&nbsp;</th><th class="num">whole loop</th><th class="num">agent</th><th class="num">per one agent</th><th class="num">engine</th><th class="num">decisions / game</th><th class="num">&micro;s / decision</th></tr></thead>
+          <tbody>
+            <tr><td><b>WIDE</b></td><td class="num">271.5 ms</td><td class="num">192.4</td><td class="num">96.2</td><td class="num">78.5</td><td class="num">859</td><td class="num bad"><b>223.9</b></td></tr>
+            <tr><td><b>DEEP</b></td><td class="num good"><b>238.7 ms</b></td><td class="num good"><b>126.4</b></td><td class="num good"><b>63.2</b></td><td class="num">111.3</td><td class="num">1712</td><td class="num good"><b>73.8</b></td></tr>
+          </tbody>
+        </table>
+        <div class="cap">Deep is <b>3&times; cheaper per decision</b> and 34% cheaper in agent time &mdash; but makes twice as many decisions, and the engine executes every one, so engine time rises 42%. The <b>whole-loop</b> gap is only 12%: most of what deep saves in the agent it hands to the engine.</div></div>
+
+        <h3>Strength &mdash; and a trap worth naming</h3>
+        <div class="card scroll"><table>
+          <thead><tr><th>per agent per game</th><th class="num">WIDE greedy</th><th class="num">DEEP greedy</th><th class="num">WIDE sampled</th><th class="num">DEEP sampled</th></tr></thead>
+          <tbody>
+            <tr><td><b>Touchdowns</b></td><td class="num">1.02</td><td class="num good"><b>1.26</b></td><td class="num">0.21</td><td class="num">0.01</td></tr>
+            <tr><td>Activations</td><td class="num">113.94</td><td class="num">111.05</td><td class="num">68.98</td><td class="num">52.95</td></tr>
+            <tr><td>Squares moved</td><td class="num">409.55</td><td class="num">507.95</td><td class="num">281.18</td><td class="num">212.22</td></tr>
+            <tr><td>Squares / activation</td><td class="num">3.59</td><td class="num">4.57</td><td class="num">4.08</td><td class="num">4.01</td></tr>
+            <tr><td>Blocks thrown</td><td class="num good"><b>15.67</b></td><td class="num">14.41</td><td class="num">7.15</td><td class="num">4.04</td></tr>
+            <tr><td>Knockdowns inflicted</td><td class="num good"><b>7.38</b></td><td class="num">6.89</td><td class="num">3.21</td><td class="num">1.85</td></tr>
+            <tr><td>Injuries inflicted</td><td class="num good"><b>7.53</b></td><td class="num">6.99</td><td class="num">4.47</td><td class="num">2.80</td></tr>
+            <tr><td>Forced fumbles</td><td class="num">0.43</td><td class="num good"><b>0.67</b></td><td class="num">0.11</td><td class="num">0.14</td></tr>
+            <tr><td>Own falls</td><td class="num good"><b>2.17</b></td><td class="num">3.03</td><td class="num">4.12</td><td class="num">6.59</td></tr>
+            <tr><td>Balls picked up</td><td class="num">1.17</td><td class="num good"><b>1.46</b></td><td class="num">0.99</td><td class="num">2.19</td></tr>
+            <tr><td>GFI rolls</td><td class="num good"><b>0.62</b></td><td class="num">5.10</td><td class="num">19.21</td><td class="num">16.45</td></tr>
+            <tr><td>Blitz follow-through</td><td class="num">58.5%</td><td class="num">59.5%</td><td class="num">43.6%</td><td class="num">31.4%</td></tr>
+          </tbody>
+        </table>
+        <div class="cap">On self-play alone deep looks <b>better</b>: 1.26 touchdowns to 1.02, and 4.57 squares per activation to 3.59.</div></div>
+
+        <div class="card scroll"><table>
+          <thead><tr><th>head-to-head, 200 games, both colours</th><th class="num">record</th><th class="num">touchdowns / game</th></tr></thead>
+          <tbody>
+            <tr><td><b>WIDE</b></td><td class="num good"><b>168 &ndash; 24 &ndash; 8</b></td><td class="num good"><b>1.86</b></td></tr>
+            <tr><td>DEEP</td><td class="num bad">8 &ndash; 24 &ndash; 168</td><td class="num bad">0.33</td></tr>
+          </tbody>
+        </table></div>
+
+        <div class="note red"><span class="dot"></span><div>
+          <p><b>Self-play scoring rate measures the pair, not the policy.</b> Deep scores more against itself
+          because both sides defend badly; against wide's defence its attack collapses from 1.26 to 0.33.
+          Every "touchdowns per game in self-play" figure in this document carries that caveat &mdash;
+          including the ones used earlier to claim progress. Head-to-head is the only strength measure here.</p>
+          <p>Why deep loses, from the table: it moves <i>further</i> (508 squares to 410) but rushes eight
+          times more often (5.10 GFI to 0.62) and falls over more (3.03 to 2.17). A one-step walk follows the
+          value gradient and cannot see that the last square of a run needs a rush it should not take &mdash; a
+          Dijkstra over the whole reachable set prices the entire route before committing to any of it. Deep
+          also throws fewer blocks and inflicts fewer injuries, so it neither scores against a real defence nor
+          grinds one down.</p>
+        </div></div>
+
+        <h3>A correction, and a fairness fix</h3>
+        <div class="note amber"><span class="dot"></span><div>
+          <p><b>The blitz follow-through figure reported in &sect;21 and &sect;22 was wrong.</b> The measuring
+          script cleared its pending declaration on <code>turnEnd</code>, silently dropping every blitz that
+          was the last action of a turn &mdash; exactly the ones most likely to have failed.</p>
+          <div class="scroll"><table>
+            <thead><tr><th>&nbsp;</th><th class="num">declared / game</th><th class="num">blocked</th><th class="num">follow-through</th></tr></thead>
+            <tbody>
+              <tr><td>TIER2=16, 6 destinations</td><td class="num">13.09</td><td class="num">7.26</td><td class="num"><b>55.5%</b></td></tr>
+              <tr><td>all destinations, flat draw</td><td class="num">12.35</td><td class="num">6.99</td><td class="num">56.6%</td></tr>
+              <tr><td>all destinations, nested draw</td><td class="num">12.46</td><td class="num">7.24</td><td class="num"><b>58.1%</b></td></tr>
+            </tbody>
+          </table></div>
+          <p>So the honest claim is <b>0% &rarr; ~58%</b>, not 0% &rarr; 84%, and nothing regressed across
+          those builds &mdash; the earlier number was an artefact of the counter, not a property of the agent.</p>
+        </div></div>
+        <div class="note"><span class="dot"></span><div>
+          <p>Deep mode also needed a fairness fix before the comparison meant anything. Stage 2 runs with no
+          reach, and the blitz branch dropped any victim it could not path to &mdash; so deep could only blitz
+          a player it was <b>already adjacent to</b>, flattering its follow-through to 97.6% by removing the
+          hard cases. Distant victims are now offered on a distance estimate, since the step-wise walk is
+          goal-seeking; follow-through fell to 59.5%, level with wide, which is the number to trust.</p>
+        </div></div>
+
+        <h3>What each mode is for</h3>
+        <p>Neither dominates, and they answer different questions.</p>
+        <ul>
+          <li><b>WIDE</b> is the stronger player and the one to measure play strength with. It is also the
+            shape a search algorithm wants a <i>policy prior</i> from, because it prices whole routes before
+            committing.</li>
+          <li><b>DEEP</b> is the shape a tree search wants to <i>expand</i>: a branching factor of 9 instead
+            of 1055 is the difference between a tractable tree and an intractable one, and it reaches the same
+            action space one small decision at a time. Its weakness is purely the missing lookahead &mdash;
+            which is exactly what a tree search would supply.</li>
+        </ul>
+      </section>
+
       <footer>
         <span>FFB-Rust · <code class="mono">docs/HEURISTIC_AGENT.md</code></span>
         <span>Design specification — not yet implemented</span>
@@ -2253,7 +2367,7 @@ const SECTIONS = [
   ['s7','Worked examples','7'], ['s8','Temperature table','8'],
   ['s9','Performance budget','9'], ['s10','Testing & calibration','10'],
   ['s11','Parity implications','11'], ['s12','Implementation plan','12'], ['s13','Open questions','13'],
-  ['s14','Review backlog','14'], ['s15','Proposed — round two','15'], ['s16','The experiment','16'], ['s17','Per-agent results','17'], ['s18','Runtime cost','18'], ['s19','Against the targets','19'], ['s20','Making it faster','20'], ['s21','All ten, measured','21'], ['s22','Per-agent report','22'],
+  ['s14','Review backlog','14'], ['s15','Proposed — round two','15'], ['s16','The experiment','16'], ['s17','Per-agent results','17'], ['s18','Runtime cost','18'], ['s19','Against the targets','19'], ['s20','Making it faster','20'], ['s21','All ten, measured','21'], ['s22','Per-agent report','22'], ['s23','Wide and deep','23'],
 ];
 document.getElementById('rail').innerHTML = SECTIONS.map(([id,label,n])=>
   `<li><a href="#${id}" data-t="${id}"><span class="n">${n}</span><span>${label}</span></a></li>`).join('');

@@ -1163,7 +1163,17 @@ struct Candidate {
 
 // ─────────────────────────────────────────────────────────────────── the agent
 
+/// How the agent searches the action space. Same weights either way — see the module note.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Mode {
+    /// One draw from the full joint action space: every player × action × target × destination.
+    Wide,
+    /// A chain of small draws: player, then action-and-target, then one movement square at a time.
+    Deep,
+}
+
 pub struct HeuristicAgent {
+    mode: Mode,
     rng: Xoshiro256StarStar,
     /// Multiplies every temperature. 1.0 = the §8 table; a very large value = uniform sampling over
     /// the identical option set; 0.0 = true argmax with no RNG consumed at all.
@@ -1187,7 +1197,12 @@ pub struct HeuristicAgent {
 
 impl HeuristicAgent {
     pub fn new(seed: u64, temp_scale: f32) -> Self {
+        Self::with_mode(seed, temp_scale, Mode::Wide)
+    }
+
+    pub fn with_mode(seed: u64, temp_scale: f32, mode: Mode) -> Self {
         HeuristicAgent {
+            mode,
             rng: Xoshiro256StarStar::seed_from_u64(seed ^ 0x4845_5552_4953_5449),
             temp_scale,
             fallback: UniformAgent::new(seed),
@@ -1800,6 +1815,363 @@ impl HeuristicAgent {
         self.take(i)
     }
 
+    // ── DEEP mode ───────────────────────────────────────────────────────────
+
+    /// Stage 1 picks the player, stage 2 picks that player's action and target.
+    ///
+    /// No pathfinding runs here at all: the player is scored by the search-free proxy and the
+    /// action set is built with `r = None`, which is the same tier-1 path §20.3 already had. The
+    /// destination is not chosen here — it emerges one square at a time from `handle_move_deep`.
+    fn handle_activate_deep(
+        &mut self,
+        g: &Game,
+        f: &Features,
+        eligible: Vec<(String, Vec<PlayerAction>)>,
+    ) -> Action {
+        self.refresh_turn(g);
+        if eligible.is_empty() {
+            return Action::EndTurn;
+        }
+        if !eligible.iter().any(|(pid, _)| !self.used_this_turn.contains(pid)) {
+            return Action::EndTurn;
+        }
+        let home = g.home_playing;
+        let side = if home { TeamSide::Home } else { TeamSide::Away };
+        let td = if home { &g.turn_data_home } else { &g.turn_data_away };
+        let team_rr = td.rerolls > 0 && !td.reroll_used;
+
+        // ---- stage 1: which player ----
+        struct P {
+            pid: String,
+            live: Vec<PlayerAction>,
+            m: Mover,
+            w: f32,
+            proxy: f32,
+        }
+        let mut ps: Vec<P> = Vec::new();
+        for (pid, actions) in &eligible {
+            if self.used_this_turn.contains(pid) {
+                continue;
+            }
+            let st = match g.field_model.player_state(pid) {
+                Some(s) => s,
+                None => continue,
+            };
+            let live: Vec<PlayerAction> =
+                actions.iter().filter(|a| action_is_live(a, td, g.rules)).cloned().collect();
+            if live.is_empty() {
+                continue;
+            }
+            let m = match self.mover_of(g, f, pid) {
+                Some(m) => m,
+                None => continue,
+            };
+            let c = match g.field_model.player_coordinate(pid) {
+                Some(c) => c,
+                None => continue,
+            };
+            let proxy = proxy_value(f, g, pid, &m);
+            let marked = f.tz[side_idx(home)][ixc(c)] > 0;
+            let can_fetch = f.ball_loose
+                && f.ball.map(|b| c.distance_in_steps(b) <= m.ma + 2).unwrap_or(false);
+            let mut w = if m.is_carrier && marked {
+                0.95
+            } else if can_fetch {
+                0.92
+            } else if m.is_carrier {
+                0.88
+            } else if st.is_prone() && marked {
+                0.70
+            } else if proxy > 0.25 {
+                0.45
+            } else {
+                0.30
+            };
+            if g.player(pid).map(has_negatrait).unwrap_or(false) {
+                w *= 0.55;
+            }
+            ps.push(P { pid: pid.clone(), live, m, w: w * proxy.max(0.05), proxy });
+        }
+        if ps.is_empty() {
+            return Action::EndTurn;
+        }
+        ps.sort_by(|a, b| a.pid.cmp(&b.pid));
+
+        self.buf.clear();
+        for q in &ps {
+            self.buf.push_note(
+                Action::ActivatePlayer {
+                    player_id: q.pid.clone(),
+                    player_action: PlayerActionChoice::Move,
+                    block_defender_id: None,
+                },
+                q.w,
+                Rule::ScoreAdvance,
+                q.w,
+                format!("stage 1 · activate {} · proxy {:.2}", q.pid, q.proxy),
+            );
+        }
+        // Banking the turn competes with the players, exactly as in wide mode.
+        self.buf.push(Action::EndTurn, 0.0, Rule::EndActivation, 0.0);
+        let pick = self.pick(0.18);
+        // Stage 1 has to be stashed: stage 2 records over it, and reporting only the second stage
+        // would understate deep mode's branching factor by hiding the player draw entirely.
+        let stage1: Vec<ScoredOption> = if self.dump_enabled {
+            self.record_distribution(0.18, pick);
+            self.last_options.clone()
+        } else {
+            Vec::new()
+        };
+        if pick >= ps.len() {
+            return Action::EndTurn;
+        }
+        let chosen = &ps[pick];
+
+        // ---- stage 2: which action, and against whom ----
+        let mut cands: Vec<Candidate> = Vec::new();
+        self.build_plans(
+            g,
+            f,
+            side,
+            (&chosen.pid, &chosen.live, &chosen.m, 1.0, chosen.proxy),
+            None,
+            0.0,
+            team_rr,
+            &mut cands,
+        );
+        if cands.is_empty() {
+            self.used_this_turn.insert(chosen.pid.clone());
+            return Action::EndTurn;
+        }
+        self.buf.clear();
+        for c in &cands {
+            self.buf.push_note(
+                Action::ActivatePlayer {
+                    player_id: c.player.clone(),
+                    player_action: c.pac,
+                    block_defender_id: c.target.clone(),
+                },
+                c.weight,
+                c.why,
+                c.weight,
+                format!("stage 2 · {}", if c.note.is_empty() { "declare" } else { &c.note }),
+            );
+        }
+        let a2 = self.pick(0.14);
+        if self.dump_enabled {
+            self.record_distribution(0.14, a2);
+            let n1 = stage1.len();
+            self.last_options.splice(0..0, stage1);
+            self.last_chosen += n1;
+        }
+        let c = cands.swap_remove(a2.min(cands.len() - 1));
+        self.used_this_turn.insert(c.player.clone());
+        *self.seen_action.entry(format!("{:?}", c.pac)).or_insert(0) += 1;
+        self.plan = Some(Plan {
+            player: c.player.clone(),
+            kind: c.kind,
+            // Deep mode never precomputes a route; the walk decides square by square.
+            path: Vec::new(),
+            delivered: false,
+            fired: false,
+        });
+        Action::ActivatePlayer {
+            player_id: c.player,
+            player_action: c.pac,
+            block_defender_id: c.target,
+        }
+    }
+
+    /// One square at a time. At most eight neighbours plus "stop", so the branching factor is 9
+    /// where wide mode's single draw faces thousands.
+    ///
+    /// The cost is that a one-step walk has no lookahead: it follows the value gradient and cannot
+    /// see a detour that pays off three squares later, which a Dijkstra over the whole reachable
+    /// set does by construction. That is the trade being measured.
+    fn handle_move_deep(
+        &mut self,
+        g: &Game,
+        f: &Features,
+        player_id: String,
+        squares: Vec<FieldCoordinate>,
+    ) -> Action {
+        if squares.is_empty() {
+            self.plan = None;
+            return Action::EndPlayerAction;
+        }
+        let here = match g.field_model.player_coordinate(&player_id) {
+            Some(c) => c,
+            None => return Action::EndPlayerAction,
+        };
+
+        // The plan's terminal action first, on exactly the engine's own conditions (see handle_move).
+        if let Some(mut pl) = self.plan.take() {
+            if pl.player == player_id && !pl.fired {
+                let pa_now = g.acting_player.player_action;
+                let adj = |v: &str| {
+                    g.field_model
+                        .player_coordinate(v)
+                        .map(|c| here.distance_in_steps(c) == 1)
+                        .unwrap_or(false)
+                };
+                match &pl.kind {
+                    PlanKind::Blitz { victim } => {
+                        let ok = matches!(
+                            pa_now,
+                            Some(PlayerAction::BlitzMove) | Some(PlayerAction::KickEmBlitz)
+                        ) && !g.acting_player.has_blocked;
+                        if ok && adj(victim) {
+                            let defender_id = victim.clone();
+                            pl.fired = true;
+                            self.plan = Some(pl);
+                            return Action::Block { defender_id };
+                        }
+                    }
+                    PlanKind::Foul { victim } => {
+                        if pa_now == Some(PlayerAction::FoulMove)
+                            && !g.acting_player.has_fouled
+                            && adj(victim)
+                        {
+                            let target_id = victim.clone();
+                            pl.fired = true;
+                            self.plan = Some(pl);
+                            return Action::Foul { target_id };
+                        }
+                    }
+                    PlanKind::Pass { receiver } => {
+                        let ok = matches!(
+                            pa_now,
+                            Some(PlayerAction::PassMove)
+                                | Some(PlayerAction::Pass)
+                                | Some(PlayerAction::HailMaryPass)
+                        );
+                        if let (true, Some(coord)) =
+                            (ok, g.field_model.player_coordinate(receiver))
+                        {
+                            pl.fired = true;
+                            self.plan = Some(pl);
+                            return Action::Pass { coord };
+                        }
+                    }
+                    PlanKind::HandOff { receiver } => {
+                        let ok = matches!(
+                            pa_now,
+                            Some(PlayerAction::HandOverMove) | Some(PlayerAction::HandOver)
+                        );
+                        if ok && g.field_model.player_coordinate(receiver).is_some() {
+                            let receiver_id = receiver.clone();
+                            pl.fired = true;
+                            self.plan = Some(pl);
+                            return Action::HandOff { receiver_id };
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            self.plan = Some(pl);
+        }
+
+        let m = match self.mover_of(g, f, &player_id) {
+            Some(m) => m,
+            None => return Action::EndPlayerAction,
+        };
+        // Where the walk is heading, if the plan has somewhere to be.
+        let goal: Option<FieldCoordinate> = match self.plan.as_ref().map(|p| &p.kind) {
+            Some(PlanKind::Blitz { victim }) => g.field_model.player_coordinate(victim),
+            Some(PlanKind::Foul { victim }) => g.field_model.player_coordinate(victim),
+            Some(PlanKind::Pickup) => f.ball.filter(|_| f.ball_loose),
+            _ => f.ball.filter(|_| f.ball_loose && !m.is_carrier),
+        };
+
+        let td = if m.home { &g.turn_data_home } else { &g.turn_data_away };
+        let team_rr = td.rerolls > 0 && !td.reroll_used;
+        let ma = m.ma;
+        let spent = g.acting_player.current_move.max(0);
+        let s = side_idx(m.home);
+        let leaving_tz = f.tz[s][ixc(here)] > 0;
+        let ag = m.ag;
+        let gt = gfi_target(weather_of(g));
+        let dodge_skill = g
+            .player(&player_id)
+            .map(|p| p.has_skill(SkillId::Dodge))
+            .unwrap_or(false);
+        let sure_feet = g
+            .player(&player_id)
+            .map(|p| p.has_skill(SkillId::SureFeet))
+            .unwrap_or(false);
+
+        self.buf.clear();
+        let mut steps = 0;
+        for n in here.neighbours() {
+            if !on_pitch(n.x, n.y) || !squares.contains(&n) {
+                continue;
+            }
+            let i = ixc(n);
+            if f.occupied(i) {
+                continue;
+            }
+            steps += 1;
+            let mut p_step = 1.0f32;
+            if leaving_tz {
+                let raw = p_roll(dodge_target(g.rules, ag, f.tz[s][i] as i32));
+                p_step *= if dodge_skill || team_rr { p_with_reroll(raw, 1.0) } else { raw };
+            }
+            let gfi = if spent + 1 > ma { 1 } else { 0 };
+            if gfi > 0 {
+                let raw = p_roll(gt);
+                p_step *= if sure_feet || team_rr { p_with_reroll(raw, 1.0) } else { raw };
+            }
+            // With a goal, the gradient is the goal; otherwise it is the value raster.
+            let (v, why) = match goal {
+                Some(gl) => {
+                    let d_now = here.distance_in_steps(gl);
+                    let d_new = n.distance_in_steps(gl);
+                    let closer = (d_now - d_new).max(0) as f32;
+                    (0.25 + 0.70 * closer, Rule::Pickup)
+                }
+                None => value_at(f, i, &m),
+            };
+            let w = p_step * v
+                - (1.0 - p_step) * c_turnover(m.unactivated, gfi, m.is_carrier)
+                - rush_penalty(gfi, m.is_carrier);
+            self.buf.push_note(
+                Action::Move { path: vec![n] },
+                w,
+                why,
+                w,
+                format!(
+                    "step to {},{} · {:.0}% · V {:.2}{}",
+                    n.x,
+                    n.y,
+                    100.0 * p_step,
+                    v,
+                    if gfi > 0 { " · RUSH" } else { "" }
+                ),
+            );
+        }
+        // Stopping is always available and costs nothing, which is what makes the walk terminate.
+        self.buf.push_note(
+            Action::EndPlayerAction,
+            0.0,
+            Rule::EndActivation,
+            0.0,
+            format!("stop after {} square{}", spent, if spent == 1 { "" } else { "s" }),
+        );
+        if steps == 0 {
+            self.plan = None;
+            return Action::EndPlayerAction;
+        }
+        let i = self.pick(0.12);
+        if self.dump_enabled {
+            self.record_distribution(0.12, i);
+        }
+        let act = self.take(i);
+        if matches!(act, Action::EndPlayerAction) {
+            self.plan = None;
+        }
+        act
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn build_plans(
         &self,
@@ -1961,7 +2333,28 @@ impl HeuristicAgent {
                         }
                         let r = match r {
                             Some(r) => r,
-                            None => continue,
+                            None => {
+                                // No search ran (deep mode, or tier 1). A distant victim is still a
+                                // legitimate blitz — the step-wise walk is goal-seeking and will
+                                // approach it — so offer it on a distance estimate rather than
+                                // dropping it. Without this, deep mode could only ever blitz a
+                                // player it was ALREADY adjacent to, which flatters its
+                                // follow-through rate while removing the mechanic.
+                                let d = here.map(|h| h.distance_in_steps(oc)).unwrap_or(99);
+                                if d <= m.ma + 2 {
+                                    let approach = if d <= m.ma { 0.55 } else { 0.30 };
+                                    push(
+                                        dice * approach,
+                                        Some(oid.clone()),
+                                        PlanKind::Blitz { victim: oid.clone() },
+                                        Vec::new(),
+                                        None,
+                                        Rule::DiceCount,
+                                        format!("blitz {} · {} sq away, walk in", oid, d),
+                                    );
+                                }
+                                continue;
+                            }
                         };
                         let mut bp = 0.0f32;
                         let mut bi = None;
@@ -2221,11 +2614,15 @@ impl HeuristicAgent {
         prompt: AgentPrompt,
     ) -> Action {
         match prompt {
-            AgentPrompt::Move { player_id, squares } => self.handle_move(g, f, player_id, squares),
+            AgentPrompt::Move { player_id, squares } => match self.mode {
+                Mode::Wide => self.handle_move(g, f, player_id, squares),
+                Mode::Deep => self.handle_move_deep(g, f, player_id, squares),
+            },
 
-            AgentPrompt::ActivatePlayer { eligible_players } => {
-                self.handle_activate(g, f, eligible_players)
-            }
+            AgentPrompt::ActivatePlayer { eligible_players } => match self.mode {
+                Mode::Wide => self.handle_activate(g, f, eligible_players),
+                Mode::Deep => self.handle_activate_deep(g, f, eligible_players),
+            },
 
             // §19.2 defect 1 — answer from the plan so the declaration and this prompt agree.
             AgentPrompt::BlitzTarget { attacker_id, eligible_players } => {

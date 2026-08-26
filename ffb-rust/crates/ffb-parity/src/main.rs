@@ -52,6 +52,10 @@ struct ParityArgs {
     /// `--heuristic-away <scale>`: give the AWAY side a different temperature scale, turning the
     /// run into a genuine head-to-head instead of self-play.
     heuristic_away: Option<f32>,
+    /// `--mode wide|deep`: how the heuristic agent searches (see agent::Mode).
+    agent_mode: String,
+    /// `--mode-away <wide|deep>`: give the away agent a different search shape, for head-to-head.
+    agent_mode_away: Option<String>,
     /// `--out <dir>`: where `--heuristic` writes its per-seed events files.
     out_dir: String,
 }
@@ -72,6 +76,8 @@ impl ParityArgs {
         let mut no_abort = false;
         let mut verbose = false;
         let mut visualize = false;
+        let mut agent_mode = String::from("wide");
+        let mut agent_mode_away: Option<String> = None;
         let mut tier = 2u8;
         let mut reuse_java = false;
         let mut heuristic: Option<f32> = None;
@@ -97,6 +103,8 @@ impl ParityArgs {
                     heuristic_away = raw[i + 1].parse().ok(); i += 1;
                 }
                 "--out" if i + 1 < raw.len() => { out_dir = raw[i + 1].clone(); i += 1; }
+                "--mode" if i + 1 < raw.len() => { agent_mode = raw[i + 1].clone(); i += 1; }
+                "--mode-away" if i + 1 < raw.len() => { agent_mode_away = Some(raw[i + 1].clone()); i += 1; }
                 "--home" if i + 1 < raw.len() => { home = raw[i + 1].clone(); i += 1; }
                 "--away" if i + 1 < raw.len() => { away = raw[i + 1].clone(); i += 1; }
                 "--edition" if i + 1 < raw.len() => { edition = raw[i + 1].clone(); i += 1; }
@@ -119,7 +127,7 @@ impl ParityArgs {
         let home_java = runner::java_team_id(&home, "home", &edition);
         let away_java = runner::java_team_id(&away, "away", &edition);
 
-        ParityArgs { network, coverage, uniform, all_rosters, all_editions, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize, tier, reuse_java, heuristic, heuristic_away, out_dir }
+        ParityArgs { network, coverage, uniform, all_rosters, all_editions, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize, tier, reuse_java, heuristic, heuristic_away, out_dir, agent_mode, agent_mode_away }
     }
 }
 
@@ -142,13 +150,19 @@ fn main() {
         } else {
             "heuristic"
         };
+        let parse_mode = |s: &str| match s {
+            "deep" => ffb_engine::agent::Mode::Deep,
+            _ => ffb_engine::agent::Mode::Wide,
+        };
+        let mode = parse_mode(&args.agent_mode);
+        let mode_away = args.agent_mode_away.as_deref().map(parse_mode).unwrap_or(mode);
         let quiet = std::env::var_os("FFB_QUIET").is_some();
         if !quiet { std::fs::create_dir_all(&args.out_dir).ok(); }
-        eprintln!("Running {} seeds with HeuristicAgent (temp_scale={scale}, arm={label})                    {} vs {} {}", args.seed_end - args.seed_start + 1, args.home, args.away, args.edition);
+        eprintln!("Running {} seeds with HeuristicAgent (temp_scale={scale}, arm={label}, mode={:?})                    {} vs {} {}", args.seed_end - args.seed_start + 1, mode, args.home, args.away, args.edition);
         let t0 = std::time::Instant::now();
         for seed in args.seed_start..=args.seed_end {
             let (events, sh, sa) = runner::run_heuristic_game(
-                seed, &args.home, &args.away, &args.edition, scale, args.heuristic_away);
+                seed, &args.home, &args.away, &args.edition, scale, args.heuristic_away, mode, mode_away);
             if quiet {
                 // FFB_QUIET: no event dump, no per-seed line. For runtime measurement only.
                 std::hint::black_box((&events, sh, sa));

@@ -3792,3 +3792,115 @@ This needs the real range ruler, not a constant.
 and 0.81 secured against 1.59. It scores fewer touchdowns against random (0.89) than against itself
 (1.07), which should not happen against a weaker opponent — and this is the mechanism. A ball it
 never holds is a ball it cannot score with.
+
+---
+
+## 23. Wide and deep
+
+Two search shapes over **identical weights**. Same primitives, same value model, same temperature
+knob — only the shape of the search differs, which is what makes them comparable at all.
+
+| | what one decision is |
+|---|---|
+| **WIDE** | the whole joint action space: every player × action × target × destination, drawn once |
+| **DEEP** | a chain — pick the player, then that player's action-and-target, then walk the move **one square at a time**, deciding again at every step |
+
+Selected with `--mode wide|deep`, and `--mode-away` gives the two sides different shapes so they can
+play each other.
+
+### 23.1 Branching factor
+
+One sampled game, seed 7:
+
+| | prompts | decisions | options / decision (mean) | median | max | **options examined** |
+|---|---|---|---|---|---|---|
+| WIDE | 504 | 213 | **1055.3** | 1239 | 2188 | **224,772** |
+| DEEP | 731 | 667 | **8.9** | 9 | 195 | **5,957** |
+
+Deep faces a branching factor **119× smaller** and examines **37× fewer options** across the whole
+game. It pays for that with 3.1× as many decisions.
+
+### 23.2 Time
+
+Greedy, 30 games, logging off:
+
+| | whole loop | agent | agent / one agent | engine | decisions / game | µs / decision |
+|---|---|---|---|---|---|---|
+| WIDE | 271.5 ms | 192.4 | 96.2 | 78.5 | 859 | **223.9** |
+| DEEP | **238.7 ms** | **126.4** | **63.2** | 111.3 | 1712 | **73.8** |
+
+Deep is **3× cheaper per decision** and **34% cheaper in agent time** — but it makes twice as many
+decisions, and the engine has to execute every one of them, so engine time rises 42%. The
+**whole-loop** difference is only 12%. Most of what deep saves in the agent it hands to the engine.
+
+### 23.3 Strength — and a trap worth naming
+
+| per agent per game | WIDE greedy | DEEP greedy | WIDE sampled | DEEP sampled |
+|---|---|---|---|---|
+| **Touchdowns** | 1.02 | **1.26** | 0.21 | 0.01 |
+| Activations | 113.94 | 111.05 | 68.98 | 52.95 |
+| Squares moved | 409.55 | **507.95** | 281.18 | 212.22 |
+| Squares / activation | 3.59 | **4.57** | 4.08 | 4.01 |
+| Blocks thrown | **15.67** | 14.41 | 7.15 | 4.04 |
+| Knockdowns inflicted | **7.38** | 6.89 | 3.21 | 1.85 |
+| Injuries inflicted | **7.53** | 6.99 | 4.47 | 2.80 |
+| Forced fumbles | 0.43 | **0.67** | 0.11 | 0.14 |
+| Own falls | **2.17** | 3.03 | 4.12 | 6.59 |
+| Balls picked up | 1.17 | **1.46** | 0.99 | 2.19 |
+| GFI rolls | **0.62** | 5.10 | 19.21 | 16.45 |
+| Blitz follow-through | 58.5% | 59.5% | 43.6% | 31.4% |
+
+On self-play alone deep looks **better**: 1.26 touchdowns to wide's 1.02, and 4.57 squares per
+activation to 3.59.
+
+Then they play each other, 200 games, both colours:
+
+| | record | touchdowns / game |
+|---|---|---|
+| **WIDE** | **168 – 24 – 8** | **1.86** |
+| DEEP | 8 – 24 – 168 | 0.33 |
+
+**Self-play scoring rate measures the pair, not the policy.** Deep scores more against itself because
+both sides defend badly; against wide's defence its attack collapses from 1.26 to 0.33. Every
+"touchdowns per game in self-play" number in this document carries that caveat, including the ones
+used earlier to claim progress. Head-to-head is the only strength measure here.
+
+Why deep loses, from the table: it moves *further* (508 squares to 410) but rushes eight times more
+often (5.10 GFI to 0.62) and falls over more (3.03 own falls to 2.17). A one-step walk follows the
+value gradient and cannot see that the last square of a run needs a rush it should not take — a
+Dijkstra over the whole reachable set prices the whole route before committing to any of it. Deep
+also throws fewer blocks and inflicts fewer injuries, so it neither scores against a real defence nor
+grinds one down.
+
+### 23.4 A correction, and a fairness fix
+
+**The blitz follow-through figure reported in §21 and §22 was wrong.** The measuring script cleared
+its pending declaration on `turnEnd`, which silently dropped every blitz that was the last action of
+a turn — exactly the ones most likely to have failed. Counted directly:
+
+| | declared / game | blocked | follow-through |
+|---|---|---|---|
+| TIER2=16, 6 destinations | 13.09 | 7.26 | **55.5%** |
+| all destinations, flat draw | 12.35 | 6.99 | 56.6% |
+| all destinations, nested draw | 12.46 | 7.24 | **58.1%** |
+
+So the honest claim is **0% → ~58%**, not 0% → 84%, and nothing regressed across those builds — the
+earlier number was an artefact of the counter, not a property of the agent.
+
+Deep mode also needed a fairness fix before this comparison meant anything. Stage 2 runs with no
+reach, and the blitz branch dropped any victim it could not path to — so deep could only blitz a
+player it was **already adjacent to**, which flattered its follow-through to 97.6% by removing the
+hard cases. Distant victims are now offered on a distance estimate, since the step-wise walk is
+goal-seeking and approaches them; follow-through fell to 59.5%, level with wide, which is the number
+to trust.
+
+### 23.5 What each mode is for
+
+Neither dominates, and they answer different questions.
+
+- **WIDE** is the stronger player and the one to measure play strength with. It is also the shape a
+  search algorithm wants a *policy prior* from, because it prices whole routes before committing.
+- **DEEP** is the shape a tree search wants to *expand*: a branching factor of 9 instead of 1055 is
+  the difference between a tractable tree and an intractable one, and it reaches the same action
+  space one small decision at a time. Its weakness is purely the missing lookahead, which is exactly
+  what a tree search would supply.
