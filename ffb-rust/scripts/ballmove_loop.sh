@@ -1,7 +1,12 @@
 #!/bin/sh
 # One iteration of the ball-move improvement loop.
 #
-#   sh scripts/ballmove_loop.sh <tag> [seeds]
+#   sh scripts/ballmove_loop.sh <tag> [seeds] [control-mode]
+#
+# The control mode is what `wide` is measured AGAINST: `wide-noball` (the default) switches off
+# passing and hand-offs together, `wide-nopass` switches off only the throw. Hand-offs outnumber
+# passes better than ten to one, so a positive `wide-noball` reading says nothing about passing on
+# its own — run the `wide-nopass` control to isolate it.
 #
 # Builds, sanity-checks that games still complete, then A/Bs the agent against itself with passing
 # and hand-offs switched off (`--mode wide-noball`), both colours, and prints the result in standard
@@ -17,6 +22,7 @@
 set -e
 TAG=${1:-loop}
 SEEDS=${2:-1600}
+CTRL=${3:-wide-noball}
 ROOT=/c/Users/Admin/niels/ffb-rust/ffb-rust
 # Two spellings of the SAME directory, deliberately. The Rust exe is a native Windows binary and
 # MSYS rewrites an argument that looks like a POSIX path on its way in, so `$D` works there; the
@@ -45,10 +51,10 @@ if [ "$EV" -lt 600 ]; then
   exit 2
 fi
 
-echo "== A/B over $((SEEDS * 2)) games"
-./../../target/release/ffb-parity.exe --heuristic 0 --mode wide --mode-away wide-noball \
+echo "== A/B over $((SEEDS * 2)) games: wide vs $CTRL"
+./../../target/release/ffb-parity.exe --heuristic 0 --mode wide --mode-away "$CTRL" \
   --seeds 1-$SEEDS --home human --away human --edition bb2025 --out "$D/${TAG}_bh" >/dev/null 2>&1
-./../../target/release/ffb-parity.exe --heuristic 0 --mode wide-noball --mode-away wide \
+./../../target/release/ffb-parity.exe --heuristic 0 --mode "$CTRL" --mode-away wide \
   --seeds 1-$SEEDS --home human --away human --edition bb2025 --out "$D/${TAG}_nh" >/dev/null 2>&1
 cd "$ROOT"
 python scripts/ab_ballmoves.py "${TAG}_bh" "${TAG}_nh" "$TAG"

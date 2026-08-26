@@ -1286,6 +1286,12 @@ pub enum Mode {
     /// make the agent stronger?" can be answered head-to-head instead of by comparing self-play
     /// touchdown rates, which measure the pair rather than the policy (§23.3).
     WideNoBall,
+    /// Wide, with PASSING switched off but hand-offs left on. The `WideNoBall` control answers
+    /// "do ball moves help?" as one question, and hand-offs outnumber passes better than ten to
+    /// one — so a positive reading there is compatible with passing being worthless or actively
+    /// harmful, hidden under the hand-offs carrying it. This isolates the throw: A/B `Wide`
+    /// against `WideNoPass` and the only difference left is passing.
+    WideNoPass,
     /// A chain of small draws: player, then action-and-target, then one movement square at a time.
     Deep,
 }
@@ -2570,7 +2576,7 @@ impl HeuristicAgent {
                 | PlayerActionChoice::ThrowBomb
                 | PlayerActionChoice::HailMaryPass
                 | PlayerActionChoice::AllYouCanEat
-                    if self.mode != Mode::WideNoBall =>
+                    if !matches!(self.mode, Mode::WideNoBall | Mode::WideNoPass) =>
                 {
                     let here = m_coord(g, pid);
                     let spots = run_up_squares(r, m, here);
@@ -2705,12 +2711,12 @@ impl HeuristicAgent {
     ) -> Action {
         match prompt {
             AgentPrompt::Move { player_id, squares } => match self.mode {
-                Mode::Wide | Mode::WideNoBall => self.handle_move(g, f, player_id, squares),
+                Mode::Wide | Mode::WideNoBall | Mode::WideNoPass => self.handle_move(g, f, player_id, squares),
                 Mode::Deep => self.handle_move_deep(g, f, player_id, squares),
             },
 
             AgentPrompt::ActivatePlayer { eligible_players } => match self.mode {
-                Mode::Wide | Mode::WideNoBall => self.handle_activate(g, f, eligible_players),
+                Mode::Wide | Mode::WideNoBall | Mode::WideNoPass => self.handle_activate(g, f, eligible_players),
                 Mode::Deep => self.handle_activate_deep(g, f, eligible_players),
             },
 

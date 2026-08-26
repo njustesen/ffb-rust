@@ -4416,11 +4416,43 @@ about control flow inside the file you are reading. `driver.rs` dispatches sever
 edition-specific overrides; before instrumenting a step, grep the driver for *every* arm that
 mentions it.
 
-### 29.4 The loop
+### 29.4 The result: ball moves finally pay
 
-`scripts/ballmove_loop.sh <tag> [seeds]` runs one iteration: build, **check games still finish**,
-then A/B against `wide-noball` over both colours and report standard errors.
+With the chain working, the A/B over **3200 games, both colours**:
+
+```
+ON   1029-1280-891   TD/game 1.17   passes 0.11   hand-offs 1.54
+OFF   891-1280-1029  TD/game 1.10
+decisive 1920, ON won 1029 vs 960 expected  ->  +3.15 SE
+```
+
+This is the first positive reading in the campaign. §27 records eight ball-move variants that all
+came in at **≤0 SE**, and §27.2 records two that looked positive at 800 games and reversed to −1.36
+and −2.55 at 3200. Nothing about the *weights* changed to produce +3.15 — what changed is that the
+give now resolves instead of being silently converted into a turnover. Every earlier reading was
+measuring a policy whose main move the engine was throwing away.
+
+The honest caveat is in the numbers themselves: **hand-offs 1.54/game against passes 0.11/game.**
+`wide-noball` switches both off at once, so this reading is dominated by hand-offs and is compatible
+with passing being worthless, or negative and hidden underneath. §29.5 isolates it.
+
+### 29.5 Isolating the throw
+
+`Mode::WideNoPass` switches off passing and leaves hand-offs on, so `wide` against `wide-nopass`
+differs in exactly one thing. This is the control the earlier passing work never had — §27 read
+every attempt against `wide-noball`, which cannot separate the two.
+
+### 29.6 The loop
+
+`scripts/ballmove_loop.sh <tag> [seeds] [control-mode]` runs one iteration: build, **check games
+still finish**, then A/B against the control over both colours and report standard errors. The
+control defaults to `wide-noball`; pass `wide-nopass` to isolate the throw.
 
 The sanity check is the important part and was learned the hard way — a broken ball-move path parks
 the driver, and the A/B reports that as a catastrophic loss without ever saying the games stopped.
+It has now caught a second failure of the same shape from the opposite direction: the script fed a
+POSIX path to native Python, every dump directory globbed empty, and it reported *0 events/game* for
+games that were completely healthy. A sanity check needs its own sanity — **a reading of zero is
+usually the harness, not the engine.**
+
 1600 seeds is the floor: §27.2 records two readings at 800 games that reversed sign at 3200.

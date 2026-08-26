@@ -153,6 +153,7 @@ fn main() {
         let parse_mode = |s: &str| match s {
             "deep" => ffb_engine::agent::Mode::Deep,
             "wide-noball" => ffb_engine::agent::Mode::WideNoBall,
+            "wide-nopass" => ffb_engine::agent::Mode::WideNoPass,
             _ => ffb_engine::agent::Mode::Wide,
         };
         let mode = parse_mode(&args.agent_mode);
