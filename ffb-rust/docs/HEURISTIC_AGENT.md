@@ -4442,6 +4442,80 @@ with passing being worthless, or negative and hidden underneath. §29.5 isolates
 differs in exactly one thing. This is the control the earlier passing work never had — §27 read
 every attempt against `wide-noball`, which cannot separate the two.
 
+```
+ON   1017-1225-958   TD/game 1.24   passes 0.10   hand-offs 1.59
+OFF   958-1225-1017  TD/game 1.22
+decisive 1975, ON won 1017 vs 988 expected  ->  +1.33 SE
+```
+
+Positive, and under the bar. Tracing 4331 pass evaluations says why: **95.3% price negative**,
+median −0.351, and the positives are almost exactly the ~5% where the throw scores outright
+(`scores_now`, 170/4331) or rescues a drive the carrier can no longer finish (`rescues`, 207/4331).
+
+### 29.5.1 A void measurement that turned out not to be void
+
+`receiver_of` caps the non-scoring positional credit at 0.20, on this comment's authority:
+
+> A token positional credit only. Crediting the ground a throw buys, or the safety it buys,
+> measured -2.55 SE over 3200 games: this agent cannot collect on either.
+
+That reading predates the engine fix, and the reasoning for discarding it was clean: it was taken
+while the engine discarded every give, so a receiver could never run after catching and the ground
+a throw bought really was uncollectable. On that argument the cap — and the rest of §27 — was
+measuring a broken engine and should be void.
+
+**It re-measured, and the old conclusion held.** Raising the credit to the absolute scale a
+carrier's own move is scored on (0.55, cap 0.75) on the *working* engine:
+
+```
+ON   996-1208-996   TD/game 1.23   passes 0.19   hand-offs 1.83
+OFF  996-1208-996   TD/game 1.22
+decisive 1992, ON won 996 vs 996 expected  ->  +0.00 SE
+```
+
+Pass rate nearly doubled and the entire +1.33 edge disappeared. The cap was doing real work, and
+the marginal throws positional credit buys are bad throws.
+
+**The lesson is about the argument, not the number.** "That measurement predates the fix, so it is
+void" is a story, and a plausible one — the engine really was broken, and the mechanism really
+would have suppressed the effect. It still has to be re-run before it is believed. A pre-fix
+measurement is *suspect*, not *wrong*.
+
+### 29.5.2 Three attempts, one axis, none kept
+
+If positional credit buys bad throws, cutting it below the baseline should buy good ones. It does
+not. Cutting the credit to a token (0.04, cap 0.06) read **+0.32 SE** — better than uncapping,
+still well short of the baseline.
+
+| config | passes/game | isolated SE |
+|---|---|---|
+| **baseline** (0.12, cap 0.20) | **0.10** | **+1.33** |
+| credit 0.55, cap 0.75 | 0.19 | +0.00 |
+| credit 0.04, cap 0.06 | 0.16 | +0.32 |
+
+One axis explains all three: **more passes is monotonically worse**, and the baseline throws the
+fewest. All three experimental configs are reverted.
+
+The third run also carried a confound worth recording, because it nearly produced a wrong reading.
+The "selective" config still threw 0.16 times a game rather than dropping below the baseline's
+0.10, because the scatter credit from §29.5.1 was still in the build — and that term survives where
+`scores_now` sets `v = 1.0`, so it was buying extra throws underneath a change meant to remove
+them. **An ablation has to remove the other change first**, or it measures the pair.
+
+### 29.5.3 The bar may not be reachable by frequency
+
+Every attempt so far tried to make passing *better*. None asked whether **+1.33 is already real**.
+
+At 0.10 passes a game, 3200 games contains roughly 320 passes. An event that rare cannot produce a
+large standard error no matter how valuable each instance is — and the evidence says making it less
+rare destroys the per-instance value. Those two facts together mean the +2 bar may be structurally
+unreachable for passing by tuning, and that the missing ingredient is statistical power rather than
+a better weight.
+
+That is testable directly. Standard errors scale with √n, so a genuine +1.33 over 3200 games should
+read about **+2.66 over 12800**, while noise stays near zero. The baseline is restored and running
+at 6400 seeds.
+
 ### 29.6 The loop
 
 `scripts/ballmove_loop.sh <tag> [seeds] [control-mode]` runs one iteration: build, **check games
