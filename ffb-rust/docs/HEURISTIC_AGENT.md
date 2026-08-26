@@ -4363,7 +4363,28 @@ finishes his run and the turn simply ends. `StepInitPassing` is now reached, but
 hand-over branch, which means `end_turn` or `end_player_action` is already set by the time it runs:
 something upstream is ending the activation instead of handing the ball over.
 
-That is a bounded question rather than an open-ended one — **which step publishes `EndPlayerAction`
+**Two more pieces landed since, and the remaining question moved again.**
+
+The catcher is now derived from `game.pass_coordinate` when no `CatcherId` parameter arrives, which
+is Java's own rule from its CLIENT_PASS handler (`fieldModel.getPlayer(game.getPassCoordinate())`).
+The parameter cannot arrive on this path because `StepInitMoving` publishes it while the Pass
+sequence is pushed *afterwards* by `StepEndMoving`.
+
+And an agent-side bug of mine was throwing away most gives outright: `handle_move` bailed with
+`EndPlayerAction` whenever `squares` was empty. An empty `squares` means no MOVEMENT is left, not
+that there is nothing to do — a pending hand-off still has to be sent, and the best run-ups are
+exactly the ones that use the carrier's whole move. The give is now sent in that case, confirmed in
+the trace: `Move(6 squares -> 16,10)` then `HandOff(away_04)`.
+
+**Where it stands:** the command is sent and accepted, the dispatch state at `StepEndMoving` is
+correct (`dispatch=HandOver, endTurn=false, endPA=false`, thrower and thrower_action both set), and
+the Pass sequence is pushed — the driver trace shows `InitPassing` running. But no `handOver` event
+is emitted and the turn ends. An `FFB_IP_TRACE` probe at the top of
+`StepInitPassing::execute_step` never fires, so **that function is not the one `start()` routes to**
+on this path. Finding what `start()` actually runs is the next step, and the probe is committed so
+the answer comes back on the first run.
+
+That was a bounded question rather than an open-ended one — **which step publishes `EndPlayerAction`
 between `StepInitMoving::handle_command` and `StepInitPassing::execute_step`** — and it is the next
 thing to trace. `StepInitMoving` does publish `EndPlayerAction(true)` on its own move-stack-empty
 path, which is the first suspect.

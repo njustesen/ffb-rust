@@ -45,6 +45,16 @@ impl StepInitPassing {
     }
 
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
+        // FFB_IP_TRACE: which of this step's four early bails fires. The *_MOVE hand-over path
+        // reaches here and leaves without giving the ball; this says why.
+        if std::env::var_os("FFB_IP_TRACE").is_some() {
+            eprintln!(
+                "IP thrower={:?} taction={:?} acting={:?} pa={:?} catcherParam={:?} passCoord={:?} endTurn={} endPA={} bloodlust={}",
+                game.thrower_id, game.thrower_action, game.acting_player.player_id,
+                game.acting_player.player_action, self.catcher_id, game.pass_coordinate,
+                self.end_turn, self.end_player_action, game.acting_player.suffering_blood_lust
+            );
+        }
         // Bomb re-throw window -- see the mixed StepInitPassing for the full note. Java parks
         // here with no dialog; the prompt only surfaces that wait so the agent can decline.
         if game.thrower_id.is_none() || game.thrower_action.is_none() {
@@ -61,7 +71,16 @@ impl StepInitPassing {
             return StepOutcome::cont();
         }
         // Java: Player<?> catcher = game.getPlayerById(fCatcherId);
-        let catcher_id = self.catcher_id.clone();
+        //
+        // The parameter is absent on the *_MOVE path: `StepInitMoving` publishes it, but the Pass
+        // sequence is pushed afterwards by `StepEndMoving`, so it never arrives. Java derives the
+        // catcher from the pass coordinate in its own CLIENT_PASS handler
+        // (`fieldModel.getPlayer(game.getPassCoordinate())`), which is the same rule — apply it
+        // here when nothing was handed in. A throw at an empty square still yields no catcher.
+        let catcher_id = self.catcher_id.clone().or_else(|| {
+            game.pass_coordinate
+                .and_then(|c| game.field_model.player_at(c).cloned())
+        });
         let catcher_exists = catcher_id.as_deref()
             .map(|id| game.player(id).is_some())
             .unwrap_or(false);

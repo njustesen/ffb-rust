@@ -1537,7 +1537,17 @@ impl HeuristicAgent {
         player_id: String,
         squares: Vec<FieldCoordinate>,
     ) -> Action {
-        if squares.is_empty() {
+        // An empty `squares` means no MOVEMENT is left, not that there is nothing to do. A pending
+        // hand-off or pass still has to be sent, and bailing here threw away every give whose run-up
+        // used the carrier's whole move - which is most of the good ones.
+        let terminal_pending = matches!(
+            self.plan.as_ref().map(|p| &p.kind),
+            Some(PlanKind::HandOff { .. })
+                | Some(PlanKind::Pass { .. })
+                | Some(PlanKind::Blitz { .. })
+                | Some(PlanKind::Foul { .. })
+        );
+        if squares.is_empty() && !terminal_pending {
             self.plan = None;
             return Action::EndPlayerAction;
         }
@@ -1834,6 +1844,9 @@ impl HeuristicAgent {
                     // HandOffMove/PassMove now reach the movement phase and establish the thrower
                     // state, but the give itself still does not resolve - see docs 29.3. Until it
                     // does, declare the immediate form the engine completes.
+                    // HandOffMove/PassMove reach the movement phase and the give is now SENT, but
+                    // it still does not resolve - see docs 29.3. Until it does, declare the
+                    // immediate form the engine completes.
                     player_action: c.pac,
                     block_defender_id: c.target.clone(),
                 },

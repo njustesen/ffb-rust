@@ -163,6 +163,14 @@ impl StepEndMoving {
     /// Java: dispatchPlayerAction(pPlayerAction).
     /// Called from handle_command when a redirected client command arrives.
     fn do_dispatch_player_action(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        if std::env::var_os("FFB_EM_TRACE").is_some() {
+            eprintln!(
+                "EM dispatch={:?} endTurn={} endPA={} acting={:?} pa={:?} thrower={:?} taction={:?}",
+                self.dispatch_player_action, self.end_turn, self.end_player_action,
+                game.acting_player.player_id, game.acting_player.player_action,
+                game.thrower_id, game.thrower_action
+            );
+        }
         if let Some(dispatch_action) = self.dispatch_player_action {
             if let Some(ref pid) = game.acting_player.player_id.clone() {
                 let jumping = game.acting_player.jumping;
