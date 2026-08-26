@@ -4341,9 +4341,35 @@ them from `StepInitSelecting`. In Java the receiver rides on `ClientCommandHandO
 up downstream; Rust's `Action::HandOff { receiver_id }` is discarded by `StepInitMoving`, which
 matches Java's own handler but leaves Rust without the state Java gets from the command object.
 
-Closing it means translating how Java's pass steps obtain the thrower and catcher on the
-`*_MOVE` path — a 1:1 translation job against `StepInitPassing`, not a weight or a one-liner, and
-the right size of task to do deliberately rather than at the end of a long session.
+**Half of that is now closed.** Java sets the thrower and catcher in
+`StepInitPassing.handleCommand(CLIENT_HAND_OVER)`, because in Java the command reaches *that* step.
+Rust's agent answers the Move prompt instead, so `StepInitMoving` is where the same state has to be
+established — and it now is:
+
+```
+game.pass_coordinate = Some(receiver's square);
+game.thrower_id      = acting player;
+game.thrower_action  = Some(PlayerAction::HandOver);
+publish StepParameter::CatcherId(receiver)
+```
+
+with the `CLIENT_PASS` equivalent alongside it — pass coordinate from the command, catcher derived
+from that square, thrower from the acting player. That lifted a move-then-give game from **267
+events to 967**: the driver no longer stalls on `StepInitPassing`'s no-thrower bail, which returns a
+bare `StepOutcome::cont()` with no prompt and stops the game outright.
+
+**What is still wrong:** the give does not resolve. No `handOver` event is emitted — the carrier
+finishes his run and the turn simply ends. `StepInitPassing` is now reached, but returns before its
+hand-over branch, which means `end_turn` or `end_player_action` is already set by the time it runs:
+something upstream is ending the activation instead of handing the ball over.
+
+That is a bounded question rather than an open-ended one — **which step publishes `EndPlayerAction`
+between `StepInitMoving::handle_command` and `StepInitPassing::execute_step`** — and it is the next
+thing to trace. `StepInitMoving` does publish `EndPlayerAction(true)` on its own move-stack-empty
+path, which is the first suspect.
+
+Until it resolves, the agent declares the immediate form the engine completes: 2.00 touchdowns, 1.93
+hand-offs, 0.20 passes per game, 1340 events per game.
 
 The agent therefore declares the immediate form again, which the engine completes: 2.10 touchdowns,
 1.93 hand-offs and 0.15 passes per game, games finishing normally.

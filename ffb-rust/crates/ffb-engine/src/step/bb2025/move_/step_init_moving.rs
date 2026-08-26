@@ -102,18 +102,40 @@ impl Step for StepInitMoving {
 
             // Java: CLIENT_HAND_OVER → dispatchPlayerAction(HAND_OVER)
             // Guard: HAND_OVER_MOVE || HAND_OVER
-            Action::HandOff { .. } => {
+            Action::HandOff { receiver_id } => {
                 if matches!(player_action, Some(PlayerAction::HandOverMove) | Some(PlayerAction::HandOver)) {
-                    return self.dispatch_player_action(PlayerAction::HandOver);
+                    // Java records this from CLIENT_HAND_OVER inside StepInitPassing; Rust sees the
+                    // command here instead, and without it InitPassing has no thrower and parks with
+                    // no prompt (StepOutcome::cont()), stopping the game outright.
+                    if let Some(c) = game.field_model.player_coordinate(receiver_id) {
+                        game.pass_coordinate = Some(c);
+                    }
+                    game.thrower_id = game.acting_player.player_id.clone();
+                    game.thrower_action = Some(PlayerAction::HandOver);
+                    return self
+                        .dispatch_player_action(PlayerAction::HandOver)
+                        .publish(StepParameter::CatcherId(Some(receiver_id.clone())));
                 }
             }
 
             // Java: CLIENT_PASS → dispatchPlayerAction(PASS or HAIL_MARY_PASS)
             // Guard: PASS_MOVE || PASS → PASS; HAIL_MARY_PASS → HAIL_MARY_PASS
-            Action::Pass { .. } => {
+            Action::Pass { coord } => {
+                // Same as the hand-over: Java's CLIENT_PASS sets the pass coordinate, derives the
+                // catcher from that square and takes the thrower from the acting player.
+                let set_thrower = |game: &mut Game| {
+                    game.pass_coordinate = Some(*coord);
+                    game.thrower_id = game.acting_player.player_id.clone();
+                    game.thrower_action = game.acting_player.player_action;
+                };
+                let catcher = game.field_model.player_at(*coord).cloned();
                 match player_action {
                     Some(PlayerAction::PassMove) | Some(PlayerAction::Pass) => {
-                        return self.dispatch_player_action(PlayerAction::Pass);
+                        set_thrower(game);
+                        game.thrower_action = Some(PlayerAction::Pass);
+                        return self
+                            .dispatch_player_action(PlayerAction::Pass)
+                            .publish(StepParameter::CatcherId(catcher));
                     }
                     Some(PlayerAction::HailMaryPass) => {
                         return self.dispatch_player_action(PlayerAction::HailMaryPass);

@@ -1831,6 +1831,9 @@ impl HeuristicAgent {
                     // now, but the give they dispatch after moving parks StepInitPassing - see
                     // docs 29. Until that is translated, declare the immediate form the engine
                     // completes.
+                    // HandOffMove/PassMove now reach the movement phase and establish the thrower
+                    // state, but the give itself still does not resolve - see docs 29.3. Until it
+                    // does, declare the immediate form the engine completes.
                     player_action: c.pac,
                     block_defender_id: c.target.clone(),
                 },
