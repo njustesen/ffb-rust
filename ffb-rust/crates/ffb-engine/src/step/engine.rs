@@ -2737,6 +2737,8 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> ffb_model::enums::PlayerActi
         PlayerActionChoice::Foul       => PA::Foul,
         PlayerActionChoice::Pass       => PA::Pass,
         PlayerActionChoice::HandOff    => PA::HandOver,
+        PlayerActionChoice::HandOffMove => PA::HandOverMove,
+        PlayerActionChoice::PassMove   => PA::PassMove,
         PlayerActionChoice::SecureTheBall => PA::SecureTheBall,
         PlayerActionChoice::Stab       => PA::Stab,
         PlayerActionChoice::ThrowTeamMate => PA::ThrowTeamMate,

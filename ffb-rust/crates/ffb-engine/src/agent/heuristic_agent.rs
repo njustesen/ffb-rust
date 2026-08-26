@@ -72,6 +72,10 @@ const CELLS: usize = W * H;
 /// mass that should have been spread over a dozen squares and gets over-sampled against players
 /// whose destinations are enumerated. 16 covers every player who can ever be eligible.
 const TIER2: usize = 16;
+/// Run-up squares a PassMove considers throwing from, besides standing still.
+const THROW_SPOTS: usize = 6;
+/// Squares next to a receiver a HandOverMove considers giving from.
+const GIVE_SPOTS: usize = 2;
 /// How many destinations get a formatted note. Every reachable square is an OPTION (§1: consider
 /// all actions); this only bounds how many carry the human-readable arithmetic, because a note is
 /// a `format!` and nobody reads the two-thousandth one.
@@ -1116,6 +1120,43 @@ fn top_moves(f: &Features, r: &Reach, m: &Mover, k: usize) -> Vec<(f32, usize)> 
     v
 }
 
+/// Fold the chance of never arriving into a plan's weight. NOT `w * p`: that is right only for a
+/// positive weight and turns a bad plan reached by a risky route into a better-looking one.
+fn risked(w: f32, p_arrive: f32, m: &Mover) -> f32 {
+    p_arrive * w - (1.0 - p_arrive) * c_turnover(m.unactivated, 0, true)
+}
+
+/// Where a player stands.
+fn m_coord(g: &Game, pid: &str) -> FieldCoordinate {
+    g.field_model.player_coordinate(pid).unwrap_or(FieldCoordinate::new(0, 0))
+}
+
+/// Squares a carrier might throw from: where he stands, plus the best a run-up could reach.
+/// Standing still is always first, so "use none of my move" is never lost.
+fn run_up_squares(r: Option<&Reach>, m: &Mover, here: FieldCoordinate) -> Vec<usize> {
+    let mut out = vec![ixc(here)];
+    if let Some(r) = r {
+        let mut v: Vec<(f32, usize)> = r
+            .order
+            .iter()
+            .map(|&idx| {
+                let i = idx as usize;
+                let fwd = (m.d_now - endzone_distance(coord_of(i), m.home)) as f32;
+                (r.p_arrive(i) * (1.0 + 0.25 * fwd.max(0.0)), i)
+            })
+            .collect();
+        v.sort_by(|a, b| {
+            b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal).then(a.1.cmp(&b.1))
+        });
+        for (_, i) in v.into_iter().take(THROW_SPOTS) {
+            if !out.contains(&i) {
+                out.push(i);
+            }
+        }
+    }
+    out
+}
+
 /// §20.3 tier-1 proxy: a search-free estimate of what a player could be worth this activation.
 /// No Dijkstra — the eight adjacent squares exactly, plus an admissible ceiling over everything
 /// inside MA+2 read straight off the rasters.
@@ -1781,6 +1822,15 @@ impl HeuristicAgent {
             self.buf.push_note(
                 Action::ActivatePlayer {
                     player_id: c.player.clone(),
+                    // Declare the MOVE-variant for a ball action, as the real Java client does:
+                    // HAND_OVER_MOVE / PASS_MOVE give a movement phase before the give, which is
+                    // what makes carrier-move + give + receiver-move possible in one turn. The
+                    // parity agents keep declaring the immediate form, so their streams are
+                    // untouched.
+                    // The MOVE-variants (HandOffMove/PassMove) are declared and routed correctly
+                    // now, but the give they dispatch after moving parks StepInitPassing - see
+                    // docs 29. Until that is translated, declare the immediate form the engine
+                    // completes.
                     player_action: c.pac,
                     block_defender_id: c.target.clone(),
                 },
@@ -2423,56 +2473,118 @@ impl HeuristicAgent {
                         );
                     }
                 }
+                // HandOverMove: the carrier moves FIRST and gives the ball at the end of it, so
+                // every team-mate he can get NEXT TO is a candidate — not just the ones he is
+                // already touching, which is all `legal_handoff_receivers` reports.
                 PlayerActionChoice::HandOff if self.mode != Mode::WideNoBall => {
-                    for rcv in legal_handoff_receivers(g, pid, side) {
-                        let w = match handoff_weight(f, g, pid, &rcv, m) {
-                            Some(w) => w,
+                    let r = match r {
+                        Some(r) => r,
+                        None => continue,
+                    };
+                    let here = m_coord(g, pid);
+                    let mut mates: Vec<String> = g
+                        .field_model
+                        .player_coordinates
+                        .iter()
+                        .filter(|(oid, &oc)| {
+                            oid.as_str() != pid
+                                && on_pitch(oc.x, oc.y)
+                                && g.team_home.has_player(oid) == m.home
+                        })
+                        .map(|(oid, _)| oid.clone())
+                        .collect();
+                    mates.sort();
+                    for rcv in mates {
+                        let rc = match g.field_model.player_coordinate(&rcv) {
+                            Some(c) => c,
                             None => continue,
                         };
-                        push(
-                            w,
-                            Some(rcv.clone()),
-                            PlanKind::HandOff { receiver: rcv.clone() },
-                            Vec::new(),
-                            None,
-                            Rule::Flat,
-                            format!("hand off to {}{}", rcv, pass_note(g, pid, &rcv, m)),
-                        );
+                        let mut spots: Vec<(f32, usize)> = Vec::new();
+                        for n in rc.neighbours() {
+                            if !on_pitch(n.x, n.y) {
+                                continue;
+                            }
+                            let j = ixc(n);
+                            if !r.reached(j) || (f.occupied(j) && n != here) {
+                                continue;
+                            }
+                            if let Some(w) = handoff_weight(f, g, coord_of(j), &rcv, m) {
+                                spots.push((risked(w, r.p_arrive(j), m), j));
+                            }
+                        }
+                        spots.sort_by(|a, b| {
+                            b.0.partial_cmp(&a.0)
+                                .unwrap_or(std::cmp::Ordering::Equal)
+                                .then(a.1.cmp(&b.1))
+                        });
+                        for (w, j) in spots.into_iter().take(GIVE_SPOTS) {
+                            let from = coord_of(j);
+                            let mut path = Vec::new();
+                            r.path_to(j, &mut path);
+                            push(
+                                w,
+                                Some(rcv.clone()),
+                                PlanKind::HandOff { receiver: rcv.clone() },
+                                path,
+                                None,
+                                Rule::Flat,
+                                format!(
+                                    "{} hand off to {}{}",
+                                    if from == here {
+                                        "stand and".to_string()
+                                    } else {
+                                        format!("run to {},{} then", from.x, from.y)
+                                    },
+                                    rcv,
+                                    pass_note(g, from, &rcv, m)
+                                ),
+                            );
+                        }
                     }
                 }
+                // PassMove: same shape, with the throw at the end of the run-up.
                 PlayerActionChoice::Pass
                 | PlayerActionChoice::ThrowBomb
                 | PlayerActionChoice::HailMaryPass
                 | PlayerActionChoice::AllYouCanEat
                     if self.mode != Mode::WideNoBall =>
                 {
-                    let rcvs = legal_pass_receivers(g, pid, side);
-                    if std::env::var_os("FFB_PASS_TRACE").is_some() {
-                        eprintln!("PT {} pac={:?} receivers={} carrier={}", pid, pac, rcvs.len(), m.is_carrier);
-                    }
-                    for rcv in rcvs {
-                        // None = not a legal throw under the edition's ruler; do not offer it.
-                        let w = match pass_weight(f, g, pid, &rcv, m) {
-                            Some(w) => w,
-                            None => {
-                                if std::env::var_os("FFB_PASS_TRACE").is_some() {
-                                    eprintln!("PT   {} -> {} OUT OF RANGE", pid, rcv);
+                    let here = m_coord(g, pid);
+                    let spots = run_up_squares(r, m, here);
+                    for rcv in legal_pass_receivers(g, pid, side) {
+                        for &j in &spots {
+                            let from = coord_of(j);
+                            let w = match pass_weight(f, g, pid, from, &rcv, m) {
+                                Some(w) => w,
+                                None => continue,
+                            };
+                            let (w, path) = match r {
+                                Some(r) if from != here => {
+                                    let mut path = Vec::new();
+                                    r.path_to(j, &mut path);
+                                    (risked(w, r.p_arrive(j), m), path)
                                 }
-                                continue;
-                            }
-                        };
-                        if std::env::var_os("FFB_PASS_TRACE").is_some() {
-                            eprintln!("PT   {} -> {} w={:+.3}", pid, rcv, w);
+                                _ => (w, Vec::new()),
+                            };
+                            push(
+                                w,
+                                Some(rcv.clone()),
+                                PlanKind::Pass { receiver: rcv.clone() },
+                                path,
+                                None,
+                                Rule::Flat,
+                                format!(
+                                    "{} pass to {}{}",
+                                    if from == here {
+                                        "stand and".to_string()
+                                    } else {
+                                        format!("run to {},{} then", from.x, from.y)
+                                    },
+                                    rcv,
+                                    pass_note(g, from, &rcv, m)
+                                ),
+                            );
                         }
-                        push(
-                            w,
-                            Some(rcv.clone()),
-                            PlanKind::Pass { receiver: rcv.clone() },
-                            Vec::new(),
-                            None,
-                            Rule::Flat,
-                            format!("pass to {}{}", rcv, pass_note(g, pid, &rcv, m)),
-                        );
                     }
                 }
                 PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate => {
@@ -3282,13 +3394,10 @@ fn receiver_of(f: &Features, g: &Game, rcv: &str, from: FieldCoordinate, m: &Mov
 
 /// A short tag saying why a pass is, or is not, worth throwing — the arithmetic that decides it is
 /// the turns-to-score comparison, and it is invisible in the weight alone.
-fn pass_note(g: &Game, thrower: &str, rcv: &str, m: &Mover) -> String {
-    let (tc, rc) = match (
-        g.field_model.player_coordinate(thrower),
-        g.field_model.player_coordinate(rcv),
-    ) {
-        (Some(a), Some(b)) => (a, b),
-        _ => return String::new(),
+fn pass_note(g: &Game, tc: FieldCoordinate, rcv: &str, m: &Mover) -> String {
+    let rc = match g.field_model.player_coordinate(rcv) {
+        Some(b) => b,
+        None => return String::new(),
     };
     let ma_t = m.ma.max(1);
     let own = (endzone_distance(tc, m.home) + ma_t - 1) / ma_t;
@@ -3315,8 +3424,14 @@ fn pass_note(g: &Game, thrower: &str, rcv: &str, m: &Mover) -> String {
     }
 }
 
-fn pass_weight(f: &Features, g: &Game, thrower: &str, rcv: &str, m: &Mover) -> Option<f32> {
-    let tc = g.field_model.player_coordinate(thrower)?;
+fn pass_weight(
+    f: &Features,
+    g: &Game,
+    thrower: &str,
+    tc: FieldCoordinate,
+    rcv: &str,
+    m: &Mover,
+) -> Option<f32> {
     let rc = g.field_model.player_coordinate(rcv)?;
     // The ENGINE's ruler: asymmetric per edition, and no Long/LongBomb at all in a Blizzard.
     // `None` means this is not a legal throw, so the option should not exist.
@@ -3379,8 +3494,7 @@ fn pass_weight(f: &Features, g: &Game, thrower: &str, rcv: &str, m: &Mover) -> O
 /// A hand-off is a pass with no throw to fumble — only the catch can fail — so it is strictly the
 /// safer way to move the ball one square. Priced the same way, which mostly means: a hand-off to an
 /// unactivated Catcher who can then run it in is a touchdown, not "a slightly better square".
-fn handoff_weight(f: &Features, g: &Game, thrower: &str, rcv: &str, m: &Mover) -> Option<f32> {
-    let tc = g.field_model.player_coordinate(thrower)?;
+fn handoff_weight(f: &Features, g: &Game, tc: FieldCoordinate, rcv: &str, m: &Mover) -> Option<f32> {
     let r = receiver_of(f, g, rcv, tc, m)?;
 
     let ma_t = m.ma.max(1);

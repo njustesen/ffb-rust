@@ -214,6 +214,12 @@ pub enum PlayerActionChoice {
     Foul,
     Pass,
     HandOff,
+    /// Move first, THEN hand the ball over — Java `PlayerAction.HAND_OVER_MOVE`, which is what the
+    /// real client sends for a Hand Over (`SelectLogicModule`). `HandOff` above is the harness's
+    /// immediate give; both exist in Java and both are routed by `StepEndSelecting`.
+    HandOffMove,
+    /// Move first, THEN throw — Java `PlayerAction.PASS_MOVE`, likewise what the real client sends.
+    PassMove,
     StandUp,
     StandUpBlitz,
     ThrowTeamMate,

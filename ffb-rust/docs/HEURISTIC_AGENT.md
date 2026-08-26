@@ -4282,3 +4282,77 @@ The build therefore keeps §27's state: ball-moves priced for what the engine ca
 of touchdowns worse than `wide-noball`, and behaving as asked — rare in open play, concentrated in
 turns 5–8. The engine gap is the thing to fix, and it belongs in the parity backlog rather than in
 the agent.
+
+---
+
+## 29. The move-variant declarations: found, half-fixed, one gap left
+
+§28 concluded that move-then-give was unreachable. That was right about the symptom and **wrong
+about the cause** — it is not that Java and Rust disagree, it is that Rust only ever exercised one
+of the two declarations Java has.
+
+### 29.1 Java has two declarations; Rust only ever sent one
+
+`StepEndSelecting` — in **both** engines — routes them differently:
+
+| declaration | sequence |
+|---|---|
+| `HAND_OVER` | Pass — give immediately, no movement |
+| `HAND_OVER_MOVE` | **Move** — move, *then* give |
+
+The real Java **client** always sends the move-variant (`SelectLogicModule`):
+
+```java
+case HAND_OVER: sendActingPlayer(player, PlayerAction.HAND_OVER_MOVE, false);
+case PASS:      sendActingPlayer(player, PlayerAction.PASS_MOVE, false);
+```
+
+The Java **parity harness** does not — `declared = (action == BLITZ) ? BLITZ_MOVE : action` — so it
+declares the immediate `HAND_OVER`/`PASS`. Rust's `pac_to_player_action` mirrors the harness, which
+is why the parity suite agrees and why no agent could move before giving the ball. Rust was faithful
+to the harness and the harness never used the play.
+
+### 29.2 What was added
+
+Two new `PlayerActionChoice` variants, `HandOffMove` and `PassMove`, mapped to
+`PlayerAction::HandOverMove` / `PassMove` at all four sites plus the client encoder. **Nothing
+existing changed**: the parity agents keep declaring `HandOff`/`Pass`, `legal_actions` offers the
+same slots in the same order, and every current mapping is untouched, so the parity streams are
+byte-identical. `ffb-engine` 7306/0, `ffb-client` 1532/0, `ffb-parity` 49/0.
+
+And it works as far as the movement phase — verified in the sequence trace:
+
+```
+Activate(home_06, HandOffMove, target=home_04)
+Move(6 squares -> 16,12)      ← the carrier now runs his move
+HandOff(home_04)              ← and gives at the end of it
+```
+
+### 29.3 The gap that remains
+
+The give then **parks the driver**: the game stops at 267 events instead of ~1500, and the A/B read
+−28 SE, which is what a stalled game looks like rather than a bad policy.
+
+`StepEndMoving::push_sequence_for_player_action` dispatches
+`HandOver | HandOverMove | … → Pass::build_sequence(&PassParams::default())` — with **no target**.
+`StepInitPassing`'s hand-over branch then requires `thrower_action == HandOver`,
+`thrower_is_acting` and a catcher, none of which the move path establishes; the immediate path gets
+them from `StepInitSelecting`. In Java the receiver rides on `ClientCommandHandOver` and is picked
+up downstream; Rust's `Action::HandOff { receiver_id }` is discarded by `StepInitMoving`, which
+matches Java's own handler but leaves Rust without the state Java gets from the command object.
+
+Closing it means translating how Java's pass steps obtain the thrower and catcher on the
+`*_MOVE` path — a 1:1 translation job against `StepInitPassing`, not a weight or a one-liner, and
+the right size of task to do deliberately rather than at the end of a long session.
+
+The agent therefore declares the immediate form again, which the engine completes: 2.10 touchdowns,
+1.93 hand-offs and 0.15 passes per game, games finishing normally.
+
+### 29.4 The loop
+
+`scripts/ballmove_loop.sh <tag> [seeds]` runs one iteration: build, **check games still finish**,
+then A/B against `wide-noball` over both colours and report standard errors.
+
+The sanity check is the important part and was learned the hard way — a broken ball-move path parks
+the driver, and the A/B reports that as a catastrophic loss without ever saying the games stopped.
+1600 seeds is the floor: §27.2 records two readings at 800 games that reversed sign at 3200.

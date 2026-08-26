@@ -426,6 +426,9 @@ fn choice_to_player_action(choice: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::Foul => PlayerAction::Foul,
         PlayerActionChoice::Pass => PlayerAction::Pass,
         PlayerActionChoice::HandOff => PlayerAction::HandOver,
+        // The real client's own declarations (SelectLogicModule): move first, then give/throw.
+        PlayerActionChoice::HandOffMove => PlayerAction::HandOverMove,
+        PlayerActionChoice::PassMove => PlayerAction::PassMove,
         PlayerActionChoice::ThrowTeamMate => PlayerAction::ThrowTeamMate,
         PlayerActionChoice::KickTeamMate => PlayerAction::KickTeamMate,
         PlayerActionChoice::HypnoticGaze => PlayerAction::Gaze,
