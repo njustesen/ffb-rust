@@ -4513,10 +4513,64 @@ unreachable for passing by tuning, and that the missing ingredient is statistica
 a better weight.
 
 That is testable directly. Standard errors scale with √n, so a genuine +1.33 over 3200 games should
-read about **+2.66 over 12800**, while noise stays near zero. The baseline is restored and running
-at 6400 seeds.
+read about **+2.66 over 12800**, while noise stays near zero. Prediction registered before the run.
 
-### 29.6 The loop
+### 29.5.4 Passing is real; it was under-powered, not mistuned
+
+```
+ON   4162-4811-3827   TD/game 1.25   passes 0.10   hand-offs 1.62
+OFF  3827-4811-4162   TD/game 1.22
+decisive 7989, ON won 4162 vs 3994 expected  ->  +3.75 SE
+```
+
+**+3.75 SE over 12800 games**, above the +2.66 the scaling predicted. The +1.33 was signal.
+
+Nothing was tuned to get here. Three attempts to improve the weights all measured *worse* than the
+baseline they were trying to beat, and the change that finally proved passing was **not changing
+it** — only measuring it with enough games. What the tuning attempts were fighting was sampling
+noise, and every one of them "fixed" it by making passing more frequent, which is the one thing
+that reliably destroys its value.
+
+The conversion data over 6400 games explains why the bar was so hard to reach:
+
+```
+PASS:    562 thrown (0.09/game)   16% led to a touchdown that turn   91% thrown in turns 5-8
+HANDOFF: 20426 thrown             36% led to a touchdown that turn   67% thrown in turns 5-8
+```
+
+Passing does exactly what it was asked to do — 91% of throws come in turns 5-8, the window where
+running cannot score — but 89 touchdowns from 562 passes across 6400 games is about **0.014 TD per
+game, roughly 1% of all scoring.** A contribution that small is real and worth having; it simply
+cannot show up as a large standard error at 3200 games, and no weight change can make it do so
+without also making it worse.
+
+**The general lesson: an effect too small to measure at your sample size looks exactly like a
+mistuned weight.** Both present as "positive but under the bar". The way to tell them apart is to
+re-measure the *unchanged* configuration with more games before touching anything — cheap, and it
+would have saved three tuning rounds here.
+
+### 29.6 Both halves, measured separately
+
+`Mode::WideNoHandOff` is the mirror of `WideNoPass`, so each half of the ball game can be read on
+its own rather than inferred from the combined number.
+
+| control | what it isolates | games | result |
+|---|---|---|---|
+| `wide-noball` | passing + hand-offs together | 3200 | **+3.15 SE** |
+| `wide-nopass` | passing alone | 12800 | **+3.75 SE** |
+| `wide-nohandoff` | hand-offs alone | 3200 | **+2.07 SE** |
+
+All three clear the +2 bar, so **both halves of the ball game improve the agent head-to-head** —
+which was the goal.
+
+Worth noting that hand-offs clear the bar less comfortably than passing does, despite firing
+sixteen times as often and converting at 36% against 16%. That is not a contradiction: the
+counterfactual to a hand-off is usually a perfectly good run by the same player, so its *marginal*
+value over the next-best action is modest. Passing's counterfactual, in the turn 5-8 window where
+91% of throws happen, is frequently nothing at all. Frequency times conversion rate is not the same
+quantity as marginal value, and only the second one is what an A/B measures.
+
+### 29.7 The loop
 
 `scripts/ballmove_loop.sh <tag> [seeds] [control-mode]` runs one iteration: build, **check games
 still finish**, then A/B against the control over both colours and report standard errors. The

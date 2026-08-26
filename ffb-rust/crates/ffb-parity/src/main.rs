@@ -154,6 +154,7 @@ fn main() {
             "deep" => ffb_engine::agent::Mode::Deep,
             "wide-noball" => ffb_engine::agent::Mode::WideNoBall,
             "wide-nopass" => ffb_engine::agent::Mode::WideNoPass,
+            "wide-nohandoff" => ffb_engine::agent::Mode::WideNoHandOff,
             _ => ffb_engine::agent::Mode::Wide,
         };
         let mode = parse_mode(&args.agent_mode);

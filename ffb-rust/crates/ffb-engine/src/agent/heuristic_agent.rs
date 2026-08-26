@@ -1292,6 +1292,11 @@ pub enum Mode {
     /// harmful, hidden under the hand-offs carrying it. This isolates the throw: A/B `Wide`
     /// against `WideNoPass` and the only difference left is passing.
     WideNoPass,
+    /// Wide, with HAND-OFFS switched off but passing left on — the mirror of `WideNoPass`, so each
+    /// half of the ball game can be read on its own. `WideNoBall` answers only "do ball moves
+    /// help?", and hand-offs outnumber passes sixteen to one, so it cannot say which half earned
+    /// the reading.
+    WideNoHandOff,
     /// A chain of small draws: player, then action-and-target, then one movement square at a time.
     Deep,
 }
@@ -2505,7 +2510,9 @@ impl HeuristicAgent {
                 // HandOverMove: the carrier moves FIRST and gives the ball at the end of it, so
                 // every team-mate he can get NEXT TO is a candidate — not just the ones he is
                 // already touching, which is all `legal_handoff_receivers` reports.
-                PlayerActionChoice::HandOff if self.mode != Mode::WideNoBall => {
+                PlayerActionChoice::HandOff
+                    if !matches!(self.mode, Mode::WideNoBall | Mode::WideNoHandOff) =>
+                {
                     let r = match r {
                         Some(r) => r,
                         None => continue,
@@ -2711,12 +2718,12 @@ impl HeuristicAgent {
     ) -> Action {
         match prompt {
             AgentPrompt::Move { player_id, squares } => match self.mode {
-                Mode::Wide | Mode::WideNoBall | Mode::WideNoPass => self.handle_move(g, f, player_id, squares),
+                Mode::Wide | Mode::WideNoBall | Mode::WideNoPass | Mode::WideNoHandOff => self.handle_move(g, f, player_id, squares),
                 Mode::Deep => self.handle_move_deep(g, f, player_id, squares),
             },
 
             AgentPrompt::ActivatePlayer { eligible_players } => match self.mode {
-                Mode::Wide | Mode::WideNoBall | Mode::WideNoPass => self.handle_activate(g, f, eligible_players),
+                Mode::Wide | Mode::WideNoBall | Mode::WideNoPass | Mode::WideNoHandOff => self.handle_activate(g, f, eligible_players),
                 Mode::Deep => self.handle_activate_deep(g, f, eligible_players),
             },
 
