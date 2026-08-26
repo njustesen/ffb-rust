@@ -167,6 +167,8 @@ def main():
             'pr': r['prompt'],
             'ch': r['chosen'],
             'tk': r.get('taken', ''),
+            'nopt': r.get('n_options', len(r['options'])),
+            'pshown': round(r.get('p_shown', 1.0), 4),
             'hl': sn['hl'], 't': sn['t'], 'hs': sn['hs'], 'aw': sn['aw'],
             'act': sn.get('act_id'),
             'b': [sn['bx'], sn['by']] if (sn.get('bx') is not None and sn.get('bp')) else None,

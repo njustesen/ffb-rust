@@ -1054,6 +1054,10 @@ pub struct PlayerSnap {
     pub cur: bool,
 }
 
+/// How many options a dumped decision keeps. The agent considers every reachable square, which is
+/// over two thousand on an open pitch; a viewer needs the shape of the distribution, not all of it.
+const DUMP_OPTION_CAP: usize = 40;
+
 /// One decision, with the board it was made on and the full distribution behind it.
 ///
 /// Written only when `FFB_HEUR_DUMP=<path>` is set. The point of carrying every option and its
@@ -1065,7 +1069,12 @@ pub struct DecisionRec {
     pub side: String,
     pub prompt: String,
     pub chosen: usize,
+    /// The most likely options only - see DUMP_OPTION_CAP. A full activation now offers over two
+    /// thousand, and serialising every one of them for every prompt would make the file unusable.
     pub options: Vec<ffb_engine::agent::ScoredOption>,
+    /// How many options there really were, and how much probability the kept ones account for.
+    pub n_options: usize,
+    pub p_shown: f32,
     /// What was actually sent to the engine. Recorded even when `options` is empty: a prompt
     /// answered from the activation plan still DID something, and a reader needs to see what.
     pub taken: String,
@@ -1468,12 +1477,30 @@ pub fn run_heuristic_game(
         };
         if let Some(sn) = pre_snap {
             let ag = if matches!(side, TeamSide::Home) { &home_agent } else { &away_agent };
+            // Keep the most likely options and the one actually taken; report the rest as a total.
+            let mut idx: Vec<usize> = (0..ag.last_options.len()).collect();
+            idx.sort_by(|&a, &b| {
+                ag.last_options[b].p
+                    .partial_cmp(&ag.last_options[a].p)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then(a.cmp(&b))
+            });
+            idx.truncate(DUMP_OPTION_CAP);
+            if !idx.contains(&ag.last_chosen) && ag.last_chosen < ag.last_options.len() {
+                idx.pop();
+                idx.push(ag.last_chosen);
+            }
+            let kept_chosen = idx.iter().position(|&j| j == ag.last_chosen).unwrap_or(0);
+            let kept: Vec<_> = idx.iter().map(|&j| ag.last_options[j].clone()).collect();
+            let p_shown: f32 = kept.iter().map(|o| o.p).sum();
             dump.push(DecisionRec {
                 i: dump.len(),
                 side: format!("{:?}", side).to_lowercase(),
                 prompt: dump_prompt,
-                chosen: ag.last_chosen,
-                options: ag.last_options.clone(),
+                chosen: kept_chosen,
+                options: kept,
+                n_options: ag.last_options.len(),
+                p_shown,
                 taken: {
                     let mut t = describe_action(&action);
                     if let (Some(dice), ffb_engine::action::Action::BlockChoice { die_index, .. }) =

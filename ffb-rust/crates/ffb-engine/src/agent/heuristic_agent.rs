@@ -72,8 +72,10 @@ const CELLS: usize = W * H;
 /// mass that should have been spread over a dozen squares and gets over-sampled against players
 /// whose destinations are enumerated. 16 covers every player who can ever be eligible.
 const TIER2: usize = 16;
-/// How many destinations each moving player offers as separate, samplable options.
-const DEST_OPTIONS: usize = 6;
+/// How many destinations get a formatted note. Every reachable square is an OPTION (§1: consider
+/// all actions); this only bounds how many carry the human-readable arithmetic, because a note is
+/// a `format!` and nobody reads the two-thousandth one.
+const DEST_NOTES: usize = 10;
 
 #[inline]
 fn ix(x: i32, y: i32) -> usize {
@@ -1148,7 +1150,12 @@ struct Candidate {
     /// Folded into the declaration so the declaration and the follow-up prompt agree (§19.2).
     target: Option<String>,
     kind: PlanKind,
+    /// An explicit route, for plans that need one (the two-leg blitz).
     path: Vec<FieldCoordinate>,
+    /// A plain move's destination, as a flat cell index. The path is walked back only for the
+    /// option that is actually sampled — materialising two thousand of them would cost far more
+    /// than the search that produced them.
+    dest: Option<usize>,
     why: Rule,
     /// Shown to a reader; the engine never sees it.
     note: String,
@@ -1237,9 +1244,9 @@ impl HeuristicAgent {
     /// The distribution the sampler used, recorded for the visualiser. Mirrors `pick` exactly:
     /// argmax puts all the mass on one option, otherwise it is the softmax at the same temperature.
     fn record_distribution(&mut self, t_base: f32, chosen: usize) {
-        self.last_options.clear();
         let n = self.buf.options.len();
         if n == 0 {
+            self.last_options.clear();
             return;
         }
         let mut ps = vec![0.0f32; n];
@@ -1259,15 +1266,64 @@ impl HeuristicAgent {
                 }
             }
         }
+        self.record_probs(&ps, chosen);
+    }
+
+    fn record_probs(&mut self, ps: &[f32], chosen: usize) {
+        self.last_options.clear();
         for (i, o) in self.buf.options.iter().enumerate() {
             self.last_options.push(ScoredOption {
                 action: o.action.clone(),
                 w: o.weight,
-                p: ps[i],
+                p: ps.get(i).copied().unwrap_or(0.0),
                 why: format!("{:?}", o.why),
                 note: o.note.clone(),
             });
         }
+        self.last_chosen = chosen;
+    }
+
+    /// Softmax over `w` at temperature `t`, returning the pick and the full distribution.
+    /// `temp_scale <= 0` degenerates to argmax with all the mass on one entry, as everywhere else.
+    fn softmax_pick(&mut self, w: &[f32], t_base: f32) -> (usize, Vec<f32>) {
+        let n = w.len();
+        if n == 0 {
+            return (0, Vec::new());
+        }
+        if n == 1 {
+            return (0, vec![1.0]);
+        }
+        if self.temp_scale <= 0.0 {
+            let mut bi = 0;
+            for i in 1..n {
+                if w[i] > w[bi] {
+                    bi = i;
+                }
+            }
+            let mut ps = vec![0.0f32; n];
+            ps[bi] = 1.0;
+            return (bi, ps);
+        }
+        let t = (t_base * self.temp_scale).max(1e-6);
+        let max = w.iter().copied().fold(f32::MIN, f32::max);
+        let mut ps: Vec<f32> = w.iter().map(|v| ((v - max) / t).exp()).collect();
+        let acc: f32 = ps.iter().sum();
+        if acc > 0.0 {
+            for v in ps.iter_mut() {
+                *v /= acc;
+            }
+        }
+        let r = self.unit();
+        let mut c = 0.0f32;
+        let mut pick = n - 1;
+        for (i, v) in ps.iter().enumerate() {
+            c += *v;
+            if r < c {
+                pick = i;
+                break;
+            }
+        }
+        (pick, ps)
     }
 
     fn pick(&mut self, t_base: f32) -> usize {
@@ -1645,13 +1701,95 @@ impl HeuristicAgent {
         // Ending the turn banks what the team has: zero gain, zero risk.
         self.buf.push(Action::EndTurn, 0.0, Rule::EndActivation, 0.0);
 
-        let i = self.sample(0.18);
+        // Two-level draw. Group by DECLARATION — the (player, action) pair the engine actually
+        // receives — and score each group by its best child, which keeps argmax identical to a flat
+        // draw while stopping a branch with two thousand destinations from drowning one with nine.
+        // build_plans emits a player's options one action at a time, so a declaration's candidates
+        // are a CONTIGUOUS RUN. Detecting runs is linear; the obvious keyed lookup was O(groups) of
+        // string comparison per candidate and cost 30 ms a game on its own.
+        let mut groups: Vec<Vec<usize>> = Vec::new();
+        for (i, c) in cands.iter().enumerate() {
+            let same = i > 0 && cands[i - 1].pac == c.pac && cands[i - 1].player == c.player;
+            if same {
+                groups.last_mut().expect("run started").push(i);
+            } else {
+                groups.push(vec![i]);
+            }
+        }
+        // EndTurn is its own group, and sits last in `buf`.
+        let end_idx = self.buf.options.len() - 1;
+        groups.push(vec![end_idx]);
+
+        let gw: Vec<f32> = groups
+            .iter()
+            .map(|g| {
+                g.iter()
+                    .map(|&j| self.buf.options[j].weight)
+                    .fold(f32::MIN, f32::max)
+            })
+            .collect();
+        let (gi, gp) = self.softmax_pick(&gw, 0.18);
+        let cw: Vec<f32> = groups[gi].iter().map(|&j| self.buf.options[j].weight).collect();
+        let (ci, _) = self.softmax_pick(&cw, 0.10);
+        let i = groups[gi][ci];
+
+        if self.dump_enabled {
+            // Joint probability, so the panel shows what the sampler really did.
+            let mut ps = vec![0.0f32; self.buf.options.len()];
+            for (g, idxs) in groups.iter().enumerate() {
+                let w: Vec<f32> = idxs.iter().map(|&j| self.buf.options[j].weight).collect();
+                let inner = if w.len() == 1 || self.temp_scale <= 0.0 {
+                    let mut v = vec![0.0f32; w.len()];
+                    let mut bi = 0;
+                    for k in 1..w.len() {
+                        if w[k] > w[bi] {
+                            bi = k;
+                        }
+                    }
+                    if !v.is_empty() {
+                        v[bi] = 1.0;
+                    }
+                    v
+                } else {
+                    let t = (0.10 * self.temp_scale).max(1e-6);
+                    let mx = w.iter().copied().fold(f32::MIN, f32::max);
+                    let mut v: Vec<f32> = w.iter().map(|x| ((x - mx) / t).exp()).collect();
+                    let acc: f32 = v.iter().sum();
+                    if acc > 0.0 {
+                        for x in v.iter_mut() {
+                            *x /= acc;
+                        }
+                    }
+                    v
+                };
+                for (k, &j) in idxs.iter().enumerate() {
+                    ps[j] = gp.get(g).copied().unwrap_or(0.0) * inner[k];
+                }
+            }
+            self.record_probs(&ps, i);
+        }
         if i < cands.len() {
             let c = cands.swap_remove(i);
+            // The path is walked back HERE, once, for the option that won — see `Candidate::dest`.
+            let path = if !c.path.is_empty() {
+                c.path
+            } else if let Some(d) = c.dest {
+                match reach(f, g, &c.player, team_rr, &mut self.sc) {
+                    Some(r) => {
+                        let mut p = Vec::new();
+                        r.path_to(d, &mut p);
+                        recycle(&mut self.sc, r);
+                        p
+                    }
+                    None => Vec::new(),
+                }
+            } else {
+                Vec::new()
+            };
             self.plan = Some(Plan {
                 player: c.player.clone(),
                 kind: c.kind,
-                path: c.path,
+                path,
                 delivered: false,
                 fired: false,
             });
@@ -1678,48 +1816,82 @@ impl HeuristicAgent {
         for pa in live {
             let pac = player_action_to_pac(pa);
             let floor = self.coverage_floor(&format!("{:?}", pac));
-            let mut push =
-                |w: f32, target: Option<String>, kind: PlanKind, path, why, note: String| {
-                    out.push(Candidate {
-                        weight: w_player * w.max(floor) + novelty,
-                        player: pid.to_string(),
-                        pac,
-                        target,
-                        kind,
-                        path,
-                        why,
-                        note,
-                    });
-                };
+            let mut push = |w: f32,
+                            target: Option<String>,
+                            kind: PlanKind,
+                            path: Vec<FieldCoordinate>,
+                            dest: Option<usize>,
+                            why,
+                            note: String| {
+                out.push(Candidate {
+                    weight: w_player * w.max(floor) + novelty,
+                    player: pid.to_string(),
+                    pac,
+                    target,
+                    kind,
+                    path,
+                    dest,
+                    why,
+                    note,
+                });
+            };
 
             match pac {
                 PlayerActionChoice::Move | PlayerActionChoice::StandUp => {
                     match r {
                         Some(r) => {
-                            let tops = top_moves(f, r, m, DEST_OPTIONS);
+                            // EVERY reachable square, weight-ordered. They are already scored —
+                            // `top_moves` computes an arrival weight for all of them — so offering
+                            // them costs a Vec entry each, not a search.
+                            let tops = top_moves(f, r, m, usize::MAX);
+                            let reachable = tops.len();
                             if tops.is_empty() {
-                                push(0.02, None, PlanKind::Move, Vec::new(), Rule::Support, String::new());
+                                push(
+                                    0.02,
+                                    None,
+                                    PlanKind::Move,
+                                    Vec::new(),
+                                    None,
+                                    Rule::Support,
+                                    String::new(),
+                                );
                             }
-                            for (w, i) in tops {
-                                let mut path = Vec::new();
-                                r.path_to(i, &mut path);
+                            for (rank, (w, i)) in tops.into_iter().enumerate() {
                                 let c = coord_of(i);
                                 let onto_ball = f.ball_loose && f.ball == Some(c);
                                 let kind =
                                     if onto_ball { PlanKind::Pickup } else { PlanKind::Move };
-                                let ar = arrival_parts(f, r, i, m);
-                                let note = format!(
-                                    "{}{},{} · {} sq · arrive {:.0}% · V {:.2}{} · w {:+.3}",
-                                    if onto_ball { "PICK UP at " } else { "to " },
-                                    c.x,
-                                    c.y,
-                                    path.len(),
-                                    100.0 * ar.p_arrive,
-                                    ar.v,
-                                    if ar.gfi > 0 { format!(" · {} rush", ar.gfi) } else { String::new() },
-                                    ar.w
+                                let note = if rank < DEST_NOTES || onto_ball {
+                                    let ar = arrival_parts(f, r, i, m);
+                                    format!(
+                                        "{}{},{} · {} sq · arrive {:.0}% · V {:.2}{} · w {:+.3} · #{} of {} reachable",
+                                        if onto_ball { "PICK UP at " } else { "to " },
+                                        c.x,
+                                        c.y,
+                                        r.cell[i].cost,
+                                        100.0 * ar.p_arrive,
+                                        ar.v,
+                                        if ar.gfi > 0 {
+                                            format!(" · {} rush", ar.gfi)
+                                        } else {
+                                            String::new()
+                                        },
+                                        ar.w,
+                                        rank + 1,
+                                        reachable
+                                    )
+                                } else {
+                                    format!("to {},{} · #{} of {}", c.x, c.y, rank + 1, reachable)
+                                };
+                                push(
+                                    w,
+                                    None,
+                                    kind,
+                                    Vec::new(),
+                                    Some(i),
+                                    Rule::ScoreAdvance,
+                                    note,
                                 );
-                                push(w, None, kind, path, Rule::ScoreAdvance, note);
                             }
                         }
                         // tier 1: the proxy stands in, discounted for being optimistic
@@ -1728,6 +1900,7 @@ impl HeuristicAgent {
                             None,
                             PlanKind::Move,
                             Vec::new(),
+                            None,
                             Rule::ScoreAdvance,
                             "no search ran for this player (§20.3 tier 1)".to_string(),
                         ),
@@ -1741,6 +1914,7 @@ impl HeuristicAgent {
                             Some(t.clone()),
                             PlanKind::Immediate,
                             Vec::new(),
+                            None,
                             Rule::DiceCount,
                             format!("block {}", t),
                         );
@@ -1779,6 +1953,7 @@ impl HeuristicAgent {
                                 Some(oid.clone()),
                                 PlanKind::Blitz { victim: oid.clone() },
                                 Vec::new(),
+                                None,
                                 Rule::DiceCount,
                                 format!("blitz {} (already adjacent)", oid),
                             );
@@ -1817,6 +1992,7 @@ impl HeuristicAgent {
                                 Some(oid.clone()),
                                 PlanKind::Blitz { victim: oid.clone() },
                                 p,
+                                None,
                                 Rule::DiceCount,
                                 format!("blitz {} via {},{}", oid, vc.x, vc.y),
                             );
@@ -1887,6 +2063,7 @@ impl HeuristicAgent {
                                                 Some(oid.clone()),
                                                 PlanKind::Blitz { victim: oid.clone() },
                                                 full,
+                                                None,
                                                 Rule::Pickup,
                                                 format!(
                                                     "blitz {} via BALL {},{} then {},{}",
@@ -1909,6 +2086,7 @@ impl HeuristicAgent {
                             Some(t.clone()),
                             PlanKind::Foul { victim: t.clone() },
                             Vec::new(),
+                            None,
                             Rule::Flat,
                             format!("foul {}", t),
                         );
@@ -1926,6 +2104,7 @@ impl HeuristicAgent {
                             Some(rcv.clone()),
                             PlanKind::HandOff { receiver: rcv.clone() },
                             Vec::new(),
+                            None,
                             Rule::Flat,
                             format!("hand off to {}", rcv),
                         );
@@ -1942,6 +2121,7 @@ impl HeuristicAgent {
                             Some(rcv.clone()),
                             PlanKind::Pass { receiver: rcv.clone() },
                             Vec::new(),
+                            None,
                             Rule::Flat,
                             format!("pass to {}", rcv),
                         );
@@ -1954,6 +2134,7 @@ impl HeuristicAgent {
                             Some(t.clone()),
                             PlanKind::Immediate,
                             Vec::new(),
+                            None,
                             Rule::Flat,
                             format!("throw team-mate to {}", t),
                         );
@@ -1964,6 +2145,7 @@ impl HeuristicAgent {
                     None,
                     PlanKind::Immediate,
                     Vec::new(),
+                    None,
                     Rule::Flat,
                     String::new(),
                 ),
