@@ -4134,3 +4134,79 @@ The pass options in the viewers now carry the arithmetic behind the decision, e.
 counts earlier in this work were quoted as "over 20 games" when they were one game. Trace output on
 stderr does accumulate across seeds; the dump does not. The viewers only ever want one game, so this
 stays as it is — but it is not a multi-game source.
+
+---
+
+## 27. Ball-moves: eight attempts, and an honest negative
+
+**I did not get passing and hand-offs to improve the agent.** They are in, they behave as asked, and
+they cost about 4% of touchdowns. This section is the trail, because the negative result is worth
+more than another round of tuning.
+
+### 27.1 How it was measured
+
+Self-play touchdown rate cannot answer "did this help" — it measures the pair, not the policy
+(§23.3). So a `wide-noball` mode was added: the identical agent with the Pass and HandOff branches
+switched off. The variant then plays it head-to-head, both colours, and the result is reported in
+standard errors on the decisive games.
+
+That harness is the most useful thing to come out of this section, because it caught two false
+positives that would otherwise have been shipped as wins.
+
+### 27.2 The trail
+
+| | change | games | result |
+|---|---|---|---|
+| v1 | receiver's square valued absolutely | 300 | −0.08 SE |
+| v2 | only credit a move that *creates* a score | 300 | −0.08 SE |
+| v3 | tempo: value the ground the throw buys | 300 → **800** | +0.48 → **−1.36 SE** |
+| v4 | price the margin over running, not the position | 800 | −0.75 SE |
+| v5 | `scores_now` as a probability, not a certainty | 800 | 0.00 SE |
+| v6 | put ball-moves on the same absolute scale as moves | 800 | +0.61 SE |
+| v7 | real FUMBLE / INACCURATE split from the engine | 800 → **3200** | +0.67 → **−2.55 SE** |
+| v8 | narrowed to the scoring case alone | 3200 | −2.74 SE |
+| v9 | activate the receiver after a ball-move | 3200 | **−1.46 SE** |
+
+**Two readings at 800 games (+0.48, +0.67) reversed to −1.36 and −2.55 at scale.** At this effect
+size 800 games is not enough to see the sign, and I reported the first of those as progress before
+checking. Any future claim about this agent's strength needs the 3200-game harness.
+
+### 27.3 What each attempt actually found
+
+Three were real bugs, and are worth keeping regardless of the outcome:
+
+- **v5.** `scores_now` tested `d ≤ MA + 2` and called it a touchdown — a ten-square dash needing
+  *two rushes* scored 1.0 and was multiplied by a 1.6 payoff. The agent handed the ball off about
+  three times a game believing it had scored. It is now `P(touchdown | he catches it)`.
+- **v6.** A Move option is scored absolutely — where is the ball at end of turn — and ball-moves
+  were being scored *marginally*, as the gain over running. A marginal +0.2 was beating an absolute
+  +0.2 move. Not comparable quantities.
+- **v9.** The receiver was activated before the turn ended only **78%** of the time. The other 22%
+  moved the ball one square, spent the carrier, and stopped — the plan's premise never happened.
+  Making the follow-up explicit halved the deficit, from −2.74 to −1.46.
+
+### 27.4 Why it still does not pay
+
+A hand-off buys about one square and costs a catch roll, a spent activation, and the risk of a
+turnover. The benefit that justifies a real passing game is *positional and spans turns* — you
+position a receiver, and the throw pays off over the next two turns. **This agent chooses each
+activation greedily with no lookahead, so it cannot collect that.** The one non-speculative case —
+a receiver who still has his activation and can run it in when the carrier cannot — is simply too
+rare to cover the cost: 2.50 hand-offs a game convert 26% of the time, 0.41 passes convert 11%.
+
+That is the same conclusion §24.3 reached qualitatively, now with a number on it. Making passing pay
+needs a receiver-positioning model that puts somebody genuinely deep every turn, or a search that
+can see two turns ahead — not another weight.
+
+### 27.5 What is in the build, and how to turn it off
+
+The behaviour asked for is there and verified over 200 games:
+
+| | per game | in turns 5–8 |
+|---|---|---|
+| Passes | 0.41 | **90%** |
+| Hand-offs | 2.50 | 69% |
+
+Rare in open play, common when the clock has made running useless — and priced by the engine's own
+range ruler and fumble grading throughout. The cost is ~4% of touchdowns against `wide-noball`,
+which remains available as a mode for anyone who wants the stronger, ball-move-free agent.

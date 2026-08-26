@@ -986,7 +986,15 @@ fn value_at(f: &Features, i: usize, m: &Mover) -> (f32, Rule) {
             // drive), which is what the residual is for. This is also what lets a rescue pass win -
             // it now competes against a correctly-valued run rather than an inflated one.
             let tts = ((d_sq as f32) / (m.ma.max(1) as f32)).ceil() as i32;
-            let reachable_in_time = if tts <= m.turns_left { 1.0 } else { 0.25 };
+            let reachable_in_time = if tts <= m.turns_left {
+                1.0
+            } else {
+                // Tunable via FFB_HOPELESS_DAMP while this is being fitted.
+                std::env::var("FFB_HOPELESS_DAMP")
+                    .ok()
+                    .and_then(|v| v.parse::<f32>().ok())
+                    .unwrap_or(0.25)
+            };
             (0.15 + 0.85 * advance)
                 * (0.75 + 0.5 * urgency(d_sq, m.ma, m.turns_left))
                 * reachable_in_time
@@ -1216,6 +1224,10 @@ struct Candidate {
 pub enum Mode {
     /// One draw from the full joint action space: every player × action × target × destination.
     Wide,
+    /// Wide, with passing and hand-offs switched off. Exists so "did the ball-move logic actually
+    /// make the agent stronger?" can be answered head-to-head instead of by comparing self-play
+    /// touchdown rates, which measure the pair rather than the policy (§23.3).
+    WideNoBall,
     /// A chain of small draws: player, then action-and-target, then one movement square at a time.
     Deep,
 }
@@ -1235,6 +1247,9 @@ pub struct HeuristicAgent {
     seen_bucket: HashMap<u64, u32>,
     last_turn_key: Option<(i32, i32, bool)>,
     used_this_turn: HashSet<String>,
+    /// Who just received the ball. The second half of a ball-move plan: he has to be the next one
+    /// activated, or the throw bought nothing.
+    awaiting_run: Option<String>,
     /// `FFB_HEUR_DUMP` — record every decision's full distribution for the visualiser.
     dump_enabled: bool,
     /// The option set of the most recent decision, with probabilities. Empty unless dumping.
@@ -1262,6 +1277,7 @@ impl HeuristicAgent {
             seen_bucket: HashMap::new(),
             last_turn_key: None,
             used_this_turn: HashSet::new(),
+            awaiting_run: None,
             dump_enabled: std::env::var_os("FFB_HEUR_DUMP").is_some(),
             last_options: Vec::new(),
             last_chosen: 0,
@@ -1430,6 +1446,7 @@ impl HeuristicAgent {
         if self.last_turn_key != Some(key) {
             self.last_turn_key = Some(key);
             self.used_this_turn.clear();
+            self.awaiting_run = None;
         }
     }
 
@@ -1714,6 +1731,10 @@ impl HeuristicAgent {
             if g.player(pid).map(has_negatrait).unwrap_or(false) {
                 w_player *= 0.55;
             }
+            // He was just thrown the ball. Running it on is the reason the throw was made.
+            if self.awaiting_run.as_deref() == Some(pid.as_str()) {
+                w_player = 1.0;
+            }
             c1.push(Cand1 { pid: pid.clone(), live, m, w_player, proxy });
         }
         if c1.is_empty() {
@@ -1864,6 +1885,18 @@ impl HeuristicAgent {
                 delivered: false,
                 fired: false,
             });
+            if std::env::var_os("FFB_BALLMOVE").is_some()
+                && matches!(
+                    c.pac,
+                    PlayerActionChoice::Pass | PlayerActionChoice::HandOff
+                )
+            {
+                // Accumulates across seeds, unlike FFB_HEUR_DUMP which overwrites per game.
+                eprintln!("BM {:?} {}", c.pac, c.note);
+            }
+            if matches!(c.pac, PlayerActionChoice::Pass | PlayerActionChoice::HandOff) {
+                self.awaiting_run = c.target.clone();
+            }
             self.used_this_turn.insert(c.player);
             *self.seen_action.entry(format!("{:?}", c.pac)).or_insert(0) += 1;
             *self.seen_bucket.entry(bucket).or_insert(0) += 1;
@@ -2390,13 +2423,12 @@ impl HeuristicAgent {
                         );
                     }
                 }
-                PlayerActionChoice::HandOff => {
+                PlayerActionChoice::HandOff if self.mode != Mode::WideNoBall => {
                     for rcv in legal_handoff_receivers(g, pid, side) {
-                        let w = g
-                            .field_model
-                            .player_coordinate(&rcv)
-                            .map(|c| 0.88 * value_at(f, ixc(c), m).0)
-                            .unwrap_or(0.05);
+                        let w = match handoff_weight(f, g, pid, &rcv, m) {
+                            Some(w) => w,
+                            None => continue,
+                        };
                         push(
                             w,
                             Some(rcv.clone()),
@@ -2404,14 +2436,16 @@ impl HeuristicAgent {
                             Vec::new(),
                             None,
                             Rule::Flat,
-                            format!("hand off to {}", rcv),
+                            format!("hand off to {}{}", rcv, pass_note(g, pid, &rcv, m)),
                         );
                     }
                 }
                 PlayerActionChoice::Pass
                 | PlayerActionChoice::ThrowBomb
                 | PlayerActionChoice::HailMaryPass
-                | PlayerActionChoice::AllYouCanEat => {
+                | PlayerActionChoice::AllYouCanEat
+                    if self.mode != Mode::WideNoBall =>
+                {
                     let rcvs = legal_pass_receivers(g, pid, side);
                     if std::env::var_os("FFB_PASS_TRACE").is_some() {
                         eprintln!("PT {} pac={:?} receivers={} carrier={}", pid, pac, rcvs.len(), m.is_carrier);
@@ -2536,12 +2570,12 @@ impl HeuristicAgent {
     ) -> Action {
         match prompt {
             AgentPrompt::Move { player_id, squares } => match self.mode {
-                Mode::Wide => self.handle_move(g, f, player_id, squares),
+                Mode::Wide | Mode::WideNoBall => self.handle_move(g, f, player_id, squares),
                 Mode::Deep => self.handle_move_deep(g, f, player_id, squares),
             },
 
             AgentPrompt::ActivatePlayer { eligible_players } => match self.mode {
-                Mode::Wide => self.handle_activate(g, f, eligible_players),
+                Mode::Wide | Mode::WideNoBall => self.handle_activate(g, f, eligible_players),
                 Mode::Deep => self.handle_activate_deep(g, f, eligible_players),
             },
 
@@ -3147,6 +3181,105 @@ fn foul_weight(f: &Features, g: &Game, att: &str, def: &str, m: &Mover) -> f32 {
 /// The one approximation left is the modifier list: the engine assembles real `PassModifier`s from
 /// tackle zones, weather and skills, and this passes an empty list and then charges +1 per opposing
 /// tackle zone on the thrower, which is the dominant term.
+/// Everything about a receiver that matters to a throw or a hand-off.
+struct Receiver {
+    /// Catch chance, at the accurate-pass/hand-off target of AG−1 plus tackle zones.
+    p_catch: f32,
+    /// Value of the square once HE is the carrier.
+    v: f32,
+    /// He still has his activation, so he can catch and then run it in on THIS turn.
+    scores_now: bool,
+    /// Turns he needs to reach the endzone himself.
+    tts: i32,
+    /// Turns he actually has, which is one fewer once he has already been activated.
+    turns: i32,
+}
+
+fn receiver_of(f: &Features, g: &Game, rcv: &str, from: FieldCoordinate, m: &Mover) -> Option<Receiver> {
+    let rc = g.field_model.player_coordinate(rcv)?;
+    let rp = g.player(rcv)?;
+    let i = ixc(rc);
+    let tz = f.tz[side_idx(m.home)][i] as i32;
+    let ag = rp.agility_with_modifiers();
+    let raw = p_roll((ag - 1 + tz).max(2));
+    let p_catch = if rp.has_skill(SkillId::Catch) { p_with_reroll(raw, 1.0) } else { raw };
+
+    let td = if m.home { &g.turn_data_home } else { &g.turn_data_away };
+    let rm = Mover {
+        home: m.home,
+        is_carrier: true,
+        ma: rp.movement_with_modifiers(),
+        ag,
+        str_: rp.strength_with_modifiers(),
+        sure_hands: rp.has_skill(SkillId::SureHands),
+        side_step: rp.has_skill(SkillId::SideStep),
+        has_catch: rp.has_skill(SkillId::Catch),
+        // Measured from where the ball starts, so the advance term reads as ground the ball gained.
+        d_now: endzone_distance(from, m.home),
+        turns_left: (8 - td.turn_nr).max(0),
+        unactivated: m.unactivated,
+    };
+    let d_rcv = endzone_distance(rc, m.home);
+    let ma = rm.ma.max(1);
+    // Still active = still holds his activation, so he can run after catching, this turn.
+    let active = g.field_model.player_state(rcv).map(|st| st.is_active()).unwrap_or(false);
+    let reach_after = if active { rm.ma + 2 } else { 0 };
+    // P(he actually gets it in | he catches it). ~0.85 covers the dodges a run through traffic
+    // needs; each rush beyond MA costs its own roll on top.
+    let p_gfi = p_roll(gfi_target(weather_of(g)));
+    let p_run_in = if !active {
+        0.0
+    } else if d_rcv <= (rm.ma - 2).max(0) {
+        0.95
+    } else if d_rcv <= rm.ma {
+        0.85
+    } else if d_rcv <= rm.ma + 1 {
+        0.85 * p_gfi
+    } else if d_rcv <= rm.ma + 2 {
+        0.85 * p_gfi * p_gfi
+    } else {
+        // Out of scoring reach this turn, but he can still run: the delivery discount floors this.
+        0.0
+    };
+    // Where the ball ENDS UP, not where the receiver is standing. This is the tempo the throw buys.
+    let effective_d = (d_rcv - reach_after).max(0);
+    let carrier_scores_now = m.d_now <= m.ma + 2;
+    let scores_now = effective_d == 0 && active && !carrier_scores_now;
+
+    // ABSOLUTE, on the same scale `value_at` uses for a carrier's own move: how far up the pitch
+    // is the ball when the turn ends? That is the only way a ball-move and a run can be compared.
+    let max_gain = m.d_now.min(m.ma + 2).max(1) as f32;
+    let advance = ((m.d_now - effective_d) as f32 / max_gain).clamp(0.0, 1.0);
+    let exposure = f.exposure(i, m.home, rm.str_);
+    let lane = f.lane[side_idx(m.home)][i];
+    // Getting the ball out of trouble is the other half of why teams hand off, and it is a margin
+    // too: zero when the receiver is in as much danger as the carrier.
+    let relief = (exposure - f.exposure(ixc(from), m.home, m.str_)).max(0.0);
+    // MARGIN over running, not absolute position value. Zero gain is a catch roll bought for
+    // nothing, and must price out that way.
+    let v = if scores_now {
+        // The one case worth paying a catch roll for, and it needs no lookahead to value.
+        p_run_in
+    } else {
+        // A token positional credit only. Crediting the ground a throw buys, or the safety it
+        // buys, measured -2.55 SE over 3200 games: this agent cannot collect on either.
+        (0.12 * advance * exposure * lane + 0.10 * relief).min(0.20)
+    };
+    if std::env::var_os("FFB_RCV_TRACE").is_some() {
+        eprintln!(
+            "RCV {rcv} pCatch={p_catch:.2} adv={advance:.2} relief={relief:.2} v={v:.2}              dNow={} dRcv={d_rcv} reach={reach_after} effD={effective_d} active={active} now={scores_now}",
+            m.d_now
+        );
+    }
+    Some(Receiver {
+        p_catch,
+        v,
+        scores_now,
+        tts: (effective_d + ma - 1) / ma,
+        turns: if active { m.turns_left } else { (m.turns_left - 1).max(0) },
+    })
+}
+
 /// A short tag saying why a pass is, or is not, worth throwing — the arithmetic that decides it is
 /// the turns-to-score comparison, and it is invisible in the weight alone.
 fn pass_note(g: &Game, thrower: &str, rcv: &str, m: &Mover) -> String {
@@ -3162,6 +3295,15 @@ fn pass_note(g: &Game, thrower: &str, rcv: &str, m: &Mover) -> String {
     let rcv_ma = g.player(rcv).map(|p| p.movement_with_modifiers()).unwrap_or(6).max(1);
     let theirs = (endzone_distance(rc, m.home) + rcv_ma - 1) / rcv_ma;
     let left = m.turns_left;
+    let active = g.field_model.player_state(rcv).map(|st| st.is_active()).unwrap_or(false);
+    let rcv_d = endzone_distance(rc, m.home);
+    if active && rcv_d <= rcv_ma + 2 {
+        let rushes = (rcv_d - rcv_ma).max(0);
+        return format!(
+            " · can score this turn: unactivated, {rcv_d} from the line, MA {rcv_ma}{}",
+            if rushes > 0 { format!(", needs {rushes} rush(es)") } else { String::new() }
+        );
+    }
     if own > left {
         if theirs <= left {
             format!(" · RESCUE: {own} turns to run it in, {left} left — he needs {theirs}")
@@ -3174,74 +3316,88 @@ fn pass_note(g: &Game, thrower: &str, rcv: &str, m: &Mover) -> String {
 }
 
 fn pass_weight(f: &Features, g: &Game, thrower: &str, rcv: &str, m: &Mover) -> Option<f32> {
-    let (tc, rc) = (
-        g.field_model.player_coordinate(thrower)?,
-        g.field_model.player_coordinate(rcv)?,
-    );
+    let tc = g.field_model.player_coordinate(thrower)?;
+    let rc = g.field_model.player_coordinate(rcv)?;
+    // The ENGINE's ruler: asymmetric per edition, and no Long/LongBomb at all in a Blizzard.
+    // `None` means this is not a legal throw, so the option should not exist.
     let mech = crate::mechanic::pass_mechanic_for(g.rules);
     let dist = mech.find_passing_distance(g, Some(tc), Some(rc), false)?;
     let p = g.player(thrower)?;
     let base_target = mech.minimum_roll_simple(p, dist, &[])?;
     let tz_on_thrower = f.tz[side_idx(m.home)][ixc(tc)] as i32;
-    let p_throw = p_roll(base_target + tz_on_thrower);
 
-    let i = ixc(rc);
-    let tz_on_rcv = f.tz[side_idx(m.home)][i] as i32;
-    // An accurate pass is +1 to the catch, which is 2+ rather than 3+ for an AG3 receiver.
-    let rp = g.player(rcv)?;
-    let catch_ag = rp.agility_with_modifiers();
-    let p_catch = p_roll((catch_ag - 1 + tz_on_rcv).max(2));
-    let p_complete = p_throw * p_catch;
+    // Roll all six faces through the engine's own grader, so FUMBLE is separated from merely
+    // INACCURATE. Tackle zones on the thrower shift the effective roll rather than the target.
+    let mut n_accurate = 0;
+    let mut n_fumble = 0;
+    for die in 1..=6i32 {
+        match mech.evaluate_pass_simple(p, die - tz_on_thrower, dist, &[], false) {
+            ffb_mechanics::pass_result::PassResult::ACCURATE => n_accurate += 1,
+            ffb_mechanics::pass_result::PassResult::FUMBLE => n_fumble += 1,
+            _ => {}
+        }
+    }
+    let p_accurate = n_accurate as f32 / 6.0;
+    let p_fumble = n_fumble as f32 / 6.0;
+    let p_scatter = (1.0 - p_accurate - p_fumble).max(0.0);
+    let p_throw = p_accurate;
 
-    // Value the square for the RECEIVER as the new carrier — the point of a pass is that somebody
-    // else ends up holding the ball. Scoring it with the thrower's Mover measured the thrower's own
-    // progress and made every forward pass look worthless.
-    let td = if m.home { &g.turn_data_home } else { &g.turn_data_away };
-    let rm = Mover {
-        home: m.home,
-        is_carrier: true,
-        ma: rp.movement_with_modifiers(),
-        ag: catch_ag,
-        str_: rp.strength_with_modifiers(),
-        sure_hands: rp.has_skill(SkillId::SureHands),
-        side_step: rp.has_skill(SkillId::SideStep),
-        has_catch: rp.has_skill(SkillId::Catch),
-        // As if he had just received it: distance measured from the thrower, so the advance term
-        // reads as ground the ball gained.
-        d_now: endzone_distance(tc, m.home),
-        turns_left: (8 - td.turn_nr).max(0),
-        unactivated: m.unactivated,
-    };
-    let scores = endzone_distance(rc, m.home) == 0;
-    let mut v = if scores { 1.0 } else { value_at(f, i, &rm).0 };
+    let r = receiver_of(f, g, rcv, tc, m)?;
+    let p_complete = p_accurate * r.p_catch;
+    // A scattered ball is not a turnover — it lands three squares away and either side may get it.
+    // Only a fumble, or a dropped catch, hands the turn over outright.
+    let p_lost = p_fumble + p_scatter * 0.45 + p_accurate * (1.0 - r.p_catch);
 
-    // Can the carrier still run it in before the half ends? A player covers about MA a turn once
-    // dodging and rushing are accounted for, so this is turns-to-score against turns remaining.
+    // Can the CARRIER still run it in before the half ends?
     let ma_t = m.ma.max(1);
     let own_tts = (m.d_now + ma_t - 1) / ma_t;
-    let rcv_ma = rm.ma.max(1);
-    let rcv_tts = (endzone_distance(rc, m.home) + rcv_ma - 1) / rcv_ma;
     let hopeless = own_tts > m.turns_left;
     // A completion that leaves somebody who CAN still make it turns a dead drive into a live one.
-    let rescues = hopeless && rcv_tts <= m.turns_left;
-    if rescues {
+    let rescues = hopeless && r.tts <= r.turns;
+
+    let mut v = r.v;
+    if r.scores_now {
+        v = 1.0;
+    } else if rescues {
         v = v.max(0.85);
     }
-    // And a drive that was going to score nothing has little left to lose, which the generic
-    // turnover cost — priced off how many players are still unactivated — cannot see.
+    // A drive that was going to score nothing has little left to lose, which the generic turnover
+    // cost — priced off how many players are still unactivated — cannot see.
     let risk = c_turnover(m.unactivated, 0, false) * if hopeless { 0.30 } else { 1.0 };
 
     if std::env::var_os("FFB_PASS_TRACE2").is_some() {
         eprintln!(
-            "PW dist={:?} tgt={} pThrow={:.2} pCatch={:.2} pC={:.2} v={:.2} risk={:.2} \
-             ownTts={} rcvTts={} left={} hopeless={} rescues={}",
-            dist, base_target, p_throw, p_catch, p_complete, v, risk,
-            own_tts, rcv_tts, m.turns_left, hopeless, rescues
+            "PW dist={:?} tgt={} pAcc={:.2} pFum={:.2} pScat={:.2} pCatch={:.2} pC={:.2} \
+             pLost={:.2} v={:.2} risk={:.2} scoresNow={} hopeless={} rescues={}",
+            dist, base_target, p_accurate, p_fumble, p_scatter, r.p_catch, p_complete,
+            p_lost, v, risk, r.scores_now, hopeless, rescues
         );
     }
-    // NOT the carrier premium: the incompletion is already the loss of the ball, and charging ×1.4
-    // on top of it made no pass positive at any range.
-    Some(p_complete * v * (if scores { 1.5 } else { 1.0 }) - (1.0 - p_complete) * risk)
+    Some(p_complete * v - p_lost * risk)
+}
+
+/// A hand-off is a pass with no throw to fumble — only the catch can fail — so it is strictly the
+/// safer way to move the ball one square. Priced the same way, which mostly means: a hand-off to an
+/// unactivated Catcher who can then run it in is a touchdown, not "a slightly better square".
+fn handoff_weight(f: &Features, g: &Game, thrower: &str, rcv: &str, m: &Mover) -> Option<f32> {
+    let tc = g.field_model.player_coordinate(thrower)?;
+    let r = receiver_of(f, g, rcv, tc, m)?;
+
+    let ma_t = m.ma.max(1);
+    let own_tts = (m.d_now + ma_t - 1) / ma_t;
+    let hopeless = own_tts > m.turns_left;
+    let rescues = hopeless && r.tts <= r.turns;
+
+    let mut v = r.v;
+    if r.scores_now {
+        v = 1.0;
+    } else if rescues {
+        v = v.max(0.85);
+    }
+    let risk = c_turnover(m.unactivated, 0, false) * if hopeless { 0.30 } else { 1.0 };
+    // No payoff multiplier: `scores_now` already carries P(touchdown).
+    let payoff = 1.0;
+    Some(r.p_catch * v * payoff - (1.0 - r.p_catch) * risk)
 }
 
 #[cfg(test)]
