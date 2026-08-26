@@ -2,3 +2,6 @@
 # Generated decision-replay viewer (1MB inline payload) and rendered frames
 docs/decision_replay.html
 seed1_sampled_frames/
+
+docs/decision_replay_wide.html
+docs/decision_replay_deep.html

@@ -3797,6 +3797,10 @@ never holds is a ball it cannot score with.
 
 ## 23. Wide and deep
 
+> **Superseded by §25 for DEEP.** The deep mode measured here walked one square per decision, which
+> was the wrong design; it was rebuilt to move full paths from a single search and now beats wide on
+> both speed and strength. The wide figures and the self-play trap below still stand.
+
 Two search shapes over **identical weights**. Same primitives, same value model, same temperature
 knob — only the shape of the search differs, which is what makes them comparable at all.
 
@@ -3904,3 +3908,149 @@ Neither dominates, and they answer different questions.
   the difference between a tractable tree and an intractable one, and it reaches the same action
   space one small decision at a time. Its weakness is purely the missing lookahead, which is exactly
   what a tree search would supply.
+
+---
+
+## 24. Fixes found by watching it play
+
+Two viewers, one per mode, both driven by the same `FFB_HEUR_DUMP` stream:
+
+- `docs/decision_replay_wide.html` — 515 prompts, 217 decisions, ~920 options each
+- `docs/decision_replay_deep.html` — 859 prompts, 786 decisions, ~8.7 options each
+
+Built with `scripts/build_decision_replay.py`. Everything below was found by reading them.
+
+### 24.1 A blitz that has to move cannot land — an ENGINE limitation
+
+Splitting every blitz declaration by whether the blitzer moved before blocking, over 100 games:
+
+| blitz declared… | declared | blocked | rate |
+|---|---|---|---|
+| victim **already adjacent** | 759 | 728 | **95.9%** |
+| **after any movement** | 505 | **1** | **0.2%** |
+
+`StepInitMoving` accepts `Action::Block` during a `BlitzMove` and calls `dispatch_player_action`,
+which publishes `DispatchPlayerAction` and jumps to `goto_label_on_end`. The sequence generator has
+to act on that, and after movement it does not — the activation simply ends. The agent-side trace
+confirms the agent is doing its part: every skipped case logged
+`pa=Some(BlitzMove) blocked=false adj=true`, i.e. the block **was** sent.
+
+That is 40% of all declared blitzes burning the team's once-per-turn blitz for nothing. It is an
+engine defect, and parity comes first, so the agent adapts instead: **only declare a blitz against
+an already-adjacent victim.** Movement *after* the block still works, so an adjacent blitz remains a
+block plus a free reposition.
+
+| | before | after |
+|---|---|---|
+| WIDE follow-through | 57.7% | **97.3%** |
+| DEEP follow-through | 59.1% | **97.3%** |
+| WIDE touchdowns (self-play) | 2.04 | **2.25** |
+| DEEP touchdowns (self-play) | 2.52 | **2.68** |
+| WIDE blocks / game | 31.3 | **37.2** |
+
+This also reverses a judgement in §23: deep mode's original 97.6% follow-through was **correct
+behaviour**, not the limitation I called it. Offering it distant victims made it worse, and the
+"fairness fix" was fixing the wrong thing.
+
+### 24.2 The blitz metric was wrong three times
+
+Worth recording, because the same metric misled in both directions before it was right:
+
+| attempt | error | read |
+|---|---|---|
+| 1 | cleared the pending declaration on `turnEnd`, dropping every blitz that was a turn's last action | **84%** — too high |
+| 2 | treated the next `playerAction` as the window's end, but the engine emits `playerAction Blitz` for the dispatch itself, so each success scored as one failure plus one success | **58%** — too low, and declarations doubled |
+| 3 | window runs to the next `playerAction` by a **different** player | **97.3%** — correct |
+
+### 24.3 Passing: three pricing errors fixed, and it still does not throw
+
+The range is now the engine's own ruler — `PassMechanic::find_passing_distance` over the edition's
+`throwing_range_table`, which is asymmetric in dx/dy and returns nothing for Long/LongBomb in a
+Blizzard — with the target from `minimum_roll_simple`. An out-of-range pass is no longer offered at
+all. Three genuine errors went with it:
+
+1. the receiver's square was valued with the **thrower's** `Mover`, so a pass was priced as though
+   the thrower ran there himself and the receiver's gaining the ball counted for nothing;
+2. the catch used the raw AG target, missing the **+1 for an accurate pass** — 3+ against 2+;
+3. `c_turnover(carries_ball = true)` charged the carrier's ×1.4 premium **on top of** the
+   incompletion, double-counting the very loss the incompletion represents.
+
+Weights moved from −0.98…−0.65 to −0.70…−0.40. **Still negative, and passing remains 0.00 per
+game** — and the trace says why:
+
+```
+dist=QuickPass tgt=4 pThrow=0.50 pCatch=0.83 pC=0.42 v=0.07 cto=0.75
+```
+
+`tgt=4` is correct: a human **lineman**'s PA is 4+, so his quick pass is a coin flip. The binding
+term is `v=0.07` — the receiver's square is worth almost nothing, because the support intents
+(cage, mark, screen) pull team-mates *toward the ball*, never downfield. There is never anybody
+worth throwing to.
+
+So this is no longer a pricing bug; it is a **positional** gap. Passing needs a receiver intent that
+sends someone deep, which is a design change rather than a fix, and it is not attempted here.
+
+### 24.4 Diagnostics kept
+
+Three env-gated traces earned their place and stay in: `FFB_BLITZ_TRACE` (why a blitz dispatch was
+skipped), `FFB_PASS_TRACE` (receivers and weights), `FFB_PASS_TRACE2` (the term-by-term breakdown of
+one pass). Each of them settled a question that reasoning about the code had got wrong.
+
+---
+
+## 25. Deep, rebuilt — and it wins
+
+**§23's deep mode was the wrong design and its numbers are superseded.** It walked one square per
+decision, which minimises the branching factor but throws away all lookahead — and it lost
+3–31–166. The economy deep is actually after is not a smaller move; it is **not paying to pathfind
+eleven players in order to pick one**:
+
+| stage | choice | options | search |
+|---|---|---|---|
+| 1 | which player | ~11 | none |
+| 2 | that player's action and target | ~15 | none |
+| 3 | the destination, as a **full path** | every reachable square | **one Dijkstra** |
+
+Wide runs up to `TIER2` = 16 searches per activation prompt (~1800 a game) to build its joint
+enumeration. Deep runs exactly one, after the player is settled (~114 a game). The move itself is a
+whole path sampled from the complete reachable set, exactly as in wide.
+
+### 25.1 Time
+
+Greedy, 30 games, logging off:
+
+| | whole loop | agent | per one agent | engine | µs / decision |
+|---|---|---|---|---|---|
+| WIDE | 328.6 ms | 229.9 | 115.0 | 98.1 | 255.0 |
+| **DEEP** | **157.7 ms** | **75.0** | **37.5** | 82.1 | **82.6** |
+
+Deep is **3.1× cheaper in agent time** and 2.1× cheaper over the whole loop — and at 75 ms/game it
+is the first configuration in this document to come in **under the 100 ms/game budget** §10.3 set.
+
+### 25.2 Strength
+
+Head-to-head, 200 games, both colours:
+
+| | record | touchdowns / game |
+|---|---|---|
+| **DEEP** | **72 – 79 – 49** | **1.14** |
+| WIDE | 49 – 79 – 72 | 0.96 |
+
+Consistent in both colours — deep 37–37–26 as home, 35–42–23 as away — so it is not a side effect.
+
+**Deep is both faster and stronger.** That reverses §23 completely, and the reason is instructive:
+the step-wise version was not "deep with less lookahead", it was deep with *no* route pricing at
+all. Once stage 3 prices a whole path the way wide does, deep keeps every bit of wide's movement
+quality and simply stops paying for fifteen searches it was going to discard.
+
+Where wide is still ahead is the *joint* choice: it can see that player A's best move is worth less
+than player B's, because it priced both. Deep commits to a player on a search-free proxy and can be
+wrong about that. The head-to-head says that cost is smaller than the compute it saves.
+
+### 25.3 One bug worth recording
+
+The first cut of stage 3 scored **zero** touchdowns. `AgentPrompt::Move`'s `squares` is the set of
+legal **next** squares — the adjacent ones — not the set of legal destinations. Wide checks
+`path.first()` against it; the rewrite filtered *destinations* against it, so only one-square moves
+survived and no carrier ever reached an endzone. The destination set must not be filtered by
+`squares` at all; the path's first square is what has to be legal.

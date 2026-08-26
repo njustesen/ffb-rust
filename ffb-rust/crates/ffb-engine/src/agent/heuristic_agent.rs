@@ -1466,6 +1466,13 @@ impl HeuristicAgent {
                                 pa_now,
                                 Some(PlayerAction::BlitzMove) | Some(PlayerAction::KickEmBlitz)
                             ) && !g.acting_player.has_blocked;
+                            if std::env::var_os("FFB_BLITZ_TRACE").is_some() {
+                                eprintln!(
+                                    "BZ {} victim={} pa={:?} blocked={} adj={} here={:?}",
+                                    player_id, victim, pa_now, g.acting_player.has_blocked,
+                                    adjacent_to(victim), here
+                                );
+                            }
                             if dispatchable && adjacent_to(victim) {
                                 let defender_id = victim.clone();
                                 pl.fired = true;
@@ -1820,8 +1827,9 @@ impl HeuristicAgent {
     /// Stage 1 picks the player, stage 2 picks that player's action and target.
     ///
     /// No pathfinding runs here at all: the player is scored by the search-free proxy and the
-    /// action set is built with `r = None`, which is the same tier-1 path §20.3 already had. The
-    /// destination is not chosen here — it emerges one square at a time from `handle_move_deep`.
+    /// action set is built with `r = None`, the same tier-1 path §20.3 already had. The destination
+    /// is decided later, by `handle_move_deep`, from the single search deep mode pays for — which is
+    /// the whole economy of the mode: one Dijkstra per activation instead of TIER2 per prompt.
     fn handle_activate_deep(
         &mut self,
         g: &Game,
@@ -1970,7 +1978,7 @@ impl HeuristicAgent {
         self.plan = Some(Plan {
             player: c.player.clone(),
             kind: c.kind,
-            // Deep mode never precomputes a route; the walk decides square by square.
+            // Deep mode leaves the route to stage 3, once the player is settled.
             path: Vec::new(),
             delivered: false,
             fired: false,
@@ -1982,12 +1990,11 @@ impl HeuristicAgent {
         }
     }
 
-    /// One square at a time. At most eight neighbours plus "stop", so the branching factor is 9
-    /// where wide mode's single draw faces thousands.
+    /// Stage 3: the destination, as a full path, from the ONE search deep mode pays for.
     ///
-    /// The cost is that a one-step walk has no lookahead: it follows the value gradient and cannot
-    /// see a detour that pays off three squares later, which a Dijkstra over the whole reachable
-    /// set does by construction. That is the trade being measured.
+    /// Identical scoring to wide mode's — every reachable square, weight-ordered — over a single
+    /// Dijkstra for the player already chosen, rather than one per candidate player. The path is
+    /// built only for the square that wins.
     fn handle_move_deep(
         &mut self,
         g: &Game,
@@ -1999,19 +2006,15 @@ impl HeuristicAgent {
             self.plan = None;
             return Action::EndPlayerAction;
         }
-        let here = match g.field_model.player_coordinate(&player_id) {
-            Some(c) => c,
-            None => return Action::EndPlayerAction,
-        };
 
-        // The plan's terminal action first, on exactly the engine's own conditions (see handle_move).
+        // The plan's terminal action first, on exactly the engine's own conditions.
         if let Some(mut pl) = self.plan.take() {
             if pl.player == player_id && !pl.fired {
+                let here = g.field_model.player_coordinate(&player_id);
                 let pa_now = g.acting_player.player_action;
                 let adj = |v: &str| {
-                    g.field_model
-                        .player_coordinate(v)
-                        .map(|c| here.distance_in_steps(c) == 1)
+                    here.zip(g.field_model.player_coordinate(v))
+                        .map(|(a, b)| a.distance_in_steps(b) == 1)
                         .unwrap_or(false)
                 };
                 match &pl.kind {
@@ -2045,8 +2048,7 @@ impl HeuristicAgent {
                                 | Some(PlayerAction::Pass)
                                 | Some(PlayerAction::HailMaryPass)
                         );
-                        if let (true, Some(coord)) =
-                            (ok, g.field_model.player_coordinate(receiver))
+                        if let (true, Some(coord)) = (ok, g.field_model.player_coordinate(receiver))
                         {
                             pl.fired = true;
                             self.plan = Some(pl);
@@ -2068,107 +2070,97 @@ impl HeuristicAgent {
                     _ => {}
                 }
             }
-            self.plan = Some(pl);
+            // §20.1 — a delivered plain move has no options it did not already have. A pickup
+            // does: the value model changed the moment the player got the ball.
+            if pl.player == player_id
+                && pl.delivered
+                && matches!(pl.kind, PlanKind::Move | PlanKind::Immediate)
+            {
+                return Action::EndPlayerAction;
+            }
         }
 
         let m = match self.mover_of(g, f, &player_id) {
             Some(m) => m,
             None => return Action::EndPlayerAction,
         };
-        // Where the walk is heading, if the plan has somewhere to be.
-        let goal: Option<FieldCoordinate> = match self.plan.as_ref().map(|p| &p.kind) {
-            Some(PlanKind::Blitz { victim }) => g.field_model.player_coordinate(victim),
-            Some(PlanKind::Foul { victim }) => g.field_model.player_coordinate(victim),
-            Some(PlanKind::Pickup) => f.ball.filter(|_| f.ball_loose),
-            _ => f.ball.filter(|_| f.ball_loose && !m.is_carrier),
-        };
-
         let td = if m.home { &g.turn_data_home } else { &g.turn_data_away };
         let team_rr = td.rerolls > 0 && !td.reroll_used;
-        let ma = m.ma;
-        let spent = g.acting_player.current_move.max(0);
-        let s = side_idx(m.home);
-        let leaving_tz = f.tz[s][ixc(here)] > 0;
-        let ag = m.ag;
-        let gt = gfi_target(weather_of(g));
-        let dodge_skill = g
-            .player(&player_id)
-            .map(|p| p.has_skill(SkillId::Dodge))
-            .unwrap_or(false);
-        let sure_feet = g
-            .player(&player_id)
-            .map(|p| p.has_skill(SkillId::SureFeet))
-            .unwrap_or(false);
+        let r = match reach(f, g, &player_id, team_rr, &mut self.sc) {
+            Some(r) => r,
+            None => return Action::EndPlayerAction,
+        };
 
+        let tops = top_moves(f, &r, &m, usize::MAX);
+        let reachable = tops.len();
         self.buf.clear();
-        let mut steps = 0;
-        for n in here.neighbours() {
-            if !on_pitch(n.x, n.y) || !squares.contains(&n) {
-                continue;
-            }
-            let i = ixc(n);
-            if f.occupied(i) {
-                continue;
-            }
-            steps += 1;
-            let mut p_step = 1.0f32;
-            if leaving_tz {
-                let raw = p_roll(dodge_target(g.rules, ag, f.tz[s][i] as i32));
-                p_step *= if dodge_skill || team_rr { p_with_reroll(raw, 1.0) } else { raw };
-            }
-            let gfi = if spent + 1 > ma { 1 } else { 0 };
-            if gfi > 0 {
-                let raw = p_roll(gt);
-                p_step *= if sure_feet || team_rr { p_with_reroll(raw, 1.0) } else { raw };
-            }
-            // With a goal, the gradient is the goal; otherwise it is the value raster.
-            let (v, why) = match goal {
-                Some(gl) => {
-                    let d_now = here.distance_in_steps(gl);
-                    let d_new = n.distance_in_steps(gl);
-                    let closer = (d_now - d_new).max(0) as f32;
-                    (0.25 + 0.70 * closer, Rule::Pickup)
-                }
-                None => value_at(f, i, &m),
-            };
-            let w = p_step * v
-                - (1.0 - p_step) * c_turnover(m.unactivated, gfi, m.is_carrier)
-                - rush_penalty(gfi, m.is_carrier);
-            self.buf.push_note(
-                Action::Move { path: vec![n] },
-                w,
-                why,
-                w,
+        let mut dests: Vec<usize> = Vec::with_capacity(reachable);
+        for (rank, (w, i)) in tops.iter().enumerate() {
+            let c = coord_of(*i);
+            // NOTE: `squares` is the set of legal NEXT squares - adjacent ones - not destinations.
+            // Filtering destinations against it left only one-square moves, which is why an earlier
+            // cut of this scored zero touchdowns. The path's FIRST square is what has to be legal,
+            // and that is checked once the winner is known.
+            let onto_ball = f.ball_loose && f.ball == Some(c);
+            let note = if rank < DEST_NOTES || onto_ball {
+                let ar = arrival_parts(f, &r, *i, &m);
                 format!(
-                    "step to {},{} · {:.0}% · V {:.2}{}",
-                    n.x,
-                    n.y,
-                    100.0 * p_step,
-                    v,
-                    if gfi > 0 { " · RUSH" } else { "" }
-                ),
-            );
+                    "{}{},{} · {} sq · arrive {:.0}% · V {:.2}{} · w {:+.3} · #{} of {}",
+                    if onto_ball { "PICK UP at " } else { "to " },
+                    c.x,
+                    c.y,
+                    r.cell[*i].cost,
+                    100.0 * ar.p_arrive,
+                    ar.v,
+                    if ar.gfi > 0 { format!(" · {} rush", ar.gfi) } else { String::new() },
+                    ar.w,
+                    rank + 1,
+                    reachable
+                )
+            } else {
+                format!("to {},{} · #{} of {}", c.x, c.y, rank + 1, reachable)
+            };
+            // A placeholder action: the real path is built for the winner only, below.
+            self.buf.push_note(Action::Move { path: vec![c] }, *w, Rule::ScoreAdvance, *w, note);
+            dests.push(*i);
         }
-        // Stopping is always available and costs nothing, which is what makes the walk terminate.
+        // Stopping here is always available and costs nothing.
         self.buf.push_note(
             Action::EndPlayerAction,
             0.0,
             Rule::EndActivation,
             0.0,
-            format!("stop after {} square{}", spent, if spent == 1 { "" } else { "s" }),
+            "stop".to_string(),
         );
-        if steps == 0 {
-            self.plan = None;
-            return Action::EndPlayerAction;
-        }
-        let i = self.pick(0.12);
+        let pick = self.pick(0.12);
         if self.dump_enabled {
-            self.record_distribution(0.12, i);
+            self.record_distribution(0.12, pick);
         }
-        let act = self.take(i);
-        if matches!(act, Action::EndPlayerAction) {
+        let act = if pick < dests.len() {
+            let mut path = Vec::new();
+            r.path_to(dests[pick], &mut path);
+            if !path.first().map(|c| squares.contains(c)).unwrap_or(false) {
+                recycle(&mut self.sc, r);
+                self.plan = None;
+                return Action::EndPlayerAction;
+            }
+            let onto_ball = path
+                .last()
+                .map(|c| f.ball_loose && f.ball == Some(*c))
+                .unwrap_or(false);
+            self.plan = Some(Plan {
+                player: player_id,
+                kind: if onto_ball { PlanKind::Pickup } else { PlanKind::Move },
+                path: Vec::new(),
+                delivered: true,
+                fired: false,
+            });
+            Action::Move { path }
+        } else {
             self.plan = None;
-        }
+            Action::EndPlayerAction
+        };
+        recycle(&mut self.sc, r);
         act
     }
 
@@ -2293,11 +2285,9 @@ impl HeuristicAgent {
                     }
                 }
                 PlayerActionChoice::Blitz | PlayerActionChoice::StandUpBlitz => {
-                    let ball_route = f.ball.filter(|_| f.ball_loose);
-                    let mut scratch2 = Scratch::default();
-                    // §20.9 — a blitz is "reach this victim, THEN hit it". The victim is folded into
-                    // the declaration so the BlitzTarget answer agrees, and the path is constrained
-                    // to a square adjacent to it so there is something to block on arrival.
+                    // A blitz can only be declared against a victim ALREADY adjacent: see below
+                    // and docs §24. Movement after the block still works, so an adjacent blitz is
+                    // a block plus a free reposition.
                     let mut foes: Vec<String> = g
                         .field_model
                         .player_coordinates
@@ -2318,8 +2308,8 @@ impl HeuristicAgent {
                         };
                         let dice = block_weight(f, g, pid, &oid, m.str_);
                         if here.map(|h| h.distance_in_steps(oc) == 1).unwrap_or(false) {
-                            // Already adjacent: no movement needed, but spending the once-per-turn
-                            // blitz on what a plain Block would do is a small waste.
+                            // Discounted against a plain Block because it spends the team's
+                            // once-per-turn blitz, which another player might use better.
                             push(
                                 dice * 0.85,
                                 Some(oid.clone()),
@@ -2331,144 +2321,10 @@ impl HeuristicAgent {
                             );
                             continue;
                         }
-                        let r = match r {
-                            Some(r) => r,
-                            None => {
-                                // No search ran (deep mode, or tier 1). A distant victim is still a
-                                // legitimate blitz — the step-wise walk is goal-seeking and will
-                                // approach it — so offer it on a distance estimate rather than
-                                // dropping it. Without this, deep mode could only ever blitz a
-                                // player it was ALREADY adjacent to, which flatters its
-                                // follow-through rate while removing the mechanic.
-                                let d = here.map(|h| h.distance_in_steps(oc)).unwrap_or(99);
-                                if d <= m.ma + 2 {
-                                    let approach = if d <= m.ma { 0.55 } else { 0.30 };
-                                    push(
-                                        dice * approach,
-                                        Some(oid.clone()),
-                                        PlanKind::Blitz { victim: oid.clone() },
-                                        Vec::new(),
-                                        None,
-                                        Rule::DiceCount,
-                                        format!("blitz {} · {} sq away, walk in", oid, d),
-                                    );
-                                }
-                                continue;
-                            }
-                        };
-                        let mut bp = 0.0f32;
-                        let mut bi = None;
-                        for n in oc.neighbours() {
-                            if !on_pitch(n.x, n.y) {
-                                continue;
-                            }
-                            let i = ixc(n);
-                            if f.occupied(i) || !r.reached(i) {
-                                continue;
-                            }
-                            let pa = r.p_arrive(i);
-                            if pa > bp {
-                                bp = pa;
-                                bi = Some(i);
-                            }
-                        }
-                        if let Some(i) = bi {
-                            let mut p = Vec::new();
-                            r.path_to(i, &mut p);
-                            let gfi = r.cell[i].gfi as i32;
-                            let w = bp * dice
-                                - (1.0 - bp) * c_turnover(m.unactivated, gfi, m.is_carrier)
-                                - rush_penalty(gfi, m.is_carrier);
-                            let vc = coord_of(i);
-                            push(
-                                w,
-                                Some(oid.clone()),
-                                PlanKind::Blitz { victim: oid.clone() },
-                                p,
-                                None,
-                                Rule::DiceCount,
-                                format!("blitz {} via {},{}", oid, vc.x, vc.y),
-                            );
-                        }
-
-                        // Second leg: collect the loose ball, then carry on to the victim. The
-                        // straight-shot route above is blind to the ball, so without this a blitzer
-                        // will happily run past it. Priced as p(reach ball) × p(pickup) ×
-                        // p(reach victim from there) × dice, with the ball itself worth having.
-                        if let (Some(ball), Some(bud)) = (ball_route, budget_of(g, pid)) {
-                            let bi2 = ixc(ball);
-                            if r.reached(bi2) && !adjacent_to_victim(f, g, ball, &oid) {
-                                let c1 = r.cell[bi2].cost as i32;
-                                let leg2 = Budget {
-                                    start: ball,
-                                    ma: bud.ma,
-                                    spent: bud.spent + c1,
-                                    cap: bud.cap - c1,
-                                    gate: 1.0,
-                                };
-                                if leg2.cap > 0 {
-                                    if let Some(r2) =
-                                        reach_with(f, g, pid, &leg2, team_rr, &mut scratch2)
-                                    {
-                                        let mut bp2 = 0.0f32;
-                                        let mut bj = None;
-                                        for n in oc.neighbours() {
-                                            if !on_pitch(n.x, n.y) {
-                                                continue;
-                                            }
-                                            let j = ixc(n);
-                                            if f.occupied(j) || !r2.reached(j) {
-                                                continue;
-                                            }
-                                            let pa = r2.p_arrive(j);
-                                            if pa > bp2 {
-                                                bp2 = pa;
-                                                bj = Some(j);
-                                            }
-                                        }
-                                        if let Some(j) = bj {
-                                            let p1 = r.p_arrive(bi2);
-                                            let tgt = (m.ag + f.tz[side_idx(m.home)][bi2] as i32)
-                                                .max(2);
-                                            let raw = p_roll(tgt);
-                                            let p_pick = if m.sure_hands {
-                                                p_with_reroll(raw, 1.0)
-                                            } else {
-                                                raw
-                                            };
-                                            let p_all = p1 * p_pick * bp2;
-                                            let gfi =
-                                                r.cell[bi2].gfi as i32 + r2.cell[j].gfi as i32;
-                                            // Carrying the ball into a block is worth more than the
-                                            // block alone, and losing it costs the carrier premium.
-                                            let w = p_all * (dice + 0.55)
-                                                - (1.0 - p_all)
-                                                    * c_turnover(m.unactivated, gfi, true)
-                                                - rush_penalty(gfi, true);
-                                            let mut p2 = Vec::new();
-                                            r2.path_to(j, &mut p2);
-                                            let mut full = Vec::new();
-                                            r.path_to(bi2, &mut full);
-                                            full.extend(p2);
-                                            let vc = coord_of(j);
-                                            push(
-                                                w,
-                                                Some(oid.clone()),
-                                                PlanKind::Blitz { victim: oid.clone() },
-                                                full,
-                                                None,
-                                                Rule::Pickup,
-                                                format!(
-                                                    "blitz {} via BALL {},{} then {},{}",
-                                                    oid, ball.x, ball.y, vc.x, vc.y
-                                                ),
-                                            );
-                                        }
-                                        recycle(&mut scratch2, r2);
-                                    }
-                                }
-                            }
-                        }
+                        // Everything past this point required MOVEMENT to reach the victim,
+                        // and a move-then-blitz does not dispatch in this engine build (0.2% of
+                        // 505 measured attempts). Offering it wastes the once-per-turn blitz, so
+                        // the branch stops at adjacency. See docs §24.
                     }
                 }
                 PlayerActionChoice::Foul => {
@@ -2507,8 +2363,24 @@ impl HeuristicAgent {
                 | PlayerActionChoice::ThrowBomb
                 | PlayerActionChoice::HailMaryPass
                 | PlayerActionChoice::AllYouCanEat => {
-                    for rcv in legal_pass_receivers(g, pid, side) {
-                        let w = pass_weight(f, g, pid, &rcv, m);
+                    let rcvs = legal_pass_receivers(g, pid, side);
+                    if std::env::var_os("FFB_PASS_TRACE").is_some() {
+                        eprintln!("PT {} pac={:?} receivers={} carrier={}", pid, pac, rcvs.len(), m.is_carrier);
+                    }
+                    for rcv in rcvs {
+                        // None = not a legal throw under the edition's ruler; do not offer it.
+                        let w = match pass_weight(f, g, pid, &rcv, m) {
+                            Some(w) => w,
+                            None => {
+                                if std::env::var_os("FFB_PASS_TRACE").is_some() {
+                                    eprintln!("PT   {} -> {} OUT OF RANGE", pid, rcv);
+                                }
+                                continue;
+                            }
+                        };
+                        if std::env::var_os("FFB_PASS_TRACE").is_some() {
+                            eprintln!("PT   {} -> {} w={:+.3}", pid, rcv, w);
+                        }
                         push(
                             w,
                             Some(rcv.clone()),
@@ -2624,34 +2496,60 @@ impl HeuristicAgent {
                 Mode::Deep => self.handle_activate_deep(g, f, eligible_players),
             },
 
-            // §19.2 defect 1 — answer from the plan so the declaration and this prompt agree.
+            // §19.2 defect 1 — the declaration and this prompt must agree.
+            //
+            // `eligible_players` is adjacency-based and the prompt fires BEFORE movement, so a
+            // ranged blitz's victim is legitimately absent from it. The engine's `handle_command`
+            // accepts any player id, and constrains the following Move prompt with
+            // `legal_blitz_move_targets`, so naming the planned victim is correct even when it is
+            // not on the list. Deferring to the list instead was what left 42% of blitzes
+            // walking toward a victim they had never selected.
             AgentPrompt::BlitzTarget { attacker_id, eligible_players } => {
-                if eligible_players.is_empty() {
-                    return Action::EndPlayerAction;
-                }
                 if let Some(pl) = &self.plan {
                     if pl.player == attacker_id {
                         if let PlanKind::Blitz { victim } = &pl.kind {
-                            if eligible_players.contains(victim) {
+                            let alive = g
+                                .field_model
+                                .player_coordinate(victim)
+                                .map(|c| on_pitch(c.x, c.y))
+                                .unwrap_or(false);
+                            if alive {
                                 return Action::SelectPlayer { player_id: victim.clone() };
                             }
                         }
                     }
+                }
+                if eligible_players.is_empty() {
+                    return Action::EndPlayerAction;
                 }
                 let astr = g.player(&attacker_id).map(|p| p.strength_with_modifiers()).unwrap_or(3);
                 let mut ep = eligible_players;
                 ep.sort();
                 for did in &ep {
                     let w = block_weight(f, g, &attacker_id, did, astr);
-                    self.buf.push(
+                    self.buf.push_note(
                         Action::SelectPlayer { player_id: did.clone() },
                         w,
                         Rule::DiceCount,
                         w,
+                        format!("blitz target {}", did),
                     );
                 }
                 let i = self.sample(0.15);
-                self.take(i)
+                let act = self.take(i);
+                // Falling back means the plan's victim is gone. Re-point the plan at what was
+                // actually selected, or the walk heads somewhere with nothing to hit.
+                if let Action::SelectPlayer { player_id } = &act {
+                    if let Some(pl) = self.plan.as_mut() {
+                        if pl.player == attacker_id {
+                            if let PlanKind::Blitz { .. } = &pl.kind {
+                                pl.kind = PlanKind::Blitz { victim: player_id.clone() };
+                                pl.path.clear();
+                            }
+                        }
+                    }
+                }
+                act
             }
 
             AgentPrompt::BlockTarget { .. } => Action::EndPlayerAction,
@@ -3190,33 +3088,69 @@ fn foul_weight(f: &Features, g: &Game, att: &str, def: &str, m: &Mover) -> f32 {
     (p_break * victim - p_eject * eject_cost) * timing
 }
 
-/// A fumble is a turnover on the spot, so the pass has to be an expectation too. The completion
-/// estimate is distance-banded rather than the full range ruler, which is a known approximation.
-fn pass_weight(f: &Features, g: &Game, thrower: &str, rcv: &str, m: &Mover) -> f32 {
-    let (tc, rc) = match (
-        g.field_model.player_coordinate(thrower),
-        g.field_model.player_coordinate(rcv),
-    ) {
-        (Some(a), Some(b)) => (a, b),
-        _ => return 0.02,
-    };
-    let d = tc.distance_in_steps(rc);
-    let base = match d {
-        0..=3 => 0.83,
-        4..=6 => 0.72,
-        7..=10 => 0.58,
-        _ => 0.42,
-    };
-    let bad_weather = matches!(weather_of(g), Weather::Blizzard | Weather::PouringRain);
-    let p_throw = if bad_weather { base * 0.8 } else { base };
+/// A fumble is a turnover on the spot, so the pass has to be an expectation.
+///
+/// The throw is priced with the ENGINE's own ruler rather than a distance band of my own: an
+/// asymmetric `throwing_range_table` per edition, which also rules Long and LongBomb out entirely
+/// in a Blizzard. `None` means the pass is not a legal throw at all, so the option should not
+/// exist — the caller drops it.
+///
+/// The one approximation left is the modifier list: the engine assembles real `PassModifier`s from
+/// tackle zones, weather and skills, and this passes an empty list and then charges +1 per opposing
+/// tackle zone on the thrower, which is the dominant term.
+fn pass_weight(f: &Features, g: &Game, thrower: &str, rcv: &str, m: &Mover) -> Option<f32> {
+    let (tc, rc) = (
+        g.field_model.player_coordinate(thrower)?,
+        g.field_model.player_coordinate(rcv)?,
+    );
+    let mech = crate::mechanic::pass_mechanic_for(g.rules);
+    let dist = mech.find_passing_distance(g, Some(tc), Some(rc), false)?;
+    let p = g.player(thrower)?;
+    let base_target = mech.minimum_roll_simple(p, dist, &[])?;
+    let tz_on_thrower = f.tz[side_idx(m.home)][ixc(tc)] as i32;
+    let p_throw = p_roll(base_target + tz_on_thrower);
+
     let i = ixc(rc);
-    let tz = f.tz[side_idx(m.home)][i] as i32;
-    let p_catch = p_roll((m.ag + tz).max(2));
+    let tz_on_rcv = f.tz[side_idx(m.home)][i] as i32;
+    // An accurate pass is +1 to the catch, which is 2+ rather than 3+ for an AG3 receiver.
+    let rp = g.player(rcv)?;
+    let catch_ag = rp.agility_with_modifiers();
+    let p_catch = p_roll((catch_ag - 1 + tz_on_rcv).max(2));
     let p_complete = p_throw * p_catch;
+
+    // Value the square for the RECEIVER as the new carrier — the point of a pass is that somebody
+    // else ends up holding the ball. Scoring it with the thrower's Mover measured the thrower's own
+    // progress and made every forward pass look worthless.
+    let td = if m.home { &g.turn_data_home } else { &g.turn_data_away };
+    let rm = Mover {
+        home: m.home,
+        is_carrier: true,
+        ma: rp.movement_with_modifiers(),
+        ag: catch_ag,
+        str_: rp.strength_with_modifiers(),
+        sure_hands: rp.has_skill(SkillId::SureHands),
+        side_step: rp.has_skill(SkillId::SideStep),
+        // As if he had just received it: distance measured from the thrower, so the advance term
+        // reads as ground the ball gained.
+        d_now: endzone_distance(tc, m.home),
+        turns_left: (8 - td.turn_nr).max(0),
+        unactivated: m.unactivated,
+    };
     let scores = endzone_distance(rc, m.home) == 0;
-    let v = if scores { 1.0 } else { value_at(f, i, m).0 };
-    p_complete * v * (if scores { 1.5 } else { 1.0 })
-        - (1.0 - p_complete) * c_turnover(m.unactivated, 0, true)
+    let v = if scores { 1.0 } else { value_at(f, i, &rm).0 };
+    if std::env::var_os("FFB_PASS_TRACE2").is_some() {
+        eprintln!(
+            "PW dist={:?} tgt={} tzT={} pThrow={:.2} tzR={} pCatch={:.2} pC={:.2} v={:.2} cto={:.2}",
+            dist, base_target, tz_on_thrower, p_throw, tz_on_rcv, p_catch,
+            p_complete, v, c_turnover(m.unactivated, 0, false)
+        );
+    }
+    // NOT the carrier premium: the incompletion is already the loss of the ball, and charging ×1.4
+    // on top of it made no pass positive at any range.
+    Some(
+        p_complete * v * (if scores { 1.5 } else { 1.0 })
+            - (1.0 - p_complete) * c_turnover(m.unactivated, 0, false),
+    )
 }
 
 #[cfg(test)]
