@@ -72,6 +72,23 @@ const CELLS: usize = W * H;
 /// mass that should have been spread over a dozen squares and gets over-sampled against players
 /// whose destinations are enumerated. 16 covers every player who can ever be eligible.
 const TIER2: usize = 16;
+/// The declaration a real Java client sends for a give: `HAND_OVER_MOVE` / `PASS_MOVE`.
+///
+/// `SelectLogicModule` never sends the immediate `HAND_OVER` / `PASS` forms — those exist for the
+/// parity harness, which declares an action and resolves it with no movement in between. The MOVE
+/// variants open a movement phase *before* the give, which is what makes carrier-move + give +
+/// receiver-move reachable in a single turn: the whole point of a hand-off chain. They are strictly
+/// more general — the movement phase may consume none of the player's move — so the immediate form
+/// is never the better declaration for this agent. The parity agents are untouched and keep
+/// declaring the immediate form, so their dice streams are unchanged.
+fn move_variant(pac: PlayerActionChoice) -> PlayerActionChoice {
+    match pac {
+        PlayerActionChoice::HandOff => PlayerActionChoice::HandOffMove,
+        PlayerActionChoice::Pass => PlayerActionChoice::PassMove,
+        other => other,
+    }
+}
+
 /// Run-up squares a PassMove considers throwing from, besides standing still.
 const THROW_SPOTS: usize = 6;
 /// Squares next to a receiver a HandOverMove considers giving from.
@@ -1837,17 +1854,7 @@ impl HeuristicAgent {
                     // what makes carrier-move + give + receiver-move possible in one turn. The
                     // parity agents keep declaring the immediate form, so their streams are
                     // untouched.
-                    // The MOVE-variants (HandOffMove/PassMove) are declared and routed correctly
-                    // now, but the give they dispatch after moving parks StepInitPassing - see
-                    // docs 29. Until that is translated, declare the immediate form the engine
-                    // completes.
-                    // HandOffMove/PassMove now reach the movement phase and establish the thrower
-                    // state, but the give itself still does not resolve - see docs 29.3. Until it
-                    // does, declare the immediate form the engine completes.
-                    // HandOffMove/PassMove reach the movement phase and the give is now SENT, but
-                    // it still does not resolve - see docs 29.3. Until it does, declare the
-                    // immediate form the engine completes.
-                    player_action: c.pac,
+                    player_action: move_variant(c.pac),
                     block_defender_id: c.target.clone(),
                 },
                 c.weight,
@@ -2104,7 +2111,7 @@ impl HeuristicAgent {
             self.buf.push_note(
                 Action::ActivatePlayer {
                     player_id: c.player.clone(),
-                    player_action: c.pac,
+                    player_action: move_variant(c.pac),
                     block_defender_id: c.target.clone(),
                 },
                 c.weight,
@@ -2133,7 +2140,7 @@ impl HeuristicAgent {
         });
         Action::ActivatePlayer {
             player_id: c.player,
-            player_action: c.pac,
+            player_action: move_variant(c.pac),
             block_defender_id: c.target,
         }
     }

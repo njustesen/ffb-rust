@@ -45,16 +45,6 @@ impl StepInitPassing {
     }
 
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
-        // FFB_IP_TRACE: which of this step's four early bails fires. The *_MOVE hand-over path
-        // reaches here and leaves without giving the ball; this says why.
-        if std::env::var_os("FFB_IP_TRACE").is_some() {
-            eprintln!(
-                "IP thrower={:?} taction={:?} acting={:?} pa={:?} catcherParam={:?} passCoord={:?} endTurn={} endPA={} bloodlust={}",
-                game.thrower_id, game.thrower_action, game.acting_player.player_id,
-                game.acting_player.player_action, self.catcher_id, game.pass_coordinate,
-                self.end_turn, self.end_player_action, game.acting_player.suffering_blood_lust
-            );
-        }
         // Bomb re-throw window -- see the mixed StepInitPassing for the full note. Java parks
         // here with no dialog; the prompt only surfaces that wait so the agent can decline.
         if game.thrower_id.is_none() || game.thrower_action.is_none() {

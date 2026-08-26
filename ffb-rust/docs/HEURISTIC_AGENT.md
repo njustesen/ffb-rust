@@ -4285,7 +4285,7 @@ the agent.
 
 ---
 
-## 29. The move-variant declarations: found, half-fixed, one gap left
+## 29. The move-variant declarations: the give chain, end to end
 
 §28 concluded that move-then-give was unreachable. That was right about the symptom and **wrong
 about the cause** — it is not that Java and Rust disagree, it is that Rust only ever exercised one
@@ -4328,7 +4328,7 @@ Move(6 squares -> 16,12)      ← the carrier now runs his move
 HandOff(home_04)              ← and gives at the end of it
 ```
 
-### 29.3 The gap that remains
+### 29.3 The gap, and how it closed
 
 The give then **parks the driver**: the game stops at 267 events instead of ~1500, and the A/B read
 −28 SE, which is what a stalled game looks like rather than a bad policy.
@@ -4341,10 +4341,12 @@ them from `StepInitSelecting`. In Java the receiver rides on `ClientCommandHandO
 up downstream; Rust's `Action::HandOff { receiver_id }` is discarded by `StepInitMoving`, which
 matches Java's own handler but leaves Rust without the state Java gets from the command object.
 
-**Half of that is now closed.** Java sets the thrower and catcher in
-`StepInitPassing.handleCommand(CLIENT_HAND_OVER)`, because in Java the command reaches *that* step.
-Rust's agent answers the Move prompt instead, so `StepInitMoving` is where the same state has to be
-established — and it now is:
+**Closed, in three pieces.** The first two were state Java establishes from the command object and
+Rust had nowhere to put; the third was the actual blocker, and it was hiding behind a wrong file.
+
+**Piece one — the thrower.** Java sets it in `StepInitPassing.handleCommand(CLIENT_HAND_OVER)`,
+because in Java the command reaches *that* step. Rust's agent answers the Move prompt instead, so
+`StepInitMoving` is where the same state has to be established:
 
 ```
 game.pass_coordinate = Some(receiver's square);
@@ -4353,47 +4355,66 @@ game.thrower_action  = Some(PlayerAction::HandOver);
 publish StepParameter::CatcherId(receiver)
 ```
 
-with the `CLIENT_PASS` equivalent alongside it — pass coordinate from the command, catcher derived
-from that square, thrower from the acting player. That lifted a move-then-give game from **267
-events to 967**: the driver no longer stalls on `StepInitPassing`'s no-thrower bail, which returns a
-bare `StepOutcome::cont()` with no prompt and stops the game outright.
+with the `CLIENT_PASS` equivalent alongside it. That lifted a move-then-give game from **267 events
+to 967** — the driver had been stalling on `StepInitPassing`'s no-thrower bail, which returns a bare
+`StepOutcome::cont()` with no prompt and stops the game outright.
 
-**What is still wrong:** the give does not resolve. No `handOver` event is emitted — the carrier
-finishes his run and the turn simply ends. `StepInitPassing` is now reached, but returns before its
-hand-over branch, which means `end_turn` or `end_player_action` is already set by the time it runs:
-something upstream is ending the activation instead of handing the ball over.
-
-**Two more pieces landed since, and the remaining question moved again.**
-
-The catcher is now derived from `game.pass_coordinate` when no `CatcherId` parameter arrives, which
-is Java's own rule from its CLIENT_PASS handler (`fieldModel.getPlayer(game.getPassCoordinate())`).
-The parameter cannot arrive on this path because `StepInitMoving` publishes it while the Pass
-sequence is pushed *afterwards* by `StepEndMoving`.
-
-And an agent-side bug of mine was throwing away most gives outright: `handle_move` bailed with
+**Piece two — an agent bug that threw away most gives.** `handle_move` bailed with
 `EndPlayerAction` whenever `squares` was empty. An empty `squares` means no MOVEMENT is left, not
-that there is nothing to do — a pending hand-off still has to be sent, and the best run-ups are
-exactly the ones that use the carrier's whole move. The give is now sent in that case, confirmed in
-the trace: `Move(6 squares -> 16,10)` then `HandOff(away_04)`.
+that there is nothing to do: a pending hand-off still has to be sent, and the best run-ups are
+exactly the ones that use the carrier's whole move.
 
-**Where it stands:** the command is sent and accepted, the dispatch state at `StepEndMoving` is
-correct (`dispatch=HandOver, endTurn=false, endPA=false`, thrower and thrower_action both set), and
-the Pass sequence is pushed — the driver trace shows `InitPassing` running. But no `handOver` event
-is emitted and the turn ends. An `FFB_IP_TRACE` probe at the top of
-`StepInitPassing::execute_step` never fires, so **that function is not the one `start()` routes to**
-on this path. Finding what `start()` actually runs is the next step, and the probe is committed so
-the answer comes back on the first run.
+**Piece three — the catcher, in the step that actually runs.** After those two the give was *sent*
+and accepted, the dispatch state at `StepEndMoving` was correct, the Pass sequence was pushed — and
+still no `handOver` event fired, the turn just ended. A probe at the top of
+`StepInitPassing::execute_step` never fired, which looked like `start()` routing somewhere else.
 
-That was a bounded question rather than an open-ended one — **which step publishes `EndPlayerAction`
-between `StepInitMoving::handle_command` and `StepInitPassing::execute_step`** — and it is the next
-thing to trace. `StepInitMoving` does publish `EndPlayerAction(true)` on its own move-stack-empty
-path, which is the first suspect.
+It was not. `start()` calls `execute_step` exactly as written — the probe was in
+**`step/bb2016/pass/step_init_passing.rs`, a file this game never instantiates.** `driver.rs` has
+two arms for `StepId::InitPassing`: a general one at line 304 pointing at
+`step::mixed::pass::step_init_passing`, and a bb2016-gated override at line 461. The test ran
+bb2025, so the mixed step was live and the bb2016 file — the one carrying the earlier catcher fix
+and the probe — was dead code for this path.
 
-Until it resolves, the agent declares the immediate form the engine completes: 2.00 touchdowns, 1.93
-hand-offs, 0.20 passes per game, 1340 events per game.
+In the mixed step the cause was one condition:
 
-The agent therefore declares the immediate form again, which the engine completes: 2.10 touchdowns,
-1.93 hand-offs and 0.15 passes per game, games finishing normally.
+```rust
+let catcher_exists = self.catcher_id.as_deref()
+    .map(|id| game.player(id).is_some()).unwrap_or(false);
+
+// Java: HAND_OVER — thrower==actingPlayer && catcher != null (no range check).
+if thrower_action == Some(PlayerAction::HandOver) && thrower_is_acting && catcher_exists { … }
+```
+
+`self.catcher_id` is populated from the `TARGET_COORDINATE` init param or from `handle_command` —
+neither of which happens on the `*_MOVE` path, where `StepInitMoving` publishes `CatcherId` but the
+Pass sequence is pushed *afterwards* by `StepEndMoving`, so the publish never arrives. With no
+catcher the HAND_OVER branch is skipped, execution falls past the bomb, pass and dump-off branches,
+and reaches the out-of-range tail — which publishes `EndTurn`. The give was sent, accepted, and then
+silently converted into a turnover.
+
+The fix is Java's own rule from its command handlers, applied where Rust needs it: derive the
+catcher from `game.pass_coordinate` when nothing was handed in. It is gated to `HandOver | Pass` so
+no other path can observe a stale coordinate, and a throw at an empty square still yields no
+catcher, which is correct.
+
+**Result.** The agent declares `HandOffMove` / `PassMove` — the forms `SelectLogicModule` actually
+sends — and the chain runs:
+
+| | immediate form | `*_MOVE` form |
+|---|---|---|
+| events / game | 1314 | **1395** |
+| `handOver` / game | **0.00** | **3.35** |
+| touchdowns / game | 1.82 | **2.65** |
+
+ffb-engine 7306/0, and the bb2025 mirror-parity matrix is **30 green / 0 red** — the parity agents
+keep declaring the immediate form, so they always have a catcher and the new derivation is a no-op
+for them.
+
+**One lesson worth keeping:** a probe that never fires is evidence about *which file is live*, not
+about control flow inside the file you are reading. `driver.rs` dispatches several `StepId`s to
+edition-specific overrides; before instrumenting a step, grep the driver for *every* arm that
+mentions it.
 
 ### 29.4 The loop
 

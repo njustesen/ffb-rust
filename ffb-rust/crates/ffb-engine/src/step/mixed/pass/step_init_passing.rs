@@ -55,6 +55,28 @@ impl StepInitPassing {
                 game.thrower_action = game.acting_player.player_action;
             }
         }
+        // On the HAND_OVER_MOVE / PASS_MOVE path the catcher cannot reach this step as a
+        // parameter: `StepInitMoving` publishes `CatcherId`, but the Pass sequence is pushed
+        // AFTERWARDS by `StepEndMoving`, so the publish never arrives. Java derives the catcher
+        // from the pass coordinate in its own command handlers
+        // (`fieldModel.getPlayer(game.getPassCoordinate())`), so apply the same rule here when
+        // nothing was handed in. Without it `catcher_exists` is false, the HAND_OVER branch is
+        // skipped, and the step falls through to the out-of-range tail that ends the turn — the
+        // give was sent and accepted but no `handOver` event was ever emitted. Gated to the two
+        // give actions so no other path can observe a stale `pass_coordinate`; a throw at an
+        // empty square still yields no catcher, which is correct.
+        if self.catcher_id.is_none()
+            && matches!(
+                game.thrower_action,
+                Some(ffb_model::enums::PlayerAction::HandOver)
+                    | Some(ffb_model::enums::PlayerAction::Pass)
+            )
+        {
+            self.catcher_id = game
+                .pass_coordinate
+                .and_then(|c| game.field_model.player_at(c).cloned());
+        }
+
         // Java's StepInitPassing simply PARKS here waiting for a client command. The bomb
         // re-throw window (TurnMode BombHome/BombAway) is the one place nothing ever declared
         // the action -- the engine made the bomb's catcher the acting player -- so no

@@ -18,7 +18,13 @@ set -e
 TAG=${1:-loop}
 SEEDS=${2:-1600}
 ROOT=/c/Users/Admin/niels/ffb-rust/ffb-rust
+# Two spellings of the SAME directory, deliberately. The Rust exe is a native Windows binary and
+# MSYS rewrites an argument that looks like a POSIX path on its way in, so `$D` works there; the
+# Python that reads the dumps back is also native and never sees that rewrite, so it needs the
+# drive-letter form. Handing Python the POSIX spelling makes every glob come back empty, which the
+# sanity check then reports as "0 events/game -- the driver is parking" when the games were fine.
 D=/c/Users/Admin/AppData/Local/Temp/claude
+DW=C:/Users/Admin/AppData/Local/Temp/claude
 
 cd "$ROOT"
 echo "== build"
@@ -30,7 +36,7 @@ cd "$ROOT/crates/ffb-parity"
   --home human --away human --edition bb2025 --out "$D/${TAG}_sane" >/dev/null 2>&1
 EV=$(python -c "
 import glob,os
-fs=glob.glob(os.path.join(r'$D/${TAG}_sane','seed_*_argmax_events.jsonl'))
+fs=glob.glob(os.path.join(r'$DW/${TAG}_sane','seed_*_argmax_events.jsonl'))
 print(int(sum(sum(1 for _ in open(f,errors='ignore')) for f in fs)/max(len(fs),1)))
 ")
 echo "   mean events/game: $EV  (a healthy game is ~1400+; under ~600 means the driver is parking)"
