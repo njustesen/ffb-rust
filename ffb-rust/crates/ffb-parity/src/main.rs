@@ -43,6 +43,17 @@ struct ParityArgs {
     /// only touched Rust cannot change what Java produced. The reuse is refused (and the
     /// JVM runs) unless `runner::java_logs_reusable` confirms the recorded fingerprint.
     reuse_java: bool,
+    /// `--heuristic <scale>`: run BOTH sides with `HeuristicAgent` at the given temperature
+    /// scale and dump one JSONL events file per seed. `1.0` = the docs/HEURISTIC_AGENT.md §8
+    /// table; a large scale (e.g. `1e6`) makes every softmax uniform over the IDENTICAL option
+    /// set, which is the control arm — same enumeration, same code path, only the sampling
+    /// differs. `None` disables the mode.
+    heuristic: Option<f32>,
+    /// `--heuristic-away <scale>`: give the AWAY side a different temperature scale, turning the
+    /// run into a genuine head-to-head instead of self-play.
+    heuristic_away: Option<f32>,
+    /// `--out <dir>`: where `--heuristic` writes its per-seed events files.
+    out_dir: String,
 }
 
 impl ParityArgs {
@@ -63,6 +74,9 @@ impl ParityArgs {
         let mut visualize = false;
         let mut tier = 2u8;
         let mut reuse_java = false;
+        let mut heuristic: Option<f32> = None;
+        let mut heuristic_away: Option<f32> = None;
+        let mut out_dir = "parity/heuristic".to_string();
 
         let mut i = 0;
         while i < raw.len() {
@@ -76,6 +90,13 @@ impl ParityArgs {
                 "--verbose" => verbose = true,
                 "--visualize" => visualize = true,
                 "--reuse-java" => reuse_java = true,
+                "--heuristic" if i + 1 < raw.len() => {
+                    heuristic = raw[i + 1].parse().ok(); i += 1;
+                }
+                "--heuristic-away" if i + 1 < raw.len() => {
+                    heuristic_away = raw[i + 1].parse().ok(); i += 1;
+                }
+                "--out" if i + 1 < raw.len() => { out_dir = raw[i + 1].clone(); i += 1; }
                 "--home" if i + 1 < raw.len() => { home = raw[i + 1].clone(); i += 1; }
                 "--away" if i + 1 < raw.len() => { away = raw[i + 1].clone(); i += 1; }
                 "--edition" if i + 1 < raw.len() => { edition = raw[i + 1].clone(); i += 1; }
@@ -98,7 +119,7 @@ impl ParityArgs {
         let home_java = runner::java_team_id(&home, "home", &edition);
         let away_java = runner::java_team_id(&away, "away", &edition);
 
-        ParityArgs { network, coverage, uniform, all_rosters, all_editions, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize, tier, reuse_java }
+        ParityArgs { network, coverage, uniform, all_rosters, all_editions, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize, tier, reuse_java, heuristic, heuristic_away, out_dir }
     }
 }
 
@@ -110,6 +131,33 @@ fn main() {
     if args.network {
         println!("Running network integration test...");
         network_test::run();
+        return;
+    }
+
+    if let Some(scale) = args.heuristic {
+        let label = if scale <= 0.0 {
+            "argmax"
+        } else if scale >= 1000.0 {
+            "uniform"
+        } else {
+            "heuristic"
+        };
+        std::fs::create_dir_all(&args.out_dir).ok();
+        eprintln!("Running {} seeds with HeuristicAgent (temp_scale={scale}, arm={label})                    {} vs {} {}", args.seed_end - args.seed_start + 1, args.home, args.away, args.edition);
+        let t0 = std::time::Instant::now();
+        for seed in args.seed_start..=args.seed_end {
+            let (events, sh, sa) = runner::run_heuristic_game(
+                seed, &args.home, &args.away, &args.edition, scale, args.heuristic_away);
+            let mut out = String::new();
+            for e in &events {
+                out.push_str(&serde_json::to_string(e).unwrap_or_default());
+                out.push('\n');
+            }
+            let path = format!("{}/seed_{}_{}_events.jsonl", args.out_dir, seed, label);
+            std::fs::write(&path, out).expect("write events");
+            println!("seed {seed}: score {sh}-{sa}, {} events", events.len());
+        }
+        eprintln!("done in {:.1}s", t0.elapsed().as_secs_f32());
         return;
     }
 

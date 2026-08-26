@@ -13,9 +13,11 @@
 //!   uniformly among all truly legal actions at every decision point, for "how much of the
 //!   game's mechanic surface does random play exercise" runs.
 
+mod heuristic_agent;
 mod random_agent;
 mod uniform_agent;
 
+pub use heuristic_agent::HeuristicAgent;
 pub use random_agent::RandomAgent;
 pub use uniform_agent::UniformAgent;
 

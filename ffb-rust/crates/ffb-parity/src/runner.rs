@@ -1274,6 +1274,76 @@ pub fn run_uniform_game(
     (all_events, score_home, score_away, unhandled_prompts)
 }
 
+/// Run a complete game with `HeuristicAgent` on BOTH sides at the given temperature scale.
+///
+/// `temp_scale = 1.0` is the §8 table. A very large scale makes every softmax uniform over the
+/// **identical** option set, which is the control arm of the §16 experiment: same enumeration,
+/// same code path, only the sampling differs.
+pub fn run_heuristic_game(
+    seed: u64,
+    home_roster: &str,
+    away_roster: &str,
+    edition: &str,
+    temp_scale: f32,
+    away_scale: Option<f32>,
+) -> (Vec<GameEvent>, i32, i32) {
+    use ffb_engine::agent::{Agent, HeuristicAgent};
+
+    let rules = edition_to_rules(edition);
+    let home = make_team(home_roster, "home", edition);
+    let away = make_team(away_roster, "away", edition);
+    let mut options: Vec<(&str, &str)> = vec![(INDUCEMENTS, "true")];
+    options.extend_from_slice(BASELINE_SETUP_OPTIONS);
+    let mut engine = GameState::new_full_pregame(home, away, rules, seed, &options);
+
+    let mut home_agent = HeuristicAgent::new(seed, temp_scale);
+    let mut away_agent = HeuristicAgent::new(seed ^ 0xFFFF_FFFF, away_scale.unwrap_or(temp_scale));
+
+    let mut all_events: Vec<GameEvent> = Vec::new();
+    // `FFB_HEUR_TIME=1` separates AGENT time from ENGINE time. Wall-clock per game confounds the
+    // two badly here: the sharper arms produce ~70% more events per game, so they do more engine
+    // work for reasons that have nothing to do with how long scoring takes.
+    let timed = std::env::var_os("FFB_HEUR_TIME").is_some();
+    let mut agent_ns: u128 = 0;
+    let mut engine_ns: u128 = 0;
+    let mut decisions: u64 = 0;
+    for _ in 0..200_000 {
+        if engine.is_finished() { break; }
+        if engine.current_prompt().is_none() { break; }
+        let side = engine.active_side();
+        let t0 = if timed { Some(std::time::Instant::now()) } else { None };
+        let action = if matches!(side, TeamSide::Home) {
+            home_agent.act(&engine)
+        } else {
+            away_agent.act(&engine)
+        };
+        if let Some(t) = t0 {
+            agent_ns += t.elapsed().as_nanos();
+            decisions += 1;
+        }
+        let t1 = if timed { Some(std::time::Instant::now()) } else { None };
+        let r = engine.apply(side, action);
+        if let Some(t) = t1 { engine_ns += t.elapsed().as_nanos(); }
+        match r {
+            Ok(evs) => all_events.extend(evs),
+            Err(e) => { eprintln!("engine error seed {seed}: {e}"); break; }
+        }
+    }
+    if timed {
+        eprintln!(
+            "HTIME seed={seed} decisions={decisions} agent_ms={:.1} engine_ms={:.1}              agent_us_per_decision={:.1} agent_share={:.1}%",
+            agent_ns as f64 / 1e6,
+            engine_ns as f64 / 1e6,
+            agent_ns as f64 / 1e3 / decisions.max(1) as f64,
+            100.0 * agent_ns as f64 / (agent_ns + engine_ns).max(1) as f64,
+        );
+    }
+
+    let score_home = engine.game.game_result.home.score;
+    let score_away = engine.game.game_result.away.score;
+    (all_events, score_home, score_away)
+}
+
 #[cfg(test)]
 mod baseline_option_tests {
     use super::BASELINE_SETUP_OPTIONS;
