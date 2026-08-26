@@ -17,7 +17,7 @@ mod heuristic_agent;
 mod random_agent;
 mod uniform_agent;
 
-pub use heuristic_agent::HeuristicAgent;
+pub use heuristic_agent::{HeuristicAgent, ScoredOption};
 pub use random_agent::RandomAgent;
 pub use uniform_agent::UniformAgent;
 

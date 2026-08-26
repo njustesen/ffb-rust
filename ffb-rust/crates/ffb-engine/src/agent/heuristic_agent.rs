@@ -209,6 +209,22 @@ pub enum Rule {
     Flat,
 }
 
+/// One enumerated option together with the probability the sampler actually gave it.
+///
+/// Only populated when `FFB_HEUR_DUMP` is set. A visualiser needs the whole distribution, not the
+/// pick — the interesting picture is *what the agent considered and how strongly*, which the chosen
+/// action alone cannot show. Off by default so it costs nothing in a measurement run.
+#[derive(Clone, serde::Serialize)]
+pub struct ScoredOption {
+    pub action: Action,
+    /// The signed weight from §5.3, before any softmax.
+    pub w: f32,
+    /// The probability this option had of being sampled, at the temperature actually used.
+    pub p: f32,
+    /// Which §6 rule produced the weight.
+    pub why: String,
+}
+
 pub struct Weighted {
     pub action: Action,
     /// SIGNED desirability — §5.3 subtracts an expected turnover cost, so a bad option is negative.
@@ -1066,6 +1082,12 @@ pub struct HeuristicAgent {
     seen_bucket: HashMap<u64, u32>,
     last_turn_key: Option<(i32, i32, bool)>,
     used_this_turn: HashSet<String>,
+    /// `FFB_HEUR_DUMP` — record every decision's full distribution for the visualiser.
+    dump_enabled: bool,
+    /// The option set of the most recent decision, with probabilities. Empty unless dumping.
+    pub last_options: Vec<ScoredOption>,
+    /// Index into `last_options` of the option that was actually taken.
+    pub last_chosen: usize,
 }
 
 impl HeuristicAgent {
@@ -1082,6 +1104,9 @@ impl HeuristicAgent {
             seen_bucket: HashMap::new(),
             last_turn_key: None,
             used_this_turn: HashSet::new(),
+            dump_enabled: std::env::var_os("FFB_HEUR_DUMP").is_some(),
+            last_options: Vec::new(),
+            last_chosen: 0,
         }
     }
 
@@ -1113,6 +1138,50 @@ impl HeuristicAgent {
     }
 
     fn sample(&mut self, t_base: f32) -> usize {
+        let idx = self.pick(t_base);
+        if self.dump_enabled {
+            self.record_distribution(t_base, idx);
+        }
+        self.last_chosen = idx;
+        idx
+    }
+
+    /// The distribution the sampler used, recorded for the visualiser. Mirrors `pick` exactly:
+    /// argmax puts all the mass on one option, otherwise it is the softmax at the same temperature.
+    fn record_distribution(&mut self, t_base: f32, chosen: usize) {
+        self.last_options.clear();
+        let n = self.buf.options.len();
+        if n == 0 {
+            return;
+        }
+        let mut ps = vec![0.0f32; n];
+        if n == 1 || self.temp_scale <= 0.0 {
+            ps[chosen.min(n - 1)] = 1.0;
+        } else {
+            let t = (t_base * self.temp_scale).max(1e-6);
+            let max = self.buf.options.iter().map(|o| o.weight).fold(f32::MIN, f32::max);
+            let mut acc = 0.0f32;
+            for (i, o) in self.buf.options.iter().enumerate() {
+                ps[i] = ((o.weight - max) / t).exp();
+                acc += ps[i];
+            }
+            if acc > 0.0 {
+                for v in ps.iter_mut() {
+                    *v /= acc;
+                }
+            }
+        }
+        for (i, o) in self.buf.options.iter().enumerate() {
+            self.last_options.push(ScoredOption {
+                action: o.action.clone(),
+                w: o.weight,
+                p: ps[i],
+                why: format!("{:?}", o.why),
+            });
+        }
+    }
+
+    fn pick(&mut self, t_base: f32) -> usize {
         let n = self.buf.options.len();
         // §20.10 — nothing to decide, so do not pay for a softmax or consume a draw.
         if n <= 1 {
@@ -1688,6 +1757,14 @@ impl Agent for HeuristicAgent {
     fn act(&mut self, gs: &GameState) -> Action {
         let g = &gs.game;
         self.buf.clear();
+        // A prompt answered from the activation plan (20.1/20.2) or by a fixed rule makes no
+        // decision at all, so it must not appear to have made the previous one. Clearing here means
+        // an empty option set in the dump reads as 'replayed, nothing scored' - which is true, and
+        // is most Move prompts.
+        if self.dump_enabled {
+            self.last_options.clear();
+            self.last_chosen = 0;
+        }
 
         let prompt = match gs.current_prompt() {
             Some(p) => p.clone(),

@@ -1,0 +1,364 @@
+<title>Decision Replay</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#0e1013; --surface:#171a1f; --surface2:#1e222a; --line:#2a2f38;
+    --ink:#e6e8ec; --ink-dim:#98a0ad; --ink-faint:#6b7482;
+    --accent:#f0a020; --cool:#4b7fd6;
+    --home:#c0392b; --away:#3b6fb6;
+    --ok:#59b96b; --warn:#e0a33a;
+    --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    --cond:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+    --body:'Barlow',system-ui,-apple-system,sans-serif;
+  }
+  :root:not([data-theme="dark"]){}
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#0e1013; --surface:#171a1f; --surface2:#1e222a;
+    }
+  }
+  /* The pitch photo and the client's own icons are dark-ground artwork; a light chrome around
+     them would fight the subject, so this page commits to one look in both themes. */
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);
+       font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1240px;margin:0 auto;padding:22px 18px 60px}
+
+  header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:4px}
+  h1{font-family:var(--cond);font-weight:700;font-size:30px;letter-spacing:.01em;margin:0;
+     text-transform:uppercase}
+  .sub{color:var(--ink-dim);font-size:14px}
+  .lede{color:var(--ink-dim);max-width:74ch;margin:10px 0 20px;font-size:14.5px}
+  .lede b{color:var(--ink)}
+
+  /* scoreboard strip */
+  .board-head{display:flex;gap:0;align-items:stretch;background:var(--surface);
+              border:1px solid var(--line);border-bottom:none;border-radius:8px 8px 0 0;overflow:hidden}
+  .cell{padding:8px 14px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:1px}
+  .cell:last-child{border-right:none}
+  .cell .k{font-family:var(--cond);font-size:11px;letter-spacing:.11em;text-transform:uppercase;
+           color:var(--ink-faint)}
+  .cell .v{font-family:var(--mono);font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+  .cell.grow{flex:1}
+  .side-home .v{color:var(--home)} .side-away .v{color:var(--away)}
+
+  .stage{display:grid;grid-template-columns:minmax(0,782px) minmax(260px,1fr);gap:0;
+         border:1px solid var(--line);border-radius:0 0 8px 8px;overflow:hidden;background:var(--surface)}
+  .canvas-wrap{background:#000;position:relative;min-width:0}
+  canvas{display:block;width:100%;height:auto;image-rendering:pixelated}
+  .panel{border-left:1px solid var(--line);background:var(--surface);display:flex;
+         flex-direction:column;min-width:0}
+  .panel-head{padding:9px 12px;border-bottom:1px solid var(--line);display:flex;
+              justify-content:space-between;align-items:baseline;gap:8px}
+  .panel-head .t{font-family:var(--cond);font-size:13px;letter-spacing:.1em;text-transform:uppercase;
+                 color:var(--ink-dim)}
+  .panel-head .n{font-family:var(--mono);font-size:12px;color:var(--ink-faint)}
+  .opts{overflow-y:auto;max-height:452px;padding:4px 0}
+  .opt{display:grid;grid-template-columns:46px 1fr;gap:8px;align-items:center;
+       padding:3px 12px;font-family:var(--mono);font-size:11.5px;position:relative}
+  .opt.chosen{background:rgba(240,160,32,.14)}
+  .opt .pct{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-dim)}
+  .opt.chosen .pct{color:var(--accent);font-weight:600}
+  .opt .lab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-dim)}
+  .opt.chosen .lab{color:var(--ink)}
+  .opt .bar{position:absolute;left:0;top:0;bottom:0;opacity:.16;pointer-events:none}
+  .none{padding:22px 14px;color:var(--ink-dim);font-size:13.5px}
+  .none b{display:block;font-family:var(--cond);text-transform:uppercase;letter-spacing:.08em;
+          font-size:15px;color:var(--warn);margin-bottom:6px}
+
+  /* transport */
+  .transport{margin-top:14px;background:var(--surface);border:1px solid var(--line);
+             border-radius:8px;padding:12px 14px}
+  .track{position:relative;height:26px;margin-bottom:8px}
+  .ticks{position:absolute;inset:0 0 12px 0;display:flex;gap:0}
+  .tick{flex:1;min-width:0;background:var(--surface2)}
+  .tick.dec{background:#39424f}
+  .tick.cur{background:var(--accent)}
+  input[type=range]{position:absolute;left:0;right:0;bottom:0;width:100%;margin:0;accent-color:var(--accent)}
+  .btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  button{font-family:var(--cond);text-transform:uppercase;letter-spacing:.07em;font-size:13px;
+         font-weight:600;background:var(--surface2);color:var(--ink);border:1px solid var(--line);
+         border-radius:5px;padding:6px 11px;cursor:pointer}
+  button:hover{border-color:#3d4552;color:#fff}
+  button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .spacer{flex:1}
+  .hint{color:var(--ink-faint);font-size:12.5px}
+
+  .keys{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;color:var(--ink-dim);font-size:12.5px;
+        align-items:center}
+  .swatch{display:inline-block;width:26px;height:11px;border-radius:2px;vertical-align:-1px;
+          margin-right:6px}
+  .note{margin-top:22px;border:1px solid var(--line);border-left:3px solid var(--accent);
+        background:var(--surface);border-radius:0 8px 8px 0;padding:14px 16px;color:var(--ink-dim);
+        font-size:14px;max-width:80ch}
+  .note b{color:var(--ink)}
+  .note+.note{margin-top:12px}
+  code{font-family:var(--mono);font-size:.92em;background:var(--surface2);padding:1px 5px;
+       border-radius:3px;color:var(--ink)}
+  @media (max-width:900px){
+    .stage{grid-template-columns:1fr}
+    .panel{border-left:none;border-top:1px solid var(--line)}
+    .opts{max-height:300px}
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Decision Replay</h1>
+    <div class="sub">seed 1 &middot; sampled vs sampled &middot; human v human &middot; bb2025</div>
+  </header>
+  <p class="lede">Every prompt of one game, with the agent's <b>whole option distribution</b> — not just
+    what it picked. Square tint is the probability mass the agent put on acting there; the amber
+    outline is the option actually sampled. Board graphics are the FFB Java client's own pitch and
+    icon sets, at the client's own geometry.</p>
+
+  <div class="board-head">
+    <div class="cell"><span class="k">Step</span><span class="v" id="v-step">0</span></div>
+    <div class="cell" id="c-side"><span class="k">Deciding</span><span class="v" id="v-side">—</span></div>
+    <div class="cell grow"><span class="k">Prompt</span><span class="v" id="v-prompt">—</span></div>
+    <div class="cell"><span class="k">Half</span><span class="v" id="v-half">1</span></div>
+    <div class="cell"><span class="k">Turn</span><span class="v" id="v-turn">0</span></div>
+    <div class="cell"><span class="k">Score</span><span class="v" id="v-score">0–0</span></div>
+  </div>
+
+  <div class="stage">
+    <div class="canvas-wrap"><canvas id="board" width="782" height="452"></canvas></div>
+    <div class="panel">
+      <div class="panel-head"><span class="t">Options considered</span><span class="n" id="v-n"></span></div>
+      <div class="opts" id="opts"></div>
+    </div>
+  </div>
+
+  <div class="transport">
+    <div class="track">
+      <div class="ticks" id="ticks"></div>
+      <input type="range" id="scrub" min="0" value="0" step="1" aria-label="Step">
+    </div>
+    <div class="btns">
+      <button id="b-first">&#124;&#9664;</button>
+      <button id="b-prevd">&#9664;&#9664; Decision</button>
+      <button id="b-prev">&#9664;</button>
+      <button id="b-play">&#9654; Play</button>
+      <button id="b-next">&#9654;</button>
+      <button id="b-nextd">Decision &#9654;&#9654;</button>
+      <button id="b-last">&#9654;&#124;</button>
+      <span class="spacer"></span>
+      <span class="hint">&#8592; &#8594; step &middot; space play</span>
+    </div>
+  </div>
+
+  <div class="keys">
+    <span><span class="swatch" id="sw-heat"></span>probability mass on a square (low &rarr; high)</span>
+    <span><span class="swatch" style="background:transparent;border:2px solid #f0a020"></span>option sampled</span>
+    <span><span class="swatch" style="background:var(--home)"></span>home</span>
+    <span><span class="swatch" style="background:var(--away)"></span>away</span>
+    <span><span class="swatch" style="background:#ffe38a;border-radius:50%;width:11px"></span>ball</span>
+  </div>
+
+  <div class="note" id="note-replay">
+    <b>Most prompts are not decisions.</b> Of this game's 451 prompts, only <b>202</b> were scored.
+    The other <b>249</b> — including <b>194 of the 200 <code>Move</code> prompts</b> — were answered
+    straight from the activation plan or by a fixed rule, so no distribution exists for them. That is
+    §20.1 and §20.2 working: once a plain move has been delivered, moving again reaches the same
+    square, so the activation ends without scoring anything.
+  </div>
+  <div class="note">
+    <b>Two icons are substitutes.</b> <code>human.Ivar</code> and <code>human.halfling_hopeful</code>
+    have no sheet in this resource set, so they borrow the lineman icon and are marked with a gold
+    dot. Everything else is the client's real artwork, sliced the way
+    <code>PlayerIconFactory</code> slices it: <code>iconSize = sheet.width / 4</code>, column
+    0/1 = home standing/moving, 2/3 = away, row = <code>iconSetIndex</code>.
+  </div>
+</div>
+
+<script id="payload" type="application/json">__PAYLOAD__</script>
+<script>
+(function(){
+  var D = JSON.parse(document.getElementById('payload').textContent);
+  var SQ = D.sq, OX = 1, OY = 1, COLS = 26, ROWS = 15;
+  var DOWN = {3:1, 4:1};
+  var OFFPITCH = {5:1,6:1,7:1,8:1,9:1,10:1,13:1};
+  var cv = document.getElementById('board'), ctx = cv.getContext('2d');
+  var pitch = new Image(), icons = {}, ready = 0, need = 1;
+  var cur = 0, playing = null;
+
+  function heat(t){
+    t = Math.max(0, Math.min(1, t));
+    var r = Math.round(75 + 165*t), g = Math.round(127 + 33*t), b = Math.round(214 - 182*t);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + (0.24 + 0.52*t).toFixed(3) + ')';
+  }
+
+  // build the heat legend swatch from the same ramp the board uses
+  (function(){
+    var el = document.getElementById('sw-heat'), s = [];
+    for (var i = 0; i <= 10; i++) s.push(heat(i/10) + ' ' + (i*10) + '%');
+    el.style.background = 'linear-gradient(90deg,' + s.join(',') + ')';
+  })();
+
+  pitch.onload = function(){ ready++; maybe(); };
+  pitch.src = D.pitch;
+  Object.keys(D.icons).forEach(function(k){
+    need++;
+    var im = new Image();
+    im.onload = function(){ ready++; maybe(); };
+    im.src = D.icons[k].d;
+    icons[k] = {img: im, s: D.icons[k].s};
+  });
+
+  function maybe(){ if (ready >= need) { build(); draw(); } }
+
+  var scrub = document.getElementById('scrub'), ticks = document.getElementById('ticks');
+  function build(){
+    scrub.max = D.steps.length - 1;
+    var html = '';
+    for (var i = 0; i < D.steps.length; i++)
+      html += '<div class="tick' + (D.steps[i].o.length ? ' dec' : '') + '" data-i="' + i + '"></div>';
+    ticks.innerHTML = html;
+  }
+
+  function draw(){
+    var s = D.steps[cur];
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(pitch, 0, 0);
+
+    // ---- probability mass per square ----
+    var mass = {}, pmax = 0, chosenSq = null;
+    for (var i = 0; i < s.o.length; i++){
+      var a = s.o[i].a; if (!a) continue;
+      var k = a[0] + ',' + a[1];
+      mass[k] = (mass[k] || 0) + s.o[i].p;
+      if (i === s.ch) chosenSq = a;
+      if (mass[k] > pmax) pmax = mass[k];
+    }
+    if (pmax <= 0) pmax = 1;
+    Object.keys(mass).forEach(function(k){
+      var p = k.split(','), x = +p[0], y = +p[1];
+      ctx.fillStyle = heat(mass[k] / pmax);
+      ctx.fillRect(OX + x*SQ, OY + y*SQ, SQ, SQ);
+    });
+
+    // ---- players ----
+    for (var j = 0; j < s.ps.length; j++){
+      var pl = s.ps[j];
+      var id = pl[0], x = pl[1], y = pl[2], home = pl[3], pos = pl[4], base = pl[5], act = pl[6];
+      if (OFFPITCH[base] || x < 0 || x >= COLS || y < 0 || y >= ROWS) continue;
+      var ic = icons[pos]; if (!ic) continue;
+      var sz = ic.s;
+      var col = home ? (id === s.act ? 1 : 0) : (id === s.act ? 3 : 2);
+      var px = OX + x*SQ + (SQ - sz)/2, py = OY + y*SQ + (SQ - sz)/2;
+      ctx.save();
+      ctx.globalAlpha = act ? 1 : 0.45;
+      if (DOWN[base]){
+        ctx.translate(px + sz/2, py + sz/2);
+        ctx.rotate(Math.PI/2);
+        ctx.drawImage(ic.img, col*sz, 0, sz, sz, -sz/2, -sz/2, sz, sz);
+      } else {
+        ctx.drawImage(ic.img, col*sz, 0, sz, sz, px, py, sz, sz);
+      }
+      ctx.restore();
+      if (D.subs.indexOf(pos) >= 0){
+        ctx.fillStyle = '#ffd75a';
+        ctx.beginPath();
+        ctx.arc(OX + x*SQ + SQ - 5, OY + y*SQ + 5, 2.6, 0, 6.284);
+        ctx.fill();
+      }
+    }
+
+    // ---- ball ----
+    if (s.b){
+      ctx.beginPath();
+      ctx.arc(OX + s.b[0]*SQ + SQ/2, OY + s.b[1]*SQ + SQ/2, 4.6, 0, 6.284);
+      ctx.fillStyle = '#ffe38a'; ctx.fill();
+      ctx.lineWidth = 1.6; ctx.strokeStyle = '#2a2205'; ctx.stroke();
+    }
+
+    // ---- the option actually sampled ----
+    if (chosenSq){
+      ctx.lineWidth = 2.5; ctx.strokeStyle = '#f0a020';
+      ctx.strokeRect(OX + chosenSq[0]*SQ + 1.5, OY + chosenSq[1]*SQ + 1.5, SQ - 3, SQ - 3);
+    }
+
+    // ---- chrome ----
+    document.getElementById('v-step').textContent = s.i;
+    document.getElementById('v-side').textContent = s.side.toUpperCase();
+    document.getElementById('c-side').className = 'cell side-' + s.side;
+    document.getElementById('v-prompt').textContent = s.pr;
+    document.getElementById('v-half').textContent = s.hl;
+    document.getElementById('v-turn').textContent = s.t;
+    document.getElementById('v-score').textContent = s.hs + '–' + s.aw;
+    document.getElementById('v-n').textContent = s.o.length ? (s.o.length + ' options') : '';
+
+    var box = document.getElementById('opts');
+    if (!s.o.length){
+      box.innerHTML = '<div class="none"><b>No decision</b>Answered from the activation plan, or by '
+        + 'a fixed rule. Nothing was scored, so there is no distribution to show.</div>';
+    } else {
+      var idx = s.o.map(function(_, i){ return i; })
+                   .sort(function(a, b){ return s.o[b].p - s.o[a].p; });
+      var out = [];
+      for (var m = 0; m < idx.length; m++){
+        var i2 = idx[m], o = s.o[i2], w = Math.round(100 * o.p / pmaxOpt(s));
+        out.push('<div class="opt' + (i2 === s.ch ? ' chosen' : '') + '" title="' + esc(o.y)
+          + '  w=' + o.w + '">'
+          + '<span class="bar" style="width:' + w + '%;background:' + heat(o.p / pmaxOpt(s)) + '"></span>'
+          + '<span class="pct">' + (100*o.p).toFixed(1) + '%</span>'
+          + '<span class="lab">' + esc(o.l) + '</span></div>');
+      }
+      box.innerHTML = out.join('');
+    }
+    box.scrollTop = 0;
+
+    scrub.value = cur;
+    var t = ticks.children;
+    for (var q = 0; q < t.length; q++) t[q].classList.toggle('cur', q === cur);
+  }
+
+  function pmaxOpt(s){
+    var m = 0;
+    for (var i = 0; i < s.o.length; i++) if (s.o[i].p > m) m = s.o[i].p;
+    return m || 1;
+  }
+  function esc(t){
+    return String(t).replace(/[&<>"]/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+    });
+  }
+
+  function go(i){
+    cur = Math.max(0, Math.min(D.steps.length - 1, i));
+    draw();
+  }
+  function nextDecision(dir){
+    var i = cur + dir;
+    while (i > 0 && i < D.steps.length - 1 && !D.steps[i].o.length) i += dir;
+    go(i);
+  }
+  function togglePlay(){
+    var b = document.getElementById('b-play');
+    if (playing){ clearInterval(playing); playing = null; b.innerHTML = '&#9654; Play'; return; }
+    b.innerHTML = '&#10074;&#10074; Pause';
+    playing = setInterval(function(){
+      if (cur >= D.steps.length - 1){ togglePlay(); return; }
+      go(cur + 1);
+    }, 420);
+  }
+
+  scrub.addEventListener('input', function(){ go(+scrub.value); });
+  document.getElementById('b-first').onclick = function(){ go(0); };
+  document.getElementById('b-last').onclick  = function(){ go(D.steps.length - 1); };
+  document.getElementById('b-prev').onclick  = function(){ go(cur - 1); };
+  document.getElementById('b-next').onclick  = function(){ go(cur + 1); };
+  document.getElementById('b-prevd').onclick = function(){ nextDecision(-1); };
+  document.getElementById('b-nextd').onclick = function(){ nextDecision(1); };
+  document.getElementById('b-play').onclick  = togglePlay;
+  ticks.addEventListener('click', function(e){
+    var d = e.target.getAttribute('data-i');
+    if (d !== null) go(+d);
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowLeft'){ go(cur - 1); e.preventDefault(); }
+    else if (e.key === 'ArrowRight'){ go(cur + 1); e.preventDefault(); }
+    else if (e.key === ' '){ togglePlay(); e.preventDefault(); }
+  });
+})();
+</script>

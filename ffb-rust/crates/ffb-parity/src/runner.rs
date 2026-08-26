@@ -1054,6 +1054,21 @@ pub struct PlayerSnap {
     pub cur: bool,
 }
 
+/// One decision, with the board it was made on and the full distribution behind it.
+///
+/// Written only when `FFB_HEUR_DUMP=<path>` is set. The point of carrying every option and its
+/// probability -- rather than just the action taken -- is that the interesting thing to look at is
+/// what the agent *considered*: a pick tells you nothing about whether it was forced or a coin flip.
+#[derive(serde::Serialize)]
+pub struct DecisionRec {
+    pub i: usize,
+    pub side: String,
+    pub prompt: String,
+    pub chosen: usize,
+    pub options: Vec<ffb_engine::agent::ScoredOption>,
+    pub snap: GameSnap,
+}
+
 #[derive(serde::Serialize)]
 pub struct GameSnap {
     pub i: usize,
@@ -1351,6 +1366,8 @@ pub fn run_heuristic_game(
     // two badly here: the sharper arms produce ~70% more events per game, so they do more engine
     // work for reasons that have nothing to do with how long scoring takes.
     let timed = std::env::var_os("FFB_HEUR_TIME").is_some();
+    let dump_path = std::env::var("FFB_HEUR_DUMP").ok();
+    let mut dump: Vec<DecisionRec> = Vec::new();
     let mut agent_ns: u128 = 0;
     let mut engine_ns: u128 = 0;
     let mut decisions: u64 = 0;
@@ -1378,12 +1395,35 @@ pub fn run_heuristic_game(
         } else {
             ""
         };
+        // The snapshot has to be taken BEFORE the action is applied: the picture must show the
+        // board the agent was looking at when it scored, not the board its choice produced.
+        let pre_snap = if dump_path.is_some() {
+            Some(snap(&engine, dump.len(), String::new(), Vec::new()))
+        } else {
+            None
+        };
+        let dump_prompt: String = if dump_path.is_some() {
+            engine.current_prompt().map(prompt_class).unwrap_or("none").to_string()
+        } else {
+            String::new()
+        };
         let t0 = if timed { Some(std::time::Instant::now()) } else { None };
         let action = if matches!(side, TeamSide::Home) {
             home_agent.act(&engine)
         } else {
             away_agent.act(&engine)
         };
+        if let Some(sn) = pre_snap {
+            let ag = if matches!(side, TeamSide::Home) { &home_agent } else { &away_agent };
+            dump.push(DecisionRec {
+                i: dump.len(),
+                side: format!("{:?}", side).to_lowercase(),
+                prompt: dump_prompt,
+                chosen: ag.last_chosen,
+                options: ag.last_options.clone(),
+                snap: sn,
+            });
+        }
         if seq {
             eprintln!("SEQ {:>6} {:<22} -> {}", format!("{:?}", side), seq_class,
                       describe_action(&action));
@@ -1403,6 +1443,15 @@ pub fn run_heuristic_game(
             Ok(evs) => all_events.extend(evs),
             Err(e) => { eprintln!("engine error seed {seed}: {e}"); break; }
         }
+    }
+    if let Some(path) = &dump_path {
+        let mut out = String::new();
+        for r in &dump {
+            out.push_str(&serde_json::to_string(r).unwrap_or_default());
+            out.push('\n');
+        }
+        std::fs::write(path, out).expect("write heuristic dump");
+        eprintln!("HDUMP {} decisions -> {}", dump.len(), path);
     }
     if timed {
         let total_ns = loop_start.elapsed().as_nanos();
