@@ -3144,3 +3144,76 @@ self-inflicted.
 **Greedy scores twice as much against uniform (1.77) as against itself (0.88).** Which is the right
 shape — the self-play number is the harder test, and the one to track.
 
+---
+
+## 18. Runtime cost — measured
+
+§9 budgeted **< 100 ms of agent time per game** and, per prompt class, tens of microseconds a
+decision. Here is what it actually costs. All figures are release builds on one core, 100 games,
+bb2025 lineman v lineman.
+
+### 18.1 Clean wall clock, all logging off
+
+`FFB_QUIET=1` disables the per-seed event dump, the per-seed `println!`, and every trace. Nothing is
+written to disk and nothing is formatted.
+
+| Arm | 100 games | per game | per decision |
+|---|---|---|---|
+| UNIFORM `1e6` | 79.5 s | 795 ms | 2402 µs |
+| SAMPLED `1.0` | 120.9 s | 1209 ms | 2025 µs |
+| GREEDY `0.01` | 123.6 s | 1236 ms | 1372 µs |
+| ARGMAX `0` | 109.4 s | 1094 ms | 1245 µs |
+
+For reference, with the event dump and per-seed line on: 84.1 / 125.5 / 153.7 / 138.7 s. So the
+logging was costing **5–20%** — real, but not the story.
+
+**The story is that this is 11–12× over the per-game budget and 25–48× over the per-decision one.**
+That is a clean miss and it should be recorded as one.
+
+### 18.2 Agent time versus engine time
+
+`FFB_HEUR_TIME=1` brackets each `act()` and each `apply()` separately. Per-game wall clock confounds
+them badly here, because the sharper arms produce ~70% more events per game and therefore do more
+*engine* work for reasons that have nothing to do with scoring. 40 games per arm:
+
+| Arm | decisions / game | agent ms / game | engine ms / game | **agent share** |
+|---|---|---|---|---|
+| UNIFORM | 331 | 682 | 36.0 | **95%** |
+| SAMPLED | 597 | 1043 | 57.9 | **95%** |
+| GREEDY | 901 | 1149 | 79.9 | **93%** |
+| ARGMAX | 879 | 1046 | 77.9 | **93%** |
+
+**The engine is 36–80 ms per game. The agent is 680–1150 ms.** Scoring is 93–95% of the total, so
+every bit of the overrun is the agent's, and the engine — the thing doing the actual Blood Bowl — is
+already comfortably inside what the whole budget allowed.
+
+### 18.3 Why — and it is exactly what was predicted
+
+**None of P5, P6 or P7 is implemented.** §15 listed the caching work; §16 built the play logic
+without it. The measured cost is the predicted cost of that decision, and the four causes are, in
+expected order of size:
+
+1. **`reachable` is called O(players) times per activation prompt, and never cached.** §6.5.1's Move
+   branch runs a Dijkstra per eligible player, and the Blitz branch runs another — up to **22
+   Dijkstras for a single `ActivatePlayer`**. This is D5, which §14 "fixed" in the *spec* by
+   specifying a two-tier scorer, and which this build does not do.
+2. **`Board::new()` is rebuilt on every `act()` call.** The tackle-zone map, the row prefixes and the
+   carrier lookup are recomputed from scratch for every decision, including the many decisions that
+   do not read them. This is what §3's `positions_stamp` exists to prevent.
+3. **`threat_on` is O(players) per square, not a precomputed map.** Scoring a ~200-square `Move`
+   prompt walks all 22 players per square — ~4400 iterations, each doing a distance and a strength
+   comparison — and `path_share` walks them again for the `Screen` intent. §5.2 specifies a bounded,
+   cached threat map; this build has neither.
+4. **The Dijkstra itself is naive.** A `HashMap` for the visited set, a **linear scan** over the
+   frontier to find the minimum (O(n²)), and a full `Vec` clone of the path on every improvement.
+
+Nothing here is surprising and nothing here is deep. It is one caching layer, specified in three
+items that were deliberately deferred, and the measurement now says what deferring them costs:
+**roughly an order of magnitude.**
+
+### 18.4 What it does not block
+
+At ~1.2 s per game a 100-seed matrix run costs about two minutes, which is why none of this got in
+the way of §16 or §17. It matters for two things and no others: a coverage sweep across 30 rosters ×
+3 editions × 100 seeds would take hours rather than minutes, and any future search would be paying
+this per node. Fix P5–P7 before either.

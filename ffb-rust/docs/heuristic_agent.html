@@ -1617,6 +1617,79 @@ referee_spots_foul = armor[0] == armor[1];              <span class="c">// doubl
         </div></div>
       </section>
 
+      <!-- 18 -->
+      <section id="s18">
+        <div class="sec-head"><span class="idx">§18</span><h2>Runtime cost — measured</h2></div>
+        <p class="sec-desc">§9 budgeted <b>&lt; 100 ms of agent time per game</b> and tens of microseconds per
+        decision. Here is what it actually costs — release build, one core, 100 games, bb2025 lineman v
+        lineman.</p>
+
+        <h3>Clean wall clock, all logging off</h3>
+        <p><code>FFB_QUIET=1</code> disables the per-seed event dump, the per-seed <code>println!</code> and
+        every trace. Nothing written to disk, nothing formatted.</p>
+        <div class="card scroll">
+          <table>
+            <thead><tr><th>Arm</th><th class="num">100 games</th><th class="num">per game</th><th class="num">per decision</th></tr></thead>
+            <tbody>
+              <tr><td>UNIFORM <code>1e6</code></td><td class="num">79.5 s</td><td class="num">795 ms</td><td class="num bad">2402 µs</td></tr>
+              <tr><td>SAMPLED <code>1.0</code></td><td class="num">120.9 s</td><td class="num">1209 ms</td><td class="num bad">2025 µs</td></tr>
+              <tr><td>GREEDY <code>0.01</code></td><td class="num">123.6 s</td><td class="num">1236 ms</td><td class="num bad">1372 µs</td></tr>
+              <tr><td>ARGMAX <code>0</code></td><td class="num">109.4 s</td><td class="num">1094 ms</td><td class="num bad">1245 µs</td></tr>
+            </tbody>
+          </table>
+          <div class="cap">With the event dump and per-seed line on: 84.1 / 125.5 / 153.7 / 138.7 s — so logging was costing 5–20%. Real, but not the story.</div>
+        </div>
+        <div class="note red"><span class="dot"></span><div>
+          <p><b>This is 11–12× over the per-game budget and 25–48× over the per-decision one.</b> A clean
+          miss, recorded as one.</p>
+        </div></div>
+
+        <h3>Agent time versus engine time</h3>
+        <p><code>FFB_HEUR_TIME=1</code> brackets each <code>act()</code> and each <code>apply()</code>
+        separately — necessary because the sharper arms produce ~70% more events per game and so do more
+        <em>engine</em> work for reasons unrelated to scoring. 40 games per arm:</p>
+        <div class="card scroll">
+          <table>
+            <thead><tr><th>Arm</th><th class="num">decisions / game</th><th class="num">agent ms / game</th><th class="num">engine ms / game</th><th class="num">agent share</th></tr></thead>
+            <tbody>
+              <tr><td>UNIFORM</td><td class="num">331</td><td class="num bad">682</td><td class="num good">36.0</td><td class="num bad"><b>95%</b></td></tr>
+              <tr><td>SAMPLED</td><td class="num">597</td><td class="num bad">1043</td><td class="num good">57.9</td><td class="num bad"><b>95%</b></td></tr>
+              <tr><td>GREEDY</td><td class="num">901</td><td class="num bad">1149</td><td class="num good">79.9</td><td class="num bad"><b>93%</b></td></tr>
+              <tr><td>ARGMAX</td><td class="num">879</td><td class="num bad">1046</td><td class="num good">77.9</td><td class="num bad"><b>93%</b></td></tr>
+            </tbody>
+          </table>
+          <div class="cap">The engine is 36–80 ms per game; the agent is 680–1150 ms. Scoring is 93–95% of the total, so the whole overrun is the agent's — and the engine is already comfortably inside what the entire budget allowed.</div>
+        </div>
+
+        <h3>Why — and it is exactly what was predicted</h3>
+        <p><b>None of P5, P6 or P7 is implemented.</b> §15 listed the caching work; §16 built the play logic
+        without it. The measured cost is the predicted cost of that choice. Four causes, in expected order of
+        size:</p>
+        <ol class="body">
+          <li><b><code>reachable</code> is called O(players) times per activation, and never cached.</b>
+            §6.5.1's Move branch runs a Dijkstra per eligible player and the Blitz branch runs another — up to
+            <b>22 Dijkstras for one <code>ActivatePlayer</code></b>. This is D5, which §14 fixed in the
+            <em>spec</em> by specifying a two-tier scorer, and which this build does not do.</li>
+          <li><b><code>Board::new()</code> is rebuilt on every <code>act()</code>.</b> The tackle-zone map, row
+            prefixes and carrier lookup are recomputed for every decision, including those that never read
+            them — exactly what §3's <code>positions_stamp</code> exists to prevent.</li>
+          <li><b><code>threat_on</code> is O(players) per square</b>, not a precomputed map. A ~200-square
+            <code>Move</code> prompt walks all 22 players per square (~4400 iterations), and
+            <code>path_share</code> walks them again for the <code>Screen</code> intent.</li>
+          <li><b>The Dijkstra is naive</b> — a <code>HashMap</code> visited set, a <b>linear scan</b> over the
+            frontier to find the minimum (O(n²)), and a full <code>Vec</code> clone of the path on every
+            improvement.</li>
+        </ol>
+        <p>None of this is deep. It is one caching layer, specified in three deliberately-deferred items, and
+        the measurement now says what deferring them costs: <b>roughly an order of magnitude</b>.</p>
+
+        <h3>What it does not block</h3>
+        <p>At ~1.2 s per game a 100-seed run costs about two minutes, which is why none of this got in the way
+        of §16 or §17. It matters for exactly two things: a sweep across 30 rosters × 3 editions × 100 seeds
+        would take hours rather than minutes, and any future search would pay this per node. Fix P5–P7 before
+        either.</p>
+      </section>
+
       <footer>
         <span>FFB-Rust · <code class="mono">docs/HEURISTIC_AGENT.md</code></span>
         <span>Design specification — not yet implemented</span>
@@ -1635,7 +1708,7 @@ const SECTIONS = [
   ['s7','Worked examples','7'], ['s8','Temperature table','8'],
   ['s9','Performance budget','9'], ['s10','Testing & calibration','10'],
   ['s11','Parity implications','11'], ['s12','Implementation plan','12'], ['s13','Open questions','13'],
-  ['s14','Review backlog','14'], ['s15','Proposed — round two','15'], ['s16','The experiment','16'], ['s17','Per-agent results','17'],
+  ['s14','Review backlog','14'], ['s15','Proposed — round two','15'], ['s16','The experiment','16'], ['s17','Per-agent results','17'], ['s18','Runtime cost','18'],
 ];
 document.getElementById('rail').innerHTML = SECTIONS.map(([id,label,n])=>
   `<li><a href="#${id}" data-t="${id}"><span class="n">${n}</span><span>${label}</span></a></li>`).join('');

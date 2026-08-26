@@ -142,20 +142,26 @@ fn main() {
         } else {
             "heuristic"
         };
-        std::fs::create_dir_all(&args.out_dir).ok();
+        let quiet = std::env::var_os("FFB_QUIET").is_some();
+        if !quiet { std::fs::create_dir_all(&args.out_dir).ok(); }
         eprintln!("Running {} seeds with HeuristicAgent (temp_scale={scale}, arm={label})                    {} vs {} {}", args.seed_end - args.seed_start + 1, args.home, args.away, args.edition);
         let t0 = std::time::Instant::now();
         for seed in args.seed_start..=args.seed_end {
             let (events, sh, sa) = runner::run_heuristic_game(
                 seed, &args.home, &args.away, &args.edition, scale, args.heuristic_away);
-            let mut out = String::new();
-            for e in &events {
-                out.push_str(&serde_json::to_string(e).unwrap_or_default());
-                out.push('\n');
+            if quiet {
+                // FFB_QUIET: no event dump, no per-seed line. For runtime measurement only.
+                std::hint::black_box((&events, sh, sa));
+            } else {
+                let mut out = String::new();
+                for e in &events {
+                    out.push_str(&serde_json::to_string(e).unwrap_or_default());
+                    out.push('\n');
+                }
+                let path = format!("{}/seed_{}_{}_events.jsonl", args.out_dir, seed, label);
+                std::fs::write(&path, out).expect("write events");
+                println!("seed {seed}: score {sh}-{sa}, {} events", events.len());
             }
-            let path = format!("{}/seed_{}_{}_events.jsonl", args.out_dir, seed, label);
-            std::fs::write(&path, out).expect("write events");
-            println!("seed {seed}: score {sh}-{sa}, {} events", events.len());
         }
         eprintln!("done in {:.1}s", t0.elapsed().as_secs_f32());
         return;
