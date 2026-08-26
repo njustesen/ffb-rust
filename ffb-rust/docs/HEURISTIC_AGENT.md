@@ -3617,11 +3617,11 @@ read the rasters. That is worth 7.6 ms/game on its own: `BlockChoice` 86 → 7.6
 
 ## 22. Per-agent report
 
-**Every number below is one agent's own.** Nothing is combined across the two teams.
+**Every number is one agent's own, pooled across home and away.** Nothing is combined across the two
+teams, and the colour split is gone — it was noise, not signal.
 
-Worth stating plainly, because §21 and §22 used different units and that is easy to misread: §21's
-`1.76 → 2.15` touchdowns is **both agents added together**. Per agent that is **0.88 → 1.08**. The
-rate went up by 22%; it did not fall to 1.
+Worth stating plainly, because §21 and §22 use different units: §21's `1.76 → 2.15` touchdowns is
+**both agents added together**. Per agent that is **0.88 → 1.08**. The rate went *up* by 22%.
 
 Three policies, all the *same program* with one parameter (§1):
 
@@ -3631,96 +3631,103 @@ Three policies, all the *same program* with one parameter (§1):
 | **SAMPLED** | `1` | the §8 temperature table, with §6.5.2's coverage floor live |
 | **RANDOM** | `1e6` | uniform sampling over the identical option set |
 
-Nine runs of 100 seeds, `human` v `human`, bb2025. The "vs" tables pool the two colours **by agent**,
-so the home/away asymmetry cancels and each column is 200 games.
+### 22.1 Touchdowns as raw counts
 
-### 22.1 Self-play — each policy against itself
+Rates are easy to misread at these magnitudes, so the self-play data as integers first:
 
-| per agent per game | GREEDY h | GREEDY a | SAMPLED h | SAMPLED a | RANDOM h | RANDOM a |
-|---|---|---|---|---|---|---|
-| **Touchdowns** | **0.99** | **1.16** | 0.19 | 0.12 | 0.03 | 0.02 |
-| Wins | 0.28 | 0.35 | 0.16 | 0.10 | 0.03 | 0.02 |
-| Draws | 0.37 | 0.37 | 0.74 | 0.74 | 0.95 | 0.95 |
-| Losses | 0.35 | 0.28 | 0.10 | 0.16 | 0.02 | 0.03 |
-| Activations | 111.79 | 112.33 | 64.52 | 66.72 | 53.04 | 53.73 |
-| Squares moved | 386.84 | 417.48 | 199.89 | 219.31 | 157.96 | 169.41 |
-| Team turns | 17.83 | 17.91 | 17.11 | 17.06 | 16.94 | 16.93 |
-| **— attack** | | | | | | |
-| Blocks thrown | 16.88 | 15.41 | 7.84 | 7.63 | 6.73 | 6.78 |
-| Blitzes declared | 3.59 | 3.17 | 3.61 | 3.53 | 3.33 | 3.12 |
-| Blitzes that blocked | 2.96 | 2.76 | 2.70 | 2.48 | 2.37 | 2.05 |
-| Knockdowns inflicted | 7.24 | 7.68 | 3.50 | 3.24 | 2.72 | 2.66 |
-| Injuries inflicted | 7.37 | 7.91 | 4.76 | 4.35 | 3.84 | 3.85 |
-| KOs inflicted | 0.49 | 0.59 | 0.41 | 0.35 | 0.22 | 0.27 |
-| Casualties inflicted | 0.50 | 0.57 | 0.33 | 0.32 | 0.22 | 0.24 |
-| Fouls | 0.09 | 0.19 | 1.23 | 1.10 | 1.12 | 1.18 |
-| Own players ejected | 0.02 | 0.02 | 0.24 | 0.21 | 0.16 | 0.25 |
-| **— defence / ball** | | | | | | |
-| **Forced fumbles (block)** | **0.37** | **0.48** | 0.21 | 0.17 | 0.11 | 0.18 |
-| Interceptions | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.01 |
-| Fumble recoveries | 0.00 | 0.00 | 0.04 | 0.03 | 0.04 | 0.03 |
-| Own fumbles | 0.14 | 0.19 | 0.15 | 0.05 | 0.25 | 0.11 |
-| Own falls | **1.78** | **2.14** | 2.50 | 2.16 | 2.96 | 3.13 |
-| **— ball handling** | | | | | | |
-| Pickup attempts | 0.74 | 1.95 | 2.55 | 2.99 | 2.21 | 2.11 |
-| Balls picked up | 0.43 | 1.27 | 1.54 | 1.78 | 1.39 | 1.32 |
-| Passes thrown | 0.00 | 0.00 | 2.87 | 2.60 | 2.94 | 2.52 |
-| Passes fumbled | 0.00 | 0.00 | 0.94 | 0.90 | 1.05 | 0.70 |
-| Completions | 0.00 | 0.00 | 0.94 | 0.90 | 0.78 | 0.74 |
-| Hand-offs | 0.08 | 0.14 | 1.22 | 1.15 | 0.87 | 0.79 |
-| GFI rolls | 0.31 | 0.84 | 1.30 | 1.79 | 1.88 | 2.27 |
-| Dodge rolls | 9.63 | 10.17 | 9.88 | 9.68 | 11.62 | 11.50 |
-| **— rates** | | | | | | |
-| Squares / activation | 3.46 | 3.72 | 3.10 | 3.29 | 2.98 | 3.15 |
-| Blitz follow-through | 82.5% | 87.1% | 74.8% | 70.3% | 71.2% | 65.7% |
-| **Knockdowns / block** | **42.9%** | **49.8%** | 44.6% | 42.5% | 40.4% | 39.2% |
-| Fumbles forced / block | 2.2% | 3.1% | 2.7% | 2.2% | 1.6% | 2.7% |
-| Pickup success | 58.1% | 65.1% | 60.4% | 59.5% | 62.9% | 62.6% |
-| Skulls kept over a better die | **0.00** | **0.00** | 0.12 | 0.08 | 0.32 | 0.34 |
+| | touchdowns in 100 games | games with any touchdown | most by one agent in one game |
+|---|---|---|---|
+| **GREEDY** | **215** | 96 / 100 | 3 |
+| **SAMPLED** | **31** | 28 / 100 | 2 |
+| **RANDOM** | **5** | **5 / 100** | **1** |
 
-### 22.2 Against random, pooled over both colours
+The random arm scored **five touchdowns across the entire 100-game run**, never twice in a game, and
+**195 of its 200 agent-games were scoreless**. So ~5% of random matches contain a touchdown — which
+matches the ~7% prior this work started from, and is a useful check that the runs are sane.
 
-| per agent per game | GREEDY | its RANDOM | SAMPLED | its RANDOM |
-|---|---|---|---|---|
-| games | 200 | 200 | 200 | 200 |
-| **Touchdowns** | **0.89** | 0.01 | 0.17 | 0.03 |
-| Wins / Draws / Losses | **0.76 / 0.23 / 0.01** | 0.01 / 0.23 / 0.76 | 0.15 / 0.83 / 0.01 | 0.01 / 0.83 / 0.15 |
-| Activations | 112.13 | 54.94 | 63.17 | 52.77 |
-| Squares moved | 349.21 | 168.30 | 199.65 | 165.42 |
-| Blocks thrown | 15.22 | 6.50 | 8.00 | 6.32 |
-| Knockdowns inflicted | 7.68 | 2.44 | 3.43 | 2.60 |
-| Injuries inflicted | 7.91 | 3.10 | 4.86 | 3.50 |
-| KOs / casualties inflicted | 0.72 / 0.71 | 0.23 / 0.17 | 0.33 / 0.28 | 0.26 / 0.23 |
-| Fouls | 0.17 | 0.66 | 1.42 | 0.89 |
-| **Forced fumbles (block)** | **0.39** | 0.12 | 0.19 | 0.12 |
-| Interceptions | 0.00 | 0.00 | 0.00 | 0.01 |
-| Fumble recoveries | 0.03 | 0.00 | 0.04 | 0.02 |
-| Own fumbles | 0.10 | 0.15 | 0.15 | 0.10 |
-| Own falls | **1.54** | 2.50 | 2.70 | 2.70 |
-| Pickup attempts / secured | 1.43 / 0.81 | 3.04 / 1.81 | 2.71 / 1.68 | 2.34 / 1.36 |
-| Passes / completions | 0.00 / 0.00 | 4.21 / 1.43 | 2.54 / 0.73 | 2.77 / 0.83 |
-| **Knockdowns / block** | **50.5%** | 37.4% | 42.9% | 41.2% |
-| Blitz follow-through | **88.3%** | 68.6% | 78.6% | 64.5% |
-| Skulls kept over a better die | **0.00** | 0.31 | 0.08 | 0.29 |
+### 22.2 Self-play — each policy against itself
 
-Head-to-head, 200 games: greedy **152–46–2**, sampled **30–167–3**.
+| per agent per game | **GREEDY** | **SAMPLED** | **RANDOM** |
+|---|---|---|---|
+| agent-games | 200 | 200 | 200 |
+| **Touchdowns** | **1.07** | 0.15 | 0.03 |
+| Activations | 112.06 | 65.62 | 53.38 |
+| Squares moved | 402.16 | 209.60 | 163.69 |
+| Squares per activation | 3.59 | 3.19 | 3.07 |
+| **ATTACK** | | | |
+| Blocks thrown | 16.14 | 7.74 | 6.75 |
+| Blitzes declared | 3.38 | 3.57 | 3.23 |
+| Blitzes that blocked | 2.86 | 2.59 | 2.21 |
+| **Blitz follow-through** | **84.6%** | 72.5% | 68.5% |
+| Knockdowns inflicted | 7.46 | 3.37 | 2.69 |
+| **Knockdowns per block** | **46.2%** | 43.6% | 39.8% |
+| Injuries inflicted | 7.64 | 4.55 | 3.85 |
+| KOs inflicted | 0.54 | 0.38 | 0.24 |
+| Casualties inflicted | 0.54 | 0.33 | 0.23 |
+| Fouls | 0.14 | 1.17 | 1.15 |
+| Own players ejected | 0.02 | 0.23 | 0.20 |
+| **DEFENCE** | | | |
+| **Forced fumbles (from a block)** | **0.42** | 0.19 | 0.14 |
+| Fumbles forced per block | 2.6% | 2.5% | 2.1% |
+| Interceptions | 0.00 | 0.00 | 0.01 |
+| Fumble recoveries | 0.00 | 0.04 | 0.04 |
+| Own fumbles | 0.17 | 0.10 | 0.18 |
+| **Own falls** | **1.96** | 2.33 | 3.04 |
+| **BALL** | | | |
+| Pickup attempts | 1.34 | 2.77 | 2.16 |
+| Balls picked up | 0.85 | 1.66 | 1.35 |
+| Pickup success | 63.2% | 59.9% | 62.7% |
+| Passes thrown | 0.00 | 2.73 | 2.73 |
+| Completions | 0.00 | 0.92 | 0.76 |
+| Hand-offs | 0.11 | 1.19 | 0.83 |
+| GFI rolls | 0.57 | 1.54 | 2.08 |
+| Dodge rolls | 9.90 | 9.78 | 11.56 |
+| **Skulls kept over a better die** | **0.00** | 0.10 | 0.33 |
 
-### 22.3 Greedy against sampled, pooled
+### 22.3 Against random
 
-| per agent per game | GREEDY | SAMPLED |
-|---|---|---|
-| **Touchdowns** | **0.91** | 0.15 |
-| Wins / Draws / Losses | **0.63 / 0.33 / 0.05** | 0.05 / 0.33 / 0.63 |
-| Blocks thrown | 15.80 | 8.01 |
-| Knockdowns inflicted | 7.58 | 3.14 |
-| Forced fumbles (block) | 0.43 | 0.24 |
-| Own falls | 1.58 | 2.36 |
-| Passes / completions | 0.00 / 0.00 | 3.52 / 1.29 |
-| Knockdowns / block | **48.0%** | 39.2% |
+| per agent per game | **GREEDY** | **SAMPLED** | **RANDOM** |
+|---|---|---|---|
+| agent-games | 200 | 200 | 400 |
+| **Touchdowns** | **0.89** | 0.17 | 0.02 |
+| Activations | 112.13 | 63.17 | 53.85 |
+| Squares moved | 349.21 | 199.65 | 166.86 |
+| Squares per activation | 3.11 | 3.16 | 3.10 |
+| **ATTACK** | | | |
+| Blocks thrown | 15.22 | 8.00 | 6.41 |
+| Blitzes declared | 1.75 | 3.69 | 3.20 |
+| Blitzes that blocked | 1.55 | 2.90 | 2.13 |
+| **Blitz follow-through** | **88.3%** | 78.6% | 66.6% |
+| Knockdowns inflicted | 7.68 | 3.43 | 2.52 |
+| **Knockdowns per block** | **50.5%** | 42.9% | 39.3% |
+| Injuries inflicted | 7.91 | 4.86 | 3.31 |
+| KOs inflicted | 0.72 | 0.33 | 0.24 |
+| Casualties inflicted | 0.71 | 0.28 | 0.20 |
+| Fouls | 0.17 | 1.42 | 0.78 |
+| Own players ejected | 0.04 | 0.20 | 0.14 |
+| **DEFENCE** | | | |
+| **Forced fumbles (from a block)** | **0.39** | 0.19 | 0.12 |
+| Fumbles forced per block | 2.6% | 2.4% | 1.8% |
+| Interceptions | 0.00 | 0.00 | 0.00 |
+| Fumble recoveries | 0.03 | 0.04 | 0.01 |
+| Own fumbles | 0.10 | 0.15 | 0.13 |
+| **Own falls** | **1.54** | 2.70 | 2.60 |
+| **BALL** | | | |
+| Pickup attempts | 1.43 | 2.71 | 2.69 |
+| Balls picked up | 0.81 | 1.68 | 1.59 |
+| Pickup success | 56.8% | 62.0% | 59.0% |
+| Passes thrown | 0.00 | 2.54 | 3.48 |
+| Completions | 0.00 | 0.73 | 1.13 |
+| Hand-offs | 0.10 | 1.09 | 1.24 |
+| GFI rolls | 0.49 | 1.58 | 1.64 |
+| Dodge rolls | 7.18 | 10.48 | 10.73 |
+| **Skulls kept over a better die** | **0.00** | 0.08 | 0.30 |
 
-**126 wins, 65 draws, 9 losses** for greedy over 200 games.
+Records over 200 games: greedy beats random **152–46–2**, sampled beats random **30–167–3**, and greedy beats sampled **126–65–9**.
 
-### 22.4 Runtime, per agent
+The RANDOM column pools its games against both opponents, so it is 400 agent-games.
+
+### 22.4 Runtime
 
 | | GREEDY | SAMPLED | RANDOM |
 |---|---|---|---|
@@ -3736,52 +3743,52 @@ they end their turns sooner.
 ### 22.5 How the defensive numbers are derived
 
 The engine emits **no `fumble` and no `interception` GameEvent**, so both are reconstructed from the
-event sequence. Stating the detectors, because the numbers are only as good as they are:
+event sequence. The detectors, stated because the numbers are only as good as they are:
 
 | | detector |
 |---|---|
 | **forced fumble** | a `blockRoll` by A, then a `playerFellDown` at coord C of a player *not* on A's team, then a `scatterBall` whose `from` is C. Credited to A |
 | own fumble | the same shape, but the player who fell is on the acting team |
 | **interception** | a successful `catchRoll` by an opponent of the thrower with **no** `scatterBall` between it and the `passRoll` — the ball was taken in flight |
-| fumble recovery | a successful `catchRoll` by an opponent **after** a `scatterBall` — the ball was loose, not intercepted. Kept separate because it is a different skill |
+| fumble recovery | a successful `catchRoll` by an opponent **after** a `scatterBall` — the ball was loose, not intercepted |
 | completion | a successful `catchRoll` by a team-mate of the thrower, no scatter between |
 
 **The interception row is a measurement gap, not a verdict.** The `Interception` prompt *does* fire —
 0.36 times per game in the passing arm — so the mechanic is reachable and the agent is being asked.
-But with no interception event in the stream, the sequence proxy above is the only observable, and
-it reads 0.00–0.01 everywhere. Measuring this properly needs an engine-side event, which is
-deliberately out of scope until parity is settled.
+But with no interception event in the stream the sequence proxy above is the only observable, and it
+reads 0.00–0.01 everywhere. Measuring it properly needs an engine-side event, which stays out of
+scope until parity is settled.
 
 ### 22.6 What the three arms say
 
-**Greedy is the strength arm and its defence is the clearest part of the gap.** Against random it
-lands **50.5% knockdowns per block** against 37.4%, forces **0.39 fumbles a game** against 0.12
-(3.3×), and falls over **1.54** times against 2.50. It never kept a Skull over a better die in 400
-agent-games. Blitz follow-through 88.3% against 68.6%.
+**Greedy is the strength arm, and defence is the clearest part of the gap.** Against random it lands
+**50.5% knockdowns per block** against 39.3%, forces **0.39 fumbles a game** against 0.12, and falls
+over **1.54** times against 2.60. It never kept a Skull over a better die in 400 agent-games. Blitz
+follow-through 88.3% against 66.6%.
 
-**Sampled is the coverage arm, and it costs almost all of the play strength.** 0.19/0.12 touchdowns
-in self-play — closer to random (0.03) than to greedy (1.08) — and it loses to greedy 9–126. This is
-**by construction, not a defect**: §6.5.2's coverage floor is live at any `temp_scale ≥ 0.1` and
-tops out at 0.35, while genuine option weights sit near 0.15. The floor therefore *outranks* real
-play, which is exactly what makes the arm explore. The bill is visible in the table: fouls 1.23
-against greedy's 0.09, ejections 0.24 against 0.02.
+**Sampled is the coverage arm, and it costs nearly all of the play strength.** 0.15 touchdowns in
+self-play — closer to random (0.03) than to greedy (1.07) — and it loses to greedy 9–126. This is
+**by construction, not a defect**: §6.5.2's coverage floor is live at any `temp_scale ≥ 0.1` and tops
+out at 0.35, while genuine option weights sit near 0.15. The floor therefore *outranks* real play,
+which is exactly what makes the arm explore. The bill is in the table: fouls 1.17 against greedy's
+0.14, ejections 0.23 against 0.02.
 
-**But it buys almost no coverage over greedy.** Distinct event types: greedy **40**, sampled **41**,
-random **41** — and the single type greedy misses is **`passRoll`**. Every other mechanic these runs
-reach, greedy reaches too. So the coverage arm currently justifies itself on one event type, and
-that one is dead for a reason already known (§22.7). Fix passing and the case for running a
-separate sampled arm at this temperature largely disappears.
+**But it buys almost no coverage.** Distinct event types: greedy **40**, sampled **41**, random
+**41** — and the one type greedy misses is **`passRoll`**. Every other mechanic these runs reach,
+greedy reaches too. So the coverage arm currently justifies itself on a single event type, and that
+one is dead for a reason already known. Fix passing and the case for a separate sampled arm at this
+temperature largely disappears.
 
-### 22.7 The two open items, unchanged and now better evidenced
+### 22.7 The two open items, now better evidenced
 
-**Passing.** Greedy throws zero. The *identical enumeration* throws 2.54–4.21 a game once sampled,
-so the receivers, the plan and the engine dispatch all work — the option is enumerated and then
-priced out. `pass_weight`'s distance-banded `p_complete` cannot beat the carrier's ×1.4 turnover
-cost at any range. Note the sampled arm's own numbers argue the *weights* are not simply too
-pessimistic: it fumbles 0.86–0.94 of every ~2.6 passes, a ~35% fumble rate, so a hard prior against
-throwing is not wrong — it is just too hard. This needs the real range ruler, not a constant.
+**Passing.** Greedy throws zero. The *identical enumeration* throws 2.5–3.5 a game once sampled, so
+the receivers, the plan and the engine dispatch all work — the option is enumerated and then priced
+out. `pass_weight`'s distance-banded `p_complete` cannot beat the carrier's ×1.4 turnover cost at any
+range. The sampled arm's own numbers argue the weights are not simply too pessimistic: it completes
+only 0.92 of every 2.73 throws, so a hard prior against passing is not wrong — it is just too hard.
+This needs the real range ruler, not a constant.
 
-**Ball contest.** Greedy still loses the ball race to random: 1.43 pickup attempts a game against
-random's 3.04, and 0.81 secured against 1.81. It scores fewer touchdowns against random (0.89) than
-against itself (0.99/1.16), which should not happen against a weaker opponent, and this is the
-mechanism — a ball it never holds is a ball it cannot score with.
+**Ball contest.** Greedy loses the ball race to random: **1.43 pickup attempts a game against 2.69**,
+and 0.81 secured against 1.59. It scores fewer touchdowns against random (0.89) than against itself
+(1.07), which should not happen against a weaker opponent — and this is the mechanism. A ball it
+never holds is a ball it cannot score with.
