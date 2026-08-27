@@ -645,6 +645,13 @@ mod tests {
         use ffb_model::enums::PlayerState;
         let mut game = make_game();
         game.acting_player.standing_up = true;
+        // The acting player must actually BE on the acting team: a team re-roll is only offered
+        // for the acting team's own roll (Java `RollMechanic.isTeamReRollAvailable` opens with
+        // `actingTeam.hasPlayer(pPlayer)`); these fixtures used to set only the id.
+        let mut p1 = ffb_model::model::player::Player::default();
+        p1.id = "p1".into();
+        p1.movement = 2; // MA < 3 keeps the stand-up on the ROLLED path these tests exercise
+        game.team_home.players.push(p1);
         game.acting_player.player_id = Some("p1".into());
         game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE).change_rooted(true));
         let mut step = StepStandUp::new("fail".into());
@@ -669,6 +676,13 @@ mod tests {
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         game.acting_player.standing_up = true;
+        // The acting player must actually BE on the acting team: a team re-roll is only offered
+        // for the acting team's own roll (Java `RollMechanic.isTeamReRollAvailable` opens with
+        // `actingTeam.hasPlayer(pPlayer)`); these fixtures used to set only the id.
+        let mut p1 = ffb_model::model::player::Player::default();
+        p1.id = "p1".into();
+        p1.movement = 2; // MA < 3 keeps the stand-up on the ROLLED path these tests exercise
+        game.team_home.players.push(p1);
         game.acting_player.player_id = Some("p1".into());
         game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE).change_rooted(true));
         let mut step = StepStandUp::new("fail".into());
@@ -688,6 +702,13 @@ mod tests {
         game.home_playing = true;
         game.turn_data_home.rerolls = 0;
         game.acting_player.standing_up = true;
+        // The acting player must actually BE on the acting team: a team re-roll is only offered
+        // for the acting team's own roll (Java `RollMechanic.isTeamReRollAvailable` opens with
+        // `actingTeam.hasPlayer(pPlayer)`); these fixtures used to set only the id.
+        let mut p1 = ffb_model::model::player::Player::default();
+        p1.id = "p1".into();
+        p1.movement = 2; // MA < 3 keeps the stand-up on the ROLLED path these tests exercise
+        game.team_home.players.push(p1);
         game.acting_player.player_id = Some("p1".into());
         game.field_model.set_player_state(
             "p1",

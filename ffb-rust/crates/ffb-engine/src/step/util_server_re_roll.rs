@@ -27,12 +27,52 @@ use crate::step::abstract_step_with_re_roll::find_skill_reroll_source;
 ///
 /// The returned `AgentPrompt` is a `ReRollOffer` that the step embeds in its
 /// `StepOutcome::cont()`.  The agent then replies with `Action::UseReRoll { use_reroll }`.
+/// Java `UtilServerReRoll.askForReRollIfAvailable(gameState, player, ...)` takes the PLAYER who
+/// made the roll and reaches `RollMechanic.isTeamReRollAvailable`, whose first condition is
+/// `actingTeam.hasPlayer(pPlayer)` — **a team re-roll is only ever offered for a roll made by the
+/// team whose turn it is.**
+///
+/// Rust took no player and therefore skipped that condition. Most callers roll for the acting
+/// player, where it is trivially satisfied, so this delegates to the acting player and is a no-op
+/// for them. The exceptions are the rolls made by someone on the OTHER team — a catch by the
+/// opponent after a scattered ball is the common one — and those must pass the real player through
+/// [`ask_for_reroll_if_available_for`].
 pub fn ask_for_reroll_if_available(
     game: &Game,
+    rerolled_action: &str,
+    minimum_roll: i32,
+    fumble: bool,
+) -> Option<AgentPrompt> {
+    let acting = game.acting_player.player_id.clone();
+    ask_for_reroll_if_available_for(game, acting.as_deref(), rerolled_action, minimum_roll, fumble)
+}
+
+/// As [`ask_for_reroll_if_available`], but for a roll made by `player_id` — which may be on the
+/// NON-acting team. Mirrors Java's player argument and its `actingTeam.hasPlayer` gate.
+///
+/// `None` means "no particular player", which skips the membership gate; use it only where Java
+/// itself has no player to pass.
+pub fn ask_for_reroll_if_available_for(
+    game: &Game,
+    player_id: Option<&str>,
     rerolled_action: &str,
     _minimum_roll: i32,
     _fumble: bool,
 ) -> Option<AgentPrompt> {
+    // Java `RollMechanic.isTeamReRollAvailable`: `actingTeam.hasPlayer(pPlayer) && ...`.
+    // A catch by the opposing team is offered NO team re-roll — Rust offered one and spent it,
+    // which showed up as `r1,3` (Java) against `r0,3` (Rust) with the dice otherwise identical
+    // (lineman bb2025 seed 45 i=265). Only reachable once an agent accepts re-rolls at all.
+    if let Some(pid) = player_id {
+        let on_acting_team = if game.home_playing {
+            game.team_home.has_player(pid)
+        } else {
+            game.team_away.has_player(pid)
+        };
+        if !on_acting_team {
+            return None;
+        }
+    }
     let acting_team_id = if game.home_playing {
         game.team_home.id.clone()
     } else {
@@ -160,6 +200,36 @@ mod tests {
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
+    }
+
+    /// Java's `RollMechanic.isTeamReRollAvailable` opens with `actingTeam.hasPlayer(pPlayer)`: a
+    /// team re-roll is only ever offered for a roll made by the team whose turn it is. Rust took no
+    /// player and skipped the condition, so a roll by the OPPONENT -- a catch after a scattered
+    /// ball is the common one -- was offered a team re-roll Java never offers.
+    #[test]
+    fn a_team_reroll_is_only_offered_for_the_acting_teams_own_roll() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 3;
+        game.turn_data_away.rerolls = 3;
+        add_player_with_skill(&mut game, "home_01", SkillId::Block);
+        // add_player_with_skill pushes onto team_home; place an away player by hand.
+        let away = game.team_home.players.last().cloned().expect("just pushed");
+        game.team_away.players.push(Player { id: "away_01".into(), ..away });
+
+        // The acting team's own roll is offered a re-roll…
+        assert!(
+            ask_for_reroll_if_available_for(&game, Some("home_01"), "CATCH", 4, false).is_some(),
+            "the acting team's own roll must be offered its team re-roll"
+        );
+        // …the opponent's is not, even though the away team has re-rolls of its own: the offer is
+        // always drawn from the ACTING team's bank, so Java refuses rather than dipping into it.
+        assert!(
+            ask_for_reroll_if_available_for(&game, Some("away_01"), "CATCH", 4, false).is_none(),
+            "a roll by the non-acting team must NOT be offered the acting team's re-roll"
+        );
+        // `None` means "no particular player" and keeps the old unguarded behaviour.
+        assert!(ask_for_reroll_if_available_for(&game, None, "CATCH", 4, false).is_some());
     }
 
     /// `reroll_used` -- the "one team re-roll per turn" latch -- is set by Java in exactly ONE

@@ -116,7 +116,6 @@ public final class HeuristicDriver {
 
         float wUse = consequence * 0.833f * scarcity;
         wUse = Math.max(0.0f, Math.min(1.0f, wUse));
-
         sampler.clear();
         sampler.push(wUse);          // index 0: use it
         sampler.push(1.0f - wUse);   // index 1: decline

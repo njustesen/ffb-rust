@@ -1005,3 +1005,72 @@ behaviour is worse than no test — it makes the fix look like the regression.
   which checks the latch AND the consequence (a second offer) across all three editions.
 
 **Next:** the last 3 rung-2 seeds, then rung 2 at sampled + uniform, then rung 3.
+
+---
+
+## ITER14 (2026-08-27) — a real port gap closed, and it did NOT move the number (still 97/100)
+
+Stating that plainly first: the fix below is a genuine 1:1 gap with a regression test, but rung 2 is
+**still 97/100** and seeds 45, 62 and 99 still fail. This iteration's value is mostly the *negative*
+result, which narrowed the frontier a lot.
+
+### What was fixed
+
+Java's `askForReRollIfAvailable` takes the **player who made the roll** and reaches
+`RollMechanic.isTeamReRollAvailable`, whose first condition is `actingTeam.hasPlayer(pPlayer)` — a
+team re-roll is only ever offered for a roll made by the team whose turn it is. Rust's
+`ask_for_reroll_if_available` took **no player at all** and skipped the condition, so a roll by the
+opponent — a catch after a scattered ball is the common one — was offered a team re-roll out of the
+acting team's bank.
+
+Added `ask_for_reroll_if_available_for(game, player_id, …)` carrying Java's gate. The 4-arg form now
+delegates with `acting_player.player_id`, which is a no-op for the ~105 callers that roll for the
+acting player, and `bb2025/shared/StepCatchScatterThrowIn` passes the real **catcher**, as Java does
+at `:590-592`. Test: `a_team_reroll_is_only_offered_for_the_acting_teams_own_roll`.
+
+Three `step_stand_up` fixtures then failed because they set `acting_player.player_id` **without ever
+putting that player on a team** — impossible in a real game, and now caught by the gate. Fixed the
+fixtures rather than weakening the gate.
+
+### What the negative result rules out
+
+The two re-roll **arms agree exactly** where both fire. Probing both sides on seeds 1-3 gave 14
+paired decisions with identical inputs and identical weights, e.g.
+
+```
+JARM action=Dodge weCarry=false rerolls=3 turn=1 cons=0.55 scar=1.0 w=0.45815
+RARM action=DODGE weCarry=false rerolls=3 turn=1 cons=0.55 scar=1   w=0.45815
+```
+
+So the agent port is not the problem. On seed 45 the Java arm is **never called at all** while Rust's
+fires five times — Rust's engine OFFERS re-rolls Java's engine does not. The remaining divergence is
+re-roll **availability**, engine-side.
+
+Also checked and eliminated: Java gates the whole dialog on `minimumRoll >= 0`, and Rust ignores
+`minimum_roll` entirely (`_minimum_roll`) — but no Rust caller passes a negative value, so that
+specific gate is not it.
+
+### Where to look next
+
+Rust's `ask_for_reroll_if_available` is ~30 lines. Java's real implementation is
+`RollMechanic.askForReRollIfAvailable` (`bb2025:247-292`), which assembles a `ReRollProperty` set —
+MASCOT, TRR, an additional-source lookup, LONER, PRO — and shows the dialog only when
+
+```java
+dialogShown = properties.stream().anyMatch(ReRollProperty::isActualReRoll)
+    || reRollSkill != null || modificationSkill != null;
+```
+
+Rust models none of that structure. The next candidates are `findAdditionalReRollProperty`,
+`isMascotAvailable`, and `find_skill_reroll_source` versus Java's
+`UtilCards.getUnusedRerollSource(actingPlayer, reRolledAction, ignoreSkills)` — note Java's takes the
+ACTION and an ignore-set, and Rust's takes neither.
+
+### Gates
+
+- Rung 2 argmax: 97/100 — **unchanged**. Seeds 45, 62, 99.
+- `--agent random`: 100/100 in bb2016, bb2020 and bb2025. Rung 0: 100/100.
+- `cargo test --workspace --release`: **14,644 / 0**.
+
+**Next:** compare Rust's re-roll availability against `RollMechanic.askForReRollIfAvailable` as a
+whole, rather than one condition at a time.

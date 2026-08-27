@@ -18,7 +18,7 @@ use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter, Seq
 use crate::step::generator::common::SpikedBallApo;
 use ffb_model::option::game_option_id;
 use crate::step::util_server_catch_scatter_throw_in::UtilServerCatchScatterThrowIn;
-use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available, ask_for_reroll_if_available_for, use_reroll};
 use ffb_model::report::report_catch_roll::ReportCatchRoll;
 use ffb_model::report::report_scatter_ball::ReportScatterBall;
 use ffb_model::report::report_throw_in::ReportThrowIn;
@@ -957,7 +957,11 @@ impl StepCatchScatterThrowIn {
                     return self.catch_ball(game, rng);
                 }
 
-                if let Some(prompt) = ask_for_reroll_if_available(game, "CATCH", min_roll, false) {
+                // Java passes the CATCHER (`bb2025/shared/StepCatchScatterThrowIn:590-592`), so a
+                // catch by a player on the non-acting team gets no team re-roll.
+                if let Some(prompt) = ask_for_reroll_if_available_for(
+                    game, Some(cid.as_str()), "CATCH", min_roll, false)
+                {
                     self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("CATCH"));
                     self.re_roll_state.re_roll_source = Some(ffb_model::enums::ReRollSource::new("TRR"));
                     self.roll = 0;
