@@ -1,6 +1,10 @@
 package com.fumbbl.ffb.ai.parity.heuristic;
 
 import com.fumbbl.ffb.IDialogParameter;
+import com.fumbbl.ffb.FieldCoordinate;
+import com.fumbbl.ffb.ReRolledAction;
+import com.fumbbl.ffb.ReRolledActions;
+import com.fumbbl.ffb.model.Player;
 import com.fumbbl.ffb.ai.simulation.MatchRunner;
 import com.fumbbl.ffb.model.Game;
 import com.fumbbl.ffb.net.commands.ClientCommandCoinChoice;
@@ -45,6 +49,11 @@ public final class HeuristicDriver {
         return classes;
     }
 
+    /** Whether this driver answers prompts of the given class. */
+    public boolean handles(PromptClass c) {
+        return classes.has(c);
+    }
+
     /**
      * Answer {@code dialog} if its class is switched on.
      *
@@ -73,6 +82,90 @@ public final class HeuristicDriver {
             default:
                 return false;
         }
+    }
+
+    /**
+     * Rust {@code AgentPrompt::ReRollOffer}. {@code T = 0.20}.
+     *
+     * <p>Two options, in this order: index 0 = USE the re-roll, index 1 = decline. The weight is
+     * {@code clamp(consequence * 0.833 * scarcity, 0, 1)}, and declining takes {@code 1 - that}.
+     *
+     * <p>The random parity contract ALWAYS declines, so every re-roll path in the engine is
+     * unexercised until this arm is switched on -- 0 re-rolls consumed across the whole 100-seed
+     * lineman baseline against 501 under the full heuristic agent.
+     *
+     * @return true to use the re-roll.
+     */
+    public boolean useReRoll(Game game, ReRolledAction action) {
+        boolean home = game.isHomePlaying();
+        com.fumbbl.ffb.model.TurnData td = home ? game.getTurnDataHome() : game.getTurnDataAway();
+        boolean weCarry = weCarryTheBall(game, home);
+
+        float consequence = consequenceOf(action, weCarry);
+
+        // Rust: scarcity is 0 when the team has no re-rolls left, so w_use is 0 and the agent
+        // always declines -- including a SKILL re-roll offered with an empty team-re-roll bank.
+        // Mirrored exactly rather than "fixed".
+        float scarcity;
+        if (td.getReRolls() > 0) {
+            float base = 0.45f + 0.55f * Math.min(td.getReRolls() / 3.0f, 1.0f);
+            scarcity = td.getTurnNr() >= 7 ? base * 1.35f : base;
+        } else {
+            scarcity = 0.0f;
+        }
+
+        float wUse = consequence * 0.833f * scarcity;
+        wUse = Math.max(0.0f, Math.min(1.0f, wUse));
+
+        sampler.clear();
+        sampler.push(wUse);          // index 0: use it
+        sampler.push(1.0f - wUse);   // index 1: decline
+        return sampler.pick(0.20f) == 0;
+    }
+
+    /**
+     * The consequence of failing the roll being offered, mirroring Rust's match on the rerolled
+     * action NAME. Rust spells these SCREAMING_SNAKE ("GFI", "PICKUP"); Java's are display strings
+     * ("Go For It", "Pick Up"), so this compares the ReRolledActions CONSTANTS instead of names --
+     * identity is what both engines actually mean, and it cannot drift on a spelling.
+     *
+     * <p>Rust's "GFI" is what its StepGoForIt passes; Java's rush passes ReRolledActions.RUSH.
+     * GO_FOR_IT is folded in with it: both sit in the same bucket, so the pairing cannot matter.
+     */
+    private static float consequenceOf(ReRolledAction a, boolean weCarry) {
+        if (a == ReRolledActions.RUSH || a == ReRolledActions.GO_FOR_IT
+            || a == ReRolledActions.DODGE || a == ReRolledActions.PICK_UP
+            || a == ReRolledActions.CATCH || a == ReRolledActions.JUMP
+            || a == ReRolledActions.ESCAPE) {
+            return weCarry ? 0.85f : 0.55f;
+        }
+        if (a == ReRolledActions.STAND_UP || a == ReRolledActions.TENTACLES
+            || a == ReRolledActions.ALWAYS_HUNGRY || a == ReRolledActions.RIGHT_STUFF) {
+            return 0.35f;
+        }
+        if (a == ReRolledActions.FOUL_APPEARANCE || a == ReRolledActions.HYPNOTIC_GAZE) {
+            return 0.20f;
+        }
+        return 0.45f;
+    }
+
+    /**
+     * Rust's {@code Features.carrier}, reduced to the one question this arm asks: is the ball
+     * carried by the team that is currently acting?
+     *
+     * <p>Carried means in play, NOT moving (loose on the ground), and with a player standing on it.
+     */
+    private static boolean weCarryTheBall(Game game, boolean home) {
+        com.fumbbl.ffb.model.FieldModel fm = game.getFieldModel();
+        FieldCoordinate ball = fm.getBallCoordinate();
+        if (ball == null || !fm.isBallInPlay() || fm.isBallMoving()) {
+            return false;
+        }
+        Player<?> carrier = fm.getPlayer(ball);
+        if (carrier == null) {
+            return false;
+        }
+        return game.getTeamHome().hasPlayer(carrier) == home;
     }
 
     // ── scored arms ────────────────────────────────────────────────────────────

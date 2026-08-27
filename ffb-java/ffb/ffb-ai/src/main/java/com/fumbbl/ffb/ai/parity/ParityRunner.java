@@ -1072,11 +1072,15 @@ public class ParityRunner {
                 // Always decline — deterministic. No game RNG consumed for the declined roll.
                 comm.clearCaptured();
                 if (dialog instanceof com.fumbbl.ffb.dialog.DialogReRollParameter) {
-                    comm.sendUseReRoll(
-                        ((com.fumbbl.ffb.dialog.DialogReRollParameter) dialog).getReRolledAction(), null);
+                    com.fumbbl.ffb.dialog.DialogReRollParameter rr =
+                        (com.fumbbl.ffb.dialog.DialogReRollParameter) dialog;
+                    comm.sendUseReRoll(rr.getReRolledAction(),
+                        reRollSourceFor(game, rr.getReRolledAction(), rr.isTeamReRollOption()));
                 } else if (dialog instanceof com.fumbbl.ffb.dialog.DialogReRollPropertiesParameter) {
-                    comm.sendUseReRoll(
-                        ((com.fumbbl.ffb.dialog.DialogReRollPropertiesParameter) dialog).getReRolledAction(), null);
+                    com.fumbbl.ffb.dialog.DialogReRollPropertiesParameter rp =
+                        (com.fumbbl.ffb.dialog.DialogReRollPropertiesParameter) dialog;
+                    comm.sendUseReRoll(rp.getReRolledAction(),
+                        reRollSourceFor(game, rp.getReRolledAction(), true));
                 } else {
                     game.setDialogParameter(null);
                     break;
@@ -2441,6 +2445,29 @@ public class ParityRunner {
             if (keep) live.add(a);
         }
         return live.toArray(new PlayerAction[0]);
+    }
+
+    /**
+     * The re-roll source to answer a re-roll offer with, or null to DECLINE.
+     *
+     * <p>The random parity contract always declines (AGENT_CONTRACT.md section 7) and that is still
+     * what happens whenever the heuristic driver is absent or does not own the `reroll` class --
+     * so tier 2, tier 3 and every lower rung keep their existing byte-matched streams.
+     *
+     * <p>When it DOES own the class, the decision comes from the mirrored scorer and an acceptance
+     * is answered with the team re-roll, which is the source Rust's engine consumes for the
+     * "TRR" ReRollSource its ask_for_reroll_if_available publishes.
+     */
+    private com.fumbbl.ffb.ReRollSource reRollSourceFor(
+            Game game, com.fumbbl.ffb.ReRolledAction action, boolean teamReRollOption) {
+        if (heuristic == null
+            || !heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.RE_ROLL_OFFER)) {
+            return null;
+        }
+        if (!teamReRollOption) {
+            return null;
+        }
+        return heuristic.useReRoll(game, action) ? com.fumbbl.ffb.ReRollSources.TEAM_RE_ROLL : null;
     }
 
     /** Sort players by their coordinate (x, y) ascending — AGENT_CONTRACT.md §6. */

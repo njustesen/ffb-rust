@@ -790,3 +790,85 @@ and per-rush `currentMove` across the two engines is exactly the diff that solve
 **Next:** rung 2 — `reroll`. The random contract always declines, so accepting runs every re-roll
 path in the engine for the first time (0 → 501 per 100 seeds under the full agent). Needs a Java
 `ReRolledAction` → Rust action-string mapping and the ball carrier.
+
+---
+
+## ITER11 (2026-08-27) — rung 2 (`reroll`): the Java arm lands at 91/100
+
+### What landed
+
+`HeuristicDriver.useReRoll` mirrors Rust's `AgentPrompt::ReRollOffer` arm: two options in Rust's
+order (index 0 = use, index 1 = decline), weight
+`clamp(consequence * 0.833 * scarcity, 0, 1)`, `T = 0.20`.
+
+Two mirroring decisions worth recording:
+
+- **Compare `ReRolledActions` CONSTANTS, not names.** Rust spells them SCREAMING_SNAKE (`"GFI"`,
+  `"PICKUP"`); Java's are display strings (`"Go For It"`, `"Pick Up"`, `"standUp"`). Matching on
+  identity is what both engines actually mean and cannot drift on a spelling. Rust's `"GFI"` is what
+  its `StepGoForIt` passes; Java's rush passes `ReRolledActions.RUSH`, and `GO_FOR_IT` is folded in
+  beside it since both sit in the same bucket.
+- **`scarcity` is 0 when the team's bank is empty**, so `w_use` is 0 and the agent declines — even a
+  SKILL re-roll offered with no team re-rolls left. Mirrored rather than "fixed".
+
+The decision lives in the driver; the *sending* stays in `ParityRunner.reRollSourceFor`, which
+reuses the existing capture/inject/dialog-clear plumbing and returns `null` (decline) whenever the
+driver is absent or does not own the class — so tier 2, tier 3 and every lower rung keep their
+byte-matched streams untouched.
+
+### Result
+
+**91/100 at argmax, and 113 re-rolls consumed where the baseline had 0.** Every re-roll path in the
+engine is now executing for the first time. Rung 0 and rung 1 unaffected.
+
+### The remaining 9 seeds: one state-only divergence, precisely located
+
+Seed 1. **No dice divergence at all** — both engines roll exactly 94 dice, and every logged step's
+`state_hash` matches, including step 303's. Only the *resolution* of the final activation differs.
+End-of-game state strings (`JAVA_END` / the new `RUST_END`) differ in exactly one field:
+
+```
+JAVA_END … r3,3 …
+RUST_END … r2,3 …
+```
+
+The **home team's re-roll count**: Java 3, Rust 2. The `r` field agrees at all 303 logged steps and
+diverges only afterwards.
+
+Rust's three recorded `use_reroll` consumptions for that seed are:
+
+```
+half=1 turn=3 home_playing=false  3->2  away_01
+half=1 turn=8 home_playing=true   3->2  home_02
+half=2 turn=1 home_playing=true   4->3  home_02
+```
+
+Away: 2 at the end of half 1, reset to 3 at half 2, never spent again → 3. Correct.
+Home: 2 at the end of half 1, reset to 3, **+1 from a kickoff Extra Re-roll = 4**, spent once → 3.
+That arithmetic gives 3, which is what Java reports — so Rust loses **one more** somewhere in the
+end-of-game resolution, and not through `use_reroll`.
+
+**This is why the class had to be switched on to find it:** with the random contract declining every
+offer, `r` is `3,3` on both sides for the whole game and any accounting error is invisible.
+
+Candidate sites for the extra loss (only three places decrement outside `use_reroll`):
+`mechanic/bb2025/state_mechanic.rs:61` and `mechanic/mixed/state_mechanic.rs:66` — both the **Leader**
+skill's grant/revoke pair, which linemen should never trigger — and `start_half`'s reset. Instrument
+every write to `turn_data_*.rerolls` through the end-of-turn → end-of-half → end-of-game cascade and
+compare against Java's `TurnData.setReRolls` call sites.
+
+### Diagnostics kept
+
+`RUST_END state=` in `run_rust_headless` under `FFB_TRACE`, the counterpart to `ParityRunner`'s
+existing `JAVA_END`. A divergence in the resolution of the LAST logged step has no following step to
+diff, so without it the end-of-game state can only be compared as an opaque hash. That one line is
+what turned this from "seed 1 fails" into "the home re-roll count is one low".
+
+### Gates
+
+- Rung 2 (`coin,receive,reroll`) argmax: **91/100**, up from every-reroll-seed-diverging.
+- `--agent random`: 100/100 in bb2016, bb2020 and bb2025.
+- Rung 0 and rung 1: 100/100.
+- `cargo test --workspace --release`: **14,641 / 0**.
+
+**Next:** the home re-roll accounting above. Then rung 2 sampled + uniform, then rung 3.

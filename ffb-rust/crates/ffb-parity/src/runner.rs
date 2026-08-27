@@ -689,6 +689,12 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
 
     let score_home = engine.game.game_result.home.score;
     let score_away = engine.game.game_result.away.score;
+    // Counterpart to ParityRunner's `JAVA_END state=`. A divergence in the resolution of the LAST
+    // logged step has no following step to diff, so without this the end-of-game state can only be
+    // compared as an opaque hash.
+    if std::env::var_os("FFB_TRACE").is_some() {
+        eprintln!("RUST_END state={}", state_string(&engine.game));
+    }
     lines.push(LogLine::GameEnd {
         i: step_index,
         home_score: score_home,
