@@ -169,3 +169,74 @@ not fix this, because the staleness was not in the fingerprint's inputs.
 
 **Next:** ITER2 — `det_math.rs` (bit-exact `exp_f32`/`ln_f32`), the 7 call sites, and the
 `as u32` -> explicit clamp at `reach_with`. This one deliberately re-baselines the A/B corpus.
+
+---
+
+## ITER2 (2026-08-27) — `det_math`: bit-reproducible `exp`/`ln`, and it cost nothing
+
+`crates/ffb-engine/src/agent/det_math.rs` (new) plus the seven call sites.
+
+### The problem, and why it is only seven lines
+
+f32 `+ - * /` are **correctly rounded** by IEEE-754 in both languages, Java 17+ is unconditionally
+strict-FP (JEP 306), and Rust does not contract to FMA — so essentially all of the agent's
+arithmetic is already bit-portable for free. Grepping the whole agent confirms there is no `sqrt`,
+`powf`, `powi`, `log2` or `log10` anywhere, and the two `.ceil()` calls are exact in both. That
+leaves exactly **seven** transcendental calls, where Rust's libm and Java's `Math`/`StrictMath` are
+three different implementations with no bit-agreement guarantee.
+
+`docs/HEURISTIC_AGENT.md` §11 prescribes converting the whole agent to i32 milli-weights for this.
+That was written before the code existed and assumed transcendentals were pervasive. Replacing
+seven call sites is a far smaller blast radius than rewriting 3,657 lines of value model, and it
+leaves every weight in the §22-§29 A/B corpus untouched.
+
+### The approach
+
+**The functions do not need to match libm's accuracy. They need to be identical to each other.**
+So `exp_f32`/`ln_f32` are built exclusively from correctly-rounded f32 primitives — `+ - * /`,
+comparisons, and exponent surgery via `to_bits`/`from_bits` — with a fixed-degree polynomial in a
+fixed evaluation order. Every step is bit-determined by the IEEE spec, so `DetMath.java`
+(`Float.floatToRawIntBits`/`intBitsToFloat`) will be identical **by construction rather than by
+luck**. `exp` uses Cody-Waite reduction plus a degree-7 Horner polynomial and a `2^k` scale; `ln`
+splits off the exponent and uses the odd series in `(m-1)/(m+1)`.
+
+348 `(input bits, output bits)` vectors are pinned in
+`crates/ffb-engine/src/agent/testdata/det_math_golden.txt`, regenerated only by the deliberately
+`#[ignore]`d `emit_golden_table`. The Java twin will assert on the same file, so a drift on either
+side fails a unit test instead of a 100-seed sweep.
+
+### The re-baseline that turned out not to be needed
+
+The plan budgeted for a one-time policy shift here, on the reasoning that last-ulp differences
+would occasionally flip which option a draw selects. Measured instead of assumed:
+
+| arm | seeds | streams changed |
+|---|---|---|
+| lineman, sampled (`--heuristic 1.0 --mode wide`) | 100 | **0** |
+| human, sampled | 20 | **0** |
+
+**Byte-identical.** `det_math`'s output agrees with the platform libm to within a few ulp over the
+ranges the agent actually uses (a unit test holds it to 1e-6 relative for `exp` over non-positive
+arguments and 4e-6 for `ln` over `p_step` in `(0, 1]`), and across ~120k decisions the cumulative
+softmax walk never landed close enough to a boundary for that to matter. So the §22-§29 corpus
+stands unchanged and no re-measurement is owed.
+
+### Also: an explicit clamp on the Dijkstra key
+
+`(-ln(p_step) * KEY_SCALE) as u32` saturates in Rust but is undefined-ish in Java, which converts
+out-of-range floats differently. Replaced with `.clamp(0.0, 1.0e9) as i64 as u32` and pinned by
+`dijkstra_key_increment_stays_in_the_clamped_range`, which walks the worst case the search can
+reach (16 consecutive `p_roll(6)` steps) and asserts the clamp is a no-op there. Verified
+byte-identical over 100 lineman seeds. The Java twin can now use `long` throughout with no
+reasoning about unsigned casts.
+
+### Gates
+
+- `cargo test -p ffb-engine --lib agent::` — 57/0.
+- `cargo test --workspace --release` — **14,636 / 0**, exit 0.
+- Lineman tier-3, fresh JVM, seeds 1-100: **bb2025 100/100, bb2020 100/100, bb2016 100/100**.
+- Heuristic event dumps byte-identical to the ITER0 baseline for lineman (100 seeds) and human (20).
+
+**Next:** ITER3 — write `AGENT_CONTRACT.md` §10 from the code (RNG channel, the exact per-prompt
+draw-count table, the canonical ordering rule, the frozen constants, the `det_math` requirement),
+then the `ClassMask` ladder and the `--agent heuristic` plumbing on both sides.

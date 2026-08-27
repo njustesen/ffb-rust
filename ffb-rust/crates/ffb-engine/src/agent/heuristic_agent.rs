@@ -54,6 +54,7 @@ use crate::legal_actions::{
 use crate::step::GameState;
 
 use super::random_agent::player_action_to_pac;
+use super::det_math::{exp_f32, ln_f32};
 use super::{Agent, UniformAgent};
 
 /// `mechanics/movement.rs: STAND_UP_COST`.
@@ -803,7 +804,7 @@ struct Reach {
 impl Reach {
     #[inline]
     fn p_arrive(&self, i: usize) -> f32 {
-        (-(self.cell[i].key as f32) / KEY_SCALE).exp() * self.gate
+        exp_f32(-(self.cell[i].key as f32) / KEY_SCALE) * self.gate
     }
     #[inline]
     fn reached(&self, i: usize) -> bool {
@@ -980,7 +981,14 @@ fn reach_with(
                     p_step *= raw;
                 }
             }
-            let nkey = key + (-(p_step.max(1e-6).ln()) * KEY_SCALE) as u32;
+            // `as u32` saturates in Rust but not in Java, so clamp explicitly and go through
+            // i64: the increment is provably in [0, 56_600] (p_step >= 1e-6, so -ln <= 13.82,
+            // times KEY_SCALE = 4096) and the accumulated key cannot exceed ~453k over a path of
+            // at most MA+2 steps -- but stating it here means the Java twin needs no reasoning
+            // about out-of-range float-to-int conversion, which the two languages define
+            // differently. See AGENT_CONTRACT.md section 10.
+            let inc = (-ln_f32(p_step.max(1e-6)) * KEY_SCALE).clamp(0.0, 1.0e9) as i64 as u32;
+            let nkey = key + inc;
             if nkey < cell[j].key {
                 cell[j] = ReachCell {
                     key: nkey,
@@ -1455,7 +1463,7 @@ impl HeuristicAgent {
             let max = self.buf.options.iter().map(|o| o.weight).fold(f32::MIN, f32::max);
             let mut acc = 0.0f32;
             for (i, o) in self.buf.options.iter().enumerate() {
-                ps[i] = ((o.weight - max) / t).exp();
+                ps[i] = exp_f32((o.weight - max) / t);
                 acc += ps[i];
             }
             if acc > 0.0 {
@@ -1504,7 +1512,7 @@ impl HeuristicAgent {
         }
         let t = (t_base * self.temp_scale).max(1e-6);
         let max = w.iter().copied().fold(f32::MIN, f32::max);
-        let mut ps: Vec<f32> = w.iter().map(|v| ((v - max) / t).exp()).collect();
+        let mut ps: Vec<f32> = w.iter().map(|v| exp_f32((v - max) / t)).collect();
         let acc: f32 = ps.iter().sum();
         if acc > 0.0 {
             for v in ps.iter_mut() {
@@ -1542,7 +1550,7 @@ impl HeuristicAgent {
         let mut acc = 0.0f32;
         let mut cum: Vec<f32> = Vec::with_capacity(n);
         for o in &self.buf.options {
-            acc += ((o.weight - max) / t).exp();
+            acc += exp_f32((o.weight - max) / t);
             cum.push(acc);
         }
         let r = self.unit() * acc;
@@ -1979,7 +1987,7 @@ impl HeuristicAgent {
                 } else {
                     let t = (0.10 * self.temp_scale).max(1e-6);
                     let mx = w.iter().copied().fold(f32::MIN, f32::max);
-                    let mut v: Vec<f32> = w.iter().map(|x| ((x - mx) / t).exp()).collect();
+                    let mut v: Vec<f32> = w.iter().map(|x| exp_f32((x - mx) / t)).collect();
                     let acc: f32 = v.iter().sum();
                     if acc > 0.0 {
                         for x in v.iter_mut() {
@@ -3134,7 +3142,7 @@ impl HeuristicAgent {
                             let dy = (y - ay) as f32;
                             best = best.min(dx * dx / 16.0 + dy * dy / 9.0);
                         }
-                        let w = p_safe * p_safe * (-best).exp();
+                        let w = p_safe * p_safe * exp_f32(-best);
                         self.buf.push_note(
                             Action::KickBall { coord: FieldCoordinate::new(x, y) },
                             w,
@@ -3689,6 +3697,27 @@ mod tests {
         assert_eq!(h.pop().unwrap().key, 100);
         assert_eq!(h.pop().unwrap().key, 500);
         assert_eq!(h.pop().unwrap().key, 900);
+    }
+
+    /// The Dijkstra key increment must stay inside the range the clamp assumes, or the `as i64`
+    /// conversion would start doing real work and the two languages would need to agree on
+    /// out-of-range float-to-int semantics (they do not). `p_step` is a product of `p_roll`
+    /// values, each in [1/6, 5/6], floored at 1e-6 by the caller.
+    #[test]
+    fn dijkstra_key_increment_stays_in_the_clamped_range() {
+        let mut p = 1.0f32;
+        // The worst case the search can reach: every step multiplies in the lowest `p_roll`.
+        for _ in 0..16 {
+            p *= p_roll(6);
+            let raw = -ln_f32(p.max(1e-6)) * KEY_SCALE;
+            assert!(raw >= 0.0, "increment must never be negative (p = {p})");
+            assert!(raw <= 1.0e9, "increment must stay under the clamp (p = {p})");
+            assert_eq!(
+                raw.clamp(0.0, 1.0e9) as i64 as u32,
+                raw as u32,
+                "clamp must be a no-op over the reachable range"
+            );
+        }
     }
 
     // ── determinism / portability of the ordering key ──────────────────────────

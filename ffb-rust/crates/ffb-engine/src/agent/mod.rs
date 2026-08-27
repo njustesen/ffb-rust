@@ -13,6 +13,7 @@
 //!   uniformly among all truly legal actions at every decision point, for "how much of the
 //!   game's mechanic surface does random play exercise" runs.
 
+pub mod det_math;
 mod heuristic_agent;
 mod random_agent;
 mod uniform_agent;
