@@ -4174,6 +4174,29 @@ mod tests {
         assert!((0..=12).contains(&back.x), "away kick does not mirror back into the home half");
     }
 
+    /// §6.10 — the follow-up table, and the one term that can flip the answer.
+    #[test]
+    fn follow_up_weight_table() {
+        let w = |carries: bool, more_marked: bool, sideline: bool| {
+            let mut v = 0.5f32;
+            if carries { v -= 0.45 }
+            if more_marked { v -= 0.35 }
+            if sideline { v -= 0.30 }
+            v.clamp(0.02, 0.98)
+        };
+        // An unencumbered follow-up into open ground is an even coin -- and a TIE at argmax, which
+        // `argmax`'s first-strict-maximum rule resolves to index 0, i.e. FOLLOW. Both sides have to
+        // agree on that, which is why the tie is worth pinning rather than avoiding.
+        assert_eq!(w(false, false, false), 0.5);
+        // Carrying the ball is the heaviest single term: chasing with the ball is how you lose it.
+        assert!(w(true, false, false) < w(false, true, false));
+        assert!(w(false, true, false) < w(false, false, true));
+        // Any two terms together are enough to make following clearly wrong, and the clamp keeps
+        // even the worst case from being impossible.
+        assert!(w(true, true, true) >= 0.02);
+        assert!(w(true, true, false) < 0.05);
+    }
+
     /// §6 — the touchback receiver table, which `HeuristicDriver.touchback` mirrors.
     #[test]
     fn touchback_weight_table() {

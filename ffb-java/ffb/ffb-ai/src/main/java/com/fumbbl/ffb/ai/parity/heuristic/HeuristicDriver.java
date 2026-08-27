@@ -173,6 +173,73 @@ public final class HeuristicDriver {
     }
 
     /**
+     * Rust {@code Features::tz_against}: how many STANDING opponents of {@code home} stand next to
+     * {@code c}.
+     *
+     * <p>Rust reads this out of a whole-pitch raster; it is the same number computed pointwise, and
+     * the follow-up arm asks for exactly two squares, so building a raster here would be a way of
+     * spending 390 cells to answer two questions.
+     */
+    private static int tzAgainst(Game game, FieldCoordinate c, boolean home) {
+        if (c == null) {
+            return 0;
+        }
+        com.fumbbl.ffb.model.FieldModel fm = game.getFieldModel();
+        com.fumbbl.ffb.model.Team opponents = home ? game.getTeamAway() : game.getTeamHome();
+        int n = 0;
+        for (Player<?> p : opponents.getPlayers()) {
+            FieldCoordinate pc = fm.getPlayerCoordinate(p);
+            com.fumbbl.ffb.PlayerState ps = fm.getPlayerState(p);
+            if (pc == null || ps == null || !onPitch(pc) || !ps.hasTacklezones()) {
+                continue;
+            }
+            if (pc.equals(c)) {
+                continue;
+            }
+            if (Math.abs(pc.getX() - c.getX()) <= 1 && Math.abs(pc.getY() - c.getY()) <= 1) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /**
+     * Rust {@code AgentPrompt::FollowUp}. {@code T = 0.30}.
+     *
+     * <p>Index 0 = follow up, index 1 = stay. Start at an even 0.5 and subtract: 0.45 if the
+     * attacker is CARRYING the ball (chasing with the ball is how you lose it), 0.35 if the square
+     * he would move into is more heavily marked than the one he is on, and 0.30 if it is on a
+     * sideline. Clamped to [0.02, 0.98] so neither answer is ever impossible.
+     *
+     * @param targetCoord the square the defender occupied when the block was declared — Rust reads
+     *     it from the DEFENDER_POSITION step parameter, which no dialog carries, so
+     *     {@code ParityRunner} snapshots it at block-dice time instead.
+     * @return true to follow up.
+     */
+    public boolean followUp(Game game, String attackerId, FieldCoordinate targetCoord) {
+        Player<?> att = game.getPlayerById(attackerId);
+        boolean home = att != null && game.getTeamHome().hasPlayer(att);
+        FieldCoordinate cur = (att != null) ? game.getFieldModel().getPlayerCoordinate(att) : null;
+
+        float w = 0.5f;
+        if (hasBall(game, attackerId)) {
+            w -= 0.45f;
+        }
+        if (cur != null && targetCoord != null
+            && tzAgainst(game, targetCoord, home) > tzAgainst(game, cur, home)) {
+            w -= 0.35f;
+        }
+        if (targetCoord != null && (targetCoord.getY() == 0 || targetCoord.getY() == YMAX)) {
+            w -= 0.30f;
+        }
+        float wf = Math.min(Math.max(w, 0.02f), 0.98f);
+        sampler.clear();
+        sampler.push(wf);
+        sampler.push(1.0f - wf);
+        return sampler.pick(0.30f) == 0;
+    }
+
+    /**
      * Rust {@code AgentPrompt::Interception}. {@code T = 0.20}.
      *
      * <p>Two options, in this order: index 0 = ATTEMPT, index 1 = decline. The attempt weight is
@@ -600,7 +667,13 @@ public final class HeuristicDriver {
         if (p == null) {
             return false;
         }
-        for (com.fumbbl.ffb.model.skill.Skill s : p.getSkills()) {
+        // getSkillsIncludingTemporaryOnes(), NOT getSkills(): Rust's `has_skill` iterates
+        // starting + extra + TEMPORARY skills, and a Prayer to Nuffle grants temporary ones.
+        // bb2020 seed 93 rolled INTENSIVE_TRAINING for the away team, which handed a lineman
+        // Block; Rust scored the block against a Blocker and Java against a plain lineman, and
+        // the blitz picked a different victim. The set is a HashSet, so its iteration order is
+        // not stable -- only ever test membership here, never take the first element.
+        for (com.fumbbl.ffb.model.skill.Skill s : p.getSkillsIncludingTemporaryOnes()) {
             if (s != null && name.equals(s.getName())) {
                 return true;
             }

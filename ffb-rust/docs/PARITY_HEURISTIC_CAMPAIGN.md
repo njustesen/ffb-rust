@@ -1521,3 +1521,68 @@ non-Loner re-roll consumes NO die — that last one is what kept the bug invisib
 **Next:** the `Features` raster tier in Java — the cross-language FIXTURE test first (`occ`, `tz`,
 `row_prefix` for fixed boards), before wiring any of it to a game. Only `followup`, `setup`,
 `activateplayer` and `move` are left, and all four want it.
+
+## ITER22 — `followup`, and `getSkills()` is not `has_skill`
+
+`followup` had been parked twice for needing "the raster tier and a parameter Java cannot see".
+Both halves of that turned out to be wrong:
+
+- `f.tz_against(c, home)` is *how many standing opponents of `home` stand next to `c`*. Rust reads it
+  out of a whole-pitch raster because it queries it thousands of times; the follow-up arm asks for
+  exactly **two** squares, so the Java side counts them pointwise. Building a raster there would be
+  a way of spending 390 cells to answer two questions.
+- `target_coord` is the DEFENDER_POSITION step parameter, and `DialogFollowupChoiceParameter` really
+  does carry nothing. But the harness can reconstruct it: snapshot the defender's square at
+  **block-dice time**, which is after the defender is fixed and before the push moves him, and which
+  fires exactly once per block in every edition. Verified against the live games — the snapshotted
+  defender id matches `getDefenderId()` at follow-up time on every single follow-up.
+
+Non-vacuity is emphatic: the random contract always declines, so **18 of 20** bb2025 seeds end on a
+different board with the class on.
+
+### The divergence
+
+bb2025 and bb2016 green everywhere; **bb2020 at argmax 99/100**, seed 93. But `--heur-classes
+followup` ALONE was 100/100 on bb2020 — so, exactly like ITER21, the new class did not cause the bug,
+it walked the game onto a path that reached one.
+
+Chasing it backwards through three probes: the state first differs after a blitz, where two AWAY
+players end up in different squares (a chain push) → the pushback probe shows the same attacker
+pushing a DIFFERENT defender → the blitz-target probe shows the same attacker, the same two
+candidates, and different weights:
+
+```
+JAVA_BT att=(12,6) cand=[(13,7), (13,6)] idx=0 w=[0.1,  0.1]
+RUST_BT att=(12,6) cand=[(13,7), (13,6)] idx=1 w=[0.07, 0.1]
+```
+
+`0.07 = 0.1 × 0.70` is `block_weight`'s "defender has Block and I do not" penalty. Rust saw Block on
+the player at (13,7); Java did not.
+
+Root cause: **`Player.getSkills()` excludes temporary skills.** Rust's `has_skill` iterates
+`starting + extra + TEMPORARY`; the Java mirror has to use `getSkillsIncludingTemporaryOnes()`.
+Seed 93 rolled the **INTENSIVE_TRAINING** prayer for the away team, which grants a skill — and the
+lineman it landed on was a Blocker to one engine and a plain lineman to the other.
+
+This is a bug in the Java driver, not the engine, and it silently affected three already-green
+classes: `blockchoice` (Block/Wrestle/Tackle/Dodge), `blitztarget` (via `block_weight`) and
+`touchback` (Sure Hands). All three were green only because no prayer had yet handed out a skill that
+mattered on a seed those classes could reach.
+
+Two prayer-granted-skill bugs in two iterations (Loner in ITER21, Block here) is not a coincidence:
+prayers are the only way a lineman game gets skills at all, so they are where every
+skill-reading code path gets its first real test.
+
+### Gates
+
+- `coin,receive,reroll,pushback,blocktarget,blockchoice,blitztarget,touchback,kick,intercept,followup`:
+  **100/100 in all three editions at scales 0, 1.0 and 1e6**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,653 / 0**, with `follow_up_weight_table`.
+  `mvn -o -pl ffb-ai test`: clean.
+
+**Next:** `setup` is a structural no-op — the heuristic's `TeamSetup` arm calls the very
+`canonical_setup_action` the random agent calls, with no sampler draw, so switching it on cannot
+change anything and its green would prove nothing. That leaves `activateplayer` and `move`, which
+ARE the raster tier, plus `other` (which routes to `UniformAgent`, so it is not a no-op and needs
+checking before `--heur-classes all` is claimed).

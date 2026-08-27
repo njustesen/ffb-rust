@@ -96,6 +96,16 @@ public class ParityRunner {
     private HeuristicDriver heuristic;
 
     /**
+     * Where the defender stood when the block was declared.
+     *
+     * <p>Rust's follow-up arm reads the DEFENDER_POSITION step parameter that StepInitBlocking
+     * publishes; DialogFollowupChoiceParameter carries NOTHING, so the harness reconstructs it.
+     * The block-dice dialog is the right moment: it is after the defender is fixed and before the
+     * push moves him, and it fires exactly once per block in every edition.
+     */
+    private FieldCoordinate defenderPositionAtBlock;
+
+    /**
      * `--multimove N` (default 0 = off). Submit a planned path of up to N one-step squares in a
      * single CLIENT_MOVE instead of one. Mirrors RandomAgent::multimove; see
      * docs/PARITY_HEURISTIC_CAMPAIGN.md -- it exists to test multi-square move-stack consumption in
@@ -1045,9 +1055,18 @@ public class ParityRunner {
             }
 
             case FOLLOWUP_CHOICE: {
-                // Always decline follow-up — deterministic, matches Rust UseReRoll(false).
+                // The heuristic agent SCORES the follow-up (Rust `AgentPrompt::FollowUp`,
+                // T = 0.30) when the `followup` class is on; otherwise always decline, which is
+                // what the byte-matched random contract does.
+                boolean follow = false;
+                if (heuristic != null
+                    && heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.FOLLOW_UP)) {
+                    String fuAttacker = (game.getActingPlayer() != null)
+                        ? game.getActingPlayer().getPlayerId() : null;
+                    follow = heuristic.followUp(game, fuAttacker, defenderPositionAtBlock);
+                }
                 comm.clearCaptured();
-                comm.sendFollowupChoice(false);
+                comm.sendFollowupChoice(follow);
                 injectCaptured(dialog, game, gameState);
                 break;
             }
@@ -2572,6 +2591,11 @@ public class ParityRunner {
      * chooses; Rust carries that as {@code own_choice = nr_of_dice >= 0} and flips every weight.
      */
     private int heuristicBlockChoice(Game game, int nrOfDice, int[] blockRoll) {
+        // Snapshot the defender's square BEFORE the push, for the follow-up arm. Unconditional:
+        // the two classes are switched on independently.
+        Player<?> preDefender = game.getPlayerById(game.getDefenderId());
+        defenderPositionAtBlock = (preDefender != null)
+            ? game.getFieldModel().getPlayerCoordinate(preDefender) : null;
         if (heuristic == null
             || !heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.BLOCK_CHOICE)
             || blockRoll == null
