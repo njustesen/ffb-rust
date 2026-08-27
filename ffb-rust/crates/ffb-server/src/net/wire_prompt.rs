@@ -417,6 +417,11 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
         AgentPrompt::ThrowTeamMateTarget { .. } => None,
         // Parity-harness-only prompt (BB2025 Punt); no client dialog exists yet.
         AgentPrompt::PuntTarget { .. } => None,
+        // Purely internal, exactly like BlockTarget above: the blitz victim reaches the server as
+        // a ClientCommandTargetSelected, not as a rendered dialog, so there is nothing to show.
+        // Added with the heuristic agent's blitz plans; this arm restores the exhaustive match
+        // (the crate had stopped compiling, which took `cargo test --workspace` down with it).
+        AgentPrompt::BlitzTarget { .. } => None,
     }
 }
 

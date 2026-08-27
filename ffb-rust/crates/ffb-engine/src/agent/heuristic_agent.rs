@@ -59,6 +59,11 @@ use super::{Agent, UniformAgent};
 /// `mechanics/movement.rs: STAND_UP_COST`.
 const STAND_UP_COST: i32 = 3;
 const EPS: f32 = 0.02;
+/// Residual worth of advancing a carrier who can no longer reach the endzone in time. Was read
+/// from FFB_HOPELESS_DAMP on every `value_at` call while it was being fitted; frozen because
+/// env-dependent POLICY cannot be mirrored by the Java agent, and the per-call `env::var` was a
+/// hot-path allocation besides. See AGENT_CONTRACT.md section 10.
+const HOPELESS_DAMP: f32 = 0.25;
 const XMAX: i32 = 25;
 const YMAX: i32 = 14;
 const W: usize = 26;
@@ -368,13 +373,59 @@ fn positions_stamp(g: &Game) -> u64 {
     acc
 }
 
-fn pid_key(id: &str) -> u32 {
-    let mut h: u32 = 2166136261;
-    for b in id.as_bytes() {
-        h ^= *b as u32;
-        h = h.wrapping_mul(16777619);
-    }
-    h
+/// The ONE ordering key that exists in both engines: (side, jersey nr). This is already the key
+/// the state hash uses on both sides -- `state_hash.rs::collect_player_parts` sorts by `p.nr` and
+/// labels positionally, and Java's `ParityRunner.addPlayersFromTeam` sorts by
+/// `Comparator.comparingInt(Player::getNr)`.
+///
+/// Player IDS MUST NEVER ENTER AN ORDERING (AGENT_CONTRACT.md section 6): Rust ids are
+/// `home_01..home_11` (and a star carries its own, e.g. `morgNThorg`) while Java's are
+/// `teamLinemanParityHome1..11` -- they sort differently, so an id sort cannot be mirrored.
+/// For `home_NN`-style ids this key reproduces the old lexicographic id order exactly, which is
+/// why swapping to it is a no-op for every non-star roster.
+fn canon_key(g: &Game, pid: &str) -> (u8, i32) {
+    let side = if g.team_home.has_player(pid) { 0u8 } else { 1u8 };
+    let nr = g.player(pid).map(|p| p.nr).unwrap_or(i32::MAX);
+    (side, nr)
+}
+
+/// On-pitch players in canonical `(side, nr)` order.
+///
+/// `field_model.player_coordinates` is a `std::collections::HashMap` with the default RANDOMLY
+/// SEEDED hasher, so iterating it directly is only safe where the accumulation is commutative.
+/// Audited, as of this commit:
+///
+/// - `positions_stamp` -- safe: `wrapping_add` into one accumulator, and it is only ever a cache
+///   key, so its value need not even agree across the two engines.
+/// - `Features::build` -- safe: `occ` writes one distinct square per player, `tz` and
+///   `row_prefix` are integer increments, and `unact` sums a CONSTANT addend so its f32 result
+///   depends only on the count, not the order.
+/// - `build_support` -- safe: `screen_tot`/`screen_hits` are integer counters and `support` is a
+///   `max`, both commutative.
+/// - `build_threat` -- **NOT safe**, which is why this exists. It writes `threat_str` under a
+///   strict `>` against `threat_reach`, so two opponents that reach a square equally (`reach ==
+///   1.0` whenever both stand adjacent -- the common case) tie, and whichever the hasher happened
+///   to yield first records ITS strength. `threat_str` feeds `strength_factor` -> `exposure` ->
+///   every arrival weight, so the agent was non-deterministic run-to-run on any roster with mixed
+///   ST. Inert for the all-ST3 lineman fixture, which is why it never showed up. The
+///   `second`/`third` reach tracking in the same loop has the same shape.
+fn canon_players(g: &Game) -> Vec<(String, FieldCoordinate)> {
+    let mut v: Vec<(String, FieldCoordinate)> = g
+        .field_model
+        .player_coordinates
+        .iter()
+        .map(|(id, &c)| (id.clone(), c))
+        .collect();
+    v.sort_by_key(|(id, _)| canon_key(g, id));
+    v
+}
+
+/// `canon_key` packed into a `u32` for use as a map key. Replaces an FNV hash of the player id:
+/// the memo is only ever a keyed lookup, never an ordering, but a hash collision that resolved
+/// differently in the two languages would be a silent divergence for free.
+fn canon_pack(g: &Game, pid: &str) -> u32 {
+    let (side, nr) = canon_key(g, pid);
+    ((side as u32) << 16) | (nr.clamp(0, 0xffff) as u32)
 }
 
 impl Features {
@@ -495,7 +546,10 @@ impl Features {
             let mut second = vec![0.0f32; CELLS];
             let mut third = vec![0.0f32; CELLS];
 
-            for (id, &c) in &g.field_model.player_coordinates {
+            // Canonical order, NOT hash order -- the `threat_str` write below is a strict-`>`
+            // tie-break. See `canon_players`.
+            for (id, c) in canon_players(g) {
+                let id = &id;
                 if !on_pitch(c.x, c.y) || g.team_home.has_player(id) == victim_home {
                     continue;
                 }
@@ -700,7 +754,7 @@ impl Features {
         def: &str,
         def_c: FieldCoordinate,
     ) -> i32 {
-        let k = (pid_key(att), pid_key(def));
+        let k = (canon_pack(g, att), canon_pack(g, def));
         if let Some(v) = self.block_memo.borrow().get(&k) {
             return *v;
         }
@@ -1010,11 +1064,7 @@ fn value_at(f: &Features, i: usize, m: &Mover) -> (f32, Rule) {
             let reachable_in_time = if tts <= m.turns_left {
                 1.0
             } else {
-                // Tunable via FFB_HOPELESS_DAMP while this is being fitted.
-                std::env::var("FFB_HOPELESS_DAMP")
-                    .ok()
-                    .and_then(|v| v.parse::<f32>().ok())
-                    .unwrap_or(0.25)
+                HOPELESS_DAMP
             };
             (0.15 + 0.85 * advance)
                 * (0.75 + 0.5 * urgency(d_sq, m.ma, m.turns_left))
@@ -1820,13 +1870,13 @@ impl HeuristicAgent {
             return Action::EndTurn;
         }
         // Deterministic order first, then rank by the proxy so ties never depend on hash order.
-        c1.sort_by(|a, b| a.pid.cmp(&b.pid));
+        c1.sort_by_key(|a| canon_key(g, &a.pid));
         let mut rank: Vec<usize> = (0..c1.len()).collect();
         rank.sort_by(|&a, &b| {
             (c1[b].w_player * c1[b].proxy.max(0.05))
                 .partial_cmp(&(c1[a].w_player * c1[a].proxy.max(0.05)))
                 .unwrap_or(std::cmp::Ordering::Equal)
-                .then(c1[a].pid.cmp(&c1[b].pid))
+                .then(canon_key(g, &c1[a].pid).cmp(&canon_key(g, &c1[b].pid)))
         });
         let tier2: HashSet<usize> = rank.iter().take(TIER2).copied().collect();
 
@@ -2069,7 +2119,7 @@ impl HeuristicAgent {
         if ps.is_empty() {
             return Action::EndTurn;
         }
-        ps.sort_by(|a, b| a.pid.cmp(&b.pid));
+        ps.sort_by_key(|a| canon_key(g, &a.pid));
 
         self.buf.clear();
         for q in &ps {
@@ -2465,7 +2515,7 @@ impl HeuristicAgent {
                         })
                         .map(|(oid, _)| oid.clone())
                         .collect();
-                    foes.sort();
+                    foes.sort_by_key(|id| canon_key(g, id));
                     let here = g.field_model.player_coordinate(pid);
                     for oid in foes {
                         let oc = match g.field_model.player_coordinate(&oid) {
@@ -2529,7 +2579,7 @@ impl HeuristicAgent {
                         })
                         .map(|(oid, _)| oid.clone())
                         .collect();
-                    mates.sort();
+                    mates.sort_by_key(|id| canon_key(g, id));
                     for rcv in mates {
                         let rc = match g.field_model.player_coordinate(&rcv) {
                             Some(c) => c,
@@ -2755,7 +2805,7 @@ impl HeuristicAgent {
                 }
                 let astr = g.player(&attacker_id).map(|p| p.strength_with_modifiers()).unwrap_or(3);
                 let mut ep = eligible_players;
-                ep.sort();
+                ep.sort_by_key(|id| canon_key(g, id));
                 for did in &ep {
                     let w = block_weight(f, g, &attacker_id, did, astr);
                     self.buf.push_note(
@@ -3106,7 +3156,7 @@ impl HeuristicAgent {
                     return Action::Acknowledge;
                 }
                 let mut sorted = eligible_players;
-                sorted.sort_by(|a, b| a.0.cmp(&b.0));
+                sorted.sort_by_key(|(pid, _)| canon_key(g, pid));
                 let los = if g.home_playing { 12 } else { 13 };
                 for (pid, coord) in &sorted {
                     let p = g.player(pid);
@@ -3639,6 +3689,105 @@ mod tests {
         assert_eq!(h.pop().unwrap().key, 100);
         assert_eq!(h.pop().unwrap().key, 500);
         assert_eq!(h.pop().unwrap().key, 900);
+    }
+
+    // ── determinism / portability of the ordering key ──────────────────────────
+
+    /// Two opponents of DIFFERENT strength, both adjacent to the same square, tie on `reach`
+    /// (`d == 1` → `1.0`). `build_threat` writes `threat_str` under a strict `>`, so before
+    /// `canon_players` the winner was whichever the randomly-seeded `HashMap` hasher yielded
+    /// first — measured: every one of 20 human-vs-human seeds produced a DIFFERENT event stream
+    /// between two runs of the same binary. Now the canonically-first (lowest `(side, nr)`)
+    /// opponent wins, deterministically and identically in both engines.
+    #[test]
+    fn threat_str_tie_is_broken_canonically_not_by_hash_order() {
+        let (weak_first, strong_first) = (build_tie_board(3, 5), build_tie_board(5, 3));
+        // The square between the two opponents, whose threat the mover would read.
+        let i = ix(10, 7);
+        // away_01 is canonically first either way, so its ST is what lands in `threat_str`.
+        assert_eq!(weak_first.threat_str[0][i], 3, "away_01 has ST3 here");
+        assert_eq!(strong_first.threat_str[0][i], 5, "away_01 has ST5 here");
+        // Both opponents are adjacent, so the reach itself saturates regardless.
+        assert_eq!(weak_first.threat_reach[0][i], 1.0);
+        assert_eq!(strong_first.threat_reach[0][i], 1.0);
+    }
+
+    /// `canon_players` must be sorted by `(side, nr)` — home before away, then jersey number.
+    #[test]
+    fn canon_players_is_sorted_by_side_then_nr() {
+        let g = tie_game(3, 5);
+        let keys: Vec<(u8, i32)> =
+            canon_players(&g).iter().map(|(id, _)| canon_key(&g, id)).collect();
+        let mut sorted = keys.clone();
+        sorted.sort();
+        assert_eq!(keys, sorted, "canon_players must already be in canonical order");
+        assert!(keys.windows(2).all(|w| w[0] != w[1]), "no two on-pitch players may collide");
+    }
+
+    /// The claim that made the swap safe to land, stated precisely.
+    ///
+    /// All seven replaced sorts are SINGLE-SIDED — `c1`/`ps` hold only the acting team,
+    /// `foes`/`ep` only opponents, `mates` only team-mates, and `Touchback` only the receiving
+    /// team — and *within a side* `(side, nr)` reproduces the old lexicographic order of
+    /// `home_NN`/`away_NN` ids exactly. So no decision changes on any roster whose ids follow
+    /// that scheme, i.e. every roster not carrying a star.
+    ///
+    /// Across sides the two orders genuinely differ (canonical puts home first, lexicographic
+    /// puts `away_*` first), which is harmless precisely because no site mixes sides — and is
+    /// why this test asserts per-side rather than whole-roster.
+    ///
+    /// Verified end-to-end as well: the lineman AND human 100-seed event streams were
+    /// byte-identical before and after the swap.
+    #[test]
+    fn canon_key_reproduces_id_order_within_a_side() {
+        let g = tie_game(3, 3);
+        for home in [true, false] {
+            let mut by_id: Vec<String> = canon_players(&g)
+                .into_iter()
+                .map(|(id, _)| id)
+                .filter(|id| g.team_home.has_player(id) == home)
+                .collect();
+            let by_canon = by_id.clone();
+            by_id.sort();
+            assert_eq!(by_canon, by_id, "side home={home}");
+        }
+    }
+
+    fn tie_game(st_away_01: i32, st_away_02: i32) -> Game {
+        use ffb_model::enums::Rules;
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerState, PS_STANDING};
+
+        let mk = |id: &str, nr: i32, st: i32| Player {
+            id: id.into(),
+            nr,
+            movement: 6,
+            strength: st,
+            agility: 3,
+            armour: 8,
+            ..Default::default()
+        };
+        let mut home = crate::step::framework::test_team("home", 0);
+        let mut away = crate::step::framework::test_team("away", 0);
+        home.players.push(mk("home_01", 1, 3));
+        away.players.push(mk("away_01", 1, st_away_01));
+        away.players.push(mk("away_02", 2, st_away_02));
+
+        let mut g = Game::new(home, away, Rules::Bb2025);
+        // Both opponents stand ADJACENT to (10, 7) so their `reach` there ties at 1.0.
+        let place = |g: &mut Game, id: &str, x: i32, y: i32| {
+            g.field_model.set_player_coordinate(id, FieldCoordinate::new(x, y));
+            g.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+        };
+        place(&mut g, "home_01", 2, 7);
+        place(&mut g, "away_01", 9, 7);
+        place(&mut g, "away_02", 11, 7);
+        g
+    }
+
+    fn build_tie_board(st_away_01: i32, st_away_02: i32) -> Features {
+        let g = tie_game(st_away_01, st_away_02);
+        Features::build(&g, positions_stamp(&g), true)
     }
 
     /// §20.1 — the plan kinds that end the activation for free are exactly the ones with no
