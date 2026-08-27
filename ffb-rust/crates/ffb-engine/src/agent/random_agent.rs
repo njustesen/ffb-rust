@@ -714,8 +714,17 @@ impl Agent for RandomAgent {
                             // same staleness the no-cap candidate list above works around), while
                             // Java reads the fresh phase-2 value of a just-activated player.
                             if self.multimove > 1 {
+                                // Java's `sendMoveAction` reads `ap.getCurrentMove()` at the moment
+                                // it draws, and for a PRONE player that moment is AFTER the stand-up:
+                                // measured `JAVA_PATH len=5 currentMove=3` against Rust's `len=6`
+                                // (lineman bb2025 seed 1, --multimove 6). Rust pre-draws BEFORE the
+                                // stand-up, so it has to charge the same 3 movement Java has already
+                                // spent, or it plans one square too many and rushes a third time.
+                                //
+                                // A ROOTED player never moves at all, so nothing is spent there.
+                                let spent = if is_prone { crate::util::movement_calc::MovementCalc::STAND_UP_COST } else { 0 };
                                 let mut path = vec![targets[idx]];
-                                self.extend_multimove(&gs.game, player_id, &mut path, 0);
+                                self.extend_multimove(&gs.game, player_id, &mut path, spent);
                                 self.pending_extra = path[1..].to_vec();
                             }
                             if std::env::var("FFB_TRACE").is_ok() {
@@ -779,6 +788,9 @@ impl Agent for RandomAgent {
                     }
                     let mut path = vec![sq];
                     path.extend(self.pending_extra.drain(..));
+                    if std::env::var_os("FFB_TRACE").is_some() {
+                        eprintln!("RUST_PATH pid={} len={} (predrawn)", player_id, path.len());
+                    }
                     return Action::Move { path };
                 }
                 if squares.is_empty() {
@@ -801,11 +813,17 @@ impl Agent for RandomAgent {
                 }
                 self.moved_this_activation = true;
                 let mut path = vec![squares[idx]];
+                if std::env::var_os("FFB_TRACE").is_some() {
+                    eprintln!("RUST_PATHPRE pid={} currentMove={}", player_id, gs.game.acting_player.current_move);
+                }
                 // SPIKE (see `multimove`): keep walking, one actionRng draw per extra square,
                 // mirrored by ParityRunner.sendMoveAction under `--multimove N`.
                 if self.multimove > 1 {
                     self.extend_multimove(
                         &gs.game, &player_id, &mut path, gs.game.acting_player.current_move);
+                }
+                if std::env::var_os("FFB_TRACE").is_some() {
+                    eprintln!("RUST_PATH pid={} len={}", player_id, path.len());
                 }
                 Action::Move { path }
             }

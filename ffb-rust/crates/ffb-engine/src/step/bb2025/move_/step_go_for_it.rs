@@ -129,6 +129,11 @@ impl StepGoForIt {
             .map(|p| p.movement_with_modifiers())
             .unwrap_or(4);
 
+        if std::env::var_os("FFB_TRACE").is_some() {
+            eprintln!("RUST_GFI pid={:?} action={:?} currentMove={} MA={} runGfi={} goingForIt={} rng={}",
+                player_id, game.acting_player.player_action, current_move, ma, run_gfi, going_for_it,
+                rng.call_count);
+        }
         if !going_for_it || current_move <= ma {
             return StepOutcome::next();
         }

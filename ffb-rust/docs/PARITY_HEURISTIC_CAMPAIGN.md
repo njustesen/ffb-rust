@@ -707,3 +707,86 @@ actually do.
 acting-player check into all three `StepInitMoving`/`StepInitSelecting` pairs, publish `MOVE_START`,
 and bound the move-stack walk by `UtilPlayer.isNextMovePossible` the way Java does. Then re-raise
 `--multimove` to MA+2 in all three editions.
+
+---
+
+## ITER10 (2026-08-27) — the movement rung is de-risked: full MA+2 walks, 100/100 in all three editions
+
+### The divergence
+
+`--multimove 6` and `8` were 0/100. Seed 1, i=28: **Java rolls two rushes, Rust rolls three.**
+
+Chasing it through the engine ruled out three plausible culprits, each with evidence:
+
+- `StepGoForIt`'s guard is `isGoingForIt() && currentMove > MA` on **both** sides — no MA+2 cap in
+  either, so Java is not refusing the third rush there.
+- `updateMoveSquares` gates on `isNextMovePossible` on **both** sides.
+- The move-square map is stale between squares on **both** sides (it is only refreshed when the move
+  stack empties), so `StepInitMoving`'s `getMoveSquare(coordinateTo)` returns null for the 2nd square
+  onward in Java too, and neither engine is bounding the walk with it.
+
+Java's own `JAVA_GFI` debug line (already in `ParityRunner` under `-Dffb.parityDebug`) then made it
+exact — a matching `RUST_GFI` was added under `FFB_TRACE`, and the two read:
+
+```
+JAVA_GFI  away1  currentMove=7,8      goingForIt=true    <- stops at 8
+RUST_GFI  away_01 currentMove=7,8,9   goingForIt=true    <- goes to 9
+```
+
+### Root cause — the spike harness, not the engine
+
+A path-length probe on both sides settled it in one line:
+
+```
+JAVA_PATH pid=…Away1 len=5 currentMove=3 multimove=6
+RUST_PATH pid=away_01 len=6 (predrawn)
+```
+
+**Java's `sendMoveAction` reads `ap.getCurrentMove()` at the moment it draws, and for a prone player
+that moment is AFTER the stand-up — `currentMove=3`, so it plans 5 squares.** Rust pre-draws the
+prone/rooted path at *activation*, before the stand-up, and ITER7 passed `spent = 0` there, so it
+planned 6. One square too many, cm reaching 9, and a third rush the rules do not allow.
+
+Fixed by charging the same 3 movement Java has already spent (`MovementCalc::STAND_UP_COST`) when
+the pre-drawn player is prone. A rooted player never moves, so nothing is spent there.
+
+This is **spike scaffolding, not engine code** — but it had to be right before the spike could say
+anything about the engine.
+
+### What this settles
+
+**The two engines consume a multi-square move stack identically**, at the full MA + 2, including
+mid-path rushes, mid-path dodges and mid-path turnovers, in **bb2016, bb2020 and bb2025**. That was
+the open risk the whole spike existed to answer, and the answer is yes.
+
+Coverage under the passing gate, against the random-agent baseline:
+
+| | baseline | `--multimove 8` |
+|---|---|---|
+| `playerMoved` | 26,278 | **56,763** |
+| **`goForItRoll`** | **0** | **14,150** |
+
+Touchdowns are still 0 and re-rolls still 0 — the random agent neither aims at an endzone nor ever
+accepts a re-roll. Those need the heuristic agent, which is the rest of the campaign.
+
+Note the `is_valid_move` gap is **not** closed and is no longer blocking: the random agent always
+sends a `from` that matches the player's current square, so Java's guard never fires. It becomes
+live again when the heuristic agent replays a *stale* plan across prompts, which is the one place
+Java drops a command and Rust does not. Keep it on the queue for the `Move` rung.
+
+### Diagnostics kept
+
+`JAVA_PATH` (under `-Dffb.parityDebug`) and `RUST_PATH` / `RUST_GFI` (under `FFB_TRACE`), matching
+the file's existing `JAVA_SMA` / `JAVA_PICK` / `JAVA_GFI` convention. Comparing planned path length
+and per-rush `currentMove` across the two engines is exactly the diff that solved this one.
+
+### Gates
+
+- **`--multimove 4`, `6` and `8`: 100/100 in bb2025; `--multimove 8` 100/100 in bb2016 and bb2020.**
+- `--agent random`: 100/100 in all three editions.
+- Heuristic rung 0 and rung 1: 100/100.
+- `cargo test --workspace --release`: **14,641 / 0**. Java trees in sync.
+
+**Next:** rung 2 — `reroll`. The random contract always declines, so accepting runs every re-roll
+path in the engine for the first time (0 → 501 per 100 seeds under the full agent). Needs a Java
+`ReRolledAction` → Rust action-string mapping and the ball carrier.

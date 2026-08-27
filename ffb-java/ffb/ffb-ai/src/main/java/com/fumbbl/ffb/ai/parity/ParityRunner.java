@@ -2575,6 +2575,9 @@ public class ParityRunner {
             FieldCoordinate c = path.get(pi);
             cmdPath[pi] = isHome ? c : c.transform();
         }
+        if (DEBUG) System.err.println("JAVA_PATH pid=" + playerId + " len=" + path.size()
+            + " currentMove=" + (game.getActingPlayer() != null ? game.getActingPlayer().getCurrentMove() : -1)
+            + " multimove=" + multimove);
         ClientCommandMove moveCmd = new ClientCommandMove(playerId, cmdFrom, cmdPath, null);
         MatchRunner.inject(gameState, moveCmd);
     }
