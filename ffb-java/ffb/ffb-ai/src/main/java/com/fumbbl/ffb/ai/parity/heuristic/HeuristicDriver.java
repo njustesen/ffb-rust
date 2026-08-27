@@ -173,6 +173,53 @@ public final class HeuristicDriver {
     }
 
     /**
+     * Rust {@code AgentPrompt::Touchback}. {@code T = 0.20}.
+     *
+     * <p>Who picks the ball up after a touchback. Fast is good, Sure Hands is better, and standing
+     * ON the line of scrimmage is bad enough to outweigh both -- that player is about to be
+     * blocked.
+     *
+     * <p>The eligible set is the RECEIVING team's on-pitch players WITH TACKLE ZONES, which is not
+     * the same predicate as the random contract's {@code isStanding()}; it is what
+     * {@code StepTouchback} builds, and the two sides must enumerate the same set. Order is
+     * {@code (side, nr)}, as everywhere else.
+     *
+     * @return the chosen player, or null when nobody is eligible.
+     */
+    public Player<?> touchback(Game game) {
+        com.fumbbl.ffb.model.FieldModel fm = game.getFieldModel();
+        com.fumbbl.ffb.model.Team recv = game.isHomePlaying() ? game.getTeamAway() : game.getTeamHome();
+        List<Player<?>> eligible = new ArrayList<>();
+        for (Player<?> p : recv.getPlayers()) {
+            FieldCoordinate c = fm.getPlayerCoordinate(p);
+            com.fumbbl.ffb.PlayerState ps = fm.getPlayerState(p);
+            if (c == null || ps == null || !onPitch(c) || !ps.hasTacklezones()) {
+                continue;
+            }
+            eligible.add(p);
+        }
+        if (eligible.isEmpty()) {
+            return null;
+        }
+        eligible.sort((a, b) -> Long.compare(canonKey(game, a.getId()), canonKey(game, b.getId())));
+        int los = game.isHomePlaying() ? 12 : 13;
+        sampler.clear();
+        for (Player<?> p : eligible) {
+            int ma = p.getMovementWithModifiers();
+            float w = 0.3f + 0.4f * Math.min(ma / 9.0f, 1.0f);
+            if (hasSkillNamed(p, "Sure Hands")) {
+                w += 0.3f;
+            }
+            FieldCoordinate c = fm.getPlayerCoordinate(p);
+            if (Math.abs(c.getX() - los) <= 1) {
+                w -= 0.5f;
+            }
+            sampler.push(w);
+        }
+        return eligible.get(sampler.pick(0.20f));
+    }
+
+    /**
      * Rust {@code canon_key}: {@code (side, jersey nr)}. Player IDS must never enter an ordering —
      * they are generated differently by the two engines. Home sorts before away.
      */

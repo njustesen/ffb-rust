@@ -935,6 +935,24 @@ public class ParityRunner {
             // ── Touchback: nearest player to kick-from (13,8) ───────────────
             case TOUCHBACK: {
                 boolean homeReceives = !game.isHomePlaying();
+                // The heuristic agent SCORES the receiver (Rust `AgentPrompt::Touchback`,
+                // T = 0.20) when the `touchback` class is on. Note it enumerates a DIFFERENT
+                // eligible set than the nearest-to-kick-from rule below -- on-pitch players WITH
+                // TACKLE ZONES, which is what StepTouchback builds -- so it must not share this
+                // block's candidate loop.
+                if (heuristic != null
+                    && heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.TOUCHBACK)) {
+                    Player<?> chosen = heuristic.touchback(game);
+                    if (chosen == null) {
+                        game.setDialogParameter(null);
+                    } else {
+                        FieldCoordinate hc = game.getFieldModel().getPlayerCoordinate(chosen);
+                        MatchRunner.injectForTeam(gameState,
+                            new ClientCommandTouchback(homeReceives ? hc : hc.transform()),
+                            homeReceives);
+                    }
+                    break;
+                }
                 Team recvTeam = homeReceives ? game.getTeamHome() : game.getTeamAway();
                 FieldCoordinate kickFrom = new FieldCoordinate(13, 8);
                 FieldCoordinate bestCoord = null;

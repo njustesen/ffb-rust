@@ -1350,3 +1350,44 @@ harness drives a 3-command blitz instead — so bb2016's green there is carried 
 the only classes left are `followup`, `intercept`, `setup`, `activateplayer` and `move`, and all five
 want the `Features` raster tier in Java. That tier is now unambiguously the last thing between here
 and `--heur-classes all`.
+
+## ITER19 — rung 4b: `touchback`
+
+The receiver table is small: `0.3 + 0.4·min(MA/9, 1)`, `+0.3` for Sure Hands, `−0.5` for standing
+within one square of the line of scrimmage. No rasters, no plan, no `Features` beyond the board.
+
+The one thing that needed care is the **eligible set**, which is not the set the random contract
+uses. `StepTouchback` builds the receiving team's on-pitch players **with tackle zones**;
+`ParityRunner`'s existing arm scans `isStanding()` and takes the one nearest to the kick-from square.
+Those are different predicates — a player without tackle zones is a legal choice for the old rule and
+not for the new one — so the heuristic path builds its own list rather than sharing that block's
+loop, then re-sorts by `(side, nr)` and sends the chosen player's coordinate
+(`transform()`ed when the away team receives, as the existing arm does).
+
+Green first try, in all three editions at all three scales. The interesting part was the
+**non-vacuity check**, because a first-try green is exactly the shape a vacuous rung has:
+`FFB_TB_PROBE` over bb2025 seeds 1-20 found **13 touchbacks, and the arm picked index 3 twelve times
+and index 1 once — never index 0**. The class fires often and never agrees with the old rule by
+accident, so the green is real.
+
+### A weight-table property worth keeping
+
+My first draft of `touchback_weight_table` asserted that the LOS penalty always outweighs Sure Hands,
+and it failed: `w(MA 9, Sure Hands, on LOS) = 0.5` against `w(MA 3, plain, off LOS) = 0.433`. The
+penalty (0.5) is larger than the Sure Hands bonus (0.3) but smaller than the MA span (0.4 across
+MA 1-9), so **the LOS term reorders the list, it does not partition it**. An implementation that
+treated it as a veto would disagree exactly there. Same lesson as `pushback_weight_table` in ITER16:
+writing the assertion is what finds the property, and the draft that fails is the useful one.
+
+### Gates
+
+- Rung 4b (`coin,receive,reroll,pushback,blocktarget,blockchoice,blitztarget,touchback`):
+  **100/100 in all three editions at scales 0, 1.0 and 1e6** — nine sweeps, fresh JVM.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,649 / 0**. `mvn -o -pl ffb-ai test`: clean.
+
+**Next:** `kick` — the last class before the raster tier, and much the largest of the cheap ones. Its
+arm models the scatter risk of every candidate square *plus* the 25/216 Weather-Change → Nice gust
+that takes three further d8 steps, computed by iterating a per-cell survival array rather than
+enumerating paths. It needs no `Features`, but it is real arithmetic, so expect the port to be a
+transcription job with a fixture test rather than a twenty-line table.

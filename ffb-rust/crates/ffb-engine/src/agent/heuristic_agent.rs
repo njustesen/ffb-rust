@@ -4100,6 +4100,38 @@ mod tests {
         assert!(on_pitch(0, 0) && on_pitch(XMAX, YMAX));
     }
 
+    /// §6 — the touchback receiver table, which `HeuristicDriver.touchback` mirrors.
+    #[test]
+    fn touchback_weight_table() {
+        let w = |ma: i32, sure_hands: bool, on_los: bool| {
+            let mut v = 0.3f32 + 0.4 * (ma as f32 / 9.0).min(1.0);
+            if sure_hands {
+                v += 0.3;
+            }
+            if on_los {
+                v -= 0.5;
+            }
+            v
+        };
+        // Faster is better, and the MA term SATURATES at 9 -- a MA 10 Gutter Runner scores the
+        // same as a MA 9 one, so the tie is broken by the other two terms, not by speed.
+        assert!(w(6, false, false) > w(5, false, false));
+        assert_eq!(w(9, false, false), w(10, false, false));
+        // Sure Hands is worth about two points of MA.
+        assert!(w(6, true, false) > w(9, false, false));
+        // …but the line-of-scrimmage penalty outweighs it: a Sure Hands player standing on the LOS
+        // is a WORSE receiver than a plain lineman standing anywhere else, because he is about to
+        // be blocked. That is the one ordering the two implementations must agree on, since it is
+        // the only term that can reorder the list rather than just rescale it.
+        assert!(w(6, true, true) < w(6, false, false));
+        // The penalty is NOT unconditional, though: 0.5 is bigger than the Sure Hands bonus but
+        // smaller than the MA span, so a fast Sure Hands player ON the line still outranks a slow
+        // one off it. My first draft of this test asserted the opposite and failed — the LOS term
+        // reorders the list, it does not partition it, and an implementation that treated it as a
+        // veto would disagree exactly here.
+        assert!(w(9, true, true) > w(3, false, false));
+    }
+
     /// An empty blitz-target list ends the TURN, not the action.
     ///
     /// The engine raises `BlitzTarget` whenever any in-bounds opponent can be blocked, but the
