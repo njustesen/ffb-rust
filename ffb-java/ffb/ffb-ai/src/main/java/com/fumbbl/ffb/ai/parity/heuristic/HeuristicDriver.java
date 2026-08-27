@@ -161,7 +161,8 @@ public final class HeuristicDriver {
     private static boolean weCarryTheBall(Game game, boolean home) {
         com.fumbbl.ffb.model.FieldModel fm = game.getFieldModel();
         FieldCoordinate ball = fm.getBallCoordinate();
-        if (ball == null || !fm.isBallInPlay() || fm.isBallMoving()) {
+        // Rust `Features::ball_carried`: in play, ON the pitch, and not loose on the ground.
+        if (ball == null || !fm.isBallInPlay() || !onPitch(ball) || fm.isBallMoving()) {
             return false;
         }
         Player<?> carrier = fm.getPlayer(ball);
@@ -169,6 +170,141 @@ public final class HeuristicDriver {
             return false;
         }
         return game.getTeamHome().hasPlayer(carrier) == home;
+    }
+
+    /**
+     * Rust `push_squares`: the three squares a block can push the defender into — straight back
+     * plus the two flanking it, derived purely from the attacker/defender geometry.
+     */
+    private static List<FieldCoordinate> pushSquares(Game game, String attId, String defId) {
+        com.fumbbl.ffb.model.FieldModel fm = game.getFieldModel();
+        Player<?> att = game.getPlayerById(attId);
+        Player<?> def = game.getPlayerById(defId);
+        FieldCoordinate a = (att != null) ? fm.getPlayerCoordinate(att) : null;
+        FieldCoordinate d = (def != null) ? fm.getPlayerCoordinate(def) : null;
+        List<FieldCoordinate> out = new ArrayList<>();
+        if (a == null || d == null) {
+            return out;
+        }
+        int dx = Integer.signum(d.getX() - a.getX());
+        int dy = Integer.signum(d.getY() - a.getY());
+        FieldCoordinate base = new FieldCoordinate(d.getX() + dx, d.getY() + dy);
+        out.add(base);
+        if (dx != 0 && dy != 0) {
+            out.add(new FieldCoordinate(d.getX() + dx, d.getY()));
+            out.add(new FieldCoordinate(d.getX(), d.getY() + dy));
+        } else if (dx != 0) {
+            out.add(new FieldCoordinate(base.getX(), base.getY() - 1));
+            out.add(new FieldCoordinate(base.getX(), base.getY() + 1));
+        } else {
+            out.add(new FieldCoordinate(base.getX() - 1, base.getY()));
+            out.add(new FieldCoordinate(base.getX() + 1, base.getY()));
+        }
+        return out;
+    }
+
+    /** Rust `can_surf`: any push square off the pitch means the defender can be crowd-surfed. */
+    private static boolean canSurf(Game game, String attId, String defId) {
+        for (FieldCoordinate c : pushSquares(game, attId, defId)) {
+            if (!onPitch(c)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Is the ball carried by this player right now? */
+    private static boolean hasBall(Game game, String playerId) {
+        com.fumbbl.ffb.model.FieldModel fm = game.getFieldModel();
+        FieldCoordinate ball = fm.getBallCoordinate();
+        // Rust `Features::ball_carried`: in play, ON the pitch, and not loose on the ground.
+        if (ball == null || !fm.isBallInPlay() || !onPitch(ball) || fm.isBallMoving()) {
+            return false;
+        }
+        Player<?> p = game.getPlayerById(playerId);
+        FieldCoordinate pc = (p != null) ? fm.getPlayerCoordinate(p) : null;
+        return pc != null && ball.equals(pc);
+    }
+
+    /**
+     * Rust {@code AgentPrompt::BlockChoice}. {@code T = 0.12}.
+     *
+     * <p>One option per die, IN THE ORDER THE DICE WERE ROLLED — the returned index is an index
+     * into {@code dice}, which is the contract with the caller.
+     *
+     * <p>When the choice is the OPPONENT's ({@code ownChoice == false}) every weight is flipped to
+     * {@code 1 - w}, so the same table serves both sides of the table.
+     *
+     * @param dice the block-die faces, in roll order.
+     * @return index into {@code dice} of the chosen face.
+     */
+    public int blockChoice(Game game, String attackerId, String defenderId, int[] dice,
+            boolean ownChoice) {
+        boolean defHasBall = hasBall(game, defenderId);
+        Player<?> att = game.getPlayerById(attackerId);
+        Player<?> def = game.getPlayerById(defenderId);
+        boolean attBlock = hasSkillNamed(att, "Block");
+        boolean attWrestle = hasSkillNamed(att, "Wrestle");
+        boolean attTackle = hasSkillNamed(att, "Tackle");
+        boolean defBlock = hasSkillNamed(def, "Block");
+        boolean defDodge = hasSkillNamed(def, "Dodge");
+        boolean surf = canSurf(game, attackerId, defenderId);
+
+        sampler.clear();
+        for (int d : dice) {
+            float w;
+            switch (d) {
+                case 6:
+                    w = 0.90f;
+                    break;
+                case 5:
+                    w = (defDodge && !attTackle) ? 0.30f : (surf ? 0.95f : 0.80f);
+                    break;
+                case 2: {
+                    boolean attDown = !attBlock && !attWrestle;
+                    boolean defDown = !defBlock;
+                    if (!attDown && defDown) {
+                        w = 0.70f;
+                    } else if (attDown && defDown) {
+                        w = defHasBall ? 0.50f : 0.30f;
+                    } else if (attDown) {
+                        w = 0.10f;
+                    } else {
+                        w = 0.35f;
+                    }
+                    break;
+                }
+                case 1:
+                    w = 0.05f;
+                    break;
+                default:
+                    w = surf ? 0.80f : 0.40f;
+                    break;
+            }
+            if (!ownChoice) {
+                w = 1.0f - w;
+            }
+            sampler.push(w);
+        }
+        return sampler.pick(0.12f);
+    }
+
+    /**
+     * Rust checks `p.has_skill(SkillId::Block)` — the literal SKILL, not one of the properties a
+     * skill happens to register. Match on the skill NAME so the two sides mean the same thing:
+     * several properties are shared by more than one skill, and keying off a property would make
+     * e.g. a Wrestle-only player read as having Block.
+     */
+    private static boolean hasSkillNamed(Player<?> p, String name) {
+        if (p == null) {
+            return false;
+        }
+        for (com.fumbbl.ffb.model.skill.Skill s : p.getSkills()) {
+            if (s != null && name.equals(s.getName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Rust `on_pitch`: 0..=25 by 0..=14. Off-pitch means the push crowd-surfs the defender. */

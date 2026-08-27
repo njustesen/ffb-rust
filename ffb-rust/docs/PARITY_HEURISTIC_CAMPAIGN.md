@@ -1214,3 +1214,74 @@ failed, which is how the property surfaced.
 the first genuine slice of the raster port, and the point to introduce the cross-language FIXTURE
 test the plan calls for: dump Rust's `tz` raster for fixed boards and assert Java reproduces it
 before wiring it to a game.
+
+## ITER17 — rung 3b: `blockchoice`, and BB2020's block-roll dialog is a third class
+
+`followup` was the stated next step and I dropped it after reading the two sides. Rust's `FollowUp`
+arm needs `f.tz_against` (a raster) *and* `target_coord`, which is the `DEFENDER_POSITION` step
+parameter published by `StepInitBlocking`. Java's `DialogFollowupChoiceParameter` carries only
+`getId()` — the harness has no way to read that square, and deriving it from the board is ambiguous
+once a chain push has moved people. So `followup` waits for the raster tier and a parameter it can
+actually see.
+
+`blockchoice` needs the ball, the four block skills and `can_surf`. **No rasters, no new state
+capture** — a strictly better target, and it went in.
+
+### The divergence
+
+Ported the `AgentPrompt::BlockChoice` table (§6.3, `T = 0.12`) to `HeuristicDriver.blockChoice`,
+along with `pushSquares`/`canSurf`, and wired it into `BLOCK_ROLL` and `BLOCK_ROLL_PROPERTIES`.
+bb2025 and bb2016 went green at every scale; **bb2020 collapsed to 39/100 at argmax and 15/100
+sampled**, from 100/100 the iteration before.
+
+Root cause: **each edition shows a DIFFERENT block-roll dialog**, and I had wired two of the three.
+
+| edition | Java `StepBlockRoll` shows | `DialogId` |
+|---|---|---|
+| bb2016 | `DialogBlockRollParameter` | `BLOCK_ROLL` |
+| bb2020 | `DialogBlockRollPartialReRollParameter` | `BLOCK_ROLL_PARTIAL_RE_ROLL` |
+| bb2025 | `DialogBlockRollPropertiesParameter` | `BLOCK_ROLL_PROPERTIES` |
+
+All three map to the **same** Rust prompt: the driver has no `Rules::Bb2020` arm for `BlockRoll`, so
+bb2020 runs the shared (bb2025) `StepBlockRoll` and raises the shared `AgentPrompt::BlockChoice`.
+I had reasoned that `BLOCK_ROLL_PARTIAL_RE_ROLL` was unreachable — a grep for `PartialReRoll` in
+`crates/ffb-engine/src/step/` returns nothing — and left it on the index-0 answer. The grep was
+right and the conclusion was wrong: **Rust has no step named for that dialog because it does not
+model the dialog, only the choice.** A Java dialog with no same-named Rust step is not evidence of an
+unreachable path.
+
+The probe that settled it took one run: `FFB_BC_PROBE` printing `dice/idx/own/nd` from both sides on
+bb2020 seed 1-4 produced **20 `RUST_BC` lines and zero `JAVA_BC` lines** — the Java arm was never
+entered at all, which is a much louder signal than a hash diff.
+
+### The fix
+
+`ParityRunner`: split the `BLOCK_ROLL` / `BLOCK_ROLL_PARTIAL_RE_ROLL` fall-through into three cases,
+each casting its own dialog type and routing through one shared `heuristicBlockChoice(game, nrOfDice,
+blockRoll)` helper. `nrOfDice < 0` → `own_choice = false` → every weight flipped to `1 - w`, exactly
+as Rust does; the helper returns 0 whenever the class is off, so the random gate is untouched.
+
+`HeuristicDriver.hasBall` mirrors `Features::ball_carried`: in play, **on the pitch**, and not loose.
+Skills are matched by NAME (`"Block"`, `"Wrestle"`, `"Tackle"`, `"Dodge"`) because Rust checks
+`has_skill(SkillId::Block)` — the literal skill. Keying off `NamedProperties` would have been wrong
+as well as uncompilable: several skills register the same property, so a Wrestle-only player would
+read as having Block.
+
+### Non-vacuity
+
+`FFB_BC_PROBE`, bb2025 seeds 1-10 at argmax: 117 block-die choices, **85 single-die (index forced),
+32 two-die, of which 16 chose index 1**. bb2016 seeds 1-5: 4 of 12 multi-die choices took index 1.
+The arm genuinely disagrees with the index-0 default in both, so both greens are real.
+
+### Gates
+
+- Rung 3b (`coin,receive,reroll,pushback,blocktarget,blockchoice`): **100/100 in all three editions
+  at all three scales** — nine sweeps, fresh JVM, no `--reuse-java`.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,647 / 0**, including the new `block_choice_weight_table`,
+  which pins the face ordering, the five Both-Down skill combinations, and the `push_squares` /
+  `can_surf` geometry Java re-implements. `mvn -o -pl ffb-ai test`: clean.
+
+**Next:** rung 4 — `blitztarget` (same shape as `blocktarget`, already green) and then `kick` /
+`touchback`, which are pure geometry. `followup` stays parked until the `Features` raster tier lands
+in Java, and that raster tier is the last thing standing between here and `--heur-classes all`.

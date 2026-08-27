@@ -973,21 +973,45 @@ public class ParityRunner {
             // For T3 (full game play) these would become seeded-random decisions once
             // both engines handle the complete in-turn sequence identically.
 
-            case BLOCK_ROLL:
-            case BLOCK_ROLL_PARTIAL_RE_ROLL: {
-                // Always pick die index 0 — deterministic, matches Rust's index=0 choice.
+            case BLOCK_ROLL: {
+                // The heuristic agent SCORES the block dice (Rust `AgentPrompt::BlockChoice`,
+                // T = 0.12) when the `blockchoice` class is on; otherwise die index 0, which is
+                // what the byte-matched random contract picks.
+                com.fumbbl.ffb.dialog.DialogBlockRollParameter br =
+                    (com.fumbbl.ffb.dialog.DialogBlockRollParameter) dialog;
+                int brIdx = heuristicBlockChoice(game, br.getNrOfDice(), br.getBlockRoll());
                 comm.clearCaptured();
-                comm.sendBlockChoice(0);
+                comm.sendBlockChoice(brIdx);
+                injectCaptured(dialog, game, gameState);
+                break;
+            }
+
+            case BLOCK_ROLL_PARTIAL_RE_ROLL: {
+                // This is BB2020's block-roll dialog (bb2020 StepBlockRoll shows
+                // DialogBlockRollPartialReRollParameter where bb2016 shows DialogBlockRollParameter
+                // and bb2025 shows DialogBlockRollPropertiesParameter). All three map to the SAME
+                // Rust prompt -- the shared step's `AgentPrompt::BlockChoice` -- so all three take
+                // the die index from the heuristic agent, or 0 when the class is off.
+                com.fumbbl.ffb.dialog.DialogBlockRollPartialReRollParameter bpr =
+                    (com.fumbbl.ffb.dialog.DialogBlockRollPartialReRollParameter) dialog;
+                int bprIdx = heuristicBlockChoice(game, bpr.getNrOfDice(), bpr.getBlockRoll());
+                comm.clearCaptured();
+                comm.sendBlockChoice(bprIdx);
                 injectCaptured(dialog, game, gameState);
                 break;
             }
 
             case BLOCK_ROLL_PROPERTIES: {
-                // BB2025 block roll: the step waits for CLIENT_BLOCK_CHOICE. Pick die
-                // index 0 and never use a reroll (AGENT_CONTRACT.md §7) — sending a
-                // reroll-decline here would just re-show the dialog forever.
+                // BB2025 block roll: the step waits for CLIENT_BLOCK_CHOICE. Never use a reroll
+                // here (AGENT_CONTRACT.md §7) — a reroll-decline would just re-show the dialog
+                // forever. The die index comes from the heuristic agent when `blockchoice` is on,
+                // and is 0 otherwise. Rust raises the SAME `AgentPrompt::BlockChoice` for this
+                // dialog as for BLOCK_ROLL; there is no separate "properties" prompt.
+                com.fumbbl.ffb.dialog.DialogBlockRollPropertiesParameter brp =
+                    (com.fumbbl.ffb.dialog.DialogBlockRollPropertiesParameter) dialog;
+                int brpIdx = heuristicBlockChoice(game, brp.getNrOfDice(), brp.getBlockRoll());
                 comm.clearCaptured();
-                comm.sendBlockChoice(0);
+                comm.sendBlockChoice(brpIdx);
                 injectCaptured(dialog, game, gameState);
                 break;
             }
@@ -2478,6 +2502,27 @@ public class ParityRunner {
             if (keep) live.add(a);
         }
         return live.toArray(new PlayerAction[0]);
+    }
+
+    /**
+     * The block-die index to send. Delegates to the heuristic agent when the {@code blockchoice}
+     * class is switched on, and otherwise answers 0 — the value the byte-matched random parity
+     * contract picks, so switching the class off leaves the existing gate untouched.
+     *
+     * <p>{@code nrOfDice < 0} means the dice are "against" the attacker and the DEFENDING coach
+     * chooses; Rust carries that as {@code own_choice = nr_of_dice >= 0} and flips every weight.
+     */
+    private int heuristicBlockChoice(Game game, int nrOfDice, int[] blockRoll) {
+        if (heuristic == null
+            || !heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.BLOCK_CHOICE)
+            || blockRoll == null
+            || blockRoll.length == 0) {
+            return 0;
+        }
+        String attackerId = (game.getActingPlayer() != null)
+            ? game.getActingPlayer().getPlayerId() : null;
+        return heuristic.blockChoice(game, attackerId, game.getDefenderId(), blockRoll,
+            nrOfDice >= 0);
     }
 
     /**

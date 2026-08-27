@@ -4092,6 +4092,62 @@ mod tests {
         assert!(on_pitch(0, 0) && on_pitch(XMAX, YMAX));
     }
 
+    /// §6.3 — the block-die table, and the push geometry the Java port re-implements.
+    ///
+    /// The weights themselves are inline in the `BlockChoice` arm, so this pins the ORDERING
+    /// invariants rather than restating the arm; a disagreement with the Java mirror shows up as
+    /// a different picked index at argmax, which is exactly what these assertions bound.
+    #[test]
+    fn block_choice_weight_table() {
+        // Skull is always the worst face and POW always the best, whatever the skills are.
+        let pow = 0.90f32;
+        let skull = 0.05f32;
+        let push = 0.40f32;
+        let push_surf = 0.80f32;
+        let pow_push_plain = 0.80f32;
+        let pow_push_dodge = 0.30f32;
+        assert!(pow > pow_push_plain && pow_push_plain > push && push > skull);
+        // A crowd-surfing push beats a plain one, and a POW/push into the crowd beats both.
+        assert!(push_surf > push);
+        assert!(0.95f32 > push_surf);
+        // Dodge (untackled) demotes POW/push BELOW a plain push -- the defender just stays up.
+        assert!(pow_push_dodge < push);
+
+        // Both Down: the four skill combinations, in the order the arm tests them.
+        let bd_att_only_up = 0.70f32; // attacker has Block/Wrestle, defender does not
+        let bd_both_down_ball = 0.50f32; // neither, but the defender carries the ball
+        let bd_both_down = 0.30f32; // neither, no ball
+        let bd_def_only_up = 0.10f32; // only the defender has Block
+        let bd_both_up = 0.35f32; // both have Block
+        assert!(bd_att_only_up > bd_both_down_ball);
+        assert!(bd_both_down_ball > bd_both_up && bd_both_up > bd_both_down);
+        assert!(bd_both_down > bd_def_only_up);
+        // Knocking the CARRIER down is worth taking a fall for; knocking a plain lineman down
+        // is not (0.30 < a plain push at 0.40) -- the one place the ball changes this table.
+        assert!(bd_both_down_ball > push && bd_both_down < push);
+
+        // The opponent's choice is the same table read backwards, so it needs no second table.
+        assert!((1.0f32 - skull) > (1.0f32 - pow));
+
+        // Push geometry. away_01 at (9,7) blocked by home_01 would be pushed toward +x; put the
+        // defender on the sideline instead and the crowd is reachable.
+        let mut g = tie_game(3, 3);
+        g.field_model.set_player_coordinate("home_01", FieldCoordinate::new(9, 7));
+        // Straight back plus the two flanks -- three squares, always.
+        assert_eq!(push_squares(&g, "home_01", "away_02").len(), 3);
+        assert_eq!(
+            push_squares(&g, "home_01", "away_02")[0],
+            FieldCoordinate::new(12, 7),
+            "base square is the defender stepped one further along the block direction"
+        );
+        assert!(!can_surf(&g, "home_01", "away_02"), "mid-pitch: no crowd in reach");
+
+        // Now against the sideline: y = 0, pushed straight up into the crowd.
+        g.field_model.set_player_coordinate("home_01", FieldCoordinate::new(10, 1));
+        g.field_model.set_player_coordinate("away_02", FieldCoordinate::new(10, 0));
+        assert!(can_surf(&g, "home_01", "away_02"), "y=0 pushed to y=-1 is off the pitch");
+    }
+
     // ── sampler draw-count contract (AGENT_CONTRACT_HEURISTIC.md section 2) ────
 
     /// How many `next_u64()` calls `f` consumed from the agent's stream.
