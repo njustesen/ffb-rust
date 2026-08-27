@@ -202,7 +202,7 @@ fn resolve_server_dir() -> String {
 pub fn run_java_headless_range(
     seed_start: u64, seed_end: u64,
     home_team_id: &str, away_team_id: &str, home_race: &str, away_race: &str, tier: u8,
-    edition: &str,
+    edition: &str, agent_spec: AgentSpec,
 ) {
     let dir = crate::log_format::matchup_dir(edition, home_race, away_race);
     std::fs::create_dir_all(&dir).ok();
@@ -243,6 +243,17 @@ pub fn run_java_headless_range(
         args.push("--ruleset".into());
         args.push(rs.into());
     }
+    // The heuristic ladder: BOTH engines must be given the same scale and the same class mask, or
+    // they disagree about which side answers a prompt -- a divergence produced by the harness
+    // rather than by either engine. See AGENT_CONTRACT_HEURISTIC.md.
+    if let AgentSpec::Heuristic { temp_scale, classes, .. } = agent_spec {
+        args.push("--agent".into());
+        args.push("heuristic".into());
+        args.push("--heur-scale".into());
+        args.push(temp_scale.to_string());
+        args.push("--heur-classes".into());
+        args.push(classes.to_spec());
+    }
 
     match Command::new("java").args(&args).status() {
         Ok(s) if s.success() => {}
@@ -266,8 +277,17 @@ pub fn run_java_headless_range(
 
 /// One recorded Java batch, written next to the logs it produced.
 fn java_fingerprint(
-    home_team_id: &str, away_team_id: &str, tier: u8, edition: &str,
+    home_team_id: &str, away_team_id: &str, tier: u8, edition: &str, agent_spec: AgentSpec,
 ) -> serde_json::Value {
+    // Which agent drove the Java side. Without this a heuristic-arm log could be served to a
+    // random-arm gate (or the reverse) as if it were current -- the exact shape of silent-stale
+    // failure that turned a 100/100 gate into 30/100 on 2026-08-27.
+    let (agent, agent_scale, agent_classes) = match agent_spec {
+        AgentSpec::Random => ("random", String::new(), String::new()),
+        AgentSpec::Heuristic { temp_scale, mode, classes } => {
+            ("heuristic", format!("{temp_scale}:{mode:?}"), classes.to_spec())
+        }
+    };
     let cp = resolve_parity_cp();
     let server_dir = resolve_server_dir();
     serde_json::json!({
@@ -283,6 +303,9 @@ fn java_fingerprint(
         "dice_trace": std::env::var_os("FFB_DICE_TRACE").is_some(),
         "trace": std::env::var_os("FFB_TRACE").is_some(),
         "dice_deep": std::env::var_os("FFB_DICE_DEEP").is_some(),
+        "agent": agent,
+        "agent_scale": agent_scale,
+        "agent_classes": agent_classes,
     })
 }
 
@@ -331,16 +354,17 @@ fn manifest_path(edition: &str, home_race: &str, away_race: &str) -> String {
 pub fn java_logs_reusable(
     seed_start: u64, seed_end: u64,
     home_team_id: &str, away_team_id: &str, home_race: &str, away_race: &str, tier: u8,
-    edition: &str,
+    edition: &str, agent_spec: AgentSpec,
 ) -> Result<(), String> {
     let path = manifest_path(edition, home_race, away_race);
     let raw = std::fs::read_to_string(&path)
         .map_err(|_| format!("no cached Java batch at {path}"))?;
     let recorded: serde_json::Value = serde_json::from_str(&raw)
         .map_err(|e| format!("unreadable manifest {path}: {e}"))?;
-    let want = java_fingerprint(home_team_id, away_team_id, tier, edition);
+    let want = java_fingerprint(home_team_id, away_team_id, tier, edition, agent_spec);
     for key in ["version", "jar", "server_data", "home_team_id", "away_team_id", "tier",
-                "edition", "dice_trace", "trace", "dice_deep"] {
+                "edition", "dice_trace", "trace", "dice_deep",
+                "agent", "agent_scale", "agent_classes"] {
         if recorded.get(key) != want.get(key) {
             return Err(format!("cached Java batch differs on `{key}`"));
         }
@@ -358,10 +382,10 @@ pub fn java_logs_reusable(
 /// Record the fingerprint of the batch just produced, so a later `--reuse-java` can trust it.
 pub fn write_java_manifest(
     home_team_id: &str, away_team_id: &str, home_race: &str, away_race: &str, tier: u8,
-    edition: &str,
+    edition: &str, agent_spec: AgentSpec,
 ) {
     let path = manifest_path(edition, home_race, away_race);
-    let fp = java_fingerprint(home_team_id, away_team_id, tier, edition);
+    let fp = java_fingerprint(home_team_id, away_team_id, tier, edition, agent_spec);
     if let Ok(s) = serde_json::to_string_pretty(&fp) {
         let _ = std::fs::write(&path, s);
     }
@@ -378,7 +402,7 @@ mod reuse_tests {
     fn reuse_declines_without_a_cached_batch() {
         let err = java_logs_reusable(
             1, 5, "teamA", "teamB", "no_such_roster", "no_such_roster", 3,
-            "no_such_edition",
+            "no_such_edition", AgentSpec::Random,
         ).unwrap_err();
         assert!(err.contains("no cached Java batch"), "unexpected reason: {err}");
     }
@@ -387,10 +411,30 @@ mod reuse_tests {
     /// input to check without touching the filesystem.
     #[test]
     fn fingerprint_distinguishes_inputs() {
-        let base = java_fingerprint("teamA", "teamB", 3, "bb2025");
-        assert_ne!(base, java_fingerprint("teamZ", "teamB", 3, "bb2025"));
-        assert_ne!(base, java_fingerprint("teamA", "teamB", 2, "bb2025"));
-        assert_ne!(base, java_fingerprint("teamA", "teamB", 3, "bb2020"));
+        let base = java_fingerprint("teamA", "teamB", 3, "bb2025", AgentSpec::Random);
+        assert_ne!(base, java_fingerprint("teamZ", "teamB", 3, "bb2025", AgentSpec::Random));
+        assert_ne!(base, java_fingerprint("teamA", "teamB", 2, "bb2025", AgentSpec::Random));
+        assert_ne!(base, java_fingerprint("teamA", "teamB", 3, "bb2020", AgentSpec::Random));
+        // The agent arm changes what Java produces, so serving a random-arm log to a heuristic
+        // gate (or the reverse) must be refused. Without this, `--reuse-java` would silently
+        // compare two different experiments -- the failure mode that turned a 100/100 gate into
+        // 30/100 on 2026-08-27.
+        let heur = AgentSpec::Heuristic {
+            temp_scale: 0.0,
+            mode: ffb_engine::agent::Mode::Wide,
+            classes: ffb_engine::agent::ClassMask::NONE,
+        };
+        assert_ne!(base, java_fingerprint("teamA", "teamB", 3, "bb2025", heur));
+        let heur_more = AgentSpec::Heuristic {
+            temp_scale: 0.0,
+            mode: ffb_engine::agent::Mode::Wide,
+            classes: ffb_engine::agent::ClassMask::NONE.with(ffb_engine::agent::PromptClass::CoinChoice),
+        };
+        assert_ne!(
+            java_fingerprint("teamA", "teamB", 3, "bb2025", heur),
+            java_fingerprint("teamA", "teamB", 3, "bb2025", heur_more),
+            "a different class mask must invalidate the cache"
+        );
     }
 }
 

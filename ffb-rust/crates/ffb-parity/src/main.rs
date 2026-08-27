@@ -443,7 +443,7 @@ fn main() {
     let java_t0 = std::time::Instant::now();
     let reused = if args.reuse_java {
         match runner::java_logs_reusable(args.seed_start, args.seed_end, &args.home_java,
-            &args.away_java, &args.home, &args.away, args.tier, &args.edition) {
+            &args.away_java, &args.home, &args.away, args.tier, &args.edition, agent_spec) {
             Ok(()) => {
                 println!("REUSE java logs for {} vs {} ({}) — cached batch matches",
                     args.home, args.away, args.edition);
@@ -458,8 +458,8 @@ fn main() {
         false
     };
     if !reused {
-        runner::run_java_headless_range(args.seed_start, args.seed_end, &args.home_java, &args.away_java, &args.home, &args.away, args.tier, &args.edition);
-        runner::write_java_manifest(&args.home_java, &args.away_java, &args.home, &args.away, args.tier, &args.edition);
+        runner::run_java_headless_range(args.seed_start, args.seed_end, &args.home_java, &args.away_java, &args.home, &args.away, args.tier, &args.edition, agent_spec);
+        runner::write_java_manifest(&args.home_java, &args.away_java, &args.home, &args.away, args.tier, &args.edition, agent_spec);
     }
     let java_total = java_t0.elapsed();
     println!("TIMING java_total={:.3}s (batched JVM, {total} seeds)", java_total.as_secs_f64());

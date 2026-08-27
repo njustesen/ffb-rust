@@ -420,3 +420,75 @@ it detects a one-line probe, and `--fix` restores agreement.
 **Next:** ITER6 — the `heuristic/` package skeleton (`AgentPrompt`/`AgentAction` mirrors, the
 `Xoshiro` draw helpers, `ClassMask`), the `HeuristicDriver` adapter inside `ParityRunner`, and
 rung 1 (`coin,receive`) green.
+
+---
+
+## ITER6 (2026-08-27) — rung 1 green: the two agents agree, end to end
+
+The Java agent now answers real prompts, and the cross-language machinery works.
+
+### What landed
+
+`ffb-ai/.../parity/heuristic/`: `PromptClass` + `ClassMask` (bit positions are contract — a
+`--heur-classes` spelling must select the same class on both sides), `Sampler` (the `unit`/`argmax`/
+`pick`/`softmaxPick` mirror), and `HeuristicDriver`, which gets first refusal on every dialog and
+returns false for any class outside its mask so `ParityRunner`'s random policy answers it untouched.
+`ParityRunner` gains `--agent`, `--heur-scale`, `--heur-classes`, and the Rust harness forwards all
+three to the JVM using `ClassMask::to_spec()` — the canonical spelling, so a differently-ordered or
+duplicated list cannot mean two different things on the two sides.
+
+The reuse fingerprint now includes the agent, scale and class mask. Without that, a heuristic-arm
+Java log could be served to a random-arm gate as if current — the ITER1 trap in a new costume.
+
+### Rung 1: 100/100 at every arm
+
+| arm | seeds | result |
+|---|---|---|
+| `--heur-scale 0` (argmax, **zero** agent RNG) | 100 | **100/100** |
+| `--heur-scale 1.0` (sampled) | 100 | **100/100** |
+| `--heur-scale 1e6` (uniform over the same options) | 100 | **100/100** |
+
+(Exit code 1 on the heuristic arms is the tier-3 *coverage checklist*, not parity: the agent now
+always receives, so some kickoff events stop occurring. `PARITY: 100/100 games match` is the verdict
+that matters — `docs/PARITY_PROCESS.md` documents this exit-code subtlety.)
+
+### The bug it found, and how the ladder found it
+
+Argmax was 100/100 while sampled was **91/100** — which immediately localised the fault to the
+sampler or its inputs, because argmax consumes no RNG at all. That is precisely why the plan puts
+argmax first.
+
+The sampler itself was then exonerated by a new cross-language golden file
+(`agent/testdata/sampler_golden.txt`, 120 `unit()` vectors + 1,200 whole decisions covering every
+temperature band): Java reproduced **every index and every draw count**. The draw count is checked,
+not just the answer — two implementations can agree on the pick while disagreeing on its cost, and
+the extra draw then poisons every later decision.
+
+So the inputs differed, and a probe on both sides said so in one line:
+
+```
+JPROBE receive half=0 w=0.85
+RPROBE receive half=1 w=0.65
+```
+
+**Java's `Game.getHalf()` still returns 0 at the pre-kickoff receive choice, where Rust's `g.half`
+is already 1.** Two different distributions that happen to agree ~82% of the time — hence 9 seeds
+in 100, and hence invisible to any smoke test. Fixed in the Java agent with
+`Math.max(1, game.getHalf())`, the same normalisation `ParityRunner.stateString` already applies to
+this exact field for this exact reason.
+
+A harness/agent mismatch, not an engine divergence — but exactly the class of thing that would have
+been blamed on the engine if it had surfaced later, under a fully-ported agent, as a mystery
+9%-of-seeds failure.
+
+### Gates
+
+- Rung 1, all three arms, 100 seeds: **100/100**.
+- Rung 0 (`--heur-classes none`): 100/100. `--agent random`: 100/100. Neither moved.
+- `cargo test --workspace --release`: **14,640 / 0**. `mvn -o -pl ffb-ai test`: **16 / 0**.
+- `python scripts/check_java_trees.py`: trees agree.
+
+**Next:** ITER7 — rung 2 (`followup,reroll,blockchoice`, plus `skill`/`intercept` if reachable).
+`ReRollOffer` is the interesting one: the random contract always declines, so accepting exercises
+every re-roll path in the engine for the first time (501 re-rolls per 100 seeds under the full
+agent, against 0 under random play).

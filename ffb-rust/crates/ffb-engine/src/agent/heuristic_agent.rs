@@ -1456,6 +1456,21 @@ impl ClassMask {
         ClassMask(self.0 | (1u32 << (c as u8)))
     }
 
+    /// The canonical spelling of this mask, round-tripping through [`ClassMask::parse`]. Used to
+    /// hand the Java side the IDENTICAL mask: passing through the user's raw string instead would
+    /// let `--heur-classes coin,coin` or a differently-ordered list mean two different things.
+    pub fn to_spec(self) -> String {
+        if self == ClassMask::NONE {
+            return "none".to_string();
+        }
+        let on: Vec<&str> =
+            PromptClass::ALL.iter().filter(|c| self.has(**c)).map(|c| c.name()).collect();
+        if on.len() == PromptClass::ALL.len() {
+            return "all".to_string();
+        }
+        on.join(",")
+    }
+
     /// `all`, `none`, or a comma-separated list of [`PromptClass::name`]s.
     pub fn parse(spec: &str) -> Result<ClassMask, String> {
         let spec = spec.trim();
@@ -3888,6 +3903,82 @@ mod tests {
                 "clamp must be a no-op over the reachable range"
             );
         }
+    }
+
+    /// Regenerates `testdata/sampler_golden.txt`, the cross-language pin for the SAMPLER --
+    /// `unit()`, the eps escape, and the pick index. Same role as the det_math table: the Java
+    /// twin asserts on this exact file, so a divergence fails a unit test instead of showing up
+    /// as a mystery state-hash mismatch 200 steps into a game.
+    ///
+    /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_sampler_golden -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_sampler_golden() {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        writeln!(out, "# sampler golden -- see agent/heuristic_agent.rs and Sampler.java.").unwrap();
+        writeln!(out, "# unit <seed> <i> <bits>   : the i-th unit() draw, as f32 bits").unwrap();
+        writeln!(out, "# pick <seed> <scale> <tbase> <n> <w0,w1,...> <idx> <draws>").unwrap();
+
+        // The raw draw sequence. If this diverges, nothing downstream can agree.
+        for seed in [1u64, 29, 33, 46, 12345] {
+            let mut a = HeuristicAgent::new(seed, 1.0);
+            for i in 0..24 {
+                let u = a.unit();
+                writeln!(out, "unit {seed} {i} {:08x}", u.to_bits()).unwrap();
+            }
+        }
+
+        // Whole decisions, at every temperature band, including the two-option equal-weight case
+        // that CoinChoice uses and where the eps escape is most visible.
+        let cases: [(f32, f32, &[f32]); 10] = [
+            (1.0, 1.00, &[0.5, 0.5]),
+            (1.0, 0.30, &[0.65, 0.35]),
+            (1.0, 0.15, &[0.9, 0.6, 0.4, 0.25, 0.1]),
+            (1.0, 0.12, &[0.05, 0.7, 0.8, 0.95]),
+            (0.05, 0.15, &[0.9, 0.6, 0.4]),
+            (0.0, 0.15, &[0.9, 0.6, 0.4]),
+            (1.0e6, 0.15, &[0.9, 0.6, 0.4]),
+            (1.0, 0.18, &[0.3]),
+            (1.0, 0.10, &[0.42, 0.42, 0.42, 0.42, 0.42, 0.42, 0.42, 0.42]),
+            (1.0, 0.20, &[-0.4, 0.0, 0.55]),
+        ];
+        for seed in [1u64, 29, 7] {
+            for (scale, tbase, ws) in cases.iter() {
+                let mut a = HeuristicAgent::new(seed, *scale);
+                // Repeat so the eps escape is actually exercised, not just skipped.
+                for _rep in 0..40 {
+                    a.buf.clear();
+                    for w in ws.iter() {
+                        a.buf.push(Action::EndTurn, *w, Rule::Flat, 0.0);
+                    }
+                    let before = a.rng.clone();
+                    let idx = a.pick(*tbase);
+                    let draws = {
+                        let after_next = a.rng.clone().next_u64();
+                        let mut k = 0;
+                        loop {
+                            let mut probe = before.clone();
+                            for _ in 0..k {
+                                probe.next_u64();
+                            }
+                            if probe.next_u64() == after_next || k > 6 {
+                                break k;
+                            }
+                            k += 1;
+                        }
+                    };
+                    let wstr: Vec<String> = ws.iter().map(|w| format!("{:08x}", w.to_bits())).collect();
+                    writeln!(
+                        out, "pick {seed} {:08x} {:08x} {} {} {idx} {draws}",
+                        scale.to_bits(), tbase.to_bits(), ws.len(), wstr.join(",")
+                    ).unwrap();
+                }
+            }
+        }
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/agent/testdata/sampler_golden.txt");
+        std::fs::write(path, out).expect("write golden");
+        eprintln!("wrote {path}");
     }
 
     // ── the Java-port class ladder ─────────────────────────────────────────────

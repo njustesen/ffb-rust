@@ -24,6 +24,8 @@ import com.fumbbl.ffb.net.commands.ClientCommandActingPlayer;
 import com.fumbbl.ffb.net.commands.ClientCommandBlock;
 import com.fumbbl.ffb.net.commands.ClientCommandFoul;
 import com.fumbbl.ffb.net.commands.ClientCommandHandOver;
+import com.fumbbl.ffb.ai.parity.heuristic.ClassMask;
+import com.fumbbl.ffb.ai.parity.heuristic.HeuristicDriver;
 import com.fumbbl.ffb.net.commands.ClientCommandMove;
 import com.fumbbl.ffb.net.commands.ClientCommandPass;
 import com.fumbbl.ffb.model.Team;
@@ -85,6 +87,13 @@ public class ParityRunner {
      *       a concrete action (move, later block/blitz/pass/hand-over/foul).
      */
     private int tier = 2;
+
+    /**
+     * Non-null when `--agent heuristic` is in force. Answers only the prompt classes in its
+     * ClassMask; everything else falls through to the random policy below, whose RNG consumption
+     * is byte-matched against Rust's RandomAgent.
+     */
+    private HeuristicDriver heuristic;
 
     private final PrintWriter out;
     private final CapturingClientCommunication comm = new CapturingClientCommunication();
@@ -152,6 +161,13 @@ public class ParityRunner {
         int tierArg = 2;
         long seedEndArg = -1;
         String rulesetArg = null;   // e.g. "BB2016"; null keeps the BB2025 default
+        // Heuristic-agent ladder (AGENT_CONTRACT_HEURISTIC.md, docs/PARITY_HEURISTIC_CAMPAIGN.md).
+        // `--agent heuristic` swaps the driver for the prompt classes named by `--heur-classes`;
+        // every other class keeps the random contract untouched, so tier 2 and tier 3 stay
+        // byte-identical to their historical behaviour when the flag is absent.
+        String agentArg = "random";
+        float heurScaleArg = 0.0f;
+        String heurClassesArg = "none";
         List<String> positional = new ArrayList<>();
         for (int i = 0; i < args.length; i++) {
             if ("--tier".equals(args[i]) && i + 1 < args.length) {
@@ -160,6 +176,12 @@ public class ParityRunner {
                 seedEndArg = Long.parseUnsignedLong(args[++i]);
             } else if ("--ruleset".equals(args[i]) && i + 1 < args.length) {
                 rulesetArg = args[++i];
+            } else if ("--agent".equals(args[i]) && i + 1 < args.length) {
+                agentArg = args[++i];
+            } else if ("--heur-scale".equals(args[i]) && i + 1 < args.length) {
+                heurScaleArg = Float.parseFloat(args[++i]);
+            } else if ("--heur-classes".equals(args[i]) && i + 1 < args.length) {
+                heurClassesArg = args[++i];
             } else {
                 positional.add(args[i]);
             }
@@ -219,6 +241,15 @@ public class ParityRunner {
 
             ParityRunner runner = new ParityRunner(out);
             runner.tier = tierArg;
+            if ("heuristic".equals(agentArg)) {
+                // Seeded from the game seed, exactly as the Rust side does: the heuristic stream is
+                // `seed ^ "HEURISTI"`, independent of the game dice and of decisionRng/actionRng.
+                runner.heuristic = new HeuristicDriver(
+                    s, heurScaleArg, ClassMask.parse(heurClassesArg));
+            } else if (!"random".equals(agentArg)) {
+                System.err.println("--agent must be 'random' or 'heuristic', got: " + agentArg);
+                System.exit(2);
+            }
             runner.run(gameState, homeTeamId, awayTeamId, s);
 
             out.flush();
@@ -836,6 +867,12 @@ public class ParityRunner {
     // ── Dialog handling ───────────────────────────────────────────────────────
 
     private void handleDialog(IDialogParameter dialog, Game game, GameState gameState) {
+        // The heuristic agent gets first refusal on every dialog. It answers only the classes in
+        // its mask and returns false otherwise, so an unported class keeps the random contract --
+        // which is what makes the ladder gateable one class at a time.
+        if (heuristic != null && heuristic.tryDialog(dialog, game, gameState)) {
+            return;
+        }
         if (System.getenv("FFB_DLG_TRACE") != null) System.err.println("JAVA_DLG " + dialog.getId()
             + " mode=" + game.getTurnMode());
         switch (dialog.getId()) {
