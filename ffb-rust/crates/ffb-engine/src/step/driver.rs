@@ -852,6 +852,12 @@ impl DriverGameState {
             // differing entry IS the divergence. Windows bounded by RUST_STEP have produced three
             // wrong root causes in the §12 work (docs/BACKLOG.md).
             let rng_before_step = self.rng.call_count;
+            // FFB_RR_STEPS: which step changed a team's re-roll bank. Same shape as
+            // FFB_RNG_STEPS, and it exists for the same reason: the `r` field is in the state hash,
+            // so an accounting error is a divergence, but nothing else says WHO changed it. Only
+            // visible once an agent actually accepts re-rolls -- under the random contract the
+            // counters never move.
+            let rr_before_step = (self.game.turn_data_home.rerolls, self.game.turn_data_away.rerolls);
             let def_before_step = self.game.defender_id.clone();
             let pos_before_step = self.game.acting_player.player_id.clone()
                 .and_then(|p| self.game.field_model.player_coordinate(&p)).map(|c| (c.x, c.y));
@@ -911,6 +917,14 @@ impl DriverGameState {
                     eprintln!("BALLCHG step={:?} {:?} -> {:?} (rng={} acting={:?})",
                         entry.step.id(), ball_before_step, ball_now,
                         self.rng.call_count, self.game.acting_player.player_id);
+                }
+            }
+            if std::env::var_os("FFB_RR_STEPS").is_some() {
+                let rr_now = (self.game.turn_data_home.rerolls, self.game.turn_data_away.rerolls);
+                if rr_now != rr_before_step {
+                    eprintln!("RRSTEP step={:?} home {}->{} away {}->{} (half={} rng={})",
+                        entry.step.id(), rr_before_step.0, rr_now.0, rr_before_step.1, rr_now.1,
+                        self.game.half, self.rng.call_count);
                 }
             }
             if std::env::var_os("FFB_RNG_STEPS").is_some() && self.rng.call_count != rng_before_step {

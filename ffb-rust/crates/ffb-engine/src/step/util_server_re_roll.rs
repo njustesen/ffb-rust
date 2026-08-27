@@ -85,6 +85,26 @@ pub fn use_reroll(game: &mut Game, re_roll_source: &ReRollSource, player_id: &st
         if td.rerolls > 0 {
             td.rerolls -= 1;
             td.reroll_used = true;
+            // Java `RollMechanic.updateTurnDataAfterReRollUsage` (`bb2025:464-488`) spends the
+            // ONE-DRIVE re-rolls FIRST: alongside the pool it decrements the first non-zero
+            // one-drive counter, in this order, and returns that source for the report.
+            //
+            // Rust decremented only the pool. The counter therefore still read 1 at the end of the
+            // drive, where `StepEndTurn::remove_rerolls_lasting_for_drive` subtracts the sum back
+            // out again -- so a re-roll that had already been SPENT was clawed back a second time,
+            // costing the team a PERMANENT re-roll. Measured on lineman bb2025 seed 1 with the
+            // `reroll` rung on: home granted Brilliant Coaching at the half-2 kickoff (3 -> 4),
+            // spent it (4 -> 3), then lost another at the final whistle (3 -> 2) where Java ends
+            // on 3. Structurally invisible until an agent actually ACCEPTS a re-roll -- under the
+            // random parity contract every offer is declined, so the counters never move and the
+            // double-subtraction has nothing to bite.
+            if td.rerolls_brilliant_coaching_one_drive > 0 {
+                td.rerolls_brilliant_coaching_one_drive -= 1;
+            } else if td.rerolls_pump_up_the_crowd_one_drive > 0 {
+                td.rerolls_pump_up_the_crowd_one_drive -= 1;
+            } else if td.reroll_show_star_one_drive > 0 {
+                td.reroll_show_star_one_drive -= 1;
+            }
             return true;
         }
         return false;
@@ -125,6 +145,55 @@ mod tests {
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
+    }
+
+    /// Java `RollMechanic.updateTurnDataAfterReRollUsage` spends the ONE-DRIVE re-rolls first:
+    /// consuming a team re-roll decrements the pool AND the first non-zero one-drive counter, in
+    /// the order Brilliant Coaching -> Pump Up The Crowd -> Show Star.
+    ///
+    /// Without that, the counter still reads 1 at the end of the drive, where
+    /// `StepEndTurn::remove_rerolls_lasting_for_drive` subtracts it back out -- clawing back a
+    /// re-roll that was already spent and costing the team a PERMANENT one (lineman bb2025 seed 1
+    /// with the `reroll` rung on: Java ends `r3,3`, Rust ended `r2,3`).
+    #[test]
+    fn spending_a_team_reroll_also_spends_a_one_drive_reroll() {
+        let src = ReRollSource::new("TRR");
+
+        // Brilliant Coaching is spent first.
+        let mut game = make_game();
+        game.turn_data_home.rerolls = 4;
+        game.turn_data_home.rerolls_brilliant_coaching_one_drive = 1;
+        game.turn_data_home.rerolls_pump_up_the_crowd_one_drive = 1;
+        assert!(use_reroll(&mut game, &src, "nobody"));
+        assert_eq!(game.turn_data_home.rerolls, 3);
+        assert_eq!(game.turn_data_home.rerolls_brilliant_coaching_one_drive, 0);
+        assert_eq!(
+            game.turn_data_home.rerolls_pump_up_the_crowd_one_drive, 1,
+            "only the FIRST non-zero counter is spent, matching Java's if/else-if chain"
+        );
+
+        // Then Pump Up The Crowd, then Show Star.
+        let mut game = make_game();
+        game.turn_data_home.rerolls = 3;
+        game.turn_data_home.rerolls_pump_up_the_crowd_one_drive = 1;
+        game.turn_data_home.reroll_show_star_one_drive = 1;
+        assert!(use_reroll(&mut game, &src, "nobody"));
+        assert_eq!(game.turn_data_home.rerolls_pump_up_the_crowd_one_drive, 0);
+        assert_eq!(game.turn_data_home.reroll_show_star_one_drive, 1);
+
+        // A plain re-roll with no one-drive grant outstanding touches only the pool.
+        let mut game = make_game();
+        game.turn_data_home.rerolls = 3;
+        assert!(use_reroll(&mut game, &src, "nobody"));
+        assert_eq!(game.turn_data_home.rerolls, 2);
+        assert_eq!(game.turn_data_home.rerolls_brilliant_coaching_one_drive, 0);
+
+        // An empty pool consumes nothing at all.
+        let mut game = make_game();
+        game.turn_data_home.rerolls = 0;
+        game.turn_data_home.rerolls_brilliant_coaching_one_drive = 1;
+        assert!(!use_reroll(&mut game, &src, "nobody"));
+        assert_eq!(game.turn_data_home.rerolls_brilliant_coaching_one_drive, 1);
     }
 
     fn add_player_with_skill(game: &mut Game, id: &str, skill: SkillId) {

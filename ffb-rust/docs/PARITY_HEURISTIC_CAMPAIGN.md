@@ -872,3 +872,82 @@ what turned this from "seed 1 fails" into "the home re-roll count is one low".
 - `cargo test --workspace --release`: **14,641 / 0**.
 
 **Next:** the home re-roll accounting above. Then rung 2 sampled + uniform, then rung 3.
+
+---
+
+## ITER12 (2026-08-27) — the one-drive re-roll was clawed back twice (91 → 95/100)
+
+### Root cause
+
+Java's `RollMechanic.updateTurnDataAfterReRollUsage` (`bb2025:464-488`) spends the **one-drive
+re-rolls first**. Consuming a team re-roll decrements the pool AND the first non-zero one-drive
+counter, in the order Brilliant Coaching → Pump Up The Crowd → Show Star:
+
+```java
+if (rrActuallyUsed) turnData.setReRolls(turnData.getReRolls() - 1);
+if (turnData.getReRollsBrilliantCoachingOneDrive() > 0) {
+    if (rrActuallyUsed) turnData.setReRollsBrilliantCoachingOneDrive(... - 1);
+    return ReRollSources.BRILLIANT_COACHING;
+}
+```
+
+Rust's `use_reroll` decremented only the pool. The counter therefore still read 1 at the end of the
+drive, where `StepEndTurn::remove_rerolls_lasting_for_drive` subtracts the sum back out again — so a
+re-roll that had **already been spent** was clawed back a second time, costing the team a
+**permanent** re-roll.
+
+Measured on lineman bb2025 seed 1: home was granted Brilliant Coaching at the half-2 kickoff
+(3 → 4), spent it (4 → 3), then lost another at the final whistle (3 → 2) where Java ends on 3.
+
+Everything around it was already a faithful port and was checked first: the drive-end body is
+identical, the `fNewHalf || fTouchdown` call condition is identical (and `checkEndOfHalf` is true at
+turn 8/8, so Java *does* run it), and the kickoff grant sets the counter on both sides.
+
+**Structurally invisible until an agent accepts a re-roll.** Under the random parity contract every
+offer is declined, so the counters never move and the double-subtraction has nothing to bite.
+
+### How it was found
+
+`FFB_RR_STEPS` (new, same shape as `FFB_RNG_STEPS`): print which STEP changed a team's re-roll bank.
+The `r` field is in the state hash, so an accounting error is a divergence, but nothing else says who
+moved it. Four lines named the culprit immediately:
+
+```
+RRSTEP step=InitKickoff          home 0->3 away 0->3 (half=1)
+RRSTEP step=EndTurn              home 2->3 away 2->3 (half=2)   <- half reset
+RRSTEP step=ApplyKickoffResult   home 3->4 away 3->3 (half=2)   <- Brilliant Coaching
+RRSTEP step=EndTurn              home 3->2 away 3->3 (half=2)   <- the bug
+```
+
+### Gates
+
+- Rung 2 (`coin,receive,reroll`) argmax: **95/100**, up from 91/100.
+- `--agent random`: 100/100 in bb2016, bb2020 and bb2025.
+- Rung 0 and rung 1: 100/100.
+- `cargo test --workspace --release`: **14,642 / 0**, including
+  `spending_a_team_reroll_also_spends_a_one_drive_reroll`.
+
+### Process note — a rule I broke and reverted
+
+While diagnosing this I added a temporary `System.err.println` probe to
+`ffb-server/.../bb2025/StepEndTurn.java`. **That is stock engine code and off-limits** — the whole
+campaign rests on Java being unmodified ground truth. Reverted, stock jar rebuilt, file verified
+probe-free. The answer came from *reading* the Java and instrumenting only the Rust side, which is
+what should have happened first. Instrument Rust; read Java.
+
+### The remaining 5 seeds are a DIFFERENT divergence
+
+Seed 16 is not the same shape — the end state differs in ball position, player states and re-rolls
+at once:
+
+```
+JAVA_END … b19,3,true … r3,2 … pa00:-1,-1,Bh,…
+RUST_END … b20,4,true … r2,3 … pa00:-1,-1,Reserve,…
+```
+
+Note `r3,2` against `r2,3` — home and away transposed, which is worth a look on its own. A
+substantive divergence much earlier in the game rather than an end-of-drive accounting slip. Failing
+seeds: 16, 45, 62, 89, 99.
+
+**Next:** seed 16 — find its FIRST diverging step (dice attribution via `FFB_RNG_STEPS` vs Java's
+`caller=`), then continue rung 2 to green and on to sampled + uniform.
