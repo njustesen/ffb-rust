@@ -3720,6 +3720,81 @@ mod tests {
         }
     }
 
+    // ── sampler draw-count contract (AGENT_CONTRACT_HEURISTIC.md section 2) ────
+
+    /// How many `next_u64()` calls `f` consumed from the agent's stream.
+    fn draws_used(agent: &mut HeuristicAgent, f: impl FnOnce(&mut HeuristicAgent)) -> usize {
+        let before = agent.rng.clone();
+        f(agent);
+        let after_next = agent.rng.clone().next_u64();
+        for k in 0..=6 {
+            let mut probe = before.clone();
+            for _ in 0..k {
+                probe.next_u64();
+            }
+            if probe.next_u64() == after_next {
+                return k;
+            }
+        }
+        panic!("consumed more than 6 draws, or the stream diverged");
+    }
+
+    fn agent_with_options(temp_scale: f32, n: usize) -> HeuristicAgent {
+        let mut a = HeuristicAgent::new(1, temp_scale);
+        for i in 0..n {
+            a.buf.push(Action::EndTurn, i as f32 * 0.1, Rule::Flat, 0.0);
+        }
+        a
+    }
+
+    /// The draw count per decision is NOT constant, and every branch of it is load-bearing: the
+    /// Java twin has to consume exactly as many, or the two streams desynchronise and every
+    /// decision after that point is unrelated. Pins the table in
+    /// `AGENT_CONTRACT_HEURISTIC.md` section 2.
+    #[test]
+    fn pick_draw_counts_match_the_contract() {
+        // n <= 1: nothing to decide, so nothing is drawn -- at ANY temperature.
+        for ts in [0.0, 0.05, 1.0, 1.0e6] {
+            for n in [0usize, 1] {
+                let mut a = agent_with_options(ts, n);
+                assert_eq!(draws_used(&mut a, |a| { a.pick(0.15); }), 0, "ts={ts} n={n}");
+            }
+        }
+        // argmax consumes nothing at all -- this is what makes `--heuristic 0` the cleanest
+        // first rung of the parity ladder: no sampler to disagree about.
+        let mut a = agent_with_options(0.0, 5);
+        assert_eq!(draws_used(&mut a, |a| { a.pick(0.15); }), 0);
+
+        // 0 < temp_scale < 0.1 disables the eps escape, and `eps > 0.0 &&` short-circuits so the
+        // probe draw is never taken: exactly one draw.
+        let mut a = agent_with_options(0.05, 5);
+        assert_eq!(draws_used(&mut a, |a| { a.pick(0.15); }), 1);
+
+        // temp_scale >= 0.1 always costs exactly two: the eps probe, then either the uniform
+        // escape or the cumulative draw. Both branches must cost the same.
+        for ts in [0.1, 1.0, 1.0e6] {
+            let mut a = agent_with_options(ts, 5);
+            assert_eq!(draws_used(&mut a, |a| { a.pick(0.15); }), 2, "ts={ts}");
+        }
+    }
+
+    /// `softmax_pick` has no eps escape and always costs exactly one draw when it decides.
+    #[test]
+    fn softmax_pick_draw_counts_match_the_contract() {
+        let w = [0.1f32, 0.5, 0.9];
+        for ts in [0.1, 1.0, 1.0e6] {
+            let mut a = agent_with_options(ts, 0);
+            assert_eq!(draws_used(&mut a, |a| { a.softmax_pick(&w, 0.18); }), 1, "ts={ts}");
+        }
+        // Degenerate option sets and argmax draw nothing.
+        let mut a = agent_with_options(1.0, 0);
+        assert_eq!(draws_used(&mut a, |a| { a.softmax_pick(&[], 0.18); }), 0);
+        let mut a = agent_with_options(1.0, 0);
+        assert_eq!(draws_used(&mut a, |a| { a.softmax_pick(&[0.5], 0.18); }), 0);
+        let mut a = agent_with_options(0.0, 0);
+        assert_eq!(draws_used(&mut a, |a| { a.softmax_pick(&w, 0.18); }), 0);
+    }
+
     // ── determinism / portability of the ordering key ──────────────────────────
 
     /// Two opponents of DIFFERENT strength, both adjacent to the same square, tie on `reach`

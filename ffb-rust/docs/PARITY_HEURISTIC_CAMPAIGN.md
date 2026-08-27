@@ -240,3 +240,51 @@ reasoning about unsigned casts.
 **Next:** ITER3 — write `AGENT_CONTRACT.md` §10 from the code (RNG channel, the exact per-prompt
 draw-count table, the canonical ordering rule, the frozen constants, the `det_math` requirement),
 then the `ClassMask` ladder and the `--agent heuristic` plumbing on both sides.
+
+---
+
+## ITER3 (2026-08-27) — the contract, written before the Java
+
+`AGENT_CONTRACT_HEURISTIC.md` (new), the companion to `AGENT_CONTRACT.md`. Written **first**, on
+purpose: a 5,000-line port checked against a spec is reviewable, one checked against a 3,657-line
+moving target is not.
+
+Nine sections, every one derived by reading the code rather than the design doc: the two RNG
+channels and the exact `unit()` formula with its Java transcription; the **draw-count table**; the
+per-call-site temperatures; the arithmetic rules (f32 is portable, `det_math` for the
+transcendentals, no other transcendentals, no out-of-range casts, explicit max loops); the canonical
+`(side, nr)` ordering rule with all nine ordering sites and the container-iteration audit; the frozen
+constants; the shared-vs-two-agent and game-construction differences between the parity arm and the
+experiment arm; the five modes; and the tier scope with its stub list.
+
+Two places where the code and `docs/HEURISTIC_AGENT.md` disagree are called out explicitly, with the
+code winning: there is no `TempTable` type (§8's table is intent; the temperatures are literals at
+17 call sites), and §11's "convert everything to i32 milli-weights" is superseded by ITER2.
+
+### The draw-count table is now executable, not prose
+
+That table is the single easiest thing to get subtly wrong in the port — a decision that costs one
+draw where the other side spends two desynchronises the stream, and every later decision is then
+unrelated noise. So it is pinned by two tests (`pick_draw_counts_match_the_contract`,
+`softmax_pick_draw_counts_match_the_contract`) that observe the agent's private RNG directly and
+count consumption by replaying a clone:
+
+| condition | `pick` draws | verified |
+|---|---|---|
+| `n <= 1`, any temperature | 0 | yes, across `temp_scale` in {0, 0.05, 1, 1e6} |
+| `temp_scale <= 0` (argmax) | 0 | yes |
+| `0 < temp_scale < 0.1` | 1 | yes — `eps` is 0, so `eps > 0.0 &&` short-circuits and the probe draw is never taken |
+| `temp_scale >= 0.1` | exactly 2 | yes, on both the escape and the cumulative branch |
+
+`softmax_pick`: 1 when it decides, 0 for `n <= 1` or argmax. Confirms the plan's table, and confirms
+that **argmax consumes nothing at all** — which is what makes `--heuristic 0` the right first rung
+of the ladder: no sampler for the two sides to disagree about.
+
+### Gates
+
+- `cargo test -p ffb-engine --lib agent::heuristic_agent` — 18/0.
+- `cargo test --workspace --release` — **14,638 / 0**, exit 0.
+
+**Next:** ITER4 — the `ClassMask`/`PlanMask` ladder plus `--agent heuristic` and `--tier 4`
+per-decision logging on the Rust side, with rung 0 (empty mask, everything delegated to
+`RandomAgent::new_parity`) required to be 100/100 by construction.
