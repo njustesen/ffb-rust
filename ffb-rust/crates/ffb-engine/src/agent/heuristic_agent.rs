@@ -55,7 +55,7 @@ use crate::step::GameState;
 
 use super::random_agent::player_action_to_pac;
 use super::det_math::{exp_f32, ln_f32};
-use super::{Agent, UniformAgent};
+use super::{Agent, RandomAgent, UniformAgent};
 
 /// `mechanics/movement.rs: STAND_UP_COST`.
 const STAND_UP_COST: i32 = 3;
@@ -1359,8 +1359,160 @@ pub enum Mode {
     Deep,
 }
 
+/// The prompt classes the heuristic agent can score, one bit each in a [`ClassMask`].
+///
+/// This exists for the Java-parity ladder (`docs/PARITY_HEURISTIC_CAMPAIGN.md`). Porting 3,600
+/// lines of scorer and only then finding out whether the two engines agree would mean debugging
+/// every prompt class at once. Instead the mask lets exactly one class at a time be switched from
+/// "answered by the parity `RandomAgent` contract" to "scored by the heuristic", so the 100-seed
+/// gate is green at rung 0 by construction and each rung adds one well-defined thing to blame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum PromptClass {
+    CoinChoice = 0,
+    ReceiveChoice = 1,
+    KickBall = 2,
+    Touchback = 3,
+    TeamSetup = 4,
+    FollowUp = 5,
+    ReRollOffer = 6,
+    SkillUse = 7,
+    Interception = 8,
+    BlockChoice = 9,
+    Pushback = 10,
+    BlockTarget = 11,
+    BlitzTarget = 12,
+    ActivatePlayer = 13,
+    Move = 14,
+    /// Everything the heuristic does not score itself; always delegated.
+    Other = 15,
+}
+
+impl PromptClass {
+    /// The CLI spelling, and the name used in `--heur-classes`.
+    pub fn name(self) -> &'static str {
+        match self {
+            PromptClass::CoinChoice => "coin",
+            PromptClass::ReceiveChoice => "receive",
+            PromptClass::KickBall => "kick",
+            PromptClass::Touchback => "touchback",
+            PromptClass::TeamSetup => "setup",
+            PromptClass::FollowUp => "followup",
+            PromptClass::ReRollOffer => "reroll",
+            PromptClass::SkillUse => "skill",
+            PromptClass::Interception => "intercept",
+            PromptClass::BlockChoice => "blockchoice",
+            PromptClass::Pushback => "pushback",
+            PromptClass::BlockTarget => "blocktarget",
+            PromptClass::BlitzTarget => "blitztarget",
+            PromptClass::ActivatePlayer => "activate",
+            PromptClass::Move => "move",
+            PromptClass::Other => "other",
+        }
+    }
+
+    pub const ALL: [PromptClass; 16] = [
+        PromptClass::CoinChoice,
+        PromptClass::ReceiveChoice,
+        PromptClass::KickBall,
+        PromptClass::Touchback,
+        PromptClass::TeamSetup,
+        PromptClass::FollowUp,
+        PromptClass::ReRollOffer,
+        PromptClass::SkillUse,
+        PromptClass::Interception,
+        PromptClass::BlockChoice,
+        PromptClass::Pushback,
+        PromptClass::BlockTarget,
+        PromptClass::BlitzTarget,
+        PromptClass::ActivatePlayer,
+        PromptClass::Move,
+        PromptClass::Other,
+    ];
+}
+
+/// Which [`PromptClass`]es the heuristic scores. Everything else is answered by the embedded
+/// parity `RandomAgent`, byte-for-byte as `AGENT_CONTRACT.md` specifies.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ClassMask(u32);
+
+impl Default for ClassMask {
+    fn default() -> Self {
+        ClassMask::ALL
+    }
+}
+
+impl ClassMask {
+    /// Delegate everything — rung 0. Must reproduce the random-agent gate exactly.
+    pub const NONE: ClassMask = ClassMask(0);
+    /// Score everything the agent knows how to score. The normal, non-parity configuration.
+    pub const ALL: ClassMask = ClassMask(u32::MAX);
+
+    pub fn has(self, c: PromptClass) -> bool {
+        self.0 & (1u32 << (c as u8)) != 0
+    }
+
+    pub fn with(self, c: PromptClass) -> ClassMask {
+        ClassMask(self.0 | (1u32 << (c as u8)))
+    }
+
+    /// `all`, `none`, or a comma-separated list of [`PromptClass::name`]s.
+    pub fn parse(spec: &str) -> Result<ClassMask, String> {
+        let spec = spec.trim();
+        if spec.eq_ignore_ascii_case("all") {
+            return Ok(ClassMask::ALL);
+        }
+        if spec.is_empty() || spec.eq_ignore_ascii_case("none") {
+            return Ok(ClassMask::NONE);
+        }
+        let mut m = ClassMask::NONE;
+        for tok in spec.split(',') {
+            let tok = tok.trim();
+            if tok.is_empty() {
+                continue;
+            }
+            match PromptClass::ALL.iter().find(|c| c.name() == tok) {
+                Some(c) => m = m.with(*c),
+                None => {
+                    let known: Vec<&str> = PromptClass::ALL.iter().map(|c| c.name()).collect();
+                    return Err(format!("unknown prompt class '{tok}'; known: {}", known.join(",")));
+                }
+            }
+        }
+        Ok(m)
+    }
+}
+
+/// Which class a prompt belongs to, for [`ClassMask`].
+pub fn prompt_class_of(p: &AgentPrompt) -> PromptClass {
+    match p {
+        AgentPrompt::CoinChoice { .. } => PromptClass::CoinChoice,
+        AgentPrompt::ReceiveChoice { .. } => PromptClass::ReceiveChoice,
+        AgentPrompt::KickBall => PromptClass::KickBall,
+        AgentPrompt::Touchback { .. } => PromptClass::Touchback,
+        AgentPrompt::TeamSetup { .. } => PromptClass::TeamSetup,
+        AgentPrompt::FollowUp { .. } => PromptClass::FollowUp,
+        AgentPrompt::ReRollOffer { .. } => PromptClass::ReRollOffer,
+        AgentPrompt::SkillUse { .. } => PromptClass::SkillUse,
+        AgentPrompt::Interception { .. } => PromptClass::Interception,
+        AgentPrompt::BlockChoice { .. } => PromptClass::BlockChoice,
+        AgentPrompt::Pushback { .. } => PromptClass::Pushback,
+        AgentPrompt::BlockTarget { .. } => PromptClass::BlockTarget,
+        AgentPrompt::BlitzTarget { .. } => PromptClass::BlitzTarget,
+        AgentPrompt::ActivatePlayer { .. } => PromptClass::ActivatePlayer,
+        AgentPrompt::Move { .. } => PromptClass::Move,
+        _ => PromptClass::Other,
+    }
+}
+
 pub struct HeuristicAgent {
     mode: Mode,
+    /// Which prompt classes this agent scores; the rest go to `parity`. `ALL` outside the
+    /// Java-port ladder.
+    classes: ClassMask,
+    /// The parity `RandomAgent`, for every class not in `classes`. Only ever consulted when the
+    /// mask is partial, so its RNG streams stay untouched in the normal `ALL` configuration.
+    parity: Box<RandomAgent>,
     rng: Xoshiro256StarStar,
     /// Multiplies every temperature. 1.0 = the §8 table; a very large value = uniform sampling over
     /// the identical option set; 0.0 = true argmax with no RNG consumed at all.
@@ -1395,6 +1547,8 @@ impl HeuristicAgent {
             mode,
             rng: Xoshiro256StarStar::seed_from_u64(seed ^ 0x4845_5552_4953_5449),
             temp_scale,
+            classes: ClassMask::ALL,
+            parity: Box::new(RandomAgent::new_parity(seed)),
             fallback: UniformAgent::new(seed),
             buf: Scored::default(),
             feat: None,
@@ -1409,6 +1563,14 @@ impl HeuristicAgent {
             last_options: Vec::new(),
             last_chosen: 0,
         }
+    }
+
+    /// Restrict the agent to scoring only `classes`, delegating everything else to the parity
+    /// `RandomAgent`. This is the Java-port ladder's rung selector; see [`ClassMask`].
+    pub fn with_classes(seed: u64, temp_scale: f32, mode: Mode, classes: ClassMask) -> Self {
+        let mut a = Self::with_mode(seed, temp_scale, mode);
+        a.classes = classes;
+        a
     }
 
     /// Uniform sampling over whatever the scorer enumerated.
@@ -2728,6 +2890,14 @@ impl Agent for HeuristicAgent {
             None => return Action::Acknowledge,
         };
 
+        // The Java-port ladder (docs/PARITY_HEURISTIC_CAMPAIGN.md). Any class not switched on is
+        // answered by the parity RandomAgent contract instead, so a partially-ported Java side can
+        // still be gated at 100/100: rung 0 delegates everything and must reproduce the
+        // random-agent gate exactly. `ClassMask::ALL` (the default) never takes this branch.
+        if !self.classes.has(prompt_class_of(&prompt)) {
+            return self.parity.act(gs);
+        }
+
         // §20.7 — build the feature block at most once per board position, then take it out of
         // `self` for the duration of the decision so the borrow checker stays satisfied without
         // any unsafe aliasing.
@@ -3718,6 +3888,76 @@ mod tests {
                 "clamp must be a no-op over the reachable range"
             );
         }
+    }
+
+    // ── the Java-port class ladder ─────────────────────────────────────────────
+
+    /// Rung 0 of the ladder: with an empty mask the heuristic agent must be **indistinguishable**
+    /// from `RandomAgent::new_parity` -- same actions, same RNG consumption, every prompt. That is
+    /// what makes "the gate is 100/100 by construction before any Java exists" a fact rather than
+    /// a hope, and it is what isolates a later rung's failure to the one class it switched on.
+    #[test]
+    fn rung_zero_is_indistinguishable_from_the_parity_agent() {
+        use crate::step::new_game;
+
+        let seed = 7u64;
+        let mut a = new_game(seed);
+        let mut b = new_game(seed);
+        let mut heur = HeuristicAgent::with_classes(seed, 1.0, Mode::Wide, ClassMask::NONE);
+        let mut rand = RandomAgent::new_parity(seed);
+
+        let mut steps = 0;
+        while !a.is_finished() && a.current_prompt().is_some() {
+            let ha = heur.act(&a);
+            let ra = rand.act(&b);
+            assert_eq!(ha, ra, "rung 0 diverged at step {steps}");
+            let side_a = a.active_side();
+            let side_b = b.active_side();
+            let _ = a.apply(side_a, ha);
+            let _ = b.apply(side_b, ra);
+            assert_eq!(
+                a.state_hash_str(),
+                b.state_hash_str(),
+                "state diverged after step {steps}"
+            );
+            steps += 1;
+            if steps > 4000 {
+                break;
+            }
+        }
+        assert!(steps > 20, "the harness game ended too early to prove anything: {steps} steps");
+    }
+
+    /// A partial mask must route by class, not by luck.
+    #[test]
+    fn class_mask_parses_and_routes() {
+        assert!(ClassMask::ALL.has(PromptClass::Move));
+        assert!(!ClassMask::NONE.has(PromptClass::Move));
+
+        let m = ClassMask::parse("coin,receive").expect("parses");
+        assert!(m.has(PromptClass::CoinChoice));
+        assert!(m.has(PromptClass::ReceiveChoice));
+        assert!(!m.has(PromptClass::Move));
+        assert!(!m.has(PromptClass::Other));
+
+        assert_eq!(ClassMask::parse("all").unwrap(), ClassMask::ALL);
+        assert_eq!(ClassMask::parse("none").unwrap(), ClassMask::NONE);
+        assert_eq!(ClassMask::parse("").unwrap(), ClassMask::NONE);
+        assert!(ClassMask::parse("nonsense").is_err());
+
+        // Every class must have a unique bit and a unique name, or a rung would silently switch
+        // on more than it names.
+        let mut seen = 0u32;
+        for c in PromptClass::ALL {
+            let bit = 1u32 << (c as u8);
+            assert_eq!(seen & bit, 0, "duplicate bit for {}", c.name());
+            seen |= bit;
+        }
+        let mut names: Vec<&str> = PromptClass::ALL.iter().map(|c| c.name()).collect();
+        names.sort_unstable();
+        let n = names.len();
+        names.dedup();
+        assert_eq!(names.len(), n, "duplicate class name");
     }
 
     // ── sampler draw-count contract (AGENT_CONTRACT_HEURISTIC.md section 2) ────

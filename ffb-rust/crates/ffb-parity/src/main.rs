@@ -58,6 +58,21 @@ struct ParityArgs {
     agent_mode_away: Option<String>,
     /// `--out <dir>`: where `--heuristic` writes its per-seed events files.
     out_dir: String,
+    /// `--agent random|heuristic`: which agent drives the Rust side of a PARITY run.
+    ///
+    /// Orthogonal to `--heuristic <scale>`, which is a Rust-only self-play EXPERIMENT that never
+    /// launches a JVM. This flag instead swaps the driver inside the real parity comparison, so
+    /// the heuristic agent can be gated against Java one prompt class at a time. Default
+    /// `random`, which is the historical behaviour byte-for-byte.
+    agent: String,
+    /// `--heur-scale <f32>`: temperature scale for `--agent heuristic`. 0 = argmax and consumes
+    /// NO agent RNG at all, which is the cleanest first rung: any divergence is then the scorer
+    /// or the engine, never the sampler.
+    heur_scale: f32,
+    /// `--heur-classes <all|none|csv>`: which prompt classes the heuristic scores; the rest are
+    /// answered by the embedded parity `RandomAgent`. `none` (rung 0) must reproduce the
+    /// random-agent gate exactly. See `agent::PromptClass::name`.
+    heur_classes: String,
 }
 
 impl ParityArgs {
@@ -83,6 +98,9 @@ impl ParityArgs {
         let mut heuristic: Option<f32> = None;
         let mut heuristic_away: Option<f32> = None;
         let mut out_dir = "parity/heuristic".to_string();
+        let mut agent = "random".to_string();
+        let mut heur_scale = 0.0f32;
+        let mut heur_classes = "none".to_string();
 
         let mut i = 0;
         while i < raw.len() {
@@ -103,6 +121,11 @@ impl ParityArgs {
                     heuristic_away = raw[i + 1].parse().ok(); i += 1;
                 }
                 "--out" if i + 1 < raw.len() => { out_dir = raw[i + 1].clone(); i += 1; }
+                "--agent" if i + 1 < raw.len() => { agent = raw[i + 1].clone(); i += 1; }
+                "--heur-scale" if i + 1 < raw.len() => {
+                    heur_scale = raw[i + 1].parse().unwrap_or(0.0); i += 1;
+                }
+                "--heur-classes" if i + 1 < raw.len() => { heur_classes = raw[i + 1].clone(); i += 1; }
                 "--mode" if i + 1 < raw.len() => { agent_mode = raw[i + 1].clone(); i += 1; }
                 "--mode-away" if i + 1 < raw.len() => { agent_mode_away = Some(raw[i + 1].clone()); i += 1; }
                 "--home" if i + 1 < raw.len() => { home = raw[i + 1].clone(); i += 1; }
@@ -127,7 +150,7 @@ impl ParityArgs {
         let home_java = runner::java_team_id(&home, "home", &edition);
         let away_java = runner::java_team_id(&away, "away", &edition);
 
-        ParityArgs { network, coverage, uniform, all_rosters, all_editions, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize, tier, reuse_java, heuristic, heuristic_away, out_dir, agent_mode, agent_mode_away }
+        ParityArgs { network, coverage, uniform, all_rosters, all_editions, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize, tier, reuse_java, heuristic, heuristic_away, out_dir, agent_mode, agent_mode_away, agent, heur_scale, heur_classes }
     }
 }
 
@@ -365,6 +388,43 @@ fn main() {
     }
 
     // ── Parity mode (default) ────────────────────────────────────────────────────
+    //
+    // Which agent drives the Rust side. `random` is the historical parity driver; `heuristic` is
+    // the Java-port ladder, which scores only the named prompt classes and answers the rest
+    // through an embedded parity RandomAgent (AGENT_CONTRACT_HEURISTIC.md).
+    let agent_spec = match args.agent.as_str() {
+        "random" => runner::AgentSpec::Random,
+        "heuristic" => {
+            let classes = match ffb_engine::agent::ClassMask::parse(&args.heur_classes) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("--heur-classes: {e}");
+                    std::process::exit(2);
+                }
+            };
+            let mode = match args.agent_mode.as_str() {
+                "deep" => ffb_engine::agent::Mode::Deep,
+                "wide-noball" => ffb_engine::agent::Mode::WideNoBall,
+                "wide-nopass" => ffb_engine::agent::Mode::WideNoPass,
+                "wide-nohandoff" => ffb_engine::agent::Mode::WideNoHandOff,
+                _ => ffb_engine::agent::Mode::Wide,
+            };
+            if args.tier < 3 {
+                eprintln!("--agent heuristic requires --tier 3 or higher");
+                std::process::exit(2);
+            }
+            eprintln!(
+                "Rust driver: HeuristicAgent (scale={}, mode={:?}, classes={})",
+                args.heur_scale, mode, args.heur_classes
+            );
+            runner::AgentSpec::Heuristic { temp_scale: args.heur_scale, mode, classes }
+        }
+        other => {
+            eprintln!("--agent must be 'random' or 'heuristic', got '{other}'");
+            std::process::exit(2);
+        }
+    };
+
     let mut passed = 0u64;
     let mut failed = 0u64;
     // Tier 3: aggregate the Rust engine's GameEvents across all seeds for the
@@ -422,7 +482,7 @@ fn main() {
         let away = args.away.clone();
         let edition = args.edition.clone();
         let panic_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            runner::run_rust_headless(seed, &home, &away, &edition, args.verbose, args.tier)
+            runner::run_rust_headless(seed, &home, &away, &edition, args.verbose, args.tier, agent_spec)
         }));
         rust_total += rust_t0.elapsed();
 

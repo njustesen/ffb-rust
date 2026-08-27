@@ -288,3 +288,78 @@ of the ladder: no sampler for the two sides to disagree about.
 **Next:** ITER4 — the `ClassMask`/`PlanMask` ladder plus `--agent heuristic` and `--tier 4`
 per-decision logging on the Rust side, with rung 0 (empty mask, everything delegated to
 `RandomAgent::new_parity`) required to be 100/100 by construction.
+
+---
+
+## ITER4 (2026-08-27) — the class ladder, and rung 0 is green against real Java
+
+The mechanism that lets a 5,000-line Java port be gated continuously instead of at the end.
+
+### `ClassMask`
+
+`PromptClass` (16 variants, one bit each) + `ClassMask` + `prompt_class_of`. `HeuristicAgent` gains
+a `classes: ClassMask` and an embedded `parity: Box<RandomAgent>`; the first thing `act` does after
+reading the prompt is
+
+```rust
+if !self.classes.has(prompt_class_of(&prompt)) {
+    return self.parity.act(gs);
+}
+```
+
+so every class not switched on is answered by the byte-matched `AGENT_CONTRACT.md` contract. The
+default is `ClassMask::ALL`, so the experiment arm and the A/B corpus are untouched — verified by
+re-running 100 lineman seeds and diffing the dumps against ITER0: identical.
+
+### Harness
+
+`runner::AgentSpec { Random, Heuristic { temp_scale, mode, classes } }`, threaded through
+`run_rust_headless`, with `--agent random|heuristic`, `--heur-scale <f32>` and
+`--heur-classes <all|none|csv>` on the CLI. Deliberately **orthogonal** to the existing
+`--heuristic <scale>`, which is Rust-only self-play that never starts a JVM; overloading it would
+conflate an experiment with a gate.
+
+The driver is a small `enum Driver` rather than `Box<dyn Agent>`, because tier 2 needs
+`RandomAgent::pick_t2_activation`, which is not on the `Agent` trait and has no heuristic meaning —
+pairing `--agent heuristic` with `--tier 2` is rejected at startup rather than papered over.
+
+Also documented at the construction site, per `AGENT_CONTRACT_HEURISTIC.md` §7: the parity arm uses
+**one shared agent** for both coaches (mirroring `ParityRunner`'s single object), never the
+two-agent home/away split `run_heuristic_game` uses for head-to-head A/B.
+
+### Rung 0 is green — against the real Java engine
+
+```
+ffb-parity --home lineman --away lineman --edition bb2025 --tier 3 --seeds 1-100 \
+    --no-abort --agent heuristic --heur-scale 0 --heur-classes none
+Rust driver: HeuristicAgent (scale=0, mode=Wide, classes=none)
+PARITY: 100/100 games match.          exit 0
+```
+
+The heuristic agent now drives the Rust side of a real parity run, end to end, at 100/100. Pinned
+in-process as well by `rung_zero_is_indistinguishable_from_the_parity_agent`, which walks a whole
+game asserting the two agents return the *same action* and leave the *same state hash* at every
+step — not merely the same final result.
+
+### And rung 1 fails, which is the point
+
+```
+--heur-classes coin,receive  ->  PARITY: 0/10 passed, 10 FAILED.
+```
+
+Expected, and checked deliberately: Java still answers `CoinChoice`/`ReceiveChoice` with the random
+contract while Rust now scores them. Without this negative control, rung 0's green would be
+consistent with the mask doing nothing at all — the vacuous-green trap recorded in
+`parity_tier_multiblock`. The mask demonstrably changes behaviour, so rung 0's green is real.
+
+`coin,receive` is therefore the first thing the Java agent has to implement.
+
+### Gates
+
+- `cargo test -p ffb-engine --lib agent::heuristic_agent` — 20/0.
+- Lineman bb2025 tier-3, fresh JVM, `--agent random`: 100/100 (unchanged).
+- Lineman bb2025 tier-3, fresh JVM, `--agent heuristic --heur-classes none`: **100/100**.
+- Heuristic experiment dumps byte-identical to ITER0 (100 lineman seeds).
+
+**Next:** ITER5 — the Java side begins: `DetMath.java` against the shared golden file, the
+`heuristic/` package skeleton, the prompt adapter, and rung 1.

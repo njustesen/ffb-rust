@@ -405,7 +405,61 @@ mod reuse_tests {
 ///       historical T2 Java logs.
 ///   3 — T3 Phase 2 agent (`act`: real activations), one log step per ActivatePlayer,
 ///       matching Java's per-activation recordStep().
-pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, edition: &str, verbose: bool, tier: u8) -> (Vec<LogLine>, Vec<GameEvent>, i32, i32) {
+/// Which agent drives the Rust side of a parity run.
+///
+/// `Random` is the historical parity driver whose RNG consumption is byte-matched against
+/// `ParityRunner.java` (`AGENT_CONTRACT.md`). `Heuristic` is the Java-port ladder
+/// (`AGENT_CONTRACT_HEURISTIC.md`): it scores only the prompt classes in `classes` and answers
+/// everything else through an embedded `RandomAgent::new_parity`, so an empty mask is
+/// indistinguishable from `Random` and the gate is green before any Java exists.
+#[derive(Clone, Copy, Debug)]
+pub enum AgentSpec {
+    Random,
+    Heuristic { temp_scale: f32, mode: ffb_engine::agent::Mode, classes: ffb_engine::agent::ClassMask },
+}
+
+/// The parity run's decision-maker. An enum rather than `Box<dyn Agent>` because tier 2 needs
+/// `RandomAgent::pick_t2_activation`, which is not part of the `Agent` trait and has no meaning
+/// for the heuristic agent.
+enum Driver {
+    Random(RandomAgent),
+    Heuristic(Box<ffb_engine::agent::HeuristicAgent>),
+}
+
+impl Driver {
+    fn new(spec: AgentSpec, seed: u64) -> Driver {
+        match spec {
+            AgentSpec::Random => Driver::Random(RandomAgent::new_parity(seed)),
+            AgentSpec::Heuristic { temp_scale, mode, classes } => Driver::Heuristic(Box::new(
+                ffb_engine::agent::HeuristicAgent::with_classes(seed, temp_scale, mode, classes),
+            )),
+        }
+    }
+
+    fn act(&mut self, gs: &GameState) -> ffb_engine::action::Action {
+        use ffb_engine::agent::Agent as _;
+        match self {
+            Driver::Random(a) => a.act(gs),
+            Driver::Heuristic(a) => a.act(gs),
+        }
+    }
+
+    /// Tier 2 only: consume the single decisionRng draw Java's tier-2 path spends on the player
+    /// pick, then end the turn. The heuristic agent has no tier-2 contract, so pairing it with
+    /// `--tier 2` is a caller error rather than something to paper over.
+    fn pick_t2_activation(&mut self, n: usize) {
+        match self {
+            Driver::Random(a) => {
+                a.pick_t2_activation(n);
+            }
+            Driver::Heuristic(_) => {
+                panic!("--agent heuristic requires --tier 3 or higher; tier 2 has no heuristic contract")
+            }
+        }
+    }
+}
+
+pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, edition: &str, verbose: bool, tier: u8, agent_spec: AgentSpec) -> (Vec<LogLine>, Vec<GameEvent>, i32, i32) {
     let rust_path = rust_log_path_for(seed, edition, home_roster, away_roster);
     let dir = std::path::Path::new(&rust_path).parent().unwrap_or(std::path::Path::new("parity"));
     std::fs::create_dir_all(dir).ok();
@@ -415,9 +469,13 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
     let away = make_team(away_roster, "away", edition);
 
     let mut engine = GameState::new_with_options(home, away, rules, seed, BASELINE_SETUP_OPTIONS);
-    // One shared agent for both teams. new_parity seeds both decision and action RNGs
-    // to match Java's decisionRng and actionRng exactly.
-    let mut agent = RandomAgent::new_parity(seed);
+    // ONE shared agent for both teams, mirroring ParityRunner's single-object shape.
+    // `new_parity` seeds both decision and action RNGs to match Java's decisionRng and actionRng
+    // exactly; the heuristic agent seeds its own single stream and embeds a parity RandomAgent for
+    // every class outside its mask. The two-agent home/away split used by `run_heuristic_game`
+    // exists only for head-to-head A/B and must NOT be used here -- see
+    // AGENT_CONTRACT_HEURISTIC.md section 7.
+    let mut agent = Driver::new(agent_spec, seed);
 
     // GameStart hash = the fresh game BEFORE any roll (Java logs it pre-pregame). The engine
     // snapshots it during construction, since `new` runs the pregame to the first prompt.
