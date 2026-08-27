@@ -2321,7 +2321,40 @@ public class ParityRunner {
     private void sendPushback(Game game, GameState gameState) {
         com.fumbbl.ffb.PushbackSquare[] squares = game.getFieldModel().getPushbackSquares();
         com.fumbbl.ffb.PushbackSquare best = null;
-        if (squares != null) {
+        // The heuristic agent SCORES the pushback (Rust `AgentPrompt::Pushback`, T = 0.15) over the
+        // unlocked squares. Without it, AGENT_CONTRACT.md section 7's deterministic min-(x,y) pick
+        // stands, so tier 2/3 and the lower rungs are untouched.
+        if (heuristic != null
+            && heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.PUSHBACK)
+            && squares != null) {
+            java.util.List<FieldCoordinate> unlocked = new ArrayList<>();
+            for (com.fumbbl.ffb.PushbackSquare sq : squares) {
+                if (sq == null || sq.isLocked() || sq.getCoordinate() == null) continue;
+                unlocked.add(sq.getCoordinate());
+            }
+            if (!unlocked.isEmpty()) {
+                ActingPlayer pbAp = game.getActingPlayer();
+                String attackerId = (pbAp != null) ? pbAp.getPlayerId() : null;
+                // Rust's prompt carries the step-local defender, i.e. the OCCUPANT being pushed --
+                // which for every candidate square is the same player, so deriving it from any of
+                // them agrees. Use the first square's push origin.
+                FieldCoordinate probeFrom = null;
+                for (com.fumbbl.ffb.PushbackSquare sq : squares) {
+                    if (sq == null || sq.isLocked() || sq.getCoordinate() == null) continue;
+                    probeFrom = pushOrigin(sq.getCoordinate(), sq.getDirection());
+                    break;
+                }
+                Player<?> pushedProbe = (probeFrom != null) ? game.getFieldModel().getPlayer(probeFrom) : null;
+                String defenderId = (pushedProbe != null) ? pushedProbe.getId() : null;
+                FieldCoordinate chosen =
+                    heuristic.pushbackChoice(game, attackerId, defenderId, unlocked);
+                for (com.fumbbl.ffb.PushbackSquare sq : squares) {
+                    if (sq == null || sq.isLocked() || sq.getCoordinate() == null) continue;
+                    if (sq.getCoordinate().equals(chosen)) { best = sq; break; }
+                }
+            }
+        }
+        if (best == null && squares != null) {
             for (com.fumbbl.ffb.PushbackSquare sq : squares) {
                 if (sq == null || sq.isLocked() || sq.getCoordinate() == null) continue;
                 if (best == null

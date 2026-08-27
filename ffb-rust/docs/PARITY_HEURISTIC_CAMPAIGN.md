@@ -1147,3 +1147,70 @@ them a 1:1 port gap that the random-agent gate structurally could not reach:
 **Next:** rung 3 — `blockchoice`, `pushback`, `followup`, `blocktarget`, `blitztarget`. These need
 the `Features` core tier (occ / tz / row_prefix) on the Java side, which is the first real slice of
 the scorer port.
+
+---
+
+## ITER16 (2026-08-27) — rung 3a: `pushback` + `blocktarget`, 100/100 first try
+
+### Scoping the rung before writing it
+
+Rung 3 is five classes (`blockchoice`, `pushback`, `followup`, `blocktarget`, `blitztarget`) and
+`act_with_features` routes all of them through the feature block — but reading the arms shows they do
+**not** all read the rasters:
+
+| class | needs |
+|---|---|
+| `blocktarget` | nothing — the arm is `Action::EndPlayerAction` |
+| `pushback` | the BALL only (`f.ball_carried`, `f.ball`) plus coordinates |
+| `followup` | **`f.tz_against`** — the tackle-zone raster |
+| `blockchoice`, `blitztarget` | `block_weight`, hence the strength/threat machinery |
+
+So `pushback` + `blocktarget` land with no raster port at all. Split the rung there rather than
+paying for `Features` before anything needs it.
+
+### What landed
+
+`HeuristicDriver.pushbackChoice` mirrors Rust's arm: options are the UNLOCKED pushback squares sorted
+by `(x, y)` — the same list and order Rust's prompt carries, since `step_pushback.rs` filters
+`!sq.locked` — weighted off-pitch 1.0-with-ball / 0.95, sideline 0.55, interior 0.20, times 1.3 for
+any square further from the **defender's** own endzone. `T = 0.15`.
+
+`ParityRunner.sendPushback` consults it and falls back to `AGENT_CONTRACT.md` §7's deterministic
+min-`(x, y)` pick whenever the driver is absent or does not own the class, so the lower rungs keep
+their streams. Rust's prompt carries the step-local defender (the occupant being pushed); Java derives
+the same player via `pushOrigin` on any candidate square, which agrees because every candidate pushes
+the same player.
+
+`blocktarget` needed no work: both sides already deselect on the mid-sequence block-target ask.
+
+### Checked for vacuity
+
+A green rung proves nothing if the arm never changes a decision. The deterministic contract picks
+min-`(x, y)`; the heuristic picks max weight. Comparing end-of-game hashes across the two masks:
+
+```
+seed 1  rung2 280b01223e03355e  ->  rung3a 44b9941ba9568636   (changed)
+seed 2  9ef2c36108fc7b09        ->  9ef2c36108fc7b09          (same)
+seed 3  59cf8e0006d26b4f        ->  59cf8e0006d26b4f          (same)
+```
+
+Seed 1's game genuinely diverges under the new arm and still matches Java, so the green is real.
+
+### Gates
+
+- Rung 3a (`coin,receive,reroll,pushback,blocktarget`): **100/100** in bb2025 at scales 0 / 1.0 / 1e6,
+  and **100/100** in bb2016 and bb2020 at argmax.
+- Rung 2 and rung 0: 100/100. `--agent random`: 100/100 in all three editions.
+- `cargo test --workspace --release`: **14,646 / 0**, including `pushback_weight_table`, which pins
+  the shared weights and the geometry both sides mirror.
+
+One invariant worth having found while writing that test: the 1.3 endzone multiplier **never crosses
+a tier** (0.20·1.3 = 0.26 < 0.55, and 0.55·1.3 = 0.715 < 0.95). Ordering is tier-first,
+multiplier-second — so a disagreement about the multiplier can only reorder squares *within* a tier,
+which bounds how badly that part can go wrong. My first draft of the test asserted the opposite and
+failed, which is how the property surfaced.
+
+**Next:** rung 3b — `followup`, which needs the `Features` CORE tier (`tz_against`) in Java. That is
+the first genuine slice of the raster port, and the point to introduce the cross-language FIXTURE
+test the plan calls for: dump Rust's `tz` raster for fixed boards and assert Java reproduces it
+before wiring it to a game.

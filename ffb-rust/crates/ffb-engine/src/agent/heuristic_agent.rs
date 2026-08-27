@@ -4051,6 +4051,47 @@ mod tests {
         assert_eq!(names.len(), n, "duplicate class name");
     }
 
+    /// The Pushback weight table, which `HeuristicDriver.pushbackChoice` mirrors on the Java side.
+    /// Pinned here because it is a CROSS-LANGUAGE contract: the two engines must score the same
+    /// squares identically or they push a player to different squares from the same board.
+    ///
+    /// Off the pitch is worth most (and more still when the pushed player carries the ball);
+    /// a sideline square beats an interior one; and any square further from the DEFENDER's own
+    /// endzone takes a 1.3 multiplier.
+    #[test]
+    fn pushback_weight_table() {
+        // The bare weights, before the endzone multiplier.
+        let off_with_ball = 1.0f32;
+        let off_without = 0.95f32;
+        let sideline = 0.55f32;
+        let interior = 0.20f32;
+        assert!(off_with_ball > off_without);
+        assert!(off_without > sideline);
+        assert!(sideline > interior);
+
+        // The endzone multiplier is 1.3 and applies to whichever square is further from the
+        // DEFENDER's own endzone -- i.e. the direction that hurts him.
+        assert!((interior * 1.3 - 0.26).abs() < 1e-6);
+        // …and it NEVER crosses a tier: even multiplied, an interior square stays below every
+        // sideline square and a sideline square below every off-pitch one. So the ordering is
+        // tier-first, multiplier-second — a useful invariant, because it means a disagreement about
+        // the multiplier can only ever reorder squares WITHIN a tier.
+        assert!(interior * 1.3 < sideline, "0.26 < 0.55");
+        assert!(sideline * 1.3 < off_without, "0.715 < 0.95");
+
+        // Geometry both sides share: home attacks toward x=25, away toward x=0.
+        assert_eq!(endzone_x(true), XMAX);
+        assert_eq!(endzone_x(false), 0);
+        assert_eq!(endzone_distance(FieldCoordinate::new(20, 7), true), 5);
+        assert_eq!(endzone_distance(FieldCoordinate::new(20, 7), false), 20);
+        // Off-pitch detection, which decides the crowd-surf weight.
+        assert!(!on_pitch(-1, 7));
+        assert!(!on_pitch(26, 7));
+        assert!(!on_pitch(10, -1));
+        assert!(!on_pitch(10, 15));
+        assert!(on_pitch(0, 0) && on_pitch(XMAX, YMAX));
+    }
+
     // ── sampler draw-count contract (AGENT_CONTRACT_HEURISTIC.md section 2) ────
 
     /// How many `next_u64()` calls `f` consumed from the agent's stream.

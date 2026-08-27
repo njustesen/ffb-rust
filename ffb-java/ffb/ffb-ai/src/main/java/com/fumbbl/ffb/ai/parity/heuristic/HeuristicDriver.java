@@ -5,6 +5,10 @@ import com.fumbbl.ffb.FieldCoordinate;
 import com.fumbbl.ffb.ReRolledAction;
 import com.fumbbl.ffb.ReRolledActions;
 import com.fumbbl.ffb.model.Player;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import com.fumbbl.ffb.ai.simulation.MatchRunner;
 import com.fumbbl.ffb.model.Game;
 import com.fumbbl.ffb.net.commands.ClientCommandCoinChoice;
@@ -165,6 +169,69 @@ public final class HeuristicDriver {
             return false;
         }
         return game.getTeamHome().hasPlayer(carrier) == home;
+    }
+
+    /** Rust `on_pitch`: 0..=25 by 0..=14. Off-pitch means the push crowd-surfs the defender. */
+    private static boolean onPitch(FieldCoordinate c) {
+        return c.getX() >= 0 && c.getX() <= 25 && c.getY() >= 0 && c.getY() <= 14;
+    }
+
+    /** Rust `endzone_x`: home attacks toward x=25, away toward x=0. */
+    private static int endzoneX(boolean home) {
+        return home ? 25 : 0;
+    }
+
+    /** Rust `endzone_distance`. */
+    private static int endzoneDistance(FieldCoordinate c, boolean home) {
+        return Math.abs(c.getX() - endzoneX(home));
+    }
+
+    /**
+     * Rust {@code AgentPrompt::Pushback}. {@code T = 0.15}.
+     *
+     * <p>Options are the UNLOCKED pushback squares sorted by {@code (x, y)} — the same list and the
+     * same order Rust's prompt carries (`step_pushback.rs` filters `!sq.locked` and the arm sorts).
+     * Pushing a player off the pitch is worth most, and worth even more when he has the ball;
+     * a sideline square is worth more than an interior one; and any square further from the
+     * DEFENDER's own endzone gets a 1.3 multiplier, because that is the direction that hurts him.
+     *
+     * @param squares unlocked pushback squares, any order — this sorts them.
+     * @return the chosen square.
+     */
+    public FieldCoordinate pushbackChoice(Game game, String attackerId, String defenderId,
+            List<FieldCoordinate> squares) {
+        List<FieldCoordinate> sorted = new ArrayList<>(squares);
+        sorted.sort(Comparator.comparingInt(FieldCoordinate::getX)
+            .thenComparingInt(FieldCoordinate::getY));
+
+        Player<?> defender = game.getPlayerById(defenderId);
+        boolean defHome = defender != null && game.getTeamHome().hasPlayer(defender);
+        com.fumbbl.ffb.model.FieldModel fm = game.getFieldModel();
+        FieldCoordinate ball = fm.getBallCoordinate();
+        boolean ballCarried = ball != null && fm.isBallInPlay() && !fm.isBallMoving();
+        FieldCoordinate defCoord = (defender != null) ? fm.getPlayerCoordinate(defender) : null;
+        boolean defHasBall = ballCarried && defCoord != null && ball.equals(defCoord);
+
+        Player<?> attacker = game.getPlayerById(attackerId);
+        FieldCoordinate attCoord = (attacker != null) ? fm.getPlayerCoordinate(attacker) : null;
+
+        sampler.clear();
+        for (FieldCoordinate sq : sorted) {
+            float w;
+            if (!onPitch(sq)) {
+                w = defHasBall ? 1.0f : 0.95f;
+            } else if (sq.getY() == 0 || sq.getY() == 14) {
+                w = 0.55f;
+            } else {
+                w = 0.20f;
+            }
+            if (attCoord != null
+                && endzoneDistance(sq, !defHome) > endzoneDistance(attCoord, !defHome)) {
+                w *= 1.3f;
+            }
+            sampler.push(w);
+        }
+        return sorted.get(sampler.pick(0.15f));
     }
 
     // ── scored arms ────────────────────────────────────────────────────────────
