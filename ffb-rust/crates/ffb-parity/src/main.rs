@@ -65,6 +65,10 @@ struct ParityArgs {
     /// the heuristic agent can be gated against Java one prompt class at a time. Default
     /// `random`, which is the historical behaviour byte-for-byte.
     agent: String,
+    /// `--multimove N`: with `--agent random`, submit a planned path of up to N one-step squares
+    /// in a single Move instead of one. The spike that tests multi-square move-stack consumption
+    /// in both engines without first porting the heuristic scorer. Default 0 = off.
+    multimove: usize,
     /// `--heur-scale <f32>`: temperature scale for `--agent heuristic`. 0 = argmax and consumes
     /// NO agent RNG at all, which is the cleanest first rung: any divergence is then the scorer
     /// or the engine, never the sampler.
@@ -99,6 +103,7 @@ impl ParityArgs {
         let mut heuristic_away: Option<f32> = None;
         let mut out_dir = "parity/heuristic".to_string();
         let mut agent = "random".to_string();
+        let mut multimove = 0usize;
         let mut heur_scale = 0.0f32;
         let mut heur_classes = "none".to_string();
 
@@ -122,6 +127,7 @@ impl ParityArgs {
                 }
                 "--out" if i + 1 < raw.len() => { out_dir = raw[i + 1].clone(); i += 1; }
                 "--agent" if i + 1 < raw.len() => { agent = raw[i + 1].clone(); i += 1; }
+                "--multimove" if i + 1 < raw.len() => { multimove = raw[i + 1].parse().unwrap_or(0); i += 1; }
                 "--heur-scale" if i + 1 < raw.len() => {
                     heur_scale = raw[i + 1].parse().unwrap_or(0.0); i += 1;
                 }
@@ -150,7 +156,7 @@ impl ParityArgs {
         let home_java = runner::java_team_id(&home, "home", &edition);
         let away_java = runner::java_team_id(&away, "away", &edition);
 
-        ParityArgs { network, coverage, uniform, all_rosters, all_editions, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize, tier, reuse_java, heuristic, heuristic_away, out_dir, agent_mode, agent_mode_away, agent, heur_scale, heur_classes }
+        ParityArgs { network, coverage, uniform, all_rosters, all_editions, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize, tier, reuse_java, heuristic, heuristic_away, out_dir, agent_mode, agent_mode_away, agent, multimove, heur_scale, heur_classes }
     }
 }
 
@@ -393,7 +399,12 @@ fn main() {
     // the Java-port ladder, which scores only the named prompt classes and answers the rest
     // through an embedded parity RandomAgent (AGENT_CONTRACT_HEURISTIC.md).
     let agent_spec = match args.agent.as_str() {
-        "random" => runner::AgentSpec::Random,
+        "random" => {
+            if args.multimove > 1 {
+                eprintln!("Rust driver: RandomAgent (multimove={})", args.multimove);
+            }
+            runner::AgentSpec::Random { multimove: args.multimove }
+        }
         "heuristic" => {
             let classes = match ffb_engine::agent::ClassMask::parse(&args.heur_classes) {
                 Ok(c) => c,

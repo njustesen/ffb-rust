@@ -246,6 +246,12 @@ pub fn run_java_headless_range(
     // The heuristic ladder: BOTH engines must be given the same scale and the same class mask, or
     // they disagree about which side answers a prompt -- a divergence produced by the harness
     // rather than by either engine. See AGENT_CONTRACT_HEURISTIC.md.
+    if let AgentSpec::Random { multimove } = agent_spec {
+        if multimove > 1 {
+            args.push("--multimove".into());
+            args.push(multimove.to_string());
+        }
+    }
     if let AgentSpec::Heuristic { temp_scale, classes, .. } = agent_spec {
         args.push("--agent".into());
         args.push("heuristic".into());
@@ -283,7 +289,7 @@ fn java_fingerprint(
     // random-arm gate (or the reverse) as if it were current -- the exact shape of silent-stale
     // failure that turned a 100/100 gate into 30/100 on 2026-08-27.
     let (agent, agent_scale, agent_classes) = match agent_spec {
-        AgentSpec::Random => ("random", String::new(), String::new()),
+        AgentSpec::Random { multimove } => ("random", format!("mm{multimove}"), String::new()),
         AgentSpec::Heuristic { temp_scale, mode, classes } => {
             ("heuristic", format!("{temp_scale}:{mode:?}"), classes.to_spec())
         }
@@ -402,7 +408,7 @@ mod reuse_tests {
     fn reuse_declines_without_a_cached_batch() {
         let err = java_logs_reusable(
             1, 5, "teamA", "teamB", "no_such_roster", "no_such_roster", 3,
-            "no_such_edition", AgentSpec::Random,
+            "no_such_edition", AgentSpec::Random { multimove: 0 },
         ).unwrap_err();
         assert!(err.contains("no cached Java batch"), "unexpected reason: {err}");
     }
@@ -411,10 +417,10 @@ mod reuse_tests {
     /// input to check without touching the filesystem.
     #[test]
     fn fingerprint_distinguishes_inputs() {
-        let base = java_fingerprint("teamA", "teamB", 3, "bb2025", AgentSpec::Random);
-        assert_ne!(base, java_fingerprint("teamZ", "teamB", 3, "bb2025", AgentSpec::Random));
-        assert_ne!(base, java_fingerprint("teamA", "teamB", 2, "bb2025", AgentSpec::Random));
-        assert_ne!(base, java_fingerprint("teamA", "teamB", 3, "bb2020", AgentSpec::Random));
+        let base = java_fingerprint("teamA", "teamB", 3, "bb2025", AgentSpec::Random { multimove: 0 });
+        assert_ne!(base, java_fingerprint("teamZ", "teamB", 3, "bb2025", AgentSpec::Random { multimove: 0 }));
+        assert_ne!(base, java_fingerprint("teamA", "teamB", 2, "bb2025", AgentSpec::Random { multimove: 0 }));
+        assert_ne!(base, java_fingerprint("teamA", "teamB", 3, "bb2020", AgentSpec::Random { multimove: 0 }));
         // The agent arm changes what Java produces, so serving a random-arm log to a heuristic
         // gate (or the reverse) must be refused. Without this, `--reuse-java` would silently
         // compare two different experiments -- the failure mode that turned a 100/100 gate into
@@ -458,7 +464,12 @@ mod reuse_tests {
 /// indistinguishable from `Random` and the gate is green before any Java exists.
 #[derive(Clone, Copy, Debug)]
 pub enum AgentSpec {
-    Random,
+    /// `multimove`: 0/1 = the historical one-square-per-activation behaviour. Greater than 1 is
+    /// the spike from `docs/PARITY_HEURISTIC_CAMPAIGN.md` -- submit a planned path of up to N
+    /// squares in ONE Move, mirrored by `ParityRunner --multimove N`, to test whether the two
+    /// engines consume a multi-square move stack identically before the heuristic agent's scorer
+    /// is ported to Java.
+    Random { multimove: usize },
     Heuristic { temp_scale: f32, mode: ffb_engine::agent::Mode, classes: ffb_engine::agent::ClassMask },
 }
 
@@ -473,7 +484,11 @@ enum Driver {
 impl Driver {
     fn new(spec: AgentSpec, seed: u64) -> Driver {
         match spec {
-            AgentSpec::Random => Driver::Random(RandomAgent::new_parity(seed)),
+            AgentSpec::Random { multimove } => {
+                let mut a = RandomAgent::new_parity(seed);
+                a.multimove = multimove;
+                Driver::Random(a)
+            }
             AgentSpec::Heuristic { temp_scale, mode, classes } => Driver::Heuristic(Box::new(
                 ffb_engine::agent::HeuristicAgent::with_classes(seed, temp_scale, mode, classes),
             )),

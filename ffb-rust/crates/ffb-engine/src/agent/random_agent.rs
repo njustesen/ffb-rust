@@ -11,6 +11,7 @@ use std::collections::HashSet;
 use rand_xoshiro::Xoshiro256StarStar;
 use rand_core::{RngCore, SeedableRng};
 use ffb_model::prompts::AgentPrompt;
+use ffb_model::model::game::Game;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::enums::{PlayerAction, SkillId};
 
@@ -23,6 +24,31 @@ use super::Agent;
 /// AGENT_CONTRACT §7: the pushback coach picks the min-`(x, y)` on-pitch square, deterministically
 /// (no decisionRng consumed). Mirrors Java `ParityRunner.sendPushback` (keep the square with the
 /// smallest x, ties broken by smallest y, over the non-locked candidates).
+/// The eight neighbours of `from` that are on pitch, unoccupied by ANY player, and not already on
+/// the planned path -- coordinate-sorted.
+///
+/// This is the same candidate rule both harnesses already apply to the first square of a move
+/// (`legal_actions::adjacent_empty_move_targets` here, the neighbour loop in
+/// `ParityRunner.sendMoveAction` there); it is factored out so the multimove spike walks by exactly
+/// that rule at every step rather than a second, subtly different one.
+///
+/// Sorted by `(x, y)` and never by player id -- `AGENT_CONTRACT.md` section 6.
+fn free_neighbours(
+    game: &Game,
+    from: FieldCoordinate,
+    exclude: &[FieldCoordinate],
+) -> Vec<FieldCoordinate> {
+    let mut out: Vec<FieldCoordinate> = from
+        .neighbours()
+        .into_iter()
+        .filter(|c| c.x >= 0 && c.x <= 25 && c.y >= 0 && c.y <= 14)
+        .filter(|c| game.field_model.player_at(*c).is_none())
+        .filter(|c| !exclude.contains(c))
+        .collect();
+    out.sort_by_key(|c| (c.x, c.y));
+    out
+}
+
 fn choose_pushback_square(squares: &[FieldCoordinate]) -> Option<FieldCoordinate> {
     squares.iter().min_by_key(|c| (c.x, c.y)).copied()
 }
@@ -36,6 +62,23 @@ pub struct RandomAgent {
     decision_rng: Xoshiro256StarStar,
     /// Action-diversity RNG — independent of Java's decisions.
     action_rng: Xoshiro256StarStar,
+    /// SPIKE KNOB (default 0 = off, i.e. the historical one-square behaviour).
+    ///
+    /// When > 1, a Move submits a path of up to this many one-step squares in a single
+    /// `Action::Move`, planned ahead by the agent, instead of one square. It exists to answer ONE
+    /// question cheaply -- do the two engines consume a multi-square move stack identically? --
+    /// using the already-byte-matched random agent, without first porting the heuristic agent's
+    /// 2,100-line scorer to Java. It drags GFI, mid-path dodges and mid-path turnovers into the
+    /// parity gate for the first time.
+    ///
+    /// `ParityRunner.sendMoveAction` mirrors it exactly under `--multimove N`: same candidate rule,
+    /// same coordinate sort, one actionRng draw per square, same MA+2 budget cap. Leaving it at 0
+    /// keeps `AGENT_CONTRACT.md` untouched.
+    pub multimove: usize,
+    /// The squares after the first for a PRE-DRAWN (prone/rooted) multimove path. Java draws the
+    /// whole path inside `sendMoveAction`, so Rust must draw the whole path at the same point in
+    /// the stream -- not one square now and the rest at the Move prompt.
+    pending_extra: Vec<FieldCoordinate>,
     /// Players skipped this turn because they are inactive (just recovered from STUNNED).
     /// Mirrors Java ParityRunner's `usedThisTurn` for rejected-inactive picks.
     used_this_turn: HashSet<String>,
@@ -152,6 +195,8 @@ impl RandomAgent {
         RandomAgent {
             decision_rng: Xoshiro256StarStar::seed_from_u64(game_seed ^ 0xDEAD_BEEF_CAFE_0001),
             action_rng: Xoshiro256StarStar::seed_from_u64(game_seed ^ 0xC0FFEE_ACE0_0001),
+            multimove: 0,
+            pending_extra: Vec::new(),
             used_this_turn: HashSet::new(),
             just_deselected: false,
             last_turn_key: None,
@@ -170,6 +215,8 @@ impl RandomAgent {
         RandomAgent {
             decision_rng: Xoshiro256StarStar::seed_from_u64(seed),
             action_rng: Xoshiro256StarStar::seed_from_u64(seed ^ 0xC0FFEE_ACE0_0001),
+            multimove: 0,
+            pending_extra: Vec::new(),
             used_this_turn: HashSet::new(),
             just_deselected: false,
             last_turn_key: None,
@@ -198,6 +245,40 @@ impl RandomAgent {
     }
 
     /// Action-RNG uniform index — diversity picks (move target, block/foul target).
+    /// Plan up to `multimove` squares in ONE `Action::Move`, drawing one `action_rng` pick per
+    /// extra square. Byte-mirrored by `ParityRunner.sendMoveAction` under `--multimove N`.
+    ///
+    /// The candidate rule at every step is the same one both harnesses already use for the FIRST
+    /// square -- the eight neighbours of the square being planned from, on pitch, unoccupied by any
+    /// player, coordinate-sorted -- plus "not already somewhere on this path", because the agent is
+    /// planning ahead against a board that has not moved yet.
+    ///
+    /// Capped at the player's MA + 2 (the two rushes), so the agent never proposes a path the
+    /// engine must refuse. `path` already contains the first square when this is called.
+    fn extend_multimove(
+        &mut self,
+        game: &Game,
+        player_id: &str,
+        path: &mut Vec<FieldCoordinate>,
+        spent: i32,
+    ) {
+        let ma = match game.player(player_id) {
+            Some(p) => p.movement_with_modifiers(),
+            None => return,
+        };
+        let budget = (ma + 2 - spent).max(0) as usize;
+        let want = self.multimove.min(budget);
+        while path.len() < want {
+            let from = *path.last().expect("path is never empty here");
+            let cands = free_neighbours(game, from, path);
+            if cands.is_empty() {
+                break;
+            }
+            let i = self.pick_action(cands.len());
+            path.push(cands[i]);
+        }
+    }
+
     fn pick_action(&mut self, len: usize) -> usize {
         self.action_rng_count += 1;
         if len == 0 { 0 } else { (self.action_rng.next_u64() as usize) % len }
@@ -584,6 +665,7 @@ impl Agent for RandomAgent {
                 // New activation → reset the "moved one square" tracker (Java INIT_MOVING policy).
                 self.moved_this_activation = false;
                 self.pending_move = None;
+                self.pending_extra.clear();
                 // Prone (standing-up) Move: mirror Java ParityRunner.sendMoveAction, which draws the
                 // move target at phase-2 — BEFORE the Select-sequence negatrait rolls. The Rust engine
                 // emits AgentPrompt::Move only from the Move sequence's StepInitMoving, which a prone
@@ -625,6 +707,17 @@ impl Agent for RandomAgent {
                             // Java uses — then re-drew (11,7); from there every later target pick was
                             // off, first visible as home_10 moving to (3,7) instead of (5,7) at i=65).
                             self.pending_move = Some(targets[idx]);
+                            // SPIKE: Java's sendMoveAction draws the WHOLE path here, so the extra
+                            // squares must be drawn at this point in the stream too, not later at
+                            // the Move prompt. `spent` is 0, not `acting_player.current_move`: at
+                            // pre-draw time the acting player is still the PREVIOUS activator (the
+                            // same staleness the no-cap candidate list above works around), while
+                            // Java reads the fresh phase-2 value of a just-activated player.
+                            if self.multimove > 1 {
+                                let mut path = vec![targets[idx]];
+                                self.extend_multimove(&gs.game, player_id, &mut path, 0);
+                                self.pending_extra = path[1..].to_vec();
+                            }
                             if std::env::var("FFB_TRACE").is_ok() {
                                 let tag = if is_prone { "prone_predraw" } else { "rooted_predraw" };
                                 eprintln!("RUST_SMA pid={} N={} {}", player_id, targets.len(), tag);
@@ -684,7 +777,9 @@ impl Agent for RandomAgent {
                     if std::env::var("FFB_TRACE").is_ok() {
                         eprintln!("RUST_MOVE_PRE pid={} t=({},{})", player_id, sq.x, sq.y);
                     }
-                    return Action::Move { path: vec![sq] };
+                    let mut path = vec![sq];
+                    path.extend(self.pending_extra.drain(..));
+                    return Action::Move { path };
                 }
                 if squares.is_empty() {
                     // No adjacent empty square: deselect, ending the activation — 1:1 with Java
@@ -705,7 +800,14 @@ impl Agent for RandomAgent {
                     eprintln!("RUST_PICK pid={} N={} idx={} t=({},{})", player_id, squares.len(), idx, squares[idx].x, squares[idx].y);
                 }
                 self.moved_this_activation = true;
-                Action::Move { path: vec![squares[idx]] }
+                let mut path = vec![squares[idx]];
+                // SPIKE (see `multimove`): keep walking, one actionRng draw per extra square,
+                // mirrored by ParityRunner.sendMoveAction under `--multimove N`.
+                if self.multimove > 1 {
+                    self.extend_multimove(
+                        &gs.game, &player_id, &mut path, gs.game.acting_player.current_move);
+                }
+                Action::Move { path }
             }
             // Pushback: AGENT_CONTRACT §7 — choose the min-(x,y) on-pitch square, DETERMINISTICALLY.
             // Java ParityRunner.sendPushback iterates the non-locked pushback squares and keeps the one

@@ -492,3 +492,81 @@ been blamed on the engine if it had surfaced later, under a fully-ported agent, 
 `ReRollOffer` is the interesting one: the random contract always declines, so accepting exercises
 every re-roll path in the engine for the first time (501 re-rolls per 100 seeds under the full
 agent, against 0 under random play).
+
+---
+
+## ITER7 (2026-08-27) — the multimove spike, and the first real engine bug
+
+Reordered the plan: the movement gap goes **before** rungs 2-4, because the coverage payoff (GFI
+0→4,400, touchdowns 0→40, the five scoring-gated dead steps) and the 1:1-port risk both sit there,
+while `blockchoice`/`pushback`/`followup` add almost nothing random play does not already produce.
+
+### The spike
+
+`--multimove N` on **both** harnesses (`RandomAgent::multimove` /
+`ParityRunner --multimove N`, default off). The random agent plans up to N one-step squares ahead
+and submits them as one `Action::Move` / one `CLIENT_MOVE`. Both sides walk by the *same* candidate
+rule at every step — the eight neighbours of the square being planned from, on pitch, unoccupied,
+coordinate-sorted, not already on the path — one `actionRng` draw per square, capped at MA + 2. To
+guarantee the rule really is the same one, Java's inline neighbour loop was factored out into
+`freeNeighbours`, the byte-mirror of Rust's `free_neighbours`.
+
+This answers *"do the two engines consume a multi-square move stack identically?"* using the
+already-byte-matched random agent — no `Features`/`Reach`/value-model port in the way — and it drags
+GFI, mid-path dodges and mid-path turnovers into the gate for the first time.
+
+**Answer: no.** First run, `--multimove 4`, lineman bb2025: **0/100**.
+
+### Bug 1 (mine, in the harness): the pre-drawn path
+
+Rust pre-draws a prone/rooted player's move target at *activation* (mirroring Java's phase-2
+`sendMoveAction`) and reuses it at the Move prompt. I had extended only the standing branch, so a
+stood-up player walked 1 square in Rust and 4 in Java. Fixed by extending the path at the pre-draw
+site — the same point in the stream where Java draws it — with `spent = 0`, because at pre-draw time
+`acting_player` is still the *previous* activator (the same staleness the no-cap candidate list
+already works around). Frontier moved 29 → 54.
+
+### Bug 2 (real, in the Rust engine): a stood-up player could never rush
+
+`crates/ffb-model/src/util/util_player.rs`, `is_next_move_going_for_it`:
+
+```rust
+if ap.standing_up && !ap.has_acted && !player.has_skill_property(CAN_STAND_UP_FOR_FREE) {
+    3 >= player.movement_with_modifiers()
+```
+
+Java calls `hasActed()`, which is **computed** — `hasMoved || hasFouled || hasBlocked || hasPassed
+|| hasTriggeredEffect || !usedSkills.isEmpty() || isForgone`. Rust has exactly that as `acted()`,
+whose doc comment already warns *"Callers mirroring Java's `hasActed()` MUST use this, not the bare
+stored field"* — and this caller used the bare stored field.
+
+A player who stands up **for free** (MA >= 4, no roll) gets `has_moved = true` while `standing_up`
+stays set — Java's `StepStandUp` only clears `standingUp` on the *rolled* path, and Rust faithfully
+mirrors that. So Java falls through to `current_move >= MA` and rushes normally, while Rust stayed in
+the stand-up branch for the whole activation evaluating `3 >= 6` — false. `goes_for_it` never became
+true, `StepGoForIt` returned early, and **Java rolled a Rush die that Rust did not** (seed 1, i=29:
+Java `rng_calls=24` against Rust's `23`).
+
+Structurally invisible until an agent moved more than one square per activation, which is exactly
+what the spike was built to expose. One-line fix, `acted()` for `has_acted`, plus
+`a_freely_stood_up_player_can_still_rush`.
+
+**`--multimove 4`: 0/100 → 99/100.**
+
+### The remaining seed
+
+Seed 58, first divergence at dice index ~92 of ~104 (both streams identical up to there), inside a
+pass chain: Java's roll 82 is `StepIntercept.intercept` returning a natural 6. A **distinct, later
+bug** — next iteration. Note the per-step `rng_calls` gap at i=172 (java 82 / rust 92) was
+misleading: the dice *values* agreed there, so it was step-boundary attribution, not a divergence.
+Diff the dice STREAM, not the per-step counts.
+
+### Gates
+
+- `--multimove 4` lineman bb2025: **99/100** (was 0/100).
+- `--multimove` off: **100/100** in bb2025, bb2020 **and** bb2016 — the existing gate is untouched.
+- Heuristic rung 0 and rung 1 (sampled): 100/100 each.
+- `cargo test --workspace --release`: **14,641 / 0**.
+
+**Next:** seed 58's pass/interception divergence, then raise `--multimove` until it is green at the
+full MA+2, then rung 2 (`reroll`).

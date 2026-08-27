@@ -95,6 +95,14 @@ public class ParityRunner {
      */
     private HeuristicDriver heuristic;
 
+    /**
+     * `--multimove N` (default 0 = off). Submit a planned path of up to N one-step squares in a
+     * single CLIENT_MOVE instead of one. Mirrors RandomAgent::multimove; see
+     * docs/PARITY_HEURISTIC_CAMPAIGN.md -- it exists to test multi-square move-stack consumption in
+     * both engines without first porting the heuristic agent's scorer.
+     */
+    private int multimove = 0;
+
     private final PrintWriter out;
     private final CapturingClientCommunication comm = new CapturingClientCommunication();
     private final List<PendingStep> pending = new ArrayList<>();
@@ -166,6 +174,7 @@ public class ParityRunner {
         // every other class keeps the random contract untouched, so tier 2 and tier 3 stay
         // byte-identical to their historical behaviour when the flag is absent.
         String agentArg = "random";
+        int multimoveArg = 0;
         float heurScaleArg = 0.0f;
         String heurClassesArg = "none";
         List<String> positional = new ArrayList<>();
@@ -178,6 +187,8 @@ public class ParityRunner {
                 rulesetArg = args[++i];
             } else if ("--agent".equals(args[i]) && i + 1 < args.length) {
                 agentArg = args[++i];
+            } else if ("--multimove".equals(args[i]) && i + 1 < args.length) {
+                multimoveArg = Integer.parseInt(args[++i]);
             } else if ("--heur-scale".equals(args[i]) && i + 1 < args.length) {
                 heurScaleArg = Float.parseFloat(args[++i]);
             } else if ("--heur-classes".equals(args[i]) && i + 1 < args.length) {
@@ -241,6 +252,7 @@ public class ParityRunner {
 
             ParityRunner runner = new ParityRunner(out);
             runner.tier = tierArg;
+            runner.multimove = multimoveArg;
             if ("heuristic".equals(agentArg)) {
                 // Seeded from the game seed, exactly as the Rust side does: the heuristic stream is
                 // `seed ^ "HEURISTI"`, independent of the game dice and of decisionRng/actionRng.
@@ -2457,6 +2469,44 @@ public class ParityRunner {
      * Occupancy: any player (home or away) at the target square makes it illegal.
      * Sort: by (x, y) before picking — matches Rust's sorted target list.
      */
+    /**
+     * The eight neighbours of {@code from} that are on pitch, unoccupied by ANY player, and not
+     * already on the planned path — coordinate-sorted.
+     *
+     * <p>Byte-mirror of Rust's {@code random_agent::free_neighbours}. This was the inline loop
+     * inside {@link #sendMoveAction}; it is factored out so the {@code --multimove} spike walks by
+     * exactly the same rule at every step rather than a second, subtly different one.
+     *
+     * <p>Sorted by {@code (x, y)} and never by player id — AGENT_CONTRACT.md section 6.
+     */
+    private static List<FieldCoordinate> freeNeighbours(
+            Game game, FieldCoordinate from, List<FieldCoordinate> exclude) {
+        com.fumbbl.ffb.model.FieldModel fm = game.getFieldModel();
+        int[] dx = {0, 1, 1, 1, 0, -1, -1, -1};  // N, NE, E, SE, S, SW, W, NW
+        int[] dy = {-1, -1, 0, 1, 1, 1, 0, -1};
+        List<FieldCoordinate> targets = new ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            int nx = from.getX() + dx[i];
+            int ny = from.getY() + dy[i];
+            if (nx < 0 || nx > 25 || ny < 0 || ny > 14) { continue; }
+            FieldCoordinate nc = new FieldCoordinate(nx, ny);
+            boolean occupied = false;
+            for (com.fumbbl.ffb.model.Player<?> p : game.getTeamHome().getPlayers()) {
+                if (nc.equals(fm.getPlayerCoordinate(p))) { occupied = true; break; }
+            }
+            if (!occupied) {
+                for (com.fumbbl.ffb.model.Player<?> p : game.getTeamAway().getPlayers()) {
+                    if (nc.equals(fm.getPlayerCoordinate(p))) { occupied = true; break; }
+                }
+            }
+            if (occupied || exclude.contains(nc)) { continue; }
+            targets.add(nc);
+        }
+        // Sort by (x, y) — matches Rust's .sort_by_key(|c| (c.x, c.y))
+        targets.sort(Comparator.comparingInt(FieldCoordinate::getX).thenComparingInt(FieldCoordinate::getY));
+        return targets;
+    }
+
     private void sendMoveAction(Game game, GameState gameState, String playerId) {
         com.fumbbl.ffb.model.FieldModel fm = game.getFieldModel();
         // Find the player's current coordinate
@@ -2474,30 +2524,7 @@ public class ParityRunner {
             return;
         }
 
-        // Compute adjacent squares on pitch, unoccupied by any player.
-        // Mirrors Rust's legal_move_targets(): coord.neighbours() filtered by is_on_pitch() and no player.
-        int[] dx = {0, 1, 1, 1, 0, -1, -1, -1};  // N, NE, E, SE, S, SW, W, NW
-        int[] dy = {-1, -1, 0, 1, 1, 1, 0, -1};
-        List<FieldCoordinate> targets = new ArrayList<>();
-        for (int i = 0; i < 8; i++) {
-            int nx = coord.getX() + dx[i];
-            int ny = coord.getY() + dy[i];
-            if (nx < 0 || nx > 25 || ny < 0 || ny > 14) { continue; }
-            FieldCoordinate nc = new FieldCoordinate(nx, ny);
-            // Check if occupied by any player (home or away)
-            boolean occupied = false;
-            for (com.fumbbl.ffb.model.Player<?> p : game.getTeamHome().getPlayers()) {
-                if (nc.equals(fm.getPlayerCoordinate(p))) { occupied = true; break; }
-            }
-            if (!occupied) {
-                for (com.fumbbl.ffb.model.Player<?> p : game.getTeamAway().getPlayers()) {
-                    if (nc.equals(fm.getPlayerCoordinate(p))) { occupied = true; break; }
-                }
-            }
-            if (!occupied) targets.add(nc);
-        }
-        // Sort by (x, y) — matches Rust's .sort_by_key(|c| (c.x, c.y))
-        targets.sort(Comparator.comparingInt(FieldCoordinate::getX).thenComparingInt(FieldCoordinate::getY));
+        List<FieldCoordinate> targets = freeNeighbours(game, coord, java.util.Collections.emptyList());
 
         if (DEBUG) System.err.println("JAVA_SMA pid=" + playerId + " coord=" + coord.getX() + "," + coord.getY() + " targets=" + targets.size() + " isHome=" + game.isHomePlaying());
 
@@ -2511,16 +2538,44 @@ public class ParityRunner {
         int idx = (int) Long.remainderUnsigned(actionRng.nextLong(), targets.size());
         FieldCoordinate target = targets.get(idx);
         if (DEBUG) System.err.println("JAVA_PICK pid=" + playerId + " N=" + targets.size() + " idx=" + idx + " t=(" + target.getX() + "," + target.getY() + ")");
+
+        // The planned path. One square unless the --multimove spike is on, in which case keep
+        // walking by the SAME candidate rule, one actionRng draw per extra square, capped at the
+        // player's MA + 2 (the two rushes) so we never propose a path the engine must refuse.
+        // Byte-mirror of RandomAgent::extend_multimove.
+        List<FieldCoordinate> path = new ArrayList<>();
+        path.add(target);
+        if (multimove > 1) {
+            com.fumbbl.ffb.model.Player<?> mover = game.getPlayerById(playerId);
+            int ma = (mover != null) ? mover.getMovementWithModifiers() : 0;
+            ActingPlayer ap = game.getActingPlayer();
+            int spent = (ap != null) ? ap.getCurrentMove() : 0;
+            int budget = Math.max(0, ma + 2 - spent);
+            int want = Math.min(multimove, budget);
+            while (path.size() < want) {
+                FieldCoordinate from = path.get(path.size() - 1);
+                List<FieldCoordinate> cands = freeNeighbours(game, from, path);
+                if (cands.isEmpty()) { break; }
+                int k = (int) Long.remainderUnsigned(actionRng.nextLong(), cands.size());
+                path.add(cands.get(k));
+            }
+        }
         // StepInitSelecting.fetchMoveStack/fetchFromSquare mirrors coords when homeCommand=false.
         // Coordinates from getPlayerCoordinate are in server-canonical (home-relative) space.
         // Away team commands must be in the away team's view (mirrored), so the server can
         // un-mirror them back to canonical. Home team commands are passed through as-is.
         boolean isHome = game.isHomePlaying();
         FieldCoordinate cmdFrom = isHome ? coord : coord.transform();
-        FieldCoordinate cmdTarget = isHome ? target : target.transform();
 
-        // Send move command: ClientCommandMove(actingPlayerId, fromCoord, [toCoord], null)
-        ClientCommandMove moveCmd = new ClientCommandMove(playerId, cmdFrom, new FieldCoordinate[]{cmdTarget}, null);
+        // Send move command: ClientCommandMove(actingPlayerId, fromCoord, path[], null).
+        // Every element of the path is mirrored for the away coach, exactly as
+        // UtilServerPlayerMove.fetchMoveStack un-mirrors it server-side.
+        FieldCoordinate[] cmdPath = new FieldCoordinate[path.size()];
+        for (int pi = 0; pi < path.size(); pi++) {
+            FieldCoordinate c = path.get(pi);
+            cmdPath[pi] = isHome ? c : c.transform();
+        }
+        ClientCommandMove moveCmd = new ClientCommandMove(playerId, cmdFrom, cmdPath, null);
         MatchRunner.inject(gameState, moveCmd);
     }
 

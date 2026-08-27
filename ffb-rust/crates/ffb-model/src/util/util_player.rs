@@ -543,7 +543,18 @@ impl UtilPlayer {
             Some(p) => p,
             None => return false,
         };
-        if ap.standing_up && !ap.has_acted && !player.has_skill_property(NamedProperties::CAN_STAND_UP_FOR_FREE) {
+        // Java: `actingPlayer.isStandingUp() && !actingPlayer.hasActed() && ...`.
+        //
+        // `hasActed()` is COMPUTED in Java (`hasMoved || hasFouled || hasBlocked || hasPassed ||
+        // hasTriggeredEffect || !usedSkills.isEmpty() || isForgone`), which is what `acted()`
+        // mirrors. Reading the bare stored `has_acted` field here was the bug: a player who stands
+        // up FOR FREE (MA >= 4, no roll) gets `has_moved = true` and keeps `standing_up = true` --
+        // Java's StepStandUp only clears `standingUp` on the ROLLED path -- so Java falls to the
+        // else branch and rushes normally, while Rust stayed in this branch forever and evaluated
+        // `3 >= MA`, which is false for any MA > 3. A stood-up player could therefore NEVER rush:
+        // `goes_for_it` stayed false, `StepGoForIt` returned early, and Java rolled a Rush die that
+        // Rust did not. Invisible until an agent moved more than one square per activation.
+        if ap.standing_up && !ap.acted() && !player.has_skill_property(NamedProperties::CAN_STAND_UP_FOR_FREE) {
             3 >= player.movement_with_modifiers()
         } else if ap.jumping {
             (ap.current_move + 1) >= player.movement_with_modifiers()
@@ -819,7 +830,7 @@ impl Default for UtilPlayer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::enums::{PlayerType, PlayerGender, Rules};
+    use crate::enums::{PlayerAction, PlayerType, PlayerGender, Rules};
     use crate::model::game::Game;
     use crate::model::player::Player;
     use crate::model::team::Team;
@@ -883,6 +894,46 @@ mod tests {
         if home { game.team_home.players.push(p); } else { game.team_away.players.push(p); }
         game.field_model.set_player_coordinate(id, coord);
         game.field_model.set_player_state(id, state);
+    }
+
+    /// Java's `isNextMoveGoingForIt` calls `hasActed()`, which is COMPUTED from the sub-flags.
+    /// Reading Rust's bare stored `has_acted` field instead meant a player who stood up FOR FREE
+    /// (MA >= 4, no roll) stayed in the stand-up branch for the rest of his activation and
+    /// evaluated `3 >= MA` -- false for any MA > 3 -- so `goes_for_it` never became true and
+    /// `StepGoForIt` never rolled. A stood-up player could NEVER rush.
+    ///
+    /// Invisible while both agents moved at most one square per activation; found the moment the
+    /// `--multimove` spike let the random agent walk four (lineman bb2025 seed 1, i=29: Java rolled
+    /// a Rush d6 that Rust did not).
+    #[test]
+    fn a_freely_stood_up_player_can_still_rush() {
+        let mut game = minimal_game();
+        add_player(&mut game, true, "home_01", FieldCoordinate::new(10, 7), ACTIVE_STANDING);
+        game.acting_player.set_player("home_01".into(), PlayerAction::Move);
+        // StepStandUp's FREE path (MA 6 >= 4): it sets has_moved and, unlike the rolled path,
+        // deliberately leaves `standing_up` set -- mirroring Java's StepStandUp.
+        game.acting_player.standing_up = true;
+        game.acting_player.has_moved = true;
+        game.acting_player.has_acted = false; // the bare field stays false; `acted()` is computed
+
+        // Below MA: no rush yet.
+        game.acting_player.current_move = 5;
+        assert!(!UtilPlayer::is_next_move_going_for_it(&game));
+        // At MA: the NEXT square is a rush. Before the fix this returned false forever, because
+        // `3 >= 6` is false.
+        game.acting_player.current_move = 6;
+        assert!(
+            UtilPlayer::is_next_move_going_for_it(&game),
+            "a player who stood up for free must rush once he reaches MA"
+        );
+
+        // The stand-up branch itself must still work for a player who has genuinely not acted.
+        game.acting_player.has_moved = false;
+        game.acting_player.current_move = 0;
+        assert!(
+            !UtilPlayer::is_next_move_going_for_it(&game),
+            "MA 6 > 3, so standing up alone does not put the next move into a rush"
+        );
     }
 
     #[test]
