@@ -3963,39 +3963,61 @@ mod tests {
         use ffb_model::enums::{PlayerState, PS_STANDING, PS_PRONE, Rules};
         use ffb_model::model::player::Player;
 
-        // (is_home, nr, x, y, standing, active)
-        type Board = &'static [(bool, i32, i32, i32, bool, bool)];
-        let boards: [(&str, Board); 5] = [
-            ("empty", &[]),
-            ("single_centre", &[(true, 1, 13, 7, true, true)]),
+        // (is_home, nr, x, y, standing, active, ma, st)
+        type Board = &'static [(bool, i32, i32, i32, bool, bool, i32, i32)];
+        // (name, board, ball, ball_in_play, ball_moving, blitz_used_home, blitz_used_away)
+        let boards: [(&str, Board, Option<(i32, i32)>, bool, bool, bool, bool); 6] = [
+            ("empty", &[], None, false, false, false, false),
+            ("single_centre", &[(true, 1, 13, 7, true, true, 6, 3)], None, false, false, false, false),
             (
                 "corners",
                 &[
-                    (true, 1, 0, 0, true, true),
-                    (true, 2, 25, 0, true, true),
-                    (false, 1, 0, 14, true, true),
-                    (false, 2, 25, 14, true, true),
+                    (true, 1, 0, 0, true, true, 6, 3),
+                    (true, 2, 25, 0, true, true, 6, 3),
+                    (false, 1, 0, 14, true, true, 6, 3),
+                    (false, 2, 25, 14, true, true, 6, 3),
                 ],
+                None, false, false, false, false,
             ),
             (
                 "prone_marks_nothing",
                 &[
-                    (true, 1, 10, 7, true, true),
-                    (true, 2, 10, 8, false, true),
-                    (false, 1, 11, 7, true, true),
-                    (false, 2, 11, 8, false, false),
+                    (true, 1, 10, 7, true, true, 6, 3),
+                    (true, 2, 10, 8, false, true, 6, 3),
+                    (false, 1, 11, 7, true, true, 6, 3),
+                    (false, 2, 11, 8, false, false, 6, 3),
                 ],
+                // A LOOSE ball: `build_support`'s screen term targets it when nobody carries.
+                Some((10, 7)), true, true, false, false,
             ),
             (
                 "line_of_scrimmage",
                 &[
-                    (true, 1, 12, 5, true, true), (true, 2, 12, 6, true, true),
-                    (true, 3, 12, 7, true, true), (true, 4, 12, 8, true, false),
-                    (true, 5, 12, 9, true, false), (true, 6, 11, 7, true, true),
-                    (false, 1, 13, 5, true, true), (false, 2, 13, 6, true, true),
-                    (false, 3, 13, 7, true, true), (false, 4, 13, 8, true, true),
-                    (false, 5, 13, 9, false, true), (false, 6, 14, 7, true, true),
+                    (true, 1, 12, 5, true, true, 6, 3), (true, 2, 12, 6, true, true, 6, 3),
+                    (true, 3, 12, 7, true, true, 6, 3), (true, 4, 12, 8, true, false, 6, 3),
+                    (true, 5, 12, 9, true, false, 6, 3), (true, 6, 11, 7, true, true, 6, 3),
+                    (false, 1, 13, 5, true, true, 6, 3), (false, 2, 13, 6, true, true, 6, 3),
+                    (false, 3, 13, 7, true, true, 6, 3), (false, 4, 13, 8, true, true, 6, 3),
+                    (false, 5, 13, 9, false, true, 6, 3), (false, 6, 14, 7, true, true, 6, 3),
                 ],
+                // home_03 CARRIES it, so cage/mark/screen all have a target, and the away blitz is
+                // already spent — which switches off `build_threat`'s block term for every
+                // non-adjacent away player and is easy to drop in a reimplementation.
+                Some((12, 7)), true, false, false, true,
+            ),
+            (
+                // MIXED STRENGTH, on purpose. `build_threat` writes `threat_str` under a strict
+                // `>` against `threat_reach`, so two opponents that reach a square equally TIE --
+                // and that tie is what ITER1 found being resolved by HashMap order. An all-ST3
+                // fixture cannot see it: every tie writes the same 3.
+                "mixed_strength_ties",
+                &[
+                    (true, 1, 10, 7, true, true, 6, 3),
+                    (false, 1, 9, 7, true, true, 6, 5),
+                    (false, 2, 11, 7, true, true, 6, 3),
+                    (false, 3, 10, 5, true, true, 8, 4),
+                ],
+                None, false, false, false, false,
             ),
         ];
 
@@ -4007,16 +4029,20 @@ mod tests {
         writeln!(out, "# tz <side 0=home 1=away> <hex, one byte per cell>").unwrap();
         writeln!(out, "# rowprefix <side> <decimal, H*(W+1) entries, comma separated>").unwrap();
         writeln!(out, "# unact <side> <f32 bits>").unwrap();
+        writeln!(out, "# ball <x> <y> <inplay> <moving>   (absent when there is no ball)").unwrap();
+        writeln!(out, "# blitz <home_used> <away_used>").unwrap();
+        writeln!(out, "# threatreach|threatmark|lane|support <side> <hex, 8 chars of f32 bits per cell>").unwrap();
+        writeln!(out, "# threatstr <side> <hex, one signed byte per cell>").unwrap();
 
-        for (name, board) in boards {
+        for (name, board, ball, ball_in_play, ball_moving, blitz_home, blitz_away) in boards {
             let mut home = crate::step::framework::test_team("home", 0);
             let mut away = crate::step::framework::test_team("away", 0);
-            for &(is_home, nr, _, _, _, _) in board {
+            for &(is_home, nr, _, _, _, _, ma, st) in board {
                 let p = Player {
                     id: format!("{}_{:02}", if is_home { "home" } else { "away" }, nr),
                     nr,
-                    movement: 6,
-                    strength: 3,
+                    movement: ma,
+                    strength: st,
                     agility: 3,
                     armour: 8,
                     ..Default::default()
@@ -4024,7 +4050,7 @@ mod tests {
                 if is_home { home.players.push(p) } else { away.players.push(p) }
             }
             let mut g = Game::new(home, away, Rules::Bb2025);
-            for &(is_home, nr, x, y, standing, active) in board {
+            for &(is_home, nr, x, y, standing, active, _, _) in board {
                 let id = format!("{}_{:02}", if is_home { "home" } else { "away" }, nr);
                 g.field_model.set_player_coordinate(&id, FieldCoordinate::new(x, y));
                 // ACTIVE is a bit of its own -- `PlayerState::new(PS_STANDING)` does NOT set it,
@@ -4035,10 +4061,22 @@ mod tests {
                         .change_active(active),
                 );
             }
-            let f = Features::build(&g, positions_stamp(&g), false);
+            if let Some((bx, by)) = ball {
+                g.field_model.ball_coordinate = Some(FieldCoordinate::new(bx, by));
+            }
+            g.field_model.ball_in_play = ball_in_play;
+            g.field_model.ball_moving = ball_moving;
+            g.turn_data_home.blitz_used = blitz_home;
+            g.turn_data_away.blitz_used = blitz_away;
+            // HEAVY: threat, lane and support as well as the core rasters.
+            let f = Features::build(&g, positions_stamp(&g), true);
 
             writeln!(out, "board {name} {}", board.len()).unwrap();
-            for &(is_home, nr, x, y, standing, _) in board {
+            if let Some((bx, by)) = ball {
+                writeln!(out, "ball {bx} {by} {ball_in_play} {ball_moving}").unwrap();
+            }
+            writeln!(out, "blitz {blitz_home} {blitz_away}").unwrap();
+            for &(is_home, nr, x, y, standing, _, ma, st) in board {
                 // `is_active()` is a SEPARATE bit from the standing/prone base, and
                 // `PlayerState::new(PS_STANDING)` does not set it — so emit what the engine
                 // actually computed rather than letting the two sides each assume. The Java
@@ -4050,7 +4088,7 @@ mod tests {
                     .player_state(&id)
                     .map(|st| st.is_active())
                     .unwrap_or(false);
-                writeln!(out, "player {} {nr} {x} {y} {} {}",
+                writeln!(out, "player {} {nr} {x} {y} {} {} {ma} {st}",
                     if is_home { "home" } else { "away" },
                     if standing { "standing" } else { "prone" },
                     if active { "active" } else { "used" }).unwrap();
@@ -4067,6 +4105,26 @@ mod tests {
             }
             for side in 0..2 {
                 writeln!(out, "unact {side} {:08x}", f.unactivated[side].to_bits()).unwrap();
+            }
+            let fhex = |v: &[f32]| {
+                v.iter().map(|x| format!("{:08x}", x.to_bits())).collect::<String>()
+            };
+            for side in 0..2 {
+                writeln!(out, "threatreach {side} {}", fhex(&f.threat_reach[side])).unwrap();
+            }
+            for side in 0..2 {
+                let v: String =
+                    f.threat_str[side].iter().map(|x| format!("{:02x}", *x as u8)).collect();
+                writeln!(out, "threatstr {side} {v}").unwrap();
+            }
+            for side in 0..2 {
+                writeln!(out, "threatmark {side} {}", fhex(&f.threat_mark[side])).unwrap();
+            }
+            for side in 0..2 {
+                writeln!(out, "lane {side} {}", fhex(&f.lane[side])).unwrap();
+            }
+            for side in 0..2 {
+                writeln!(out, "support {side} {}", fhex(&f.support[side])).unwrap();
             }
         }
 

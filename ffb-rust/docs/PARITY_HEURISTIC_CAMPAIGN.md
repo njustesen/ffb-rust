@@ -1687,3 +1687,63 @@ Row, column and board, not "a sweep went red". Restored afterwards and re-verifi
 fixture, then `Reach` — whose quantised Dijkstra key is the next thing that cannot be checked any
 other way. `build_threat` is the one with a KNOWN ordering hazard (ITER1: it writes under a strict
 `>` and ties were resolved by hash order), so the fixture needs a board with mixed ST to pin it.
+
+## ITER25 — the HEAVY tier: threat, lane, support
+
+`build_threat`, `build_lane` and `build_support` ported to Java and added to the same fixture.
+Six boards now, and the golden file carries the board state the heavy tier reads that the core tier
+does not: where the ball is, whether it is loose or carried, and whether each team has spent its
+blitz.
+
+Three of those inputs were chosen because each switches a whole term on or off:
+
+- **a LOOSE ball** (`prone_marks_nothing`) — `build_support`'s screen term falls back to the ball's
+  square when nobody carries it;
+- **a CARRIED ball with the away blitz already spent** (`line_of_scrimmage`) — cage and mark get a
+  target, and `build_threat`'s block term switches off for every non-adjacent away player. That
+  `(d == 1 || !opp_blitz_spent)` guard is easy to drop;
+- **mixed strength** (`mixed_strength_ties`, ST 3/4/5) — see below.
+
+### The mixed-ST board earns its place
+
+`build_threat` writes `threat_str` under a strict `>` against `threat_reach`, so two opponents that
+reach a square equally TIE, and whichever is visited first records ITS strength. That is the ITER1
+bug — Rust resolved the tie by `HashMap` order and was non-deterministic run to run on any roster
+with mixed ST. An all-ST3 fixture cannot see it: every tie writes the same 3.
+
+Checked that the board actually catches it, by reversing the Java sort within a side:
+
+```
+FeaturesTest.coreRastersMatchRust threatStr[0] at (0,0) on board mixed_strength_ties
+  ==> expected: <5> but was: <4>
+```
+
+So a class of bug that previously surfaced as run-to-run non-determinism is now a unit-test failure
+naming the square. Restored and re-verified green.
+
+### The one real disagreement
+
+`threat_str` is seeded to **3**, not 0 — an unthreatened square reports the baseline ST rather than
+none — and `lane` to 1.0 and `support` to 0.10. Java's `new float[]` is zero, so the first run failed
+at `(0,0)` on the EMPTY board. `lane` and `support` are overwritten cell by cell so their defaults
+never show, but `threat_str` is written only where some opponent can reach, which leaves the default
+visible over most of the pitch. Worth noting that the empty board — the one that looks like it tests
+nothing — is what caught it.
+
+Float arrays are compared **bit for bit**, not within a tolerance. A tolerance would be the wrong
+test: these values are compared with `>` and fed to a softmax, so a last-bit difference can reorder
+two options and change the answer. f32 arithmetic is bit-portable between the two languages
+(ITER2), so exact equality is achievable, and anything less would let a real divergence through.
+
+### Gates
+
+- `mvn -o -pl ffb-ai test`: **17 tests, 0 failures**, the fixture now checking 108 arrays across
+  6 boards.
+- `cargo test --workspace --release`: **14,654 / 0**.
+- Fourteen-class rung still **100/100 in all three editions** at argmax; `--agent random` 100/100 in
+  all three. Nothing on a live path changed.
+
+**Next:** `Reach` — the quantised-key Dijkstra. It is the last piece before the value model, it has
+its own determinism hazard (a binary heap ordered by an integer key, where ties must break the same
+way in both languages), and it is the natural next fixture: dump the reach key and path for a fixed
+board and mover, and assert Java reproduces both.
