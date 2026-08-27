@@ -172,6 +172,125 @@ public final class HeuristicDriver {
         return game.getTeamHome().hasPlayer(carrier) == home;
     }
 
+    /** Pitch width and height, and the flat index Rust's rasters use. */
+    private static final int XMAX = 25;
+    private static final int YMAX = 14;
+    private static final int W = 26;
+    private static final int CELLS = W * 15;
+
+    private static int ix(int x, int y) {
+        return y * W + x;
+    }
+
+    /** The eight scatter directions, IN RUST'S ORDER — f32 sums are not associative. */
+    private static final int[][] DIRS = {
+        {-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}
+    };
+
+    /**
+     * Rust {@code AgentPrompt::KickBall}. {@code T = 0.10}.
+     *
+     * <p>Scores every square of the receiving half by how likely the ball is to STAY there, and
+     * how close it is to the aim point. Two ways to lose it:
+     *
+     * <ul>
+     *   <li>the kick scatter itself — one of 8 directions, 1..{@code dmax} squares, where
+     *       {@code dmax} is 3 if the kicking team has anyone with Kick and 6 otherwise;
+     *   <li>the <b>gust</b>: a Weather Change kickoff result (2d6 = 8, so 5/36) that rolls Nice
+     *       (4-10, so 30/36) sends the ball three further single-square d8 scatters, and
+     *       {@code StepApplyKickoffResult} re-tests the half bounds after every one. That is
+     *       25/216, and it is why a square that looks perfectly safe is not.
+     * </ul>
+     *
+     * <p>{@code q[k]} — the chance a k-step uniform-d8 walk never leaves the half — is built by
+     * ITERATING a per-cell array three times rather than enumerating 8³ paths per candidate.
+     * The loop order and the division points are load-bearing: every one of these sums is f32, and
+     * f32 addition is not associative, so reordering them changes the last bits and therefore
+     * (occasionally) the argmax.
+     *
+     * @return the square to kick to, in SERVER coordinates.
+     */
+    public FieldCoordinate kickBall(Game game) {
+        boolean homeKicking = game.isHomePlaying();
+        int x0 = homeKicking ? 13 : 0;
+        int x1 = homeKicking ? XMAX : 12;
+        int ezX = homeKicking ? XMAX : 0;
+
+        // Kick halves the scatter, which is what makes a deep corner kick affordable.
+        com.fumbbl.ffb.model.FieldModel fm = game.getFieldModel();
+        com.fumbbl.ffb.model.Team kicking = homeKicking ? game.getTeamHome() : game.getTeamAway();
+        boolean hasKick = false;
+        for (Player<?> p : kicking.getPlayers()) {
+            FieldCoordinate c = fm.getPlayerCoordinate(p);
+            if (c != null && onPitch(c) && hasSkillNamed(p, "Kick")) {
+                hasKick = true;
+                break;
+            }
+        }
+        int dmax = hasKick ? 3 : 6;
+
+        int cx = (x0 + x1) / 2;
+        int cy = YMAX / 2;
+        int[][] aims;
+        if (hasKick) {
+            int ax = cx + 3 * Integer.signum(ezX - cx);
+            aims = new int[][] {{ax, cy - 3}, {ax, cy + 3}};
+        } else {
+            aims = new int[][] {{cx, cy}};
+        }
+
+        final float pGust = 25.0f / 216.0f;
+        float[] q = new float[CELLS];
+        java.util.Arrays.fill(q, 1.0f);
+        for (int step = 0; step < 3; step++) {
+            float[] next = new float[CELLS];
+            for (int x = x0; x <= x1; x++) {
+                for (int y = 0; y <= YMAX; y++) {
+                    float acc = 0.0f;
+                    for (int[] d : DIRS) {
+                        int nx = x + d[0];
+                        int ny = y + d[1];
+                        if (nx >= x0 && nx <= x1 && ny >= 0 && ny <= YMAX) {
+                            acc += q[ix(nx, ny)];
+                        }
+                    }
+                    next[ix(x, y)] = acc / 8.0f;
+                }
+            }
+            q = next;
+        }
+
+        sampler.clear();
+        List<FieldCoordinate> squares = new ArrayList<>();
+        for (int x = x0; x <= x1; x++) {
+            for (int y = 0; y <= YMAX; y++) {
+                float acc = 0.0f;
+                int total = 0;
+                for (int[] d : DIRS) {
+                    for (int dist = 1; dist <= dmax; dist++) {
+                        total++;
+                        int ex = x + d[0] * dist;
+                        int ey = y + d[1] * dist;
+                        if (ex >= x0 && ex <= x1 && ey >= 0 && ey <= YMAX) {
+                            acc += (1.0f - pGust) + pGust * q[ix(ex, ey)];
+                        }
+                    }
+                }
+                float pSafe = acc / (float) total;
+                // Squared: a touchback does not merely waste the kick, it gifts possession.
+                float best = Float.MAX_VALUE;
+                for (int[] a : aims) {
+                    float dx = (float) (x - a[0]);
+                    float dy = (float) (y - a[1]);
+                    best = Math.min(best, dx * dx / 16.0f + dy * dy / 9.0f);
+                }
+                sampler.push(pSafe * pSafe * DetMath.expF32(-best));
+                squares.add(new FieldCoordinate(x, y));
+            }
+        }
+        return squares.get(sampler.pick(0.10f));
+    }
+
     /**
      * Rust {@code AgentPrompt::Touchback}. {@code T = 0.20}.
      *

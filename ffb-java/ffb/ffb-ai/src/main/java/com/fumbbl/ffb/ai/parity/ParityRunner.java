@@ -423,6 +423,16 @@ public class ParityRunner {
                 // Deterministic random kick coord — matches Rust ParityAgent.
                 // Home kicks to away's half (x 13..25), away kicks to home's half (x 0..12).
                 boolean home = game.isHomePlaying();
+                // The heuristic agent SCORES every square of the receiving half (Rust
+                // `AgentPrompt::KickBall`, T = 0.10) when the `kick` class is on, and spends NO
+                // decisionRng doing it — one sampler draw replaces the two uniform draws below.
+                if (heuristic != null
+                    && heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.KICK_BALL)) {
+                    FieldCoordinate hk = heuristic.kickBall(game);
+                    MatchRunner.inject(gameState,
+                        new ClientCommandKickoff(home ? hk : hk.transform()));
+                    break;
+                }
                 decisionRngAdvances++;
                 int xRaw = (int) Long.remainderUnsigned(decisionRng.nextLong(), 13L);
                 decisionRngAdvances++;

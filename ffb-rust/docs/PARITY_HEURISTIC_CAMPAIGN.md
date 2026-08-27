@@ -1391,3 +1391,60 @@ arm models the scatter risk of every candidate square *plus* the 25/216 Weather-
 that takes three further d8 steps, computed by iterating a per-cell survival array rather than
 enumerating paths. It needs no `Features`, but it is real arithmetic, so expect the port to be a
 transcription job with a fixture test rather than a twenty-line table.
+
+## ITER20 — rung 4c: `kick`, and a divergence with byte-identical picks
+
+The largest of the cheap classes. The arm scores all 195 squares of the receiving half by
+`p_safe² · exp(−d²)`, where `p_safe` folds two ways to lose the ball: the kick scatter (8 directions ×
+1..`dmax`, `dmax` = 3 with Kick and 6 without) and the **gust** — the 25/216 Weather-Change→Nice
+result that sends the ball three further single-square d8 scatters, each re-tested against the half
+bounds. The three-step survival array `q` is built by ITERATING a per-cell array, not by enumerating
+8³ paths per candidate.
+
+Every one of those sums is f32, and f32 addition is not associative, so the port had to keep the
+direction order, the loop nesting and the division points exactly as Rust has them. It did: the first
+probe showed the two sides agreeing to the last bit.
+
+### The divergence
+
+`--heur-classes kick` alone: **0/10**, diverging at the very FIRST activation. And the probe said the
+two agents agreed completely:
+
+```
+JAVA_KICK n=195 idx=97 home=false dmax=6 act=(6,7)
+RUST_KICK n=195 idx=97 home=false dmax=6 act=KickBall { coord: (6,7) }
+```
+
+Same option count, same index, same weights to the last bit, same square — and the game still
+diverged. The scoring was never the problem: **the two coordinates were in different frames.**
+
+`StepKickoff` mirrors an away coach's coordinate back into the server frame, because a client command
+from the away team arrives in the away-relative frame. `RandomAgent`'s KickBall arm pre-transforms
+for exactly that reason and carries a comment saying what happens if it does not — "without this
+pre-transform, StepKickoff mirrored (6,8)→(19,8), landing the ball in the kicking half → spurious
+touchback". The heuristic arm scored in the server frame and emitted the server frame, so every away
+kick in the game landed in the KICKING half.
+
+Fix: score in the server frame, emit `if home_kicking { target } else { target.transform() }` — the
+Java harness already did the matching `home ? hk : hk.transform()`. Test:
+`an_away_kick_is_emitted_in_the_client_frame`.
+
+**The lesson generalises past this arm.** Agreement on the *decision* is not agreement on the
+*command*. A probe that compares what the two agents CHOSE will happily print two identical lines
+while the engines do different things with them, and every instinct says to go looking at the scoring
+model. Three iterations, three bugs in the plumbing around a correctly-ported arm — a dialog id
+(ITER17), a fall-through action (ITER18), and now a coordinate frame.
+
+### Gates
+
+- Rung 4c (`coin,receive,reroll,pushback,blocktarget,blockchoice,blitztarget,touchback,kick`):
+  **100/100 in all three editions at scales 0, 1.0 and 1e6** — nine sweeps, fresh JVM, and this is
+  the first rung where all nine came back with no coverage warning either.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,651 / 0**. `mvn -o -pl ffb-ai test`: clean.
+
+**Next:** the cheap classes are DONE. Everything left — `followup`, `intercept`, `setup`,
+`activateplayer`, `move` — wants the `Features` raster tier in Java. Start it the way the plan says:
+a cross-language FIXTURE test that dumps Rust's `occ` / `tz` / `row_prefix` rasters for a set of fixed
+boards and asserts Java reproduces them, BEFORE wiring any of it to a game. If those cannot agree,
+nothing downstream can, and a fixture is a far cheaper place to find that out than a 100-seed sweep.

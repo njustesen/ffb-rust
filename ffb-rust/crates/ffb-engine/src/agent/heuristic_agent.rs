@@ -3336,8 +3336,16 @@ impl HeuristicAgent {
                             best = best.min(dx * dx / 16.0 + dy * dy / 9.0);
                         }
                         let w = p_safe * p_safe * exp_f32(-best);
+                        // Scoring is done in the SERVER frame, but the action is a client command:
+                        // `StepKickoff` mirrors an away coach's coordinate back, so an away kick has
+                        // to be pre-transformed or it lands in the KICKING half and touchbacks.
+                        // `RandomAgent`'s KickBall arm does the same, and says so; this arm did not,
+                        // and every away kick in the game was mirrored (bb2025 seed 2 diverged at the
+                        // very first activation with the two engines' picks byte-identical).
+                        let target = FieldCoordinate::new(x, y);
+                        let coord = if home_kicking { target } else { target.transform() };
                         self.buf.push_note(
-                            Action::KickBall { coord: FieldCoordinate::new(x, y) },
+                            Action::KickBall { coord },
                             w,
                             Rule::Flat,
                             p_safe,
@@ -4098,6 +4106,40 @@ mod tests {
         assert!(!on_pitch(10, -1));
         assert!(!on_pitch(10, 15));
         assert!(on_pitch(0, 0) && on_pitch(XMAX, YMAX));
+    }
+
+    /// An AWAY kick is emitted in the CLIENT frame, like every other away command.
+    ///
+    /// `StepKickoff` mirrors an away coach's coordinate back into the server frame, so a
+    /// server-frame coordinate sent as-is lands in the KICKING half and touchbacks. `RandomAgent`
+    /// pre-transforms for exactly this reason; this arm did not, and bb2025 seed 2 diverged at the
+    /// first activation with the two engines' *picks* byte-identical — the scoring agreed and the
+    /// frame did not.
+    #[test]
+    fn an_away_kick_is_emitted_in_the_client_frame() {
+        use crate::step::new_game;
+
+        let mut gs = new_game(11);
+        let coord_for = |gs: &mut crate::step::driver::DriverGameState, home_playing: bool| {
+            gs.game.home_playing = home_playing;
+            gs.pending_prompt = Some(AgentPrompt::KickBall);
+            let mut a = HeuristicAgent::with_classes(11, 0.0, Mode::Wide, ClassMask::ALL);
+            match a.act(gs) {
+                Action::KickBall { coord } => coord,
+                other => panic!("expected KickBall, got {other:?}"),
+            }
+        };
+
+        // Home kicks into the away half and needs no transform: server frame IS its client frame.
+        let home = coord_for(&mut gs, true);
+        assert!((13..=XMAX).contains(&home.x), "home kick landed at {home:?}");
+
+        // Away scores the HOME half (x 0..12) and then mirrors, so what leaves the agent is the
+        // high half — and mirroring it back reproduces the square that was scored.
+        let away = coord_for(&mut gs, false);
+        assert!((13..=XMAX).contains(&away.x), "away kick was not pre-transformed: {away:?}");
+        let back = away.transform();
+        assert!((0..=12).contains(&back.x), "away kick does not mirror back into the home half");
     }
 
     /// §6 — the touchback receiver table, which `HeuristicDriver.touchback` mirrors.
