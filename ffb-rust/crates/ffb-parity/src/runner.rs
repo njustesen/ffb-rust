@@ -1433,6 +1433,20 @@ pub fn run_heuristic_game(
     // that rather than asserting it. Also a whole-loop timer, so `agent + engine + residual`
     // has to add up to the wall clock and nothing can hide outside the two brackets.
     let mut per_class: std::collections::BTreeMap<&'static str, (u64, u128)> = Default::default();
+    // FFB_GIVE_TRACE: was the give the ONLY way that touchdown could happen?
+    //
+    // A touchdown after a hand-off or a pass is not evidence the give earned it - the carrier may
+    // have been able to walk it in himself. The counterfactual that matters is the thrower's
+    // position AT THE START OF HIS TEAM'S TURN: if the endzone was already within his own
+    // movement plus two rushes, running was available and the give was a stylistic choice. If it
+    // was not, the give created a touchdown that no amount of running could have produced.
+    //
+    // The event stream cannot answer this - it carries no coordinates for the thrower - so the
+    // reach has to be snapshotted at every turn change, before any movement happens, and looked
+    // up when the give resolves.
+    let give_trace = std::env::var_os("FFB_GIVE_TRACE").is_some();
+    let mut turn_reach: std::collections::HashMap<String, (i32, i32)> = Default::default();
+    let mut turn_key: Option<(String, i32)> = None;
     let loop_start = std::time::Instant::now();
     for _ in 0..200_000 {
         if engine.is_finished() { break; }
@@ -1472,6 +1486,26 @@ pub fn run_heuristic_game(
         } else {
             None
         };
+        if give_trace {
+            let g = &engine.game;
+            let home_turn = matches!(side, TeamSide::Home);
+            let td = if home_turn { &g.turn_data_home } else { &g.turn_data_away };
+            let key = (format!("{:?}", side), td.turn_nr);
+            if turn_key.as_ref() != Some(&key) {
+                // New team turn: record every player's distance to the endzone he is attacking and
+                // his own reach, BEFORE he has moved a square this turn.
+                turn_key = Some(key);
+                turn_reach.clear();
+                for (pid, c) in g.field_model.player_coordinates.iter() {
+                    if let Some(pl) = g.player(pid) {
+                        let ez = if home_turn { 25 } else { 0 };
+                        let d = (c.x - ez).abs();
+                        let reach = pl.movement_with_modifiers() + 2;
+                        turn_reach.insert(pid.clone(), (d, reach));
+                    }
+                }
+            }
+        }
         let t0 = if timed { Some(std::time::Instant::now()) } else { None };
         let action = if matches!(side, TeamSide::Home) {
             home_agent.act(&engine)
@@ -1534,7 +1568,37 @@ pub fn run_heuristic_game(
         let r = engine.apply(side, action);
         if let Some(t) = t1 { engine_ns += t.elapsed().as_nanos(); }
         match r {
-            Ok(evs) => all_events.extend(evs),
+            Ok(evs) => {
+                if give_trace {
+                    for e in &evs {
+                        let (kind, thrower) = match e {
+                            GameEvent::HandOver { from_id, .. } => ("handoff", Some(from_id.clone())),
+                            GameEvent::PassRoll { player_id, .. } => ("pass", Some(player_id.clone())),
+                            _ => ("", None),
+                        };
+                        // Touchdown and turn-end markers, so the correlation can be done from this
+                        // one stream: a give "converted" if a touchdown by the giving side follows
+                        // it before that side's turn ends.
+                        match e {
+                            GameEvent::Touchdown { player_id, .. } =>
+                                eprintln!("GTD scorer={player_id}"),
+                            GameEvent::TurnEnd { team_id, turn_nr } =>
+                                eprintln!("GEND team={team_id} turn={turn_nr}"),
+                            _ => {}
+                        }
+                        if let Some(tid) = thrower {
+                            let (d, reach) = turn_reach.get(&tid).copied().unwrap_or((-1, -1));
+                            // in_range: the thrower could have reached the endzone himself, from
+                            // where he stood when the turn began.
+                            let in_range = d >= 0 && d <= reach;
+                            eprintln!(
+                                "GIVE kind={kind} thrower={tid} d_turn_start={d} reach={reach} in_range={in_range}"
+                            );
+                        }
+                    }
+                }
+                all_events.extend(evs)
+            }
             Err(e) => { eprintln!("engine error seed {seed}: {e}"); break; }
         }
     }
