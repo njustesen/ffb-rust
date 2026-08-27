@@ -5,3 +5,6 @@ seed1_sampled_frames/
 
 docs/decision_replay_wide.html
 docs/decision_replay_deep.html
+
+# Heuristic-agent event dumps written by ffb-parity --out (default parity/heuristic)
+crates/ffb-parity/parity/
