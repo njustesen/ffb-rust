@@ -107,7 +107,7 @@ impl StepCatchOfTheDay {
             //         { setSound(BOUNCE); return; }
             let source = self.re_roll_source.clone();
             let reroll_ok = match source {
-                Some(ref name) => use_reroll(game, &ReRollSource::new(name.as_str()), &player_id),
+                Some(ref name) => use_reroll(game, &ReRollSource::new(name.as_str()), &player_id, rng),
                 None => false,
             };
             if !reroll_ok {

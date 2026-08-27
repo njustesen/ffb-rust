@@ -150,7 +150,7 @@ impl StepModifierTrait for WildAnimalStepModifier {
         if state.re_rolled_action.as_deref() == Some("WILD_ANIMAL") {
             if let Some(ref source_name) = state.re_roll_source.clone() {
                 let source = ReRollSource::new(source_name.as_str());
-                if !use_reroll(game, &source, &player_id) {
+                if !use_reroll(game, &source, &player_id, rng) {
                     skip_roll = true;
                 }
             } else {

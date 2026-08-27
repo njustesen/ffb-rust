@@ -3365,6 +3365,15 @@ public class ParityRunner {
             MatchRunner.inject(gameState, new ClientCommandInterceptorChoice(null, null));
             return;
         }
+        // The heuristic agent decides only WHETHER to intercept (Rust `AgentPrompt::Interception`,
+        // T = 0.20); accepting takes `find_interceptors().first()` -- the ENGINE's own first
+        // candidate, deliberately NOT the coordinate-sorted one the random pick below draws from.
+        if (heuristic != null
+            && heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.INTERCEPTION)) {
+            String chosen = heuristic.intercept() ? candidates.get(0).getId() : null;
+            MatchRunner.inject(gameState, new ClientCommandInterceptorChoice(chosen, null));
+            return;
+        }
         candidates.sort((a, b) -> {
             FieldCoordinate ca = game.getFieldModel().getPlayerCoordinate(a);
             FieldCoordinate cb = game.getFieldModel().getPlayerCoordinate(b);

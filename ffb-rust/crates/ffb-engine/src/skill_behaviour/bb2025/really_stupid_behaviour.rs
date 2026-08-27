@@ -82,7 +82,7 @@ impl StepModifierTrait for ReallyStupidStepModifier {
         if state.re_rolled_action.as_deref() == Some("REALLY_STUPID") {
             if let Some(ref source_name) = state.re_roll_source.clone() {
                 let source = ReRollSource::new(source_name.as_str());
-                if !use_reroll(game, &source, &player_id) {
+                if !use_reroll(game, &source, &player_id, rng) {
                     do_roll = false;
                     cancel_as_failure = true;
                 }

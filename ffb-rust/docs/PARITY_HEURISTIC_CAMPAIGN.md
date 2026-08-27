@@ -1448,3 +1448,76 @@ model. Three iterations, three bugs in the plumbing around a correctly-ported ar
 a cross-language FIXTURE test that dumps Rust's `occ` / `tz` / `row_prefix` rasters for a set of fixed
 boards and asserts Java reproduces them, BEFORE wiring any of it to a game. If those cannot agree,
 nothing downstream can, and a fixture is a far cheaper place to find that out than a 100-seed sweep.
+
+## ITER21 — `intercept`, and the Loner roll that was never ported
+
+`intercept` was on the "needs the raster tier" list and should not have been: the arm reads nothing
+but `p_roll(target_number)`. Two options — attempt at `p_roll(0) * 1.5 = 1.25`, decline at a flat
+`0.20`, `T = 0.20`. Accepting takes `find_interceptors().first()`, the ENGINE's own first candidate,
+deliberately *not* the coordinate-sorted one the random pick draws from, so the Java side sends
+`UtilPassing.findInterceptors(...)[0]` unsorted.
+
+Non-vacuity: end-of-game hashes over bb2025 seeds 1-20 differ from the `none` mask on **2 seeds**.
+
+### The divergence
+
+bb2025 and bb2016 green at every scale; **bb2020 at `--heur-scale 1.0` came back 99/100**, seed 54.
+Adding a class shifts the sampler stream, and a different stream walked into a bug that had been
+sitting there the whole time.
+
+The route to it is worth recording, because two diagnostics lied on the way:
+
+1. The state hashes first differ at step 149, inside a blitz. Both sides' block-choice weights are
+   `[0.9, ...]` — but Java's second die is `0.4` and Rust's is `0.9`. Java's dialog says the dice are
+   `[6, 3]`; Rust's prompt says `[6, 6]`. Same attacker, same defender, same board.
+2. The **dice-stream diff said the first difference was at position 83** — a d8 in Java against a d6
+   in Rust, forty-odd rolls later. That is the trap `feedback_parity_dice_comparison` warns about:
+   Rust was drawing the same values one position EARLIER, and positions 70-72 happened to be
+   `6, 6, 6`, so an off-by-one inside a run of equal values is invisible to a diff.
+3. What actually localised it was per-step `rng_calls`: identical up to step 136, where Java spends
+   **three** and Rust **two** — and the state hashes still matched afterwards, because the extra roll
+   changed nothing that step. `FFB_DICE_TRACE`'s Java `caller=` named it outright:
+   `RollMechanic.useReRoll:306`.
+
+That line is the **Loner** roll:
+
+```java
+if (pPlayer.hasSkillProperty(NamedProperties.hasToRollToUseTeamReroll)) {
+    int roll = gameState.getDiceRoller().rollSkill();
+    successful = DiceInterpreter.getInstance().isSkillRollSuccessful(roll, minimumLonerRoll(pPlayer));
+    stepResult.addReport(new ReportReRoll(pPlayer.getId(), ReRollSources.LONER, successful, roll));
+} else { successful = true; }
+```
+
+All three editions do it. **Rust did it in none** — `util_server_re_roll.rs` had no mention of the
+property, and `GameEvent::LonerRoll` existed in the model with no producer anywhere in the engine.
+
+### Why a lineman had Loner
+
+Worth stating, because "there is no Loner in lineman vs lineman" is the obvious objection and it is
+almost right. Seed 54's kickoff rolled **Cheering Fans**, which in BB2020 grants a Prayer to Nuffle,
+which rolled **BAD_HABITS** for the home team — and Bad Habits gives Loner to the *opposing* team.
+`away_01` re-rolled a dodge two turns later. Three coincidences had to line up before this roll could
+ever be observed: the `reroll` class has to ACCEPT an offer (the random contract always declines),
+the kickoff has to produce a prayer, and the prayer has to be that one.
+
+### The fix
+
+`use_reroll` now takes `&mut GameRng` and performs the Loner roll after spending, returning whether
+it succeeded — **the re-roll is spent either way**, which is the half a naive "return false" gets
+wrong. 131 call sites updated. Test:
+`a_loner_rolls_for_the_team_reroll_and_spends_it_either_way`, which pins both halves and asserts a
+non-Loner re-roll consumes NO die — that last one is what kept the bug invisible.
+
+### Gates
+
+- `coin,receive,reroll,pushback,blocktarget,blockchoice,blitztarget,touchback,kick,intercept`:
+  **100/100 in all three editions at scales 0, 1.0 and 1e6**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,652 / 0**. `mvn -o -pl ffb-ai test`: clean.
+
+**Seven engine bugs now**, all 1:1 port gaps the random gate could not structurally reach.
+
+**Next:** the `Features` raster tier in Java — the cross-language FIXTURE test first (`occ`, `tz`,
+`row_prefix` for fixed boards), before wiring any of it to a game. Only `followup`, `setup`,
+`activateplayer` and `move` are left, and all four want it.

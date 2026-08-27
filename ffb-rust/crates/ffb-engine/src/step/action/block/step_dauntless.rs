@@ -149,7 +149,7 @@ impl StepDauntless {
         if re_rolled {
             if let Some(ref source_name) = self.re_roll_source.clone() {
                 let source = ReRollSource::new(source_name.as_str());
-                if !use_reroll(game, &source, &player_id) {
+                if !use_reroll(game, &source, &player_id, rng) {
                     do_roll = false;
                 }
             } else {

@@ -78,7 +78,7 @@ impl StepModifierTrait for SwoopStepModifier {
                 None => true,
                 Some(ref source_name) => {
                     let source = ReRollSource::new(source_name.as_str());
-                    !use_reroll(game, &source, &player_id)
+                    !use_reroll(game, &source, &player_id, rng)
                 }
             };
             if should_skip {

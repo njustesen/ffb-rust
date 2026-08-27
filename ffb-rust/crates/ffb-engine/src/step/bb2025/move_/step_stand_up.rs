@@ -138,7 +138,7 @@ impl StepStandUp {
             let source_opt = self.re_roll_state.re_roll_source.clone();
             let consumed = source_opt
                 .as_ref()
-                .map(|s| use_reroll(game, s, &pid))
+                .map(|s| use_reroll(game, s, &pid, rng))
                 .unwrap_or(false);
             if !consumed {
                 // Java: `if (STAND_UP == getReRolledAction()) { if (source == null ||

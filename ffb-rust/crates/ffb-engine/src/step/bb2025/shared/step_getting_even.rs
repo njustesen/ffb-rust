@@ -74,7 +74,7 @@ impl StepGettingEven {
             let can_use = match (&self.re_roll_source, &player_id) {
                 (Some(source_name), Some(pid)) => {
                     let source = ReRollSource::new(source_name.as_str());
-                    use_reroll(game, &source, pid)
+                    use_reroll(game, &source, pid, rng)
                 }
                 _ => false,
             };

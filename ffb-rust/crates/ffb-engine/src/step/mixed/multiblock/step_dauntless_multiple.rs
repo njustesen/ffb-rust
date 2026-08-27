@@ -189,7 +189,7 @@ impl StepDauntlessMultiple {
         // Re-roll path (UseReRollForTarget command)
         let mut outcome = StepOutcome::next();
         if let (Some(target), Some(source)) = (self.re_roll_target.clone(), self.re_roll_source.clone()) {
-            if use_reroll(game, &source, &attacker_id) {
+            if use_reroll(game, &source, &attacker_id, rng) {
                 // Recompute min roll for this target
                 let min_roll = {
                     let attacker = game.player(&attacker_id);

@@ -81,7 +81,7 @@ impl StepAlwaysHungry {
         let mut do_always_hungry = do_always_hungry;
         if do_always_hungry && already_rerolled_ah {
             let source_opt = self.re_roll_state.re_roll_source.clone();
-            let consumed = source_opt.as_ref().map(|s| use_reroll(game, s, &acting_id)).unwrap_or(false);
+            let consumed = source_opt.as_ref().map(|s| use_reroll(game, s, &acting_id, rng)).unwrap_or(false);
             if !consumed {
                 do_always_hungry = false;
                 do_escape = true;
@@ -119,7 +119,7 @@ impl StepAlwaysHungry {
 
                 let skill_source = find_skill_reroll_source(game, "ALWAYS_HUNGRY");
                 if let Some(source) = skill_source {
-                    use_reroll(game, &source, &acting_id);
+                    use_reroll(game, &source, &acting_id, rng);
                     self.re_roll_state.re_roll_source = Some(source);
                     self.roll_ah = 0;
                     return self.execute_step(game, rng);
@@ -150,7 +150,7 @@ impl StepAlwaysHungry {
                 .as_ref().map(|a| a.name == "ESCAPE").unwrap_or(false);
             if already_rerolled_escape {
                 let source_opt = self.re_roll_state.re_roll_source.clone();
-                let consumed = source_opt.as_ref().map(|s| use_reroll(game, s, &thrown_player_id)).unwrap_or(false);
+                let consumed = source_opt.as_ref().map(|s| use_reroll(game, s, &thrown_player_id, rng)).unwrap_or(false);
                 if !consumed {
                     let label = self.goto_label_on_failure.clone();
                     return StepOutcome::goto(&label);
@@ -186,7 +186,7 @@ impl StepAlwaysHungry {
 
                     let skill_source = find_skill_reroll_source(game, "ESCAPE");
                     if let Some(source) = skill_source {
-                        use_reroll(game, &source, &acting_id);
+                        use_reroll(game, &source, &acting_id, rng);
                         self.re_roll_state.re_roll_source = Some(source);
                         self.roll_escape = 0;
                         return self.execute_step(game, rng);

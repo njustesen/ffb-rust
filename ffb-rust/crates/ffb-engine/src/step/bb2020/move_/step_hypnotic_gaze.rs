@@ -79,7 +79,7 @@ impl StepHypnoticGaze {
             if let Some(ref source_name) = self.re_roll_source.clone() {
                 let source = ReRollSource::new(source_name.as_str());
                 let pid = acting_player_id.as_deref().unwrap_or("");
-                if !use_reroll(game, &source, pid) {
+                if !use_reroll(game, &source, pid, rng) {
                     do_gaze = false;
                 }
             } else {

@@ -109,7 +109,7 @@ impl Step for StepThenIStartedBlastin {
                     if let (Some(source), Some(acting_id)) =
                         (self.re_roll_state.re_roll_source.clone(), game.acting_player.player_id.clone())
                     {
-                        if use_reroll(game, &source, &acting_id) {
+                        if use_reroll(game, &source, &acting_id, rng) {
                             return self.execute_step(game, rng);
                         }
                     }

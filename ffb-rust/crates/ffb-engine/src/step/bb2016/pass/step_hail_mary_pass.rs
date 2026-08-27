@@ -112,7 +112,7 @@ impl StepHailMaryPass {
             // Java: if (source == null || !useReRoll(...)) → doRoll=false, doNextStep=true
             if let Some(ref source_str) = self.re_roll_source.clone() {
                 let source = ReRollSource::new(source_str.as_str());
-                if use_reroll(game, &source, &thrower_id) {
+                if use_reroll(game, &source, &thrower_id, rng) {
                     do_roll = true;
                 } else {
                     do_roll = false;

@@ -226,7 +226,7 @@ impl StepRightStuff {
         if do_roll && already_rerolled {
             let consumed = self.re_roll_state.re_roll_source
                 .as_ref()
-                .map(|s| use_reroll(game, s, &player_id))
+                .map(|s| use_reroll(game, s, &player_id, rng))
                 .unwrap_or(false);
             if !consumed {
                 do_roll = false;
@@ -371,7 +371,7 @@ impl StepRightStuff {
                 // Skill re-roll (auto-use)
                 let skill_source = find_skill_reroll_source(game, "RIGHT_STUFF");
                 if let Some(source) = skill_source {
-                    use_reroll(game, &source, &player_id);
+                    use_reroll(game, &source, &player_id, rng);
                     self.re_roll_state.re_roll_source = Some(source);
                     self.roll = 0;
                     return self.execute_step(game, rng);

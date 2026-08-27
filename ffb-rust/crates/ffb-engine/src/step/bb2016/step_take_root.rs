@@ -77,7 +77,7 @@ impl StepTakeRoot {
         if re_rolled {
             if let Some(ref source_str) = self.re_roll_source.clone() {
                 let source = ReRollSource::new(source_str.as_str());
-                if use_reroll(game, &source, &acting_id) {
+                if use_reroll(game, &source, &acting_id, rng) {
                     do_roll = true;
                 } else {
                     self.cancel_player_action(game);

@@ -131,7 +131,7 @@ impl StepUnchannelledFury {
         let skip_roll = if self.re_rolled_action.as_deref() == Some("UNCHANNELLED_FURY") {
             if let Some(ref source_name) = self.re_roll_source.clone() {
                 let source = ReRollSource::new(source_name.as_str());
-                !use_reroll(game, &source, &player_id)
+                !use_reroll(game, &source, &player_id, rng)
             } else {
                 true // player declined re-roll
             }

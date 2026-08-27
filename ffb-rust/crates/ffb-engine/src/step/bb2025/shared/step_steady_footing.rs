@@ -242,7 +242,7 @@ impl StepSteadyFooting {
         if self.re_rolled_action.as_deref() == Some("STEADY_FOOTING") {
             if let Some(ref source_name) = self.re_roll_source.clone() {
                 let source = ReRollSource::new(source_name.as_str());
-                if !use_reroll(game, &source, &player_id) {
+                if !use_reroll(game, &source, &player_id, rng) {
                     return self.fail(game, rng);
                 }
             } else {

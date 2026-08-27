@@ -55,7 +55,7 @@ impl StepAllYouCanEat {
         if let Some(ref action) = self.re_roll_state.re_rolled_action.clone() {
             if action.get_name() == RE_ROLLED_ACTION {
                 let did_reroll = if let Some(ref src) = self.re_roll_state.re_roll_source.clone() {
-                    crate::step::util_server_re_roll::use_reroll(game, src, &player_id)
+                    crate::step::util_server_re_roll::use_reroll(game, src, &player_id, rng)
                 } else {
                     false
                 };

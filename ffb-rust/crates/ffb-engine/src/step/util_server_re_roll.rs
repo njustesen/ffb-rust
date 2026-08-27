@@ -14,6 +14,7 @@ use ffb_model::enums::ReRollSource;
 use ffb_model::model::game::Game;
 use ffb_model::prompts::AgentPrompt;
 use crate::step::abstract_step_with_re_roll::find_skill_reroll_source;
+use ffb_model::util::rng::GameRng;
 
 /// Java: `UtilServerReRoll.askForReRollIfAvailable(gameState, actingPlayer, reRolledAction,
 ///         minimumRoll, fumble)`.
@@ -114,7 +115,51 @@ pub fn ask_for_reroll_if_available_for(
 ///
 /// The `re_roll_source` name is used to distinguish skill-based from team-based re-rolls.
 /// Convention: TRR source name = "TRR"; skill sources = skill enum name.
-pub fn use_reroll(game: &mut Game, re_roll_source: &ReRollSource, player_id: &str) -> bool {
+/// Java `RollMechanic.useReRoll` (all three editions, same shape): a player with **Loner** has to
+/// roll for a TEAM re-roll to work at all, and the re-roll is spent either way.
+///
+/// ```java
+/// if (pPlayer.hasSkillProperty(NamedProperties.hasToRollToUseTeamReroll)) {
+///     int roll = gameState.getDiceRoller().rollSkill();
+///     int minimumRoll = minimumLonerRoll(pPlayer);          // the skill's own X+ value
+///     successful = DiceInterpreter.getInstance().isSkillRollSuccessful(roll, minimumRoll);
+///     stepResult.addReport(new ReportReRoll(pPlayer.getId(), ReRollSources.LONER, successful, roll));
+/// } else {
+///     successful = true;
+/// }
+/// ```
+///
+/// This was missing entirely: nothing in the engine ever rolled it, and `GameEvent::LonerRoll`
+/// had no producer. Two things had to line up before it could be seen — the `reroll` prompt class
+/// has to ACCEPT an offer (the random parity contract always declines), and someone has to HAVE
+/// Loner, which in a lineman game only happens when a Prayer to Nuffle grants it. bb2020 seed 54
+/// is that game: Java rolled the Loner die, Rust did not, and every roll afterwards was one
+/// position out of step. The values happened to agree for ten more dice, so the dice-stream diff
+/// pointed at a d8 scatter forty positions later.
+fn loner_roll(game: &mut Game, player_id: &str, rng: &mut GameRng) -> bool {
+    use ffb_model::model::property::named_properties::NamedProperties;
+    let Some(player) = game.player(player_id) else { return true };
+    if !player.has_skill_property(NamedProperties::HAS_TO_ROLL_TO_USE_TEAM_REROLL) {
+        return true;
+    }
+    let minimum_roll = player.get_skill_int_value(NamedProperties::HAS_TO_ROLL_TO_USE_TEAM_REROLL);
+    let roll = rng.d6();
+    let success = crate::dice_interpreter::DiceInterpreter::is_skill_roll_successful(roll, minimum_roll);
+    game.report_list.add(ffb_model::report::report_re_roll::ReportReRoll::new(
+        Some(player_id.to_string()),
+        ReRollSource::new("Loner"),
+        success,
+        roll,
+    ));
+    success
+}
+
+pub fn use_reroll(
+    game: &mut Game,
+    re_roll_source: &ReRollSource,
+    player_id: &str,
+    rng: &mut GameRng,
+) -> bool {
     // Check if source is a team re-roll (TRR).
     // Java: ReRollSource.hasProperty(ReRollProperty.TRR) etc.
     if re_roll_source.name == "TRR"
@@ -160,7 +205,7 @@ pub fn use_reroll(game: &mut Game, re_roll_source: &ReRollSource, player_id: &st
             } else if td.reroll_show_star_one_drive > 0 {
                 td.reroll_show_star_one_drive -= 1;
             }
-            return true;
+            return loner_roll(game, player_id, rng);
         }
         return false;
     }
@@ -241,6 +286,68 @@ mod tests {
     /// Rust set it for every edition, so BB2020/BB2025 refused the second re-roll of a turn
     /// (lineman bb2025 seed 16: Java re-rolls two failed dodges in one turn, Rust re-rolled the
     /// first and fell over on the second).
+    /// A **Loner** spends the team re-roll and then has to roll for it to work.
+    ///
+    /// `RollMechanic.useReRoll` does this in all three editions and Rust did it in none — nothing
+    /// in the engine rolled the die. It takes two coincidences to see: the agent has to ACCEPT a
+    /// re-roll (the random parity contract always declines) and the player has to HAVE Loner,
+    /// which no lineman does by roster. bb2020 seed 54 supplied both — a Cheering Fans kickoff
+    /// rolled the BAD_HABITS prayer, which grants Loner to the opposing team, and the away
+    /// lineman that re-rolled a dodge two turns later was one of them.
+    #[test]
+    fn a_loner_rolls_for_the_team_reroll_and_spends_it_either_way() {
+        use ffb_model::model::property::named_properties::NamedProperties;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::player::Player;
+
+        let src = ReRollSource::new("TRR");
+        let build = || {
+            let mut home = test_team("home", 0);
+            home.players.push(Player {
+                id: "loner_01".into(),
+                nr: 1,
+                movement: 6,
+                strength: 3,
+                agility: 3,
+                armour: 8,
+                extra_skills: vec![SkillWithValue {
+                    skill_id: SkillId::Loner,
+                    value: Some("4+".into()),
+                }],
+                ..Default::default()
+            });
+            let mut game = Game::new(home, test_team("away", 0), Rules::Bb2025);
+            game.turn_data_home.rerolls = 3;
+            game
+        };
+
+        // Loner 4+ registers the property, and its int value IS the minimum roll.
+        let g = build();
+        let p = g.player("loner_01").expect("the loner");
+        assert!(p.has_skill_property(NamedProperties::HAS_TO_ROLL_TO_USE_TEAM_REROLL));
+        assert_eq!(p.get_skill_int_value(NamedProperties::HAS_TO_ROLL_TO_USE_TEAM_REROLL), 4);
+
+        // Whatever the die says, the re-roll is GONE. That is the half a naive "return false"
+        // would get wrong, and it is the half the bank tracks.
+        let mut seen_success = false;
+        let mut seen_failure = false;
+        for seed in 0..40u64 {
+            let mut game = build();
+            let ok = use_reroll(&mut game, &src, "loner_01", &mut GameRng::new(seed));
+            assert_eq!(game.turn_data_home.rerolls, 2, "seed {seed}: spent either way");
+            if ok { seen_success = true } else { seen_failure = true }
+        }
+        assert!(seen_success && seen_failure, "Loner 4+ must be able to go both ways");
+
+        // A player WITHOUT Loner never rolls, so every other re-roll in the game leaves the die
+        // stream exactly where it was — which is what kept this invisible for so long.
+        let mut game = build();
+        let mut rng = GameRng::new(7);
+        assert!(use_reroll(&mut game, &src, "nobody", &mut rng));
+        assert_eq!(rng.d6(), GameRng::new(7).d6(), "a non-Loner re-roll must not consume a die");
+    }
+
     #[test]
     fn reroll_used_latch_is_bb2016_only() {
         let src = ReRollSource::new("TRR");
@@ -252,7 +359,7 @@ mod tests {
         ] {
             let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
             game.turn_data_home.rerolls = 3;
-            assert!(use_reroll(&mut game, &src, "nobody"));
+            assert!(use_reroll(&mut game, &src, "nobody", &mut GameRng::new(0)));
             assert_eq!(game.turn_data_home.rerolls, 2, "{rules:?} always spends from the bank");
             assert_eq!(
                 game.turn_data_home.reroll_used, expect_latch,
@@ -287,7 +394,7 @@ mod tests {
         game.turn_data_home.rerolls = 4;
         game.turn_data_home.rerolls_brilliant_coaching_one_drive = 1;
         game.turn_data_home.rerolls_pump_up_the_crowd_one_drive = 1;
-        assert!(use_reroll(&mut game, &src, "nobody"));
+        assert!(use_reroll(&mut game, &src, "nobody", &mut GameRng::new(0)));
         assert_eq!(game.turn_data_home.rerolls, 3);
         assert_eq!(game.turn_data_home.rerolls_brilliant_coaching_one_drive, 0);
         assert_eq!(
@@ -300,14 +407,14 @@ mod tests {
         game.turn_data_home.rerolls = 3;
         game.turn_data_home.rerolls_pump_up_the_crowd_one_drive = 1;
         game.turn_data_home.reroll_show_star_one_drive = 1;
-        assert!(use_reroll(&mut game, &src, "nobody"));
+        assert!(use_reroll(&mut game, &src, "nobody", &mut GameRng::new(0)));
         assert_eq!(game.turn_data_home.rerolls_pump_up_the_crowd_one_drive, 0);
         assert_eq!(game.turn_data_home.reroll_show_star_one_drive, 1);
 
         // A plain re-roll with no one-drive grant outstanding touches only the pool.
         let mut game = make_game();
         game.turn_data_home.rerolls = 3;
-        assert!(use_reroll(&mut game, &src, "nobody"));
+        assert!(use_reroll(&mut game, &src, "nobody", &mut GameRng::new(0)));
         assert_eq!(game.turn_data_home.rerolls, 2);
         assert_eq!(game.turn_data_home.rerolls_brilliant_coaching_one_drive, 0);
 
@@ -315,7 +422,7 @@ mod tests {
         let mut game = make_game();
         game.turn_data_home.rerolls = 0;
         game.turn_data_home.rerolls_brilliant_coaching_one_drive = 1;
-        assert!(!use_reroll(&mut game, &src, "nobody"));
+        assert!(!use_reroll(&mut game, &src, "nobody", &mut GameRng::new(0)));
         assert_eq!(game.turn_data_home.rerolls_brilliant_coaching_one_drive, 1);
     }
 
@@ -385,7 +492,7 @@ mod tests {
         game.home_playing = true;
         game.turn_data_home.rerolls = 2;
         let source = ReRollSource::new("TRR");
-        let ok = use_reroll(&mut game, &source, "p1");
+        let ok = use_reroll(&mut game, &source, "p1", &mut GameRng::new(0));
         assert!(ok);
         assert_eq!(game.turn_data_home.rerolls, 1);
         // `make_game()` is BB2025, and BB2025 does NOT latch `reroll_used` -- Java sets it only in
@@ -400,7 +507,7 @@ mod tests {
         game.home_playing = true;
         game.turn_data_home.rerolls = 0;
         let source = ReRollSource::new("TRR");
-        let ok = use_reroll(&mut game, &source, "p1");
+        let ok = use_reroll(&mut game, &source, "p1", &mut GameRng::new(0));
         assert!(!ok);
     }
 
@@ -409,7 +516,7 @@ mod tests {
         let mut game = make_game();
         add_player_with_skill(&mut game, "p1", SkillId::Dodge);
         let source = ReRollSource::new("Dodge");
-        let ok = use_reroll(&mut game, &source, "p1");
+        let ok = use_reroll(&mut game, &source, "p1", &mut GameRng::new(0));
         assert!(ok);
         assert!(game.team_home.player("p1").unwrap().used_skills.contains(&SkillId::Dodge));
     }

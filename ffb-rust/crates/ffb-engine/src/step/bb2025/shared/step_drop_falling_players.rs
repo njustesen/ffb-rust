@@ -279,7 +279,7 @@ impl StepDropFallingPlayers {
 
                 let uses_a_team_reroll = is_option_enabled(game, PILING_ON_USES_A_TEAM_REROLL);
                 let reroll_spent = !uses_a_team_reroll
-                    || use_reroll(game, &ReRollSource::new("TRR"), &attacker_id);
+                    || use_reroll(game, &ReRollSource::new("TRR"), &attacker_id, rng);
 
                 if using && reroll_spent {
                     game.mark_skill_used(&attacker_id, ffb_model::enums::SkillId::PilingOn);

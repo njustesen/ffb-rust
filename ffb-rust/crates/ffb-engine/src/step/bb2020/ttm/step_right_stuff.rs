@@ -124,7 +124,7 @@ impl StepRightStuff {
         // Java: if (reRolledAction == RIGHT_STUFF) { if (source == null || !useReRoll) doRoll = false; }
         if do_roll && already_rerolled {
             let source_opt = self.re_roll_state.re_roll_source.clone();
-            let consumed = source_opt.as_ref().map(|s| use_reroll(game, s, &player_id)).unwrap_or(false);
+            let consumed = source_opt.as_ref().map(|s| use_reroll(game, s, &player_id, rng)).unwrap_or(false);
             if !consumed {
                 do_roll = false;
             }
@@ -224,7 +224,7 @@ impl StepRightStuff {
 
                 let skill_source = find_skill_reroll_source(game, "RIGHT_STUFF");
                 if let Some(source) = skill_source {
-                    use_reroll(game, &source, &player_id);
+                    use_reroll(game, &source, &player_id, rng);
                     self.re_roll_state.re_roll_source = Some(source);
                     self.roll = 0;
                     return self.execute_step(game, rng);

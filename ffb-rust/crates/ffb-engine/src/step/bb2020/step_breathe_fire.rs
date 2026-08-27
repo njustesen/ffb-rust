@@ -143,7 +143,7 @@ impl StepBreatheFire {
             if let Some(ref source_name) = self.re_roll_source.clone() {
                 use ffb_model::enums::ReRollSource;
                 let source = ReRollSource::new(source_name.as_str());
-                if use_reroll(game, &source, &attacker_id) {
+                if use_reroll(game, &source, &attacker_id, rng) {
                     self.result = None;
                 }
             }

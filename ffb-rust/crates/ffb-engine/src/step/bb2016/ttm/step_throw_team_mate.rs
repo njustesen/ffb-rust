@@ -70,7 +70,7 @@ impl StepThrowTeamMate {
             if let Some(ref source_name) = self.re_roll_source.clone() {
                 let thrower_id = game.acting_player.player_id.clone().unwrap_or_default();
                 let source = ReRollSource::new(source_name);
-                if use_reroll(game, &source, &thrower_id) {
+                if use_reroll(game, &source, &thrower_id, rng) {
                     do_roll = true;
                 }
             }

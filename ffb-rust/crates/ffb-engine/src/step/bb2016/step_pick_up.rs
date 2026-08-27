@@ -116,7 +116,7 @@ impl StepPickUp {
             let source_opt = self.re_roll_state.re_roll_source.clone();
             let consumed = source_opt
                 .as_ref()
-                .map(|s| use_reroll(game, s, &player_id))
+                .map(|s| use_reroll(game, s, &player_id, rng))
                 .unwrap_or(false);
             if !consumed {
                 // Java: this pre-check failure branch only publishes END_TURN and
@@ -198,7 +198,7 @@ impl StepPickUp {
             // Skill re-roll (Sure Hands)
             let skill_source = find_skill_reroll_source(game, "PICKUP");
             if let Some(source) = skill_source {
-                use_reroll(game, &source, player_id);
+                use_reroll(game, &source, player_id, rng);
                 self.re_roll_state.re_roll_source = Some(source);
                 self.roll = 0;
                 let pid = player_id.to_owned();

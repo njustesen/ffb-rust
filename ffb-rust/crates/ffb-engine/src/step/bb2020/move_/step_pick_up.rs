@@ -120,7 +120,7 @@ impl StepPickUp {
             let source_opt = self.re_roll_state.re_roll_source.clone();
             let consumed = source_opt
                 .as_ref()
-                .map(|s| use_reroll(game, s, &pid))
+                .map(|s| use_reroll(game, s, &pid, rng))
                 .unwrap_or(false);
             if !consumed {
                 // Java: getReRollSource() == null || !useReRoll(...) → unconditional END_TURN,
@@ -202,7 +202,7 @@ impl StepPickUp {
             let skill_source = find_skill_reroll_source(game, "PICKUP");
             if let Some(source) = skill_source {
                 let pid = player_id.as_deref().unwrap_or("").to_owned();
-                use_reroll(game, &source, &pid);
+                use_reroll(game, &source, &pid, rng);
                 self.re_roll_state.re_roll_source = Some(source);
                 self.roll = 0;
                 return self.pick_up(game, rng, player_id);

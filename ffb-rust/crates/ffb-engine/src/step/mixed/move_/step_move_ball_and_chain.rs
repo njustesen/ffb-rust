@@ -77,7 +77,7 @@ impl StepMoveBallAndChain {
             true
         } else if let Some(ref src) = self.re_roll_state.re_roll_source.clone() {
             let pid = game.acting_player.player_id.clone().unwrap_or_default();
-            crate::step::util_server_re_roll::use_reroll(game, src, &pid)
+            crate::step::util_server_re_roll::use_reroll(game, src, &pid, rng)
         } else {
             false
         };

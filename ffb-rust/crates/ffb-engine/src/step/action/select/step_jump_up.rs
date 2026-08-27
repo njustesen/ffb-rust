@@ -105,7 +105,7 @@ impl StepJumpUp {
         if re_rolled {
             if let Some(ref source_name) = self.re_roll_source.clone() {
                 let source = ReRollSource::new(source_name.as_str());
-                if !use_reroll(game, &source, &player_id) {
+                if !use_reroll(game, &source, &player_id, rng) {
                     // Token exhausted — fail immediately.
                     // Java: this early `return false` happens before `actingPlayer.markSkillUsed(skill)`
                     // at the bottom of handleExecuteStepHook, so the skill is NOT marked used here.
@@ -467,7 +467,7 @@ mod tests {
         step.goto_label_on_failure = "FAIL".into();
         step.re_rolled_action = Some("JUMP_UP".into());
         step.re_roll_source = Some("TRR".into());
-        // No re-rolls available on the team → use_reroll() will fail (token exhausted).
+        // No re-rolls available on the team → use_reroll(, rng) will fail (token exhausted).
         game.turn_data_home.rerolls = 0;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);

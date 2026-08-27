@@ -161,7 +161,7 @@ impl StepBalefulHex {
                 let declined_or_failed = match self.re_roll_source.clone() {
                     Some(ref source_name) => {
                         let source = ReRollSource::new(source_name.as_str());
-                        !use_reroll(game, &source, &player_id)
+                        !use_reroll(game, &source, &player_id, rng)
                     }
                     None => true,
                 };

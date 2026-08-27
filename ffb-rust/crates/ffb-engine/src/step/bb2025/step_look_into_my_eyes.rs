@@ -129,7 +129,7 @@ impl StepLookIntoMyEyes {
         //       }
         if self.re_rolled_action.as_deref() == Some(RE_ROLLED_ACTION) {
             let consumed = match self.re_roll_source.clone() {
-                Some(source_name) => use_reroll(game, &ReRollSource::new(source_name.as_str()), &player_id),
+                Some(source_name) => use_reroll(game, &ReRollSource::new(source_name.as_str()), &player_id, rng),
                 None => false,
             };
             if !consumed {

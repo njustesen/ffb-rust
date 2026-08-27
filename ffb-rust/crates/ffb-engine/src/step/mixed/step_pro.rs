@@ -50,7 +50,7 @@ impl StepPro {
 
         // Java: if (getReRollSource() != null) { if (useReRoll(source, player)) { changeUsedPro(false) } else doRoll=false }
         if let Some(ref source) = self.re_roll.re_roll_source.clone() {
-            if use_reroll(game, source, &player_id) {
+            if use_reroll(game, source, &player_id, rng) {
                 // Reset usedPro flag so the Pro roll can proceed
                 if let Some(state) = game.field_model.player_state(&player_id) {
                     game.field_model.set_player_state(&player_id, state.change_used_pro(false));

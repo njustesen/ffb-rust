@@ -118,7 +118,7 @@ impl StepShadowing {
                                     if let Some(ref source_str) = self.re_roll_source.clone() {
                                         let source = ReRollSource::new(source_str.as_str());
                                         let actor_id = game.acting_player.player_id.clone().unwrap_or_default();
-                                        if !use_reroll(game, &source, &actor_id) {
+                                        if !use_reroll(game, &source, &actor_id, rng) {
                                             roll_shadowing = false;
                                         }
                                     } else {

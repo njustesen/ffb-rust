@@ -111,7 +111,7 @@ impl StepAlwaysHungry {
             if self.re_rolled_action.as_deref() == Some("ALWAYS_HUNGRY") {
                 let consumed = if let Some(ref source_name) = self.re_roll_source.clone() {
                     let source = ReRollSource::new(source_name.as_str());
-                    use_reroll(game, &source, &acting_player_id)
+                    use_reroll(game, &source, &acting_player_id, rng)
                 } else {
                     false // player declined
                 };
@@ -179,7 +179,7 @@ impl StepAlwaysHungry {
             if self.re_rolled_action.as_deref() == Some("ESCAPE") {
                 let consumed = if let Some(ref source_name) = self.re_roll_source.clone() {
                     let source = ReRollSource::new(source_name.as_str());
-                    use_reroll(game, &source, &thrown_player_id)
+                    use_reroll(game, &source, &thrown_player_id, rng)
                 } else {
                     false // player declined
                 };

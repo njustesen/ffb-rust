@@ -77,7 +77,7 @@ impl StepThrowKeg {
         if is_re_rolling {
             // Java: if (getReRollSource() == null || !UtilServerReRoll.useReRoll(...))
             let can_use = match &self.re_roll.re_roll_source.clone() {
-                Some(source) => use_reroll(game, source, &acting_player_id),
+                Some(source) => use_reroll(game, source, &acting_player_id, rng),
                 None => false,
             };
             if !can_use {

@@ -69,7 +69,7 @@ impl StepPuntDistance {
             match self.re_roll_source.clone() {
                 Some(ref source_name) => {
                     let source = ReRollSource::new(source_name.as_str());
-                    if !use_reroll(game, &source, &player_id) {
+                    if !use_reroll(game, &source, &player_id, rng) {
                         return self.leave(game);
                     }
                     // Re-roll consumed — fall through to roll again.

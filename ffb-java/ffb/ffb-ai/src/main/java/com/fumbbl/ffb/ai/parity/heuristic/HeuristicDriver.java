@@ -172,6 +172,33 @@ public final class HeuristicDriver {
         return game.getTeamHome().hasPlayer(carrier) == home;
     }
 
+    /**
+     * Rust {@code AgentPrompt::Interception}. {@code T = 0.20}.
+     *
+     * <p>Two options, in this order: index 0 = ATTEMPT, index 1 = decline. The attempt weight is
+     * {@code p_roll(targetNumber) * 1.5}, and declining is a flat {@code 0.20}.
+     *
+     * <p>Both live steps ({@code bb2020} and {@code bb2025} {@code StepIntercept}) publish
+     * {@code target_number = 0}, which {@code p_roll} clamps to {@code 5/6} — so the attempt is
+     * worth 1.25 against 0.20 and the agent nearly always tries. That constant is not visible to
+     * this side (the dialog does not carry it), so it is pinned by
+     * {@code the_live_intercept_prompts_publish_target_number_zero} on the Rust side.
+     *
+     * @return true to attempt the interception.
+     */
+    public boolean intercept() {
+        sampler.clear();
+        sampler.push(pRoll(0) * 1.5f);
+        sampler.push(0.20f);
+        return sampler.pick(0.20f) == 0;
+    }
+
+    /** Rust {@code p_roll}: the chance of making a d6 target, clamped to [1/6, 5/6]. */
+    private static float pRoll(int target) {
+        float p = (7 - target) / 6.0f;
+        return Math.min(Math.max(p, 1.0f / 6.0f), 5.0f / 6.0f);
+    }
+
     /** Pitch width and height, and the flat index Rust's rasters use. */
     private static final int XMAX = 25;
     private static final int YMAX = 14;

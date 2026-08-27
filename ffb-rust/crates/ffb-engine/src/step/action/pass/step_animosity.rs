@@ -151,7 +151,7 @@ impl StepAnimosity {
                 if let Some(ref source_str) = self.re_roll_source.clone() {
                     let source = ReRollSource::new(source_str.as_str());
                     let thrower_id = thrower.as_ref().map(|t| t.id.clone()).unwrap_or_default();
-                    if use_reroll(game, &source, &thrower_id) {
+                    if use_reroll(game, &source, &thrower_id, rng) {
                         do_roll = true;
                     } else {
                         game.acting_player.suffering_animosity = true;
@@ -275,7 +275,7 @@ impl StepAnimosity {
             if let Some(ref source_str) = self.re_roll_source.clone() {
                 let source = ReRollSource::new(source_str.as_str());
                 let thrower_id = game.thrower().map(|t| t.id.clone()).unwrap_or_default();
-                if use_reroll(game, &source, &thrower_id) {
+                if use_reroll(game, &source, &thrower_id, rng) {
                     do_roll = true;
                 } else {
                     game.acting_player.suffering_animosity = true;

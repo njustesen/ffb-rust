@@ -67,7 +67,7 @@ impl StepBlockRoll {
 
             if is_block_reroll {
                 if let Some(ref source) = self.re_roll.re_roll_source.clone() {
-                    if !use_reroll(game, source, &acting_id) {
+                    if !use_reroll(game, source, &acting_id, rng) {
                         do_roll = false;
                         // Java: showBlockRollDialog(false)
                     }

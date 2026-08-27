@@ -156,7 +156,7 @@ impl StepHailMaryPass {
         if self.re_rolled_action.as_deref() == Some(REROLLED_ACTION_PASS) {
             if let Some(source_name) = self.re_roll_source.clone() {
                 let thrower_id_for_reroll = thrower_id.clone().unwrap_or_default();
-                if use_reroll(game, &ReRollSource::new(source_name), &thrower_id_for_reroll) {
+                if use_reroll(game, &ReRollSource::new(source_name), &thrower_id_for_reroll, rng) {
                     self.roll = 0;
                 }
             }

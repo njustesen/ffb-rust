@@ -196,7 +196,7 @@ impl Step for StepCatchScatterThrowIn {
             Action::UseReRoll { use_reroll: true } => {
                 if let Some(source) = self.re_roll_state.re_roll_source.clone() {
                     let pid = self.catcher_id.clone().unwrap_or_default();
-                    use_reroll(game, &source, &pid);
+                    use_reroll(game, &source, &pid, rng);
                     self.roll = 0; // fresh roll
                 }
             }
@@ -864,7 +864,7 @@ impl StepCatchScatterThrowIn {
         if already_rerolled {
             let source_opt = self.re_roll_state.re_roll_source.clone();
             let consumed = source_opt.as_ref()
-                .map(|s| use_reroll(game, s, &cid))
+                .map(|s| use_reroll(game, s, &cid, rng))
                 .unwrap_or(false);
             if !consumed {
                 do_roll = false;

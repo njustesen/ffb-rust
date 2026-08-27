@@ -94,7 +94,7 @@ impl StepFoulChainsaw {
         if already_rerolled {
             let source = self.re_roll_state.re_roll_source.clone();
             let consumed = source.as_ref()
-                .map(|s| use_reroll(game, s, &attacker_id))
+                .map(|s| use_reroll(game, s, &attacker_id, rng))
                 .unwrap_or(false);
             if !consumed {
                 drop_chainsaw_player = true;
@@ -128,7 +128,7 @@ impl StepFoulChainsaw {
 
                 let skill_source = find_skill_reroll_source(game, "CHAINSAW");
                 if let Some(source) = skill_source {
-                    use_reroll(game, &source, &attacker_id);
+                    use_reroll(game, &source, &attacker_id, rng);
                     self.re_roll_state.re_roll_source = Some(source);
                     return self.execute_step(game, rng);
                 }

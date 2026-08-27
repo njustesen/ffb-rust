@@ -4108,6 +4108,38 @@ mod tests {
         assert!(on_pitch(0, 0) && on_pitch(XMAX, YMAX));
     }
 
+    /// The interception weights, and the constant the Java mirror cannot see.
+    ///
+    /// `HeuristicDriver.intercept()` hardcodes `pRoll(0)` because the Java dialog does not carry a
+    /// target number. Both LIVE steps publish 0 — the legacy `engine.rs` prompt publishes 6, but
+    /// that path is not the one the driver runs — so pin the constant here rather than leaving the
+    /// two sides silently coupled through a literal.
+    #[test]
+    fn intercept_weights_and_the_target_number_the_live_steps_publish() {
+        // p_roll clamps, so a "target number" of 0 is not a 100% chance: it is 5/6.
+        assert!((p_roll(0) - 5.0 / 6.0).abs() < 1e-6);
+        let attempt = p_roll(0) * 1.5;
+        let decline = 0.20f32;
+        // Attempting outweighs declining by more than 6x, so at argmax the agent always tries --
+        // which is the whole point of switching the class on: the random contract picks a random
+        // candidate, and 2 of 20 bb2025 seeds end on a different board because of it.
+        assert!(attempt > 6.0 * decline);
+
+        // Both live StepIntercept twins publish 0. If either changes, the Java side is wrong and
+        // nothing in the sweep would say so directly.
+        for src in [
+            include_str!("../step/bb2025/pass/step_intercept.rs"),
+            include_str!("../step/bb2020/pass/step_intercept.rs"),
+        ] {
+            let at = src.find("AgentPrompt::Interception").expect("prompt is raised here");
+            let window = &src[at..at + 240];
+            assert!(
+                window.contains("target_number: 0"),
+                "a live StepIntercept no longer publishes target_number 0"
+            );
+        }
+    }
+
     /// An AWAY kick is emitted in the CLIENT frame, like every other away command.
     ///
     /// `StepKickoff` mirrors an away coach's coordinate back into the server frame, so a

@@ -861,7 +861,7 @@ impl StepCatchScatterThrowIn {
         if already_rerolled {
             let source_opt = self.re_roll_state.re_roll_source.clone();
             let consumed = source_opt.as_ref()
-                .map(|s| use_reroll(game, s, &cid))
+                .map(|s| use_reroll(game, s, &cid, rng))
                 .unwrap_or(false);
             if !consumed {
                 do_roll = false;

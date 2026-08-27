@@ -102,7 +102,7 @@ impl StepFoulAppearance {
             let source_opt = self.re_roll_state.re_roll_source.clone();
             let consumed = source_opt
                 .as_ref()
-                .map(|s| use_reroll(game, s, pid.as_deref().unwrap_or("")))
+                .map(|s| use_reroll(game, s, pid.as_deref().unwrap_or(""), rng))
                 .unwrap_or(false);
             if !consumed {
                 return self.fail_fa(game);
@@ -130,7 +130,7 @@ impl StepFoulAppearance {
             let pid = game.acting_player.player_id.clone();
             let skill_source = find_skill_reroll_source(game, "FOUL_APPEARANCE");
             if let Some(source) = skill_source {
-                use_reroll(game, &source, pid.as_deref().unwrap_or(""));
+                use_reroll(game, &source, pid.as_deref().unwrap_or(""), rng);
                 self.re_roll_state.re_roll_source = Some(source);
                 self.roll = 0;
                 return self.execute_step(game, rng);

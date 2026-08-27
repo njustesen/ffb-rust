@@ -128,7 +128,7 @@ impl StepBreatheFire {
         if self.re_rolled_action.as_deref() == Some("BREATHE_FIRE") {
             if let Some(ref source_name) = self.re_roll_source.clone() {
                 let source = ReRollSource::new(source_name.as_str());
-                if use_reroll(game, &source, &attacker_id) {
+                if use_reroll(game, &source, &attacker_id, rng) {
                     self.result = None; // Re-roll successful: clear so we re-roll below
                 }
                 // If use_reroll returned false: source exhausted, keep existing result

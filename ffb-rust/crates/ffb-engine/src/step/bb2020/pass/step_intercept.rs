@@ -282,7 +282,7 @@ impl StepIntercept {
         // only be set from within `intercept()`, which is only called once chosen).
         if self.re_rolled_action.as_deref() == Some("INTERCEPTION") {
             let consumed = match (self.re_roll_source.clone(), self.interceptor_id.clone()) {
-                (Some(src), Some(id)) => use_reroll(game, &ReRollSource::new(src.as_str()), &id),
+                (Some(src), Some(id)) => use_reroll(game, &ReRollSource::new(src.as_str()), &id, rng),
                 _ => false,
             };
             if !consumed {

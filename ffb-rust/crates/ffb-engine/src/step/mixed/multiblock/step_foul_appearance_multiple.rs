@@ -143,7 +143,7 @@ impl StepFoulAppearanceMultiple {
         } else {
             // Java: re-roll path — called after UseReRollForTarget command
             if let (Some(target), Some(source)) = (self.re_roll_target.clone(), self.re_roll_source.clone()) {
-                if use_reroll(game, &source, &attacker_id) {
+                if use_reroll(game, &source, &attacker_id, rng) {
                     self.minimum_rolls.insert(target.clone(), min_roll);
                     let roll = rng.d6();
                     let successful = DiceInterpreter::is_skill_roll_successful(roll, min_roll);

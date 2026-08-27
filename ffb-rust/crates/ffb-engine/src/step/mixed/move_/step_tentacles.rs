@@ -109,7 +109,7 @@ impl StepTentacles {
                             if let Some(ref source) = self.re_roll_state.re_roll_source.clone() {
                                 // BB2020/2025: re-roll is offered to and consumed by the
                                 // *defender* (the Tentacles player), not the acting player.
-                                if !use_reroll(game, source, defender_id) {
+                                if !use_reroll(game, source, defender_id, rng) {
                                     roll_tentacles = false;
                                     self.state.using_tentacles = Some(false);
                                 }

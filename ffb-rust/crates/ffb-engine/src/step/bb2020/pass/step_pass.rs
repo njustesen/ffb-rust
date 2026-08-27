@@ -137,7 +137,7 @@ impl StepPass {
                 let thrower_id = game.thrower_id.clone().unwrap_or_default();
                 if let Some(ref source_name) = self.re_roll_source.clone() {
                     let source = ReRollSource::new(source_name.as_str());
-                    if !use_reroll(game, &source, &thrower_id) {
+                    if !use_reroll(game, &source, &thrower_id, rng) {
                         // token exhausted → handle failed pass with stored result
                         return self.handle_failed_pass(game);
                     }

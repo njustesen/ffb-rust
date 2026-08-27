@@ -132,7 +132,7 @@ impl StepAnimalSavagery {
             if re_rolled {
                 if let Some(source_name) = self.re_roll_source.clone() {
                     let source = ReRollSource::new(source_name.as_str());
-                    if !use_reroll(game, &source, &acting_player_id) {
+                    if !use_reroll(game, &source, &acting_player_id, rng) {
                         do_roll = false;
                         status_failure = true;
                     }

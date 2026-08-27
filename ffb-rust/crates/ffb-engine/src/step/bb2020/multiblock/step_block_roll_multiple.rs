@@ -236,7 +236,7 @@ impl StepBlockRollMultiple {
                                     roll.remove_re_roll_source(&ReRollSource::new("Team ReRoll"));
                                     roll.remove_re_roll_source(&ReRollSource::new("Lord of Chaos"));
                                 }
-                            } else if use_reroll(game, &source, &acting_player_id) {
+                            } else if use_reroll(game, &source, &acting_player_id, rng) {
                                 // Re-roll all dice
                                 let n = roll.get_nr_of_dice() as usize;
                                 let fresh: Vec<i32> = (0..n).map(|_| rng.d6()).collect();

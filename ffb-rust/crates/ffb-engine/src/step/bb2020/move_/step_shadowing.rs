@@ -106,7 +106,7 @@ impl StepShadowing {
                                     if let Some(ref source_str) = self.re_roll_source.clone() {
                                         let source = ReRollSource::new(source_str.as_str());
                                         // BB2020: re-roll offered to defender
-                                        if !use_reroll(game, &source, defender_id) {
+                                        if !use_reroll(game, &source, defender_id, rng) {
                                             roll_shadowing = false;
                                             self.using_shadowing = Some(false);
                                         }

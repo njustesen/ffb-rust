@@ -173,7 +173,7 @@ impl StepIntercept {
 
         if let Some(skill_id) = catch_skill {
             let source = ReRollSource::new(format!("{:?}", skill_id));
-            use_reroll(game, &source, interceptor_id);
+            use_reroll(game, &source, interceptor_id, rng);
             // Recursive: re_rolled_action == "CATCH" now, so no further re-roll after this
             return self.roll_intercept(interceptor_id, game, rng);
         }
@@ -237,7 +237,7 @@ impl StepIntercept {
                     }
                 } else {
                     let source = ReRollSource::new(src_name.clone());
-                    use_reroll(game, &source, &interceptor_id)
+                    use_reroll(game, &source, &interceptor_id, rng)
                 }
             } else {
                 false // declined

@@ -88,7 +88,7 @@ impl StepSafeThrow {
         if already_rerolled {
             let thrower_id = game.thrower_id.clone().unwrap_or_default();
             if let Some(ref source) = self.re_roll_source.clone() {
-                if !use_reroll(game, source, &thrower_id) {
+                if !use_reroll(game, source, &thrower_id, rng) {
                     do_safe_throw = false;
                 }
             } else {

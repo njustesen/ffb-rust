@@ -64,7 +64,7 @@ impl StepFoulChainsaw {
             .as_ref().map(|a| a.name == "CHAINSAW").unwrap_or(false);
         if already_rerolled {
             let consumed = self.re_roll_state.re_roll_source.as_ref()
-                .map(|s| use_reroll(game, s, &acting_id))
+                .map(|s| use_reroll(game, s, &acting_id, rng))
                 .unwrap_or(false);
             if !consumed {
                 drop_chainsaw_player = true;
