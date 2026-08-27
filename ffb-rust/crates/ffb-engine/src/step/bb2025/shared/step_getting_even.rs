@@ -234,7 +234,10 @@ mod tests {
         );
         assert_eq!(out2.action, StepAction::NextStep);
         assert_eq!(game.turn_data_home.rerolls, 0);
-        assert!(game.turn_data_home.reroll_used);
+        // BB2020/BB2025 do not latch `reroll_used` -- Java sets it only in
+        // `bb2016/RollMechanic`, so those editions allow more than one team re-roll per
+        // turn. The consumption that matters is the BANK, asserted above.
+        assert!(!game.turn_data_home.reroll_used);
     }
 
     /// Without an available TRR, a failed roll must fall straight through to NEXT_STEP

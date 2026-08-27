@@ -81,10 +81,25 @@ pub fn use_reroll(game: &mut Game, re_roll_source: &ReRollSource, player_id: &st
         || re_roll_source.name == "BRILLIANT_COACHING"
         || re_roll_source.name == "MASCOT"
     {
+        // `reroll_used` is set by Java in exactly ONE place -- `bb2016/RollMechanic`'s
+        // `updateTurnDataAfterReRollUsage`, which is a two-line method whose whole body is
+        // `setReRollUsed(true); setReRolls(reRolls - 1)`. BB2020 and BB2025 override that method
+        // (`bb2025:464-488`) and never touch the flag, so in those editions it stays false and a
+        // team may spend MORE THAN ONE team re-roll in a turn, bounded only by the bank.
+        //
+        // The availability CHECK is shared (Java's `RollMechanic.isTeamReRollAvailable` tests
+        // `!isReRollUsed()` for every edition) -- it is only the SET that is bb2016-only. Rust set
+        // it unconditionally, so BB2020/BB2025 refused the SECOND re-roll of a turn: lineman bb2025
+        // seed 16, home fails a dodge (die 14), re-rolls it (15, success), fails the next dodge
+        // (16) and Java re-rolls again (17, success) while Rust fell over and rolled armour+injury.
+        // Structurally invisible while the parity contract declined every offer.
+        let is_bb2016 = game.rules == ffb_model::enums::Rules::Bb2016;
         let td = game.turn_data_mut();
         if td.rerolls > 0 {
             td.rerolls -= 1;
-            td.reroll_used = true;
+            if is_bb2016 {
+                td.reroll_used = true;
+            }
             // Java `RollMechanic.updateTurnDataAfterReRollUsage` (`bb2025:464-488`) spends the
             // ONE-DRIVE re-rolls FIRST: alongside the pool it decrements the first non-zero
             // one-drive counter, in this order, and returns that source for the report.
@@ -145,6 +160,44 @@ mod tests {
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
+    }
+
+    /// `reroll_used` -- the "one team re-roll per turn" latch -- is set by Java in exactly ONE
+    /// place, `bb2016/RollMechanic.updateTurnDataAfterReRollUsage`. BB2020 and BB2025 override that
+    /// method and never touch the flag, so those editions allow MORE THAN ONE team re-roll per
+    /// turn, bounded only by the bank. The availability CHECK is shared; only the SET is
+    /// edition-specific.
+    ///
+    /// Rust set it for every edition, so BB2020/BB2025 refused the second re-roll of a turn
+    /// (lineman bb2025 seed 16: Java re-rolls two failed dodges in one turn, Rust re-rolled the
+    /// first and fell over on the second).
+    #[test]
+    fn reroll_used_latch_is_bb2016_only() {
+        let src = ReRollSource::new("TRR");
+
+        for (rules, expect_latch) in [
+            (Rules::Bb2016, true),
+            (Rules::Bb2020, false),
+            (Rules::Bb2025, false),
+        ] {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+            game.turn_data_home.rerolls = 3;
+            assert!(use_reroll(&mut game, &src, "nobody"));
+            assert_eq!(game.turn_data_home.rerolls, 2, "{rules:?} always spends from the bank");
+            assert_eq!(
+                game.turn_data_home.reroll_used, expect_latch,
+                "{rules:?}: only bb2016 latches reroll_used"
+            );
+
+            // …and the consequence: a SECOND team re-roll in the same turn is offered in
+            // bb2020/bb2025 and refused in bb2016. `ask_for_reroll_if_available` is the caller
+            // that matters, and it gates on `!reroll_used` for every edition.
+            let offer = ask_for_reroll_if_available(&game, "DODGE", 4, false);
+            assert_eq!(
+                offer.is_some(), !expect_latch,
+                "{rules:?}: a second team re-roll must be offered iff the latch is unset"
+            );
+        }
     }
 
     /// Java `RollMechanic.updateTurnDataAfterReRollUsage` spends the ONE-DRIVE re-rolls first:
@@ -265,7 +318,10 @@ mod tests {
         let ok = use_reroll(&mut game, &source, "p1");
         assert!(ok);
         assert_eq!(game.turn_data_home.rerolls, 1);
-        assert!(game.turn_data_home.reroll_used);
+        // `make_game()` is BB2025, and BB2025 does NOT latch `reroll_used` -- Java sets it only in
+        // `bb2016/RollMechanic`. This assertion used to require the latch, pinning a deviation that
+        // refused the second team re-roll of a turn; see `reroll_used_latch_is_bb2016_only`.
+        assert!(!game.turn_data_home.reroll_used);
     }
 
     #[test]

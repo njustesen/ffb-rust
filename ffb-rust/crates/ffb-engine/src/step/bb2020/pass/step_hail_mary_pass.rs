@@ -448,7 +448,10 @@ mod tests {
 
         step.handle_command(&Action::UseReRoll { use_reroll: true }, &mut game, &mut GameRng::new(1));
         assert_eq!(game.turn_data().rerolls, 0, "accepting the offer should consume the team re-roll");
-        assert!(game.turn_data().reroll_used);
+        // BB2020/BB2025 do not latch `reroll_used` -- Java sets it only in
+        // `bb2016/RollMechanic`, so those editions allow more than one team re-roll per
+        // turn. The consumption that matters is the BANK, asserted above.
+        assert!(!game.turn_data().reroll_used);
     }
 
     #[test]

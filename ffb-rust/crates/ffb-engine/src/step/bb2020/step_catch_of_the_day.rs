@@ -345,7 +345,10 @@ mod tests {
         assert_eq!(out2.action, StepAction::NextStep);
         assert_eq!(game.field_model.ball_coordinate, Some(FieldCoordinate::new(10, 7)),
             "re-rolled success must move the ball to the player");
-        assert!(game.turn_data().reroll_used, "team re-roll token must be consumed");
+        // The token spent is the BANK entry (set to 1 above). BB2020 does not latch
+        // `reroll_used` -- Java sets that only in `bb2016/RollMechanic` -- so assert what is
+        // actually the contract here.
+        assert_eq!(game.turn_data().rerolls, 0, "team re-roll token must be consumed");
     }
 
     #[test]

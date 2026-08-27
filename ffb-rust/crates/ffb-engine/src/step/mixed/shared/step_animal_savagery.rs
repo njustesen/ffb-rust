@@ -1040,7 +1040,9 @@ mod tests {
         step.re_roll_source = Some("TRR".into());
         let out = step.start(&mut game, &mut GameRng::new(seed));
         assert_eq!(out.action, StepAction::NextStep);
-        assert!(game.turn_data_home.reroll_used);
+        // The bank (set to 1 above) is what a team re-roll spends. `reroll_used` is latched only
+        // in bb2016 -- Java sets it in `bb2016/RollMechanic` alone -- and this step runs shared.
+        assert_eq!(game.turn_data_home.rerolls, 0);
     }
 
     // ── Single-target auto lash-out ──────────────────────────────────────────

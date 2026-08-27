@@ -951,3 +951,57 @@ seeds: 16, 45, 62, 89, 99.
 
 **Next:** seed 16 — find its FIRST diverging step (dice attribution via `FFB_RNG_STEPS` vs Java's
 `caller=`), then continue rung 2 to green and on to sampled + uniform.
+
+---
+
+## ITER13 (2026-08-27) — the one-team-re-roll-per-turn latch is BB2016-ONLY (95 → 97/100)
+
+### Root cause
+
+`setReRollUsed(true)` appears in **exactly one place in all of Java**:
+`bb2016/RollMechanic.updateTurnDataAfterReRollUsage`, whose entire body is
+
+```java
+turnData.setReRollUsed(true);
+turnData.setReRolls(turnData.getReRolls() - 1);
+```
+
+BB2020 and BB2025 **override that method** (`bb2025:464-488`, the one-drive version from ITER12) and
+never touch the flag. So in those editions the latch stays false and a team may spend **more than one
+team re-roll in a turn**, bounded only by the bank.
+
+The availability CHECK is shared — `RollMechanic.isTeamReRollAvailable` tests `!isReRollUsed()` for
+every edition — so it is only the **SET** that is edition-specific. Rust's shared `use_reroll` set it
+unconditionally, so BB2020/BB2025 refused the second re-roll of a turn.
+
+Seed 16, dice 14-18, from Java's `caller=` stacks against Rust's `FFB_RNG_STEPS`:
+
+```
+JAVA  14 dodge(2) fail   15 dodge(6) RE-ROLL ok   16 dodge(2) fail   17 dodge(6) RE-ROLL ok   18 dodge(6)
+RUST  14 dodge(2) fail   15 re-roll ok            16 dodge(2) fail   -> FallDown, armour+injury (6 dice)
+```
+
+Rust re-rolled the first failed dodge and refused the second, so home_01 fell over where Java stayed
+up — and from there the games are unrelated.
+
+**Invisible under the random parity contract**, which declines every offer: the latch is never set,
+so whether it *would* have blocked a second re-roll never comes up.
+
+### Five stale tests, all pinning the deviation
+
+`use_reroll_trr_decrements_count`, both `step_hail_mary_pass` variants, `step_catch_of_the_day`,
+`step_getting_even` and `step_animal_savagery` all asserted `reroll_used` after a BB2020/BB2025
+re-roll. Two of them already asserted the bank hit 0, making the latch line redundant; the others
+now assert the **bank**, which is what a team re-roll actually spends. A test that pins the wrong
+behaviour is worse than no test — it makes the fix look like the regression.
+
+### Gates
+
+- Rung 2 (`coin,receive,reroll`) argmax: **97/100**, from 95/100 (and 91/100 at ITER11).
+- `--agent random`: 100/100 in bb2016, bb2020 and bb2025 — bb2016 is unaffected because it still
+  latches.
+- Rung 0 and rung 1: 100/100.
+- `cargo test --workspace --release`: **14,643 / 0**, including `reroll_used_latch_is_bb2016_only`,
+  which checks the latch AND the consequence (a second offer) across all three editions.
+
+**Next:** the last 3 rung-2 seeds, then rung 2 at sampled + uniform, then rung 3.
