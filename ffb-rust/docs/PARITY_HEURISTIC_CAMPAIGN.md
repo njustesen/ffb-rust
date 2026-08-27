@@ -1630,3 +1630,60 @@ parity hack: a fallback that orders players by a generated id is wrong on its ow
 `--heur-classes all`. Start with the cross-language FIXTURE test the plan calls for: dump Rust's
 `occ` / `tz` / `row_prefix` for a set of fixed boards and assert Java reproduces them, before wiring
 any of it to a game.
+
+## ITER24 — the `Features` CORE raster tier, pinned by a cross-language fixture
+
+The last two classes, `activate` and `move`, stand on `Features`, and `Features` stands on three
+whole-pitch arrays. The plan says to pin those with a FIXTURE before wiring anything to a game, and
+that is exactly what this iteration does — no parity sweep involved, and none needed.
+
+- Rust: `emit_features_golden` (ignored) writes `agent/testdata/features_golden.txt` — five boards,
+  each with its `occ`, both `tz` sides, both `rowPrefix` sides and both `unactivated` values.
+- Java: `Features.java` (CORE tier) + `FeaturesTest.coreRastersMatchRust`, which reads that file.
+
+The boards are chosen to break a careless reimplementation: pitch corners (neighbour clipping), a
+full line of scrimmage with players adjacent across it (both `tz` sides at once), prone players
+(they occupy a square but mark nothing), and a mixture of activated and unactivated players.
+
+**`Features.build` takes a snapshot, not a `Game`.** The raster arithmetic and the model plumbing are
+separate concerns and only the arithmetic has to agree bit for bit, so the fixture pins the
+arithmetic and `snapshot(Game)` stays a thin adapter the parity sweep exercises. Without that split
+the fixture would have to construct a whole Java `Game` per board.
+
+### What the first run found
+
+`occ`, `tz` and `rowPrefix` matched on all five boards immediately — including the `rowPrefix`
+off-by-one, which is an exclusive prefix over `W + 1` columns per row and the single most likely
+thing to get wrong. The one disagreement was `unactivated`, and it was the **fixture** that was
+wrong, not either implementation: `PlayerState::new(PS_STANDING)` does NOT set the ACTIVE bit — that
+is a bit of its own — so Rust saw zero active players where the Java test had assumed all of them
+were. Fixed by emitting the flag the Rust engine actually computed as a column in the golden file,
+so neither side gets to assume it.
+
+That is the same lesson as the state hash not being able to see the ACTIVE bit
+(`parity_tier_ttm`), arriving from a different direction.
+
+### Is the fixture worth anything?
+
+Checked, rather than assumed: changing the Java `rowPrefix` loop from `p.x + 1` to `p.x` — the
+exclusive/inclusive off-by-one — fails it immediately and precisely:
+
+```
+FeaturesTest.coreRastersMatchRust:121 rowPrefix[1] entry 202 (row 7, col 13)
+  on board single_centre ==> expected: <0> but was: <1>
+```
+
+Row, column and board, not "a sweep went red". Restored afterwards and re-verified green.
+
+### Gates
+
+- `mvn -o -pl ffb-ai test`: **17 tests, 0 failures**, including the new fixture.
+- `cargo test --workspace --release`: **14,654 / 0**.
+- The fourteen-class rung is still **100/100 in all three editions** at argmax, and `--agent random`
+  is still 100/100 in all three. No behaviour changed this iteration — only the emitter and the new
+  Java class, neither of which is on a live path yet.
+
+**Next:** `build_threat`, `build_lane` and `build_support` (the HEAVY tier) extended into the same
+fixture, then `Reach` — whose quantised Dijkstra key is the next thing that cannot be checked any
+other way. `build_threat` is the one with a KNOWN ordering hazard (ITER1: it writes under a strict
+`>` and ties were resolved by hash order), so the fixture needs a board with mixed ST to pin it.

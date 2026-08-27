@@ -3940,6 +3940,143 @@ mod tests {
     /// twin asserts on this exact file, so a divergence fails a unit test instead of showing up
     /// as a mystery state-hash mismatch 200 steps into a game.
     ///
+    /// The `Features` CORE raster tier, as a cross-language fixture.
+    ///
+    /// `occ`, `tz` and `row_prefix` are the foundation the whole value model stands on: `Reach`
+    /// walks them, `build_threat` and `build_support` seed off them, and every arrival weight
+    /// reads them. If the two languages disagree here, nothing downstream can agree — and a
+    /// disagreement found in a 100-seed sweep costs a day, while one found here costs a minute.
+    /// So the rasters get pinned BEFORE any of it is wired to a game, which is what the plan asks
+    /// for.
+    ///
+    /// The boards are deliberately awkward: pitch corners, a full sideline column, prone players
+    /// (no tackle zones, so they mark nothing but still occupy), and two players adjacent across
+    /// the halfway line. `row_prefix` in particular is an exclusive prefix over `W + 1` columns
+    /// per row, which is exactly the kind of off-by-one a from-scratch reimplementation gets
+    /// wrong.
+    ///
+    /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_features_golden -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_features_golden() {
+        use std::fmt::Write as _;
+        use ffb_model::enums::{PlayerState, PS_STANDING, PS_PRONE, Rules};
+        use ffb_model::model::player::Player;
+
+        // (is_home, nr, x, y, standing, active)
+        type Board = &'static [(bool, i32, i32, i32, bool, bool)];
+        let boards: [(&str, Board); 5] = [
+            ("empty", &[]),
+            ("single_centre", &[(true, 1, 13, 7, true, true)]),
+            (
+                "corners",
+                &[
+                    (true, 1, 0, 0, true, true),
+                    (true, 2, 25, 0, true, true),
+                    (false, 1, 0, 14, true, true),
+                    (false, 2, 25, 14, true, true),
+                ],
+            ),
+            (
+                "prone_marks_nothing",
+                &[
+                    (true, 1, 10, 7, true, true),
+                    (true, 2, 10, 8, false, true),
+                    (false, 1, 11, 7, true, true),
+                    (false, 2, 11, 8, false, false),
+                ],
+            ),
+            (
+                "line_of_scrimmage",
+                &[
+                    (true, 1, 12, 5, true, true), (true, 2, 12, 6, true, true),
+                    (true, 3, 12, 7, true, true), (true, 4, 12, 8, true, false),
+                    (true, 5, 12, 9, true, false), (true, 6, 11, 7, true, true),
+                    (false, 1, 13, 5, true, true), (false, 2, 13, 6, true, true),
+                    (false, 3, 13, 7, true, true), (false, 4, 13, 8, true, true),
+                    (false, 5, 13, 9, false, true), (false, 6, 14, 7, true, true),
+                ],
+            ),
+        ];
+
+        let mut out = String::new();
+        writeln!(out, "# Features CORE raster golden -- heuristic_agent.rs and Features.java.").unwrap();
+        writeln!(out, "# board <name> <n>").unwrap();
+        writeln!(out, "# player <home|away> <nr> <x> <y> <standing|prone> <active|used>").unwrap();
+        writeln!(out, "# occ <hex, one byte per cell, row-major over W=26 by H=15>").unwrap();
+        writeln!(out, "# tz <side 0=home 1=away> <hex, one byte per cell>").unwrap();
+        writeln!(out, "# rowprefix <side> <decimal, H*(W+1) entries, comma separated>").unwrap();
+        writeln!(out, "# unact <side> <f32 bits>").unwrap();
+
+        for (name, board) in boards {
+            let mut home = crate::step::framework::test_team("home", 0);
+            let mut away = crate::step::framework::test_team("away", 0);
+            for &(is_home, nr, _, _, _, _) in board {
+                let p = Player {
+                    id: format!("{}_{:02}", if is_home { "home" } else { "away" }, nr),
+                    nr,
+                    movement: 6,
+                    strength: 3,
+                    agility: 3,
+                    armour: 8,
+                    ..Default::default()
+                };
+                if is_home { home.players.push(p) } else { away.players.push(p) }
+            }
+            let mut g = Game::new(home, away, Rules::Bb2025);
+            for &(is_home, nr, x, y, standing, active) in board {
+                let id = format!("{}_{:02}", if is_home { "home" } else { "away" }, nr);
+                g.field_model.set_player_coordinate(&id, FieldCoordinate::new(x, y));
+                // ACTIVE is a bit of its own -- `PlayerState::new(PS_STANDING)` does NOT set it,
+                // which is why `unactivated` was the one field the first fixture run disagreed on.
+                g.field_model.set_player_state(
+                    &id,
+                    PlayerState::new(if standing { PS_STANDING } else { PS_PRONE })
+                        .change_active(active),
+                );
+            }
+            let f = Features::build(&g, positions_stamp(&g), false);
+
+            writeln!(out, "board {name} {}", board.len()).unwrap();
+            for &(is_home, nr, x, y, standing, _) in board {
+                // `is_active()` is a SEPARATE bit from the standing/prone base, and
+                // `PlayerState::new(PS_STANDING)` does not set it — so emit what the engine
+                // actually computed rather than letting the two sides each assume. The Java
+                // fixture reads this column; guessing it was the one thing that disagreed on the
+                // first run, and it was the fixture guessing, not the arithmetic.
+                let id = format!("{}_{:02}", if is_home { "home" } else { "away" }, nr);
+                let active = g
+                    .field_model
+                    .player_state(&id)
+                    .map(|st| st.is_active())
+                    .unwrap_or(false);
+                writeln!(out, "player {} {nr} {x} {y} {} {}",
+                    if is_home { "home" } else { "away" },
+                    if standing { "standing" } else { "prone" },
+                    if active { "active" } else { "used" }).unwrap();
+            }
+            let hex = |v: &[u8]| v.iter().map(|b| format!("{b:02x}")).collect::<String>();
+            writeln!(out, "occ {}", hex(&f.occ)).unwrap();
+            for side in 0..2 {
+                writeln!(out, "tz {side} {}", hex(&f.tz[side])).unwrap();
+            }
+            for side in 0..2 {
+                let rp: Vec<String> =
+                    f.row_prefix[side].iter().map(|v| v.to_string()).collect();
+                writeln!(out, "rowprefix {side} {}", rp.join(",")).unwrap();
+            }
+            for side in 0..2 {
+                writeln!(out, "unact {side} {:08x}", f.unactivated[side].to_bits()).unwrap();
+            }
+        }
+
+        // CARGO_MANIFEST_DIR, not `file!()`: the test's cwd is the package directory, so a
+        // `file!()`-relative path writes a second nested `crates/ffb-engine` tree.
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/agent/testdata/features_golden.txt");
+        std::fs::write(path, out).unwrap();
+        eprintln!("wrote {path}");
+    }
+
     /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_sampler_golden -- --ignored`
     #[test]
     #[ignore]
