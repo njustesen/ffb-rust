@@ -4135,6 +4135,166 @@ mod tests {
         eprintln!("wrote {path}");
     }
 
+    /// `Reach` — the quantised-key Dijkstra — as a cross-language fixture.
+    ///
+    /// This is the piece where a from-scratch reimplementation is most likely to agree
+    /// approximately and disagree exactly, and where "approximately" is worthless: `p_arrive` is
+    /// `exp(-key / 4096)`, the value model compares arrival weights with `>`, and the whole search
+    /// is a min-heap whose ties have to break the same way in both languages. Three separate
+    /// hazards, none of them visible from a game log:
+    ///
+    /// 1. **the key increment.** `(-ln(p) * 4096) as u32` saturates in Rust and is undefined-ish in
+    ///    Java for out-of-range floats, so the Rust side clamps explicitly and goes via `i64`.
+    ///    Whether the Java twin reproduces the same integer for every step is exactly what this
+    ///    pins.
+    /// 2. **heap tie-breaking.** `HeapItem` is ordered on `(key, cost, idx)` — `idx` only to make
+    ///    ties deterministic. A Java `PriorityQueue` comparing on `key` alone would pop equal-key
+    ///    cells in insertion order and settle a different `prev`, giving a different PATH with an
+    ///    identical arrival probability. The `prev` array below is what catches that; the keys
+    ///    alone would not.
+    /// 3. **`order`.** Sorted at the end precisely so the OUTPUT does not depend on the heap, but
+    ///    its membership still has to match.
+    ///
+    /// The cases cover an open pitch (no dodges, pure GFI), a tackle-zone gauntlet (dodge targets
+    /// that differ per destination square), a prone mover (the stand-up cost eats MA and the gate
+    /// becomes `p_roll(4)`), a Blizzard (GFI target 3 rather than 2), and BB2016 (a different
+    /// dodge-target formula entirely).
+    ///
+    /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_reach_golden -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_reach_golden() {
+        use std::fmt::Write as _;
+        use ffb_model::enums::{PlayerState, PS_STANDING, PS_PRONE, Rules, Weather};
+        use ffb_model::model::player::Player;
+
+        // (is_home, nr, x, y, standing, ma, st, ag, dodge, sure_feet)
+        type Mover = (bool, i32, i32, i32, bool, i32, i32, i32, bool, bool);
+        let cases: [(&str, Rules, Weather, bool, &[Mover]); 5] = [
+            // Open pitch: nothing to dodge out of, so every step past MA is a bare GFI.
+            ("open", Rules::Bb2025, Weather::Nice, false,
+             &[(true, 1, 5, 7, true, 6, 3, 3, false, false)]),
+            // A gauntlet. The mover starts marked, so EVERY step out of his square is a dodge, and
+            // the target depends on how many tackle zones the DESTINATION has.
+            ("gauntlet", Rules::Bb2025, Weather::Nice, false,
+             &[(true, 1, 10, 7, true, 6, 3, 3, false, false),
+               (false, 1, 11, 7, true, 6, 3, 3, false, false),
+               (false, 2, 11, 8, true, 6, 3, 3, false, false),
+               (false, 3, 10, 6, true, 6, 3, 3, false, false),
+               (false, 4, 9, 8, true, 6, 3, 3, false, false)]),
+            // Prone with a team re-roll: MA drops by the stand-up cost and `gate` becomes p_roll(4),
+            // and the re-roll applies to the FIRST roll of a path only.
+            ("prone_with_reroll", Rules::Bb2025, Weather::Nice, true,
+             &[(true, 1, 10, 7, false, 6, 3, 3, false, false),
+               (false, 1, 11, 7, true, 6, 3, 3, false, false)]),
+            // Blizzard: the GFI target is 3, not 2, in every edition. Sure Feet as well, so the GFI
+            // re-roll branch is taken rather than the bare roll.
+            ("blizzard_sure_feet", Rules::Bb2025, Weather::Blizzard, false,
+             &[(true, 1, 5, 7, true, 4, 3, 3, false, true)]),
+            // BB2016 computes the dodge target from `7 - AG` instead of the AG scale, and this
+            // mover has Dodge, so the skill re-roll branch is taken on every dodge.
+            ("bb2016_dodge", Rules::Bb2016, Weather::Nice, false,
+             &[(true, 1, 10, 7, true, 6, 3, 3, true, false),
+               (false, 1, 11, 7, true, 6, 3, 3, false, false),
+               (false, 2, 9, 6, true, 6, 3, 3, false, false)]),
+        ];
+
+        let mut out = String::new();
+        writeln!(out, "# Reach golden -- heuristic_agent.rs `reach_with` and Reach.java.").unwrap();
+        writeln!(out, "# case <name> <rules> <weather> <team_rr>").unwrap();
+        writeln!(out, "# mover <home|away> <nr> <x> <y> <standing|prone> <ma> <st> <ag> <dodge> <surefeet>").unwrap();
+        writeln!(out, "# budget <ma> <spent> <cap> <gate f32 bits>").unwrap();
+        writeln!(out, "# key <decimal per cell, comma separated; 4294967295 = unreached>").unwrap();
+        writeln!(out, "# cost|gfi <decimal per cell>").unwrap();
+        writeln!(out, "# prev <decimal per cell; 65535 = none>").unwrap();
+        writeln!(out, "# order <decimal cell indices, ascending>").unwrap();
+        writeln!(out, "# path <x> <y> <x,y;x,y;...>   the back-pointer walk to that square").unwrap();
+
+        for (name, rules, weather, team_rr, movers) in cases {
+            let mut home = crate::step::framework::test_team("home", 0);
+            let mut away = crate::step::framework::test_team("away", 0);
+            for &(is_home, nr, _, _, _, ma, st, ag, dodge, sure_feet) in movers {
+                let mut p = Player {
+                    id: format!("{}_{:02}", if is_home { "home" } else { "away" }, nr),
+                    nr,
+                    movement: ma,
+                    strength: st,
+                    agility: ag,
+                    armour: 8,
+                    ..Default::default()
+                };
+                if dodge {
+                    p.starting_skills.push(ffb_model::model::skill_def::SkillWithValue {
+                        skill_id: SkillId::Dodge,
+                        value: None,
+                    });
+                }
+                if sure_feet {
+                    p.starting_skills.push(ffb_model::model::skill_def::SkillWithValue {
+                        skill_id: SkillId::SureFeet,
+                        value: None,
+                    });
+                }
+                if is_home { home.players.push(p) } else { away.players.push(p) }
+            }
+            let mut g = Game::new(home, away, rules);
+            g.field_model.weather = weather;
+            for &(is_home, nr, x, y, standing, _, _, _, _, _) in movers {
+                let id = format!("{}_{:02}", if is_home { "home" } else { "away" }, nr);
+                g.field_model.set_player_coordinate(&id, FieldCoordinate::new(x, y));
+                g.field_model.set_player_state(
+                    &id,
+                    PlayerState::new(if standing { PS_STANDING } else { PS_PRONE })
+                        .change_active(true),
+                );
+            }
+            let f = Features::build(&g, positions_stamp(&g), true);
+            let mut sc = Scratch::default();
+            let b = budget_of(&g, "home_01").expect("the mover is on the pitch");
+            let r = reach_with(&f, &g, "home_01", &b, team_rr, &mut sc)
+                .expect("a positive movement cap");
+
+            writeln!(out, "case {name} {rules:?} {weather:?} {team_rr}").unwrap();
+            for &(is_home, nr, x, y, standing, ma, st, ag, dodge, sure_feet) in movers {
+                writeln!(out, "mover {} {nr} {x} {y} {} {ma} {st} {ag} {dodge} {sure_feet}",
+                    if is_home { "home" } else { "away" },
+                    if standing { "standing" } else { "prone" }).unwrap();
+            }
+            writeln!(out, "budget {} {} {} {:08x}", b.ma, b.spent, b.cap, b.gate.to_bits()).unwrap();
+            let join = |v: Vec<String>| v.join(",");
+            writeln!(out, "key {}", join(r.cell.iter().map(|c| c.key.to_string()).collect())).unwrap();
+            writeln!(out, "cost {}", join(r.cell.iter().map(|c| c.cost.to_string()).collect())).unwrap();
+            writeln!(out, "gfi {}", join(r.cell.iter().map(|c| c.gfi.to_string()).collect())).unwrap();
+            writeln!(out, "prev {}", join(r.cell.iter().map(|c| c.prev.to_string()).collect())).unwrap();
+            writeln!(out, "order {}", join(r.order.iter().map(|i| i.to_string()).collect())).unwrap();
+            // Paths to a handful of reached squares, so `prev` is checked as a WALK and not only
+            // cell by cell: a single wrong back-pointer is a wrong route.
+            let mut path = Vec::new();
+            let mut emitted = 0;
+            for i in r.order.iter().map(|i| *i as usize) {
+                if !r.reached(i) {
+                    continue;
+                }
+                r.path_to(i, &mut path);
+                if path.is_empty() {
+                    continue;
+                }
+                let c = coord_of(i);
+                let steps: Vec<String> =
+                    path.iter().map(|p| format!("{},{}", p.x, p.y)).collect();
+                writeln!(out, "path {} {} {}", c.x, c.y, steps.join(";")).unwrap();
+                emitted += 1;
+                if emitted >= 12 {
+                    break;
+                }
+            }
+        }
+
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/agent/testdata/reach_golden.txt");
+        std::fs::write(path, out).unwrap();
+        eprintln!("wrote {path}");
+    }
+
     /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_sampler_golden -- --ignored`
     #[test]
     #[ignore]

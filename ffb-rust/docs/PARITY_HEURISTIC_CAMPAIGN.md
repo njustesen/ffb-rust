@@ -1747,3 +1747,58 @@ two options and change the answer. f32 arithmetic is bit-portable between the tw
 its own determinism hazard (a binary heap ordered by an integer key, where ties must break the same
 way in both languages), and it is the natural next fixture: dump the reach key and path for a fixed
 board and mover, and assert Java reproduces both.
+
+## ITER26 — `Reach`: the quantised-key Dijkstra
+
+The last piece before the value model, and the one where a reimplementation is most likely to agree
+approximately and disagree exactly. `Reach.java` + `ReachTest`, pinned by `reach_golden.txt`: five
+cases, and for each one the key, cost, GFI count and back-pointer of every one of the 390 squares,
+the visit set, and twelve explicit back-pointer WALKS.
+
+Cases chosen so each turns on a different branch: an open pitch (pure GFI, no dodges), a gauntlet
+(the mover starts marked, so every step is a dodge and the target depends on the destination's
+tackle zones), prone with a team re-roll (stand-up eats MA, `gate` becomes `p_roll(4)`, and the
+re-roll applies to the first roll only), Blizzard with Sure Feet (GFI target 3, and the re-roll
+branch rather than the bare roll), and BB2016 with Dodge (a different dodge-target formula
+entirely).
+
+### Why `prev` and the paths are in the fixture
+
+Two routes to the same square can carry the **identical key** — a dodge past one tackle zone costs
+the same wherever it happens — so an implementation whose heap breaks ties differently produces the
+same arrival PROBABILITIES by a different ROUTE. Every key would match and the agent would still
+walk somewhere else. The back-pointer array catches that; the keys alone cannot.
+
+### What dropping the tie-break actually does
+
+Ordering the Java queue on `key` alone, as a `PriorityQueue<Item>` naturally invites, fails
+immediately:
+
+```
+ReachTest.reachMatchesRust key at (11,0) in case open ==> expected: <746> but was: <1492>
+```
+
+Worth noting that it changed the **key**, not just the route. Rust orders on `(key, cost, idx)`, and
+without the `cost` term a higher-cost cell with an equal key can be popped first, be marked `seen`,
+and propagate a worse key onward — so the tie-break is load-bearing for correctness, not only for
+determinism. I had expected this to show up as a differing `prev` with matching keys. Restored and
+re-verified green.
+
+### Honest limits of this fixture
+
+The explicit clamp on the key increment (`clamp(0.0, 1.0e9) as i64 as u32`, there because `as u32`
+saturates in Rust and the Java cast does not) is **not** exercised by these boards: `p_step` never
+gets near `1e-6`, so the conversion is in range on every step. The clamp is ported and commented on
+both sides, but this fixture is not evidence that it agrees — only that nothing here needs it.
+
+### Gates
+
+- `mvn -o -pl ffb-ai test`: **18 tests, 0 failures** — the new `ReachTest` checks 5 cases × 4 cell
+  arrays plus 60 path walks.
+- `cargo test --workspace --release`: **14,654 / 0**.
+- Fourteen-class rung still **100/100 in all three editions** at argmax; `--agent random` 100/100 in
+  all three. Nothing on a live path changed — `Reach.java` has no caller yet.
+
+**Next:** the value model — `value_at` / `exposure` / `strength_factor` and the arrival weights that
+read `Reach`. That is the last thing between here and `build_plans`, and the same fixture treatment
+applies: dump Rust's per-square value for a fixed board and mover before anything is wired up.
