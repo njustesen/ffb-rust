@@ -1586,3 +1586,47 @@ skill-reading code path gets its first real test.
 change anything and its green would prove nothing. That leaves `activateplayer` and `move`, which
 ARE the raster tier, plus `other` (which routes to `UniformAgent`, so it is not a no-op and needs
 checking before `--heur-classes all` is claimed).
+
+## ITER23 — `setup`, `skill`, `other`: everything that is not the raster tier
+
+Three classes at once, because two of them are no-ops and the third is one line.
+
+**`setup`** is a STRUCTURAL no-op: the heuristic's `TeamSetup` arm calls the very
+`canonical_setup_action` the random agent calls, with no sampler draw. On or off, byte-identical.
+**`skill`** is measured unreachable in this tier (ITER0). Both confirmed empirically: 0 of 20 bb2025
+seeds change their end-of-game hash with either switched on. A green that proves nothing is still
+worth *recording* as proving nothing.
+
+**`other`** was not a no-op, and should have been. `PromptClass::Other` is the tail the agent does
+not model at all — and it fell through to `UniformAgent`, whose `PlayerChoice` arm sorts candidates
+**by player id**. The two engines generate different ids (`home_06` vs `teamLinemanParityHome6`), so
+that arm cannot agree with the Java side by construction; it also breaks the campaign's own rule
+that ids never enter an ordering. `RandomAgent`, the byte-matched contract, carries a dozen
+reason-specific `PlayerChoice` arms — RAIDING_PARTY, AUTO_GAZE_ZOAT, WISDOM, FURIOUS_OUTBURST,
+ANIMAL_SAVAGERY — every one coordinate-sorted for exactly that reason.
+
+bb2020 seed 26 is the whole story in one game: **one** `Other` prompt in 300 steps, a `PlayerChoice`
+raised by a prayer, and the game diverged at step 0.
+
+Fix: the `_` arm delegates to `self.parity` instead of `self.fallback`, which makes `Other` mean what
+it says — the agent does not model this prompt, so it uses the reference contract. Test:
+`the_unmodelled_tail_answers_with_the_parity_contract` asserts the class is a no-op in both
+directions AND that both agree with `RandomAgent` itself.
+
+This is a change to the AGENT, not the engine, and it is worth being explicit that it is not a
+parity hack: a fallback that orders players by a generated id is wrong on its own terms, and the
+`--heuristic` experiment reaches the same prompts.
+
+### Gates
+
+- `coin,receive,reroll,pushback,blocktarget,blockchoice,blitztarget,touchback,kick,intercept,followup,setup,other,skill`
+  — **fourteen classes, everything except `activate` and `move` — 100/100 in all three editions at
+  scales 0, 1.0 and 1e6.**
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,654 / 0**. `mvn -o -pl ffb-ai test`: clean (no Java
+  change this iteration).
+
+**Next:** `activate` and `move` — the `Features` raster tier, and the last thing between here and
+`--heur-classes all`. Start with the cross-language FIXTURE test the plan calls for: dump Rust's
+`occ` / `tz` / `row_prefix` for a set of fixed boards and assert Java reproduces them, before wiring
+any of it to a game.

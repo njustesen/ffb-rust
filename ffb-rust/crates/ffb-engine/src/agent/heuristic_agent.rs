@@ -3400,8 +3400,22 @@ impl HeuristicAgent {
 
             AgentPrompt::TeamSetup { team_id, .. } => canonical_setup_action(g, &team_id),
 
-            // Everything else: the long tail, identical in both arms of the experiment.
-            _ => self.fallback.act(gs),
+            // Everything else: the long tail this agent does not model.
+            //
+            // This used to fall through to `UniformAgent`, and that was wrong for a reason that has
+            // nothing to do with the heuristic: `UniformAgent`'s `PlayerChoice` arm sorts the
+            // candidates BY PLAYER ID, and the two engines generate different ids (`home_06` vs
+            // `teamLinemanParityHome6`), so it cannot agree with anything on the Java side by
+            // construction. `RandomAgent` -- the byte-matched parity contract -- has a dozen
+            // reason-specific arms for exactly this prompt, every one of them coordinate-sorted for
+            // exactly that reason.
+            //
+            // Delegating here makes `PromptClass::Other` a true no-op: on or off, an unmodelled
+            // prompt gets the same answer, which is what "the agent does not model this" should
+            // mean. bb2020 seed 26 is the case that showed it -- one PlayerChoice in the whole
+            // game, from a prayer, answered `home_06` by the uniform tail and something else by
+            // the contract.
+            _ => self.parity.act(gs),
         }
     }
 }
@@ -4227,6 +4241,39 @@ mod tests {
         // reorders the list, it does not partition it, and an implementation that treated it as a
         // veto would disagree exactly here.
         assert!(w(9, true, true) > w(3, false, false));
+    }
+
+    /// `PromptClass::Other` must be a NO-OP: the agent does not model those prompts, so switching
+    /// the class on or off has to give the same answer.
+    ///
+    /// It did not. The unmodelled tail fell through to `UniformAgent`, whose `PlayerChoice` arm
+    /// sorts candidates BY PLAYER ID — and the two engines generate different ids, so that arm
+    /// could never agree with the Java harness. `RandomAgent` has a dozen reason-specific arms for
+    /// this one prompt, every one coordinate-sorted for exactly that reason. bb2020 seed 26 has a
+    /// single PlayerChoice in the whole game, raised by a prayer, and it diverged at step 0.
+    #[test]
+    fn the_unmodelled_tail_answers_with_the_parity_contract() {
+        use crate::step::new_game;
+
+        let prompt = || AgentPrompt::PlayerChoice {
+            eligible_players: vec!["home_02".into(), "home_01".into()],
+            reason: "WISDOM".into(),
+            descriptions: Vec::new(),
+        };
+
+        let answer = |classes: ClassMask| {
+            let mut gs = new_game(5);
+            gs.pending_prompt = Some(prompt());
+            let mut a = HeuristicAgent::with_classes(5, 1.0, Mode::Wide, classes);
+            a.act(&gs)
+        };
+        // On and off must agree, and both must agree with the contract itself.
+        let mut gs = new_game(5);
+        gs.pending_prompt = Some(prompt());
+        let contract = RandomAgent::new_parity(5).act(&gs);
+
+        assert_eq!(answer(ClassMask::ALL), contract, "Other ON must use the contract");
+        assert_eq!(answer(ClassMask::NONE), contract, "Other OFF already did");
     }
 
     /// An empty blitz-target list ends the TURN, not the action.
