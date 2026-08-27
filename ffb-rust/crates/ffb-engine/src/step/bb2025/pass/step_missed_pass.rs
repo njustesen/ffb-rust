@@ -6,7 +6,7 @@ use ffb_model::util::rng::GameRng;
 use ffb_model::report::report_scatter_ball::ReportScatterBall;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
-use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter};
+use crate::step::framework::{StepId, StepParameter};
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.pass.StepMissedPass.
 ///
@@ -23,10 +23,10 @@ use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter};
 ///  3. Report scatter (ReportScatterBall — not yet translated).
 ///  4. Set pass_coordinate = last_valid_coordinate, field_model.range_ruler.
 ///  5. Set ball/bomb coordinate and moving flag.
-///  6. Publish CatchScatterThrowInMode + ThrowInCoordinate if out of bounds.
+///  6. Publish NOTHING -- the out-of-bounds routing belongs to StepResolvePass, as in Java.
 ///  7. NEXT_STEP.
 ///
-/// Publishes: `CatchScatterThrowInMode`, `ThrowInCoordinate` (when out-of-bounds).
+/// Publishes: nothing (see the note at the end of `execute_step`).
 pub struct StepMissedPass {
     /// Java: rollList
     pub roll_list: Vec<i32>,
@@ -323,31 +323,26 @@ impl StepMissedPass {
         game.field_model.move_squares.clear();
 
         // Java: getResult().setNextAction(StepAction.NEXT_STEP)
-        // Java: passes CatchScatterThrowInMode via publishParameter
-        // (In the Java sequence, CATCH_SCATTER_THROW_IN_MODE and THROWIN_COORDINATE are published
-        //  by this step when the ball lands out of bounds)
-        if out_of_bounds && !is_bomb {
-            // Java's bb2020/bb2025 MissedPass publishes NOTHING — the out-of-bounds routing lives
-            // in StepResolvePass, which publishes ThrowIn for a BALL and BombOutOfBounds for a
-            // BOMB. This Rust-side publish stays for the ball path (measured green across all
-            // editions) but must never fire for a bomb: it threw the real ball in from the
-            // touchline after a wildly-inaccurate BOMB sailed out (goblin bb2020 seed 10 step 14:
-            // 4 extra dice — throw-in d8+2d6 + a scatter — and the ball teleported to (7,7)
-            // while Java's bomb simply vanished).
-            let mut outcome = StepOutcome::next()
-                .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ThrowIn));
-            if let Some(lvc) = self.last_valid_coordinate {
-                outcome = outcome.publish(StepParameter::ThrowInCoordinate(lvc));
-            }
-            match self.pending_deviate.take() {
-                Some(ev) => outcome.with_event(ev),
-                None => outcome,
-            }
-        } else {
-            match self.pending_deviate.take() {
-                Some(ev) => StepOutcome::next().with_event(ev),
-                None => StepOutcome::next(),
-            }
+        //
+        // And NOTHING else. `bb2025/StepMissedPass.executeStep` publishes no parameters at all --
+        // it sets passCoordinate / outOfBounds / the ball coordinate and returns NEXT_STEP. The
+        // out-of-bounds routing lives one step later in `StepResolvePass`, which publishes
+        // ThrowIn + THROW_IN_COORDINATE for a ball and BOMB_OUT_OF_BOUNDS for a bomb.
+        //
+        // Rust used to publish ThrowIn HERE as well. That was measured green, because without an
+        // interception `StepResolvePass` publishes the identical pair a moment later
+        // (`ThrowInCoordinate(game.pass_coordinate)`, and this step has just set
+        // `pass_coordinate = last_valid_coordinate`) -- so the early publish was merely redundant.
+        //
+        // It stops being redundant the moment an interception SUCCEEDS. Java's ResolvePass then
+        // takes its `isInterceptionSuccessful()` branch, which publishes NO mode, leaving
+        // StepCatchScatterThrowIn inert. Rust's early ThrowIn was already in flight, so that step
+        // woke up with a stale mode and ran a whole throw-in/bounce/catch chain: ten dice Java
+        // never rolls (lineman bb2025 seed 58 i=171, reachable only once an agent moves far enough
+        // to stand in a pass corridor -- see docs/PARITY_HEURISTIC_CAMPAIGN.md ITER8/ITER9).
+        match self.pending_deviate.take() {
+            Some(ev) => StepOutcome::next().with_event(ev),
+            None => StepOutcome::next(),
         }
     }
 }
@@ -533,7 +528,7 @@ mod tests {
     // ── out-of-bounds publish ─────────────────────────────────────────────────
 
     #[test]
-    fn out_of_bounds_publishes_throw_in_mode() {
+    fn publishes_nothing_even_when_the_ball_goes_out_of_bounds() {
         // Start right at the edge so the ball scatters off
         // FieldCoordinate::new(0, 0) is on pitch; stepping North/West can leave bounds
         // We use coordinate (0, 0) and force direction North (towards y-1 → off pitch)
@@ -548,14 +543,17 @@ mod tests {
         // that IF last_valid_coordinate != coordinate_end, throw_in is published.
         let mut step = StepMissedPass::new();
         let out = step.start(&mut game, &mut GameRng::new(7));
-        // Either in-bounds (NextStep, no ThrowIn) or out-of-bounds (NextStep + ThrowIn).
         assert_eq!(out.action, StepAction::NextStep);
-        if step.last_valid_coordinate != step.coordinate_end {
-            let has_throw_in = out.published.iter().any(|p| {
-                matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ThrowIn))
-            });
-            assert!(has_throw_in);
-        }
+        // Java's bb2025 StepMissedPass publishes NOTHING -- not even when the ball goes out of
+        // bounds. The throw-in routing belongs to StepResolvePass one step later, and duplicating
+        // it here is not harmless: on a SUCCESSFUL interception Java's ResolvePass publishes no
+        // mode at all, so an early ThrowIn from this step leaves StepCatchScatterThrowIn holding a
+        // stale mode and rolling ten dice Java never rolls (seed 58 i=171).
+        assert!(
+            out.published.is_empty(),
+            "MissedPass must publish nothing, in or out of bounds; got {:?}",
+            out.published
+        );
     }
 
     // ── pass_coordinate updated ────────────────────────────────────────────────

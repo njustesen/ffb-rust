@@ -642,3 +642,68 @@ Unchanged from ITER7 (no code landed): `--multimove 4` 99/100; `--multimove` off
 three editions; heuristic rungs 0 and 1 green; workspace 14,641/0. Probes removed, tree clean.
 
 **Next:** finish this fix, then raise `--multimove` toward MA+2, then rung 2 (`reroll`).
+
+---
+
+## ITER9 (2026-08-27) — the stale mode fixed 1:1; `--multimove 4` is 100/100
+
+### The fix
+
+`bb2025/StepMissedPass.executeStep` in Java publishes **nothing** — it sets `passCoordinate`,
+`outOfBounds` and the ball coordinate, then returns `NEXT_STEP`. The out-of-bounds routing lives one
+step later in `StepResolvePass`, which publishes `ThrowIn` + `THROW_IN_COORDINATE` for a ball and
+`BOMB_OUT_OF_BOUNDS` for a bomb.
+
+Rust's `step_missed_pass.rs` published `ThrowIn` **there as well**, and its own comment said so:
+*"Java's bb2020/bb2025 MissedPass publishes NOTHING … This Rust-side publish stays for the ball path
+(measured green across all editions)."* A deliberate deviation, kept because it measured green.
+
+It measured green because it was **redundant**: with no interception, `StepResolvePass` publishes the
+identical pair a moment later — and identical in value too, since `MissedPass` has just set
+`pass_coordinate = last_valid_coordinate`, which is exactly what `ResolvePass` publishes as the
+throw-in coordinate.
+
+It stops being redundant the moment an interception **succeeds**. Java's `ResolvePass` then takes its
+`isInterceptionSuccessful()` branch, which publishes no mode at all, leaving
+`StepCatchScatterThrowIn` inert. Rust's early `ThrowIn` was already in flight, so that step woke with
+a stale mode and ran a throw-in/bounce/catch chain — ten dice Java never rolls.
+
+Removed the publish; `StepResolvePass` alone owns the routing, as in Java. The test that asserted the
+old behaviour now asserts the Java contract and is renamed
+`publishes_nothing_even_when_the_ball_goes_out_of_bounds`.
+
+**A "measured green" deviation is a latent divergence waiting for a path that reaches it.** This one
+waited for an agent that moves far enough to stand in a pass corridor.
+
+### Gates
+
+- **`--multimove 4` lineman bb2025: 100/100** (was 99/100).
+- `--agent random` lineman tier-3: **100/100 in bb2016, bb2020 and bb2025**.
+- Heuristic rung 0 and rung 1: 100/100 each.
+- `cargo test --workspace --release`: **14,641 / 0**; pass-family suite 130/0.
+
+### New frontier: `--multimove 6` is 0/100, and it is the queue's item 1
+
+Raising the spike to 6 and 8 squares fails immediately. Seed 1, first dice divergence at i=28:
+
+```
+JAVA  pos=29,30  StepGoForIt.rush      <- TWO rushes
+RUST  RNGSTEP 18,19,20  step=GoForIt    <- THREE rushes
+```
+
+**A player may rush at most twice (MA + 2). Java refuses the ninth square; Rust executes it.** The
+agent plans up to `ma + 2 - spent`, but at pre-draw time `spent` is 0 for a prone player who will go
+on to spend 3 standing up — and Java's `sendMoveAction` reads 0 there too, so both harnesses propose
+the same over-long path. Java's ENGINE declines it and Rust's does not.
+
+That is exactly the gap this campaign's queue names first: `Action::Move` carries neither a player id
+nor a `from`, so two of Java's three `CLIENT_MOVE` guards cannot be evaluated, `is_valid_move` has
+**zero** production call sites in Rust against ten in the Java server, and
+`step_init_moving.rs:70` says *"UtilServerPlayerMove.isValidMove + fetchMoveStack not ported; trust
+agent path"*. The move stack is trusted to exhaustion instead of being bounded by what the player can
+actually do.
+
+**Next:** port that gap 1:1 — add `player_id` + `from` to `Action::Move`, wire `is_valid_move` and the
+acting-player check into all three `StepInitMoving`/`StepInitSelecting` pairs, publish `MOVE_START`,
+and bound the move-stack walk by `UtilPlayer.isNextMovePossible` the way Java does. Then re-raise
+`--multimove` to MA+2 in all three editions.
