@@ -173,6 +173,114 @@ public final class HeuristicDriver {
     }
 
     /**
+     * Rust {@code canon_key}: {@code (side, jersey nr)}. Player IDS must never enter an ordering —
+     * they are generated differently by the two engines. Home sorts before away.
+     */
+    private static long canonKey(Game game, String playerId) {
+        Player<?> p = game.getPlayerById(playerId);
+        long side = (p != null && game.getTeamHome().hasPlayer(p)) ? 0L : 1L;
+        long nr = (p != null) ? p.getNr() : Integer.MAX_VALUE;
+        return (side << 32) | (nr & 0xffffffffL);
+    }
+
+    /**
+     * Rust {@code block_weight}: how much this defender is worth blocking, as a weight in
+     * {@code [0.01, 1.0]}.
+     *
+     * <p>The die count comes from {@code ServerUtilPlayer.findBlockStrength} on BOTH sides —
+     * Rust's {@code find_block_strength} is a translation of that same method, so the assist
+     * arithmetic is not re-derived here.
+     */
+    float blockWeight(Game game, String attId, String defId, int attStr) {
+        com.fumbbl.ffb.model.FieldModel fm = game.getFieldModel();
+        Player<?> att = game.getPlayerById(attId);
+        Player<?> def = game.getPlayerById(defId);
+        if (att == null || def == null) {
+            return 0.05f;
+        }
+        FieldCoordinate ac = fm.getPlayerCoordinate(att);
+        FieldCoordinate dc = fm.getPlayerCoordinate(def);
+        if (ac == null || dc == null) {
+            return 0.05f;
+        }
+        int aStr = com.fumbbl.ffb.server.util.ServerUtilPlayer.findBlockStrength(
+            game, att, attStr, def, false);
+        int dStr = com.fumbbl.ffb.server.util.ServerUtilPlayer.findBlockStrength(
+            game, def, def.getStrengthWithModifiers(), att, false);
+        int n;
+        if (aStr > 2 * dStr) {
+            n = 3;
+        } else if (aStr > dStr) {
+            n = 2;
+        } else if (2 * aStr < dStr) {
+            n = -3;
+        } else if (aStr < dStr) {
+            n = -2;
+        } else {
+            n = 1;
+        }
+        float w;
+        switch (n) {
+            case 3:
+                w = 0.90f;
+                break;
+            case 2:
+                w = 0.60f;
+                break;
+            case 1:
+                w = hasSkillNamed(att, "Block") ? 0.40f : 0.25f;
+                break;
+            case -2:
+                w = 0.10f;
+                break;
+            default:
+                w = 0.025f;
+                break;
+        }
+        boolean defHasBall = hasBall(game, defId);
+        if (defHasBall) {
+            w *= 1.35f;
+        }
+        if (canSurf(game, attId, defId)) {
+            w *= defHasBall ? 1.9f : 1.5f;
+        }
+        if (hasSkillNamed(def, "Block")
+            && !hasSkillNamed(att, "Block")
+            && !hasSkillNamed(att, "Wrestle")) {
+            w *= 0.70f;
+        }
+        return Math.min(Math.max(w, 0.01f), 1.0f);
+    }
+
+    /**
+     * Rust {@code AgentPrompt::BlitzTarget}. {@code T = 0.15}.
+     *
+     * <p>The Rust arm consults the activation PLAN first, but a plan only exists once the
+     * {@code activateplayer} class is ported; with it off, {@code self.plan} is {@code None} and
+     * the arm falls straight through to this scored enumeration.
+     *
+     * <p>{@code candidates} arrives in the harness's coordinate order and is RE-SORTED by
+     * {@code (side, nr)} here, exactly as the Rust arm does — the sampler returns an index, so
+     * the two sides must enumerate identically.
+     *
+     * @return the chosen defender's id, or null when there is nothing to blitz.
+     */
+    public String blitzTarget(Game game, String attackerId, List<String> candidates) {
+        if (candidates == null || candidates.isEmpty()) {
+            return null;
+        }
+        List<String> ordered = new ArrayList<>(candidates);
+        ordered.sort((a, b) -> Long.compare(canonKey(game, a), canonKey(game, b)));
+        Player<?> att = game.getPlayerById(attackerId);
+        int attStr = (att != null) ? att.getStrengthWithModifiers() : 3;
+        sampler.clear();
+        for (String defId : ordered) {
+            sampler.push(blockWeight(game, attackerId, defId, attStr));
+        }
+        return ordered.get(sampler.pick(0.15f));
+    }
+
+    /**
      * Rust `push_squares`: the three squares a block can push the defender into — straight back
      * plus the two flanking it, derived purely from the attacker/defender geometry.
      */

@@ -2994,7 +2994,15 @@ impl HeuristicAgent {
                     }
                 }
                 if eligible_players.is_empty() {
-                    return Action::EndPlayerAction;
+                    // NOT EndPlayerAction. The engine raises this prompt whenever ANY in-bounds
+                    // opponent can be blocked, but the candidates are only the ADJACENT ones, so a
+                    // blitzer with no neighbour gets an empty list -- and
+                    // `ParityRunner.sendBlitzTargetSelection` answers exactly that case with
+                    // ClientCommandEndTurn. `RandomAgent` mirrors it; this arm did not, and
+                    // EndPlayerAction leaves `StepSelectBlitzTarget` waiting on a target that never
+                    // comes: bb2025 seed 8 stalled with 50 unchanged iterations and aborted the game
+                    // mid-drive.
+                    return Action::EndTurn;
                 }
                 let astr = g.player(&attacker_id).map(|p| p.strength_with_modifiers()).unwrap_or(3);
                 let mut ep = eligible_players;
@@ -4090,6 +4098,33 @@ mod tests {
         assert!(!on_pitch(10, -1));
         assert!(!on_pitch(10, 15));
         assert!(on_pitch(0, 0) && on_pitch(XMAX, YMAX));
+    }
+
+    /// An empty blitz-target list ends the TURN, not the action.
+    ///
+    /// The engine raises `BlitzTarget` whenever any in-bounds opponent can be blocked, but the
+    /// candidate list holds only the ADJACENT ones -- so a blitzer with no neighbour is prompted
+    /// with nothing to pick. `ParityRunner.sendBlitzTargetSelection` answers that with
+    /// ClientCommandEndTurn, and `RandomAgent` mirrors it. This arm answered EndPlayerAction, and
+    /// `StepSelectBlitzTarget` then waited forever for a target: bb2025 seed 8 aborted the game
+    /// after 50 unchanged iterations, mid-drive, with the score still 0-0.
+    #[test]
+    fn an_empty_blitz_target_list_ends_the_turn() {
+        use crate::step::new_game;
+
+        let prompt = || AgentPrompt::BlitzTarget {
+            attacker_id: "home_01".into(),
+            eligible_players: Vec::new(),
+        };
+        let mut gs = new_game(3);
+        gs.pending_prompt = Some(prompt());
+        let mut heur = HeuristicAgent::with_classes(3, 0.0, Mode::Wide, ClassMask::ALL);
+        assert_eq!(heur.act(&gs), Action::EndTurn);
+
+        // …and it is the same answer the byte-matched random contract gives, which is what makes
+        // the class switchable without moving the stream.
+        let mut rand = RandomAgent::new_parity(3);
+        assert_eq!(rand.act(&gs), Action::EndTurn);
     }
 
     /// §6.3 — the block-die table, and the push geometry the Java port re-implements.

@@ -1873,6 +1873,24 @@ public class ParityRunner {
     private void sendBlitzTargetSelection(Game game, GameState gameState) {
         ActingPlayer ap = game.getActingPlayer();
         String pid = (ap != null) ? ap.getPlayerId() : null;
+        // The heuristic agent SCORES the blitz target (Rust `AgentPrompt::BlitzTarget`, T = 0.15)
+        // when the `blitztarget` class is on. It must NOT fall through to pickBlockTarget, which
+        // would spend an actionRng draw the Rust side does not spend in that configuration.
+        if (pid != null && heuristic != null
+            && heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.BLITZ_TARGET)) {
+            java.util.List<String> candidates = new ArrayList<>();
+            for (Player<?> op : blockTargetCandidates(game, pid)) {
+                candidates.add(op.getId());
+            }
+            String chosen = heuristic.blitzTarget(game, pid, candidates);
+            if (chosen == null) {
+                MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
+            } else {
+                MatchRunner.inject(gameState,
+                    new com.fumbbl.ffb.net.commands.ClientCommandTargetSelected(chosen));
+            }
+            return;
+        }
         Player<?> blockTarget = (pid != null) ? pickBlockTarget(game, pid) : null;
         if (blockTarget == null) {
             System.err.println("BLITZ_TARGET_NONE pid=" + pid + " — ending turn for acting player");
@@ -1889,12 +1907,19 @@ public class ParityRunner {
      * MOVING (mirrors Rust PlayerState::can_be_blocked — note: NOT hasTackleZones, no
      * confused check), coordinate-sorted, 1 actionRng pick (AGENT_CONTRACT.md §3/§6).
      */
-    private Player<?> pickBlockTarget(Game game, String playerId) {
+    /**
+     * The candidate list {@link #pickBlockTarget} draws from, WITHOUT drawing: adjacent opponents
+     * whose state base is STANDING or MOVING, in coordinate order. Extracted so the heuristic
+     * agent can score the same list without spending an actionRng draw on it.
+     */
+    private List<Player<?>> blockTargetCandidates(Game game, String playerId) {
         FieldModel fm = game.getFieldModel();
         FieldCoordinate coord = playerCoordinate(game, playerId);
-        if (coord == null) return null;
-        Team opponent = game.isHomePlaying() ? game.getTeamAway() : game.getTeamHome();
         List<Player<?>> targets = new ArrayList<>();
+        if (coord == null) {
+            return targets;
+        }
+        Team opponent = game.isHomePlaying() ? game.getTeamAway() : game.getTeamHome();
         for (Player<?> op : opponent.getPlayers()) {
             FieldCoordinate oc = fm.getPlayerCoordinate(op);
             PlayerState ops = fm.getPlayerState(op);
@@ -1906,6 +1931,12 @@ public class ParityRunner {
             }
         }
         sortPlayersByCoordinate(targets, fm);
+        return targets;
+    }
+
+    private Player<?> pickBlockTarget(Game game, String playerId) {
+        FieldModel fm = game.getFieldModel();
+        List<Player<?>> targets = blockTargetCandidates(game, playerId);
         if (targets.isEmpty()) return null;
         int idx = (int) Long.remainderUnsigned(actionRng.nextLong(), targets.size());
         if (DEBUG) System.err.println("JAVA_BLOCK_PICK pid=" + playerId + " N=" + targets.size() + " idx=" + idx + " def=" + targets.get(idx).getId());

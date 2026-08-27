@@ -1285,3 +1285,68 @@ The arm genuinely disagrees with the index-0 default in both, so both greens are
 **Next:** rung 4 — `blitztarget` (same shape as `blocktarget`, already green) and then `kick` /
 `touchback`, which are pure geometry. `followup` stays parked until the `Features` raster tier lands
 in Java, and that raster tier is the last thing standing between here and `--heur-classes all`.
+
+## ITER18 — rung 4a: `blitztarget`, and an empty candidate list ends the TURN
+
+`AgentPrompt::BlitzTarget` looked like it needed the raster tier and does not. Its arm consults the
+activation PLAN first, but a plan only exists once `activateplayer` is ported, so with that class off
+the arm falls straight through to a scored enumeration over `block_weight` — and `block_weight`'s
+only heavy dependency is `Features::block_strength`, which is a memo around
+`ServerUtilPlayer::find_block_strength`. **That method exists in Java**, and `ffb-ai` already depends
+on `ffb-server`, so the port calls the original rather than re-deriving the assist arithmetic:
+
+```java
+int aStr = ServerUtilPlayer.findBlockStrength(game, att, attStr, def, false);
+int dStr = ServerUtilPlayer.findBlockStrength(game, def, def.getStrengthWithModifiers(), att, false);
+```
+
+The rest is the die-count → weight table, the ball multiplier (1.35), the crowd-surf multiplier
+(1.5, or 1.9 on the carrier) and the Block-without-Block/Wrestle penalty (0.70).
+
+### The divergence
+
+First gate: **89/100** in bb2025 at argmax — usefully red, so the arm is not vacuous. Lowest failing
+seed 8, and the failure shape was `rust=None`: Rust's log simply *stopped* 54 steps before Java's,
+with the score 0-0 mid-drive. `FFB_DRIVE_TRACE` named it in one line:
+
+```
+NO_PROGRESS seed=8 half=2 turn=5 active=away: 50 iterations with unchanged hash
+  prompt=Some(BlitzTarget { attacker_id: "away_04", eligible_players: [] }) — aborting game
+```
+
+An **empty** candidate list. The engine raises `BlitzTarget` whenever *any* in-bounds opponent can be
+blocked, but the candidates are only the **adjacent** ones — so a blitzer with no neighbour is
+prompted with nothing to pick. `ParityRunner.sendBlitzTargetSelection` answers that case with
+`ClientCommandEndTurn`, and `RandomAgent` mirrors it with a comment saying explicitly that
+`EndPlayerAction` is wrong there. The heuristic arm returned `EndPlayerAction`, and
+`StepSelectBlitzTarget` then waited for a target that never came.
+
+Fix: `Action::EndTurn`, with `an_empty_blitz_target_list_ends_the_turn` asserting both agents give
+the same answer. The test sets `DriverGameState::pending_prompt` directly — that field is
+`pub(crate)`, so an agent arm can be exercised on a board the harness would need hundreds of steps to
+reach.
+
+Worth noting what the bug was *not*: nothing about scoring, weights or the sampler. Two iterations
+running, the failure has been in the **plumbing around** the ported arm rather than in the arm —
+ITER17's was a dialog id, this one a fall-through action. The scorer keeps porting cleanly; the
+contract around it is where the port leaks.
+
+`ParityRunner`: `pickBlockTarget`'s candidate computation is now `blockTargetCandidates`, which
+draws no RNG, so the heuristic can score the same list without spending the `actionRng` draw the
+Rust side does not spend in this configuration.
+
+### Gates
+
+- Rung 4a (`coin,receive,reroll,pushback,blocktarget,blockchoice,blitztarget`): **100/100 in all
+  three editions at all three scales** — nine sweeps, fresh JVM.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025 (the
+  `blockTargetCandidates` extraction is on the random path too).
+- `cargo test --workspace --release`: **14,648 / 0**. `mvn -o -pl ffb-ai test`: clean.
+
+Note `blitztarget` is inert in bb2016: that edition has no `SELECT_BLITZ_TARGET` step at all — the
+harness drives a 3-command blitz instead — so bb2016's green there is carried by the other classes.
+
+**Next:** rung 4b — `kick` and `touchback`, both pure geometry with no raster dependency. After that
+the only classes left are `followup`, `intercept`, `setup`, `activateplayer` and `move`, and all five
+want the `Features` raster tier in Java. That tier is now unambiguously the last thing between here
+and `--heur-classes all`.
