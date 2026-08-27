@@ -363,3 +363,60 @@ consistent with the mask doing nothing at all — the vacuous-green trap recorde
 
 **Next:** ITER5 — the Java side begins: `DetMath.java` against the shared golden file, the
 `heuristic/` package skeleton, the prompt adapter, and rung 1.
+
+---
+
+## ITER5 (2026-08-27) — Java begins: `DetMath` agrees with Rust to the last bit
+
+The biggest technical risk in the plan, retired first.
+
+### The result
+
+`DetMath.java` is a line-for-line transcription of `det_math.rs`, and `DetMathTest` reads **the
+same golden file** the Rust test reads — not a copy, so the two cannot drift.
+
+```
+mvn -o -pl ffb-ai test -Dtest=DetMathTest
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0
+```
+
+**All 348 pinned `(input bits, output bits)` vectors match exactly.** So the central premise of
+ITER2 — that f32 arithmetic composed only of correctly-rounded primitives is bit-identical across
+Rust and Java — is now demonstrated rather than argued, on real values from the ranges the agent
+uses. Every scored weight flows through `expF32` and every Dijkstra key through `lnF32`, so this was
+the one thing that had to work before the remaining ~5,000 lines were worth writing.
+
+### One subtlety that would have been a silent one-ulp bug
+
+Rust's `f32::round` is **ties-away-from-zero**. Java's `Math.round` rounds halves toward positive
+infinity and `Math.rint` rounds them to even — *neither* matches. The range reduction
+`k = round(x * LOG2E)` hits an exact .5 only occasionally, so this would not have shown up in a
+smoke test; it would have surfaced as a rare, seed-dependent divergence deep in a game. Written out
+explicitly as `roundTiesAway` and pinned by its own test.
+
+This is the shape of bug the golden table exists to catch, and it was caught on the first run.
+
+### Both Java trees, and a check that they agree
+
+There are two copies of the Java source: `C:/Users/Admin/niels/ffb/ffb` (the Maven build tree, whose
+jar `ffb-parity` actually loads) and `<repo>/ffb-java/ffb` (the git-**tracked** reference copy).
+Only the second is under version control, so an edit applied to one and not the other is invisible
+to `git status` and silently makes the reviewed source differ from the measured source.
+
+`scripts/check_java_trees.py` diffs the co-editable harness packages between them, `--fix` syncs
+build-tree -> tracked-tree (never the reverse: the build tree is what the jar was compiled from, so
+it is the one that describes the measurement). Verified in both directions — it reports agreement,
+it detects a one-line probe, and `--fix` restores agreement.
+
+**Run it before any gate that follows a harness edit.**
+
+### Gates
+
+- `mvn -o -pl ffb-ai test -Dtest=DetMathTest` — 3/0, 348 vectors bit-identical.
+- `python scripts/check_java_trees.py` — trees agree.
+- Maven lives at `C:/Users/Admin/bin/maven/bin/mvn` and is **not on PATH**; use the absolute path,
+  with `-o` (offline) since the dependencies are already in `~/.m2`.
+
+**Next:** ITER6 — the `heuristic/` package skeleton (`AgentPrompt`/`AgentAction` mirrors, the
+`Xoshiro` draw helpers, `ClassMask`), the `HeuristicDriver` adapter inside `ParityRunner`, and
+rung 1 (`coin,receive`) green.
