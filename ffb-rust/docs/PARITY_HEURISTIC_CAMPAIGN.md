@@ -570,3 +570,75 @@ Diff the dice STREAM, not the per-step counts.
 
 **Next:** seed 58's pass/interception divergence, then raise `--multimove` until it is green at the
 full MA+2, then rung 2 (`reroll`).
+
+---
+
+## ITER8 (2026-08-27) — seed 58 root-caused: a stale catch/scatter mode survives a successful interception
+
+Diagnosis only; no code change. The fix needs one more fact (below) and lands next iteration.
+
+### What happens
+
+`--multimove 4`, lineman bb2025, seed 58, away_03's PASS at i=171. Both engines agree through the
+interception: **both roll a 6 and both succeed** (Rust probe: `roll=6 min=5 easy=false ok=true`;
+Java's `caller=` stack shows `StepIntercept.intercept` at the same stream position). Java's pass
+activation then **ends** — its next die is the following activation's dodge. Rust instead spends
+**ten more dice** inside `CatchScatterThrowIn`.
+
+`FFB_RNG_STEPS` gives the attribution Java's `caller=` gives for free:
+
+```
+RNGSTEP 44 step=MissedPass          78->81  pid=away_03 pa=Pass
+RNGSTEP 45 step=CatchScatterThrowIn 82->85  pid=away_03 pa=Pass
+RNGSTEP 46 step=CatchScatterThrowIn 85->88  pid=away_03 pa=Pass
+RNGSTEP 47 step=CatchScatterThrowIn 88->91  pid=away_03 pa=Pass
+RNGSTEP 48 step=CatchScatterThrowIn 91->92  pid=away_03 pa=Pass
+RNGSTEP 49 step=MoveDodge           92->93  pid=home_09 pa=Move      <- Java is here at 83
+```
+
+A probe at the step's mode switch shows why:
+
+```
+RCS mode=Some(ThrowIn) ball=Some(17,2) inplay=true
+```
+
+**`StepCatchScatterThrowIn` wakes up with a stale `ThrowIn` mode and runs a whole throw-in /
+bounce / catch chain.** With no mode its `None => {}` arm is inert, which is what Java's equivalent
+effectively is here: `bb2025/StepResolvePass:43` publishes **no** `CATCH_SCATTER_THROW_IN_MODE` on
+the `isInterceptionSuccessful()` branch.
+
+Ruled out along the way, each with evidence rather than reasoning:
+
+- **Not the natural-6 rule.** `roll == 6 || (roll != 1 && roll >= minimum_roll)` is present and fired.
+- **Not the agent.** Both harnesses attempt the interception (Rust `SelectPlayer` on a coord-sorted
+  list; Java `sendInterceptorChoice`).
+- **Not `StepResolvePass`'s branch structure.** Rust's interception branch early-`return`s, so it is
+  exclusive exactly like Java's `if / else if / else`, and it publishes no mode.
+
+So the stale mode is published **earlier in the same pass sequence** — `StepMissedPass`'s three
+scatters put the ball out of bounds, which is the natural source of a `ThrowIn`. This is the same
+family as the two hazards `StepResolvePass` already documents in its own comments: Rust threads step
+parameters that **outlive** the point Java re-creates its per-pass `PassState`.
+
+### The one fact still needed
+
+Whether Java also publishes `THROW_IN` there and then *skips* the step, or never publishes it at
+all. Read `bb2025/StepMissedPass.java` and the Java `Pass` sequence's post-`Intercept` routing, then
+port whichever it is 1:1. Note `StepParameter::CatchScatterThrowInMode` carries a bare mode with no
+"clear" form, so a fix that needs to *unset* it will have to add one — mirroring the
+`InterceptorId(None)` clear already used on the failure branch.
+
+### Correction to ITER7
+
+ITER7 said the two dice streams "agreed up to index 91". That was the wrong inference: both engines
+draw from the **same** stream, so equal values only mean equal draw *counts*, not equal behaviour —
+Rust was already spending its draws on `CatchScatterThrowIn` while Java spent them on a dodge and an
+armour/injury roll. **Compare dice by their step ATTRIBUTION (`FFB_RNG_STEPS` vs Java's `caller=`),
+not by value.** Matching values across a divergence are the null result, not evidence.
+
+### Gates
+
+Unchanged from ITER7 (no code landed): `--multimove 4` 99/100; `--multimove` off 100/100 in all
+three editions; heuristic rungs 0 and 1 green; workspace 14,641/0. Probes removed, tree clean.
+
+**Next:** finish this fix, then raise `--multimove` toward MA+2, then rung 2 (`reroll`).
