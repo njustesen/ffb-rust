@@ -181,10 +181,17 @@ impl Step for StepCatchScatterThrowIn {
                 self.evaluate = *use_skill;
             }
             Action::UseReRoll { use_reroll: true } => {
-                // Player accepted the re-roll offer
-                if let Some(source) = self.re_roll_state.re_roll_source.clone() {
-                    let pid = self.catcher_id.clone().unwrap_or_default();
-                    use_reroll(game, &source, &pid);
+                // Player accepted the re-roll offer. Record it and let `catch_ball` do the
+                // CONSUMING -- Java has exactly ONE `useReRoll` in this step
+                // (`bb2025/shared/StepCatchScatterThrowIn:517`, inside the catch path); its
+                // `handleCommand` only records the source via AbstractStepWithReRoll.
+                //
+                // Rust consumed here AS WELL, so one accepted catch re-roll spent TWO from the
+                // bank: `RRCMD step=CatchScatterThrowIn home 2->0` in a single command
+                // (lineman bb2025 seed 45). Invisible while the parity contract declined every
+                // offer, and invisible to `FFB_RR_STEPS` until that trace was taught to bracket
+                // `handle_command` as well as step execution.
+                if self.re_roll_state.re_roll_source.is_some() {
                     self.roll = 0; // fresh roll
                 }
             }
@@ -1029,6 +1036,38 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2025)
+    }
+
+    /// Java has exactly ONE `useReRoll` in this step (`:517`, inside the catch path); its
+    /// `handleCommand` for the re-roll answer only records the source. Rust consumed the re-roll in
+    /// `handle_command` TOO, so one accepted catch re-roll spent TWO from the bank
+    /// (`RRCMD step=CatchScatterThrowIn home 2->0`, lineman bb2025 seed 45).
+    ///
+    /// Accepting must therefore leave the bank untouched — `catch_ball` does the spending.
+    #[test]
+    fn accepting_a_catch_reroll_does_not_itself_spend_from_the_bank() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 2;
+
+        let mut step = StepCatchScatterThrowIn::new();
+        step.catcher_id = Some("home_01".into());
+        step.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
+        step.re_roll_state.re_rolled_action = Some(ReRolledAction::new("CATCH"));
+        step.roll = 1;
+
+        step.set_parameter(&StepParameter::CatcherId(Some("home_01".into())));
+        let _ = step.handle_command(
+            &Action::UseReRoll { use_reroll: true },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+
+        assert_eq!(
+            game.turn_data_home.rerolls, 2,
+            "handle_command must NOT spend the re-roll; catch_ball is the single consumer"
+        );
+        assert_eq!(step.roll, 0, "accepting still forces a fresh die");
     }
 
     fn make_player(id: &str, agility: i32) -> Player {

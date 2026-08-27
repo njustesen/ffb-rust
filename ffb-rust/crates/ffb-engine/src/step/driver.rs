@@ -789,7 +789,21 @@ impl DriverGameState {
         let def_before_cmd = self.game.defender_id.clone();
         let pos_before_cmd = self.game.acting_player.player_id.clone()
             .and_then(|p| self.game.field_model.player_coordinate(&p)).map(|c| (c.x, c.y));
+        // FFB_RR_STEPS also has to bracket handle_command, not just step execution: `use_reroll`
+        // runs while the agent's answer is being applied, so the per-step wrapper below never saw
+        // the decrement and the trace showed a bank that moved with no step responsible. Same
+        // attribution gap as the Intercept die in ITER8 -- if a diagnostic only wraps one of the two
+        // entry points, half the mutations are invisible.
+        let rr_before_cmd = (self.game.turn_data_home.rerolls, self.game.turn_data_away.rerolls);
         let mut outcome = entry.step.handle_command(&action, &mut self.game, &mut self.rng);
+        if std::env::var_os("FFB_RR_STEPS").is_some() {
+            let rr_now = (self.game.turn_data_home.rerolls, self.game.turn_data_away.rerolls);
+            if rr_now != rr_before_cmd {
+                eprintln!("RRCMD step={:?} home {}->{} away {}->{} (half={} rng={})",
+                    entry.step.id(), rr_before_cmd.0, rr_now.0, rr_before_cmd.1, rr_now.1,
+                    self.game.half, self.rng.call_count);
+            }
+        }
         if std::env::var_os("FFB_POSCHG").is_some() {
             let now = self.game.acting_player.player_id.clone()
                 .and_then(|p| self.game.field_model.player_coordinate(&p)).map(|c| (c.x, c.y));

@@ -1074,3 +1074,76 @@ ACTION and an ignore-set, and Rust's takes neither.
 
 **Next:** compare Rust's re-roll availability against `RollMechanic.askForReRollIfAvailable` as a
 whole, rather than one condition at a time.
+
+---
+
+## ITER15 (2026-08-27) — RUNG 2 GREEN: 100/100 in all three editions, all three scales
+
+### Correction to ITER14 first
+
+ITER14 concluded "Java's arm is never called on seed 45". **That was wrong, and the cause was my own
+tooling.** Java runs first in the batched JVM, so every `JARM` line precedes every `RARM` line, and
+the `| tail -8` I used to compare them showed only the Rust half. Re-run without the window: the two
+arms fire **9 times each** on seed 45 and agree on every value (the only textual difference is
+`scar=1.0` against `scar=1`).
+
+This is the trap already recorded in memory as *trace window truncation* — never conclude from a
+`head`/`tail`-bounded view — and it cost an iteration. When two engines are compared in one stream,
+**one runs to completion before the other**, so any window is a window on one engine.
+
+### Root cause
+
+`RRCMD step=CatchScatterThrowIn home 2->0` — the bank dropped by **two in a single command**.
+
+Java has exactly **one** `useReRoll` in that step (`bb2025/shared/StepCatchScatterThrowIn:517`,
+inside the catch path); its `handleCommand` for the re-roll answer only records the source via
+`AbstractStepWithReRoll`. Rust consumed it in `handle_command` **as well as** in `catch_ball`, so one
+accepted catch re-roll spent two from the bank.
+
+Removed the `handle_command` consumption; `catch_ball` is the single consumer, as in Java. The
+`self.roll = 0` fresh-die reset stays.
+
+### The diagnostic had to be fixed first
+
+`FFB_RR_STEPS` (added ITER12) showed only two lines for seed 45 and none of the decrements, because
+the driver's per-step wrapper brackets step **execution** only — `use_reroll` runs while the agent's
+answer is applied. Taught the trace to bracket `handle_command` too (`RRCMD`), and the double
+decrement was immediately visible.
+
+**Same attribution gap as the Intercept die in ITER8.** A diagnostic that wraps one of two entry
+points makes half the mutations invisible, and an empty trace then reads as "nothing happened".
+
+### Rung 2 is green everywhere
+
+| | argmax | sampled | uniform |
+|---|---|---|---|
+| bb2025 | **100/100** | **100/100** | **100/100** |
+| bb2020 | **100/100** | — | — |
+| bb2016 | **100/100** | — | — |
+
+Re-rolls are now genuinely exercised in a passing parity gate — 113 consumed per 100 seeds against
+**0** for the entire history of this matchup.
+
+### Gates
+
+- Rung 2 (`coin,receive,reroll`): 100/100 in bb2025 at scales 0 / 1.0 / 1e6, and 100/100 in bb2016
+  and bb2020 at argmax.
+- `--agent random`: 100/100 in all three editions. Rung 0: 100/100.
+- `cargo test --workspace --release`: **14,645 / 0**. All probes removed, both Java trees in sync,
+  jar rebuilt clean.
+
+### Score so far
+
+Three classes ported (`coin`, `receive`, `reroll`) and **six real engine bugs** found, every one of
+them a 1:1 port gap that the random-agent gate structurally could not reach:
+
+1. `build_threat`'s `HashMap` tie-break — run-to-run non-determinism on mixed-ST rosters.
+2. `has_acted` vs computed `acted()` — a stood-up player could never rush.
+3. `StepMissedPass` publishing a mode Java does not — ten phantom dice after an interception.
+4. The one-drive re-roll clawed back after being spent.
+5. The one-per-turn re-roll latch applied outside bb2016.
+6. A catch re-roll consumed twice.
+
+**Next:** rung 3 — `blockchoice`, `pushback`, `followup`, `blocktarget`, `blitztarget`. These need
+the `Features` core tier (occ / tz / row_prefix) on the Java side, which is the first real slice of
+the scorer port.
