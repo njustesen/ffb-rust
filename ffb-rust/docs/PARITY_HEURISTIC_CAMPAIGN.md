@@ -2172,3 +2172,49 @@ Bite-check: replacing the contiguous rule with a keyed lookup fails at
 harness's legal-action list per eligible player, the thing no fixture can supply — and then
 `--heur-classes activate` can go live. That is the first sweep where a mistake shows up as a parity
 failure rather than a red unit test.
+
+## ITER35 — `build_plans`: the enumeration shape
+
+Every weight is pinned; what this iteration pins is the SHAPE of the candidate list — how many
+entries each declared action contributes, in what order, with which kind and target. That list is
+the input to the two-level draw, so a list differing by one entry picks a different action even when
+every weight agrees.
+
+Four decisions a port loses easily, all now observable:
+
+- **Move offers EVERY reachable square** (254 on an open pitch), weight-ordered — not a top-K.
+  Pruning by arrival probability was measured once and was catastrophic: 1.76 touchdowns per game
+  down to 0.19. `p_arrive` is an admissible BOUND but not an admissible RANKING — a one-square
+  shuffle arrives with p = 1.0 and a six-square scoring run with p ≈ 0.3, so a top-K is almost
+  exactly the set of moves that go nowhere.
+- **The loose-ball square is `Pickup`, not `Move`** — picking it up changes the value model, so the
+  activation may legitimately continue.
+- **Blitz stops at adjacency**: non-adjacent victims are SKIPPED, not scored low, so the candidate
+  COUNT is the observable difference (1, not 2, on the fixture board).
+- **An empty reachable set still emits one candidate** at 0.02, so a player who cannot move does not
+  vanish from the declaration list.
+
+Bite-check: pruning Move to a top-12 fails at `candidate COUNT (move_open) ==> expected: <254> but
+was: <12>`.
+
+### `w_player` crosses the boundary as a parameter
+
+The first run failed on a Move weight, and the cause was the fixture rather than the port: the
+emitter passes `w_player = 1.0` to `build_plans` explicitly, while the test recomputed it from the
+tier-1 ladder and got 0.30. `build_plans` takes it as a PARAMETER, so it now crosses as one —
+recomputing it pins the ladder a second time (it already has its own fixture) and would silently
+test a different call if the emitter ever passed something else.
+
+The same reasoning that put the `Features` snapshot, the foul assists and the pass face-counts on
+the golden rather than in the test: **whatever the function takes as an argument should arrive as an
+argument.**
+
+### Gates
+
+- `mvn -o -pl ffb-ai test`: **26 tests, 0 failures**.
+- `cargo test --workspace --release`: **14,654 / 0**.
+- Fourteen-class rung still **100/100 in all three editions** at argmax.
+
+**Next:** the HandOff and Pass enumerations (they need the harness's receiver eligibility, so the
+live gate is the natural place), then wiring `handle_activate` into `ParityRunner`'s activation loop
+and switching `--heur-classes activate` on.

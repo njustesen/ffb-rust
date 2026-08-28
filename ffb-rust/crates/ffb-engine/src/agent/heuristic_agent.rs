@@ -5613,6 +5613,194 @@ mod tests {
         eprintln!("wrote {path}");
     }
 
+    /// `build_plans` — the ENUMERATION — as a cross-language fixture.
+    ///
+    /// Every weight it reads is already pinned. What is not is the SHAPE of the list it produces:
+    /// how many candidates each action contributes, in what order, with which `PlanKind` and which
+    /// target. That shape is the input to the two-level draw, so a list that differs by one entry
+    /// picks a different action even when every weight agrees.
+    ///
+    /// The things most easily lost in a port, all visible here:
+    ///
+    /// - **Move offers EVERY reachable square**, weight-ordered, not a top-K. Pruning to the best
+    ///   arrival probabilities measured catastrophic once (1.76 touchdowns/game to 0.19) because
+    ///   `p_arrive` is an admissible bound but not an admissible RANKING: a one-square shuffle
+    ///   arrives with p = 1.0 and a six-square scoring run with p ≈ 0.3.
+    /// - **A square holding a loose ball becomes `PlanKind::Pickup`**, not `Move` — the activation
+    ///   may legitimately continue after picking it up.
+    /// - **Blitz stops at adjacency.** A move-then-blitz does not dispatch in this engine build, so
+    ///   offering it would waste the team's once-per-turn blitz; the branch deliberately `continue`s
+    ///   past every non-adjacent victim rather than scoring it lower.
+    /// - **HandOff enumerates squares NEXT TO each team-mate**, capped at `GIVE_SPOTS`, because the
+    ///   carrier moves first and gives at the end — not just the mates he already touches.
+    /// - **Pass enumerates run-up squares × receivers**, with `risked` folded in only when the
+    ///   throw happens somewhere other than where he stands.
+    ///
+    /// The live-action list is supplied by the golden: which actions are legal is the harness's
+    /// job in production (it is what `computeEligiblePlayers` answers), and re-deriving it here
+    /// would pin a second copy of the eligibility rules instead of the enumeration.
+    ///
+    /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_planenum_golden -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_planenum_golden() {
+        use std::fmt::Write as _;
+        use ffb_model::enums::{PlayerState, PS_STANDING, PS_PRONE, Rules};
+        use ffb_model::model::player::Player;
+
+        // (is_home, nr, x, y, standing)
+        type P2 = (bool, i32, i32, i32, bool);
+        type Board = &'static [P2];
+
+        // (name, board, ball, loose, actions for home_01)
+        let cases: [(&str, Board, Option<(i32, i32)>, bool, &[PlayerAction]); 5] = [
+            (
+                // Plain move in the open: the whole reachable set, weight-ordered.
+                "move_open",
+                &[(true, 1, 8, 7, true), (false, 1, 20, 7, true)],
+                None, false, &[PlayerAction::Move],
+            ),
+            (
+                // A loose ball inside the reachable set: exactly one candidate must be Pickup.
+                "move_onto_loose_ball",
+                &[(true, 1, 10, 7, true), (false, 1, 20, 2, true)],
+                Some((12, 7)), true, &[PlayerAction::Move],
+            ),
+            (
+                // Block: one candidate per adjacent standing opponent, in canonical order.
+                "block_two_targets",
+                &[
+                    (true, 1, 10, 7, true),
+                    (false, 1, 11, 7, true), (false, 2, 11, 8, true), (false, 3, 20, 2, true),
+                ],
+                None, false, &[PlayerAction::Block],
+            ),
+            (
+                // Blitz: only the ADJACENT victim is offered; the distant one is skipped entirely
+                // rather than scored low, so the candidate count is the assertion.
+                "blitz_adjacent_only",
+                &[
+                    (true, 1, 10, 7, true),
+                    (false, 1, 11, 7, true), (false, 2, 16, 7, true),
+                ],
+                None, false, &[PlayerAction::Blitz],
+            ),
+            (
+                // HandOff and Pass from a carrier, with two team-mates: run-up squares against
+                // receivers, and the GIVE_SPOTS cap per receiver.
+                "give_and_pass",
+                &[
+                    (true, 1, 12, 7, true), (true, 2, 14, 7, true), (true, 3, 12, 9, true),
+                    (false, 1, 18, 7, true),
+                ],
+                Some((12, 7)), false, &[PlayerAction::HandOver, PlayerAction::Pass],
+            ),
+        ];
+
+        let mut out = String::new();
+        writeln!(out, "# build_plans enumeration golden.").unwrap();
+        writeln!(out, "# case <name>").unwrap();
+        writeln!(out, "# player <home|away> <nr> <x> <y> <standing|prone>").unwrap();
+        writeln!(out, "# ball <x> <y> <loose>").unwrap();
+        writeln!(out, "# actions <comma separated PlayerAction names for home_01>").unwrap();
+        writeln!(out, "# params <w_player bits> <proxy bits> <novelty bits>").unwrap();
+        writeln!(out, "# n <candidate count>").unwrap();
+        writeln!(out, "# c <index> <pac> <kind> <target|-> <dest|-> <weight bits>").unwrap();
+
+        for (name, board, ball, loose, actions) in cases {
+            let mut home = crate::step::framework::test_team("home", 0);
+            let mut away = crate::step::framework::test_team("away", 0);
+            for &(is_home, nr, _, _, _) in board {
+                let p = Player {
+                    id: format!("{}_{:02}", if is_home { "home" } else { "away" }, nr),
+                    nr,
+                    movement: 6,
+                    strength: 3,
+                    agility: 3,
+                    passing: 4,
+                    armour: 8,
+                    ..Default::default()
+                };
+                if is_home { home.players.push(p) } else { away.players.push(p) }
+            }
+            let mut g = Game::new(home, away, Rules::Bb2025);
+            g.home_playing = true;
+            g.turn_data_home.turn_nr = 3;
+            g.turn_data_away.turn_nr = 3;
+            for &(is_home, nr, x, y, standing) in board {
+                let id = format!("{}_{:02}", if is_home { "home" } else { "away" }, nr);
+                g.field_model.set_player_coordinate(&id, FieldCoordinate::new(x, y));
+                g.field_model.set_player_state(
+                    &id,
+                    PlayerState::new(if standing { PS_STANDING } else { PS_PRONE })
+                        .change_active(true),
+                );
+            }
+            if let Some((bx, by)) = ball {
+                g.field_model.ball_coordinate = Some(FieldCoordinate::new(bx, by));
+                g.field_model.ball_in_play = true;
+                g.field_model.ball_moving = loose;
+            }
+            let f = Features::build(&g, positions_stamp(&g), true);
+            let mut agent = HeuristicAgent::new(4, 0.0);
+            let m = agent.mover_of(&g, &f, "home_01").expect("mover");
+            let proxy = proxy_value(&f, &g, "home_01", &m);
+            let mut sc = Scratch::default();
+            let b = budget_of(&g, "home_01").expect("budget");
+            let r = reach_with(&f, &g, "home_01", &b, false, &mut sc).expect("reach");
+
+            let mut cands: Vec<Candidate> = Vec::new();
+            agent.build_plans(
+                &g,
+                &f,
+                TeamSide::Home,
+                ("home_01", actions, &m, 1.0, proxy),
+                Some(&r),
+                0.0,
+                false,
+                &mut cands,
+            );
+
+            writeln!(out, "case {name}").unwrap();
+            for &(is_home, nr, x, y, standing) in board {
+                writeln!(out, "player {} {nr} {x} {y} {}",
+                    if is_home { "home" } else { "away" },
+                    if standing { "standing" } else { "prone" }).unwrap();
+            }
+            if let Some((bx, by)) = ball {
+                writeln!(out, "ball {bx} {by} {loose}").unwrap();
+            }
+            let an: Vec<String> = actions.iter().map(|a| format!("{a:?}")).collect();
+            writeln!(out, "actions {}", an.join(",")).unwrap();
+            // `build_plans` takes these as PARAMETERS, so they cross the boundary as parameters.
+            // Recomputing `w_player` on the far side pins the tier-1 ladder a second time and, if
+            // the emitter ever passes something else, silently tests a different call.
+            writeln!(out, "params {:08x} {:08x} {:08x}",
+                1.0f32.to_bits(), proxy.to_bits(), 0.0f32.to_bits()).unwrap();
+            writeln!(out, "n {}", cands.len()).unwrap();
+            for (i, c) in cands.iter().enumerate() {
+                let kind = match &c.kind {
+                    PlanKind::Move => "Move".to_string(),
+                    PlanKind::Pickup => "Pickup".to_string(),
+                    PlanKind::Blitz { victim } => format!("Blitz:{victim}"),
+                    PlanKind::Foul { victim } => format!("Foul:{victim}"),
+                    PlanKind::Pass { receiver } => format!("Pass:{receiver}"),
+                    PlanKind::HandOff { receiver } => format!("HandOff:{receiver}"),
+                    PlanKind::Immediate => "Immediate".to_string(),
+                };
+                writeln!(out, "c {i} {:?} {kind} {} {} {:08x}",
+                    c.pac,
+                    c.target.clone().unwrap_or_else(|| "-".to_string()),
+                    c.dest.map(|d| d.to_string()).unwrap_or_else(|| "-".to_string()),
+                    c.weight.to_bits()).unwrap();
+            }
+        }
+
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/agent/testdata/planenum_golden.txt");
+        std::fs::write(path, out).unwrap();
+        eprintln!("wrote {path}");
+    }
+
     /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_sampler_golden -- --ignored`
     #[test]
     #[ignore]
