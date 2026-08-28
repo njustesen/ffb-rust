@@ -1689,6 +1689,10 @@ pub struct HeuristicAgent {
     seen_bucket: HashMap<u64, u32>,
     last_turn_key: Option<(i32, i32, bool)>,
     used_this_turn: HashSet<String>,
+    /// Java `ParityRunner.justDeselected`. Set when a non-REGULAR window ends a turn; it then ends
+    /// the FOLLOWING turn too, because in Java that window's activation was the original team's
+    /// last processed one. `RandomAgent` carries the same flag.
+    just_deselected: bool,
     /// Who just received the ball. The second half of a ball-move plan: he has to be the next one
     /// activated, or the throw bought nothing.
     awaiting_run: Option<String>,
@@ -1721,6 +1725,7 @@ impl HeuristicAgent {
             seen_bucket: HashMap::new(),
             last_turn_key: None,
             used_this_turn: HashSet::new(),
+            just_deselected: false,
             awaiting_run: None,
             dump_enabled: std::env::var_os("FFB_HEUR_DUMP").is_some(),
             last_options: Vec::new(),
@@ -2099,6 +2104,7 @@ impl HeuristicAgent {
         }
         self.refresh_turn(g);
         if g.turn_mode != ffb_model::enums::TurnMode::Regular && !self.used_this_turn.is_empty() {
+            self.just_deselected = true;
             return Action::EndTurn;
         }
         if eligible.is_empty() {
@@ -2108,7 +2114,12 @@ impl HeuristicAgent {
         // Every eligible player has already had its activation decided this turn. Re-offering them
         // is how the driver livelocks: an activation that ends without moving leaves the engine's
         // eligible list unchanged, so `used_this_turn` is the only thing that makes progress.
-        if !any_unused {
+        // Java: `if (remaining.isEmpty() || justDeselected) { justDeselected = false;
+        // usedThisTurn.clear(); EndTurn }` -- one exit, and it CLEARS rather than waiting for the
+        // next turn key to do it.
+        if !any_unused || self.just_deselected {
+            self.just_deselected = false;
+            self.used_this_turn.clear();
             return Action::EndTurn;
         }
         let home = g.home_playing;
@@ -2395,12 +2406,17 @@ impl HeuristicAgent {
         }
         self.refresh_turn(g);
         if g.turn_mode != ffb_model::enums::TurnMode::Regular && !self.used_this_turn.is_empty() {
+            self.just_deselected = true;
             return Action::EndTurn;
         }
         if eligible.is_empty() {
             return Action::EndTurn;
         }
-        if !eligible.iter().any(|(pid, _)| !self.used_this_turn.contains(pid)) {
+        if !eligible.iter().any(|(pid, _)| !self.used_this_turn.contains(pid))
+            || self.just_deselected
+        {
+            self.just_deselected = false;
+            self.used_this_turn.clear();
             return Action::EndTurn;
         }
         let home = g.home_playing;
@@ -5734,6 +5750,36 @@ mod tests {
                 Action::ActivatePlayer { .. }
             ),
             "a REGULAR turn keeps activating"
+        );
+
+        // Guard 3, `justDeselected`: the turn AFTER a window closes is ended too, because in Java
+        // that window's activation was the original team's last processed one.
+        let mut agent = HeuristicAgent::new(11, 0.0);
+        g.turn_mode = TurnMode::Blitz;
+        g.turn_data_home.turn_nr = 1;
+        assert!(matches!(
+            agent.handle_activate(&g, &f, eligible.clone()),
+            Action::ActivatePlayer { .. }
+        ));
+        assert!(matches!(
+            agent.handle_activate(&g, &f, eligible.clone()),
+            Action::EndTurn
+        ));
+        // A genuinely new REGULAR turn -- fresh key, nobody used -- and it STILL ends, once.
+        g.turn_mode = TurnMode::Regular;
+        g.turn_data_home.turn_nr = 2;
+        assert!(
+            matches!(agent.handle_activate(&g, &f, eligible.clone()), Action::EndTurn),
+            "the turn after a window closes is ended too"
+        );
+        // ...and only once: the flag is consumed, so the turn after THAT plays normally.
+        g.turn_data_home.turn_nr = 3;
+        assert!(
+            matches!(
+                agent.handle_activate(&g, &f, eligible.clone()),
+                Action::ActivatePlayer { .. }
+            ),
+            "justDeselected must be consumed, not sticky"
         );
     }
 

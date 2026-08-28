@@ -2970,3 +2970,44 @@ anything `RandomAgent` does between "the engine asked" and "a player was picked"
 
 **Next:** enumerate the rest of `RandomAgent`'s between-prompt-and-pick contract and check the
 heuristic against it as a set, rather than waiting for each rule to surface as a seed.
+
+## ITER52 — the rest of the pick-loop contract, enumerated instead of discovered
+
+ITER51 ended by saying these rules should be listed deliberately rather than found one seed at a
+time. Doing that: reading `RandomAgent`'s activation loop against the heuristic's gives six contract
+rules, and exactly one was still missing.
+
+| # | rule | heuristic |
+|---|---|---|
+| 1 | `turn_nr < 1` → EndTurn, before the turn-key update | ITER51 |
+| 2 | turn-key change clears the per-turn memory | had it (`refresh_turn`) |
+| 3 | non-REGULAR mode allows ONE activation | ITER51 |
+| 4 | `remaining.isEmpty() \|\| justDeselected` → clear and EndTurn | **missing** |
+| 5 | `usedThisTurn.add` on every pick | had it |
+| 6 | `filterStaleActions` | had it (`action_is_live`) |
+
+Rule 4's `justDeselected` half was absent entirely. Java sets it when a non-REGULAR window ends a
+turn, and the flag then ends the *following* turn as well — in Java that window's activation was the
+original team's last processed one, so the turn it interrupted is over. `RandomAgent` carries the
+flag with the same comment; the heuristic did not. The same exit also *clears* `usedThisTurn` rather
+than waiting for the next turn key to do it, which the heuristic was also not doing.
+
+**bb2020 79 → 87/100** on one flag.
+
+The table is the point. Three of these rules were found by chasing individual seeds (ITER47, ITER51
+twice); reading the loop once found the fourth in minutes. The general lesson for the rest of the
+campaign: where the heuristic *replaced* a random-agent code path rather than extending it, diff the
+two paths as a whole instead of waiting for divergences to surface one at a time.
+
+### Gates
+
+- `--heur-classes all`, 100 seeds, argmax: **bb2020 79 → 87/100**, **bb2016 4 → 5/100**,
+  bb2025 87/100.
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,657 / 0** (the guard test extended; the new assertion
+  bite-checked). `mvn -o -pl ffb-ai test`: **31 / 0**. The two Java trees agree.
+
+**Next:** bb2025 and bb2020 are both at 87/100 and bb2016 at 5/100. bb2016 is the outlier and its
+remaining failures are likely structural (3-command blitz, different generators); the 13 bb2025
+reds are the cleanest next target.
