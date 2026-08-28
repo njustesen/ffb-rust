@@ -2127,3 +2127,48 @@ entered**, and the only cheap way to find those is to break the code on purpose 
 candidate list, NOT a keyed lookup) and the two-level softmax draw that groups by declaration and
 scores each group by its best child. Then the enumeration wiring in `ParityRunner`, and the live
 gate.
+
+## ITER34 — the two-level activation draw
+
+The agent does **not** sample flatly over candidates. It groups them by DECLARATION — the
+`(player, action)` pair the engine actually receives — scores each group by its BEST child, samples
+a group at `T = 0.18` and then a child within it at `T = 0.10`.
+
+The reason is cardinality. A Move declaration can carry two thousand destinations and a Block nine,
+so a flat draw lets the Move branch drown the Block one purely by how many squares exist. Scoring a
+group by its max keeps argmax identical to a flat draw while fixing the sampled case.
+
+Three things have to agree, and only the first is obvious:
+
+1. **contiguous runs, not a keyed lookup.** `build_plans` emits one action at a time, so a
+   declaration's options are adjacent. A keyed lookup merges two *non-adjacent* runs of the same
+   declaration into one group and changes the sampling tree.
+2. `EndTurn` is its own group, appended last, weight exactly 0.0 — so it beats every negative branch
+   and loses to every positive one.
+3. **the draw count.** Two `softmax_pick` calls spend one draw each, *unless* a level has a single
+   entry, where it spends none. A grouping that produces one group too many or too few costs a draw,
+   and every decision after it reads a different number.
+
+Extracted `group_declarations` in Rust so the emitter and the live path cannot drift — a fixture
+that reimplements the grouping is pinning its own copy of it.
+
+Five synthetic candidate lists chosen for shape rather than realism: twelve Move destinations
+against two Block targets (the cardinality case), one player with two adjacent actions, **interleaved
+runs** of the same declaration, all-negative weights (so EndTurn's 0.0 wins), and an exact tie. The
+test asserts it sees draw counts of 0, 1 **and** 2 — a set of cases that always spends two would
+leave the singleton path untested.
+
+Bite-check: replacing the contiguous rule with a keyed lookup fails at
+`group count (interleaved_runs) ==> expected: <4> but was: <3>` — the board that exists for it.
+
+### Gates
+
+- `mvn -o -pl ffb-ai test`: **25 tests, 0 failures**.
+- `cargo test --workspace --release`: **14,654 / 0**.
+- Fourteen-class rung **100/100 in all three editions** at argmax; `--agent random` 100/100 in all
+  three.
+
+**Next:** the wiring. `ParityRunner` has to enumerate the same candidate list — which needs the
+harness's legal-action list per eligible player, the thing no fixture can supply — and then
+`--heur-classes activate` can go live. That is the first sweep where a mistake shows up as a parity
+failure rather than a red unit test.

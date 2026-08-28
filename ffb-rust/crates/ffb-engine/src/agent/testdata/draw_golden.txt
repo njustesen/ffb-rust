@@ -1,0 +1,62 @@
+# two-level activation draw golden -- heuristic_agent.rs handle_activate.
+# case <name>
+# cand <player> <pac> <weight bits>
+# groups <a,b,c|d,e|...>   candidate indices per group, EndTurn group last
+# groupw <f32 bits, comma separated>
+# draw <scale bits> <chosen candidate index> <draws spent>
+case many_moves_vs_few_blocks
+cand a 0 3dcccccd
+cand a 0 3df5c28f
+cand a 0 3de147ae
+cand a 0 3db851ec
+cand a 0 3e051eb8
+cand a 0 3da3d70a
+cand a 0 3df5c28f
+cand a 0 3dcccccd
+cand a 0 3de147ae
+cand a 0 3d8f5c29
+cand a 0 3df5c28f
+cand a 0 3d75c28f
+cand b 1 3f0ccccd
+cand b 1 3ecccccd
+groups 0,1,2,3,4,5,6,7,8,9,10,11|12,13|14
+groupw 3e051eb8,3f0ccccd,00000000
+draw 00000000 12 0
+draw 3f800000 12 2
+draw 49742400 12 2
+case same_player_two_actions
+cand a 0 3e99999a
+cand a 0 3e4ccccd
+cand a 1 3f000000
+cand b 0 3e800000
+groups 0,1|2|3|4
+groupw 3e99999a,3f000000,3e800000,00000000
+draw 00000000 2 0
+draw 3f800000 2 1
+draw 49742400 2 1
+case interleaved_runs
+cand a 0 3e99999a
+cand b 0 3f19999a
+cand a 0 3f666666
+groups 0|1|2|3
+groupw 3e99999a,3f19999a,3f666666,00000000
+draw 00000000 2 0
+draw 3f800000 2 1
+draw 49742400 1 1
+case all_negative
+cand a 0 becccccd
+cand a 0 beb33333
+cand b 1 bf666666
+groups 0,1|2|3
+groupw beb33333,bf666666,00000000
+draw 00000000 3 0
+draw 3f800000 3 1
+draw 49742400 2 1
+case exact_tie
+cand a 0 3f000000
+cand b 1 3f000000
+groups 0|1|2
+groupw 3f000000,3f000000,00000000
+draw 00000000 0 0
+draw 3f800000 0 1
+draw 49742400 1 1

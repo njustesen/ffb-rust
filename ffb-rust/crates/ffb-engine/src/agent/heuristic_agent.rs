@@ -1182,6 +1182,28 @@ fn best_move(f: &Features, r: &Reach, m: &Mover) -> (f32, Option<usize>) {
 /// `best_move` returns only the argmax, which is right for a forced re-plan but wrong for the
 /// activation menu: it made the destination invisible to sampling and to any reader. Ties break on
 /// the flat index so the order is deterministic (§9).
+/// Group the candidate list by DECLARATION — the `(player, action)` pair the engine actually
+/// receives.
+///
+/// `build_plans` emits a player's options one action at a time, so a declaration's candidates are a
+/// CONTIGUOUS RUN and detecting runs is linear. The obvious keyed lookup was `O(groups)` of string
+/// comparison per candidate and cost 30 ms a game on its own.
+///
+/// Extracted so the golden emitter and the live path cannot drift: a fixture that reimplements the
+/// grouping is pinning its own copy.
+fn group_declarations(cands: &[Candidate]) -> Vec<Vec<usize>> {
+    let mut groups: Vec<Vec<usize>> = Vec::new();
+    for (i, c) in cands.iter().enumerate() {
+        let same = i > 0 && cands[i - 1].pac == c.pac && cands[i - 1].player == c.player;
+        if same {
+            groups.last_mut().expect("run started").push(i);
+        } else {
+            groups.push(vec![i]);
+        }
+    }
+    groups
+}
+
 fn top_moves(f: &Features, r: &Reach, m: &Mover, k: usize) -> Vec<(f32, usize)> {
     let mut v: Vec<(f32, usize)> = r
         .order
@@ -2118,15 +2140,7 @@ impl HeuristicAgent {
         // build_plans emits a player's options one action at a time, so a declaration's candidates
         // are a CONTIGUOUS RUN. Detecting runs is linear; the obvious keyed lookup was O(groups) of
         // string comparison per candidate and cost 30 ms a game on its own.
-        let mut groups: Vec<Vec<usize>> = Vec::new();
-        for (i, c) in cands.iter().enumerate() {
-            let same = i > 0 && cands[i - 1].pac == c.pac && cands[i - 1].player == c.player;
-            if same {
-                groups.last_mut().expect("run started").push(i);
-            } else {
-                groups.push(vec![i]);
-            }
-        }
+        let mut groups = group_declarations(&cands);
         // EndTurn is its own group, and sits last in `buf`.
         let end_idx = self.buf.options.len() - 1;
         groups.push(vec![end_idx]);
@@ -5452,6 +5466,149 @@ mod tests {
         }
 
         let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/agent/testdata/activate_golden.txt");
+        std::fs::write(path, out).unwrap();
+        eprintln!("wrote {path}");
+    }
+
+    /// The two-level activation draw — declaration grouping plus the nested softmax — as a
+    /// fixture.
+    ///
+    /// The agent does NOT sample flatly over candidates. It groups them by DECLARATION (the
+    /// `(player, action)` pair the engine actually receives), scores each group by its best child,
+    /// samples a group at `T = 0.18` and then a child within it at `T = 0.10`. The reason is in the
+    /// shapes: a Move declaration can carry two thousand destinations and a Block nine, and a flat
+    /// draw would let the Move branch drown the Block one purely by cardinality. Scoring a group by
+    /// its MAX keeps argmax identical to a flat draw while fixing the sampled case.
+    ///
+    /// Three things have to agree, and only the first is obvious:
+    ///
+    /// 1. the grouping — CONTIGUOUS runs of `(player, pac)`, because `build_plans` emits one action
+    ///    at a time. A keyed lookup would group non-adjacent runs together and change the tree.
+    /// 2. `EndTurn` is its own group, appended AFTER all of them, and its weight is exactly 0.0 —
+    ///    so it competes with negative-weight branches and loses to positive ones.
+    /// 3. the DRAW COUNT: two `softmax_pick` calls, each spending one draw unless its list has a
+    ///    single entry (or the temperature is 0, where nothing is drawn at all). A group of one
+    ///    silently costs a draw fewer, and the stream desynchronises from there.
+    ///
+    /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_draw_golden -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_draw_golden() {
+        use std::fmt::Write as _;
+
+        // (player, pac-as-index, weight) — the shapes that matter, not real boards: one huge Move
+        // run against a small Block run, singleton groups, negative weights, and an exact tie.
+        type C = (&'static str, u8, f32);
+        let cases: [(&str, &[C]); 5] = [
+            (
+                // The cardinality case the two-level draw exists for: 12 Move destinations for one
+                // player against 2 Block targets for another, with the BEST option in the small
+                // group.
+                "many_moves_vs_few_blocks",
+                &[
+                    ("a", 0, 0.10), ("a", 0, 0.12), ("a", 0, 0.11), ("a", 0, 0.09),
+                    ("a", 0, 0.13), ("a", 0, 0.08), ("a", 0, 0.12), ("a", 0, 0.10),
+                    ("a", 0, 0.11), ("a", 0, 0.07), ("a", 0, 0.12), ("a", 0, 0.06),
+                    ("b", 1, 0.55), ("b", 1, 0.40),
+                ],
+            ),
+            (
+                // The SAME player with two different actions, adjacent: two groups, not one.
+                "same_player_two_actions",
+                &[("a", 0, 0.30), ("a", 0, 0.20), ("a", 1, 0.50), ("b", 0, 0.25)],
+            ),
+            (
+                // Non-adjacent runs of the same declaration. A keyed lookup merges these; the
+                // contiguous rule keeps them apart, and the group weights differ as a result.
+                "interleaved_runs",
+                &[("a", 0, 0.30), ("b", 0, 0.60), ("a", 0, 0.90)],
+            ),
+            (
+                // Every weight negative, so EndTurn's 0.0 is the best option on the board.
+                "all_negative",
+                &[("a", 0, -0.40), ("a", 0, -0.35), ("b", 1, -0.90)],
+            ),
+            (
+                // An exact tie between two groups: whatever breaks it must break it the same way.
+                "exact_tie",
+                &[("a", 0, 0.50), ("b", 1, 0.50)],
+            ),
+        ];
+
+        let mut out = String::new();
+        writeln!(out, "# two-level activation draw golden -- heuristic_agent.rs handle_activate.").unwrap();
+        writeln!(out, "# case <name>").unwrap();
+        writeln!(out, "# cand <player> <pac> <weight bits>").unwrap();
+        writeln!(out, "# groups <a,b,c|d,e|...>   candidate indices per group, EndTurn group last").unwrap();
+        writeln!(out, "# groupw <f32 bits, comma separated>").unwrap();
+        writeln!(out, "# draw <scale bits> <chosen candidate index> <draws spent>").unwrap();
+
+        for (name, cs) in cases {
+            writeln!(out, "case {name}").unwrap();
+            for &(pl, pac, w) in cs {
+                writeln!(out, "cand {pl} {pac} {:08x}", w.to_bits()).unwrap();
+            }
+
+            // Rebuild the Candidate list so the LIVE `group_declarations` is what runs.
+            let cands: Vec<Candidate> = cs
+                .iter()
+                .map(|&(pl, pac, w)| Candidate {
+                    weight: w,
+                    player: pl.to_string(),
+                    pac: if pac == 0 {
+                        PlayerActionChoice::Move
+                    } else {
+                        PlayerActionChoice::Block
+                    },
+                    target: None,
+                    kind: PlanKind::Move,
+                    path: Vec::new(),
+                    dest: None,
+                    why: Rule::Flat,
+                    note: String::new(),
+                })
+                .collect();
+            let mut groups = group_declarations(&cands);
+            // EndTurn is its own group and sits last, exactly as `handle_activate` appends it.
+            let end_idx = cands.len();
+            groups.push(vec![end_idx]);
+
+            let mut all_w: Vec<f32> = cands.iter().map(|c| c.weight).collect();
+            all_w.push(0.0); // EndTurn
+
+            let gs: Vec<String> = groups
+                .iter()
+                .map(|g| g.iter().map(|i| i.to_string()).collect::<Vec<_>>().join(","))
+                .collect();
+            writeln!(out, "groups {}", gs.join("|")).unwrap();
+
+            let gw: Vec<f32> = groups
+                .iter()
+                .map(|g| g.iter().map(|&j| all_w[j]).fold(f32::MIN, f32::max))
+                .collect();
+            let gwh: Vec<String> = gw.iter().map(|v| format!("{:08x}", v.to_bits())).collect();
+            writeln!(out, "groupw {}", gwh.join(",")).unwrap();
+
+            for scale in [0.0f32, 1.0, 1.0e6] {
+                let mut a = HeuristicAgent::new(9, scale);
+                let before = a.rng.clone();
+                let (gi, _) = a.softmax_pick(&gw, 0.18);
+                let cw: Vec<f32> = groups[gi].iter().map(|&j| all_w[j]).collect();
+                let (ci, _) = a.softmax_pick(&cw, 0.10);
+                let chosen = groups[gi][ci];
+                // How many draws the pair actually spent, measured the same way the draw-count
+                // tests do: advance a clone of the pre-state until it matches.
+                let mut probe = before;
+                let mut draws = 0usize;
+                while probe.clone().next_u64() != a.rng.clone().next_u64() && draws < 8 {
+                    probe.next_u64();
+                    draws += 1;
+                }
+                writeln!(out, "draw {:08x} {chosen} {draws}", scale.to_bits()).unwrap();
+            }
+        }
+
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/agent/testdata/draw_golden.txt");
         std::fs::write(path, out).unwrap();
         eprintln!("wrote {path}");
     }

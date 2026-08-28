@@ -123,6 +123,99 @@ public final class Activation {
         return out;
     }
 
+    /** One enumerated option: which declaration it belongs to, and what it is worth. */
+    public static final class Option {
+        public final String player;
+        /** The declared action. Only equality matters, so any stable key will do. */
+        public final String pac;
+        public final float weight;
+
+        public Option(String player, String pac, float weight) {
+            this.player = player;
+            this.pac = pac;
+            this.weight = weight;
+        }
+    }
+
+    /**
+     * Rust {@code group_declarations}: group the options by DECLARATION — the {@code (player,
+     * action)} pair the engine actually receives.
+     *
+     * <p><b>Contiguous runs, not a keyed lookup.</b> {@code build_plans} emits a player's options
+     * one action at a time, so a declaration's options are adjacent; grouping by key instead would
+     * merge two non-adjacent runs of the same declaration into one group and change the sampling
+     * tree. (It is also what made the original O(groups) of string comparison per option.)
+     */
+    public static List<List<Integer>> groupDeclarations(List<Option> options) {
+        List<List<Integer>> groups = new ArrayList<>();
+        for (int i = 0; i < options.size(); i++) {
+            Option c = options.get(i);
+            Option prev = i > 0 ? options.get(i - 1) : null;
+            boolean same = prev != null && prev.pac.equals(c.pac) && prev.player.equals(c.player);
+            if (same) {
+                groups.get(groups.size() - 1).add(i);
+            } else {
+                List<Integer> g = new ArrayList<>();
+                g.add(i);
+                groups.add(g);
+            }
+        }
+        return groups;
+    }
+
+    /**
+     * The two-level draw: pick a DECLARATION at {@code T = 0.18}, then an option within it at
+     * {@code T = 0.10}.
+     *
+     * <p>The agent does not sample flatly, and the reason is cardinality: a Move declaration can
+     * carry two thousand destinations and a Block nine, so a flat draw lets the Move branch drown
+     * the Block one purely by how many squares exist. Scoring each group by its BEST child keeps
+     * argmax identical to a flat draw while fixing the sampled case.
+     *
+     * <p>{@code EndTurn} is appended as its own group with weight exactly 0.0 — it therefore beats
+     * every negative-weight branch and loses to every positive one, which is what "banking what the
+     * team has" should mean.
+     *
+     * <p><b>Two draws, not one</b>, unless a level has a single entry (or the temperature is 0,
+     * where nothing is drawn). A singleton group silently costs a draw fewer, and the stream
+     * desynchronises from there — which is why the fixture pins the draw COUNT and not only the
+     * choice.
+     *
+     * @return the chosen index into {@code options}, or {@code options.size()} for EndTurn.
+     */
+    public static int chooseCandidate(Sampler sampler, List<Option> options) {
+        List<List<Integer>> groups = groupDeclarations(options);
+        int endIdx = options.size();
+        List<Integer> endGroup = new ArrayList<>();
+        endGroup.add(endIdx);
+        groups.add(endGroup);
+
+        float[] allW = new float[options.size() + 1];
+        for (int i = 0; i < options.size(); i++) {
+            allW[i] = options.get(i).weight;
+        }
+        allW[endIdx] = 0.0f;
+
+        float[] gw = new float[groups.size()];
+        for (int g = 0; g < groups.size(); g++) {
+            // Rust folds with f32::MIN as the seed, not negative infinity; identical here because
+            // every weight is finite, and written the same way so it stays identical.
+            float best = -Float.MAX_VALUE;
+            for (int j : groups.get(g)) {
+                best = Math.max(best, allW[j]);
+            }
+            gw[g] = best;
+        }
+        int gi = sampler.softmaxPick(gw, gw.length, 0.18f);
+        List<Integer> chosen = groups.get(gi);
+        float[] cw = new float[chosen.size()];
+        for (int k = 0; k < chosen.size(); k++) {
+            cw[k] = allW[chosen.get(k)];
+        }
+        int ci = sampler.softmaxPick(cw, cw.length, 0.10f);
+        return chosen.get(ci);
+    }
+
     /** The indices into {@link #rank}'s output that get a real search. */
     public static int tier2Count(int nCands) {
         return Math.min(TIER2, nCands);
