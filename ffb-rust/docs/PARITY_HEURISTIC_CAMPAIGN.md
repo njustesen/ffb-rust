@@ -3063,3 +3063,25 @@ find, and it took until the fifty-third iteration because everything upstream of
 
 **Next:** bb2025 and bb2020 have 11 reds each, bb2016 95. Worth checking whether the two editions'
 reds are the same seeds — a shared cause would be worth more than either list.
+
+## ITER54 — the two editions fail on the same seeds (investigation, no fix landed)
+
+Answering ITER53's question, because it changes what to work on next. The red lists:
+
+| | bb2020 | bb2025 |
+|---|---|---|
+| shared seed AND step | 14/178, 20/114, 30/177, 32/187, 35/114, 58/163, 72/72, 98/166 | same eight |
+| edition-only | 62/65, 93/107, 97/140 | 62/83, 73/37, 87/134 |
+
+**Eight of eleven reds are the same seed at the same step in both editions.** These are one small
+set of shared causes, not twenty-two independent bugs, and each fix should be worth roughly double.
+
+Started on the shallowest shared one, seed 72 step 72: a block whose crowd push badly hurts `h02` in
+Java and `h05` in Rust, on identical dice. Diffing every pushback decision in the game shows all
+sixteen *choices* agreeing (same squares, same pick index) while two of them name a different
+defender — Java `h03` where Rust says `h02` — so ITER53's fix is right but incomplete: the
+chain-aware defender is correct at the first chain level and wrong deeper in. The picks happen to
+match there, so this is not yet proven to be the cause of the divergence; the next step is to trace
+the push chain itself (defender, from-square, chosen square) rather than the agent's answers.
+
+No code change; recorded so the next iteration starts from the measurement rather than repeating it.
