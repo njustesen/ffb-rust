@@ -397,7 +397,17 @@ impl StepInitSelecting {
         // on the first bb2016 activation. For a MOVE, emit AgentPrompt::Move with the legal one-step
         // destinations (same list StepInitMoving uses); the agent builds the full path and replies
         // Action::Move{path}. (BLOCK/BLITZ/FOUL dispatch prompts are wired in follow-up steps.)
-        if action == Some(PlayerAction::Move) {
+        // Java gates the movement phase on `actingPlayer.getPlayerAction().isMoving()`, which
+        // covers every MOVE VARIANT and not just plain MOVE. This read `== Move`, so declaring a
+        // HAND_OVER_MOVE or PASS_MOVE -- the variants that exist precisely to buy a movement phase
+        // before the give or the throw -- produced NO prompt at all: the parity loop saw
+        // `prompt_after=None, finished=false` and ended the game silently, mid-drive (bb2016 seed 2
+        // step 38, and 95 of 100 bb2016 seeds). The random contract never declared a move variant,
+        // so nothing before the heuristic could reach it.
+        //
+        // Rust stores a declared bb2016 blitz as `Blitz` rather than `BlitzMove`, and Java's
+        // `isMoving()` does not list `BLITZ` either, so the blitz path is unaffected.
+        if action.map(|a| a.is_moving()).unwrap_or(false) {
             if let Some(player_id) = game.acting_player.player_id.clone() {
                 let squares = crate::legal_actions::legal_move_targets(game, &player_id);
                 return StepOutcome::cont()
@@ -505,6 +515,72 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2016)
+    }
+
+    /// Every MOVE VARIANT must open a movement phase, not just plain `Move`.
+    ///
+    /// Java gates this on `PlayerAction.isMoving()`, which lists `HAND_OVER_MOVE` and `PASS_MOVE`
+    /// alongside `MOVE`; Rust compared against `Move` alone. A declared `HandOffMove` therefore
+    /// produced NO prompt — the parity loop saw `prompt_after=None, finished=false` and ended the
+    /// game silently in mid-drive. bb2016 seed 2 stopped at step 38 while Java played on to 164,
+    /// and 95 of 100 bb2016 seeds were red.
+    ///
+    /// The random contract only ever declares the immediate `HandOver`/`Pass`, so nothing before
+    /// the heuristic could reach this.
+    #[test]
+    fn every_move_variant_opens_a_movement_phase() {
+        use ffb_model::enums::{PlayerState, PS_STANDING};
+        use ffb_model::types::FieldCoordinate;
+
+        // (declared choice, the action it is stored as)
+        let cases = [
+            (PlayerActionChoice::Move, PlayerAction::Move),
+            (PlayerActionChoice::HandOffMove, PlayerAction::HandOverMove),
+            (PlayerActionChoice::PassMove, PlayerAction::PassMove),
+        ];
+        for (choice, expected) in cases {
+            let mut game = make_game();
+            for (id, nr, x, y) in [("p1", 1, 10, 7), ("p2", 2, 11, 7)] {
+                game.team_home.players.push(ffb_model::model::player::Player {
+                    id: id.into(), name: id.into(), nr, position_id: "pos".into(),
+                    movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+                    ..Default::default()
+                });
+                game.field_model.set_player_coordinate(id, FieldCoordinate::new(x, y));
+                game.field_model
+                    .set_player_state(id, PlayerState::new(PS_STANDING).change_active(true));
+            }
+            game.home_playing = true;
+            game.field_model.ball_coordinate = Some(FieldCoordinate::new(10, 7));
+            game.field_model.ball_in_play = true;
+
+            let mut step = StepInitSelecting::new("end".into());
+            let out = step.handle_command(
+                &Action::ActivatePlayer {
+                    player_id: "p1".into(),
+                    player_action: choice,
+                    // The receiver is folded in at activation, exactly as the agent supplies it.
+                    block_defender_id: Some("p2".into()),
+                },
+                &mut game,
+                &mut GameRng::new(0),
+            );
+
+            assert_eq!(
+                game.acting_player.player_action,
+                Some(expected),
+                "{choice:?} must be stored as {expected:?}"
+            );
+            assert!(
+                matches!(
+                    out.prompt,
+                    Some(ffb_model::prompts::AgentPrompt::Move { ref player_id, .. })
+                        if player_id == "p1"
+                ),
+                "{choice:?} must open a movement phase, got {:?}",
+                out.prompt
+            );
+        }
     }
 
     /// Java `StepInitSelecting.prepareStandingUp()` gates its stand-up branch on

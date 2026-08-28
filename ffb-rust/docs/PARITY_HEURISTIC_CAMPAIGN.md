@@ -3258,3 +3258,55 @@ remaining failures are structural rather than sampling-related — its 3-command
 generators and step twins. That is now the largest single block of work and the obvious next target.
 
 **Next:** bb2016's lowest failing seed at argmax.
+
+## ITER58 — bb2016 gave no movement phase to a move variant, and the game ended in silence
+
+**bb2016 argmax: 5 → 13/100.** Scale 1.0: 5 → 7/100.
+
+bb2016 seed 2 diverged at step 38, and the state strings matched everywhere they overlapped —
+because Rust had only 38 steps against Java's 164. The `LOOP` trace named it in one line:
+
+```
+LOOP applied=Activate(home_03,HandOffMove) prompt_after=None finished=false
+```
+
+No prompt and not finished, so the parity loop's `current_prompt().is_none()` exit fired and the
+game stopped mid-drive without a word. `bb2016/StepInitSelecting::execute_step` opens the movement
+phase on
+
+```rust
+if action == Some(PlayerAction::Move) {
+```
+
+where Java gates it on `PlayerAction.isMoving()` — which lists `HAND_OVER_MOVE` and `PASS_MOVE`
+alongside `MOVE`. Those two variants exist *precisely* to buy a movement phase before the give or
+the throw, and bb2016 was the one edition that gave them none. `is_moving()` was already ported
+faithfully on the Rust enum; the call site simply did not use it.
+
+Rust stores a declared bb2016 blitz as `Blitz` rather than `BlitzMove`, and Java's `isMoving()` does
+not list `BLITZ` either, so widening the gate to the real predicate leaves the blitz path untouched
+— confirmed by `--agent random` and the fourteen-class rung staying 100/100 in all three editions.
+
+**Why bb2016 alone.** The random contract declares the IMMEDIATE `HandOver`/`Pass`, never a move
+variant, so no gate before the heuristic could reach this line. ITER49 taught the agent to declare
+the MOVE variants — and bb2025 and bb2020 handled them, so the campaign moved on with bb2016 still
+silently ending 95 of its 100 games at the first give.
+
+**The signal worth remembering:** a *shorter* Rust log with no state mismatch is not a subtle
+divergence — it is a stall, and `LOOP applied=… prompt_after=None` names the exact action that
+caused it. That is much faster than diffing states, and this iteration's first three commands were
+the whole diagnosis.
+
+### Gates
+
+- `--heur-classes all`, 100 seeds, argmax: **bb2016 5 → 13/100**; bb2020 90/100, bb2025 90/100
+  (untouched — the fix is in a bb2016-only file).
+- scale 1.0: **bb2016 5 → 7/100**; bb2025 94/100, bb2020 93/100.
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,659 / 0** (+1, bite-checked — it fails on exactly the
+  `== Move` comparison). `mvn -o -pl ffb-ai test`: **34 / 0**. The two Java trees agree.
+
+**Next:** bb2016's new lowest failing seed. 87 reds remain there against 10 in each of the other two,
+so bb2016 stays the target — and the stall signature above is worth checking for first each time,
+since one more dead action would look identical.
