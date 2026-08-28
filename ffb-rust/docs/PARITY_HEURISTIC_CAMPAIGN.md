@@ -2897,3 +2897,35 @@ terminal can fire.
 **Next:** bb2016 is now the outlier at 2/100 and is where the remaining structural work is — it
 routes through different generators and step twins, and its blitz is the 3-command form. bb2025's
 13 reds and bb2020's 31 are the other two fronts; seeds 14 and 20 are the shallowest bb2025 reds.
+
+## ITER50 — bb2016's blitz re-picked its own victim
+
+bb2016 seed 1 step 21: both sides activate `home_01` with a blitz, and one step later Java has ended
+the whole team turn (t21 home → t22 away) while Rust is still in it with `blitz_used` set — and Rust
+has spent one more die.
+
+bb2016's blitz is the **3-command form** (`CLIENT_BLITZ_MOVE` with an empty path, then
+`CLIENT_BLOCK`), so it goes through `sendConcreteAction`'s bb2016 arm rather than
+`SELECT_BLITZ_TARGET`. That arm called `pickBlockTarget` — the *random* contract's picker, which
+draws from `actionRng` — throwing away the victim the heuristic had already chosen when it declared
+the blitz, and spending a die the Rust side does not spend.
+
+`sendBlockAction` was given exactly this fix earlier in the campaign; bb2016's blitz was the one
+remaining arm still re-picking. It now uses `heuristicTarget` the same way, and falls back to
+`pickBlockTarget` only when the random agent is driving.
+
+Like ITER46 this is a routing change with no pure-function seam to unit-test — the property is
+"which of two branches the dispatcher takes", and `sendBlockAction`'s identical fix has no unit test
+either for the same reason. The sweep is the evidence: seed 1 **21 → 185**, seed 5 **23 → 89**,
+bb2016 overall **2/100 → 4/100**.
+
+### Gates
+
+- `--heur-classes all`, 100 seeds, argmax: **bb2016 4/100** (was 2), bb2020 69/100, bb2025 87/100.
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,656 / 0** (no Rust change). `mvn -o -pl ffb-ai test`:
+  **31 / 0**. The two Java trees agree.
+
+**Next:** bb2016 seed 4 fails at **step 0**, which is a different and much earlier problem than the
+rest of the bb2016 set — worth taking before the deeper ones.

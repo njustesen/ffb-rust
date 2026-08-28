@@ -1946,6 +1946,14 @@ public class ParityRunner {
                         FieldCoordinate cmdFrom = game.isHomePlaying() ? bcoord : bcoord.transform();
                         MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandBlitzMove(
                             pid, cmdFrom, new FieldCoordinate[]{}));
+                    } else if (activation != null && heuristicTarget != null) {
+                        // Same reason as sendBlockAction: the heuristic CHOSE this victim when it
+                        // declared the blitz. Re-picking here both ignores that choice and spends
+                        // an actionRng draw the Rust side does not spend -- bb2016 was the one
+                        // edition still doing it, because its blitz is the 3-command form and goes
+                        // through this arm rather than SELECT_BLITZ_TARGET.
+                        MatchRunner.inject(gameState, new ClientCommandBlock(
+                            pid, heuristicTarget, false, false, false, false, false));
                     } else {
                         Player<?> btarget = pickBlockTarget(game, pid);
                         if (btarget == null) {
