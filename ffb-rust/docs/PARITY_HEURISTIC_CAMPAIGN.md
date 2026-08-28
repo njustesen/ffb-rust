@@ -2771,11 +2771,14 @@ them `StandUp`) dropped seed 1 from 185 to 22 and seed 3 from 72 to 20. It was n
 naming — it was wrong about the semantics: `STAND_UP` is *stand up and end the activation*, so the
 player rose and stopped. Reverted.
 
-**stdout and stderr do not interleave.** `JSTEP` and a `System.err` probe land in different streams,
-and through a pipe the whole probe output can appear after the whole step log. That ordering
-artifact produced a confident, wrong conclusion — "`sendMoveAction` is never called for this player"
-— twice. Every probe that has to be read *in sequence with* the step log must print to `System.out`
-and carry `stepIndex`; without the index the two cannot be aligned at all.
+**stdout and stderr do not interleave.** `JSTEP` is printed on **`System.err`**
+(`ParityRunner.java:1723`). A probe on `System.out` therefore lands in a different stream, and
+through a pipe the whole probe output can appear after the whole step log. That ordering artifact
+produced a confident, wrong conclusion — "`sendMoveAction` is never called for this player" — twice.
+A probe that has to be read *in sequence with* the step log must print to `System.err`, and should
+carry `stepIndex` anyway: with the index the two can be aligned no matter how they buffer, and
+without it they cannot be aligned at all. (The candidate-list dumps that found the ITER45 foul bug
+were on `System.err` and were correctly paired; it was the `System.out` probe that lied.)
 
 ### Gates
 
