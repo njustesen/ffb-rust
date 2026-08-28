@@ -2559,3 +2559,41 @@ granularities, and the state index is the finer signal.
 - `mvn -o -pl ffb-ai test`: 28 / 0.
 
 **Next:** home_01 landing on (11,7) rather than (11,6) after the blitz.
+
+## ITER44 — `spent`, and why the blitzer still does not move
+
+**The fix.** Rust's `budget_of` sets `spent` from the ACTING player's `current_move`; the Java
+driver passed 0. So every re-plan handed the mover a full fresh allowance — most visibly a blitzer
+who had already stood up and blocked, whose Java reach was longer than his Rust one. Both call sites
+(`recordPlan` and `replan`) now use `spentBy(game, playerId)`, which returns 0 for anyone who is not
+the acting player, since only he has spent anything.
+
+**What it did not fix, and why that is the real finding.** The blitzer still ends on (11,7) where
+Rust puts him on (11,6) — and the reason is not scoring at all. Instrumenting showed `replan` is
+**never called**, because the harness's phase-2 blitz arm is entered exactly ONCE per blitz:
+
+```
+JAVA_BZARM pid=Home1 sent=false tss=Away1     <- block sent here
+(no second entry)
+```
+
+After the block the harness never revisits phase 2 for that player, so `sendMoveAction` — and with
+it the whole replay path — is unreachable. ITER43's change (call `sendMoveAction` instead of
+`CONFIRM` on the second entry) is correct and is simply never reached.
+
+The player in question is PRONE before the blitz, so this is a stand-up blitz: he stands, blocks,
+and in Rust then spends what movement is left. The harness's loop was built for an agent that had
+nothing left to do after a block, and it ends the activation structurally rather than by choice.
+
+That makes the next step a control-flow change in the harness rather than a scoring one — a
+different kind of fix from the last three, and worth naming as such rather than continuing to look
+for a weight that disagrees.
+
+### Gates
+
+- Fourteen-class rung: **100/100 in all three editions** at argmax.
+- `--agent random`: **100/100** in all three editions.
+- `mvn -o -pl ffb-ai test`: 28 / 0. Frontier unchanged at state `i = 13`.
+
+**Next:** make the harness revisit phase 2 after a blitz block, so the blitzer's remaining movement
+is reachable at all.

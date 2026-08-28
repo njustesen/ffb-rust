@@ -159,7 +159,8 @@ public final class ActivationDriver {
         FieldCoordinate here = coordOf(game, player);
         if (dest != null && here != null) {
             Features f = Features.build(game);
-            Reach r = Reach.search(f, Reach.budgetOf(here, m.ma, isProne(game, player), 0),
+            Reach r = Reach.search(f,
+                Reach.budgetOf(here, m.ma, isProne(game, player), spentBy(game, player)),
                 new Reach.MoverSpec(m.home, m.ag, false, false), false, false, teamReRoll);
             if (r != null) {
                 path = r.pathTo(dest);
@@ -220,7 +221,8 @@ public final class ActivationDriver {
         com.fumbbl.ffb.model.TurnData td =
             m.home ? game.getTurnDataHome() : game.getTurnDataAway();
         boolean teamReRoll = td.getReRolls() > 0 && !td.isReRollUsed();
-        Reach r = Reach.search(f, Reach.budgetOf(here, m.ma, isProne(game, playerId), 0),
+        Reach r = Reach.search(f,
+            Reach.budgetOf(here, m.ma, isProne(game, playerId), spentBy(game, playerId)),
             new Reach.MoverSpec(m.home, m.ag, false, false), false, false, teamReRoll);
         if (r == null) {
             plan = null;
@@ -264,6 +266,22 @@ public final class ActivationDriver {
     /** Latch the terminal action so it is attempted at most once per activation. */
     public void markFired() {
         plan.fired = true;
+    }
+
+    /**
+     * Rust {@code budget_of}'s {@code spent}: how much movement this player has already used.
+     *
+     * <p>Only the ACTING player has spent anything — for anyone else the activation has not started
+     * — and it is what stops a re-plan from handing a blitzer who has already blocked a full fresh
+     * move allowance. Passing 0 here gave the Java blitzer a longer reach than the Rust one and
+     * landed him a square further on.
+     */
+    private static int spentBy(Game game, String playerId) {
+        ActingPlayer ap = game.getActingPlayer();
+        if (ap == null || !playerId.equals(ap.getPlayerId())) {
+            return 0;
+        }
+        return Math.max(ap.getCurrentMove(), 0);
     }
 
     private static boolean isProne(Game game, String playerId) {
