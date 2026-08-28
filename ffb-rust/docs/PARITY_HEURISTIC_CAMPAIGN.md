@@ -2302,3 +2302,51 @@ action — and then the harness wiring. `activate` and `move` have to go live to
 set by one and consumed by the other, and the random contract's per-activation state (its
 `moved_this_activation`, its pre-drawn move target) is only refreshed when IT sees the activation
 prompt, so splitting them would leave that state stale on one side.
+
+## ITER38 — `handle_move`: the plan replay, extracted
+
+The move handler is a state machine with **seven exits and four engine guards**, and in Rust it was
+control flow tangled with the mutations it drives (`pl.fired = true; self.plan = Some(pl); return
+...`). That shape cannot be pinned against a Java twin, because there is no way to call it with
+made-up inputs.
+
+Extracted as `replay_plan(kind, is_mine, path_empty, delivered, fired, &ReplayFacts) -> Replay`,
+a pure function of the board facts the caller gathers. `handle_move` now gathers the facts, asks it,
+and turns the verdict into an `Action`.
+
+The rules it encodes, in order:
+
+- an EMPTY square list means no MOVEMENT is left, **not** that there is nothing to do — a pending
+  give, throw, blitz or foul still has to be sent. Bailing here threw away every give whose run-up
+  spent the carrier's whole move, which is most of the good ones.
+- a path is delivered only when the offered squares contain its next step; if the board moved under
+  the plan, re-decide rather than insist.
+- every terminal action is gated on the engine's OWN condition (`BlitzMove` + not having blocked +
+  adjacent; `FoulMove` + not having fouled; the pass/give action set + the target still on the
+  pitch) and latched with `fired`, because `StepInitMoving` re-emits this prompt when its guard
+  fails and a resend would spin forever.
+- a delivered plain move ends — moving twice reaches the same square.
+- once fired, only a **blitz** has anything legitimate left (its post-block movement), and a
+  **pickup** re-decides because it genuinely changed the value model.
+
+One asymmetry is preserved deliberately and called out in the comment: `terminal_pending` is read
+off the plan WITHOUT checking whose plan it is, so a pending give belonging to another player still
+suppresses the early exit. Tightening that to "this player's plan" is the obvious cleanup and would
+change behaviour.
+
+### Verifying a refactor the gate cannot see
+
+`handle_move` is not exercised by the current mask — `move` is the one class still off — so neither
+the parity gate nor the workspace tests would have caught a mistake here. Verified behaviourally
+instead: ten full games at `--heur-classes all --heur-scale 1.0`, capturing **Rust's own**
+end-of-game hashes before and after the extraction. Identical on all ten. Plus
+`plan_replay_state_machine`, which walks every exit and all four guards explicitly.
+
+### Gates
+
+- `cargo test --workspace --release`: **14,655 / 0**.
+- Fourteen-class rung **100/100 in all three editions** at argmax; `--agent random` 100/100 in all
+  three.
+
+**Next:** port `replay_plan` to Java against a table-driven golden, then wire both `activate` and
+`move` into `ParityRunner` together and run the first live gate.

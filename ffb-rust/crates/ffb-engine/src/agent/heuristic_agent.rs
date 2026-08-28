@@ -1182,7 +1182,133 @@ fn best_move(f: &Features, r: &Reach, m: &Mover) -> (f32, Option<usize>) {
 /// `best_move` returns only the argmax, which is right for a forced re-plan but wrong for the
 /// activation menu: it made the destination invisible to sampling and to any reader. Ties break on
 /// the flat index so the order is deterministic (§9).
-/// Group the candidate list by DECLARATION — the `(player, action)` pair the engine actually
+/// The board facts `replay_plan` needs, gathered once by the caller.
+///
+/// Pulled out as a struct so the decision below is a pure function of them: it is a state machine
+/// with seven exits and four engine guards, and the only way to pin it against the Java twin is to
+/// be able to call it with made-up inputs.
+#[derive(Clone, Copy)]
+pub(crate) struct ReplayFacts {
+    /// The action the ENGINE currently has on the acting player, which is what gates every
+    /// terminal dispatch. `StepInitMoving` falls THROUGH when its guard fails and re-emits the
+    /// same prompt, so a rejected action resent would spin forever.
+    pub(crate) pa_now: Option<PlayerAction>,
+    pub(crate) has_blocked: bool,
+    pub(crate) has_fouled: bool,
+    /// Whether the plan's victim/receiver is adjacent right now.
+    pub(crate) target_adjacent: bool,
+    /// Whether the plan's receiver is still on the pitch.
+    pub(crate) target_on_pitch: bool,
+    /// Whether the offered squares include the next step of the planned path.
+    pub(crate) squares_include_next: bool,
+    pub(crate) squares_empty: bool,
+}
+
+/// What `handle_move` decided, before it is turned into an `Action`.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub(crate) enum Replay {
+    /// Deliver the whole remaining path in one answer; the engine walks it.
+    DeliverPath,
+    /// Send the plan's terminal action.
+    FireTerminal,
+    EndPlayerAction,
+    /// No usable plan — re-decide from scratch.
+    Replan,
+}
+
+/// The plan-replay state machine, as a pure function.
+///
+/// Seven exits, and the ordering between them is the whole content:
+///
+/// - an EMPTY square list means no MOVEMENT is left, **not** that there is nothing to do. A pending
+///   give, throw, blitz or foul still has to be sent; bailing here threw away every give whose
+///   run-up used the carrier's whole move, which is most of the good ones.
+/// - a path is only delivered when the offered squares actually contain its next step. If the board
+///   moved under the plan, fall through and re-decide rather than insisting.
+/// - every terminal action is gated on the engine's OWN condition and latched with `fired`, because
+///   `StepInitMoving` re-emits this prompt when its guard fails, so resending would spin.
+/// - `Move`/`Immediate` that has been delivered ends: moving twice reaches the same square.
+///   A plan that never carried a path (a tier-1 proxy pick) still has to decide, so it falls
+///   through instead.
+/// - once `fired`, only a `Blitz` has anything legitimate left (its post-block movement); a
+///   `Pickup` genuinely changed the value model and re-decides.
+pub(crate) fn replay_plan(
+    kind: &PlanKind,
+    plan_is_for_this_player: bool,
+    path_empty: bool,
+    delivered: bool,
+    fired: bool,
+    f: &ReplayFacts,
+) -> Replay {
+    let terminal_pending = matches!(
+        kind,
+        PlanKind::HandOff { .. } | PlanKind::Pass { .. } | PlanKind::Blitz { .. }
+            | PlanKind::Foul { .. }
+    );
+    // NOTE the asymmetry, and it is the original's: `terminal_pending` is read off the plan
+    // WITHOUT checking whose plan it is. A pending give belonging to another player still
+    // suppresses the early exit here. Tightening it to "this player's plan" is the obvious
+    // cleanup and would change behaviour.
+    if f.squares_empty && !terminal_pending {
+        return Replay::EndPlayerAction;
+    }
+    if !plan_is_for_this_player {
+        return Replay::Replan;
+    }
+    if !path_empty {
+        if f.squares_include_next {
+            return Replay::DeliverPath;
+        }
+        return Replay::Replan;
+    }
+    if !fired {
+        let dispatchable = match kind {
+            PlanKind::Blitz { .. } => {
+                matches!(
+                    f.pa_now,
+                    Some(PlayerAction::BlitzMove) | Some(PlayerAction::KickEmBlitz)
+                ) && !f.has_blocked
+                    && f.target_adjacent
+            }
+            PlanKind::Foul { .. } => {
+                f.pa_now == Some(PlayerAction::FoulMove) && !f.has_fouled && f.target_adjacent
+            }
+            PlanKind::Pass { .. } => {
+                matches!(
+                    f.pa_now,
+                    Some(PlayerAction::PassMove)
+                        | Some(PlayerAction::Pass)
+                        | Some(PlayerAction::HailMaryPass)
+                ) && f.target_on_pitch
+            }
+            PlanKind::HandOff { .. } => {
+                matches!(
+                    f.pa_now,
+                    Some(PlayerAction::HandOverMove) | Some(PlayerAction::HandOver)
+                ) && f.target_on_pitch
+            }
+            PlanKind::Move | PlanKind::Immediate | PlanKind::Pickup => false,
+        };
+        if dispatchable {
+            return Replay::FireTerminal;
+        }
+        if matches!(kind, PlanKind::Move | PlanKind::Immediate) && delivered {
+            return Replay::EndPlayerAction;
+        }
+        if !matches!(kind, PlanKind::Pickup | PlanKind::Move) && delivered {
+            return Replay::EndPlayerAction;
+        }
+        return Replay::Replan;
+    }
+    // Already fired: the activation is over, except for a blitz's post-block movement and a
+    // pickup, which genuinely changed the value model.
+    if !matches!(kind, PlanKind::Pickup) && !matches!(kind, PlanKind::Blitz { .. }) {
+        return Replay::EndPlayerAction;
+    }
+    Replay::Replan
+}
+
+/// Group the candidate list by DECLARATION/// Group the candidate list by DECLARATION — the `(player, action)` pair the engine actually
 /// receives.
 ///
 /// `build_plans` emits a player's options one action at a time, so a declaration's candidates are a
@@ -1822,130 +1948,85 @@ impl HeuristicAgent {
         player_id: String,
         squares: Vec<FieldCoordinate>,
     ) -> Action {
-        // An empty `squares` means no MOVEMENT is left, not that there is nothing to do. A pending
-        // hand-off or pass still has to be sent, and bailing here threw away every give whose run-up
-        // used the carrier's whole move - which is most of the good ones.
-        let terminal_pending = matches!(
-            self.plan.as_ref().map(|p| &p.kind),
-            Some(PlanKind::HandOff { .. })
-                | Some(PlanKind::Pass { .. })
-                | Some(PlanKind::Blitz { .. })
-                | Some(PlanKind::Foul { .. })
-        );
-        if squares.is_empty() && !terminal_pending {
-            self.plan = None;
-            return Action::EndPlayerAction;
-        }
+        // The whole state machine lives in `replay_plan`, so it can be pinned against the Java
+        // twin with made-up inputs. What is left here is gathering the board facts it reads and
+        // turning its verdict into an `Action`.
+        let facts = {
+            let here = g.field_model.player_coordinate(&player_id);
+            let target = self.plan.as_ref().and_then(|pl| match &pl.kind {
+                PlanKind::Blitz { victim } | PlanKind::Foul { victim } => Some(victim.clone()),
+                PlanKind::Pass { receiver } | PlanKind::HandOff { receiver } => {
+                    Some(receiver.clone())
+                }
+                _ => None,
+            });
+            let tc = target.as_deref().and_then(|t| g.field_model.player_coordinate(t));
+            ReplayFacts {
+                pa_now: g.acting_player.player_action,
+                has_blocked: g.acting_player.has_blocked,
+                has_fouled: g.acting_player.has_fouled,
+                target_adjacent: here
+                    .zip(tc)
+                    .map(|(a, b)| a.distance_in_steps(b) == 1)
+                    .unwrap_or(false),
+                target_on_pitch: tc.is_some(),
+                squares_include_next: self
+                    .plan
+                    .as_ref()
+                    .and_then(|pl| pl.path.first())
+                    .map(|n| squares.contains(n))
+                    .unwrap_or(false),
+                squares_empty: squares.is_empty(),
+            }
+        };
 
         if let Some(mut pl) = self.plan.take() {
-            if pl.player == player_id {
-                if !pl.path.is_empty() {
-                    // Deliver the whole remaining path in ONE answer; the engine walks it.
-                    if squares.contains(&pl.path[0]) {
-                        let path = std::mem::take(&mut pl.path);
-                        pl.delivered = true;
-                        self.plan = Some(pl);
-                        return Action::Move { path };
-                    }
-                    // The board moved under the plan — fall through and re-decide.
-                } else if !pl.fired {
-                    // Movement done. Now the plan's terminal action, if it has one.
-                    //
-                    // `StepInitMoving` guards each of these dispatches and falls THROUGH when the
-                    // guard fails, re-emitting this same prompt. Resending a rejected action would
-                    // therefore spin forever, so each one is gated on the engine's own condition
-                    // and latched with `fired` so it is attempted at most once per activation.
-                    let here = g.field_model.player_coordinate(&player_id);
-                    let pa_now = g.acting_player.player_action;
-                    let adjacent_to = |v: &str| {
-                        here.zip(g.field_model.player_coordinate(v))
-                            .map(|(a, b)| a.distance_in_steps(b) == 1)
-                            .unwrap_or(false)
-                    };
-                    match &pl.kind {
-                        PlanKind::Blitz { victim } => {
-                            let dispatchable = matches!(
-                                pa_now,
-                                Some(PlayerAction::BlitzMove) | Some(PlayerAction::KickEmBlitz)
-                            ) && !g.acting_player.has_blocked;
-                            if std::env::var_os("FFB_BLITZ_TRACE").is_some() {
-                                eprintln!(
-                                    "BZ {} victim={} pa={:?} blocked={} adj={} here={:?}",
-                                    player_id, victim, pa_now, g.acting_player.has_blocked,
-                                    adjacent_to(victim), here
-                                );
-                            }
-                            if dispatchable && adjacent_to(victim) {
-                                let defender_id = victim.clone();
-                                pl.fired = true;
-                                self.plan = Some(pl);
-                                return Action::Block { defender_id };
-                            }
-                        }
-                        PlanKind::Foul { victim } => {
-                            let dispatchable = pa_now == Some(PlayerAction::FoulMove)
-                                && !g.acting_player.has_fouled;
-                            if dispatchable && adjacent_to(victim) {
-                                let target_id = victim.clone();
-                                pl.fired = true;
-                                self.plan = Some(pl);
-                                return Action::Foul { target_id };
-                            }
-                        }
+            let verdict = replay_plan(
+                &pl.kind,
+                pl.player == player_id,
+                pl.path.is_empty(),
+                pl.delivered,
+                pl.fired,
+                &facts,
+            );
+            match verdict {
+                Replay::DeliverPath => {
+                    let path = std::mem::take(&mut pl.path);
+                    pl.delivered = true;
+                    self.plan = Some(pl);
+                    return Action::Move { path };
+                }
+                Replay::FireTerminal => {
+                    let kind = pl.kind.clone();
+                    pl.fired = true;
+                    self.plan = Some(pl);
+                    return match kind {
+                        PlanKind::Blitz { victim } => Action::Block { defender_id: victim },
+                        PlanKind::Foul { victim } => Action::Foul { target_id: victim },
                         PlanKind::Pass { receiver } => {
-                            let dispatchable = matches!(
-                                pa_now,
-                                Some(PlayerAction::PassMove)
-                                    | Some(PlayerAction::Pass)
-                                    | Some(PlayerAction::HailMaryPass)
-                            );
-                            if let (true, Some(coord)) =
-                                (dispatchable, g.field_model.player_coordinate(receiver))
-                            {
-                                pl.fired = true;
-                                self.plan = Some(pl);
-                                return Action::Pass { coord };
+                            match g.field_model.player_coordinate(&receiver) {
+                                Some(coord) => Action::Pass { coord },
+                                None => Action::EndPlayerAction,
                             }
                         }
                         PlanKind::HandOff { receiver } => {
-                            let dispatchable = matches!(
-                                pa_now,
-                                Some(PlayerAction::HandOverMove) | Some(PlayerAction::HandOver)
-                            );
-                            if dispatchable && g.field_model.player_coordinate(receiver).is_some() {
-                                let receiver_id = receiver.clone();
-                                pl.fired = true;
-                                self.plan = Some(pl);
-                                return Action::HandOff { receiver_id };
-                            }
+                            Action::HandOff { receiver_id: receiver }
                         }
-                        PlanKind::Move | PlanKind::Immediate => {
-                            // §20.1 — Move → Move never makes sense. A plain move that has ALREADY
-                            // been delivered has no options it did not already have, so end without
-                            // scoring anything. A plan that never carried a path (a tier-1 proxy
-                            // pick, §20.3) still has to decide where to go, so it falls through.
-                            if pl.delivered {
-                                return Action::EndPlayerAction;
-                            }
-                        }
-                        // A pickup genuinely changed the value model; re-decide below.
-                        PlanKind::Pickup => {}
-                    }
-                    // The terminal action was not dispatchable here. Nothing else this activation
-                    // can do that it could not already do, so end rather than re-plan — unless the
-                    // plan never got a path in the first place, which still needs deciding.
-                    if !matches!(pl.kind, PlanKind::Pickup | PlanKind::Move) && pl.delivered {
-                        return Action::EndPlayerAction;
-                    }
-                } else if !matches!(pl.kind, PlanKind::Pickup) {
-                    // The terminal action has already been sent; the activation is over. A blitz is
-                    // the one case with something legitimate left to do — the board changed under it
-                    // — so it re-plans its post-block movement.
-                    if !matches!(pl.kind, PlanKind::Blitz { .. }) {
-                        return Action::EndPlayerAction;
-                    }
+                        _ => Action::EndPlayerAction,
+                    };
+                }
+                Replay::EndPlayerAction => {
+                    // The plan is dropped here exactly as the original did: `take()` above already
+                    // removed it and this arm does not put it back.
+                    return Action::EndPlayerAction;
+                }
+                Replay::Replan => {
+                    // Keep the plan; the fall-through below re-decides and may overwrite it.
+                    self.plan = Some(pl);
                 }
             }
+        } else if facts.squares_empty {
+            return Action::EndPlayerAction;
         }
 
         // No usable plan: interrupted, pushed, or a prompt the activation did not predict.
@@ -6260,6 +6341,98 @@ mod tests {
         // even the worst case from being impossible.
         assert!(w(true, true, true) >= 0.02);
         assert!(w(true, true, false) < 0.05);
+    }
+
+    /// The plan-replay state machine, exit by exit.
+    ///
+    /// Seven exits and four engine guards, and the ordering between them is the whole content —
+    /// which is why it is a pure function rather than control flow tangled with the mutations it
+    /// drives. Refactoring it out was verified behaviour-preserving by replaying ten full games
+    /// with `--heur-classes all` and comparing Rust's own end-of-game hashes before and after.
+    #[test]
+    fn plan_replay_state_machine() {
+        let facts = |pa: Option<PlayerAction>, blocked: bool, fouled: bool, adj: bool,
+                     on_pitch: bool, next: bool, empty: bool| ReplayFacts {
+            pa_now: pa,
+            has_blocked: blocked,
+            has_fouled: fouled,
+            target_adjacent: adj,
+            target_on_pitch: on_pitch,
+            squares_include_next: next,
+            squares_empty: empty,
+        };
+        let blitz = PlanKind::Blitz { victim: "v".into() };
+        let give = PlanKind::HandOff { receiver: "r".into() };
+        let plain = PlanKind::Move;
+
+        // No movement left and nothing pending: end. This is the common exit.
+        assert_eq!(
+            replay_plan(&plain, true, true, false, false,
+                &facts(None, false, false, false, false, false, true)),
+            Replay::EndPlayerAction
+        );
+        // No movement left but a give IS pending: the give must still be sent. Bailing here threw
+        // away every give whose run-up spent the carrier's whole move.
+        assert_eq!(
+            replay_plan(&give, true, true, false, false,
+                &facts(Some(PlayerAction::HandOverMove), false, false, false, true, false, true)),
+            Replay::FireTerminal
+        );
+        // A path is delivered only when the offered squares contain its next step...
+        assert_eq!(
+            replay_plan(&plain, true, false, false, false,
+                &facts(None, false, false, false, false, true, false)),
+            Replay::DeliverPath
+        );
+        // ...and when the board has moved under it, the plan re-decides rather than insisting.
+        assert_eq!(
+            replay_plan(&plain, true, false, false, false,
+                &facts(None, false, false, false, false, false, false)),
+            Replay::Replan
+        );
+        // A blitz fires only with the engine's own action set AND not having blocked AND adjacent.
+        for (pa, blocked, adj, want) in [
+            (Some(PlayerAction::BlitzMove), false, true, Replay::FireTerminal),
+            (Some(PlayerAction::BlitzMove), true, true, Replay::Replan),
+            (Some(PlayerAction::BlitzMove), false, false, Replay::Replan),
+            (Some(PlayerAction::Move), false, true, Replay::Replan),
+        ] {
+            assert_eq!(
+                replay_plan(&blitz, true, true, false, false,
+                    &facts(pa, blocked, false, adj, true, false, false)),
+                want,
+                "blitz guard pa={pa:?} blocked={blocked} adj={adj}"
+            );
+        }
+        // A delivered plain move ends: moving twice reaches the same square.
+        assert_eq!(
+            replay_plan(&plain, true, true, true, false,
+                &facts(None, false, false, false, false, false, false)),
+            Replay::EndPlayerAction
+        );
+        // Once fired, only a blitz has anything left -- its post-block movement.
+        assert_eq!(
+            replay_plan(&blitz, true, true, true, true,
+                &facts(None, false, false, false, false, false, false)),
+            Replay::Replan
+        );
+        assert_eq!(
+            replay_plan(&give, true, true, true, true,
+                &facts(None, false, false, false, false, false, false)),
+            Replay::EndPlayerAction
+        );
+        // A pickup changed the value model, so it re-decides rather than ending.
+        assert_eq!(
+            replay_plan(&PlanKind::Pickup, true, true, true, true,
+                &facts(None, false, false, false, false, false, false)),
+            Replay::Replan
+        );
+        // A plan belonging to ANOTHER player is not replayed.
+        assert_eq!(
+            replay_plan(&plain, false, false, false, false,
+                &facts(None, false, false, false, false, true, false)),
+            Replay::Replan
+        );
     }
 
     /// §6 — the touchback receiver table, which `HeuristicDriver.touchback` mirrors.
