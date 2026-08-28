@@ -2115,6 +2115,18 @@ impl HeuristicAgent {
                 Some(s) => s,
                 None => continue,
             };
+            // SKIP_INACTIVE (AGENT_CONTRACT.md §2.4). The engine's eligible list does not carry
+            // the ACTIVE bit, and Java's `StepInitSelecting` guards its whole CLIENT_ACTING_PLAYER
+            // branch on `playerState.isActive()` -- an activation for an inactive player is
+            // silently IGNORED there, leaving the acting player null. Rust's engine has no such
+            // guard and executes it, so the two only agree if the agent never asks. The random
+            // agent already honours this (it skips the pick and burns the decisionRng call); the
+            // heuristic replaced that pick loop wholesale and inherited nothing, so it activated
+            // players Java would not move -- a just-unstunned player, or a team-mate thrown this
+            // turn who lands STANDING but inactive.
+            if !st.is_active() {
+                continue;
+            }
             let live: Vec<PlayerAction> =
                 actions.iter().filter(|a| action_is_live(a, td, g.rules)).cloned().collect();
             if live.is_empty() {
@@ -2361,6 +2373,18 @@ impl HeuristicAgent {
                 Some(s) => s,
                 None => continue,
             };
+            // SKIP_INACTIVE (AGENT_CONTRACT.md §2.4). The engine's eligible list does not carry
+            // the ACTIVE bit, and Java's `StepInitSelecting` guards its whole CLIENT_ACTING_PLAYER
+            // branch on `playerState.isActive()` -- an activation for an inactive player is
+            // silently IGNORED there, leaving the acting player null. Rust's engine has no such
+            // guard and executes it, so the two only agree if the agent never asks. The random
+            // agent already honours this (it skips the pick and burns the decisionRng call); the
+            // heuristic replaced that pick loop wholesale and inherited nothing, so it activated
+            // players Java would not move -- a just-unstunned player, or a team-mate thrown this
+            // turn who lands STANDING but inactive.
+            if !st.is_active() {
+                continue;
+            }
             let live: Vec<PlayerAction> =
                 actions.iter().filter(|a| action_is_live(a, td, g.rules)).cloned().collect();
             if live.is_empty() {
@@ -5572,6 +5596,87 @@ mod tests {
     ///    silently costs a draw fewer, and the stream desynchronises from there.
     ///
     /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_draw_golden -- --ignored`
+    /// SKIP_INACTIVE: the agent must never activate a player whose ACTIVE bit is clear.
+    ///
+    /// Java's `StepInitSelecting` accepts `CLIENT_ACTING_PLAYER` only when
+    /// `playerState.isActive()`; for anyone else the command is IGNORED and the acting player
+    /// stays null, so the activation is a silent no-op that moves nobody. Rust's engine has no
+    /// such guard and happily executes it -- the two agree only if the agent does not ask.
+    ///
+    /// The random agent has honoured this since the contract was written. The heuristic replaced
+    /// that pick loop wholesale and inherited none of it, so it moved players Java left standing
+    /// still (bb2025 seed 2 step 12: Java left the inactive prone player at (11,7), Rust stood him
+    /// up and moved three squares, with identical dice).
+    #[test]
+    fn heuristic_never_activates_an_inactive_player() {
+        use ffb_model::enums::{PlayerState, PS_STANDING, Rules};
+        use ffb_model::model::player::Player;
+
+        // Two home players, identical in every way the scorer reads -- same square value, same
+        // distance to the endzone -- except that home_01's ACTIVE bit is clear. Anything the
+        // agent could prefer about him it must still refuse to act on.
+        let mut home = crate::step::framework::test_team("home", 0);
+        let mut away = crate::step::framework::test_team("away", 0);
+        for nr in 1..=2 {
+            home.players.push(Player {
+                id: format!("home_{:02}", nr),
+                nr,
+                movement: 6,
+                strength: 3,
+                agility: 3,
+                armour: 8,
+                ..Default::default()
+            });
+        }
+        away.players.push(Player {
+            id: "away_01".to_string(),
+            nr: 1,
+            movement: 6,
+            strength: 3,
+            agility: 3,
+            armour: 8,
+            ..Default::default()
+        });
+
+        let mut g = Game::new(home, away, Rules::Bb2025);
+        g.home_playing = true;
+        g.turn_data_home.turn_nr = 3;
+        g.turn_data_away.turn_nr = 3;
+        for (id, x, y, active) in
+            [("home_01", 10, 6, false), ("home_02", 10, 8, true), ("away_01", 20, 7, true)]
+        {
+            g.field_model.set_player_coordinate(id, FieldCoordinate::new(x, y));
+            g.field_model
+                .set_player_state(id, PlayerState::new(PS_STANDING).change_active(active));
+        }
+        g.field_model.ball_coordinate = Some(FieldCoordinate::new(13, 7));
+        g.field_model.ball_in_play = true;
+
+        let f = Features::build(&g, positions_stamp(&g), true);
+        let eligible: Vec<(String, Vec<PlayerAction>)> = vec![
+            ("home_01".to_string(), vec![PlayerAction::Move]),
+            ("home_02".to_string(), vec![PlayerAction::Move]),
+        ];
+
+        // Argmax, so this is a fact about the option set and not about a lucky draw.
+        let mut agent = HeuristicAgent::new(7, 0.0);
+        match agent.handle_activate(&g, &f, eligible.clone()) {
+            Action::ActivatePlayer { player_id, .. } => {
+                assert_eq!(player_id, "home_02", "the inactive player must not be activated");
+            }
+            other => panic!("expected an activation of home_02, got {other:?}"),
+        }
+
+        // With the inactive player as the ONLY candidate there is nothing to activate at all --
+        // it must end the turn rather than fall back to him.
+        let mut agent = HeuristicAgent::new(7, 0.0);
+        let only_inactive = vec![("home_01".to_string(), vec![PlayerAction::Move])];
+        assert!(
+            matches!(agent.handle_activate(&g, &f, only_inactive), Action::EndTurn),
+            "an eligible list of only inactive players leaves nothing to do"
+        );
+    }
+
     #[test]
     #[ignore]
     fn emit_draw_golden() {

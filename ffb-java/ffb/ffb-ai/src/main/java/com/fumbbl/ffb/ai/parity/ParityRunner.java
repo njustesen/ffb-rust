@@ -2878,9 +2878,25 @@ public class ParityRunner {
             if (c == null || st == null) {
                 continue;
             }
+            // SKIP_INACTIVE (AGENT_CONTRACT.md 2.4). StepInitSelecting only accepts a
+            // CLIENT_ACTING_PLAYER whose `playerState.isActive()`; for anyone else the command is
+            // ignored outright and the acting player stays null, so the activation is a silent
+            // no-op. The random path picks such a player, burns its decisionRng call and re-picks;
+            // the heuristic replaces that pick loop entirely, so it has to drop them here instead.
+            if (!st.isActive()) {
+                continue;
+            }
             // The live actions, filtered exactly as the random path filters them: the eligible list
             // is a TURN-START snapshot, so a blitz or pass another player already spent has to be
             // dropped before the agent scores it.
+            // A PRONE player's MOVE is really a STAND_UP. The engine keys the stand-up on
+            // `playerAction.isStandingUp()`, which is true only for STAND_UP and STAND_UP_BLITZ,
+            // so declaring a plain MOVE for a player on the ground never sets `setStandingUp(true)`
+            // and the activation ends without him rising -- silently, which is why the random gate
+            // never noticed that every prone player wastes his turn. Rust's eligible list names
+            // them `StandUp` / `StandUpBlitz` and its scorer treats both as the standing action;
+            // only the declaration differs, and it is the declaration the engine reads.
+            boolean prone = st.getBase() == PlayerState.PRONE;
             List<String> actions = new ArrayList<>();
             for (PlayerAction a : filterStaleActions(game, (PlayerAction[]) entry[1])) {
                 actions.add(nameForAgent(a));
@@ -2924,6 +2940,18 @@ public class ParityRunner {
             }
         }
         return false;
+    }
+
+    /**
+     * {@link #nameForAgent} for a player who is on the ground, mirroring Rust's own eligible list
+     * for a prone player: {@code [StandUp, StandUpBlitz]}.
+     */
+    private static String standUpNameForAgent(PlayerAction a) {
+        switch (a) {
+            case MOVE: case STAND_UP: return "StandUp";
+            case BLITZ: case BLITZ_MOVE: case STAND_UP_BLITZ: return "StandUpBlitz";
+            default: return nameForAgent(a);
+        }
     }
 
     /** Rust {@code has_negatrait}: the traits that make an activation likely to be wasted. */

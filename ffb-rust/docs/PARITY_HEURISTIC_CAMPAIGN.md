@@ -2735,3 +2735,56 @@ crossing into the second half.
 **Next:** seed 2 step 12 is now the shallowest frontier and the cheapest to trace — Java declares
 `Activate(Home9, MOVE)` against Rust's `Activate(home_09, Move)`, same player and same action, so
 the pre-state hashes already differ and the real divergence is earlier in that game.
+
+## ITER47 — the heuristic was activating players the engine refuses to move
+
+Seed 2 step 12: both agents activate the same prone player with the same action; Java leaves him
+prone at (11,7), Rust stands him up and moves three squares, and the dice counts are IDENTICAL. No
+roll was involved, so nothing in the dice stream could point at it.
+
+The state string's last per-player field is the **ACTIVE bit**, and that player's was `0`. Java's
+`StepInitSelecting` guards its entire `CLIENT_ACTING_PLAYER` branch on `playerState.isActive()` —
+for anyone else the command is ignored outright, the acting player stays null, and the activation is
+a silent no-op. Rust's `legal_activate_player_actions` never looks at the bit and its engine
+executes the activation.
+
+Both random agents already honour this: the Java harness picks such a player, burns its
+`decisionRng` call and re-picks (`SKIP_INACTIVE`, `AGENT_CONTRACT.md` §2.4), and Rust's
+`RandomAgent` mirrors it exactly. That contract is what has been hiding the engine gap. The
+heuristic replaced the whole pick loop and inherited none of it, so it activated players Java would
+not move — a just-unstunned player, or a team-mate thrown this turn who lands STANDING but inactive.
+
+Fixed on both sides at the same place, by giving the heuristic the contract the random agent has
+always had: `handle_activate` and `handle_activate_deep` skip a player whose ACTIVE bit is clear,
+and `ParityRunner.eligibleFor` drops him from the list it hands the scorer. Neither engine's
+eligible list changes, which matters — the random path's `idx % N` alignment depends on inactive
+players still being IN it and being rejected at pick time.
+
+**The Rust engine gap is real and is now unreachable rather than fixed.** Adding the `isActive()`
+guard to `legal_activate_player_actions` would shorten Rust's eligible list and break the random
+contract that depends on its length. Logged for the backlog rather than done here.
+
+### Two wrong turns worth recording
+
+**A correct fix can measure worse.** Declaring `PlayerAction.STAND_UP` for prone players (Rust names
+them `StandUp`) dropped seed 1 from 185 to 22 and seed 3 from 72 to 20. It was not wrong about the
+naming — it was wrong about the semantics: `STAND_UP` is *stand up and end the activation*, so the
+player rose and stopped. Reverted.
+
+**stdout and stderr do not interleave.** `JSTEP` and a `System.err` probe land in different streams,
+and through a pipe the whole probe output can appear after the whole step log. That ordering
+artifact produced a confident, wrong conclusion — "`sendMoveAction` is never called for this player"
+— twice. Every probe that has to be read *in sequence with* the step log must print to `System.out`
+and carry `stepIndex`; without the index the two cannot be aligned at all.
+
+### Gates
+
+- `--heur-classes all` bb2025 argmax: **0/20**, but every seed deeper — seed 1 **185 → 216**,
+  seed 2 **12 → 49**, seed 3 **72 → 188**.
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,656 / 0** (+1: `heuristic_never_activates_an_inactive_player`,
+  bite-checked — it fails when the guard is removed). `mvn -o -pl ffb-ai test`: **29 / 0**.
+- The two Java trees agree.
+
+**Next:** seed 2 step 49 is the shallowest frontier.
