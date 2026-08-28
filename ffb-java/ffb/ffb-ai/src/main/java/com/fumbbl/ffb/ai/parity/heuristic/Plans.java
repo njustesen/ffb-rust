@@ -61,6 +61,71 @@ public final class Plans {
     }
 
     /**
+     * Rust {@code proxy_value}: the tier-1 stand-in for a player the reach search did not run for.
+     *
+     * <p>No Dijkstra at all — the eight adjacent squares scored exactly, plus an admissible CEILING
+     * over everything inside {@code MA + 2} read straight off the rasters, then discounted to 55%
+     * because the ceiling is optimistic by construction.
+     *
+     * <p>This is what scores every player the search skipped, so a disagreement here reorders the
+     * activation queue without changing a single move — the kind of divergence that looks like a
+     * different decision when it is really a different SORT.
+     *
+     * <p>Note the ceiling is NOT {@code valueAt}: it drops exposure and the sideline term and keeps
+     * only the advance/lane (carrier), a flat 0.9 (loose ball) or the support raster. Reusing
+     * {@code valueAt} here would be the natural simplification and would change the number.
+     */
+    public static float proxyValue(Features f, FieldCoordinate at, ValueModel.Mover m) {
+        float best = 0.0f;
+        for (int dy = -1; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                if (dx == 0 && dy == 0) {
+                    continue;
+                }
+                int nx = at.getX() + dx;
+                int ny = at.getY() + dy;
+                if (!Features.onPitch(nx, ny)) {
+                    continue;
+                }
+                int i = Features.ix(nx, ny);
+                if (!f.occupied(i)) {
+                    best = Math.max(best, ValueModel.valueAt(f, i, m).v);
+                }
+            }
+        }
+        int r = m.ma + 2;
+        int s = Features.sideIdx(m.home);
+        float ceiling = 0.0f;
+        for (int y = Math.max(at.getY() - r, 0); y <= Math.min(at.getY() + r, Features.YMAX); y++) {
+            for (int x = Math.max(at.getX() - r, 0); x <= Math.min(at.getX() + r, Features.XMAX);
+                    x++) {
+                int i = Features.ix(x, y);
+                if (f.occupied(i)) {
+                    continue;
+                }
+                float v;
+                if (m.isCarrier) {
+                    int dSq = ValueModel.endzoneDistance(x, m.home);
+                    int maxGain = Math.max(Math.min(m.dNow, m.ma + 2), 1);
+                    float adv = Math.min(Math.max((float) (m.dNow - dSq) / (float) maxGain, 0.0f),
+                        1.0f);
+                    v = (0.15f + 0.85f * adv) * f.lane[s][i];
+                } else if (f.ballLoose && f.ball != null && f.ball.getX() == x
+                        && f.ball.getY() == y) {
+                    v = 0.9f;
+                } else {
+                    v = f.support[s][i];
+                }
+                if (v > ceiling) {
+                    ceiling = v;
+                }
+            }
+        }
+        // The ceiling is optimistic by construction, so discount it rather than trust it.
+        return Math.max(best, 0.55f * ceiling);
+    }
+
+    /**
      * Rust {@code risked}: fold the chance of never arriving into a plan's weight.
      *
      * <p><b>Not {@code w * p}.</b> That is right only for a positive weight, and it turns a bad

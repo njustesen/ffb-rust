@@ -170,6 +170,11 @@ class PlansTest {
                     }
                     break;
                 }
+                case "proxy":
+                    assertEquals((int) Long.parseLong(p[1], 16),
+                        Float.floatToRawIntBits(Plans.proxyValue(f, here, m)),
+                        "proxyValue (" + where + ")");
+                    break;
                 default:
                     break;
             }

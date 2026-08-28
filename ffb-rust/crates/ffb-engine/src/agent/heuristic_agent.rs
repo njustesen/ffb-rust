@@ -4739,6 +4739,7 @@ mod tests {
         writeln!(out, "# topmoves <cell index:weight bits, comma separated, IN ORDER>").unwrap();
         writeln!(out, "# runup <cell indices, comma separated, IN ORDER>").unwrap();
         writeln!(out, "# risked <w bits>:<p bits>:<result bits> for a few probe pairs").unwrap();
+        writeln!(out, "# proxy <f32 bits>   the search-free tier-1 estimate").unwrap();
 
         for (name, board, ball, loose, movers) in cases {
             for &(mname, is_carrier, ma, ag, str_, d_now, turns_left, unact, team_rr) in movers {
@@ -4820,6 +4821,15 @@ mod tests {
                     })
                     .collect();
                 writeln!(out, "risked {}", rr.join(",")).unwrap();
+
+                // `proxy_value` is the §20.3 tier-1 stand-in: no Dijkstra at all, just the eight
+                // adjacent squares exactly plus an admissible CEILING over everything inside MA+2,
+                // read straight off the rasters and then discounted because it is optimistic by
+                // construction. It is what every player the search did not run for is scored with,
+                // so a disagreement here reorders the activation queue without touching a single
+                // move.
+                writeln!(out, "proxy {:08x}", proxy_value(&f, &g, "home_01", &m).to_bits())
+                    .unwrap();
             }
         }
 

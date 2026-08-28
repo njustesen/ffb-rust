@@ -2039,3 +2039,50 @@ failed loudly (`expected: <0>`), which is the right way for that mistake to go.
 search-free tier-1 estimate), the enumeration itself, and the WIDE `ActivatePlayer` arm — and the
 enumeration needs the harness's legal-action list rather than a fixture, so that is where the live
 gate takes over.
+
+## ITER32 — `proxy_value`: the last weight
+
+`proxy_value` is the §20.3 tier-1 stand-in — what scores every player the reach search did NOT run
+for. No Dijkstra: the eight adjacent squares scored exactly, plus an admissible ceiling over
+everything inside `MA + 2` read straight off the rasters, discounted to 55% because the ceiling is
+optimistic by construction.
+
+Worth being explicit about why it matters. A disagreement here **reorders the activation queue
+without changing a single move** — it looks like a different decision when it is really a different
+sort, and that is a much harder failure to read backwards from a state hash than a wrong square.
+
+One trap in the port: the ceiling is **not** `value_at`. It drops the exposure and sideline terms
+and keeps only advance × lane (carrier), a flat 0.9 (loose ball), or the support raster. Reusing
+`value_at` there is the natural simplification and changes the number. Written out rather than
+delegated, with a comment saying so.
+
+Folded into the existing plans golden rather than a new file, since it needs the same board and
+mover. Bite-check: dropping the 0.55 discount fails at `proxyValue (open_field_ties/carrier)`.
+
+### Gates
+
+- `mvn -o -pl ffb-ai test`: **23 tests, 0 failures**.
+- `cargo test --workspace --release`: **14,654 / 0**.
+- Fourteen-class rung still **100/100 in all three editions** at argmax.
+
+### Where the port stands
+
+Every numeric input to the last two prompt classes is now ported AND pinned by a cross-language
+fixture:
+
+| layer | Java | fixture |
+|---|---|---|
+| `exp`/`ln` | `DetMath` | 348 vectors |
+| sampler | `Sampler` | 120 unit + 1200 pick vectors |
+| rasters (core + heavy) | `Features` | 6 boards × 12 arrays |
+| reach | `Reach` | 5 cases, every cell + 60 path walks |
+| value | `ValueModel` | 4 boards × 16 movers × 390 cells + rule |
+| arrival | `Arrival` | 3 boards × 7 movers, all four parts |
+| orderings + proxy | `Plans` | 3 boards, full ordered lists |
+| give / foul | `BallMoves` | 4 boards, all five receiver parts |
+| pass | `BallMoves.passWeight` | 4 boards incl. Blizzard-illegal and bb2016 |
+
+**Next:** the enumeration in `build_plans` and the WIDE `ActivatePlayer` arm. That needs the
+harness's legal-action list, not a fixture — so this is the point where the goldens hand over to the
+live gate, and where multi-square movement, GFI chains and scoring paths become reachable for the
+first time.
