@@ -3367,3 +3367,46 @@ misbehaves, diffing it against the bb2025 file is worth doing before anything el
 **Next:** re-run the stall census on bb2016's remaining 28 reds — the same two commands — before
 picking a seed. `Action::Pass` in the same file sets no thrower state either and is the obvious
 candidate, but no sampled seed stalled on it, so measure before fixing.
+
+## ITER60 — the pass, measured before it was fixed
+
+**bb2016 argmax: 72 → 77/100. bb2016 scale 1.0: 10 → 81/100.**
+
+ITER59 predicted this one from the code — `Action::Pass` in the same file set no thrower state
+either — and explicitly said to measure before fixing, since no sampled seed had stalled on it. The
+census says: of bb2016's 28 remaining reds, **12 are stalls**, and of six sampled, two ended on
+`Pass(...)` and three on `EndPlayerAction`.
+
+So the prediction was right and worth acting on, and the discipline was also right: `EndPlayerAction`
+is the larger group and would have been missed by fixing the predicted thing and moving on.
+
+The fix is the give's, one arm down, ported from the bb2025 twin. The only difference is that a pass
+takes its catcher from the target SQUARE rather than a receiver id. `HAIL_MARY_PASS` keeps its bare
+dispatch, as in bb2025 — it is thrown at a square and its own step sets what it needs.
+
+**The sampled gate moved eight times as far as argmax** (10 → 81 against 72 → 77). Worth
+remembering: a stall ends the game, so a single dead command destroys every seed that reaches it,
+and how many seeds reach it depends on the policy. Reading the two gates' deltas as one number would
+have understated this fix badly.
+
+### Gates
+
+- `--heur-classes all`, 100 seeds, argmax: **bb2016 72 → 77/100**; bb2020 90/100, bb2025 90/100
+  (untouched — bb2016-only file).
+- scale 1.0: **bb2016 10 → 81/100**; bb2025 94/100, bb2020 93/100.
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,661 / 0** (+1, bite-checked). `mvn -o -pl ffb-ai test`:
+  **34 / 0**. The two Java trees agree.
+
+### Where the campaign stands
+
+| | argmax | scale 1.0 |
+|---|---|---|
+| bb2025 | 90 | 94 |
+| bb2020 | 90 | 93 |
+| bb2016 | 77 | 81 |
+
+**Next:** the `EndPlayerAction` stalls — three of the six sampled, and now the largest identified
+group. A stall on a DESELECT is a different shape from a dead command: the action is universal, so
+it is the state it lands in that has no continuation. Census first, as usual.

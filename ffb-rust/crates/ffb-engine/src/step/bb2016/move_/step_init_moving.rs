@@ -116,14 +116,30 @@ impl Step for StepInitMoving {
                         .publish(StepParameter::CatcherId(Some(receiver_id.clone())));
                 }
             }
-            Action::Pass { .. } => {
-                if player_action == Some(PlayerAction::PassMove)
-                    || player_action == Some(PlayerAction::Pass)
-                {
-                    return self.dispatch_player_action(PlayerAction::Pass);
-                }
-                if player_action == Some(PlayerAction::HailMaryPass) {
-                    return self.dispatch_player_action(PlayerAction::HailMaryPass);
+            Action::Pass { coord } => {
+                // Exactly the hand-over's problem one arm down (ITER59): Java's CLIENT_PASS sets
+                // the pass coordinate, derives the catcher from that square and takes the thrower
+                // from the acting player, all inside StepInitPassing. Rust sees the command here,
+                // so without setting them that step finds `thrower_id`/`thrower_action` unset,
+                // parks with no prompt, and the game stops mid-drive. Ported from the bb2025 twin,
+                // which has always done it.
+                //
+                // HAIL_MARY_PASS keeps the bare dispatch it has in bb2025 too -- it is thrown at a
+                // square rather than a receiver and its own step sets what it needs.
+                let catcher = game.field_model.player_at(*coord).cloned();
+                match player_action {
+                    Some(PlayerAction::PassMove) | Some(PlayerAction::Pass) => {
+                        game.pass_coordinate = Some(*coord);
+                        game.thrower_id = game.acting_player.player_id.clone();
+                        game.thrower_action = Some(PlayerAction::Pass);
+                        return self
+                            .dispatch_player_action(PlayerAction::Pass)
+                            .publish(StepParameter::CatcherId(catcher));
+                    }
+                    Some(PlayerAction::HailMaryPass) => {
+                        return self.dispatch_player_action(PlayerAction::HailMaryPass);
+                    }
+                    _ => {}
                 }
             }
             Action::ThrowTeamMate { .. } => {
@@ -350,6 +366,49 @@ mod tests {
                 StepParameter::CatcherId(Some(id)) if id == "p2"
             )),
             "the catcher must be published for the passing step"
+        );
+    }
+
+    /// The same for a PASS thrown mid-move — the sibling arm, and the same defect.
+    ///
+    /// ITER59 fixed the give and predicted this one from the code; ITER60's stall census measured
+    /// it before touching it (two of bb2016's twelve remaining stalls ended on `Pass`). A pass
+    /// takes its catcher from the target SQUARE rather than from a receiver id, which is the only
+    /// difference.
+    #[test]
+    fn pass_during_a_move_sets_up_the_passing_step() {
+        use ffb_model::types::FieldCoordinate;
+
+        let mut game = make_game();
+        for (id, nr, x, y) in [("p1", 1, 10, 7), ("p2", 2, 14, 7)] {
+            game.team_home.players.push(ffb_model::model::player::Player {
+                id: id.into(), name: id.into(), nr, position_id: "pos".into(),
+                movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+                ..Default::default()
+            });
+            game.field_model.set_player_coordinate(id, FieldCoordinate::new(x, y));
+        }
+        game.home_playing = true;
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::PassMove);
+
+        let target = FieldCoordinate::new(14, 7);
+        let mut step = StepInitMoving::new("end".into());
+        let out = step.handle_command(
+            &Action::Pass { coord: target },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+
+        assert_eq!(game.thrower_id.as_deref(), Some("p1"));
+        assert_eq!(game.thrower_action, Some(PlayerAction::Pass));
+        assert_eq!(game.pass_coordinate, Some(target));
+        assert!(
+            out.published.iter().any(|p| matches!(
+                p,
+                StepParameter::CatcherId(Some(id)) if id == "p2"
+            )),
+            "the catcher is whoever stands on the target square"
         );
     }
 
