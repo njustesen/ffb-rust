@@ -2,6 +2,8 @@
 ///
 /// Helper logic for stalling detection and penalty, shared across stalling-related steps.
 use ffb_model::model::game::Game;
+use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
+use ffb_model::util::pathfinding::path_finder_with_pass_block_support::PathFinderWithPassBlockSupport;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::util_player::UtilPlayer;
 
@@ -52,9 +54,38 @@ impl StallingExtension {
         } else {
             return false;
         }
-        // Guard 4: open path to end-zone.
-        // no-op: PathFinderWithPassBlockSupport not ported; headless conservatively returns false (no open path detected)
-        false
+        // Guard 4: an open path to the enemy end-zone.
+        //
+        // Java `hasOpenPathToEndzone`: the endzone the player is ATTACKING (away's for a home
+        // player), every square of it as the target set, and
+        // `PathFinderWithPassBlockSupport.getShortestPath(game, endZoneCoordinates, player, 0)` --
+        // `0` because this asks whether the carrier could have scored with a FULL move, not from
+        // wherever he has already got to.
+        //
+        // This was a stub returning `false`, on the note that the pathfinder was not translated.
+        // It is: `ffb_model::util::pathfinding::path_finder_with_pass_block_support`, with
+        // `get_shortest_path_for_player` taking exactly Java's four arguments. So the whole BB2025
+        // stalling rule was dead -- `StepForgoneStalling` ran, found its carrier and asked this,
+        // which always said no. Java rolls a d6 for such a carrier and Rust rolled nothing, which
+        // shifts every later die by one (bb2025 seed 26 step 25 under uniform sampling: identical
+        // boards, rng_calls 46 against 45).
+        let player = match game.player(player_id) {
+            Some(p) => p,
+            None => return false,
+        };
+        let attacking_away_endzone = game.team_home.has_player(player_id);
+        let bounds = if attacking_away_endzone {
+            FieldCoordinateBounds::ENDZONE_AWAY
+        } else {
+            FieldCoordinateBounds::ENDZONE_HOME
+        };
+        let end_coords: std::collections::HashSet<FieldCoordinate> = (0..=14)
+            .map(|y| FieldCoordinate::new(if attacking_away_endzone { 25 } else { 0 }, y))
+            .filter(|c| bounds.is_in_bounds(*c))
+            .collect();
+        PathFinderWithPassBlockSupport::new()
+            .get_shortest_path_for_player(game, &end_coords, player, 0)
+            .is_some()
     }
 
     /// Java `handleStaller(IStep, Player<?> player)`.

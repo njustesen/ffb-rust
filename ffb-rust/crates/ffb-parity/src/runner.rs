@@ -14,7 +14,7 @@ use ffb_model::model::player::Player;
 use ffb_model::model::roster_position::RosterPosition;
 use ffb_model::model::team::Team;
 use ffb_model::prompts::AgentPrompt;
-use ffb_model::option::game_option_id::{INDUCEMENTS, MAX_PLAYERS_ON_FIELD, MIN_PLAYERS_ON_LOS, MAX_PLAYERS_IN_WIDE_ZONE, MB_STACKS_AGAINST_CHAINSAW, CLAW_DOES_NOT_STACK};
+use ffb_model::option::game_option_id::{INDUCEMENTS, MAX_PLAYERS_ON_FIELD, MIN_PLAYERS_ON_LOS, MAX_PLAYERS_IN_WIDE_ZONE, MB_STACKS_AGAINST_CHAINSAW, CLAW_DOES_NOT_STACK, ENABLE_STALLING_CHECK};
 use crate::log_format::{GameLog, LogLine, java_log_path_for, rust_log_path_for, rust_events_path_for};
 use crate::state_hash::state_hash;
 use ffb_model::util::state_hash::state_string;
@@ -47,6 +47,17 @@ pub const BASELINE_SETUP_OPTIONS: &[(&str, &str)] = &[
     // the defender Prone instead of KO'd — necromantic bb2020 seed 65, where a Knuckle Dusters
     // prayer grants the Claws Werewolf a temporary Mighty Blow (+1).
     (CLAW_DOES_NOT_STACK, "false"),
+    // Third of the same shape. `UtilServerStartGame:301-303` builds an ENABLE_STALLING_CHECK option
+    // set to FALSE and then does NOT add it -- the `addOption` line is commented out -- so Java
+    // falls back to `GameOptionFactory`'s default, which is TRUE. Rust treats an unset option as
+    // disabled, so its BB2025 stalling rule never ran at all.
+    //
+    // Effect: Java rolls a d6 in `StallingExtension.handleStaller` for a lone ball-carrier with an
+    // open path to the endzone, and Rust rolls nothing (bb2025 seed 26 step 25, uniform sampling:
+    // identical boards, rng_calls 46 against 45). Every die after it is then read one position
+    // early. The whole rule -- `StepForgoneStalling`, `StallingExtension`, `ReportStallerDetected`
+    // -- is implemented and faithful on the Rust side; it was simply switched off.
+    (ENABLE_STALLING_CHECK, "true"),
 ];
 
 /// Invoke the Java parity runner as a subprocess.

@@ -3627,3 +3627,62 @@ iterations. The test now asserts both halves: `cost` identical, `key` different.
 
 **Next:** bb2025's two uniform-only reds (1e6), then bb2016, which is now the whole remaining
 problem at 88/84/88. Its 12 argmax reds are all bb2016-only seeds.
+
+## ITER65 — the BB2025 stalling rule was dead in three places at once
+
+**bb2025 uniform (1e6): 98 → 99/100.** Everything else unchanged; bb2020 remains 100/100 at all
+three scales.
+
+bb2025's uniform reds were seeds 26 and 82. Seed 26's states matched everywhere and only
+`rng_calls` differed — 46 against 45 — and the dice trace named the extra die outright:
+
+```
+JAVA_DIE rng=46 d6=4 from=...bb2025.shared.StallingExtension.handleStaller:73
+```
+
+Java rolls a d6 at a stalling player; Rust rolled nothing. **Three independent defects were
+stopping it**, and each one alone would have been enough:
+
+1. **The option was off.** `UtilServerStartGame:301-303` builds `ENABLE_STALLING_CHECK` set to
+   FALSE and then does *not* add it — the `addOption` line is commented out — so Java falls back to
+   `GameOptionFactory`'s default, which is **true**. Rust treats an unset option as disabled. This
+   is the third instance of that exact trap in `runner.rs`, alongside `mbStacksAgainstChainsaw` and
+   `clawDoesNotStack`, and the comment there now says so.
+2. **Guard 4 was a stub.** `is_considered_stalling` ended with `false` and a note that
+   `PathFinderWithPassBlockSupport` was not translated. It *is*:
+   `ffb_model::util::pathfinding::path_finder_with_pass_block_support`, whose
+   `get_shortest_path_for_player` takes exactly Java's four arguments. Ported-but-unreached code
+   again — the fourth time this campaign.
+3. **`check_for_staller` had the condition inverted.** Java's guard is
+   `!gameState.isStalling() && isConsideredStalling()` and its body *ends* with
+   `gameState.stallingDetected()`. Rust required `game.stalling` to be true already and never set
+   it — so the flag was never raised and `StepStallingPlayer`, a faithful port that reads exactly
+   that flag, could never fire.
+
+**A test encoded the bug.** `staller_detected_report_added_when_stalling` set `game.stalling = true`
+and asserted a report — the inverted behaviour, written from the Rust code rather than from Java. It
+failed the moment the condition was corrected, which is the useful thing a test can do here;
+rewritten as `check_for_staller_raises_the_flag_for_a_lone_carrier`, which asserts the flag goes UP,
+that a second call is a no-op while it is up, and that the option gates it.
+
+Writing that test also corrected my own reading of the rule: `hasOpenPathToEndzone` asks the
+pathfinder for a route of at most **MA** squares, so "open path" means *could have scored this
+turn and chose not to*. My first version put the carrier 20 squares out and no carrier is ever
+stalling from there.
+
+### Gates
+
+| | argmax | scale 1.0 | scale 1e6 |
+|---|---|---|---|
+| bb2025 | **100** | **100** | 99 |
+| bb2020 | **100** | **100** | **100** |
+| bb2016 | 88 | 84 | 88 |
+
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in all three — checked deliberately, since enabling
+  the stalling option changes engine behaviour for every agent, not just the heuristic.
+- `cargo test --workspace --release`: **14,663 / 0**. `mvn -o -pl ffb-ai test`: **35 / 0**. The two
+  Java trees agree.
+
+**Next:** bb2025's last uniform red is seed 82 at step 94. After that bb2016 is the whole remaining
+problem at 88/84/88.

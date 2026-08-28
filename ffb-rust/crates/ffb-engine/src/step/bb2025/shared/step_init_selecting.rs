@@ -5,6 +5,7 @@ use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::skill_use::SkillUse;
 use ffb_model::prompts::AgentPrompt;
 use ffb_model::report::mixed::report_staller_detected::ReportStallerDetected;
+use super::stalling_extension::StallingExtension;
 use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
 use crate::action::{Action, PlayerActionChoice};
@@ -576,8 +577,23 @@ impl Step for StepInitSelecting {
 }
 
 impl StepInitSelecting {
-    /// Java: `checkForStaller()` — if game is already marked stalling (game.stalling==true),
-    /// emit `ReportStallerDetected` for the acting player (unless they are forgone).
+    /// Java `checkForStaller()`:
+    ///
+    /// ```java
+    /// if (enableStallingCheck && !gameState.isStalling() && isConsideredStalling()) {
+    ///     if (actingPlayer.getPlayerAction() != PlayerAction.FORGO) {
+    ///         addReport(new ReportStallerDetected(actingPlayer.getPlayerId()));
+    ///     }
+    ///     gameState.stallingDetected();
+    /// }
+    /// ```
+    ///
+    /// This DETECTS a staller and raises the flag. Rust had the condition inverted -- it required
+    /// `game.stalling` to be true already and never set it -- so the flag was never raised, and
+    /// `StepStallingPlayer` (which is a faithful port, and reads exactly that flag) could never
+    /// roll. Together with the two other gaps in the same rule that ITER65 fixed, the whole BB2025
+    /// stalling check was dead: Java rolls a d6 for a lone carrier with an open path to the endzone
+    /// and Rust rolled nothing, shifting every later die by one.
     /// Java `StepInitSelecting`, shared tail of the CLIENT_ACTING_PLAYER case: after the
     /// declaration branch (whichever it took) Java runs `updateMoveSquares` and, for a
     /// standing-up activation, charges the stand-up its movement.
@@ -639,16 +655,21 @@ impl StepInitSelecting {
     }
 
     fn check_for_staller(game: &mut Game) {
-        if game.stalling {
-            let player_id = game.acting_player.player_id.clone();
-            if let Some(pid) = player_id {
-                let forgo = game.acting_player.forgone;
-                if !forgo {
-                    // Java: if (actingPlayer.getPlayerAction() != PlayerAction.FORGO)
-                    game.report_list.add(ReportStallerDetected::new(Some(pid)));
-                }
-            }
+        if !game.options.is_enabled("enableStallingCheck") || game.stalling {
+            return;
         }
+        let Some(pid) = game.acting_player.player_id.clone() else {
+            return;
+        };
+        if !StallingExtension::new().is_considered_stalling(game, &pid) {
+            return;
+        }
+        // Java: if (actingPlayer.getPlayerAction() != PlayerAction.FORGO)
+        if !game.acting_player.forgone {
+            game.report_list.add(ReportStallerDetected::new(Some(pid)));
+        }
+        // Java: gameState.stallingDetected()
+        game.stalling = true;
     }
 
     fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
@@ -1340,35 +1361,60 @@ mod tests {
             "expected SKILL_USE report for ShotToNothing (GAIN_HAIL_MARY)");
     }
 
+    /// `checkForStaller` DETECTS a staller and raises the flag; it does not react to a flag that
+    /// is already up.
+    ///
+    /// This test previously asserted the opposite — it set `game.stalling = true` and expected a
+    /// report — which is what the Rust code did and Java does not. Java's guard is
+    /// `!gameState.isStalling() && isConsideredStalling()`, and the body ENDS with
+    /// `gameState.stallingDetected()`. With the condition inverted the flag was never raised, so
+    /// `StepStallingPlayer` (a faithful port that reads exactly that flag) could never roll, and
+    /// the whole BB2025 stalling rule was dead.
     #[test]
-    fn staller_detected_report_added_when_stalling() {
-        use ffb_model::enums::{PlayerType, PlayerGender};
+    fn check_for_staller_raises_the_flag_for_a_lone_carrier() {
+        use ffb_model::enums::{PlayerState, PS_STANDING};
         use ffb_model::model::player::Player;
         use ffb_model::report::report_id::ReportId;
-        use std::collections::HashSet;
+        use ffb_model::types::FieldCoordinate;
+
         let mut game = make_game();
-        game.stalling = true;
-        game.acting_player.player_id = Some("p1".into());
-        game.acting_player.forgone = false;
+        game.options.set("enableStallingCheck", "true");
+        game.home_playing = true;
         game.team_home.players.push(Player {
             id: "p1".into(), name: "P1".into(), nr: 1, position_id: "pos".into(),
-            player_type: PlayerType::Regular, gender: PlayerGender::Male,
             movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
-            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
-            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-            is_big_guy: false,
             ..Default::default()
         });
-        game.field_model.set_player_coordinate("p1", ffb_model::types::FieldCoordinate::new(5, 5));
-        let mut step = StepInitSelecting::new("end".into());
-        let action = Action::ActivatePlayer {
-            player_id: "p1".into(),
-            player_action: PlayerActionChoice::Move,
-            block_defender_id: None,
-        };
-        step.handle_command(&action, &mut game, &mut GameRng::new(0));
-        assert!(game.report_list.has_report(ReportId::STALLER_DETECTED),
-            "expected STALLER_DETECTED report when game.stalling is true");
+        // A lone carrier with nobody near him and a clear run at the away endzone: stalling.
+        // WITHIN his movement -- Java's `hasOpenPathToEndzone` asks the pathfinder for a route of
+        // at most MA squares (`getShortestPath(..., player, 0)`), so "open path" means he could
+        // score THIS turn and chose not to. From (5,5) the endzone is 20 squares away and no
+        // carrier is ever stalling.
+        game.field_model.set_player_coordinate("p1", FieldCoordinate::new(20, 7));
+        game.field_model
+            .set_player_state("p1", PlayerState::new(PS_STANDING).change_active(true));
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(20, 7));
+        game.field_model.ball_in_play = true;
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.forgone = false;
+
+        assert!(!game.stalling, "the flag starts down");
+        StepInitSelecting::check_for_staller(&mut game);
+        assert!(game.stalling, "detecting a staller must RAISE the flag");
+        assert!(game.report_list.has_report(ReportId::STALLER_DETECTED));
+
+        // Already flagged: Java's `!isStalling()` guard makes a second call a no-op.
+        let reports_before = game.report_list.size();
+        StepInitSelecting::check_for_staller(&mut game);
+        assert_eq!(game.report_list.size(), reports_before,
+            "a second call must not re-report while the flag is up");
+
+        // The option off is the other half of Java's guard.
+        let mut off = make_game();
+        off.home_playing = true;
+        off.acting_player.player_id = Some("p1".into());
+        StepInitSelecting::check_for_staller(&mut off);
+        assert!(!off.stalling, "with enableStallingCheck off nothing is detected");
     }
 
     #[test]
