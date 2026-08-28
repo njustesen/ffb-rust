@@ -95,7 +95,14 @@ public final class ActivationChoice {
 
     /** Rust {@code move_variant}: a ball action is declared in its MOVE form. */
     public static String moveVariant(String pac) {
-        if ("HandOff".equals(pac)) {
+        // BOTH spellings of the give. Rust's enumeration calls it `HandOff`; the harness's own
+        // action vocabulary, which is what actually reaches this method, calls it `HandOver`
+        // (`ParityRunner.nameForAgent(PlayerAction.HAND_OVER)`). Matching only Rust's spelling let
+        // `HandOver` fall through unchanged, and `actionFromName` has no case for it -- so its
+        // `default` turned every give into a plain MOVE. The agent picked the give (bb2025 seed 2
+        // step 49: the SAME candidate at the SAME weight as Rust, index 849 of 2,171) and the
+        // harness then declared something else, which is why no scoring diff could show it.
+        if ("HandOff".equals(pac) || "HandOver".equals(pac)) {
             return "HandOffMove";
         }
         if ("Pass".equals(pac)) {

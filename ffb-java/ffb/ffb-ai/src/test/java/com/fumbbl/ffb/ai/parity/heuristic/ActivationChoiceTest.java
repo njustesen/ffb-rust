@@ -257,4 +257,33 @@ class ActivationChoiceTest {
             return new ArrayList<>();
         }
     }
+
+    /**
+     * Regression guard for ITER48: every terminal action name the harness can produce must survive
+     * {@link ActivationChoice#moveVariant} as a name {@code ParityRunner.actionFromName} knows.
+     *
+     * <p>The give was declared as a plain MOVE for the whole campaign because two vocabularies
+     * disagreed -- Rust's enumeration says {@code HandOff}, the harness's action names say
+     * {@code HandOver} -- and {@code moveVariant} matched only the first, passing the second
+     * through unchanged into a {@code default:} arm. Nothing in the scoring could show it: the
+     * agent picked the give correctly and the declaration threw it away.
+     *
+     * <p>Asserting the mapping is not enough on its own, so this also pins the property that made
+     * the bug possible: a name that reaches the declaration must not be one the runner has to
+     * guess at.
+     */
+    @Test
+    void moveVariantMapsBothSpellingsOfEveryBallAction() {
+        assertEquals("HandOffMove", ActivationChoice.moveVariant("HandOff"));
+        assertEquals("HandOffMove", ActivationChoice.moveVariant("HandOver"),
+            "the harness spells the give HandOver; it must map to the same declaration");
+        assertEquals("PassMove", ActivationChoice.moveVariant("Pass"));
+
+        // Actions with no movement phase are declared as themselves.
+        for (String pac : new String[] {"Move", "StandUp", "Block", "Blitz", "StandUpBlitz",
+                "Foul", "HailMaryPass"}) {
+            assertEquals(pac, ActivationChoice.moveVariant(pac),
+                pac + " has no move-variant and must pass through unchanged");
+        }
+    }
 }

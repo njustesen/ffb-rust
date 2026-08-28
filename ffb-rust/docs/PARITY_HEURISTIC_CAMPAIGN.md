@@ -2791,3 +2791,46 @@ were on `System.err` and were correctly paired; it was the `System.out` probe th
 - The two Java trees agree.
 
 **Next:** seed 2 step 49 is the shallowest frontier.
+
+## ITER48 — the give was declared as a plain move, for the whole campaign
+
+**First green seeds on `--heur-classes all`: 2/20.**
+
+Seed 2 step 49: Java declared `Activate(Home5, MOVE)`, Rust `Activate(home_05, HandOffMove)`.
+Dumping both candidate lists showed they were **identical** — 2,171 candidates, same order, same
+weights, and both argmax landed on the *same* entry: index 849, `h04` give, `w=0.592533`.
+
+So the agents agreed completely and the harness threw the answer away afterwards. Two vocabularies
+disagree about the name of a give:
+
+| | name |
+|---|---|
+| Rust's enumeration | `HandOff` |
+| the harness's action names (`nameForAgent(PlayerAction.HAND_OVER)`) | `HandOver` |
+
+`ActivationChoice.moveVariant` matched only `"HandOff"`, so `"HandOver"` — which is what actually
+reaches it — passed through unchanged; `ParityRunner.actionFromName` has no case for it, and its
+`default:` arm returns `PlayerAction.MOVE`. Every give the Java agent ever chose was declared as a
+plain move. `Pass` was unaffected: both sides spell it the same, so `moveVariant` mapped it.
+
+Fixed by making `moveVariant` accept both spellings. Guarded by
+`ActivationChoiceTest.moveVariantMapsBothSpellingsOfEveryBallAction`, which also pins that the
+no-movement-phase actions pass through unchanged.
+
+**Why nothing earlier could find this.** The bug is downstream of every fixture in the campaign.
+The goldens test scoring; the scoring was right. The state hash sees the consequence — a ball that
+did not move — several steps later. Only a diff of the two agents' *chosen candidate* against their
+*declared action* separates "picked differently" from "picked identically and declared differently",
+and that distinction is what took ITER45–48 four iterations to learn to make.
+
+### Gates
+
+- `--heur-classes all` bb2025 argmax: **2/20** (was 0/20) — seeds 7 and 8 fully green. Seed 1 at
+  216, seed 3 at 188, seed 6 **69 → 185**. Seed 2 still at 49: a second, independent divergence at
+  the same step.
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,656 / 0**. `mvn -o -pl ffb-ai test`: **30 / 0**.
+- The two Java trees agree.
+
+**Next:** seed 2 step 49's remaining divergence, then seed 10 at 42.
