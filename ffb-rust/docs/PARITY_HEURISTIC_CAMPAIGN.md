@@ -3463,3 +3463,59 @@ it took one grep.
 **Next:** bb2016's stalls should now be gone or nearly so — re-run the census. If it is clean, the
 remaining 17 bb2016 reds are genuine state divergences and the edition finally looks like the other
 two, at which point the three lists are worth comparing for shared seeds again (ITER54's trick).
+
+## ITER62 — the agent read the wrong field for a bribe: bb2020 and bb2025 both 90 → 97
+
+**argmax: bb2025 90 → 97/100, bb2020 90 → 97/100, bb2016 83 → 86/100.**
+
+The census first: **no stalls remain in any edition** (bb2016 17 reds, bb2020 10, bb2025 10, all
+genuine state divergences). So the three red lists were worth comparing again, and they split
+cleanly:
+
+- bb2016's 17 reds are all **bb2016-only** seeds.
+- bb2020 and bb2025 share **8 seeds at identical steps** — 14/178, 20/114, 30/177, 32/187, 35/114,
+  58/163, 98/166 — plus 62 at different steps.
+
+Took the shared seed 20. Both sides activate `home_03` at step 114; Java declares `FOUL_MOVE` and
+Rust `Move`. The candidate diff was a single row:
+
+```
+JAVA h01 foul tgt=a02 0.064770        RUST h01 foul tgt=a02 0.003657
+```
+
+At argmax, where both coverage terms are zero, so this is the raw `foulWeight`. Probing its inputs
+on both sides gave it immediately: **Java saw `bribes=1`, Rust saw `bribes=0`**, and a bribe swaps
+the ejection cost from 0.45 to 0.07.
+
+The **"Get the Ref"** kickoff hands +1 Bribe the Ref to *both* teams. Rust's engine implements it
+faithfully — into `turn_data_*.inducement_set`, exactly where Java's `handleGetTheRef` writes it.
+The agent was reading `Team::bribes`, a *different* field that only the inducement-PURCHASE step
+writes, so it stayed 0 for a granted bribe and every foul after that kickoff was priced as if
+ejection were seven times more costly.
+
+**My ITER45 Java port was the correct one here.** It read the inducement set because that is what
+Java does; the Rust original read a field that happens to agree only when bribes are bought rather
+than granted. Worth noting because the reflex all campaign long has been "Rust is the reference, the
+port is suspect" — the port being right is what exposed this.
+
+### Gates
+
+- `--heur-classes all`, 100 seeds, argmax: **bb2025 90 → 97/100**, **bb2020 90 → 97/100**,
+  **bb2016 83 → 86/100**.
+- scale 1.0: bb2025 94/100, bb2020 93/100, bb2016 83/100.
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,663 / 0** (+1, bite-checked — with the old field the two
+  weights are byte-identical). `mvn -o -pl ffb-ai test`: **34 / 0**. The two Java trees agree.
+
+### Where the campaign stands
+
+| | argmax | scale 1.0 |
+|---|---|---|
+| bb2025 | 97 | 94 |
+| bb2020 | 97 | 93 |
+| bb2016 | 86 | 83 |
+
+**Next:** re-compare the three red lists — 3/3/14 now, and if bb2020 and bb2025 still share their
+remaining three, that is one more shared cause. bb2016's 14 are its own problem and are the bulk of
+what is left.

@@ -3770,7 +3770,20 @@ fn foul_weight(f: &Features, g: &Game, att: &str, def: &str, m: &Mover) -> f32 {
     } else {
         0.35
     };
-    let bribes = if m.home { g.team_home.bribes } else { g.team_away.bribes };
+    // The team's remaining Bribe the Ref, read from the TURN DATA's inducement set -- which is
+    // where the engine actually keeps it. `team.bribes` is a separate field that only the
+    // inducement-PURCHASE step writes, so it stays 0 for a bribe granted mid-game: the "Get the
+    // Ref" kickoff hands +1 to BOTH teams (`StepApplyKickoffResult::handle_get_the_ref`, which
+    // Rust implements faithfully -- into the inducement set). Reading the wrong field left every
+    // foul after that kickoff priced with the 0.45 ejection cost instead of 0.07 (bb2025 seed 20
+    // step 114: Java 0.064770 against Rust 0.003657, and Java fouled where Rust moved). The
+    // purchase step writes BOTH, so the set covers bought bribes too.
+    let ind_set = if m.home { &g.turn_data_home.inducement_set } else { &g.turn_data_away.inducement_set };
+    let bribes = ind_set
+        .for_usage(ffb_model::inducement::usage::Usage::AVOID_BAN)
+        .and_then(|t| ind_set.get(t))
+        .map(|i| i.value - i.uses)
+        .unwrap_or(0);
     let eject_cost = if bribes > 0 { 0.07 } else { 0.45 };
     // The referee spots a foul on DOUBLES — armour, then injury if the armour broke. Fixed at about
     // 1/6, rising with the chance of hurting the victim, and nothing the agent chooses lowers it.
@@ -5781,6 +5794,65 @@ mod tests {
             ),
             "justDeselected must be consumed, not sticky"
         );
+    }
+
+    /// A bribe granted MID-GAME must reach the foul weight.
+    ///
+    /// The "Get the Ref" kickoff hands +1 Bribe the Ref to BOTH teams, and the engine records it
+    /// where Java does — in the turn data's inducement set. `Team::bribes` is a separate field
+    /// that only the inducement-PURCHASE step writes, so it stays 0 for a granted bribe. Reading
+    /// it priced every foul after that kickoff with the 0.45 ejection cost instead of 0.07
+    /// (bb2025 seed 20 step 114: Java 0.064770 against Rust 0.003657, and Java fouled where Rust
+    /// moved). The same seed failed identically in bb2020 — this was 8 of the 10 shared reds.
+    #[test]
+    fn foul_weight_sees_a_bribe_granted_by_the_kickoff() {
+        use ffb_model::enums::{PlayerState, PS_PRONE, PS_STANDING, Rules};
+        use ffb_model::inducement::inducement::Inducement;
+        use ffb_model::inducement::usage::Usage;
+        use ffb_model::model::player::Player;
+
+        let mut home = crate::step::framework::test_team("home", 0);
+        let away = crate::step::framework::test_team("away", 0);
+        home.players.push(Player {
+            id: "home_01".into(), nr: 1, movement: 6, strength: 3, agility: 3, armour: 8,
+            ..Default::default()
+        });
+        let mut g = Game::new(home, away, Rules::Bb2025);
+        g.team_away.players.push(Player {
+            id: "away_01".into(), nr: 1, movement: 6, strength: 3, agility: 3, armour: 8,
+            ..Default::default()
+        });
+        g.home_playing = true;
+        g.field_model.set_player_coordinate("home_01", FieldCoordinate::new(12, 7));
+        g.field_model
+            .set_player_state("home_01", PlayerState::new(PS_STANDING).change_active(true));
+        g.field_model.set_player_coordinate("away_01", FieldCoordinate::new(13, 7));
+        g.field_model.set_player_state("away_01", PlayerState::new(PS_PRONE));
+        g.field_model.ball_coordinate = Some(FieldCoordinate::new(2, 2));
+        g.field_model.ball_in_play = true;
+
+        let f = Features::build(&g, positions_stamp(&g), true);
+        let m = HeuristicAgent::new(3, 0.0)
+            .mover_of(&g, &f, "home_01")
+            .expect("the fouler is a valid mover");
+
+        // `Team::bribes` stays 0 throughout: the kickoff never writes it.
+        assert_eq!(g.team_home.bribes, 0);
+        let without = foul_weight(&f, &g, "home_01", "away_01", &m);
+
+        // What "Get the Ref" actually does.
+        g.turn_data_home.inducement_set.add_inducement(Inducement::new(
+            "BRIBE".to_string(),
+            1,
+            vec![Usage::AVOID_BAN],
+        ));
+        let with = foul_weight(&f, &g, "home_01", "away_01", &m);
+
+        assert!(
+            with > without,
+            "a bribe makes ejection cheap, so the foul must be worth MORE: {with} vs {without}"
+        );
+        assert_eq!(g.team_home.bribes, 0, "and it is still not on the team field");
     }
 
     /// SKIP_INACTIVE: the agent must never activate a player whose ACTIVE bit is clear.
