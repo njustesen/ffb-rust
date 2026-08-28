@@ -3310,3 +3310,60 @@ the whole diagnosis.
 **Next:** bb2016's new lowest failing seed. 87 reds remain there against 10 in each of the other two,
 so bb2016 stays the target — and the stall signature above is worth checking for first each time,
 since one more dead action would look identical.
+
+## ITER59 — the bb2016 give had nowhere to land: 13 → 72/100
+
+**bb2016 argmax: 13 → 72/100.** Scale 1.0: 7 → 10/100.
+
+ITER58 ended by suggesting the stall signature be checked first each time. Doing that turned the
+whole edition into one measurement: of bb2016's 87 reds, **82 reported `rust=None`** — Rust ran out
+of steps rather than disagreeing about one. Sampling ten of them for the last applied action:
+
+```
+13 HandOff→home_05    16 HandOff→away_03    20 HandOff→away_08
+14 HandOff→away_04    18 HandOff→home_02    21 HandOff→away_07
+```
+
+Six of ten stalled on the terminal give — the command ITER58 had just made reachable.
+
+`bb2016/StepInitMoving`'s `Action::HandOff` arm dispatched the action and set nothing else.
+`StepInitPassing` opens with
+
+```rust
+if game.thrower_id.is_none() || game.thrower_action.is_none() { ... }   // bare cont(), no prompt
+```
+
+so it parked and the game stopped. Java sets both from `CLIENT_HAND_OVER` inside `StepInitPassing`;
+Rust sees that command one step earlier, so the arm has to set them — which **the bb2025 twin has
+always done**, comment and all, twenty lines away in the mirror file:
+
+```rust
+game.pass_coordinate = Some(c);
+game.thrower_id = game.acting_player.player_id.clone();
+game.thrower_action = Some(PlayerAction::HandOver);
+... .publish(StepParameter::CatcherId(Some(receiver_id.clone())))
+```
+
+Ported it verbatim. One arm, twenty-eight lines, and bb2016 went from 13 to 72.
+
+**Two editions of the same file drifting apart is now the third instance** — ITER53 (the chain-push
+defender, where bb2016 was the *correct* one and bb2020/bb2025 wrong) and ITER55 (two copies of the
+block weighting) were the others. The direction reverses; the shape does not. When a bb2016 twin
+misbehaves, diffing it against the bb2025 file is worth doing before anything else.
+
+**And the stall check earns its place in the loop.** Two commands turned "87 failing seeds" into
+"one dead command", which is a far better starting point than the shallowest seed's state diff.
+
+### Gates
+
+- `--heur-classes all`, 100 seeds, argmax: **bb2016 13 → 72/100**; bb2020 90/100, bb2025 90/100
+  (untouched — bb2016-only file).
+- scale 1.0: **bb2016 7 → 10/100**; bb2025 94/100, bb2020 93/100.
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,660 / 0** (+1, bite-checked). `mvn -o -pl ffb-ai test`:
+  **34 / 0**. The two Java trees agree.
+
+**Next:** re-run the stall census on bb2016's remaining 28 reds — the same two commands — before
+picking a seed. `Action::Pass` in the same file sets no thrower state either and is the obvious
+candidate, but no sampled seed stalled on it, so measure before fixing.

@@ -94,11 +94,26 @@ impl Step for StepInitMoving {
                     return self.dispatch_player_action(PlayerAction::Foul);
                 }
             }
-            Action::HandOff { .. } => {
+            Action::HandOff { receiver_id } => {
                 if player_action == Some(PlayerAction::HandOverMove)
                     || player_action == Some(PlayerAction::HandOver)
                 {
-                    return self.dispatch_player_action(PlayerAction::HandOver);
+                    // Java records the thrower and the target square from CLIENT_HAND_OVER inside
+                    // StepInitPassing; Rust sees the command HERE instead, so the state has to be
+                    // set here or `StepInitPassing` finds `thrower_id`/`thrower_action` unset,
+                    // parks with a bare `cont()` and no prompt, and the game stops outright. The
+                    // bb2025 twin has carried this since it was written; bb2016's arm dispatched
+                    // the action and set none of it. Unreachable until ITER58 let a bb2016 give
+                    // have a movement phase at all -- after which 82 of bb2016's 87 reds were this
+                    // one stall.
+                    if let Some(c) = game.field_model.player_coordinate(receiver_id) {
+                        game.pass_coordinate = Some(c);
+                    }
+                    game.thrower_id = game.acting_player.player_id.clone();
+                    game.thrower_action = Some(PlayerAction::HandOver);
+                    return self
+                        .dispatch_player_action(PlayerAction::HandOver)
+                        .publish(StepParameter::CatcherId(Some(receiver_id.clone())));
                 }
             }
             Action::Pass { .. } => {
@@ -288,6 +303,54 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2016)
+    }
+
+    /// A give arriving mid-move must leave `StepInitPassing` everything it needs.
+    ///
+    /// That step opens with `if game.thrower_id.is_none() || game.thrower_action.is_none()` and
+    /// parks on a bare `cont()` — no prompt — when either is unset, which stops the game outright
+    /// rather than failing. Java sets both from `CLIENT_HAND_OVER` inside `StepInitPassing`; Rust
+    /// sees the command here, so this arm has to set them. The bb2025 twin always did; bb2016's
+    /// dispatched the action and set nothing, and once ITER58 gave a bb2016 give a movement phase
+    /// at all, **82 of bb2016's 87 remaining reds were this single stall**.
+    #[test]
+    fn hand_off_during_a_move_sets_up_the_passing_step() {
+        use ffb_model::types::FieldCoordinate;
+
+        let mut game = make_game();
+        for (id, nr, x, y) in [("p1", 1, 10, 7), ("p2", 2, 11, 7)] {
+            game.team_home.players.push(ffb_model::model::player::Player {
+                id: id.into(), name: id.into(), nr, position_id: "pos".into(),
+                movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+                ..Default::default()
+            });
+            game.field_model.set_player_coordinate(id, FieldCoordinate::new(x, y));
+        }
+        game.home_playing = true;
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::HandOverMove);
+
+        let mut step = StepInitMoving::new("end".into());
+        let out = step.handle_command(
+            &Action::HandOff { receiver_id: "p2".into() },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+
+        assert_eq!(game.thrower_id.as_deref(), Some("p1"), "the thrower is the acting player");
+        assert_eq!(game.thrower_action, Some(PlayerAction::HandOver));
+        assert_eq!(
+            game.pass_coordinate,
+            Some(FieldCoordinate::new(11, 7)),
+            "the target square is the RECEIVER's, not the thrower's"
+        );
+        assert!(
+            out.published.iter().any(|p| matches!(
+                p,
+                StepParameter::CatcherId(Some(id)) if id == "p2"
+            )),
+            "the catcher must be published for the passing step"
+        );
     }
 
     #[test]
