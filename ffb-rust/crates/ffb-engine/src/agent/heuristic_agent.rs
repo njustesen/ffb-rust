@@ -4664,6 +4664,170 @@ mod tests {
         eprintln!("wrote {path}");
     }
 
+    /// The destination ORDERINGS `build_plans` enumerates from — `top_moves` and
+    /// `run_up_squares` — as a cross-language fixture.
+    ///
+    /// The arrival weights themselves are already pinned (ITER28). What is not, and what nothing
+    /// downstream can survive getting wrong, is the ORDER: the agent samples an INDEX into this
+    /// list, so two implementations that agree on every weight and disagree on one comparison pick
+    /// different squares. Three things have to match:
+    ///
+    /// 1. **descending by weight, ascending by cell index on ties.** Ties are not hypothetical —
+    ///    every square a plain `Move` cannot improve on scores identically.
+    /// 2. **which cells are in the list at all**, which is `Reach::order` and therefore the visit
+    ///    set, not the whole pitch.
+    /// 3. **`run_up_squares` puts the mover's CURRENT square first, unconditionally**, so "use
+    ///    none of my move" is never lost, and then appends at most `THROW_SPOTS` others by a
+    ///    different metric (arrival probability weighted by forward progress, NOT arrival weight).
+    ///    Two different orderings in the same function is exactly the kind of thing a port
+    ///    collapses into one.
+    ///
+    /// The golden stores the full ordered lists, so a single transposed pair fails with both
+    /// indices named.
+    ///
+    /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_plans_golden -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_plans_golden() {
+        use std::fmt::Write as _;
+        use ffb_model::enums::{PlayerState, PS_STANDING, Rules};
+        use ffb_model::model::player::Player;
+
+        type Board = &'static [(bool, i32, i32, i32)];
+        // (name, is_carrier, ma, ag, str, d_now, turns_left, unactivated, team_rr)
+        type M = (&'static str, bool, i32, i32, i32, i32, i32, f32, bool);
+
+        let cases: [(&str, Board, Option<(i32, i32)>, bool, &[M]); 3] = [
+            (
+                // Open field: most reachable squares score identically, so the tie-break is doing
+                // nearly all the ordering work. If it differs, this is where it shows.
+                "open_field_ties",
+                &[(true, 1, 8, 7), (false, 1, 20, 7)],
+                None, false,
+                &[
+                    ("plain", false, 6, 3, 3, 17, 8, 1.0, false),
+                    ("carrier", true, 6, 3, 3, 17, 8, 1.0, false),
+                ],
+            ),
+            (
+                // A carrier who can reach the endzone: the ordering has to put the scoring squares
+                // on top, and `run_up_squares` weights forward progress rather than weight.
+                "carrier_near_endzone",
+                &[(true, 1, 19, 7), (true, 2, 18, 9), (false, 1, 21, 6), (false, 2, 21, 8)],
+                Some((19, 7)), false,
+                &[("carrier", true, 6, 3, 3, 6, 8, 1.0, false)],
+            ),
+            (
+                // Marked on four sides: many squares are unreachable, so the LIST MEMBERSHIP is as
+                // much of the contract as the order.
+                "gauntlet",
+                &[
+                    (true, 1, 10, 7),
+                    (false, 1, 11, 7), (false, 2, 11, 8), (false, 3, 10, 6), (false, 4, 9, 8),
+                ],
+                None, false,
+                &[("plain", false, 6, 3, 3, 15, 8, 1.0, false)],
+            ),
+        ];
+
+        let mut out = String::new();
+        writeln!(out, "# top_moves / run_up_squares golden -- heuristic_agent.rs and Plans.java.").unwrap();
+        writeln!(out, "# case <name>").unwrap();
+        writeln!(out, "# player <home|away> <nr> <x> <y>").unwrap();
+        writeln!(out, "# ball <x> <y> <loose>").unwrap();
+        writeln!(out, "# mover <name> <carrier> <ma> <ag> <str> <d_now> <turns_left> <unact bits> <team_rr>").unwrap();
+        writeln!(out, "# topmoves <cell index:weight bits, comma separated, IN ORDER>").unwrap();
+        writeln!(out, "# runup <cell indices, comma separated, IN ORDER>").unwrap();
+        writeln!(out, "# risked <w bits>:<p bits>:<result bits> for a few probe pairs").unwrap();
+
+        for (name, board, ball, loose, movers) in cases {
+            for &(mname, is_carrier, ma, ag, str_, d_now, turns_left, unact, team_rr) in movers {
+                let mut home = crate::step::framework::test_team("home", 0);
+                let mut away = crate::step::framework::test_team("away", 0);
+                for &(is_home, nr, _, _) in board {
+                    let p = Player {
+                        id: format!("{}_{:02}", if is_home { "home" } else { "away" }, nr),
+                        nr,
+                        movement: if is_home && nr == 1 { ma } else { 6 },
+                        strength: if is_home && nr == 1 { str_ } else { 3 },
+                        agility: if is_home && nr == 1 { ag } else { 3 },
+                        armour: 8,
+                        ..Default::default()
+                    };
+                    if is_home { home.players.push(p) } else { away.players.push(p) }
+                }
+                let mut g = Game::new(home, away, Rules::Bb2025);
+                for &(is_home, nr, x, y) in board {
+                    let id = format!("{}_{:02}", if is_home { "home" } else { "away" }, nr);
+                    g.field_model.set_player_coordinate(&id, FieldCoordinate::new(x, y));
+                    g.field_model
+                        .set_player_state(&id, PlayerState::new(PS_STANDING).change_active(true));
+                }
+                if let Some((bx, by)) = ball {
+                    g.field_model.ball_coordinate = Some(FieldCoordinate::new(bx, by));
+                    g.field_model.ball_in_play = true;
+                    g.field_model.ball_moving = loose;
+                }
+                let f = Features::build(&g, positions_stamp(&g), true);
+                let mut sc = Scratch::default();
+                let b = budget_of(&g, "home_01").expect("the mover is on the pitch");
+                let r = reach_with(&f, &g, "home_01", &b, team_rr, &mut sc)
+                    .expect("a positive movement cap");
+                let m = Mover {
+                    home: true,
+                    is_carrier,
+                    ma,
+                    ag,
+                    str_,
+                    sure_hands: false,
+                    side_step: false,
+                    has_catch: false,
+                    d_now,
+                    turns_left,
+                    unactivated: unact,
+                };
+                let here = m_coord(&g, "home_01");
+
+                writeln!(out, "case {name}").unwrap();
+                for &(is_home, nr, x, y) in board {
+                    writeln!(out, "player {} {nr} {x} {y}",
+                        if is_home { "home" } else { "away" }).unwrap();
+                }
+                if let Some((bx, by)) = ball {
+                    writeln!(out, "ball {bx} {by} {loose}").unwrap();
+                }
+                writeln!(out, "mover {mname} {is_carrier} {ma} {ag} {str_} {d_now} {turns_left} {:08x} {team_rr}",
+                    unact.to_bits()).unwrap();
+
+                let tops = top_moves(&f, &r, &m, usize::MAX);
+                let t: Vec<String> =
+                    tops.iter().map(|(w, i)| format!("{i}:{:08x}", w.to_bits())).collect();
+                writeln!(out, "topmoves {}", t.join(",")).unwrap();
+
+                let ru = run_up_squares(Some(&r), &m, here);
+                let rs: Vec<String> = ru.iter().map(|i| i.to_string()).collect();
+                writeln!(out, "runup {}", rs.join(",")).unwrap();
+
+                // `risked` is a two-line function, but it is NOT `w * p` and the difference only
+                // shows on a NEGATIVE weight -- so probe both signs explicitly.
+                let probes: [(f32, f32); 4] =
+                    [(0.8, 1.0), (0.8, 0.4), (-0.5, 0.9), (-0.5, 0.25)];
+                let rr: Vec<String> = probes
+                    .iter()
+                    .map(|&(w, p)| {
+                        format!("{:08x}:{:08x}:{:08x}",
+                            w.to_bits(), p.to_bits(), risked(w, p, &m).to_bits())
+                    })
+                    .collect();
+                writeln!(out, "risked {}", rr.join(",")).unwrap();
+            }
+        }
+
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/agent/testdata/plans_golden.txt");
+        std::fs::write(path, out).unwrap();
+        eprintln!("wrote {path}");
+    }
+
     /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_sampler_golden -- --ignored`
     #[test]
     #[ignore]

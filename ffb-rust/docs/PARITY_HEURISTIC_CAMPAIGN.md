@@ -1896,3 +1896,48 @@ Bite-check: `rushPenalty`'s non-carrier constant 0.40 → 0.35 fails at
 read is now pinned bit for bit — rasters, reach, value, arrival — so what remains is the plan
 selection itself and the wiring. After that the live gate begins, and with it multi-square movement,
 GFI chains and scoring paths that the random gate has never executed.
+
+## ITER29 — the plan orderings: `top_moves`, `run_up_squares`, `risked`
+
+`build_plans` is ~320 lines and enumerates from two ordered destination lists. The weights inside
+them are already pinned; what this iteration pins is the **order**, because the agent samples an
+INDEX into these lists — two implementations that agree on every weight and transpose one pair pick
+different squares.
+
+`Plans.java` + `PlansTest`, three boards: an open field (where most reachable squares score
+identically, so ties do nearly all the ordering work), a carrier within reach of the endzone, and a
+four-way gauntlet (where LIST MEMBERSHIP is as much of the contract as order — most of the pitch is
+unreachable). The golden stores the full ordered lists, and a mismatch reports the position plus
+both cell coordinates rather than "a sweep went red".
+
+`run_up_squares` deserves its own mention: it contains **two different orderings**, and collapsing
+them is the obvious port mistake. The mover's own square goes first unconditionally so "use none of
+my move" is never lost, and the rest are ranked by arrival probability weighted by forward
+progress — deliberately NOT by arrival weight, because a throwing platform is judged by whether he
+gets there and how far up the pitch it is, not by what standing there is worth.
+
+### One bite-check that discriminates, and one that cannot
+
+Collapsing the run-up metric to bare `p_arrive` fails immediately:
+`runUpSquares position 1 (open_field_ties/plain) ==> expected: <40> but was: <28>`.
+
+Dropping the index tie-break from `top_moves` **does not fail**, and cannot: the list is built from
+`Reach::order`, which is sorted ascending, and both languages' sorts are stable, so ties keep their
+input order either way. The explicit fallback is kept — it is what Rust writes, and it stops the
+ordering depending on a property that lives in a different method — but the fixture does not test
+it. Recorded in the Javadoc as a measured caveat rather than left as an implied guarantee; the
+alternative is a comment claiming coverage the test does not have.
+
+That is now the second fixture whose bite-check found a branch it could not reach (ITER27 was the
+first). Running the check is cheap; assuming the fixture is strong is not.
+
+### Gates
+
+- `mvn -o -pl ffb-ai test`: **21 tests, 0 failures**.
+- `cargo test --workspace --release`: **14,654 / 0**.
+- Fourteen-class rung still **100/100 in all three editions** at argmax.
+
+**Next:** the remaining `build_plans` weights that have no fixture yet — `handoff_weight`,
+`pass_weight`, `foul_weight`, `proxy_value` — and then the enumeration itself plus the WIDE
+`ActivatePlayer` arm. The enumeration is where Java needs the harness's legal-action list rather
+than a fixture, so that is the point at which the live gate takes over from the goldens.
