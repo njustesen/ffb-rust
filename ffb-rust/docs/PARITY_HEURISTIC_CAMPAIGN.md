@@ -1988,3 +1988,54 @@ scoresNow ignores carrierScoresNow        → v carrier_can_score_himself/home_2
 (`find_passing_distance`, `minimum_roll_simple`, `evaluate_pass_simple`); Java has all three, so the
 port calls them rather than re-deriving a range table. Then `proxy_value`, the enumeration itself,
 and the WIDE `ActivatePlayer` arm.
+
+## ITER31 — `pass_weight`: the last plan price
+
+A fumble is a turnover on the spot, so a pass has to be an EXPECTATION rather than a preference, and
+the three outcomes are priced apart:
+
+```
+p_complete = p_accurate · p_catch
+p_lost     = p_fumble + p_scatter · 0.45 + p_accurate · (1 − p_catch)
+w          = p_complete · v − p_lost · risk
+```
+
+**The 0.45 is the whole argument.** A scattered ball is *not* a turnover — it lands three squares
+away and either side may reach it — so pricing a scatter like a fumble makes the agent refuse every
+pass it should be making. Perturbing it to 1.0 fails the fixture at
+`short_to_scorer/home_2 from (12,7)`.
+
+The six-face loop is the other load-bearing part: it asks the ENGINE'S OWN grader which faces are
+ACCURATE and which FUMBLE rather than deriving them from the target number, because those are
+different questions — a 1 fumbles whatever the target is, and the accurate band differs by edition.
+Tackle zones on the thrower shift the effective ROLL, not the target, which is why the counts and
+not a modifier are what cross the boundary.
+
+Four cases: a short pass to a scorer, the same throw with the thrower MARKED (the accurate/fumble
+split moves 2/2 → 0/4 → 1/3, so the shift is visibly applied to the right side), a **Blizzard** where
+Long is not a legal throw at all (Rust returns `None`, and the option must not exist), and BB2016,
+which grades on a different table.
+
+The golden carries the graded face counts as INPUTS — the same split as `Features` taking a snapshot
+and foul assists being fed in. Those are shared engine mechanics the parity matrix already covers,
+so re-deriving them in the test would pin a second copy of the pass tables instead of the arithmetic
+on top. `BallMoves.gradeFaces` is the production path that calls the real mechanic, and the live gate
+is what will exercise it.
+
+The test asserts its own coverage: an illegal throw must appear, and the accurate/fumble split must
+take at least three distinct values — a fixture where every throw grades 2/2 would pass while
+testing a three-outcome model at one point.
+
+A column off-by-one in the test read `tz_on_thrower` as the expected weight on the first run. It
+failed loudly (`expected: <0>`), which is the right way for that mistake to go.
+
+### Gates
+
+- `mvn -o -pl ffb-ai test`: **23 tests, 0 failures**.
+- `cargo test --workspace --release`: **14,654 / 0**.
+- Fourteen-class rung still **100/100 in all three editions** at argmax.
+
+**Every weight `build_plans` reads is now ported and pinned.** What is left is `proxy_value` (the
+search-free tier-1 estimate), the enumeration itself, and the WIDE `ActivatePlayer` arm — and the
+enumeration needs the harness's legal-action list rather than a fixture, so that is where the live
+gate takes over.

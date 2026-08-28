@@ -5029,6 +5029,202 @@ mod tests {
         eprintln!("wrote {path}");
     }
 
+    /// `pass_weight` — the last plan price — as a cross-language fixture.
+    ///
+    /// A fumble is a turnover on the spot, so a pass has to be an EXPECTATION rather than a
+    /// preference, and the three outcomes are priced separately:
+    ///
+    /// ```text
+    /// p_complete = p_accurate * p_catch
+    /// p_lost     = p_fumble + p_scatter * 0.45 + p_accurate * (1 - p_catch)
+    /// w          = p_complete * v - p_lost * risk
+    /// ```
+    ///
+    /// The 0.45 on a scatter is the point: **a scattered ball is not a turnover.** It lands three
+    /// squares away and either side may reach it, so pricing a scatter like a fumble makes the
+    /// agent refuse every pass it should be making. That is the single most consequential constant
+    /// in this function.
+    ///
+    /// The six-face loop is also load-bearing: it asks the ENGINE'S OWN grader which faces are
+    /// ACCURATE and which FUMBLE, rather than deriving them from the target number, because the
+    /// two are not the same question — a 1 fumbles regardless of target, and the accurate band
+    /// depends on the edition.
+    ///
+    /// The golden carries `n_accurate` / `n_fumble` / the passing distance as INPUTS, the same
+    /// split used for `Features` (a snapshot, not a Game) and for foul assists: those come from
+    /// mechanics both engines already share and the parity matrix already covers, so what needs
+    /// pinning here is the arithmetic on top of them.
+    ///
+    /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_pass_golden -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_pass_golden() {
+        use std::fmt::Write as _;
+        use ffb_model::enums::{PlayerState, PS_STANDING, PS_PRONE, Rules, Weather};
+        use ffb_model::model::player::Player;
+
+        type P2 = (bool, i32, i32, i32, bool, i32, i32, i32);
+        type Board = &'static [P2];
+
+        // (name, rules, weather, board, ball, turn_nr, d_now, turns_left, unact)
+        let cases: [(&str, Rules, Weather, Board, (i32, i32), i32, i32, i32, f32); 4] = [
+            (
+                // Short pass to an unmarked receiver who can run it in: the case a pass exists for.
+                "short_to_scorer", Rules::Bb2025, Weather::Nice,
+                &[
+                    (true, 1, 12, 7, true, 6, 3, 3),
+                    (true, 2, 18, 7, true, 6, 3, 3),
+                    (false, 1, 13, 9, true, 6, 3, 3),
+                ],
+                (12, 7), 3, 13, 5, 1.0,
+            ),
+            (
+                // The thrower is MARKED: `tz_on_thrower` shifts the effective roll, which changes
+                // the accurate/fumble split rather than the target -- easy to apply to the wrong
+                // side of the comparison.
+                "thrower_marked", Rules::Bb2025, Weather::Nice,
+                &[
+                    (true, 1, 12, 7, true, 6, 3, 3),
+                    (true, 2, 18, 7, true, 6, 3, 3),
+                    (false, 1, 11, 7, true, 6, 3, 3),
+                    (false, 2, 12, 6, true, 6, 3, 3),
+                ],
+                (12, 7), 3, 13, 5, 1.0,
+            ),
+            (
+                // A BLIZZARD rules Long and LongBomb out entirely, so some throws stop being legal
+                // at all -- `None`, and the option must not exist.
+                "blizzard_long", Rules::Bb2025, Weather::Blizzard,
+                &[
+                    (true, 1, 4, 7, true, 6, 3, 3),
+                    (true, 2, 20, 7, true, 6, 3, 3),
+                    (true, 3, 9, 7, true, 6, 3, 3),
+                ],
+                (4, 7), 3, 21, 5, 1.0,
+            ),
+            (
+                // BB2016 grades passes on a different table entirely.
+                "bb2016", Rules::Bb2016, Weather::Nice,
+                &[
+                    (true, 1, 12, 7, true, 6, 3, 3),
+                    (true, 2, 18, 7, true, 6, 3, 3),
+                    (true, 3, 14, 9, true, 6, 3, 3),
+                ],
+                (12, 7), 3, 13, 5, 1.0,
+            ),
+        ];
+
+        let mut out = String::new();
+        writeln!(out, "# pass_weight golden -- heuristic_agent.rs and BallMoves.passWeight.").unwrap();
+        writeln!(out, "# case <name> <rules> <weather> <turn_nr> <d_now> <turns_left> <unact bits>").unwrap();
+        writeln!(out, "# player <home|away> <nr> <x> <y> <standing|prone> <ma> <ag> <st>").unwrap();
+        writeln!(out, "# ball <x> <y>").unwrap();
+        writeln!(out, "# pass <rcv nr> <from x> <from y> <dist|NONE> <n_accurate> <n_fumble> <tz_thrower> <w bits|->").unwrap();
+
+        for (name, rules, weather, board, ball, turn_nr, d_now, turns_left, unact) in cases {
+            let mut home = crate::step::framework::test_team("home", 0);
+            let mut away = crate::step::framework::test_team("away", 0);
+            for &(is_home, nr, _, _, _, ma, ag, st) in board {
+                let p = Player {
+                    id: format!("{}_{:02}", if is_home { "home" } else { "away" }, nr),
+                    nr,
+                    movement: ma,
+                    strength: st,
+                    agility: ag,
+                    passing: 4,
+                    armour: 8,
+                    ..Default::default()
+                };
+                if is_home { home.players.push(p) } else { away.players.push(p) }
+            }
+            let mut g = Game::new(home, away, rules);
+            g.field_model.weather = weather;
+            g.turn_data_home.turn_nr = turn_nr;
+            g.turn_data_away.turn_nr = turn_nr;
+            for &(is_home, nr, x, y, standing, _, _, _) in board {
+                let id = format!("{}_{:02}", if is_home { "home" } else { "away" }, nr);
+                g.field_model.set_player_coordinate(&id, FieldCoordinate::new(x, y));
+                g.field_model.set_player_state(
+                    &id,
+                    PlayerState::new(if standing { PS_STANDING } else { PS_PRONE })
+                        .change_active(true),
+                );
+            }
+            g.field_model.ball_coordinate = Some(FieldCoordinate::new(ball.0, ball.1));
+            g.field_model.ball_in_play = true;
+            g.field_model.ball_moving = false;
+            let f = Features::build(&g, positions_stamp(&g), true);
+            let m = Mover {
+                home: true,
+                is_carrier: true,
+                ma: 6,
+                ag: 3,
+                str_: 3,
+                sure_hands: false,
+                side_step: false,
+                has_catch: false,
+                d_now,
+                turns_left,
+                unactivated: unact,
+            };
+
+            writeln!(out, "case {name} {rules:?} {weather:?} {turn_nr} {d_now} {turns_left} {:08x}",
+                unact.to_bits()).unwrap();
+            for &(is_home, nr, x, y, standing, ma, ag, st) in board {
+                writeln!(out, "player {} {nr} {x} {y} {} {ma} {ag} {st}",
+                    if is_home { "home" } else { "away" },
+                    if standing { "standing" } else { "prone" }).unwrap();
+            }
+            writeln!(out, "ball {} {}", ball.0, ball.1).unwrap();
+
+            let here = m_coord(&g, "home_01");
+            let froms = [here, FieldCoordinate::new(here.x + 1, here.y)];
+            let mech = crate::mechanic::pass_mechanic_for(g.rules);
+            let thrower = g.player("home_01").expect("thrower");
+            for &(is_home, nr, _, _, _, _, _, _) in board {
+                if !is_home || nr == 1 {
+                    continue;
+                }
+                let rcv = format!("home_{nr:02}");
+                let rc = match g.field_model.player_coordinate(&rcv) {
+                    Some(c) => c,
+                    None => continue,
+                };
+                for from in froms {
+                    if !on_pitch(from.x, from.y) {
+                        continue;
+                    }
+                    let dist = mech.find_passing_distance(&g, Some(from), Some(rc), false);
+                    let tz = f.tz[side_idx(m.home)][ixc(from)] as i32;
+                    let (dname, na, nf) = match dist {
+                        Some(d) => {
+                            let mut na = 0;
+                            let mut nf = 0;
+                            for die in 1..=6i32 {
+                                match mech.evaluate_pass_simple(thrower, die - tz, d, &[], false) {
+                                    ffb_mechanics::pass_result::PassResult::ACCURATE => na += 1,
+                                    ffb_mechanics::pass_result::PassResult::FUMBLE => nf += 1,
+                                    _ => {}
+                                }
+                            }
+                            (format!("{d:?}"), na, nf)
+                        }
+                        None => ("NONE".to_string(), 0, 0),
+                    };
+                    let w = pass_weight(&f, &g, "home_01", from, &rcv, &m);
+                    writeln!(out, "pass {nr} {} {} {dname} {na} {nf} {tz} {}",
+                        from.x, from.y,
+                        match w { Some(w) => format!("{:08x}", w.to_bits()),
+                                  None => "-".to_string() }).unwrap();
+                }
+            }
+        }
+
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/agent/testdata/pass_golden.txt");
+        std::fs::write(path, out).unwrap();
+        eprintln!("wrote {path}");
+    }
+
     /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_sampler_golden -- --ignored`
     #[test]
     #[ignore]

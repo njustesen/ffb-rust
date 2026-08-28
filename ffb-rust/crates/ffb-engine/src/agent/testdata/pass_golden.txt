@@ -1,0 +1,38 @@
+# pass_weight golden -- heuristic_agent.rs and BallMoves.passWeight.
+# case <name> <rules> <weather> <turn_nr> <d_now> <turns_left> <unact bits>
+# player <home|away> <nr> <x> <y> <standing|prone> <ma> <ag> <st>
+# ball <x> <y>
+# pass <rcv nr> <from x> <from y> <dist|NONE> <n_accurate> <n_fumble> <tz_thrower> <w bits|->
+case short_to_scorer Bb2025 Nice 3 13 5 3f800000
+player home 1 12 7 standing 6 3 3
+player home 2 18 7 standing 6 3 3
+player away 1 13 9 standing 6 3 3
+ball 12 7
+pass 2 12 7 ShortPass 2 2 0 be016c14
+pass 2 13 7 ShortPass 2 2 0 be016c14
+case thrower_marked Bb2025 Nice 3 13 5 3f800000
+player home 1 12 7 standing 6 3 3
+player home 2 18 7 standing 6 3 3
+player away 1 11 7 standing 6 3 3
+player away 2 12 6 standing 6 3 3
+ball 12 7
+pass 2 12 7 ShortPass 0 4 2 bf1ccccd
+pass 2 13 7 ShortPass 1 3 1 bebd27d2
+case blizzard_long Bb2025 Blizzard 3 21 5 3f800000
+player home 1 4 7 standing 6 3 3
+player home 2 20 7 standing 6 3 3
+player home 3 9 7 standing 6 3 3
+ball 4 7
+pass 2 4 7 NONE 0 0 0 -
+pass 2 5 7 NONE 0 0 0 -
+pass 3 4 7 ShortPass 2 2 0 bebddddd
+pass 3 5 7 ShortPass 2 2 0 bebddddd
+case bb2016 Bb2016 Nice 3 13 5 3f800000
+player home 1 12 7 standing 6 3 3
+player home 2 18 7 standing 6 3 3
+player home 3 14 9 standing 6 3 3
+ball 12 7
+pass 2 12 7 ShortPass 3 1 0 3deeeeec
+pass 2 13 7 ShortPass 3 1 0 3deeeeec
+pass 3 12 7 QuickPass 4 1 0 be4aaaac
+pass 3 13 7 QuickPass 4 1 0 be4aaaac

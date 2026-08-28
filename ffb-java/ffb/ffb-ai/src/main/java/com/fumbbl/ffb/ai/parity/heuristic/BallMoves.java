@@ -181,6 +181,90 @@ public final class BallMoves {
         return r.pCatch * v * 1.0f - (1.0f - r.pCatch) * risk;
     }
 
+    /**
+     * Rust {@code pass_weight}, given the ENGINE's grading of the six die faces.
+     *
+     * <p>A fumble is a turnover on the spot, so a pass has to be an EXPECTATION and the three
+     * outcomes are priced apart:
+     *
+     * <pre>
+     * pComplete = pAccurate * pCatch
+     * pLost     = pFumble + pScatter * 0.45 + pAccurate * (1 - pCatch)
+     * w         = pComplete * v - pLost * risk
+     * </pre>
+     *
+     * <p><b>The 0.45 is the whole argument.</b> A scattered ball is NOT a turnover — it lands three
+     * squares away and either side may reach it — so pricing a scatter like a fumble makes the
+     * agent refuse every pass it should be making.
+     *
+     * <p>{@code nAccurate} and {@code nFumble} are counted by rolling all six faces through the
+     * engine's own grader, NOT derived from the target number: a 1 fumbles whatever the target is,
+     * and the accurate band differs by edition. Tackle zones on the thrower shift the effective
+     * ROLL rather than the target, which is why the caller passes the shifted counts rather than a
+     * modifier.
+     *
+     * @param nAccurate faces the engine grades ACCURATE, out of six.
+     * @param nFumble faces the engine grades FUMBLE, out of six.
+     */
+    public static float passWeight(Features f, Ctx ctx, RcvSpec rcv, FieldCoordinate from,
+            ValueModel.Mover m, int nAccurate, int nFumble) {
+        float pAccurate = (float) nAccurate / 6.0f;
+        float pFumble = (float) nFumble / 6.0f;
+        float pScatter = Math.max(1.0f - pAccurate - pFumble, 0.0f);
+
+        Receiver r = receiverOf(f, ctx, rcv, from, m);
+        float pComplete = pAccurate * r.pCatch;
+        // A scattered ball is not a turnover; only a fumble, or a dropped catch, hands the turn
+        // over outright.
+        float pLost = pFumble + pScatter * 0.45f + pAccurate * (1.0f - r.pCatch);
+
+        int maT = Math.max(m.ma, 1);
+        int ownTts = (m.dNow + maT - 1) / maT;
+        boolean hopeless = ownTts > m.turnsLeft;
+        // A completion that leaves somebody who CAN still make it turns a dead drive into a live one.
+        boolean rescues = hopeless && r.tts <= r.turns;
+
+        float v = r.v;
+        if (r.scoresNow) {
+            v = 1.0f;
+        } else if (rescues) {
+            v = Math.max(v, 0.85f);
+        }
+        float risk = Arrival.cTurnover(m.unactivated, 0, false) * (hopeless ? 0.30f : 1.0f);
+        return pComplete * v - pLost * risk;
+    }
+
+    /**
+     * Count the ACCURATE and FUMBLE faces the way {@code pass_weight} does — through the engine's
+     * own grader, with tackle zones shifting the roll.
+     *
+     * <p>This is the production path; the fixture feeds the counts in directly so that what it
+     * pins is the arithmetic rather than a second copy of the pass tables, which both engines
+     * already share and the parity matrix already covers.
+     *
+     * @return {@code {nAccurate, nFumble}}, or null when the throw is not legal at all.
+     */
+    public static int[] gradeFaces(com.fumbbl.ffb.mechanics.PassMechanic mech,
+            com.fumbbl.ffb.model.Game game, com.fumbbl.ffb.model.Player<?> thrower,
+            FieldCoordinate from, FieldCoordinate to, int tzOnThrower) {
+        com.fumbbl.ffb.PassingDistance dist = mech.findPassingDistance(game, from, to, false);
+        if (dist == null) {
+            return null;
+        }
+        int nAccurate = 0;
+        int nFumble = 0;
+        for (int die = 1; die <= 6; die++) {
+            com.fumbbl.ffb.mechanics.PassResult res =
+                mech.evaluatePass(thrower, die - tzOnThrower, dist, java.util.Collections.emptyList(), false);
+            if (res == com.fumbbl.ffb.mechanics.PassResult.ACCURATE) {
+                nAccurate++;
+            } else if (res == com.fumbbl.ffb.mechanics.PassResult.FUMBLE) {
+                nFumble++;
+            }
+        }
+        return new int[] {nAccurate, nFumble};
+    }
+
     /** Rust {@code p_2d6_at_least}. */
     public static float p2d6AtLeast(int need) {
         if (need <= 2) {
