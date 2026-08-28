@@ -2929,3 +2929,44 @@ bb2016 overall **2/100 → 4/100**.
 
 **Next:** bb2016 seed 4 fails at **step 0**, which is a different and much earlier problem than the
 rest of the bb2016 set — worth taking before the deeper ones.
+
+## ITER51 — the heuristic never inherited the turn guards
+
+bb2016 seed 4 diverged at **step 0** — its very first recorded step — with eight home players still
+in the reserves box. The setup was not the problem: probing the prompt stream showed Rust's setup
+placing exactly the formation Java placed. The problem was that the whole Rust game finished in
+**5 ms**.
+
+Bisecting the class mask pinned it precisely: the fourteen-class rung is green on this seed and
+adding `activate` alone breaks it. The prompt stream then showed the run ending after 56 prompts
+instead of 995, with the last few activations happening in `TurnMode::Blitz` at `turn_nr = 0` — the
+**bb2016 Blitz! kickoff**.
+
+`ParityRunner`'s INIT_SELECTING arm applies two rules ahead of the branch that reaches the agent at
+all, so the Java side obeys them whichever agent is driving:
+
+```java
+if (turn < 1) { inject EndTurn; break; }                       // before the turn-key update
+if (game.getTurnMode() != TurnMode.REGULAR && !usedThisTurn.isEmpty()) { ... EndTurn }
+```
+
+`RandomAgent` mirrors both, with the comments to prove it. The heuristic replaced the entire pick
+loop and inherited neither, so during a Blitz! kickoff it kept activating through a turn Java had
+already ended.
+
+That is the same shape as ITER47's `SKIP_INACTIVE`: **a contract rule that lives in the harness
+loop, not in the scorer, and that the heuristic bypassed by replacing the loop wholesale.** Three of
+these have now been found. They are worth enumerating deliberately rather than one seed at a time —
+anything `RandomAgent` does between "the engine asked" and "a player was picked" is a candidate.
+
+### Gates
+
+- `--heur-classes all`, 100 seeds, argmax: **bb2020 69 → 79/100**; bb2025 87/100, bb2016 4/100
+  (seed 4 itself **step 0 → 97**).
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,657 / 0** (+1, both guards bite-checked separately).
+  `mvn -o -pl ffb-ai test`: **31 / 0**. The two Java trees agree.
+
+**Next:** enumerate the rest of `RandomAgent`'s between-prompt-and-pick contract and check the
+heuristic against it as a set, rather than waiting for each rule to surface as a seed.

@@ -2074,7 +2074,33 @@ impl HeuristicAgent {
         f: &Features,
         eligible: Vec<(String, Vec<PlayerAction>)>,
     ) -> Action {
+        // Two rules the random contract has always applied and the heuristic never inherited.
+        // Both live in `ParityRunner`'s INIT_SELECTING arm, ahead of the branch that reaches the
+        // agent at all, so the Java side obeys them no matter which agent is driving -- and Rust's
+        // heuristic, which replaced the whole pick loop, obeyed neither.
+        //
+        // 1. `if (turn < 1) { EndTurn }`, BEFORE the turn-key update. A team whose turn counter is
+        //    still 0 has not started a turn this half; a window that opens for it closes with zero
+        //    movers and zero draws.
+        // 2. A non-REGULAR mode -- a Blitz! or Quick Snap kickoff, a pass-block window -- allows
+        //    exactly ONE activation and then ends.
+        //
+        // Missing them, a bb2016 Blitz! kickoff let the heuristic keep activating during a turn
+        // Java had already ended, and the game ran off the rails immediately: seed 4 finished in
+        // 5 ms with eight players still in the box, and the parity log diverged at its very first
+        // recorded step.
+        let turn_nr = if g.home_playing {
+            g.turn_data_home.turn_nr
+        } else {
+            g.turn_data_away.turn_nr
+        };
+        if turn_nr < 1 {
+            return Action::EndTurn;
+        }
         self.refresh_turn(g);
+        if g.turn_mode != ffb_model::enums::TurnMode::Regular && !self.used_this_turn.is_empty() {
+            return Action::EndTurn;
+        }
         if eligible.is_empty() {
             return Action::EndTurn;
         }
@@ -2344,7 +2370,33 @@ impl HeuristicAgent {
         f: &Features,
         eligible: Vec<(String, Vec<PlayerAction>)>,
     ) -> Action {
+        // Two rules the random contract has always applied and the heuristic never inherited.
+        // Both live in `ParityRunner`'s INIT_SELECTING arm, ahead of the branch that reaches the
+        // agent at all, so the Java side obeys them no matter which agent is driving -- and Rust's
+        // heuristic, which replaced the whole pick loop, obeyed neither.
+        //
+        // 1. `if (turn < 1) { EndTurn }`, BEFORE the turn-key update. A team whose turn counter is
+        //    still 0 has not started a turn this half; a window that opens for it closes with zero
+        //    movers and zero draws.
+        // 2. A non-REGULAR mode -- a Blitz! or Quick Snap kickoff, a pass-block window -- allows
+        //    exactly ONE activation and then ends.
+        //
+        // Missing them, a bb2016 Blitz! kickoff let the heuristic keep activating during a turn
+        // Java had already ended, and the game ran off the rails immediately: seed 4 finished in
+        // 5 ms with eight players still in the box, and the parity log diverged at its very first
+        // recorded step.
+        let turn_nr = if g.home_playing {
+            g.turn_data_home.turn_nr
+        } else {
+            g.turn_data_away.turn_nr
+        };
+        if turn_nr < 1 {
+            return Action::EndTurn;
+        }
         self.refresh_turn(g);
+        if g.turn_mode != ffb_model::enums::TurnMode::Regular && !self.used_this_turn.is_empty() {
+            return Action::EndTurn;
+        }
         if eligible.is_empty() {
             return Action::EndTurn;
         }
@@ -5596,6 +5648,95 @@ mod tests {
     ///    silently costs a draw fewer, and the stream desynchronises from there.
     ///
     /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_draw_golden -- --ignored`
+    /// The two turn guards the random contract has always applied, mirrored from
+    /// `ParityRunner`'s INIT_SELECTING arm: a team whose turn counter is still 0 does not act, and
+    /// a non-REGULAR turn mode allows exactly ONE activation.
+    ///
+    /// A bb2016 Blitz! kickoff runs at `turn_nr == 0` in `TurnMode::Blitz`. Without these, the
+    /// heuristic kept activating through a turn Java had already ended: seed 4 finished in 5 ms
+    /// with eight players still in the box and diverged at its very first recorded step.
+    #[test]
+    fn heuristic_honours_the_turn_guards() {
+        use ffb_model::enums::{PlayerState, TurnMode, PS_STANDING, Rules};
+        use ffb_model::model::player::Player;
+
+        let mut home = crate::step::framework::test_team("home", 0);
+        let mut away = crate::step::framework::test_team("away", 0);
+        for nr in 1..=2 {
+            home.players.push(Player {
+                id: format!("home_{:02}", nr),
+                nr,
+                movement: 6,
+                strength: 3,
+                agility: 3,
+                armour: 8,
+                ..Default::default()
+            });
+        }
+        away.players.push(Player {
+            id: "away_01".to_string(),
+            nr: 1,
+            movement: 6,
+            strength: 3,
+            agility: 3,
+            armour: 8,
+            ..Default::default()
+        });
+        let mut g = Game::new(home, away, Rules::Bb2016);
+        g.home_playing = true;
+        for (id, x, y) in [("home_01", 10, 6), ("home_02", 10, 8), ("away_01", 20, 7)] {
+            g.field_model.set_player_coordinate(id, FieldCoordinate::new(x, y));
+            g.field_model
+                .set_player_state(id, PlayerState::new(PS_STANDING).change_active(true));
+        }
+        g.field_model.ball_coordinate = Some(FieldCoordinate::new(13, 7));
+        g.field_model.ball_in_play = true;
+        let f = Features::build(&g, positions_stamp(&g), true);
+        let eligible: Vec<(String, Vec<PlayerAction>)> = vec![
+            ("home_01".to_string(), vec![PlayerAction::Move]),
+            ("home_02".to_string(), vec![PlayerAction::Move]),
+        ];
+
+        // Guard 1: turn counter still 0 -- nothing happens, whatever the mode.
+        g.turn_mode = TurnMode::Blitz;
+        g.turn_data_home.turn_nr = 0;
+        let mut agent = HeuristicAgent::new(11, 0.0);
+        assert!(
+            matches!(agent.handle_activate(&g, &f, eligible.clone()), Action::EndTurn),
+            "a team whose turn counter is 0 must not activate"
+        );
+
+        // Guard 2: a non-REGULAR mode gets exactly one activation, then ends.
+        g.turn_data_home.turn_nr = 1;
+        let mut agent = HeuristicAgent::new(11, 0.0);
+        assert!(
+            matches!(
+                agent.handle_activate(&g, &f, eligible.clone()),
+                Action::ActivatePlayer { .. }
+            ),
+            "the FIRST activation of a Blitz! turn is allowed"
+        );
+        assert!(
+            matches!(agent.handle_activate(&g, &f, eligible.clone()), Action::EndTurn),
+            "the SECOND must end the turn instead"
+        );
+
+        // A REGULAR turn is unaffected: a second activation still happens.
+        g.turn_mode = TurnMode::Regular;
+        let mut agent = HeuristicAgent::new(11, 0.0);
+        assert!(matches!(
+            agent.handle_activate(&g, &f, eligible.clone()),
+            Action::ActivatePlayer { .. }
+        ));
+        assert!(
+            matches!(
+                agent.handle_activate(&g, &f, eligible.clone()),
+                Action::ActivatePlayer { .. }
+            ),
+            "a REGULAR turn keeps activating"
+        );
+    }
+
     /// SKIP_INACTIVE: the agent must never activate a player whose ACTIVE bit is clear.
     ///
     /// Java's `StepInitSelecting` accepts `CLIENT_ACTING_PLAYER` only when
