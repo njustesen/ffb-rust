@@ -96,6 +96,13 @@ public class ParityRunner {
     private HeuristicDriver heuristic;
 
     /**
+     * Owns an activation from declaration until its plan is spent. Non-null exactly when the
+     * heuristic owns the `activate` class; `activate` and `move` are switched on together because
+     * the plan is created by one and consumed by the other.
+     */
+    private com.fumbbl.ffb.ai.parity.heuristic.ActivationDriver activation;
+
+    /**
      * Where the defender stood when the block was declared.
      *
      * <p>Rust's follow-up arm reads the DEFENDER_POSITION step parameter that StepInitBlocking
@@ -268,6 +275,18 @@ public class ParityRunner {
                 // `seed ^ "HEURISTI"`, independent of the game dice and of decisionRng/actionRng.
                 runner.heuristic = new HeuristicDriver(
                     s, heurScaleArg, ClassMask.parse(heurClassesArg));
+                // `activate` and `move` are one unit: the plan is created by the activation and
+                // consumed by the movement, so the driver exists exactly when both are owned.
+                if (runner.heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.ACTIVATE_PLAYER)
+                    && runner.heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.MOVE)) {
+                    runner.activation = new com.fumbbl.ffb.ai.parity.heuristic.ActivationDriver(
+                        runner.heuristic.sampler());
+                } else if (runner.heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.ACTIVATE_PLAYER)
+                    || runner.heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.MOVE)) {
+                    System.err.println("--heur-classes: 'activate' and 'move' must be switched on "
+                        + "together; the plan is created by one and consumed by the other.");
+                    System.exit(2);
+                }
             } else if (!"random".equals(agentArg)) {
                 System.err.println("--agent must be 'random' or 'heuristic', got: " + agentArg);
                 System.exit(2);
@@ -574,6 +593,47 @@ public class ParityRunner {
                             justDeselected = false;
                             usedThisTurn.clear();
                             MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
+                            break;
+                        }
+                        // The heuristic agent picks the player AND the action together: they are
+                        // one decision (the two-level draw groups by declaration), so the two
+                        // separate RNG picks below are replaced wholesale rather than one at a
+                        // time. Neither decisionRng nor actionRng is consumed here, and the Rust
+                        // side skips both the same way.
+                        if (activation != null) {
+                            activation.refreshTurn(game);
+                            com.fumbbl.ffb.ai.parity.heuristic.ActivationChoice.Decision hd =
+                                activation.chooseActivation(game, eligibleFor(game, remaining));
+                            if (hd.player == null) {
+                                justDeselected = false;
+                                usedThisTurn.clear();
+                                MatchRunner.inject(gameState,
+                                    new ClientCommandEndTurn(game.getTurnMode(), null));
+                                break;
+                            }
+                            String hPlayerId = hd.player;
+                            PlayerAction hAction = actionFromName(hd.action);
+                            for (int ri = 0; ri < remaining.size(); ri++) {
+                                if (hPlayerId.equals(remaining.get(ri)[0])) {
+                                    remaining.remove(ri);
+                                    break;
+                                }
+                            }
+                            usedThisTurn.add(hPlayerId);
+                            heuristicTarget = hd.target;
+                            if (!isHandledActingAction(hAction)) {
+                                System.err.println("UNHANDLED_ACTING_ACTION_AT_PICK: " + hAction
+                                    + " pid=" + hPlayerId + " -- deselecting, no step logged");
+                                continue;
+                            }
+                            recordStep(game, "Activate(" + hPlayerId + "," + hAction + ")",
+                                gameState.getDiceRoller().getCallCount());
+                            blitzBlockSent = false;
+                            bb2016BlitzMoveSent = false;
+                            // Declared exactly as the random path declares it; phase 2 then reads
+                            // the acting player back out of the game and dispatches.
+                            MatchRunner.inject(gameState,
+                                new ClientCommandActingPlayer(hPlayerId, hAction, false));
                             break;
                         }
                         // Pick random player using decisionRng (matches Rust's decision_rng.pick()).
@@ -2695,6 +2755,119 @@ public class ParityRunner {
         return targets;
     }
 
+    /** The block/foul target the heuristic chose, for the phase-2 dispatch. */
+    private String heuristicTarget;
+
+    /**
+     * Turn the agent's action name back into the engine's enum.
+     *
+     * <p>Rust names its choices after `PlayerActionChoice`; the engine names them after
+     * `PlayerAction`, and a ball action is declared in its MOVE form because that is what gives a
+     * movement phase before the give or throw.
+     */
+    private static PlayerAction actionFromName(String name) {
+        switch (name) {
+            case "Move":
+                return PlayerAction.MOVE;
+            case "StandUp":
+                return PlayerAction.STAND_UP;
+            case "Block":
+                return PlayerAction.BLOCK;
+            case "Blitz":
+            case "StandUpBlitz":
+                return PlayerAction.BLITZ_MOVE;
+            case "Foul":
+                return PlayerAction.FOUL_MOVE;
+            case "HandOffMove":
+                return PlayerAction.HAND_OVER_MOVE;
+            case "PassMove":
+                return PlayerAction.PASS_MOVE;
+            case "HailMaryPass":
+                return PlayerAction.HAIL_MARY_PASS;
+            default:
+                return PlayerAction.MOVE;
+        }
+    }
+
+    /** Adapt the harness's eligible list to what the heuristic's chooser expects. */
+    private List<com.fumbbl.ffb.ai.parity.heuristic.ActivationChoice.Eligible> eligibleFor(
+            Game game, List<Object[]> remaining) {
+        List<com.fumbbl.ffb.ai.parity.heuristic.ActivationChoice.Eligible> out = new ArrayList<>();
+        FieldModel fm = game.getFieldModel();
+        for (Object[] entry : remaining) {
+            String pid = (String) entry[0];
+            Player<?> p = game.getPlayerById(pid);
+            if (p == null) {
+                continue;
+            }
+            FieldCoordinate c = fm.getPlayerCoordinate(p);
+            PlayerState st = fm.getPlayerState(p);
+            if (c == null || st == null) {
+                continue;
+            }
+            // The live actions, filtered exactly as the random path filters them: the eligible list
+            // is a TURN-START snapshot, so a blitz or pass another player already spent has to be
+            // dropped before the agent scores it.
+            List<String> actions = new ArrayList<>();
+            for (PlayerAction a : filterStaleActions(game, (PlayerAction[]) entry[1])) {
+                actions.add(nameForAgent(a));
+            }
+            if (actions.isEmpty()) {
+                continue;
+            }
+            // The player's OWN attributes, not defaults: the mover model reads every one of them,
+            // and the reach search reads Dodge and Sure Feet.
+            out.add(new com.fumbbl.ffb.ai.parity.heuristic.ActivationChoice.Eligible(pid, p.getNr(),
+                c, !st.isProneOrStunned() || st.isStunned(), hasNegatrait(p), actions,
+                p.getMovementWithModifiers(), p.getAgilityWithModifiers(),
+                p.getStrengthWithModifiers(),
+                namedSkill(p, "Sure Hands"), namedSkill(p, "Side Step"), namedSkill(p, "Catch"),
+                namedSkill(p, "Dodge"), namedSkill(p, "Sure Feet")));
+        }
+        return out;
+    }
+
+    /** The engine's enum, under the name the agent's enumeration switches on. */
+    private static String nameForAgent(PlayerAction a) {
+        switch (a) {
+            case MOVE: return "Move";
+            case STAND_UP: return "StandUp";
+            case BLOCK: return "Block";
+            case BLITZ: case BLITZ_MOVE: return "Blitz";
+            case STAND_UP_BLITZ: return "StandUpBlitz";
+            case FOUL: case FOUL_MOVE: return "Foul";
+            case HAND_OVER: case HAND_OVER_MOVE: return "HandOver";
+            case PASS: case PASS_MOVE: return "Pass";
+            case HAIL_MARY_PASS: return "HailMaryPass";
+            default: return a.name();
+        }
+    }
+
+    /** Does this player have the named skill, temporary grants included? */
+    private static boolean namedSkill(Player<?> p, String name) {
+        for (com.fumbbl.ffb.model.skill.Skill s : p.getSkillsIncludingTemporaryOnes()) {
+            if (s != null && name.equals(s.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Rust {@code has_negatrait}: the traits that make an activation likely to be wasted. */
+    private static boolean hasNegatrait(Player<?> p) {
+        for (com.fumbbl.ffb.model.skill.Skill s : p.getSkillsIncludingTemporaryOnes()) {
+            if (s == null) {
+                continue;
+            }
+            String n = s.getName();
+            if ("Bone Head".equals(n) || "Bone-Head".equals(n) || "Really Stupid".equals(n)
+                || "Wild Animal".equals(n) || "Take Root".equals(n) || "Blood Lust".equals(n)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void sendMoveAction(Game game, GameState gameState, String playerId) {
         com.fumbbl.ffb.model.FieldModel fm = game.getFieldModel();
         // Find the player's current coordinate
@@ -2713,6 +2886,35 @@ public class ParityRunner {
         }
 
         List<FieldCoordinate> targets = freeNeighbours(game, coord, java.util.Collections.emptyList());
+
+        // The heuristic replays the plan its activation made, rather than picking a neighbour.
+        if (activation != null) {
+            com.fumbbl.ffb.ai.parity.heuristic.MoveReplay.Verdict v =
+                activation.replayMove(game, playerId, targets);
+            List<FieldCoordinate> path;
+            switch (v) {
+                case DELIVER_PATH:
+                    path = activation.takePath();
+                    break;
+                case FIRE_TERMINAL:
+                    activation.markFired();
+                    sendPlanTerminal(game, gameState, playerId);
+                    return;
+                case END_PLAYER_ACTION:
+                    MatchRunner.inject(gameState,
+                        new ClientCommandActingPlayer(null, null, false));
+                    return;
+                default:
+                    path = activation.replan(game, playerId, targets);
+                    break;
+            }
+            if (path.isEmpty()) {
+                MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));
+                return;
+            }
+            sendPath(game, gameState, playerId, coord, path);
+            return;
+        }
 
         if (DEBUG) System.err.println("JAVA_SMA pid=" + playerId + " coord=" + coord.getX() + "," + coord.getY() + " targets=" + targets.size() + " isHome=" + game.isHomePlaying());
 
@@ -2748,6 +2950,63 @@ public class ParityRunner {
                 path.add(cands.get(k));
             }
         }
+        sendPath(game, gameState, playerId, coord, path);
+    }
+
+    /**
+     * Send the terminal action the plan was made FOR.
+     *
+     * <p>The plan's target is the victim or receiver chosen at activation, so nothing is re-decided
+     * here — that is the whole point of carrying a plan. The pass coordinate is framed for the
+     * away coach exactly as the random path frames it.
+     */
+    private void sendPlanTerminal(Game game, GameState gameState, String playerId) {
+        com.fumbbl.ffb.ai.parity.heuristic.ActivationDriver.Plan p = activation.plan();
+        if (p == null || p.target == null) {
+            MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));
+            return;
+        }
+        switch (p.kind) {
+            case BLITZ:
+                MatchRunner.inject(gameState, new ClientCommandBlock(playerId, p.target,
+                    false, false, false, false, false));
+                break;
+            case FOUL:
+                MatchRunner.inject(gameState, new ClientCommandFoul(playerId, p.target, false));
+                break;
+            case PASS: {
+                Player<?> rcv = game.getPlayerById(p.target);
+                FieldCoordinate rc = (rcv != null)
+                    ? game.getFieldModel().getPlayerCoordinate(rcv) : null;
+                if (rc == null) {
+                    MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));
+                    return;
+                }
+                boolean isHome = game.isHomePlaying();
+                MatchRunner.inject(gameState,
+                    new ClientCommandPass(playerId, isHome ? rc : rc.transform()));
+                break;
+            }
+            case HAND_OFF:
+                MatchRunner.inject(gameState, new ClientCommandHandOver(playerId, p.target));
+                break;
+            default:
+                MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));
+                break;
+        }
+    }
+
+    /**
+     * Build and inject the move command.
+     *
+     * <p>Coordinates from {@code getPlayerCoordinate} are in server-canonical (home-relative)
+     * space; an AWAY command must be in the away coach's view so the server can un-mirror it, which
+     * is what {@code UtilServerPlayerMove.fetchMoveStack} does on the far side. Factored out so the
+     * random and heuristic paths cannot disagree about the frame — the same mistake the kick
+     * placement made in ITER20.
+     */
+    private void sendPath(Game game, GameState gameState, String playerId, FieldCoordinate coord,
+            List<FieldCoordinate> path) {
         // StepInitSelecting.fetchMoveStack/fetchFromSquare mirrors coords when homeCommand=false.
         // Coordinates from getPlayerCoordinate are in server-canonical (home-relative) space.
         // Away team commands must be in the away team's view (mirrored), so the server can

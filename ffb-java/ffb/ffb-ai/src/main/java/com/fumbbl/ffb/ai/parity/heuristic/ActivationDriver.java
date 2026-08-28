@@ -78,6 +78,18 @@ public final class ActivationDriver {
         }
     }
 
+    /**
+     * BB2016 computes the dodge target from the old {@code 7 - AG} scale, which the reach search
+     * needs. Read off the ruleset name rather than a version number, because that is what the
+     * harness has to hand.
+     */
+    private static boolean editionIsBb2016(Game game) {
+        com.fumbbl.ffb.mechanics.Mechanic m = (com.fumbbl.ffb.mechanics.Mechanic) game
+            .getFactory(com.fumbbl.ffb.FactoryType.Factory.MECHANIC)
+            .forName(com.fumbbl.ffb.mechanics.Mechanic.Type.AGILITY.name());
+        return m != null && m.getClass().getName().contains("bb2016");
+    }
+
     private static int turnOf(Game game) {
         return game.isHomePlaying() ? game.getTurnDataHome().getTurnNr()
             : game.getTurnDataAway().getTurnNr();
@@ -97,8 +109,13 @@ public final class ActivationDriver {
             home ? game.getTurnDataHome() : game.getTurnDataAway();
         boolean teamReRoll = td.getReRolls() > 0 && !td.isReRollUsed();
 
+        boolean bb2016 = game.getOptions() != null
+            && com.fumbbl.ffb.util.StringTool.isProvided(String.valueOf(game.getRules()))
+            && false;
+        boolean blizzard = game.getFieldModel().getWeather() == com.fumbbl.ffb.Weather.BLIZZARD;
         ActivationChoice.Decision d = ActivationChoice.choose(f, sampler, new GameBoard(game, f),
-            remaining, turnOf(game), teamReRoll, awaitingRun, usedThisTurn);
+            remaining, turnOf(game), teamReRoll, awaitingRun, usedThisTurn, home,
+            editionIsBb2016(game), blizzard);
         if (d.player == null) {
             return d;
         }
@@ -157,6 +174,61 @@ public final class ActivationDriver {
             plan = null;
         }
         return v;
+    }
+
+    /**
+     * Rust {@code best_move} plus the re-plan tail of {@code handle_move}: no usable plan, so
+     * decide a destination from scratch.
+     *
+     * <p>A re-plan that ends ON the loose ball becomes a PICKUP rather than a plain move — the
+     * value model changes the moment the player has the ball, so the activation must be allowed to
+     * continue rather than end.
+     *
+     * @return the path to send, or an empty list to deselect.
+     */
+    public List<FieldCoordinate> replan(Game game, String playerId,
+            List<FieldCoordinate> squares) {
+        Features f = Features.build(game);
+        ValueModel.Mover m = moverOf(game, f, playerId);
+        FieldCoordinate here = coordOf(game, playerId);
+        if (m == null || here == null) {
+            plan = null;
+            return new ArrayList<>();
+        }
+        com.fumbbl.ffb.model.TurnData td =
+            m.home ? game.getTurnDataHome() : game.getTurnDataAway();
+        boolean teamReRoll = td.getReRolls() > 0 && !td.isReRollUsed();
+        Reach r = Reach.search(f, Reach.budgetOf(here, m.ma, isProne(game, playerId), 0),
+            new Reach.MoverSpec(m.home, m.ag, false, false), false, false, teamReRoll);
+        if (r == null) {
+            plan = null;
+            return new ArrayList<>();
+        }
+        // best_move: the highest arrival weight over the REACHED set, strict `>` so the first
+        // maximum wins.
+        float bestW = -Float.MAX_VALUE;
+        Integer bestI = null;
+        for (int i : r.order) {
+            float w = Arrival.weight(f, r, i, m);
+            if (w > bestW) {
+                bestW = w;
+                bestI = i;
+            }
+        }
+        List<FieldCoordinate> path = new ArrayList<>();
+        if (bestI != null && bestW > 0.0f) {
+            path = r.pathTo(bestI);
+        }
+        if (path.isEmpty() || !squares.contains(path.get(0))) {
+            plan = null;
+            return new ArrayList<>();
+        }
+        FieldCoordinate last = path.get(path.size() - 1);
+        boolean endsOnBall = f.ballLoose && f.ball != null && f.ball.equals(last);
+        plan = new Plan(playerId, endsOnBall ? MoveReplay.Kind.PICKUP : MoveReplay.Kind.MOVE,
+            new ArrayList<>(), null);
+        plan.delivered = true;
+        return path;
     }
 
     /** Take the whole remaining path; the engine walks it. Marks the plan delivered. */

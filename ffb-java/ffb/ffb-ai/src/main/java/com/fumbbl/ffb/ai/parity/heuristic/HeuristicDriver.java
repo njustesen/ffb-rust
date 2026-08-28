@@ -53,6 +53,17 @@ public final class HeuristicDriver {
         return classes;
     }
 
+    /**
+     * The shared sampler.
+     *
+     * <p>There is exactly ONE stream for the whole agent, and every scored decision draws from it
+     * in the order the engine asks. Handing it to the activation driver rather than giving that
+     * driver its own is what keeps the two halves on the same stream.
+     */
+    public Sampler sampler() {
+        return sampler;
+    }
+
     /** Whether this driver answers prompts of the given class. */
     public boolean handles(PromptClass c) {
         return classes.has(c);

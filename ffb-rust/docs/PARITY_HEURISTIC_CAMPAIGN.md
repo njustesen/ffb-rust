@@ -2433,3 +2433,45 @@ quietly meant something else.
 `--heur-classes ...,activate,move` for the first live gate. Both switch on together: the plan is
 created by one and consumed by the other, and the harness's prone-move RNG choreography is split
 across both, so separating them would desynchronise the stream by construction.
+
+## ITER41 — the wiring, and the first live gate
+
+Both call sites are in: the activation loop picks player AND action from the heuristic in one
+decision (replacing both RNG picks wholesale, since the two-level draw groups by declaration), and
+`sendMoveAction` replays the plan. A guard rejects `activate` without `move` at startup — the plan is
+created by one and consumed by the other, so switching them on separately is a configuration error,
+not a supported rung.
+
+First live run: **0/20**, and seed 1 diverged at **step 0**. Four real defects, each found by asking
+for data rather than reading the code again:
+
+1. **`ActivationChoice.choose` hardcoded `home = true`.** Every AWAY decision was computed as though
+   it attacked the wrong endzone — wrong raster side, wrong `endzone_distance`, wrong everything
+   downstream.
+2. **Movers were built with default 6/3/3** instead of the player's own MA/AG/ST and skills. The
+   `Eligible` record simply did not carry them.
+3. **`Features.build(Game)` delegated to the fixture overload** — empty `BoardState` and
+   `heavy = false`, so the live agent scored every square on a board with **no ball and no threat,
+   lane or support rasters**. This is the one worth remembering: the fixture overload exists because
+   fixtures do not have a `Game`, and routing a live game through it fails silently and plausibly.
+   The agent preferred a block over a run because no run had any value to compute.
+4. **The bb2025 `findPassingDistance` override NPEs at activation time.** It dereferences
+   `getActingPlayer().getPlayerAction()` to ask whether the throw is a bomb, and the agent scores
+   passes BEFORE declaring an action. More importantly, **Rust does not implement that override at
+   all** — its `find_passing_distance` is the base method — so the base is what the two agents must
+   agree on. The Java agent now reads the engine's own `PASSING_DISTANCES_TABLE` reflectively rather
+   than transcribing a copy, and the skipped refinement (PASS_TO_PARTNER, which needs a partnered
+   pair) is recorded as a pre-existing Rust port gap rather than papered over.
+
+After the four: seed 1 matches for **9 steps** before diverging, and the first activation of the
+game agrees exactly (`away_04/Move` on both sides). That is the only form "the target improves" can
+take for a class whose first measurement is 0.
+
+### Gates
+
+- `--heur-classes all` bb2025 argmax: **0/20**, seed 1 to step 9 (was step 0). The frontier.
+- Fourteen-class rung: **100/100 in all three editions** at argmax — unchanged.
+- `--agent random`: **100/100** in all three editions.
+- `cargo test --workspace --release`: 14,655 / 0. `mvn -o -pl ffb-ai test`: 28 / 0.
+
+**Next:** seed 1 step 9 — the first divergence that is not a wiring mistake.

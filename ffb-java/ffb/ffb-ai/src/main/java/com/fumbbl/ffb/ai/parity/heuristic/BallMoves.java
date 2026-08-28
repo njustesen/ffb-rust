@@ -247,7 +247,7 @@ public final class BallMoves {
     public static int[] gradeFaces(com.fumbbl.ffb.mechanics.PassMechanic mech,
             com.fumbbl.ffb.model.Game game, com.fumbbl.ffb.model.Player<?> thrower,
             FieldCoordinate from, FieldCoordinate to, int tzOnThrower) {
-        com.fumbbl.ffb.PassingDistance dist = mech.findPassingDistance(game, from, to, false);
+        com.fumbbl.ffb.PassingDistance dist = basePassingDistance(mech, game, from, to);
         if (dist == null) {
             return null;
         }
@@ -263,6 +263,60 @@ public final class BallMoves {
             }
         }
         return new int[] {nAccurate, nFumble};
+    }
+
+    /**
+     * The BASE passing distance — the abstract class's own implementation, not the edition
+     * override.
+     *
+     * <p>Two reasons, and the second is the load-bearing one:
+     *
+     * <ul>
+     *   <li>The bb2025 override dereferences {@code game.getActingPlayer().getPlayerAction()} to
+     *       ask whether the throw is a bomb. The agent scores passes BEFORE declaring an action, so
+     *       at that moment there is no acting player and the override throws.
+     *   <li><b>Rust does not implement that override at all.</b> Its {@code find_passing_distance}
+     *       is the base method and nothing else, so the base is what the two agents have to agree
+     *       on. Calling the override here would make the Java agent disagree with the Rust one on
+     *       any board where the refinement fires.
+     * </ul>
+     *
+     * <p>The refinement it skips is PASS_TO_PARTNER, which needs a partnered pair (Two For One) —
+     * absent from every roster in this tier, so nothing observable is lost today. That Rust lacks
+     * it is a pre-existing port gap, recorded here rather than papered over.
+     *
+     * <p>Read reflectively from the engine's OWN table rather than transcribed, so the edition's
+     * ranges stay the single source of truth.
+     */
+    static com.fumbbl.ffb.PassingDistance basePassingDistance(
+            com.fumbbl.ffb.mechanics.PassMechanic mech, com.fumbbl.ffb.model.Game game,
+            FieldCoordinate from, FieldCoordinate to) {
+        if (from == null || to == null) {
+            return null;
+        }
+        int deltaY = Math.abs(to.getY() - from.getY());
+        int deltaX = Math.abs(to.getX() - from.getX());
+        if (deltaY >= 14 || deltaX >= 14) {
+            return null;
+        }
+        com.fumbbl.ffb.PassingDistance d;
+        try {
+            java.lang.reflect.Field f =
+                com.fumbbl.ffb.mechanics.PassMechanic.class.getDeclaredField(
+                    "PASSING_DISTANCES_TABLE");
+            f.setAccessible(true);
+            com.fumbbl.ffb.PassingDistance[][] table =
+                (com.fumbbl.ffb.PassingDistance[][]) f.get(mech);
+            d = table[deltaY][deltaX];
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("PassMechanic.PASSING_DISTANCES_TABLE moved", e);
+        }
+        boolean blizzard = game.getFieldModel().getWeather() == com.fumbbl.ffb.Weather.BLIZZARD;
+        if (blizzard && (d == com.fumbbl.ffb.PassingDistance.LONG_BOMB
+                || d == com.fumbbl.ffb.PassingDistance.LONG_PASS)) {
+            return null;
+        }
+        return d;
     }
 
     /** Rust {@code p_2d6_at_least}. */

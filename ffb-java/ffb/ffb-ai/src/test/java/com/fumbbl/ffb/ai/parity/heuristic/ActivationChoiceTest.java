@@ -143,13 +143,13 @@ class ActivationChoiceTest {
                         }
                         elig.add(new ActivationChoice.Eligible(String.format("home_%02d", nr), nr,
                             new FieldCoordinate(me.x, me.y), me.standing, false,
-                            eligActions.get(i)));
+                            eligActions.get(i), 6, 3, 3, false, false, false, false, false));
                     }
 
                     ActivationChoice.Board bd = new BoardFromRows(board, f);
                     Sampler s = new Sampler(21, scale);
                     ActivationChoice.Decision d = ActivationChoice.choose(f, s, bd, elig, 3, false,
-                        null, new HashSet<>());
+                        null, new HashSet<>(), true, false, false);
 
                     String gotPlayer = d.player == null ? "ENDTURN" : d.player;
                     String gotAction = d.player == null ? "-" : d.action;

@@ -43,15 +43,33 @@ public final class ActivationChoice {
         public final boolean negatrait;
         /** The actions still live for him this turn, in the engine's order. */
         public final List<String> actions;
+        /** His own attributes; the mover model reads all of them. */
+        public final int ma;
+        public final int ag;
+        public final int st;
+        public final boolean sureHands;
+        public final boolean sideStep;
+        public final boolean hasCatch;
+        public final boolean dodge;
+        public final boolean sureFeet;
 
         public Eligible(String id, int nr, FieldCoordinate at, boolean standing, boolean negatrait,
-                List<String> actions) {
+                List<String> actions, int ma, int ag, int st, boolean sureHands, boolean sideStep,
+                boolean hasCatch, boolean dodge, boolean sureFeet) {
             this.id = id;
             this.nr = nr;
             this.at = at;
             this.standing = standing;
             this.negatrait = negatrait;
             this.actions = actions;
+            this.ma = ma;
+            this.ag = ag;
+            this.st = st;
+            this.sureHands = sureHands;
+            this.sideStep = sideStep;
+            this.hasCatch = hasCatch;
+            this.dodge = dodge;
+            this.sureFeet = sureFeet;
         }
     }
 
@@ -99,8 +117,15 @@ public final class ActivationChoice {
      *     scoring, because the first roll of a path can be bought back.
      * @param awaitingRun the player who was just thrown the ball, or null.
      */
+    /**
+     * @param home which side is acting. Everything downstream reads it: the raster index, the
+     *     endzone the movers are attacking, and which players count as opponents. Hardcoding it
+     *     to home computes every AWAY decision as though it were attacking the wrong end of the
+     *     pitch — which is exactly what the first live gate caught.
+     */
     public static Decision choose(Features f, Sampler sampler, Board board, List<Eligible> eligible,
-            int turnNr, boolean teamReRoll, String awaitingRun, Set<String> usedThisTurn) {
+            int turnNr, boolean teamReRoll, String awaitingRun, Set<String> usedThisTurn,
+            boolean home, boolean bb2016, boolean blizzard) {
         if (eligible.isEmpty()) {
             return new Decision(null, null, null);
         }
@@ -129,11 +154,12 @@ public final class ActivationChoice {
             }
             int i = Features.ix(e.at.getX(), e.at.getY());
             boolean isCarrier = f.ballCarried && f.ball != null && f.ball.equals(e.at);
-            ValueModel.Mover m = new ValueModel.Mover(true, isCarrier, 6, 3, 3, false, false, false,
-                ValueModel.endzoneDistance(e.at.getX(), true), Math.max(8 - turnNr, 0),
-                f.unactivated[0]);
+            ValueModel.Mover m = new ValueModel.Mover(home, isCarrier, e.ma, e.ag, e.st,
+                e.sureHands, e.sideStep, e.hasCatch,
+                ValueModel.endzoneDistance(e.at.getX(), home), Math.max(8 - turnNr, 0),
+                f.unactivated[Features.sideIdx(home)]);
             float proxy = Plans.proxyValue(f, e.at, m);
-            boolean marked = (f.tz[0][i] & 0xff) > 0;
+            boolean marked = (f.tz[Features.sideIdx(home)][i] & 0xff) > 0;
             float w = Activation.playerWeight(isCarrier, marked,
                 Activation.canFetch(f, e.at, m.ma), !e.standing, proxy, e.negatrait,
                 e.id.equals(awaitingRun));
@@ -149,8 +175,8 @@ public final class ActivationChoice {
         // Rank to decide who gets a SEARCH. The candidate list itself stays in canonical order.
         List<Activation.Cand> cands = new ArrayList<>();
         for (int i = 0; i < live.size(); i++) {
-            cands.add(new Activation.Cand(live.get(i).id, 0, live.get(i).nr, weights.get(i),
-                proxies.get(i)));
+            cands.add(new Activation.Cand(live.get(i).id, Features.sideIdx(home),
+                live.get(i).nr, weights.get(i), proxies.get(i)));
         }
         List<Activation.Cand> ranked = Activation.rank(cands);
         Set<String> searched = new HashSet<>();
@@ -168,7 +194,8 @@ public final class ActivationChoice {
             Reach r = null;
             if (searched.contains(e.id)) {
                 r = Reach.search(f, Reach.budgetOf(e.at, m.ma, !e.standing, 0),
-                    new Reach.MoverSpec(true, m.ag, false, false), false, false, teamReRoll);
+                    new Reach.MoverSpec(m.home, m.ag, e.dodge, e.sureFeet), bb2016, blizzard,
+                    teamReRoll);
             }
             for (String pac : e.actions) {
                 switch (pac) {

@@ -463,7 +463,21 @@ public final class Features {
         return out;
     }
 
+    /**
+     * Build from a live game: the snapshot PLUS the board state the heavy tier reads.
+     *
+     * <p>The one-argument {@link #build(List)} overload exists for fixtures and passes an empty
+     * board with {@code heavy = false} — no ball, no threat raster, no lane, no support. Routing a
+     * live game through it silently scores every square as though the pitch were empty and nobody
+     * held the ball, which is what the first live gate caught: the agent picked a block over a run
+     * because no run had any value to compute.
+     */
     public static Features build(Game game) {
-        return build(snapshot(game));
+        FieldModel fm = game.getFieldModel();
+        boolean blitzHome = game.getTurnDataHome().isBlitzUsed();
+        boolean blitzAway = game.getTurnDataAway().isBlitzUsed();
+        BoardState board = new BoardState(fm.getBallCoordinate(), fm.isBallInPlay(),
+            fm.isBallMoving(), blitzHome, blitzAway);
+        return build(snapshot(game), board, true);
     }
 }
