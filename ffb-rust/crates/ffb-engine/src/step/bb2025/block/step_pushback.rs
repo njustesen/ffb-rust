@@ -209,8 +209,21 @@ impl StepPushback {
             if let Some(starting_sq) = self.starting_pushback_square {
                 let defender_coord = starting_sq.coordinate;
 
-                // Java: state.defender = fieldModel.getPlayer(defenderCoordinate)
-                let defender_id = game.defender_id.clone().unwrap_or_default();
+                // Java: state.defender = fieldModel.getPlayer(defenderCoordinate) -- the OCCUPANT
+                // of the starting pushback square, which for a CHAIN push is the player being
+                // shoved along, NOT the block's original defender. Reading `game.defender_id`
+                // named the original victim for the rest of the chain, so the pushback prompt told
+                // the agent it was pushing an opponent while it was pushing its own team-mate --
+                // flipping `def_home` and with it the endzone-distance bonus (bb2025 seed 25 step
+                // 35: from the same three squares Java pushed away_10 to (21,12) and Rust to
+                // (22,12)). The same id also reaches the StandFirm/Grab/SideStep hooks, which Java
+                // likewise passes `state.defender`. bb2016's twin already keeps a step-local
+                // defender for exactly this reason.
+                let defender_id = game
+                    .field_model
+                    .player_at(defender_coord)
+                    .map(|s| s.to_owned())
+                    .unwrap_or_else(|| game.defender_id.clone().unwrap_or_default());
 
                 // Java: pushbackMode = REGULAR; findPushbackSquares; fieldModel.add
                 let home_choice = game.home_playing;
@@ -353,7 +366,7 @@ impl StepPushback {
                         .collect();
                     return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::Pushback {
                         attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
-                        defender_id: game.defender_id.clone().unwrap_or_default(),
+                        defender_id: defender_id.clone(),
                         squares,
                     });
                 }
@@ -385,7 +398,13 @@ impl StepPushback {
                 };
                 Some(ffb_model::events::GameEvent::Pushback {
                     attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
-                    defender_id: game.defender_id.clone().unwrap_or_default(),
+                    // The same chain-aware player the prompt names, so the event stream and the
+                    // decision agree about who was pushed.
+                    defender_id: self
+                        .chain_pushed_player
+                        .clone()
+                        .or_else(|| game.defender_id.clone())
+                        .unwrap_or_default(),
                     squares,
                 })
             };
@@ -485,6 +504,54 @@ mod tests {
         let mut step = StepPushback::new();
         let accepted = step.set_parameter(&StepParameter::EndTurn(true));
         assert!(!accepted);
+    }
+
+    /// A CHAIN push must name the player it is actually pushing.
+    ///
+    /// Java's `StepPushback` sets `state.defender = fieldModel.getPlayer(defenderCoordinate)` --
+    /// the OCCUPANT of the starting pushback square. Rust read `game.defender_id`, which stays the
+    /// block's original victim for the whole chain, so the pushback prompt named an opponent while
+    /// the player being shoved was a team-mate. The agent's pushback weights key on whether the
+    /// pushed player is home or away, so the prompt's defender is a decision input, not a label:
+    /// bb2025 seed 25 step 35 pushed to (22,12) where Java pushed to (21,12), from the same three
+    /// squares.
+    #[test]
+    fn chain_pushback_prompt_names_the_occupant_not_the_original_defender() {
+        let mut step = StepPushback::new();
+        let mut game = make_game();
+
+        // The original block: home_01 pushes away_01 out of (7,7).
+        let defender_at = FieldCoordinate::new(7, 7);
+        let occupant_at = FieldCoordinate::new(8, 7);
+        game.acting_player.player_id = Some("home_01".into());
+        game.defender_id = Some("away_01".into());
+        game.home_playing = true;
+        for (id, c) in [
+            ("home_01", FieldCoordinate::new(6, 7)),
+            ("away_01", defender_at),
+            // The chain victim: away_01 is shoved into a square its OWN team-mate occupies.
+            ("away_02", occupant_at),
+        ] {
+            game.field_model.set_player_coordinate(id, c);
+            game.field_model.set_player_state(id, PlayerState::new(PS_STANDING).change_active(true));
+        }
+
+        // The chain re-prompt is computed from the starting pushback square, which by then is the
+        // square the player being pushed stands on -- here the OCCUPANT's.
+        step.starting_pushback_square =
+            Some(PushbackSquare::new(occupant_at, Direction::East, true));
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        let named = match out.prompt {
+            Some(ffb_model::prompts::AgentPrompt::Pushback { ref defender_id, .. }) => {
+                defender_id.clone()
+            }
+            other => panic!("expected a Pushback prompt, got {other:?}"),
+        };
+        assert_eq!(
+            named, "away_02",
+            "the chain push must name the occupant being shoved, not the original defender"
+        );
     }
 
     // ── start with no state ──────────────────────────────────────────────────

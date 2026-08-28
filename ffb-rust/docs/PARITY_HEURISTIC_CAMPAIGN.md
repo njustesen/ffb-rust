@@ -3011,3 +3011,55 @@ two paths as a whole instead of waiting for divergences to surface one at a time
 **Next:** bb2025 and bb2020 are both at 87/100 and bb2016 at 5/100. bb2016 is the outlier and its
 remaining failures are likely structural (3-command blitz, different generators); the 13 bb2025
 reds are the cleanest next target.
+
+## ITER53 — a chain push named the wrong player, and the agent believed it
+
+**The first Rust ENGINE bug of this stretch** — ITER45-52 were all harness and port defects.
+
+bb2025 seed 25 step 35: both sides block with `away_04` and a chain-pushed player lands one square
+apart, with identical dice. Probing both pushback choosers gave it immediately:
+
+```
+JAVA_PB att=away_04 def=away_10  sq=(21,12)(22,12)(23,12) pick=0   → (21,12)
+RUST_PB att=away_04 def=home_07  sq=[(21,12),(22,12),(23,12)] pick=1 → (22,12)
+```
+
+The same three squares, and a different `defender_id`. Java names `away_10` — the team-mate
+actually being shoved along the chain — and Rust names `home_07`, the block's *original* victim.
+The agent's pushback weight multiplies by 1.3 when the square is further from the endzone the pushed
+player is defending, so `def_home` flips the bonus: Rust's weights were `[0.2, 0.26, 0.26]` where
+Java's made the first square the winner.
+
+Java's `StepPushback` line 154:
+
+```java
+state.defender = fieldModel.getPlayer(defenderCoordinate);   // the OCCUPANT of the starting square
+```
+
+Rust read `game.defender_id`, which stays the original victim for the whole chain. The Rust comment
+above the line already *said* `state.defender = fieldModel.getPlayer(defenderCoordinate)` — the
+port had copied Java's comment and then not implemented it. bb2016's twin carries a step-local
+`defender_id` with a comment describing this exact failure; bb2020 and bb2025 never got it.
+
+The same id also reaches the StandFirm/Grab/SideStep hooks, which Java likewise passes
+`state.defender`, so fixing it at the source rather than at the prompt is both simpler and more
+faithful.
+
+**Why the random gate could never catch this.** `AGENT_CONTRACT.md` §7 has the random agent take the
+deterministic min-(x,y) pushback square — it never reads the defender at all. The prompt's
+`defender_id` only becomes a decision input once an agent scores the squares, so this field could be
+wrong indefinitely while 100/100 stayed green. It is exactly the class of bug the campaign exists to
+find, and it took until the fifty-third iteration because everything upstream of it was broken first.
+
+### Gates
+
+- `--heur-classes all`, 100 seeds, argmax: **bb2025 87 → 89/100**, **bb2020 87 → 89/100**,
+  bb2016 5/100.
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025 — the gate that matters
+  most here, since this is an engine change.
+- `cargo test --workspace --release`: **14,658 / 0** (+1, bite-checked). `mvn -o -pl ffb-ai test`:
+  **31 / 0**. The two Java trees agree.
+
+**Next:** bb2025 and bb2020 have 11 reds each, bb2016 95. Worth checking whether the two editions'
+reds are the same seeds — a shared cause would be worth more than either list.

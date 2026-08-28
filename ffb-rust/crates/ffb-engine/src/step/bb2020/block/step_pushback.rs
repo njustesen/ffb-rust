@@ -136,8 +136,21 @@ impl StepPushback {
             if let Some(starting_sq) = self.starting_pushback_square {
                 let defender_coord = starting_sq.coordinate;
 
-                // Java: state.defender = fieldModel.getPlayer(defenderCoordinate)
-                let defender_id = game.defender_id.clone().unwrap_or_default();
+                // Java: state.defender = fieldModel.getPlayer(defenderCoordinate) -- the OCCUPANT
+                // of the starting pushback square, which for a CHAIN push is the player being
+                // shoved along, NOT the block's original defender. Reading `game.defender_id`
+                // named the original victim for the rest of the chain, so the pushback prompt told
+                // the agent it was pushing an opponent while it was pushing its own team-mate --
+                // flipping `def_home` and with it the endzone-distance bonus (bb2025 seed 25 step
+                // 35: from the same three squares Java pushed away_10 to (21,12) and Rust to
+                // (22,12)). The same id also reaches the StandFirm/Grab/SideStep hooks, which Java
+                // likewise passes `state.defender`. bb2016's twin already keeps a step-local
+                // defender for exactly this reason.
+                let defender_id = game
+                    .field_model
+                    .player_at(defender_coord)
+                    .map(|s| s.to_owned())
+                    .unwrap_or_else(|| game.defender_id.clone().unwrap_or_default());
 
                 let home_choice = game.home_playing;
                 let occupied = |c: FieldCoordinate| game.field_model.player_at(c).is_some();
@@ -251,7 +264,7 @@ impl StepPushback {
                     .collect();
                 return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::Pushback {
                     attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
-                    defender_id: game.defender_id.clone().unwrap_or_default(),
+                    defender_id: defender_id.clone(),
                     squares,
                 });
             }
