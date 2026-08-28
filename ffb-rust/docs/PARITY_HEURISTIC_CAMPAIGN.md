@@ -3192,3 +3192,69 @@ whenever the port grows.
 **Next:** the sampled gate is now the weakest at 6/100, and it is a different frontier from argmax —
 everything the sampler touches (draw counts, temperatures, the RNG stream itself) is untested there.
 Take its lowest failing seed next; the argmax reds will still be waiting.
+
+## ITER57 — one of six call sites, and the sampled gate went 6/100 → 94/100
+
+**bb2025 `--heur-scale 1.0`: 6 → 94/100. bb2020: 6 → 93/100. Uniform (1e6): bb2020 94/100,
+bb2025 92/100.**
+
+Took the sampled gate's shallowest failure, bb2025 seed 13 at step 2 — the same state on both sides,
+the same player chosen, a different action. Dumping the candidates showed the two lists identical in
+size and order with exactly **three** differing rows, all fouls:
+
+```
+J h00 foul tgt=a00 0.003657      R h00 foul tgt=a00 0.322000
+```
+
+0.322 = 0.92 × 0.35: Rust floored the foul at the coverage floor and Java used its raw weight.
+ITER56 had wired the floor into the candidate builders and hit five of the six call sites — the FOUL
+branch wraps its arguments across lines differently from the others, so the edit that replaced
+`0.0f, 0.0f` never matched it:
+
+```java
+PlanBuilder.foulCandidates(e.id, pac, board.foulTargets(e.id), wPlayer,
+    0.0f, 0.0f, out);          // <- the comma lands after wPlayer, not after the zeros
+```
+
+An eighty-fold difference on the one action still wrong, and it held the whole sampled gate at 6/100.
+
+**A mechanical edit needs a mechanical check.** ITER56 counted its own replacements (it printed
+"inline calls 4, multiline calls 1, immediate arm 1" = 6) and six was also the number of
+`coverage.floor(pac)` occurrences afterwards — so the count *looked* right. It was: six replacements
+across seven call sites. Counting what you changed does not tell you what you missed; the check that
+would have caught it is grepping for the pattern that must no longer exist anywhere, which is now
+one line and finds nothing.
+
+### Regression test
+
+`ActivationChoiceTest.everyActionBranchConsumesTheCoverageFloor` drives the real `choose` with a
+stub board offering one foul and one move, and pre-seeds `seenAction` so the two branches get
+DIFFERENT floors — a shared floor makes them tie and the test cannot see anything. Coverage off, the
+move wins on raw weight; coverage on, the foul's untouched floor lifts it above. Bite-checked: it
+fails on exactly the line ITER56 missed.
+
+### Gates
+
+- `--heur-classes all`, 100 seeds, **scale 1.0**: bb2025 **6 → 94/100**, bb2020 **6 → 93/100**,
+  bb2016 **0 → 5/100**.
+- **scale 1e6**: bb2020 94/100, bb2025 92/100 (first measurement).
+- **argmax** unchanged at bb2025 90/100, bb2020 90/100, bb2016 5/100 — the coverage terms are zero
+  there, so this cannot move it.
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,658 / 0** (no Rust change). `mvn -o -pl ffb-ai test`:
+  **34 / 0**. The two Java trees agree.
+
+### Where the campaign now stands
+
+| | argmax | scale 1.0 | scale 1e6 |
+|---|---|---|---|
+| bb2025 | 90 | 94 | 92 |
+| bb2020 | 90 | 93 | 94 |
+| bb2016 | 5 | 5 | — |
+
+bb2016 is the outlier by a wide margin and is the same 5/100 at both scales, which suggests its
+remaining failures are structural rather than sampling-related — its 3-command blitz, its own
+generators and step twins. That is now the largest single block of work and the obvious next target.
+
+**Next:** bb2016's lowest failing seed at argmax.

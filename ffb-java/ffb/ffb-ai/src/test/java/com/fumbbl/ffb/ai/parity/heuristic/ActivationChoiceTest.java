@@ -334,4 +334,86 @@ class ActivationChoiceTest {
         // Counters are per ACTION, so one action's use does not lower another's floor.
         assertEquals(0.35f, f2.floor("Foul"));
     }
+
+    /**
+     * Regression guard for ITER57: EVERY action branch of {@link ActivationChoice#choose} must
+     * consume the coverage floor.
+     *
+     * <p>ITER56 wired the floor and the novelty bonus into the candidate builders and missed ONE of
+     * the six call sites — the FOUL branch, whose arguments wrap across lines differently from the
+     * other five, so the edit that replaced {@code 0.0f, 0.0f} did not match it. The result was a
+     * foul scored at its raw weight (0.0037) where Rust floored it at 0.35 (0.322): an
+     * eighty-fold difference on the one action that was still wrong, and
+     * {@code --heur-scale 1.0} sat at 6/100 instead of 94/100.
+     *
+     * <p>The test drives the real {@code choose} with a stub board offering exactly one foul target
+     * and one move, at a raw foul weight far below the floor. With coverage OFF the move wins; with
+     * coverage ON the floor lifts the foul above it. A branch that ignores the floor cannot pass
+     * both halves.
+     */
+    @Test
+    void everyActionBranchConsumesTheCoverageFloor() {
+        // One home player, one prone away player next to him: a legal foul and a legal move.
+        List<Features.Snap> snaps = new ArrayList<>();
+        snaps.add(new Features.Snap(true, 12, 7, true, true, 6, 3, 1));
+        snaps.add(new Features.Snap(false, 13, 7, false, true, 6, 3, 1));
+        Features f = Features.build(snaps,
+            new Features.BoardState(new FieldCoordinate(2, 2), false, false, false, false), true);
+
+        ActivationChoice.Board board = new ActivationChoice.Board() {
+            @Override
+            public List<PlanBuilder.BlockTarget> blockTargets(String playerId) {
+                return new ArrayList<>();
+            }
+
+            @Override
+            public List<PlanBuilder.BlockTarget> blitzFoes(String playerId) {
+                return new ArrayList<>();
+            }
+
+            @Override
+            public List<PlanBuilder.BlockTarget> foulTargets(String playerId) {
+                List<PlanBuilder.BlockTarget> out = new ArrayList<>();
+                // A raw weight far below the 0.35 floor, so the floor decides the outcome.
+                out.add(new PlanBuilder.BlockTarget("away_01", new FieldCoordinate(13, 7), 0.004f));
+                return out;
+            }
+
+            @Override
+            public List<PlanBuilder.Receiver> receivers(String playerId, boolean forPass) {
+                return new ArrayList<>();
+            }
+        };
+
+        List<ActivationChoice.Eligible> elig = new ArrayList<>();
+        elig.add(new ActivationChoice.Eligible("home_01", 1, new FieldCoordinate(12, 7), true,
+            false, java.util.Arrays.asList("Move", "Foul"), 6, 3, 3,
+            false, false, false, false, false));
+
+        // Move is already well used, so its floor has decayed to zero; Foul is untouched, so its
+        // floor is the full 0.35. That asymmetry is what makes the two branches distinguishable —
+        // with a shared floor they would simply tie.
+        java.util.Map<String, Integer> seenAction = new java.util.HashMap<>();
+        seenAction.put("Move", 4);
+
+        assertEquals("Move", decide(f, board, elig, 0.0f, seenAction),
+            "below tempScale 0.1 both coverage terms are dead, so the raw foul weight loses");
+        assertEquals("Foul", decide(f, board, elig, 1.0f, seenAction),
+            "the FOUL branch must consume the floor like every other branch");
+    }
+
+    /** Run {@code choose} at argmax with the coverage terms forced on or off. */
+    private static String decide(Features f, ActivationChoice.Board board,
+            List<ActivationChoice.Eligible> elig, float coverageScale,
+            java.util.Map<String, Integer> seenAction) {
+        // A bucket already seen, so `novelty` is zero and the FLOOR is the only term in play.
+        java.util.Map<Long, Integer> seenBucket = new java.util.HashMap<>();
+        seenBucket.put(12345L, 1);
+        ActivationChoice.Coverage cov = new ActivationChoice.Coverage(
+            coverageScale, seenBucket, new java.util.HashMap<>(seenAction));
+        // Sampler at 0.0 = argmax, so the decision is a fact about the weights, not a draw.
+        ActivationChoice.Decision d = ActivationChoice.choose(f, new Sampler(5, 0.0f), board, elig,
+            3, false, null, new HashSet<>(), true, false, false, cov, 12345L);
+        return d.pac;
+    }
 }

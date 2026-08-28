@@ -332,7 +332,7 @@ public final class ActivationChoice {
                         break;
                     case "Foul":
                         PlanBuilder.foulCandidates(e.id, pac, board.foulTargets(e.id), wPlayer,
-                            0.0f, 0.0f, out);
+                            coverage.floor(pac), coverage.novelty(bucket), out);
                         break;
                     case "HandOver":
                         if (r != null) {
