@@ -1,5 +1,6 @@
 package com.fumbbl.ffb.ai.parity.heuristic;
 
+import com.fumbbl.ffb.PlayerAction;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -130,5 +132,48 @@ class MoveReplayTest {
 
     private static boolean bit(int bits, int shift) {
         return ((bits >> shift) & 1) == 1;
+    }
+
+    /**
+     * Regression guard for ITER49: every action that can gate a terminal must reach
+     * {@link MoveReplay} under the name {@link MoveReplay#decide} actually compares against.
+     *
+     * <p>{@code ActivationDriver} passed {@code getPlayerAction().name()} — the Java ENUM name,
+     * {@code "HAND_OVER_MOVE"} — into a table written in Rust's {@code PlayerActionChoice}
+     * spelling, {@code "HandOverMove"}. Nothing matched, so {@code FIRE_TERMINAL} was unreachable
+     * and every give and pass the heuristic planned died at the end of its run-up with the ball
+     * still in the carrier's hands.
+     *
+     * <p>Asserting the strings alone would not catch a future rename on the {@code decide} side,
+     * so this drives {@code decide} itself: with a pending terminal, an empty path and the
+     * dispatch condition met, the mapped name MUST produce {@code FIRE_TERMINAL}. That is the
+     * property the bug violated.
+     */
+    @Test
+    void everyTerminalGateNameReachesDecide() {
+        Object[][] cases = {
+            {PlayerAction.HAND_OVER_MOVE, MoveReplay.Kind.HAND_OFF, "HandOverMove"},
+            {PlayerAction.HAND_OVER, MoveReplay.Kind.HAND_OFF, "HandOver"},
+            {PlayerAction.PASS_MOVE, MoveReplay.Kind.PASS, "PassMove"},
+            {PlayerAction.PASS, MoveReplay.Kind.PASS, "Pass"},
+            {PlayerAction.HAIL_MARY_PASS, MoveReplay.Kind.PASS, "HailMaryPass"},
+            {PlayerAction.BLITZ_MOVE, MoveReplay.Kind.BLITZ, "BlitzMove"},
+            {PlayerAction.FOUL_MOVE, MoveReplay.Kind.FOUL, "FoulMove"},
+        };
+        for (Object[] c : cases) {
+            PlayerAction action = (PlayerAction) c[0];
+            MoveReplay.Kind kind = (MoveReplay.Kind) c[1];
+            String name = ActivationDriver.pacName(action);
+            assertEquals(c[2], name, action + " must map to Rust's spelling");
+            // targetAdjacent and targetOnPitch both true, nothing blocked or fouled yet, path
+            // spent, not yet fired -- the exact state at the end of a run-up.
+            MoveReplay.Facts f = new MoveReplay.Facts(name, false, false, true, true, false, false);
+            assertEquals(MoveReplay.Verdict.FIRE_TERMINAL,
+                MoveReplay.decide(kind, true, true, true, false, f),
+                action + " must be able to fire its terminal");
+        }
+        // An action with no Rust spelling has no terminal, and must not be invented.
+        assertNull(ActivationDriver.pacName(PlayerAction.THROW_TEAM_MATE));
+        assertNull(ActivationDriver.pacName(null));
     }
 }

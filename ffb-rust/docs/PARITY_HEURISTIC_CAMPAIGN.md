@@ -2834,3 +2834,66 @@ and that distinction is what took ITER45–48 four iterations to learn to make.
 - The two Java trees agree.
 
 **Next:** seed 2 step 49's remaining divergence, then seed 10 at 42.
+
+## ITER49 — the ball actions were dead on the Java side, in two places at once
+
+**bb2025 argmax 87/100, bb2020 69/100** (from 2/20 and never measured at 100).
+
+ITER48 fixed the give's *declaration*; this iteration found that even once declared correctly, a
+give or pass could not complete. Two independent defects, both on the path between the plan and the
+engine, and the second only became visible once the first was fixed.
+
+### 1. The MOVE variant threw away the movement phase it exists to buy
+
+`sendConcreteAction` routed `HAND_OVER_MOVE` to `sendHandOverAction` and `PASS_MOVE` to
+`sendPassAction` — the immediate handlers. The whole point of declaring the MOVE variant is to get
+a movement phase *before* the give or throw, which is what makes carrier-move-then-give possible in
+one turn. The heuristic planned a run-up and the harness gave the ball from wherever the carrier
+already stood.
+
+Seed 2 step 49 made this unarguable: Java's recorded plan was byte-identical to Rust's — same
+receiver, same destination index 195 = (13,7), same path `[(12,5), (13,6), (13,7)]` from (11,4) —
+and Rust walked it while Java gave from (11,4) without moving.
+
+The `*_MOVE` arms now go through `sendMoveAction` when the heuristic owns the activation; the
+immediate forms `HAND_OVER` / `PASS`, which is what the random contract declares, still reach the
+old handlers untouched.
+
+### 2. `FIRE_TERMINAL` was unreachable for every terminal
+
+With the run-up delivered, the give still never fired. `ActivationDriver` built its `MoveReplay`
+facts with
+
+```java
+ap.getPlayerAction().name()      // "HAND_OVER_MOVE" -- the Java ENUM name
+```
+
+against a table written in Rust's `PlayerActionChoice` spelling (`"HandOverMove"`, `"PassMove"`,
+`"BlitzMove"`, `"FoulMove"`). **No terminal has ever matched.** `dispatchable` was permanently
+false, so `FIRE_TERMINAL` could not be returned and every give and pass the heuristic planned died
+at the end of its run-up with the ball still in the carrier's hands. The blitz and the foul survived
+only because they fire through their own arms rather than through the replay.
+
+Added `ActivationDriver.pacName`, the engine's `PlayerAction` under the vocabulary `MoveReplay`
+actually compares against, returning null for an action with no Rust spelling.
+
+**Both defects are string mismatches between two vocabularies that no test compared.** The
+`MoveReplayTest` golden walks all 50,176 input combinations of `decide` — and passes — because it
+supplies the names itself. A fixture that generates its own inputs cannot discover that the
+production caller supplies different ones. The new
+`MoveReplayTest.everyTerminalGateNameReachesDecide` closes exactly that gap: it takes each real
+`PlayerAction`, maps it the way production does, and drives `decide` with the result, asserting the
+terminal can fire.
+
+### Gates
+
+- `--heur-classes all`, 100 seeds, argmax: **bb2025 87/100, bb2020 69/100, bb2016 2/100**.
+  20-seed bb2025 went 2/20 → 18/20.
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,656 / 0**. `mvn -o -pl ffb-ai test`: **31 / 0**.
+- The two Java trees agree.
+
+**Next:** bb2016 is now the outlier at 2/100 and is where the remaining structural work is — it
+routes through different generators and step twins, and its blitz is the 3-command form. bb2025's
+13 reds and bb2020's 31 are the other two fronts; seeds 14 and 20 are the shallowest bb2025 reds.

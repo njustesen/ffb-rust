@@ -5,6 +5,7 @@ import com.fumbbl.ffb.PlayerState;
 import com.fumbbl.ffb.model.ActingPlayer;
 import com.fumbbl.ffb.model.FieldModel;
 import com.fumbbl.ffb.FactoryType;
+import com.fumbbl.ffb.PlayerAction;
 import com.fumbbl.ffb.mechanics.Mechanic;
 import com.fumbbl.ffb.mechanics.SkillMechanic;
 import com.fumbbl.ffb.model.Game;
@@ -184,7 +185,7 @@ public final class ActivationDriver {
         FieldCoordinate tc = (plan != null && plan.target != null)
             ? coordOf(game, plan.target) : null;
         MoveReplay.Facts facts = new MoveReplay.Facts(
-            ap != null && ap.getPlayerAction() != null ? ap.getPlayerAction().name() : null,
+            ap != null ? pacName(ap.getPlayerAction()) : null,
             ap != null && ap.hasBlocked(),
             ap != null && ap.hasFouled(),
             here != null && tc != null
@@ -200,6 +201,36 @@ public final class ActivationDriver {
             plan = null;
         }
         return v;
+    }
+
+    /**
+     * The engine's {@link PlayerAction} under the name Rust's {@code PlayerActionChoice} uses,
+     * which is the vocabulary {@link MoveReplay} compares against.
+     *
+     * <p>This was {@code getPlayerAction().name()} — the Java ENUM name, {@code "HAND_OVER_MOVE"},
+     * against a table of {@code "HandOverMove"}. No terminal ever matched, so `FIRE_TERMINAL` was
+     * unreachable and every give and pass the heuristic planned died at the end of its run-up with
+     * the ball still in the carrier's hands. Returning null for an unmapped action is deliberate:
+     * an action with no Rust spelling has no terminal to fire.
+     */
+    static String pacName(PlayerAction a) {
+        if (a == null) {
+            return null;
+        }
+        switch (a) {
+            case MOVE: return "Move";
+            case STAND_UP: return "StandUp";
+            case BLOCK: return "Block";
+            case BLITZ: case BLITZ_MOVE: case BLITZ_SELECT: return "BlitzMove";
+            case STAND_UP_BLITZ: return "StandUpBlitz";
+            case FOUL: case FOUL_MOVE: return "FoulMove";
+            case PASS: return "Pass";
+            case PASS_MOVE: return "PassMove";
+            case HAIL_MARY_PASS: return "HailMaryPass";
+            case HAND_OVER: return "HandOver";
+            case HAND_OVER_MOVE: return "HandOverMove";
+            default: return null;
+        }
     }
 
     /**

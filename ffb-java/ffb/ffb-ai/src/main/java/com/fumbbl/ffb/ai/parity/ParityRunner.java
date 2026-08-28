@@ -1985,8 +1985,27 @@ public class ParityRunner {
             case FOUL_MOVE:
                 sendFoulAction(game, gameState, pid);
                 break;
-            case PASS:
             case PASS_MOVE:
+            case HAND_OVER_MOVE:
+                // The MOVE variant of a ball action exists to buy a MOVEMENT PHASE before the
+                // throw or the give -- that is the whole reason `moveVariant` declares it. Sending
+                // the ball straight away here threw that phase away: the heuristic ran its carrier
+                // up to a chosen square, and the harness gave the ball from wherever he already
+                // stood (bb2025 seed 2 step 49: the plan was byte-identical to Rust's, path
+                // [(12,5), (13,6), (13,7)] from (11,4), and Rust walked it while Java gave from
+                // (11,4) and never moved). The move path replays that plan and `MoveReplay` fires
+                // the terminal itself once the run-up is spent.
+                //
+                // Only for the heuristic: the random contract declares the IMMEDIATE forms
+                // (HAND_OVER / PASS), which still land in the arms below, so its byte-matched
+                // stream is untouched.
+                if (activation != null) {
+                    sendMoveAction(game, gameState, pid);
+                    break;
+                }
+                sendBallAction(game, gameState, pid, pa);
+                break;
+            case PASS:
             case THROW_BOMB:
             case HAIL_MARY_PASS:
                 sendPassAction(game, gameState, pid);
@@ -1995,7 +2014,6 @@ public class ParityRunner {
                 sendSynchronousMultiBlock(game, gameState, pid);
                 break;
             case HAND_OVER:
-            case HAND_OVER_MOVE:
                 sendHandOverAction(game, gameState, pid);
                 break;
             case THROW_TEAM_MATE:
@@ -2967,6 +2985,18 @@ public class ParityRunner {
             }
         }
         return false;
+    }
+
+    /**
+     * The immediate form of a ball action, for the paths that declared a MOVE variant but have no
+     * plan to run up with. Keeps the two arms above from duplicating the routing.
+     */
+    private void sendBallAction(Game game, GameState gameState, String playerId, PlayerAction pa) {
+        if (pa == PlayerAction.HAND_OVER_MOVE) {
+            sendHandOverAction(game, gameState, playerId);
+        } else {
+            sendPassAction(game, gameState, playerId);
+        }
     }
 
     private void sendMoveAction(Game game, GameState gameState, String playerId) {
