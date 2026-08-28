@@ -1851,3 +1851,48 @@ not what "add a strong mover" produces.
 `Reach::p_arrive` with `value_at`) and then `build_plans`. After that the WIDE `ActivatePlayer` and
 `Move` arms can be wired up, and the live gate begins — which is where the remaining engine
 divergences are, since multi-square movement, GFI chains and scoring paths all go live at once.
+
+## ITER28 — `arrival_parts`: where reach meets value
+
+The composition step: `w = p·V − (1−p)·c_turnover − rush_penalty`, with a short-circuit for a
+carrier arriving IN the endzone — a touchdown ends the drive, so there is no "after" to lose and
+only the rush is priced. `Arrival.java` + `ArrivalTest`, pinned by `arrival_golden.txt`.
+
+Both halves were already pinned separately. What is new is that they are combined the same way, that
+the GFI count carried out of the reach search is the one the penalties see, and that the touchdown
+branch fires on exactly the right squares.
+
+**All four parts are compared, not just `w`.** A sum of three terms reaching the same total by
+different routes is precisely the disagreement a single number hides: a value model that is too
+generous and a turnover cost that is too harsh cancel on one board and diverge on the next.
+
+Three cases, each with a term that would otherwise be dead:
+
+- `carrier_can_score` — the carrier stands **6** squares from the endzone with MA 6, so the touchdown
+  short-circuit is genuinely reachable. Put him out of range and that branch is never taken, which
+  is the easy version of this fixture to write and the useless one. A variant with `unactivated = 0`
+  isolates the `c_turnover` scaling, and one with `turns_left = 1` the hopeless damp.
+- `gauntlet_rushes` — marked on all four sides, so distant squares cost GFI: `rush_penalty` and the
+  `gfi` factor both bite, and four times harder for a non-carrier. The golden carries GFI counts of
+  0, 1 **and** 2.
+- `loose_ball_in_reach` — the pickup value and the arrival probability multiply, which is the whole
+  point of the composition.
+
+The test asserts the coverage rather than assuming it: it fails if no square needed a rush, and
+fails if the endzone short-circuit never fired. After ITER27 — where a bite-check reported a real
+result from an experiment that had silently done nothing — the fixtures now say out loud which
+branches they reached.
+
+Bite-check: `rushPenalty`'s non-carrier constant 0.40 → 0.35 fails at
+`w at (2,0) for gauntlet_rushes/noncarrier ==> expected: <-1.5448468> but was: <-1.4448467>`.
+
+### Gates
+
+- `mvn -o -pl ffb-ai test`: **20 tests, 0 failures**.
+- `cargo test --workspace --release`: **14,654 / 0**.
+- Fourteen-class rung still **100/100 in all three editions** at argmax. Nothing live changed.
+
+**Next:** `build_plans` and then the WIDE `ActivatePlayer` and `Move` arms. Every ingredient they
+read is now pinned bit for bit — rasters, reach, value, arrival — so what remains is the plan
+selection itself and the wiring. After that the live gate begins, and with it multi-square movement,
+GFI chains and scoring paths that the random gate has never executed.

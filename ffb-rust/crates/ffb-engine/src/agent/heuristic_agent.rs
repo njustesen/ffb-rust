@@ -4501,6 +4501,169 @@ mod tests {
         eprintln!("wrote {path}");
     }
 
+    /// `arrival_parts` — where the reach search and the value model are finally multiplied
+    /// together — as a cross-language fixture.
+    ///
+    /// This is the composition step: `w = p·V − (1−p)·c_turnover − rush_penalty`, with a
+    /// short-circuit for a carrier arriving IN the endzone (a touchdown ends the drive, so there is
+    /// no "after" to lose and only the rush is priced). Both halves are already pinned separately;
+    /// what is new is that they are combined the same way, that the GFI count carried out of the
+    /// reach search is the one the penalties see, and that the touchdown branch fires on exactly
+    /// the right squares.
+    ///
+    /// `w`, `p_arrive`, `v` and `gfi` are all emitted, not just `w` — three terms summing to the
+    /// same total by different routes is precisely the failure a single number hides.
+    ///
+    /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_arrival_golden -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_arrival_golden() {
+        use std::fmt::Write as _;
+        use ffb_model::enums::{PlayerState, PS_STANDING, Rules};
+        use ffb_model::model::player::Player;
+
+        // (is_home, nr, x, y)
+        type Board = &'static [(bool, i32, i32, i32)];
+        // (name, is_carrier, ma, ag, str, sure_hands, side_step, has_catch, d_now, turns_left,
+        //  unactivated, team_rr)
+        type M = (&'static str, bool, i32, i32, i32, bool, bool, bool, i32, i32, f32, bool);
+
+        let cases: [(&str, Board, Option<(i32, i32)>, bool, &[M]); 3] = [
+            (
+                // The carrier stands 6 squares from the endzone with MA 6, so the touchdown
+                // short-circuit is genuinely REACHABLE — the branch is dead in a fixture where the
+                // endzone is out of range, which is the easy mistake here.
+                "carrier_can_score",
+                &[(true, 1, 19, 7), (true, 2, 18, 9), (false, 1, 21, 6), (false, 2, 21, 8)],
+                Some((19, 7)), false,
+                &[
+                    ("carrier", true, 6, 3, 3, false, false, false, 6, 8, 1.0, false),
+                    ("carrier_last_turn", true, 6, 3, 3, false, false, false, 6, 1, 1.0, false),
+                    // Same board, same reach, but nobody left to activate: `c_turnover` shrinks and
+                    // risky arrivals get relatively better.
+                    ("carrier_alone", true, 6, 3, 3, false, false, false, 6, 8, 0.0, false),
+                ],
+            ),
+            (
+                // Marked on all sides, so every step is a dodge and the far squares are all GFI:
+                // `rush_penalty` and the `gfi` factor in `c_turnover` both bite, and they bite four
+                // times harder for a non-carrier.
+                "gauntlet_rushes",
+                &[
+                    (true, 1, 10, 7),
+                    (false, 1, 11, 7), (false, 2, 11, 8), (false, 3, 10, 6), (false, 4, 9, 8),
+                ],
+                None, false,
+                &[
+                    ("noncarrier", false, 6, 3, 3, false, false, false, 15, 8, 1.0, false),
+                    ("noncarrier_with_rr", false, 6, 3, 3, false, false, false, 15, 8, 1.0, true),
+                ],
+            ),
+            (
+                // A loose ball inside the mover's reach: the pickup value and the arrival
+                // probability multiply, which is the whole point of the composition.
+                "loose_ball_in_reach",
+                &[(true, 1, 10, 7), (false, 1, 14, 7)],
+                Some((13, 7)), true,
+                &[
+                    ("chaser", false, 6, 3, 3, false, false, false, 15, 8, 1.0, false),
+                    ("chaser_sure_hands", false, 6, 3, 3, true, false, false, 15, 8, 1.0, false),
+                ],
+            ),
+        ];
+
+        let mut out = String::new();
+        writeln!(out, "# arrival_parts golden -- heuristic_agent.rs and Arrival.java.").unwrap();
+        writeln!(out, "# case <name>").unwrap();
+        writeln!(out, "# player <home|away> <nr> <x> <y>").unwrap();
+        writeln!(out, "# ball <x> <y> <loose>   (absent when there is no ball)").unwrap();
+        writeln!(out, "# mover <name> <carrier> <ma> <ag> <str> <sure_hands> <side_step> <catch> <d_now> <turns_left> <unact bits> <team_rr>").unwrap();
+        writeln!(out, "# w|parrive|v <f32 bits per cell, 8 hex chars each>").unwrap();
+        writeln!(out, "# gfi <decimal per cell, comma separated>").unwrap();
+
+        for (name, board, ball, loose, movers) in cases {
+            for &(mname, is_carrier, ma, ag, str_, sure_hands, side_step, has_catch, d_now,
+                   turns_left, unact, team_rr) in movers
+            {
+                let mut home = crate::step::framework::test_team("home", 0);
+                let mut away = crate::step::framework::test_team("away", 0);
+                for &(is_home, nr, _, _) in board {
+                    let p = Player {
+                        id: format!("{}_{:02}", if is_home { "home" } else { "away" }, nr),
+                        nr,
+                        // The MOVER's own stats have to match the Mover struct, or the reach search
+                        // and the value model would be describing different players.
+                        movement: if is_home && nr == 1 { ma } else { 6 },
+                        strength: if is_home && nr == 1 { str_ } else { 3 },
+                        agility: if is_home && nr == 1 { ag } else { 3 },
+                        armour: 8,
+                        ..Default::default()
+                    };
+                    if is_home { home.players.push(p) } else { away.players.push(p) }
+                }
+                let mut g = Game::new(home, away, Rules::Bb2025);
+                for &(is_home, nr, x, y) in board {
+                    let id = format!("{}_{:02}", if is_home { "home" } else { "away" }, nr);
+                    g.field_model.set_player_coordinate(&id, FieldCoordinate::new(x, y));
+                    g.field_model
+                        .set_player_state(&id, PlayerState::new(PS_STANDING).change_active(true));
+                }
+                if let Some((bx, by)) = ball {
+                    g.field_model.ball_coordinate = Some(FieldCoordinate::new(bx, by));
+                    g.field_model.ball_in_play = true;
+                    g.field_model.ball_moving = loose;
+                }
+                let f = Features::build(&g, positions_stamp(&g), true);
+                let mut sc = Scratch::default();
+                let b = budget_of(&g, "home_01").expect("the mover is on the pitch");
+                let r = reach_with(&f, &g, "home_01", &b, team_rr, &mut sc)
+                    .expect("a positive movement cap");
+                let m = Mover {
+                    home: true,
+                    is_carrier,
+                    ma,
+                    ag,
+                    str_,
+                    sure_hands,
+                    side_step,
+                    has_catch,
+                    d_now,
+                    turns_left,
+                    unactivated: unact,
+                };
+
+                writeln!(out, "case {name}").unwrap();
+                for &(is_home, nr, x, y) in board {
+                    writeln!(out, "player {} {nr} {x} {y}",
+                        if is_home { "home" } else { "away" }).unwrap();
+                }
+                if let Some((bx, by)) = ball {
+                    writeln!(out, "ball {bx} {by} {loose}").unwrap();
+                }
+                writeln!(out, "mover {mname} {is_carrier} {ma} {ag} {str_} {sure_hands} {side_step} {has_catch} {d_now} {turns_left} {:08x} {team_rr}",
+                    unact.to_bits()).unwrap();
+
+                let (mut ws, mut ps, mut vs) = (String::new(), String::new(), String::new());
+                let mut gs: Vec<String> = Vec::with_capacity(CELLS);
+                for i in 0..CELLS {
+                    let a = arrival_parts(&f, &r, i, &m);
+                    let _ = write!(ws, "{:08x}", a.w.to_bits());
+                    let _ = write!(ps, "{:08x}", a.p_arrive.to_bits());
+                    let _ = write!(vs, "{:08x}", a.v.to_bits());
+                    gs.push(a.gfi.to_string());
+                }
+                writeln!(out, "w {ws}").unwrap();
+                writeln!(out, "parrive {ps}").unwrap();
+                writeln!(out, "v {vs}").unwrap();
+                writeln!(out, "gfi {}", gs.join(",")).unwrap();
+            }
+        }
+
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/agent/testdata/arrival_golden.txt");
+        std::fs::write(path, out).unwrap();
+        eprintln!("wrote {path}");
+    }
+
     /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_sampler_golden -- --ignored`
     #[test]
     #[ignore]
