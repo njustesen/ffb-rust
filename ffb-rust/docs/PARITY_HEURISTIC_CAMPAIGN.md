@@ -2262,3 +2262,43 @@ cross-language fixtures, and every one of them has been perturbed on purpose to 
 `--heur-classes activate` on with `move` still OFF. Both sides then move by the byte-matched random
 contract, so what that gate tests is exactly the activation choice — the ladder discipline applied
 one last time.
+
+## ITER37 — `handle_activate` end to end
+
+The composition. Every layer already had its own golden; what none of them could catch is a bug in
+the WIRING between two of them — each can be perfectly right while the order they run in, or what
+one hands the next, is wrong. `ActivationChoice.choose` + `ActivationChoiceTest` pin the whole
+decision: same entry point, same return value, no engine underneath. Five boards × three scales.
+
+The `move_vs_block` board is the one that shows the draw doing work: at argmax it declares
+`Block away_01`, at 1.0 and 1e6 it declares `Move`. The test asserts that at least one case CHANGES
+its answer across scales — a set of boards where argmax and the sampled pick always agree would
+exercise the two-level draw without ever testing it.
+
+### The composition rule the bite-check exposed
+
+Rust sorts the candidates CANONICALLY, ranks into a **separate index vector**, and then iterates the
+**canonical** list — consulting the rank only to decide whether a reach search runs. The ranking
+picks who gets a SEARCH; it does not reorder the candidate list. Iterating in ranked order instead
+produces the same candidates in a different sequence, and the declaration grouping is positional.
+
+The bite-check did not fail on the first four boards: their rankings happened to coincide with
+canonical order, so the distinction was invisible. Added
+`ranking_differs_from_canonical`, where home_02 carries the ball and therefore outranks home_01 —
+and the perturbation now fails at
+`player (ranking_differs_from_canonical @ scale 1.0) ==> expected: <home_01> but was: <home_02>`.
+
+Note it fails at scale 1.0 and NOT at argmax: reordering the list cannot change a max, only which
+option a sample lands on. A fixture that only ran at argmax would have missed it entirely.
+
+### Gates
+
+- `mvn -o -pl ffb-ai test`: **27 tests, 0 failures**.
+- `cargo test --workspace --release`: **14,654 / 0**.
+- Fourteen-class rung still **100/100 in all three editions** at argmax.
+
+**Next:** `handle_move` — the plan replay, with the engine-guard conditions that gate each terminal
+action — and then the harness wiring. `activate` and `move` have to go live together: the plan is
+set by one and consumed by the other, and the random contract's per-activation state (its
+`moved_this_activation`, its pre-drawn move target) is only refreshed when IT sees the activation
+prompt, so splitting them would leave that state stale on one side.

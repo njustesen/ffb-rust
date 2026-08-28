@@ -1,0 +1,63 @@
+# handle_activate end-to-end golden.
+# case <name>
+# player <home|away> <nr> <x> <y> <standing|prone>
+# ball <x> <y> <loose>
+# eligible <nr> <comma separated actions>
+# chose <scale bits> <player|ENDTURN> <action|-> <target|->
+case three_movers
+player home 1 6 5 standing
+player home 2 6 7 standing
+player home 3 6 9 standing
+player away 1 20 7 standing
+eligible 1 Move
+eligible 2 Move
+eligible 3 Move
+chose 00000000 home_01 Move -
+chose 3f800000 home_01 Move -
+chose 49742400 home_01 Move -
+case carrier_can_score
+player home 1 20 7 standing
+player home 2 6 5 standing
+player home 3 6 9 standing
+player away 1 22 3 standing
+ball 20 7 false
+eligible 1 Move
+eligible 2 Move
+eligible 3 Move
+chose 00000000 home_01 Move -
+chose 3f800000 home_01 Move -
+chose 49742400 home_01 Move -
+case move_vs_block
+player home 1 10 7 standing
+player home 2 6 9 standing
+player away 1 11 7 standing
+player away 2 11 8 standing
+eligible 1 Move,Block
+eligible 2 Move
+chose 00000000 home_01 Block away_01
+chose 3f800000 home_01 Move -
+chose 49742400 home_01 Move -
+case ranking_differs_from_canonical
+player home 1 6 5 standing
+player home 2 14 7 standing
+player home 3 6 9 standing
+player away 1 20 7 standing
+ball 14 7 false
+eligible 1 Move
+eligible 2 Move
+eligible 3 Move
+chose 00000000 home_02 Move -
+chose 3f800000 home_01 Move -
+chose 49742400 home_01 Move -
+case loose_ball_scramble
+player home 1 10 7 standing
+player home 2 22 12 standing
+player home 3 9 8 prone
+player away 1 20 2 standing
+ball 12 7 true
+eligible 1 Move
+eligible 2 Move
+eligible 3 Move
+chose 00000000 home_01 Move -
+chose 3f800000 home_01 Move -
+chose 49742400 home_01 Move -

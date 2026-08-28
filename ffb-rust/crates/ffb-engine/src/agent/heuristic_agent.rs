@@ -5808,6 +5808,189 @@ mod tests {
         eprintln!("wrote {path}");
     }
 
+    /// `handle_activate` END TO END — the whole activation decision — as a fixture.
+    ///
+    /// Every part of this has its own golden already: the tier-1 ladder, the reach search, the
+    /// value model, the arrival weights, the enumeration, the grouping and the two-level draw. What
+    /// no other fixture covers is that they COMPOSE the same way — that the ranking feeds the right
+    /// players into the search, that the search feeds the right candidates into the enumeration,
+    /// and that the enumeration's order is the order the grouping sees.
+    ///
+    /// A composition bug is invisible to the part fixtures by construction: each of them can be
+    /// perfectly right while the wiring between two of them is wrong. This is the one that catches
+    /// that, and it is also the closest thing to the live gate that a fixture can be — same
+    /// entry point, same return value, no engine.
+    ///
+    /// Emitted at all three temperature scales, because the draw is where the scales differ: at 0
+    /// the whole thing is deterministic and consumes nothing, at 1.0 it spends two draws, and at
+    /// 1e6 it spends the same two but on a nearly uniform distribution.
+    ///
+    /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_actend_golden -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_actend_golden() {
+        use std::fmt::Write as _;
+        use ffb_model::enums::{PlayerState, PS_STANDING, PS_PRONE, Rules};
+        use ffb_model::model::player::Player;
+
+        // (is_home, nr, x, y, standing)
+        type P2 = (bool, i32, i32, i32, bool);
+        type Board = &'static [P2];
+        // (player nr, actions)
+        type Elig = &'static [(i32, &'static [PlayerAction])];
+
+        let cases: [(&str, Board, Option<(i32, i32)>, bool, Elig); 5] = [
+            (
+                // Three movers, nothing else on offer: the choice is entirely the tier-1 ranking
+                // feeding the reach search and the destination weights.
+                "three_movers",
+                &[
+                    (true, 1, 6, 5, true), (true, 2, 6, 7, true), (true, 3, 6, 9, true),
+                    (false, 1, 20, 7, true),
+                ],
+                None, false,
+                &[(1, &[PlayerAction::Move]), (2, &[PlayerAction::Move]),
+                  (3, &[PlayerAction::Move])],
+            ),
+            (
+                // A carrier who can score, against two team-mates who cannot: the value model has
+                // to win over the raw ranking.
+                "carrier_can_score",
+                &[
+                    (true, 1, 20, 7, true), (true, 2, 6, 5, true), (true, 3, 6, 9, true),
+                    (false, 1, 22, 3, true),
+                ],
+                Some((20, 7)), false,
+                &[(1, &[PlayerAction::Move]), (2, &[PlayerAction::Move]),
+                  (3, &[PlayerAction::Move])],
+            ),
+            (
+                // Move against Block for the SAME player, plus a second player: two declarations
+                // from one player is what the grouping exists to keep apart.
+                "move_vs_block",
+                &[
+                    (true, 1, 10, 7, true), (true, 2, 6, 9, true),
+                    (false, 1, 11, 7, true), (false, 2, 11, 8, true),
+                ],
+                None, false,
+                &[(1, &[PlayerAction::Move, PlayerAction::Block]),
+                  (2, &[PlayerAction::Move])],
+            ),
+            (
+                // The RANKING is not the canonical order: home_02 carries the ball, so he outranks
+                // home_01 and home_03. `build_plans` still walks the CANONICAL list -- the rank
+                // only decides who gets a search -- so enumerating in ranked order instead
+                // produces the same candidates in a different sequence, and the declaration
+                // grouping is positional.
+                //
+                // Added because the bite-check did NOT fail on the first four boards: their
+                // rankings happened to coincide with canonical order, so the distinction was
+                // invisible.
+                "ranking_differs_from_canonical",
+                &[
+                    (true, 1, 6, 5, true), (true, 2, 14, 7, true), (true, 3, 6, 9, true),
+                    (false, 1, 20, 7, true),
+                ],
+                Some((14, 7)), false,
+                &[(1, &[PlayerAction::Move]), (2, &[PlayerAction::Move]),
+                  (3, &[PlayerAction::Move])],
+            ),
+            (
+                // A loose ball one player can fetch and another cannot, with a prone player too.
+                "loose_ball_scramble",
+                &[
+                    (true, 1, 10, 7, true), (true, 2, 22, 12, true), (true, 3, 9, 8, false),
+                    (false, 1, 20, 2, true),
+                ],
+                Some((12, 7)), true,
+                &[(1, &[PlayerAction::Move]), (2, &[PlayerAction::Move]),
+                  (3, &[PlayerAction::Move])],
+            ),
+        ];
+
+        let mut out = String::new();
+        writeln!(out, "# handle_activate end-to-end golden.").unwrap();
+        writeln!(out, "# case <name>").unwrap();
+        writeln!(out, "# player <home|away> <nr> <x> <y> <standing|prone>").unwrap();
+        writeln!(out, "# ball <x> <y> <loose>").unwrap();
+        writeln!(out, "# eligible <nr> <comma separated actions>").unwrap();
+        writeln!(out, "# chose <scale bits> <player|ENDTURN> <action|-> <target|->").unwrap();
+
+        for (name, board, ball, loose, elig) in cases {
+            writeln!(out, "case {name}").unwrap();
+            for &(is_home, nr, x, y, standing) in board {
+                writeln!(out, "player {} {nr} {x} {y} {}",
+                    if is_home { "home" } else { "away" },
+                    if standing { "standing" } else { "prone" }).unwrap();
+            }
+            if let Some((bx, by)) = ball {
+                writeln!(out, "ball {bx} {by} {loose}").unwrap();
+            }
+            for &(nr, acts) in elig {
+                let an: Vec<String> = acts.iter().map(|a| format!("{a:?}")).collect();
+                writeln!(out, "eligible {nr} {}", an.join(",")).unwrap();
+            }
+
+            for scale in [0.0f32, 1.0, 1.0e6] {
+                let mut home = crate::step::framework::test_team("home", 0);
+                let mut away = crate::step::framework::test_team("away", 0);
+                for &(is_home, nr, _, _, _) in board {
+                    let p = Player {
+                        id: format!("{}_{:02}", if is_home { "home" } else { "away" }, nr),
+                        nr,
+                        movement: 6,
+                        strength: 3,
+                        agility: 3,
+                        passing: 4,
+                        armour: 8,
+                        ..Default::default()
+                    };
+                    if is_home { home.players.push(p) } else { away.players.push(p) }
+                }
+                let mut g = Game::new(home, away, Rules::Bb2025);
+                g.home_playing = true;
+                g.turn_data_home.turn_nr = 3;
+                g.turn_data_away.turn_nr = 3;
+                g.turn_data_home.rerolls = 0;
+                for &(is_home, nr, x, y, standing) in board {
+                    let id = format!("{}_{:02}", if is_home { "home" } else { "away" }, nr);
+                    g.field_model.set_player_coordinate(&id, FieldCoordinate::new(x, y));
+                    g.field_model.set_player_state(
+                        &id,
+                        PlayerState::new(if standing { PS_STANDING } else { PS_PRONE })
+                            .change_active(true),
+                    );
+                }
+                if let Some((bx, by)) = ball {
+                    g.field_model.ball_coordinate = Some(FieldCoordinate::new(bx, by));
+                    g.field_model.ball_in_play = true;
+                    g.field_model.ball_moving = loose;
+                }
+                let f = Features::build(&g, positions_stamp(&g), true);
+                let eligible: Vec<(String, Vec<PlayerAction>)> = elig
+                    .iter()
+                    .map(|&(nr, acts)| (format!("home_{nr:02}"), acts.to_vec()))
+                    .collect();
+                let mut agent = HeuristicAgent::new(21, scale);
+                let act = agent.handle_activate(&g, &f, eligible);
+                let (pl, pa, tgt) = match act {
+                    Action::ActivatePlayer { player_id, player_action, block_defender_id } => (
+                        player_id,
+                        format!("{player_action:?}"),
+                        block_defender_id.unwrap_or_else(|| "-".to_string()),
+                    ),
+                    Action::EndTurn => ("ENDTURN".to_string(), "-".to_string(), "-".to_string()),
+                    other => (format!("{other:?}"), "-".to_string(), "-".to_string()),
+                };
+                writeln!(out, "chose {:08x} {pl} {pa} {tgt}", scale.to_bits()).unwrap();
+            }
+        }
+
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/agent/testdata/actend_golden.txt");
+        std::fs::write(path, out).unwrap();
+        eprintln!("wrote {path}");
+    }
+
     /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_sampler_golden -- --ignored`
     #[test]
     #[ignore]
