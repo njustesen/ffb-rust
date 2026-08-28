@@ -56,6 +56,14 @@ public final class ActivationDriver {
     private final Sampler sampler;
     private Plan plan;
     private final Set<String> usedThisTurn = new HashSet<>();
+    /**
+     * Rust `seen_bucket` / `seen_action`: how many decisions the agent has already made in each
+     * coarse board bucket, and how often it has taken each action. They feed the two COVERAGE
+     * terms, which are dead at argmax and live from `tempScale` 0.1 up. Per-agent and never reset
+     * -- Rust keeps them for the whole game.
+     */
+    private final java.util.Map<Long, Integer> seenBucket = new java.util.HashMap<>();
+    private final java.util.Map<String, Integer> seenAction = new java.util.HashMap<>();
     private String awaitingRun;
     private String lastTurnKey;
 
@@ -133,13 +141,19 @@ public final class ActivationDriver {
             && com.fumbbl.ffb.util.StringTool.isProvided(String.valueOf(game.getRules()))
             && false;
         boolean blizzard = game.getFieldModel().getWeather() == com.fumbbl.ffb.Weather.BLIZZARD;
+        ActivationChoice.Coverage coverage =
+            new ActivationChoice.Coverage(sampler.tempScale(), seenBucket, seenAction);
+        long bucket = ActivationChoice.bucket(f, game);
         ActivationChoice.Decision d = ActivationChoice.choose(f, sampler, new GameBoard(game, f),
             remaining, turnOf(game), teamReRoll, awaitingRun, usedThisTurn, home,
-            editionIsBb2016(game), blizzard);
+            editionIsBb2016(game), blizzard, coverage, bucket);
         if (d.player == null) {
             return d;
         }
         usedThisTurn.add(d.player);
+        // Rust records the BASE action name (its `PlayerActionChoice` debug string), not the
+        // move-variant the declaration uses, and records it only for a chosen candidate.
+        coverage.record(bucket, d.pac);
         // A ball move is the reason the receiver must be the next one activated.
         if ("HandOffMove".equals(d.action) || "PassMove".equals(d.action)) {
             awaitingRun = d.target;

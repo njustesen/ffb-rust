@@ -3139,3 +3139,56 @@ mismatched entries are downstream of a board that had already diverged.
 **Next:** the remaining bb2025/bb2020 reds still share most of their seeds. Before chasing another
 one individually, grep both driver classes for weighting constants that appear in only one of them —
 this iteration's bug had exactly that shape and a second instance would be cheap to find.
+
+## ITER56 — the two coverage terms, found by diffing constants instead of chasing a seed
+
+ITER55 ended by suggesting a constant diff between the two sides rather than another seed hunt.
+Doing it: strip comments and the test module from `heuristic_agent.rs`, do the same to the Java
+`heuristic/` package, and compare the multisets of float literals. Most of the difference is noise
+(doc section numbers, Rust-only deep mode), but `0.08` appears in Rust's live code and nowhere in
+Java. It is the **novelty** bonus — and pulling that thread found a second term beside it.
+
+Both are per-decision inputs that `PlanBuilder` already accepted and `ActivationChoice` fed a
+hardcoded `0.0f` at all six of its candidate-building call sites:
+
+| term | Rust | was |
+|---|---|---|
+| `novelty` | `0.08` the first time a board BUCKET is seen | `0.0f` |
+| `floor(pac)` | `0.35 * (1 - min(seen/4, 1))` while an action is under-used | `0.0f` |
+
+Both are **dead below `temp_scale` 0.1 and live above it**. That is the whole reason they survived
+56 iterations: every gate so far has been argmax, where Rust computes zero for both and the port's
+hardcoded zero is indistinguishable from the real thing. The activation golden cannot see them
+either — it was emitted with both at zero.
+
+So this iteration also measured the sampled gate for the first time. It was **0/100**, and the two
+terms were a real part of that:
+
+- **bb2025 `--heur-scale 1.0`: 0/100 → 6/100.** bb2020 likewise 0 → 6. bb2016 stays 0/100.
+
+Ported `bucket` too (`ballz | carried<<6 | turn<<8 | weather<<12 | half<<16`), including the detail
+that the weather index is the ordinal of **Rust's** `Weather` enum, whose order differs from the
+Java enum's. `Decision` now also carries the BASE action name, because Rust's counter keys on its
+`PlayerActionChoice` rather than on the declaration — a give counts as one `HandOver` however it is
+declared.
+
+**The lesson is about the method, not the bug.** Five of the last six iterations found the fault by
+diffing two *executions*; this one found it by diffing two *texts*, in a few minutes, and it was a
+defect no execution diff could have surfaced at the scale we were gating. Both techniques are worth
+keeping — and a constant that appears on one side only is a cheap, high-yield thing to re-run
+whenever the port grows.
+
+### Gates
+
+- `--heur-classes all`, 100 seeds, **argmax unchanged as expected**: bb2025 90/100, bb2020 90/100,
+  bb2016 5/100 — both terms are zero at argmax, so this fix cannot move it.
+- `--heur-classes all`, 100 seeds, **scale 1.0**: bb2025 **0 → 6/100**, bb2020 **0 → 6/100**,
+  bb2016 0/100.
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,658 / 0** (no Rust change). `mvn -o -pl ffb-ai test`:
+  **33 / 0** (+1, novelty bite-checked). The two Java trees agree.
+
+**Next:** the sampled gate is now the weakest at 6/100, and it is a different frontier from argmax —
+everything the sampler touches (draw counts, temperatures, the RNG stream itself) is untested there.
+Take its lowest failing seed next; the argmax reds will still be waiting.

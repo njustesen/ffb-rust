@@ -148,8 +148,14 @@ class ActivationChoiceTest {
 
                     ActivationChoice.Board bd = new BoardFromRows(board, f);
                     Sampler s = new Sampler(21, scale);
+                    // The golden was emitted with BOTH coverage terms at zero, so this fixture
+                    // exercises the sharp arms only: a Coverage built at tempScale 0 returns 0.0
+                    // from `novelty` and `floor` whatever the maps hold. The live sweep at
+                    // `--heur-scale 1.0` is what covers them.
+                    ActivationChoice.Coverage cov = new ActivationChoice.Coverage(
+                        0.0f, new java.util.HashMap<>(), new java.util.HashMap<>());
                     ActivationChoice.Decision d = ActivationChoice.choose(f, s, bd, elig, 3, false,
-                        null, new HashSet<>(), true, false, false);
+                        null, new HashSet<>(), true, false, false, cov, 0L);
 
                     String gotPlayer = d.player == null ? "ENDTURN" : d.player;
                     String gotAction = d.player == null ? "-" : d.action;
@@ -285,5 +291,47 @@ class ActivationChoiceTest {
             assertEquals(pac, ActivationChoice.moveVariant(pac),
                 pac + " has no move-variant and must pass through unchanged");
         }
+    }
+
+    /**
+     * Regression guard for ITER56: Rust's two COVERAGE terms, which this port fed a hardcoded
+     * {@code 0.0f} at every one of its six candidate-building call sites.
+     *
+     * <p>Both are dead below {@code tempScale} 0.1 and live above it, which is exactly why the
+     * argmax gate never noticed — and why {@code --heur-scale 1.0} was **0/100**. They are a
+     * coverage device that costs play strength by construction, so they are switched off in the
+     * sharp arms; a port that drops them is invisible until the sampling arms are gated.
+     *
+     * <p>Pinned here rather than in a golden because the activation golden was emitted with both
+     * at zero and therefore cannot see them.
+     */
+    @Test
+    void coverageTermsAreDeadAtArgmaxAndLiveWhenSampling() {
+        java.util.Map<Long, Integer> buckets = new java.util.HashMap<>();
+        java.util.Map<String, Integer> actions = new java.util.HashMap<>();
+
+        // Argmax: both terms are zero no matter what the maps hold.
+        ActivationChoice.Coverage sharp = new ActivationChoice.Coverage(0.0f, buckets, actions);
+        assertEquals(0.0f, sharp.novelty(1234L));
+        assertEquals(0.0f, sharp.floor("Move"));
+
+        ActivationChoice.Coverage soft = new ActivationChoice.Coverage(1.0f, buckets, actions);
+        // An unseen bucket pays the novelty bonus; a seen one does not.
+        assertEquals(0.08f, soft.novelty(1234L));
+        soft.record(1234L, "Move");
+        assertEquals(0.0f, soft.novelty(1234L), "the bonus is for the FIRST visit only");
+        assertEquals(0.08f, soft.novelty(9999L), "a different bucket is still new");
+
+        // The floor decays linearly over four uses and then stays at zero.
+        ActivationChoice.Coverage f2 = new ActivationChoice.Coverage(1.0f,
+            new java.util.HashMap<>(), new java.util.HashMap<>());
+        float[] expected = {0.35f, 0.2625f, 0.175f, 0.0875f, 0.0f, 0.0f};
+        for (int seen = 0; seen < expected.length; seen++) {
+            assertEquals(expected[seen], f2.floor("Block"), 1e-6f,
+                "floor after " + seen + " uses");
+            f2.record(0L, "Block");
+        }
+        // Counters are per ACTION, so one action's use does not lower another's floor.
+        assertEquals(0.35f, f2.floor("Foul"));
     }
 }

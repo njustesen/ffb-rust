@@ -2,9 +2,12 @@ package com.fumbbl.ffb.ai.parity.heuristic;
 
 import com.fumbbl.ffb.FieldCoordinate;
 
+import com.fumbbl.ffb.model.Game;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -82,9 +85,21 @@ public final class ActivationChoice {
         public final PlanBuilder.Kind kind;
         /** Destination cell for a move-shaped plan, else null. */
         public final Integer dest;
+        /**
+         * The BASE action name, before {@link #moveVariant}. Rust's coverage counter keys on its
+         * `PlayerActionChoice` rather than on the declaration, so a give counts as one "HandOver"
+         * however it is declared.
+         */
+        public final String pac;
 
         public Decision(String player, String action, String target, PlanBuilder.Kind kind,
                 Integer dest) {
+            this(player, action, target, kind, dest, action);
+        }
+
+        public Decision(String player, String action, String target, PlanBuilder.Kind kind,
+                Integer dest, String pac) {
+            this.pac = pac;
             this.player = player;
             this.action = action;
             this.target = target;
@@ -137,9 +152,91 @@ public final class ActivationChoice {
      *     to home computes every AWAY decision as though it were attacking the wrong end of the
      *     pitch — which is exactly what the first live gate caught.
      */
+    /**
+     * Rust's two COVERAGE terms, both dead below {@code tempScale} 0.1 and both hardcoded to
+     * {@code 0.0f} in this port until ITER56.
+     *
+     * <p>{@code novelty} adds a flat 0.08 to every candidate the first time the agent sees a board
+     * BUCKET (ball zone, carried, turn/3, weather, half). {@code floor(pac)} raises a candidate's
+     * action weight to {@code 0.35 * (1 - min(seen/4, 1))} while that action is under-used. Both
+     * exist to widen coverage, both cost play strength by construction, and both are switched off
+     * in the sharp arms -- which is why argmax never noticed they were missing and
+     * {@code --heur-scale 1.0} was 0/100.
+     */
+    public static final class Coverage {
+        private final float tempScale;
+        private final Map<Long, Integer> seenBucket;
+        private final Map<String, Integer> seenAction;
+
+        public Coverage(float tempScale, Map<Long, Integer> seenBucket,
+                Map<String, Integer> seenAction) {
+            this.tempScale = tempScale;
+            this.seenBucket = seenBucket;
+            this.seenAction = seenAction;
+        }
+
+        /** Rust: `if temp_scale >= 0.1 && seen_bucket[bucket] == 0 { 0.08 } else { 0.0 }`. */
+        float novelty(long bucket) {
+            if (tempScale < 0.1f) {
+                return 0.0f;
+            }
+            return seenBucket.getOrDefault(bucket, 0) == 0 ? 0.08f : 0.0f;
+        }
+
+        /** Rust {@code coverage_floor}. */
+        float floor(String pac) {
+            if (tempScale < 0.1f) {
+                return 0.0f;
+            }
+            int seen = seenAction.getOrDefault(pac, 0);
+            return 0.35f * (1.0f - Math.min(seen / 4.0f, 1.0f));
+        }
+
+        void record(long bucket, String pac) {
+            seenBucket.merge(bucket, 1, Integer::sum);
+            seenAction.merge(pac, 1, Integer::sum);
+        }
+    }
+
+    /**
+     * Rust {@code bucket}: the coarse board key the novelty bonus is keyed on.
+     *
+     * <p>`ballz | carried << 6 | turn << 8 | weather << 12 | half << 16`, with the ball zone
+     * defaulting to 31 when there is no ball. The weather index is the ordinal of Rust's `Weather`
+     * enum, whose order is Sweltering, VerySunny, Nice, PouringRain, Blizzard, Intro.
+     */
+    public static long bucket(Features f, Game game) {
+        long ballz = 31;
+        if (f.ball != null) {
+            ballz = (long) (f.ball.getX() / 5) * 4 + (f.ball.getY() / 4);
+        }
+        long carried = f.carrierAt != null ? 1 : 0;
+        int turnNr = Math.max(game.getTurnDataHome().getTurnNr(), game.getTurnDataAway().getTurnNr());
+        long turn = turnNr / 3;
+        long weather = weatherIndex(game.getFieldModel().getWeather());
+        long half = Math.max(0, game.getHalf());
+        return ballz | (carried << 6) | (turn << 8) | (weather << 12) | (half << 16);
+    }
+
+    /** The ordinal of Rust's `Weather` enum, which is NOT the order of the Java enum. */
+    private static long weatherIndex(com.fumbbl.ffb.Weather w) {
+        if (w == null) {
+            return 2;
+        }
+        switch (w) {
+            case SWELTERING_HEAT: return 0;
+            case VERY_SUNNY:      return 1;
+            case NICE:            return 2;
+            case POURING_RAIN:    return 3;
+            case BLIZZARD:        return 4;
+            default:              return 5;
+        }
+    }
+
     public static Decision choose(Features f, Sampler sampler, Board board, List<Eligible> eligible,
             int turnNr, boolean teamReRoll, String awaitingRun, Set<String> usedThisTurn,
-            boolean home, boolean bb2016, boolean blizzard) {
+            boolean home, boolean bb2016, boolean blizzard, Coverage coverage,
+            long bucket) {
         if (eligible.isEmpty()) {
             return new Decision(null, null, null, null, null);
         }
@@ -216,7 +313,7 @@ public final class ActivationChoice {
                     case "Move":
                     case "StandUp":
                         if (r != null) {
-                            PlanBuilder.moveCandidates(f, r, m, e.id, pac, wPlayer, 0.0f, 0.0f,
+                            PlanBuilder.moveCandidates(f, r, m, e.id, pac, wPlayer, coverage.floor(pac), coverage.novelty(bucket),
                                 out);
                         } else {
                             // Tier 1: the proxy stands in, discounted for being optimistic.
@@ -226,12 +323,12 @@ public final class ActivationChoice {
                         break;
                     case "Block":
                         PlanBuilder.blockCandidates(f, m, e.id, pac, board.blockTargets(e.id),
-                            wPlayer, 0.0f, 0.0f, out);
+                            wPlayer, coverage.floor(pac), coverage.novelty(bucket), out);
                         break;
                     case "Blitz":
                     case "StandUpBlitz":
                         PlanBuilder.blitzCandidates(m, e.id, pac, e.at, board.blitzFoes(e.id),
-                            wPlayer, 0.0f, 0.0f, out);
+                            wPlayer, coverage.floor(pac), coverage.novelty(bucket), out);
                         break;
                     case "Foul":
                         PlanBuilder.foulCandidates(e.id, pac, board.foulTargets(e.id), wPlayer,
@@ -240,7 +337,7 @@ public final class ActivationChoice {
                     case "HandOver":
                         if (r != null) {
                             PlanBuilder.handOffCandidates(f, r, m, e.id, pac, e.at,
-                                board.receivers(e.id, false), wPlayer, 0.0f, 0.0f, out);
+                                board.receivers(e.id, false), wPlayer, coverage.floor(pac), coverage.novelty(bucket), out);
                         }
                         break;
                     case "Pass":
@@ -250,12 +347,14 @@ public final class ActivationChoice {
                             r == null ? java.util.Collections.singletonList(
                                 Features.ix(e.at.getX(), e.at.getY()))
                                 : Plans.runUpSquares(r, m, e.at),
-                            wPlayer, 0.0f, 0.0f, out);
+                            wPlayer, coverage.floor(pac), coverage.novelty(bucket), out);
                         break;
                     default:
                         // Everything else is declared and resolved without a movement phase.
-                        out.add(new PlanBuilder.Candidate(wPlayer * 0.40f, e.id, pac, null,
-                            PlanBuilder.Kind.IMMEDIATE, null));
+                        out.add(new PlanBuilder.Candidate(
+                            wPlayer * Math.max(0.40f, coverage.floor(pac))
+                                + coverage.novelty(bucket),
+                            e.id, pac, null, PlanBuilder.Kind.IMMEDIATE, null));
                         break;
                 }
             }
@@ -273,6 +372,6 @@ public final class ActivationChoice {
             return new Decision(null, null, null, null, null); // EndTurn
         }
         PlanBuilder.Candidate c = out.get(pick);
-        return new Decision(c.player, moveVariant(c.pac), c.target, c.kind, c.dest);
+        return new Decision(c.player, moveVariant(c.pac), c.target, c.kind, c.dest, c.pac);
     }
 }
