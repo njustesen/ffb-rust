@@ -164,4 +164,28 @@ class ValueModelTest {
             "not every branch fired: T=" + sawTouchdown + " A=" + sawAdvance
                 + " P=" + sawPickup + " S=" + sawSupport);
     }
+
+    /**
+     * Regression guard for ITER55: the crowd-surf factor of Rust's {@code block_weight}.
+     *
+     * <p>There were two copies of the block weighting — {@code HeuristicDriver}'s, which scores the
+     * BLOCK-TARGET prompt, and {@code ActivationDriver.blockWeight}, which scores ACTIVATION
+     * candidates — and only the first applied this factor. The two agents therefore agreed on every
+     * ordinary block and picked different victims exactly when one stood on the sideline: bb2025
+     * seed 72 step 72 offered the same three victims in the same order, and Java scored the
+     * sideline one 0.092 against Rust's 0.138 (= 0.092 x 1.5). Java blocked someone else, and a
+     * step later a different player was badly hurt.
+     *
+     * <p>Both callers now go through {@link HeuristicDriver#surfMultiplier}; this pins its four
+     * cases so a future edit cannot quietly drop one again.
+     */
+    @Test
+    void surfMultiplierCoversEveryCase() {
+        assertEquals(1.0f, HeuristicDriver.surfMultiplier(false, false));
+        assertEquals(1.0f, HeuristicDriver.surfMultiplier(false, true),
+            "a defender who cannot be surfed gets no bonus, ball or no ball");
+        assertEquals(1.5f, HeuristicDriver.surfMultiplier(true, false));
+        assertEquals(1.9f, HeuristicDriver.surfMultiplier(true, true),
+            "surfing the CARRIER is worth more than surfing anyone else");
+    }
 }

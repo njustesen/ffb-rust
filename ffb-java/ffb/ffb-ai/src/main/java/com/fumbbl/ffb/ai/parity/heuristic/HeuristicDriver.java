@@ -512,9 +512,7 @@ public final class HeuristicDriver {
         if (defHasBall) {
             w *= 1.35f;
         }
-        if (canSurf(game, attId, defId)) {
-            w *= defHasBall ? 1.9f : 1.5f;
-        }
+        w *= surfMultiplier(canSurf(game, attId, defId), defHasBall);
         if (hasSkillNamed(def, "Block")
             && !hasSkillNamed(att, "Block")
             && !hasSkillNamed(att, "Wrestle")) {
@@ -555,7 +553,7 @@ public final class HeuristicDriver {
      * Rust `push_squares`: the three squares a block can push the defender into — straight back
      * plus the two flanking it, derived purely from the attacker/defender geometry.
      */
-    private static List<FieldCoordinate> pushSquares(Game game, String attId, String defId) {
+    static List<FieldCoordinate> pushSquares(Game game, String attId, String defId) {
         com.fumbbl.ffb.model.FieldModel fm = game.getFieldModel();
         Player<?> att = game.getPlayerById(attId);
         Player<?> def = game.getPlayerById(defId);
@@ -582,8 +580,23 @@ public final class HeuristicDriver {
         return out;
     }
 
+    /**
+     * Rust {@code block_weight}'s crowd-surf factor: {@code w *= canSurf ? (hasBall ? 1.9 : 1.5) : 1}.
+     *
+     * <p>One method for both callers because having two was the bug. {@code HeuristicDriver}'s
+     * block-target arm applied it and {@code ActivationDriver.blockWeight} — the copy that scores
+     * ACTIVATION candidates — did not, so the two agents agreed on every ordinary block and picked
+     * different victims whenever one stood on the sideline.
+     */
+    static float surfMultiplier(boolean canSurf, boolean defHasBall) {
+        if (!canSurf) {
+            return 1.0f;
+        }
+        return defHasBall ? 1.9f : 1.5f;
+    }
+
     /** Rust `can_surf`: any push square off the pitch means the defender can be crowd-surfed. */
-    private static boolean canSurf(Game game, String attId, String defId) {
+    static boolean canSurf(Game game, String attId, String defId) {
         for (FieldCoordinate c : pushSquares(game, attId, defId)) {
             if (!onPitch(c)) {
                 return true;

@@ -483,6 +483,16 @@ public final class ActivationDriver {
             if (defHasBall) {
                 w *= 1.35f;
             }
+            // The CROWD-SURF bonus, which this port was missing entirely: a defender who can be
+            // pushed off the pitch is worth far more than the dice alone say, and Rust's
+            // `block_weight` has multiplied by it since the agent was written. Without it the two
+            // agents scored every ordinary block identically and diverged only when a victim stood
+            // on the sideline -- bb2025 seed 72 step 72, where the three candidates were the same
+            // three players in the same order and only the sideline one differed, 0.092 against
+            // Rust's 0.138 (= 0.092 x 1.5). Java then blocked a different player, and a step later
+            // a different player was badly hurt.
+            w *= HeuristicDriver.surfMultiplier(HeuristicDriver.canSurf(game, attId, defId),
+                defHasBall);
             if (hasSkill(def, "Block") && !hasSkill(att, "Block") && !hasSkill(att, "Wrestle")) {
                 w *= 0.70f;
             }

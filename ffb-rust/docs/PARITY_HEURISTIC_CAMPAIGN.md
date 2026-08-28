@@ -3085,3 +3085,57 @@ match there, so this is not yet proven to be the cause of the divergence; the ne
 the push chain itself (defender, from-square, chosen square) rather than the agent's answers.
 
 No code change; recorded so the next iteration starts from the measurement rather than repeating it.
+
+## ITER55 — two copies of the block weighting, and only one knew about the crowd
+
+bb2025 seed 72 step 72 (a shared red — the same seed and step fails in bb2020 too). Both sides
+activate `away_03` with a block; a step later Java has `home_03` badly hurt and Rust has `home_06`,
+on identical dice.
+
+Walking it back through four probes: the injury applies to `game.defender_id`, which comes from the
+block declaration, which comes from the agent's chosen target. Dumping the block candidates at that
+decision:
+
+```
+JAVA_CAND away_03 Block tgt=home_03 w=0.092000    RUST_CAND away_03 Block tgt=home_03 w=0.092000
+JAVA_CAND away_03 Block tgt=home_04 w=0.092000    RUST_CAND away_03 Block tgt=home_04 w=0.092000
+JAVA_CAND away_03 Block tgt=home_06 w=0.092000    RUST_CAND away_03 Block tgt=home_06 w=0.138000
+```
+
+Same three victims, same order, one different weight — and 0.138 = 0.092 × 1.5. `home_06` stands on
+the sideline at (11,14): it is the **crowd-surf bonus**, which Rust's `block_weight` has applied
+since the agent was written and the Java port did not.
+
+The reason it survived this long is that there are **two** copies of the block weighting.
+`HeuristicDriver`'s scores the BLOCK-TARGET prompt and did apply the factor; `ActivationDriver`'s —
+the copy that scores ACTIVATION candidates — did not. The two agents therefore agreed on every
+ordinary block, and diverged only when a victim happened to stand where a push could send him off
+the pitch. `canSurf` and `pushSquares` were already ported and correct; only this caller was
+missing.
+
+Both callers now go through one `HeuristicDriver.surfMultiplier`, because having two was the bug.
+`ValueModelTest.surfMultiplierCoversEveryCase` pins its four cases.
+
+**The generalisable point:** the campaign has been finding ported-but-unreached code (ITER45-49) and
+contract rules bypassed by a replaced loop (ITER47, 51, 52). This is a third kind — *duplicated*
+logic where one copy drifted. Worth grepping for other constants that appear in both driver classes.
+
+### Also recorded: the seed-72 chain investigation from ITER54 was a dead end
+
+All sixteen pushback decisions in that game agree on the square AND the pick; two of them name a
+different defender, but both are at steps **146 and 154**, long after the divergence at step 72, so
+they are consequences rather than causes. ITER53's fix is not incomplete after all — the two
+mismatched entries are downstream of a board that had already diverged.
+
+### Gates
+
+- `--heur-classes all`, 100 seeds, argmax: **bb2025 89 → 90/100**, **bb2020 89 → 90/100**,
+  bb2016 5/100.
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,658 / 0** (no Rust change). `mvn -o -pl ffb-ai test`:
+  **32 / 0**. The two Java trees agree.
+
+**Next:** the remaining bb2025/bb2020 reds still share most of their seeds. Before chasing another
+one individually, grep both driver classes for weighting constants that appear in only one of them —
+this iteration's bug had exactly that shape and a second instance would be cheap to find.
