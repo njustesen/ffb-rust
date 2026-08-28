@@ -4,6 +4,9 @@ import com.fumbbl.ffb.FieldCoordinate;
 import com.fumbbl.ffb.PlayerState;
 import com.fumbbl.ffb.model.ActingPlayer;
 import com.fumbbl.ffb.model.FieldModel;
+import com.fumbbl.ffb.FactoryType;
+import com.fumbbl.ffb.mechanics.Mechanic;
+import com.fumbbl.ffb.mechanics.SkillMechanic;
 import com.fumbbl.ffb.model.Game;
 import com.fumbbl.ffb.model.Player;
 import com.fumbbl.ffb.model.Team;
@@ -342,7 +345,7 @@ public final class ActivationDriver {
                 if (!eligible) {
                     continue;
                 }
-                float w = fouls ? 0.0f : blockWeight(playerId, o.getId(), attStr);
+                float w = fouls ? foulWeight(playerId, o) : blockWeight(playerId, o.getId(), attStr);
                 out.add(new PlanBuilder.BlockTarget(o.getId(), oc, w));
             }
             if (canonicalOrder) {
@@ -360,6 +363,57 @@ public final class ActivationDriver {
                     : Integer.compare(a.at.getY(), b.at.getY()));
             }
             return out;
+        }
+
+        /**
+         * Rust {@code foul_weight}. The arithmetic itself lives in {@link BallMoves#foulWeight};
+         * this supplies the four board facts it reads.
+         *
+         * <p>Fouls were scored as a flat ZERO until ITER45, which made every foul candidate tie at
+         * `wPlayer * 0` and lose to any move — so the Java agent never fouled, while Rust weighed
+         * the armour break against the ejection risk and regularly did. It is not a scoring
+         * difference the state hash can see directly: it shows up one step later, as a victim who
+         * is Prone on one side and KO'd on the other.
+         *
+         * @param attId the fouling player
+         * @param def the prone or stunned victim
+         */
+        private float foulWeight(String attId, Player<?> def) {
+            Player<?> att = game.getPlayerById(attId);
+            FieldCoordinate dc = game.getFieldModel().getPlayerCoordinate(def);
+            if (att == null || dc == null) {
+                return 0.0f;
+            }
+            SkillMechanic mechanic = (SkillMechanic) game.getFactory(FactoryType.Factory.MECHANIC)
+                .forName(Mechanic.Type.SKILL.name());
+            int off = com.fumbbl.ffb.util.UtilPlayer.findOffensiveFoulAssists(game, att, def,
+                mechanic);
+            int dfn = com.fumbbl.ffb.util.UtilPlayer.findDefensiveFoulAssists(game, att, def);
+            ValueModel.Mover m = moverOf(game, f, attId);
+            if (m == null) {
+                return 0.0f;
+            }
+            return BallMoves.foulWeight(f, def.getArmourWithModifiers(), off, dfn, dc,
+                bribesOf(game.isHomePlaying()), m);
+        }
+
+        /**
+         * The team's remaining Bribe the Ref inducements. Rust keeps this as a plain count on the
+         * team; the engine keeps it in the turn's inducement set, so read it back out by type name.
+         */
+        private int bribesOf(boolean home) {
+            com.fumbbl.ffb.model.TurnData td =
+                home ? game.getTurnDataHome() : game.getTurnDataAway();
+            if (td == null || td.getInducementSet() == null) {
+                return 0;
+            }
+            for (com.fumbbl.ffb.inducement.Inducement i : td.getInducementSet().getInducements()) {
+                if (i != null && i.getType() != null
+                    && "bribes".equalsIgnoreCase(i.getType().getName())) {
+                    return i.getValue() - i.getUses();
+                }
+            }
+            return 0;
         }
 
         /** Rust {@code block_weight}, via the engine's own assist arithmetic. */

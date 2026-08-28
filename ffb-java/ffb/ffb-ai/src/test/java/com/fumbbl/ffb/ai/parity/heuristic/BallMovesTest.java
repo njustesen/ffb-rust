@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -199,5 +200,52 @@ class BallMovesTest {
         assertTrue(sawScoresNow && sawNotScoresNow,
             "scoresNow was always " + sawScoresNow + "; the branch that makes a give worth 1.0 "
                 + "instead of 0.20 is untested");
+    }
+
+    /**
+     * Regression guard for ITER45: {@code ActivationDriver.foes} scored every foul target at a
+     * hardcoded {@code 0.0f} instead of calling {@link BallMoves#foulWeight}. The arithmetic was
+     * ported and golden-tested all along; only the call was missing, so no fixture could see it.
+     *
+     * <p>This pins the fact that made the placeholder wrong: over the whole plausible input range
+     * -- every armour value, both assist directions, all three ball-proximity tiers -- the weight is
+     * never zero. A zero foul weight is therefore not a value the model can produce, and any future
+     * caller that reports one is not calling this function.
+     */
+    @Test
+    void foulWeightIsNeverZero() {
+        List<Features.Snap> snaps = new ArrayList<>();
+        snaps.add(new Features.Snap(true, 12, 7, true, true, 6, 3, 1));   // the fouler
+        snaps.add(new Features.Snap(false, 13, 7, false, true, 6, 3, 1)); // the victim, down
+        FieldCoordinate victim = new FieldCoordinate(13, 7);
+
+        // The three ball-proximity tiers foulWeight distinguishes: carried by the victim, loose
+        // next to him, and nowhere near.
+        FieldCoordinate[] balls = {victim, new FieldCoordinate(13, 8), new FieldCoordinate(2, 2)};
+        boolean[] carried = {true, false, false};
+
+        int cases = 0;
+        for (int b = 0; b < balls.length; b++) {
+            Features f = Features.build(snaps,
+                new Features.BoardState(balls[b], carried[b], false, false, false), true);
+            for (int av = 6; av <= 11; av++) {
+                for (int off = 0; off <= 3; off++) {
+                    for (int dfn = 0; dfn <= 3; dfn++) {
+                        for (int bribes = 0; bribes <= 1; bribes++) {
+                            for (float unact : new float[] {0.0f, 1.0f}) {
+                                ValueModel.Mover m = new ValueModel.Mover(true, true, 6, 3, 3,
+                                    false, false, false, 10, 8, unact);
+                                float w = BallMoves.foulWeight(f, av, off, dfn, victim, bribes, m);
+                                assertNotEquals(0.0f, w, String.format(
+                                    "av=%d off=%d dfn=%d bribes=%d unact=%.1f ballTier=%d",
+                                    av, off, dfn, bribes, unact, b));
+                                cases++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assertEquals(3 * 6 * 4 * 4 * 2 * 2, cases);
     }
 }

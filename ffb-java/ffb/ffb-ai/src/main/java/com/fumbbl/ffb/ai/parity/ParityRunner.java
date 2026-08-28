@@ -916,6 +916,17 @@ public class ParityRunner {
                 ActingPlayer imAp = game.getActingPlayer();
                 String imPid = (imAp != null) ? imAp.getPlayerId() : "null";
                 if (DEBUG) System.err.println("JAVA_IM pid=" + imPid + " si=" + stepIndex);
+                // The random contract ends the activation here unconditionally, which is why it can
+                // never move more than one square. The heuristic owns a PLAN that outlives the
+                // engine's first move prompt -- post-block blitz movement, a give whose run-up has
+                // not finished, a re-plan after the board moved -- so it gets the same second look
+                // Rust's StepInitMoving gives it, and answers with MoveReplay rather than a
+                // reflexive deselect. `replayMove` still returns END_PLAYER_ACTION for the plain
+                // delivered move, so the random behaviour is what a spent plan reduces to.
+                if (activation != null && imAp != null && imAp.getPlayerId() != null) {
+                    sendMoveAction(game, gameState, imAp.getPlayerId());
+                    break;
+                }
                 MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));
                 break;
             }

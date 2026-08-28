@@ -2597,3 +2597,90 @@ for a weight that disagrees.
 
 **Next:** make the harness revisit phase 2 after a blitz block, so the blitzer's remaining movement
 is reachable at all.
+
+## ITER45 — the blitzer's second look, and fouls that were worth nothing
+
+Two harness defects, found in sequence: the first made a whole engine prompt unreachable, and the
+second was only visible once it was.
+
+### The `INIT_MOVING` deselect
+
+ITER44 concluded that `sendMoveAction` — and with it `ActivationDriver.replan` and the entire
+`MoveReplay` state machine — was never called, because the blitzer never came back through phase 2
+of `INIT_SELECTING`. That was true, and it was the wrong entry point to be watching. A probe on
+*every* `handleStep` shows the engine does offer the blitzer his post-block movement; it just
+arrives as its own step:
+
+```
+INIT_SELECTING tm=REGULAR ap=Home1/BLITZ_MOVE/blocked=false/move=3   <- phase 2 sends the block
+PUSHBACK       tm=REGULAR ap=Home1/BLITZ/blocked=true/move=4
+INIT_MOVING    tm=REGULAR ap=Home1/BLITZ_MOVE/blocked=true/move=4    <- the second look
+```
+
+`case INIT_MOVING` injected an unconditional deselect. That is the correct contract for the random
+agent — it is *why* random play has a hard ceiling of one square per activation — but it discards
+every plan that outlives the engine's first move prompt: post-block blitz movement, a give whose
+run-up has not finished, a re-plan after the board moved. Rust's `StepInitMoving` re-emits the move
+prompt and lets `replay_plan` answer; the harness now does the same when the heuristic owns the
+activation. `replayMove` still returns `END_PLAYER_ACTION` for a plain delivered move, so the random
+behaviour is what a spent plan reduces to rather than a special case.
+
+Seed 1's first divergence moved from **step 12 to step 78** on this change alone.
+
+### Fouls scored at a hardcoded zero
+
+Step 78 was then a clean, isolated signal: same pre-state, same player picked, different action —
+Java declared `MOVE`, Rust declared `Foul`. Dumping both candidate lists at that decision and
+diffing them gave **exactly 6 differences out of 1,378 candidates**, every one a foul against the
+same victim, Java `0.000000` against Rust `0.072016`.
+
+`ActivationDriver.foes` read:
+
+```java
+float w = fouls ? 0.0f : blockWeight(playerId, o.getId(), attStr);
+```
+
+`BallMoves.foulWeight` had been ported faithfully and pinned by golden vectors the whole time. Only
+the *call* was missing, so no fixture could see it: the arithmetic was tested in isolation and never
+reached in the game. Every foul candidate tied at `wPlayer * 0` and lost to any move, so the Java
+agent never fouled while Rust weighed the armour break against the ejection risk and regularly did.
+It is not a difference the state hash can show directly — it surfaces one step later, as a victim
+who is Prone on one side and KO'd on the other.
+
+Wired it to `BallMoves.foulWeight` with the four board facts it reads: the victim's armour, the
+engine's own `UtilPlayer.findOffensiveFoulAssists`/`findDefensiveFoulAssists`, and the team's
+remaining Bribe the Ref inducements (Rust keeps that as a plain count on the team; the engine keeps
+it in the turn's inducement set, so it is read back out by type name).
+
+**The lesson, and it is the same one three times now:** a golden fixture proves the arithmetic, not
+that anything calls it. Both defects this iteration were *unreached correct code* — `MoveReplay` and
+`foulWeight` were each fully ported, fully tested, and dead. The check that finds this class of bug
+is a diff of the two agents' candidate lists at a decision they disagree on, which localised the
+foul weight to six rows out of 1,378 in one run.
+
+### Regression test
+
+`BallMovesTest.foulWeightIsNeverZero` walks the plausible input range — every armour value, both
+assist directions, all three ball-proximity tiers, with and without bribes — and asserts the weight
+is never zero, pinning the fact that made the placeholder wrong: `0.0f` is not a value this model
+can produce, so any caller reporting one is not calling it. It is an indirect guard; the direct one
+would need a live `Game`, which the `ffb-ai` test tree has no scaffolding for. The parity sweep is
+what actually proves the wiring.
+
+### Gates
+
+- `--heur-classes all` bb2025 argmax: still **0/20**, but seed 1 now diverges at **step 139**
+  (was 12). Seeds 2 and 3 at steps 12 and 72.
+- Fourteen-class rung (`coin,receive,reroll,pushback,blocktarget,blockchoice,blitztarget,touchback,
+  kick,intercept,followup,setup,other,skill`): **100/100 in bb2016, bb2020 and bb2025** at argmax.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,655 / 0**. `mvn -o -pl ffb-ai test`: **29 / 0**.
+- `python scripts/check_java_trees.py`: the two Java trees agree.
+
+**Next:** seed 1 step 110 is already root-caused and is the following iteration's fix. Rust offers
+a foul candidate (`home_03` on `away_01`) that Java does not offer at all — Java has *no* foul
+candidate there. The eligible-action list the harness hands the agent is a **turn-start snapshot**,
+so a victim who went down *during* the acting team's own turn never appears in it, while Rust
+recomputes legality live. The snapshot is a harness artifact, not engine behaviour: the Java engine
+would allow that foul. Refresh the action list live inside `eligibleFor` only — `filterStaleActions`
+must keep its snapshot semantics on the random path, where `idx % N` alignment depends on it.
