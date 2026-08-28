@@ -602,8 +602,31 @@ public class ParityRunner {
                         // side skips both the same way.
                         if (activation != null) {
                             activation.refreshTurn(game);
+                            // LIVE, not the turn-start snapshot. Rust reads `eligible_players` off
+                            // the engine's prompt, which the engine recomputes for every
+                            // activation; the snapshot above is a harness convenience that the
+                            // random path needs because its `idx % N` alignment depends on the list
+                            // never changing size mid-turn. The heuristic consumes no RNG here, so
+                            // it can afford the truth -- and it needs it: a victim knocked down
+                            // during the acting team's OWN turn makes FOUL legal for his
+                            // neighbours, which the engine allows and a turn-start snapshot cannot
+                            // see. `computeEligiblePlayers` is a pure function of the current game
+                            // state, so recomputing it is exactly what the engine would report.
+                            List<Object[]> liveRemaining = new ArrayList<>();
+                            for (Object[] entry : computeEligiblePlayers(game)) {
+                                if (!usedThisTurn.contains((String) entry[0])) {
+                                    liveRemaining.add(entry);
+                                }
+                            }
+                            if (liveRemaining.isEmpty()) {
+                                justDeselected = false;
+                                usedThisTurn.clear();
+                                MatchRunner.inject(gameState,
+                                    new ClientCommandEndTurn(game.getTurnMode(), null));
+                                break;
+                            }
                             com.fumbbl.ffb.ai.parity.heuristic.ActivationChoice.Decision hd =
-                                activation.chooseActivation(game, eligibleFor(game, remaining));
+                                activation.chooseActivation(game, eligibleFor(game, liveRemaining));
                             if (hd.player == null) {
                                 justDeselected = false;
                                 usedThisTurn.clear();

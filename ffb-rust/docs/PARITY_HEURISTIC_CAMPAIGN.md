@@ -2684,3 +2684,54 @@ so a victim who went down *during* the acting team's own turn never appears in i
 recomputes legality live. The snapshot is a harness artifact, not engine behaviour: the Java engine
 would allow that foul. Refresh the action list live inside `eligibleFor` only — `filterStaleActions`
 must keep its snapshot semantics on the random path, where `idx % N` alignment depends on it.
+
+## ITER46 — the eligible list was a turn-start photograph
+
+The divergence ITER45 left root-caused, fixed. At seed 1 step 110 Rust offered a foul
+(`home_03` on `away_01`) that Java did not offer **at all** — Java had no foul candidate there, so
+this was never a scoring difference.
+
+The harness computes `eligibleThisTurn = computeEligiblePlayers(game)` **once, when the turn
+starts**, and every activation that turn is picked from that list. Rust reads `eligible_players`
+straight off the engine's `ActivatePlayer` prompt, which the engine recomputes for every activation.
+The two agree until the board changes *during* the acting team's own turn — and knocking an opponent
+down is precisely that. After a home block puts `away_01` on the ground, FOUL becomes legal for all
+his neighbours; the engine says so, Rust sees it, and Java is still reading a photograph taken
+before the block.
+
+The snapshot is not wrong for the random path — it is load-bearing there. That agent picks with
+`idx % N` against a shared stream, so the list must not change size mid-turn or the two sides
+desynchronise. The heuristic consumes no RNG at this point, so it can afford the truth. The live
+recompute is therefore scoped to the `activation != null` branch, and `filterStaleActions` keeps its
+snapshot semantics everywhere else.
+
+`computeEligiblePlayers` is a pure function of the current game state, so calling it again is
+exactly what the engine would report.
+
+### On the missing unit test
+
+This fix has none, and it is worth saying why rather than inventing a vacuous one. The property
+being fixed — *the activation loop reads the list live instead of reusing a field* — is control flow
+in a 60-line loop, not the return value of any function. `computeEligiblePlayers` itself was already
+correct and unchanged. Extracting the action menu into a pure, testable function is the right shape
+(it is how `Reach`, `BallMoves` and `MoveReplay` became testable in this campaign), but that menu is
+~120 lines of skill-property lookups feeding the byte-matched random contract, and refactoring it to
+buy a test for a fix elsewhere is a poor trade inside one iteration. The `ffb-ai` test tree also has
+no live-`Game` scaffolding; `HeadlessGameSetup.create` could provide it and is the obvious thing to
+build when a fix actually needs it.
+
+What proves this fix is the sweep: **seed 1's first divergence moved from step 139 to step 185**,
+crossing into the second half.
+
+### Gates
+
+- `--heur-classes all` bb2025 argmax: **0/20**; seed 1 at **step 185** (was 139), seeds 2 and 3
+  unchanged at steps 12 and 72.
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,655 / 0** (no Rust change). `mvn -o -pl ffb-ai test`:
+  **29 / 0**. The two Java trees agree.
+
+**Next:** seed 2 step 12 is now the shallowest frontier and the cheapest to trace — Java declares
+`Activate(Home9, MOVE)` against Rust's `Activate(home_09, Move)`, same player and same action, so
+the pre-state hashes already differ and the real divergence is earlier in that game.
