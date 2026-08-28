@@ -78,11 +78,18 @@ public final class ActivationChoice {
         public final String player;
         public final String action;
         public final String target;
+        /** What the activation is FOR; the follow-up prompts replay this instead of re-deciding. */
+        public final PlanBuilder.Kind kind;
+        /** Destination cell for a move-shaped plan, else null. */
+        public final Integer dest;
 
-        public Decision(String player, String action, String target) {
+        public Decision(String player, String action, String target, PlanBuilder.Kind kind,
+                Integer dest) {
             this.player = player;
             this.action = action;
             this.target = target;
+            this.kind = kind;
+            this.dest = dest;
         }
     }
 
@@ -127,7 +134,7 @@ public final class ActivationChoice {
             int turnNr, boolean teamReRoll, String awaitingRun, Set<String> usedThisTurn,
             boolean home, boolean bb2016, boolean blizzard) {
         if (eligible.isEmpty()) {
-            return new Decision(null, null, null);
+            return new Decision(null, null, null, null, null);
         }
         boolean anyUnused = false;
         for (Eligible e : eligible) {
@@ -140,7 +147,7 @@ public final class ActivationChoice {
         // is how the driver livelocks: an activation that ends without moving leaves the engine's
         // eligible list unchanged, so `usedThisTurn` is the only thing that makes progress.
         if (!anyUnused) {
-            return new Decision(null, null, null);
+            return new Decision(null, null, null, null, null);
         }
 
         // ---- tier 1: search-free proxy for every eligible player ----
@@ -169,7 +176,7 @@ public final class ActivationChoice {
             weights.add(w);
         }
         if (live.isEmpty()) {
-            return new Decision(null, null, null);
+            return new Decision(null, null, null, null, null);
         }
 
         // Rank to decide who gets a SEARCH. The candidate list itself stays in canonical order.
@@ -247,7 +254,7 @@ public final class ActivationChoice {
             }
         }
         if (out.isEmpty()) {
-            return new Decision(null, null, null);
+            return new Decision(null, null, null, null, null);
         }
 
         List<Activation.Option> options = new ArrayList<>();
@@ -256,9 +263,9 @@ public final class ActivationChoice {
         }
         int pick = Activation.chooseCandidate(sampler, options);
         if (pick >= out.size()) {
-            return new Decision(null, null, null); // EndTurn
+            return new Decision(null, null, null, null, null); // EndTurn
         }
         PlanBuilder.Candidate c = out.get(pick);
-        return new Decision(c.player, moveVariant(c.pac), c.target);
+        return new Decision(c.player, moveVariant(c.pac), c.target, c.kind, c.dest);
     }
 }

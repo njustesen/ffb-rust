@@ -2475,3 +2475,48 @@ take for a class whose first measurement is 0.
 - `cargo test --workspace --release`: 14,655 / 0. `mvn -o -pl ffb-ai test`: 28 / 0.
 
 **Next:** seed 1 step 9 — the first divergence that is not a wiring mistake.
+
+## ITER42 — the plan was never recorded, and block targets sort by COORDINATE
+
+Three defects, all on the Java side, all found by comparing what the two agents actually did rather
+than by re-reading the port.
+
+**1. The plan was never recorded.** `chooseActivation` returned a decision and threw away what the
+decision was FOR, so `activation.plan()` was always null and `replayMove` re-planned from scratch on
+every movement prompt. `ActivationChoice.Decision` now carries the `Kind` and the destination, and
+the driver calls `recordPlan`.
+
+**2. Phase 2 re-picked the block target at random.** The heuristic chose a victim when it declared
+the block; `sendBlockAction` then ignored it, ran `pickBlockTarget`, and spent an `actionRng` draw
+the Rust side does not spend. Same declaration on both sides, different defender.
+
+**3. Block targets sort by COORDINATE; blitz foes sort CANONICALLY.** This is the instructive one.
+Rust's `legal_block_targets` and `legal_foul_targets` both sort by `(x, y)` — the comment says
+"Java `pickBlockTarget` sorts by (x, y) before picking — match that order" — while `build_plans`'
+blitz branch sorts its foes with `canon_key`. The two orderings are deliberately different, and
+sorting both canonically swapped the victims:
+
+```
+seed 1, identical board:  Java away_01 blocks home_01
+                          Rust away_01 blocks home_02
+```
+
+A single sort comparator, in a helper that looked like it should obviously be canonical because
+every OTHER ordering in this campaign is. The rule that has held all campaign — never order by
+player id — made the wrong answer look like the right one here, because coordinate order is neither
+id order nor canonical order.
+
+### Where the frontier is
+
+`--heur-classes all`, bb2025 argmax: still **0/20**, but seed 1 now diverges at **step 12** (was 9,
+was 0 before ITER41). Six defects in two iterations, and each one moves the frontier a few steps
+further. The failures are localised and the diagnosis loop is short — a probe on each side, one
+comparison, one fix.
+
+### Gates
+
+- Fourteen-class rung: **100/100 in all three editions** at argmax.
+- `--agent random`: **100/100** in all three editions.
+- `cargo test --workspace --release`: 14,655 / 0. `mvn -o -pl ffb-ai test`: 28 / 0.
+
+**Next:** seed 1 step 12.

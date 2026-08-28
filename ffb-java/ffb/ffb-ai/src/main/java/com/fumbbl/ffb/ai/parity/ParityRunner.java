@@ -2051,6 +2051,14 @@ public class ParityRunner {
     }
 
     private void sendBlockAction(Game game, GameState gameState, String playerId) {
+        // The heuristic already CHOSE the victim when it declared the block; re-picking here would
+        // both ignore that choice and spend an actionRng draw the Rust side does not spend. This
+        // is what step 8 of seed 1 was: the same declaration on both sides, a different defender.
+        if (activation != null && heuristicTarget != null) {
+            MatchRunner.inject(gameState, new ClientCommandBlock(playerId, heuristicTarget,
+                false, false, false, false, false));
+            return;
+        }
         Player<?> target = pickBlockTarget(game, playerId);
         if (target == null) {
             MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));

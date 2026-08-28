@@ -90,6 +90,22 @@ public final class ActivationDriver {
         return m != null && m.getClass().getName().contains("bb2016");
     }
 
+    /** The enumeration's kind, as the replay state machine names it. */
+    private static MoveReplay.Kind kindOf(PlanBuilder.Kind k) {
+        if (k == null) {
+            return MoveReplay.Kind.MOVE;
+        }
+        switch (k) {
+            case PICKUP: return MoveReplay.Kind.PICKUP;
+            case BLITZ: return MoveReplay.Kind.BLITZ;
+            case FOUL: return MoveReplay.Kind.FOUL;
+            case PASS: return MoveReplay.Kind.PASS;
+            case HAND_OFF: return MoveReplay.Kind.HAND_OFF;
+            case IMMEDIATE: return MoveReplay.Kind.IMMEDIATE;
+            default: return MoveReplay.Kind.MOVE;
+        }
+    }
+
     private static int turnOf(Game game) {
         return game.isHomePlaying() ? game.getTurnDataHome().getTurnNr()
             : game.getTurnDataAway().getTurnNr();
@@ -123,6 +139,12 @@ public final class ActivationDriver {
         // A ball move is the reason the receiver must be the next one activated.
         if ("HandOffMove".equals(d.action) || "PassMove".equals(d.action)) {
             awaitingRun = d.target;
+        }
+        // Record what the activation is FOR, so the movement prompts replay it instead of
+        // re-deciding. Without this the plan is always null and every move re-plans from scratch.
+        ValueModel.Mover m = moverOf(game, f, d.player);
+        if (m != null) {
+            recordPlan(game, d.player, kindOf(d.kind), d.dest, d.target, m, teamReRoll);
         }
         return d;
     }
@@ -271,8 +293,15 @@ public final class ActivationDriver {
             return game.isHomePlaying() ? game.getTeamAway() : game.getTeamHome();
         }
 
+        /**
+         * @param canonicalOrder BLITZ enumerates its foes in canonical {@code (side, nr)} order,
+         *     while BLOCK and FOUL take theirs from {@code legal_block_targets} /
+         *     {@code legal_foul_targets}, which sort by COORDINATE. The two are deliberately
+         *     different in Rust and sorting both the same way swaps the victims: seed 1 had
+         *     away_01 blocking home_01 in Java and home_02 in Rust from the identical board.
+         */
         private List<PlanBuilder.BlockTarget> foes(String playerId, boolean adjacentOnly,
-                boolean fouls) {
+                boolean fouls, boolean canonicalOrder) {
             FieldModel fm = game.getFieldModel();
             FieldCoordinate here = coordOf(game, playerId);
             List<PlanBuilder.BlockTarget> out = new ArrayList<>();
@@ -298,15 +327,20 @@ public final class ActivationDriver {
                 float w = fouls ? 0.0f : blockWeight(playerId, o.getId(), attStr);
                 out.add(new PlanBuilder.BlockTarget(o.getId(), oc, w));
             }
-            // Canonical order: home before away, then jersey number. Never the id.
-            out.sort((a, b) -> {
-                Player<?> pa = game.getPlayerById(a.id);
-                Player<?> pb = game.getPlayerById(b.id);
-                int sa = game.getTeamHome().hasPlayer(pa) ? 0 : 1;
-                int sb = game.getTeamHome().hasPlayer(pb) ? 0 : 1;
-                return sa != sb ? Integer.compare(sa, sb)
-                    : Integer.compare(pa.getNr(), pb.getNr());
-            });
+            if (canonicalOrder) {
+                out.sort((a, b) -> {
+                    Player<?> pa = game.getPlayerById(a.id);
+                    Player<?> pb = game.getPlayerById(b.id);
+                    int sa = game.getTeamHome().hasPlayer(pa) ? 0 : 1;
+                    int sb = game.getTeamHome().hasPlayer(pb) ? 0 : 1;
+                    return sa != sb ? Integer.compare(sa, sb)
+                        : Integer.compare(pa.getNr(), pb.getNr());
+                });
+            } else {
+                out.sort((a, b) -> a.at.getX() != b.at.getX()
+                    ? Integer.compare(a.at.getX(), b.at.getX())
+                    : Integer.compare(a.at.getY(), b.at.getY()));
+            }
             return out;
         }
 
@@ -366,17 +400,17 @@ public final class ActivationDriver {
 
         @Override
         public List<PlanBuilder.BlockTarget> blockTargets(String playerId) {
-            return foes(playerId, true, false);
+            return foes(playerId, true, false, false);
         }
 
         @Override
         public List<PlanBuilder.BlockTarget> blitzFoes(String playerId) {
-            return foes(playerId, false, false);
+            return foes(playerId, false, false, true);
         }
 
         @Override
         public List<PlanBuilder.BlockTarget> foulTargets(String playerId) {
-            return foes(playerId, true, true);
+            return foes(playerId, true, true, false);
         }
 
         @Override
