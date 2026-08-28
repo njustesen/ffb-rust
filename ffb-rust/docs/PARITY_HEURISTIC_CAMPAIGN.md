@@ -3519,3 +3519,60 @@ port is suspect" — the port being right is what exposed this.
 **Next:** re-compare the three red lists — 3/3/14 now, and if bb2020 and bb2025 still share their
 remaining three, that is one more shared cause. bb2016's 14 are its own problem and are the bulk of
 what is left.
+
+## ITER63 — the foul re-picked its own victim: bb2020 reaches 100/100
+
+**bb2020 argmax: 97 → 100/100 — the first edition to go green on the full class set.**
+bb2025 97 → 99/100, bb2016 86 → 87/100.
+
+The red lists after ITER62 left two shared seeds (14 and 32, identical steps in both editions). Took
+seed 14. Both sides foul with `away_07` at step 178 on the same dice — and a *different victim* ends
+up KO'd: Java `home_11`, Rust `home_03`.
+
+Diffing the foul candidates across every decision in the game showed them **identical** until
+decision 192, long after the divergence. That is what pointed at the delivery rather than the
+weights: both agents scored the same options and picked the same one, and the harness then fouled
+someone else.
+
+`sendFoulAction` re-picked the victim with `actionRng` from its own coordinate-sorted list, ignoring
+`heuristicTarget` — the same defect `sendBlockAction` had fixed back at ITER45 and the bb2016 blitz
+at ITER50.
+
+**Applying ITER57's lesson, I checked the whole class before fixing one member:**
+
+| sender | honours `heuristicTarget` | reachable by the heuristic |
+|---|---|---|
+| `sendBlockAction` | yes | yes |
+| `sendFoulAction` | **no** | **yes** ← the bug |
+| `sendPassAction` | no | no — ITER49 routes ball actions via `sendMoveAction`/`sendPlanTerminal` |
+| `sendHandOverAction` | no | no — same |
+| `sendThrowTeamMateAction` | no | no — no TTM on a lineman roster |
+| `sendBlitzTargetSelection` | n/a | yes, via its own plan replay |
+
+So exactly one arm needed fixing, and the other four are unreachable rather than latent — which is
+worth knowing, because two of them will become reachable the moment the campaign moves past lineman
+rosters.
+
+### Regression test
+
+None, for the same reason as ITER46 and ITER50: the property is which branch a dispatcher takes,
+and the `ffb-ai` test tree has no live-`Game` scaffolding. The table above is the guard that
+actually applies here — a mechanical check over the whole class rather than a test of the one
+member — and the sweep is the evidence.
+
+### Gates
+
+| | argmax | scale 1.0 | scale 1e6 |
+|---|---|---|---|
+| bb2025 | 99 | 99 | 93 |
+| bb2020 | **100** | 97 | 96 |
+| bb2016 | 87 | 83 | 85 |
+
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,663 / 0** (no Rust change). `mvn -o -pl ffb-ai test`:
+  **34 / 0**. The two Java trees agree.
+
+**Next:** bb2025 has ONE red left at argmax and one at scale 1.0 — take it. bb2016's 13 and the
+sampled-gate gaps are what remains after that. Note that argmax, 1.0 and 1e6 no longer move
+together: 1e6 is now the weakest column in two editions, and the goal needs all three.

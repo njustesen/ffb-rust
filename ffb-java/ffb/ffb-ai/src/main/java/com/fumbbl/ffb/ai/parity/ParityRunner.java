@@ -2164,6 +2164,20 @@ public class ParityRunner {
      * Rust PlayerState::can_be_fouled), coordinate-sorted, 1 actionRng pick.
      */
     private void sendFoulAction(Game game, GameState gameState, String playerId) {
+        // The heuristic already CHOSE the victim when it declared the foul -- exactly as for a
+        // block, and `sendBlockAction` has honoured that since ITER45. This arm was missed, so it
+        // re-picked with `actionRng` from its own coordinate-sorted list and fouled a different
+        // player than the agent scored. The two candidate lists were IDENTICAL at the diverging
+        // decision, which is what pointed here rather than at the weights (bb2025 seed 14 step
+        // 178: Java KO'd home_11 and Rust home_03, from the same foul).
+        //
+        // `sendPassAction` / `sendHandOverAction` re-pick too, but ITER49 routed the heuristic's
+        // ball actions through `sendMoveAction` and `sendPlanTerminal`, so it never reaches them;
+        // the blitz has its own plan replay in `sendBlitzTargetSelection`.
+        if (activation != null && heuristicTarget != null) {
+            MatchRunner.inject(gameState, new ClientCommandFoul(playerId, heuristicTarget, false));
+            return;
+        }
         FieldModel fm = game.getFieldModel();
         FieldCoordinate coord = playerCoordinate(game, playerId);
         if (coord == null) {
