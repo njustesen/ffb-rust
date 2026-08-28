@@ -1929,9 +1929,18 @@ public class ParityRunner {
                 com.fumbbl.ffb.model.TargetSelectionState tss = game.getFieldModel().getTargetSelectionState();
                 if (!blitzBlockSent && tss != null && tss.getSelectedPlayerId() != null) {
                     blitzBlockSent = true;
+                    if (activation != null && activation.plan() != null) {
+                        activation.markFired();
+                    }
                     if (DEBUG) System.err.println("JAVA_BLITZ_BLOCK pid=" + pid + " def=" + tss.getSelectedPlayerId());
                     MatchRunner.inject(gameState, new ClientCommandBlock(
                         pid, tss.getSelectedPlayerId(), false, false, false, false, false));
+                } else if (activation != null) {
+                    // A blitz is the ONE plan with something legitimate left after its terminal
+                    // action: `replay_plan` returns Replan for a fired blitz precisely so the
+                    // blitzer spends his remaining movement. Confirming here ends the activation a
+                    // move early, which is what seed 1 step 11 was.
+                    sendMoveAction(game, gameState, pid);
                 } else {
                     if (DEBUG) System.err.println("JAVA_BLITZ_END pid=" + pid + " sent=" + blitzBlockSent);
                     MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandConfirm());
@@ -1980,6 +1989,28 @@ public class ParityRunner {
     private void sendBlitzTargetSelection(Game game, GameState gameState) {
         ActingPlayer ap = game.getActingPlayer();
         String pid = (ap != null) ? ap.getPlayerId() : null;
+        // A blitz declared by the ACTIVATION already chose its victim: Rust's BlitzTarget arm
+        // consults the plan first and returns that victim WITHOUT sampling. Re-scoring here would
+        // both risk a different victim and spend a sampler draw the Rust side does not spend --
+        // which desynchronises everything downstream, not just this choice.
+        if (pid != null && activation != null && activation.plan() != null
+            && activation.plan().kind
+                == com.fumbbl.ffb.ai.parity.heuristic.MoveReplay.Kind.BLITZ
+            && pid.equals(activation.plan().player)
+            && activation.plan().target != null) {
+            Player<?> victim = game.getPlayerById(activation.plan().target);
+            FieldCoordinate vc = (victim != null)
+                ? game.getFieldModel().getPlayerCoordinate(victim) : null;
+            // Rust checks the victim is still ON THE PITCH before replaying him; if he is gone the
+            // arm falls through to its scored enumeration.
+            if (vc != null && com.fumbbl.ffb.ai.parity.heuristic.Features.onPitch(vc.getX(),
+                    vc.getY())) {
+                MatchRunner.inject(gameState,
+                    new com.fumbbl.ffb.net.commands.ClientCommandTargetSelected(
+                        activation.plan().target));
+                return;
+            }
+        }
         // The heuristic agent SCORES the blitz target (Rust `AgentPrompt::BlitzTarget`, T = 0.15)
         // when the `blitztarget` class is on. It must NOT fall through to pickBlockTarget, which
         // would spend an actionRng draw the Rust side does not spend in that configuration.

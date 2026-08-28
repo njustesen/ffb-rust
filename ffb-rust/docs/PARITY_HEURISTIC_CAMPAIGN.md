@@ -2520,3 +2520,42 @@ comparison, one fix.
 - `cargo test --workspace --release`: 14,655 / 0. `mvn -o -pl ffb-ai test`: 28 / 0.
 
 **Next:** seed 1 step 12.
+
+## ITER43 — the blitz: a victim already chosen, and a move still owed
+
+Two defects, both about a blitz being a TWO-part plan that the harness was treating as one.
+
+**1. The blitz victim was re-scored instead of replayed.** Rust's `BlitzTarget` arm consults the
+plan FIRST and returns its victim without sampling — the activation already decided who to hit.
+Java went on calling the ITER18 scored path, which risks a different victim and, worse, spends a
+sampler draw the Rust side does not spend. A draw-count difference desynchronises everything
+downstream, not just the choice it belongs to. Now replayed from the plan, with Rust's
+still-on-the-pitch check preserved so a vanished victim still falls through to the scored
+enumeration.
+
+**2. The blitzer was denied his remaining movement.** The harness blocked and then sent `CONFIRM`,
+ending the activation. But a blitz is the ONE plan with something legitimate left after its terminal
+action — `replay_plan` returns `Replan` for a fired blitz precisely so the blitzer spends the rest of
+his move — and Rust's event stream shows exactly that: `block away_01`, pushback, then
+`playerMoved home_01 → (11,6)`. Confirming there ends the activation a move early.
+
+Both are the same shape of mistake: the harness's blitz path was written for an agent that had no
+plan, so it re-derived what the plan already knew and stopped where a planless agent would.
+
+### Where the frontier is
+
+The first differing STATE moved from `i = 10` to **`i = 13`**. The blitzer now blocks the right
+victim and does move afterwards — he just lands on (11,7) where Rust lands on (11,6), which is the
+next thing to chase (a follow-up versus a post-block move). The reported failing STEP is still 12,
+because a step is only logged at an activation boundary while the state diverges inside one.
+
+Worth noting for the next iteration: the step number and the state index move at different
+granularities, and the state index is the finer signal.
+
+### Gates
+
+- Fourteen-class rung: **100/100 in all three editions** at argmax.
+- `--agent random`: **100/100** in all three editions.
+- `mvn -o -pl ffb-ai test`: 28 / 0.
+
+**Next:** home_01 landing on (11,7) rather than (11,6) after the blitz.
