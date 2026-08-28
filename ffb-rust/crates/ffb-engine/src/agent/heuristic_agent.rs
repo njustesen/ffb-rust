@@ -6072,6 +6072,86 @@ mod tests {
         eprintln!("wrote {path}");
     }
 
+    /// `replay_plan` — the plan-replay state machine — as an EXHAUSTIVE fixture.
+    ///
+    /// Every other golden in this campaign samples: a handful of boards chosen to reach the
+    /// branches that matter, with a bite-check to confirm they do. Twice that sampling has been
+    /// caught missing a branch (ITER27, ITER33) and once it was caught grading its own homework
+    /// (ITER36).
+    ///
+    /// This one does not sample. The input space is ten booleans, seven plan kinds and seven
+    /// relevant player actions, so all **50,176** combinations fit in one file — 49 lines of 1024
+    /// verdicts, one character each. There is no branch it can miss, and no board to choose badly.
+    ///
+    /// Worth doing here specifically because the state machine is the piece with the most exits
+    /// (seven) and the least structure: nothing about it suggests which combinations are
+    /// interesting, so any sample would be a guess.
+    ///
+    /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_replay_golden -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_replay_golden() {
+        use std::fmt::Write as _;
+
+        let kinds: [(&str, PlanKind); 7] = [
+            ("Move", PlanKind::Move),
+            ("Pickup", PlanKind::Pickup),
+            ("Immediate", PlanKind::Immediate),
+            ("Blitz", PlanKind::Blitz { victim: "v".into() }),
+            ("Foul", PlanKind::Foul { victim: "v".into() }),
+            ("Pass", PlanKind::Pass { receiver: "r".into() }),
+            ("HandOff", PlanKind::HandOff { receiver: "r".into() }),
+        ];
+        // Every action the guards actually test, plus None and one that matches nothing.
+        let actions: [(&str, Option<PlayerAction>); 7] = [
+            ("None", None),
+            ("Move", Some(PlayerAction::Move)),
+            ("BlitzMove", Some(PlayerAction::BlitzMove)),
+            ("KickEmBlitz", Some(PlayerAction::KickEmBlitz)),
+            ("FoulMove", Some(PlayerAction::FoulMove)),
+            ("PassMove", Some(PlayerAction::PassMove)),
+            ("HandOverMove", Some(PlayerAction::HandOverMove)),
+        ];
+
+        let mut out = String::new();
+        writeln!(out, "# replay_plan EXHAUSTIVE golden -- heuristic_agent.rs and MoveReplay.java.").unwrap();
+        writeln!(out, "# row <kind> <pa_now> <1024 verdicts>").unwrap();
+        writeln!(out, "# Bit order, most significant first, over the 10-bit index of each verdict:").unwrap();
+        writeln!(out, "#   is_mine, path_empty, delivered, fired, has_blocked, has_fouled,").unwrap();
+        writeln!(out, "#   target_adjacent, target_on_pitch, squares_include_next, squares_empty").unwrap();
+        writeln!(out, "# Verdicts: D = DeliverPath, F = FireTerminal, E = EndPlayerAction, R = Replan").unwrap();
+
+        for (kname, kind) in &kinds {
+            for (aname, pa) in &actions {
+                let mut row = String::with_capacity(1024);
+                for bits in 0..1024u32 {
+                    let b = |shift: u32| (bits >> shift) & 1 == 1;
+                    let facts = ReplayFacts {
+                        pa_now: *pa,
+                        has_blocked: b(5),
+                        has_fouled: b(4),
+                        target_adjacent: b(3),
+                        target_on_pitch: b(2),
+                        squares_include_next: b(1),
+                        squares_empty: b(0),
+                    };
+                    let v = replay_plan(kind, b(9), b(8), b(7), b(6), &facts);
+                    row.push(match v {
+                        Replay::DeliverPath => 'D',
+                        Replay::FireTerminal => 'F',
+                        Replay::EndPlayerAction => 'E',
+                        Replay::Replan => 'R',
+                    });
+                }
+                writeln!(out, "row {kname} {aname} {row}").unwrap();
+            }
+        }
+
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/agent/testdata/replay_golden.txt");
+        std::fs::write(path, out).unwrap();
+        eprintln!("wrote {path}");
+    }
+
     /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_sampler_golden -- --ignored`
     #[test]
     #[ignore]

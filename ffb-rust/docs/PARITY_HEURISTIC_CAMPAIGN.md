@@ -2350,3 +2350,45 @@ end-of-game hashes before and after the extraction. Identical on all ten. Plus
 
 **Next:** port `replay_plan` to Java against a table-driven golden, then wire both `activate` and
 `move` into `ParityRunner` together and run the first live gate.
+
+## ITER39 — `replay_plan` in Java, pinned EXHAUSTIVELY
+
+Every other golden in this campaign samples: a handful of boards chosen to reach the branches that
+matter, with a deliberate perturbation to confirm they do. **Three times that check found the sample
+was not adequate** — ITER27 (a `strength_factor` branch no board reached), ITER33 (two rung pairs,
+one of them unobservable in principle), ITER36 (a fixture wired to its own expected output).
+
+This one does not sample. `replay_plan`'s input space is ten booleans × seven plan kinds × seven
+relevant player actions, so all **50,176** combinations fit in one 55 KB file — 49 rows of 1024
+verdicts, one character each — and `MoveReplayTest` walks every one. There is no branch it can miss
+and no board chosen badly.
+
+Worth doing here specifically: the state machine has seven exits and nothing about its shape
+suggests which combinations are interesting, so any sample would have been a guess. Where exhaustive
+enumeration is affordable, it removes the question rather than answering it.
+
+All 50,176 matched on the first run.
+
+### The bite-check, on the case the comment warned about
+
+Perturbing the preserved asymmetry — gating `terminalPending` on "is this MY plan", the obvious
+cleanup that ITER38's comment explicitly flagged — fails immediately, and names the input in full:
+
+```
+Blitz/None: isMine=false pathEmpty=false delivered=false fired=false blocked=false
+  fouled=false adjacent=false onPitch=false includesNext=false squaresEmpty=true
+  ==> expected: <R> but was: <E>
+```
+
+A sampled fixture would have had to guess that `isMine=false` with a blitz plan and an empty square
+list was worth a board.
+
+### Gates
+
+- `mvn -o -pl ffb-ai test`: **28 tests, 0 failures**.
+- `cargo test --workspace --release`: **14,655 / 0**.
+- Fourteen-class rung **100/100 in all three editions** at argmax.
+
+**Next:** the wiring. `ParityRunner` gets the activation branch and the move-replay branch together
+— they are one unit, since the plan is set by one and consumed by the other — and then
+`--heur-classes activate,move` goes live for the first real gate.
