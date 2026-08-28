@@ -4295,6 +4295,212 @@ mod tests {
         eprintln!("wrote {path}");
     }
 
+    /// `value_at` — the per-square value model — as a cross-language fixture.
+    ///
+    /// This is where the agent decides what the board is WORTH, and it is the last piece before
+    /// `build_plans`. Everything it reads has already been pinned (`Features` in ITER24/25,
+    /// `Reach` in ITER26); what is new here is the arithmetic on top, and it branches hard:
+    ///
+    /// - a CARRIER scores by advance, urgency and whether the endzone is reachable at all in the
+    ///   turns the half has left (the `HOPELESS_DAMP` residual);
+    /// - a mover standing on a LOOSE ball is a pickup, valued by the pickup roll;
+    /// - everyone else is valued by the support raster, unless he is a plausible RECEIVER — ahead
+    ///   of the ball, in throwing range, and able to run the rest in next turn.
+    ///
+    /// Each of those is a different formula, and the receiver branch in particular has three
+    /// conditions that all have to agree or the intent fires on the wrong half of the pitch.
+    ///
+    /// Emitted for every square and every mover, so the branch selection is pinned by the `rule`
+    /// column as well as the value: two implementations can agree on a number while disagreeing
+    /// about WHY, and that disagreement shows up the moment the board changes.
+    ///
+    /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_value_golden -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_value_golden() {
+        use std::fmt::Write as _;
+        use ffb_model::enums::{PlayerState, PS_STANDING, Rules};
+        use ffb_model::model::player::Player;
+
+        // (is_home, nr, x, y)
+        type Board = &'static [(bool, i32, i32, i32)];
+        // (home, is_carrier, ma, ag, str, sure_hands, side_step, has_catch, d_now, turns_left,
+        //  unactivated)
+        type M = (bool, bool, i32, i32, i32, bool, bool, bool, i32, i32, f32);
+
+        let cases: [(&str, Board, Option<(i32, i32)>, bool, &[(&str, M)]); 4] = [
+            (
+                // A carrier with room, and the same board seen by a non-carrier team-mate who is
+                // AHEAD of the ball -- which is what switches the receiver branch on.
+                "carrier_and_receiver",
+                &[
+                    (true, 1, 8, 7, ), (true, 2, 14, 7), (true, 3, 8, 9),
+                    (false, 1, 12, 6), (false, 2, 12, 8), (false, 3, 16, 7),
+                ],
+                Some((8, 7)), false,
+                &[
+                    ("carrier", (true, true, 6, 3, 3, false, false, false, 17, 8, 1.0)),
+                    ("receiver_ahead", (true, false, 6, 3, 3, false, false, true, 17, 8, 1.0)),
+                    ("receiver_no_catch", (true, false, 6, 3, 3, false, false, false, 17, 8, 1.0)),
+                    ("away_defender", (false, false, 6, 3, 3, false, false, false, 8, 8, 1.0)),
+                ],
+            ),
+            (
+                // A LOOSE ball: the pickup branch, with and without Sure Hands, and under a tackle
+                // zone so the pickup target is not the bare AG.
+                "loose_ball",
+                &[
+                    (true, 1, 10, 7), (false, 1, 11, 7), (false, 2, 11, 8),
+                ],
+                Some((10, 8)), true,
+                &[
+                    ("plain", (true, false, 6, 3, 3, false, false, false, 15, 8, 1.0)),
+                    ("sure_hands", (true, false, 6, 3, 3, true, false, false, 15, 8, 1.0)),
+                ],
+            ),
+            (
+                // A carrier who CANNOT reach the endzone in the turns left: `HOPELESS_DAMP`. Also
+                // Side Step, which changes the sideline penalty from 0.25 to 1.0.
+                "hopeless_and_sidestep",
+                &[(true, 1, 2, 7), (false, 1, 20, 7)],
+                Some((2, 7)), false,
+                &[
+                    ("hopeless", (true, true, 6, 3, 3, false, false, false, 23, 1, 1.0)),
+                    ("hopeless_sidestep", (true, true, 6, 3, 3, false, true, false, 23, 1, 1.0)),
+                    ("plenty_of_time", (true, true, 6, 3, 3, false, false, false, 23, 8, 1.0)),
+                ],
+            ),
+            (
+                // Mixed strength on the board, so `exposure`'s `strength_factor` is not the
+                // identity: an ST 5 threat prices a square very differently for an ST 3 mover than
+                // for an ST 5 one.
+                "strength_factor",
+                // away_03 is ST 3 and stands well clear of the other two, so the squares around
+                // HIM carry threat_str 3 -- which is the only way an ST 7 mover can reach the
+                // `2 * att < def` branch. With only ST 5 and ST 4 threats on the board that branch
+                // is unreachable however strong the mover is.
+                &[(true, 1, 10, 7), (false, 1, 12, 7), (false, 2, 12, 9), (false, 3, 4, 3)],
+                None, false,
+                &[
+                    // `strength_factor(att, def)` takes the THREAT as `att` and the MOVER as
+                    // `def`, so covering all five branches needs movers on both sides of the
+                    // threats: ST 2 against an ST 5 threat gives 1.4, ST 7 against the default
+                    // ST 3 gives 0.5, and the middle three fall out of 3 / 5 / equal. A fixture
+                    // without the extremes silently skips two branches -- which is exactly what
+                    // this one did until perturbing the 0.5 constant failed to break it.
+                    // `strength_factor(att, def)` takes the THREAT as `att` and the MOVER as
+                    // `def`, so all five branches need movers on BOTH sides of the threats: ST 2
+                    // against an ST 5 threat gives 1.4, and ST 7 against the default ST 3 gives
+                    // 0.5. Without the extremes the fixture silently skips two branches -- which
+                    // is what it did, and perturbing the 0.5 constant proved it by NOT failing.
+                    ("st3", (true, false, 6, 3, 3, false, false, false, 15, 8, 1.0)),
+                    ("st5", (true, false, 6, 3, 5, false, false, false, 15, 8, 1.0)),
+                    ("st1", (true, false, 6, 3, 1, false, false, false, 15, 8, 1.0)),
+                    ("st2_vs_st5", (true, false, 6, 3, 2, false, false, false, 15, 8, 1.0)),
+                    ("st7_outmuscles", (true, false, 6, 3, 7, false, false, false, 15, 8, 1.0)),
+                    ("st2_vs_st5", (true, false, 6, 3, 2, false, false, false, 15, 8, 1.0)),
+                    ("st7_outmuscles", (true, false, 6, 3, 7, false, false, false, 15, 8, 1.0)),
+                ],
+            ),
+        ];
+
+        let mut out = String::new();
+        writeln!(out, "# value_at golden -- heuristic_agent.rs and ValueModel.java.").unwrap();
+        writeln!(out, "# case <name>").unwrap();
+        writeln!(out, "# player <home|away> <nr> <x> <y> <st>").unwrap();
+        writeln!(out, "# ball <x> <y> <loose>   (absent when there is no ball)").unwrap();
+        writeln!(out, "# mover <name> <home> <carrier> <ma> <ag> <str> <sure_hands> <side_step> <catch> <d_now> <turns_left> <unact f32 bits>").unwrap();
+        writeln!(out, "# value <f32 bits per cell, 8 hex chars each>").unwrap();
+        writeln!(out, "# rule <one char per cell: T=Touchdown A=Advance P=Pickup S=Support ?=other>").unwrap();
+
+        for (name, board, ball, loose, movers) in cases {
+            // Give the away side mixed strength on the `strength_factor` board only; elsewhere
+            // everyone is ST 3 so the factor is the identity and the other terms are isolated.
+            let st_of = |is_home: bool, nr: i32| -> i32 {
+                if name == "strength_factor" && !is_home {
+                    match nr { 1 => 5, 2 => 4, _ => 3 }
+                } else {
+                    3
+                }
+            };
+            let mut home = crate::step::framework::test_team("home", 0);
+            let mut away = crate::step::framework::test_team("away", 0);
+            for &(is_home, nr, _, _) in board {
+                let p = Player {
+                    id: format!("{}_{:02}", if is_home { "home" } else { "away" }, nr),
+                    nr,
+                    movement: 6,
+                    strength: st_of(is_home, nr),
+                    agility: 3,
+                    armour: 8,
+                    ..Default::default()
+                };
+                if is_home { home.players.push(p) } else { away.players.push(p) }
+            }
+            let mut g = Game::new(home, away, Rules::Bb2025);
+            for &(is_home, nr, x, y) in board {
+                let id = format!("{}_{:02}", if is_home { "home" } else { "away" }, nr);
+                g.field_model.set_player_coordinate(&id, FieldCoordinate::new(x, y));
+                g.field_model
+                    .set_player_state(&id, PlayerState::new(PS_STANDING).change_active(true));
+            }
+            if let Some((bx, by)) = ball {
+                g.field_model.ball_coordinate = Some(FieldCoordinate::new(bx, by));
+                g.field_model.ball_in_play = true;
+                g.field_model.ball_moving = loose;
+            }
+            let f = Features::build(&g, positions_stamp(&g), true);
+
+            writeln!(out, "case {name}").unwrap();
+            for &(is_home, nr, x, y) in board {
+                writeln!(out, "player {} {nr} {x} {y} {}",
+                    if is_home { "home" } else { "away" }, st_of(is_home, nr)).unwrap();
+            }
+            if let Some((bx, by)) = ball {
+                writeln!(out, "ball {bx} {by} {loose}").unwrap();
+            }
+
+            for &(mname, mv) in movers {
+                let (home_, is_carrier, ma, ag, str_, sure_hands, side_step, has_catch, d_now,
+                     turns_left, unact) = mv;
+                let m = Mover {
+                    home: home_,
+                    is_carrier,
+                    ma,
+                    ag,
+                    str_,
+                    sure_hands,
+                    side_step,
+                    has_catch,
+                    d_now,
+                    turns_left,
+                    unactivated: unact,
+                };
+                writeln!(out, "mover {mname} {home_} {is_carrier} {ma} {ag} {str_} {sure_hands} {side_step} {has_catch} {d_now} {turns_left} {:08x}",
+                    unact.to_bits()).unwrap();
+                let mut vals = String::new();
+                let mut rules = String::new();
+                for i in 0..CELLS {
+                    let (v, rule) = value_at(&f, i, &m);
+                    let _ = write!(vals, "{:08x}", v.to_bits());
+                    rules.push(match rule {
+                        Rule::ScoreTouchdown => 'T',
+                        Rule::ScoreAdvance => 'A',
+                        Rule::Pickup => 'P',
+                        Rule::Support => 'S',
+                        _ => '?',
+                    });
+                }
+                writeln!(out, "value {vals}").unwrap();
+                writeln!(out, "rule {rules}").unwrap();
+            }
+        }
+
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/agent/testdata/value_golden.txt");
+        std::fs::write(path, out).unwrap();
+        eprintln!("wrote {path}");
+    }
+
     /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_sampler_golden -- --ignored`
     #[test]
     #[ignore]

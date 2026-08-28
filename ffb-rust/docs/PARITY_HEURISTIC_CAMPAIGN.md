@@ -1802,3 +1802,52 @@ both sides, but this fixture is not evidence that it agrees — only that nothin
 **Next:** the value model — `value_at` / `exposure` / `strength_factor` and the arrival weights that
 read `Reach`. That is the last thing between here and `build_plans`, and the same fixture treatment
 applies: dump Rust's per-square value for a fixed board and mover before anything is wired up.
+
+## ITER27 — `value_at`, and a bite-check that lied twice
+
+The value model: what a square is WORTH to a particular mover. `ValueModel.java` + `ValueModelTest`,
+pinned by `value_golden.txt` — four boards, sixteen movers, and for each the value of all 390 squares
+plus **the rule that produced it**.
+
+The rule column matters as much as the number. Three branches (carrier / pickup / support-or-receiver)
+are genuinely different formulas, and two implementations can agree on a value while disagreeing
+about which branch produced it — invisible until the board changes and the branches diverge. All four
+rule characters appear in the golden, and the test asserts each one actually fires.
+
+### The bite-check was wrong twice before it was right
+
+This is the part worth recording, because the failure mode was *silent* both times.
+
+1. **First attempt: the perturbation never landed.** The script that flipped `strengthFactor`'s 0.5
+   to 0.55 had no assert. It printed its success message unconditionally, replaced nothing, and the
+   test passed — which I read as "that branch is unreachable". It was a broken experiment reporting
+   a real-sounding result. Every perturbation script now asserts its target matched.
+2. **Second attempt: the branch really was unreachable, for a reason the first attempt hid.**
+   `strength_factor(att, def)` takes the THREAT as `att` and the MOVER as `def`, so `2 * att < def`
+   needs a mover more than twice as strong as the threat. Adding an ST 7 mover was still not enough:
+   the board's opponents were ST 5 and ST 4, and `threat_str` only holds 3 where NOBODY reaches —
+   and where nobody reaches, `threat_reach` is 0 and the factor is multiplied away.
+
+The fix is an isolated **ST 3** opponent standing well clear of the other two, so the squares around
+him carry `threat_str = 3` with a positive reach. Then the perturbation fails immediately:
+
+```
+ValueModelTest.valueAtMatchesRust value at (0,0) for strength_factor/st7_outmuscles
+  ==> expected: <0.014880952> but was: <0.014450868>
+```
+
+Generalisable: **a raster's default value is not observable wherever the raster's own gate is zero.**
+Covering a branch of `strength_factor` needed a board where the threat exists AND is weak, which is
+not what "add a strong mover" produces.
+
+### Gates
+
+- `mvn -o -pl ffb-ai test`: **19 tests, 0 failures**.
+- `cargo test --workspace --release`: **14,654 / 0**.
+- Fourteen-class rung still **100/100 in all three editions** at argmax. Nothing live changed —
+  `ValueModel.java` has no caller yet.
+
+**Next:** the arrival weights (`Arrival`, the signed weight of arriving at a square, which combines
+`Reach::p_arrive` with `value_at`) and then `build_plans`. After that the WIDE `ActivatePlayer` and
+`Move` arms can be wired up, and the live gate begins — which is where the remaining engine
+divergences are, since multi-square movement, GFI chains and scoring paths all go live at once.

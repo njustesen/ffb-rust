@@ -125,6 +125,16 @@ public final class Features {
         return x >= 0 && x <= XMAX && y >= 0 && y <= YMAX;
     }
 
+    /**
+     * Rust {@code carrier_at[side]}: where OUR carrier stands, per side.
+     *
+     * <p>Not "where the carrier stands" — it is null when the ball is held by the OTHER team, which
+     * is what makes the receiver and cage intents fire only for the side that actually has it.
+     */
+    public FieldCoordinate carrierAtFor(boolean home) {
+        return (carrierAt != null && carrierIsHome == home) ? carrierAt : null;
+    }
+
     public int tzAgainst(FieldCoordinate c, boolean home) {
         return tz[sideIdx(home)][ix(c.getX(), c.getY())] & 0xff;
     }
