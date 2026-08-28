@@ -1,0 +1,66 @@
+# receiver_of / handoff_weight / foul_weight golden.
+# case <name> <turn_nr> <d_now> <turns_left> <unact bits>
+# player <home|away> <nr> <x> <y> <standing|prone> <active|used> <ma> <ag> <st>
+# ball <x> <y>   (carried)
+# receiver <rcv nr> <from x> <from y> <pcatch>:<v>:<scoresnow>:<tts>:<turns>
+# handoff <rcv nr> <from x> <from y> <f32 bits, or - when None>
+# foul <def nr> <av> <off assists> <def assists> <f32 bits>
+case give_that_scores 3 11 5 3f800000
+player home 1 14 7 standing active 6 3 3
+player home 2 20 7 standing active 6 3 3
+player away 1 15 6 standing active 6 3 3
+ball 14 7
+receiver 2 14 7 3f555555:3f59999a:true:0:5
+handoff 2 14 7 3f355555
+receiver 2 15 7 3f555555:3f59999a:true:0:5
+handoff 2 15 7 3f355555
+receiver 2 14 8 3f555555:3f59999a:true:0:5
+handoff 2 14 8 3f355555
+foul 1 8 0 0 3db16297
+case receiver_already_acted 3 11 5 3f800000
+player home 1 14 7 standing active 6 3 3
+player home 2 20 7 standing used 6 3 3
+player away 1 15 6 standing active 6 3 3
+ball 14 7
+receiver 2 14 7 3f555555:3d8e0743:false:1:4
+handoff 2 14 7 bd89a4a0
+receiver 2 15 7 3f555555:3d8e0743:false:1:4
+handoff 2 15 7 bd89a4a0
+receiver 2 14 8 3f555555:3d5f8dbd:false:1:4
+handoff 2 14 8 bda2da48
+foul 1 8 0 0 3db16297
+case carrier_can_score_himself 3 5 5 3f800000
+player home 1 20 7 standing active 6 3 3
+player home 2 22 9 standing active 6 3 3
+player away 1 21 5 standing active 6 3 3
+ball 20 7
+receiver 2 20 7 3f555555:3d6177c7:false:0:5
+handoff 2 20 7 bda20e1a
+receiver 2 21 7 3f555555:3d6177c7:false:0:5
+handoff 2 21 7 bda20e1a
+receiver 2 20 8 3f555555:3d6177c7:false:0:5
+handoff 2 20 8 bda20e1a
+foul 1 8 0 0 3b82402c
+case foul_targets 3 15 5 3f800000
+player home 1 10 7 standing active 6 3 3
+player home 2 10 8 standing active 6 3 3
+player home 3 9 6 standing active 6 3 3
+player away 1 11 7 prone active 6 3 3
+player away 2 11 8 prone active 6 3 3
+player away 3 20 2 prone active 6 3 3
+ball 11 7
+receiver 2 10 7 3f555555:3d909090:false:2:5
+handoff 2 10 7 bd87878a
+receiver 2 11 7 3f555555:3d909090:false:2:5
+handoff 2 11 7 bd87878a
+receiver 2 10 8 3f555555:3d909090:false:2:5
+handoff 2 10 8 bd87878a
+receiver 3 10 7 3f555555:3d7cfcfb:false:2:5
+handoff 3 10 7 bd96969a
+receiver 3 11 7 3f555555:3d7cfcfb:false:2:5
+handoff 3 11 7 bd96969a
+receiver 3 10 8 3f555555:3d7cfcfb:false:2:5
+handoff 3 10 8 bd96969a
+foul 1 8 1 0 3e8945a6
+foul 2 8 1 0 3e25be7e
+foul 3 8 0 0 3b82402c

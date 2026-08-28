@@ -4828,6 +4828,207 @@ mod tests {
         eprintln!("wrote {path}");
     }
 
+    /// `receiver_of`, `handoff_weight` and `foul_weight` — the ball-move and foul prices — as a
+    /// cross-language fixture.
+    ///
+    /// `receiver_of` is the biggest single function in the plan layer and the one with the most
+    /// ways to be subtly wrong. It answers "what happens if this player ends up with the ball", and
+    /// the answer turns on four things that are easy to get one step out:
+    ///
+    /// - **`active`** — a receiver who still holds his activation can catch AND run this turn, and
+    ///   one who does not has `reach_after = 0` and a turn fewer. That is the difference between a
+    ///   touchdown and a token positional credit.
+    /// - **`effective_d`** — where the BALL ends up, not where the receiver stands: `d_rcv` minus
+    ///   what he can still cover. Using `d_rcv` alone silently prices every give as though the
+    ///   receiver never moved.
+    /// - **`scores_now`** — and its exclusion when the CARRIER could score by himself, which stops
+    ///   the agent throwing away a run it was already going to make.
+    /// - **`p_run_in`** — a five-way ladder on the receiver's own MA, with a GFI factor per rush.
+    ///
+    /// `foul_weight` is included because it reads the engine's real assist counts
+    /// (`find_offensive_foul_assists` / `find_defensive_foul_assists`), which both sides must call
+    /// rather than re-derive, and because its `victim` term is a three-way branch on where the ball
+    /// is.
+    ///
+    /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_ballmoves_golden -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_ballmoves_golden() {
+        use std::fmt::Write as _;
+        use ffb_model::enums::{PlayerState, PS_STANDING, PS_PRONE, Rules};
+        use ffb_model::model::player::Player;
+
+        // (is_home, nr, x, y, standing, active, ma, ag, st)
+        type P2 = (bool, i32, i32, i32, bool, bool, i32, i32, i32);
+        type Board = &'static [P2];
+
+        // (name, board, ball, turn_nr, carrier d_now, turns_left, unactivated)
+        let cases: [(&str, Board, Option<(i32, i32)>, i32, i32, i32, f32); 4] = [
+            (
+                // The give that scores: an ACTIVE receiver close enough to run it in, while the
+                // carrier himself cannot. Both halves of `scores_now` matter here.
+                "give_that_scores",
+                &[
+                    (true, 1, 14, 7, true, true, 6, 3, 3),
+                    (true, 2, 20, 7, true, true, 6, 3, 3),
+                    (false, 1, 15, 6, true, true, 6, 3, 3),
+                ],
+                Some((14, 7)), 3, 11, 5, 1.0,
+            ),
+            (
+                // Same board, but the receiver has ALREADY acted: reach_after collapses to 0, he
+                // gets a turn fewer, and the whole thing is worth a token credit instead.
+                "receiver_already_acted",
+                &[
+                    (true, 1, 14, 7, true, true, 6, 3, 3),
+                    (true, 2, 20, 7, true, false, 6, 3, 3),
+                    (false, 1, 15, 6, true, true, 6, 3, 3),
+                ],
+                Some((14, 7)), 3, 11, 5, 1.0,
+            ),
+            (
+                // The carrier can score by HIMSELF, so `scores_now` must be false for the receiver
+                // however good he looks -- otherwise the agent gives away a run it had already won.
+                "carrier_can_score_himself",
+                &[
+                    (true, 1, 20, 7, true, true, 6, 3, 3),
+                    (true, 2, 22, 9, true, true, 6, 3, 3),
+                    (false, 1, 21, 5, true, true, 6, 3, 3),
+                ],
+                Some((20, 7)), 3, 5, 5, 1.0,
+            ),
+            (
+                // Fouls: a PRONE victim next to the ball, one carrying it, and one far away --
+                // the three branches of the `victim` term -- with assists on both sides.
+                "foul_targets",
+                &[
+                    (true, 1, 10, 7, true, true, 6, 3, 3),
+                    (true, 2, 10, 8, true, true, 6, 3, 3),
+                    (true, 3, 9, 6, true, true, 6, 3, 3),
+                    (false, 1, 11, 7, false, true, 6, 3, 3),
+                    (false, 2, 11, 8, false, true, 6, 3, 3),
+                    (false, 3, 20, 2, false, true, 6, 3, 3),
+                ],
+                Some((11, 7)), 3, 15, 5, 1.0,
+            ),
+        ];
+
+        let mut out = String::new();
+        writeln!(out, "# receiver_of / handoff_weight / foul_weight golden.").unwrap();
+        writeln!(out, "# case <name> <turn_nr> <d_now> <turns_left> <unact bits>").unwrap();
+        writeln!(out, "# player <home|away> <nr> <x> <y> <standing|prone> <active|used> <ma> <ag> <st>").unwrap();
+        writeln!(out, "# ball <x> <y>   (carried)").unwrap();
+        writeln!(out, "# receiver <rcv nr> <from x> <from y> <pcatch>:<v>:<scoresnow>:<tts>:<turns>").unwrap();
+        writeln!(out, "# handoff <rcv nr> <from x> <from y> <f32 bits, or - when None>").unwrap();
+        writeln!(out, "# foul <def nr> <av> <off assists> <def assists> <f32 bits>").unwrap();
+
+        for (name, board, ball, turn_nr, d_now, turns_left, unact) in cases {
+            let mut home = crate::step::framework::test_team("home", 0);
+            let mut away = crate::step::framework::test_team("away", 0);
+            for &(is_home, nr, _, _, _, _, ma, ag, st) in board {
+                let p = Player {
+                    id: format!("{}_{:02}", if is_home { "home" } else { "away" }, nr),
+                    nr,
+                    movement: ma,
+                    strength: st,
+                    agility: ag,
+                    armour: 8,
+                    ..Default::default()
+                };
+                if is_home { home.players.push(p) } else { away.players.push(p) }
+            }
+            let mut g = Game::new(home, away, Rules::Bb2025);
+            g.turn_data_home.turn_nr = turn_nr;
+            g.turn_data_away.turn_nr = turn_nr;
+            for &(is_home, nr, x, y, standing, active, _, _, _) in board {
+                let id = format!("{}_{:02}", if is_home { "home" } else { "away" }, nr);
+                g.field_model.set_player_coordinate(&id, FieldCoordinate::new(x, y));
+                g.field_model.set_player_state(
+                    &id,
+                    PlayerState::new(if standing { PS_STANDING } else { PS_PRONE })
+                        .change_active(active),
+                );
+            }
+            if let Some((bx, by)) = ball {
+                g.field_model.ball_coordinate = Some(FieldCoordinate::new(bx, by));
+                g.field_model.ball_in_play = true;
+                g.field_model.ball_moving = false;
+            }
+            let f = Features::build(&g, positions_stamp(&g), true);
+            let m = Mover {
+                home: true,
+                is_carrier: true,
+                ma: 6,
+                ag: 3,
+                str_: 3,
+                sure_hands: false,
+                side_step: false,
+                has_catch: false,
+                d_now,
+                turns_left,
+                unactivated: unact,
+            };
+
+            writeln!(out, "case {name} {turn_nr} {d_now} {turns_left} {:08x}", unact.to_bits())
+                .unwrap();
+            for &(is_home, nr, x, y, standing, active, ma, ag, st) in board {
+                writeln!(out, "player {} {nr} {x} {y} {} {} {ma} {ag} {st}",
+                    if is_home { "home" } else { "away" },
+                    if standing { "standing" } else { "prone" },
+                    if active { "active" } else { "used" }).unwrap();
+            }
+            if let Some((bx, by)) = ball {
+                writeln!(out, "ball {bx} {by}").unwrap();
+            }
+
+            // Every home team-mate, from a couple of throwing squares, so `from` varies too.
+            let here = m_coord(&g, "home_01");
+            let froms = [here, FieldCoordinate::new(here.x + 1, here.y),
+                         FieldCoordinate::new(here.x, here.y + 1)];
+            for &(is_home, nr, _, _, _, _, _, _, _) in board {
+                if !is_home || nr == 1 {
+                    continue;
+                }
+                let rcv = format!("home_{nr:02}");
+                for from in froms {
+                    if !on_pitch(from.x, from.y) {
+                        continue;
+                    }
+                    if let Some(r) = receiver_of(&f, &g, &rcv, from, &m) {
+                        writeln!(out, "receiver {nr} {} {} {:08x}:{:08x}:{}:{}:{}",
+                            from.x, from.y, r.p_catch.to_bits(), r.v.to_bits(),
+                            r.scores_now, r.tts, r.turns).unwrap();
+                    }
+                    let hw = handoff_weight(&f, &g, from, &rcv, &m);
+                    writeln!(out, "handoff {nr} {} {} {}", from.x, from.y,
+                        match hw { Some(w) => format!("{:08x}", w.to_bits()),
+                                   None => "-".to_string() }).unwrap();
+                }
+            }
+            for &(is_home, nr, _, _, _, _, _, _, _) in board {
+                if is_home {
+                    continue;
+                }
+                let def = format!("away_{nr:02}");
+                let w = foul_weight(&f, &g, "home_01", &def, &m);
+                // The assist counts come from the ENGINE (`UtilPlayer`), and the Java mirror calls
+                // the same method in production -- but the FIXTURE feeds them in, so what it pins
+                // is the arithmetic on top rather than a second copy of the assist rules. Same
+                // split as `Features::build` taking a snapshot instead of a Game.
+                let off = ffb_model::util::util_player::UtilPlayer::find_offensive_foul_assists(
+                    &g, "home_01", &def) as i32;
+                let dfn = ffb_model::util::util_player::UtilPlayer::find_defensive_foul_assists(
+                    &g, "home_01", &def) as i32;
+                let av = g.player(&def).map(|q| q.armour_with_modifiers()).unwrap_or(8);
+                writeln!(out, "foul {nr} {av} {off} {dfn} {:08x}", w.to_bits()).unwrap();
+            }
+        }
+
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/agent/testdata/ballmoves_golden.txt");
+        std::fs::write(path, out).unwrap();
+        eprintln!("wrote {path}");
+    }
+
     /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_sampler_golden -- --ignored`
     #[test]
     #[ignore]

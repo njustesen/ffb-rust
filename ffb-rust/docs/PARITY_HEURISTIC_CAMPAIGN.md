@@ -1941,3 +1941,50 @@ first). Running the check is cheap; assuming the fixture is strong is not.
 `pass_weight`, `foul_weight`, `proxy_value` — and then the enumeration itself plus the WIDE
 `ActivatePlayer` arm. The enumeration is where Java needs the harness's legal-action list rather
 than a fixture, so that is the point at which the live gate takes over from the goldens.
+
+## ITER30 — `receiver_of`, `handoff_weight`, `foul_weight`
+
+`receiver_of` is the biggest single function in the plan layer and the one with the most ways to be
+quietly wrong — and every one of them is an **off-by-one-step**, not a bad constant:
+
+| term | the mistake it invites |
+|---|---|
+| `active` | a receiver who has already gone has `reach_after = 0` and one turn fewer; that single flag separates a touchdown from a token credit |
+| `effective_d` | where the BALL ends up, `d_rcv − reach_after`. Using `d_rcv` prices every give as though the receiver never moved afterwards |
+| `scores_now` | false when the CARRIER could score by himself — without it the agent gives away a run it had already won |
+| `p_run_in` | a five-way ladder on the receiver's MA, with a GFI factor per rush |
+
+`BallMoves.java` + `BallMovesTest`, four boards: a give that scores, the SAME board with the receiver
+already activated, a board where the carrier can score himself, and a foul board with prone victims
+on, next to, and far from the ball (the three branches of the `victim` term) plus assists on both
+sides.
+
+All five parts of the receiver are compared — `p_catch`, `v`, `scores_now` and both turn counts —
+because the flag and the counts are what the hand-off price branches on, and a value that matches
+with the wrong flag behind it is a disagreement waiting for the next board. The test also asserts
+`scores_now` is seen BOTH ways; a fixture where it is always false would pass while testing almost
+nothing.
+
+Foul assists are fed IN by the golden rather than recomputed, the same split as `Features::build`
+taking a snapshot: the arithmetic is what needs pinning, and production calls the engine's own
+`UtilPlayer` on both sides.
+
+### Bite-checks
+
+Both of the subtle terms discriminate, and the second fires exactly on the board built for it:
+
+```
+effectiveD = dRcv                         → v give_that_scores/home_2 from (14,7)  differs
+scoresNow ignores carrierScoresNow        → v carrier_can_score_himself/home_2 from (20,7) differs
+```
+
+### Gates
+
+- `mvn -o -pl ffb-ai test`: **22 tests, 0 failures**.
+- `cargo test --workspace --release`: **14,654 / 0**.
+- Fourteen-class rung still **100/100 in all three editions** at argmax.
+
+**Next:** `pass_weight` — the last plan weight — which needs the engine's own pass mechanics
+(`find_passing_distance`, `minimum_roll_simple`, `evaluate_pass_simple`); Java has all three, so the
+port calls them rather than re-deriving a range table. Then `proxy_value`, the enumeration itself,
+and the WIDE `ActivatePlayer` arm.
