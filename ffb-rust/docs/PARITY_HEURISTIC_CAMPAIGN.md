@@ -3410,3 +3410,56 @@ have understated this fix badly.
 **Next:** the `EndPlayerAction` stalls — three of the six sampled, and now the largest identified
 group. A stall on a DESELECT is a different shape from a dead command: the action is universal, so
 it is the state it lands in that has no continuation. Census first, as usual.
+
+## ITER61 — bb2016 had no arm for a deselect: 77 → 83/100
+
+**bb2016 argmax: 77 → 83/100.** Scale 1.0 unchanged at 81/100.
+
+The census after ITER60: 23 reds, 6 stalls, and **all six ended on `EndPlayerAction`** — the group
+ITER60 flagged. The context named it:
+
+```
+LOOP applied=Activate(home_11,Move) prompt_after=Some(Move { player_id: "home_11", squares: [] })
+LOOP applied=EndPlayerAction        prompt_after=None finished=false
+```
+
+A `Move` prompt with an **empty** square list — the player has nowhere to go — answered with a
+deselect, and nothing follows.
+
+Java's bb2016 `StepInitSelecting` handles `CLIENT_ACTING_PLAYER` with no player id in the `else` of
+its guard:
+
+```java
+} else {
+    fEndPlayerAction = true;
+}
+commandStatus = StepCommandStatus.EXECUTE_STEP;
+```
+
+Rust had **no arm for it at all**, so the command fell through to `_ => {}` and returned a bare
+`cont()` with no prompt.
+
+**Why it hid.** The deselect only reaches this step while it is still waiting for its second
+command, which happens only when the player never moved. After any real movement the deselect lands
+in `StepInitMoving`, which has always handled it — so the identical command works a few lines
+earlier in the same game. The failing case needs a player with zero legal destinations, which the
+random agent, moving one square per activation into open space, essentially never produces.
+
+Note this is **not** a copy of the bb2025 arm: bb2025's twin calls `change_player_action_to_none`,
+matching ITS Java. The two editions genuinely differ here, so ITER59's "diff against the mirror"
+heuristic would have given the wrong answer — the Java source is still the authority, and checking
+it took one grep.
+
+### Gates
+
+- `--heur-classes all`, 100 seeds, argmax: **bb2016 77 → 83/100**; bb2020 90/100, bb2025 90/100
+  (untouched — bb2016-only file).
+- scale 1.0: bb2016 81/100 (unchanged), bb2025 94/100, bb2020 93/100.
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,662 / 0** (+1, bite-checked). `mvn -o -pl ffb-ai test`:
+  **34 / 0**. The two Java trees agree.
+
+**Next:** bb2016's stalls should now be gone or nearly so — re-run the census. If it is clean, the
+remaining 17 bb2016 reds are genuine state divergences and the edition finally looks like the other
+two, at which point the three lists are worth comparing for shared seeds again (ITER54's trick).

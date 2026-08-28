@@ -193,6 +193,24 @@ impl Step for StepInitSelecting {
                 return self.execute_step(game, rng);
             }
             // Java: CLIENT_ACTING_PLAYER — changePlayerAction then executeStep (no dispatchPlayerAction)
+            // Java `bb2016/StepInitSelecting`, CLIENT_ACTING_PLAYER:
+            //     if (isProvided(playerId) && actingTeam == selectedPlayer.getTeam()) { changePlayerAction(...) }
+            //     else { fEndPlayerAction = true; }
+            //     commandStatus = EXECUTE_STEP;
+            // The `else` -- a DESELECT, `ClientCommandActingPlayer(null, null, false)` -- had no arm
+            // here at all, so it fell through to `_ => {}` and a bare `cont()` with no prompt, and
+            // the game stopped. It only bites when the deselect arrives while this step is still
+            // waiting for its second command, i.e. when the player never moved: a Move prompt with
+            // an EMPTY square list, answered with EndPlayerAction. After any real movement the
+            // deselect lands in `StepInitMoving`, which has always handled it -- which is why the
+            // same command works a few lines earlier in the same game.
+            //
+            // (bb2025's twin instead calls `change_player_action_to_none`, matching ITS Java; the
+            // two editions genuinely differ here, so this is not a copy of the bb2025 arm.)
+            Action::EndPlayerAction => {
+                self.end_player_action = true;
+                return self.execute_step(game, rng);
+            }
             // This path fires for STAND_UP / STAND_UP_BLITZ / REMOVE_CONFUSION → NEXT_STEP in executeStep
             Action::ActivatePlayer { player_id, player_action, block_defender_id } => {
                 let pa = pac_to_player_action(*player_action);
@@ -515,6 +533,47 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2016)
+    }
+
+    /// A DESELECT arriving before the player has moved must still end the action.
+    ///
+    /// Java's bb2016 `StepInitSelecting` handles `CLIENT_ACTING_PLAYER` with no player id by
+    /// setting `fEndPlayerAction = true` and executing the step. Rust had no arm for it, so the
+    /// command fell through to `_ => {}` and a bare `cont()` with no prompt — the game stopped
+    /// where it stood.
+    ///
+    /// It only bites when the deselect arrives while this step is still waiting for its second
+    /// command, which happens when the player never moved: a `Move` prompt with an EMPTY square
+    /// list, answered with `EndPlayerAction`. After any real movement the deselect lands in
+    /// `StepInitMoving`, which has always handled it — so the identical command works a few lines
+    /// earlier in the same game, which is what made this hard to see.
+    #[test]
+    fn deselect_before_moving_ends_the_player_action() {
+        use ffb_model::enums::{PlayerState, PS_STANDING};
+        use ffb_model::types::FieldCoordinate;
+
+        let mut game = make_game();
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            ..Default::default()
+        });
+        game.home_playing = true;
+        game.field_model.set_player_coordinate("p1", FieldCoordinate::new(10, 7));
+        game.field_model
+            .set_player_state("p1", PlayerState::new(PS_STANDING).change_active(true));
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+
+        let mut step = StepInitSelecting::new("end".into());
+        let out = step.handle_command(&Action::EndPlayerAction, &mut game, &mut GameRng::new(0));
+
+        assert!(step.end_player_action, "Java sets fEndPlayerAction on a deselect");
+        assert_ne!(
+            out.action,
+            StepAction::Continue,
+            "a deselect must ADVANCE the step; a bare Continue with no prompt stops the game"
+        );
     }
 
     /// Every MOVE VARIANT must open a movement phase, not just plain `Move`.
