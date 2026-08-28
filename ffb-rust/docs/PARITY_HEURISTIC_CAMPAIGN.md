@@ -2086,3 +2086,44 @@ fixture:
 harness's legal-action list, not a fixture — so this is the point where the goldens hand over to the
 live gate, and where multi-square movement, GFI chains and scoring paths become reachable for the
 first time.
+
+## ITER33 — the tier-1 activation ranking
+
+Before any search runs, every eligible player gets a search-free score, and only the top `TIER2`
+(16) get a Dijkstra. So this ladder decides **who is even considered properly** — and a disagreement
+here does not present as a wrong move. It presents as the right move made by the wrong player, or by
+a player the other engine never scored at all.
+
+`Activation.java` + `ActivationTest`, six boards covering all six rungs plus both post-ladder
+effects (the negatrait ×0.55, and the `awaiting_run` override that OVERWRITES rather than scales).
+
+### The bite-check failed to bite, twice, and both were real
+
+1. Swapping `can_fetch` (0.92) and `is_carrier` (0.88) — my comment had called this "the rung most
+   easily reordered" — changed **nothing**. The two are **mutually exclusive by construction**: a
+   `can_fetch` needs a LOOSE ball and `is_carrier` needs a CARRIED one. Their relative order is
+   unobservable, and no board can pin it. The comment was wrong and is now corrected in place; a
+   Javadoc asserting a property no test covers is worse than no Javadoc.
+2. Swapping `prone && marked` (0.70) and `proxy > 0.25` (0.45) — the ONE adjacent pair that can both
+   hold — also changed nothing, because a prone marked player is normally hemmed in and his proxy
+   never cleared 0.25 on any existing board.
+
+Fixed by adding `prone_marked_with_support`: the prone marked player stands next to our own carrier,
+so the cage term lifts the support raster around him and his discounted ceiling reaches **0.3025**.
+The swap now fails at `wPlayer prone_marked_with_support/home_2`.
+
+Three iterations in a row where the bite-check found something the fixture could not reach
+(ITER27 `strength_factor`, ITER29 the sort tie-break, and both of these). The pattern is consistent
+enough to state plainly: **a fixture that passes tells you nothing about the branches it never
+entered**, and the only cheap way to find those is to break the code on purpose and watch.
+
+### Gates
+
+- `mvn -o -pl ffb-ai test`: **24 tests, 0 failures**.
+- `cargo test --workspace --release`: **14,654 / 0**.
+- Fourteen-class rung still **100/100 in all three editions** at argmax.
+
+**Next:** the rest of `handle_activate` — the per-declaration grouping (contiguous runs of the
+candidate list, NOT a keyed lookup) and the two-level softmax draw that groups by declaration and
+scores each group by its best child. Then the enumeration wiring in `ParityRunner`, and the live
+gate.

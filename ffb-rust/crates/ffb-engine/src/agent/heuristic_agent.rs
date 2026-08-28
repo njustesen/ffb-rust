@@ -5235,6 +5235,227 @@ mod tests {
         eprintln!("wrote {path}");
     }
 
+    /// The tier-1 activation ranking — `w_player`, and the order it produces — as a fixture.
+    ///
+    /// Before any search runs, every eligible player gets a search-free score and the top `TIER2`
+    /// of them are the ONLY ones that get a Dijkstra. So this ladder decides not just who is
+    /// likeliest to be picked but **who is even considered properly**, and a disagreement here
+    /// cannot be seen as a wrong move — it shows up as the right move by the wrong player, or as a
+    /// player who was never scored at all.
+    ///
+    /// The ladder is a chain of `else if`s, so ORDER matters as much as the constants: a marked
+    /// carrier is 0.95 and an unmarked one 0.88, but "can fetch a loose ball" sits BETWEEN them at
+    /// 0.92 — testing that needs a board where the same player is both, which is what
+    /// `carrier_and_fetcher` is for. The negatrait multiplier is applied AFTER the ladder and the
+    /// `awaiting_run` override AFTER that, overwriting rather than scaling.
+    ///
+    /// The rank comparator is `w_player * max(proxy, 0.05)` descending, `canon_key` ascending on
+    /// ties — the floor on `proxy` is what stops a player with proxy 0 from being unrankable.
+    ///
+    /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_activate_golden -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_activate_golden() {
+        use std::fmt::Write as _;
+        use ffb_model::enums::{PlayerState, PS_STANDING, PS_PRONE, Rules};
+        use ffb_model::model::player::Player;
+
+        // (is_home, nr, x, y, standing, negatrait)
+        type P2 = (bool, i32, i32, i32, bool, bool);
+        type Board = &'static [P2];
+
+        // (name, board, ball, ball_loose, turn_nr, awaiting_run nr or 0)
+        let cases: [(&str, Board, Option<(i32, i32)>, bool, i32, i32); 6] = [
+            (
+                // Plain: nobody carries, nobody is marked. Every home player lands on the same two
+                // bottom rungs, so the ORDER is decided entirely by proxy and the canonical tie.
+                "flat_field",
+                &[
+                    (true, 1, 5, 5, true, false), (true, 2, 5, 7, true, false),
+                    (true, 3, 5, 9, true, false), (false, 1, 20, 7, true, false),
+                ],
+                None, false, 3, 0,
+            ),
+            (
+                // A carrier, MARKED: the top rung (0.95). The same board also has an unmarked
+                // team-mate, so 0.95 and the lower rungs are compared directly.
+                "marked_carrier",
+                &[
+                    (true, 1, 12, 7, true, false), (true, 2, 6, 3, true, false),
+                    (false, 1, 13, 7, true, false),
+                ],
+                Some((12, 7)), false, 3, 0,
+            ),
+            (
+                // A LOOSE ball within MA+2 of one player and not the other: the 0.92 rung, which
+                // sits between the marked and unmarked carrier rungs and is therefore the one most
+                // easily reordered by a port that flattens the chain.
+                "carrier_and_fetcher",
+                &[
+                    (true, 1, 10, 7, true, false), (true, 2, 22, 12, true, false),
+                    (false, 1, 20, 2, true, false),
+                ],
+                Some((12, 7)), true, 3, 0,
+            ),
+            (
+                // PRONE and marked (0.70), plus a negatrait player whose whole score is multiplied
+                // by 0.55 AFTER the ladder -- two effects that a port can easily merge.
+                "prone_and_negatrait",
+                &[
+                    (true, 1, 10, 7, false, false), (true, 2, 14, 3, true, true),
+                    (false, 1, 11, 7, true, false), (false, 2, 15, 3, true, false),
+                ],
+                None, false, 3, 0,
+            ),
+            (
+                // A prone, MARKED player who ALSO has proxy > 0.25 -- the only way to observe the
+                // order of those two rungs, since they are the only adjacent pair in the chain
+                // that can both hold at once. He stands next to our own carrier, so the cage term
+                // lifts the support raster around him and the discounted ceiling clears 0.25.
+                //
+                // Found because the bite-check did NOT fail when the rungs were swapped: a prone
+                // marked player is normally hemmed in, so his proxy is low and the chain never has
+                // to choose. Note the two rungs above are mutually EXCLUSIVE by construction --
+                // `can_fetch` needs a loose ball and `is_carrier` needs a carried one -- so their
+                // relative order carries no meaning and no board can pin it.
+                "prone_marked_with_support",
+                &[
+                    (true, 1, 12, 7, true, false),
+                    (true, 2, 12, 8, false, false),
+                    (true, 3, 11, 7, true, false),
+                    (false, 1, 13, 8, true, false),
+                    (false, 2, 11, 9, true, false),
+                ],
+                Some((12, 7)), false, 3, 0,
+            ),
+            (
+                // `awaiting_run`: the player who was just thrown the ball is forced to 1.0,
+                // OVERWRITING the ladder and the negatrait multiplier both.
+                "awaiting_run_overrides",
+                &[
+                    (true, 1, 10, 7, true, true), (true, 2, 16, 7, true, true),
+                    (false, 1, 20, 7, true, false),
+                ],
+                None, false, 3, 2,
+            ),
+        ];
+
+        let mut out = String::new();
+        writeln!(out, "# tier-1 activation ranking golden -- heuristic_agent.rs handle_activate.").unwrap();
+        writeln!(out, "# case <name> <turn_nr> <awaiting nr, 0 = none>").unwrap();
+        writeln!(out, "# player <home|away> <nr> <x> <y> <standing|prone> <negatrait>").unwrap();
+        writeln!(out, "# ball <x> <y> <loose>").unwrap();
+        writeln!(out, "# cand <nr> <w_player bits> <proxy bits>").unwrap();
+        writeln!(out, "# rank <nrs in ranked order, comma separated>").unwrap();
+
+        for (name, board, ball, loose, turn_nr, awaiting) in cases {
+            let mut home = crate::step::framework::test_team("home", 0);
+            let mut away = crate::step::framework::test_team("away", 0);
+            for &(is_home, nr, _, _, _, negatrait) in board {
+                let mut p = Player {
+                    id: format!("{}_{:02}", if is_home { "home" } else { "away" }, nr),
+                    nr,
+                    movement: 6,
+                    strength: 3,
+                    agility: 3,
+                    armour: 8,
+                    ..Default::default()
+                };
+                if negatrait {
+                    p.starting_skills.push(ffb_model::model::skill_def::SkillWithValue {
+                        skill_id: SkillId::BoneHead,
+                        value: None,
+                    });
+                }
+                if is_home { home.players.push(p) } else { away.players.push(p) }
+            }
+            let mut g = Game::new(home, away, Rules::Bb2025);
+            g.home_playing = true;
+            g.turn_data_home.turn_nr = turn_nr;
+            g.turn_data_away.turn_nr = turn_nr;
+            for &(is_home, nr, x, y, standing, _) in board {
+                let id = format!("{}_{:02}", if is_home { "home" } else { "away" }, nr);
+                g.field_model.set_player_coordinate(&id, FieldCoordinate::new(x, y));
+                g.field_model.set_player_state(
+                    &id,
+                    PlayerState::new(if standing { PS_STANDING } else { PS_PRONE })
+                        .change_active(true),
+                );
+            }
+            if let Some((bx, by)) = ball {
+                g.field_model.ball_coordinate = Some(FieldCoordinate::new(bx, by));
+                g.field_model.ball_in_play = true;
+                g.field_model.ball_moving = loose;
+            }
+            let f = Features::build(&g, positions_stamp(&g), true);
+            let agent = HeuristicAgent::new(1, 1.0);
+
+            writeln!(out, "case {name} {turn_nr} {awaiting}").unwrap();
+            for &(is_home, nr, x, y, standing, negatrait) in board {
+                writeln!(out, "player {} {nr} {x} {y} {} {negatrait}",
+                    if is_home { "home" } else { "away" },
+                    if standing { "standing" } else { "prone" }).unwrap();
+            }
+            if let Some((bx, by)) = ball {
+                writeln!(out, "ball {bx} {by} {loose}").unwrap();
+            }
+
+            // Recompute the tier-1 score exactly as `handle_activate` does, for every home player.
+            let mut scored: Vec<(i32, f32, f32)> = Vec::new();
+            for &(is_home, nr, _, _, _, _) in board {
+                if !is_home {
+                    continue;
+                }
+                let pid = format!("home_{nr:02}");
+                let st = g.field_model.player_state(&pid).expect("state");
+                let m = agent.mover_of(&g, &f, &pid).expect("mover");
+                let c = g.field_model.player_coordinate(&pid).expect("coord");
+                let proxy = proxy_value(&f, &g, &pid, &m);
+                let marked = f.tz[side_idx(true)][ixc(c)] > 0;
+                let can_fetch = f.ball_loose
+                    && f.ball.map(|b| c.distance_in_steps(b) <= m.ma + 2).unwrap_or(false);
+                let mut w_player: f32 = if m.is_carrier && marked {
+                    0.95
+                } else if can_fetch {
+                    0.92
+                } else if m.is_carrier {
+                    0.88
+                } else if st.is_prone() && marked {
+                    0.70
+                } else if proxy > 0.25 {
+                    0.45
+                } else {
+                    0.30
+                };
+                if g.player(&pid).map(has_negatrait).unwrap_or(false) {
+                    w_player *= 0.55;
+                }
+                if awaiting == nr {
+                    w_player = 1.0;
+                }
+                writeln!(out, "cand {nr} {:08x} {:08x}", w_player.to_bits(), proxy.to_bits())
+                    .unwrap();
+                scored.push((nr, w_player, proxy));
+            }
+            // Canonical order first, then rank -- so a tie can never depend on hash order.
+            scored.sort_by_key(|(nr, _, _)| *nr);
+            let mut rank: Vec<usize> = (0..scored.len()).collect();
+            rank.sort_by(|&a, &b| {
+                (scored[b].1 * scored[b].2.max(0.05))
+                    .partial_cmp(&(scored[a].1 * scored[a].2.max(0.05)))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then(scored[a].0.cmp(&scored[b].0))
+            });
+            let order: Vec<String> =
+                rank.iter().map(|&i| scored[i].0.to_string()).collect();
+            writeln!(out, "rank {}", order.join(",")).unwrap();
+        }
+
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/agent/testdata/activate_golden.txt");
+        std::fs::write(path, out).unwrap();
+        eprintln!("wrote {path}");
+    }
+
     /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_sampler_golden -- --ignored`
     #[test]
     #[ignore]

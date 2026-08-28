@@ -1,0 +1,57 @@
+# tier-1 activation ranking golden -- heuristic_agent.rs handle_activate.
+# case <name> <turn_nr> <awaiting nr, 0 = none>
+# player <home|away> <nr> <x> <y> <standing|prone> <negatrait>
+# ball <x> <y> <loose>
+# cand <nr> <w_player bits> <proxy bits>
+# rank <nrs in ranked order, comma separated>
+case flat_field 3 0
+player home 1 5 5 standing false
+player home 2 5 7 standing false
+player home 3 5 9 standing false
+player away 1 20 7 standing false
+cand 1 3e99999a 3dcccccd
+cand 2 3e99999a 3dcccccd
+cand 3 3e99999a 3dcccccd
+rank 1,2,3
+case marked_carrier 3 0
+player home 1 12 7 standing false
+player home 2 6 3 standing false
+player away 1 13 7 standing false
+ball 12 7 false
+cand 1 3f733333 3f0ccccd
+cand 2 3ee66666 3e9ae148
+rank 1,2
+case carrier_and_fetcher 3 0
+player home 1 10 7 standing false
+player home 2 22 12 standing false
+player away 1 20 2 standing false
+ball 12 7 true
+cand 1 3f6b851f 3efd70a4
+cand 2 3e99999a 3e7d70a4
+rank 1,2
+case prone_and_negatrait 3 0
+player home 1 10 7 prone false
+player home 2 14 3 standing true
+player away 1 11 7 standing false
+player away 2 15 3 standing false
+cand 1 3f333333 3da8f5c3
+cand 2 3e28f5c3 3da8f5c3
+rank 1,2
+case prone_marked_with_support 3 0
+player home 1 12 7 standing false
+player home 2 12 8 prone false
+player home 3 11 7 standing false
+player away 1 13 8 standing false
+player away 2 11 9 standing false
+ball 12 7 false
+cand 1 3f733333 3f0ccccd
+cand 2 3f333333 3e9ae148
+cand 3 3ee66666 3e9ae148
+rank 1,2,3
+case awaiting_run_overrides 3 2
+player home 1 10 7 standing true
+player home 2 16 7 standing true
+player away 1 20 7 standing false
+cand 1 3e28f5c3 3dcccccd
+cand 2 3f800000 3da8f5c3
+rank 2,1
