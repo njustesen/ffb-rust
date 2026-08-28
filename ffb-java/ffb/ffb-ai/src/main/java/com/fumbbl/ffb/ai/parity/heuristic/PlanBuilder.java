@@ -161,6 +161,114 @@ public final class PlanBuilder {
         }
     }
 
+    /** Squares next to a receiver a HandOverMove considers giving from. */
+    public static final int GIVE_SPOTS = 2;
+
+    /**
+     * The HandOff branch.
+     *
+     * <p>The carrier moves FIRST and gives the ball at the end of the run, so every team-mate he
+     * can get NEXT TO is a candidate — not just the ones he is already touching, which is all a
+     * "legal hand-off receivers" list reports. For each receiver, the squares ADJACENT to him that
+     * the reach search actually reached are scored, ordered, and the best {@link #GIVE_SPOTS} kept.
+     *
+     * <p>A square that is occupied is skipped UNLESS it is where the carrier already stands — he
+     * occupies it himself, and "stand still and give" has to remain available.
+     *
+     * @param receivers team-mates in the order the engine reports them; the caller supplies the
+     *     list because who is a legal receiver is an eligibility question.
+     * @param handoffWeightAt scores a give from a square to a receiver, or null when it is not on.
+     */
+    public static void handOffCandidates(Features f, Reach r, ValueModel.Mover m, String player,
+            String pac, FieldCoordinate here, List<Receiver> receivers, float wPlayer, float floor,
+            float novelty, List<Candidate> out) {
+        for (Receiver rcv : receivers) {
+            List<Plans.Dest> spots = new ArrayList<>();
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    if (dx == 0 && dy == 0) {
+                        continue;
+                    }
+                    int nx = rcv.at.getX() + dx;
+                    int ny = rcv.at.getY() + dy;
+                    if (!Features.onPitch(nx, ny)) {
+                        continue;
+                    }
+                    int j = Features.ix(nx, ny);
+                    boolean isHere = nx == here.getX() && ny == here.getY();
+                    if (!r.reached(j) || (f.occupied(j) && !isHere)) {
+                        continue;
+                    }
+                    Float w = rcv.weightFrom(new FieldCoordinate(nx, ny));
+                    if (w == null) {
+                        continue;
+                    }
+                    spots.add(new Plans.Dest(Plans.risked(w, r.pArrive(j), m), j));
+                }
+            }
+            spots.sort(Comparator.<Plans.Dest>comparingDouble(d -> -d.w).thenComparingInt(d -> d.i));
+            int taken = 0;
+            for (Plans.Dest d : spots) {
+                if (taken >= GIVE_SPOTS) {
+                    break;
+                }
+                taken++;
+                out.add(new Candidate(wPlayer * Math.max(d.w, floor) + novelty, player, pac,
+                    rcv.id, Kind.HAND_OFF, d.i));
+            }
+        }
+    }
+
+    /**
+     * The Pass branch: the same shape with the throw at the end of the run-up.
+     *
+     * <p>Enumerated receivers × run-up squares, in that nesting — receivers OUTSIDE, squares
+     * inside, which is the order the candidate list ends up in and therefore the order the
+     * declaration grouping sees.
+     *
+     * <p>{@code risked} is folded in only when the throw happens somewhere other than where the
+     * thrower stands: standing still carries no chance of never arriving.
+     */
+    public static void passCandidates(Reach r, ValueModel.Mover m, String player, String pac,
+            FieldCoordinate here, List<Receiver> receivers, List<Integer> runUpSquares,
+            float wPlayer, float floor, float novelty, List<Candidate> out) {
+        for (Receiver rcv : receivers) {
+            for (int j : runUpSquares) {
+                FieldCoordinate from = new FieldCoordinate(j % Features.W, j / Features.W);
+                Float w = rcv.weightFrom(from);
+                if (w == null) {
+                    continue;
+                }
+                float weight = w;
+                if (r != null && !(from.getX() == here.getX() && from.getY() == here.getY())) {
+                    weight = Plans.risked(w, r.pArrive(j), m);
+                }
+                out.add(new Candidate(wPlayer * Math.max(weight, floor) + novelty, player, pac,
+                    rcv.id, Kind.PASS, j));
+            }
+        }
+    }
+
+    /**
+     * A receiver, with a callback that prices a give or a throw FROM a given square.
+     *
+     * <p>The callback exists because the price depends on where the thrower ends up, and the
+     * caller is the only one that can compute it — {@code passWeight} needs the engine's pass
+     * mechanics and {@code handoffWeight} needs the receiver's own attributes.
+     */
+    public abstract static class Receiver {
+        public final String id;
+        public final FieldCoordinate at;
+
+        protected Receiver(String id, FieldCoordinate at) {
+            this.id = id;
+            this.at = at;
+        }
+
+        /** @return the weight, or null when this is not a legal give/throw from there. */
+        public abstract Float weightFrom(FieldCoordinate from);
+    }
+
     /** Sort helper mirroring Rust's canonical `(side, nr)` ordering for candidate id lists. */
     public static void sortCanonically(List<BlockTarget> targets,
             java.util.function.ToIntFunction<String> sideOf,

@@ -2218,3 +2218,47 @@ argument.**
 **Next:** the HandOff and Pass enumerations (they need the harness's receiver eligibility, so the
 live gate is the natural place), then wiring `handle_activate` into `ParityRunner`'s activation loop
 and switching `--heur-classes activate` on.
+
+## ITER36 — the HandOff and Pass enumerations, and a fixture that graded its own homework
+
+The last two enumeration branches. Both have the same shape — the carrier moves FIRST and gives or
+throws at the end — so every square he can reach next to a team-mate is a candidate, not just the
+mates he already touches. HandOff keeps the best `GIVE_SPOTS` (2) per receiver; Pass enumerates
+receivers × run-up squares.
+
+Two things had to change in the GOLDEN before any of it was observable:
+
+- HandOff and Pass candidates carry a **path**, not a `dest` — the run-up IS the plan. Without
+  emitting the path, every give candidate looked identical: same receiver, no dest, and a weight
+  that floors to 0.0 because the raw give price is negative and the coverage floor is 0.
+- `w_player` and `novelty` are `build_plans` PARAMETERS and now cross as parameters (ITER35).
+
+### The fixture graded its own homework
+
+The first version of the give test built its `weightFrom` callback **out of the golden's own rows**:
+it returned a weight only for squares the golden already listed. So the `GIVE_SPOTS` cap could never
+bind, and perturbing it from 2 to 3 changed nothing — the callback simply had nothing else to offer.
+
+Rewritten to price gives with the real `BallMoves.handoffWeight`, which has its own fixture from
+ITER30. Now the cap binds and the perturbation fails:
+`HandOff candidate COUNT (give_and_pass) ==> expected: <4> but was: <6>`.
+
+Worth naming, because it is a distinct failure mode from the previous three: not a branch the
+fixture could not reach, but a fixture **wired to its own expected output**. It passes for the same
+reason a mirror agrees with you. The tell was that the bite-check did not bite; the fix was to feed
+it an independent computation.
+
+### Gates
+
+- `mvn -o -pl ffb-ai test`: **26 tests, 0 failures**.
+- `cargo test --workspace --release`: **14,654 / 0**.
+- Fourteen-class rung still **100/100 in all three editions** at argmax.
+
+**The whole agent is now ported and pinned.** Rasters, reach, value, arrival, orderings, proxy,
+give/foul/pass prices, the tier-1 ladder, the enumeration and the two-level draw all have
+cross-language fixtures, and every one of them has been perturbed on purpose to confirm it fails.
+
+**Next:** wire `handle_activate` into `ParityRunner`'s activation loop and switch
+`--heur-classes activate` on with `move` still OFF. Both sides then move by the byte-matched random
+contract, so what that gate tests is exactly the activation choice — the ladder discipline applied
+one last time.

@@ -5,267 +5,267 @@
 # actions <comma separated PlayerAction names for home_01>
 # params <w_player bits> <proxy bits> <novelty bits>
 # n <candidate count>
-# c <index> <pac> <kind> <target|-> <dest|-> <weight bits>
+# c <index> <pac> <kind> <target|-> <dest|-> <weight bits> <path|->
 case move_open
 player home 1 8 7 standing
 player away 1 20 7 standing
 actions Move
 params 3f800000 3dcccccd 00000000
 n 254
-c 0 Move Move - 28 3dcccccd
-c 1 Move Move - 29 3dcccccd
-c 2 Move Move - 30 3dcccccd
-c 3 Move Move - 31 3dcccccd
-c 4 Move Move - 32 3dcccccd
-c 5 Move Move - 33 3dcccccd
-c 6 Move Move - 34 3dcccccd
-c 7 Move Move - 35 3dcccccd
-c 8 Move Move - 36 3dcccccd
-c 9 Move Move - 54 3dcccccd
-c 10 Move Move - 55 3dcccccd
-c 11 Move Move - 56 3dcccccd
-c 12 Move Move - 57 3dcccccd
-c 13 Move Move - 58 3dcccccd
-c 14 Move Move - 59 3dcccccd
-c 15 Move Move - 60 3dcccccd
-c 16 Move Move - 61 3dcccccd
-c 17 Move Move - 62 3dcccccd
-c 18 Move Move - 80 3dcccccd
-c 19 Move Move - 81 3dcccccd
-c 20 Move Move - 82 3dcccccd
-c 21 Move Move - 83 3dcccccd
-c 22 Move Move - 84 3dcccccd
-c 23 Move Move - 85 3dcccccd
-c 24 Move Move - 86 3dcccccd
-c 25 Move Move - 87 3dcccccd
-c 26 Move Move - 88 3dcccccd
-c 27 Move Move - 106 3dcccccd
-c 28 Move Move - 107 3dcccccd
-c 29 Move Move - 108 3dcccccd
-c 30 Move Move - 109 3dcccccd
-c 31 Move Move - 110 3dcccccd
-c 32 Move Move - 111 3dcccccd
-c 33 Move Move - 112 3dcccccd
-c 34 Move Move - 113 3dcccccd
-c 35 Move Move - 114 3dcccccd
-c 36 Move Move - 132 3dcccccd
-c 37 Move Move - 133 3dcccccd
-c 38 Move Move - 134 3dcccccd
-c 39 Move Move - 135 3dcccccd
-c 40 Move Move - 136 3dcccccd
-c 41 Move Move - 137 3dcccccd
-c 42 Move Move - 138 3dcccccd
-c 43 Move Move - 139 3dcccccd
-c 44 Move Move - 140 3dcccccd
-c 45 Move Move - 158 3dcccccd
-c 46 Move Move - 159 3dcccccd
-c 47 Move Move - 160 3dcccccd
-c 48 Move Move - 161 3dcccccd
-c 49 Move Move - 162 3dcccccd
-c 50 Move Move - 163 3dcccccd
-c 51 Move Move - 164 3dcccccd
-c 52 Move Move - 165 3dcccccd
-c 53 Move Move - 166 3dcccccd
-c 54 Move Move - 184 3dcccccd
-c 55 Move Move - 185 3dcccccd
-c 56 Move Move - 186 3dcccccd
-c 57 Move Move - 187 3dcccccd
-c 58 Move Move - 188 3dcccccd
-c 59 Move Move - 189 3dcccccd
-c 60 Move Move - 191 3dcccccd
-c 61 Move Move - 192 3dcccccd
-c 62 Move Move - 210 3dcccccd
-c 63 Move Move - 211 3dcccccd
-c 64 Move Move - 212 3dcccccd
-c 65 Move Move - 213 3dcccccd
-c 66 Move Move - 214 3dcccccd
-c 67 Move Move - 215 3dcccccd
-c 68 Move Move - 216 3dcccccd
-c 69 Move Move - 217 3dcccccd
-c 70 Move Move - 218 3dcccccd
-c 71 Move Move - 236 3dcccccd
-c 72 Move Move - 237 3dcccccd
-c 73 Move Move - 238 3dcccccd
-c 74 Move Move - 239 3dcccccd
-c 75 Move Move - 240 3dcccccd
-c 76 Move Move - 241 3dcccccd
-c 77 Move Move - 242 3dcccccd
-c 78 Move Move - 243 3dcccccd
-c 79 Move Move - 244 3dcccccd
-c 80 Move Move - 262 3dcccccd
-c 81 Move Move - 263 3dcccccd
-c 82 Move Move - 264 3dcccccd
-c 83 Move Move - 265 3dcccccd
-c 84 Move Move - 266 3dcccccd
-c 85 Move Move - 267 3dcccccd
-c 86 Move Move - 268 3dcccccd
-c 87 Move Move - 269 3dcccccd
-c 88 Move Move - 270 3dcccccd
-c 89 Move Move - 288 3dcccccd
-c 90 Move Move - 289 3dcccccd
-c 91 Move Move - 290 3dcccccd
-c 92 Move Move - 291 3dcccccd
-c 93 Move Move - 292 3dcccccd
-c 94 Move Move - 293 3dcccccd
-c 95 Move Move - 294 3dcccccd
-c 96 Move Move - 295 3dcccccd
-c 97 Move Move - 296 3dcccccd
-c 98 Move Move - 314 3dcccccd
-c 99 Move Move - 315 3dcccccd
-c 100 Move Move - 316 3dcccccd
-c 101 Move Move - 317 3dcccccd
-c 102 Move Move - 318 3dcccccd
-c 103 Move Move - 319 3dcccccd
-c 104 Move Move - 320 3dcccccd
-c 105 Move Move - 321 3dcccccd
-c 106 Move Move - 322 3dcccccd
-c 107 Move Move - 340 3dcccccd
-c 108 Move Move - 341 3dcccccd
-c 109 Move Move - 342 3dcccccd
-c 110 Move Move - 343 3dcccccd
-c 111 Move Move - 344 3dcccccd
-c 112 Move Move - 345 3dcccccd
-c 113 Move Move - 346 3dcccccd
-c 114 Move Move - 347 3dcccccd
-c 115 Move Move - 348 3dcccccd
-c 116 Move Move - 37 3d9e2590
-c 117 Move Move - 38 3d9e2590
-c 118 Move Move - 63 3d9e2590
-c 119 Move Move - 64 3d9e2590
-c 120 Move Move - 89 3d9e2590
-c 121 Move Move - 90 3d9e2590
-c 122 Move Move - 115 3d9e2590
-c 123 Move Move - 116 3d9e2590
-c 124 Move Move - 141 3d9e2590
-c 125 Move Move - 142 3d9e2590
-c 126 Move Move - 167 3d9e2590
-c 127 Move Move - 168 3d9e2590
-c 128 Move Move - 193 3d9e2590
-c 129 Move Move - 194 3d9e2590
-c 130 Move Move - 219 3d9e2590
-c 131 Move Move - 220 3d9e2590
-c 132 Move Move - 245 3d9e2590
-c 133 Move Move - 246 3d9e2590
-c 134 Move Move - 271 3d9e2590
-c 135 Move Move - 272 3d9e2590
-c 136 Move Move - 297 3d9e2590
-c 137 Move Move - 298 3d9e2590
-c 138 Move Move - 323 3d9e2590
-c 139 Move Move - 324 3d9e2590
-c 140 Move Move - 349 3d9e2590
-c 141 Move Move - 350 3d9e2590
-c 142 Move Move - 39 3d3be3d1
-c 143 Move Move - 40 3d3be3d1
-c 144 Move Move - 65 3d3be3d1
-c 145 Move Move - 66 3d3be3d1
-c 146 Move Move - 91 3d3be3d1
-c 147 Move Move - 92 3d3be3d1
-c 148 Move Move - 117 3d3be3d1
-c 149 Move Move - 118 3d3be3d1
-c 150 Move Move - 143 3d3be3d1
-c 151 Move Move - 144 3d3be3d1
-c 152 Move Move - 169 3d3be3d1
-c 153 Move Move - 170 3d3be3d1
-c 154 Move Move - 195 3d3be3d1
-c 155 Move Move - 196 3d3be3d1
-c 156 Move Move - 221 3d3be3d1
-c 157 Move Move - 222 3d3be3d1
-c 158 Move Move - 247 3d3be3d1
-c 159 Move Move - 248 3d3be3d1
-c 160 Move Move - 273 3d3be3d1
-c 161 Move Move - 274 3d3be3d1
-c 162 Move Move - 299 3d3be3d1
-c 163 Move Move - 300 3d3be3d1
-c 164 Move Move - 325 3d3be3d1
-c 165 Move Move - 326 3d3be3d1
-c 166 Move Move - 351 3d3be3d1
-c 167 Move Move - 352 3d3be3d1
-c 168 Move Move - 27 00000000
-c 169 Move Move - 53 00000000
-c 170 Move Move - 79 00000000
-c 171 Move Move - 105 00000000
-c 172 Move Move - 131 00000000
-c 173 Move Move - 157 00000000
-c 174 Move Move - 183 00000000
-c 175 Move Move - 209 00000000
-c 176 Move Move - 235 00000000
-c 177 Move Move - 261 00000000
-c 178 Move Move - 287 00000000
-c 179 Move Move - 313 00000000
-c 180 Move Move - 339 00000000
-c 181 Move Move - 41 00000000
-c 182 Move Move - 67 00000000
-c 183 Move Move - 93 00000000
-c 184 Move Move - 119 00000000
-c 185 Move Move - 145 00000000
-c 186 Move Move - 171 00000000
-c 187 Move Move - 197 00000000
-c 188 Move Move - 223 00000000
-c 189 Move Move - 249 00000000
-c 190 Move Move - 275 00000000
-c 191 Move Move - 301 00000000
-c 192 Move Move - 327 00000000
-c 193 Move Move - 353 00000000
-c 194 Move Move - 1 00000000
-c 195 Move Move - 2 00000000
-c 196 Move Move - 3 00000000
-c 197 Move Move - 4 00000000
-c 198 Move Move - 5 00000000
-c 199 Move Move - 6 00000000
-c 200 Move Move - 7 00000000
-c 201 Move Move - 8 00000000
-c 202 Move Move - 9 00000000
-c 203 Move Move - 10 00000000
-c 204 Move Move - 365 00000000
-c 205 Move Move - 366 00000000
-c 206 Move Move - 367 00000000
-c 207 Move Move - 368 00000000
-c 208 Move Move - 369 00000000
-c 209 Move Move - 370 00000000
-c 210 Move Move - 371 00000000
-c 211 Move Move - 372 00000000
-c 212 Move Move - 373 00000000
-c 213 Move Move - 374 00000000
-c 214 Move Move - 11 00000000
-c 215 Move Move - 12 00000000
-c 216 Move Move - 375 00000000
-c 217 Move Move - 376 00000000
-c 218 Move Move - 13 00000000
-c 219 Move Move - 14 00000000
-c 220 Move Move - 15 00000000
-c 221 Move Move - 377 00000000
-c 222 Move Move - 378 00000000
-c 223 Move Move - 379 00000000
-c 224 Move Move - 26 00000000
-c 225 Move Move - 52 00000000
-c 226 Move Move - 78 00000000
-c 227 Move Move - 104 00000000
-c 228 Move Move - 130 00000000
-c 229 Move Move - 156 00000000
-c 230 Move Move - 182 00000000
-c 231 Move Move - 208 00000000
-c 232 Move Move - 234 00000000
-c 233 Move Move - 260 00000000
-c 234 Move Move - 286 00000000
-c 235 Move Move - 312 00000000
-c 236 Move Move - 338 00000000
-c 237 Move Move - 42 00000000
-c 238 Move Move - 68 00000000
-c 239 Move Move - 94 00000000
-c 240 Move Move - 120 00000000
-c 241 Move Move - 146 00000000
-c 242 Move Move - 172 00000000
-c 243 Move Move - 198 00000000
-c 244 Move Move - 224 00000000
-c 245 Move Move - 250 00000000
-c 246 Move Move - 276 00000000
-c 247 Move Move - 302 00000000
-c 248 Move Move - 328 00000000
-c 249 Move Move - 354 00000000
-c 250 Move Move - 0 00000000
-c 251 Move Move - 364 00000000
-c 252 Move Move - 16 00000000
-c 253 Move Move - 380 00000000
+c 0 Move Move - 28 3dcccccd -
+c 1 Move Move - 29 3dcccccd -
+c 2 Move Move - 30 3dcccccd -
+c 3 Move Move - 31 3dcccccd -
+c 4 Move Move - 32 3dcccccd -
+c 5 Move Move - 33 3dcccccd -
+c 6 Move Move - 34 3dcccccd -
+c 7 Move Move - 35 3dcccccd -
+c 8 Move Move - 36 3dcccccd -
+c 9 Move Move - 54 3dcccccd -
+c 10 Move Move - 55 3dcccccd -
+c 11 Move Move - 56 3dcccccd -
+c 12 Move Move - 57 3dcccccd -
+c 13 Move Move - 58 3dcccccd -
+c 14 Move Move - 59 3dcccccd -
+c 15 Move Move - 60 3dcccccd -
+c 16 Move Move - 61 3dcccccd -
+c 17 Move Move - 62 3dcccccd -
+c 18 Move Move - 80 3dcccccd -
+c 19 Move Move - 81 3dcccccd -
+c 20 Move Move - 82 3dcccccd -
+c 21 Move Move - 83 3dcccccd -
+c 22 Move Move - 84 3dcccccd -
+c 23 Move Move - 85 3dcccccd -
+c 24 Move Move - 86 3dcccccd -
+c 25 Move Move - 87 3dcccccd -
+c 26 Move Move - 88 3dcccccd -
+c 27 Move Move - 106 3dcccccd -
+c 28 Move Move - 107 3dcccccd -
+c 29 Move Move - 108 3dcccccd -
+c 30 Move Move - 109 3dcccccd -
+c 31 Move Move - 110 3dcccccd -
+c 32 Move Move - 111 3dcccccd -
+c 33 Move Move - 112 3dcccccd -
+c 34 Move Move - 113 3dcccccd -
+c 35 Move Move - 114 3dcccccd -
+c 36 Move Move - 132 3dcccccd -
+c 37 Move Move - 133 3dcccccd -
+c 38 Move Move - 134 3dcccccd -
+c 39 Move Move - 135 3dcccccd -
+c 40 Move Move - 136 3dcccccd -
+c 41 Move Move - 137 3dcccccd -
+c 42 Move Move - 138 3dcccccd -
+c 43 Move Move - 139 3dcccccd -
+c 44 Move Move - 140 3dcccccd -
+c 45 Move Move - 158 3dcccccd -
+c 46 Move Move - 159 3dcccccd -
+c 47 Move Move - 160 3dcccccd -
+c 48 Move Move - 161 3dcccccd -
+c 49 Move Move - 162 3dcccccd -
+c 50 Move Move - 163 3dcccccd -
+c 51 Move Move - 164 3dcccccd -
+c 52 Move Move - 165 3dcccccd -
+c 53 Move Move - 166 3dcccccd -
+c 54 Move Move - 184 3dcccccd -
+c 55 Move Move - 185 3dcccccd -
+c 56 Move Move - 186 3dcccccd -
+c 57 Move Move - 187 3dcccccd -
+c 58 Move Move - 188 3dcccccd -
+c 59 Move Move - 189 3dcccccd -
+c 60 Move Move - 191 3dcccccd -
+c 61 Move Move - 192 3dcccccd -
+c 62 Move Move - 210 3dcccccd -
+c 63 Move Move - 211 3dcccccd -
+c 64 Move Move - 212 3dcccccd -
+c 65 Move Move - 213 3dcccccd -
+c 66 Move Move - 214 3dcccccd -
+c 67 Move Move - 215 3dcccccd -
+c 68 Move Move - 216 3dcccccd -
+c 69 Move Move - 217 3dcccccd -
+c 70 Move Move - 218 3dcccccd -
+c 71 Move Move - 236 3dcccccd -
+c 72 Move Move - 237 3dcccccd -
+c 73 Move Move - 238 3dcccccd -
+c 74 Move Move - 239 3dcccccd -
+c 75 Move Move - 240 3dcccccd -
+c 76 Move Move - 241 3dcccccd -
+c 77 Move Move - 242 3dcccccd -
+c 78 Move Move - 243 3dcccccd -
+c 79 Move Move - 244 3dcccccd -
+c 80 Move Move - 262 3dcccccd -
+c 81 Move Move - 263 3dcccccd -
+c 82 Move Move - 264 3dcccccd -
+c 83 Move Move - 265 3dcccccd -
+c 84 Move Move - 266 3dcccccd -
+c 85 Move Move - 267 3dcccccd -
+c 86 Move Move - 268 3dcccccd -
+c 87 Move Move - 269 3dcccccd -
+c 88 Move Move - 270 3dcccccd -
+c 89 Move Move - 288 3dcccccd -
+c 90 Move Move - 289 3dcccccd -
+c 91 Move Move - 290 3dcccccd -
+c 92 Move Move - 291 3dcccccd -
+c 93 Move Move - 292 3dcccccd -
+c 94 Move Move - 293 3dcccccd -
+c 95 Move Move - 294 3dcccccd -
+c 96 Move Move - 295 3dcccccd -
+c 97 Move Move - 296 3dcccccd -
+c 98 Move Move - 314 3dcccccd -
+c 99 Move Move - 315 3dcccccd -
+c 100 Move Move - 316 3dcccccd -
+c 101 Move Move - 317 3dcccccd -
+c 102 Move Move - 318 3dcccccd -
+c 103 Move Move - 319 3dcccccd -
+c 104 Move Move - 320 3dcccccd -
+c 105 Move Move - 321 3dcccccd -
+c 106 Move Move - 322 3dcccccd -
+c 107 Move Move - 340 3dcccccd -
+c 108 Move Move - 341 3dcccccd -
+c 109 Move Move - 342 3dcccccd -
+c 110 Move Move - 343 3dcccccd -
+c 111 Move Move - 344 3dcccccd -
+c 112 Move Move - 345 3dcccccd -
+c 113 Move Move - 346 3dcccccd -
+c 114 Move Move - 347 3dcccccd -
+c 115 Move Move - 348 3dcccccd -
+c 116 Move Move - 37 3d9e2590 -
+c 117 Move Move - 38 3d9e2590 -
+c 118 Move Move - 63 3d9e2590 -
+c 119 Move Move - 64 3d9e2590 -
+c 120 Move Move - 89 3d9e2590 -
+c 121 Move Move - 90 3d9e2590 -
+c 122 Move Move - 115 3d9e2590 -
+c 123 Move Move - 116 3d9e2590 -
+c 124 Move Move - 141 3d9e2590 -
+c 125 Move Move - 142 3d9e2590 -
+c 126 Move Move - 167 3d9e2590 -
+c 127 Move Move - 168 3d9e2590 -
+c 128 Move Move - 193 3d9e2590 -
+c 129 Move Move - 194 3d9e2590 -
+c 130 Move Move - 219 3d9e2590 -
+c 131 Move Move - 220 3d9e2590 -
+c 132 Move Move - 245 3d9e2590 -
+c 133 Move Move - 246 3d9e2590 -
+c 134 Move Move - 271 3d9e2590 -
+c 135 Move Move - 272 3d9e2590 -
+c 136 Move Move - 297 3d9e2590 -
+c 137 Move Move - 298 3d9e2590 -
+c 138 Move Move - 323 3d9e2590 -
+c 139 Move Move - 324 3d9e2590 -
+c 140 Move Move - 349 3d9e2590 -
+c 141 Move Move - 350 3d9e2590 -
+c 142 Move Move - 39 3d3be3d1 -
+c 143 Move Move - 40 3d3be3d1 -
+c 144 Move Move - 65 3d3be3d1 -
+c 145 Move Move - 66 3d3be3d1 -
+c 146 Move Move - 91 3d3be3d1 -
+c 147 Move Move - 92 3d3be3d1 -
+c 148 Move Move - 117 3d3be3d1 -
+c 149 Move Move - 118 3d3be3d1 -
+c 150 Move Move - 143 3d3be3d1 -
+c 151 Move Move - 144 3d3be3d1 -
+c 152 Move Move - 169 3d3be3d1 -
+c 153 Move Move - 170 3d3be3d1 -
+c 154 Move Move - 195 3d3be3d1 -
+c 155 Move Move - 196 3d3be3d1 -
+c 156 Move Move - 221 3d3be3d1 -
+c 157 Move Move - 222 3d3be3d1 -
+c 158 Move Move - 247 3d3be3d1 -
+c 159 Move Move - 248 3d3be3d1 -
+c 160 Move Move - 273 3d3be3d1 -
+c 161 Move Move - 274 3d3be3d1 -
+c 162 Move Move - 299 3d3be3d1 -
+c 163 Move Move - 300 3d3be3d1 -
+c 164 Move Move - 325 3d3be3d1 -
+c 165 Move Move - 326 3d3be3d1 -
+c 166 Move Move - 351 3d3be3d1 -
+c 167 Move Move - 352 3d3be3d1 -
+c 168 Move Move - 27 00000000 -
+c 169 Move Move - 53 00000000 -
+c 170 Move Move - 79 00000000 -
+c 171 Move Move - 105 00000000 -
+c 172 Move Move - 131 00000000 -
+c 173 Move Move - 157 00000000 -
+c 174 Move Move - 183 00000000 -
+c 175 Move Move - 209 00000000 -
+c 176 Move Move - 235 00000000 -
+c 177 Move Move - 261 00000000 -
+c 178 Move Move - 287 00000000 -
+c 179 Move Move - 313 00000000 -
+c 180 Move Move - 339 00000000 -
+c 181 Move Move - 41 00000000 -
+c 182 Move Move - 67 00000000 -
+c 183 Move Move - 93 00000000 -
+c 184 Move Move - 119 00000000 -
+c 185 Move Move - 145 00000000 -
+c 186 Move Move - 171 00000000 -
+c 187 Move Move - 197 00000000 -
+c 188 Move Move - 223 00000000 -
+c 189 Move Move - 249 00000000 -
+c 190 Move Move - 275 00000000 -
+c 191 Move Move - 301 00000000 -
+c 192 Move Move - 327 00000000 -
+c 193 Move Move - 353 00000000 -
+c 194 Move Move - 1 00000000 -
+c 195 Move Move - 2 00000000 -
+c 196 Move Move - 3 00000000 -
+c 197 Move Move - 4 00000000 -
+c 198 Move Move - 5 00000000 -
+c 199 Move Move - 6 00000000 -
+c 200 Move Move - 7 00000000 -
+c 201 Move Move - 8 00000000 -
+c 202 Move Move - 9 00000000 -
+c 203 Move Move - 10 00000000 -
+c 204 Move Move - 365 00000000 -
+c 205 Move Move - 366 00000000 -
+c 206 Move Move - 367 00000000 -
+c 207 Move Move - 368 00000000 -
+c 208 Move Move - 369 00000000 -
+c 209 Move Move - 370 00000000 -
+c 210 Move Move - 371 00000000 -
+c 211 Move Move - 372 00000000 -
+c 212 Move Move - 373 00000000 -
+c 213 Move Move - 374 00000000 -
+c 214 Move Move - 11 00000000 -
+c 215 Move Move - 12 00000000 -
+c 216 Move Move - 375 00000000 -
+c 217 Move Move - 376 00000000 -
+c 218 Move Move - 13 00000000 -
+c 219 Move Move - 14 00000000 -
+c 220 Move Move - 15 00000000 -
+c 221 Move Move - 377 00000000 -
+c 222 Move Move - 378 00000000 -
+c 223 Move Move - 379 00000000 -
+c 224 Move Move - 26 00000000 -
+c 225 Move Move - 52 00000000 -
+c 226 Move Move - 78 00000000 -
+c 227 Move Move - 104 00000000 -
+c 228 Move Move - 130 00000000 -
+c 229 Move Move - 156 00000000 -
+c 230 Move Move - 182 00000000 -
+c 231 Move Move - 208 00000000 -
+c 232 Move Move - 234 00000000 -
+c 233 Move Move - 260 00000000 -
+c 234 Move Move - 286 00000000 -
+c 235 Move Move - 312 00000000 -
+c 236 Move Move - 338 00000000 -
+c 237 Move Move - 42 00000000 -
+c 238 Move Move - 68 00000000 -
+c 239 Move Move - 94 00000000 -
+c 240 Move Move - 120 00000000 -
+c 241 Move Move - 146 00000000 -
+c 242 Move Move - 172 00000000 -
+c 243 Move Move - 198 00000000 -
+c 244 Move Move - 224 00000000 -
+c 245 Move Move - 250 00000000 -
+c 246 Move Move - 276 00000000 -
+c 247 Move Move - 302 00000000 -
+c 248 Move Move - 328 00000000 -
+c 249 Move Move - 354 00000000 -
+c 250 Move Move - 0 00000000 -
+c 251 Move Move - 364 00000000 -
+c 252 Move Move - 16 00000000 -
+c 253 Move Move - 380 00000000 -
 case move_onto_loose_ball
 player home 1 10 7 standing
 player away 1 20 2 standing
@@ -273,260 +273,260 @@ ball 12 7 true
 actions Move
 params 3f800000 3efd70a4 00000000
 n 254
-c 0 Move Pickup - 194 3f2807e9
-c 1 Move Move - 168 3eb1ea42
-c 2 Move Move - 220 3eb1ea42
-c 3 Move Move - 68 3e53604b
-c 4 Move Move - 93 3e53604b
-c 5 Move Move - 94 3e53604b
-c 6 Move Move - 118 3e53604b
-c 7 Move Move - 119 3e53604b
-c 8 Move Move - 120 3e53604b
-c 9 Move Move - 143 3e53604b
-c 10 Move Move - 144 3e53604b
-c 11 Move Move - 145 3e53604b
-c 12 Move Move - 146 3e53604b
-c 13 Move Move - 169 3e53604b
-c 14 Move Move - 170 3e53604b
-c 15 Move Move - 171 3e53604b
-c 16 Move Move - 172 3e53604b
-c 17 Move Move - 195 3e53604b
-c 18 Move Move - 196 3e53604b
-c 19 Move Move - 197 3e53604b
-c 20 Move Move - 198 3e53604b
-c 21 Move Move - 221 3e53604b
-c 22 Move Move - 222 3e53604b
-c 23 Move Move - 223 3e53604b
-c 24 Move Move - 247 3e53604b
-c 25 Move Move - 248 3e53604b
-c 26 Move Move - 30 3dcccccd
-c 27 Move Move - 31 3dcccccd
-c 28 Move Move - 32 3dcccccd
-c 29 Move Move - 33 3dcccccd
-c 30 Move Move - 34 3dcccccd
-c 31 Move Move - 35 3dcccccd
-c 32 Move Move - 36 3dcccccd
-c 33 Move Move - 56 3dcccccd
-c 34 Move Move - 57 3dcccccd
-c 35 Move Move - 58 3dcccccd
-c 36 Move Move - 59 3dcccccd
-c 37 Move Move - 60 3dcccccd
-c 38 Move Move - 61 3dcccccd
-c 39 Move Move - 62 3dcccccd
-c 40 Move Move - 82 3dcccccd
-c 41 Move Move - 83 3dcccccd
-c 42 Move Move - 84 3dcccccd
-c 43 Move Move - 85 3dcccccd
-c 44 Move Move - 86 3dcccccd
-c 45 Move Move - 87 3dcccccd
-c 46 Move Move - 88 3dcccccd
-c 47 Move Move - 108 3dcccccd
-c 48 Move Move - 109 3dcccccd
-c 49 Move Move - 110 3dcccccd
-c 50 Move Move - 111 3dcccccd
-c 51 Move Move - 112 3dcccccd
-c 52 Move Move - 113 3dcccccd
-c 53 Move Move - 114 3dcccccd
-c 54 Move Move - 134 3dcccccd
-c 55 Move Move - 135 3dcccccd
-c 56 Move Move - 136 3dcccccd
-c 57 Move Move - 137 3dcccccd
-c 58 Move Move - 138 3dcccccd
-c 59 Move Move - 139 3dcccccd
-c 60 Move Move - 140 3dcccccd
-c 61 Move Move - 160 3dcccccd
-c 62 Move Move - 161 3dcccccd
-c 63 Move Move - 162 3dcccccd
-c 64 Move Move - 163 3dcccccd
-c 65 Move Move - 164 3dcccccd
-c 66 Move Move - 165 3dcccccd
-c 67 Move Move - 166 3dcccccd
-c 68 Move Move - 186 3dcccccd
-c 69 Move Move - 187 3dcccccd
-c 70 Move Move - 188 3dcccccd
-c 71 Move Move - 189 3dcccccd
-c 72 Move Move - 190 3dcccccd
-c 73 Move Move - 191 3dcccccd
-c 74 Move Move - 212 3dcccccd
-c 75 Move Move - 213 3dcccccd
-c 76 Move Move - 214 3dcccccd
-c 77 Move Move - 215 3dcccccd
-c 78 Move Move - 216 3dcccccd
-c 79 Move Move - 217 3dcccccd
-c 80 Move Move - 218 3dcccccd
-c 81 Move Move - 238 3dcccccd
-c 82 Move Move - 239 3dcccccd
-c 83 Move Move - 240 3dcccccd
-c 84 Move Move - 241 3dcccccd
-c 85 Move Move - 242 3dcccccd
-c 86 Move Move - 243 3dcccccd
-c 87 Move Move - 244 3dcccccd
-c 88 Move Move - 264 3dcccccd
-c 89 Move Move - 265 3dcccccd
-c 90 Move Move - 266 3dcccccd
-c 91 Move Move - 267 3dcccccd
-c 92 Move Move - 268 3dcccccd
-c 93 Move Move - 269 3dcccccd
-c 94 Move Move - 270 3dcccccd
-c 95 Move Move - 290 3dcccccd
-c 96 Move Move - 291 3dcccccd
-c 97 Move Move - 292 3dcccccd
-c 98 Move Move - 293 3dcccccd
-c 99 Move Move - 294 3dcccccd
-c 100 Move Move - 295 3dcccccd
-c 101 Move Move - 296 3dcccccd
-c 102 Move Move - 316 3dcccccd
-c 103 Move Move - 317 3dcccccd
-c 104 Move Move - 318 3dcccccd
-c 105 Move Move - 319 3dcccccd
-c 106 Move Move - 320 3dcccccd
-c 107 Move Move - 321 3dcccccd
-c 108 Move Move - 322 3dcccccd
-c 109 Move Move - 323 3dcccccd
-c 110 Move Move - 324 3dcccccd
-c 111 Move Move - 325 3dcccccd
-c 112 Move Move - 326 3dcccccd
-c 113 Move Move - 327 3dcccccd
-c 114 Move Move - 328 3dcccccd
-c 115 Move Move - 342 3dcccccd
-c 116 Move Move - 343 3dcccccd
-c 117 Move Move - 344 3dcccccd
-c 118 Move Move - 345 3dcccccd
-c 119 Move Move - 346 3dcccccd
-c 120 Move Move - 347 3dcccccd
-c 121 Move Move - 348 3dcccccd
-c 122 Move Move - 349 3dcccccd
-c 123 Move Move - 350 3dcccccd
-c 124 Move Move - 351 3dcccccd
-c 125 Move Move - 352 3dcccccd
-c 126 Move Move - 353 3dcccccd
-c 127 Move Move - 354 3dcccccd
-c 128 Move Move - 37 3d9e2590
-c 129 Move Move - 38 3d9e2590
-c 130 Move Move - 63 3d9e2590
-c 131 Move Move - 64 3d9e2590
-c 132 Move Move - 89 3d9e2590
-c 133 Move Move - 90 3d9e2590
-c 134 Move Move - 115 3d9e2590
-c 135 Move Move - 116 3d9e2590
-c 136 Move Move - 141 3d9e2590
-c 137 Move Move - 142 3d9e2590
-c 138 Move Move - 167 3d9e2590
-c 139 Move Move - 193 3d9e2590
-c 140 Move Move - 219 3d9e2590
-c 141 Move Move - 245 3d9e2590
-c 142 Move Move - 246 3d9e2590
-c 143 Move Move - 271 3d9e2590
-c 144 Move Move - 272 3d9e2590
-c 145 Move Move - 273 3d9e2590
-c 146 Move Move - 274 3d9e2590
-c 147 Move Move - 275 3d9e2590
-c 148 Move Move - 276 3d9e2590
-c 149 Move Move - 297 3d9e2590
-c 150 Move Move - 298 3d9e2590
-c 151 Move Move - 299 3d9e2590
-c 152 Move Move - 300 3d9e2590
-c 153 Move Move - 301 3d9e2590
-c 154 Move Move - 302 3d9e2590
-c 155 Move Move - 39 3d3be3d1
-c 156 Move Move - 40 3d3be3d1
-c 157 Move Move - 41 3d3be3d1
-c 158 Move Move - 42 3d3be3d1
-c 159 Move Move - 65 3d3be3d1
-c 160 Move Move - 66 3d3be3d1
-c 161 Move Move - 67 3d3be3d1
-c 162 Move Move - 91 3d3be3d1
-c 163 Move Move - 92 3d3be3d1
-c 164 Move Move - 117 3d3be3d1
-c 165 Move Move - 224 3d3be3d1
-c 166 Move Move - 249 3d3be3d1
-c 167 Move Move - 250 3d3be3d1
-c 168 Move Move - 43 00000000
-c 169 Move Move - 69 00000000
-c 170 Move Move - 95 00000000
-c 171 Move Move - 121 00000000
-c 172 Move Move - 147 00000000
-c 173 Move Move - 173 00000000
-c 174 Move Move - 29 00000000
-c 175 Move Move - 55 00000000
-c 176 Move Move - 81 00000000
-c 177 Move Move - 107 00000000
-c 178 Move Move - 133 00000000
-c 179 Move Move - 159 00000000
-c 180 Move Move - 185 00000000
-c 181 Move Move - 211 00000000
-c 182 Move Move - 237 00000000
-c 183 Move Move - 263 00000000
-c 184 Move Move - 289 00000000
-c 185 Move Move - 315 00000000
-c 186 Move Move - 329 00000000
-c 187 Move Move - 341 00000000
-c 188 Move Move - 355 00000000
-c 189 Move Move - 277 00000000
-c 190 Move Move - 303 00000000
-c 191 Move Move - 199 00000000
-c 192 Move Move - 225 00000000
-c 193 Move Move - 251 00000000
-c 194 Move Move - 3 00000000
-c 195 Move Move - 4 00000000
-c 196 Move Move - 5 00000000
-c 197 Move Move - 6 00000000
-c 198 Move Move - 7 00000000
-c 199 Move Move - 8 00000000
-c 200 Move Move - 9 00000000
-c 201 Move Move - 10 00000000
-c 202 Move Move - 367 00000000
-c 203 Move Move - 368 00000000
-c 204 Move Move - 369 00000000
-c 205 Move Move - 370 00000000
-c 206 Move Move - 371 00000000
-c 207 Move Move - 372 00000000
-c 208 Move Move - 373 00000000
-c 209 Move Move - 374 00000000
-c 210 Move Move - 375 00000000
-c 211 Move Move - 376 00000000
-c 212 Move Move - 377 00000000
-c 213 Move Move - 378 00000000
-c 214 Move Move - 379 00000000
-c 215 Move Move - 380 00000000
-c 216 Move Move - 381 00000000
-c 217 Move Move - 11 00000000
-c 218 Move Move - 12 00000000
-c 219 Move Move - 13 00000000
-c 220 Move Move - 14 00000000
-c 221 Move Move - 15 00000000
-c 222 Move Move - 16 00000000
-c 223 Move Move - 17 00000000
-c 224 Move Move - 44 00000000
-c 225 Move Move - 70 00000000
-c 226 Move Move - 96 00000000
-c 227 Move Move - 122 00000000
-c 228 Move Move - 148 00000000
-c 229 Move Move - 28 00000000
-c 230 Move Move - 54 00000000
-c 231 Move Move - 80 00000000
-c 232 Move Move - 106 00000000
-c 233 Move Move - 132 00000000
-c 234 Move Move - 158 00000000
-c 235 Move Move - 184 00000000
-c 236 Move Move - 210 00000000
-c 237 Move Move - 236 00000000
-c 238 Move Move - 262 00000000
-c 239 Move Move - 288 00000000
-c 240 Move Move - 314 00000000
-c 241 Move Move - 330 00000000
-c 242 Move Move - 340 00000000
-c 243 Move Move - 356 00000000
-c 244 Move Move - 278 00000000
-c 245 Move Move - 304 00000000
-c 246 Move Move - 18 00000000
-c 247 Move Move - 174 00000000
-c 248 Move Move - 200 00000000
-c 249 Move Move - 226 00000000
-c 250 Move Move - 252 00000000
-c 251 Move Move - 2 00000000
-c 252 Move Move - 366 00000000
-c 253 Move Move - 382 00000000
+c 0 Move Pickup - 194 3f2807e9 -
+c 1 Move Move - 168 3eb1ea42 -
+c 2 Move Move - 220 3eb1ea42 -
+c 3 Move Move - 68 3e53604b -
+c 4 Move Move - 93 3e53604b -
+c 5 Move Move - 94 3e53604b -
+c 6 Move Move - 118 3e53604b -
+c 7 Move Move - 119 3e53604b -
+c 8 Move Move - 120 3e53604b -
+c 9 Move Move - 143 3e53604b -
+c 10 Move Move - 144 3e53604b -
+c 11 Move Move - 145 3e53604b -
+c 12 Move Move - 146 3e53604b -
+c 13 Move Move - 169 3e53604b -
+c 14 Move Move - 170 3e53604b -
+c 15 Move Move - 171 3e53604b -
+c 16 Move Move - 172 3e53604b -
+c 17 Move Move - 195 3e53604b -
+c 18 Move Move - 196 3e53604b -
+c 19 Move Move - 197 3e53604b -
+c 20 Move Move - 198 3e53604b -
+c 21 Move Move - 221 3e53604b -
+c 22 Move Move - 222 3e53604b -
+c 23 Move Move - 223 3e53604b -
+c 24 Move Move - 247 3e53604b -
+c 25 Move Move - 248 3e53604b -
+c 26 Move Move - 30 3dcccccd -
+c 27 Move Move - 31 3dcccccd -
+c 28 Move Move - 32 3dcccccd -
+c 29 Move Move - 33 3dcccccd -
+c 30 Move Move - 34 3dcccccd -
+c 31 Move Move - 35 3dcccccd -
+c 32 Move Move - 36 3dcccccd -
+c 33 Move Move - 56 3dcccccd -
+c 34 Move Move - 57 3dcccccd -
+c 35 Move Move - 58 3dcccccd -
+c 36 Move Move - 59 3dcccccd -
+c 37 Move Move - 60 3dcccccd -
+c 38 Move Move - 61 3dcccccd -
+c 39 Move Move - 62 3dcccccd -
+c 40 Move Move - 82 3dcccccd -
+c 41 Move Move - 83 3dcccccd -
+c 42 Move Move - 84 3dcccccd -
+c 43 Move Move - 85 3dcccccd -
+c 44 Move Move - 86 3dcccccd -
+c 45 Move Move - 87 3dcccccd -
+c 46 Move Move - 88 3dcccccd -
+c 47 Move Move - 108 3dcccccd -
+c 48 Move Move - 109 3dcccccd -
+c 49 Move Move - 110 3dcccccd -
+c 50 Move Move - 111 3dcccccd -
+c 51 Move Move - 112 3dcccccd -
+c 52 Move Move - 113 3dcccccd -
+c 53 Move Move - 114 3dcccccd -
+c 54 Move Move - 134 3dcccccd -
+c 55 Move Move - 135 3dcccccd -
+c 56 Move Move - 136 3dcccccd -
+c 57 Move Move - 137 3dcccccd -
+c 58 Move Move - 138 3dcccccd -
+c 59 Move Move - 139 3dcccccd -
+c 60 Move Move - 140 3dcccccd -
+c 61 Move Move - 160 3dcccccd -
+c 62 Move Move - 161 3dcccccd -
+c 63 Move Move - 162 3dcccccd -
+c 64 Move Move - 163 3dcccccd -
+c 65 Move Move - 164 3dcccccd -
+c 66 Move Move - 165 3dcccccd -
+c 67 Move Move - 166 3dcccccd -
+c 68 Move Move - 186 3dcccccd -
+c 69 Move Move - 187 3dcccccd -
+c 70 Move Move - 188 3dcccccd -
+c 71 Move Move - 189 3dcccccd -
+c 72 Move Move - 190 3dcccccd -
+c 73 Move Move - 191 3dcccccd -
+c 74 Move Move - 212 3dcccccd -
+c 75 Move Move - 213 3dcccccd -
+c 76 Move Move - 214 3dcccccd -
+c 77 Move Move - 215 3dcccccd -
+c 78 Move Move - 216 3dcccccd -
+c 79 Move Move - 217 3dcccccd -
+c 80 Move Move - 218 3dcccccd -
+c 81 Move Move - 238 3dcccccd -
+c 82 Move Move - 239 3dcccccd -
+c 83 Move Move - 240 3dcccccd -
+c 84 Move Move - 241 3dcccccd -
+c 85 Move Move - 242 3dcccccd -
+c 86 Move Move - 243 3dcccccd -
+c 87 Move Move - 244 3dcccccd -
+c 88 Move Move - 264 3dcccccd -
+c 89 Move Move - 265 3dcccccd -
+c 90 Move Move - 266 3dcccccd -
+c 91 Move Move - 267 3dcccccd -
+c 92 Move Move - 268 3dcccccd -
+c 93 Move Move - 269 3dcccccd -
+c 94 Move Move - 270 3dcccccd -
+c 95 Move Move - 290 3dcccccd -
+c 96 Move Move - 291 3dcccccd -
+c 97 Move Move - 292 3dcccccd -
+c 98 Move Move - 293 3dcccccd -
+c 99 Move Move - 294 3dcccccd -
+c 100 Move Move - 295 3dcccccd -
+c 101 Move Move - 296 3dcccccd -
+c 102 Move Move - 316 3dcccccd -
+c 103 Move Move - 317 3dcccccd -
+c 104 Move Move - 318 3dcccccd -
+c 105 Move Move - 319 3dcccccd -
+c 106 Move Move - 320 3dcccccd -
+c 107 Move Move - 321 3dcccccd -
+c 108 Move Move - 322 3dcccccd -
+c 109 Move Move - 323 3dcccccd -
+c 110 Move Move - 324 3dcccccd -
+c 111 Move Move - 325 3dcccccd -
+c 112 Move Move - 326 3dcccccd -
+c 113 Move Move - 327 3dcccccd -
+c 114 Move Move - 328 3dcccccd -
+c 115 Move Move - 342 3dcccccd -
+c 116 Move Move - 343 3dcccccd -
+c 117 Move Move - 344 3dcccccd -
+c 118 Move Move - 345 3dcccccd -
+c 119 Move Move - 346 3dcccccd -
+c 120 Move Move - 347 3dcccccd -
+c 121 Move Move - 348 3dcccccd -
+c 122 Move Move - 349 3dcccccd -
+c 123 Move Move - 350 3dcccccd -
+c 124 Move Move - 351 3dcccccd -
+c 125 Move Move - 352 3dcccccd -
+c 126 Move Move - 353 3dcccccd -
+c 127 Move Move - 354 3dcccccd -
+c 128 Move Move - 37 3d9e2590 -
+c 129 Move Move - 38 3d9e2590 -
+c 130 Move Move - 63 3d9e2590 -
+c 131 Move Move - 64 3d9e2590 -
+c 132 Move Move - 89 3d9e2590 -
+c 133 Move Move - 90 3d9e2590 -
+c 134 Move Move - 115 3d9e2590 -
+c 135 Move Move - 116 3d9e2590 -
+c 136 Move Move - 141 3d9e2590 -
+c 137 Move Move - 142 3d9e2590 -
+c 138 Move Move - 167 3d9e2590 -
+c 139 Move Move - 193 3d9e2590 -
+c 140 Move Move - 219 3d9e2590 -
+c 141 Move Move - 245 3d9e2590 -
+c 142 Move Move - 246 3d9e2590 -
+c 143 Move Move - 271 3d9e2590 -
+c 144 Move Move - 272 3d9e2590 -
+c 145 Move Move - 273 3d9e2590 -
+c 146 Move Move - 274 3d9e2590 -
+c 147 Move Move - 275 3d9e2590 -
+c 148 Move Move - 276 3d9e2590 -
+c 149 Move Move - 297 3d9e2590 -
+c 150 Move Move - 298 3d9e2590 -
+c 151 Move Move - 299 3d9e2590 -
+c 152 Move Move - 300 3d9e2590 -
+c 153 Move Move - 301 3d9e2590 -
+c 154 Move Move - 302 3d9e2590 -
+c 155 Move Move - 39 3d3be3d1 -
+c 156 Move Move - 40 3d3be3d1 -
+c 157 Move Move - 41 3d3be3d1 -
+c 158 Move Move - 42 3d3be3d1 -
+c 159 Move Move - 65 3d3be3d1 -
+c 160 Move Move - 66 3d3be3d1 -
+c 161 Move Move - 67 3d3be3d1 -
+c 162 Move Move - 91 3d3be3d1 -
+c 163 Move Move - 92 3d3be3d1 -
+c 164 Move Move - 117 3d3be3d1 -
+c 165 Move Move - 224 3d3be3d1 -
+c 166 Move Move - 249 3d3be3d1 -
+c 167 Move Move - 250 3d3be3d1 -
+c 168 Move Move - 43 00000000 -
+c 169 Move Move - 69 00000000 -
+c 170 Move Move - 95 00000000 -
+c 171 Move Move - 121 00000000 -
+c 172 Move Move - 147 00000000 -
+c 173 Move Move - 173 00000000 -
+c 174 Move Move - 29 00000000 -
+c 175 Move Move - 55 00000000 -
+c 176 Move Move - 81 00000000 -
+c 177 Move Move - 107 00000000 -
+c 178 Move Move - 133 00000000 -
+c 179 Move Move - 159 00000000 -
+c 180 Move Move - 185 00000000 -
+c 181 Move Move - 211 00000000 -
+c 182 Move Move - 237 00000000 -
+c 183 Move Move - 263 00000000 -
+c 184 Move Move - 289 00000000 -
+c 185 Move Move - 315 00000000 -
+c 186 Move Move - 329 00000000 -
+c 187 Move Move - 341 00000000 -
+c 188 Move Move - 355 00000000 -
+c 189 Move Move - 277 00000000 -
+c 190 Move Move - 303 00000000 -
+c 191 Move Move - 199 00000000 -
+c 192 Move Move - 225 00000000 -
+c 193 Move Move - 251 00000000 -
+c 194 Move Move - 3 00000000 -
+c 195 Move Move - 4 00000000 -
+c 196 Move Move - 5 00000000 -
+c 197 Move Move - 6 00000000 -
+c 198 Move Move - 7 00000000 -
+c 199 Move Move - 8 00000000 -
+c 200 Move Move - 9 00000000 -
+c 201 Move Move - 10 00000000 -
+c 202 Move Move - 367 00000000 -
+c 203 Move Move - 368 00000000 -
+c 204 Move Move - 369 00000000 -
+c 205 Move Move - 370 00000000 -
+c 206 Move Move - 371 00000000 -
+c 207 Move Move - 372 00000000 -
+c 208 Move Move - 373 00000000 -
+c 209 Move Move - 374 00000000 -
+c 210 Move Move - 375 00000000 -
+c 211 Move Move - 376 00000000 -
+c 212 Move Move - 377 00000000 -
+c 213 Move Move - 378 00000000 -
+c 214 Move Move - 379 00000000 -
+c 215 Move Move - 380 00000000 -
+c 216 Move Move - 381 00000000 -
+c 217 Move Move - 11 00000000 -
+c 218 Move Move - 12 00000000 -
+c 219 Move Move - 13 00000000 -
+c 220 Move Move - 14 00000000 -
+c 221 Move Move - 15 00000000 -
+c 222 Move Move - 16 00000000 -
+c 223 Move Move - 17 00000000 -
+c 224 Move Move - 44 00000000 -
+c 225 Move Move - 70 00000000 -
+c 226 Move Move - 96 00000000 -
+c 227 Move Move - 122 00000000 -
+c 228 Move Move - 148 00000000 -
+c 229 Move Move - 28 00000000 -
+c 230 Move Move - 54 00000000 -
+c 231 Move Move - 80 00000000 -
+c 232 Move Move - 106 00000000 -
+c 233 Move Move - 132 00000000 -
+c 234 Move Move - 158 00000000 -
+c 235 Move Move - 184 00000000 -
+c 236 Move Move - 210 00000000 -
+c 237 Move Move - 236 00000000 -
+c 238 Move Move - 262 00000000 -
+c 239 Move Move - 288 00000000 -
+c 240 Move Move - 314 00000000 -
+c 241 Move Move - 330 00000000 -
+c 242 Move Move - 340 00000000 -
+c 243 Move Move - 356 00000000 -
+c 244 Move Move - 278 00000000 -
+c 245 Move Move - 304 00000000 -
+c 246 Move Move - 18 00000000 -
+c 247 Move Move - 174 00000000 -
+c 248 Move Move - 200 00000000 -
+c 249 Move Move - 226 00000000 -
+c 250 Move Move - 252 00000000 -
+c 251 Move Move - 2 00000000 -
+c 252 Move Move - 366 00000000 -
+c 253 Move Move - 382 00000000 -
 case block_two_targets
 player home 1 10 7 standing
 player away 1 11 7 standing
@@ -535,8 +535,8 @@ player away 3 20 2 standing
 actions Block
 params 3f800000 3da8f5c3 00000000
 n 2
-c 0 Block Immediate away_01 - 3dcccccd
-c 1 Block Immediate away_02 - 3dcccccd
+c 0 Block Immediate away_01 - 3dcccccd -
+c 1 Block Immediate away_02 - 3dcccccd -
 case blitz_adjacent_only
 player home 1 10 7 standing
 player away 1 11 7 standing
@@ -544,7 +544,7 @@ player away 2 16 7 standing
 actions Blitz
 params 3f800000 3da8f5c3 00000000
 n 1
-c 0 Blitz Blitz:away_01 away_01 - 3e59999a
+c 0 Blitz Blitz:away_01 away_01 - 3e59999a -
 case give_and_pass
 player home 1 12 7 standing
 player home 2 14 7 standing
@@ -554,21 +554,21 @@ ball 12 7 false
 actions HandOver,Pass
 params 3f800000 3f0ccccd 00000000
 n 18
-c 0 HandOff HandOff:home_02 home_02 - 00000000
-c 1 HandOff HandOff:home_02 home_02 - 00000000
-c 2 HandOff HandOff:home_03 home_03 - 00000000
-c 3 HandOff HandOff:home_03 home_03 - 00000000
-c 4 Pass Pass:home_03 home_03 - 00000000
-c 5 Pass Pass:home_03 home_03 - 00000000
-c 6 Pass Pass:home_03 home_03 - 00000000
-c 7 Pass Pass:home_03 home_03 - 00000000
-c 8 Pass Pass:home_03 home_03 - 00000000
-c 9 Pass Pass:home_03 home_03 - 00000000
-c 10 Pass Pass:home_03 home_03 - 00000000
-c 11 Pass Pass:home_02 home_02 - 00000000
-c 12 Pass Pass:home_02 home_02 - 00000000
-c 13 Pass Pass:home_02 home_02 - 00000000
-c 14 Pass Pass:home_02 home_02 - 00000000
-c 15 Pass Pass:home_02 home_02 - 00000000
-c 16 Pass Pass:home_02 home_02 - 00000000
-c 17 Pass Pass:home_02 home_02 - 00000000
+c 0 HandOff HandOff:home_02 home_02 - 00000000 13,6
+c 1 HandOff HandOff:home_02 home_02 - 00000000 13,6;14,6
+c 2 HandOff HandOff:home_03 home_03 - 00000000 11,8
+c 3 HandOff HandOff:home_03 home_03 - 00000000 12,8
+c 4 Pass Pass:home_03 home_03 - 00000000 -
+c 5 Pass Pass:home_03 home_03 - 00000000 13,6;14,5;15,4;16,3;17,2;18,1
+c 6 Pass Pass:home_03 home_03 - 00000000 13,6;14,5;15,4;16,3;17,2;18,2
+c 7 Pass Pass:home_03 home_03 - 00000000 13,6;14,5;15,4;16,3;17,2;18,3
+c 8 Pass Pass:home_03 home_03 - 00000000 13,6;14,5;15,4;16,3;17,3;18,4
+c 9 Pass Pass:home_03 home_03 - 00000000 13,6;14,5;15,4;16,3;17,4;18,5
+c 10 Pass Pass:home_03 home_03 - 00000000 13,6;14,5;15,4;16,4;17,5;18,6
+c 11 Pass Pass:home_02 home_02 - 00000000 -
+c 12 Pass Pass:home_02 home_02 - 00000000 13,6;14,5;15,4;16,3;17,2;18,1
+c 13 Pass Pass:home_02 home_02 - 00000000 13,6;14,5;15,4;16,3;17,2;18,2
+c 14 Pass Pass:home_02 home_02 - 00000000 13,6;14,5;15,4;16,3;17,2;18,3
+c 15 Pass Pass:home_02 home_02 - 00000000 13,6;14,5;15,4;16,3;17,3;18,4
+c 16 Pass Pass:home_02 home_02 - 00000000 13,6;14,5;15,4;16,3;17,4;18,5
+c 17 Pass Pass:home_02 home_02 - 00000000 13,6;14,5;15,4;16,4;17,5;18,6

@@ -69,6 +69,7 @@ class PlanBuilderTest {
         String target;
         String dest;
         int weightBits;
+        String path;
     }
 
     @Test
@@ -85,6 +86,7 @@ class PlanBuilderTest {
         int casesChecked = 0;
         boolean sawPickup = false;
         boolean sawSkippedBlitz = false;
+        boolean sawBallMove = false;
 
         // Cases are terminated by the next `case` or end of file; collect then verify.
         List<Runnable> pending = new ArrayList<>();
@@ -100,6 +102,7 @@ class PlanBuilderTest {
                     Verify v = verify(caseName, rows, ball, loose, actions, params, wants);
                     sawPickup |= v.sawPickup;
                     sawSkippedBlitz |= v.sawSkippedBlitz;
+                    sawBallMove |= v.sawBallMove;
                     casesChecked++;
                 }
                 caseName = p[1];
@@ -143,6 +146,7 @@ class PlanBuilderTest {
                     w.target = p[4];
                     w.dest = p[5];
                     w.weightBits = (int) Long.parseLong(p[6], 16);
+                    w.path = p.length > 7 ? p[7] : "-";
                     wants.add(w);
                     break;
                 }
@@ -156,11 +160,13 @@ class PlanBuilderTest {
             + "untested");
         assertTrue(sawSkippedBlitz, "no blitz case where a distant victim was skipped; the "
             + "adjacency cutoff is untested");
+        assertTrue(sawBallMove, "no HandOff/Pass case; the give enumeration is untested");
     }
 
     private static final class Verify {
         boolean sawPickup;
         boolean sawSkippedBlitz;
+        boolean sawBallMove;
     }
 
     /** Rebuild the case and compare against the golden's candidate lines. */
@@ -178,13 +184,83 @@ class PlanBuilderTest {
         assertNotNull(me, "home_01 must be on the board (" + caseName + ")");
         Features f = Features.build(snaps,
             new Features.BoardState(ball, ball != null, loose, false, false), true);
-        FieldCoordinate here = new FieldCoordinate(me.x, me.y);
+        final FieldCoordinate here = new FieldCoordinate(me.x, me.y);
         boolean isCarrier = f.ballCarried && f.ball != null && f.ball.equals(here);
         ValueModel.Mover m = new ValueModel.Mover(true, isCarrier, 6, 3, 3, false, false, false,
             ValueModel.endzoneDistance(me.x, true), Math.max(8 - 3, 0), f.unactivated[0]);
 
-        // Only the branches whose enumeration is geometry plus pinned weights are rebuilt here.
-        if (!"Move".equals(actions) && !"Block".equals(actions) && !"Blitz".equals(actions)) {
+        // HandOff and Pass are enumerated too. Their WEIGHTS come from the golden -- the give and
+        // throw prices have their own fixtures (ITER30/31) and re-deriving them here would need
+        // the engine's pass mechanics, which is exactly the plumbing the live gate covers. What is
+        // checked here is the enumeration: which receivers, from which squares, in which order.
+        boolean ballMoves = actions.contains("HandOver") || actions.contains("Pass");
+        if (!"Move".equals(actions) && !"Block".equals(actions) && !"Blitz".equals(actions)
+                && !ballMoves) {
+            return v;
+        }
+        if (ballMoves) {
+            v.sawBallMove = true;
+            List<PlanBuilder.Candidate> gotBm = new ArrayList<>();
+            Reach rr = Reach.search(f, Reach.budgetOf(here, m.ma, false, 0),
+                new Reach.MoverSpec(true, m.ag, false, false), false, false, false);
+            assertNotNull(rr, "reach for " + caseName);
+            // Receivers in the engine's order: team-mates on the pitch, coordinate-sorted.
+            List<Row> mates = new ArrayList<>();
+            for (Row o : rows) {
+                if (o.home && o.nr != 1) {
+                    mates.add(o);
+                }
+            }
+            // The give branch walks team-mates in CANONICAL order and the pass branch in
+            // COORDINATE order; both happen to coincide on this board, and the golden is the
+            // arbiter either way.
+            int idx = 0;
+            for (Want w : wants) {
+                if (!w.kind.startsWith("HandOff") && !w.kind.startsWith("Pass")) {
+                    idx++;
+                }
+            }
+            // Price the gives with the REAL handoffWeight, which has its own fixture (ITER30).
+            // Deriving the callback from the golden's own rows was the first attempt and was
+            // worthless: it could only ever return the squares the golden already listed, so the
+            // GIVE_SPOTS cap never bound and perturbing it from 2 to 3 did not fail.
+            final List<Want> ws = wants;
+            final BallMoves.Ctx ctx = new BallMoves.Ctx(3, false);
+            final ValueModel.Mover mm = m;
+            final Features ff = f;
+            List<PlanBuilder.Receiver> giveRcv = new ArrayList<>();
+            for (Row o : mates) {
+                final String id = String.format("home_%02d", o.nr);
+                final BallMoves.RcvSpec spec = new BallMoves.RcvSpec(
+                    new FieldCoordinate(o.x, o.y), 6, 3, 3, true, false, false, false);
+                giveRcv.add(new PlanBuilder.Receiver(id, new FieldCoordinate(o.x, o.y)) {
+                    @Override
+                    public Float weightFrom(FieldCoordinate from) {
+                        return BallMoves.handoffWeight(ff, ctx, spec, from, mm);
+                    }
+                });
+            }
+            PlanBuilder.handOffCandidates(f, rr, m, "home_01", "HandOver", here, giveRcv,
+                params[0], 0.0f, params[2], gotBm);
+            long wantGive = ws.stream().filter(w -> w.kind.startsWith("HandOff")).count();
+            assertEquals(wantGive, gotBm.size(),
+                "HandOff candidate COUNT (" + caseName + ")");
+            int gi = 0;
+            for (Want w : ws) {
+                if (!w.kind.startsWith("HandOff")) {
+                    continue;
+                }
+                PlanBuilder.Candidate c = gotBm.get(gi);
+                assertEquals(w.kind, "HandOff:" + c.target,
+                    "HandOff receiver at " + gi + " (" + caseName + ")");
+                String wantSquare = "-".equals(w.path)
+                    ? here.getX() + "," + here.getY()
+                    : w.path.substring(w.path.lastIndexOf(';') + 1);
+                String gotSquare = (c.dest % Features.W) + "," + (c.dest / Features.W);
+                assertEquals(wantSquare, gotSquare,
+                    "HandOff give square at " + gi + " (" + caseName + ")");
+                gi++;
+            }
             return v;
         }
 

@@ -5705,7 +5705,7 @@ mod tests {
         writeln!(out, "# actions <comma separated PlayerAction names for home_01>").unwrap();
         writeln!(out, "# params <w_player bits> <proxy bits> <novelty bits>").unwrap();
         writeln!(out, "# n <candidate count>").unwrap();
-        writeln!(out, "# c <index> <pac> <kind> <target|-> <dest|-> <weight bits>").unwrap();
+        writeln!(out, "# c <index> <pac> <kind> <target|-> <dest|-> <weight bits> <path|->").unwrap();
 
         for (name, board, ball, loose, actions) in cases {
             let mut home = crate::step::framework::test_team("home", 0);
@@ -5788,11 +5788,18 @@ mod tests {
                     PlanKind::HandOff { receiver } => format!("HandOff:{receiver}"),
                     PlanKind::Immediate => "Immediate".to_string(),
                 };
-                writeln!(out, "c {i} {:?} {kind} {} {} {:08x}",
+                // HandOff and Pass carry a PATH rather than a `dest` -- the run-up is the plan --
+                // so the path is what makes their enumerated square observable at all. Without it
+                // every give candidate looks identical: same receiver, no dest, and a weight that
+                // floors to 0 because the raw give price is negative.
+                let path: Vec<String> =
+                    c.path.iter().map(|p| format!("{},{}", p.x, p.y)).collect();
+                writeln!(out, "c {i} {:?} {kind} {} {} {:08x} {}",
                     c.pac,
                     c.target.clone().unwrap_or_else(|| "-".to_string()),
                     c.dest.map(|d| d.to_string()).unwrap_or_else(|| "-".to_string()),
-                    c.weight.to_bits()).unwrap();
+                    c.weight.to_bits(),
+                    if path.is_empty() { "-".to_string() } else { path.join(";") }).unwrap();
             }
         }
 
