@@ -3576,3 +3576,54 @@ member — and the sweep is the evidence.
 **Next:** bb2025 has ONE red left at argmax and one at scale 1.0 — take it. bb2016's 13 and the
 sampled-gate gaps are what remains after that. Note that argmax, 1.0 and 1e6 no longer move
 together: 1e6 is now the weakest column in two editions, and the goal needs all three.
+
+## ITER64 — the plan was scored with the weather and rebuilt without it
+
+**bb2020: 100/100 at ALL THREE scales. bb2025: 100/100 at argmax and 1.0, 98/100 uniform.**
+bb2016 87 → 88 argmax.
+
+bb2025's last argmax red was seed 73. Both sides move `away_04` at step 37 on a board they agree
+about, and the ball carrier ends at (19,12) for Java and (20,11) for Rust, with Java rolling one
+extra die. The weather was **Blizzard**.
+
+`ActivationChoice.choose` passes the real edition and weather when it SCORES a destination:
+
+```java
+new Reach.MoverSpec(m.home, m.ag, e.dodge, e.sureFeet), bb2016, blizzard, teamReRoll
+```
+
+Both of `ActivationDriver`'s path REBUILDS — `recordPlan` and `replan` — passed:
+
+```java
+new Reach.MoverSpec(m.home, m.ag, false, false), false, false, teamReRoll
+```
+
+Four wrong arguments. A plan was therefore chosen under one set of movement rules and its path
+re-derived under another; in a blizzard the rush target is 3 rather than 2, so the squares past a
+player's MA are worth materially less and a different route wins. Both rebuilds now go through one
+`searchFor` that reads all four facts from the game.
+
+**The test was wrong before it was right, and the reason matters.** The obvious assertion — that a
+blizzard changes the reach — fails: it changes neither the reached SET nor `cost`. A rush is still
+*allowed* in a blizzard, just likelier to fail, so the difference lands entirely in the quantised
+`key` that the search minimises and `pathTo` walks back. Comparing the field a reader would reach
+for first finds nothing, which is precisely why a constant `false` here looked free for 64
+iterations. The test now asserts both halves: `cost` identical, `key` different.
+
+### Gates
+
+| | argmax | scale 1.0 | scale 1e6 |
+|---|---|---|---|
+| bb2025 | **100** | **100** | 98 |
+| bb2020 | **100** | **100** | **100** |
+| bb2016 | 88 | 84 | 88 |
+
+- Fourteen-class rung: **100/100 in bb2016, bb2020 and bb2025**.
+- `--agent random` lineman tier-3: **100/100** in bb2016, bb2020 and bb2025.
+- `cargo test --workspace --release`: **14,663 / 0** (no Rust change). `mvn -o -pl ffb-ai test`:
+  **35 / 0** (+1). The two Java trees agree.
+
+**bb2020 is DONE** — 100/100 at all three scales, which is one third of the campaign goal.
+
+**Next:** bb2025's two uniform-only reds (1e6), then bb2016, which is now the whole remaining
+problem at 88/84/88. Its 12 argmax reds are all bb2016-only seeds.

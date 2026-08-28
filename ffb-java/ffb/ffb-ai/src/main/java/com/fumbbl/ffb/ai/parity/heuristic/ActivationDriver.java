@@ -95,6 +95,38 @@ public final class ActivationDriver {
      * needs. Read off the ruleset name rather than a version number, because that is what the
      * harness has to hand.
      */
+    /**
+     * The four board facts a reach search needs beyond the budget, read from the game.
+     *
+     * <p>`ActivationChoice.choose` passes the real ones when it SCORES a destination; both
+     * rebuilds below passed `false, false` and a `MoverSpec` with no Dodge and no Sure Feet, so a
+     * plan was chosen under one set of movement rules and its path re-derived under another. In a
+     * BLIZZARD the rush target is 3 rather than 2, which changes which squares are worth reaching:
+     * bb2025 seed 73 step 37 sent the ball carrier to (20,11) where Java sent him to (19,12), on a
+     * board both sides agreed about.
+     */
+    private Reach searchFor(Game game, Features f, String playerId, ValueModel.Mover m,
+            Reach.Budget budget, boolean teamReRoll) {
+        Player<?> p = game.getPlayerById(playerId);
+        boolean blizzard = game.getFieldModel().getWeather() == com.fumbbl.ffb.Weather.BLIZZARD;
+        return Reach.search(f, budget,
+            new Reach.MoverSpec(m.home, m.ag, hasSkillOn(p, "Dodge"), hasSkillOn(p, "Sure Feet")),
+            editionIsBb2016(game), blizzard, teamReRoll);
+    }
+
+    /** {@code GameBoard.hasSkill}, reachable from the driver itself. */
+    private static boolean hasSkillOn(Player<?> p, String name) {
+        if (p == null) {
+            return false;
+        }
+        for (com.fumbbl.ffb.model.skill.Skill sk : p.getSkillsIncludingTemporaryOnes()) {
+            if (sk != null && name.equals(sk.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean editionIsBb2016(Game game) {
         com.fumbbl.ffb.mechanics.Mechanic m = (com.fumbbl.ffb.mechanics.Mechanic) game
             .getFactory(com.fumbbl.ffb.FactoryType.Factory.MECHANIC)
@@ -177,9 +209,9 @@ public final class ActivationDriver {
         FieldCoordinate here = coordOf(game, player);
         if (dest != null && here != null) {
             Features f = Features.build(game);
-            Reach r = Reach.search(f,
+            Reach r = searchFor(game, f, player, m,
                 Reach.budgetOf(here, m.ma, isProne(game, player), spentBy(game, player)),
-                new Reach.MoverSpec(m.home, m.ag, false, false), false, false, teamReRoll);
+                teamReRoll);
             if (r != null) {
                 path = r.pathTo(dest);
             }
@@ -269,9 +301,9 @@ public final class ActivationDriver {
         com.fumbbl.ffb.model.TurnData td =
             m.home ? game.getTurnDataHome() : game.getTurnDataAway();
         boolean teamReRoll = td.getReRolls() > 0 && !td.isReRollUsed();
-        Reach r = Reach.search(f,
+        Reach r = searchFor(game, f, playerId, m,
             Reach.budgetOf(here, m.ma, isProne(game, playerId), spentBy(game, playerId)),
-            new Reach.MoverSpec(m.home, m.ag, false, false), false, false, teamReRoll);
+            teamReRoll);
         if (r == null) {
             plan = null;
             return new ArrayList<>();

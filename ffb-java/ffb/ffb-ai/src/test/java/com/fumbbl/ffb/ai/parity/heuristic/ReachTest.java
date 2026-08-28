@@ -201,4 +201,58 @@ class ReachTest {
         assertTrue(casesChecked >= 5, "too few cases: " + casesChecked);
         assertTrue(pathsChecked >= 40, "too few paths: " + pathsChecked);
     }
+
+    /**
+     * Regression guard for ITER64: the blizzard flag CHANGES the reach, so passing a constant
+     * `false` is not harmless.
+     *
+     * <p>`ActivationChoice.choose` passed the real weather when it SCORED a destination, while
+     * both of `ActivationDriver`'s path rebuilds — `recordPlan` and `replan` — passed
+     * `false, false` and a `MoverSpec` with no Dodge and no Sure Feet. A plan was therefore chosen
+     * under one set of movement rules and its path re-derived under another. In a blizzard the rush
+     * target is 3 instead of 2, so the squares past a player's MA are worth materially less:
+     * bb2025 seed 73 step 37 sent the ball carrier to (20,11) where Java sent him to (19,12), on a
+     * board both sides agreed about.
+     *
+     * <p>Both rebuilds now go through one `searchFor` that reads all four facts from the game.
+     * This test pins the premise — that the flag is load-bearing — which is what makes the shared
+     * helper necessary rather than cosmetic.
+     */
+    @Test
+    void blizzardChangesWhatIsWorthReaching() {
+        // One lone mover, so the only thing separating the two searches is the rush target.
+        List<Features.Snap> snaps = new ArrayList<>();
+        snaps.add(new Features.Snap(true, 5, 7, true, true, 6, 3, 1));
+        Features f = Features.build(snaps,
+            new Features.BoardState(null, false, false, false, false), true);
+
+        FieldCoordinate start = new FieldCoordinate(5, 7);
+        // MA 6 with nothing spent: the two RUSH squares beyond it are the ones at stake.
+        Reach.Budget b = Reach.budgetOf(start, 6, false, 0);
+        Reach.MoverSpec spec = new Reach.MoverSpec(true, 3, false, false);
+
+        Reach fair = Reach.search(f, b, spec, false, false, false);
+        Reach blizzard = Reach.search(f, b, spec, false, true, false);
+
+        assertNotNull(fair);
+        assertNotNull(blizzard);
+
+        // The same squares are REACHED either way -- a rush is still allowed in a blizzard, just
+        // likelier to fail -- so the difference lands in the quantised KEY, which is what the
+        // search minimises and what `pathTo` walks back. Comparing `cost` finds nothing, which is
+        // exactly why a constant `false` here looked harmless.
+        int differingCost = 0;
+        int differingKey = 0;
+        for (int i = 0; i < Features.CELLS; i++) {
+            if (fair.cost[i] != blizzard.cost[i]) {
+                differingCost++;
+            }
+            if (fair.key[i] != blizzard.key[i]) {
+                differingKey++;
+            }
+        }
+        assertEquals(0, differingCost, "a blizzard does not change which squares are reachable");
+        assertTrue(differingKey > 0,
+            "but it MUST change their cost in probability, or passing `false` for it would be free");
+    }
 }
