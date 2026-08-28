@@ -2392,3 +2392,44 @@ list was worth a board.
 **Next:** the wiring. `ParityRunner` gets the activation branch and the move-replay branch together
 — they are one unit, since the plan is set by one and consumed by the other — and then
 `--heur-classes activate,move` goes live for the first real gate.
+
+## ITER40 — `ActivationDriver`: the live half, wired to a real Game
+
+The state the decisions are threaded through, and the adapters that answer eligibility questions
+from an actual `Game` rather than a fixture snapshot. Everything it DECIDES is computed by classes
+that already have cross-language fixtures; what is new is the plumbing between them and the engine.
+
+- `chooseActivation` builds `Features` from the game, assembles the eligible list, and delegates to
+  the already-pinned `ActivationChoice.choose`. It then records `usedThisTurn` and, for a ball move,
+  `awaitingRun` — the receiver who must be activated next, or the throw bought nothing.
+- `recordPlan` re-runs the reach search to turn the chosen candidate's destination into a PATH,
+  which is exactly what Rust's `handle_activate` tail does rather than carrying the path through the
+  draw.
+- `replayMove` gathers the seven board facts and asks the exhaustively-pinned `MoveReplay.decide`.
+- `GameBoard` answers block/blitz/foul targets and receivers, calling the ENGINE's own
+  `ServerUtilPlayer.findBlockStrength` and the edition's `PassMechanic` rather than re-deriving
+  either.
+
+### Three API mismatches, all caught by the compiler
+
+`PlayerState` has no `isProne()` — only `isProneOrStunned()` and `isStunned()`, so the prone
+predicate is the difference of the two. `os.isProne() || os.isStunned()` for foul targets collapses
+to `isProneOrStunned()`. And the pass mechanic is reached through
+`game.getFactory(FactoryType.Factory.MECHANIC).forName(Mechanic.Type.PASS.name())`, the same lookup
+the engine's own skill behaviours use, so the EDITION's table is what answers.
+
+Worth noting these are the kind of mistake that is cheap precisely because it is a compile error.
+The expensive ones in this campaign have all been the opposite: code that compiled, ran, and
+quietly meant something else.
+
+### Gates
+
+- `mvn -o -pl ffb-ai test`: **28 tests, 0 failures**.
+- `cargo test --workspace --release`: **14,655 / 0**.
+- Fourteen-class rung **100/100 in all three editions** at argmax; `--agent random` 100/100 in all
+  three. Nothing live changed — `ActivationDriver` has no caller yet.
+
+**Next:** the two call sites in `ParityRunner` — the activation loop and `sendMoveAction` — and then
+`--heur-classes ...,activate,move` for the first live gate. Both switch on together: the plan is
+created by one and consumed by the other, and the harness's prone-move RNG choreography is split
+across both, so separating them would desynchronise the stream by construction.
