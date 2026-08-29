@@ -177,9 +177,13 @@ impl StepKickoffReturn {
                 self.window_open = true;
                 // Java: UtilServerDialog.showDialog(…, new DialogKickoffReturnParameter(), false)
                 let eligible: Vec<String> = kickoff_return_player.into_iter().collect();
-                // Java: pushCurrentStepOnStack() + Select.pushSequence
-                return StepOutcome::repeat()
+                // Java: `pushCurrentStepOnStack()` + `Select.pushSequence(...)`. That is
+                // `push_self`, NOT `repeat`: the step must resume BELOW the pushed sequence, once
+                // it finishes. `repeat` re-runs the step immediately instead, so the Select
+                // sequence never gets control and the window never closes.
+                return StepOutcome::cont()
                     .with_prompt(AgentPrompt::KickoffReturn { eligible_players: eligible })
+                    .push_self()
                     .push_seq(select_sequence());
             }
         }

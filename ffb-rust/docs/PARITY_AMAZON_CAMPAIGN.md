@@ -642,3 +642,52 @@ in the ground-truth engine is exactly how ground truth stops being ground truth.
 the single largest known cause on bb2020 (32 of 44 failures show the turn mismatch) and now has a
 precise blocker: `repeat().with_prompt().push_seq()` does not re-enter the step the way Java's
 `pushCurrentStepOnStack()` does.
+
+## ITER11 — investigation: Java's harness contract for the kickoff-return window, mapped
+
+**Third attempt at the window; still not live. Gate unchanged (100 / 55 / 45).** What this iteration
+bought is the CONTRACT, which none of the previous attempts had, plus one more 1:1 correction.
+
+**The census that justified another attempt.** With bb2016 green, the two remaining editions are
+bb2020 45 fails and bb2025 55, sharing only 28 seeds. The single largest bucket is still the
+turn-number mismatch — **32 of bb2020's 45** and 25 of bb2025's 55 — which is this window. Nothing
+else in the census is close.
+
+**Correction found: `repeat` where Java has `pushCurrentStepOnStack`.** The step returned
+`StepOutcome::repeat().with_prompt(...).push_seq(select_sequence())`. Java does
+`getGameState().pushCurrentStepOnStack(); generator.pushSequence(Select...)`, and the framework has
+that exact primitive — `push_self`, documented as "re-insert the CURRENT step instance BELOW the
+sequences the same outcome pushed, so it resumes after they finish". `repeat` re-runs the step
+immediately instead, so the pushed Select sequence never gets control. Corrected to `push_self`.
+
+**The contract, from `ParityRunner`'s two `case KICKOFF_RETURN` arms** — this is the piece that was
+missing, and it is not what the Rust side assumes:
+
+1. the DIALOG is acknowledged with **zero RNG** (`game.setDialogParameter(null)`), and
+2. at the window STATE the harness injects `ClientCommandEndTurn` — **the returner never moves.**
+
+So the window opens, is immediately ended, and the sequence continues with the receiving team's turn
+counter untouched. Rust instead pushes a full `Select` sequence and expects the agent to play a
+mini-turn.
+
+**Still failing, identically.** With `push_self` and the step in the sequence, the run is unchanged
+from ITER8: `KickoffReturn` dispatched once, `KickoffResultRoll` never, the game "finishing" at
+turn 8/8 with **zero recorded activations**. So neither the consumption fix (ITER9) nor the
+control-flow fix (here) is sufficient on its own; the remaining piece is the agent side — something
+must answer the window the way `ParityRunner` does, by ending the turn rather than activating.
+
+Sequence entry reverted for the third time. The `push_self` correction is KEPT: it is what Java
+does, and it is inert while the step is unreached (measured: 0 dispatches).
+
+**Gate:** bb2016 100/100, bb2020 55/100, bb2025 45/100, `cargo test -p ffb-engine` 7347/0, bb2020
+and bb2025 seeds 1-20 re-measured at 9/20 and 10/20 after the revert.
+
+**Next — and this is a recommendation about SCOPE, not a target.** Three iterations have now each
+removed one real blocker from this window without making it live, and each cost a full iteration to
+discover the next one. The remaining work is now specified rather than exploratory: put the step in
+both runtime sequences, have the agents answer a `KickoffReturn` prompt with `EndTurn` (mirroring
+`ParityRunner`), and verify the step's exit branch fires and hands control back to
+`KickoffResultRoll`. That is a coherent single change worth ~57 failures across two editions, but it
+is a *session*, not a loop slot. Meanwhile the loop can keep taking the other bucket: 10 of bb2020's
+45 and 28 of bb2025's 55 failures show neither a turn nor an active-team mismatch, so they are
+ordinary divergences of the kind ITER10 closed.
