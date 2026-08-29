@@ -92,15 +92,20 @@ impl StepModifierTrait for SidestepStepModifier {
         {
             // Java: if (!sideStepping.containsKey(id)) showDialog(DialogSkillUseParameter(Sidestep))
             // and CONTINUE, waiting for the coach's answer; re-enters with the value populated.
-            // The parity harness (ParityRunner SKILL_USE handler) answers useSkill=TRUE for every
-            // skill except DumpOff/PrimalSavagery/SafePairOfHands — so Sidestep is always USED.
-            // Rust auto-decides inline (no dialog round-trip), so record that answer (true) and fall
-            // through to the SIDE_STEP mode switch below in the same pass. (Previously hardcoded
-            // false = decline, so Rust never used Sidestep and the attacker's 3-square pushback
-            // picked a different square than the defender's Sidestep choice — elf seed 11 i=1: a
-            // Sidestep blitzer pushed to (11,7) in Rust vs the defender's (11,6) in Java.)
+            //
+            // This used to auto-answer TRUE inline, on the reasoning that the parity harness always
+            // uses the skill, so the round-trip was unobservable. That was true of the RANDOM
+            // contract, which answers a SKILL_USE for free. The heuristic SCORES `SkillUse` and
+            // spends two sampler draws on it, so a prompt Rust never emits desynchronises the two
+            // RNG streams for the rest of the game. Sidestep is bb2025-only and, on the amazon
+            // roster, is carried by exactly one player -- the star Estelle la Veneaux -- which is
+            // why bb2025 sat at 0/100 while bb2016 and bb2020 moved.
+            //
+            // A hook cannot raise a prompt, so park the request; `StepPushback` turns it into one
+            // and files the answer back into `side_stepping`.
             if !state.side_stepping.contains_key(&defender_id) {
-                state.side_stepping.insert(defender_id.clone(), true);
+                state.pending_skill_use = Some((defender_id.clone(), SkillId::Sidestep));
+                return true;
             }
 
             // Java: if (state.sideStepping.get(id)) { switch to SIDE_STEP mode }
@@ -261,13 +266,15 @@ mod tests {
         assert!(!result, "SideStep should not fire when no free squares around defender");
     }
 
-    /// Regression (elf seed 11 i=1): a Sidestep defender's first (undecided) pushback must
-    /// AUTO-USE Sidestep — Java shows a DialogSkillUseParameter and the parity harness
-    /// (ParityRunner SKILL_USE handler) answers useSkill=true for every skill except
-    /// DumpOff/PrimalSavagery/SafePairOfHands. So the map records `true` and the pushback
-    /// switches to SIDE_STEP mode (defender chooses the square). Previously hardcoded false.
+    /// A Sidestep defender's FIRST (undecided) pushback must ASK, not decide.
+    ///
+    /// Java shows a `DialogSkillUseParameter` and waits. This used to auto-answer `true` inline,
+    /// reasoning that the parity harness always uses the skill so the round-trip was unobservable
+    /// -- true of the random contract, which answers for free, and false of the heuristic, which
+    /// scores `SkillUse` and spends two sampler draws on it. A prompt one engine never emits
+    /// cannot be answered, and the two RNG streams part for the rest of the game.
     #[test]
-    fn side_step_headless_auto_uses_and_switches_mode() {
+    fn an_undecided_sidestep_asks_instead_of_deciding() {
         use ffb_model::enums::Direction;
         use ffb_model::types::PushbackSquare;
         let mut game = make_game();
@@ -278,12 +285,48 @@ mod tests {
 
         let m = SidestepStepModifier;
         let mut hs = default_hook_state("def1", true);
-        hs.starting_pushback_square = Some(PushbackSquare::new(FieldCoordinate::new(10, 7), Direction::North, true));
-        // side_stepping map empty → first decision → auto-USE (ParityRunner SKILL_USE default).
+        hs.starting_pushback_square =
+            Some(PushbackSquare::new(FieldCoordinate::new(10, 7), Direction::North, true));
         let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
+
+        assert!(result, "Java returns true from the hook when it shows the dialog");
+        assert_eq!(
+            hs.pending_skill_use,
+            Some(("def1".to_string(), SkillId::Sidestep)),
+            "the offer must be parked for the step to raise"
+        );
+        assert!(
+            !hs.side_stepping.contains_key("def1"),
+            "nothing may be decided before the coach answers"
+        );
+        assert_ne!(
+            hs.pushback_mode,
+            PushbackMode::SIDE_STEP,
+            "the mode switch belongs to the ACCEPT path, not to making the offer"
+        );
+    }
+
+    /// ...and once the answer is in, the hook takes its other branch and switches the mode.
+    #[test]
+    fn an_accepted_sidestep_switches_the_pushback_mode() {
+        use ffb_model::enums::Direction;
+        use ffb_model::types::PushbackSquare;
+        let mut game = make_game();
+        game.team_away.players.push(player_with_skills("def1", vec![SkillId::Sidestep]));
+        game.defender_id = Some("def1".into());
+        game.field_model.set_player_coordinate("def1", FieldCoordinate::new(10, 7));
+        game.field_model.set_player_state("def1", PlayerState::new(PS_STANDING));
+
+        let m = SidestepStepModifier;
+        let mut hs = default_hook_state("def1", true);
+        hs.starting_pushback_square =
+            Some(PushbackSquare::new(FieldCoordinate::new(10, 7), Direction::North, true));
+        hs.side_stepping.insert("def1".to_string(), true);
+        let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
+
         assert!(result, "side step handled (used) returns true");
-        assert_eq!(hs.side_stepping.get("def1"), Some(&true), "first decision auto-uses Sidestep");
-        assert_eq!(hs.pushback_mode, PushbackMode::SIDE_STEP, "using Sidestep switches to SIDE_STEP mode");
+        assert!(hs.pending_skill_use.is_none(), "an answered offer must not be re-asked");
+        assert_eq!(hs.pushback_mode, PushbackMode::SIDE_STEP);
     }
 
     #[test]

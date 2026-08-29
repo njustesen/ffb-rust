@@ -384,3 +384,58 @@ bb2020 and bb2016 sit at 55 and 52 with the same skills minus Estelle, so the bb
 likely hers — the `BalefulHex` declaration now translates correctly (ITER4) but nothing has verified
 what the two engines DO with it. Start there: run seed 1 to the first divergence and check whether
 the star's action resolves identically on both sides.
+
+## ITER6 — Sidestep asked instead of assumed (bb2025 only, and no seed closed)
+
+**The bug, and it is ITER3's twin.** bb2025 seed 5 diverges at step 2. The two agents agree exactly
+for two activations and then Java spends two draws Rust does not; windowing the prompt streams names
+it: `SKILL_USE skill=Sidestep pid=...Home2`. Java's `SidestepBehaviour` shows a
+`DialogSkillUseParameter` during `StepPushback` and waits; Rust's hook auto-answered TRUE inline,
+with a comment explaining that the parity harness always uses the skill so the round-trip is
+unobservable.
+
+That is exactly the reasoning ITER3 disproved for the Pass skill. It holds for the RANDOM contract,
+which answers a SKILL_USE for free, and fails for the heuristic, which SCORES the class and spends
+two sampler draws on it.
+
+**Why this was bb2025's blocker specifically.** Sidestep is bb2025-only (bb2016 and bb2020 spell it
+`Side Step` and have their own behaviour), and on the amazon roster exactly one player carries it —
+the star Estelle la Veneaux, who is only on the bb2025 team. bb2016 and bb2020 have no carrier, so
+this could not have been their problem, and indeed their numbers do not move by a single seed.
+
+**Fixed** by parking the request: a step HOOK cannot raise a prompt, so `SidestepBehaviour` sets
+`pending_skill_use` and returns true (Java returns true when it shows the dialog), `StepPushback`
+turns that into `AgentPrompt::SkillUse`, and the answer is filed back into `side_stepping` exactly as
+Java's `handleCommandHook` does. Another test asserted the old auto-use and failed on the corrected
+code; rewritten as two — the undecided case must ASK and decide nothing, and the accepted case
+switches the pushback mode.
+
+**Gate — no seed closed, and the depth says why the fix is kept:**
+
+| | ITER5 | ITER6 |
+|---|---|---|
+| bb2016 amazon | 52/100 | 52/100 |
+| bb2020 amazon | 55/100 | 55/100 |
+| bb2025 amazon | 1/100 | 1/100 |
+| lineman heuristic 1.0 x3 | 100/100 | **100/100** |
+| `cargo test -p ffb-engine` | 7345/0 | **7346/0** |
+
+The pass count cannot see this fix, so measure what it can: across bb2025's 99 failures, **49 seeds
+now diverge LATER and 0 earlier**, median first-diff step **4 -> 9**. bb2016 and bb2020 are untouched
+to the step — 0 deeper, 0 shallower — which is exactly the signature of a change confined to the one
+edition that has the skill. Seed 5's own alignment moved from activation 3 to activation 5, with six
+Sidestep prompts now firing where none did.
+
+A seed with several independent causes closes only when the last of them goes, so "seeds passed" is
+a lagging indicator mid-campaign. Kept on that evidence, and the entry says plainly that no seed was
+closed.
+
+**Also found, not fixed:** `bb2016/side_step_behaviour.rs` has the identical auto-use
+(`side_stepping.insert(id, true)`), and so does its Stand Firm sibling by the same comment's
+admission. No amazon carries Side Step in bb2016/bb2020, so it is unreachable on this roster and
+fixing it blind would be an unmeasured change to two green-ish editions. Logged for the roster that
+does carry it.
+
+**Next:** bb2025 seed 5 now diverges at activation 5 with the draws AGREEING and Rust enumerating
+**54 more candidates** than Java (2025 vs 1971) — the same shape as the ITER4 FOUL, an option Rust
+offers and Java does not, but fifty of them. Dump both lists there and diff by declaration.

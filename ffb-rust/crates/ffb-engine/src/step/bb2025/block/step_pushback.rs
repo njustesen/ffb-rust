@@ -50,6 +50,10 @@ pub struct StepPushbackHookState {
     /// on the step (it survives the per-iteration hook state), so a hook signals the clear here and
     /// `StepPushback` performs it.
     pub clear_pushback_stack: bool,
+    /// A hook that needs the coach's answer before it can decide. Java shows a
+    /// `DialogSkillUseParameter` and returns from the step; a hook cannot raise a prompt itself, so
+    /// it parks the request here and the step turns it into one.
+    pub pending_skill_use: Option<(String, ffb_model::enums::SkillId)>,
 }
 
 impl StepPushbackHookState {
@@ -78,6 +82,7 @@ impl StepPushbackHookState {
             pushback_mode: PushbackMode::REGULAR,
             published: Vec::new(),
             clear_pushback_stack: false,
+            pending_skill_use: None,
         }
     }
 }
@@ -100,6 +105,8 @@ pub struct StepPushback {
     pub grabbing: Option<bool>,
     /// Java: sideStepping (Map<String, Boolean>)
     pub side_stepping: HashMap<String, bool>,
+    /// The outstanding skill offer, so its answer is filed against the right player.
+    pub pending_skill_use: Option<(String, ffb_model::enums::SkillId)>,
     /// Java: standingFirm (Map<String, Boolean>)
     pub standing_firm: HashMap<String, bool>,
     /// Java: pushbackStack — (playerId, coordinate) pairs (LIFO).
@@ -120,6 +127,7 @@ impl StepPushback {
             starting_pushback_square: None,
             grabbing: None,
             side_stepping: HashMap::new(),
+            pending_skill_use: None,
             standing_firm: HashMap::new(),
             pushback_stack: Vec::new(),
             chain_pushed_player: None,
@@ -140,6 +148,16 @@ impl Step for StepPushback {
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
+            // Java `SidestepBehaviour.handleCommandHook`:
+            //   state.sideStepping.put(useSkillCommand.getPlayerId(), isSkillUsed());
+            //   return EXECUTE_STEP;
+            // The answer is filed against the player the offer named, then the step re-runs and the
+            // hook takes its other branch.
+            Action::UseSkill { use_skill, .. } => {
+                if let Some((pid, _)) = self.pending_skill_use.take() {
+                    self.side_stepping.insert(pid, *use_skill);
+                }
+            }
             Action::PushTo { coord } => {
                 // Java: CLIENT_PUSHBACK —
                 //   if (checkCommandIsFromHomePlayer) pushbackStack.push(pushback)
@@ -260,6 +278,19 @@ impl StepPushback {
                 self.standing_firm = hook_state.standing_firm;
                 self.grabbing = hook_state.grabbing;
                 self.starting_pushback_square = hook_state.starting_pushback_square;
+                // Java shows `DialogSkillUseParameter` from inside the behaviour and returns; the
+                // Rust hook cannot raise a prompt, so it parks the request and the step asks. The
+                // answer comes back as `Action::UseSkill` and re-enters `start`.
+                if let Some((ref pid, skill_id)) = hook_state.pending_skill_use {
+                    self.pending_skill_use = Some((pid.clone(), skill_id));
+                    return StepOutcome::cont().with_prompt(
+                        ffb_model::prompts::AgentPrompt::SkillUse {
+                            player_id: pid.clone(),
+                            skill_id: skill_id as u16,
+                            skill_name: format!("{skill_id:?}"),
+                        },
+                    );
+                }
                 do_push = hook_state.do_push;
                 // Java: behaviour hooks may `step.publishParameter(...)` (e.g. Stand Firm publishing
                 // FOLLOWUP_CHOICE=false to suppress the attacker's follow-up when the push is avoided).
