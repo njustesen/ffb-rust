@@ -202,8 +202,11 @@ impl StepPass {
                 None
             };
             if !dont_drop && self.re_rolled_action.is_none() {
-                // Java: mechanic.eligibleToReRoll → askForReRollIfAvailable
-                // client-only: DialogSkillUseParameter for pass skill re-roll — headless uses auto re-roll logic
+                // NOTE: this file is NOT dispatched. `driver.rs` routes `StepId::Pass` to the
+                // bb2025 step for every edition, so the pass-skill re-roll prompt Java shows here
+                // (`bb2016/StepPass` -> DialogSkillUseParameter) is implemented in
+                // `step/bb2025/pass/step_pass.rs`, edition-independently, and NOT here. Editing
+                // this file changes nothing at run time.
                 if let Some(prompt) = ask_for_reroll_if_available(game, "PASS", self.minimum_roll, is_fumble) {
                     self.re_rolled_action = Some("PASS".into());
                     self.re_roll_source = Some("TRR".into());

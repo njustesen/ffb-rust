@@ -71,6 +71,35 @@ pub fn find_skill_reroll_source(game: &Game, rerolled_action: &str) -> Option<Re
         .map(|(skill_id, priority)| ReRollSource::with_priority(format!("{:?}", skill_id), priority))
 }
 
+/// Java: `UtilCards.getRerollSource(Player, ReRolledAction)`.
+///
+/// The sibling of [`find_skill_reroll_source`], and deliberately NOT the same function. Java has
+/// both and they differ in three ways that matter: this one takes an arbitrary PLAYER rather than
+/// the acting player, it does not filter out skills already used this activation, and it keeps only
+/// skills whose usage type is REGULAR. It also has no turn-mode guard.
+///
+/// `StepPass` asks about the THROWER, who is normally the acting player but need not be, and it
+/// asks before anything has been marked used -- so the "unused" variant would answer a different
+/// question.
+pub fn find_player_reroll_source(
+    player: &ffb_model::model::player::Player,
+    rerolled_action: &str,
+) -> Option<ReRollSource> {
+    player
+        .all_skill_ids()
+        .filter(|id| id.usage_type() == ffb_model::enums::SkillUsageType::Regular)
+        .filter_map(|id| {
+            id.reroll_sources()
+                .iter()
+                .find(|(action, _)| *action == rerolled_action)
+                .map(|(_, priority)| (id, *priority))
+        })
+        // Java takes `min(comparingInt(getPriority))`, which keeps the FIRST minimum in stream
+        // order; the SkillId tie-break makes that deterministic here, as in the sibling.
+        .min_by_key(|(id, priority)| (*priority, *id as i32))
+        .map(|(skill_id, priority)| ReRollSource::with_priority(format!("{:?}", skill_id), priority))
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

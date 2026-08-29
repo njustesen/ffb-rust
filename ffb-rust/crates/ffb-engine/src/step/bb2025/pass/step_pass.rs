@@ -46,6 +46,11 @@ pub struct StepPass {
     pub minimum_roll: i32,
     /// Java: PassState.result — the PassResult from evaluatePass()
     pub pass_result: Option<PassResult>,
+    /// Java `PassState.passSkillUsed`. The pass-skill re-roll is OFFERED once per step; a second
+    /// failure falls through to the team re-roll instead of asking again.
+    pub pass_skill_used: bool,
+    /// The re-roll source named in the outstanding offer, so an ACCEPT can spend the right skill.
+    pub pass_skill_source: Option<String>,
     // AbstractStepWithReRoll fields
     pub re_rolled_action: Option<String>,
     pub re_roll_source: Option<String>,
@@ -67,6 +72,8 @@ impl StepPass {
             roll: 0,
             minimum_roll: 0,
             pass_result: None,
+            pass_skill_used: false,
+            pass_skill_source: None,
             re_rolled_action: None,
             re_roll_source: None,
         }
@@ -81,10 +88,23 @@ impl Step for StepPass {
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // (see `pass_skill_offer` below for the pass-skill re-roll half of CLIENT_USE_SKILL)
         // Java: CLIENT_USE_SKILL → canAddStrengthToPass → usingModifyingSkill = isSkillUsed()
         // Java: CLIENT_USE_SKILL → dontDropFumbles      → usingSafePass = isSkillUsed()
         // Java: otherwise → handleSkillCommand(commandUseSkill, passState) [pass reroll dialog]
         match action {
+            // Java `AbstractPassBehaviour`'s StepPass modifier, verbatim:
+            //   step.setReRolledAction(PASS);
+            //   step.setReRollSource(useSkillCommand.isSkillUsed() ? getReRollSource() : null);
+            // A DECLINE therefore does not fall back on the team re-roll: `executeStep` sees the
+            // re-rolled action set with a null source and goes straight to the failed-pass path.
+            // Matched on the outstanding OFFER rather than on the skill id, because the same
+            // command carries the two modifying-skill answers below.
+            Action::UseSkill { use_skill, .. } if self.pass_skill_source.is_some() => {
+                let source = self.pass_skill_source.take();
+                self.re_rolled_action = Some("PASS".into());
+                self.re_roll_source = if *use_skill { source } else { None };
+            }
             Action::UseSkill { skill_id, use_skill } => {
                 // Java: route by skill property: canAddStrengthToPass → usingModifyingSkill
                 //                                dontDropFumbles       → usingSafePass
@@ -123,6 +143,44 @@ impl Step for StepPass {
 }
 
 impl StepPass {
+    /// Java (every edition, `StepPass`): after a failed pass,
+    /// ```java
+    /// ReRollSource passingReroll = UtilCards.getRerollSource(game.getThrower(), PASS);
+    /// if (passingReroll != null && !state.passSkillUsed) {
+    ///     state.passSkillUsed = true;
+    ///     showDialog(new DialogSkillUseParameter(throwerId, passingReroll.getSkill(game), ...));
+    /// } else { askForReRollIfAvailable(...); }
+    /// ```
+    ///
+    /// The skill offer comes FIRST and it is a real question put to the coach. Rust used to
+    /// auto-USE the skill here with no prompt, on the reasoning that the parity contract always
+    /// answers yes — true of the RANDOM agent, and it costs it no draws. The heuristic SCORES
+    /// `SkillUse`, so the missing prompt cost it two sampler draws that Java spent, and the two
+    /// RNG streams parted on the first failed pass by a thrower with the Pass skill. No lineman
+    /// has it; every Amazon Thrower does, in all three editions.
+    ///
+    /// Returns the prompt to show, or `None` to fall through to the team re-roll.
+    fn pass_skill_offer(&mut self, game: &Game) -> Option<ffb_model::prompts::AgentPrompt> {
+        if self.pass_skill_used {
+            return None;
+        }
+        let thrower_id = game.thrower_id.clone()?;
+        // Java asks `getRerollSource(PLAYER, action)` here, not the acting-player/unused variant:
+        // no "already used" filter, REGULAR usage types only. See `find_player_reroll_source`.
+        let source = game
+            .player(&thrower_id)
+            .and_then(|p| crate::step::abstract_step_with_re_roll::find_player_reroll_source(p, "PASS"))?;
+        self.pass_skill_used = true;
+        self.pass_skill_source = Some(source.name.clone());
+        let skill_id = ffb_model::enums::SkillId::from_class_name(&source.name)
+            .unwrap_or(ffb_model::enums::SkillId::Pass);
+        Some(ffb_model::prompts::AgentPrompt::SkillUse {
+            player_id: thrower_id,
+            skill_id: skill_id as u16,
+            skill_name: source.name,
+        })
+    }
+
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java guard: if thrower or throwerAction is null → return (no-op).
         // Java's `return;` here leaves StepResult's default nextAction (CONTINUE) untouched —
@@ -339,10 +397,10 @@ impl StepPass {
                 // re-roll can roll the fumble away entirely before Safe Pass is consulted
                 // (amazon seed 34 i=45: roll 1 → auto Pass re-roll 5 → ACCURATE → catch).
                 if !already_rerolled {
-                    if let Some(source) = find_skill_reroll_source(game, "PASS") {
-                        self.re_rolled_action = Some("PASS".into());
-                        self.re_roll_source = Some(source.name.clone());
-                        return self.execute_step(game, rng);
+                    if let Some(prompt) = self.pass_skill_offer(game) {
+                        let mut out = StepOutcome::cont().with_prompt(prompt);
+                        if let Some(ev) = roll_event { out = out.with_event(ev); }
+                        return out;
                     }
                     if let Some(prompt) = ask_for_reroll_if_available(game, "PASS", self.minimum_roll, true) {
                         self.re_rolled_action = Some("PASS".into());
@@ -391,17 +449,11 @@ impl StepPass {
             PassResult::FUMBLE => {
                 // Java: askForReRollIfAvailable before handling fumble
                 if !already_rerolled {
-                    // A FREE single-use SKILL re-roll (e.g. Pass) is offered by Java as a SKILL_USE
-                    // that ParityRunner ALWAYS uses — mirroring the engine's auto-use of Sure
-                    // Hands/Catch. Auto-use it here (no prompt): the pass die re-rolls once. Only a
-                    // TEAM re-roll is offered to the agent (which declines it deterministically).
-                    if let Some(source) = find_skill_reroll_source(game, "PASS") {
-                        self.re_rolled_action = Some("PASS".into());
-                        self.re_roll_source = Some(source.name.clone());
-                        // Re-enter: the top-of-function re-roll gate consumes the skill token via
-                        // use_reroll (marks it used), clears roll/result and re-rolls; already_rerolled
-                        // then blocks a second offer so the re-rolled result stands.
-                        return self.execute_step(game, rng);
+                    // Java OFFERS the pass skill (a dialog), it does not spend it silently.
+                    if let Some(prompt) = self.pass_skill_offer(game) {
+                        let mut out = StepOutcome::cont().with_prompt(prompt);
+                        if let Some(ev) = roll_event { out = out.with_event(ev); }
+                        return out;
                     }
                     if let Some(prompt) = ask_for_reroll_if_available(game, "PASS", self.minimum_roll, true) {
                         self.re_rolled_action = Some("PASS".into());
@@ -439,11 +491,10 @@ impl StepPass {
             PassResult::INACCURATE | PassResult::WILDLY_INACCURATE => {
                 // Java: askForReRollIfAvailable before routing to missed pass
                 if !already_rerolled {
-                    // Free single-use SKILL re-roll (Pass): auto-use it (see the FUMBLE branch).
-                    if let Some(source) = find_skill_reroll_source(game, "PASS") {
-                        self.re_rolled_action = Some("PASS".into());
-                        self.re_roll_source = Some(source.name.clone());
-                        return self.execute_step(game, rng);
+                    if let Some(prompt) = self.pass_skill_offer(game) {
+                        let mut out = StepOutcome::cont().with_prompt(prompt);
+                        if let Some(ev) = roll_event { out = out.with_event(ev); }
+                        return out;
                     }
                     if let Some(prompt) = ask_for_reroll_if_available(game, "PASS", self.minimum_roll, false) {
                         self.re_rolled_action = Some("PASS".into());
@@ -606,13 +657,16 @@ mod tests {
     }
 
     #[test]
-    fn fumble_auto_uses_free_pass_skill_reroll_without_prompt() {
-        // Regression (docs/PARITY_TTM.md "FRONTIER (human) — seed 4 step 174"): a thrower with the
-        // Pass skill that fumbles/misses has a FREE single-use skill re-roll. Java offers it as a
-        // SKILL_USE that ParityRunner ALWAYS uses (mirroring the engine's auto-use of Sure Hands /
-        // Catch), so the engine must AUTO-USE it — re-rolling the pass die once and marking the Pass
-        // skill used — WITHOUT emitting a decline-able ReRollOffer (which the agent would decline,
-        // skipping the re-roll die and desyncing from Java).
+    fn fumble_offers_the_pass_skill_rather_than_spending_it() {
+        // This test used to assert the OPPOSITE — that the free Pass-skill re-roll is auto-used
+        // with no prompt — and it was wrong about the Java. Every edition's `StepPass` does
+        //   passingReroll = UtilCards.getRerollSource(thrower, PASS);
+        //   if (passingReroll != null && !state.passSkillUsed) { showDialog(SkillUse) }
+        // i.e. it ASKS. The old reasoning ("ParityRunner always uses it, so auto-use is
+        // equivalent") holds only for the random contract, which answers for free; the heuristic
+        // agent SCORES SkillUse and spends two sampler draws on it, so a missing prompt puts the
+        // two engines' RNG streams permanently out of step. No lineman carries Pass, which is why
+        // this survived the whole lineman campaign; every Amazon Thrower carries it.
         use ffb_model::enums::{SkillId, TurnMode};
         use ffb_model::model::skill_def::SkillWithValue;
         use ffb_model::prompts::AgentPrompt;
@@ -623,15 +677,70 @@ mod tests {
         game.turn_mode = TurnMode::Regular;
 
         let mut step = make_step();
-        step.roll = 1; // force the first pass roll to a natural 1 → FUMBLE
+        step.roll = 1; // force the first pass roll to a natural 1 -> FUMBLE
         let out = step.start(&mut game, &mut GameRng::new(0));
 
-        assert!(!matches!(out.prompt, Some(AgentPrompt::ReRollOffer { .. })),
-            "the free Pass skill re-roll must be auto-used, not offered as a decline-able ReRollOffer");
-        assert!(game.player("t1").unwrap().used_skills.contains(&SkillId::Pass),
-            "the Pass skill must be marked used after the auto re-roll");
-        assert_eq!(step.re_rolled_action.as_deref(), Some("PASS"),
-            "re_rolled_action records the single PASS re-roll (blocks a second offer)");
+        match out.prompt {
+            Some(AgentPrompt::SkillUse { ref player_id, ref skill_name, .. }) => {
+                assert_eq!(player_id, "t1");
+                assert_eq!(skill_name, "Pass");
+            }
+            ref other => panic!("expected a Pass SkillUse offer, got {other:?}"),
+        }
+        assert!(step.pass_skill_used, "Java sets passSkillUsed when it shows the dialog");
+        assert!(
+            !game.player("t1").unwrap().used_skills.contains(&SkillId::Pass),
+            "the skill is spent when the coach ACCEPTS, not when the offer is made"
+        );
+    }
+
+    #[test]
+    fn accepting_the_pass_skill_spends_it_and_declining_does_not() {
+        // Java `AbstractPassBehaviour`: the answer always sets the re-rolled action, and sets the
+        // SOURCE only on accept. A decline goes straight to the failed-pass path — it does NOT
+        // fall back on the team re-roll.
+        use ffb_model::enums::{SkillId, TurnMode};
+        use ffb_model::model::skill_def::SkillWithValue;
+        for accept in [true, false] {
+            let mut game = make_game_with_thrower(3);
+            game.team_home.player_mut("t1").unwrap()
+                .starting_skills.push(SkillWithValue { skill_id: SkillId::Pass, value: None });
+            game.acting_player.player_id = Some("t1".into());
+            game.turn_mode = TurnMode::Regular;
+            let mut step = make_step();
+            step.roll = 1;
+            step.start(&mut game, &mut GameRng::new(0));
+            step.handle_command(
+                &Action::UseSkill { skill_id: SkillId::Pass, use_skill: accept },
+                &mut game,
+                &mut GameRng::new(0),
+            );
+            assert_eq!(step.re_rolled_action.as_deref(), Some("PASS"), "accept={accept}");
+            assert_eq!(
+                game.player("t1").unwrap().used_skills.contains(&SkillId::Pass),
+                accept,
+                "the Pass skill is spent only on accept (accept={accept})"
+            );
+        }
+    }
+
+    #[test]
+    fn the_pass_skill_is_offered_only_once_per_step() {
+        // Java guards the dialog with `!state.passSkillUsed`, so a second failure in the same step
+        // falls through to the team re-roll instead of asking again.
+        use ffb_model::enums::{SkillId, TurnMode};
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::prompts::AgentPrompt;
+        let mut game = make_game_with_thrower(3);
+        game.team_home.player_mut("t1").unwrap()
+            .starting_skills.push(SkillWithValue { skill_id: SkillId::Pass, value: None });
+        game.acting_player.player_id = Some("t1".into());
+        game.turn_mode = TurnMode::Regular;
+        let mut step = make_step();
+        step.roll = 1;
+        step.pass_skill_used = true;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(!matches!(out.prompt, Some(AgentPrompt::SkillUse { .. })));
     }
 
     #[test]

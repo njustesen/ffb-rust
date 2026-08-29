@@ -31,7 +31,7 @@ structurally, not just by generator.
 
 | amazon v amazon, `--heur-classes all`, seeds 1-100 | sampled (1.0) |
 |---|---|
-| bb2016 | 39/100 |
+| bb2016 | 52/100 |
 | bb2020 | 14/100 |
 | bb2025 | 0/100 |
 
@@ -206,3 +206,65 @@ star while Java declares MOVE for someone else. `ParityRunner.actionFromName` ha
 its `default` returns `PlayerAction.MOVE` — the identical shape as the `HandOver`/`HandOffMove` bug
 already recorded in `ActivationChoice.moveVariant`. The agent picks the right thing and the harness
 declares something else, so no scoring diff can show it.
+
+## ITER3 — Rust spent the Pass skill instead of offering it (and the fix first landed in a dead file)
+
+**The bug.** After a failed pass, Java (every edition, `StepPass`) does:
+
+```java
+ReRollSource passingReroll = UtilCards.getRerollSource(game.getThrower(), PASS);
+if (passingReroll != null && !state.passSkillUsed) { showDialog(new DialogSkillUseParameter(...)); }
+else { askForReRollIfAvailable(...); }
+```
+
+It ASKS. Rust auto-USED the skill and re-entered the step, with a comment explaining why that was
+equivalent: "Java offers it as a SKILL_USE that ParityRunner ALWAYS uses". True of the RANDOM
+contract, which answers for free. ITER2 made the heuristic SCORE `SkillUse`, so Java now spends two
+sampler draws there — and a prompt Rust never emits cannot be answered, so the two RNG streams part
+on the first failed pass by a thrower with the Pass skill. No lineman has it. Every Amazon Thrower
+has it, in all three editions.
+
+**Fixed** in `step/bb2025/pass/step_pass.rs` — the step that actually runs for all three editions —
+by replacing the auto-use at all three failure sites (SAVED_FUMBLE, FUMBLE, INACCURATE/WILDLY) with
+the offer, and porting `AbstractPassBehaviour`'s answer: the re-rolled action is set either way, the
+SOURCE only on accept, so a decline goes straight to the failed-pass path rather than falling back
+on the team re-roll. Added `find_player_reroll_source`, the twin of Java's
+`UtilCards.getRerollSource(PLAYER, action)` — no "already used" filter, REGULAR usage types only,
+which is a different question from the existing `find_skill_reroll_source`.
+
+**Two process failures worth more than the fix, both caught by measurement rather than by review.**
+
+1. **The fix first landed in a dead file.** `step/bb2016/pass/step_pass.rs` is the obvious home for a
+   bb2016 pass bug, and it is never dispatched: `driver.rs` routes `StepId::Pass` to the bb2025 step
+   for every edition. The gate came back with a byte-identical failing seed set — same 61 seeds,
+   same first-diff step on every one — which is the signature of a change that did not execute. The
+   file now carries a note saying so. (This is the campaign's "ported-but-unreached" pattern, and the
+   TTM lesson that edition-gating inside the shared step beats routing to a dead twin.)
+2. **A concurrent run of the same matchup corrupted a measurement.** I started the random control
+   while the bb2016 heuristic gate was still running; they share
+   `parity/bb2016/amazon_vs_amazon/seed_N_*.jsonl`, and the gate reported **12/100**. Re-run alone:
+   **52/100**. The rule against this is in the command file; the cost of breaking it is a number
+   that looks like a catastrophic regression and would have got a correct fix reverted.
+
+**An existing test asserted the bug** (`fumble_auto_uses_free_pass_skill_reroll_without_prompt`) and
+failed the moment the code was corrected — the useful half of the trap. Read against the Java, it
+was wrong; rewritten as three tests: the offer is made, accepting spends the skill while declining
+does not, and the offer happens only once per step.
+
+**Gate:**
+
+| | ITER2 | ITER3 |
+|---|---|---|
+| bb2016 amazon | 39/100 | **52/100** |
+| bb2020 amazon | 14/100 | 14/100 |
+| bb2025 amazon | 0/100 | 0/100 |
+| lineman heuristic 1.0 x3 | 100/100 | **100/100** |
+| `cargo test -p ffb-engine` | 7342/0 | **7344/0** |
+
+`rust_total` 34.1s for 100 bb2016 seeds, down from 36.6s — the agent no longer re-enters the step to
+re-roll silently. No Java change this iteration, so the jar and the Java tests are untouched.
+
+**Next:** bb2020 is the edition holding still at 14/100 while bb2016 moves, so it has a cause of its
+own; bb2025's 0/100 has the `BalefulHex` declaration bug queued from ITER2
+(`ParityRunner.actionFromName` has no case for it and defaults to MOVE). Take the bb2025 one first:
+it is a known, named defect with a one-line shape, and 0/100 means every seed is blocked behind it.
