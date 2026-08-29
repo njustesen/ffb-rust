@@ -1,12 +1,52 @@
 # Parity campaign — the HEURISTIC agent, both engines
 
-Goal: `HeuristicAgent` drives **both** Rust and Java on the same seed, with every decision and every
-per-step state hash identical, at **100/100 on lineman-vs-lineman bb2025**.
+## 🏁 COMPLETE — 2026-08-29, ITER70, commit `3b3746b12`
+
+`HeuristicAgent` drives **both** Rust and Java on the same seed, with every decision and every
+per-step state hash identical, **100/100 on lineman-vs-lineman in bb2016, bb2020 AND bb2025, at
+`--heur-scale` 0, 1.0 and 1e6** — nine gates, all green.
+
+| seeds 1-100, `--heur-classes all` | argmax (0) | sampled (1.0) | uniform (1e6) |
+|---|---|---|---|
+| bb2016 | **100/100** | **100/100** | **100/100** |
+| bb2020 | **100/100** | **100/100** | **100/100** |
+| bb2025 | **100/100** | **100/100** | **100/100** |
+
+Fourteen-class rung 100/100 x 3; `--agent random` 100/100 x 3 (never regressed in 70 iterations);
+`cargo test --workspace --release` 14,664/0; `mvn -o -pl ffb-ai test` 35/0; the two Java trees agree.
+
+The original goal was bb2025 alone; it was widened to all three rulesets on 2026-08-27. Coverage
+moved as predicted: **GFI 0 → 5,663** and **touchdowns 0 → 6** per 100 games.
+
+**The next tier is a user decision.** Candidates and what is already known about each are in
+`.claude/commands/heur-iter.md` ("Candidate next tiers"); concrete deferred items are in
+`docs/BACKLOG.md`.
+
+### What the campaign actually found
+
+Not wrong arithmetic. Four recurring shapes, each of which bit more than once:
+
+1. **Ported-but-unreached code** — `MoveReplay`, `foulWeight`, the coverage terms, the pathfinder:
+   all correct, none called. A golden fixture proves arithmetic, never that production calls it.
+2. **Contract rules living in the harness LOOP, not the scorer** — `SKIP_INACTIVE`, `turn < 1`, the
+   non-REGULAR one-activation rule, `justDeselected`. The heuristic replaced `RandomAgent`'s pick
+   loop wholesale and inherited none of them.
+3. **Two copies of one rule that drifted** — and the direction reverses: sometimes the bb2016 twin
+   was the correct one, sometimes the editions legitimately differ.
+4. **Vocabulary and coordinate-frame mismatches at a seam** — including porting a Java command
+   handler without porting its INPUT convention (ITER69), which cost 12 of bb2016's reds.
+
+The tooling that found them, and the traps that cost time, are written up in
+`.claude/commands/heur-iter.md` under "Root-cause ONE divergence" and "Traps".
+
+---
 
 Process: `docs/PARITY_PROCESS.md` (unchanged — Java engine is ground truth, fix Rust only,
 `ffb-ai` harness is co-editable, a regression test per fix, revert on regression).
-Agent spec: `AGENT_CONTRACT.md` §10 (to be written).
+Agent spec: `AGENT_CONTRACT_HEURISTIC.md`.
 Design + measurement history of the agent itself: `docs/HEURISTIC_AGENT.md`.
+
+The rest of this file is the per-iteration ledger, ITER0 → ITER70, oldest first.
 
 ---
 

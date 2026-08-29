@@ -60,10 +60,23 @@ These are dead code in Java too. Deleting them is a cleanup question, not a fide
 Reaching either means changing drafted team data - a separate and larger decision (same category
 as `DauntlessMultiple`, closed 2026-08-18).
 
-### C. Scoring-gated — BLOCKED on a user tier decision (5)
+### C. Scoring-gated — the PREMISE is gone; the 5 steps are still unreached here (5)
 `AssignTouchdowns` `InitPunt` `EndPunt` `PuntDirection` `PuntDistance`
 
-Out of scope until the agent is allowed to score. Unchanged.
+**Updated 2026-08-29, after the heuristic campaign (ITER70).** This category was justified by "the
+agent is not allowed to score" and, below, by both agents moving one square per activation. **That
+premise no longer holds**: with `--agent heuristic --heur-classes all`, a 100-game bb2025 run
+records **GFI rolls 5,663**, **touchdowns 6** and **throw-ins 4**. The agent scores.
+
+But these five steps are **still not dispatched** — measured directly, not assumed:
+`FFB_DRIVE_TRACE=1` over lineman-v-lineman bb2025 seeds 1-100 at `--heur-scale 1.0` reaches **107
+distinct StepIds and none of them**. So a touchdown is recognised without `AssignTouchdowns` running
+in this matchup, and the Punt family needs a trigger lineman play does not produce.
+
+They therefore stay in the dead list, but for a NEW and narrower reason: not "the agent cannot
+score", but "these particular steps are not on the path this matchup takes". Reclassifying them
+needs a re-measure across all rosters and editions with the heuristic driving — which is exactly the
+sweep this inventory was built from, and which has not been re-run since the agent changed.
 
 ### D. Inducements — parity teams purchase none (6)
 `MasterChef` `WeatherMage` `Wizard` `PlayCard` `FanFactor` `PrayerRoll`
@@ -159,3 +172,13 @@ next was added.
 exactly ONE SQUARE PER ACTIVATION (measured 1:1, `player_moved_events == activations.Move`), which
 alone makes GFI and touchdowns - and therefore the whole scoring/Punt family - structurally
 unreachable. See BACKLOG.
+
+> **Superseded 2026-08-29.** That paragraph describes the RANDOM agent, and was true when written.
+> The heuristic-agent campaign (`docs/PARITY_HEURISTIC_CAMPAIGN.md`, complete at ITER70) removed the
+> one-square-per-activation ceiling: the same 100-game measurement now shows 5,663 GFI rolls, 6
+> touchdowns and 4 throw-ins. The decision it was waiting on has been taken and delivered.
+>
+> **This whole inventory is stale in one specific way**: it was measured with the random agent, and
+> the heuristic reaches states random play cannot. The counts here are a floor, not a current
+> reading. Re-run both sweeps with `--agent heuristic --heur-classes all` before trusting any
+> "dead" classification — see section C for the one case already re-checked.

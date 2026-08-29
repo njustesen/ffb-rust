@@ -3829,3 +3829,54 @@ carrier barely moves and play stays compressed mid-pitch.
 So `throw-ins` is the THIRD symptom of the one-move-per-activation root cause, alongside `GFI
 rolls` and `touchdowns`. It is an honest signal that the test games are unrealistic and should go
 green on its own once movement is fixed. Hiding it would remove the indicator.
+
+---
+
+## Deferred by the heuristic-agent campaign (added 2026-08-29, after ITER70)
+
+The heuristic campaign is complete (9/9 gates at 100/100 — see
+`docs/PARITY_HEURISTIC_CAMPAIGN.md`). Four things were found during it, deliberately **not** fixed,
+and each says why. None is a parity red today.
+
+### D1. `throw-ins`, `GFI rolls`, `touchdowns` — the one-move-per-activation premise is GONE
+
+The note above (and the `T3_COVERAGE.md` note column) says these three are blocked because "both
+harnesses move exactly ONE square per activation". That was true of the RANDOM agent and is **no
+longer true**: under `--agent heuristic --heur-classes all` a 100-game bb2025 run records **GFI
+rolls 5,663**, **touchdowns 6** and **throw-ins 4**, all `ok`.
+
+The stale note text still ships in `T3_COVERAGE.md`. Worth clearing, and worth re-reading the
+`absent (optional)` rows now that the games are realistic.
+
+### D2. The tier-3 checklist reports `REQUIRED ITEMS MISSING` on a technicality
+
+`action Pass` and `action HandOver` count only the IMMEDIATE declarations. The heuristic declares
+the MOVE variants (`PASS_MOVE` / `HAND_OVER_MOVE`) — deliberately, because that is what buys the
+movement phase before the throw — so both read 0 while the same run records **128 pass rolls**, 79
+catches and a working give.
+
+Fix is in `crates/ffb-parity/src/t3_checklist.rs`: count the MOVE variants toward those two items.
+Not done during the campaign because it changes MEASUREMENT code while measurements were the thing
+being trusted.
+
+### D3. bb2020's `rollXCoordinate` rolls a d24 where Java rolls a d26
+
+`crates/ffb-engine/src/step/bb2020/step_stalling_player.rs` does `rng.die(24)` with a comment
+claiming "Java rollXCoordinate() = roll in [1..24]". Java is
+`DiceRoller.rollXCoordinate() = rollDice(26) - 1`, i.e. x in [0, 25]. The bb2025 twin was written
+correctly during ITER66.
+
+Left alone because that branch does not fire in the current bb2020 gate — fixing it blind would be
+an unmeasured change to a 100/100 edition. Fix it together with a seed that actually reaches it.
+
+### D4. `legal_activate_player_actions` never checks the ACTIVE bit
+
+Java's `StepInitSelecting` guards its whole `CLIENT_ACTING_PLAYER` branch on
+`playerState.isActive()` and silently IGNORES the command otherwise; Rust's engine has no such guard
+and executes the activation. ITER47 made this **unreachable** rather than fixing it — both agents
+now decline to activate an inactive player.
+
+It is not fixed because adding the guard to `legal_activate_player_actions` would SHORTEN the
+eligible list, and the random contract's `idx % N` alignment depends on inactive players staying IN
+that list and being rejected at pick time. Fixing it properly means changing both agents' contracts
+together, with the random gate re-measured.
