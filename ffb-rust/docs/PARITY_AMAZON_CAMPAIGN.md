@@ -1091,3 +1091,46 @@ because Java plays an activation in the window that Rust answers away.
 **Next:** the livelock. Why does allowing one activation inside the window fail to terminate, when
 the non-REGULAR rule should end the turn immediately after it? That is now the only thing between
 the window and the ~45 seeds it accounts for.
+
+## ITER20 — the window livelock, diagnosed (no seed movement; gate unchanged)
+
+**Gate unchanged (100 / 60 / 55); behaviour identical to ITER19** — the only additions are two
+env-gated probes (`FFB_KRLOOP`, `FFB_KRPLAY`) that are off by default.
+
+**The livelock is unbounded stack growth, and the trace says so plainly.** Allowing the agent to
+activate inside the window and then deselect gives:
+
+```
+DRIVE step=KickoffReturn stack_len=24429194 ... rng=175
+DRIVE step=KickoffReturn stack_len=24429214 ... rng=175
+DRIVE step=KickoffReturn stack_len=24429234 ... rng=175
+```
+
+Twenty entries added per turn of the cycle, no dice rolled, forever. The mechanism is the step's
+own first sub-branch, ported 1:1 from Java:
+
+```java
+if (fEndPlayerAction && !actingPlayer.hasActed() && !fEndTurn) {
+    changePlayerAction(null); pushCurrentStepOnStack(); generator.pushSequence(Select...);
+}
+```
+
+A mover who is deselected WITHOUT having acted causes the window to re-open the Select sequence.
+The agent deselects again, the step re-parks itself and pushes another twenty steps, and nothing
+ever ends it. Extending the pass-block Move-deselect rule to this window does NOT help — it makes
+the deselect happen sooner, which is the very thing that feeds the cycle. Reverted.
+
+**So the escape has to come from outside the mover**, and that is exactly what `ParityRunner`'s
+`case KICKOFF_RETURN: inject(ClientCommandEndTurn)` is: the harness ends the turn rather than
+letting the deselect cycle run. The `EndTurn` answer committed in ITER19 is therefore not a
+workaround — it is the harness contract, and it is the only terminating behaviour found.
+
+**What is still unexplained** is the other half: Java RECORDS `Activate(Away6, MOVE)` inside the
+window on bb2020 seed 1 (step 142, state string in `KICKOFF_RETURN` mode). An `EndTurn` injection
+alone would produce no such step. So Java's sequencing lets exactly one activation through BEFORE
+the injection, and the question is what orders those two. That is a harness-sequencing question, not
+an engine one, and it is where the next attempt should start — `ParityRunner`'s state switch around
+the `KICKOFF_RETURN` arm, and which of its branches runs first.
+
+**Gate:** unchanged by construction — bb2016 100/100, bb2020 60/100, bb2025 55/100, seeds 1-20
+re-measured 20/10/11, `cargo test -p ffb-engine` 7349/0.

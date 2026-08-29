@@ -2132,7 +2132,15 @@ impl HeuristicAgent {
         // record one activation inside the window on some seeds, so this is not the whole truth
         // yet; see docs/PARITY_AMAZON_CAMPAIGN.md ITER19.
         if g.turn_mode == ffb_model::enums::TurnMode::KickoffReturn {
-            return Action::EndTurn;
+            if std::env::var_os("FFB_KRLOOP").is_some() {
+                eprintln!(
+                    "KRACT mode=KickoffReturn used={} elig={} just_desel={} turn={}",
+                    self.used_this_turn.len(), eligible.len(), self.just_deselected, turn_nr
+                );
+            }
+            if std::env::var_os("FFB_KRPLAY").is_none() {
+                return Action::EndTurn;
+            }
         }
         // NOTE: Java freezes the eligible list for the whole turn
         // (`eligibleThisTurn = computeEligiblePlayers(game)`) while this reads the engine's live
@@ -2500,7 +2508,15 @@ impl HeuristicAgent {
         // record one activation inside the window on some seeds, so this is not the whole truth
         // yet; see docs/PARITY_AMAZON_CAMPAIGN.md ITER19.
         if g.turn_mode == ffb_model::enums::TurnMode::KickoffReturn {
-            return Action::EndTurn;
+            if std::env::var_os("FFB_KRLOOP").is_some() {
+                eprintln!(
+                    "KRACT mode=KickoffReturn used={} elig={} just_desel={} turn={}",
+                    self.used_this_turn.len(), eligible.len(), self.just_deselected, turn_nr
+                );
+            }
+            if std::env::var_os("FFB_KRPLAY").is_none() {
+                return Action::EndTurn;
+            }
         }
         self.refresh_turn(g);
         if g.turn_mode != ffb_model::enums::TurnMode::Regular && !self.used_this_turn.is_empty() {
