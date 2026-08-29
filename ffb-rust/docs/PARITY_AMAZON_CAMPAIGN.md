@@ -33,7 +33,7 @@ structurally, not just by generator.
 |---|---|
 | bb2016 | **100/100** 🏁 |
 | bb2020 | 60/100 |
-| bb2025 | 51/100 |
+| bb2025 | 55/100 |
 
 Control: `--agent random` amazon is **100/100 in all three editions**, so the roster itself is
 parity-clean and every red below belongs to the heuristic.
@@ -934,3 +934,58 @@ answering the window with `EndTurn`, and an `FFB_KR` probe. The only outstanding
 **Next:** either the window as a focused piece of work (one change, `StepInitSelecting`, gated on
 all three editions plus both random matchups), or back to the non-window remainder — bb2025 still
 has ~20 failures that are not this.
+
+## ITER17 — a hexed player still projected tackle zones in Rust (bb2025 51 -> 55)
+
+**The fix is the defect ITER13 logged and ITER14 wrongly deferred**, and the correction of my own
+reasoning is the most useful thing in this entry.
+
+**Classifier first.** ITER14 showed the turn-number test for "is this the kickoff window" is too
+weak. Replaced it with the alignment SIGNATURE: a window case resets the candidate list (|dn| in the
+hundreds), an ordinary one differs by one or two options. Over bb2025's first six failures: two
+WINDOW, four LIST — and every LIST case has Rust enumerating MORE options than Java.
+
+**Root cause.** bb2025 seed 9: both engines activate `home_02` (the star Estelle) for a Baleful Hex
+at step 4, agreeing exactly. At the very next activation Rust offers `away_01` blocks on **both**
+`home_01` and `home_03`; Java offers only `home_03`.
+
+Java's block-target rule is `hasTacklezones()` — `(STANDING || MOVING || BLOCKED) && !confused &&
+!hypnotized`. Rust's `legal_block_targets` tested `can_be_blocked()` — `STANDING || MOVING`. **A
+hexed player is STANDING and CONFUSED**: Java stops treating him as a target, Rust never checked.
+Both engines had hexed `home_01` correctly (ITER7 fixed the declaration); only the consequence
+differed.
+
+**Where ITER14 went wrong, recorded because the reasoning error is instructive.** That entry
+declined this fix with "fixing it would ADD targets on the Rust side; seed 50 needs FEWER". That
+considered only half the predicate. `has_tacklezones` differs from `can_be_blocked` in two
+directions at once: it ADDS the `BLOCKED` base and SUBTRACTS confused and hypnotized players. The
+subtracting half is the one that matters here, and dismissing the whole change on the adding half
+cost three iterations. A predicate that differs in two directions cannot be reasoned about as
+though it differed in one.
+
+**Fixed — and the first attempt broke a standing gate, which is the second lesson here.** Changing
+`legal_block_targets` itself to Java's rule took `--agent random` bb2025 amazon from **100 to
+93/100**. That helper answers the RANDOM contract's question, whose `idx % N` alignment is defined
+against `ParityRunner`'s own picker, not against `ActivationDriver.foes`. Reverted it and applied
+the tackle-zone filter in the HEURISTIC's Block arm instead — which is the faithful mapping anyway,
+since `foes` IS the heuristic's board. The scoped version keeps the whole gain with the random
+contract at 100/100.
+
+The regression test asserts both halves: the heuristic drops a hexed neighbour, and the shared
+helper still keeps him.
+
+**Gate:**
+
+| | ITER16 | ITER17 |
+|---|---|---|
+| bb2016 amazon | 100/100 | **100/100** |
+| bb2020 amazon | 60/100 | 60/100 |
+| bb2025 amazon | 51/100 | **55/100** |
+| lineman heuristic 1.0 x3 | 100/100 | **100/100** |
+| `cargo test -p ffb-engine` | 7348/0 | **7349/0** |
+
+bb2020 does not move: no star, so no hex, so nothing confused.
+
+**Next:** re-run the signature classifier over bb2025's remaining 45 and bb2020's 40. The LIST
+family has now produced two fixes (ITER12's dodge dialog, this one) and is the loop's natural
+material; the WINDOW family remains blocked on the single `StepInitSelecting` change from ITER16.

@@ -986,6 +986,13 @@ pub fn legal_block_targets(game: &Game, player_id: &str, side: TeamSide) -> Vec<
                 .unwrap_or(false)
         })
         .filter(|p| {
+            // NOTE: this is `can_be_blocked` (`STANDING || MOVING`), NOT Java's `hasTacklezones`
+            // (`(STANDING || MOVING || BLOCKED) && !confused && !hypnotized`). Switching it to the
+            // Java rule is correct for the HEURISTIC's board (`ActivationDriver.foes`) and it broke
+            // the RANDOM contract: `--agent random` bb2025 amazon went 100 -> 93/100, because the
+            // random agent's `idx % N` alignment is defined against ParityRunner's own picker, not
+            // against `foes`. The tackle-zone rule is therefore applied in the heuristic's Block
+            // arm instead. See docs/PARITY_AMAZON_CAMPAIGN.md ITER17.
             game.field_model.player_state(&p.id)
                 .map(|s| s.can_be_blocked())
                 .unwrap_or(false)

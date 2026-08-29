@@ -2954,7 +2954,20 @@ impl HeuristicAgent {
                     }
                 }
                 PlayerActionChoice::Block => {
-                    for t in legal_block_targets(g, pid, side) {
+                    // Java's board for the heuristic is `ActivationDriver.foes(..., adjacentOnly)`,
+                    // which keeps an opponent only while `os.hasTacklezones()` --
+                    // `(STANDING || MOVING || BLOCKED) && !confused && !hypnotized`.
+                    // `legal_block_targets` answers the RANDOM contract's question instead
+                    // (`can_be_blocked`, i.e. `STANDING || MOVING`) and must stay that way: making
+                    // it Java-faithful took `--agent random` bb2025 amazon from 100 to 93/100.
+                    //
+                    // The gap that matters is CONFUSION. A hexed player is STANDING and confused,
+                    // so Java drops him as a target and Rust kept him -- amazon bb2025 seed 9,
+                    // where both engines hex `home_01` and Rust then offers blocks on `home_01`
+                    // and `home_03` against Java's `home_03` alone.
+                    for t in legal_block_targets(g, pid, side).into_iter().filter(|t| {
+                        g.field_model.player_state(t).map(|s| s.has_tacklezones()).unwrap_or(false)
+                    }) {
                         let w = block_weight(f, g, pid, &t, m.str_);
                         push(
                             w,
@@ -7188,6 +7201,45 @@ mod tests {
                 Action::EndPlayerAction
             ) || a.plan.is_none(),
             "the deselect must not leak into a regular turn"
+        );
+    }
+
+    /// Java's board for the heuristic (`ActivationDriver.foes`) keeps an opponent only while
+    /// `hasTacklezones()`, which is false for a CONFUSED player. A hexed player is STANDING and
+    /// confused, so Java stops offering him as a block target; Rust's `legal_block_targets` answers
+    /// the RANDOM contract's question (`can_be_blocked`) and does not check confusion, so the
+    /// heuristic must filter. Making `legal_block_targets` itself Java-faithful is NOT an option:
+    /// it took `--agent random` bb2025 amazon from 100 to 93/100.
+    #[test]
+    fn the_heuristic_does_not_block_a_confused_opponent() {
+        use ffb_model::enums::{PS_STANDING, PlayerState};
+        let mut g = tie_game(3, 3);
+        let attacker = g.team_home.players[0].id.clone();
+        let victim = g.team_away.players[0].id.clone();
+        let here = g.field_model.player_coordinate(&attacker).unwrap();
+        g.field_model
+            .set_player_coordinate(&victim, FieldCoordinate::new(here.x + 1, here.y));
+        g.field_model.set_player_state(&victim, PlayerState::new(PS_STANDING));
+
+        let visible = |g: &Game| {
+            legal_block_targets(g, &attacker, TeamSide::Home)
+                .into_iter()
+                .filter(|t| {
+                    g.field_model.player_state(t).map(|s| s.has_tacklezones()).unwrap_or(false)
+                })
+                .collect::<Vec<_>>()
+        };
+        assert!(visible(&g).contains(&victim), "a standing neighbour is blockable");
+
+        let st = g.field_model.player_state(&victim).unwrap();
+        g.field_model.set_player_state(&victim, st.change_confused(true).change_active(false));
+        assert!(
+            !visible(&g).contains(&victim),
+            "a hexed (confused) neighbour projects no tackle zone and is not a block target"
+        );
+        assert!(
+            legal_block_targets(&g, &attacker, TeamSide::Home).contains(&victim),
+            "the shared helper must keep him -- the random contract depends on it"
         );
     }
 
