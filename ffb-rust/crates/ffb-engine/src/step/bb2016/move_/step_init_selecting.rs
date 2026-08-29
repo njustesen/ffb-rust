@@ -142,8 +142,24 @@ impl Step for StepInitSelecting {
                 if game.turn_data().pass_used && !is_bomb_action {
                     return StepOutcome::cont();
                 }
-                // Java: if (game.isHomePlaying()) { publish(coord) } else { publish(coord.transform()) }
-                let target = if game.home_playing { *coord } else { coord.transform() };
+                // Java's `CLIENT_PASS` handler un-mirrors for the away team:
+                //     if (isHomePlaying()) publish(coord) else publish(coord.transform())
+                // That transform exists because Java's CLIENT sends the target in the AWAY COACH's
+                // view. `Action::Pass` is not that command -- it is an AGENT action, and every Rust
+                // agent fills it from `field_model.player_coordinate(receiver)`, which is already
+                // canonical. Porting the handler without porting its input convention un-mirrored a
+                // coordinate that was never mirrored.
+                //
+                // bb2020 and bb2025 take `Action::Pass` as canonical (`step_init_moving`, ITER60)
+                // and are 100/100; bb2016 was the only arm transforming. The cost was not a
+                // slightly-off target: at bb2016 seed 77 step 75 an away pass aimed at (15,7)
+                // became (10,7), and the corridor from the thrower at (15,5) to THAT square crosses
+                // three home players, so Rust offered an interception Java never offers and spent
+                // the pass roll on the wrong die.
+                //
+                // The random agent never throws a pass in the bb2016 gate, which is why 100/100
+                // held over this for the whole campaign.
+                let target = *coord;
                 let dispatch_action = if player_action == Some(PlayerAction::HailMaryPass) {
                     PlayerAction::HailMaryPass
                 } else {
@@ -1201,21 +1217,34 @@ mod tests {
             "dispatch_player_action set with failed guard must not fall through to the standing-up NEXT_STEP branch");
     }
 
+    /// `Action::Pass` carries a CANONICAL coordinate, for either team.
+    ///
+    /// This test used to assert the opposite — that an away pass is mirrored — because the arm
+    /// ported Java's `CLIENT_PASS` handler, whose transform exists to un-mirror a coordinate the
+    /// Java CLIENT sends in the away coach's view. No Rust agent sends that: they all fill
+    /// `Action::Pass` from `field_model.player_coordinate(receiver)`, which is already canonical.
+    /// bb2020 and bb2025 have always treated it as canonical; bb2016 was the outlier, and its
+    /// un-mirror moved an away pass aimed at (15,7) to (10,7) — a corridor crossing three
+    /// opponents instead of none (seed 77 step 75).
     #[test]
-    fn pass_target_coordinate_transformed_for_away_team() {
-        // Java: CLIENT_PASS → if (game.isHomePlaying()) publish(coord) else publish(coord.transform())
-        let mut game = make_game();
-        game.home_playing = false;
-        game.acting_player.player_id = Some("p1".into());
-        game.acting_player.player_action = Some(PlayerAction::Pass);
-        let mut step = StepInitSelecting::new("end".into());
-        let coord = ffb_model::types::FieldCoordinate::new(10, 7);
-        let out = step.handle_command(&Action::Pass { coord }, &mut game, &mut GameRng::new(0));
-        let published = out.published.iter().find(|p| matches!(p, StepParameter::TargetCoordinate(_)));
-        if let Some(StepParameter::TargetCoordinate(c)) = published {
-            assert_eq!(*c, coord.transform(), "away-team pass target coordinate must be mirrored");
-        } else {
-            panic!("TargetCoordinate not published");
+    fn pass_target_coordinate_is_canonical_for_either_team() {
+        use ffb_model::types::FieldCoordinate;
+
+        for home_playing in [true, false] {
+            let mut game = make_game();
+            game.home_playing = home_playing;
+            game.acting_player.player_id = Some("p1".into());
+            game.acting_player.player_action = Some(PlayerAction::Pass);
+            let mut step = StepInitSelecting::new("end".into());
+            let coord = FieldCoordinate::new(15, 7);
+            let out = step.handle_command(&Action::Pass { coord }, &mut game, &mut GameRng::new(0));
+            match out.published.iter().find(|p| matches!(p, StepParameter::TargetCoordinate(_))) {
+                Some(StepParameter::TargetCoordinate(c)) => assert_eq!(
+                    *c, coord,
+                    "home_playing={home_playing}: the target must be published unchanged"
+                ),
+                _ => panic!("TargetCoordinate not published"),
+            }
         }
     }
 

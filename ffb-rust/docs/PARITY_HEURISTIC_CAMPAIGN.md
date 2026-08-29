@@ -3848,3 +3848,57 @@ the frame question disappears rather than being papered over.
 | bb2025 | 100 | 100 | 99 |
 | bb2020 | 100 | 100 | 100 |
 | bb2016 | 88 | 84 | 88 |
+
+## ITER69 — one un-mirrored coordinate: bb2016 88 → 100, and 8 of 9 gates are green
+
+**bb2016 argmax 88 → 100/100, scale 1.0 84 → 100/100, uniform 88 → 100/100.**
+Eight of the nine gates are now 100/100; the only red left in the campaign is bb2025 uniform seed 82.
+
+ITER68 named two candidates and said to test (b) first. **(b) is refuted**, and cheaply: bb2016's
+terminal pass belongs in `StepInitSelecting` by design — ITER58 established that bb2016 emits its
+Move prompts from there — and Java's own two handlers genuinely differ:
+
+| | Java handler | transforms the target? |
+|---|---|---|
+| bb2016 | `StepInitSelecting.CLIENT_PASS` | **yes**, `coord.transform()` for the away team |
+| bb2025 | `StepInitMoving.CLIENT_PASS` | **no** — it does not touch the coordinate at all |
+
+So Rust's bb2016 transform is a faithful port of the handler. The defect is subtler: **it ports the
+handler without porting its input convention.** Java's transform exists to un-mirror a coordinate
+the Java CLIENT sends in the away coach's view. `Action::Pass` is not that command — it is an AGENT
+action, and every Rust agent fills it from `field_model.player_coordinate(receiver)`, already
+canonical. bb2020 and bb2025 take it as canonical and are 100/100; bb2016 alone un-mirrored a
+coordinate that was never mirrored.
+
+The cost was not a slightly-off target. An away pass aimed at (15,7) became (10,7), and the corridor
+from the thrower at (15,5) to *that* square crosses three home players where the real one crosses
+none — so Rust offered an interception Java never offers, spent a die on it, and then evaluated the
+pass on the wrong roll (5 → accurate, where Java's first die was 1 → fumble).
+
+**Why 100/100 held over it for 69 iterations:** the random agent never throws a pass in the bb2016
+gate. Measured directly — `--agent random` over bb2016 seeds 1-12 produces not a single
+`RUST_PASSFRAME` line. A gate cannot catch what it never executes.
+
+A test encoded the bug again (`pass_target_coordinate_transformed_for_away_team`, asserting the
+mirror). Rewritten as `pass_target_coordinate_is_canonical_for_either_team`, which checks both
+teams — the second instance of a test written from the Rust code rather than from Java, after
+ITER65's.
+
+### Gates
+
+| | argmax | scale 1.0 | scale 1e6 |
+|---|---|---|---|
+| bb2025 | **100** | **100** | 99 |
+| bb2020 | **100** | **100** | **100** |
+| bb2016 | **100** | **100** | **100** |
+
+- Fourteen-class rung: **100/100** in all three editions.
+- `--agent random` lineman tier-3: **100/100** in all three editions.
+- `cargo test --workspace --release`: **14,663 / 0**. `mvn -o -pl ffb-ai test`: **35 / 0**.
+- The two Java trees agree.
+
+**Next and last:** bb2025 uniform seed 82 — the stalling rock whose injury is rolled but never
+applied. ITER67 left the precise lead: Java's rock almost certainly fires from
+`bb2025/StepStallingPlayer` (EndPlayerAction, which reaches the drop machinery) while Rust fires it
+from `StepForgoneStalling` (EndTurn, which does not). Probe which step Java takes, then align Rust's
+`StepStallingPlayer` gates.
