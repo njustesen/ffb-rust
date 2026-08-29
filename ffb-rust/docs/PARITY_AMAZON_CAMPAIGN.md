@@ -1325,3 +1325,65 @@ PRONE/STUNNED; and `is_adjacent` is Chebyshev-1 on both sides, identical to Java
 state hash does not distinguish — the hash is known not to carry the ACTIVE bit. The next iteration
 should extend `RELIG`/`JELIG` to dump, for the disagreeing player, every adjacent opponent with its
 coordinate and full state, and compare those directly.
+
+## ITER24 — the classifier was lying, and the real frontier is the turn boundary (no seed movement)
+
+**No behaviour change by construction** — every edit is an env-gated probe. Seeds 1-20 re-measured
+20 / 13 / 18, identical to ITER23; `cargo test -p ffb-engine` 7354/0.
+
+### Two corrections to the record
+
+**1. The FOUL frontier named in ITER23 does not exist.** Aligning `RNBR` (new) and `JNBR` (new) on
+the same activation counter shows both engines seeing the identical neighbour — `away_03` at (7,11),
+base 3 PRONE, inactive, no tackle zones — and Java's `computeEligiblePlayers` producing
+`[MOVE, FOUL]` while Rust's filtered list produces `[Move]`, after which both shrink identically.
+ITER22 had already fixed it; seed 1 passes. The ITER23 note was written from PRE-ITER22 traces. A
+saved `.err` file does not carry the binary that produced it — re-measure before building on one.
+
+**2. `classify.sh` was mislabelling turn-boundary divergences as LIST.** Amazon-vs-amazon is a
+MIRROR matchup: when the engines disagree about whose turn it is, both still enumerate ~11 players,
+so the candidate totals differ by one or two and a size test cannot tell that apart from a genuine
+list difference. Seed 2 was read as LIST for two iterations; its own `PARITY FAIL` line said
+`java active: home` against `rust active: away` the whole time. The classifier now derives the
+acting side from the `RELIG`/`JELIG` player-id prefixes and tests SIDE and TURN *before* size, and
+is checked in at `scripts/classify_amazon_divergence.sh` rather than living in a scratch directory.
+
+Re-classified with the corrected tool, the current bb2025 reds are **~17 SIDE, 2 TURN, 1 LIST,
+4 now-agreeing**. The LIST and DRAWS families are gone; every remaining red is a turn boundary.
+
+### The frontier, stated precisely
+
+New `FFB_ENDTURN` probes log every EndTurn with the branch that produced it — `RET` in the Rust
+agent, `JET` in `ParityRunner`. Seed 46 (bb2025), the earliest instance:
+
+```
+JET k=35 turn=3 side=home mode=KICKOFF_RETURN why=window-closed used=1 latch=true
+JET k=35 turn=4 side=home mode=REGULAR       why=latch         used=0 latch=true
+
+RET k=34 turn=3 side=home mode=KickoffReturn why=window-closed used=1 latch=true
+RET k=34 turn=5 side=away mode=Regular       why=latch         used=0 latch=false
+```
+
+The latch semantics AGREE. What differs is who acts next: Java offers **home turn 4** (the latch
+kills it, then away plays turn 5); Rust offers **away turn 5** (the latch kills that instead, then
+home plays turn 4). Same two turns, opposite order, so the whole game shifts by one activation.
+
+`StepKickoffReturn` is not the culprit — Java's exit branch and the Rust port are identical,
+`setHomePlaying(!isHomePlaying())` included, and both agents report `side=home` while still in the
+window. `FFB_DRIVE_TRACE` shows what Rust actually does after the window closes:
+
+```
+EndSelecting -> ... -> EndTurn -> KickoffResultRoll -> ApplyKickoffResult -> KickoffAnimation
+ -> Touchback -> EndKickoff -> InitInducement ... -> InitSelecting   (away, turn 5)
+```
+
+Rust runs a COMPLETE NEW KICKOFF and never issues an `InitSelecting` for home turn 4. Java returns
+to home in `REGULAR` mode with no kickoff between. So the divergence is in what the kickoff-return
+window's close leads to, not in the step's own arithmetic — which is ITER19's territory (the
+`GotoLabelOnEnd("END_SELECTING")` on `InitSelecting`, and `StepId::KickoffReturn` added to both
+runtime kickoff sequences).
+
+**Next:** find why Rust's post-window path ends the drive instead of resuming the kicking team's
+turn. Compare the Java server's step sequence over the same interval against the `FFB_DRIVE_TRACE`
+above; the first step that appears in one and not the other is the answer. Do NOT reason from the
+sequence tables — ITER19 already showed those are edition-defaulted and only the live path counts.

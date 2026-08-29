@@ -556,6 +556,7 @@ public class ParityRunner {
                     int turn = homePlaying ? game.getTurnDataHome().getTurnNr()
                                           : game.getTurnDataAway().getTurnNr();
                     if (turn < 1) {
+                        probeEndTurn(game, "turn<1");
                         MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
                         break;
                     }
@@ -570,6 +571,7 @@ public class ParityRunner {
                     // Non-Regular modes (kickoff Blitz!, QuickSnap): one activation then EndTurn.
                     if (game.getTurnMode() != TurnMode.REGULAR && !usedThisTurn.isEmpty()) {
                         justDeselected = true;
+                        probeEndTurn(game, "window-closed");
                         MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
                         break;
                     }
@@ -590,6 +592,7 @@ public class ParityRunner {
                     while (true) {
                         if (remaining.isEmpty() || justDeselected) {
                             // All players used for this turn, or non-Regular mode reset: EndTurn.
+                            probeEndTurn(game, justDeselected ? "latch" : "all-used");
                             justDeselected = false;
                             usedThisTurn.clear();
                             MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
@@ -941,7 +944,7 @@ public class ParityRunner {
             }
 
             case KICKOFF_RETURN:
-                MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
+                probeEndTurn(game, "kickoff-return-arm"); MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
                 break;
 
             case INIT_MOVING: {
@@ -3271,6 +3274,20 @@ public class ParityRunner {
         MatchRunner.inject(gameState, moveCmd);
     }
 
+    /**
+     * `FFB_ENDTURN` mirror of Rust's `probe_endturn`. Which BRANCH ends a turn is the one fact the
+     * state hash cannot show, and the amazon reds are all turn-boundary divergences.
+     */
+    private void probeEndTurn(Game game, String why) {
+        if (System.getenv("FFB_ENDTURN") == null) return;
+        int t = game.isHomePlaying() ? game.getTurnDataHome().getTurnNr()
+                                     : game.getTurnDataAway().getTurnNr();
+        System.err.println("JET k=" + (com.fumbbl.ffb.ai.parity.heuristic.ActivationChoice.PROBE_ACT + 1)
+            + " turn=" + t + " side=" + (game.isHomePlaying() ? "home" : "away")
+            + " mode=" + game.getTurnMode() + " why=" + why
+            + " used=" + usedThisTurn.size() + " latch=" + justDeselected);
+    }
+
     // ── Eligible player computation (mirrors Rust's eligible_players_for_activation) ──
 
     /**
@@ -3599,6 +3616,25 @@ public class ParityRunner {
                 // HypnoticGaze: player moves and gazes an adjacent opponent (canGazeDuringMove)
                 if (p.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canGazeDuringMove)) {
                     actions.add(PlayerAction.GAZE);
+                }
+            }
+
+            // Mirror of Rust's RNBR probe: every adjacent OPPONENT with coordinate and state.
+            // The foul and block predicates are pure functions of exactly this, so a disagreement
+            // in the action lists must be visible here. Off unless FFB_CAND is set.
+            String nbrWant = System.getenv("FFB_CAND");
+            if (nbrWant != null && Integer.parseInt(nbrWant)
+                    == com.fumbbl.ffb.ai.parity.heuristic.ActivationChoice.PROBE_ACT + 1) {
+                for (Player<?> op : opponent.getPlayers()) {
+                    FieldCoordinate oc = fm.getPlayerCoordinate(op);
+                    PlayerState ops = fm.getPlayerState(op);
+                    if (oc == null || ops == null || !isAdjacentCoord(coord, oc)) continue;
+                    System.err.println("JNBR k=" + (com.fumbbl.ffb.ai.parity.heuristic.ActivationChoice.PROBE_ACT + 1) + " pid=" + p.getId() + " opp=" + op.getId()
+                        + " nr=" + op.getNr() + " at=" + oc.getX() + "," + oc.getY()
+                        + " base=" + ops.getBase() + " active=" + ops.isActive()
+                        + " tz=" + hasTackleZones(ops)
+                        + " foulUsed=" + td.isFoulUsed() + " blitzUsed=" + td.isBlitzUsed()
+                        + " acts=" + actions);
                 }
             }
 

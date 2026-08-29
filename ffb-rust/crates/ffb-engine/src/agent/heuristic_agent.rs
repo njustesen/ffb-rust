@@ -1923,6 +1923,20 @@ impl HeuristicAgent {
         false
     }
 
+    /// `FFB_ENDTURN`: every EndTurn this agent returns, with the branch that produced it. The
+    /// turn boundary is where the amazon reds live, and "which branch ended the turn" is the one
+    /// fact neither the state hash nor the candidate summary can show.
+    fn probe_endturn(&self, g: &Game, turn_nr: i32, why: &str) {
+        if std::env::var_os("FFB_ENDTURN").is_some() {
+            eprintln!(
+                "RET k={} turn={} side={} mode={:?} why={} used={} latch={}",
+                self.probe_act, turn_nr,
+                if g.home_playing { "home" } else { "away" },
+                g.turn_mode, why, self.used_this_turn.len(), self.just_deselected
+            );
+        }
+    }
+
     fn bucket(&self, f: &Features, g: &Game) -> u64 {
         let ballz = f.ball.map(|c| (c.x / 5) as u64 * 4 + (c.y / 4) as u64).unwrap_or(31);
         let carried = f.carrier.is_some() as u64;
@@ -2189,9 +2203,11 @@ impl HeuristicAgent {
             .collect();
         if g.turn_mode != ffb_model::enums::TurnMode::Regular && !self.used_this_turn.is_empty() {
             self.just_deselected = true;
+            self.probe_endturn(g, turn_nr, "window-closed");
             return Action::EndTurn;
         }
         if eligible.is_empty() {
+            self.probe_endturn(g, turn_nr, "eligible-empty");
             return Action::EndTurn;
         }
         let any_unused = eligible.iter().any(|(pid, _)| !self.used_this_turn.contains(pid));
@@ -2202,8 +2218,10 @@ impl HeuristicAgent {
         // usedThisTurn.clear(); EndTurn }` -- one exit, and it CLEARS rather than waiting for the
         // next turn key to do it.
         if !any_unused || self.just_deselected {
+            let why = if self.just_deselected { "latch" } else { "all-used" };
             self.just_deselected = false;
             self.used_this_turn.clear();
+            self.probe_endturn(g, turn_nr, why);
             return Action::EndTurn;
         }
         let home = g.home_playing;
@@ -2384,6 +2402,24 @@ impl HeuristicAgent {
                 if want.parse::<u32>().ok() == Some(self.probe_act) {
                     for (pid, acts) in eligible.iter() {
                         eprintln!("RELIG k={} pid={} actions={:?}", self.probe_act, pid, acts);
+                        // Every adjacent OPPONENT with its coordinate and full state. The foul and
+                        // block predicates are pure functions of exactly this, so when the two
+                        // agents' action lists disagree while their flags and positions agree, the
+                        // disagreement has to be visible here (`JNBR` is the Java mirror).
+                        if let Some(c) = g.field_model.player_coordinate(pid) {
+                            let opp = if g.home_playing { &g.team_away } else { &g.team_home };
+                            for o in opp.players.iter() {
+                                let Some(oc) = g.field_model.player_coordinate(&o.id) else { continue };
+                                if !oc.is_adjacent(c) { continue; }
+                                let os = g.field_model.player_state(&o.id);
+                                eprintln!(
+                                    "RNBR k={} pid={} opp={} nr={} at={},{} base={:?} active={:?} tz={:?}",
+                                    self.probe_act, pid, o.id, o.nr, oc.x, oc.y,
+                                    os.map(|s| s.base()), os.map(|s| s.is_active()),
+                                    os.map(|s| s.has_tacklezones())
+                                );
+                            }
+                        }
                     }
                     for (i, c) in cands.iter().enumerate() {
                         eprintln!(
@@ -3272,6 +3308,9 @@ impl Agent for HeuristicAgent {
             let what = match &prompt {
                 AgentPrompt::SkillUse { skill_name, player_id, .. } => {
                     format!(" skill={skill_name} pid={player_id}")
+                }
+                AgentPrompt::ReRollOffer { source, action, .. } => {
+                    format!(" src={source:?} action={action}")
                 }
                 _ => String::new(),
             };

@@ -39,7 +39,7 @@ public final class ActivationChoice {
     }
 
     /** Counts activation decisions, so FFB_CAND=<k> can name one. Diagnostics only. */
-    private static int PROBE_ACT = 0;
+    public static int PROBE_ACT = 0;   // visible so ParityRunner can gate its own probes on the same counter
 
     /** One eligible player as the harness reports him. */
     public static final class Eligible {
