@@ -3180,10 +3180,17 @@ impl Agent for HeuristicAgent {
         // gives the previous prompt's cost by differencing, which works despite act()'s many
         // early returns.
         if std::env::var_os("FFB_DRAWS").is_some() {
+            let what = match &prompt {
+                AgentPrompt::SkillUse { skill_name, player_id, .. } => {
+                    format!(" skill={skill_name} pid={player_id}")
+                }
+                _ => String::new(),
+            };
             eprintln!(
-                "RDRAW cls={} total={}",
+                "RDRAW cls={} total={}{}",
                 prompt_class_of(&prompt).name(),
-                self.probe_draws
+                self.probe_draws,
+                what
             );
         }
 

@@ -91,7 +91,23 @@ impl StepBlockDodge {
         let home_choice = game.home_playing;
         // Java: findPushbackSquares returns all candidate squares (including occupied ones).
         // Use the candidates function (no occupancy filtering) for dodge-choice detection.
-        let regular_squares = UtilServerPushback::find_pushback_squares_candidates(starting_square, home_choice);
+        // Java `findDodgeChoice` reads `findPushbackSquares(game, startingSquare, REGULAR)`, which
+        // FILTERS: in-bounds only, and then, when any candidate is free, only the FREE ones (the
+        // crowd-push branch keeps all three). Rust called a raw-candidates helper whose doc claimed
+        // Java "returns all 3 candidates (including occupied ones)" -- it does not, and the whole
+        // chain-push test below is scanning that list for occupants. With the raw list an occupied
+        // neighbour is always found, so Rust declared a chain-push risk and asked the coach to use
+        // Dodge where Java had already decided.
+        //
+        // Measured on amazon bb2016 seed 1: same block, same starting square (14,9) SOUTHEAST --
+        // Java's list is [(15,10),(14,10)] with chain=false, Rust's was [(15,9),(15,10),(14,10)]
+        // with chain=true. Rust spent two sampler draws on a prompt Java never showed, and the two
+        // RNG streams parted at activation 33.
+        let regular_squares = UtilServerPushback::find_pushback_squares_standard(
+            starting_square,
+            &|c| game.field_model.player_at(c).is_some(),
+            home_choice,
+        );
 
         let chain_push = regular_squares.iter().any(|sq| game.field_model.player_at(sq.coordinate).is_some());
 
@@ -311,8 +327,12 @@ mod tests {
         game.defender_id = Some("def".into());
         game.field_model.set_player_coordinate("att", FieldCoordinate::new(10, 7));
         game.field_model.set_player_coordinate("def", FieldCoordinate::new(10, 8));
-        // Place a blocker at (10,9) — directly south of defender — causes chain push
+        // ALL THREE candidates must be occupied for a chain push. Java's REGULAR list keeps only
+        // the FREE squares whenever any is free, so one blocker among three leaves somewhere to be
+        // pushed and Java decides without asking. This used to place a single blocker.
         game.field_model.set_player_coordinate("blocker", FieldCoordinate::new(10, 9));
+        game.field_model.set_player_coordinate("blocker2", FieldCoordinate::new(9, 9));
+        game.field_model.set_player_coordinate("blocker3", FieldCoordinate::new(11, 9));
         assert!(StepBlockDodge::find_dodge_choice(&game));
     }
 

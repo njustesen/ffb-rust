@@ -71,7 +71,23 @@ impl StepBlockDodge {
         };
 
         let home_choice = game.home_playing;
-        let regular_squares = UtilServerPushback::find_pushback_squares_candidates(starting_square, home_choice);
+        // Java `findDodgeChoice` reads `findPushbackSquares(game, startingSquare, REGULAR)`, which
+        // FILTERS: in-bounds only, and then, when any candidate is free, only the FREE ones (the
+        // crowd-push branch keeps all three). Rust called a raw-candidates helper whose doc claimed
+        // Java "returns all 3 candidates (including occupied ones)" -- it does not, and the whole
+        // chain-push test below is scanning that list for occupants. With the raw list an occupied
+        // neighbour is always found, so Rust declared a chain-push risk and asked the coach to use
+        // Dodge where Java had already decided.
+        //
+        // Measured on amazon bb2016 seed 1: same block, same starting square (14,9) SOUTHEAST --
+        // Java's list is [(15,10),(14,10)] with chain=false, Rust's was [(15,9),(15,10),(14,10)]
+        // with chain=true. Rust spent two sampler draws on a prompt Java never showed, and the two
+        // RNG streams parted at activation 33.
+        let regular_squares = UtilServerPushback::find_pushback_squares_standard(
+            starting_square,
+            &|c| game.field_model.player_at(c).is_some(),
+            home_choice,
+        );
 
         let chain_push = regular_squares.iter().any(|sq| game.field_model.player_at(sq.coordinate).is_some());
 
@@ -120,6 +136,14 @@ impl StepBlockDodge {
             }
         });
 
+        if std::env::var_os("FFB_DODGE_TRACE").is_some() {
+            eprintln!(
+                "RDODGE att={attacker_id} def={defender_id} start=({},{}) dir={:?} chain={chain_push} side={sideline_push} half={attacker_half_push} sq={:?}",
+                starting_square.coordinate.x, starting_square.coordinate.y,
+                starting_square.direction,
+                grab_squares.iter().map(|q| (q.coordinate.x, q.coordinate.y)).collect::<Vec<_>>()
+            );
+        }
         // Java: `usingDodge = true` when no risk; otherwise leave null → dialog.
         if !chain_push && !sideline_push && !attacker_half_push {
             Some(true)
@@ -229,6 +253,42 @@ mod tests {
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2016)
+    }
+
+    /// Java `findDodgeChoice` scans `findPushbackSquares(game, start, REGULAR)`, and that list is
+    /// already filtered to the FREE squares whenever any candidate is free. So an occupied
+    /// neighbour cannot make `chainPush` true while a free square exists, and Java decides
+    /// `usingDodge = true` without asking the coach.
+    ///
+    /// Rust scanned the RAW three candidates, found the occupant, declared a chain-push risk and
+    /// raised a `SkillUse` prompt Java never raises — two sampler draws that put the two agents'
+    /// RNG streams permanently out of step (amazon bb2016 seed 1, activation 33).
+    #[test]
+    fn an_occupied_neighbour_is_not_a_chain_push_while_a_free_square_exists() {
+        let mut game = make_game();
+        // Attacker at (13,9) shoving the defender at (14,9) -- direction EAST, so the three
+        // candidates are (15,8), (15,9), (15,10). Occupy (15,9) only.
+        add_player(&mut game, false, "att", FieldCoordinate::new(13, 9), PS_STANDING);
+        add_player(&mut game, true, "def", FieldCoordinate::new(14, 9), PS_STANDING);
+        add_player(&mut game, true, "blocker", FieldCoordinate::new(15, 9), PS_STANDING);
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("def".into());
+
+        assert_eq!(
+            StepBlockDodge::find_dodge_choice(&game),
+            Some(true),
+            "a free square exists, so Java decides without asking"
+        );
+
+        // Fill the other two: now nothing is free, the crowd-push branch keeps all three, and the
+        // occupants make it a genuine chain push -- which Java DOES ask about.
+        add_player(&mut game, true, "b2", FieldCoordinate::new(15, 8), PS_STANDING);
+        add_player(&mut game, true, "b3", FieldCoordinate::new(15, 10), PS_STANDING);
+        assert_eq!(
+            StepBlockDodge::find_dodge_choice(&game),
+            None,
+            "with no free square the chain-push risk is real and the coach is asked"
+        );
     }
 
     fn add_player(game: &mut Game, team_home: bool, id: &str, coord: FieldCoordinate, state_base: u32) {
@@ -353,10 +413,16 @@ mod tests {
         let mut step = StepBlockDodge::new();
         let mut game = make_game();
         game.home_playing = true;
-        // Attacker at (10,7), defender at (10,8), blocker at (10,9)
+        // Attacker at (10,7), defender at (10,8) -- direction SOUTH, candidates (11,9),(10,9),(9,9).
+        // ALL THREE must be occupied for this to be a chain push: Java's REGULAR list keeps only the
+        // FREE squares whenever any is free, so one blocker among three leaves nothing to chain into
+        // and Java decides without asking. Filling one square used to be enough here, which asserted
+        // a prompt Java never raises.
         add_player(&mut game, true, "att", FieldCoordinate::new(10, 7), PS_STANDING);
         add_player(&mut game, false, "def", FieldCoordinate::new(10, 8), PS_STANDING);
         add_player(&mut game, false, "blocker", FieldCoordinate::new(10, 9), PS_STANDING);
+        add_player(&mut game, false, "blocker2", FieldCoordinate::new(11, 9), PS_STANDING);
+        add_player(&mut game, false, "blocker3", FieldCoordinate::new(9, 9), PS_STANDING);
         game.acting_player.player_id = Some("att".into());
         game.defender_id = Some("def".into());
 

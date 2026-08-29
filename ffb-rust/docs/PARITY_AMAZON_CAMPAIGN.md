@@ -31,7 +31,7 @@ structurally, not just by generator.
 
 | amazon v amazon, `--heur-classes all`, seeds 1-100 | sampled (1.0) |
 |---|---|
-| bb2016 | 52/100 |
+| bb2016 | **100/100** 🏁 |
 | bb2020 | 55/100 |
 | bb2025 | 45/100 |
 
@@ -579,3 +579,66 @@ the only live change is a guard on a step with zero dispatches. `cargo test -p f
 **Next:** identify which skill Rust prompts for at bb2016 seed 1 activation 33 that Java resolves
 without asking, and make Rust match. `FFB_CAND=33` on that seed plus the `RDRAW cls=skill` line will
 name it.
+
+## ITER10 — bb2016 GREEN (52 -> 100/100): a filtered list read as if it were raw
+
+**The first edition is done.** bb2016 amazon v amazon at `--heur-scale 1.0` is **100/100**.
+
+**The bug.** Java's `findDodgeChoice` decides whether a Defender-Stumbles is risky enough to ask the
+coach about Dodge, by scanning `findPushbackSquares(game, start, REGULAR)` for occupants. That list
+is **already filtered**: in-bounds only, and then, whenever any candidate is free, **only the free
+ones** (all three are kept solely in the crowd-push case, where none is free). So an occupied
+neighbour cannot make `chainPush` true while somewhere free exists — Java decides `usingDodge = true`
+and shows no dialog.
+
+Rust scanned the RAW three candidates. Its helper even said so:
+"Java `findPushbackSquares` returns all 3 candidates (including occupied ones) — used by
+`StepBlockDodge.findDodgeChoice` to detect chain-push". That premise is wrong, and the whole
+chain-push test was built on it. With the raw list an occupied neighbour is nearly always present,
+so Rust declared a chain-push risk and raised a `SkillUse` prompt Java never raises — two sampler
+draws, and the two RNG streams parted for the rest of the game.
+
+**The measurement that settled it**, after the probes were mirrored on both sides:
+
+```
+JDODGE att=Away3 def=Home10 start=(14,9) dir=SOUTHEAST chain=false sq=(15,10)(14,10)
+RDODGE att=away_03 def=home_10 start=(14,9) dir=Southeast chain=true  sq=[(15,9),(15,10),(14,10)]
+```
+
+Same block, same starting square, and Java's list is two squares where Rust's is three. `(15,9)` is
+occupied; Java had already dropped it.
+
+**Fixed** by having both dodge steps (`bb2016/block` and `mixed`, the latter serving bb2020/bb2025)
+call `find_pushback_squares_standard` — the helper that already implements Java's filter — instead
+of the raw-candidates one.
+
+**Two existing tests asserted the bug** and failed on the corrected code: each placed ONE blocker
+among three candidates and asserted a prompt. Under Java's filter that is not a chain push at all.
+Rewritten to occupy all three, which is a genuine chain push and does prompt. A third, new test
+pins both halves: one occupied neighbour beside a free square decides silently; all three occupied
+asks. **My own first draft of it was wrong too** — it assumed direction SOUTHEAST where the fixture
+gives EAST, so the "all occupied" half left `(15,8)` free and still decided silently. The failure
+was the fixture, not the fix.
+
+**Gate:**
+
+| | ITER9 | ITER10 |
+|---|---|---|
+| bb2016 amazon | 52/100 | **100/100** |
+| bb2020 amazon | 55/100 | 55/100 |
+| bb2025 amazon | 45/100 | 45/100 |
+| lineman heuristic 1.0 x3 | 100/100 | **100/100** |
+| `cargo test -p ffb-engine` | 7346/0 | **7347/0** |
+
+bb2020 and bb2025 do not move: their blocks route through the same corrected helper, so the fix is
+live there too, but their remaining failures have other causes.
+
+**Process note.** Diagnosing this needed a probe inside `ffb-server`, which the campaign rules
+forbid editing. It was added, used for exactly one measurement, and removed before the gate;
+`git status` on that file is clean. Recorded because the temptation to leave "just a logging line"
+in the ground-truth engine is exactly how ground truth stops being ground truth.
+
+**Next:** bb2020 (55) and bb2025 (45) with bb2016 out of the way. The kickoff-return window remains
+the single largest known cause on bb2020 (32 of 44 failures show the turn mismatch) and now has a
+precise blocker: `repeat().with_prompt().push_seq()` does not re-enter the step the way Java's
+`pushCurrentStepOnStack()` does.
