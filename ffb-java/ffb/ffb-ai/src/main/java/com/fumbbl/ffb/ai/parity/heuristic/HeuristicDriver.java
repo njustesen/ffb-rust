@@ -79,6 +79,21 @@ public final class HeuristicDriver {
         if (dialog == null || dialog.getId() == null) {
             return false;
         }
+        // Per-prompt draw accounting (FFB_DRAWS), mirroring Rust's RDRAW. Printing the RUNNING
+        // TOTAL on entry gives each prompt's cost by differencing, and differencing the two
+        // engines' totals names the prompt where their RNG streams parted.
+        if (System.getenv("FFB_DRAWS") != null) {
+            String probeWhat = "";
+            if (dialog instanceof com.fumbbl.ffb.dialog.DialogSkillUseParameter) {
+                com.fumbbl.ffb.dialog.DialogSkillUseParameter psu =
+                    (com.fumbbl.ffb.dialog.DialogSkillUseParameter) dialog;
+                probeWhat = " skill=" + (psu.getSkill() == null ? "null"
+                    : psu.getSkill().getClass().getSimpleName())
+                    + " pid=" + psu.getPlayerId();
+            }
+            System.err.println("JDRAW cls=" + dialog.getId() + " total=" + sampler.drawCount()
+                + probeWhat);
+        }
         switch (dialog.getId()) {
             case COIN_CHOICE:
                 if (!classes.has(PromptClass.COIN_CHOICE)) {
@@ -97,6 +112,56 @@ public final class HeuristicDriver {
             default:
                 return false;
         }
+    }
+
+    /**
+     * Rust {@code AgentPrompt::SkillUse} (§6.16). {@code T = 0.20}.
+     *
+     * <p>Two options, in this order: index 0 = USE the skill, index 1 = decline, weighted
+     * {@code w} and {@code 1 - w}. The whole policy is one lookup on the skill's name.
+     *
+     * <p><b>This class was unreachable for the entire lineman campaign</b> — a team with no skills
+     * is never offered one — so the Rust side scored it and the Java side had no arm at all,
+     * falling through to the random contract's fixed "always use" rule. That rule answers without
+     * touching the sampler, so the two RNG streams stayed in lockstep only while no skill existed.
+     * The amazons put Dodge on all twelve players, and the very first failed dodge desynchronised
+     * the draw counts: Rust spent 2 draws where Java spent 0, and every decision after it read a
+     * different random stream. Same candidate lists, same weights, different pick.
+     *
+     * <p>The names are Rust's {@code format!("{:?}", SkillId)} — the enum variant, which is also
+     * Java's {@code Skill.getClass().getSimpleName()}. Anything unlisted is 0.50, i.e. a coin flip
+     * that still costs the draws.
+     *
+     * <p>Deliberately NO special cases. The random contract declines DumpOff, PrimalSavagery,
+     * SafePairOfHands and Swoop because the harness cannot drive the paths they open, but Rust's
+     * heuristic has no such carve-out, and inventing one here would be a divergence from the agent
+     * this is a port OF. None of the four exists on an amazon roster; if one ever reaches this arm
+     * the fix belongs in Rust first.
+     *
+     * @param skillName the skill's class simple name, e.g. {@code "Dodge"}.
+     * @return true to use the skill.
+     */
+    public boolean useSkill(String skillName) {
+        float wUse;
+        if ("Dodge".equals(skillName)) {
+            wUse = 0.95f;
+        } else if ("Juggernaut".equals(skillName)) {
+            wUse = 0.80f;
+        } else if ("HitAndRun".equals(skillName)) {
+            wUse = 0.70f;
+        } else if ("Fend".equals(skillName)) {
+            wUse = 0.85f;
+        } else if ("Wrestle".equals(skillName)) {
+            wUse = 0.55f;
+        } else if ("QuickBite".equals(skillName) || "AnimalSavagery".equals(skillName)) {
+            wUse = 0.85f;
+        } else {
+            wUse = 0.50f;
+        }
+        sampler.clear();
+        sampler.push(wUse);          // index 0: use it
+        sampler.push(1.0f - wUse);   // index 1: decline
+        return sampler.pick(0.20f) == 0;
     }
 
     /**

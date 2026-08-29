@@ -31,8 +31,8 @@ structurally, not just by generator.
 
 | amazon v amazon, `--heur-classes all`, seeds 1-100 | sampled (1.0) |
 |---|---|
-| bb2016 | 46/100 |
-| bb2020 | 0/100 |
+| bb2016 | 39/100 |
+| bb2020 | 14/100 |
 | bb2025 | 0/100 |
 
 Control: `--agent random` amazon is **100/100 in all three editions**, so the roster itself is
@@ -123,3 +123,86 @@ attributes and skills feed `ValueModel.Mover` on both sides, and the Java `Eligi
 `getMovementWithModifiers`/`getAgilityWithModifiers`/`getStrengthWithModifiers` plus five
 name-matched skills, any one of which a star can carry differently from a rostered player. Check the
 INPUTS before the arithmetic.
+
+## ITER2 — the SkillUse prompt: a class the lineman campaign proved unreachable
+
+**The measurement chain, because two hypotheses died on the way and the tooling lied once.**
+
+ITER1 left bb2025 seed 2 diverging at a decision where both sides held the same state hash. Probes
+were added to BOTH agents to dump the activation candidate lists (`FFB_CANDSUM`, `FFB_CAND=<k>`,
+`FFB_DRAWS`), and they settled it in three steps:
+
+1. Decisions 1-6 enumerate **the same players with the same option counts**; the sets first differ
+   at 7, which is AFTER the divergence, not at it.
+2. At the diverging decision the two lists are **bit-identical** — same order, same players, same
+   actions, same raw float weights, 1850 rows each. So the scoring agrees completely and the DRAW
+   disagrees.
+3. The draw counters said why: entering that decision Rust had spent **26** sampler draws and Java
+   **24**. They were equal at the previous decision, so two draws went missing inside the
+   activation between them.
+
+Windowing both prompt streams by draw count named it outright: Rust's `skill` prompt spends 2
+draws, Java's `SKILL_USE` spends 0.
+
+**Root cause.** `PromptClass::SKILL_USE` is scored by Rust and had **no arm at all** in
+`HeuristicDriver`, so it fell through to the random contract's fixed "always use the skill" rule.
+That rule answers without touching the sampler. The class was unreachable for all 70 lineman
+iterations — a team with no skills is never offered one — so nothing ever caught it. Every amazon
+carries Dodge, and the first failed dodge desynchronised the two RNG streams for the rest of the
+game.
+
+**Fixed** by porting Rust's arm 1:1 into `HeuristicDriver.useSkill` (the weight table: Dodge 0.95,
+Fend/QuickBite/AnimalSavagery 0.85, Juggernaut 0.80, HitAndRun 0.70, Wrestle 0.55, everything else
+0.50; two options; `pick(0.20)`), and routing `ParityRunner`'s SKILL_USE arm through it whenever the
+class is switched on. Deliberately **no** carve-out for the four skills the random contract declines
+for harness reasons (DumpOff, PrimalSavagery, SafePairOfHands, Swoop) — Rust's heuristic has none,
+and inventing one here would be a divergence from the agent this is a port of. None of the four
+exists on an amazon roster.
+
+`SkillUseTest` pins the weight table, the **draw cost** (2 live, 0 at argmax) and that a 0.95/0.05
+split actually declines sometimes — without that last one, the sampled arm would be
+indistinguishable from the fixed rule it replaced, which is precisely how this hid.
+
+**Gate:**
+
+| | ITER1 | ITER2 |
+|---|---|---|
+| bb2016 amazon | 46/100 | **39/100** |
+| bb2020 amazon | 0/100 | **14/100** |
+| bb2025 amazon | 0/100 | 0/100 (seed 2's first divergence moved from step 6 to step **39**) |
+| lineman heuristic 1.0 x3 | 100/100 | **100/100** |
+| `cargo test -p ffb-engine` | 7342/0 | **7342/0** |
+| `mvn -o -pl ffb-ai test` | 36/0 | **39/0** |
+
+**bb2016 went DOWN by 7 and the fix was kept anyway. The evidence for that call:**
+
+Diffing the failing seed sets (never the counts) gives 10 newly broken, 3 newly fixed. Taking the
+lowest newly-broken seed, bb2016 seed 13, the two agents agree for 116 activations and then diverge
+with **identical candidate lists** and Java **two draws ahead** — one whole extra sampled prompt.
+Windowing the prompt streams names it: Java is offered `SKILL_USE skill=Pass` for the Amazon
+Thrower, and **Rust's bb2016 engine never emits that prompt at all**.
+
+So the asymmetry is in the ENGINE and it was there before this iteration. Answering the prompt for
+free used to hide it; sampling it exposes it. Reverting would re-hide a real Rust engine bug to buy
+back seven seeds, which is the wrong trade, and the aggregate across the three editions rises 46 ->
+53 regardless.
+
+**A tooling lesson worth more than the seeds.** The first bb2016 measurement showed a **one**-draw
+gap at decision 114 and pointed at the wrong place. Rust's epsilon branch draws twice but only one
+of them goes through `unit()`, while Java counts both — so my own instrument was off by one on every
+epsilon hit. Corrected, the same seed reads a clean two-draw gap at decision 117. An instrument that
+disagrees with itself by exactly one is indistinguishable from a real one-draw divergence.
+
+The probes are kept, documented and env-gated (`FFB_CANDSUM`, `FFB_CAND=<k>`, `FFB_DRAWS`) rather
+than removed: they are the campaign's highest-yield tool and cost one integer increment per draw.
+
+**Next (ITER3):** port Java's bb2016 Pass-skill re-roll prompt into the Rust engine. Java asks the
+coach; Rust decides for itself (the lineman campaign's `2244d941` made the Pass re-roll auto-use).
+Java is the truth, so Rust must emit the prompt. That is a Rust ENGINE fix with a colocated
+regression test, and it should recover most of the 10 bb2016 seeds as well as being right.
+
+**Also queued, seen in the same runs:** Rust declares `Activate(home_02, BalefulHex)` for the bb2025
+star while Java declares MOVE for someone else. `ParityRunner.actionFromName` has no case for it and
+its `default` returns `PlayerAction.MOVE` — the identical shape as the `HandOver`/`HandOffMove` bug
+already recorded in `ActivationChoice.moveVariant`. The agent picks the right thing and the harness
+declares something else, so no scoring diff can show it.

@@ -38,6 +38,9 @@ public final class ActivationChoice {
     private ActivationChoice() {
     }
 
+    /** Counts activation decisions, so FFB_CAND=<k> can name one. Diagnostics only. */
+    private static int PROBE_ACT = 0;
+
     /** One eligible player as the harness reports him. */
     public static final class Eligible {
         public final String id;
@@ -380,6 +383,33 @@ public final class ActivationChoice {
         }
         if (out.isEmpty()) {
             return new Decision(null, null, null, null, null);
+        }
+
+        // Candidate-list diagnostics, mirroring Rust's. FFB_CANDSUM=1 for one summary line per
+        // activation (size, running draw total, per-declaration counts); FFB_CAND=<k> for the
+        // k-th activation's full list with raw float weights, which is what proves two agents
+        // enumerated and scored identically and still picked differently.
+        PROBE_ACT++;
+        if (System.getenv("FFB_CANDSUM") != null) {
+            java.util.TreeMap<String, Integer> n = new java.util.TreeMap<>();
+            for (PlanBuilder.Candidate c : out) {
+                n.merge(c.player + "/" + c.pac, 1, Integer::sum);
+            }
+            StringBuilder sb = new StringBuilder();
+            for (Map.Entry<String, Integer> e : n.entrySet()) {
+                sb.append(' ').append(e.getKey()).append(':').append(e.getValue());
+            }
+            System.err.println("JSUM k=" + PROBE_ACT + " n=" + out.size()
+                + " draws=" + sampler.drawCount() + sb);
+        }
+        String probeWant = System.getenv("FFB_CAND");
+        if (probeWant != null && Integer.parseInt(probeWant) == PROBE_ACT) {
+            for (int i = 0; i < out.size(); i++) {
+                PlanBuilder.Candidate c = out.get(i);
+                System.err.println("JCAND k=" + PROBE_ACT + " i=" + i + " pid=" + c.player
+                    + " pac=" + c.pac + " tgt=" + c.target + " w="
+                    + String.format("%08x", Float.floatToRawIntBits(c.weight)));
+            }
         }
 
         List<Activation.Option> options = new ArrayList<>();

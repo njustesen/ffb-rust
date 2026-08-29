@@ -1696,6 +1696,11 @@ pub struct HeuristicAgent {
     /// Who just received the ball. The second half of a ball-move plan: he has to be the next one
     /// activated, or the throw bought nothing.
     awaiting_run: Option<String>,
+    /// Counts activation decisions, so `FFB_CAND=<k>` can name one. Diagnostics only.
+    probe_act: u32,
+    /// Total sampler draws consumed. The Java `Sampler` keeps the same counter, and comparing the
+    /// two is how a desynchronised RNG stream is localised to the prompt that caused it.
+    probe_draws: u64,
     /// `FFB_HEUR_DUMP` — record every decision's full distribution for the visualiser.
     dump_enabled: bool,
     /// The option set of the most recent decision, with probabilities. Empty unless dumping.
@@ -1727,6 +1732,8 @@ impl HeuristicAgent {
             used_this_turn: HashSet::new(),
             just_deselected: false,
             awaiting_run: None,
+            probe_act: 0,
+            probe_draws: 0,
             dump_enabled: std::env::var_os("FFB_HEUR_DUMP").is_some(),
             last_options: Vec::new(),
             last_chosen: 0,
@@ -1753,6 +1760,7 @@ impl HeuristicAgent {
     // ── sampling ───────────────────────────────────────────────────────────
 
     fn unit(&mut self) -> f32 {
+        self.probe_draws += 1;
         (self.rng.next_u64() >> 11) as f32 / (1u64 << 53) as f32
     }
 
@@ -1875,6 +1883,10 @@ impl HeuristicAgent {
         let max = self.buf.options.iter().map(|o| o.weight).fold(f32::MIN, f32::max);
         let eps = if self.temp_scale < 0.1 { 0.0 } else { EPS };
         if eps > 0.0 && self.unit() < eps {
+            // This second draw does not go through unit(), and Java counts it. Count it
+            // here too or the two probe totals disagree by one on every epsilon hit -- which is
+            // exactly the false 'divergence' the bb2016 measurement first showed.
+            self.probe_draws += 1;
             return ((self.rng.next_u64() as usize) % n).min(n - 1);
         }
         let mut acc = 0.0f32;
@@ -2264,6 +2276,40 @@ impl HeuristicAgent {
         // Ending the turn banks what the team has: zero gain, zero risk.
         self.buf.push(Action::EndTurn, 0.0, Rule::EndActivation, 0.0);
 
+        // Agent diagnostics, all env-gated and off by default. Diffing the two agents' candidate
+        // lists is the campaign's highest-yield tool, and the draw ACCOUNTING is what caught
+        // ITER2: identical lists, identical weights, and a different pick, because one side had
+        // silently spent two draws the other never spent.
+        //
+        //   FFB_CANDSUM=1  one line per activation: size, running draw total, per-declaration counts
+        //   FFB_CAND=<k>   the k-th activation's full candidate list with raw float weights
+        //   FFB_DRAWS=1    one line per prompt: its class and the running draw total
+        {
+            self.probe_act += 1;
+            if std::env::var_os("FFB_CANDSUM").is_some() {
+                let mut n = std::collections::BTreeMap::new();
+                for c in cands.iter() {
+                    *n.entry((c.player.clone(), format!("{:?}", c.pac))).or_insert(0u32) += 1;
+                }
+                let parts: Vec<String> =
+                    n.iter().map(|((p, a), c)| format!("{p}/{a}:{c}")).collect();
+                eprintln!(
+                    "RSUM k={} n={} draws={} {}",
+                    self.probe_act, cands.len(), self.probe_draws, parts.join(" ")
+                );
+            }
+            if let Ok(want) = std::env::var("FFB_CAND") {
+                if want.parse::<u32>().ok() == Some(self.probe_act) {
+                    for (i, c) in cands.iter().enumerate() {
+                        eprintln!(
+                            "RCAND k={} i={} pid={} pac={:?} tgt={:?} w={:08x}",
+                            self.probe_act, i, c.player, c.pac, c.target,
+                            c.weight.to_bits()
+                        );
+                    }
+                }
+            }
+        }
         // Two-level draw. Group by DECLARATION — the (player, action) pair the engine actually
         // receives — and score each group by its best child, which keeps argmax identical to a flat
         // draw while stopping a branch with two thousand destinations from drowning one with nine.
@@ -3098,6 +3144,16 @@ impl Agent for HeuristicAgent {
         // random-agent gate exactly. `ClassMask::ALL` (the default) never takes this branch.
         if !self.classes.has(prompt_class_of(&prompt)) {
             return self.parity.act(gs);
+        }
+        // Per-prompt draw accounting (`FFB_DRAWS`). Printing the RUNNING TOTAL on entry
+        // gives the previous prompt's cost by differencing, which works despite act()'s many
+        // early returns.
+        if std::env::var_os("FFB_DRAWS").is_some() {
+            eprintln!(
+                "RDRAW cls={} total={}",
+                prompt_class_of(&prompt).name(),
+                self.probe_draws
+            );
         }
 
         // §20.7 — build the feature block at most once per board position, then take it out of

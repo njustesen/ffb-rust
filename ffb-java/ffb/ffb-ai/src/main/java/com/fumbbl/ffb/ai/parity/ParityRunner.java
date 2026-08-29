@@ -1295,6 +1295,15 @@ public class ParityRunner {
                     boolean useSkill = (skillName == null)
                         || (!"DumpOff".equals(skillName) && !"PrimalSavagery".equals(skillName)
                             && !"SafePairOfHands".equals(skillName) && !"Swoop".equals(skillName));
+                    // The heuristic SCORES this prompt where the random contract answers it with
+                    // the fixed rule above. It must reach the agent, not just the engine: Rust
+                    // spends two sampler draws here, so answering it for free desynchronises the
+                    // two random streams for the rest of the game -- invisible on a lineman roster
+                    // that is never offered a skill, and the first thing an amazon hits.
+                    if (skillName != null && heuristic != null
+                        && heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.SKILL_USE)) {
+                        useSkill = heuristic.useSkill(skillName);
+                    }
                     comm.clearCaptured();
                     comm.sendUseSkill(su.getSkill(), useSkill, su.getPlayerId());
                     injectCaptured(dialog, game, gameState);
