@@ -532,3 +532,50 @@ rule, which is the most likely cause of the stall. Gate bb2020 first: it has the
 
 **Also logged:** the runtime sequences omit `SWARMING` x2 as well. No amazon has Swarming, so adding
 it would be an unmeasured change; it belongs with whatever roster does.
+
+## ITER9 — the kickoff-return window, attempt two: one blocker removed, one still standing
+
+**Outcome: the window is still dead, deliberately.** A second attempt at ITER8's frontier removed
+one real blocker and found the next one; the sequence entry is reverted again and the gate is
+unchanged. Recorded as a partial, not dressed up.
+
+**Blocker removed.** `StepKickoffReturn.consumes_parameter` returned `false` unconditionally, and
+said why: Java guards its consumption on `game.getTurnMode() == KICKOFF_RETURN`, "that guard is not
+expressible here (`consumes_parameter` has no game access)", and "the headless port never enters
+KICKOFF_RETURN mode, so never-consume is the Java-equivalent runtime behavior; revisit if
+kickoff-return interactions are ever ported."
+
+Both halves of that reasoning have now expired. The port DOES enter the mode (On the Ball), and the
+guard needs no game at all: the window is open exactly when THIS step opened it, so a `window_open`
+flag answers the same question. Without consuming, the `END_TURN` that closes the window travels
+past the step, the exit branch never fires, and the mode stays `KickoffReturn` forever — the game
+ran 486 driver iterations, recorded **zero** activations and finished 0-0. That is now fixed and
+documented at the site.
+
+**Blocker still standing.** With the consumption fixed, adding the step to the runtime sequences
+still leaves the game unable to leave the window: `FFB_DRIVE_TRACE` shows `KickoffReturn` dispatched
+**once** and `KickoffResultRoll` never, so the step is not re-entered after the `Select` sequence it
+pushes. The step returns `StepOutcome::repeat().with_prompt(...).push_seq(select_sequence())`, and
+whatever `repeat` + `push_seq` + a prompt do together is not what Java's
+`pushCurrentStepOnStack() + generator.pushSequence(...)` does. That is a step-framework question,
+not a kickoff question, and it is the next thing to settle for this window.
+
+The `consumes_parameter` fix is kept: it is INERT while the step is absent from the sequences
+(measured: 0 dispatches), it is what Java does, and it saves the next attempt a step.
+
+**Switched tactics** rather than grind a third attempt, and the switch immediately paid. bb2016 is
+the edition the window barely touches (6 of 48 failures show the turn mismatch, against 32 of 44 in
+bb2020). Its seed 1 diverges at activation 33 with the lists the SAME size (1606 each) and Rust
+**2 draws ahead**. Windowing the prompt streams: Rust fires `skill` (2 draws), `pushback`,
+`followup`; Java fires no `SKILL_USE` at all in that window.
+
+So bb2016's frontier is the MIRROR of ITER3 and ITER6 — there Java asked for a skill and Rust
+decided silently; here **Rust asks and Java does not**. Same class of defect, opposite direction,
+and it is the fourth skill-prompt asymmetry this campaign.
+
+**Gate: unchanged.** bb2016 52, bb2020 55, bb2025 45 (re-run); lineman untouched by construction —
+the only live change is a guard on a step with zero dispatches. `cargo test -p ffb-engine` 7346/0.
+
+**Next:** identify which skill Rust prompts for at bb2016 seed 1 activation 33 that Java resolves
+without asking, and make Rust match. `FFB_CAND=33` on that seed plus the `RDRAW cls=skill` line will
+name it.

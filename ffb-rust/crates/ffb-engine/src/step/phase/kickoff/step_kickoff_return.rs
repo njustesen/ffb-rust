@@ -24,11 +24,17 @@ pub struct StepKickoffReturn {
     end_player_action: bool,
     /// Java: fEndTurn
     end_turn: bool,
+    /// True from the moment THIS step opens the kickoff-return window until it closes it again.
+    ///
+    /// Java guards its `setParameter` consumption on `game.getTurnMode() == KICKOFF_RETURN`, and
+    /// `consumes_parameter` has no `&Game`. It does not need one: the window is open exactly when
+    /// this step opened it, so the step can answer from its own state.
+    window_open: bool,
 }
 
 impl StepKickoffReturn {
     pub fn new() -> Self {
-        Self { touchback: false, end_player_action: false, end_turn: false }
+        Self { touchback: false, end_player_action: false, end_turn: false, window_open: false }
     }
 }
 
@@ -67,14 +73,20 @@ impl Step for StepKickoffReturn {
 
     // Java: setParameter consume()s these keys — but ONLY when
     // game.getTurnMode() == TurnMode.KICKOFF_RETURN (TOUCHBACK is set WITHOUT consuming).
-    // That guard is not expressible here (consumes_parameter has no game access). This
-    // step is stack-resident during the whole kickoff, where the mode is NOT KickoffReturn
-    // and Java does not consume — consuming unconditionally would eat END_TURN publishes
-    // meant for steps below it. The headless port never enters KICKOFF_RETURN mode, so
-    // never-consume is the Java-equivalent runtime behavior; revisit if kickoff-return
-    // interactions are ever ported.
-    fn consumes_parameter(&self, _param: &StepParameter) -> bool {
-        false
+    //
+    // This step is stack-resident for the whole kickoff, where the mode is NOT KickoffReturn and
+    // Java does not consume; consuming unconditionally would eat END_TURN publishes meant for
+    // steps below it. The old comment here said the guard was "not expressible" because
+    // `consumes_parameter` has no `&Game`, and left it as never-consume on the grounds that the
+    // headless port never enters KICKOFF_RETURN mode. It now does (amazon: On the Ball), and the
+    // guard needs no game at all — the window is open exactly when THIS step opened it.
+    //
+    // Without consuming, the END_TURN that closes the window travels past this step, the exit
+    // branch never fires, the mode stays KickoffReturn forever and the game plays no activations
+    // at all: 486 driver iterations, 0 recorded steps, final score 0-0.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        self.window_open
+            && matches!(param, StepParameter::EndTurn(_) | StepParameter::EndPlayerAction(_))
     }
 }
 
@@ -94,6 +106,7 @@ impl StepKickoffReturn {
                 game.home_playing = !game.home_playing;
                 // Java: game.setTurnMode(TurnMode.KICKOFF)
                 game.turn_mode = TurnMode::Kickoff;
+                self.window_open = false;
                 // Java: UtilPlayer.refreshPlayersForTurnStart(game)
                 let mechanic = crate::mechanic::game_mechanic_for(game.rules);
                 UtilPlayer::refresh_players_for_turn_start(game, &mechanic.enhancements_to_remove_at_end_of_turn(), &mechanic.enhancements_to_remove_at_end_of_turn_when_not_setting_active());
@@ -161,6 +174,7 @@ impl StepKickoffReturn {
                 game.home_playing = !game.home_playing;
                 // Java: game.setTurnMode(TurnMode.KICKOFF_RETURN)
                 game.turn_mode = TurnMode::KickoffReturn;
+                self.window_open = true;
                 // Java: UtilServerDialog.showDialog(…, new DialogKickoffReturnParameter(), false)
                 let eligible: Vec<String> = kickoff_return_player.into_iter().collect();
                 // Java: pushCurrentStepOnStack() + Select.pushSequence
