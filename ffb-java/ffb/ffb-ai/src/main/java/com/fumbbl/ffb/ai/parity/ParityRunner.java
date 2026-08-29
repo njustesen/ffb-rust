@@ -602,6 +602,14 @@ public class ParityRunner {
                         // side skips both the same way.
                         if (activation != null) {
                             activation.refreshTurn(game);
+                            if (System.getenv("FFB_CANDSUM") != null) {
+                                com.fumbbl.ffb.model.TurnData ptd = game.isHomePlaying()
+                                    ? game.getTurnDataHome() : game.getTurnDataAway();
+                                System.err.println("JFLAGS turn=" + ptd.getTurnNr()
+                                    + " home=" + game.isHomePlaying()
+                                    + " blitz=" + ptd.isBlitzUsed() + " pass=" + ptd.isPassUsed()
+                                    + " hand=" + ptd.isHandOverUsed() + " foul=" + ptd.isFoulUsed());
+                            }
                             // LIVE, not the turn-start snapshot. Rust reads `eligible_players` off
                             // the engine's prompt, which the engine recomputes for every
                             // activation; the snapshot above is a harness convenience that the

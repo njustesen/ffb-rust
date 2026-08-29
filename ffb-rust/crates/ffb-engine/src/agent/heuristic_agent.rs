@@ -2324,7 +2324,11 @@ impl HeuristicAgent {
                     .map(|(pid, acts)| format!("{pid}:{}", acts.iter()
                         .map(|a| format!("{a:?}")).collect::<Vec<_>>().join("|")))
                     .collect();
-                eprintln!("RELIG k={} turn={} {}", self.probe_act, turn_nr, elig.join(" "));
+                eprintln!(
+                    "RELIG k={} turn={} blitz={} pass={} hand={} foul={} {}",
+                    self.probe_act, turn_nr, td.blitz_used, td.pass_used, td.hand_over_used,
+                    td.foul_used, elig.join(" ")
+                );
             }
             if let Ok(want) = std::env::var("FFB_CAND") {
                 if want.parse::<u32>().ok() == Some(self.probe_act) {

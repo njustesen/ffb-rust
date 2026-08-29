@@ -790,3 +790,53 @@ disagreement.
 **Next:** confirm the `blitzUsed` disagreement directly (print `turn_data.blitz_used` alongside the
 eligible dump on both sides, bb2020 seed 50, turn 5), then find the blitz that set it. A flag that
 gates two of the six declarations is worth more than one seed if it is wrong generally.
+
+## ITER14 — ITER13's hypothesis REFUTED by measurement; seed 50 is the window family after all
+
+**No fix; gate unchanged by construction (only env-gated probes were added).** This iteration's
+value is a retraction backed by data, and a re-classification that matters for how the rest of the
+campaign is scheduled.
+
+**Instrumented first this time**, rather than reading code and inferring — which is what produced
+ITER13's wrong answer. The turn-data flags now print alongside both eligible dumps (`RELIG` gains
+`blitz/pass/hand/foul`; `JFLAGS` prints the same from `ParityRunner`, where the `Game` is in scope —
+`ActivationChoice.choose` does not receive one).
+
+**ITER13 said** the engines must disagree about `blitzUsed`, since both gate Block and Blitz on it
+and Java's list had lost them. **They do not.** At the diverging activation (bb2020 seed 50, k=162)
+both sides read `blitz=false`:
+
+```
+k=161  R turn=6 blitz=false | J turn=6 blitz=false
+k=162  R turn=5 blitz=false | J turn=5 blitz=false     <- the parity divergence
+```
+
+The flags do diverge later (k=168, Rust `blitz=true` against Java `false`) but that is downstream of
+a game that has already parted, and in the OPPOSITE direction to the prediction. The inference was
+wrong and the measurement was one probe away the whole time.
+
+**What the same dump shows instead.** The acting-team turn numbers around the divergence run
+5, 5, 5, 6, 6, 6, **5**, 7, 7, 7. Away's turn 5 is interrupted by home's turn 6 and then RESUMES —
+which is the post-kickoff shape, not an ordinary turn boundary. Java re-snapshots its eligible list
+when the turn key changes and computes `away_06 = Move` (no adjacent opponent with tackle zones on
+the board it sees); Rust's live list still says `Move|Block|Blitz`. The two engines disagree about
+the board after the kickoff.
+
+**So seed 50 is not a separate cause.** My census classified it "non-window" because the turn NUMBERS
+matched at the first-diff step — that test is too weak, since this window leaves the counters equal
+and changes the board instead. The honest reading is that the kickoff-return family is a bigger
+share of the remaining failures than the census suggested.
+
+**Also carried forward, still not fixed:** `legal_block_targets` uses `can_be_blocked`
+(`STANDING || MOVING`) where Java uses `hasTacklezones` (adds `BLOCKED`, subtracts confused and
+hypnotized). Fixing it would ADD targets on the Rust side; seed 50 needs Rust to have FEWER, so
+landing it here would be an unmeasured change in the wrong direction for the observed bug. It also
+feeds the random and uniform agents, so it needs its own gate.
+
+**Gate:** unchanged — bb2016 100/100, bb2020 60/100, bb2025 51/100 (seeds 1-20 re-measured 10/20 and
+10/20), `cargo test -p ffb-engine` 7348/0, Java trees synced.
+
+**Next:** with seed 50 reclassified, the kickoff-return window plausibly accounts for most of what
+remains in both editions. The specified work from ITER11 is unchanged and is the highest-value item
+on the board; the loop's per-iteration format has now spent three iterations on it without landing
+it, which is itself the argument for giving it a session.
