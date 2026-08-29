@@ -3740,3 +3740,55 @@ does not match.
 
 **Next:** the apothecary-mode question above — one grep — then seed 82 should close and bb2025 joins
 bb2020 as a finished edition.
+
+## ITER67 — seed 82 traced to the end; switching tactics (investigation, no code change)
+
+**No code change and no gate movement.** Second consecutive iteration on bb2025 seed 82 without
+closing it. Recording the trace so the next attempt starts from the answer, and switching targets —
+the campaign's own instruction when an approach stops paying.
+
+ITER66 left one question: does the `SteadyFootingContext` reach `StepSteadyFooting`? **It does.**
+Probing the driver's publish walk and the step's `set_parameter` together:
+
+```
+RUST_PUBSF   from=ForgoneStalling stack=[EndTurn, CatchScatterThrowIn, Apothecary, PlaceBall, SteadyFooting]
+RUST_SF_PARAM step_mode=Some(HitPlayer) ctx_mode=HitPlayer pid=Some("away_04")
+```
+
+So the apothecary mode matches, the context is accepted, and `SteadyFooting` proceeds to `fail()` —
+correctly, since a lineman has no Steady Footing skill. `fail()` publishes
+`StepParameter::DropPlayerContext`.
+
+**And nothing consumes it.** The only consumer in either engine is
+`StepHandleDropPlayerContext`, and that step is in **neither** side's `EndTurn` sequence — Java's
+`bb2025/EndTurn.java` is `FORGONE_STALLING, STEADY_FOOTING, PLACE_BALL, APOTHECARY,
+CATCH_SCATTER_THROW_IN, END_TURN`, with no `HANDLE_DROP_PLAYER_CONTEXT` anywhere in it.
+
+That is the real finding, and it points away from where I was digging: **if Java's drop had come
+through `StepForgoneStalling`, Java could not apply it either.** So Java's rock almost certainly
+fires from `bb2025/StepStallingPlayer` in the **EndPlayerAction** sequence — which does reach the
+drop machinery — while Rust fires it from `StepForgoneStalling` in EndTurn. The dice trace cannot
+distinguish them (`StallingExtension.handleStaller:73` is called from both), which is why two
+iterations went the wrong way.
+
+**Next attempt starts here:** probe which of the two steps Java takes, then make Rust's
+`StepStallingPlayer` gates match so the rule fires from the same place. Rust's `StepStallingPlayer`
+requires `game.stalling`, which ITER65 now sets, so it is a question of which step wins the race,
+not of a missing capability.
+
+### Switching targets
+
+bb2025 is at 100/100/99 and bb2020 at 100/100/100. bb2016 is 88/84/88 — **44 of the 47 remaining
+reds across the whole campaign**. The next iterations go there; seed 82 is one seed in one scale of
+one edition and will keep.
+
+### Gates (unchanged, re-verified)
+
+| | argmax | scale 1.0 | scale 1e6 |
+|---|---|---|---|
+| bb2025 | 100 | 100 | 99 |
+| bb2020 | 100 | 100 | 100 |
+| bb2016 | 88 | 84 | 88 |
+
+`--agent random` and the fourteen-class rung **100/100** in all three editions; `cargo test
+--workspace --release` **14,663 / 0**; `mvn -o -pl ffb-ai test` **35 / 0**; the two Java trees agree.
