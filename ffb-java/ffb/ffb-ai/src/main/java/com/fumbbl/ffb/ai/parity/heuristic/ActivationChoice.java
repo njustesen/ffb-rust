@@ -5,6 +5,7 @@ import com.fumbbl.ffb.FieldCoordinate;
 import com.fumbbl.ffb.model.Game;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -255,11 +256,29 @@ public final class ActivationChoice {
         }
 
         // ---- tier 1: search-free proxy for every eligible player ----
+        // CANONICAL ORDER, and it has to be imposed here rather than assumed. Rust does
+        // `c1.sort_by_key(|a| canon_key(g, &a.pid))` -- `(side, nr)` -- before it builds a single
+        // plan, and the class doc above says this method walks the canonically-sorted list. It did
+        // not: it walked whatever order the harness supplied, which is ROSTER order
+        // (`computeEligiblePlayers`, "roster order, same as Rust's eligible_this_turn Vec").
+        //
+        // Those two orders are the same list whenever a jersey number equals its roster index, and
+        // that is true of every lineman team -- which is why 70 iterations of lineman parity never
+        // saw it. The bb2025 amazon spec numbers its second roster slot 13, so the orders differ,
+        // and since the declaration grouping and the draw are POSITIONAL, a differently ordered
+        // candidate list picks a different candidate from identical weights.
+        //
+        // `side` is constant across one call (the eligible list is the acting team's), so ordering
+        // by `nr` alone reproduces `canon_key` exactly; it is written as the full two-level
+        // comparator anyway so the code does not depend on that argument staying true.
+        List<Eligible> canonical = new ArrayList<>(eligible);
+        canonical.sort(Comparator.<Eligible>comparingInt(e -> home ? 0 : 1)
+            .thenComparingInt(e -> e.nr));
         List<Eligible> live = new ArrayList<>();
         List<ValueModel.Mover> movers = new ArrayList<>();
         List<Float> proxies = new ArrayList<>();
         List<Float> weights = new ArrayList<>();
-        for (Eligible e : eligible) {
+        for (Eligible e : canonical) {
             if (usedThisTurn.contains(e.id) || e.actions.isEmpty()) {
                 continue;
             }

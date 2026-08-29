@@ -187,6 +187,91 @@ class ActivationChoiceTest {
                 + "never actually tested");
     }
 
+    /**
+     * The decision must not depend on the ORDER the eligible list arrives in.
+     *
+     * <p>Rust canonically sorts by {@code (side, nr)} before it enumerates anything; the harness
+     * supplies ROSTER order. Those agree only while a jersey number equals its roster index, which
+     * is true of every lineman team and false of the bb2025 amazons, whose second roster slot wears
+     * 13. The draw and the declaration grouping are POSITIONAL, so an unsorted list picks a
+     * different candidate out of identical weights -- a divergence with no wrong number anywhere in
+     * it.
+     *
+     * <p>Numbers 1, 13, 3 in roster order are the amazon case exactly: sorted canonically they are
+     * 1, 3, 13, so the second and third candidates swap.
+     */
+    @Test
+    void eligibleListOrderDoesNotChangeTheDecision() {
+        List<Row> board = new ArrayList<>();
+        // Roster order 1, 13, 3, 4, 5, 6 -- the bb2025 amazon shape. Nobody carries the ball and
+        // nobody is adjacent to it, so no single candidate dominates and the draw is genuinely
+        // spread across players; a fixture with a clear best move answers it the same way whatever
+        // order the list is in, and tests nothing.
+        int[][] mine = {{1, 11, 4}, {13, 12, 6}, {3, 11, 8}, {4, 12, 10}, {5, 10, 5}, {6, 10, 9}};
+        for (int[] m : mine) {
+            Row r = new Row();
+            r.home = true;
+            r.nr = m[0];
+            r.x = m[1];
+            r.y = m[2];
+            r.standing = true;
+            board.add(r);
+        }
+        for (int[] o : new int[][] {{2, 13, 6}, {4, 12, 9}, {7, 20, 7}}) {
+            Row r = new Row();
+            r.home = false;
+            r.nr = o[0];
+            r.x = o[1];
+            r.y = o[2];
+            r.standing = true;
+            board.add(r);
+        }
+        List<Features.Snap> snaps = new ArrayList<>();
+        for (Row r : board) {
+            snaps.add(new Features.Snap(r.home, r.x, r.y, r.standing, true, 6, 3, r.nr));
+        }
+        FieldCoordinate ball = new FieldCoordinate(22, 7);
+        Features f = Features.build(snaps,
+            new Features.BoardState(ball, true, true, false, false), true);
+        ActivationChoice.Board bd = new BoardFromRows(board, f);
+
+        List<ActivationChoice.Eligible> roster = new ArrayList<>();
+        for (Row r : board) {
+            if (!r.home) {
+                continue;
+            }
+            roster.add(new ActivationChoice.Eligible(String.format("home_%02d", r.nr), r.nr,
+                new FieldCoordinate(r.x, r.y), true, false,
+                Arrays.asList("Move", "Block"), 6, 3, 3, false, false, false, false, false));
+        }
+        List<ActivationChoice.Eligible> canonical = new ArrayList<>(roster);
+        canonical.sort(java.util.Comparator.comparingInt(e -> e.nr));
+        assertEquals(13, roster.get(1).nr, "the fixture must actually be out of canonical order");
+        assertEquals(3, canonical.get(1).nr);
+
+        for (float scale : new float[] {0.0f, 1.0f, 1.0e6f}) {
+            ActivationChoice.Decision a = choose(f, bd, roster, scale);
+            ActivationChoice.Decision b = choose(f, bd, canonical, scale);
+            assertEquals(describe(b), describe(a), "roster order vs canonical order @ " + scale);
+        }
+    }
+
+    private static ActivationChoice.Decision choose(Features f, ActivationChoice.Board bd,
+            List<ActivationChoice.Eligible> elig, float scale) {
+        return ActivationChoice.choose(f, new Sampler(21, scale), bd, elig, 3, false, null,
+            new HashSet<>(), true, false, false,
+            new ActivationChoice.Coverage(0.0f, new java.util.HashMap<>(),
+                new java.util.HashMap<>()),
+            0L);
+    }
+
+    private static String describe(ActivationChoice.Decision d) {
+        if (d.player == null) {
+            return "ENDTURN";
+        }
+        return d.player + "/" + d.action + "/" + d.target + "/" + d.dest;
+    }
+
     /** Supplies the eligibility answers the harness gives in production. */
     private static final class BoardFromRows implements ActivationChoice.Board {
         private final List<Row> rows;
