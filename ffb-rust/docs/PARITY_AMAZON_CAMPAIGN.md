@@ -32,8 +32,8 @@ structurally, not just by generator.
 | amazon v amazon, `--heur-classes all`, seeds 1-100 | sampled (1.0) |
 |---|---|
 | bb2016 | **100/100** 🏁 |
-| bb2020 | 55/100 |
-| bb2025 | 45/100 |
+| bb2020 | 60/100 |
+| bb2025 | 51/100 |
 
 Control: `--agent random` amazon is **100/100 in all three editions**, so the roster itself is
 parity-clean and every red below belongs to the heuristic.
@@ -691,3 +691,51 @@ both runtime sequences, have the agents answer a `KickoffReturn` prompt with `En
 is a *session*, not a loop slot. Meanwhile the loop can keep taking the other bucket: 10 of bb2020's
 45 and 28 of bb2025's 55 failures show neither a turn nor an active-team mismatch, so they are
 ordinary divergences of the kind ITER10 closed.
+
+## ITER12 — bb2020/bb2025's dodge dialog was never modelled (55 -> 60, 45 -> 51)
+
+**Targeting rule that paid:** the census split each edition's failures into the kickoff-return
+bucket (blocked) and the rest, then looked for a seed failing the SAME way in BOTH editions —
+33, 50, 56, 59. One cause, two editions.
+
+**The bug, and it is the fourth of its exact kind.** bb2020 and bb2025 share
+`AbstractDodgingBehaviour`, which asks the coach about Dodge iff `askForSkill` (the chain/sideline/
+half risk the step computes) **and** the defender had tackle zones. Rust's `mixed/step_block_dodge.rs`
+did not model the dialog branch at all, and said why:
+
+> Headless mode never returns `stop_processing=true` (no dialog channel through this path), so we
+> don't need to model Java's `if (waitForDialog) return;` branch.
+
+True while the RANDOM contract answered a `SKILL_USE` for free. The heuristic SCORES the class and
+spends two sampler draws on it, so the streams part at the first block where Java asks. Measured on
+bb2025 seed 33 activation 124: identical candidate lists (1182 each), Java two draws ahead, and the
+window contains `SKILL_USE skill=Dodge pid=...Away3` on the Java side only.
+
+**Worth stating plainly: bb2020/bb2025 do NOT share bb2016's algorithm.** bb2016's `DodgeBehaviour`
+is 139 lines of chain/sideline/half analysis; bb2020's and bb2025's are 15 lines each, both
+delegating to `AbstractDodgingBehaviour`, which has no such analysis — the risk test lives in the
+STEP there, and the behaviour only asks. Reading one edition's behaviour as the other's is how
+ITER10's fix could look complete while leaving this open.
+
+**Fixed** by porting the guards verbatim: defender has the skill, `askForSkill`, and
+`oldDefenderState.hasTacklezones()`. The regression test pins all three — a risky push asks, no risk
+does not, and no tackle zones does not.
+
+**Gate:**
+
+| | ITER11 | ITER12 |
+|---|---|---|
+| bb2016 amazon | 100/100 | **100/100** |
+| bb2020 amazon | 55/100 | **60/100** |
+| bb2025 amazon | 45/100 | **51/100** |
+| lineman heuristic 1.0 x3 | 100/100 | **100/100** |
+| `cargo test -p ffb-engine` | 7347/0 | **7348/0** |
+
+**Seed 33 did not close, and that is the useful part**: its first divergence moved from activation
+124 to 130, and the new one has the kickoff-return signature (Rust enumerating a fresh 2184-option
+turn against Java's 377-option remnant). The dodge cause was real and is gone; the window sits
+behind it.
+
+**Next:** the same non-window bucket has more in it — bb2020 and bb2025 still share failing seeds
+50, 56 and 59 — so repeat this iteration's targeting rule. The kickoff-return window remains the
+largest single cause and remains blocked on the agent-side contract from ITER11.

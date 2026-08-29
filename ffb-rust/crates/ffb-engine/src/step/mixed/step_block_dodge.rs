@@ -166,12 +166,50 @@ impl StepBlockDodge {
             self.ask_for_skill = Some(Self::find_dodge_choice(game));
         }
 
+        // Java `AbstractDodgingBehaviour.handleExecuteStepHook`:
+        //
+        //   if (defender == null || !defender.has(skill)) return false;
+        //   if (requireUnusedSkill && defender.isUsed(skill)) return false;
+        //   if (usingDodge == null) usingDodge = oldDefenderState.hasTacklezones();
+        //   if (askForSkill && oldDefenderState.hasTacklezones()) { showDialog(...); return true; }
+        //
+        // The dialog branch used to be skipped here, on the reasoning that "headless mode never
+        // returns stop_processing=true (no dialog channel through this path)". That was true while
+        // the RANDOM contract answered a SKILL_USE for free; the heuristic SCORES the class and
+        // spends two sampler draws on it, so the two RNG streams part at the first block where
+        // Java asks. Measured on amazon bb2025 seed 33 activation 124: identical candidate lists
+        // (1182 each), Java two draws ahead, and the window contains
+        // `SKILL_USE skill=Dodge pid=...Away3` on the Java side only.
+        //
+        // NOTE the guards are Java's, not bb2016's: bb2020 and bb2025 share
+        // `AbstractDodgingBehaviour`, which has no chain-push analysis of its own -- it asks iff
+        // `askForSkill` (which IS the chain/sideline/half risk, computed by the step) AND the
+        // defender had tackle zones.
+        if self.using_dodge.is_none() {
+            let defender_has_dodge = game
+                .defender_id
+                .as_deref()
+                .and_then(|id| game.player(id))
+                .map(|p| p.has_skill(ffb_model::enums::SkillId::Dodge))
+                .unwrap_or(false);
+            let old_has_tz = self.old_defender_state.map(|s| s.has_tacklezones()).unwrap_or(false);
+            if defender_has_dodge && self.ask_for_skill.unwrap_or(false) && old_has_tz {
+                if let Some(defender_id) = game.defender_id.clone() {
+                    return StepOutcome::cont().with_prompt(
+                        ffb_model::prompts::AgentPrompt::SkillUse {
+                            player_id: defender_id,
+                            skill_id: ffb_model::enums::SkillId::Dodge as u16,
+                            skill_name: "Dodge".into(),
+                        },
+                    );
+                }
+            }
+        }
+
         // Java: UtilServerDialog.hideDialog(); boolean waitForDialog = executeStepHooks(this, state);
         // Dispatches to DodgeBehaviour/WatchOutBehaviour (AbstractDodgingStepModifier), which
         // default `using_dodge` from `oldDefenderState.hasTacklezones()` and add the
-        // ReportSkillUse report. Headless mode never returns `stop_processing=true` (no dialog
-        // channel through this path — see AbstractDodgingStepModifier's doc comment), so we
-        // don't need to model Java's `if (waitForDialog) return;` branch.
+        // ReportSkillUse report.
         let mut hook_state = StepBlockDodgeHookState {
             using_dodge: self.using_dodge,
             ask_for_skill: self.ask_for_skill.unwrap_or(false),
@@ -248,6 +286,50 @@ mod tests {
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
+    }
+
+    /// Java `AbstractDodgingBehaviour` (bb2020 + bb2025) asks the coach iff `askForSkill` -- the
+    /// chain/sideline/half risk the step computes -- AND the defender had tackle zones. The dialog
+    /// branch was not modelled here at all, on the reasoning that "headless mode never returns
+    /// stop_processing=true". True while the RANDOM contract answered a SKILL_USE for free; the
+    /// heuristic spends two sampler draws on it, so a prompt Rust never emits parts the two RNG
+    /// streams (amazon bb2025 seed 33, activation 124).
+    #[test]
+    fn a_risky_block_asks_the_defender_about_dodge() {
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::prompts::AgentPrompt;
+        use ffb_model::enums::{SkillId, PS_PRONE};
+        let mut game = make_game();
+        add_defender(&mut game, "def", PS_STANDING);
+        game.team_away.player_mut("def").unwrap()
+            .starting_skills.push(SkillWithValue { skill_id: SkillId::Dodge, value: None });
+        game.defender_id = Some("def".into());
+
+        let mut step = StepBlockDodge::new();
+        step.old_defender_state = Some(PlayerState::new(PS_STANDING));
+        step.ask_for_skill = Some(true);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            matches!(out.prompt, Some(AgentPrompt::SkillUse { ref skill_name, .. }) if skill_name == "Dodge"),
+            "a risky push must ask, got {:?}", out.prompt
+        );
+
+        // ...and the two guards Java applies. No risk -> no question.
+        let mut step = StepBlockDodge::new();
+        step.old_defender_state = Some(PlayerState::new(PS_STANDING));
+        step.ask_for_skill = Some(false);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(!matches!(out.prompt, Some(AgentPrompt::SkillUse { .. })), "no risk, no question");
+
+        // A defender who had no tackle zones is not asked either, however risky the push.
+        let mut step = StepBlockDodge::new();
+        step.old_defender_state = Some(PlayerState::new(PS_PRONE));
+        step.ask_for_skill = Some(true);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            !matches!(out.prompt, Some(AgentPrompt::SkillUse { .. })),
+            "no tackle zones, no question"
+        );
     }
 
     fn add_defender(game: &mut Game, id: &str, state: u32) {
