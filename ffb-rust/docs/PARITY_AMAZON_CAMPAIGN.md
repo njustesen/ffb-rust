@@ -840,3 +840,47 @@ feeds the random and uniform agents, so it needs its own gate.
 remains in both editions. The specified work from ITER11 is unchanged and is the highest-value item
 on the board; the loop's per-iteration format has now spent three iterations on it without landing
 it, which is itself the argument for giving it a session.
+
+## ITER15 — the window, attempt four: three pieces ready, one question left (no fix)
+
+**Gate unchanged (100 / 60 / 51).** All three specified pieces from ITER11 are now IN the tree and
+inert; the sequence entry is reverted a fourth time. What this iteration adds is the last unknown,
+stated precisely.
+
+**Built and kept (inert while the step is unreached, measured: 0 dispatches):**
+
+1. `consumes_parameter` guarded on `window_open` (ITER9) — Java's `turnMode == KICKOFF_RETURN` guard,
+   expressible from the step's own state.
+2. `push_self` instead of `repeat` (ITER11) — Java's `pushCurrentStepOnStack()`.
+3. **New here:** both agents answer an activation inside the window with `EndTurn`, mirroring
+   `ParityRunner`'s `case KICKOFF_RETURN: inject(ClientCommandEndTurn)`. The harness never moves the
+   returner, and neither should the agents.
+
+**With all three plus the sequence entry, the run is still wrong — but differently, and the trace
+finally says why.** The game reaches turn 8/8 with zero recorded activations: turns advance and
+nothing is played. That is the signature of `turn_mode` never leaving `KickoffReturn` — every
+subsequent activation hits the new agent rule and ends the turn.
+
+Tracing the control flow: on the START path the driver does not apply `push_self` (only
+`apply_action` does), so the step returns `Continue` with its prompt, the agent acknowledges, the
+step re-runs with both end flags false, falls out of its window branch and returns `next()` — it
+leaves the stack. The `Select` sequence it pushed then runs, the agent answers `EndTurn`,
+`StepEndTurn` publishes `END_TURN(true)` from its window-skip branch... and there is no
+`StepKickoffReturn` left on the stack to consume it and reset the mode.
+
+**And Java does the same thing** — its `executeStep` also ends with `NEXT_STEP` after pushing — so
+the mode must be reset somewhere else in Java, and I have not found where. `StepEndTurn`'s
+`BLITZ || KICKOFF_RETURN || PASS_BLOCK || ...` branch publishes `END_TURN` and returns without
+touching `turnMode`.
+
+**That single question — what resets `turnMode` out of `KICKOFF_RETURN` in Java — is the whole
+remaining blocker.** Everything else is in place.
+
+**Gate:** unchanged; bb2020 and bb2025 seeds 1-20 re-measured at 10/20 each after the revert,
+bb2016 20/20, `cargo test -p ffb-engine` 7348/0.
+
+**Scheduling note, stated for the fourth time and now with a cost attached.** Iterations 8, 9, 11
+and 15 have each advanced this item and none has landed it; that is four of the last eight loop
+slots. The per-iteration format is a poor fit for a change that needs the whole path working at
+once, because each attempt must be reverted to keep the gate honest. The next person to touch it
+should start from the question above with the three pieces already built.

@@ -341,6 +341,14 @@ impl Agent for RandomAgent {
                 if turn_nr < 1 {
                     return Action::EndTurn;
                 }
+                // Java `ParityRunner`'s KICKOFF_RETURN arm injects `ClientCommandEndTurn` as
+                // soon as the window state is reached: the harness NEVER moves the returner. The
+                // window exists so the receiving team's turn counter is not advanced yet -- Java
+                // opens it, ends it, and the kickoff sequence continues. Without this the agent
+                // activates inside the window, which Java never does.
+                if gs.game.turn_mode == ffb_model::enums::TurnMode::KickoffReturn {
+                    return Action::EndTurn;
+                }
                 let turn_key = (gs.game.half, turn_nr, gs.game.home_playing);
                 if self.last_turn_key != Some(turn_key) {
                     self.last_turn_key = Some(turn_key);

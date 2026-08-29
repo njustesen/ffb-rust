@@ -2127,6 +2127,13 @@ impl HeuristicAgent {
         if turn_nr < 1 {
             return Action::EndTurn;
         }
+        // Java `ParityRunner`'s KICKOFF_RETURN arm injects `ClientCommandEndTurn` as soon as the
+        // window state is reached: the harness NEVER moves the returner. The window exists so the
+        // receiving team's turn counter is not advanced yet -- Java opens it, ends it, and the
+        // kickoff sequence continues.
+        if g.turn_mode == ffb_model::enums::TurnMode::KickoffReturn {
+            return Action::EndTurn;
+        }
         // NOTE: Java freezes the eligible list for the whole turn
         // (`eligibleThisTurn = computeEligiblePlayers(game)`) while this reads the engine's live
         // list, and the two DO differ -- amazon bb2025 seed 1 activation 19, where Rust offers a
@@ -2483,6 +2490,13 @@ impl HeuristicAgent {
             g.turn_data_away.turn_nr
         };
         if turn_nr < 1 {
+            return Action::EndTurn;
+        }
+        // Java `ParityRunner`'s KICKOFF_RETURN arm injects `ClientCommandEndTurn` as soon as the
+        // window state is reached: the harness NEVER moves the returner. The window exists so the
+        // receiving team's turn counter is not advanced yet -- Java opens it, ends it, and the
+        // kickoff sequence continues.
+        if g.turn_mode == ffb_model::enums::TurnMode::KickoffReturn {
             return Action::EndTurn;
         }
         self.refresh_turn(g);
