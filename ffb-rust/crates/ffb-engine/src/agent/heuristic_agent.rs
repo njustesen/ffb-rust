@@ -2155,19 +2155,38 @@ impl HeuristicAgent {
                 self.used_this_turn.len(), eligible.len(), self.just_deselected, turn_nr
             );
         }
-        // NOTE: Java freezes the eligible list for the whole turn
-        // (`eligibleThisTurn = computeEligiblePlayers(game)`) while this reads the engine's live
-        // list. Freezing here has now been measured THREE times -- ITER4, ITER5 and ITER18, the
-        // last on a tree that had changed materially since -- and is worse every time (ITER18:
-        // bb2016 20 -> 9, bb2020 10 -> 3, bb2025 11 -> 3 of seeds 1-20).
+        // Java freezes the eligible list for the whole turn
+        // (`eligibleThisTurn = computeEligiblePlayers(game)`) and then, at each activation, drops
+        // the entries that turn stale (`filterStaleActions`). Both halves, or neither.
         //
-        // The reason is that Java's snapshot is of `ParityRunner.computeEligiblePlayers`, the
-        // HARNESS's own rule, not of the engine's `legal_activate_player_actions`. Freezing Rust's
-        // engine list does not make it equal to Java's harness list; it just freezes a different
-        // one, and the live version happens to agree more often. Aligning them means giving the
-        // heuristic its own eligibility computation mirroring `computeEligiblePlayers` -- a larger
-        // change than a freeze. See docs/PARITY_AMAZON_CAMPAIGN.md ITER18.
+        // A bare freeze was measured worse THREE times (ITER4, ITER5, ITER18) and the standing
+        // note here concluded the engine's list must simply differ from the harness's. It does
+        // not: `RandomAgent` snapshots the SAME engine list and is 100/100 against Java in all
+        // three editions for both matchups. What those three attempts were missing is the second
+        // half -- a frozen list still offering a Blitz the team has already spent makes the
+        // POSITIONAL action pick read a longer list than Java's, which is worse than being live.
+        //
+        // Live-vs-frozen is measurable directly, and it is what the remaining reds are made of:
+        // bb2025 seed 1 k=19, Java offers `Home6:Move` while Rust offers `home_06:Move|Foul`,
+        // because an opponent went prone next to him AFTER the turn began (n=319 vs 318).
+        // Java `ParityRunner`, HEURISTIC branch: it does NOT reuse `eligibleThisTurn`. It
+        // recomputes, and says why -- "a turn-start snapshot cannot see [what the engine allows];
+        // `computeEligiblePlayers` is a pure function of the current game state, so recomputing it
+        // is exactly what the engine would report." The live list is therefore correct, which is
+        // the answer to four separate attempts (ITER4, ITER5, ITER18, ITER22) at freezing it: the
+        // frozen list measures worse because it IS worse, not because half of it was missing.
+        //
+        // What the live list still owes Java is the filter. `eligibleFor` runs
+        // `filterStaleActions` over the recomputed entries before the agent scores them, and on a
+        // live list that is not a no-op: it shrinks a PASS_BLOCK window to MOVE + the UseSkill
+        // specials, and it applies the edition rules for Throw/Kick Team-Mate that the engine's
+        // own list does not encode.
         self.refresh_turn(g);
+        let eligible: Vec<(String, Vec<PlayerAction>)> = eligible
+            .iter()
+            .map(|(pid, acts)| (pid.clone(), crate::agent::filter_stale_actions(g, acts)))
+            .filter(|(_, acts)| !acts.is_empty())
+            .collect();
         if g.turn_mode != ffb_model::enums::TurnMode::Regular && !self.used_this_turn.is_empty() {
             self.just_deselected = true;
             return Action::EndTurn;
@@ -2531,7 +2550,14 @@ impl HeuristicAgent {
                 self.used_this_turn.len(), eligible.len(), self.just_deselected, turn_nr
             );
         }
+        // Same live list + stale filter as `handle_activate`; kept in step with it so the two
+        // activation paths cannot drift. (Mode::Deep is not covered by the parity gate.)
         self.refresh_turn(g);
+        let eligible: Vec<(String, Vec<PlayerAction>)> = eligible
+            .iter()
+            .map(|(pid, acts)| (pid.clone(), crate::agent::filter_stale_actions(g, acts)))
+            .filter(|(_, acts)| !acts.is_empty())
+            .collect();
         if g.turn_mode != ffb_model::enums::TurnMode::Regular && !self.used_this_turn.is_empty() {
             self.just_deselected = true;
             return Action::EndTurn;

@@ -1196,3 +1196,70 @@ with `classify.sh` — the WINDOW family should have shrunk sharply, and whateve
 (LIST or DRAWS) is the next frontier. The known LIST candidate is still the heuristic's own
 eligible-list mirror: Java freezes `eligibleThisTurn = computeEligiblePlayers(game)` for the whole
 turn while Rust reads the engine's live list every activation.
+
+## ITER22 — the live list was right; it was missing the FILTER (+6 bb2020, +13 bb2025)
+
+ITER21 collapsed the WINDOW family, so the reds were re-classified: **12 LIST, 2 DRAWS, 0 WINDOW**
+of the first 14 bb2025 seeds. LIST is now the whole problem, and it had a standing named suspect —
+the eligible-list freeze.
+
+**The freeze was attempted a fourth time, and refuted for good.** The reasoning was that the three
+earlier attempts (ITER4, ITER5, ITER18) each did only half the job: `RandomAgent` freezes AND runs
+`filterStaleActions`, and is 100/100 against Java everywhere, so a bare freeze should measure worse
+while freeze-plus-filter should measure better. Implemented in full, it measured
+**bb2016 20 -> 9, bb2020 10 -> 3, bb2025 11 -> 3** on seeds 1-20 — ITER18's numbers almost exactly.
+
+Debugging forward rather than reverting on the probe found the answer in `ParityRunner`, in the
+**heuristic branch of the activation switch**, which does not use `eligibleThisTurn` at all:
+
+```java
+// ...which the engine allows and a turn-start snapshot cannot see.
+// `computeEligiblePlayers` is a pure function of the current game state, so recomputing it
+// is exactly what the engine would report.
+List<Object[]> liveRemaining = new ArrayList<>();
+for (Object[] entry : computeEligiblePlayers(game)) { ... }
+activation.chooseActivation(game, eligibleFor(game, liveRemaining));
+```
+
+Java's heuristic path is **live**. The random path freezes; the heuristic path recomputes, on
+purpose, with the reason written down. Rust's live list was correct all along — and the standing
+note in `heuristic_agent.rs` claiming the two lists were simply different objects was wrong about
+why, which is why the freeze kept being retried.
+
+**What the live list actually owed Java is the filter.** `eligibleFor` runs `filterStaleActions`
+over the recomputed entries before the agent scores them, and on a live list that is NOT a no-op:
+
+- it shrinks a `PASS_BLOCK` window to MOVE + the UseSkill specials, whatever the engine reports;
+- it applies the edition rules the engine's list does not encode — BB2016/BB2020 spend the team's
+  PASS on a Throw Team-Mate and its BLITZ on a Kick Team-Mate, only BB2025 tracks either on its own
+  flag.
+
+The action pick is POSITIONAL, so one extra entry picks a different action from identical weights.
+
+`filter_stale_actions` now lives in `agent/mod.rs` rather than in either agent, because Java's own
+comment makes the coupling explicit ("Rust's RandomAgent applies the identical filter so idx % N
+stays aligned") and two copies would drift. Three regression tests pin it: the once-per-turn
+actions, the window shrink, and the per-edition team-mate rules. The behavioural proof is the
+measurement — the helper is new code, so its tests pin a contract rather than reproduce a failure.
+
+**Lesson worth keeping: two callers of the same Java helper are not the same contract.** The random
+and heuristic paths of `ParityRunner` share `computeEligiblePlayers` and diverge immediately after,
+one freezing and one not. Three iterations were spent porting the wrong caller's behaviour because
+the frozen one was the one that had been read.
+
+**Gate — full standing gate, all green:**
+
+| | ITER21 | ITER22 |
+|---|---|---|
+| bb2016 amazon | 100/100 | **100/100** |
+| bb2020 amazon | 64/100 | **70/100** |
+| bb2025 amazon | 60/100 | **73/100** |
+| lineman heuristic 1.0, x3 editions | 100/100 | **100/100** |
+| `cargo test -p ffb-engine` | 7350/0 | **7353/0** |
+
+**Next:** the residual LIST divergence is a genuine predicate disagreement on FOUL. bb2025 seed 1
+k=19: Java offers `Home6:Move`, Rust `home_06:Move|Foul`, with `foulUsed` false on both sides, so
+`hasAdjacentFoulTarget` and Rust's `legal_actions` foul branch disagree about the same board. Rust's
+extra `!has_tacklezones()` term is NOT the cause — it is vacuous for PRONE/STUNNED. Measure the two
+predicates against the same coordinates rather than reasoning about them; the likely axis is
+off-pitch (box) coordinates, which Java skips for the acting player but not for foul victims.
