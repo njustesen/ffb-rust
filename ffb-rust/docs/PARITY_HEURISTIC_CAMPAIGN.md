@@ -3902,3 +3902,55 @@ applied. ITER67 left the precise lead: Java's rock almost certainly fires from
 `bb2025/StepStallingPlayer` (EndPlayerAction, which reaches the drop machinery) while Rust fires it
 from `StepForgoneStalling` (EndTurn, which does not). Probe which step Java takes, then align Rust's
 `StepStallingPlayer` gates.
+
+## ITER70 — the last red: the rock's injury was wrapped in the wrong shape
+
+# 🏁 GOAL MET — 9/9 gates at 100/100
+
+**bb2025 uniform 99 → 100/100.** All three editions are now 100/100 at all three scales.
+
+ITER67 guessed that Java fired the rock from `StepStallingPlayer` rather than `StepForgoneStalling`.
+**That guess was wrong**, and checking it properly is what found the real answer. `StepStallingPlayer`
+tests the ACTING player; at seed 82 step 94 the actor is the blitzer `away_11` while the staller is
+the carrier `away_04`, so it cannot fire for him in either engine — `gotRid` is true and Java reports
+"did not stall after all". `StepForgoneStalling`, which scans the team for the carrier, is the right
+step in both.
+
+So the divergence was never about which step. It was the **shape of the context**:
+
+```java
+new SteadyFootingContext(injuryResult,
+    Collections.singletonList(new DropPlayerCommand(player.getId(), HIT_PLAYER, true)))
+```
+
+Java wraps an **InjuryResult** with a deferred drop command. ITER66 wrapped a **DropPlayerContext**,
+copying bb2020's stalling step. The difference decides whether the injury is ever applied:
+`StepSteadyFooting::fail` publishes `INJURY_RESULT` only for the InjuryResult shape —
+`injury_result()` returns `None` for a DropPlayer inner, **in both engines** — and `INJURY_RESULT` is
+what the following `Apothecary(HitPlayer)` consumes. Built the other way it published only
+`DROP_PLAYER_CONTEXT`, which nothing in the EndTurn sequence consumes. The rock was thrown, the
+armour, injury and casualty were all rolled, and the player stood there holding the ball.
+
+**The lesson from ITER66-70 as a set:** three iterations were spent on this one seed, and the first
+two chased the delivery mechanism and the calling step while the fault was in a constructor
+argument. What finally worked was reading Java's own call site verbatim instead of reasoning about
+what the surrounding machinery must need — the same discipline the campaign states up front, applied
+late.
+
+### Final gates
+
+| | argmax | scale 1.0 | scale 1e6 |
+|---|---|---|---|
+| bb2016 | **100/100** | **100/100** | **100/100** |
+| bb2020 | **100/100** | **100/100** | **100/100** |
+| bb2025 | **100/100** | **100/100** | **100/100** |
+
+- Fourteen-class rung: **100/100** in all three editions.
+- `--agent random` lineman tier-3: **100/100** in all three editions — never regressed once in 70
+  iterations.
+- `cargo test --workspace --release`: **14,664 / 0**. `mvn -o -pl ffb-ai test`: **35 / 0**.
+- The two Java trees agree.
+
+The goal as stated in `heur-iter.md` is met: `HeuristicAgent` drives **both** engines on the same
+seed with identical per-step state hashes, 100/100 on lineman-vs-lineman in bb2016, bb2020 and
+bb2025, at `--heur-scale` 0, 1.0 and 1e6.

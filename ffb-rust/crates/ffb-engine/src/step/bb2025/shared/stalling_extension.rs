@@ -3,7 +3,8 @@
 /// Helper logic for stalling detection and penalty, shared across stalling-related steps.
 use ffb_model::model::game::Game;
 use ffb_model::enums::ApothecaryMode;
-use crate::drop_player_context::{DropPlayerContext, SteadyFootingContext};
+use crate::drop_player_context::SteadyFootingContext;
+use crate::step::bb2025::command::drop_player_command::DropPlayerCommand;
 use crate::step::util_server_injury::handle_injury_by_name;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::util::pathfinding::path_finder_with_pass_block_support::PathFinderWithPassBlockSupport;
@@ -170,17 +171,29 @@ impl StallingExtension {
             None,
             ApothecaryMode::HitPlayer,
         );
-        let dpc = DropPlayerContext {
-            injury_result: Some(Box::new(injury_result)),
-            end_turn: false,
-            eligible_for_safe_pair_of_hands: true,
-            label: None,
-            player_id: Some(player_id.to_string()),
-            apothecary_mode: Some(ApothecaryMode::HitPlayer),
-            requires_armour_break: false,
-            ..DropPlayerContext::new()
-        };
-        (event, Some(SteadyFootingContext::from_drop_player(dpc)))
+        // Java wraps this as an INJURY RESULT carrying a deferred DropPlayerCommand:
+        //
+        //     new SteadyFootingContext(injuryResult,
+        //         Collections.singletonList(new DropPlayerCommand(player.getId(), HIT_PLAYER, true)))
+        //
+        // NOT as a DropPlayerContext, which is what ITER66 built by copying bb2020's stalling step.
+        // The distinction decides whether the injury is ever applied: `StepSteadyFooting::fail`
+        // publishes `INJURY_RESULT` only for the InjuryResult shape (`injury_result()` returns None
+        // for a DropPlayer inner, in both engines), and `INJURY_RESULT` is what the following
+        // `Apothecary(HitPlayer)` in the EndTurn sequence consumes. Built the other way it
+        // published only `DROP_PLAYER_CONTEXT`, which **nothing** in that sequence consumes -- so
+        // the rock was thrown, the armour and injury and casualty were all rolled, and the player
+        // stayed standing with the ball (bb2025 seed 82 step 94).
+        let commands: Vec<std::sync::Arc<dyn crate::step::framework::DeferredCommand>> =
+            vec![std::sync::Arc::new(DropPlayerCommand::new(
+                player_id.to_string(),
+                ApothecaryMode::HitPlayer,
+                true,
+            ))];
+        (
+            event,
+            Some(SteadyFootingContext::from_injury_result_with_commands(injury_result, commands)),
+        )
     }
 }
 
@@ -270,5 +283,53 @@ mod tests {
         let mut rng = GameRng::new(0);
         ext.handle_staller(&mut game, "h1", 7, &mut rng);
         assert!(game.game_result.home.stalled);
+    }
+
+    /// A connecting rock must produce a context that carries an INJURY RESULT.
+    ///
+    /// Java builds `new SteadyFootingContext(injuryResult, [DropPlayerCommand(...)])`. Wrapping the
+    /// injury in a `DropPlayerContext` instead — which is what bb2020's stalling step does, and
+    /// what ITER66 copied — silently loses it: `StepSteadyFooting::fail` publishes `INJURY_RESULT`
+    /// only for the InjuryResult shape (`injury_result()` returns None for a DropPlayer inner, in
+    /// both engines), and `INJURY_RESULT` is what the following `Apothecary(HitPlayer)` consumes.
+    /// Built the other way the rock was thrown and every die rolled, and the player stayed standing
+    /// with the ball.
+    #[test]
+    fn a_connecting_rock_carries_an_injury_result() {
+        use ffb_model::enums::{PlayerState, PS_STANDING, Rules};
+        use ffb_model::model::player::Player;
+        use ffb_model::types::FieldCoordinate;
+        use ffb_model::util::rng::GameRng;
+
+        let mut home = test_team("home", 0);
+        let away = test_team("away", 0);
+        home.players.push(Player {
+            id: "home_01".into(), nr: 1, movement: 6, strength: 3, agility: 3, armour: 8,
+            ..Default::default()
+        });
+        let mut g = Game::new(home, away, Rules::Bb2025);
+        g.home_playing = true;
+        g.field_model.set_player_coordinate("home_01", FieldCoordinate::new(20, 7));
+        g.field_model
+            .set_player_state("home_01", PlayerState::new(PS_STANDING).change_active(true));
+        g.field_model.ball_coordinate = Some(FieldCoordinate::new(20, 7));
+        g.field_model.ball_in_play = true;
+
+        // turn_nr 1: `roll >= turn_nr` succeeds on anything, so the rock always connects.
+        let (event, ctx) =
+            StallingExtension::new().handle_staller(&mut g, "home_01", 1, &mut GameRng::new(4));
+
+        match event {
+            ffb_model::events::GameEvent::ThrowAtStallingPlayer { success, .. } => {
+                assert!(success, "turn 1 makes every roll a hit");
+            }
+            other => panic!("expected ThrowAtStallingPlayer, got {other:?}"),
+        }
+        let ctx = ctx.expect("a connecting rock must produce a SteadyFooting context");
+        assert!(
+            ctx.injury_result().is_some(),
+            "the context must carry the INJURY RESULT -- a DropPlayerContext wrapper hides it from              StepSteadyFooting::fail, and nothing downstream applies the injury"
+        );
+        assert_eq!(ctx.get_apothecary_mode(), ApothecaryMode::HitPlayer);
     }
 }
