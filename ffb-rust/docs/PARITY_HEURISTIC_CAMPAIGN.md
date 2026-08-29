@@ -3792,3 +3792,59 @@ one edition and will keep.
 
 `--agent random` and the fourteen-class rung **100/100** in all three editions; `cargo test
 --workspace --release` **14,663 / 0**; `mvn -o -pl ffb-ai test` **35 / 0**; the two Java trees agree.
+
+## ITER68 — bb2016's away pass is thrown at a mirrored square (investigation; fix deferred one iteration)
+
+**No code change.** The divergence is fully root-caused and the fix has a design choice that should
+not be rushed into code shared with a 100/100 edition. Recording it so the next iteration starts at
+the decision rather than the search.
+
+bb2016 seed 77, the shallowest of its 12 argmax reds. At step 75 both sides throw a pass with
+`away_07`; Java rolls 4 dice, Rust 3, and the ball lands 5 squares apart. The dice traces align the
+problem exactly:
+
+```
+Java:  84 d6=1 rollSkill   85 d8=3   86 d6=2 rollSkill   87 d8=5
+Rust:  84 d6=1             85 d6=5   86 d8=4
+```
+
+`FFB_DIE_AT=84` — the backtrace hook the RNG advertises as "the single most effective parity tool
+there is", and it earned that here — put Rust's **first** die in `StepIntercept`, not the pass.
+Java's first die *is* the pass roll. So Rust attempts an interception Java never offers, and the
+pass roll it then evaluates is the second die (5 → ACCURATE) where Java's is the first (1 → fumble).
+
+Why Rust finds an interceptor:
+
+```
+RUST_INTERC  thrower=away_07 at=(15,5) target=(10,7) found=[home_01, home_02, home_03]
+JAVA_PASSCMD thrower=Away7  rcv=Away10  rc=(15,7)  isHome=false  sent=(10,7)
+```
+
+The receiver is canonically at **(15,7)**. Java's harness sends the coach-frame **(10,7)** and the
+engine un-mirrors it back to (15,7). Rust's agent sends the **canonical** (15,7)
+(`Action::Pass { coord: player_coordinate(receiver) }`, no transform) and bb2016's
+`StepInitSelecting` un-mirrors it anyway — `let target = if home_playing { *coord } else {
+coord.transform() }` — turning (15,7) into (10,7). The corridor from (15,5) to (10,7) crosses three
+home players; the real corridor to (15,7) crosses none.
+
+This is ITER20's kick-frame bug in a second place, and the fix is not simply "pre-transform in the
+agent":
+
+- bb2016's terminal pass lands in `StepInitSelecting`, which transforms.
+- bb2025/bb2020's lands in `StepInitMoving` (ITER60's arm), which does **not** — and those editions
+  are 100/100 with the agent sending canonical.
+
+So an unconditional agent-side transform would break the two finished editions. The two candidate
+fixes are (a) make the agent's pass frame edition-aware, or (b) find out why the heuristic's
+terminal pass reaches `StepInitSelecting` in bb2016 at all rather than `StepInitMoving` — which
+would be the same defect ITER49 fixed for bb2025, where the MOVE variant was being routed to the
+immediate handler. **(b) is the more likely root cause and should be checked first**: if it holds,
+the frame question disappears rather than being papered over.
+
+### Gates (unchanged; no code change this iteration)
+
+| | argmax | scale 1.0 | scale 1e6 |
+|---|---|---|---|
+| bb2025 | 100 | 100 | 99 |
+| bb2020 | 100 | 100 | 100 |
+| bb2016 | 88 | 84 | 88 |
