@@ -6,7 +6,7 @@ use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
-use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available_for, use_reroll};
 
 /// Java: ReRolledActions.GETTING_EVEN.getName() == "Getting Even"
 const RE_ROLLED_ACTION_GETTING_EVEN: &str = "Getting Even";
@@ -98,8 +98,21 @@ impl StepGettingEven {
                 // and updates PlayerResult stats — no gameplay mechanic reads it, so there is
                 // no engine-side effect to replicate here.
             } else if self.re_rolled_action.is_none() {
-                // Java: if (getReRolledAction() == null && UtilServerReRoll.askForReRollIfAvailable(...)) { CONTINUE; return; }
-                if let Some(prompt) = ask_for_reroll_if_available(game, RE_ROLLED_ACTION_GETTING_EVEN, MINIMUM_ROLL, false) {
+                // Java: `askForReRollIfAvailable(getGameState(), player, GETTING_EVEN, ...)`, where
+                // `player` is THIS STEP's `playerId` -- not the acting player. The distinction is
+                // the whole rule here: `isTeamReRollAvailable` gates on `actingTeam.hasPlayer`, and
+                // a Getting Even roll is made for a player of the team that is NOT acting, so Java
+                // offers no team re-roll and shows no dialog at all. Calling the acting-player
+                // overload passed the membership gate every time and raised an offer Java never
+                // makes -- two sampler draws out of step, with the candidate lists still identical
+                // (bb2025 seed 19: draws 178 vs 176 at activation 75, n=1410 on both sides).
+                if let Some(prompt) = ask_for_reroll_if_available_for(
+                    game,
+                    self.player_id.as_deref(),
+                    RE_ROLLED_ACTION_GETTING_EVEN,
+                    MINIMUM_ROLL,
+                    false,
+                ) {
                     self.re_rolled_action = Some(RE_ROLLED_ACTION_GETTING_EVEN.into());
                     self.re_roll_source = Some("TRR".into());
                     return StepOutcome::cont().with_prompt(prompt);
@@ -120,8 +133,14 @@ mod tests {
     use ffb_model::enums::Rules;
 
     fn make_game() -> Game {
-        let home = test_team("home", 0);
+        let mut home = test_team("home", 0);
         let away = test_team("away", 0);
+        // `p1` must actually BE on a team. Java's `askForReRollIfAvailable` gates the team re-roll
+        // on `actingTeam.hasPlayer(player)`, so a fixture whose teams are empty cannot exercise the
+        // offer at all -- it only ever tested the membership check being skipped.
+        home.players.push(ffb_model::model::player::Player {
+            id: "p1".into(), nr: 1, ..Default::default()
+        });
         Game::new(home, away, Rules::Bb2025)
     }
 
@@ -250,5 +269,57 @@ mod tests {
         step.player_id = Some("p1".into());
         let out = step.start(&mut game, &mut GameRng::new(seed));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    /// ITER23 regression. Java's `askForReRollIfAvailable` takes THIS STEP's player, and
+    /// `isTeamReRollAvailable` gates on `actingTeam.hasPlayer(player)`. A Getting Even roll is made
+    /// for a player of the team that is NOT acting, so Java offers no team re-roll and shows no
+    /// dialog. Rust called the acting-player overload, which passed the membership gate every time
+    /// and raised an offer Java never makes -- worth two sampler draws each occurrence.
+    ///
+    /// Asserted as an invariant over many rolls rather than one seeded roll, because the branch is
+    /// only reached when the roll FAILS; the acting-team half then proves the test is not vacuous.
+    #[test]
+    fn getting_even_reroll_follows_the_acting_team() {
+        fn game_with_players() -> Game {
+            let mut home = test_team("home", 0);
+            let mut away = test_team("away", 0);
+            home.players.push(ffb_model::model::player::Player {
+                id: "h1".into(), nr: 1, ..Default::default()
+            });
+            away.players.push(ffb_model::model::player::Player {
+                id: "a1".into(), nr: 1, ..Default::default()
+            });
+            let mut g = Game::new(home, away, Rules::Bb2025);
+            // Home is acting, and BOTH teams hold a re-roll — so the only thing that can decide
+            // the offer is team membership.
+            g.home_playing = true;
+            g.turn_data_home.rerolls = 2;
+            g.turn_data_away.rerolls = 2;
+            g
+        }
+
+        let mut offered_for_acting = 0;
+        for seed in 0..64u64 {
+            let mut g = game_with_players();
+            let mut step = StepGettingEven::new();
+            step.player_id = Some("a1".into());
+            let out = step.start(&mut g, &mut GameRng::new(seed));
+            assert!(
+                out.prompt.is_none(),
+                "seed {seed}: a Getting Even roll for the NON-acting team must never be offered a                  team re-roll"
+            );
+
+            let mut g = game_with_players();
+            let mut step = StepGettingEven::new();
+            step.player_id = Some("h1".into());
+            if step.start(&mut g, &mut GameRng::new(seed)).prompt.is_some() {
+                offered_for_acting += 1;
+            }
+        }
+        assert!(
+            offered_for_acting > 0,
+            "the acting team was never offered a re-roll in 64 rolls -- the test cannot              distinguish the fix from a step that simply never offers one"
+        );
     }
 }

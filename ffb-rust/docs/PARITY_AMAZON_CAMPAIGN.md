@@ -1263,3 +1263,65 @@ k=19: Java offers `Home6:Move`, Rust `home_06:Move|Foul`, with `foulUsed` false 
 extra `!has_tacklezones()` term is NOT the cause — it is vacuous for PRONE/STUNNED. Measure the two
 predicates against the same coordinates rather than reasoning about them; the likely axis is
 off-pitch (box) coordinates, which Java skips for the acting player but not for foul victims.
+
+## ITER23 — Getting Even offered a team re-roll Java never offers (+4 bb2025)
+
+Re-classifying the post-ITER22 reds split them evenly: **5 LIST, 5 DRAWS** of ten bb2025 seeds, and
+the DRAWS half carried an unusually tight signature — `dd = ±2` on every single one. Two draws is
+exactly one `Sampler::pick` at live temperature, so the shape says "one agent answers a prompt the
+other never sees", which is the same defect class as ITER1's `SkillUse` arm.
+
+Windowing seed 19 between the activations that agree (k=74, both at 171 draws) and the one that does
+not (k=75, Java 176 / Rust 178) made it explicit — and note the candidate lists are IDENTICAL there
+(`n=1410` on both sides), so nothing about eligibility is involved:
+
+```
+RDRAW blitztarget 172   JDRAW SELECT_BLITZ_TARGET   172
+RDRAW blockchoice 172   JDRAW BLOCK_ROLL_PROPERTIES 172
+RDRAW pushback    172
+RDRAW followup    174   JDRAW FOLLOWUP_CHOICE       174
+RDRAW other       176   JDRAW USE_APOTHECARY        176
+RDRAW reroll      176   <- Java has no such dialog
+```
+
+Rust's blockchoice-0 + pushback-2 nets to Java's blockroll-2, so those agree; the whole gap is a
+`ReRollOffer { src: TRR, action: "Getting Even" }` that Java does not raise at all.
+
+**The rule is one argument.** Java's `StepGettingEven` passes THIS STEP's `playerId`:
+
+```java
+UtilServerReRoll.askForReRollIfAvailable(getGameState(), player, ReRolledActions.GETTING_EVEN, ...)
+```
+
+and `RollMechanic.isTeamReRollAvailable` gates on `actingTeam.hasPlayer(pPlayer)`. A Getting Even
+roll is made for a player of the team that is NOT acting, so no TRR property is collected, and
+`dialogShown` is false — no dialog, no draws. Rust called the acting-player overload, whose fallback
+is `game.acting_player.player_id`; that player is on the acting team by definition, so the
+membership gate — which Rust HAS, correctly ported, right there in the same function — could never
+bite. Fixed by calling `ask_for_reroll_if_available_for(game, self.player_id.as_deref(), ...)`.
+
+**Three existing tests went red on the fix, and they were the wrong ones.** All three set
+`player_id = "p1"` on a fixture whose teams are EMPTY, so `has_player` was false for both teams and
+the membership branch was skipped entirely — they had only ever exercised the bug. Putting `p1` on
+the acting team in `make_game()` makes all ten pass. Fifth time this campaign a test encoded the
+defect rather than the contract.
+
+**Gate — full standing gate:**
+
+| | ITER22 | ITER23 |
+|---|---|---|
+| bb2016 amazon | 100/100 | **100/100** |
+| bb2020 amazon | 70/100 | 70/100 (bb2025-only rule) |
+| bb2025 amazon | 73/100 | **77/100** |
+| lineman heuristic 1.0, x3 editions | 100/100 | **100/100** |
+| `cargo test -p ffb-engine` | 7353/0 | **7354/0** |
+
+**Next — the LIST half, and it is NOT what it looks like.** bb2025 seed 1 k=19: Java offers
+`Home6:Move`, Rust `home_06:Move|Foul`. Ruled out by measurement, not argument: the per-player Move
+counts match pairwise (127/191 on both sides) so positions agree; `JFLAGS` and `RELIG` both read
+`foul=false` so the turn-data flags agree; Rust's extra `!has_tacklezones()` term is vacuous for
+PRONE/STUNNED; and `is_adjacent` is Chebyshev-1 on both sides, identical to Java's
+`dx<=1 && dy<=1 && dx+dy>0`. What remains is an OPPONENT's state or coordinate that the per-step
+state hash does not distinguish — the hash is known not to carry the ACTIVE bit. The next iteration
+should extend `RELIG`/`JELIG` to dump, for the disagreeing player, every adjacent opponent with its
+coordinate and full state, and compare those directly.
