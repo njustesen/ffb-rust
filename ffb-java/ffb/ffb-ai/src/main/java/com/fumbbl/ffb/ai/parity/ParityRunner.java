@@ -654,9 +654,13 @@ public class ParityRunner {
                             blitzBlockSent = false;
                             bb2016BlitzMoveSent = false;
                             // Declared exactly as the random path declares it; phase 2 then reads
-                            // the acting player back out of the game and dispatches.
-                            MatchRunner.inject(gameState,
-                                new ClientCommandActingPlayer(hPlayerId, hAction, false));
+                            // the acting player back out of the game and dispatches. A star
+                            // special is a COMMAND PAIR and never a bare declaration -- see
+                            // sendStarSpecialDeclaration.
+                            if (!sendStarSpecialDeclaration(game, gameState, hPlayerId, hAction)) {
+                                MatchRunner.inject(gameState,
+                                    new ClientCommandActingPlayer(hPlayerId, hAction, false));
+                            }
                             break;
                         }
                         // Pick random player using decisionRng (matches Rust's decision_rng.pick()).
@@ -2928,6 +2932,55 @@ public class ParityRunner {
                     return PlayerAction.MOVE;
                 }
         }
+    }
+
+    /**
+     * The star specials are declared as a COMMAND PAIR, not as an acting action.
+     *
+     * <p>Java's `StepInitSelecting` dispatches them only from `CLIENT_USE_SKILL`: the client sends
+     * `ActingPlayer(MOVE)` and then `ClientCommandUseSkill(<the skill>)`, and the skill's property
+     * is what sets `fDispatchPlayerAction`. Sending `ActingPlayer(BALEFUL_HEX)` on its own is
+     * accepted and then does NOTHING -- measured on amazon bb2025 seed 5, where Java's pre- and
+     * post-hash for the hex activation are identical while Rust's board changed.
+     *
+     * <p>The random path has always sent the pair (its own inline chain, a few hundred lines up);
+     * the heuristic branch sent the bare declaration. This is that chain as a helper so the two
+     * cannot drift again.
+     *
+     * @return true when the action was declared here, false to fall through to the plain
+     *     `ActingPlayer(action)` declaration.
+     */
+    private boolean sendStarSpecialDeclaration(Game game, GameState gameState, String playerId,
+            PlayerAction action) {
+        com.fumbbl.ffb.model.property.ISkillProperty property;
+        switch (action) {
+            case BALEFUL_HEX:
+                property = com.fumbbl.ffb.model.property.NamedProperties.canMakeOpponentMissTurn;
+                break;
+            case LOOK_INTO_MY_EYES:
+                property = com.fumbbl.ffb.model.property.NamedProperties.canStealBallFromOpponent;
+                break;
+            case CATCH_OF_THE_DAY:
+                property = com.fumbbl.ffb.model.property.NamedProperties.canGetBallOnGround;
+                break;
+            case THEN_I_STARTED_BLASTIN:
+                property = com.fumbbl.ffb.model.property.NamedProperties.canBlastRemotePlayer;
+                break;
+            case RAIDING_PARTY:
+                property = com.fumbbl.ffb.model.property.NamedProperties.canMoveOpenTeamMate;
+                break;
+            default:
+                return false;
+        }
+        Player<?> p = game.getPlayerById(playerId);
+        java.util.Optional<com.fumbbl.ffb.model.skill.Skill> skill =
+            com.fumbbl.ffb.util.UtilCards.getUnusedSkillWithProperty(p, property);
+        MatchRunner.inject(gameState, new ClientCommandActingPlayer(playerId, PlayerAction.MOVE, false));
+        if (skill.isPresent()) {
+            MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(
+                skill.get(), true, playerId, null, false));
+        }
+        return true;
     }
 
     /** Adapt the harness's eligible list to what the heuristic's chooser expects. */

@@ -33,7 +33,7 @@ structurally, not just by generator.
 |---|---|
 | bb2016 | 52/100 |
 | bb2020 | 55/100 |
-| bb2025 | 1/100 |
+| bb2025 | 45/100 |
 
 Control: `--agent random` amazon is **100/100 in all three editions**, so the roster itself is
 parity-clean and every red below belongs to the heuristic.
@@ -439,3 +439,44 @@ does carry it.
 **Next:** bb2025 seed 5 now diverges at activation 5 with the draws AGREEING and Rust enumerating
 **54 more candidates** than Java (2025 vs 1971) — the same shape as the ITER4 FOUL, an option Rust
 offers and Java does not, but fifty of them. Dump both lists there and diff by declaration.
+
+## ITER7 — a star special is a COMMAND PAIR, not a declaration (bb2025 1 -> 45/100)
+
+**The measurement that named it, in one line.** At the diverging activation Java's pre-hash and
+post-hash are *identical* (`439b40e2...` -> `439b40e2...`) while Rust's board changed. Java did not
+merely resolve the Baleful Hex differently — it did **nothing at all**. A step that changes no state
+has not run.
+
+Why: Java's `StepInitSelecting` dispatches every star special exclusively from `CLIENT_USE_SKILL`.
+The client sends `ActingPlayer(MOVE)` and then `ClientCommandUseSkill(<skill>)`, and it is the
+skill's PROPERTY (`canMakeOpponentMissTurn`) that sets `fDispatchPlayerAction = BALEFUL_HEX`.
+Sending `ActingPlayer(BALEFUL_HEX)` on its own is accepted and goes nowhere. Rust's engine takes the
+declaration directly, so the agent's identical choice reached one engine and evaporated in the other.
+
+The random path has always sent the pair — its own inline chain, a few hundred lines above the
+heuristic branch, which is why `--agent random` was 100/100 on this roster all along. The heuristic
+branch sent the bare declaration. Extracted that chain as `sendStarSpecialDeclaration` and called it
+from the heuristic branch, covering all five of the family (Baleful Hex, Look Into My Eyes, Catch of
+the Day, Then I Started Blastin', Raiding Party) so the two paths cannot drift again.
+
+**This supersedes half of ITER4.** That iteration made `actionFromName` return the real
+`PlayerAction.BALEFUL_HEX` instead of defaulting to MOVE, and reported honestly that it closed no
+seed. It was necessary but not sufficient: the name was right and the COMMAND was still wrong. Two
+correct-looking fixes were needed before either could show a number.
+
+**Gate:**
+
+| | ITER6 | ITER7 |
+|---|---|---|
+| bb2016 amazon | 52/100 | 52/100 |
+| bb2020 amazon | 55/100 | 55/100 |
+| bb2025 amazon | 1/100 | **45/100** |
+| lineman heuristic 1.0 x3 | 100/100 | **100/100** |
+| `mvn -o -pl ffb-ai test` | 39/0 | **39/0** |
+
+bb2016 and bb2020 are untouched to the seed, as they must be: neither fields a star.
+
+**Next:** the three editions are finally in the same range (52 / 55 / 45) and no single cause
+dominates any of them. Census each edition's remaining failures for a SHARED first-diff shape before
+picking one — the ITER5 lesson was that the edition split itself was the clue, and the same table
+should now be read for what the three have in common.
