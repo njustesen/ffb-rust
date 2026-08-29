@@ -884,3 +884,53 @@ and 15 have each advanced this item and none has landed it; that is four of the 
 slots. The per-iteration format is a poor fit for a change that needs the whole path working at
 once, because each attempt must be reverted to keep the gate honest. The next person to touch it
 should start from the question above with the three pieces already built.
+
+## ITER16 — the window: ITER15's question ANSWERED (no fix; gate unchanged)
+
+**Gate unchanged (100 / 60 / 51).** ITER15 ended on one question: what resets `turnMode` out of
+`KICKOFF_RETURN` in Java. It is answered, and the answer identifies a step-framework difference
+rather than anything kickoff-specific.
+
+**Java resets it in the step itself.** `StepKickoffReturn` line 125, inside its
+`turnMode == KICKOFF_RETURN` branch:
+
+```java
+if (fEndPlayerAction || fEndTurn) {
+    UtilServerSteps.changePlayerAction(this, null, null, false);
+    game.setHomePlaying(!game.isHomePlaying());
+    game.setTurnMode(TurnMode.KICKOFF);          // <- here
+    UtilPlayer.refreshPlayersForTurnStart(game);
+}
+```
+
+Rust has this branch too, translated 1:1. It never runs — because the step is never re-entered.
+
+**Why it is never re-entered, measured rather than reasoned.** A probe in the step
+(`FFB_KR=1`) shows it entered **exactly once**, with `mode=Kickoff`, opening the window and never
+returning. The driver's start path DOES honour `push_self` (lines 951-956), so the step IS
+re-inserted below the pushed `Select` sequence. What removes it is the END TURN itself:
+`StepInitSelecting.handle_command(Action::EndTurn)` returns **`GotoLabel`**, and a goto unwinds the
+stack to its label — past the parked `StepKickoffReturn`.
+
+Java's window `EndTurn` does not unwind. `StepEndTurn` sees
+`turnMode == BLITZ || KICKOFF_RETURN || PASS_BLOCK || ...`, publishes `END_TURN=true` and returns
+`NEXT_STEP`, leaving the stack intact so the parked step resumes and resets the mode.
+
+**So the blocker is not the kickoff sequence, the agents, or the parameters — all three are now
+correct in the tree.** It is that Rust routes a window `EndTurn` through the same stack-unwinding
+path as a real end of turn. Fixing it means making an `EndTurn` inside a non-REGULAR window
+behave as Java's does: publish and continue, without the goto. That touches `StepInitSelecting`,
+which is on the hot path of every activation in every edition — which is exactly why it wants a
+gate of its own rather than a loop slot's revert-if-worse.
+
+**Everything needed is now in the tree and inert** (measured: 0 dispatches of the step):
+`consumes_parameter` guarded on `window_open`, `push_self` for `pushCurrentStepOnStack`, both agents
+answering the window with `EndTurn`, and an `FFB_KR` probe. The only outstanding change is the
+`EndTurn`-in-a-window routing.
+
+**Gate:** unchanged; bb2020/bb2025 seeds 1-20 re-measured at 10/20 each, `cargo test -p ffb-engine`
+7348/0.
+
+**Next:** either the window as a focused piece of work (one change, `StepInitSelecting`, gated on
+all three editions plus both random matchups), or back to the non-window remainder — bb2025 still
+has ~20 failures that are not this.

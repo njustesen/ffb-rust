@@ -92,6 +92,13 @@ impl Step for StepKickoffReturn {
 
 impl StepKickoffReturn {
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        if std::env::var_os("FFB_KR").is_some() {
+            eprintln!(
+                "KR enter mode={:?} end_turn={} end_pa={} window={} acted={}",
+                game.turn_mode, self.end_turn, self.end_player_action, self.window_open,
+                game.acting_player.has_acted
+            );
+        }
         if game.turn_mode == TurnMode::KickoffReturn {
             // Already inside the kickoff-return mini-turn
             if self.end_player_action && !game.acting_player.has_acted && !self.end_turn {
