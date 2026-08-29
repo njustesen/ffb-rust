@@ -739,3 +739,54 @@ behind it.
 **Next:** the same non-window bucket has more in it — bb2020 and bb2025 still share failing seeds
 50, 56 and 59 — so repeat this iteration's targeting rule. The kickoff-return window remains the
 largest single cause and remains blocked on the agent-side contract from ITER11.
+
+## ITER13 — investigation: the two engines disagree about `blitzUsed` (no code change)
+
+**No fix this iteration; gate unchanged by construction (100 / 60 / 51), nothing was edited.** The
+iteration produced a precisely located divergence and eliminated three plausible explanations for
+it.
+
+**Targeting.** Re-censused after ITER12: bb2020 is down to 39 failures (8 non-window), bb2025 to 49
+(22 non-window), and they now share exactly ONE non-window seed — 50. Took it.
+
+**The divergence.** bb2020 seed 50, activation 162: draws AGREE (393 each) and the candidate lists
+differ by two options — Rust offers `away_06` a Block and a Blitz that Java does not. Dumping both
+eligible lists shows the difference is upstream of the agent entirely:
+
+```
+k=157  turn 5   R away_06=Move|Block|Blitz   J away_06=Move|Block|Blitz
+k=162  turn 5   R away_06=Move|Block|Blitz   J away_06=Move
+```
+
+Same turn, same player: Java's list LOST Block and Blitz partway through the turn and Rust's did
+not.
+
+**Three explanations ruled out, each by reading the code rather than guessing:**
+
+1. *The agent's board.* Java's `ActivationDriver.foes` filters on `hasTacklezones()`; Rust's
+   `legal_block_targets` filters on `can_be_blocked()`, which is `STANDING || MOVING` and drops
+   Java's `BLOCKED` base and its `!confused && !hypnotized` terms. A real 1:1 defect — **but not
+   this one**, because the difference here is in the ELIGIBLE ACTION LIST, which is computed before
+   any target enumeration. Logged for later; `can_be_blocked` has eleven call sites and changing it
+   blind would be unmeasured.
+2. *Tackle zones.* Java's `ParityRunner.hasTackleZones` is byte-for-byte the same rule as Rust's
+   `PlayerState::has_tacklezones`, and Rust's `legal_actions` BLOCK branch already calls it. Both
+   sides agree on the rule.
+3. *Confusion.* Every `changeConfused(true)` site in the Java server is a negatrait behaviour —
+   Bone Head, Really Stupid, Animal Savagery. No amazon carries any of them, so no amazon is ever
+   confused and that term cannot explain it.
+
+**What is left.** Both sides gate Block and Blitz on the same flag: Java's `filterStaleActions`
+drops both when `td.isBlitzUsed()`, and Rust's `action_is_live` does
+`Block | Blitz | StandUpBlitz => !td.blitz_used`. For Java's list to shrink while Rust's does not,
+**the two engines must disagree about `blitzUsed` for that team at that moment** — Java has it set
+and Rust does not.
+
+That is an engine-state divergence, and the turn-data flags ARE in the state hash, so it should be
+visible: the next step is to find the earlier blitz that one engine counted and the other did not,
+by dumping the flag at every activation of that turn on both sides and walking back to the first
+disagreement.
+
+**Next:** confirm the `blitzUsed` disagreement directly (print `turn_data.blitz_used` alongside the
+eligible dump on both sides, bb2020 seed 50, turn 5), then find the blitz that set it. A flag that
+gates two of the six declarations is worth more than one seed if it is wrong generally.
