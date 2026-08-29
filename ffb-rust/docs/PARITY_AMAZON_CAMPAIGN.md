@@ -1037,3 +1037,57 @@ loop-slot shape:
 Everything cheaper than those has been taken: the campaign has gone 0/0/0 -> 100/60/55 in seventeen
 iterations, and the last four LIST fixes each moved 4-11 seeds by mirroring a Java rule the port had
 approximated.
+
+## ITER19 — the kickoff-return window is LIVE (structural iteration; gate held, seeds unmoved)
+
+**Process changed first.** The user allowed adjusting the process, so `.claude/commands/amz-iter.md`
+gained a **Structural changes** section: an item the ledger has already specified may be implemented
+whole, debugged FORWARD rather than reverted on an intermediate probe, and judged on the FULL
+standing gate. Four iterations (8, 9, 11, 15) had been spent reverting a half-built path because a
+20-seed probe on it measures nothing.
+
+**Under that rule, the window is now live** — the first time in this campaign. `FFB_DRIVE_TRACE`
+over a bb2020 game: `KickoffReturn` **6 dispatches** (open + resume per kickoff) against 0 before,
+and `KickoffResultRoll` **3** against 0. The `FFB_KR` trace shows Java's exact flow:
+
+```
+KR enter mode=Kickoff        end_turn=false window=false   <- opens the window
+KR enter mode=KickoffReturn  end_turn=true  window=true    <- resumes, exits, resets the mode
+```
+
+**The last blocker was a missing parameter, not a stack question.** `select_sequence()` built its
+`InitSelecting` step with no parameters, where Java's `Select` generator passes
+`GOTO_LABEL_ON_END = END_SELECTING`. So `goto_label_on_end` was the EMPTY STRING, and the window's
+`EndTurn` did `goto ""` — which drains the entire step stack and ends the game
+(`FFB DRIVER ERROR: goto unknown label ''`, visible on stderr the whole time). It was invisible
+because this helper's only live caller was the step that never ran. Ported-but-unreached, for the
+fourth time, and this one had its own error message waiting to be read.
+
+All four earlier pieces were needed and correct: the `window_open`-guarded `consumes_parameter`
+(ITER9), `push_self` for `pushCurrentStepOnStack` (ITER11), the agents' window answer (ITER15), and
+this label.
+
+**One correction to ITER15.** Java DOES record an activation inside the window on some seeds
+(bb2020 seed 1 step 142: `Activate(Away6, MOVE)` in `KICKOFF_RETURN` mode), so answering `EndTurn`
+is not the whole truth. Letting the agent activate instead **livelocks the driver** — a 20-seed run
+never terminated. The `EndTurn` answer is kept because it is stable and correct-enough to leave the
+window live; the livelock is the next thing to understand.
+
+**Gate — held everywhere, moved nowhere:**
+
+| | ITER18 | ITER19 |
+|---|---|---|
+| bb2016 amazon | 100/100 | **100/100** |
+| bb2020 amazon | 60/100 | 60/100 |
+| bb2025 amazon | 55/100 | 55/100 |
+| lineman heuristic 1.0 x3 | 100/100 | **100/100** |
+| `--agent random`, both matchups x3 | 100/100 | **100/100** |
+| `cargo test -p ffb-engine` | 7349/0 | **7349/0** |
+
+Kept under the structural rule: the path is live, the full gate is green, and the remaining distance
+is named. bb2020 seed 1 still diverges at step 142 with Java on away turn 7 and Rust on turn 8 —
+because Java plays an activation in the window that Rust answers away.
+
+**Next:** the livelock. Why does allowing one activation inside the window fail to terminate, when
+the non-REGULAR rule should end the turn immediately after it? That is now the only thing between
+the window and the ~45 seeds it accounts for.

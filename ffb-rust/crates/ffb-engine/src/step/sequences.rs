@@ -49,6 +49,7 @@ fn kickoff_tail(rules: ffb_model::enums::Rules) -> Vec<SequenceStep> {
         SequenceStep::new(StepId::Setup),
         SequenceStep::new(StepId::Kickoff),
         SequenceStep::new(StepId::KickoffScatterRoll),
+        SequenceStep::new(StepId::KickoffReturn),
         // NOTE: Java's sequence has SWARMING x2 and KICKOFF_RETURN here and this one does not, so
         // `StepKickoffReturn` -- translated 1:1 -- has never run: `FFB_DRIVE_TRACE` counts 3 each
         // of the other kickoff steps and ZERO of it. That is why Rust goes straight to a REGULAR
@@ -170,6 +171,7 @@ pub fn h2_kickoff_sequence() -> Vec<SequenceStep> {
         SequenceStep::new(StepId::Setup),
         SequenceStep::new(StepId::Kickoff),
         SequenceStep::new(StepId::KickoffScatterRoll),
+        SequenceStep::new(StepId::KickoffReturn),
         // NOTE: Java's sequence has SWARMING x2 and KICKOFF_RETURN here and this one does not, so
         // `StepKickoffReturn` -- translated 1:1 -- has never run: `FFB_DRIVE_TRACE` counts 3 each
         // of the other kickoff steps and ZERO of it. That is why Rust goes straight to a REGULAR
@@ -301,7 +303,16 @@ pub fn pick_up_catch_scatter_sequence() -> Vec<SequenceStep> {
 
 pub fn select_sequence() -> Vec<SequenceStep> {
     let mut seq = Vec::with_capacity(20);
-    seq.push(SequenceStep::new(StepId::InitSelecting));
+    // Java `generator/Select`: `sequence.add(INIT_SELECTING, from(GOTO_LABEL_ON_END,
+    // END_SELECTING), ...)`. Without the parameter `StepInitSelecting.goto_label_on_end` is the
+    // EMPTY STRING, and its EndTurn / EndPlayerAction branches then goto a label that does not
+    // exist -- which drains the whole step stack ("FFB DRIVER ERROR: goto unknown label ''") and
+    // ends the game. Invisible until now because this helper's only live caller was
+    // `StepKickoffReturn`, which was itself never dispatched.
+    seq.push(SequenceStep::with_params(
+        StepId::InitSelecting,
+        vec![StepParameter::GotoLabelOnEnd("END_SELECTING".into())],
+    ));
     for _ in 0..14 {
         seq.push(SequenceStep::new(StepId::NoOp));
     }

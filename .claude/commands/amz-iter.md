@@ -114,6 +114,25 @@ Every commit must keep ALL of these green. If one goes red, REVERT rather than c
 - The two Java trees agree (`python scripts/check_java_trees.py`).
 - Run time does not blow up: compare `rust_total=` against the previous iteration.
 
+## Structural changes — the exception to revert-if-worse
+
+Most iterations are one small fix, and the rule below (revert unless the target's failure count
+drops) is right for those. It is WRONG for a change that only works once every part of a path is in
+place: a 20-seed probe on a half-finished path measures nothing, and reverting on it throws away the
+work. Four iterations were spent that way on the kickoff-return window.
+
+When an item is **specified** — the ledger names the change, the file, and what it should do — it may
+be taken as a STRUCTURAL iteration instead:
+
+- Implement the whole path in one go, including the parts that only make sense together.
+- Do NOT revert on an intermediate probe. Debug forward until the path either works or is understood.
+- Decide keep-or-revert on the **full standing gate**, not on a 20-seed probe: all three editions x
+  amazon and lineman, plus `--agent random` for both matchups x three editions.
+- If the full gate is worse, revert and record why, exactly as an ordinary iteration would.
+
+A structural iteration may legitimately produce no gate movement and still be worth committing, if it
+leaves the path measurably closer and the ledger says what remains.
+
 ## Iteration procedure
 
 1. **Orient.** Read the TAIL of `docs/PARITY_AMAZON_CAMPAIGN.md` for the frontier and the previous

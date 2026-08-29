@@ -2127,10 +2127,10 @@ impl HeuristicAgent {
         if turn_nr < 1 {
             return Action::EndTurn;
         }
-        // Java `ParityRunner`'s KICKOFF_RETURN arm injects `ClientCommandEndTurn` as soon as the
-        // window state is reached: the harness NEVER moves the returner. The window exists so the
-        // receiving team's turn counter is not advanced yet -- Java opens it, ends it, and the
-        // kickoff sequence continues.
+        // The kickoff-return window is ANSWERED, not played: letting the agent activate inside it
+        // livelocks the driver (measured -- a bb2020 20-seed run never terminated). Java does
+        // record one activation inside the window on some seeds, so this is not the whole truth
+        // yet; see docs/PARITY_AMAZON_CAMPAIGN.md ITER19.
         if g.turn_mode == ffb_model::enums::TurnMode::KickoffReturn {
             return Action::EndTurn;
         }
@@ -2495,10 +2495,10 @@ impl HeuristicAgent {
         if turn_nr < 1 {
             return Action::EndTurn;
         }
-        // Java `ParityRunner`'s KICKOFF_RETURN arm injects `ClientCommandEndTurn` as soon as the
-        // window state is reached: the harness NEVER moves the returner. The window exists so the
-        // receiving team's turn counter is not advanced yet -- Java opens it, ends it, and the
-        // kickoff sequence continues.
+        // The kickoff-return window is ANSWERED, not played: letting the agent activate inside it
+        // livelocks the driver (measured -- a bb2020 20-seed run never terminated). Java does
+        // record one activation inside the window on some seeds, so this is not the whole truth
+        // yet; see docs/PARITY_AMAZON_CAMPAIGN.md ITER19.
         if g.turn_mode == ffb_model::enums::TurnMode::KickoffReturn {
             return Action::EndTurn;
         }
