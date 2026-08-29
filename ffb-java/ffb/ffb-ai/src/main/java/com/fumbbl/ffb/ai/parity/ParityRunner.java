@@ -2907,7 +2907,26 @@ public class ParityRunner {
             case "HailMaryPass":
                 return PlayerAction.HAIL_MARY_PASS;
             default:
-                return PlayerAction.MOVE;
+                // The cases above are the DELIBERATE renames -- the ones where the agent's
+                // vocabulary and the engine's differ on purpose. Everything else round-trips
+                // through the enum's own name, because that is exactly what `nameForAgent` emits
+                // for it (`default: return a.name()`).
+                //
+                // This used to `return PlayerAction.MOVE`, which silently turned every action
+                // outside the nine into a plain move. The heuristic reaches them: the bb2025
+                // amazon roster fields the star Estelle la Veneaux, whose BALEFUL_HEX the agent
+                // picked and the harness declared as MOVE. Rust declared the real action, so the
+                // two engines took different branches out of an IDENTICAL decision -- the same
+                // shape as the HandOver bug recorded in `ActivationChoice.moveVariant`, where the
+                // agent is right and the harness mistranslates it.
+                try {
+                    return PlayerAction.valueOf(name);
+                } catch (IllegalArgumentException e) {
+                    // Loud rather than silent: a name neither branch knows is a porting gap, and
+                    // defaulting it to MOVE is what hid this one for three iterations.
+                    System.err.println("UNMAPPED_AGENT_ACTION: " + name + " -- declaring MOVE");
+                    return PlayerAction.MOVE;
+                }
         }
     }
 

@@ -1905,7 +1905,9 @@ impl HeuristicAgent {
 
     // ── bookkeeping ────────────────────────────────────────────────────────
 
-    fn refresh_turn(&mut self, g: &Game) {
+    /// Returns true when this call started a NEW turn, so the caller can take the turn-start
+    /// snapshot the parity contract is defined on.
+    fn refresh_turn(&mut self, g: &Game) -> bool {
         let turn_nr = if g.home_playing {
             g.turn_data_home.turn_nr
         } else {
@@ -1916,7 +1918,9 @@ impl HeuristicAgent {
             self.last_turn_key = Some(key);
             self.used_this_turn.clear();
             self.awaiting_run = None;
+            return true;
         }
+        false
     }
 
     fn bucket(&self, f: &Features, g: &Game) -> u64 {
@@ -2114,6 +2118,14 @@ impl HeuristicAgent {
         if turn_nr < 1 {
             return Action::EndTurn;
         }
+        // NOTE (amazon ITER4): Java snapshots the eligible list ONCE per turn
+        // (`eligibleThisTurn = computeEligiblePlayers(game)` at the turn-key change) while the
+        // heuristic reads the engine's live list, and the two DO diverge -- measured on amazon
+        // bb2025 seed 1 activation 19, where Rust offers `home_06` a FOUL (319 candidates) that
+        // Java's frozen list does not (318), at identical draw counts. Snapshotting here anyway
+        // measured far WORSE (bb2016 52 -> 14/100), so the snapshots differ in their CONTENT or
+        // their timing, not merely in being taken; reverted rather than kept unexplained. The
+        // evidence to start from is `FFB_CAND=19` on that seed: `RELIG` vs `JELIG`.
         self.refresh_turn(g);
         if g.turn_mode != ffb_model::enums::TurnMode::Regular && !self.used_this_turn.is_empty() {
             self.just_deselected = true;
@@ -2300,6 +2312,9 @@ impl HeuristicAgent {
             }
             if let Ok(want) = std::env::var("FFB_CAND") {
                 if want.parse::<u32>().ok() == Some(self.probe_act) {
+                    for (pid, acts) in eligible.iter() {
+                        eprintln!("RELIG k={} pid={} actions={:?}", self.probe_act, pid, acts);
+                    }
                     for (i, c) in cands.iter().enumerate() {
                         eprintln!(
                             "RCAND k={} i={} pid={} pac={:?} tgt={:?} w={:08x}",

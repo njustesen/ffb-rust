@@ -404,6 +404,10 @@ public final class ActivationChoice {
         }
         String probeWant = System.getenv("FFB_CAND");
         if (probeWant != null && Integer.parseInt(probeWant) == PROBE_ACT) {
+            for (Eligible e : eligible) {
+                System.err.println("JELIG k=" + PROBE_ACT + " pid=" + e.id
+                    + " actions=" + e.actions);
+            }
             for (int i = 0; i < out.size(); i++) {
                 PlanBuilder.Candidate c = out.get(i);
                 System.err.println("JCAND k=" + PROBE_ACT + " i=" + i + " pid=" + c.player

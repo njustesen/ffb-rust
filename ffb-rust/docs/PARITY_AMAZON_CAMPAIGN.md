@@ -268,3 +268,56 @@ re-roll silently. No Java change this iteration, so the jar and the Java tests a
 own; bb2025's 0/100 has the `BalefulHex` declaration bug queued from ITER2
 (`ParityRunner.actionFromName` has no case for it and defaults to MOVE). Take the bb2025 one first:
 it is a known, named defect with a one-line shape, and 0/100 means every seed is blocked behind it.
+
+## ITER4 — a mistranslated star declaration fixed; a snapshot hypothesis refuted by measurement
+
+**Fixed: `actionFromName` turned every unlisted action into MOVE.** `nameForAgent` ends
+`default: return a.name()`, so an action outside its nine special cases reaches the agent as
+`BALEFUL_HEX`; `actionFromName` ended `default: return PlayerAction.MOVE`, so it came back as a
+plain move. The bb2025 amazon roster fields the star Estelle la Veneaux, the agent picked her
+BALEFUL_HEX, and the harness declared MOVE while Rust declared the real action — the two engines
+taking different branches out of an IDENTICAL decision. Same shape as the `HandOver` bug already
+recorded in `ActivationChoice.moveVariant`: the agent is right and the harness mistranslates it.
+
+The default now round-trips through `PlayerAction.valueOf(name)`, which is exactly the inverse of
+what `nameForAgent` emits, and an unmappable name prints `UNMAPPED_AGENT_ACTION` instead of silently
+becoming a move. Verified live: Java's log now records `Activate(...,BALEFUL_HEX)` against Rust's
+`Activate(home_02,BalefulHex)`, and bb2025 seed 2's first divergence moved from step 39 to 40. **No
+gate movement** — like ITER1, a real mistranslation fixed with no seed closed, and recorded as such
+rather than counted as progress.
+
+**Refuted: the eligible-list snapshot.** Root-causing bb2025 seed 1 gave a clean signal — at
+activation 19 the draw counts AGREE (51 each) and the candidate lists differ by exactly one option:
+Rust offers `home_06` a FOUL, Java does not. Dumping both eligible lists (`RELIG`/`JELIG`, new,
+env-gated) shows why: Rust has `[Move, Foul]` for that player and Java has `[Move]`.
+
+`RandomAgent` snapshots the eligible list at turn start and says so in a comment — "NOT the engine's
+live per-activation list, so an action offered at turn start survives even if its target is knocked
+down later in the same turn" — while the heuristic reads the live list. That is a textbook instance
+of the campaign's own "contract rules that live in the harness LOOP, not the scorer" pattern, and it
+looked certain.
+
+It measured **bb2016 52 -> 14/100** and was reverted. So the two lists differ for a reason other
+than the one I assumed: both sides compute FOUL from the same predicate (adjacent PRONE/STUNNED
+opponent, foul unused) and both re-filter stale actions per activation, yet Java's list lacks it.
+Either the snapshots are taken at different MOMENTS, or Java's `computeEligiblePlayers` and Rust's
+`legal_activate_player_actions` disagree about this player. That is the next thing to settle, and it
+now has an exact repro rather than a theory.
+
+The failed experiment is worth its cost: it converted "the heuristic should snapshot" from a
+plausible-looking certainty into a measured falsehood, and it left the diagnostic behind.
+
+**Gate:**
+
+| | ITER3 | ITER4 |
+|---|---|---|
+| bb2016 amazon | 52/100 | 52/100 |
+| bb2020 amazon | 14/100 | 14/100 |
+| bb2025 amazon | 0/100 | 0/100 |
+| lineman heuristic 1.0 x3 | 100/100 | **100/100** |
+| `cargo test -p ffb-engine` | 7344/0 | **7344/0** |
+| `mvn -o -pl ffb-ai test` | 39/0 | **39/0** |
+
+**Next:** settle why Java's eligible list lacks FOUL for `home_06` at bb2025 seed 1 activation 19.
+Print the turn key and the board at the moment each side takes its snapshot; if they coincide, the
+fault is in one of the two eligibility computations and Java is the truth.
