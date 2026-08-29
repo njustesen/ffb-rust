@@ -1969,6 +1969,15 @@ impl HeuristicAgent {
         player_id: String,
         squares: Vec<FieldCoordinate>,
     ) -> Action {
+        // Java: the engine flow never re-presents INIT_SELECTING phase 2 for a pass-block window
+        // mover, so `ParityRunner`'s INIT_MOVING handler deselects immediately -- the mover
+        // activates but never moves, and no target is drawn. `RandomAgent` mirrors it (its comment
+        // names amazon seeds 8/11, where the On-the-Ball defender stays put in Java); the
+        // heuristic knew nothing about pass-block windows at all, which is exactly the roster
+        // where they fire: On the Ball is the Amazon Thrower's skill in bb2020 and bb2025.
+        if g.turn_mode == ffb_model::enums::TurnMode::PassBlock {
+            return Action::EndPlayerAction;
+        }
         // The whole state machine lives in `replay_plan`, so it can be pinned against the Java
         // twin with made-up inputs. What is left here is gathering the board facts it reads and
         // turning its verdict into an `Action`.
@@ -2118,14 +2127,15 @@ impl HeuristicAgent {
         if turn_nr < 1 {
             return Action::EndTurn;
         }
-        // NOTE (amazon ITER4): Java snapshots the eligible list ONCE per turn
-        // (`eligibleThisTurn = computeEligiblePlayers(game)` at the turn-key change) while the
-        // heuristic reads the engine's live list, and the two DO diverge -- measured on amazon
-        // bb2025 seed 1 activation 19, where Rust offers `home_06` a FOUL (319 candidates) that
-        // Java's frozen list does not (318), at identical draw counts. Snapshotting here anyway
-        // measured far WORSE (bb2016 52 -> 14/100), so the snapshots differ in their CONTENT or
-        // their timing, not merely in being taken; reverted rather than kept unexplained. The
-        // evidence to start from is `FFB_CAND=19` on that seed: `RELIG` vs `JELIG`.
+        // NOTE: Java freezes the eligible list for the whole turn
+        // (`eligibleThisTurn = computeEligiblePlayers(game)`) while this reads the engine's live
+        // list, and the two DO differ -- amazon bb2025 seed 1 activation 19, where Rust offers a
+        // FOUL whose victim was knocked down mid-turn and Java's frozen list cannot. Freezing here
+        // was tried twice and measured WORSE both times (bb2016 52 -> 14/100, and 7 -> 3 of seeds
+        // 1-20 even with the pass-block rules below in place), with no stalls -- 17 of 17 failures
+        // were real divergences. The frozen lists agree byte-for-byte at the turn's first
+        // activation, so they diverge in some consequence not yet understood. Left live
+        // deliberately; see docs/PARITY_AMAZON_CAMPAIGN.md ITER5.
         self.refresh_turn(g);
         if g.turn_mode != ffb_model::enums::TurnMode::Regular && !self.used_this_turn.is_empty() {
             self.just_deselected = true;
@@ -2309,6 +2319,12 @@ impl HeuristicAgent {
                     "RSUM k={} n={} draws={} {}",
                     self.probe_act, cands.len(), self.probe_draws, parts.join(" ")
                 );
+                let elig: Vec<String> = eligible
+                    .iter()
+                    .map(|(pid, acts)| format!("{pid}:{}", acts.iter()
+                        .map(|a| format!("{a:?}")).collect::<Vec<_>>().join("|")))
+                    .collect();
+                eprintln!("RELIG k={} turn={} {}", self.probe_act, turn_nr, elig.join(" "));
             }
             if let Ok(want) = std::env::var("FFB_CAND") {
                 if want.parse::<u32>().ok() == Some(self.probe_act) {
@@ -7115,6 +7131,39 @@ mod tests {
             }
         }
         panic!("consumed more than 6 draws, or the stream diverged");
+    }
+
+    /// Java `ParityRunner`: a pass-block window mover is deselected immediately, because the
+    /// engine flow never re-presents INIT_SELECTING phase 2 for him. `RandomAgent` has always
+    /// mirrored this; the heuristic knew nothing about pass-block windows, which is precisely the
+    /// roster that opens them — On the Ball is the Amazon Thrower's skill in bb2020 and bb2025.
+    #[test]
+    fn a_move_prompt_in_a_pass_block_window_deselects() {
+        use ffb_model::enums::TurnMode;
+        let mut g = tie_game(3, 3);
+        let f = Features::build(&g, positions_stamp(&g), true);
+        let pid = g.team_home.players[0].id.clone();
+        let mut a = HeuristicAgent::new(1, 1.0);
+
+        g.turn_mode = TurnMode::PassBlock;
+        assert!(
+            matches!(
+                a.handle_move(&g, &f, pid.clone(), vec![FieldCoordinate::new(13, 8)]),
+                Action::EndPlayerAction
+            ),
+            "a pass-block window mover must be deselected, not moved"
+        );
+
+        // ...and the rule is confined to that window: a REGULAR turn still decides normally, or
+        // the fix would freeze every activation in the game.
+        g.turn_mode = TurnMode::Regular;
+        assert!(
+            !matches!(
+                a.handle_move(&g, &f, pid.clone(), vec![FieldCoordinate::new(13, 8)]),
+                Action::EndPlayerAction
+            ) || a.plan.is_none(),
+            "the deselect must not leak into a regular turn"
+        );
     }
 
     fn agent_with_options(temp_scale: f32, n: usize) -> HeuristicAgent {

@@ -32,8 +32,8 @@ structurally, not just by generator.
 | amazon v amazon, `--heur-classes all`, seeds 1-100 | sampled (1.0) |
 |---|---|
 | bb2016 | 52/100 |
-| bb2020 | 14/100 |
-| bb2025 | 0/100 |
+| bb2020 | 55/100 |
+| bb2025 | 1/100 |
 
 Control: `--agent random` amazon is **100/100 in all three editions**, so the roster itself is
 parity-clean and every red below belongs to the heuristic.
@@ -321,3 +321,66 @@ plausible-looking certainty into a measured falsehood, and it left the diagnosti
 **Next:** settle why Java's eligible list lacks FOUL for `home_06` at bb2025 seed 1 activation 19.
 Print the turn key and the board at the moment each side takes its snapshot; if they coincide, the
 fault is in one of the two eligibility computations and Java is the truth.
+
+## ITER5 — the pass-block window, which the heuristic had never heard of
+
+**bb2020 14 -> 55/100**, and bb2025 records its first passing seed of the campaign. The largest
+single move so far, and it came from a grep that returned zero.
+
+**How it was found.** ITER4's refuted snapshot left an exact repro, so this iteration started by
+re-measuring it rather than re-theorising. Dumping both eligible lists at every activation of
+bb2025 seed 1 showed the frozen and live lists **agree byte-for-byte at the turn's first
+activation** — Java `Move|Block|Blitz|BALEFUL_HEX`, Rust `Move|Block|Blitz|BalefulHex`, same eleven
+players. So the freeze moments coincide and the snapshot hypothesis could not explain the gap.
+
+Re-applying the snapshot anyway and censusing the damage was what paid: **17 failures, 0 stalls** —
+all real divergences. That ruled out the obvious mechanism (a frozen list going stale and being
+refused by the engine) and sent me to read `RandomAgent`'s activation branch line by line against
+the heuristic's. It carries TWO pass-block rules that the heuristic does not, and
+`grep -c PassBlock heuristic_agent.rs` returned **0**.
+
+1. **The action filter.** Java `filterStaleActions`: in a non-REGULAR window the list shrinks to
+   MOVE plus the UseSkill specials. A window Block/Blitz/Foul is a declare-then-deselect no-op, and
+   a window BLITZ against the suspended thrower re-fires `CONFIRM_END_ACTION` forever.
+2. **The move deselect.** The engine never re-presents `INIT_SELECTING` phase 2 for a pass-block
+   window mover, so `ParityRunner` deselects immediately: the mover activates and never moves.
+   `RandomAgent`'s comment for this one names **amazon seeds 8/11**, where the On-the-Ball defender
+   stays put in Java.
+
+That comment is the whole story. **On the Ball is the Amazon Thrower's skill in bb2020 and bb2025** —
+the two editions that were stuck at 14 and 0 while bb2016 moved freely with every other fix. bb2016
+amazons have no On the Ball, so bb2016 has no pass-block windows, and its number does not move here
+(52 -> 52). The edition split was the clue and it was visible in the ITER0 table all along.
+
+**The A/B that settled what to keep**, seeds 1-20:
+
+| | bb2016 | bb2020 | bb2025 |
+|---|---|---|---|
+| baseline (ITER4) | 7 | 3 | 0 |
+| snapshot + pass-block rules | 3 | 2 | 0 |
+| **pass-block rules only** | **7** | **9** | **1** |
+
+So the snapshot is harmful on its own terms and the pass-block rules are the win. Kept the rules,
+dropped the snapshot for the second and last time — with a comment in the code recording that Java
+freezes and Rust does not, that the lists agree at turn start, and that freezing measured worse
+twice. That is a known, documented, deliberate divergence rather than an oversight.
+
+**Gate:**
+
+| | ITER4 | ITER5 |
+|---|---|---|
+| bb2016 amazon | 52/100 | 52/100 |
+| bb2020 amazon | 14/100 | **55/100** |
+| bb2025 amazon | 0/100 | **1/100** |
+| lineman heuristic 1.0 x3 | 100/100 | **100/100** |
+| `cargo test -p ffb-engine` | 7344/0 | **7345/0** |
+
+Regression test `a_move_prompt_in_a_pass_block_window_deselects` pins both halves: the window
+deselects, and the rule does not leak into a regular turn — without that second assertion the fix
+would freeze every activation in the game and still pass.
+
+**Next:** bb2025 at 1/100 is now the outlier, and it is the only edition with a STAR on the roster.
+bb2020 and bb2016 sit at 55 and 52 with the same skills minus Estelle, so the bb2025 gap is most
+likely hers — the `BalefulHex` declaration now translates correctly (ITER4) but nothing has verified
+what the two engines DO with it. Start there: run seed 1 to the first divergence and check whether
+the star's action resolves identically on both sides.
