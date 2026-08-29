@@ -3686,3 +3686,57 @@ stalling from there.
 
 **Next:** bb2025's last uniform red is seed 82 at step 94. After that bb2016 is the whole remaining
 problem at 88/84/88.
+
+## ITER66 — the rock is thrown but never lands (partial; gate unchanged)
+
+**No gate moved.** bb2025 uniform stays 99/100, everything else as ITER65 left it. Recorded because
+the work is verified and the remaining step is now named precisely — the same shape as ITER54.
+
+bb2025's last uniform red is seed 82. At step 94 Java rolls **12** dice where Rust rolled 4, and the
+trace shows what they are:
+
+```
+139 d6  block          142 d6  StallingExtension.handleStaller   <- ITER65 got this far
+140 d6  armour         143 d26 rollXCoordinate                    <- the rock's start square
+141 d6  armour         144-147 d6  armour + injury
+                       148-149 casualty (d16 + d6)
+                       150 d8  (the ball, after the carrier leaves)
+```
+
+ITER65 made the staller roll happen; its *consequences* were still a stub, whose note said the
+branch was "unreachable in headless" — true before ITER65 and false after. Ported Java's
+`if (successful)` branch: the rock's start square, `InjuryTypeThrowARockStalling` via
+`handle_injury_by_name`, and a `SteadyFootingContext` wrapping the drop. **Rust now rolls 11 of the
+12.**
+
+Two things found on the way:
+
+- **`rollXCoordinate()` is `rollDice(26) - 1`**, giving x in [0, 25]. Rust's bb2020 twin rolls
+  `die(24)` with a comment claiming [1..24]. That is wrong, but its branch does not fire in the
+  current gate, so it is left alone rather than fixed blind — noted here so it is not mistaken for
+  a model to copy.
+- `handle_staller` now returns `(GameEvent, Option<SteadyFootingContext>)`, because the extension
+  cannot publish step parameters and both callers must.
+
+**What is still missing.** The injury is rolled but never applied: Java ends with `away_04`
+seriously injured off the pitch and the ball bounced to (2,14); Rust leaves him Standing at (1,13)
+holding it. The 12th die is that bounce. `StepForgoneStalling` publishes the context (probe
+confirms `ctx=true`), and its sequence has `SteadyFooting` immediately after with a matching
+`ApothecaryMode::HitPlayer`, so the next thing to check is whether
+`SteadyFootingContext::from_drop_player` carries the apothecary mode through to
+`get_apothecary_mode()` — `StepSteadyFooting::set_parameter` drops the context on the floor when it
+does not match.
+
+### Gates (all unchanged, verified not regressed)
+
+| | argmax | scale 1.0 | scale 1e6 |
+|---|---|---|---|
+| bb2025 | 100 | 100 | 99 |
+| bb2020 | 100 | 100 | 100 |
+| bb2016 | 88 | 84 | 88 |
+
+- Fourteen-class rung **100/100** and `--agent random` **100/100** in all three editions.
+- `cargo test --workspace --release`: **14,663 / 0**. `mvn -o -pl ffb-ai test`: **35 / 0**.
+
+**Next:** the apothecary-mode question above — one grep — then seed 82 should close and bb2025 joins
+bb2020 as a finished edition.

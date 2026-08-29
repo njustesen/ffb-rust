@@ -85,12 +85,17 @@ impl StepForgoneStalling {
         if let Some(player_id) = stalling_player_id {
             if self.stalling_extension.is_considered_stalling(game, &player_id) {
                 let turn_nr = game.turn_data().turn_nr;
-                let stalling_ev = self.stalling_extension.handle_staller(game, &player_id, turn_nr, rng);
+                let (stalling_ev, steady_footing) =
+                    self.stalling_extension.handle_staller(game, &player_id, turn_nr, rng);
                 // Java: getResult().addReport(new ReportPlayerEvent(player.getId(), "is stalling"))
                 game.report_list.add(ReportPlayerEvent::new(Some(player_id.clone()), Some("is stalling".into())));
-                return StepOutcome::next()
+                let out = StepOutcome::next()
                     .with_event(stalling_ev)
                     .with_event(GameEvent::PlayerNote { player_id, note: "is stalling".into() });
+                return match steady_footing {
+                    Some(ctx) => out.publish(StepParameter::SteadyFootingContext(Box::new(ctx))),
+                    None => out,
+                };
             }
         }
 

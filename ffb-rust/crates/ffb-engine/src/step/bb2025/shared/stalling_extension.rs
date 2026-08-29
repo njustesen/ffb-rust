@@ -2,6 +2,9 @@
 ///
 /// Helper logic for stalling detection and penalty, shared across stalling-related steps.
 use ffb_model::model::game::Game;
+use ffb_model::enums::ApothecaryMode;
+use crate::drop_player_context::{DropPlayerContext, SteadyFootingContext};
+use crate::step::util_server_injury::handle_injury_by_name;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::util::pathfinding::path_finder_with_pass_block_support::PathFinderWithPassBlockSupport;
 use ffb_model::model::property::named_properties::NamedProperties;
@@ -97,7 +100,13 @@ impl StallingExtension {
     /// The injury machinery (UtilServerInjury, InjuryTypeThrowARockStalling,
     /// SteadyFootingContext, DropPlayerCommand, Animation) is not yet translated,
     /// so the rock-hit branch is a TODO stub that never executes (conservative).
-    pub fn handle_staller(&self, game: &mut Game, player_id: &str, turn_nr: i32, rng: &mut ffb_model::util::rng::GameRng) -> ffb_model::events::GameEvent {
+    pub fn handle_staller(
+        &self,
+        game: &mut Game,
+        player_id: &str,
+        turn_nr: i32,
+        rng: &mut ffb_model::util::rng::GameRng,
+    ) -> (ffb_model::events::GameEvent, Option<SteadyFootingContext>) {
         let roll: i32;
         let successful: bool;
 
@@ -117,12 +126,61 @@ impl StallingExtension {
             game.game_result.away.stalled = true;
         }
 
-        // no-op: InjuryTypeThrowARockStalling injury — unreachable in headless (stalling detection disabled; Guard 4 requires pathfinder not ported)
-        ffb_model::events::GameEvent::ThrowAtStallingPlayer {
+        let event = ffb_model::events::GameEvent::ThrowAtStallingPlayer {
             player_id: player_id.to_string(),
             roll,
             success: successful,
+        };
+        if !successful {
+            return (event, None);
         }
+
+        // Java, the `if (successful)` branch: pick the rock's starting square on whichever
+        // touchline the player is nearer, then injure him with `InjuryTypeThrowARockStalling` and
+        // hand the drop to the SteadyFooting pipeline.
+        //
+        // This was a stub whose note said the branch was "unreachable in headless (stalling
+        // detection disabled)". That was true until ITER65 switched the rule on, and then the roll
+        // happened with none of its consequences: Java rolled 12 dice at bb2025 seed 82 step 94 --
+        // the staller d6, an x-coordinate, armour, injury, casualty -- where Rust rolled 4.
+        let player_coord = match game.field_model.player_coordinate(player_id) {
+            Some(c) => c,
+            None => return (event, None),
+        };
+        // Java: `rollXCoordinate()` is `rollDice(26) - 1`, i.e. a d26 giving x in [0, 25] --
+        // NOT a d24. (bb2020's twin rolls `die(24)` and is wrong about this; its branch does not
+        // fire in the current gate, so it is left alone rather than fixed blind.)
+        let x = rng.die(26) - 1;
+        // Java: FieldCoordinateBounds.UPPER_HALF is (0,0)..(25,7).
+        let _start_coord = if player_coord.y <= 7 {
+            FieldCoordinate::new(x, 0)
+        } else {
+            FieldCoordinate::new(x, 14)
+        };
+        // The animation and syncGameModel that follow in Java are client-side only.
+
+        let injury_result = handle_injury_by_name(
+            game,
+            rng,
+            "InjuryTypeThrowARockStalling",
+            None,
+            player_id,
+            player_coord,
+            None,
+            None,
+            ApothecaryMode::HitPlayer,
+        );
+        let dpc = DropPlayerContext {
+            injury_result: Some(Box::new(injury_result)),
+            end_turn: false,
+            eligible_for_safe_pair_of_hands: true,
+            label: None,
+            player_id: Some(player_id.to_string()),
+            apothecary_mode: Some(ApothecaryMode::HitPlayer),
+            requires_armour_break: false,
+            ..DropPlayerContext::new()
+        };
+        (event, Some(SteadyFootingContext::from_drop_player(dpc)))
     }
 }
 

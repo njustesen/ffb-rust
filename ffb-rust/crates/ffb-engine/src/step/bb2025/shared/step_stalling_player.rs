@@ -98,9 +98,16 @@ impl StepStallingPlayer {
 
         // Java: stallingExtension.handleStaller(this, player);
         let turn_nr = game.turn_data().turn_nr;
-        let stalling_ev = self.stalling_extension.handle_staller(game, &player_id, turn_nr, rng);
+        let (stalling_ev, steady_footing) =
+            self.stalling_extension.handle_staller(game, &player_id, turn_nr, rng);
 
-        StepOutcome::next().with_event(stalling_ev)
+        // Java publishes STEADY_FOOTING_CONTEXT alongside the injury when the rock connects, which
+        // is what removes the player from the pitch.
+        let out = StepOutcome::next().with_event(stalling_ev);
+        match steady_footing {
+            Some(ctx) => out.publish(StepParameter::SteadyFootingContext(Box::new(ctx))),
+            None => out,
+        }
     }
 }
 
