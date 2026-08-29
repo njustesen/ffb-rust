@@ -49,6 +49,13 @@ fn kickoff_tail(rules: ffb_model::enums::Rules) -> Vec<SequenceStep> {
         SequenceStep::new(StepId::Setup),
         SequenceStep::new(StepId::Kickoff),
         SequenceStep::new(StepId::KickoffScatterRoll),
+        // NOTE: Java's sequence has SWARMING x2 and KICKOFF_RETURN here and this one does not, so
+        // `StepKickoffReturn` -- translated 1:1 -- has never run: `FFB_DRIVE_TRACE` counts 3 each
+        // of the other kickoff steps and ZERO of it. That is why Rust goes straight to a REGULAR
+        // turn and bumps the receiving team's turn counter where Java opens a KICKOFF_RETURN
+        // window and leaves it alone (bb2020 amazon seed 1 step 142). Simply adding the step here
+        // makes Rust stall on the very first kickoff -- the window needs its agent contract on
+        // both sides first. See docs/PARITY_AMAZON_CAMPAIGN.md ITER8.
         SequenceStep::new(StepId::KickoffResultRoll),
         SequenceStep::new(StepId::ApplyKickoffResult),
         // Java `generator/mixed/Kickoff.java:45-46`:
@@ -163,6 +170,13 @@ pub fn h2_kickoff_sequence() -> Vec<SequenceStep> {
         SequenceStep::new(StepId::Setup),
         SequenceStep::new(StepId::Kickoff),
         SequenceStep::new(StepId::KickoffScatterRoll),
+        // NOTE: Java's sequence has SWARMING x2 and KICKOFF_RETURN here and this one does not, so
+        // `StepKickoffReturn` -- translated 1:1 -- has never run: `FFB_DRIVE_TRACE` counts 3 each
+        // of the other kickoff steps and ZERO of it. That is why Rust goes straight to a REGULAR
+        // turn and bumps the receiving team's turn counter where Java opens a KICKOFF_RETURN
+        // window and leaves it alone (bb2020 amazon seed 1 step 142). Simply adding the step here
+        // makes Rust stall on the very first kickoff -- the window needs its agent contract on
+        // both sides first. See docs/PARITY_AMAZON_CAMPAIGN.md ITER8.
         SequenceStep::new(StepId::KickoffResultRoll),
         SequenceStep::new(StepId::ApplyKickoffResult),
         // See start_game_sequence: KICKOFF_ANIMATION sets ballInPlay(true) (pickups/catches

@@ -480,3 +480,55 @@ bb2016 and bb2020 are untouched to the seed, as they must be: neither fields a s
 dominates any of them. Census each edition's remaining failures for a SHARED first-diff shape before
 picking one — the ITER5 lesson was that the edition split itself was the clue, and the same table
 should now be read for what the three have in common.
+
+## ITER8 — investigation: the kickoff-return window has never run (no fix; one reverted attempt)
+
+**No code behaviour changed this iteration.** What it produced is a root cause with an exact repro,
+and the measurement that a one-line fix for it is not enough.
+
+**The census first**, as the ITER7 frontier asked. Across the three editions the remaining failures
+are no longer edition-specific — only 13 seeds fail in all three, 37 in exactly one — with **0
+stalls** and every divergence an `Activate | Activate`, at a median first-diff step of 49-67. But one
+number stands out: at the diverging step Java and Rust disagree about the **turn number** in
+**32 of bb2020's 44** failures, against 6 of 48 in bb2016.
+
+**Root cause.** bb2020 seed 1, step 142: Java's state string reads `h2t87aaway` in
+`mode=KICKOFF_RETURN` — half 2, home on turn 8, away still on **turn 7**, score 1-0, home having
+just scored. Rust is on away **turn 8** in a REGULAR turn with a fresh eligible list. Both engines
+held identical hashes one step earlier, and the hash DOES include both turn counters, so the
+counters parted during that one activation.
+
+Java opens a KICKOFF_RETURN window after the kickoff and leaves the receiving team's turn counter
+alone; Rust goes straight to REGULAR and increments it. `StepKickoffReturn` is translated 1:1 in
+Rust and **has never executed**: `FFB_DRIVE_TRACE` over that game counts 3 each of `Kickoff`,
+`KickoffScatterRoll`, `KickoffResultRoll` and `KickoffAnimation`, and **zero** `KickoffReturn`. The
+generator files (`generator/mixed/kickoff.rs`, `generator/bb2025/kickoff.rs`) list it; the runtime
+sequence in `step/sequences.rs` -- the one actually pushed -- does not. That is the campaign's
+"ported-but-unreached" pattern for the third time, after `MoveReplay` and the bb2016 `StepPass`.
+
+**Why no lineman iteration could have found it:** the window only opens for a player with
+`canMoveDuringKickOffScatter`. No lineman has it. The Amazon Thrower does — On the Ball, in bb2020
+and bb2025 — which is also why bb2016 shows the turn mismatch six times and bb2020 thirty-two.
+
+**The attempted fix, and its measurement.** Adding `StepId::KickoffReturn` to both runtime kickoff
+sequences in Java's position made bb2020 go **9/20 -> 0/20**, with Rust stalling at step 0: the
+window now opens and the game cannot get out of it. Reverted. Both sides do have outline handling
+(Rust's `RandomAgent` answers `AgentPrompt::KickoffReturn` as a confirm-only prompt; `ParityRunner`
+has two `case KICKOFF_RETURN` arms), so what is missing is the flow around them — most likely the
+`push_seq(select_sequence())` the step performs, against the heuristic's rule that a non-REGULAR
+window allows exactly one activation and then ends the turn.
+
+A note in `sequences.rs` records all of this at the site, so the next reader does not have to
+rediscover that the step is dead.
+
+**Gate: unchanged from ITER7 by construction** — the only edit is a comment. bb2016 52, bb2020 55,
+bb2025 45, lineman 100/100 x3, all as gated in ITER7. bb2020 seeds 1-20 re-measured at 9/20 after
+the revert, confirming the tree is back where it started.
+
+**Next:** make the kickoff-return window live, as a scoped port rather than a sequence entry —
+(1) add the step to both runtime sequences, (2) give the heuristic a KICKOFF_RETURN arm that mirrors
+`ParityRunner`'s two, and (3) check the interaction with the one-activation-per-non-REGULAR-window
+rule, which is the most likely cause of the stall. Gate bb2020 first: it has the most to gain.
+
+**Also logged:** the runtime sequences omit `SWARMING` x2 as well. No amazon has Swarming, so adding
+it would be an unmeasured change; it belongs with whatever roster does.
