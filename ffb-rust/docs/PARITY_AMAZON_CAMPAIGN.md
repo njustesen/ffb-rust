@@ -989,3 +989,51 @@ bb2020 does not move: no star, so no hex, so nothing confused.
 **Next:** re-run the signature classifier over bb2025's remaining 45 and bb2020's 40. The LIST
 family has now produced two fixes (ITER12's dodge dialog, this one) and is the loop's natural
 material; the WINDOW family remains blocked on the single `StepInitSelecting` change from ITER16.
+
+## ITER18 — the eligible-list freeze, refuted a THIRD time and now explained (no fix)
+
+**Gate unchanged (100 / 60 / 55).** A negative result, but a load-bearing one: it explains why the
+LIST family has resisted four attempts and says what would actually close it.
+
+**Classification.** The signature classifier over bb2025's current failures: seeds 1, 5, 6, 14 are
+LIST (dn = 1, 4, 2, 1 — Rust always with MORE options), seed 16 is WINDOW. The LIST cases keep
+producing the same shape as bb2020 seed 50 — e.g. bb2025 seed 6 at activation 112, where `away_06`
+has Block and Blitz in Rust's list and neither in Java's.
+
+**Re-tested the freeze, because the environment had changed.** ITER4 and ITER5 measured freezing the
+eligible list as harmful, but that was before the pass-block rules, the dodge dialog, the star
+command-pair and the hex fix. Re-running the same experiment on today's tree:
+
+| seeds 1-20 | bb2016 | bb2020 | bb2025 |
+|---|---|---|---|
+| live (current) | 20 | 10 | 11 |
+| frozen | **9** | **3** | **3** |
+
+Worse again, and by more than before. Three measurements, one conclusion.
+
+**And this time the reason is clear.** Java's snapshot is of `ParityRunner.computeEligiblePlayers` —
+the HARNESS's own rule — not of the engine's `legal_activate_player_actions`. Freezing Rust's engine
+list does not make it equal to Java's harness list; it freezes a DIFFERENT list, and the live
+version happens to agree more often. That also explains why the random agent can freeze safely: its
+`idx % N` contract is defined against the same harness snapshot, so the two were built to agree.
+
+**What would actually close this family:** give the heuristic its own eligibility computation
+mirroring `computeEligiblePlayers` (adjacent-block-target, adjacent-foul-target, hand-over and pass
+availability, the stale-action filter) and freeze THAT — the same lesson as ITER17's block targets,
+where the fix was to mirror the harness's board rather than to change the shared engine helper. It
+is a self-contained piece of work with a clear spec and its own gate.
+
+**Gate:** unchanged — bb2016 100/100, bb2020 60/100, bb2025 55/100; seeds 1-20 re-measured at 20/10/11
+after the revert; `cargo test -p ffb-engine` 7349/0.
+
+**Two structural items now stand between this campaign and its goal**, both specified, neither a
+loop-slot shape:
+
+1. **The kickoff-return window** (ITER16): one change in `StepInitSelecting` so a window `EndTurn`
+   publishes and continues instead of unwinding the stack. Worth the WINDOW family.
+2. **The heuristic's eligible list** (this iteration): mirror `computeEligiblePlayers` and freeze.
+   Worth the LIST family.
+
+Everything cheaper than those has been taken: the campaign has gone 0/0/0 -> 100/60/55 in seventeen
+iterations, and the last four LIST fixes each moved 4-11 seeds by mirroring a Java rule the port had
+approximated.

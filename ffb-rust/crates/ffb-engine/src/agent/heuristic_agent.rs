@@ -2136,13 +2136,16 @@ impl HeuristicAgent {
         }
         // NOTE: Java freezes the eligible list for the whole turn
         // (`eligibleThisTurn = computeEligiblePlayers(game)`) while this reads the engine's live
-        // list, and the two DO differ -- amazon bb2025 seed 1 activation 19, where Rust offers a
-        // FOUL whose victim was knocked down mid-turn and Java's frozen list cannot. Freezing here
-        // was tried twice and measured WORSE both times (bb2016 52 -> 14/100, and 7 -> 3 of seeds
-        // 1-20 even with the pass-block rules below in place), with no stalls -- 17 of 17 failures
-        // were real divergences. The frozen lists agree byte-for-byte at the turn's first
-        // activation, so they diverge in some consequence not yet understood. Left live
-        // deliberately; see docs/PARITY_AMAZON_CAMPAIGN.md ITER5.
+        // list. Freezing here has now been measured THREE times -- ITER4, ITER5 and ITER18, the
+        // last on a tree that had changed materially since -- and is worse every time (ITER18:
+        // bb2016 20 -> 9, bb2020 10 -> 3, bb2025 11 -> 3 of seeds 1-20).
+        //
+        // The reason is that Java's snapshot is of `ParityRunner.computeEligiblePlayers`, the
+        // HARNESS's own rule, not of the engine's `legal_activate_player_actions`. Freezing Rust's
+        // engine list does not make it equal to Java's harness list; it just freezes a different
+        // one, and the live version happens to agree more often. Aligning them means giving the
+        // heuristic its own eligibility computation mirroring `computeEligiblePlayers` -- a larger
+        // change than a freeze. See docs/PARITY_AMAZON_CAMPAIGN.md ITER18.
         self.refresh_turn(g);
         if g.turn_mode != ffb_model::enums::TurnMode::Regular && !self.used_this_turn.is_empty() {
             self.just_deselected = true;
