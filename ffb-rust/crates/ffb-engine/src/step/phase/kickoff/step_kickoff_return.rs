@@ -104,6 +104,13 @@ impl StepKickoffReturn {
             if self.end_player_action && !game.acting_player.has_acted && !self.end_turn {
                 // Java: UtilServerSteps.changePlayerAction(this, null, null, false)
                 game.acting_player.player_id = None;
+                // Java's `fEndPlayerAction` is re-supplied by each END_PLAYER_ACTION publish; this
+                // port stores it in a field that `consumes_parameter` fills, so it stays SET after
+                // being acted on. Left sticky, this branch re-opens the Select sequence on every
+                // re-entry with no agent involvement at all -- the step spins and the stack grows
+                // without bound (ITER20). Clear it here, as Java effectively does by only ever
+                // seeing it on the publish that carried it.
+                self.end_player_action = false;
                 // Java: getGameState().pushCurrentStepOnStack() + Select.pushSequence
                 return StepOutcome::repeat().push_seq(select_sequence());
             } else if self.end_player_action || self.end_turn {
@@ -283,4 +290,29 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
     }
 
+    /// ITER21 regression. A mover deselected WITHOUT having acted makes this step re-open the
+    /// Select sequence (Java `StepKickoffReturn`, first sub-branch). Java only ever sees
+    /// `fEndPlayerAction` on the publish that carried it; this port keeps it in a field, so left
+    /// sticky the branch fires again on every re-entry with no agent involvement -- the step
+    /// spins and the stack grows without bound (measured: stack_len 24,429,194 and climbing).
+    /// The flag must be cleared as the branch consumes it, so a second visit with no new publish
+    /// takes a different branch.
+    #[test]
+    fn end_player_action_is_consumed_by_the_reopen_branch() {
+        let mut game = make_game();
+        game.turn_mode = TurnMode::KickoffReturn;
+        game.acting_player.has_acted = false;
+        let mut step = StepKickoffReturn::new();
+        step.end_player_action = true;
+
+        let first = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(first.action, StepAction::Repeat, "the window re-opens Select once");
+        assert_eq!(first.pushes.len(), 1, "exactly one Select sequence pushed");
+        assert!(!step.end_player_action, "the branch must consume the flag");
+
+        // Second visit, nothing republished: the re-open branch must NOT fire again.
+        let second = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(second.action, StepAction::NextStep, "no second re-open");
+        assert!(second.pushes.is_empty(), "sticky flag would push Select forever");
+    }
 }

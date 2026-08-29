@@ -1134,3 +1134,65 @@ the `KICKOFF_RETURN` arm, and which of its branches runs first.
 
 **Gate:** unchanged by construction — bb2016 100/100, bb2020 60/100, bb2025 55/100, seeds 1-20
 re-measured 20/10/11, `cargo test -p ffb-engine` 7349/0.
+
+## ITER21 — the kickoff-return window is PLAYED, not answered away (+4 bb2020, +5 bb2025)
+
+**Structural iteration** (the `amz-iter.md` exception): the change was specified in ITER20's
+next-step, so it was implemented as one whole path and judged on the full standing gate rather than
+reverted on an intermediate probe.
+
+ITER20 left two facts that looked contradictory. Java RECORDS an activation inside the
+kickoff-return window (bb2020 seed 1 step 142, `Activate(Away6, MOVE)` with the state string in
+`KICKOFF_RETURN` mode), yet letting Rust's agent activate inside the window livelocked the driver.
+Both are true, and the rule that reconciles them is in `ParityRunner`'s INIT_SELECTING **phase 2**,
+not in its `KICKOFF_RETURN` arm:
+
+```java
+if (tier <= 2 || game.getTurnMode() != TurnMode.REGULAR) {
+    justDeselected = true;
+    MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));
+} else { sendConcreteAction(game, gameState); }
+```
+
+A non-REGULAR window therefore plays exactly **one** activation and then deselects, and the
+`justDeselected` latch makes the next phase-1 visit end the turn. That is the terminating behaviour
+ITER20 could not find — and it lives on the harness side of the loop, which is why looking at the
+step kept coming up empty.
+
+Rust had **half** of it. `handle_move` deselected, but only in `PassBlock` mode and without ever
+setting `just_deselected`. Three coordinated changes:
+
+1. **`heuristic_agent.rs`** — the phase-2 deselect now covers every non-REGULAR mode
+   (`turn_mode != Regular`, not `== PassBlock`) and latches `self.just_deselected = true`.
+2. **`heuristic_agent.rs` / `random_agent.rs`** — the `KickoffReturn -> EndTurn` answers are gone
+   from both agents. The window plays its one activation, as Java does. `FFB_KRLOOP` survives as a
+   probe only.
+3. **`step_kickoff_return.rs`** — and this was the actual livelock. Java's `fEndPlayerAction` is
+   re-supplied by each `END_PLAYER_ACTION` publish; the port stores it in a field that
+   `consumes_parameter` fills, so it stayed SET after being acted on. The re-open branch
+   (`end_player_action && !hasActed && !end_turn`) therefore fired on **every** re-entry with no
+   agent involvement at all — twenty stack entries per cycle, no dice rolled, forever. Clearing the
+   flag as the branch consumes it is what Java gets for free by only ever seeing it on the publish
+   that carried it. Regression test `end_player_action_is_consumed_by_the_reopen_branch` pins it:
+   first visit re-opens Select once, second visit with nothing republished must not push again.
+
+The lesson generalises past this step. **A Java field re-supplied per publish is not the same as a
+Rust field filled by `consumes_parameter`** — the first is edge-triggered, the second is level-held,
+and a branch that reads it as a one-shot will re-fire forever. Worth grepping for elsewhere.
+
+**Gate — full standing gate, all green:**
+
+| | ITER20 | ITER21 |
+|---|---|---|
+| bb2016 amazon | 100/100 | **100/100** |
+| bb2020 amazon | 60/100 | **64/100** |
+| bb2025 amazon | 55/100 | **60/100** |
+| lineman heuristic 1.0, x3 editions | 100/100 | **100/100** |
+| `--agent random`, amazon + lineman x3 | 100/100 | **100/100 (all six)** |
+| `cargo test -p ffb-engine` | 7349/0 | **7350/0** |
+
+**Next:** the window is live but not yet identical. Re-classify the remaining bb2020/bb2025 reds
+with `classify.sh` — the WINDOW family should have shrunk sharply, and whatever now dominates
+(LIST or DRAWS) is the next frontier. The known LIST candidate is still the heuristic's own
+eligible-list mirror: Java freezes `eligibleThisTurn = computeEligiblePlayers(game)` for the whole
+turn while Rust reads the engine's live list every activation.

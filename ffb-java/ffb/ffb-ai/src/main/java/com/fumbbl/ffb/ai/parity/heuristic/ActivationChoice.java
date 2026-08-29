@@ -401,6 +401,11 @@ public final class ActivationChoice {
             }
             System.err.println("JSUM k=" + PROBE_ACT + " n=" + out.size()
                 + " draws=" + sampler.drawCount() + sb);
+            StringBuilder eb = new StringBuilder();
+            for (Eligible e : eligible) {
+                eb.append(' ').append(e.id).append(':').append(String.join("|", e.actions));
+            }
+            System.err.println("JELIG k=" + PROBE_ACT + " turn=" + turnNr + eb);
         }
         String probeWant = System.getenv("FFB_CAND");
         if (probeWant != null && Integer.parseInt(probeWant) == PROBE_ACT) {

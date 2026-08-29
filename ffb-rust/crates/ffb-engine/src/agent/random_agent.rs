@@ -341,15 +341,6 @@ impl Agent for RandomAgent {
                 if turn_nr < 1 {
                     return Action::EndTurn;
                 }
-                // The kickoff-return window is ANSWERED, not played. Java's harness has a
-                // `case KICKOFF_RETURN: inject(ClientCommandEndTurn)` arm, and letting the agent
-                // activate inside the window instead LIVELOCKS the driver (measured: a bb2020
-                // 20-seed run never terminated). Java does record one activation inside the window
-                // on some seeds, so this is not yet the whole truth -- see
-                // docs/PARITY_AMAZON_CAMPAIGN.md ITER19.
-                if gs.game.turn_mode == ffb_model::enums::TurnMode::KickoffReturn {
-                    return Action::EndTurn;
-                }
                 let turn_key = (gs.game.half, turn_nr, gs.game.home_playing);
                 if self.last_turn_key != Some(turn_key) {
                     self.last_turn_key = Some(turn_key);

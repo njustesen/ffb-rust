@@ -1975,7 +1975,20 @@ impl HeuristicAgent {
         // names amazon seeds 8/11, where the On-the-Ball defender stays put in Java); the
         // heuristic knew nothing about pass-block windows at all, which is exactly the roster
         // where they fire: On the Ball is the Amazon Thrower's skill in bb2020 and bb2025.
-        if g.turn_mode == ffb_model::enums::TurnMode::PassBlock {
+        // Java `ParityRunner` INIT_SELECTING **phase 2**:
+        //
+        //   if (tier <= 2 || game.getTurnMode() != TurnMode.REGULAR) {
+        //       justDeselected = true;
+        //       inject(new ClientCommandActingPlayer(null, null, false));   // deselect
+        //   } else { sendConcreteAction(...); }
+        //
+        // So a non-REGULAR window records exactly ONE activation and then deselects, and the
+        // `justDeselected` latch makes the NEXT phase-1 visit end the turn. Rust deselected but
+        // never latched, which is what made the kickoff-return window livelock: the step re-opens
+        // its Select sequence for a mover deselected without acting, the agent activated someone
+        // else, and the stack grew forever (ITER20: stack_len 24,429,194 and climbing).
+        if g.turn_mode != ffb_model::enums::TurnMode::Regular {
+            self.just_deselected = true;
             return Action::EndPlayerAction;
         }
         // The whole state machine lives in `replay_plan`, so it can be pinned against the Java
@@ -2131,16 +2144,16 @@ impl HeuristicAgent {
         // livelocks the driver (measured -- a bb2020 20-seed run never terminated). Java does
         // record one activation inside the window on some seeds, so this is not the whole truth
         // yet; see docs/PARITY_AMAZON_CAMPAIGN.md ITER19.
-        if g.turn_mode == ffb_model::enums::TurnMode::KickoffReturn {
-            if std::env::var_os("FFB_KRLOOP").is_some() {
-                eprintln!(
-                    "KRACT mode=KickoffReturn used={} elig={} just_desel={} turn={}",
-                    self.used_this_turn.len(), eligible.len(), self.just_deselected, turn_nr
-                );
-            }
-            if std::env::var_os("FFB_KRPLAY").is_none() {
-                return Action::EndTurn;
-            }
+        // The window is PLAYED, not answered away: Java records one activation inside it (bb2020
+        // seed 1 step 142, `Activate(Away6, MOVE)` in KICKOFF_RETURN mode). The phase-2 deselect
+        // above plus its `just_deselected` latch is what ends it after that one pick.
+        if std::env::var_os("FFB_KRLOOP").is_some()
+            && g.turn_mode == ffb_model::enums::TurnMode::KickoffReturn
+        {
+            eprintln!(
+                "KRACT used={} elig={} just_desel={} turn={}",
+                self.used_this_turn.len(), eligible.len(), self.just_deselected, turn_nr
+            );
         }
         // NOTE: Java freezes the eligible list for the whole turn
         // (`eligibleThisTurn = computeEligiblePlayers(game)`) while this reads the engine's live
@@ -2507,16 +2520,16 @@ impl HeuristicAgent {
         // livelocks the driver (measured -- a bb2020 20-seed run never terminated). Java does
         // record one activation inside the window on some seeds, so this is not the whole truth
         // yet; see docs/PARITY_AMAZON_CAMPAIGN.md ITER19.
-        if g.turn_mode == ffb_model::enums::TurnMode::KickoffReturn {
-            if std::env::var_os("FFB_KRLOOP").is_some() {
-                eprintln!(
-                    "KRACT mode=KickoffReturn used={} elig={} just_desel={} turn={}",
-                    self.used_this_turn.len(), eligible.len(), self.just_deselected, turn_nr
-                );
-            }
-            if std::env::var_os("FFB_KRPLAY").is_none() {
-                return Action::EndTurn;
-            }
+        // The window is PLAYED, not answered away: Java records one activation inside it (bb2020
+        // seed 1 step 142, `Activate(Away6, MOVE)` in KICKOFF_RETURN mode). The phase-2 deselect
+        // above plus its `just_deselected` latch is what ends it after that one pick.
+        if std::env::var_os("FFB_KRLOOP").is_some()
+            && g.turn_mode == ffb_model::enums::TurnMode::KickoffReturn
+        {
+            eprintln!(
+                "KRACT used={} elig={} just_desel={} turn={}",
+                self.used_this_turn.len(), eligible.len(), self.just_deselected, turn_nr
+            );
         }
         self.refresh_turn(g);
         if g.turn_mode != ffb_model::enums::TurnMode::Regular && !self.used_this_turn.is_empty() {
