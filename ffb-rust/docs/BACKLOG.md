@@ -3880,3 +3880,45 @@ It is not fixed because adding the guard to `legal_activate_player_actions` woul
 eligible list, and the random contract's `idx % N` alignment depends on inactive players staying IN
 that list and being rejected at pick time. Fixing it properly means changing both agents' contracts
 together, with the random gate re-measured.
+
+## E. Deferred from the amazon heuristic campaign (2026-08-30, ITER29)
+
+Same defect classes as the fixes that closed the campaign; none is reachable from an amazon roster,
+so each is a unit for a roster that reaches it. Do them as UNITS (all sites of one class together,
+one gate), not one site at a time.
+
+### E1. Remaining bare `acting_player.has_acted` readers
+
+Java's `hasActed()` is derived (`ActingPlayer::acted()` in Rust). Bare readers left:
+`bb2020/gaze/step_select_gaze_target.rs:208,242` (live for all editions),
+`bb2025/step_auto_gaze_zoat.rs:81`, `bb2020/shared/step_init_feeding.rs:113`,
+`bb2020/step_select_blitz_target.rs:139,172` (dead twin). Tests in those files set `has_acted =
+true` directly; `acted()` ORs the field in, so they keep passing — rewrite them to set `has_moved`.
+
+### E2. Treacherous: `hasActedIgnoringNegativeTraits() || justStoodUp()`
+
+`bb2025/step_treacherous.rs:97` (and the bb2020 twin) approximate it as `!has_acted || standing_up`.
+A 1:1 port needs two things Rust lacks: a `SkillId -> is_negative_trait` lookup (the flag lives on
+the `Skill` struct, `model/skill/skill.rs:153`, with no id-keyed accessor) and
+`Constant.MINIMUM_MOVE_TO_STAND_UP` (= 3). `justStoodUp()` also reads Jump Up's used bit and
+`isBlockAction()`.
+
+### E3. Raw `acting_player.player_id = None` where Java calls `changeActingPlayer(null)`
+
+30 sites (`grep -rn "acting_player.player_id = None" crates/ffb-engine/src`). The 1:1 port is
+`util_server_steps::change_player_action_to_none`. Keep the raw clear ONLY where Java is genuinely
+`setPlayerId(null)` — `StepPassBlock` documents one such site. Audit each against its Java line.
+
+### E4. Player-only `used_skills.insert(SkillId::X)` where Java is `actingPlayer.markSkillUsed`
+
+The five star-special copies are fixed (`util_server_steps::mark_skill_used`). The sweep in ITER29
+found ~15 more Player-only inserts (Dodge/Catch re-roll sites in `abstract_step_with_re_roll.rs`,
+`step_dauntless.rs`, `step_diving_tackle.rs`, `step_bombardier.rs`, `step_jump_up.rs`, bb2016
+`step_hypnotic_gaze.rs`/`step_blood_lust.rs`/`step_always_hungry.rs`). Each needs its Java line
+read: some are `player.markUsed` (correct as is), some are `actingPlayer.markSkillUsed`.
+
+### E5. `t3_checklist` counts `GFI rolls`/`touchdowns` as BLOCKED
+
+The checklist note says both harnesses move one square per activation; the heuristic agent moves
+~4.3 and rolls GFIs, so the items should be REQUIRED for heuristic runs and the note retired.
+Measurement code, so it was not touched during the campaign.

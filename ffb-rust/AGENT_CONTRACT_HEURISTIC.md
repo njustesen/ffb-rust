@@ -255,3 +255,42 @@ The reachable `UniformAgent` fallback surface is six branches: `ApothecaryChoice
 `ArgueTheCall` needs a **scored always-argue arm** rather than the fallback's coin flip:
 `AGENT_CONTRACT.md` §7 records that `ParityRunner` cannot decline cleanly, because clearing that
 dialog loops the server on Sent-Off ejections.
+
+## 10. The turn loop — harness rules both agents inherit
+
+The heuristic replaced `RandomAgent`'s pick loop wholesale, but the loop it sits in is
+`ParityRunner`'s, and three of that loop's rules are part of the contract. Each was rediscovered the
+hard way during the amazon campaign (`docs/PARITY_AMAZON_CAMPAIGN.md`, ITER19–29).
+
+**Phase 1 / phase 2.** At `INIT_SELECTING` with no acting player (phase 1) the harness picks a
+player and injects `CLIENT_ACTING_PLAYER`. On the NEXT iteration, with the acting player set
+(phase 2):
+
+```java
+if (tier <= 2 || game.getTurnMode() != TurnMode.REGULAR) {
+    justDeselected = true;
+    inject(new ClientCommandActingPlayer(null, null, false));   // deselect, no move
+} else { sendConcreteAction(game, gameState); }
+```
+
+Rust's prompt model merges the two Java commands into `ActivatePlayer` + `Move`, so phase 2 is
+answered at the **Move prompt**: in any non-REGULAR turn mode (`PassBlock`, `KickoffReturn`,
+kickoff `Blitz`, …) the agent returns `EndPlayerAction` and sets `just_deselected`. The window's
+one activation is recorded and never moves. It is `!= Regular`, not `== PassBlock`.
+
+**The latch.** `justDeselected` ends the next phase-1 visit's turn (`if (remaining.isEmpty() ||
+justDeselected) { justDeselected = false; usedThisTurn.clear(); EndTurn }`) — so the original
+team's turn ends right after its window closes. Both agents carry the flag with the same name.
+
+**One activation per window.** `if (mode != REGULAR && !usedThisTurn.isEmpty()) { justDeselected =
+true; EndTurn }` — checked BEFORE the pick. Together with phase 2 this is what closes a window:
+pick → deselect → EndTurn.
+
+**Live, filtered eligibility.** The heuristic branch recomputes `computeEligiblePlayers(game)` at
+every activation (it does NOT reuse the random path's turn-start `eligibleThisTurn`) and runs
+`filterStaleActions` over the result (`agent::filter_stale_actions` in Rust). Both halves, or the
+positional action pick reads a different list.
+
+**`PlayerChoice` and the long tail** are delegated to the embedded `RandomAgent`, whose arms are
+coordinate-sorted or `actionRng`-picked to match `ParityRunner`'s handlers; the heuristic must not
+grow its own arm for a prompt the harness answers by contract.

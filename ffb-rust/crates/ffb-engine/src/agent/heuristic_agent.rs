@@ -3692,6 +3692,11 @@ impl HeuristicAgent {
                     0.0,
                 );
                 let i = self.sample(0.20);
+                if std::env::var_os("FFB_DRAWS").is_some() {
+                    // `RSKILL`: the ANSWER to a SkillUse prompt (index 0 = use), so the two sides'
+                    // skill decisions can be diffed and not just their draw totals (`JSKILL`).
+                    eprintln!("RSKILL skill={skill_name} w_use={w_use} idx={i} draws={}", self.probe_draws);
+                }
                 self.take(i)
             }
 

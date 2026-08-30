@@ -31,9 +31,12 @@ structurally, not just by generator.
 
 | amazon v amazon, `--heur-classes all`, seeds 1-100 | sampled (1.0) | argmax (0) | uniform (1e6) |
 |---|---|---|---|
-| bb2016 | **100/100** 🏁 | see ITER30 | see ITER30 |
-| bb2020 | **100/100** 🏁 (ITER29) | see ITER30 | see ITER30 |
-| bb2025 | **100/100** 🏁 (ITER29) | see ITER30 | see ITER30 |
+| bb2016 | **100/100** 🏁 | **100/100** | **100/100** |
+| bb2020 | **100/100** 🏁 | **100/100** | **100/100** |
+| bb2025 | **100/100** 🏁 | **100/100** | **100/100** |
+
+**All nine parity gates green (ITER30, 2026-08-30).** Lineman heuristic 100 x3 at scale 0,
+100 x3 at 1.0, 100 x3 at 1e6; `--agent random` both matchups x3 editions 100/100 (all six).
 
 Control: `--agent random` amazon is **100/100 in all three editions**, so the roster itself is
 parity-clean and every red below belongs to the heuristic.
@@ -1672,3 +1675,74 @@ Deferred to BACKLOG: Treacherous's `hasActedIgnoringNegativeTraits() || justStoo
 no `SkillId`→negative-trait lookup and no `MINIMUM_MOVE_TO_STAND_UP`; not on any amazon roster);
 the remaining bare `has_acted` readers (gaze target, auto-gaze Zoat, bb2020 init-feeding) and the
 30 raw `player_id = None` sites — same defect classes, none amazon-live, one unit each.
+
+## ITER30 — the last gate: bb2025 at 1e6, 97 → 100 (Safe Pass is a dialog; a re-roll is spent once) 🏁
+
+With scale 1.0 green everywhere, the six never-run scale gates were measured: eleven of twelve
+(amazon + lineman, 0 and 1e6, three editions) were 100/100 on the ITER29 binary. The one red was
+**bb2025 amazon at 1e6: 97/100** — seeds 26, 40, 89 — all three a Thrower's `PassMove` after which
+Java hands play to the other team and Rust does not.
+
+### Inner loop, seed 26 (diverges at the game's second step)
+
+`FFB_DRAWS` shows Java asking TWO skill dialogs at the pass — `SKILL_USE skill=Pass` then
+`SKILL_USE skill=SafePass` — where Rust asked one. Rust's `SAVED_FUMBLE` arm applied Safe Pass
+**silently**, with the comment "ParityRunner SKILL_USE = always use, 0 rng". That was true of the
+random contract and false of the heuristic, whose Java driver answers the dialog with
+`useSkill("SafePass")` — a 0.50 coin costing two sampler draws — and declines half the time under
+uniform sampling; Java's pass then fumbles and turns over while Rust's thrower kept the ball. Fifth
+instance this campaign of "Rust auto-answers a prompt Java asks" (after ITER1 SkillUse, ITER10 Pass,
+ITER12 Sidestep, ITER15 dodge). Ported 1:1 from Java's `handleSafePass`: `usingSafePass == null` →
+dialog; `false` → `state.setResult(FUMBLE)` (a real fumble, turnover); `true` →
+`actingPlayer.markSkillUsed(safePass)` (through ITER29's shared `mark_skill_used`) + the report.
+Seed 26 passed.
+
+### Inner loop, seeds 40 and 89 — the same answer, a different consequence
+
+Both sides now asked `Pass` then `SafePass` at identical draw totals (247, 249), yet Java turned over
+and Rust played on. The new `RSKILL`/`JSKILL` probes print the ANSWER, not just the total:
+`Pass idx=0` (re-roll) then `SafePass idx=1` (decline) — **identical on both sides**. The divergence
+was downstream, and the extended `RUST_STEPPASS` trace named it:
+
+```
+roll=0 result=None safe=None        rerolled=None/None
+roll=0 result=None safe=None        rerolled=Some("PASS")/Some("Pass")     <- after the re-roll
+roll=0 result=None safe=Some(false) rerolled=Some("PASS")/Some("Pass")     <- after the decline
+```
+
+Java's re-entry block reads `else { roll = 0; setReRollSource(null); }` — one successful re-roll
+SPENDS the source. Rust reset the roll but kept the source, so the Safe Pass re-entry ran the block
+again; and since Java's `useReRoll` for a REGULAR-usage skill is just `hasSkill`, Rust's mirror said
+yes again and rolled the pass a THIRD time — a d6 the Java stream never spent. One line:
+`self.re_roll_source = None;` after a successful use. Both seeds passed.
+
+### The regression the gate caught, and the edition gate
+
+The full gate then read **bb2020 amazon 100 → 94 and bb2020 `--agent random` 100 → 99**. Java
+bb2020's `StepPass` has **no** `handleSafePass` and **no** `setReRollSource(null)`: a saved fumble is
+automatic there (straight to `goToLabelOnSavedFumble`, no dialog, no `markSkillUsed`), and its roll
+section rolls unconditionally on every entry that reaches it, so it needs no clear. The shared Rust
+step (`driver.rs` routes `StepId::Pass` here for every edition) was asking bb2020 a bb2025 question
+— two sampler draws per saved fumble the Java stream never spends. Both behaviours are now gated on
+`game.rules == Rules::Bb2025`, with a bb2020 test written from bb2020's `handleFailedPass`. This is
+the TTM-campaign lesson again: edition-gate inside the shared step, never route to the dead twins.
+
+### Gate — the full standing gate, all editions, both agents, all scales
+
+| | ITER29 | **ITER30** |
+|---|---|---|
+| amazon 1.0 — bb2016 / bb2020 / bb2025 | 100 / 100 / 100 | **100/100 / 100/100 / 100/100** |
+| amazon 0 — bb2016 / bb2020 / bb2025 | (unmeasured) | **100 / 100 / 100** |
+| amazon 1e6 — bb2016 / bb2020 / bb2025 | (unmeasured) | **100 / 100 / 100** |
+| lineman heuristic 1.0 x3 | 100 x3 | **100 / 100 / 100** |
+| lineman heuristic 0 x3 / 1e6 x3 | (unmeasured) | **100 x3 / 100 x3** |
+| `--agent random` amazon + lineman x3 | 100 (all six) | **100/100 (all six)** |
+| `cargo test -p ffb-engine` | 7360/0 | **7365/0** |
+
+**Nine parity gates at 100/100. The parity half of the goal is met in all three rulesets.**
+
+New probes (env-gated, off by default): `RSKILL`/`JSKILL` under `FFB_DRAWS` (the SkillUse answer),
+`result=/safe=/rerolled=` on `RUST_STEPPASS` under `FFB_TRACE`.
+
+**Next:** the coverage harvest (`scripts/harvest_coverage.sh <edition>`, run ALONE, one edition at a
+time) into `docs/EVENT_COVERAGE_<edition>.md`; then the push.

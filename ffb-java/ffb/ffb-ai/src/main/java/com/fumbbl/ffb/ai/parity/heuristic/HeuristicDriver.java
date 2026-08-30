@@ -161,7 +161,13 @@ public final class HeuristicDriver {
         sampler.clear();
         sampler.push(wUse);          // index 0: use it
         sampler.push(1.0f - wUse);   // index 1: decline
-        return sampler.pick(0.20f) == 0;
+        int idx = sampler.pick(0.20f);
+        if (System.getenv("FFB_DRAWS") != null) {
+            // `JSKILL`: mirror of Rust's `RSKILL` -- the answer, not just the draw total.
+            System.err.println("JSKILL skill=" + skillName + " w_use=" + wUse + " idx=" + idx
+                + " draws=" + sampler.drawCount());
+        }
+        return idx == 0;
     }
 
     /**

@@ -196,13 +196,27 @@ impl StepPass {
             if let Some(ref source_name) = self.re_roll_source.clone() {
                 let source = ReRollSource::new(source_name.as_str());
                 if use_reroll(game, &source, &thrower_id, rng) {
-                    // Re-roll consumed — clear stored roll so we re-roll below
+                    // Java: `roll = 0; setReRollSource(null);` -- the source is spent by ONE
+                    // successful use. Without the clear, every later re-entry of this step (the
+                    // Safe Pass answer, a modifying-skill answer) ran this block again, and since
+                    // Java's `useReRoll` for a REGULAR-usage skill is just `hasSkill`, Rust's
+                    // mirror said yes again: the pass was rolled a THIRD time, one d6 the Java
+                    // stream never spent (bb2025 amazon seeds 40/89 at --heur-scale 1e6, where
+                    // Safe Pass is declined half the time and the re-entry actually happens).
                     self.roll = 0;
                     self.pass_result = None;
+                    // This step is dispatched for EVERY edition (`driver.rs` routes `StepId::Pass`
+                    // here), and the editions' Java differs: bb2025's `executeStep` clears the
+                    // source; bb2020's has no such line -- its roll section rolls UNCONDITIONALLY
+                    // on every entry that reaches it, and it never re-enters after a used re-roll
+                    // because it has no Safe Pass dialog to come back from. Gate the clear as Java
+                    // does, or bb2020 stops matching (ITER30: bb2020 amazon 100 -> 94 with the
+                    // ungated bb2025 behaviour).
+                    if game.rules == ffb_model::enums::Rules::Bb2025 {
+                        self.re_roll_source = None;
+                    }
                 }
-                // else: token exhausted → fall through with stored result
             }
-            // source == None (player declined) → fall through with stored result
         }
 
         let is_bomb = matches!(
@@ -256,8 +270,9 @@ impl StepPass {
         };
 
         if std::env::var("FFB_TRACE").is_ok() {
-            eprintln!("RUST_STEPPASS thrower={:?} action={:?} pass_coord={:?} thrower_coord={:?} dist={:?} roll={}",
-                game.thrower_id, game.thrower_action, game.pass_coordinate, thrower_coord, passing_dist, self.roll);
+            eprintln!("RUST_STEPPASS thrower={:?} action={:?} pass_coord={:?} thrower_coord={:?} dist={:?} roll={} result={:?} safe={:?} rerolled={:?}/{:?}",
+                game.thrower_id, game.thrower_action, game.pass_coordinate, thrower_coord, passing_dist, self.roll,
+                self.pass_result, self.using_safe_pass, self.re_rolled_action, self.re_roll_source);
         }
         // Roll if not yet rolled (roll=0 means fresh)
         if self.roll == 0 {
@@ -306,6 +321,15 @@ impl StepPass {
             self.pass_result = Some(result);
         }
 
+        // Java `handleSafePass`: `else if (!usingSafePass) { state.setResult(PassResult.FUMBLE); }`
+        // -- a DECLINED Safe Pass turns the saved fumble into a real one, and the FUMBLE branch of
+        // `handleFailedPass` then runs (ball dropped, scatter, turnover). Rewriting the stored
+        // result here takes exactly that branch below; the roll is kept, and `already_rerolled`
+        // suppresses any second re-roll offer just as Java's `getReRolledAction() != null` does on
+        // its re-entry.
+        if self.pass_result == Some(PassResult::SAVED_FUMBLE) && self.using_safe_pass == Some(false) {
+            self.pass_result = Some(PassResult::FUMBLE);
+        }
         let result = self.pass_result.unwrap();
         let already_rerolled = self.re_rolled_action.is_some();
         // An OUT-OF-RANGE pass (findPassingDistance → None) is never thrown: no accuracy roll (roll=0
@@ -410,9 +434,47 @@ impl StepPass {
                         return out;
                     }
                 }
-                // Java: handleSafePass → usingSafePass dialog (ParityRunner SKILL_USE =
-                // always use, 0 rng) → markSkillUsed(safePass), ball stays with the
-                // thrower, goto goToLabelOnSavedFumble.
+                // Java `handleSafePass`:
+                //
+                //   if (usingSafePass == null) {
+                //       showDialog(new DialogSkillUseParameter(throwerId, safePass, 0, false)); return false;
+                //   } else if (!usingSafePass) { state.setResult(FUMBLE); }          // handled above
+                //   else { actingPlayer.markSkillUsed(safePass); report SAVED_FUMBLE_BALL/BOMB }
+                //
+                // This used to apply Safe Pass SILENTLY ("ParityRunner SKILL_USE = always use, 0
+                // rng") -- true for the RANDOM contract, false for the heuristic, whose Java driver
+                // answers this dialog with `useSkill("SafePass")` (a 0.50 coin, two sampler draws)
+                // and can decline. Under uniform sampling it declines half the time, Java's pass
+                // then fumbles and turns over while Rust's thrower kept the ball (bb2025 amazon
+                // seeds 26/40/89 at --heur-scale 1e6). Fifth instance of the same defect class.
+                //
+                // bb2025 ONLY. Java bb2020's `StepPass.handleFailedPass` has no `handleSafePass`:
+                // a SAVED_FUMBLE goes straight to `goToLabelOnSavedFumble` with `DONT_DROP_FUMBLE
+                // true`, no dialog and no `markSkillUsed`. Asking the bb2020 agents a question
+                // Java bb2020 never asks cost the heuristic two sampler draws per saved fumble
+                // (bb2020 amazon 100 -> 94) and moved the random control too (100 -> 99).
+                if game.rules == ffb_model::enums::Rules::Bb2025 {
+                    if self.using_safe_pass.is_none() {
+                        let mut out = StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
+                            player_id: thrower_id.clone(),
+                            skill_id: ffb_model::enums::SkillId::SafePass as u16,
+                            skill_name: "SafePass".into(),
+                        });
+                        if let Some(ev) = roll_event { out = out.with_event(ev); }
+                        return out;
+                    }
+                    // Java: game.getActingPlayer().markSkillUsed(safePass) -- the ACTING PLAYER's set.
+                    crate::step::util_server_steps::mark_skill_used(
+                        game, &thrower_id, ffb_model::enums::SkillId::SafePass,
+                    );
+                    game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
+                        Some(thrower_id.clone()),
+                        ffb_model::enums::SkillId::SafePass,
+                        true,
+                        if is_bomb { ffb_model::model::skill_use::SkillUse::SAVED_FUMBLE_BOMB }
+                        else { ffb_model::model::skill_use::SkillUse::SAVED_FUMBLE_BALL },
+                    ));
+                }
                 if is_bomb {
                     game.field_model.bomb_coordinate = None;
                     game.field_model.bomb_moving = false;
@@ -599,6 +661,123 @@ mod tests {
         game.field_model.set_player_coordinate("t1", FieldCoordinate::new(1, 7));
         game.pass_coordinate = Some(FieldCoordinate::new(4, 7));
         game
+    }
+
+    /// A thrower with Safe Pass whose pass fumbles: Java's `evaluatePass` yields SAVED_FUMBLE and
+    /// `handleSafePass` shows `DialogSkillUseParameter(thrower, safePass)`. The team has no
+    /// re-rolls and the thrower no Pass skill, so no re-roll offer precedes the dialog.
+    fn safe_pass_fixture() -> (Game, StepPass) {
+        // PA 0 is a hard FUMBLE in the mechanic (no Safe Pass); a natural 1 with PA > 0 and
+        // dontDropFumbles is the SAVED_FUMBLE Java's handleSafePass is about.
+        let mut game = make_game_with_thrower(3);
+        game.team_home.player_mut("t1").unwrap().add_skill(ffb_model::enums::SkillId::SafePass);
+        game.acting_player.set_player("t1".into(), PlayerAction::Pass);
+        let mut step = make_step();
+        step.roll = 1;
+        (game, step)
+    }
+
+    /// Java: `if (usingSafePass == null) { showDialog(...); return false; }` -- a dialog, never an
+    /// automatic use.
+    #[test]
+    fn saved_fumble_asks_the_thrower_about_safe_pass() {
+        let (mut game, mut step) = safe_pass_fixture();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue, "the step waits on the Safe Pass dialog");
+        match out.prompt {
+            Some(ffb_model::prompts::AgentPrompt::SkillUse { skill_name, player_id, .. }) => {
+                assert_eq!(skill_name, "SafePass");
+                assert_eq!(player_id, "t1");
+            }
+            other => panic!("expected a SafePass SkillUse prompt, got {other:?}"),
+        }
+    }
+
+    /// Java: `else if (!usingSafePass) { state.setResult(PassResult.FUMBLE); }` -- the decline is a
+    /// real fumble: PASS_FUMBLE true, DONT_DROP_FUMBLE false, ball at the thrower, turnover path.
+    #[test]
+    fn declining_safe_pass_is_a_real_fumble() {
+        let (mut game, mut step) = safe_pass_fixture();
+        step.start(&mut game, &mut GameRng::new(0));
+        let out = step.handle_command(
+            &Action::UseSkill { skill_id: ffb_model::enums::SkillId::SafePass, use_skill: false },
+            &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassFumble(true))));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DontDropFumble(false))));
+        assert!(game.acting_player.used_skills.is_empty(), "a declined skill is not marked used");
+    }
+
+    /// Java: `else { actingPlayer.markSkillUsed(safePass); ... GOTO goToLabelOnSavedFumble }`.
+    #[test]
+    fn using_safe_pass_saves_the_fumble_and_marks_the_acting_players_skill() {
+        let (mut game, mut step) = safe_pass_fixture();
+        step.start(&mut game, &mut GameRng::new(0));
+        let out = step.handle_command(
+            &Action::UseSkill { skill_id: ffb_model::enums::SkillId::SafePass, use_skill: true },
+            &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(out.goto_label.as_deref(), Some("saved_fumble"));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DontDropFumble(true))));
+        assert!(game.acting_player.used_skills.contains(&ffb_model::enums::SkillId::SafePass),
+                "Java: actingPlayer.markSkillUsed(safePass) -- a term of hasActed()");
+        assert!(game.acting_player.acted());
+    }
+
+    /// Java `executeStep`: `else { roll = 0; setReRollSource(null); }` -- one successful re-roll
+    /// spends the source. A later re-entry (here: the Safe Pass answer) must NOT roll again.
+    #[test]
+    fn a_used_pass_reroll_is_spent_and_a_later_reentry_does_not_roll_again() {
+        let (mut game, mut step) = safe_pass_fixture();
+        game.team_home.player_mut("t1").unwrap().add_skill(ffb_model::enums::SkillId::Pass);
+        let mut rng = GameRng::new(7);
+        // natural 1 -> SAVED_FUMBLE -> the Pass skill is OFFERED first
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::SkillUse { ref skill_name, .. }) if skill_name == "Pass"));
+        // accept: the step re-rolls once and the source is spent
+        let calls_before = rng.call_count;
+        step.handle_command(&Action::UseSkill { skill_id: ffb_model::enums::SkillId::Pass, use_skill: true }, &mut game, &mut rng);
+        assert!(rng.call_count > calls_before, "the accepted re-roll rolls the pass again");
+        assert!(step.re_roll_source.is_none(), "Java: setReRollSource(null) after a successful use");
+        let roll_after_reroll = step.roll;
+        // whatever the re-roll produced, a further re-entry must leave the roll alone
+        let calls_before = rng.call_count;
+        if step.pass_result == Some(PassResult::SAVED_FUMBLE) {
+            step.handle_command(&Action::UseSkill { skill_id: ffb_model::enums::SkillId::SafePass, use_skill: false }, &mut game, &mut rng);
+        } else {
+            step.start(&mut game, &mut rng);
+        }
+        assert_eq!(rng.call_count, calls_before, "a re-entry after the spent re-roll must not roll");
+        assert_eq!(step.roll, roll_after_reroll);
+    }
+
+    /// Java bb2020 `StepPass.handleFailedPass`: a SAVED_FUMBLE has NO dialog -- DONT_DROP_FUMBLE
+    /// true, ball back on the thrower, GOTO goToLabelOnSavedFumble, and no `markSkillUsed`.
+    /// This shared step must not ask bb2020 a bb2025 question.
+    #[test]
+    fn bb2020_saved_fumble_is_automatic_no_dialog() {
+        let mut home = test_team("home", 0);
+        let away = test_team("away", 0);
+        let mut thrower = ffb_model::model::player::Player::default();
+        thrower.id = "t1".into();
+        thrower.passing = 3;
+        thrower.add_skill(ffb_model::enums::SkillId::SafePass);
+        home.players.push(thrower);
+        let mut game = Game::new(home, away, Rules::Bb2020);
+        game.thrower_id = Some("t1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.field_model.set_player_coordinate("t1", FieldCoordinate::new(1, 7));
+        game.pass_coordinate = Some(FieldCoordinate::new(4, 7));
+        game.acting_player.set_player("t1".into(), PlayerAction::Pass);
+        let mut step = make_step();
+        step.roll = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel, "bb2020: straight to the saved-fumble label");
+        assert_eq!(out.goto_label.as_deref(), Some("saved_fumble"));
+        assert!(out.prompt.is_none(), "bb2020 Java shows no Safe Pass dialog");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DontDropFumble(true))));
+        assert!(game.acting_player.used_skills.is_empty(), "bb2020 Java does not markSkillUsed here");
     }
 
     #[test]
