@@ -1989,19 +1989,35 @@ impl HeuristicAgent {
         // names amazon seeds 8/11, where the On-the-Ball defender stays put in Java); the
         // heuristic knew nothing about pass-block windows at all, which is exactly the roster
         // where they fire: On the Ball is the Amazon Thrower's skill in bb2020 and bb2025.
-        // Java `ParityRunner` INIT_SELECTING **phase 2**:
+        // ...and that is the RANDOM contract. Java's INIT_MOVING arm splits on which agent is
+        // driving, and the HEURISTIC half has no mode gate whatsoever:
         //
-        //   if (tier <= 2 || game.getTurnMode() != TurnMode.REGULAR) {
-        //       justDeselected = true;
-        //       inject(new ClientCommandActingPlayer(null, null, false));   // deselect
-        //   } else { sendConcreteAction(...); }
+        //   if (activation != null && imAp != null && imAp.getPlayerId() != null) {
+        //       sendMoveAction(game, gameState, imAp.getPlayerId());
+        //       break;
+        //   }
+        //   inject(new ClientCommandActingPlayer(null, null, false));   // random path only
         //
-        // So a non-REGULAR window records exactly ONE activation and then deselects, and the
-        // `justDeselected` latch makes the NEXT phase-1 visit end the turn. Rust deselected but
-        // never latched, which is what made the kickoff-return window livelock: the step re-opens
-        // its Select sequence for a mover deselected without acting, the agent activated someone
-        // else, and the stack grew forever (ITER20: stack_len 24,429,194 and climbing).
-        if g.turn_mode != ffb_model::enums::TurnMode::Regular {
+        // So the window's one activation MOVES, in every turn mode; the deselect that closes the
+        // window is `ParityRunner`'s INIT_SELECTING phase 2, a different prompt, and Rust answers
+        // its equivalent in `handle_activate` (the `turn_mode != Regular && !used_this_turn`
+        // exit, which sets the same latch).
+        //
+        // ITER21 put the phase-2 rule HERE, one prompt too early, and it suppressed the move
+        // itself. That is what kept the kickoff-return window open: a mover that never moves
+        // leaves `acting_player.has_acted` false, which is precisely the condition
+        // `StepKickoffReturn`'s re-open branch tests, so the step pushed another Select and the
+        // window caught a player of the OTHER team (bb2025 seed 46: `home_06` prompted while the
+        // mode was still KickoffReturn, answered EndPlayerAction, and reached a state Java --
+        // which had closed the window and moved him -- did not).
+        //
+        // PASS_BLOCK is the exception, and it is an ENGINE-FLOW exception rather than an agent
+        // rule: for a pass-block mover the Java engine never re-presents INIT_SELECTING phase 2,
+        // so the mover activates and never moves (the amazon On-the-Ball defender who stays put
+        // in Java on seeds 8/11). Dropping the deselect for PASS_BLOCK too costs 10 of 20 bb2020
+        // seeds and 15 of 20 bb2025 seeds, so the mode gate is real -- it is just PASS_BLOCK, not
+        // "not REGULAR". The latch stays, because phase 2 sets it wherever it fires.
+        if g.turn_mode == ffb_model::enums::TurnMode::PassBlock {
             self.just_deselected = true;
             return Action::EndPlayerAction;
         }
@@ -3369,6 +3385,26 @@ impl HeuristicAgent {
         prompt: AgentPrompt,
     ) -> Action {
         match prompt {
+            AgentPrompt::Move { ref player_id, ref squares } if std::env::var_os("FFB_MOVEP").is_some() => {
+                // `FFB_MOVEP`: what the agent is OFFERED and what it answers at every move prompt.
+                // The amazon reds bottom out in an activation that declares the same action from
+                // the same state and reaches a different state with no dice rolled, which can only
+                // be the submitted path (`JMOVEP` is the Java mirror).
+                let at = g.field_model.player_coordinate(player_id).map(|c| (c.x, c.y));
+                let offered: Vec<String> =
+                    squares.iter().map(|c| format!("{},{}", c.x, c.y)).collect();
+                let pid = player_id.clone();
+                let sq = squares.clone();
+                let a = match self.mode {
+                    Mode::Deep => self.handle_move_deep(&gs.game, &f, pid, sq),
+                    _ => self.handle_move(&gs.game, &f, pid, sq),
+                };
+                eprintln!(
+                    "RMOVEP k={} pid={} at={:?} n={} offered=[{}] ans={:?}",
+                    self.probe_act, player_id, at, squares.len(), offered.join(" "), a
+                );
+                a
+            }
             AgentPrompt::Move { player_id, squares } => match self.mode {
                 Mode::Wide | Mode::WideNoBall | Mode::WideNoPass | Mode::WideNoHandOff => self.handle_move(g, f, player_id, squares),
                 Mode::Deep => self.handle_move_deep(g, f, player_id, squares),

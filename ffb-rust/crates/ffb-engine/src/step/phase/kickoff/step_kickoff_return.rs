@@ -111,8 +111,15 @@ impl StepKickoffReturn {
                 // without bound (ITER20). Clear it here, as Java effectively does by only ever
                 // seeing it on the publish that carried it.
                 self.end_player_action = false;
-                // Java: getGameState().pushCurrentStepOnStack() + Select.pushSequence
-                return StepOutcome::repeat().push_seq(select_sequence());
+                // Java: `getGameState().pushCurrentStepOnStack()` + `Select.pushSequence(...)` --
+                // the IDENTICAL idiom the window-open branch below uses, and which that branch
+                // already translates as `push_self`, with a comment saying why: the step must
+                // resume BELOW the pushed sequence, because `repeat` re-runs it immediately and
+                // the Select sequence never gets control. The same two Java lines were translated
+                // two different ways in one file. With `repeat` the window never closes, so the
+                // re-opened Select prompts a player of the OTHER team while the mode is still
+                // KickoffReturn (bb2025 seed 46, `home_06`).
+                return StepOutcome::cont().push_self().push_seq(select_sequence());
             } else if self.end_player_action || self.end_turn {
                 // Java: UtilServerSteps.changePlayerAction(this, null, null, false)
                 game.acting_player.player_id = None;
@@ -306,7 +313,12 @@ mod tests {
         step.end_player_action = true;
 
         let first = step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(first.action, StepAction::Repeat, "the window re-opens Select once");
+        // Java is `pushCurrentStepOnStack()` + `Select.pushSequence(...)`: the step is re-pushed
+        // BELOW the new sequence and resumes after it, which is `cont().push_self()`. Written as
+        // `repeat()` (as this test originally asserted) the step re-runs immediately, the Select
+        // sequence never gets control, and the window never closes -- ITER25.
+        assert_eq!(first.action, StepAction::Continue, "the step waits below the pushed sequence");
+        assert!(first.push_self, "Java re-pushes the current step");
         assert_eq!(first.pushes.len(), 1, "exactly one Select sequence pushed");
         assert!(!step.end_player_action, "the branch must consume the flag");
 

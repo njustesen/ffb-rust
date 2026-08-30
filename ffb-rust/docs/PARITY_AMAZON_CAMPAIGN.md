@@ -1387,3 +1387,73 @@ runtime kickoff sequences).
 turn. Compare the Java server's step sequence over the same interval against the `FFB_DRIVE_TRACE`
 above; the first step that appears in one and not the other is the answer. Do NOT reason from the
 sequence tables — ITER19 already showed those are edition-defaulted and only the live path counts.
+
+## ITER25/26 — the kickoff-return window, closed at last (+11 bb2020, +7 bb2025)
+
+**One structural iteration, two halves, gated together** — neither works alone, and one of them
+measures WORSE alone, which is why they are one entry.
+
+ITER24 ended pointing at the turn boundary. That was the symptom. Chasing seed 46 down to the step
+level found the cause one layer lower: at `i=33` both engines declare `home_06 Move` from an
+IDENTICAL pre-state with no dice, and reach different states. The new `FFB_MOVEP` probe says why —
+`RMOVEP k=34 pid=home_06 ans=EndPlayerAction`. A HOME player is being prompted while Rust still
+reports `mode=KickoffReturn`, and ITER21's rule answers him with a deselect.
+
+### Half 1 (agent) — the deselect is PASS_BLOCK's rule, not "not REGULAR"
+
+Java's `INIT_MOVING` arm splits on which agent is driving, and the heuristic half has no mode gate:
+
+```java
+if (activation != null && imAp != null && imAp.getPlayerId() != null) {
+    sendMoveAction(game, gameState, imAp.getPlayerId());   // MOVES, in every turn mode
+    break;
+}
+inject(new ClientCommandActingPlayer(null, null, false));  // random path only
+```
+
+ITER21 generalised the pass-block deselect to every non-REGULAR mode. Removing it entirely is far
+worse (bb2020 13 -> 3, bb2025 18 -> 3 of 20): PASS_BLOCK genuinely needs it, because for a
+pass-block mover the Java ENGINE never re-presents INIT_SELECTING phase 2. So the gate is real and
+it is `== PassBlock`, not `!= Regular`. **On its own this half measures 100 / 69 / 77 against a
+100 / 70 / 77 baseline** — neutral to slightly negative, and it would have been reverted as a
+failure if it had been gated by itself.
+
+### Half 2 (engine) — the same two Java lines, translated two different ways in one file
+
+`StepKickoffReturn` uses `pushCurrentStepOnStack() + Select.pushSequence(...)` in BOTH its
+window-open and window-re-open branches. Rust translated the open branch as `push_self`, with a
+comment spelling out why:
+
+> That is `push_self`, NOT `repeat`: the step must resume BELOW the pushed sequence, once it
+> finishes. `repeat` re-runs the step immediately instead, so the Select sequence never gets
+> control and the window never closes.
+
+and translated the re-open branch, the identical idiom, as `repeat()`. The file contradicted
+itself, and the comment on the correct half described the bug in the other half exactly. With
+`repeat` the window never closes, so the re-opened Select prompts a player of the OTHER team while
+the mode is still KickoffReturn — which is what half 1 was then mis-answering.
+
+**Together: 20 / 16 / 20 on seeds 1-20** (from 20 / 13 / 18), and on the full gate:
+
+| | ITER23/24 | ITER25/26 |
+|---|---|---|
+| bb2016 amazon | 100/100 | **100/100** |
+| bb2020 amazon | 70/100 | **81/100** |
+| bb2025 amazon | 77/100 | **84/100** |
+| lineman heuristic 1.0, x3 editions | 100/100 | **100/100** |
+| `cargo test -p ffb-engine` | 7354/0 | **7354/0** |
+
+**Lesson — a test written from the Rust side inherits the Rust side's bugs.** ITER21's own
+regression test asserted `StepAction::Repeat` for this branch: it pinned the mistranslation as if
+it were the contract, and had to be rewritten to assert `Continue + push_self`. That is the SIXTH
+test this campaign to encode the defect rather than the rule (ITER6, ITER10 x2, ITER12, ITER23 x3
+counted as one, and now ITER21's). The common thread is that each was written by reading Rust and
+asking "what does this do?" instead of reading Java and asking "what must this do?".
+
+**Second lesson — gate coupled changes together.** Half 1 alone is a regression; half 2 needs
+half 1 to be visible at all. The structural-iteration rule in `amz-iter.md` exists for exactly
+this, and a strict revert-if-worse reading would have thrown away an 11-seed gain.
+
+**Next:** seed 46 itself still fails, so the window is closed but not yet identical. Re-classify the
+remaining reds — the SIDE family should have shrunk sharply, and whatever now dominates is the next
+frontier.
