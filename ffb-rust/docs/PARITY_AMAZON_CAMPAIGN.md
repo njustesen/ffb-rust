@@ -1457,3 +1457,55 @@ this, and a strict revert-if-worse reading would have thrown away an 11-seed gai
 **Next:** seed 46 itself still fails, so the window is closed but not yet identical. Re-classify the
 remaining reds — the SIDE family should have shrunk sharply, and whatever now dominates is the next
 frontier.
+
+## ITER27 — the frontier is movement, and the classifier is a LAGGING indicator (no seed movement)
+
+**Probe-only** — seeds 1-20 re-measure 20 / 16 / 20, identical to ITER26; `cargo test -p ffb-engine`
+7354/0.
+
+Re-classifying the 16 remaining bb2025 reds after ITER25/26: **15 LIST, 1 SIDE**, every one with
+`dd=0`, against 17 SIDE before. The SIDE and DRAWS families are gone; the whole frontier is
+candidate-list size, and the seed-33 evidence says that means MOVEMENT.
+
+### The classifier is a lagging indicator, and seed 33 proves it
+
+Seed 33 at k=131 looked like a textbook LIST case: identical eligible lists, identical side, turn
+and draws, and only three per-declaration counts differing by one (`Away1/Move` 197 vs 196,
+`Away3` 229 vs 228, `Away4` 229 vs 230). Adding `dest` to `RCAND`/`JCAND` narrowed it to a SINGLE
+square — cell 269 = (9,10) — reachable in Java for all three movers and unreachable in Rust.
+
+That looked like a `Reach` bug. It is not. A new `RPOS` dump shows 22 on-pitch players, all
+rostered, and **`home_06` standing on (9,10) in Rust** — so Java simply has him somewhere else. The
+boards had already diverged; `Features.occupied` was reporting the truth about two different games.
+
+`classify.sh` only notices a divergence once it changes a candidate-list SIZE, which can be dozens
+of activations after the state actually drifts. `scripts/first_state_divergence.sh` is the leading
+indicator: it reads the recorded jsonl and reports the first per-step state-hash mismatch. On seed
+33 that is index 115 — sixteen activations earlier than the classifier's k=131.
+
+**Use `first_state_divergence.sh` FIRST from now on, and `classify.sh` only to bucket a family.**
+
+### What the first divergence actually is
+
+Seed 33 index 115 has the same shape as seed 46: a one-activation away window inside home's turn 5,
+then `home_06 Move` — declaration identical on both sides, no dice, different resulting state. The
+window itself now agrees exactly (`RET`/`JET` both close on home t5 and consume the latch on home
+t6), so ITER25/26 did its job; the residual is the MOVE.
+
+New `RMOVEP`/`JMOVEP` probes log every move prompt with what was offered and what was answered.
+Aligning them one-for-one (which needed probes on Java's `FIRE_TERMINAL` and `END_PLAYER_ACTION`
+branches too, or the sequences silently drop entries) gives a first mismatch at prompt #7:
+
+```
+R ('H2', (12, 6), 'TERMINAL:Block')
+J ('H2', (12, 6), 'PATH:12,7 13,6')
+```
+
+Same player, same square, and Rust fires the block terminal where Java delivers a two-square
+approach first. That is the two-leg blitz plan, and it is the next fix.
+
+**Method note.** Two of this iteration's readings were wrong before they were right: the destination
+diff first came out empty because Rust prints `Some(n)`/`away_01` where Java prints `n`/`Away1`, and
+the move-prompt comparison first reported a bogus "extra prompt" because `Pass { coord: ... }` was
+parsed as a path. Both were parser bugs in the analysis, not engine findings. A comparison tool that
+has never been shown to produce a KNOWN result is not evidence.

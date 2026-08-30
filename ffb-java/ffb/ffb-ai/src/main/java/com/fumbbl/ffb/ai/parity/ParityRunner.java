@@ -3142,10 +3142,12 @@ public class ParityRunner {
                     path = activation.takePath();
                     break;
                 case FIRE_TERMINAL:
+                    probeMoveVerdict(playerId, coord, "FIRE_TERMINAL", targets);
                     activation.markFired();
                     sendPlanTerminal(game, gameState, playerId);
                     return;
                 case END_PLAYER_ACTION:
+                    probeMoveVerdict(playerId, coord, "EndPlayerAction", targets);
                     MatchRunner.inject(gameState,
                         new ClientCommandActingPlayer(null, null, false));
                     return;
@@ -3154,9 +3156,11 @@ public class ParityRunner {
                     break;
             }
             if (path.isEmpty()) {
+                probeMovePath(playerId, coord, null, targets);
                 MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));
                 return;
             }
+            probeMovePath(playerId, coord, path, targets);
             sendPath(game, gameState, playerId, coord, path);
             return;
         }
@@ -3286,6 +3290,36 @@ public class ParityRunner {
             + " turn=" + t + " side=" + (game.isHomePlaying() ? "home" : "away")
             + " mode=" + game.getTurnMode() + " why=" + why
             + " used=" + usedThisTurn.size() + " latch=" + justDeselected);
+    }
+
+    /** Companion to {@link #probeMovePath}: the non-path verdicts, so the two sides' move-prompt
+     * sequences line up one-for-one instead of silently dropping entries. */
+    private void probeMoveVerdict(String pid, FieldCoordinate at, String verdict,
+            List<FieldCoordinate> targets) {
+        if (System.getenv("FFB_MOVEP") == null) return;
+        System.err.println("JMOVEP k=" + (com.fumbbl.ffb.ai.parity.heuristic.ActivationChoice.PROBE_ACT)
+            + " pid=" + pid + " at=" + at.getX() + "," + at.getY()
+            + " n=" + targets.size() + " offered=[]" + " ans=" + verdict);
+    }
+
+    /** `FFB_MOVEP` mirror of Rust's `RMOVEP`: what the mover is offered and the path it answers. */
+    private void probeMovePath(String pid, FieldCoordinate at, List<FieldCoordinate> path,
+            List<FieldCoordinate> targets) {
+        if (System.getenv("FFB_MOVEP") == null) return;
+        StringBuilder off = new StringBuilder();
+        for (FieldCoordinate c : targets) {
+            off.append(off.length() == 0 ? "" : " ").append(c.getX()).append(',').append(c.getY());
+        }
+        StringBuilder pb = new StringBuilder();
+        if (path != null) {
+            for (FieldCoordinate c : path) {
+                pb.append(pb.length() == 0 ? "" : " ").append(c.getX()).append(',').append(c.getY());
+            }
+        }
+        System.err.println("JMOVEP k=" + (com.fumbbl.ffb.ai.parity.heuristic.ActivationChoice.PROBE_ACT)
+            + " pid=" + pid + " at=" + at.getX() + "," + at.getY()
+            + " n=" + targets.size() + " offered=[" + off + "]"
+            + " ans=" + (path == null ? "EndPlayerAction" : "[" + pb + "]"));
     }
 
     // ── Eligible player computation (mirrors Rust's eligible_players_for_activation) ──

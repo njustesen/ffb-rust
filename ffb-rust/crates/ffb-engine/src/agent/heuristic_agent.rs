@@ -2416,8 +2416,31 @@ impl HeuristicAgent {
             }
             if let Ok(want) = std::env::var("FFB_CAND") {
                 if want.parse::<u32>().ok() == Some(self.probe_act) {
+                    // Every occupancy source Features::build reads, with whether the id is
+                    // actually on a roster. Java's `Features.snapshot` walks the TEAM ROSTERS and
+                    // looks the coordinate up; Rust walks `field_model.player_coordinates`. An
+                    // entry in that map for a player no longer on a roster is a phantom occupant
+                    // that only Rust can see.
+                    let mut ids: Vec<(&String, &FieldCoordinate)> =
+                        g.field_model.player_coordinates.iter().collect();
+                    ids.sort_by_key(|(id, _)| (*id).clone());
+                    for (id, c) in ids {
+                        if !on_pitch(c.x, c.y) { continue; }
+                        let roster = g.team_home.has_player(id) || g.team_away.has_player(id);
+                        eprintln!(
+                            "RPOS k={} id={} at={},{} roster={} state={:?}",
+                            self.probe_act, id, c.x, c.y, roster,
+                            g.field_model.player_state(id).map(|s| s.base())
+                        );
+                    }
                     for (pid, acts) in eligible.iter() {
-                        eprintln!("RELIG k={} pid={} actions={:?}", self.probe_act, pid, acts);
+                        eprintln!(
+                            "RELIG k={} pid={} at={:?} ma={:?} actions={:?}",  // (board dump below)
+                            self.probe_act, pid,
+                            g.field_model.player_coordinate(pid).map(|c| (c.x, c.y)),
+                            g.player(pid).map(|p| p.movement),
+                            acts
+                        );
                         // Every adjacent OPPONENT with its coordinate and full state. The foul and
                         // block predicates are pure functions of exactly this, so when the two
                         // agents' action lists disagree while their flags and positions agree, the
@@ -2439,8 +2462,8 @@ impl HeuristicAgent {
                     }
                     for (i, c) in cands.iter().enumerate() {
                         eprintln!(
-                            "RCAND k={} i={} pid={} pac={:?} tgt={:?} w={:08x}",
-                            self.probe_act, i, c.player, c.pac, c.target,
+                            "RCAND k={} i={} pid={} pac={:?} tgt={:?} dest={:?} w={:08x}",
+                            self.probe_act, i, c.player, c.pac, c.target, c.dest,
                             c.weight.to_bits()
                         );
                     }

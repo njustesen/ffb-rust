@@ -411,12 +411,13 @@ public final class ActivationChoice {
         if (probeWant != null && Integer.parseInt(probeWant) == PROBE_ACT) {
             for (Eligible e : eligible) {
                 System.err.println("JELIG k=" + PROBE_ACT + " pid=" + e.id
-                    + " actions=" + e.actions);
+                    + " at=(" + e.at.getX() + ", " + e.at.getY() + ")"
+                    + " ma=" + e.ma + " actions=" + e.actions);
             }
             for (int i = 0; i < out.size(); i++) {
                 PlanBuilder.Candidate c = out.get(i);
                 System.err.println("JCAND k=" + PROBE_ACT + " i=" + i + " pid=" + c.player
-                    + " pac=" + c.pac + " tgt=" + c.target + " w="
+                    + " pac=" + c.pac + " tgt=" + c.target + " dest=" + c.dest + " w="
                     + String.format("%08x", Float.floatToRawIntBits(c.weight)));
             }
         }
