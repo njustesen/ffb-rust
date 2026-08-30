@@ -31,11 +31,14 @@ diagnosis of the 2026-08-30 stall: `C:/Users/Admin/.claude/plans/implement-the-n
 The completed lineman campaign — read it once, it is the playbook:
 `ffb-rust/docs/PARITY_HEURISTIC_CAMPAIGN.md` and `.claude/commands/heur-iter.md`.
 
-## Status (2026-08-30, ITER29/30)
+## Status (2026-08-30, ITER30 — `695cb5936`)
 
-Scale 1.0: **100 / 100 / 100** 🏁🏁🏁. Scale 0: **100 / 100 / 100**. Scale 1e6: see the ledger's
-ITER30 entry. Standing gate all green. The parity frontier is EMPTY; the loop now serves the other
-two halves (agent quality, coverage) and the BACKLOG §E hygiene units.
+**Nine parity gates at 100/100** — bb2016 / bb2020 / bb2025 × scales 0 / 1.0 / 1e6 — plus the nine
+lineman gates and the six random controls. Event coverage harvested and analysed in
+`docs/EVENT_COVERAGE.md` (findings F1–F5: the event stream is mostly blind to skill use; parity is
+the proof; BACKLOG §E6/E7). The parity frontier is EMPTY. Open: the agent-quality half (skill-aware
+scoring for Dodge/Block/Catch/Pass/Safe Pass in the value model and `Reach`, kept simple, goldens
+updated deliberately) and the BACKLOG §E hygiene units. Any new red: `frontier.sh` first.
 
 ## Why amazon, and what is new about it
 

@@ -3922,3 +3922,18 @@ read: some are `player.markUsed` (correct as is), some are `actingPlayer.markSki
 The checklist note says both harnesses move one square per activation; the heuristic agent moves
 ~4.3 and rolls GFIs, so the items should be REQUIRED for heuristic runs and the note retired.
 Measurement code, so it was not touched during the campaign.
+
+### E6. Skill-use, pass-block and re-roll events are mostly unemitted (docs/EVENT_COVERAGE.md F1/F2/F5)
+
+`GameEvent::SkillUse` is raised by three steps (block-result Dodge, Dump Off, Horns); every re-roll
+skill, dialog skill and activation skill is used silently. `passBlock` always carries
+`player_id: null`. No re-roll event type exists. Mirror Java's `ReportSkillUse` / `ReportReRoll`
+sites into the event stream (the report list is already 1:1), and emit the blockers on `passBlock`.
+Until then `harvest_coverage.sh` under-reports skill usage on skilled rosters by an order of
+magnitude; parity, not events, is the proof they run.
+
+### E7. bb2016 move twins emit no `playerMoved` / `goForItRoll` (docs/EVENT_COVERAGE.md F3)
+
+bb2016: 13,104 Move actions, 60 touchdowns, ZERO movement events; bb2020/25 emit ~62k and ~4.8k.
+`step/bb2016/move_/*` (the twins the driver dispatches for bb2016) never emit them. The checklist's
+`GFI rolls 0` for bb2016 is this gap. Add the emits where the bb2025 twins have them.
