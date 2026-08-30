@@ -36,9 +36,11 @@ The completed lineman campaign — read it once, it is the playbook:
 **Nine parity gates at 100/100** — bb2016 / bb2020 / bb2025 × scales 0 / 1.0 / 1e6 — plus the nine
 lineman gates and the six random controls. Event coverage harvested and analysed in
 `docs/EVENT_COVERAGE.md` (findings F1–F5: the event stream is mostly blind to skill use; parity is
-the proof; BACKLOG §E6/E7). The parity frontier is EMPTY. Open: the agent-quality half (skill-aware
-scoring for Dodge/Block/Catch/Pass/Safe Pass in the value model and `Reach`, kept simple, goldens
-updated deliberately) and the BACKLOG §E hygiene units. Any new red: `frontier.sh` first.
+the proof; BACKLOG §E6/E7). The parity frontier is EMPTY. Open: the agent-quality half — `Reach`
+already prices **Dodge** (a tackle-zone exit costs `p_with_reroll`, `heuristic_agent.rs:966`) and the
+block scorer reads the defender's Dodge; what is NOT modelled is Block, Catch, Pass and Safe Pass on
+the rolls the agent already prices — and the BACKLOG §E hygiene units. Any new red: `frontier.sh`
+first.
 
 ## Why amazon, and what is new about it
 

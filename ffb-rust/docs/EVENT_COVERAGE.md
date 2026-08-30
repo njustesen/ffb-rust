@@ -33,7 +33,7 @@ Dodge re-roll, and its outcome is parity-verified.
 
 | skill (who) | exercised | evented | evidence |
 |---|---|---|---|
-| Dodge (everyone, all editions) | yes | **partly** | dodge rolls 913/1001/1078; the re-roll on a failed dodge emits nothing; the Dodge-negates-Defender-Stumbles use IS evented as `skillUse` (304/234/251 = the `PowPushback` counts exactly) |
+| Dodge (everyone, all editions) | yes | **yes, on two events** | dodge rolls 913/1001/1078, of which **322/264/284 carry `rerolled:true`** — the Dodge re-roll is visible on `dodgeRoll`, not as a `skillUse`; the Dodge-negates-Defender-Stumbles use IS evented as `skillUse` (304/234/251 = the `PowPushback` counts exactly). The agent prices Dodge in `Reach` (a tackle-zone exit costs `p_with_reroll`), which is why dodge attempts triple from bb2016 to bb2020/25 |
 | Block (bb2016 Blitzer) | yes | no | 297 `BothDown` results in bb2016; the Block save is not evented |
 | Catch (bb2016 Catcher) | yes | no | 322 catch rolls; the Catch re-roll is not evented |
 | Pass (Thrower, all editions) | yes | no | 219/187/195 pass rolls; the Pass re-roll is a `SkillUse` DIALOG answered by both agents (ITER10, ITER30 `JDRAW skill=Pass`) — no event |
