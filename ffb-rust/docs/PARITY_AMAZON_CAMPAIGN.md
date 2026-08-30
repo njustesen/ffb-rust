@@ -1509,3 +1509,47 @@ diff first came out empty because Rust prints `Some(n)`/`away_01` where Java pri
 the move-prompt comparison first reported a bogus "extra prompt" because `Pass { coord: ... }` was
 parsed as a path. Both were parser bugs in the analysis, not engine findings. A comparison tool that
 has never been shown to produce a KNOWN result is not evidence.
+
+## ITER28 — a correct-looking 1:1 fix, reverted on measurement (no seed movement)
+
+**Reverted. Gate restored to ITER26's 20 / 16 / 20 on seeds 1-20.** Recorded because the finding
+survives the revert and the next iteration starts from it.
+
+`first_state_divergence.sh` put seed 33's first divergence at index 115 -> 116, and the aligned
+`RMOVEP`/`JMOVEP` traces named it exactly:
+
+```
+k=129  R away_08 (7,5) -> [6,4 5,3 4,3 ...]      J away_08 (7,5) -> [6,4 5,3 4,3 ...]   agree
+k=130  R home_06 (5,9) -> [6,9 7,8 8,9 9,10]     J  -- no prompt at all --
+k=131  R away_04 (13,8) -> [14,7 ...]            J away_04 (13,8) -> [14,7 ...]          agree
+```
+
+Rust plays ONE extra activation immediately after the kickoff-return window; Java goes straight on.
+The gate for that extra activation is `StepKickoffReturn`'s re-open branch,
+`end_player_action && !acting_player.has_acted && !end_turn`.
+
+**And `has_acted` is a port artefact.** Java's `ActingPlayer.hasActed()` is DERIVED —
+`hasMoved() || hasFouled() || hasBlocked() || hasPassed() || hasTriggeredEffect ||
+!fUsedSkills.isEmpty() || isForgone()` — and there is no `setHasActed` anywhere in the Java tree.
+Rust stores a bool that a plain move never sets. Worse, `ActingPlayer::acted()` already exists as
+the derived mirror, and its own doc comment says callers mirroring `hasActed()` MUST use it rather
+than the bare field, citing a previous bug of exactly this shape (high_elf seed 31 i=14). This call
+site reads the bare field.
+
+**So the obvious fix is to call `acted()` — and it measures WORSE and does not work.** bb2020
+16 -> 13, bb2025 20 -> 18 of 20, and seed 33's first divergence did not move an inch. The reason is
+that by the time the step re-enters, Rust has ALREADY cleared the acting player, so `acted()` and
+the bare field both read a fresh all-false `ActingPlayer`. The accessor was never the problem.
+
+**The real question is WHEN Rust clears the acting player relative to Java** — Java still has the
+mover in hand when `StepKickoffReturn` evaluates `hasActed()`, and Rust does not. That is where the
+next iteration should start: instrument `changeActingPlayer`/`UtilActingPlayer` on both sides and
+compare the clear against this step's re-entry.
+
+The comment at the call site now records all of this, so the next reader does not re-run the
+experiment.
+
+**Lesson (a second instance of the half-fix pattern).** A change can be a faithful 1:1 port of the
+Java expression, be endorsed by the codebase's own documentation, target a correctly-identified
+divergence — and still be wrong, because the STATE it reads was assembled differently. Port the
+expression AND check the moment it is evaluated.

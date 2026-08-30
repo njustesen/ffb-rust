@@ -101,6 +101,13 @@ impl StepKickoffReturn {
         }
         if game.turn_mode == TurnMode::KickoffReturn {
             // Already inside the kickoff-return mini-turn
+            // NOTE: this reads the BARE `has_acted` field, and `ActingPlayer::acted()` (the
+            // derived mirror of Java's `hasActed()`) is documented as the thing callers must use.
+            // Switching to `acted()` is NOT the fix, though -- measured ITER28: bb2020 16 -> 13,
+            // bb2025 20 -> 18 of 20, and the target divergence did not move. By the time this step
+            // re-enters, Rust has already cleared the acting player, so both the field and the
+            // derived predicate read a fresh all-false ActingPlayer. The real question is WHEN Rust
+            // clears it relative to Java, not which accessor is read here.
             if self.end_player_action && !game.acting_player.has_acted && !self.end_turn {
                 // Java: UtilServerSteps.changePlayerAction(this, null, null, false)
                 game.acting_player.player_id = None;
