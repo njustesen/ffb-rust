@@ -185,6 +185,36 @@ pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerActi
     }
 }
 
+/// Java `ActingPlayer.markSkillUsed(Skill)`:
+///
+/// ```java
+/// fUsedSkills.add(pSkill);                                   // the ACTING PLAYER's set
+/// if (pSkill.getSkillUsageType().isTrackOutsideActivation() && !getPlayer().isUsed(pSkill)) {
+///     getPlayer().markUsed(pSkill, getGame());               // the PLAYER's set, only if tracked
+/// }
+/// ```
+///
+/// The first line is the one that matters for parity: `fUsedSkills` is a term of Java's derived
+/// `hasActed()`, and `hasActed()` is what `changeActingPlayer(null)` reads to decide whether the
+/// player leaves his activation `STANDING + inactive` (used up) or merely `STANDING` (free to be
+/// picked again). Five step-local `mark_skill_used` copies wrote ONLY to `Player.used_skills`, so a
+/// star who spent her activation on a special (Estelle's Baleful Hex, bb2025 amazon seeds 70/97)
+/// came out of the deselect still ACTIVE in Rust and inactive in Java -- one bit of state, and the
+/// whole game downstream of it. `step_then_i_started_blastin.rs` had already fixed its own copy
+/// for the identical reason (chaos_dwarf bb2025 seed 6); the other four had not.
+pub fn mark_skill_used(game: &mut Game, player_id: &str, skill_id: ffb_model::enums::SkillId) {
+    if game.acting_player.player_id.as_deref() == Some(player_id) {
+        game.acting_player.used_skills.insert(skill_id);
+    }
+    if skill_id.usage_type().track_outside_activation() {
+        if let Some(p) = game.team_home.player_mut(player_id)
+            .or_else(|| game.team_away.player_mut(player_id))
+        {
+            p.used_skills.insert(skill_id);
+        }
+    }
+}
+
 /// Java `UtilServerSteps.changePlayerAction(step, null, null, false)` — clear the acting
 /// player. Mirrors `UtilActingPlayer.changeActingPlayer(game, null, null, false)`:
 /// the OLD acting player (if any) leaves its transient MOVING base — a player who has
@@ -552,5 +582,56 @@ mod tests {
         game.field_model.ball_coordinate = Some(ball_pos);
         add_player_to_home(&mut game, "p01", ball_pos, PS_PRONE);
         assert!(!check_touchdown(&game));
+    }
+}
+
+#[cfg(test)]
+mod mark_skill_used_tests {
+    use super::*;
+    use crate::step::framework::test_team;
+    use ffb_model::enums::{PlayerAction, Rules, SkillId};
+
+    fn game() -> Game {
+        let mut home = test_team("home", 0);
+        home.players.push(ffb_model::model::player::Player { id: "h1".into(), nr: 1, ..Default::default() });
+        home.players.push(ffb_model::model::player::Player { id: "h2".into(), nr: 2, ..Default::default() });
+        Game::new(home, test_team("away", 0), Rules::Bb2025)
+    }
+
+    /// Java `ActingPlayer.markSkillUsed`: the skill lands in the ACTING PLAYER's `fUsedSkills`,
+    /// which is a term of the derived `hasActed()`.
+    #[test]
+    fn marking_the_acting_players_skill_makes_it_acted() {
+        let mut g = game();
+        g.acting_player.set_player("h1".into(), PlayerAction::Move);
+        assert!(!g.acting_player.acted());
+        mark_skill_used(&mut g, "h1", SkillId::BalefulHex);
+        assert!(g.acting_player.used_skills.contains(&SkillId::BalefulHex));
+        assert!(g.acting_player.acted(), "hasActed() = ... || !fUsedSkills.isEmpty()");
+    }
+
+    /// A skill used by someone who is NOT the acting player (a reactive skill) does not touch the
+    /// acting player's set -- Java's `markSkillUsed` is a method of the one ActingPlayer.
+    #[test]
+    fn marking_a_non_acting_player_leaves_the_acting_player_alone() {
+        let mut g = game();
+        g.acting_player.set_player("h1".into(), PlayerAction::Move);
+        mark_skill_used(&mut g, "h2", SkillId::BalefulHex);
+        assert!(g.acting_player.used_skills.is_empty());
+        assert!(!g.acting_player.acted());
+    }
+
+    /// The Player's own set is written only for usage types tracked outside the activation --
+    /// Java: `if (usageType.isTrackOutsideActivation() && !player.isUsed(skill)) player.markUsed`.
+    #[test]
+    fn the_player_is_marked_only_when_the_usage_type_tracks_outside_the_activation() {
+        for skill in [SkillId::BalefulHex, SkillId::Treacherous, SkillId::LookIntoMyEyes,
+                      SkillId::CatchOfTheDay] {
+            let mut g = game();
+            g.acting_player.set_player("h1".into(), PlayerAction::Move);
+            mark_skill_used(&mut g, "h1", skill);
+            let on_player = g.team_home.player("h1").unwrap().used_skills.contains(&skill);
+            assert_eq!(on_player, skill.usage_type().track_outside_activation(), "{skill:?}");
+        }
     }
 }

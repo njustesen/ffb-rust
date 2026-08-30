@@ -302,25 +302,18 @@ pub fn pick_up_catch_scatter_sequence() -> Vec<SequenceStep> {
 }
 
 pub fn select_sequence() -> Vec<SequenceStep> {
-    let mut seq = Vec::with_capacity(20);
-    // Java `generator/Select`: `sequence.add(INIT_SELECTING, from(GOTO_LABEL_ON_END,
-    // END_SELECTING), ...)`. Without the parameter `StepInitSelecting.goto_label_on_end` is the
-    // EMPTY STRING, and its EndTurn / EndPlayerAction branches then goto a label that does not
-    // exist -- which drains the whole step stack ("FFB DRIVER ERROR: goto unknown label ''") and
-    // ends the game. Invisible until now because this helper's only live caller was
-    // `StepKickoffReturn`, which was itself never dispatched.
-    seq.push(SequenceStep::with_params(
-        StepId::InitSelecting,
-        vec![StepParameter::GotoLabelOnEnd("END_SELECTING".into())],
-    ));
-    for _ in 0..14 {
-        seq.push(SequenceStep::new(StepId::NoOp));
-    }
-    for _ in 0..4 {
-        seq.push(SequenceStep::new(StepId::NoOp));
-    }
-    seq.push(SequenceStep::labelled(StepId::EndSelecting, "END_SELECTING", vec![]));
-    seq
+    // Until ITER29 this was a STUB -- `InitSelecting` + 18 `NoOp` + `EndSelecting` -- and
+    // `StepKickoffReturn` was its only live caller, which is how the kickoff-return window came to
+    // run a Select sequence unlike any Java has. The step now builds the edition's real sequence
+    // itself (`StepKickoffReturn::window_select_sequence`); this helper survives for the tests that
+    // reach for "a select sequence" and is the bb2025 real one. Production code has no caller.
+    use crate::step::generator::bb2025::select::{Select, SelectParams};
+    Select::build_sequence(&SelectParams {
+        update_persistence: false,
+        is_blitz_move: false,
+        block_targets: Vec::new(),
+        rules: ffb_model::enums::Rules::Bb2025,
+    })
 }
 
 #[cfg(test)]
@@ -467,10 +460,13 @@ mod tests {
     }
 
     #[test]
-    fn select_sequence_last_step_has_end_selecting_label() {
+    fn select_sequence_ends_in_end_selecting_and_carries_the_label() {
+        // Java `generator/bb2025/Select`: the END_SELECTING label sits on RESET_FUMBLEROOSKIE, the
+        // step BEFORE END_SELECTING -- the stub put it on END_SELECTING itself, and this test used
+        // to pin that.
         let seq = select_sequence();
-        let last = seq.last().unwrap();
-        assert_eq!(last.step_id, StepId::EndSelecting);
-        assert_eq!(last.label.as_deref(), Some("END_SELECTING"));
+        assert_eq!(seq.last().unwrap().step_id, StepId::EndSelecting);
+        assert!(seq.iter().any(|s| s.label.as_deref() == Some("END_SELECTING")));
+        assert!(seq.iter().all(|s| s.step_id != StepId::NoOp));
     }
 }

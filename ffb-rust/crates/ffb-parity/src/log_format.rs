@@ -106,7 +106,22 @@ pub fn rust_log_path(seed: u64) -> String {
 /// phantom red that a `cargo build` rewriting `ffb-parity.exe` mid-gate produces.
 /// Scoped this way the three matrices are independent and can gate in parallel.
 pub fn matchup_dir(edition: &str, home: &str, away: &str) -> String {
-    format!("parity/{edition}/{home}_vs_{away}")
+    matchup_dir_in(&parity_root(), edition, home, away)
+}
+
+/// The root every log path hangs off. `FFB_PARITY_ROOT` overrides the default `parity`.
+///
+/// The edition/matchup scoping above keeps CONCURRENT runs apart, but it cannot keep two
+/// runs of the same matchup with different AGENTS apart: the `--agent random` control that
+/// follows every heuristic gate wrote into the same directory and destroyed the heuristic's
+/// evidence — 14 of 19 bb2020 reds had no analysable log by the time anyone looked. The control
+/// runs with `FFB_PARITY_ROOT=parity_random` so the gate's files survive it.
+pub fn parity_root() -> String {
+    std::env::var("FFB_PARITY_ROOT").unwrap_or_else(|_| "parity".to_string())
+}
+
+pub fn matchup_dir_in(root: &str, edition: &str, home: &str, away: &str) -> String {
+    format!("{root}/{edition}/{home}_vs_{away}")
 }
 
 /// Race-specific log paths — include edition + home + away so no two runs collide.
@@ -136,6 +151,17 @@ mod tests {
     /// The three edition matrices must never share a log directory: before the edition
     /// segment existed, gating bb2016 and bb2025 concurrently had each run overwriting the
     /// other's `seed_N_java.jsonl` and reporting reds that did not reproduce in isolation.
+    #[test]
+    fn parity_root_override_moves_every_path() {
+        // Env-free: the override is exercised through the root-taking form so this test cannot
+        // race another test that reads the process environment.
+        assert_eq!(matchup_dir_in("parity_random", "bb2025", "amazon", "amazon"),
+                   "parity_random/bb2025/amazon_vs_amazon");
+        assert_eq!(matchup_dir_in("parity", "bb2025", "amazon", "amazon"),
+                   matchup_dir("bb2025", "amazon", "amazon"),
+                   "default root must be `parity` (no FFB_PARITY_ROOT in the test env)");
+    }
+
     #[test]
     fn log_paths_are_scoped_by_edition_and_matchup() {
         let a = java_log_path_for(7, "bb2016", "ogre", "ogre");

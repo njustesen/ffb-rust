@@ -959,11 +959,60 @@ impl DriverGameState {
         }
     }
 
+    /// `FFB_STEPTRACE`: one line per prompt, carrying the state the per-step hash CANNOT see —
+    /// turn mode, acting side, each side's turn counter, the acting player with its DERIVED
+    /// `acted()` next to the stored `has_acted`, and every on-pitch player's base:active.
+    /// `JSTATE` in `ParityRunner` prints the identical fields at each harness iteration, so the
+    /// two traces diff by eye at the activation where the recorded hashes first disagree. Built
+    /// because ten iterations were spent inferring exactly this state from side effects.
+    fn probe_state(&self, step: StepId, prompt: Option<&ffb_model::prompts::AgentPrompt>) {
+        if std::env::var_os("FFB_STEPTRACE").is_none() {
+            return;
+        }
+        let g = &self.game;
+        let ap = &g.acting_player;
+        let mut pl: Vec<String> = Vec::new();
+        for (side, team) in [("H", &g.team_home), ("A", &g.team_away)] {
+            for p in &team.players {
+                let Some(c) = g.field_model.player_coordinate(&p.id) else { continue };
+                if c.is_box_coordinate() {
+                    continue;
+                }
+                let st = g.field_model.player_state(&p.id);
+                pl.push(format!(
+                    "{side}{}:{}:{}",
+                    p.nr,
+                    st.map(|s| s.base()).unwrap_or(0),
+                    st.map(|s| if s.is_active() { "a" } else { "i" }).unwrap_or("?")
+                ));
+            }
+        }
+        let jersey = |id: &str| -> String {
+            g.team_home.players.iter().find(|p| p.id == id).map(|p| format!("H{}", p.nr))
+                .or_else(|| g.team_away.players.iter().find(|p| p.id == id).map(|p| format!("A{}", p.nr)))
+                .unwrap_or_else(|| id.to_string())
+        };
+        let pr = prompt
+            .map(|p| {
+                let d = format!("{p:?}");
+                d.split(|c| c == ' ' || c == '{' || c == '(').next().unwrap_or("").to_string()
+            })
+            .unwrap_or_else(|| "-".into());
+        eprintln!(
+            "RSTATE step={step:?} prompt={pr} mode={:?} home={} tH={} tA={} ap={} act={:?} acted={} has_acted={} moved={} cm={} pl=[{}]",
+            g.turn_mode, g.home_playing, g.turn_data_home.turn_nr, g.turn_data_away.turn_nr,
+            ap.player_id.as_deref().map(jersey).unwrap_or_else(|| "null".into()),
+            ap.player_action, ap.acted(), ap.has_acted, ap.has_moved, ap.current_move,
+            pl.join(",")
+        );
+    }
+
     fn dispatch(&mut self, entry: DriverStepEntry, action: Action, outcome: StepOutcome) {
         self.waiting_for_command = matches!(outcome.action, StepAction::Continue);
         match outcome.action {
             StepAction::NextStep => {}
             StepAction::Continue | StepAction::Repeat => {
+                self.probe_state(entry.step.id(), outcome.prompt.as_ref());
                 self.pending_prompt = outcome.prompt;
                 self.current = Some(entry);
             }
@@ -985,6 +1034,7 @@ impl DriverGameState {
         match outcome.action {
             StepAction::NextStep => {}
             StepAction::Continue | StepAction::Repeat => {
+                self.probe_state(entry.step.id(), outcome.prompt.as_ref());
                 self.pending_prompt = outcome.prompt;
                 self.current = Some(entry);
             }

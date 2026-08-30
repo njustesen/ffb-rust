@@ -1989,35 +1989,27 @@ impl HeuristicAgent {
         // names amazon seeds 8/11, where the On-the-Ball defender stays put in Java); the
         // heuristic knew nothing about pass-block windows at all, which is exactly the roster
         // where they fire: On the Ball is the Amazon Thrower's skill in bb2020 and bb2025.
-        // ...and that is the RANDOM contract. Java's INIT_MOVING arm splits on which agent is
-        // driving, and the HEURISTIC half has no mode gate whatsoever:
+        // Java `ParityRunner` INIT_SELECTING **phase 2** -- shared by BOTH agent paths (phase 1
+        // picks the player and injects CLIENT_ACTING_PLAYER; the NEXT harness iteration, with the
+        // acting player set, is phase 2):
         //
-        //   if (activation != null && imAp != null && imAp.getPlayerId() != null) {
-        //       sendMoveAction(game, gameState, imAp.getPlayerId());
-        //       break;
-        //   }
-        //   inject(new ClientCommandActingPlayer(null, null, false));   // random path only
+        //   if (tier <= 2 || game.getTurnMode() != TurnMode.REGULAR) {
+        //       justDeselected = true;
+        //       inject(new ClientCommandActingPlayer(null, null, false));   // deselect
+        //   } else { sendConcreteAction(game, gameState); }
         //
-        // So the window's one activation MOVES, in every turn mode; the deselect that closes the
-        // window is `ParityRunner`'s INIT_SELECTING phase 2, a different prompt, and Rust answers
-        // its equivalent in `handle_activate` (the `turn_mode != Regular && !used_this_turn`
-        // exit, which sets the same latch).
+        // So in ANY non-REGULAR window the picked player is recorded and then deselected without a
+        // Move sequence ever being pushed. `FFB_STEPTRACE` on bb2025 seed 33 shows it directly:
+        // `JSTATE ... mode=KICKOFF_RETURN ap=H6 act=MOVE cm=0` and the very next iteration
+        // `ap=null`, with no INIT_MOVING in between and no `JMOVEP` line for the player.
         //
-        // ITER21 put the phase-2 rule HERE, one prompt too early, and it suppressed the move
-        // itself. That is what kept the kickoff-return window open: a mover that never moves
-        // leaves `acting_player.has_acted` false, which is precisely the condition
-        // `StepKickoffReturn`'s re-open branch tests, so the step pushed another Select and the
-        // window caught a player of the OTHER team (bb2025 seed 46: `home_06` prompted while the
-        // mode was still KickoffReturn, answered EndPlayerAction, and reached a state Java --
-        // which had closed the window and moved him -- did not).
-        //
-        // PASS_BLOCK is the exception, and it is an ENGINE-FLOW exception rather than an agent
-        // rule: for a pass-block mover the Java engine never re-presents INIT_SELECTING phase 2,
-        // so the mover activates and never moves (the amazon On-the-Ball defender who stays put
-        // in Java on seeds 8/11). Dropping the deselect for PASS_BLOCK too costs 10 of 20 bb2020
-        // seeds and 15 of 20 bb2025 seeds, so the mode gate is real -- it is just PASS_BLOCK, not
-        // "not REGULAR". The latch stays, because phase 2 sets it wherever it fires.
-        if g.turn_mode == ffb_model::enums::TurnMode::PassBlock {
+        // Rust's prompt model merges Java's two commands into ActivatePlayer + Move, so the
+        // phase-2 deselect lands HERE, at the Move prompt. ITER21 had this right (`!= Regular`).
+        // ITER25 narrowed it to PASS_BLOCK on the strength of a probe that only made sense
+        // together with the `push_self` fix landing in the same gate -- and the kickoff-return
+        // mover then walked four squares Java never walked (seed 33 `home_06`, (5,9) -> (9,10)),
+        // which was every remaining amazon red in both editions.
+        if g.turn_mode != ffb_model::enums::TurnMode::Regular {
             self.just_deselected = true;
             return Action::EndPlayerAction;
         }

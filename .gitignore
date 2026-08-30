@@ -8,6 +8,9 @@
 # roster XMLs and a load-bearing harness change went unnoticed for sessions.
 # They are also unsafe to read after an aborted run (they go stale silently).
 ffb-rust/parity/
+# The --agent random control's own root (FFB_PARITY_ROOT=parity_random), so it can never
+# overwrite the heuristic gate's evidence in ffb-rust/parity/.
+ffb-rust/parity_random/
 
 # Coverage reports, rewritten on every ffb-parity invocation.
 ffb-rust/T3_COVERAGE.md

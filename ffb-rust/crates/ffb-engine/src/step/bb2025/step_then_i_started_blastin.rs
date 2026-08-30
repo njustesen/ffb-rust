@@ -332,21 +332,11 @@ impl StepThenIStartedBlastin {
     }
 
     fn mark_skill_used(game: &mut Game, player_id: &str, skill_id: SkillId) {
-        // Java ActingPlayer.markSkillUsed: the skill lands in the ACTING PLAYER's
-        // fUsedSkills — that set is what makes hasActed() true, and hasActed() is what
-        // deactivates the star when the activation ends (chaos_dwarf bb2025 seed 6 i=90:
-        // Zzharg stayed ACTIVE after his shot without it).
-        if game.acting_player.player_id.as_deref() == Some(player_id) {
-            game.acting_player.used_skills.insert(skill_id);
-        }
-        let is_home = game.team_home.player(player_id).is_some();
-        if is_home {
-            if let Some(p) = game.team_home.player_mut(player_id) {
-                p.used_skills.insert(skill_id);
-            }
-        } else if let Some(p) = game.team_away.player_mut(player_id) {
-            p.used_skills.insert(skill_id);
-        }
+        // Java ActingPlayer.markSkillUsed: the skill lands in the ACTING PLAYER's fUsedSkills --
+        // that set is what makes hasActed() true, and hasActed() is what deactivates the star when
+        // the activation ends (chaos_dwarf bb2025 seed 6 i=90: Zzharg stayed ACTIVE after his shot
+        // without it). This file fixed that first; the shared port now carries it for every step.
+        crate::step::util_server_steps::mark_skill_used(game, player_id, skill_id);
     }
 }
 

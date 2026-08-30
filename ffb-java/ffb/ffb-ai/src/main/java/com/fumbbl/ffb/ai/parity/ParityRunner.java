@@ -401,6 +401,7 @@ public class ParityRunner {
                 sameStepNoDialogCount = (dialog == null) ? 1 : 0;
             }
 
+            probeState(stepId, dialog, game);
             if (dialog != null && stepId != StepId.INIT_SELECTING) {
                 handleDialog(dialog, game, gameState);
             } else {
@@ -435,6 +436,46 @@ public class ParityRunner {
         out.println(String.format(
             "{\"i\":%d,\"type\":\"game_end\",\"home_score\":%d,\"away_score\":%d,\"state_hash\":\"%s\"}",
             stepIndex, scoreHome, scoreAway, endHash));
+    }
+
+    /**
+     * `FFB_STEPTRACE` mirror of the Rust driver's `RSTATE`: the state the per-step hash cannot
+     * see, printed at every harness iteration. Same field order and encoding as Rust
+     * (jersey ids `H6`/`A3`, base:active as `<base>:a|i`), so the two traces diff by eye at the
+     * activation where the recorded hashes first disagree.
+     */
+    private void probeState(StepId stepId, IDialogParameter dialog, Game game) {
+        if (System.getenv("FFB_STEPTRACE") == null) return;
+        FieldModel fm = game.getFieldModel();
+        ActingPlayer ap = game.getActingPlayer();
+        StringBuilder pl = new StringBuilder();
+        for (boolean home : new boolean[] {true, false}) {
+            for (Player<?> p : (home ? game.getTeamHome() : game.getTeamAway()).getPlayers()) {
+                FieldCoordinate c = fm.getPlayerCoordinate(p);
+                if (c == null || c.isBoxCoordinate()) continue;
+                PlayerState st = fm.getPlayerState(p);
+                if (pl.length() > 0) pl.append(',');
+                pl.append(home ? 'H' : 'A').append(p.getNr()).append(':')
+                  .append(st == null ? 0 : st.getBase()).append(':')
+                  .append(st == null ? "?" : (st.isActive() ? "a" : "i"));
+            }
+        }
+        String apId = "null";
+        if (ap != null && ap.getPlayerId() != null) {
+            Player<?> p = game.getPlayerById(ap.getPlayerId());
+            apId = (p == null) ? ap.getPlayerId()
+                : (game.getTeamHome().hasPlayer(p) ? "H" : "A") + p.getNr();
+        }
+        System.err.println("JSTATE i=" + stepIndex + " step=" + stepId
+            + " dialog=" + (dialog == null ? "-" : dialog.getId())
+            + " mode=" + game.getTurnMode() + " home=" + game.isHomePlaying()
+            + " tH=" + game.getTurnDataHome().getTurnNr() + " tA=" + game.getTurnDataAway().getTurnNr()
+            + " ap=" + apId
+            + " act=" + (ap == null ? "null" : ap.getPlayerAction())
+            + " acted=" + (ap != null && ap.hasActed())
+            + " moved=" + (ap != null && ap.hasMoved())
+            + " cm=" + (ap == null ? 0 : ap.getCurrentMove())
+            + " pl=[" + pl + "]");
     }
 
     // ── Step handling ─────────────────────────────────────────────────────────

@@ -14,8 +14,7 @@ use ffb_model::types::FieldCoordinateBounds;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
-use crate::step::framework::{Step, StepId, StepOutcome, StepParameter};
-use crate::step::sequences::select_sequence;
+use crate::step::framework::{SequenceStep, Step, StepId, StepOutcome, StepParameter};
 
 pub struct StepKickoffReturn {
     /// Java: fTouchback
@@ -35,6 +34,44 @@ pub struct StepKickoffReturn {
 impl StepKickoffReturn {
     pub fn new() -> Self {
         Self { touchback: false, end_player_action: false, end_turn: false, window_open: false }
+    }
+
+    /// Java: `generator.pushSequence(new Select.SequenceParams(getGameState(), false))` -- the
+    /// edition's REAL Select generator with `updatePersistence = false`, exactly as
+    /// `StepPassBlock::select_seq` already builds the pass-block window's.
+    ///
+    /// Until ITER29 this step pushed `sequences::select_sequence()`, a stub of `InitSelecting`
+    /// + 18 `NoOp` + `EndSelecting` of which it was the only live caller. The real sequence
+    /// carries the negatrait / JUMP_UP / STAND_UP / RESET_FUMBLEROOSKIE steps and, crucially, the
+    /// `END_SELECTING` label on RESET_FUMBLEROOSKIE that `InitSelecting`'s `GotoLabelOnEnd` jumps
+    /// to. Dispatched on `game.rules` because each edition has its own generator (and the
+    /// `..Default::default()` lesson: an edition-gated params struct silently defaults to BB2025).
+    fn window_select_sequence(game: &Game) -> Vec<SequenceStep> {
+        use ffb_model::enums::Rules;
+        match game.rules {
+            Rules::Bb2016 => {
+                use crate::step::generator::bb2016::select::{Select, SelectParams};
+                Select::build_sequence(&SelectParams { update_persistence: false })
+            }
+            Rules::Bb2020 => {
+                use crate::step::generator::bb2020::select::{Select, SelectParams};
+                Select::build_sequence(&SelectParams {
+                    update_persistence: false,
+                    is_blitz_move: false,
+                    block_targets: Vec::new(),
+                })
+            }
+            // `Common` is the mechanic dispatchers' convention too (`mechanic/mod.rs`).
+            Rules::Bb2025 | Rules::Common => {
+                use crate::step::generator::bb2025::select::{Select, SelectParams};
+                Select::build_sequence(&SelectParams {
+                    update_persistence: false,
+                    is_blitz_move: false,
+                    block_targets: Vec::new(),
+                    rules: Rules::Bb2025,
+                })
+            }
+        }
     }
 }
 
@@ -100,36 +137,34 @@ impl StepKickoffReturn {
             );
         }
         if game.turn_mode == TurnMode::KickoffReturn {
-            // Already inside the kickoff-return mini-turn
-            // NOTE: this reads the BARE `has_acted` field, and `ActingPlayer::acted()` (the
-            // derived mirror of Java's `hasActed()`) is documented as the thing callers must use.
-            // Switching to `acted()` is NOT the fix, though -- measured ITER28: bb2020 16 -> 13,
-            // bb2025 20 -> 18 of 20, and the target divergence did not move. By the time this step
-            // re-enters, Rust has already cleared the acting player, so both the field and the
-            // derived predicate read a fresh all-false ActingPlayer. The real question is WHEN Rust
-            // clears it relative to Java, not which accessor is read here.
-            if self.end_player_action && !game.acting_player.has_acted && !self.end_turn {
-                // Java: UtilServerSteps.changePlayerAction(this, null, null, false)
-                game.acting_player.player_id = None;
-                // Java's `fEndPlayerAction` is re-supplied by each END_PLAYER_ACTION publish; this
-                // port stores it in a field that `consumes_parameter` fills, so it stays SET after
-                // being acted on. Left sticky, this branch re-opens the Select sequence on every
-                // re-entry with no agent involvement at all -- the step spins and the stack grows
-                // without bound (ITER20). Clear it here, as Java effectively does by only ever
-                // seeing it on the publish that carried it.
-                self.end_player_action = false;
+            // Already inside the kickoff-return mini-turn.
+            //
+            // `acted()`, not the stored `has_acted`: Java's `ActingPlayer.hasActed()` is DERIVED
+            // (`hasMoved() || hasFouled() || hasBlocked() || hasPassed() || ...`) and nothing in the
+            // Java tree ever sets a stored flag. For the window mover the answer is the same either
+            // way -- the harness deselects him before he moves (see `handle_move`) -- but the
+            // derived form is the 1:1 one. ITER28 tried `acted()` ALONE, while the agent still
+            // moved the window player, and it measured worse: with the mover having acted this
+            // branch no longer fired, so the harness's window-closing EndTurn was never asked for
+            // and the two step sequences parted. A correct component of a unit measured wrong on
+            // its own; that is why the unit is gated together.
+            if self.end_player_action && !game.acting_player.acted() && !self.end_turn {
+                // Java: UtilServerSteps.changePlayerAction(this, null, null, false) -- the full
+                // changeActingPlayer(null): MOVING -> STANDING (inactive if acted, PRONE if
+                // standing up), end-of-turn enhancements dropped if not acted, then setPlayer(null).
+                // Was a raw `player_id = None` that left every per-activation flag standing.
+                crate::step::util_server_steps::change_player_action_to_none(game);
                 // Java: `getGameState().pushCurrentStepOnStack()` + `Select.pushSequence(...)` --
-                // the IDENTICAL idiom the window-open branch below uses, and which that branch
-                // already translates as `push_self`, with a comment saying why: the step must
-                // resume BELOW the pushed sequence, because `repeat` re-runs it immediately and
-                // the Select sequence never gets control. The same two Java lines were translated
-                // two different ways in one file. With `repeat` the window never closes, so the
-                // re-opened Select prompts a player of the OTHER team while the mode is still
-                // KickoffReturn (bb2025 seed 46, `home_06`).
-                return StepOutcome::cont().push_self().push_seq(select_sequence());
+                // the IDENTICAL idiom the window-open branch below uses: `push_self`, so the step
+                // resumes BELOW the pushed sequence. (`repeat` re-ran it immediately and the Select
+                // never got control -- ITER26.) `fEndPlayerAction` is NOT cleared here: Java's
+                // field is assigned on every publish and this step only ever sees it on the publish
+                // that carried it; the `push_self` semantics are what stop the ITER20 spin.
+                let seq = Self::window_select_sequence(game);
+                return StepOutcome::cont().push_self().push_seq(seq);
             } else if self.end_player_action || self.end_turn {
                 // Java: UtilServerSteps.changePlayerAction(this, null, null, false)
-                game.acting_player.player_id = None;
+                crate::step::util_server_steps::change_player_action_to_none(game);
                 // Java: game.setHomePlaying(!game.isHomePlaying())
                 game.home_playing = !game.home_playing;
                 // Java: game.setTurnMode(TurnMode.KICKOFF)
@@ -209,10 +244,11 @@ impl StepKickoffReturn {
                 // `push_self`, NOT `repeat`: the step must resume BELOW the pushed sequence, once
                 // it finishes. `repeat` re-runs the step immediately instead, so the Select
                 // sequence never gets control and the window never closes.
+                let seq = Self::window_select_sequence(game);
                 return StepOutcome::cont()
                     .with_prompt(AgentPrompt::KickoffReturn { eligible_players: eligible })
                     .push_self()
-                    .push_seq(select_sequence());
+                    .push_seq(seq);
             }
         }
 
@@ -304,34 +340,95 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
     }
 
-    /// ITER21 regression. A mover deselected WITHOUT having acted makes this step re-open the
-    /// Select sequence (Java `StepKickoffReturn`, first sub-branch). Java only ever sees
-    /// `fEndPlayerAction` on the publish that carried it; this port keeps it in a field, so left
-    /// sticky the branch fires again on every re-entry with no agent involvement -- the step
-    /// spins and the stack grows without bound (measured: stack_len 24,429,194 and climbing).
-    /// The flag must be cleared as the branch consumes it, so a second visit with no new publish
-    /// takes a different branch.
+    // ── Written from the Java (StepKickoffReturn + UtilActingPlayer.changeActingPlayer), not
+    //    from reading this file. ITER21's test asserted `Repeat` here and pinned a bug.
+
+    fn game_with_mover(rules: Rules) -> Game {
+        use ffb_model::enums::{PlayerState, PS_MOVING};
+        use ffb_model::types::FieldCoordinate;
+        let mut home = test_team("home", 0);
+        home.players.push(ffb_model::model::player::Player { id: "h1".into(), nr: 1, ..Default::default() });
+        let mut g = Game::new(home, test_team("away", 0), rules);
+        g.turn_mode = TurnMode::KickoffReturn;
+        g.home_playing = true;
+        g.field_model.set_player_coordinate("h1", FieldCoordinate::new(5, 5));
+        g.field_model.set_player_state("h1", PlayerState::new(PS_MOVING));
+        g.acting_player.set_player("h1".into(), ffb_model::enums::PlayerAction::Move);
+        g
+    }
+
+    /// Java: `if (fEndPlayerAction && !actingPlayer.hasActed() && !fEndTurn)` re-opens Select;
+    /// `hasActed()` is DERIVED from hasMoved/hasFouled/hasBlocked/hasPassed/..., so a mover who
+    /// moved does NOT re-open, whatever a stored flag says.
     #[test]
-    fn end_player_action_is_consumed_by_the_reopen_branch() {
-        let mut game = make_game();
-        game.turn_mode = TurnMode::KickoffReturn;
-        game.acting_player.has_acted = false;
+    fn reopen_only_when_the_mover_has_not_acted_derived() {
+        let mut g = game_with_mover(Rules::Bb2025);
         let mut step = StepKickoffReturn::new();
+        step.window_open = true;
         step.end_player_action = true;
+        let out = step.start(&mut g, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue, "not acted: the window re-opens Select");
+        assert!(out.push_self, "Java: pushCurrentStepOnStack()");
+        assert_eq!(out.pushes.len(), 1);
 
-        let first = step.start(&mut game, &mut GameRng::new(0));
-        // Java is `pushCurrentStepOnStack()` + `Select.pushSequence(...)`: the step is re-pushed
-        // BELOW the new sequence and resumes after it, which is `cont().push_self()`. Written as
-        // `repeat()` (as this test originally asserted) the step re-runs immediately, the Select
-        // sequence never gets control, and the window never closes -- ITER25.
-        assert_eq!(first.action, StepAction::Continue, "the step waits below the pushed sequence");
-        assert!(first.push_self, "Java re-pushes the current step");
-        assert_eq!(first.pushes.len(), 1, "exactly one Select sequence pushed");
-        assert!(!step.end_player_action, "the branch must consume the flag");
+        let mut g = game_with_mover(Rules::Bb2025);
+        g.acting_player.has_moved = true;          // hasActed() == true; stored has_acted stays false
+        assert!(!g.acting_player.has_acted);
+        let mut step = StepKickoffReturn::new();
+        step.window_open = true;
+        step.end_player_action = true;
+        let out = step.start(&mut g, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep, "acted: the window CLOSES");
+        assert!(!out.push_self && out.pushes.is_empty());
+        assert_eq!(g.turn_mode, TurnMode::Kickoff);
+        assert!(!g.home_playing, "setHomePlaying(!isHomePlaying())");
+    }
 
-        // Second visit, nothing republished: the re-open branch must NOT fire again.
-        let second = step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(second.action, StepAction::NextStep, "no second re-open");
-        assert!(second.pushes.is_empty(), "sticky flag would push Select forever");
+    /// Java closes the window through `changePlayerAction(null)`: the mover leaves MOVING and the
+    /// acting player is fully reset -- not a bare id clear that leaves `hasMoved` standing.
+    #[test]
+    fn closing_the_window_runs_change_acting_player_null() {
+        use ffb_model::enums::PS_MOVING;
+        let mut g = game_with_mover(Rules::Bb2025);
+        g.acting_player.has_moved = true;
+        let mut step = StepKickoffReturn::new();
+        step.window_open = true;
+        step.end_player_action = true;
+        step.start(&mut g, &mut GameRng::new(0));
+        assert!(g.acting_player.player_id.is_none());
+        assert!(!g.acting_player.has_moved, "setPlayer(null) resets the per-activation flags");
+        assert_ne!(g.field_model.player_state("h1").unwrap().base(), PS_MOVING,
+                   "changeActingPlayer(null) takes the old player out of MOVING");
+    }
+
+    /// Java pushes the edition's REAL Select generator (`Select.pushSequence(params, false)`),
+    /// not a stub: bb2025 carries JUMP_UP/STAND_UP, bb2020 and bb2016 carry BONE_HEAD.
+    #[test]
+    fn window_select_is_the_editions_real_sequence() {
+        for (rules, must_have) in [
+            (Rules::Bb2025, StepId::StandUp),
+            (Rules::Bb2020, StepId::BoneHead),
+            (Rules::Bb2016, StepId::BoneHead),
+        ] {
+            let g = game_with_mover(rules);
+            let seq = StepKickoffReturn::window_select_sequence(&g);
+            assert_eq!(seq.first().map(|s| s.step_id), Some(StepId::InitSelecting), "{rules:?}");
+            assert_eq!(seq.last().map(|s| s.step_id), Some(StepId::EndSelecting), "{rules:?}");
+            assert!(seq.iter().any(|s| s.step_id == must_have), "{rules:?} lacks {must_have:?}");
+            assert!(seq.iter().all(|s| s.step_id != StepId::NoOp), "{rules:?} still has the stub's NoOps");
+            assert!(seq.iter().any(|s| s.label.as_deref() == Some("END_SELECTING")),
+                    "{rules:?}: InitSelecting's GotoLabelOnEnd needs the END_SELECTING label");
+        }
+    }
+
+    /// Java: `fEndPlayerAction = (Boolean) parameter.getValue()` on EVERY publish -- a published
+    /// `false` clears it. No manual clearing anywhere in the step.
+    #[test]
+    fn end_player_action_follows_every_publish() {
+        let mut step = StepKickoffReturn::new();
+        assert!(step.set_parameter(&StepParameter::EndPlayerAction(true)));
+        assert!(step.end_player_action);
+        assert!(step.set_parameter(&StepParameter::EndPlayerAction(false)));
+        assert!(!step.end_player_action);
     }
 }

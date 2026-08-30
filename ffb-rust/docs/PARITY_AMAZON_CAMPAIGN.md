@@ -29,11 +29,11 @@ structurally, not just by generator.
 
 ## Status
 
-| amazon v amazon, `--heur-classes all`, seeds 1-100 | sampled (1.0) |
-|---|---|
-| bb2016 | **100/100** 🏁 |
-| bb2020 | 60/100 |
-| bb2025 | 55/100 |
+| amazon v amazon, `--heur-classes all`, seeds 1-100 | sampled (1.0) | argmax (0) | uniform (1e6) |
+|---|---|---|---|
+| bb2016 | **100/100** 🏁 | see ITER30 | see ITER30 |
+| bb2020 | **100/100** 🏁 (ITER29) | see ITER30 | see ITER30 |
+| bb2025 | **100/100** 🏁 (ITER29) | see ITER30 | see ITER30 |
 
 Control: `--agent random` amazon is **100/100 in all three editions**, so the roster itself is
 parity-clean and every red below belongs to the heuristic.
@@ -1553,3 +1553,122 @@ experiment.
 Java expression, be endorsed by the codebase's own documentation, target a correctly-identified
 divergence — and still be wrong, because the STATE it reads was assembled differently. Port the
 expression AND check the moment it is evaluated.
+
+## ITER29 — the window as a unit: bb2020 81 → 100, bb2025 84 → 100 (+19, +16) 🏁🏁
+
+**The stall, named.** After ITER28 the loop had spent seven iterations on one mechanism, three of
+them probe-only and one reverted, and every instrument it relied on was blind to the state that
+mechanism perturbs. The user asked for the diagnosis, a loop that converges, and the fix. The plan
+is `C:/Users/Admin/.claude/plans/implement-the-new-agent-zazzy-balloon.md`; this entry is its
+execution record.
+
+### What was actually wrong
+
+Every remaining red with an analysable log — 16 bb2025, 4 bb2020 — was **the first activation after
+a non-REGULAR window flip**: same pre-hash, same declared activation, no dice, different post-state.
+bb2016 was green only because its Thrower has no On the Ball and so never opens a window. The
+kickoff-return window in Rust had been assembled from parts that were each not the Java:
+
+| # | Rust | Java |
+|---|---|---|
+| 1 | `select_sequence()` — a **stub** (`InitSelecting` + 18 `NoOp` + `EndSelecting`) of which `StepKickoffReturn` was the only live caller | `Select.pushSequence(params, false)` — the edition's real generator |
+| 2 | `acting_player.player_id = None` (raw) | `changePlayerAction(this, null, null, false)` → MOVING→STANDING(+inactive if acted), enhancements dropped if not, `setPlayer(null)` |
+| 3 | `!acting_player.has_acted` (stored, never set by a move) | `!actingPlayer.hasActed()` (derived) |
+| 4 | agent deselect gated on `== PassBlock` (ITER25) | harness phase 2 deselects for every `!= REGULAR` mode |
+
+`change_player_action_to_none` in `util_server_steps.rs` was already the 1:1 port of #2 and
+`ActingPlayer::acted()` of #3 — both existed, neither was called here.
+
+### The loop that converged (three nested loops)
+
+- **Inner**: one target seed, `scripts/first_state_divergence.sh` for the exact activation, then the
+  new **prompt-level state traces** — `RSTATE` (Rust driver, `FFB_STEPTRACE`) and `JSTATE`
+  (`ParityRunner`, same fields): turn mode, acting side, both turn counters, the acting player with
+  derived `acted()` next to stored `has_acted`, and every on-pitch player's `base:active`. These are
+  exactly the fields the per-step hash cannot see, and diffing them at the divergence named the cause
+  in one read where ten iterations of inference had not.
+- **Middle**: `scripts/frontier.sh` — `first_state_divergence` over every red, tabulated — plus the
+  20-seed probe ×3.
+- **Outer**: the full standing gate, once, on the whole unit.
+
+### What the traces showed
+
+Seed 33 (bb2025): Java selects `H6` in the window with `cm=0`, then `ap=null` — **no `INIT_MOVING`
+between and no `JMOVEP` line**. Java never moves the kickoff-return player: the harness's phase-2
+deselect fires for every non-REGULAR mode. Rust (after ITER25) walked him four squares. Everything
+after that — both re-open the Select, both harnesses end the turn, both `KR` exit on `END_TURN`, both
+continue to `KickoffResultRoll` — was already structurally identical; only the board differed.
+**ITER21 had the rule right; ITER25 narrowed it on a probe that only made sense together with the
+`push_self` fix in the same gate.**
+
+### The unit (one change set, gated once)
+
+1. Agent: deselect at the Move prompt for `turn_mode != Regular` (ITER21 restored).
+2. `StepKickoffReturn` builds the edition's real Select (`window_select_sequence`, dispatched on
+   `game.rules`, exactly as `StepPassBlock::select_seq` does). `sequences::select_sequence()` is
+   no longer a stub; it survives only for tests.
+3. Both window branches call `change_player_action_to_none` instead of the raw clear.
+4. The re-open branch reads `acted()`. **ITER28's reverted change was correct** — alone, with the
+   mover still walking, it stopped the re-open the harness's EndTurn depended on, which is why it
+   measured worse. A correct component of a unit measured wrong on its own.
+5. No manual clearing of `end_player_action`: Java assigns it on every publish, and `push_self` is
+   what stops the ITER20 spin.
+6. Tests written from the Java: re-open only when the mover has NOT acted (derived); closing runs
+   `changeActingPlayer(null)`; the pushed Select is the edition's real one (`StandUp`, `BoneHead`);
+   a published `false` clears the flag. ITER21's test had asserted `Repeat` — the bug.
+
+Seed 33 passed on the first inner-loop run. Middle loop: probe **20/20/20** (from 20/16/20), all 19
+bb2020 reds gone, 12 of 16 bb2025 reds gone.
+
+### The second family, found by the same tools in one pass
+
+The four survivors (62, 66, 70, 97) were all Estelle's **Baleful Hex after a flip**. Two of them
+passed when run alone — the frontier had run concurrently with the bb2025 probe, and **two runs of
+the same edition+matchup interfere even on disjoint seeds** (new process rule below). The two that
+failed deterministically were both *away*-side Estelle; the traces showed the whole state difference
+at the next step was ONE bit: Estelle herself `active=0` in Java, `active=1` in Rust after her
+Hex-then-deselect. Same target, same dice.
+
+Java's `ActingPlayer.markSkillUsed(skill)` adds the skill to the **acting player's** `fUsedSkills` —
+a term of `hasActed()` — and marks the Player only if the usage type tracks outside the activation.
+Rust had **five** step-local `mark_skill_used` copies (Baleful Hex, Catch of the Day, Look Into My
+Eyes, Then I Started Blastin', Treacherous) writing only to `Player.used_skills`, so `acted()` never
+saw them and `changeActingPlayer(null)` never retired the star. `step_then_i_started_blastin.rs` had
+fixed its own copy during the star campaign (chaos_dwarf seed 6) and left the other four. Now one
+shared `util_server_steps::mark_skill_used`, 1:1, with the five copies (in BOTH the bb2020 and the
+live bb2025 twins — the first edit landed in the dead twins) delegating to it. Three tests.
+
+### Gate — full standing gate, all green
+
+| | ITER26 | **ITER29** |
+|---|---|---|
+| bb2016 amazon (1.0) | 100/100 | **100/100** 🏁 |
+| bb2020 amazon (1.0) | 81/100 | **100/100** 🏁 |
+| bb2025 amazon (1.0) | 84/100 | **100/100** 🏁 |
+| lineman heuristic (1.0) ×3 | 100/100 | **100/100** |
+| `--agent random` amazon + lineman ×3 | 100/100 | **100/100** (all six) |
+| `cargo test -p ffb-engine` | 7354/0 | **7360/0** |
+| `rust_total=` amazon | 42–48 s | 42–44 s |
+
+Scales 0 and 1e6 are running as ITER30.
+
+### Process changes (also in the plan; `amz-iter.md` to be rewritten in the close-out)
+
+- **Unit-port rule**: a mechanism is one change set; components are never reverted for measuring
+  worse alone; keep-or-revert only on the outer gate of the whole unit.
+- **Leading indicator first**: `first_state_divergence.sh` / `frontier.sh`, never the candidate-count
+  classifier, which lagged seed 33 by sixteen activations.
+- **State traces** (`FFB_STEPTRACE`) before inference.
+- **Isolated control output**: `FFB_PARITY_ROOT=parity_random` for `--agent random`; the old shared
+  directory had destroyed 14 of 19 bb2020 logs.
+- **Never run two parity processes on the same edition+matchup concurrently, even on disjoint
+  seeds** — it produced two false reds in this iteration.
+- **Verify every analysis script on a green seed and a known red before believing it.**
+- **Tests from the Java, never from reading the Rust** — the seventh test this campaign to encode a
+  bug (ITER21's `Repeat`) went the same way as the first six.
+
+**Next (ITER30):** the six scale-0/1e6 gates; then the coverage harvest, the docs, and the push.
+Deferred to BACKLOG: Treacherous's `hasActedIgnoringNegativeTraits() || justStoodUp()` (Rust has
+no `SkillId`→negative-trait lookup and no `MINIMUM_MOVE_TO_STAND_UP`; not on any amazon roster);
+the remaining bare `has_acted` readers (gaze target, auto-gaze Zoat, bb2020 init-feeding) and the
+30 raw `player_id = None` sites — same defect classes, none amazon-live, one unit each.

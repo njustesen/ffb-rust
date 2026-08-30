@@ -103,14 +103,9 @@ impl StepLookIntoMyEyes {
     }
 
     fn mark_skill_used(game: &mut Game, player_id: &str) {
-        let is_home = game.team_home.player(player_id).is_some();
-        if is_home {
-            if let Some(p) = game.team_home.player_mut(player_id) {
-                p.used_skills.insert(SkillId::LookIntoMyEyes);
-            }
-        } else if let Some(p) = game.team_away.player_mut(player_id) {
-            p.used_skills.insert(SkillId::LookIntoMyEyes);
-        }
+        // Java: actingPlayer.markSkillUsed(skill) -- see util_server_steps::mark_skill_used for
+        // why this must reach the ACTING PLAYER's set and not only the Player's.
+        crate::step::util_server_steps::mark_skill_used(game, player_id, SkillId::LookIntoMyEyes);
     }
 }
 

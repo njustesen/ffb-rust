@@ -260,14 +260,10 @@ impl StepBalefulHex {
     }
 
     fn mark_skill_used(game: &mut Game, player_id: &str) {
-        let is_home = game.team_home.player(player_id).is_some();
-        if is_home {
-            if let Some(p) = game.team_home.player_mut(player_id) {
-                p.used_skills.insert(SkillId::BalefulHex);
-            }
-        } else if let Some(p) = game.team_away.player_mut(player_id) {
-            p.used_skills.insert(SkillId::BalefulHex);
-        }
+        // Java: actingPlayer.markSkillUsed(skill) -- see util_server_steps::mark_skill_used for
+        // why this must reach the ACTING PLAYER's set and not only the Player's (bb2025 amazon
+        // seeds 70/97: Estelle stayed ACTIVE after her Hex in Rust, inactive in Java).
+        crate::step::util_server_steps::mark_skill_used(game, player_id, SkillId::BalefulHex);
     }
 }
 
