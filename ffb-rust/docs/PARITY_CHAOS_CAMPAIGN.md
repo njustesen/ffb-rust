@@ -42,7 +42,7 @@ New surface, by mechanism:
 
 | chaos v chaos, `--heur-classes all`, seeds 1-100 | sampled (1.0) |
 |---|---|
-| bb2016 | 67/100 |
+| bb2016 | 67/100 → **100/100** (ITER2) 🏁 |
 | bb2020 | 60/100 → **92/100** (ITER1) |
 | bb2025 | 74/100 → **98/100** (ITER1) |
 
@@ -91,3 +91,27 @@ root), cargo test -p ffb-engine 7366/0. 20-seed probes first: bb2025 20/20, bb20
 
 **Remaining reds**: bb2025 seeds {57 (LENGTH/stall), 1 other}; bb2020 8 seeds incl. seed 18
 HandOffMove-vs-PASS_MOVE declaration divergence; bb2016 33 seeds (Wild Animal familia untouched).
+
+## ITER2 — bb2016 Loner minimum is a FIXED 4, not the (absent) skill value
+
+**Seed**: bb2016 seed 10, first hash diff idx 8 (resolving idx 7... actually i=8, the Minotaur's
+MOVE after the home_02 blitz). Purpose-diffing the dice streams (Rust DRIVE rng-deltas vs Java
+Fortuna callers, 0- vs 1-based aligned) put the first mismatch at pos 33: Java
+`RollMechanic.useReRoll:286` (the Loner die) where Rust attributed the position to a fresh GFI.
+
+**Root cause**: Java bb2016 `RollMechanic.minimumLonerRoll` returns a FIXED 4 (LRB6 Loner has no
+printed value); bb2020/25 read the skill value. Rust's shared `loner_roll` read
+`get_skill_int_value` in every edition — a valueless bb2016 "Loner" yields 0, so
+`is_skill_roll_successful(3, 0)` auto-passed every Loner check. Same die drawn, opposite verdict:
+Java's Minotaur loses the GFI re-roll and falls; Rust re-rolls the GFI and runs on.
+
+**Fix** (`step/util_server_re_roll.rs::loner_roll`): bb2016 → fixed 4, else the value read. Test
+`bb2016_loner_minimum_is_a_fixed_four`.
+
+**Gate**: chaos bb2016 67→**100/100** 🏁 (one fix, all 33 reds were this), bb2020 92 (same 8 seeds),
+bb2025 98 (same 2). Standing: amazon ×3 + lineman ×3 100/100, random chaos bb2016 100/100,
+ffb-engine 7367/0. Probe first: bb2016 20/20.
+
+**Remaining reds**: bb2020 {4,10,17,18,26,70,76,85} — family: agent-choice divergence on matched
+hashes (Rust RSUM shows ZERO home_01/Pass candidates at seed 4 k=15 where Java declares PASS_MOVE).
+bb2025 {28,77}.

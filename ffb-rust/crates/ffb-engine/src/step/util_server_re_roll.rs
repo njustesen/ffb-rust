@@ -142,7 +142,17 @@ fn loner_roll(game: &mut Game, player_id: &str, rng: &mut GameRng) -> bool {
     if !player.has_skill_property(NamedProperties::HAS_TO_ROLL_TO_USE_TEAM_REROLL) {
         return true;
     }
-    let minimum_roll = player.get_skill_int_value(NamedProperties::HAS_TO_ROLL_TO_USE_TEAM_REROLL);
+    // Java: RollMechanic.minimumLonerRoll — bb2016 returns a FIXED 4 (`bb2016/RollMechanic.java:209`,
+    // the LRB6 Loner has no printed value); bb2020/25 read the skill's value (Loner (4+) etc.).
+    // Rust read the value everywhere, and a valueless bb2016 "Loner" yields 0 → every Loner check
+    // auto-succeeded (is_skill_roll_successful(3, 0) = true where Java needs 4+). chaos bb2016
+    // seed 10 i=8: the Minotaur's failed GFI re-roll — Java Loner 3 FAILS (min 4), re-roll lost,
+    // player falls; Rust "passed", re-rolled the GFI and ran on.
+    let minimum_roll = if game.rules == ffb_model::enums::Rules::Bb2016 {
+        4
+    } else {
+        player.get_skill_int_value(NamedProperties::HAS_TO_ROLL_TO_USE_TEAM_REROLL)
+    };
     let roll = rng.d6();
     let success = crate::dice_interpreter::DiceInterpreter::is_skill_roll_successful(roll, minimum_roll);
     game.report_list.add(ffb_model::report::report_re_roll::ReportReRoll::new(
@@ -234,6 +244,36 @@ pub fn use_reroll(
 
 #[cfg(test)]
 mod tests {
+    /// Java bb2016 `RollMechanic.minimumLonerRoll` returns a FIXED 4 (the LRB6 Loner has no
+    /// printed value); bb2020/25 read the skill value. A valueless bb2016 Loner must NOT
+    /// auto-succeed (chaos bb2016 seed 10 i=8: Loner 3 fails min 4, the GFI re-roll is lost).
+    #[test]
+    fn bb2016_loner_minimum_is_a_fixed_four() {
+        use ffb_model::enums::{Rules, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = ffb_model::model::game::Game::new(
+            crate::step::framework::test_team("home", 0),
+            crate::step::framework::test_team("away", 0),
+            Rules::Bb2016,
+        );
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            movement: 5, strength: 5, agility: 2, passing: 1, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Loner, value: None }],
+            ..Default::default()
+        });
+        game.turn_data_mut().rerolls = 1;
+        // Seed chosen so the loner d6 is 3: passes a 0-minimum, fails the fixed 4.
+        let mut seed = 0u64;
+        loop {
+            if ffb_model::util::rng::GameRng::new(seed).d6() == 3 { break; }
+            seed += 1;
+        }
+        let mut rng = ffb_model::util::rng::GameRng::new(seed);
+        let consumed = use_reroll(&mut game, &ffb_model::enums::ReRollSource::new("TRR"), "p1", &mut rng);
+        assert!(!consumed, "a bb2016 Loner roll of 3 must FAIL the fixed minimum of 4");
+    }
+
     use super::*;
     use crate::step::framework::test_team;
     use ffb_model::enums::{Rules, TurnMode};
