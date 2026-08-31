@@ -288,6 +288,14 @@ impl StepMoveDodge {
             }
         }
 
+        if std::env::var_os("FFB_TRACE").is_some() {
+            // `RARMBAR`: what the Arm Bar search saw -- the from-square and the candidates.
+            eprintln!(
+                "RARMBAR from={:?} acting={:?} found={:?} choice={} chosen_id={:?}",
+                self.coordinate_from, game.acting_player.player_id,
+                self.arm_bar_players, self.arm_bar_choice, self.arm_bar_player_id
+            );
+        }
         // Java: armBarPlayer resolution — explicit choice > single candidate > coach dialog.
         let mut arm_bar_player: Option<String> = None;
         if let Some(ref pid) = self.arm_bar_player_id {

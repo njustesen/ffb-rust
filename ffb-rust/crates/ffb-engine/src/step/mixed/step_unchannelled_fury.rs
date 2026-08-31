@@ -168,8 +168,18 @@ impl StepUnchannelledFury {
         let has_uf_skill = game.player(&player_id)
             .map(|p| p.has_skill(SkillId::UnchannelledFury))
             .unwrap_or(false);
-        let do_roll = has_uf_skill
-            && !game.acting_player.used_skills.contains(&SkillId::UnchannelledFury);
+        // Java: `boolean doRoll = true` — the hasUnusedSkill test is the ELSE branch, taken only
+        // when NO re-roll is in flight (`UnchannelledFuryBehaviour.java:66-84`). Reaching here
+        // with reRolledAction matching means the re-roll was CONSUMED (useReRoll succeeded in the
+        // skip_roll check above), and Java rolls a FRESH d6 even though the first roll already
+        // marked the skill used. Gating that fresh roll on the used-skills set skipped it: chaos
+        // bb2025 seed 8 i=34 — Java UF 3-fail, Loner 4-pass, fresh roll 5-pass, dodge 2-fail,
+        // armour 2+6 +ArmBar breaks; Rust never drew the fresh die and sat one draw behind the
+        // stream, turning the same dodge fail into an unbroken 5+2 armour roll.
+        let rerolling = self.re_rolled_action.as_deref() == Some("UNCHANNELLED_FURY");
+        let do_roll = rerolling
+            || (has_uf_skill
+                && !game.acting_player.used_skills.contains(&SkillId::UnchannelledFury));
 
         if !do_roll {
             return StepOutcome::next();
@@ -415,6 +425,31 @@ mod tests {
         StepUnchannelledFury::new("FAIL").start(&mut game, &mut rng);
         assert!(rng.call_count > before2,
             "second activation must roll again — this is the draw Rust was skipping");
+    }
+
+    /// Java `UnchannelledFuryBehaviour.java:66-84`: when the re-roll is CONSUMED (useReRoll
+    /// succeeds), `doRoll` stays TRUE and a FRESH negatrait d6 is rolled, even though the first
+    /// roll marked the skill used. Chaos bb2025 seed 8 i=34: Java UF 3-fail, Loner 4-pass,
+    /// fresh 5-pass; Rust skipped the fresh die and sat one draw behind the stream for the rest
+    /// of the game (armour 5+2 held where Java's 2+6 +Arm Bar broke).
+    #[test]
+    fn consumed_team_reroll_rolls_a_fresh_fury_die() {
+        let mut game = make_game();
+        let pid = add_player_with_skill(&mut game, "p1", SkillId::UnchannelledFury);
+        game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING));
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        // The first (failed) roll already marked the skill used on the acting player.
+        game.acting_player.used_skills.insert(SkillId::UnchannelledFury);
+        game.turn_data_mut().rerolls = 1;
+        let mut step = StepUnchannelledFury::new("FAIL");
+        step.re_rolled_action = Some("UNCHANNELLED_FURY".into());
+        step.re_roll_source = Some("TRR".into());
+        let mut rng = GameRng::new(0);
+        let before = rng.call_count;
+        let out = step.start(&mut game, &mut rng);
+        assert!(rng.call_count > before, "the consumed re-roll must draw a fresh negatrait d6");
+        assert!(out.events.iter().any(|e| matches!(e, GameEvent::ConfusionRoll { .. })),
+            "the fresh roll reports a ConfusionRoll");
     }
 
     #[test]
