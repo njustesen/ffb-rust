@@ -278,6 +278,7 @@ pub fn change_player_action_to_none(game: &mut Game) {
     ap.has_fed = false;
     ap.has_acted = false;
     ap.standing_up = false;
+    ap.took_square = false;
     ap.old_player_state = None;
 }
 

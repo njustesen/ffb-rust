@@ -222,3 +222,32 @@ event absence — it cost one wrong sub-theory (away_03's spend was in fact mirr
 engine/agent produces NO HandOver candidates where Java declares HAND_OVER_MOVE (bb2016 k=134:
 Java Home7/HandOver:8, Rust none, RELIG shows home_07:Move|Pass only). Singleton: bb2025@0 seed 46
 (away_09 Move resolution).
+
+## ITER7 — deselecting a never-moved stand-up reverts to PRONE (folded-flow bridge)
+
+**Seed**: bb2025 @0 seed 46 i=75 — the prone away_09 declares MOVE, the agent's plan is empty,
+the activation ends: Java's A9 ends PRONE and still active; Rust ended it Standing.
+
+**Root cause**: Java's ParityRunner deselects an empty-plan MOVE at PHASE 2, while INIT_SELECTING
+is still waiting for the concrete command — StepStandUp has NOT run, `hasActed()` is false, and
+`changeActingPlayer(null)` takes the `standingUp || wasProne → PRONE` branch. Rust's folded flow
+runs the whole select tail (negatraits, JumpUp, StandUp) at the DECLARATION, so by the time its
+Move prompt exists the stand-up already set `has_moved` → `acted()` true → STANDING+inactive.
+
+**Fix**: `ActingPlayer.took_square` (Rust-only bridge flag — Java gets the same fact from step
+ORDER), set at InitMoving's square pop, cleared on player change and in `to_none`. InitMoving's
+EndPlayerAction arm unmarks `has_moved` when `!took_square && (standing_up || was_prone)`.
+
+**Two measured wrong attempts, both caught by gates**: an InitMoving INSTANCE flag (each move
+round pushes a fresh InitMoving → misfired for stood-AND-moved players, seed 46's divergence moved
+to i=31) and `current_move <= 3` (a Jump Up stand costs 0 → wrongly unmarked jumped-up players who
+moved 1-3 squares — amazon bb2020 100→59, bb2025 100→52; chaos has no Jump Up so its gates stayed
+green. The STANDING regression wave, not the target gate, caught it).
+
+**Gate**: chaos bb2016 100/100/99, bb2020 100/100/100, bb2025 100/100/99 (@1.0/@0/@1e6);
+amazon ×3 + lineman ×3 100/100; ffb-engine 7372/0, ffb-model 2798/0.
+
+**Remaining reds (2)**: the HandOver-candidate family — bb2016@1e6 seed 23, bb2025@1e6 seed 40:
+Rust produces NO HandOver candidates where Java declares HAND_OVER_MOVE (Java Home7/HandOver:8 at
+k=134; Rust RELIG shows home_07:Move|Pass — the HandOver action is missing from Rust's
+ELIGIBILITY, upstream of the agent).

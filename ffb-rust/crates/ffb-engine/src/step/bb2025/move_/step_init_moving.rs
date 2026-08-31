@@ -169,6 +169,28 @@ impl Step for StepInitMoving {
 
             // Java: CLIENT_ACTING_PLAYER with no playerId (deselect) → fEndPlayerAction = true, EXECUTE_STEP
             Action::EndPlayerAction => {
+                // Java: the ParityRunner deselects an empty-plan MOVE at PHASE 2, while
+                // INIT_SELECTING is still waiting for the concrete command — StepStandUp has NOT
+                // run, hasActed() is false, and changeActingPlayer reverts the charged stand-up
+                // to PRONE (still active). Rust's folded flow has already run StandUp
+                // (has_moved = true) by the time this prompt exists, so undo its mark when no
+                // square was ever taken: the deselect must land in to_none's standing_up→PRONE
+                // branch, not the acted()→STANDING+inactive one (chaos bb2025 seed 46 @0 i=75:
+                // Java's A9 ends PRONE and still active; Rust ended it Standing).
+                // "No square was ever taken" must be an ACTIVATION-level fact (an instance flag
+                // misfired: every move round pushes a FRESH InitMoving), and it must NOT be
+                // inferred from current_move (a Jump Up stand costs 0, so `current_move <= 3`
+                // wrongly unmarked a jumped-up player who then moved 1-3 squares — amazon bb2020
+                // 100→59). `acting_player.took_square` is set at the square pop and cleared on
+                // player change; the prone gate is Java's own `standingUp || wasProne`.
+                let was_prone = game.acting_player.old_player_state
+                    .map(|st| st.base() == ffb_model::enums::PS_PRONE)
+                    .unwrap_or(false);
+                if !game.acting_player.took_square
+                    && (game.acting_player.standing_up || was_prone)
+                {
+                    game.acting_player.has_moved = false;
+                }
                 self.end_player_action = true;
                 return self.execute_step(game, rng);
             }
@@ -288,6 +310,7 @@ impl StepInitMoving {
                 .unwrap_or(false);
             game.field_model.target_selection_state.as_mut().map(|t| t.commit());
             game.acting_player.has_moved = true;
+            game.acting_player.took_square = true;
             game.turn_data_mut().turn_started = true;
             // Java: per-PlayerAction TurnData flags
             let player_action = game.acting_player.player_action;
@@ -468,6 +491,36 @@ mod tests {
     }
 
     #[test]
+    /// Java parity (chaos bb2025 seed 46 @0 i=75): deselecting a prone mover that stood up but
+    /// never took a square must NOT count the stand-up as having acted — the harness deselects
+    /// at phase 2 in Java, before StepStandUp runs, so hasActed() is false and the player
+    /// reverts to PRONE at changeActingPlayer(null).
+    #[test]
+    fn deselect_before_any_square_unmarks_the_standup_move() {
+        let mut game = ffb_model::model::game::Game::new(
+            crate::step::framework::test_team("home", 0),
+            crate::step::framework::test_team("away", 0),
+            ffb_model::enums::Rules::Bb2025,
+        );
+        game.acting_player.player_id = Some("home_01".into());
+        game.acting_player.standing_up = true;
+        game.acting_player.has_moved = true; // StandUp's mark
+        game.acting_player.took_square = false; // no square ever popped this activation
+        let mut step = StepInitMoving::new(String::new());
+        let _ = step.handle_command(&Action::EndPlayerAction, &mut game, &mut GameRng::new(0));
+        assert!(!game.acting_player.has_moved,
+            "the never-moved stand-up must be unmarked so the deselect lands in the PRONE branch");
+
+        // A player who stood AND moved keeps the mark (he has acted) — a Jump Up stand costs 0,
+        // so this must key on took_square, never on current_move (amazon bb2020 100→59).
+        game.acting_player.standing_up = true;
+        game.acting_player.has_moved = true;
+        game.acting_player.took_square = true;
+        let mut step2 = StepInitMoving::new(String::new());
+        let _ = step2.handle_command(&Action::EndPlayerAction, &mut game, &mut GameRng::new(0));
+        assert!(game.acting_player.has_moved, "a stood-up player who took squares HAS acted");
+    }
+
     fn end_player_action_goes_to_label_with_end_player_action() {
         let mut game = make_game();
         let mut step = StepInitMoving::new("end".into());

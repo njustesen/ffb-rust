@@ -13,6 +13,9 @@ pub struct ActingPlayer {
     pub current_move: i32,
     pub goes_for_it: bool,
     pub standing_up: bool,
+    /// Rust-only bridge flag (no Java field): true once this activation POPPED a move square.
+    /// Java gets the same fact from step ORDER — its phase-2 deselect runs before JumpUp/StandUp.
+    pub took_square: bool,
     /// Java: ActingPlayer.fOldPlayerState — the player's PlayerState captured at the moment of
     /// activation (UtilActingPlayer.changeActingPlayer), STICKY (set once per activation, reset on
     /// player change). TakeRootBehaviour reads `getOldPlayerState().getBase() == STANDING` to decide
@@ -128,6 +131,7 @@ impl ActingPlayer {
             self.has_fed = false;
             self.has_acted = false;
             self.standing_up = false;
+            self.took_square = false;
             // Java UtilActingPlayer.changeActingPlayer resets oldPlayerState on a genuine player
             // change; change_player_action re-captures it (sticky) right after this.
             self.old_player_state = None;
