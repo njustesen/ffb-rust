@@ -75,6 +75,29 @@ impl StepPass {
     }
 }
 
+
+/// Java `PassMechanic.eligibleToReRoll` (bb2020/bb2025): `reRolledAction != PASS &&
+/// thrower.getPassingWithModifiers() > 0`. The first conjunct is the caller's
+/// `!already_rerolled`; this is the second. A PA-less thrower (the chaos Minotaur, passing 0:
+/// roll=0, auto-FUMBLE) gets NO re-roll offer and no Pass-skill dialog in Java — Rust offered
+/// one, the heuristic spent 2 sampler draws declining it, and the two agents' draw streams
+/// parted on a matched board (chaos bb2020 seed 4 k=15). bb2016's mechanic has no PA conjunct
+/// (`bb2016/PassMechanic.java:100`), so its twin keeps the bare check.
+fn thrower_eligible_to_reroll(game: &Game) -> bool {
+    // bb2016's mechanic has NO PA conjunct (`bb2016/PassMechanic.java:100` — LRB6 passing is
+    // AG-based, the stat may be 0 for everyone): dispatch on rules exactly as Java's mechanic
+    // factory does, because bb2016 games execute THIS step file too (chaos bb2016 seed 51 went
+    // red when the PA gate was applied unconditionally: Java offered the Minotaur's pass re-roll,
+    // Rust suppressed it, and the agents' sampler streams parted).
+    if game.rules == ffb_model::enums::Rules::Bb2016 {
+        return true;
+    }
+    game.thrower_id.as_deref()
+        .and_then(|id| game.player(id))
+        .map(|p| p.passing_with_modifiers() > 0)
+        .unwrap_or(false)
+}
+
 impl Step for StepPass {
     fn id(&self) -> StepId { StepId::Pass }
 
@@ -334,7 +357,7 @@ impl StepPass {
             }
             PassResult::FUMBLE => {
                 // Java: mechanic.eligibleToReRoll → askForReRollIfAvailable
-                if !already_rerolled {
+                if !already_rerolled && thrower_eligible_to_reroll(game) {
                     if let Some(prompt) = ask_for_reroll_if_available(game, "PASS", self.minimum_roll, true) {
                         self.re_rolled_action = Some("PASS".into());
                         self.re_roll_source = Some("TRR".into());
@@ -345,7 +368,7 @@ impl StepPass {
             }
             PassResult::INACCURATE | PassResult::WILDLY_INACCURATE => {
                 // Java: askForReRollIfAvailable before routing to missed pass
-                if !already_rerolled {
+                if !already_rerolled && thrower_eligible_to_reroll(game) {
                     if let Some(prompt) = ask_for_reroll_if_available(game, "PASS", self.minimum_roll, false) {
                         self.re_rolled_action = Some("PASS".into());
                         self.re_roll_source = Some("TRR".into());
@@ -454,6 +477,35 @@ mod tests {
 
     fn make_step() -> StepPass {
         StepPass::new("end".into(), "missed".into(), "saved_fumble".into())
+    }
+
+    /// Java bb2020 `PassMechanic.eligibleToReRoll`: `reRolledAction != PASS &&
+    /// thrower.getPassingWithModifiers() > 0`. A PA-less thrower's fumbled pass gets NO re-roll
+    /// offer (chaos bb2020 seed 4 k=15: the Minotaur, passing 0 — Java silent, Rust dialoged,
+    /// and the agents' sampler streams parted on a matched board).
+    #[test]
+    fn pa_less_thrower_gets_no_reroll_offer() {
+        let mut game = make_game_with_thrower(0);
+        game.turn_data_mut().rerolls = 3;
+        let mut step = make_step();
+        let out = step.start(&mut game, &mut ffb_model::util::rng::GameRng::new(0));
+        assert!(out.prompt.is_none(), "PA 0 thrower must not be offered a pass re-roll");
+    }
+
+    #[test]
+    fn pa_thrower_still_gets_the_reroll_offer() {
+        let mut game = make_game_with_thrower(4);
+        game.turn_data_mut().rerolls = 3;
+        let mut step = make_step();
+        // Find a seed whose pass d6 fails a 4+ (and is not a natural 6).
+        let mut seed = 0u64;
+        loop {
+            let r = ffb_model::util::rng::GameRng::new(seed).d6();
+            if r > 1 && r < 4 { break; }
+            seed += 1;
+        }
+        let out = step.start(&mut game, &mut ffb_model::util::rng::GameRng::new(seed));
+        assert!(out.prompt.is_some(), "a PA 4+ thrower's failed pass is offered the TRR");
     }
 
     fn make_game_with_thrower(pa: i32) -> Game {

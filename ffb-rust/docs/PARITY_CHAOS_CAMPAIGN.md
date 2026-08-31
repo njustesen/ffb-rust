@@ -43,7 +43,7 @@ New surface, by mechanism:
 | chaos v chaos, `--heur-classes all`, seeds 1-100 | sampled (1.0) |
 |---|---|
 | bb2016 | 67/100 → **100/100** (ITER2) 🏁 |
-| bb2020 | 60/100 → 92 (ITER1) → **97/100** (ITER3) |
+| bb2020 | 60 → 92 (ITER1) → 97 (ITER3) → **100/100** (ITER4) 🏁 |
 | bb2025 | 74/100 → **98/100** (ITER1) |
 
 Baseline 2026-08-31, binary `68fa1851e` (`rust_total=` 30–36 s). Every edition is red this time —
@@ -140,3 +140,31 @@ Java draws=40 entering k=16. The 2-draw split happens during the k=15 pass activ
 `FFB_DRAWS` shows Rust `cls=move total=40` right after the Activate (draws 38→40 on the FIRST Move
 prompt), then flat. Next step: same per-prompt draw log on the JAVA side (JDRAW) to see which
 prompt Java answers with fewer draws — the offset, not the k=16 choice, is the unit.
+
+## ITER4 — a PA-less thrower's failed pass gets NO re-roll offer (bb2020/25); bb2016 has no PA conjunct
+
+**Seed**: bb2020 seed 4 again — after ITER3 both agents declare the Minotaur PASS, resolve it
+identically, and the boards stay matched; but `FFB_DRAWS` showed the sampler streams parting
+during that activation: Rust's reroll arm spent 2 draws on a `ReRollOffer(TRR, PASS)` that Java
+never dialoged (`JSTATE i=15` has no dialog row; `RUST_STEPPASS roll=0 result=None`).
+
+**Root cause**: Java gates the WHOLE offer block (Pass-skill dialog + TRR ask) behind
+`mechanic.eligibleToReRoll(reRolledAction, thrower)`. bb2020/bb2025:
+`reRolledAction != PASS && thrower.getPassingWithModifiers() > 0`; bb2016: the bare
+`reRolledAction != PASS`. Rust's step files carried only the first conjunct — a PA-0 thrower
+(roll=0, auto-FUMBLE) was offered a re-roll for a die that was never rolled. The offer changes no
+hashed state; only the agents' draw counters part, and the NEXT activation picks differently.
+
+**Second half (the bb2016 lesson repeated)**: gating unconditionally sent chaos bb2016 100→99
+(seed 51, the SAME shape inverted — Java bb2016 offers the Minotaur's pass re-roll, Rust now
+suppressed it). bb2016 games execute these same step files, so the helper dispatches on
+`game.rules` exactly as Java's mechanic factory does. The edition-gated-generator-defaults lesson
+generalises: an edition-specific conjunct in a SHARED step must be rules-dispatched, never assumed
+from the file's directory name.
+
+**Fix**: `thrower_eligible_to_reroll(game)` in `bb2020/pass/step_pass.rs` (2 sites) and
+`bb2025/pass/step_pass.rs` (3 sites, incl. the Pass-skill offers); bb2016 → always true. Tests
+`pa_less_thrower_gets_no_reroll_offer` / `pa_thrower_still_gets_the_reroll_offer`.
+
+**Gate**: chaos bb2016 **100** / bb2020 **100** 🏁 / bb2025 98 ({28, 77} unchanged). Amazon ×3 +
+lineman ×3 100/100, ffb-engine 7369/0.

@@ -80,6 +80,29 @@ impl StepPass {
     }
 }
 
+
+/// Java `PassMechanic.eligibleToReRoll` (bb2020/bb2025): `reRolledAction != PASS &&
+/// thrower.getPassingWithModifiers() > 0`. The first conjunct is the caller's
+/// `!already_rerolled`; this is the second. A PA-less thrower (the chaos Minotaur, passing 0:
+/// roll=0, auto-FUMBLE) gets NO re-roll offer and no Pass-skill dialog in Java — Rust offered
+/// one, the heuristic spent 2 sampler draws declining it, and the two agents' draw streams
+/// parted on a matched board (chaos bb2020 seed 4 k=15). bb2016's mechanic has no PA conjunct
+/// (`bb2016/PassMechanic.java:100`), so its twin keeps the bare check.
+fn thrower_eligible_to_reroll(game: &Game) -> bool {
+    // bb2016's mechanic has NO PA conjunct (`bb2016/PassMechanic.java:100` — LRB6 passing is
+    // AG-based, the stat may be 0 for everyone): dispatch on rules exactly as Java's mechanic
+    // factory does, because bb2016 games execute THIS step file too (chaos bb2016 seed 51 went
+    // red when the PA gate was applied unconditionally: Java offered the Minotaur's pass re-roll,
+    // Rust suppressed it, and the agents' sampler streams parted).
+    if game.rules == ffb_model::enums::Rules::Bb2016 {
+        return true;
+    }
+    game.thrower_id.as_deref()
+        .and_then(|id| game.player(id))
+        .map(|p| p.passing_with_modifiers() > 0)
+        .unwrap_or(false)
+}
+
 impl Step for StepPass {
     fn id(&self) -> StepId { StepId::Pass }
 
@@ -420,7 +443,7 @@ impl StepPass {
                 // reroll block precedes handleFailedPass/handleSafePass, so a Pass-skill
                 // re-roll can roll the fumble away entirely before Safe Pass is consulted
                 // (amazon seed 34 i=45: roll 1 → auto Pass re-roll 5 → ACCURATE → catch).
-                if !already_rerolled {
+                if !already_rerolled && thrower_eligible_to_reroll(game) {
                     if let Some(prompt) = self.pass_skill_offer(game) {
                         let mut out = StepOutcome::cont().with_prompt(prompt);
                         if let Some(ev) = roll_event { out = out.with_event(ev); }
@@ -510,7 +533,7 @@ impl StepPass {
             }
             PassResult::FUMBLE => {
                 // Java: askForReRollIfAvailable before handling fumble
-                if !already_rerolled {
+                if !already_rerolled && thrower_eligible_to_reroll(game) {
                     // Java OFFERS the pass skill (a dialog), it does not spend it silently.
                     if let Some(prompt) = self.pass_skill_offer(game) {
                         let mut out = StepOutcome::cont().with_prompt(prompt);
@@ -552,7 +575,7 @@ impl StepPass {
             }
             PassResult::INACCURATE | PassResult::WILDLY_INACCURATE => {
                 // Java: askForReRollIfAvailable before routing to missed pass
-                if !already_rerolled {
+                if !already_rerolled && thrower_eligible_to_reroll(game) {
                     if let Some(prompt) = self.pass_skill_offer(game) {
                         let mut out = StepOutcome::cont().with_prompt(prompt);
                         if let Some(ev) = roll_event { out = out.with_event(ev); }
