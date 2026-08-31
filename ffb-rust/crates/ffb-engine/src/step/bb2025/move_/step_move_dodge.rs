@@ -153,6 +153,11 @@ impl StepMoveDodge {
         if already_rerolled && !using_modifier_ignoring {
             let pid = player_id.as_deref().unwrap_or("").to_owned();
             let source_opt = self.re_roll_state.re_roll_source.clone();
+            if std::env::var_os("FFB_TRACE").is_some() {
+                // `RMDRR`: the re-entry re-roll attempt -- source, bank, and the roll state.
+                eprintln!("RMDRR pid={pid} source={source_opt:?} bank={} dodge_roll={} arm_bar_choice={}",
+                    game.turn_data().rerolls, self.dodge_roll, self.arm_bar_choice);
+            }
             let consumed = source_opt
                 .as_ref()
                 .map(|s| use_reroll(game, s, &pid, rng))

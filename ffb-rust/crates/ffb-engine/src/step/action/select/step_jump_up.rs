@@ -459,17 +459,24 @@ mod tests {
     }
 
     #[test]
-    fn exhausted_reroll_token_fails_without_marking_skill_used() {
-        // Java: if reRollSource is set but UtilServerReRoll.useReRoll(...) fails (token exhausted),
-        // the method returns before reaching actingPlayer.markSkillUsed(skill) at the bottom.
-        let (mut game, pid) = make_game_block_standing_up(vec![SkillId::JumpUp], 3);
+    fn failed_loner_reroll_fails_without_marking_skill_used() {
+        // Java: if reRollSource is set but UtilServerReRoll.useReRoll(...) fails, the method
+        // returns before reaching actingPlayer.markSkillUsed(skill) at the bottom. Since the
+        // unconditional-spend port (chaos ITER6: Java never re-checks the bank), the only way
+        // useReRoll FAILS is a failed Loner check — a natural 1 fails any minimum.
+        let (mut game, pid) = make_game_block_standing_up(vec![SkillId::JumpUp, SkillId::Loner], 3);
         let mut step = StepJumpUp::new();
         step.goto_label_on_failure = "FAIL".into();
         step.re_rolled_action = Some("JUMP_UP".into());
         step.re_roll_source = Some("TRR".into());
-        // No re-rolls available on the team → use_reroll(, rng) will fail (token exhausted).
-        game.turn_data_home.rerolls = 0;
-        let out = step.start(&mut game, &mut GameRng::new(0));
+        game.turn_data_home.rerolls = 1;
+        // Seed whose first d6 is a natural 1: the Loner check fails, the re-roll is lost.
+        let mut seed = 0u64;
+        loop {
+            if GameRng::new(seed).d6() == 1 { break; }
+            seed += 1;
+        }
+        let out = step.start(&mut game, &mut GameRng::new(seed));
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("FAIL"));
         assert!(

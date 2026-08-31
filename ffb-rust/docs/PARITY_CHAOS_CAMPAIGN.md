@@ -192,3 +192,33 @@ only PlayerChoice re-entry into MoveDodge) is bb2025-only.
 
 **Remaining for the campaign goal**: scales 0 and 1e6 ×3 editions; agent chaos-skill scoring;
 coverage harvest; docs+push.
+
+## ITER6 — a team re-roll spend is UNCONDITIONAL: availability gates the offer, never the spend
+
+**Seeds**: bb2025 @1e6 {6, 40} and @0 {78} (all after the scale-gate sweep; @1.0 was already green).
+
+**Root cause**: Java `RollMechanic.useTeamReRoll` (ALL editions) never re-checks the bank —
+`updateTurnDataAfterReRollUsage` decrements unconditionally and the counter may go NEGATIVE;
+`isTeamReRollAvailable` is consulted only when BUILDING an offer. The stale-reRollSource re-entry
+(ITER5's ARM_BAR quirk) therefore spends from an empty bank and re-rolls: chaos bb2025 seed 40
+@1e6 i=8 — Java's second spend at bank 0 → Loner 6 → fresh dodge 6 → the move continues. Rust's
+`if td.rerolls > 0` guard in `use_reroll` was an invention; at bank 0 it returned false → fall +
+turnover. Instrument: `RMDRR` probe (kept, FFB_TRACE-gated) printing source/bank/roll state at the
+re-entry.
+
+**Fix** (`util_server_re_roll.rs`): unconditional spend (i32 goes negative, exactly Java), bb2016
+`reroll_used` latch and one-drive decrements kept. THREE guard-era tests rewritten from the Java
+(`..._goes_negative`, one-drive tail, `use_reroll_trr_spends_even_when_empty`, and
+step_jump_up's exhausted-token test now uses the Loner-fail path — the only way useReRoll fails).
+
+**Trap logged**: "no JSTATE dialogs" in a run WITHOUT FFB_STEPTRACE is instrument absence, not
+event absence — it cost one wrong sub-theory (away_03's spend was in fact mirrored).
+
+**Gate**: chaos @1.0 ×3 100/100 (held), @0: bb2016 100, bb2020 100, bb2025 99 (seed 78 CLEARED,
+46 remains); @1e6: bb2020 100, bb2016 99 (seed 23), bb2025 99 (seed 40). Amazon ×3 + lineman ×3
+100/100, ffb-engine 7371/0.
+
+**Frontier**: ONE family + one singleton. Family: bb2016@1e6 seed 23 + bb2025@1e6 seed 40 — Rust's
+engine/agent produces NO HandOver candidates where Java declares HAND_OVER_MOVE (bb2016 k=134:
+Java Home7/HandOver:8, Rust none, RELIG shows home_07:Move|Pass only). Singleton: bb2025@0 seed 46
+(away_09 Move resolution).

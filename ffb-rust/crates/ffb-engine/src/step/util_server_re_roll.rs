@@ -190,7 +190,15 @@ pub fn use_reroll(
         // Structurally invisible while the parity contract declined every offer.
         let is_bb2016 = game.rules == ffb_model::enums::Rules::Bb2016;
         let td = game.turn_data_mut();
-        if td.rerolls > 0 {
+        // Java `RollMechanic.useTeamReRoll` (all three editions) NEVER re-checks the bank: reaching
+        // useReRoll means the OFFER was made (availability is an ask-time check), and
+        // `updateTurnDataAfterReRollUsage` decrements unconditionally — the counter can go
+        // NEGATIVE. The stale-reRollSource re-entry (ARM_BAR answer into StepMoveDodge) reaches
+        // this with the bank already empty, and Java spends anyway and re-rolls (chaos bb2025
+        // seed 40 @1e6 i=8: Java's second spend at bank 0 → Loner 6 → fresh dodge 6 → the move
+        // continues; Rust's `if rerolls > 0` guard returned false → fall + turnover). The guard
+        // was a Rust invention; `rerolls` is i32 and may go negative exactly as Java's does.
+        {
             td.rerolls -= 1;
             if is_bb2016 {
                 td.reroll_used = true;
@@ -217,7 +225,6 @@ pub fn use_reroll(
             }
             return loner_roll(game, player_id, rng);
         }
-        return false;
     }
 
     // Skill-based re-roll: mark the skill as used.
@@ -244,6 +251,24 @@ pub fn use_reroll(
 
 #[cfg(test)]
 mod tests {
+    /// Java `RollMechanic.useTeamReRoll` decrements the bank UNCONDITIONALLY — availability is an
+    /// ask-time check only, and the stale-source re-entry (ARM_BAR → StepMoveDodge) legitimately
+    /// spends from an empty bank, going negative (chaos bb2025 seed 40 @1e6).
+    #[test]
+    fn a_team_reroll_spend_at_bank_zero_still_consumes_and_goes_negative() {
+        use ffb_model::enums::{Rules, ReRollSource};
+        let mut game = ffb_model::model::game::Game::new(
+            crate::step::framework::test_team("home", 0),
+            crate::step::framework::test_team("away", 0),
+            Rules::Bb2025,
+        );
+        game.turn_data_mut().rerolls = 0;
+        let mut rng = ffb_model::util::rng::GameRng::new(0);
+        let consumed = use_reroll(&mut game, &ReRollSource::new("TRR"), "nobody", &mut rng);
+        assert!(consumed, "the spend is unconditional once the offer was made");
+        assert_eq!(game.turn_data_mut().rerolls, -1, "the counter goes negative, as Java's does");
+    }
+
     /// Java bb2016 `RollMechanic.minimumLonerRoll` returns a FIXED 4 (the LRB6 Loner has no
     /// printed value); bb2020/25 read the skill value. A valueless bb2016 Loner must NOT
     /// auto-succeed (chaos bb2016 seed 10 i=8: Loner 3 fails min 4, the GFI re-roll is lost).
@@ -458,12 +483,14 @@ mod tests {
         assert_eq!(game.turn_data_home.rerolls, 2);
         assert_eq!(game.turn_data_home.rerolls_brilliant_coaching_one_drive, 0);
 
-        // An empty pool consumes nothing at all.
+        // Java's updateTurnDataAfterReRollUsage never checks the pool: an "empty" pool still
+        // spends (to -1) and still consumes the outstanding one-drive grant.
         let mut game = make_game();
         game.turn_data_home.rerolls = 0;
         game.turn_data_home.rerolls_brilliant_coaching_one_drive = 1;
-        assert!(!use_reroll(&mut game, &src, "nobody", &mut GameRng::new(0)));
-        assert_eq!(game.turn_data_home.rerolls_brilliant_coaching_one_drive, 1);
+        assert!(use_reroll(&mut game, &src, "nobody", &mut GameRng::new(0)));
+        assert_eq!(game.turn_data_home.rerolls, -1);
+        assert_eq!(game.turn_data_home.rerolls_brilliant_coaching_one_drive, 0);
     }
 
     fn add_player_with_skill(game: &mut Game, id: &str, skill: SkillId) {
@@ -541,14 +568,17 @@ mod tests {
         assert!(!game.turn_data_home.reroll_used);
     }
 
+    /// Java `useTeamReRoll` has no bank check — availability gates the OFFER, never the spend
+    /// (the stale-source ARM_BAR re-entry spends from an empty bank; chaos bb2025 seed 40 @1e6).
     #[test]
-    fn use_reroll_trr_fails_when_empty() {
+    fn use_reroll_trr_spends_even_when_empty() {
         let mut game = make_game();
         game.home_playing = true;
         game.turn_data_home.rerolls = 0;
         let source = ReRollSource::new("TRR");
         let ok = use_reroll(&mut game, &source, "p1", &mut GameRng::new(0));
-        assert!(!ok);
+        assert!(ok);
+        assert_eq!(game.turn_data_home.rerolls, -1);
     }
 
     #[test]
