@@ -176,12 +176,24 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
 
         // HandOff: ball-carrier can hand off to an adjacent teammate
         if !turn_data.hand_over_used && ball_coord == Some(coord) {
+            // ON-PITCH teammates only: boxed players keep a dugout coordinate, and the two
+            // engines' box encodings differ (Rust SI = (-4,0), Java's slot fell within
+            // Chebyshev-1 of the (0,0) corner), so the raw adjacency disagreed on identical
+            // boards — chaos bb2016 seed 23 @1e6. The harness's hasAdjacentTeammate carries
+            // the same isInBounds guard.
             let teammate_adjacent = team.players.iter().any(|tp| {
                 tp.id != pid
                     && game.field_model.player_coordinate(&tp.id)
-                        .map(|tc| tc.is_adjacent(coord))
+                        .map(|tc| tc.is_on_pitch() && tc.is_adjacent(coord))
                         .unwrap_or(false)
             });
+            if std::env::var_os("FFB_TRACE").is_some() {
+                let mates: Vec<String> = team.players.iter().filter(|tp| tp.id != pid).map(|tp| {
+                    let tc = game.field_model.player_coordinate(&tp.id);
+                    format!("{}@{:?}adj={:?}", tp.id, tc, tc.map(|c| c.is_adjacent(coord)))
+                }).collect();
+                eprintln!("RHANDOFF pid={pid} coord={coord:?} adj={teammate_adjacent} {}", mates.join(" "));
+            }
             if teammate_adjacent {
                 actions.push(Action::ActivatePlayer {
                     player_id: pid.clone(),

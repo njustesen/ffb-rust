@@ -3747,7 +3747,12 @@ public class ParityRunner {
         for (Player<?> tp : teammates) {
             if (tp.getId().equals(self.getId())) continue;
             FieldCoordinate tc = fm.getPlayerCoordinate(tp);
-            if (tc != null && isAdjacentCoord(coord, tc)) return true;
+            // Boxed players keep a DUGOUT coordinate, and some box slots are within Chebyshev-1
+            // of the pitch corners: a seriously-injured teammate "adjacent" to a carrier on (0,0)
+            // granted a phantom HAND_OVER (chaos bb2016 seed 23 @1e6, k=134 — Rust's box encoding
+            // is farther out, so only the Java side offered it). Only ON-PITCH teammates count.
+            if (tc != null && FieldCoordinateBounds.FIELD.isInBounds(tc)
+                && isAdjacentCoord(coord, tc)) return true;
         }
         return false;
     }

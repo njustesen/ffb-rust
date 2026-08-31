@@ -40,11 +40,14 @@ New surface, by mechanism:
 
 ## Status
 
-| chaos v chaos, `--heur-classes all`, seeds 1-100 | sampled (1.0) |
-|---|---|
-| bb2016 | 67/100 → **100/100** (ITER2) 🏁 |
-| bb2020 | 60 → 92 (ITER1) → 97 (ITER3) → **100/100** (ITER4) 🏁 |
-| bb2025 | 74 → 98 (ITER1) → **100/100** (ITER5) 🏁 |
+| chaos v chaos, seeds 1-100 | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| bb2016 | **100** | **100** | **100** |
+| bb2020 | **100** | **100** | **100** |
+| bb2025 | **100** | **100** | **100** |
+
+**🏁 ALL NINE PARITY GATES GREEN (2026-08-31, ITER8).** From baselines 67/60/74 @1.0 via 8
+iterations. Remaining campaign halves: agent chaos-skill scoring; coverage harvest; docs+push.
 
 Baseline 2026-08-31, binary `68fa1851e` (`rust_total=` 30–36 s). Every edition is red this time —
 Horns/Frenzy/Wild Animal are new even in bb2016. Control: `--agent random` chaos was 100/100 ×3 in
@@ -251,3 +254,22 @@ amazon ×3 + lineman ×3 100/100; ffb-engine 7372/0, ffb-model 2798/0.
 Rust produces NO HandOver candidates where Java declares HAND_OVER_MOVE (Java Home7/HandOver:8 at
 k=134; Rust RELIG shows home_07:Move|Pass — the HandOver action is missing from Rust's
 ELIGIBILITY, upstream of the agent).
+
+## ITER8 — only ON-PITCH teammates make a carrier hand-off eligible (harness + engine)
+
+**Seeds**: the last two — bb2016@1e6 seed 23, bb2025@1e6 seed 40. Family signature: `JELIG
+Home7:Move|Pass|HandOver` vs `RELIG home_07:Move|Pass` on MATCHED boards.
+
+**Root cause**: the carrier stood on the (0,0) corner; his only Chebyshev-neighbour was a
+seriously-injured teammate in the DUGOUT. Boxed players keep a coordinate, and the two engines'
+box encodings differ — Rust stores the SI slot at (-4,0) (the state string only PRINTS -1,-1),
+Java's slot fell within distance 1 of the corner — so `ParityRunner.hasAdjacentTeammate` counted
+a boxed player and offered a phantom HAND_OVER on the Java side only. `RHANDOFF` probe (kept,
+FFB_TRACE-gated in `legal_actions`) printed every teammate's raw coordinate and verdict.
+
+**Fix**: `hasAdjacentTeammate` requires `FieldCoordinateBounds.FIELD.isInBounds(tc)` (both Java
+trees, jar rebuilt, `check_java_trees.py --fix` synced); Rust's `legal_actions` HandOff gains the
+symmetric `is_on_pitch()` guard.
+
+**Gate**: 🏁 chaos ×3 editions × scales 0/1.0/1e6 ALL 100/100; amazon ×3 + lineman ×3 100/100;
+random controls chaos+amazon+lineman ×3 editions 100/100 (isolated root); ffb-engine 7372/0.
