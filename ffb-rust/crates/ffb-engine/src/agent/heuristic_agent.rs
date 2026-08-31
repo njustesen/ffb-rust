@@ -4225,7 +4225,11 @@ fn pass_weight(
     let mech = crate::mechanic::pass_mechanic_for(g.rules);
     let dist = mech.find_passing_distance(g, Some(tc), Some(rc), false)?;
     let p = g.player(thrower)?;
-    let base_target = mech.minimum_roll_simple(p, dist, &[])?;
+    // Java (BallMoves.gradeFaces) bails ONLY on an illegal distance — it never consults the
+    // minimum roll. Bailing here on `minimum_roll_simple == None` dropped every pass candidate
+    // for a PA-less thrower (chaos bb2020 seed 4 k=15: the Minotaur, passing 0 — Java built
+    // Home1/Pass:14, Rust built none and blitzed instead). The minimum is only trace fodder.
+    let base_target = mech.minimum_roll_simple(p, dist, &[]);
     let tz_on_thrower = f.tz[side_idx(m.home)][ixc(tc)] as i32;
 
     // Roll all six faces through the engine's own grader, so FUMBLE is separated from merely
@@ -4269,7 +4273,7 @@ fn pass_weight(
 
     if std::env::var_os("FFB_PASS_TRACE2").is_some() {
         eprintln!(
-            "PW dist={:?} tgt={} pAcc={:.2} pFum={:.2} pScat={:.2} pCatch={:.2} pC={:.2} \
+            "PW dist={:?} tgt={:?} pAcc={:.2} pFum={:.2} pScat={:.2} pCatch={:.2} pC={:.2} \
              pLost={:.2} v={:.2} risk={:.2} scoresNow={} hopeless={} rescues={}",
             dist, base_target, p_accurate, p_fumble, p_scatter, r.p_catch, p_complete,
             p_lost, v, risk, r.scores_now, hopeless, rescues

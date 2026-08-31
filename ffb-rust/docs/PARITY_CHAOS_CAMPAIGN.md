@@ -43,7 +43,7 @@ New surface, by mechanism:
 | chaos v chaos, `--heur-classes all`, seeds 1-100 | sampled (1.0) |
 |---|---|
 | bb2016 | 67/100 → **100/100** (ITER2) 🏁 |
-| bb2020 | 60/100 → **92/100** (ITER1) |
+| bb2020 | 60/100 → 92 (ITER1) → **97/100** (ITER3) |
 | bb2025 | 74/100 → **98/100** (ITER1) |
 
 Baseline 2026-08-31, binary `68fa1851e` (`rust_total=` 30–36 s). Every edition is red this time —
@@ -115,3 +115,28 @@ ffb-engine 7367/0. Probe first: bb2016 20/20.
 **Remaining reds**: bb2020 {4,10,17,18,26,70,76,85} — family: agent-choice divergence on matched
 hashes (Rust RSUM shows ZERO home_01/Pass candidates at seed 4 k=15 where Java declares PASS_MOVE).
 bb2025 {28,77}.
+
+## ITER3 — a PA-less thrower still gets pass candidates (agent, Rust-only bail removed)
+
+**Seed**: bb2020 seed 4, resolving i=14 — Rust declares home_02 Blitz where Java declares Home1
+(the Minotaur, passing 0) PASS_MOVE, on MATCHED hashes. `FFB_CANDSUM` was the decisive instrument:
+Java `JSUM k=15 n=1815 ... Home1/Pass:14`, Rust `RSUM k=15 n=1801` with NO Pass rows — exactly 14
+candidates short, every other per-player count identical.
+
+**Root cause**: Rust `pass_weight` (heuristic_agent.rs) bailed with `?` on
+`mech.minimum_roll_simple(...)`, which is None for a PA-less thrower. Java's `BallMoves.gradeFaces`
+bails ONLY on an illegal distance and never consults the minimum roll — the six faces are graded
+through the engine's own `evaluatePass`, PA-less or not. The Rust bail was an extra gate with no
+Java line behind it; the minimum is now computed only for the trace print.
+
+**Gate**: chaos bb2020 92→**97** (probe 16/20→19/20; seeds 10/17/18 cleared, their
+HandOffMove-vs-PASS_MOVE "declaration divergences" were all this), bb2016 100 (held), bb2025 98
+(unchanged). Amazon ×3 + lineman ×3 100/100 (the fix touches shared agent scoring — full wave
+re-run), ffb-engine 7367/0.
+
+**Frontier after ITER3**: bb2020 {4, 26, 70}; bb2025 {28, 77}. Seed 4's divergence moved to i=15:
+identical candidate sets (n=1735 both) but the agents' DRAW counters differ — Rust draws=42 vs
+Java draws=40 entering k=16. The 2-draw split happens during the k=15 pass activation:
+`FFB_DRAWS` shows Rust `cls=move total=40` right after the Activate (draws 38→40 on the FIRST Move
+prompt), then flat. Next step: same per-prompt draw log on the JAVA side (JDRAW) to see which
+prompt Java answers with fewer draws — the offset, not the k=16 choice, is the unit.
