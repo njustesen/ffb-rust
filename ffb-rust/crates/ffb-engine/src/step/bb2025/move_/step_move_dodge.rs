@@ -159,7 +159,14 @@ impl StepMoveDodge {
                 .unwrap_or(false);
             if consumed {
                 self.re_roll_used = true;
-                // Dodge roll was reset to 0 when the re-roll offer was issued; fresh d6 below
+                // Java: `doRoll = reRolledAction && source != null` → `dodge(true)` rolls a FRESH
+                // die on EVERY executeStep entry in this state — including the ARM_BAR PlayerChoice
+                // re-entry, where the stale reRollSource re-triggers useReRoll (a SECOND team
+                // re-roll + Loner) and the dodge is rolled again (chaos bb2025 seed 28 i=60: Java
+                // dodge 2-fail → TRR+Loner → 2-fail → ARM_BAR answer → TRR+Loner AGAIN → fresh 5
+                // SUCCEEDS and the move continues; Rust reused the stale 2 and fell). Resetting
+                // here is Java's dodge(doRoll=true), not just the offer-time reset.
+                self.dodge_roll = 0;
             } else {
                 return self.fail_dodge(game);
             }
@@ -389,6 +396,37 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("fail"));
+    }
+
+    /// Java `StepMoveDodge.executeStep` (bb2025): with reRolledAction=DODGE and a live
+    /// reRollSource, EVERY entry re-runs useReRoll and rolls a FRESH dodge die — including the
+    /// ARM_BAR PlayerChoice re-entry (chaos bb2025 seed 28 i=60: the answer burns a SECOND team
+    /// re-roll and the fresh die succeeds; Rust reused the stale failed die and fell).
+    #[test]
+    fn arm_bar_answer_rerolls_the_dodge_with_a_fresh_die() {
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.dodging = true;
+        game.turn_data_mut().rerolls = 2;
+        let mut step = StepMoveDodge::new("fail".into());
+        step.re_roll_state.re_rolled_action =
+            Some(ffb_model::model::re_rolled_action::ReRolledAction::new("DODGE"));
+        step.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
+        step.dodge_roll = 2; // the stale failed die from before the ARM_BAR prompt
+        // Seed whose first d6 is a 6 — the fresh roll must succeed where the stale 2 fails.
+        let mut seed = 0u64;
+        loop {
+            if ffb_model::util::rng::GameRng::new(seed).d6() == 6 { break; }
+            seed += 1;
+        }
+        let mut rng = ffb_model::util::rng::GameRng::new(seed);
+        let before = rng.call_count;
+        let out = step.handle_command(
+            &Action::SelectPlayer { player_id: String::new() }, &mut game, &mut rng);
+        assert!(rng.call_count > before, "the ARM_BAR re-entry must roll a fresh dodge die");
+        assert_eq!(out.action, StepAction::NextStep,
+            "a fresh 6 succeeds; the stale 2 must not be reused");
     }
 
     /// Regression (human seed 13): a Dodge-skill player's failed-dodge re-roll is CANCELLED by an

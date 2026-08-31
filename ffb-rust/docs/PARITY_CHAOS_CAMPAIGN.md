@@ -44,7 +44,7 @@ New surface, by mechanism:
 |---|---|
 | bb2016 | 67/100 → **100/100** (ITER2) 🏁 |
 | bb2020 | 60 → 92 (ITER1) → 97 (ITER3) → **100/100** (ITER4) 🏁 |
-| bb2025 | 74/100 → **98/100** (ITER1) |
+| bb2025 | 74 → 98 (ITER1) → **100/100** (ITER5) 🏁 |
 
 Baseline 2026-08-31, binary `68fa1851e` (`rust_total=` 30–36 s). Every edition is red this time —
 Horns/Frenzy/Wild Animal are new even in bb2016. Control: `--agent random` chaos was 100/100 ×3 in
@@ -168,3 +168,27 @@ from the file's directory name.
 
 **Gate**: chaos bb2016 **100** / bb2020 **100** 🏁 / bb2025 98 ({28, 77} unchanged). Amazon ×3 +
 lineman ×3 100/100, ffb-engine 7369/0.
+
+## ITER5 — the ARM_BAR answer re-rolls the dodge with a FRESH die (bb2025)
+
+**Seeds**: bb2025 {28, 77} — the last two. Shape: Rust ends the away turn early (a fall +
+turnover) where Java's activation continues.
+
+**Root cause** (seed 28 i=60, the away Minotaur's MOVE): dodge 2-fail → TRR offered, used → Loner
+pass → fresh dodge 2-fail → TWO Arm Bar Warriors adjacent → PLAYER_CHOICE dialog. Java's
+`executeStep` re-entry after that answer passes through the re-roll block AGAIN — the stale
+`reRollSource` was never cleared — so `useReRoll` burns a SECOND team re-roll (+ Loner) and
+`dodge(doRoll=true)` rolls a FRESH die (5 → SUCCESS, the move continues). Rust's `if dodge_roll
+== 0` gate reused the stale failed 2 → fall, injury, turnover. Java's quirk is ground truth:
+`doRoll = reRolledAction && source != null` makes EVERY entry in that state roll fresh.
+
+**Fix** (`bb2025/move_/step_move_dodge.rs`): reset `dodge_roll = 0` in the consumed-re-roll
+branch — Java's `dodge(true)`, not just the offer-time reset. Test
+`arm_bar_answer_rerolls_the_dodge_with_a_fresh_die`. bb2016/bb2020 twins untouched: Arm Bar (the
+only PlayerChoice re-entry into MoveDodge) is bb2025-only.
+
+**Gate**: chaos **bb2016 100 / bb2020 100 / bb2025 100** — 🏁 ALL THREE EDITIONS GREEN @ scale
+1.0. Amazon ×3 + lineman ×3 100/100, ffb-engine 7370/0.
+
+**Remaining for the campaign goal**: scales 0 and 1e6 ×3 editions; agent chaos-skill scoring;
+coverage harvest; docs+push.
