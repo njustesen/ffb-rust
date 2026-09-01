@@ -118,3 +118,35 @@ Regeneration exercised+evented (bb2025) / exercised-unevented (bb2016/20 — rol
 event site); SafePairOfHands + DumpOff + Swoop + PrimalSavagery exercised-unevented (prompted,
 pinned DECLINE by both contracts — their USE paths are undriveable coach dialogs, genuinely dead
 under the harness); Animosity — no event, engine-internal (parity is the proof).
+
+
+---
+
+# Event coverage — HeuristicAgent, dark_elf v dark_elf (harvested 2026-09-01)
+
+Per-edition detail: `EVENT_COVERAGE_dark_elf_bb2016.md` / `_bb2020.md` / `_bb2025.md` (each a
+clean 100-seed run at scale 1.0; parity 100/100 in all three).
+
+## What dark_elf reached that no earlier race did
+
+- **The gaze stars execute** (ITER1): `BlackInk` declared 138× (bb2020, star 54496) and
+  `AutoGazeZoat` 188× (bb2025, Zoat 39558) — both were silently deselected by the harness before
+  this campaign. The gaze itself is exercised-unevented (retirement bit + hashes are the proof).
+- **PUNT is driven end-to-end for the first time in ANY campaign** (ITER3-5): 43 `Punt`
+  declarations resolved in bb2025 (direction roll, bounce, punter retirement); the PuntToCrowd
+  boundary dialog is pinned DECLINE by contract. Punt had been unreachable since the dead-step
+  frontier.
+- **MultipleBlock under the heuristic**: 67 declarations (bb2020, Helmut Wulf) including the
+  defender-picks-the-die `DialogOpponentBlockSelection` path (ITER7 harness case).
+- **block 3 dice: 4** (bb2025) — first non-zero since the checklist began tracking it.
+- `hitAndRun` 82 (bb2025), `passBlock` 114 (bb2020), `regenerationRoll` 13 (bb2025),
+  `throwAtStallingPlayer` 1 (bb2025); dodge volume is the highest of any race (1019 successes
+  bb2016) — an all-Dodge/Agility roster.
+
+Buckets (dark_elf's new skills): Black Ink / Zoat gaze / Punt / Multiple Block exercised (gaze +
+punt unevented beyond the declaration; hashes + RPUNTDIR trace are the record); Stand Firm
+(ITER2) and the Frenzy-blitz Foul Appearance split (ITER7) exercised-unevented (328
+`foulAppearanceRoll` bb2020); Dump-Off / Safe Pair of Hands / Swoop / Primal Savagery pinned
+DECLINE by contract (ITER6 — the pins are now HARD: a 0.0 wUse through the 1e6 softmax was a
+coin flip); Stab/Shadowing (Assassins) present in rosters, no dedicated event — parity is the
+proof.

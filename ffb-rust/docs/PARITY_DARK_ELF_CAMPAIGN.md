@@ -118,3 +118,14 @@ solo**; a "pin" through a temperature-scaled sampler is not a pin.
   editions) — a probe in it never fired; the live twin's identical text hid nothing this time.
 
 Probes kept (FFB_TRACE-gated): RPUNTDIR (punt direction inputs), REB (EndBlocking continue gate).
+
+## 🏁 NINE GATES GREEN (2026-09-01, post-ITER7 battery)
+
+dark_elf heuristic bb2016/bb2020/bb2025 × scales 1.0/0/1e6: **ALL 100/100**; random controls ×3
+editions 100/100. ffb-engine 7381/0, ffb-model 2799/0. Standing gates: amazon ×3 + lineman ×3 ALL
+100/100. Chaos-family regressions: chaos/chaos_dwarf/chaos_pact ×3 each ALL 100/100;
+then coverage harvest, memory, push.
+
+Coverage harvested ×3 (`EVENT_COVERAGE_dark_elf_*.md` + summary in `EVENT_COVERAGE.md`): the gaze
+stars, PUNT (43 resolved declarations — a first), MultipleBlock w/ defender die pick, 3-die
+blocks, Hit and Run, Pass Block all exercised. CAMPAIGN CLOSED 2026-09-01.
