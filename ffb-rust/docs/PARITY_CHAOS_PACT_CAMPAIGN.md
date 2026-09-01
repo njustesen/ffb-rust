@@ -104,3 +104,24 @@ above the successful-branch. Test: `inaccurate_throw_offer_is_bb2025_only`.
 
 **Gate**: chaos_pact @1.0 bb2016 **100** / bb2020 **100** / bb2025 **100** 🏁; ffb-engine 7380/0,
 ffb-model 2799/0. rust_total 45.6s/45.4s (bb2020/bb2025, 100 seeds). Scales + standing gates next.
+
+## ITER5 — has_ball at the injury drop-site is Java's hasBall, not coordinate equality (bb2020@1e6 seed 99)
+
+`UtilServerInjury.dropPlayer`'s ball handling uses `UtilPlayer.hasBall` = `ballInPlay &&
+!ballMoving && coords equal`. Rust's local check was bare coordinate equality, so a defender
+PUSHED ONTO A LOOSE BALL counted as its carrier: `DROPPED_BALL_CARRIER` was published and
+StepPlaceBall raised a phantom Safe-Pair-of-Hands dialog Java never shows (seed 99 i=59: away_03
+blocks home_04 into the moving ball at (11,7); Java followup@165 → next pick@167, Rust burned two
+extra draws on the dialog; found via RSUM/JSUM — candidate sets IDENTICAL at n=1764, only the
+draws differed). Fix: call the existing 1:1 `UtilPlayer::has_ball`. The same variable feeds the
+acting-team turnover check below it — also Java's shape.
+
+**Full re-verification on the new binary (the fix is in shared injury code): chaos_pact
+🏁 ALL NINE gates 100/100** (bb2016/bb2020/bb2025 × 0/1.0/1e6); amazon ×3 + lineman ×3 100/100;
+chaos ×3 + chaos_dwarf ×3 100/100; ffb-engine 7382/0, ffb-model 2799/0.
+
+**Random-control frontier**: chaos_pact random bb2016/bb2025 100/100; bb2020 93/100 — six
+NO_PROGRESS aborts, all spinning on the NEW SkillUse(SafePairOfHands) prompt: ParityRunner's
+random contract DECLINES SafePairOfHands (same list as DumpOff/PrimalSavagery/Swoop) but
+RandomAgent had no arm — the generic always-use answer carries the Block placeholder, which
+StepPlaceBall's property gate ignores, so the prompt refired forever. → ITER6.

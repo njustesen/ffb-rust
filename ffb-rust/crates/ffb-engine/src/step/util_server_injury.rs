@@ -415,9 +415,13 @@ fn drop_player_with_base_rng(
     }
 
     // Ball handling — Java places this OUTSIDE the if/else above, so it runs for Ball & Chain too.
-    let has_ball = game.field_model.ball_coordinate
-        .map(|bc| game.field_model.player_at(bc).map(|id| id.as_str() == player_id).unwrap_or(false))
-        .unwrap_or(false);
+    // Java: UtilPlayer.hasBall(game, player) — ballInPlay && !ballMoving && coords equal. The old
+    // local check was bare coordinate equality, so a defender PUSHED ONTO A LOOSE BALL counted as
+    // its carrier: DROPPED_BALL_CARRIER was published and StepPlaceBall raised a phantom Safe Pair
+    // of Hands dialog Java never shows (chaos_pact bb2020 seed 99 @1e6 i=59: away_03 blocks
+    // home_04 into the moving ball at (11,7); Java followup@165 → next pick@167, Rust spent two
+    // extra draws on the dialog).
+    let has_ball = ffb_model::util::util_player::UtilPlayer::has_ball(game, player_id);
 
     if eligible_for_safe_pair_of_hands && has_ball {
         params.push(StepParameter::DroppedBallCarrier(Some(player_id.to_owned())));
