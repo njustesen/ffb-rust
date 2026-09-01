@@ -82,3 +82,39 @@ player distinction before converting — only verified sites were converted here
 
 **Measured @1.0**: bb2016 100/100, bb2020 100/100, bb2025 98→100 (40, 63 green single-seed);
 standing amazon ×3 + lineman ×3 100/100; randoms bb2016/bb2020 100/100.
+
+## ITER5 — the random agent mirrors the PUNT declaration (bb2025 random control 94→100)
+
+All six random-control reds were `J Activate(*,PUNT)` vs a Rust deselect: `is_handled_acting_action`
+(the ParityRunner `isHandledActingAction` mirror) never gained PUNT when the harness did. The
+control caught a contract asymmetry the heuristic gates could not.
+
+## ITER6 — a 0.0 wUse pin is not deterministic; and the batched JVM poisons on a stock NPE (@1e6)
+
+bb2025 @1e6 ran 37/100 with seeds 38-100 red CONSECUTIVELY — the signature of a mid-batch event,
+not 63 game bugs. Seed 38 alone: both drivers answered USE on a pinned-0.0 DumpOff (`JSKILL/RSKILL
+idx=0`) — the softmax at scale 1e6 flattens [0,1] to a coin flip (parity HELD; the flip was
+mirrored) and drove both engines into the undriveable DUMP_OFF pass: stock Java NPE
+(StepBlockStatistics, the dark_elf-seed-55 family) whose exception then POISONED the shared JVM
+for seeds 39-100, and a Rust `goto unknown label ''` in the dump-off chain (real engine bug, now
+unreachable again; BACKLOG candidate). Fix: the four undriveable pins (DumpOff/PrimalSavagery/
+SafePairOfHands/Swoop) still spend the sampler draws but the ANSWER is overridden to DECLINE in
+both drivers. Lesson: **consecutive seed ranges of reds = batch-state poisoning, test the seeds
+solo**; a "pin" through a temperature-scaled sampler is not a pin.
+
+## ITER7 — MB defender dialog + the Frenzy blitz Foul-Appearance edition split (@1e6 stragglers)
+
+- bb2020 seed 24: the heuristic's MULTIPLE_BLOCK reached `DialogOpponentBlockSelectionParameter`
+  (a not-own-choice roll: the DEFENDER picks the die) — no ParityRunner case, RandomStrategy has
+  none either → dialog re-fired to the sameDialog abort. Case added (+ the bb2025 PROPERTIES
+  twin): first `needsSelection()` target, die index 0, injected for the DIALOG'S team — mirroring
+  Rust's headless auto-select-0. (Own-goal avoided this time: placed ABOVE `case PLAYER_CHOICE:`.)
+- bb2020 seed 48: Java `FoulAppearanceBehaviour.handleFailure` publishes END_PLAYER_ACTION for
+  `GAZE || isBlockAction() || isBlitzing()` in bb2025 but WITHOUT `isBlitzing()` in bb2020 — a
+  bb2020 Witch Elf whose FRENZY second-block FA failed must cancel only the second block and
+  CONTINUE THE BLITZ MOVE. The shared Rust step ran the bb2025 shape for every edition; now
+  rules-dispatched. Test `failed_blitz_fa_ends_action_only_in_bb2025`. En route: the bb2020
+  `step_end_blocking.rs` twin is DEAD CODE (make_step dispatches the bb2025 twin for all
+  editions) — a probe in it never fired; the live twin's identical text hid nothing this time.
+
+Probes kept (FFB_TRACE-gated): RPUNTDIR (punt direction inputs), REB (EndBlocking continue gate).

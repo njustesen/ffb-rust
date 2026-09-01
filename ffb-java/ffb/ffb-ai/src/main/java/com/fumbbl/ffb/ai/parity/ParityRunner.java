@@ -1256,6 +1256,49 @@ public class ParityRunner {
                 break;
             }
 
+            case OPPONENT_BLOCK_SELECTION:
+            case OPPONENT_BLOCK_SELECTION_PROPERTIES: {
+                // Multi-block DEFENDER die selection (DialogOpponentBlockSelectionParameter /
+                // its bb2025 PROPERTIES twin, shown by StepBlockRollMultiple when a roll is not
+                // ownChoice): pick DIE INDEX 0 for the first still-unselected target, no pro,
+                // no reroll - mirroring Rust's headless auto-select-0. Unhandled, it fell to
+                // the NON-SEEDED RandomStrategy which has no case either, so the dialog
+                // re-fired until the sameDialog abort truncated the game (dark_elf bb2020 @1e6
+                // seed 24: Java 48 records vs Rust 127). BlockRollProperties shares no
+                // supertype with BlockRoll, so each dialog class is walked in its own branch.
+                String obsTargetId = null;
+                String obsTeamId = null;
+                if (dialog instanceof com.fumbbl.ffb.dialog.DialogOpponentBlockSelectionParameter) {
+                    com.fumbbl.ffb.dialog.DialogOpponentBlockSelectionParameter ob =
+                        (com.fumbbl.ffb.dialog.DialogOpponentBlockSelectionParameter) dialog;
+                    obsTeamId = ob.getTeamId();
+                    for (com.fumbbl.ffb.model.BlockRoll roll : ob.getBlockRolls()) {
+                        if (roll.needsSelection()) { obsTargetId = roll.getTargetId(); break; }
+                    }
+                } else if (dialog instanceof com.fumbbl.ffb.dialog.DialogOpponentBlockSelectionPropertiesParameter) {
+                    com.fumbbl.ffb.dialog.DialogOpponentBlockSelectionPropertiesParameter ob =
+                        (com.fumbbl.ffb.dialog.DialogOpponentBlockSelectionPropertiesParameter) dialog;
+                    obsTeamId = ob.getTeamId();
+                    for (com.fumbbl.ffb.model.BlockRollProperties roll : ob.getBlockRolls()) {
+                        if (roll.needsSelection()) { obsTargetId = roll.getTargetId(); break; }
+                    }
+                }
+                if (obsTargetId != null) {
+                    com.fumbbl.ffb.net.commands.ClientCommandBlockOrReRollChoiceForTarget obsCmd =
+                        new com.fumbbl.ffb.net.commands.ClientCommandBlockOrReRollChoiceForTarget(
+                            obsTargetId, 0, -1, null);
+                    if (obsTeamId != null) {
+                        MatchRunner.injectForTeam(gameState, obsCmd,
+                            obsTeamId.equals(game.getTeamHome().getId()));
+                    } else {
+                        MatchRunner.inject(gameState, obsCmd);
+                    }
+                } else {
+                    game.setDialogParameter(null);
+                }
+                break;
+            }
+
             case RE_ROLL_BLOCK_FOR_TARGETS: {
                 // Multi-block die selection (DialogReRollBlockForTargetsParameter, shown by
                 // StepBlockRollMultiple): pick DIE INDEX 0 for the first still-unselected

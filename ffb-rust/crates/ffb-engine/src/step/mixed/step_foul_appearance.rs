@@ -236,12 +236,16 @@ impl StepFoulAppearance {
             game.turn_data_mut().blitz_used = true;
         }
 
-        // Java (bb2025 FoulAppearanceBehaviour.handleFailure): if (GAZE || blockAction || blitzing)
-        //   → publishParameter(END_PLAYER_ACTION, true)
-        // Note: the bb2020 variant of this behaviour omits `isBlitzing()` here, but this crate
-        // targets the bb2025 ruleset (see FoulAppearanceBehaviour.java bb2025 vs bb2020 diff).
+        // Java handleFailure END_PLAYER_ACTION publish — a genuine EDITION SPLIT:
+        //   bb2025 FoulAppearanceBehaviour: GAZE || isBlockAction() || isBlitzing()
+        //   bb2020 FoulAppearanceBehaviour: GAZE || isBlockAction()      (NO isBlitzing)
+        // This shared step ran the bb2025 shape for every edition, so a bb2020 Witch Elf whose
+        // FRENZY second-block Foul Appearance failed had her whole activation ended where Java
+        // cancels only the second block and CONTINUES THE BLITZ MOVE (dark_elf bb2020 @1e6
+        // seed 48 i=67: Java resumes into a Tentacles check, Rust went to the next activation).
         let end_action = player_action.map(|pa|
-            pa.is_gaze() || pa.is_block_action() || pa.is_blitzing()
+            pa.is_gaze() || pa.is_block_action()
+                || (game.rules == ffb_model::enums::Rules::Bb2025 && pa.is_blitzing())
         ).unwrap_or(false);
 
         // Java: game.setDefenderId(null)
@@ -385,6 +389,25 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::Continue);
         assert!(out.prompt.is_some());
+    }
+
+    /// Java edition split: bb2020's handleFailure publishes END_PLAYER_ACTION only for
+    /// GAZE/block actions — a failed BLITZ Foul Appearance keeps the activation alive (the
+    /// blitz move continues); bb2025 also ends blitzes.
+    #[test]
+    fn failed_blitz_fa_ends_action_only_in_bb2025() {
+        for (rules, expect_end) in [(ffb_model::enums::Rules::Bb2020, false),
+                                    (ffb_model::enums::Rules::Bb2025, true)] {
+            let mut game = make_game();
+            game.rules = rules;
+            game.home_playing = true;
+            game.acting_player.player_id = Some("atk".into());
+            game.acting_player.player_action = Some(PlayerAction::Blitz);
+            let out = StepFoulAppearance::new("END_BLOCKING").fail_fa(&mut game);
+            let ended = out.published.iter().any(|p| matches!(
+                p, crate::step::framework::StepParameter::EndPlayerAction(true)));
+            assert_eq!(ended, expect_end, "{rules:?}");
+        }
     }
 
     #[test]

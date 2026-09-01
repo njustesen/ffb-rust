@@ -168,6 +168,15 @@ public final class HeuristicDriver {
         sampler.push(wUse);          // index 0: use it
         sampler.push(1.0f - wUse);   // index 1: decline
         int idx = sampler.pick(0.20f);
+        // A 0.0 pin is NOT deterministic through the softmax: at --heur-scale 1e6 the scaled
+        // temperature flattens the distribution to a coin flip, and even at 1.0 the use branch
+        // keeps ~0.7% mass. Both agents flipped together (parity held) and drove the engines
+        // into the undriveable DUMP_OFF pass - the stock StepBlockStatistics NPE poisoned the
+        // batched JVM for every later seed (dark_elf bb2025 @1e6 seed 38 -> 63 consecutive
+        // "reds"). The draws above are still spent; the ANSWER is overridden to DECLINE.
+        if (wUse == 0.0f) {
+            idx = 1;
+        }
         if (System.getenv("FFB_DRAWS") != null) {
             // `JSKILL`: mirror of Rust's `RSKILL` -- the answer, not just the draw total.
             System.err.println("JSKILL skill=" + skillName + " w_use=" + wUse + " idx=" + idx

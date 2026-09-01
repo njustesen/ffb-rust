@@ -310,9 +310,12 @@ mod tests {
         step.out_of_bounds = true;
         step.start(&mut game, &mut GameRng::new(0));
 
+        // Java: actingPlayer.markSkillUsed — the ACTING-player mark (the hasActed() term that
+        // retires the punter); the Player-level mark follows only for usage types tracked
+        // outside the activation.
         assert!(
-            game.team_home.player("punter").unwrap().used_skills.contains(&SkillId::Punt),
-            "expected Punt skill to be marked used on the acting player"
+            game.acting_player.used_skills.contains(&SkillId::Punt),
+            "expected Punt marked used on the ACTING player (hasActed term)"
         );
     }
 }

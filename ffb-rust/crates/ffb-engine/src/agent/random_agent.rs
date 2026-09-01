@@ -186,6 +186,12 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             | PlayerActionChoice::WisdomOfTheWhiteDwarf
             // AUTO_GAZE_ZOAT: declared as ActingPlayer(MOVE) + UseSkill(zoat), like BLACK_INK.
             | PlayerActionChoice::AutoGazeZoat
+            // PUNT (bb2025): forceDispatch — the bare declaration pushes the punt sequence and
+            // the INIT_PUNT square wait is driven by the PuntTarget contract. ParityRunner's
+            // isHandledActingAction gained PUNT in the dark_elf campaign; without this mirror the
+            // Rust random agent kept DESELECTING punts Java now declares (bb2025 random control
+            // 94/100: all six reds `J Activate(*,PUNT)` vs a Rust deselect+re-pick).
+            | PlayerActionChoice::Punt
     )
 }
 

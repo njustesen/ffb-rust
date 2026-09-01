@@ -3738,6 +3738,14 @@ impl HeuristicAgent {
                     0.0,
                 );
                 let i = self.sample(0.20);
+                // A 0.0 pin is NOT deterministic through the softmax: at --heur-scale 1e6 the
+                // scaled temperature flattens the two-option distribution to a coin flip, and even
+                // at 1.0 the use branch keeps ~0.7% mass. Both agents flipped together (parity
+                // held!) and drove the engines into the undriveable DUMP_OFF pass — Java's stock
+                // StepBlockStatistics NPE then poisoned the batched JVM for every later seed
+                // (dark_elf bb2025 @1e6 seed 38 → 63 consecutive "reds"). The sample above still
+                // spends the contract's draws; the ANSWER is overridden to DECLINE (index 1).
+                let i = if w_use == 0.0 { 1 } else { i };
                 if std::env::var_os("FFB_DRAWS").is_some() {
                     // `RSKILL`: the ANSWER to a SkillUse prompt (index 0 = use), so the two sides'
                     // skill decisions can be diffed and not just their draw totals (`JSKILL`).

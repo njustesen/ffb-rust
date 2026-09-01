@@ -620,6 +620,10 @@ impl StepEndBlocking {
         let can_move_on = !self.using_stab && !self.using_chainsaw && !self.using_breathe_fire;
         let next_move_possible = UtilPlayer::is_next_move_possible(game, false);
 
+        if std::env::var_os("FFB_TRACE").is_some() {
+            eprintln!("REB is_blitz={is_blitz} can_move_on={can_move_on} tz={} next_move={next_move_possible} pa={player_action:?}",
+                attacker_state.has_tacklezones());
+        }
         if (is_blitz && can_move_on || flashes_blade)
             && attacker_state.has_tacklezones()
             && next_move_possible
