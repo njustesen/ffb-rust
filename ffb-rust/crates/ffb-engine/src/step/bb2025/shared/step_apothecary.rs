@@ -40,6 +40,9 @@ pub struct StepApothecary {
     pub attacker_poisoned: bool,
     /// Java: apothecaryType
     pub apothecary_type: Option<ApothecaryType>,
+    /// Set while the bb2025 failed-Regeneration re-roll offer (DialogReRollProperties) is up:
+    /// the casualty player whose regeneration may be re-rolled with a team re-roll.
+    regen_reroll_pending: Option<String>,
 }
 
 impl StepApothecary {
@@ -52,6 +55,7 @@ impl StepApothecary {
             defender_poisoned: false,
             attacker_poisoned: false,
             apothecary_type: None,
+            regen_reroll_pending: None,
         }
     }
 
@@ -196,8 +200,38 @@ impl StepApothecary {
                             if let Some(ev) = ev { self.pending_regeneration.push(ev); }
                             if regenerated {
                                 self.cure_poison(game);
-                            } else {
-                                // client-only: Igor/WAIT_FOR_IGOR_USE dialog — headless auto-declines
+                            } else if game.rules == ffb_model::enums::Rules::Bb2025
+                                && game.player(&defender_id)
+                                    .map(|p| p.has_skill_property(
+                                        ffb_model::model::property::named_properties::NamedProperties::CAN_ROLL_TO_SAVE_FROM_INJURY))
+                                    .unwrap_or(false)
+                            {
+                                // Only a roll that HAPPENED and failed gets the offer — the
+                                // helper returns (false, None) for a casualty WITHOUT the
+                                // Regeneration skill, and offering there invented a dialog Java
+                                // never shows (it moved seed 43's divergence EARLIER, i=8→i=6).
+                                // Java bb2025 StepApothecary.executeStep (pre-regeneration): a
+                                // failed Regeneration first offers a REGENERATION inducement
+                                // (Igor — absent from the parity teams; the client-only
+                                // WAIT_FOR_IGOR_USE dialog), then
+                                // `UtilServerReRoll.askForReRollIfAvailable(player, REGENERATION,
+                                // 4, false)` — the bb2025 RollMechanic shows
+                                // DialogReRollProperties iff a team re-roll is available.
+                                // bb2020's StepApothecary has NO such ask — edition-gated.
+                                // (chaos_pact bb2025 seed 43 i=8: the Troll's failed regen —
+                                // Java's driver spends two draws on the dialog; Rust's silence
+                                // split the agents' streams and Java's next away turn ended with
+                                // zero activations where Rust played on.)
+                                if let Some(prompt) =
+                                    crate::step::util_server_re_roll::ask_for_reroll_if_available_for(
+                                        game, Some(&defender_id), "REGENERATION", 4, false,
+                                    )
+                                {
+                                    self.regen_reroll_pending = Some(defender_id.clone());
+                                    let mut out = StepOutcome::cont().with_prompt(prompt);
+                                    for ev in pending_events { out = out.with_event(ev); }
+                                    return out;
+                                }
                             }
                         }
                     }
@@ -205,7 +239,17 @@ impl StepApothecary {
             }
         }
 
-        if do_next_step {
+        if !do_next_step {
+            return StepOutcome::cont();
+        }
+        self.finish_tail(game, pending_events)
+    }
+
+    /// Java StepApothecary.executeStep tail — Getting Even + injury side effects. Split out so
+    /// the bb2025 regeneration re-roll answer (handle_command UseReRoll) can resume here without
+    /// re-running the status switches (which would double-report and re-apply).
+    fn finish_tail(&mut self, game: &mut Game, pending_events: Vec<GameEvent>) -> StepOutcome {
+        {
             // Java StepApothecary.java:231-372 — Getting Even (Hatred). After the injury is
             // applied, if the defender's final state is a Serious Injury caused by an attacker
             // whose position carries a can-get-even-with keyword, Java pushes StepId.GETTING_EVEN
@@ -249,8 +293,6 @@ impl StepApothecary {
             for ev in side_events { out = out.with_event(ev); }
             if let Some(seq) = getting_even { out = out.push_seq(seq); }
             out
-        } else {
-            StepOutcome::cont()
         }
     }
 
@@ -398,6 +440,39 @@ impl Step for StepApothecary {
                     return self.execute_step(game, rng);
                 }
             }
+            // Java bb2025 CLIENT_USE_RE_ROLL (ReRolledActions.REGENERATION): an accepted TEAM
+            // re-roll spends via useReRoll (the Loner roll happens inside) and rolls a FRESH
+            // regeneration die; success clears the casualty (RESERVE via handleRegeneration) +
+            // seriousInjury and sets RESULT_CHOICE. Either way `passedRegeneration` — the step
+            // proceeds to its tail. Rust's folded flow reaches this AFTER the apothecary answer
+            // (Java rolls regen before its apo dialog), so the tail is all that remains; the two
+            // orders consume identical engine dice and agent draws (the apo handlers spend zero).
+            Action::UseReRoll { use_reroll } => {
+                if let Some(pid) = self.regen_reroll_pending.take() {
+                    if *use_reroll
+                        && crate::step::util_server_re_roll::use_reroll(
+                            game, &ffb_model::enums::ReRollSource::new("TRR"), &pid, rng)
+                    {
+                        let (regenerated, ev) = crate::step::util_server_injury::
+                            handle_regeneration_reporting(game, rng, &pid);
+                        if let Some(ev) = ev { self.pending_regeneration.push(ev); }
+                        if regenerated {
+                            if let Some(ir) = self.injury_result.as_mut() {
+                                if let Some(st) = game.field_model.player_state(&pid) {
+                                    ir.injury_context.set_injury(st);
+                                }
+                                ir.injury_context.serious_injury = None;
+                                ir.injury_context.apothecary_status = ApothecaryStatus::ResultChoice;
+                            }
+                        }
+                    }
+                    let mut out = self.finish_tail(game, Vec::new());
+                    for ev in std::mem::take(&mut self.pending_regeneration) {
+                        out = out.with_event(ev);
+                    }
+                    return out;
+                }
+            }
             // Java: CLIENT_APOTHECARY_CHOICE → handleApothecaryChoice(state, seriousInjury)
             Action::ApothecaryChoice { player_state, serious_injury } => {
                 if self.injury_result.is_some() {
@@ -467,6 +542,53 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2025)
+    }
+
+    fn casualty_regen_game() -> Game {
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: "troll".into(), name: "troll".into(), nr: 1, position_id: "p".into(),
+            movement: 4, strength: 5, agility: 1, passing: 0, armour: 10,
+            starting_skills: vec![SkillWithValue::new(ffb_model::enums::SkillId::Regeneration)],
+            ..Default::default()
+        });
+        game.field_model.set_player_state("troll",
+            ffb_model::enums::PlayerState::new(ffb_model::enums::PS_BADLY_HURT));
+        game.turn_data_home.rerolls = 1;
+        game
+    }
+
+    /// Java bb2025 StepApothecary CLIENT_USE_RE_ROLL(REGENERATION): the accepted team re-roll
+    /// SPENDS (useReRoll) and rolls a FRESH regeneration die (handleRegeneration rerolled=true).
+    #[test]
+    fn accepted_regen_reroll_spends_trr_and_rolls_fresh() {
+        let mut game = casualty_regen_game();
+        let mut step = StepApothecary::new();
+        step.regen_reroll_pending = Some("troll".into());
+        let mut rng = GameRng::new(0);
+        let before = rng.call_count;
+        let _ = step.handle_command(
+            &crate::action::Action::UseReRoll { use_reroll: true }, &mut game, &mut rng);
+        assert_eq!(game.turn_data_home.rerolls, 0, "the team re-roll is spent");
+        assert!(rng.call_count > before, "a fresh regeneration die is rolled");
+        assert!(step.regen_reroll_pending.is_none());
+    }
+
+    /// Java: the declined offer spends nothing and rolls nothing — passedRegeneration only.
+    #[test]
+    fn declined_regen_reroll_spends_nothing() {
+        let mut game = casualty_regen_game();
+        let mut step = StepApothecary::new();
+        step.regen_reroll_pending = Some("troll".into());
+        let mut rng = GameRng::new(0);
+        let before = rng.call_count;
+        let out = step.handle_command(
+            &crate::action::Action::UseReRoll { use_reroll: false }, &mut game, &mut rng);
+        assert_eq!(game.turn_data_home.rerolls, 1, "nothing spent on a decline");
+        assert_eq!(rng.call_count, before, "no dice rolled on a decline");
+        assert_eq!(out.action, StepAction::NextStep, "the step proceeds to its tail");
     }
 
     fn make_ir(mode: ApothecaryMode, status: ApothecaryStatus) -> InjuryResult {

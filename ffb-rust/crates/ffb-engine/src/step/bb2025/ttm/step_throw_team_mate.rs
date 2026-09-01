@@ -198,6 +198,25 @@ impl StepThrowTeamMate {
                 result: pass_result,
             };
 
+            // Java bb2025 ThrowTeamMateBehaviour: only an ACCURATE throw skips the re-roll
+            // offer — an INACCURATE one still scatters and Java offers to re-roll it BEFORE the
+            // scatter (chaos_pact bb2025 seeds 50/97: the goblin throw d6=4 → INACCURATE; Java's
+            // driver spends two draws on DialogReRollProperties that Rust never raised, splitting
+            // the agents' streams). bb2020's behaviour offers only when the throw was NOT
+            // successful (ACCURATE and INACCURATE both skip) — the shared step splits on edition.
+            let offer_eligible = if game.rules == Rules::Bb2025 {
+                pass_result != PassOutcome::Complete
+            } else {
+                !successful
+            };
+            if offer_eligible && self.re_rolled_action.is_none() && player_can_pass {
+                let is_fumble = pass_result == PassOutcome::Fumble;
+                if let Some(prompt) = ask_for_reroll_if_available(game, rerolled_action_key, self.minimum_roll, is_fumble) {
+                    self.re_rolled_action = Some(rerolled_action_key.into());
+                    self.re_roll_source = Some("TRR".into());
+                    return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
+                }
+            }
             if successful {
                 // Java: if ACCURATE && hasSkillProperty(canSkipTtmScatterOnSuperbThrow) && usingBullseye == null
                 //   show dialog → Continue (wait for Bullseye decision)
@@ -219,14 +238,6 @@ impl StepThrowTeamMate {
                     .with_event(roll_event)
                     .publish(StepParameter::UsingBullseye(self.using_bullseye.unwrap_or(false)));
             } else {
-                if self.re_rolled_action.is_none() && player_can_pass {
-                    let is_fumble = pass_result == PassOutcome::Fumble;
-                    if let Some(prompt) = ask_for_reroll_if_available(game, rerolled_action_key, self.minimum_roll, is_fumble) {
-                        self.re_rolled_action = Some(rerolled_action_key.into());
-                        self.re_roll_source = Some("TRR".into());
-                        return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
-                    }
-                }
                 return self.handle_pass_result().with_event(roll_event);
             }
         }
@@ -451,6 +462,45 @@ mod tests {
         assert!(step.re_roll_source.is_none(), "the reroll source must be cleared on decline");
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassResultParam(PassOutcome::Fumble))),
             "the original FUMBLE result must be re-emitted, not a fresh roll");
+    }
+
+    /// Java bb2025 ThrowTeamMateBehaviour: only ACCURATE skips the re-roll offer — an INACCURATE
+    /// throw is offered a re-roll before it scatters. bb2020 offers only when the throw was NOT
+    /// successful, so the same INACCURATE roll prompts under bb2025 and passes through under
+    /// bb2020 (chaos_pact bb2025 seeds 50/97).
+    #[test]
+    fn inaccurate_throw_offer_is_bb2025_only() {
+        // Find a seed whose throw comes up INACCURATE under bb2020 (no offer there).
+        let mut found = None;
+        for seed in 0..200u64 {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+            game.home_playing = true;
+            game.turn_data_home.rerolls = 1;
+            add_thrower(&mut game, "thrower", FieldCoordinate::new(10, 7), 4);
+            game.acting_player.player_id = Some("thrower".into());
+            game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+            let mut step = StepThrowTeamMate::new();
+            step.thrown_player_id = Some("tp1".into());
+            let out = step.start(&mut game, &mut GameRng::new(seed));
+            if out.published.iter().any(|p| matches!(p, StepParameter::PassResultParam(PassOutcome::Inaccurate))) {
+                assert!(out.prompt.is_none(), "bb2020 must NOT offer a re-roll on an INACCURATE throw");
+                found = Some(seed);
+                break;
+            }
+        }
+        let seed = found.expect("no seed in 0..200 produced an INACCURATE bb2020 throw");
+        // The same dice under bb2025 must PROMPT the re-roll offer instead of passing through.
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        add_thrower(&mut game, "thrower", FieldCoordinate::new(10, 7), 4);
+        game.acting_player.player_id = Some("thrower".into());
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+        let mut step = StepThrowTeamMate::new();
+        step.thrown_player_id = Some("tp1".into());
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::ReRollOffer { .. })),
+            "bb2025 offers a re-roll on the INACCURATE throw");
     }
 
     #[test]

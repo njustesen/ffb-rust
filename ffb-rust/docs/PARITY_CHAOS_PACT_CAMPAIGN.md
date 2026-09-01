@@ -73,3 +73,34 @@ handleRegeneration but NO askForReRoll. NEXT: port the regen re-roll offer into
 `bb2025/shared/step_apothecary.rs` (edition-gated `rules == Bb2025`), re-entry-safe (Rust's
 folded flow rolls regen AFTER the apo dialog where Java rolls it before — the 2 offer draws land
 at the same stream positions either way because the apo handlers consume 0 draws on both sides).
+
+## ITER3 — a failed Regeneration gets a team re-roll offer (bb2025 only; seeds 43/56/83)
+
+Java bb2025 `StepApothecary.executeStep` (pre-regeneration): casualty + Regeneration + failed roll
+→ Igor inducement first (absent from parity teams), then
+`UtilServerReRoll.askForReRollIfAvailable(player, REGENERATION, 4, false)` — the bb2025
+RollMechanic's `DialogReRollPropertiesParameter`, shown iff a team re-roll is available. The
+accepted answer spends via `useReRoll` (Loner rolled inside — the Troll's valueless Loner=4 from
+ITER1) and rolls a FRESH regen die; success clears the casualty + seriousInjury and sets
+RESULT_CHOICE. **bb2020's StepApothecary has NO such ask — edition-gated.** Rust's folded flow
+rolls regen AFTER the apo dialog (Java before it); the orders consume identical engine dice and
+agent draws (both apo handlers spend zero), recorded as a deliberate fold. The step's tail
+(Getting Even + side effects) was split into `finish_tail` so the re-roll answer resumes without
+re-running the status switches. **Wrong first cut, caught by the seed set moving EARLIER (i=8→i=6)
+not smaller**: the helper returns `(false, None)` for a casualty WITHOUT Regeneration, and
+offering there invented a dialog Java never shows — the ask is gated on the skill.
+Tests: `accepted_regen_reroll_spends_trr_and_rolls_fresh`, `declined_regen_reroll_spends_nothing`.
+
+## ITER4 — only an ACCURATE bb2025 TTM throw skips the re-roll offer (seeds 50/97)
+
+Java bb2025 `ThrowTeamMateBehaviour`: `passResult == ACCURATE → handlePassResult; else … ask` —
+an INACCURATE throw still scatters AND is offered a re-roll first. bb2020's behaviour asks only
+when `!successful` (ACCURATE and INACCURATE both skip). Rust's shared step used the bb2020 shape
+for every edition, so the d6=4 INACCURATE goblin throw got no offer — Java's driver spent two
+draws on the dialog and the streams split ~25 draws before the next matched dialog (the two-pointer
+class-matched JDRAW/RDRAW comparison found it; the plain zip kept slipping on classes only one
+side prints). Fix: `offer_eligible = (bb2025 ? result != Complete : !successful)`, offer hoisted
+above the successful-branch. Test: `inaccurate_throw_offer_is_bb2025_only`.
+
+**Gate**: chaos_pact @1.0 bb2016 **100** / bb2020 **100** / bb2025 **100** 🏁; ffb-engine 7380/0,
+ffb-model 2799/0. rust_total 45.6s/45.4s (bb2020/bb2025, 100 seeds). Scales + standing gates next.
