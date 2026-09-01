@@ -279,6 +279,26 @@ impl RandomAgent {
         }
     }
 
+    /// The parity contract's Throw/Kick-Team-Mate thrown-player pick: adjacent standing
+    /// throwable teammates (`legal_throw_team_mate_targets`, coordinate-sorted), ONE actionRng
+    /// draw — 1:1 with `ParityRunner.sendThrowTeamMateAction`. `pub(crate)` because the HEURISTIC
+    /// folds the same pick into its declaration: Java's heuristic driver reaches the identical
+    /// code (sendConcreteAction THROW_TEAM_MATE → sendThrowTeamMateAction, one actionRng) at
+    /// phase 2, while Rust's default-arm candidate carries no target — without this fold the
+    /// declaration deselected instantly and no TTM ever resolved under the heuristic
+    /// (chaos_pact: Java threw goblins, Rust's big guys did nothing — bb2020 seeds 6/7/10/19,
+    /// bb2016 seed 4).
+    pub(crate) fn fold_ttm_target(&mut self, game: &ffb_model::model::game::Game, player_id: &str) -> Option<String> {
+        let side = if game.home_playing { TeamSide::Home } else { TeamSide::Away };
+        let targets = legal_throw_team_mate_targets(game, player_id, side);
+        if targets.is_empty() {
+            None
+        } else {
+            let tidx = self.pick_action(targets.len());
+            Some(targets[tidx].clone())
+        }
+    }
+
     fn pick_action(&mut self, len: usize) -> usize {
         self.action_rng_count += 1;
         if len == 0 { 0 } else { (self.action_rng.next_u64() as usize) % len }
@@ -576,14 +596,7 @@ impl Agent for RandomAgent {
                         }
                     }
                     PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate => {
-                        let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
-                        let targets = legal_throw_team_mate_targets(&gs.game, player_id, side);
-                        if targets.is_empty() {
-                            None
-                        } else {
-                            let tidx = self.pick_action(targets.len());
-                            Some(targets[tidx].clone())
-                        }
+                        self.fold_ttm_target(&gs.game, player_id)
                     }
                     _ => None,
                 };

@@ -49,7 +49,7 @@ use ffb_model::types::FieldCoordinate;
 use crate::action::{Action, PlayerActionChoice};
 use crate::legal_actions::{
     canonical_setup_action, legal_block_targets, legal_foul_targets, legal_handoff_receivers,
-    legal_pass_receivers, legal_throw_team_mate_targets, TeamSide,
+    legal_pass_receivers, TeamSide,
 };
 use crate::step::GameState;
 
@@ -2562,7 +2562,30 @@ impl HeuristicAgent {
             *self.seen_action.entry(format!("{:?}", c.pac)).or_insert(0) += 1;
             *self.seen_bucket.entry(bucket).or_insert(0) += 1;
         }
-        self.take(i)
+        // Java's heuristic driver declares a TTM/KTM and then, at phase 2, picks the thrown
+        // player with the harness's random rule (sendThrowTeamMateAction: coord-sorted adjacent
+        // throwable teammates, ONE actionRng draw). The candidate here — built by the same
+        // default arm as Java's chooser — carries NO target, and a targetless declaration
+        // deselects instantly, so no TTM ever resolved under the heuristic (chaos_pact bb2020
+        // seeds 6/7/10/19, bb2016 seed 4). Fold the identical pick, from the identical
+        // action_rng stream (the embedded parity agent's), into the taken answer.
+        let mut taken = self.take(i);
+        if let Action::ActivatePlayer {
+            ref player_id,
+            player_action: PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate,
+            ref mut block_defender_id,
+        } = taken
+        {
+            if block_defender_id.is_none() {
+                let pid = player_id.clone();
+                let t = self.parity.fold_ttm_target(g, &pid);
+                if std::env::var_os("FFB_TRACE").is_some() {
+                    eprintln!("RTTMFOLD pid={pid} target={t:?}");
+                }
+                *block_defender_id = t;
+            }
+        }
+        taken
     }
 
     // ── DEEP mode ───────────────────────────────────────────────────────────
@@ -2791,10 +2814,31 @@ impl HeuristicAgent {
             delivered: false,
             fired: false,
         });
+        // Java's heuristic driver declares a TTM/KTM and then, at phase 2, picks the thrown
+        // player with the harness's random rule (sendThrowTeamMateAction: coord-sorted adjacent
+        // throwable teammates, ONE actionRng). The Rust candidate (built by the same default arm
+        // as Java's chooser) carries NO target, and a targetless declaration deselects instantly
+        // — so fold the identical pick, from the identical action_rng stream, into the answer.
+        let target = if matches!(c.pac, PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate)
+            && c.target.is_none()
+        {
+            let t = self.parity.fold_ttm_target(g, &c.player);
+            if std::env::var_os("FFB_TRACE").is_some() {
+                eprintln!("RTTMFOLD pid={} pac={:?} target={:?}", c.player, c.pac, t);
+            }
+            t
+        } else {
+            if std::env::var_os("FFB_TRACE").is_some()
+                && matches!(c.pac, PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate)
+            {
+                eprintln!("RTTMFOLD-SKIP pid={} target_was={:?}", c.player, c.target);
+            }
+            c.target
+        };
         Action::ActivatePlayer {
             player_id: c.player,
             player_action: move_variant(c.pac),
-            block_defender_id: c.target,
+            block_defender_id: target,
         }
     }
 
@@ -3281,19 +3325,13 @@ impl HeuristicAgent {
                         }
                     }
                 }
-                PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate => {
-                    for t in legal_throw_team_mate_targets(g, pid, side) {
-                        push(
-                            0.35,
-                            Some(t.clone()),
-                            PlanKind::Immediate,
-                            Vec::new(),
-                            None,
-                            Rule::Flat,
-                            format!("throw team-mate to {}", t),
-                        );
-                    }
-                }
+                // ThrowTeamMate / KickTeamMate: Java's ActivationChoice has NO arm for these —
+                // they land in its `default:` (ONE immediate candidate, weight wPlayer*max(0.40,
+                // floor)+novelty, no target). A bespoke Rust arm built one candidate PER TARGET at
+                // 0.35, so a chaos_pact big guy with N throwable goblins put N-1 extra candidates
+                // into the lottery and every draw after the first activation read a different
+                // stream (chaos_pact baseline 0/100 in ALL THREE editions; bb2025 seed 2 k=1:
+                // Java n=2000, Rust n=1998 — exactly the two big guys' phantom arms).
                 _ => push(
                     0.40,
                     None,
@@ -3680,6 +3718,11 @@ impl HeuristicAgent {
                     "Fend" => 0.85,
                     "Wrestle" => 0.55,
                     "QuickBite" | "AnimalSavagery" => 0.85,
+                    // The four skills whose USE path no harness can drive (DumpOff enters an
+                    // undriveable INIT_PASSING, PrimalSavagery/Swoop open target dialogs,
+                    // SafePairOfHands a PLACE_BALL coach dialog): pinned to DECLINE, still
+                    // spending the sampler draws. Mirrored in HeuristicDriver.useSkill.
+                    "DumpOff" | "PrimalSavagery" | "SafePairOfHands" | "Swoop" => 0.0,
                     _ => 0.50,
                 };
                 self.buf.push(

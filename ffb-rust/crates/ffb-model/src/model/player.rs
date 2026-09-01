@@ -435,13 +435,23 @@ impl Player {
     /// Dirty Player's armour bonus). Falls back to 0 when no such skill or no numeric value —
     /// the same result the previous stub gave for the no-value case.
     pub fn get_skill_int_value(&self, property: &str) -> i32 {
-        self.starting_skills.iter()
+        let matching: Vec<&crate::model::skill_def::SkillWithValue> = self.starting_skills.iter()
             .chain(self.extra_skills.iter())
             .chain(self.temporary_skills.iter())
             .filter(|sw| sw.skill_id.properties().contains(&property))
+            .collect();
+        matching.iter()
             .find_map(|sw| sw.value.as_deref()
                 .and_then(|v| v.trim().trim_end_matches('+').parse::<i32>().ok()))
-            .unwrap_or(0)
+            // Java: `intValue != null ? intValue : skill.getDefaultSkillValue()` — a skill
+            // carried WITHOUT a roster value falls back to its class constructor default.
+            // Returning a bare 0 made bb2025's valueless "Loner" (the chaos_pact big guys)
+            // auto-pass every Loner check: Java's mixed/Loner defaults to 4, its roll of 3
+            // FAILED and the dodge was never re-rolled, while Rust re-rolled it
+            // (chaos_pact bb2025 seed 2 i=10, the troll's dodge — pos 24 Loner=3).
+            .unwrap_or_else(|| matching.first()
+                .map(|sw| sw.skill_id.default_skill_value())
+                .unwrap_or(0))
     }
 
     /// Java: Player.getSkillIntValue(Skill) — the numeric value attached to a specific skill on this
@@ -892,6 +902,16 @@ mod tests {
         let back: Player = serde_json::from_str(&json).unwrap();
         assert_eq!(p.id, back.id);
         assert_eq!(p.movement, back.movement);
+    }
+
+    /// Java: a skill carried WITHOUT a roster value falls back to the class default —
+    /// mixed/Loner is 4 (chaos_pact bb2025 troll/ogre carry plain "Loner").
+    #[test]
+    fn valueless_loner_defaults_to_four() {
+        use crate::model::skill_def::SkillWithValue;
+        let mut p = Player::default();
+        p.starting_skills.push(SkillWithValue { skill_id: crate::enums::SkillId::Loner, value: None });
+        assert_eq!(p.get_skill_int_value(crate::model::property::named_properties::NamedProperties::HAS_TO_ROLL_TO_USE_TEAM_REROLL), 4);
     }
 
     #[test]

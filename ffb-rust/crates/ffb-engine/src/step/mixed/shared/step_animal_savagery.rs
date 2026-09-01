@@ -253,6 +253,10 @@ impl StepAnimalSavagery {
             &game.team_away
         };
         let mut players = adjacent_targets(game, team_ref, player_coordinate);
+        if std::env::var_os("FFB_TRACE").is_some() {
+            eprintln!("RASFAIL pid={acting_player_id} at={player_coordinate:?} attack_opp={:?} targets={players:?}",
+                self.state.attack_opponent);
+        }
 
         if let Some(thrown_id) = self.state.thrown_player_id.clone() {
             if !thrown_id.is_empty() {
@@ -521,7 +525,14 @@ impl Step for StepAnimalSavagery {
                 self.re_roll_source = None;
                 self.execute_step(game, rng)
             }
-            _ => StepOutcome::next(),
+            // Java: EVERY answer routes back to EXECUTE_STEP — the ACCEPTED re-roll included.
+            // The `_ => StepOutcome::next()` wildcard swallowed `UseReRoll {{ true }}`: the step
+            // never re-executed, so no team re-roll was spent, no Loner check ran, no fresh
+            // Animal Savagery die was rolled, and the FAILED roll was silently forgotten — the
+            // rat ogre walked on where Java lashed out at a teammate and THEN walked
+            // (chaos_pact bb2020 seed 18 i=9: Java Loner 5 → fresh 3 → FAIL → block chain;
+            // Rust spent those two positions as GFI rushes).
+            _ => self.execute_step(game, rng),
         }
     }
 
@@ -758,6 +769,36 @@ fn mark_skill_used(game: &mut Game, player_id: &str, skill: SkillId) {
 
 #[cfg(test)]
 mod tests {
+    /// Java: the accepted re-roll answer routes to EXECUTE_STEP — the re-entry spends the
+    /// re-roll and rolls a FRESH Animal Savagery die (chaos_pact bb2020 seed 18 i=9).
+    #[test]
+    fn accepted_reroll_re_executes_and_rolls_fresh() {
+        let mut game = ffb_model::model::game::Game::new(
+            crate::step::framework::test_team("home", 0),
+            crate::step::framework::test_team("away", 0),
+            ffb_model::enums::Rules::Bb2020,
+        );
+        use ffb_model::model::skill_def::SkillWithValue;
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "p".into(),
+            movement: 6, strength: 5, agility: 3, passing: 3, armour: 9,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::AnimalSavagery, value: None }],
+            ..Default::default()
+        });
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(ffb_model::enums::PlayerAction::Move);
+        game.acting_player.used_skills.insert(SkillId::AnimalSavagery); // first roll happened
+        game.turn_data_mut().rerolls = 2;
+        let mut step = StepAnimalSavagery::new(String::new());
+        step.re_rolled_action = Some("ANIMAL_SAVAGERY".into());
+        step.re_roll_source = Some("TRR".into());
+        let mut rng = ffb_model::util::rng::GameRng::new(0);
+        let before = rng.call_count;
+        let _ = step.handle_command(&crate::action::Action::UseReRoll { use_reroll: true }, &mut game, &mut rng);
+        assert!(rng.call_count > before, "the accepted re-roll must re-execute and roll fresh");
+        assert!(game.turn_data_mut().rerolls < 2, "the team re-roll is spent");
+    }
+
     use super::*;
     use crate::step::framework::{StepAction, test_team};
     use ffb_model::enums::{PlayerGender, PlayerType, Rules};

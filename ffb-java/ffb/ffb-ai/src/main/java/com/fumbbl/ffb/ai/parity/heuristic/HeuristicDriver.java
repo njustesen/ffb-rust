@@ -155,6 +155,12 @@ public final class HeuristicDriver {
             wUse = 0.55f;
         } else if ("QuickBite".equals(skillName) || "AnimalSavagery".equals(skillName)) {
             wUse = 0.85f;
+        } else if ("DumpOff".equals(skillName) || "PrimalSavagery".equals(skillName)
+            || "SafePairOfHands".equals(skillName) || "Swoop".equals(skillName)) {
+            // The four skills whose USE path no harness can drive: pinned to DECLINE while still
+            // spending the sampler draws, mirroring the Rust agent's table (chaos_pact bb2020
+            // seed 8: the Renegade Thrower's Safe Pair of Hands offer).
+            wUse = 0.0f;
         } else {
             wUse = 0.50f;
         }

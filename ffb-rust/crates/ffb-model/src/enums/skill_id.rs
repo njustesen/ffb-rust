@@ -1101,6 +1101,20 @@ impl SkillId {
         }
     }
 
+    /// Java: each Skill class constructor's default value (`Skill.getDefaultSkillValue`), the
+    /// fallback when a roster carries the skill WITHOUT a value. Only three classes register a
+    /// non-zero default: `mixed/Loner` = 4, `bb2020/MightyBlow` and `bb2025/MightyBlow` = 1,
+    /// `bb2020/DirtyPlayer` = 1 (bb2016's variants default 0 — their values come from static
+    /// modifiers in the factories, not from this lookup).
+    pub fn default_skill_value(self) -> i32 {
+        match self {
+            SkillId::Loner => 4,
+            SkillId::MightyBlow => 1,
+            SkillId::DirtyPlayer => 1,
+            _ => 0,
+        }
+    }
+
     pub fn properties(self) -> &'static [&'static str] {
         match self {
             // Java mixed/special star skills — each registers exactly one property; the

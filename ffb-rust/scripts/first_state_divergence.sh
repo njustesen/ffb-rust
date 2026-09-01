@@ -1,6 +1,8 @@
 #!/bin/sh
 # first_state_divergence.sh <edition> <seed> [--no-rerun]
 #
+# MATCHUP=<race> (default amazon) selects the mirror matchup; HEUR_SCALE (default 1.0) the scale.
+#
 # The LEADING indicator: re-run one seed with the heuristic agent and report the first per-step
 # state-hash divergence from the recorded jsonl, plus the activation whose RESOLUTION produced it
 # (the step before) and whether that activation was the first one after a side/turn flip -- i.e.
@@ -15,15 +17,16 @@
 # control writes to FFB_PARITY_ROOT=parity_random, but any other run of the same matchup clobbers.
 cd /c/Users/Admin/niels/ffb-rust/ffb-rust
 E=$1; S=$2
+M=${MATCHUP:-amazon}
 if [ "$3" != "--no-rerun" ]; then
-  ./target/release/ffb-parity --home amazon --away amazon --edition $E --tier 3 \
+  ./target/release/ffb-parity --home $M --away $M --edition $E --tier 3 \
       --seeds $S-$S --no-abort --agent heuristic --heur-scale ${HEUR_SCALE:-1.0} --heur-classes all >/dev/null 2>&1
 fi
-python - "parity/$E/amazon_vs_amazon/seed_${S}_rust.jsonl" "parity/$E/amazon_vs_amazon/seed_${S}_java.jsonl" "$S" <<'PY'
+python - "parity/$E/${M}_vs_${M}/seed_${S}_rust.jsonl" "parity/$E/${M}_vs_${M}/seed_${S}_java.jsonl" "$S" <<'PY'
 import json,sys,re
 def load(p): return [json.loads(l) for l in open(p,encoding='utf-8') if '"type":"step"' in l]
 R=load(sys.argv[1]); J=load(sys.argv[2]); seed=sys.argv[3]
-def short(c): return re.sub(r'teamAmazonParity2[05]','',c)
+def short(c): return re.sub(r'team[A-Za-z]+Parity[0-9]*','',c)
 first=None
 for i,(r,j) in enumerate(zip(R,J)):
     if r['state_hash']!=j['state_hash']: first=i; break
@@ -36,8 +39,13 @@ if first==0:
 r=R[first-1]; j=J[first-1]
 flip = first>=2 and (R[first-2]['active'],R[first-2]['turn'])!=(r['active'],r['turn'])
 def norm(c):
-    # Java `Activate(Home6,BLITZ_MOVE)` vs Rust `Activate(home_06,Blitz)`: same declaration.
-    c = short(c).lower().replace('blitz_move','blitz').replace('hand_over','handoff').replace('_','')
+    # Java `Activate(Home6,BLITZ_MOVE)` vs Rust `Activate(home_06,Blitz)` -- and the harness names
+    # every heuristic foul FOUL_MOVE (`actionFromName: case "Foul" -> FOUL_MOVE`), hand-over
+    # HAND_OVER_MOVE, etc. Strip the MOVE suffix from the action and unify HandOver/HandOff, or
+    # this column cries DECLARATION DIFFERS on identical declarations (chaos frontier, 5 rows).
+    c = short(c).lower().replace('_','')
+    c = re.sub(r'(blitz|foul|handover|handoff|pass|throwteammate|kickteammate)move\b', r'\1', c)
+    c = c.replace('handover','handoff')
     return re.sub(r'([a-z])0+(\d)', r'\1\2', c)
 same_decl = norm(j['chosen']) == norm(r['chosen'])
 print('seed %-3s  first hash diff idx %-4d  resolving idx %-4d %s t%s %-4s %-30s dice=%s%s%s'%(

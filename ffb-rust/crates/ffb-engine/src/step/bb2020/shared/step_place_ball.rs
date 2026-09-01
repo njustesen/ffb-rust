@@ -51,6 +51,17 @@ impl Step for StepPlaceBall {
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java CLIENT_USE_SKILL (canPlaceBallWhenKnockedDownOrPlacedProne): used → Phase::SELECT
+        // (the coach place dialog — unreachable under the parity contract, both agents decline);
+        // declined → Phase::DONE → leave(), publishing DROPPED_BALL_CARRIER = null. Both report
+        // ReportSkillUse(PLACE_BALL).
+        if let Action::UseSkill { skill_id: ffb_model::enums::SkillId::SafePairOfHands, use_skill } = action {
+            let pid = self.player_id.clone();
+            game.report_list.add(ReportSkillUse::new(
+                pid, ffb_model::enums::SkillId::SafePairOfHands, *use_skill, SkillUse::PLACE_BALL,
+            ));
+            return StepOutcome::next().publish(StepParameter::DroppedBallCarrier(None));
+        }
         match action {
             Action::UseSkill { skill_id, use_skill } => {
                 let has_prop = skill_id.properties().contains(&NamedProperties::CAN_PLACE_BALL_WHEN_KNOCKED_DOWN_OR_PLACED_PRONE);
@@ -72,9 +83,9 @@ impl Step for StepPlaceBall {
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
-            StepParameter::PlayerId(v) => { self.player_id = Some(v.clone()); true }
+            // Java setParameter: DROPPED_BALL_CARRIER carries the carrier id (no PLAYER_ID arm).
+            StepParameter::DroppedBallCarrier(v) => { self.player_id = v.clone(); true }
             StepParameter::CatchScatterThrowInMode(v) => { self.catch_scatter_throw_in_mode = Some(*v); true }
-            StepParameter::DroppedBallCarrier(_) => true, // consumed
             _ => false,
         }
     }
@@ -108,15 +119,38 @@ impl StepPlaceBall {
             false
         };
 
+        if std::env::var_os("FFB_TRACE").is_some() {
+            eprintln!("RPLACEBALL pid={player_id:?} mode={:?} has_skill={has_skill} can_use={can_use}",
+                self.catch_scatter_throw_in_mode);
+        }
         if !can_use {
             // Java: setup() returns early (skill == null || cannotUseSkill) — no publish.
             return StepOutcome::next();
         }
 
-        // Skill available but dialog infra not yet ported: auto-decline (conservative).
-        // Java would show DialogSkillUseParameter and wait for CLIENT_USE_SKILL response;
-        // a decline reaches Phase::DONE → leave(), which DOES publish DROPPED_BALL_CARRIER=null.
-        StepOutcome::next().publish(StepParameter::DroppedBallCarrier(None))
+        // Java setup(): the dialog also requires a FREE ball-adjacent square to place into —
+        // with none, NEXT_STEP and no dialog.
+        let has_free_adjacent = game.field_model.ball_coordinate.map(|bc| {
+            game.field_model.adjacent_on_pitch(bc)
+                .into_iter()
+                .any(|c| game.field_model.player_at(c).is_none())
+        }).unwrap_or(false);
+        if !has_free_adjacent {
+            return StepOutcome::next();
+        }
+        // Java: UtilServerDialog.showDialog(DialogSkillUseParameter(playerId, skill, 0)) — the
+        // Safe Pair of Hands offer. Auto-declining here spent ZERO agent draws while Java's
+        // heuristic driver answers the dialog through its useSkill sampler (TWO draws), splitting
+        // the two agents' streams for the rest of the game (chaos_pact bb2020 seed 8 i=47: the
+        // blocked Renegade Thrower — Rust's next activation answered EndTurn where Java's played
+        // on). The offer is pinned to DECLINE by both agents' contracts (wUse 0.0 — using it
+        // enters a PLACE_BALL coach dialog neither harness can drive), so only the decline path
+        // is reachable in parity games.
+        StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
+            player_id: player_id.to_string(),
+            skill_id: ffb_model::enums::SkillId::SafePairOfHands as u16,
+            skill_name: ffb_model::enums::SkillId::SafePairOfHands.class_name().to_string(),
+        })
     }
 }
 
@@ -172,30 +206,48 @@ mod tests {
         );
     }
 
-    #[test]
-    fn skill_available_auto_decline_publishes_dropped_ball_carrier_none() {
-        // When the skill IS available (and the dialog auto-declines, since Select/Place
-        // phases aren't ported), Java's decline path reaches Phase::DONE -> leave(), which
-        // DOES publish DROPPED_BALL_CARRIER = null.
-        use ffb_model::enums::SkillId;
+    fn make_prompt_ready() -> (Game, StepPlaceBall) {
         use ffb_model::model::skill_def::SkillWithValue;
         let mut game = make_game();
-        let mut player = ffb_model::model::player::Player::default();
-        player.id = "p1".into();
-        player.starting_skills.push(SkillWithValue::new(SkillId::SafePairOfHands));
-        game.team_home.players.push(player);
-        game.field_model.set_player_state("p1", ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING));
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: "carrier".into(), name: "carrier".into(), nr: 1, position_id: "p".into(),
+            movement: 6, strength: 3, agility: 3, passing: 3, armour: 8,
+            starting_skills: vec![SkillWithValue::new(ffb_model::enums::SkillId::SafePairOfHands)],
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("carrier", ffb_model::types::FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("carrier", ffb_model::enums::PlayerState::new(ffb_model::enums::PS_PRONE));
+        game.field_model.ball_coordinate = Some(ffb_model::types::FieldCoordinate::new(5, 5));
         let mut step = StepPlaceBall::new();
-        step.player_id = Some("p1".into());
+        step.player_id = Some("carrier".into());
         step.catch_scatter_throw_in_mode = Some(CatchScatterThrowInMode::ScatterBall);
-        let out = step.start(&mut game, &mut GameRng::new(0));
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DroppedBallCarrier(None))));
+        (game, step)
     }
 
     #[test]
-    fn set_parameter_player_id_accepted() {
+    fn skill_available_prompts_and_decline_publishes_dropped_ball_carrier_none() {
+        // Java setup(): with the skill usable and a free ball-adjacent square, the step DIALOGS
+        // (DialogSkillUseParameter) — the agents answer through their samplers (the heuristic
+        // spends two draws; auto-declining spent zero and split the streams, chaos_pact bb2020
+        // seed 8). The decline lands in Phase::DONE → leave() → DROPPED_BALL_CARRIER = null.
+        let (mut game, mut step) = make_prompt_ready();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue, "the offer must PROMPT, not auto-resolve");
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::SkillUse { .. })));
+        let out2 = step.handle_command(
+            &crate::action::Action::UseSkill {
+                skill_id: ffb_model::enums::SkillId::SafePairOfHands, use_skill: false },
+            &mut game, &mut GameRng::new(0));
+        assert!(out2.published.iter().any(|p| matches!(p, StepParameter::DroppedBallCarrier(None))));
+    }
+
+    #[test]
+    fn set_parameter_dropped_ball_carrier_sets_player_id() {
+        // Java setParameter: DROPPED_BALL_CARRIER carries the carrier id (no PLAYER_ID arm).
         let mut step = StepPlaceBall::new();
-        assert!(step.set_parameter(&StepParameter::PlayerId("p1".into())));
+        assert!(step.set_parameter(&StepParameter::DroppedBallCarrier(Some("p1".into()))));
+        assert_eq!(step.player_id.as_deref(), Some("p1"));
+        assert!(!step.set_parameter(&StepParameter::PlayerId("p2".into())));
         assert_eq!(step.player_id.as_deref(), Some("p1"));
     }
 

@@ -1,6 +1,8 @@
 #!/bin/sh
 # harvest_coverage.sh <edition> [scale]
 #
+# MATCHUP=<race> (default amazon) selects the mirror matchup; the output file carries it.
+#
 # ONE clean heuristic amazon-vs-amazon run (seeds 1-100), then copy the tier-3 checklist the run
 # wrote to docs/EVENT_COVERAGE_<edition>.md and append the full GameEvent catalog + per-skill
 # tallies from the run's own event logs (docs/COVERAGE_REPORT.md procedure).
@@ -10,22 +12,24 @@
 # somebody else's. Run editions one after another, never together.
 cd /c/Users/Admin/niels/ffb-rust/ffb-rust
 E=$1; SC=${2:-1.0}
+M=${MATCHUP:-amazon}
 OUT=docs/EVENT_COVERAGE_$E.md
-./target/release/ffb-parity --home amazon --away amazon --edition $E --tier 3 \
+[ "$M" != "amazon" ] && OUT=docs/EVENT_COVERAGE_${M}_$E.md
+./target/release/ffb-parity --home $M --away $M --edition $E --tier 3 \
     --seeds 1-100 --no-abort --agent heuristic --heur-scale $SC --heur-classes all > /tmp/cov_$E.log 2>&1
 PAR=$(grep -E "^PARITY:" /tmp/cov_$E.log)
 {
-  echo "# Event coverage — HeuristicAgent, amazon v amazon, $E, --heur-scale $SC, seeds 1-100"
+  echo "# Event coverage — HeuristicAgent, $M v $M, $E, --heur-scale $SC, seeds 1-100"
   echo
-  echo "Harvested $(date +%Y-%m-%d) by \`scripts/harvest_coverage.sh $E $SC\`. Parity for the run: \`$PAR\`."
+  echo "Harvested $(date +%Y-%m-%d) by \`MATCHUP=$M scripts/harvest_coverage.sh $E $SC\`. Parity for the run: \`$PAR\`."
   echo
   echo "## Tier-3 checklist (as written by the run)"
   echo
   sed -n '3,200p' T3_COVERAGE.md
   echo
-  echo "## GameEvent catalog (from parity/$E/amazon_vs_amazon/seed_*_rust_events.jsonl)"
+  echo "## GameEvent catalog (from parity/$E/${M}_vs_${M}/seed_*_rust_events.jsonl)"
   echo
-  cat parity/$E/amazon_vs_amazon/seed_*_rust_events.jsonl | tr -cd '[:print:]\n' > /tmp/allev_$E.txt
+  cat parity/$E/${M}_vs_${M}/seed_*_rust_events.jsonl | tr -cd '[:print:]\n' > /tmp/allev_$E.txt
   echo "Total events: $(wc -l < /tmp/allev_$E.txt)"
   echo
   echo '```'
