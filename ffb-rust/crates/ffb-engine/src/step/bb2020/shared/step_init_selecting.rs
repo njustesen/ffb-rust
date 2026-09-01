@@ -87,6 +87,10 @@ impl Step for StepInitSelecting {
                 self.end_turn = true;
             }
             Action::ActivatePlayer { player_id, player_action, block_defender_id } => {
+                if std::env::var_os("FFB_TRACE").is_some() {
+                    eprintln!("RACT pid={player_id} pac={player_action:?} bdef={block_defender_id:?} game_def={:?}",
+                        game.defender_id);
+                }
                 let pa = pac_to_player_action(*player_action);
                 util_server_steps::change_player_action(game, player_id, pa, false);
                 if let Some(def_id) = block_defender_id {

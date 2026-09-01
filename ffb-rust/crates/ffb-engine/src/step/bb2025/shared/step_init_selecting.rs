@@ -194,6 +194,10 @@ impl Step for StepInitSelecting {
                 util_server_steps::change_player_action_to_none(game);
             }
             Action::ActivatePlayer { player_id, player_action, block_defender_id } => {
+                if std::env::var_os("FFB_TRACE").is_some() {
+                    eprintln!("RACT pid={player_id} pac={player_action:?} bdef={block_defender_id:?} game_def={:?}",
+                        game.defender_id);
+                }
                 // Rust bridging: a TREACHEROUS "declaration" stands for the client's two
                 // commands — CLIENT_ACTING_PLAYER(PASS_MOVE) then CLIENT_USE_SKILL(treacherous)
                 // (bb2025 SelectLogicModule pairs sendUseSkill with the ball-action cases;

@@ -3149,6 +3149,9 @@ impl HeuristicAgent {
                     }
                 }
                 PlayerActionChoice::Foul => {
+                    if std::env::var_os("FFB_TRACE").is_some() {
+                        eprintln!("RFOULCAND pid={pid} targets={:?}", legal_foul_targets(g, pid, side));
+                    }
                     for t in legal_foul_targets(g, pid, side) {
                         let w = foul_weight(f, g, pid, &t, m);
                         push(

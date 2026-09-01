@@ -285,6 +285,9 @@ impl UtilPlayer {
             }
             if let Some(assist_coord) = game.field_model.player_coordinate(assist_id) {
                 let adjacent_attackers = Self::find_adjacent_players_with_tacklezones(game, attacker_team, assist_coord, false);
+                if std::env::var_os("FFB_TRACE").is_some() {
+                    eprintln!("RDEFASSIST att={attacker_id}@{att_coord:?} cand={assist_id}@{assist_coord:?} adj_att={adjacent_attackers:?}");
+                }
                 if adjacent_attackers.len() < 2 {
                     assists += 1;
                 }

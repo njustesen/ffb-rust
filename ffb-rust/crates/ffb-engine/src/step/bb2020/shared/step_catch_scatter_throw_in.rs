@@ -554,6 +554,9 @@ impl StepCatchScatterThrowIn {
 
     /// Java: bounceBall() — roll 1×d8, advance ball 1 square, check player/bounds.
     fn bounce_ball(&mut self, game: &mut Game, rng: &mut GameRng) -> Option<CatchScatterThrowInMode> {
+        if std::env::var_os("FFB_TRACE").is_some() {
+            eprintln!("RBOUNCE from={:?}", game.field_model.ball_coordinate);
+        }
         self.re_roll_state = ReRollState::new();
         self.catcher_id = None;
 

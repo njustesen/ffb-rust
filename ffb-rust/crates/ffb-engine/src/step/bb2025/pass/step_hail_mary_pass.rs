@@ -107,6 +107,17 @@ impl Step for StepHailMaryPass {
                     self.using_modifying_skill = Some(*use_skill);
                 }
             }
+            // Java: the declined RE_ROLL dialog clears the re-roll source
+            // (AbstractStepWithReRoll), so the re-entry's `if source == null` path stands on the
+            // original roll. Rust had NO UseReRoll arm — a decline fell through with the source
+            // still set from the offer, so the re-entry SPENT the team re-roll and rolled a fresh
+            // HMP d6 anyway (chaos_dwarf bb2025 seed 99 i=60: Rust r2→r1 + 3 extra dice on a
+            // NoReRoll; Java spends nothing).
+            Action::UseReRoll { use_reroll } => {
+                if !use_reroll {
+                    self.re_roll_source = None;
+                }
+            }
             _ => {}
         }
         self.execute_step(game, rng)
@@ -309,6 +320,25 @@ impl StepHailMaryPass {
 
 #[cfg(test)]
 mod tests {
+    /// Java: declining the HMP re-roll dialog clears the re-roll source — the original roll
+    /// stands, no team re-roll is spent, no fresh die is drawn (chaos_dwarf bb2025 seed 99 i=60).
+    #[test]
+    fn declined_reroll_spends_nothing_and_keeps_the_roll() {
+        let mut game = make_game_with_thrower(3);
+        game.turn_data_mut().rerolls = 2;
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.re_rolled_action = Some(REROLLED_ACTION_PASS.into());
+        step.re_roll_source = Some("TRR".into());
+        step.roll = 1; // the fumbled original roll
+        step.minimum_roll = 4;
+        let mut rng = ffb_model::util::rng::GameRng::new(0);
+        let before = rng.call_count;
+        let _ = step.handle_command(&crate::action::Action::UseReRoll { use_reroll: false }, &mut game, &mut rng);
+        assert_eq!(rng.call_count, before, "a declined re-roll draws no dice");
+        assert_eq!(game.turn_data_mut().rerolls, 2, "a declined re-roll spends no team re-roll");
+        assert_eq!(step.roll, 1, "the original roll stands");
+    }
+
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::StepAction;

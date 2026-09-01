@@ -38,17 +38,36 @@ impl InjuryTypeServer for InjuryTypeFoul {
 impl ModificationAwareInjuryType for InjuryTypeFoul {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str, roll: bool) {
         // Add foul-assist armor modifier based on net offensive - defensive assists
+        // Java `ArmorModifierFactory.getFoulAssist`: when the DEFENDER has an unused
+        // `ignoresArmourModifiersFromSkills` skill (Iron Hard Skin), the whole foul-assist set —
+        // positive, NEGATIVE, and the Foul static bonus — is replaced by that skill's own modifiers
+        // (IHS registers one marker whose appliesToContext is `false`, i.e. nothing applies).
+        // Rust applied the assists unconditionally, so a chaos-dwarf Blocker with two defensive
+        // assists took armour 10-2=8 < AV10 (held) where Java's 10 >= 10 broke and stunned him
+        // (chaos_dwarf bb2020 seed 12 i=99, bb2025 seed 51; JFOUL: `assists=-2 mods=Iron Hard
+        // Skin/ broken=true`).
+        let defender_ignores_skill_armor_mods = game.player(defender_id)
+            .map(|p| p.has_unused_skill_with_property(NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS))
+            .unwrap_or(false);
         if let Some(aid) = attacker_id {
             let off = UtilPlayer::find_offensive_foul_assists(game, aid, defender_id) as i32;
             let def = UtilPlayer::find_defensive_foul_assists(game, aid, defender_id) as i32;
             let net = off - def;
-            if let Some(m) = foul_assist_armor_modifier(net) {
-                self.ctx.add_armor_modifier(m);
+            if !defender_ignores_skill_armor_mods {
+                if let Some(m) = foul_assist_armor_modifier(net) {
+                    self.ctx.add_armor_modifier(m);
+                }
+            }
+            if std::env::var_os("FFB_TRACE").is_some() {
+                // `RFOUL`: the assist arithmetic feeding the armour roll.
+                eprintln!("RFOUL att={aid} def={defender_id} off={off} def_assists={def} net={net} mods={:?}",
+                    self.ctx.armor_modifiers.iter().map(|m| (m.name.clone(), m.value)).collect::<Vec<_>>());
             }
             // Add "Foul" blatant-foul modifier if option enabled or attacker has no tackle zones
-            if game.options.is_enabled(game_option_id::FOUL_BONUS)
-                || (game.options.is_enabled(game_option_id::FOUL_BONUS_OUTSIDE_TACKLEZONE)
-                    && UtilPlayer::find_tacklezones(game, aid) < 1)
+            if !defender_ignores_skill_armor_mods
+                && (game.options.is_enabled(game_option_id::FOUL_BONUS)
+                    || (game.options.is_enabled(game_option_id::FOUL_BONUS_OUTSIDE_TACKLEZONE)
+                        && UtilPlayer::find_tacklezones(game, aid) < 1))
             {
                 self.ctx.add_armor_modifier(ARMOR_FOUL);
             }
@@ -182,6 +201,54 @@ impl ModificationAwareInjuryType for InjuryTypeFoul {
 
 #[cfg(test)]
 mod tests {
+    /// Java `ArmorModifierFactory.getFoulAssist`: a defender with an unused
+    /// `ignoresArmourModifiersFromSkills` skill (Iron Hard Skin) replaces the whole foul-assist
+    /// set with the skill's own no-op marker — assists (positive AND negative) never apply
+    /// (chaos_dwarf bb2020 seed 12 i=99: two defensive assists must NOT save the Blocker).
+    #[test]
+    fn iron_hard_skin_ignores_foul_assist_modifiers() {
+        use ffb_model::enums::{Rules, SkillId, PlayerState, PS_PRONE, PS_STANDING};
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = ffb_model::model::game::Game::new(
+            crate::step::framework::test_team("home", 0),
+            crate::step::framework::test_team("away", 0),
+            Rules::Bb2020,
+        );
+        let mk = |id: &str, skills: Vec<SkillId>| ffb_model::model::player::Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "p".into(),
+            movement: 5, strength: 3, agility: 3, passing: 3, armour: 10,
+            starting_skills: skills.into_iter()
+                .map(|s| SkillWithValue { skill_id: s, value: None }).collect(),
+            ..Default::default()
+        };
+        game.team_home.players.push(mk("att", vec![]));
+        game.team_away.players.push(mk("vic", vec![SkillId::IronHardSkin]));
+        game.team_away.players.push(mk("da1", vec![]));
+        game.team_away.players.push(mk("da2", vec![]));
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(14, 5));
+        game.field_model.set_player_coordinate("vic", FieldCoordinate::new(13, 5));
+        game.field_model.set_player_coordinate("da1", FieldCoordinate::new(14, 6));
+        game.field_model.set_player_coordinate("da2", FieldCoordinate::new(14, 4));
+        game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
+        game.field_model.set_player_state("vic", PlayerState::new(PS_PRONE));
+        game.field_model.set_player_state("da1", PlayerState::new(PS_STANDING));
+        game.field_model.set_player_state("da2", PlayerState::new(PS_STANDING));
+        let mut it = InjuryTypeFoul::new();
+        // Two defensive assists exist; with IHS on the victim none may be added.
+        it.armour_roll(&game, &mut ffb_model::util::rng::GameRng::new(0), Some("att"), "vic", true);
+        assert!(it.ctx.armor_modifiers.iter().all(|m| !m.name.contains("Assist")),
+            "IHS must suppress the foul-assist modifiers, negative included");
+
+        // Without IHS the -2 applies.
+        let mut game2 = game.clone();
+        game2.team_away.players[0].starting_skills.clear();
+        let mut it2 = InjuryTypeFoul::new();
+        it2.armour_roll(&game2, &mut ffb_model::util::rng::GameRng::new(0), Some("att"), "vic", true);
+        assert!(it2.ctx.armor_modifiers.iter().any(|m| m.name.contains("Defensive")),
+            "without IHS the defensive assists still apply");
+    }
+
     use super::*;
     use ffb_model::enums::{Rules, SkillId};
     use ffb_mechanics::modifiers::{ARMOR_DIRTY_PLAYER_1, ARMOR_DIRTY_PLAYER_2, Modifier};
