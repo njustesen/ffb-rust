@@ -947,6 +947,15 @@ impl Agent for RandomAgent {
                 Action::UseSkill { skill_id: SkillId::QuickBite, use_skill: true },
             Some(AgentPrompt::SkillUse { skill_name, .. }) if skill_name == "Swoop" =>
                 Action::UseSkill { skill_id: SkillId::Swoop, use_skill: false },
+            // Safe Pair of Hands (BB2020/BB2025): DECLINE, like DumpOff/PrimalSavagery/Swoop —
+            // ParityRunner's SKILL_USE decline list names all four (using it enters TurnMode.
+            // SAFE_PAIR_OF_HANDS → a PLACE_BALL coach dialog the harness cannot drive). The
+            // generic always-use arm below sends the Block placeholder, which StepPlaceBall's
+            // property gate ignores → the prompt refired forever and the game aborted on
+            // NO_PROGRESS (chaos_pact bb2020 random seeds 9/23/25/55/83/94). The step routes the
+            // DECLINED answer to leave(): the ball scatters in both engines.
+            Some(AgentPrompt::SkillUse { skill_name, .. }) if skill_name == "SafePairOfHands" =>
+                Action::UseSkill { skill_id: SkillId::SafePairOfHands, use_skill: false },
             // Skill use: AGENT_CONTRACT §7 — ALWAYS use, deterministically, 0 rng. Java ParityRunner
             // SKILL_USE = `sendUseSkill(skill, true, playerId)` (no decisionRng). The old code
             // random-sampled via pick_bool (spurious draw + wrong choice → decision-stream desync).

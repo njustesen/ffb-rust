@@ -125,3 +125,17 @@ NO_PROGRESS aborts, all spinning on the NEW SkillUse(SafePairOfHands) prompt: Pa
 random contract DECLINES SafePairOfHands (same list as DumpOff/PrimalSavagery/Swoop) but
 RandomAgent had no arm — the generic always-use answer carries the Block placeholder, which
 StepPlaceBall's property gate ignores, so the prompt refired forever. → ITER6.
+
+## ITER6 — RandomAgent declines Safe Pair of Hands (the parity contract's decline list)
+
+`ParityRunner`'s SKILL_USE random contract declines exactly four skills — DumpOff,
+PrimalSavagery, SafePairOfHands, Swoop (each opens a dialog the harness cannot drive).
+RandomAgent had arms for three; SafePairOfHands fell to the generic always-use arm, whose
+`SkillId::Block` placeholder fails StepPlaceBall's property gate → the prompt refired until
+NO_PROGRESS aborted the game (bb2020 random seeds 9/23/25/55/83/94 — the prompt is new since
+ITER2; before it the step auto-declined silently). Fix: the decline arm, mirroring the Java list.
+
+**🏁 CAMPAIGN PARITY COMPLETE**: chaos_pact heuristic ×3 editions ×3 scales ALL 100/100;
+random controls chaos_pact ×3 **100/100** (+ amazon ×3, lineman ×3 random 100/100); standing
+amazon ×3 + lineman ×3 and chaos ×3 + chaos_dwarf ×3 heuristic 100/100; ffb-engine 7382/0,
+ffb-model 2799/0. Remaining: coverage harvest ×3 + docs + push.
