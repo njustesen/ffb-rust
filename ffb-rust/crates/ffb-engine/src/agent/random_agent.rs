@@ -2173,6 +2173,9 @@ mod rng_trace_tests {
             // ANY edition and the matrices were green because of it.
             PlayerActionChoice::KickTeamMate,
             PlayerActionChoice::ThrowBomb,
+            // PUNT is forceDispatch and driven end-to-end since the dark_elf campaign
+            // (ParityRunner isHandledActingAction gained PUNT/PUNT_MOVE).
+            PlayerActionChoice::Punt,
         ] {
             assert!(is_handled_acting_action(pa), "{pa:?} has a sendConcreteAction arm");
         }
@@ -2180,7 +2183,6 @@ mod rng_trace_tests {
             PlayerActionChoice::Stab,
             PlayerActionChoice::HypnoticGaze,
             PlayerActionChoice::Swoop,
-            PlayerActionChoice::Punt,
             PlayerActionChoice::BreatheFire,
             PlayerActionChoice::ProjectileVomit,
             PlayerActionChoice::SecureTheBall,
