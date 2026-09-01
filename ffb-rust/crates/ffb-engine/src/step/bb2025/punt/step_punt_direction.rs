@@ -78,7 +78,12 @@ impl StepPuntDirection {
         if let Some(skill_id) = game.player(&player_id)
             .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_PUNT))
         {
-            game.mark_skill_used(&player_id, skill_id);
+            // Java: actingPlayer.markSkillUsed(NamedProperties.canPunt) — the ACTING-player mark
+            // is a hasActed() term, which is what retires the punter STANDING+inactive when the
+            // activation ends. Game::mark_skill_used wrote only Player.used_skills, so the punter
+            // stayed ACTIVE after the punt (dark_elf bb2025 seeds 40/63 + six random-control
+            // reds: J a07 active=0 vs R active=1 — the gaze-star fault's fourth copy).
+            crate::step::util_server_steps::mark_skill_used(game, &player_id, skill_id);
         }
 
         if self.out_of_bounds {

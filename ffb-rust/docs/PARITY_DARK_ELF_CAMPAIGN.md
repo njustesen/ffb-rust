@@ -67,3 +67,18 @@ answer into `side_stepping`). bb2020 seed 1 GREEN.
   to i=9). Moved above the pair.
 
 Seed 6's punt now byte-identical (ball b23,1 both, rng 34=34); bb2025 seed 1 + seeds 6-10 GREEN.
+
+## ITER4 — the punter must retire: acting-player skill mark, fourth copy (bb2025 seeds 40/63)
+
+Java `StepPuntDirection`: `actingPlayer.markSkillUsed(NamedProperties.canPunt)` — the mark is a
+`hasActed()` term, retiring the punter STANDING+inactive when the activation ends. Rust used the
+player-only `Game::mark_skill_used`, so the punter stayed ACTIVE (J `a07 …,0` vs R `…,1` at the
+post-punt record) and every later pick diverged. Also caught 6 of 6 reds in the bb2025 RANDOM
+control (94→re-running) — the control's first catch this campaign. Fix:
+`util_server_steps::mark_skill_used`. **Audit note**: `game.mark_skill_used(` still has ~11
+callers (animosity, missed_pass ×2, init_feeding ×2, init_bomb, drop_falling_players/PilingOn,
+raiding_party, pump_up ×2); each needs checking against its Java site for the actingPlayer-vs-
+player distinction before converting — only verified sites were converted here.
+
+**Measured @1.0**: bb2016 100/100, bb2020 100/100, bb2025 98→100 (40, 63 green single-seed);
+standing amazon ×3 + lineman ×3 100/100; randoms bb2016/bb2020 100/100.
