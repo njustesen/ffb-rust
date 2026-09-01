@@ -42,3 +42,30 @@ rolled a fresh HMP d6 + bounce chain — 3 extra dice and a burnt TRR on a decli
 **Gate after ITER1+2**: chaos_dwarf @1.0 ×3 **100/100**; scales: bb2016 100/100, bb2020 100/100,
 bb2025 @1e6 100, @0 97 (seeds 9, 24, 41 — new frontier). chaos ×3 + amazon ×3 + lineman ×3
 100/100; random chaos_dwarf ×3 100/100; ffb-engine 7374/0.
+
+## ITER3 — the setup prompt offers only players who can be set up
+
+`StepSetup` listed `team.players` verbatim; only `canBeSetUpNextDrive()` players may be OFFERED
+(BANNED/KO'd/casualties excluded), matching Java's client and the harness's `placeReserves`.
+Necessary but not sufficient for the @0 family — the real killer was ITER4.
+
+## ITER4 — a turn-8 touchdown ending half 1 is NOT the end of the game (bb2025 seeds 9/24/41 @0)
+
+All three @0 reds ended HALF 1 with a turn-8 TOUCHDOWN. Rust's `!fEndGame` approximation for the
+Secret-Weapon argue gate was `(new_half && half > 1) || (touchdown && both turn_nr >= 8)` — the
+touchdown disjunct ignored the half, so the HALFTIME argue was skipped as "end of game": Java
+argued the away Zzharg (roll 4, failed, banned for half 2) while Rust kept him and FIELDED him,
+shifting the whole second-half board one setup slot. Fix: `is_end_of_game` helper —
+`half > 1 && (new_half || (touchdown && both >= 8))` — with truth-table test.
+
+**The hunt** (recorded because it burned the tools): the divergence chased through the setup
+eligibility (ITER3), the argue thresholds (correct), the ban write (correct), and THREE probe
+generations (RSWMARK / RSWARGUE / RSWBAN / RETGATE, all kept FFB_TRACE-gated). The RETGATE probe
+ended it in one line: `new_half=true td=true half=1 ... eog=true`. Also: Zzharg Madeye is on the
+team spec as star nr 2 — his SECRET WEAPON is what makes chaos_dwarf exercise the whole
+drive-end argue machinery; `JAVA_TOOL_OPTIONS=-Dffb.parityDebug=true` switches on ParityRunner's
+DEBUG prints (JAVA_ARGUE_DIALOG) without editing anything.
+
+**🏁 GATE: ALL NINE chaos_dwarf gates 100/100** (bb2016/bb2020/bb2025 × scales 0/1.0/1e6).
+Standing: chaos ×3 + amazon ×3 + lineman ×3 100/100, random chaos_dwarf ×3 100/100,
+ffb-engine 7375/0.

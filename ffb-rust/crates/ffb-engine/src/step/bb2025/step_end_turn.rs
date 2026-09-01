@@ -336,7 +336,27 @@ impl StepEndTurn {
     /// Secret Weapon send-off. The caller runs this only when NOT end-of-game (Java's `!fEndGame` guard
     /// on askForArgueTheCall / removeUsedSecretWeapons): a Secret Weapon is physically banned at a
     /// drive end that is not the end of the game, but the final half ending keeps it on the pitch.
+    /// Java gates argueTheCall/removeUsedSecretWeapons by `!fEndGame`. The end of the GAME is the
+    /// FINAL half ending — by whistle or by a turn-8 touchdown — never a half-1 drive end. The
+    /// old approximation `touchdown && both turn_nr >= 8` ignored the half, so a touchdown that
+    /// ended HALF 1 on turn 8 skipped the halftime argue entirely: Java argued the away Zzharg
+    /// (roll 4, failed, banned for half 2) while Rust kept and FIELDED him (chaos_dwarf bb2025
+    /// seeds 9/24/41 @0 — all three ended half 1 with a turn-8 touchdown).
+    fn is_end_of_game(new_half: bool, touchdown: bool, half: i32, home_turn: i32, away_turn: i32) -> bool {
+        half > 1 && (new_half || (touchdown && home_turn >= 8 && away_turn >= 8))
+    }
+
     fn argue_and_remove_secret_weapons(&mut self, game: &mut Game, rng: &mut GameRng) {
+        if std::env::var_os("FFB_TRACE").is_some() {
+            let flagged: Vec<String> = [false, true].iter().flat_map(|&h| {
+                let t = if h { &game.team_home } else { &game.team_away };
+                t.players.iter().map(|p| p.id.clone()).collect::<Vec<_>>()
+            }).filter(|pid| {
+                let h = game.team_home.has_player(pid);
+                game.game_result.team_result_mut(h).player_result_mut(pid).has_used_secret_weapon
+            }).collect();
+            eprintln!("RSWARGUE flagged={flagged:?}");
+        }
         use ffb_model::enums::{PS_BANNED, PlayerState, SendToBoxReason};
         use ffb_model::model::property::named_properties::NamedProperties;
         use ffb_model::report::mixed::report_argue_the_call_roll::ReportArgueTheCallRoll;
@@ -466,6 +486,9 @@ impl StepEndTurn {
                 // Java removeUsedSecretWeapon: setPlayerState(BANNED) + putPlayerIntoBox. remove_player clears
                 // the field coordinate + state; set BANNED so setup skips it and the state reads "-1,-1,Reserve"
                 // (PS_BANNED maps to the default "Reserve", off-pitch → -1,-1), matching Java.
+                if std::env::var_os("FFB_TRACE").is_some() {
+                    eprintln!("RSWBAN pid={pid}");
+                }
                 game.field_model.remove_player(&pid);
                 game.field_model.set_player_state(&pid, PlayerState::new(PS_BANNED));
                 let pr = game.game_result.team_result_mut(is_home).player_result_mut(&pid);
@@ -642,8 +665,10 @@ impl StepEndTurn {
         // (game.half is not yet incremented at this point): the final half ending, or a game-ending TD.
         // Without this Rust banned a played Secret Weapon at the end of half 2 (game end) where Java
         // keeps it — a final-state (game_end hash) divergence, dwarf seed 4 step 294.
-        let is_end_of_game = (self.new_half && game.half > 1)
-            || (touchdown && game.turn_data_home.turn_nr >= 8 && game.turn_data_away.turn_nr >= 8);
+        let is_end_of_game = Self::is_end_of_game(
+            self.new_half, touchdown, game.half,
+            game.turn_data_home.turn_nr, game.turn_data_away.turn_nr,
+        );
         // bb2016 `StepEndTurn` calls `recoverKnockout` (line 281) BEFORE `reportSecretWeaponsUsed`
         // (364) and the argue asks (387/395); bb2025 does the reverse. Both consume game rng, so the
         // block must move with the edition.
@@ -653,6 +678,10 @@ impl StepEndTurn {
         {
             self.ko_recovery_done = true;
             self.recover_knockouts_and_fainting(game, rng, touchdown);
+        }
+        if std::env::var_os("FFB_TRACE").is_some() {
+            eprintln!("RETGATE new_half={} td={} half={} choiceA={:?} eog={} mode={:?}",
+                self.new_half, touchdown, game.half, self.argue_the_call_choice_away, is_end_of_game, game.turn_mode);
         }
         if self.argue_the_call_choice_away.is_none() {
             if self.new_half || touchdown {
@@ -862,6 +891,17 @@ impl Step for StepEndTurn {
 
 #[cfg(test)]
 mod tests {
+    /// Java `!fEndGame`: a turn-8 touchdown that ends HALF 1 is a normal drive end — the argue
+    /// runs (chaos_dwarf bb2025 seed 41 @0); only the FINAL half ending is the end of the game.
+    #[test]
+    fn a_half_one_turn_eight_touchdown_is_not_the_end_of_the_game() {
+        assert!(!StepEndTurn::is_end_of_game(true, true, 1, 8, 8));
+        assert!(!StepEndTurn::is_end_of_game(true, false, 1, 8, 8));
+        assert!(StepEndTurn::is_end_of_game(true, false, 2, 8, 8), "final whistle");
+        assert!(StepEndTurn::is_end_of_game(false, true, 2, 8, 8), "game-ending touchdown");
+        assert!(!StepEndTurn::is_end_of_game(false, true, 2, 5, 5), "mid-half-2 touchdown");
+    }
+
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::StepAction;

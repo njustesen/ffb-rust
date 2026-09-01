@@ -188,6 +188,9 @@ impl UtilServerGame {
             }
         }
         for (player_id, is_home, increment_turns, has_secret_weapon) in updates {
+            if has_secret_weapon && std::env::var_os("FFB_TRACE").is_some() {
+                eprintln!("RSWMARK pid={player_id}");
+            }
             let pr = game.game_result.team_result_mut(is_home).player_result_mut(&player_id);
             if has_secret_weapon {
                 pr.has_used_secret_weapon = true;

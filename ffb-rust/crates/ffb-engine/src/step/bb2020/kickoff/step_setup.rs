@@ -50,10 +50,21 @@ impl StepSetup {
         if !self.end_setup {
             // Java: implicit setup UI (the step stays in Continue waiting for the client).
             // Emit TeamSetup prompt so the driver waits. Auto-confirm for empty teams.
-            let (team_id, player_ids) = if game.home_playing {
-                (game.team_home.id.clone(), game.team_home.players.iter().map(|p| p.id.clone()).collect::<Vec<_>>())
-            } else {
-                (game.team_away.id.clone(), game.team_away.players.iter().map(|p| p.id.clone()).collect::<Vec<_>>())
+            // Only players whose state allows a setup may be OFFERED for placement — Java's
+            // client/harness both place from `PlayerState.canBeSetUpNextDrive()` (BANNED, KO'd and
+            // casualties excluded). Listing team.players verbatim let the heuristic FIELD a
+            // secret-weapon-banned player: chaos_dwarf bb2025 seed 41 @0 — both engines banned
+            // Zzharg at the half (argue roll 4 failed), Java benched him, Rust's agent placed him
+            // at (13,7) and the whole second-half board shifted one setup slot.
+            let (team_id, player_ids) = {
+                let team = if game.home_playing { &game.team_home } else { &game.team_away };
+                let ids: Vec<String> = team.players.iter()
+                    .filter(|p| game.field_model.player_state(&p.id)
+                        .map(|s| s.can_be_set_up_next_drive())
+                        .unwrap_or(true))
+                    .map(|p| p.id.clone())
+                    .collect();
+                (team.id.clone(), ids)
             };
             if player_ids.is_empty() {
                 // No players: auto-advance without waiting for a client command.
