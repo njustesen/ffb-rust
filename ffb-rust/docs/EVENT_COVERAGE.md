@@ -87,3 +87,34 @@ The amazon skills ARE reached: the state-hash parity over 900 games (3 editions 
 proof, and where the events are blind the traces in the ledger are the record. What is NOT yet true
 is that the event stream can show it on its own — F1–F5 are the work that would make
 `harvest_coverage.sh` a sufficient instrument. They are queued as BACKLOG §E5–E7.
+
+
+---
+
+# Event coverage — HeuristicAgent, chaos_pact v chaos_pact (harvested 2026-09-01)
+
+Per-edition detail: `EVENT_COVERAGE_chaos_pact_bb2016.md` / `_bb2020.md` / `_bb2025.md` (each a
+clean 100-seed run at scale 1.0; parity 100/100 in all three).
+
+## What chaos_pact reached that chaos/chaos_dwarf never did
+
+- **Throw Team-Mate resolves under the heuristic** for the first time (the ITER1 fold): declared
+  571/287/495 (bb2016/20/25), RESOLVED (throwTeamMateRoll) 4/15/4 — the huge declared-to-resolved
+  gap is the contract's targetless-declaration deselect (a throw needs an adjacent standing
+  Right-Stuff goblin, which the one-square-per-activation agents rarely produce; see BACKLOG's
+  one-move decision).
+- **Regeneration**: 3 `regenerationRoll` events (bb2025; the event fires from the apothecary
+  step's reporting) — and the ITER3 failed-regen TRR offer is exercised by parity (the dialog's
+  two draws are the proof; declines are unevented, bucket exercised-unevented).
+- **skillUse** events: 264/343/271 — dominated by Horns (the blitzing big guys, id 10) plus the
+  Goblin's Dodge (id 127). Safe Pair of Hands (ITER2/5/6) and the Animal-Savagery/negatrait
+  family are exercised-unevented: their proof is the nine 100/100 gates + the traced dialogs
+  (seed 8/99 SkillUse prompts), not the event stream — consistent with findings F1–F5 above.
+- `confusionRoll` 4536/…/2844 — the three per-edition big-guy negatraits (Really Stupid /
+  Wild Animal / Animal Savagery) fire constantly; bb2025 also shows 32 touchdowns.
+
+Buckets (chaos_pact's new skills): TTM/Always Hungry/Right Stuff exercised+evented;
+Regeneration exercised+evented (bb2025) / exercised-unevented (bb2016/20 — rolls happen, no
+event site); SafePairOfHands + DumpOff + Swoop + PrimalSavagery exercised-unevented (prompted,
+pinned DECLINE by both contracts — their USE paths are undriveable coach dialogs, genuinely dead
+under the harness); Animosity — no event, engine-internal (parity is the proof).

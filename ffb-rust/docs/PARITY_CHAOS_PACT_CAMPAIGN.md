@@ -139,3 +139,11 @@ ITER2; before it the step auto-declined silently). Fix: the decline arm, mirrori
 random controls chaos_pact ×3 **100/100** (+ amazon ×3, lineman ×3 random 100/100); standing
 amazon ×3 + lineman ×3 and chaos ×3 + chaos_dwarf ×3 heuristic 100/100; ffb-engine 7382/0,
 ffb-model 2799/0. Remaining: coverage harvest ×3 + docs + push.
+
+## 🏁 CAMPAIGN COMPLETE 2026-09-01
+
+All three halves: (1) nine parity gates 100/100 + chaos_pact random ×3 100/100; (2) the agent
+plays the race — TTM resolves via the ITER1 fold (4/15/4 resolved throws per edition), the four
+undriveable-dialog skills pinned DECLINE in BOTH agents; (3) coverage harvested →
+`EVENT_COVERAGE_chaos_pact_*.md` + the summary section in `EVENT_COVERAGE.md`. Standing:
+amazon ×3, lineman ×3, chaos ×3, chaos_dwarf ×3 all 100/100; ffb-engine 7382/0, ffb-model 2799/0.
