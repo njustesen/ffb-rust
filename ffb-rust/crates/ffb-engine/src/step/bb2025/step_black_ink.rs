@@ -145,14 +145,11 @@ impl StepBlackInk {
                 game.field_model.set_player_state(target_id, state.change_confused(true));
             }
             // Java: actingPlayer.markSkillUsed(skill)
-            let is_home = game.team_home.player(&player_id).is_some();
-            if is_home {
-                if let Some(p) = game.team_home.player_mut(&player_id) {
-                    p.used_skills.insert(SkillId::BlackInk);
-                }
-            } else if let Some(p) = game.team_away.player_mut(&player_id) {
-                p.used_skills.insert(SkillId::BlackInk);
-            }
+            // Java: actingPlayer.markSkillUsed(skill) — acting-player mark (a hasActed() term,
+            // retiring the gazer STANDING+inactive at the deselect) plus the Player-level mark for
+            // OncePerGame tracking. The raw Player insert left the gazer re-activatable
+            // (dark_elf bb2020 seed 1 i=6 — the Estelle/Baleful-Hex fault pattern again).
+            crate::step::util_server_steps::mark_skill_used(game, &player_id, SkillId::BlackInk);
             // Java: UtilServerPlayerMove.updateMoveSquares(getGameState(), game.getActingPlayer().isJumping());
             //       ServerUtilBlock.updateDiceDecorations(getGameState());
             let jumping = game.acting_player.jumping;

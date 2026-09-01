@@ -156,7 +156,12 @@ impl StepAutoGazeZoat {
             if let Some(old_state) = game.field_model.player_state(&pid) {
                 game.field_model.set_player_state(&pid, old_state.change_confused(true));
             }
-            game.mark_skill_used(&acting_id, skill);
+            // Java: actingPlayer.markSkillUsed(skill) — the ACTING-player mark is a term of
+            // hasActed(), which is what retires the gazer STANDING+inactive at the deselect.
+            // Game::mark_skill_used wrote only Player.used_skills, so Rust's H2 came out of the
+            // empty-move deselect still ACTIVE where Java's ended 1:i (dark_elf bb2025 seed 1
+            // i=9 — the sixth copy of the Estelle/Baleful-Hex fault).
+            crate::step::util_server_steps::mark_skill_used(game, &acting_id, skill);
             let jumping = game.acting_player.jumping;
             UtilServerPlayerMove::update_move_squares(game, jumping);
             ServerUtilBlock::update_dice_decorations(game);

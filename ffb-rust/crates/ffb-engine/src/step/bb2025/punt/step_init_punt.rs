@@ -41,7 +41,19 @@ impl Step for StepInitPunt {
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
             Action::EndTurn => { self.end_turn = true; }
-            Action::Punt { coord } => { self.coordinate_to = Some(*coord); }
+            Action::Punt { coord } => {
+                // Java: `checkCommandIsFromHomePlayer ? coord : coord.transform()` — an away
+                // coach's CLIENT_FIELD_COORDINATE arrives in HIS mirrored view and the server
+                // un-transforms it. The Rust agent mirrors the away coordinate exactly like
+                // Java's comm (agent contract), so consuming it RAW handed StepPuntDirection a
+                // foreign square — transform((19,5)) = (6,5), a 13-square diagonal whose
+                // direction template panicked the throw-in mechanic (dark_elf bb2025 seeds
+                // 6/7/10: `Unable to determine throwInDirection`).
+                let from_home = game.acting_player.player_id.as_deref()
+                    .map(|id| game.team_home.has_player(id))
+                    .unwrap_or(true);
+                self.coordinate_to = Some(if from_home { *coord } else { coord.transform() });
+            }
             _ => {}
         }
         self.execute_step(game, rng)
@@ -102,6 +114,14 @@ impl StepInitPunt {
             let on_boundary = player_coord.y == 0 || player_coord.y == 14
                 || player_coord.x == 0 || player_coord.x == 25;
             if !on_boundary {
+                self.punt_to_crowd = Some(false);
+            } else {
+                // Java shows DialogPuntToCrowdParameter for a boundary punter; the parity
+                // contract answers it with a deterministic DECLINE and zero draws
+                // (ParityRunner's PUNT_TO_CROWD case — the default was the NON-SEEDED
+                // RandomStrategy). Auto-decline here so both sides spend nothing and the punt
+                // proceeds to the target squares (dark_elf bb2025 seed 1 i=64: the (0,13)
+                // endzone punter).
                 self.punt_to_crowd = Some(false);
             }
         }

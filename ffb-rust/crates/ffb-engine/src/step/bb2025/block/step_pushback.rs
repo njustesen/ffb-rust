@@ -154,8 +154,15 @@ impl Step for StepPushback {
             // The answer is filed against the player the offer named, then the step re-runs and the
             // hook takes its other branch.
             Action::UseSkill { use_skill, .. } => {
-                if let Some((pid, _)) = self.pending_skill_use.take() {
-                    self.side_stepping.insert(pid, *use_skill);
+                // Java files the answer into the map the OFFER came from: SidestepBehaviour's
+                // handleCommandHook writes sideStepping, StandFirmBehaviour's writes standingFirm.
+                // Routing everything into side_stepping left a Stand Firm answer unrecorded, so
+                // the hook re-asked forever (dark_elf bb2020: Helmut Wulf).
+                if let Some((pid, skill)) = self.pending_skill_use.take() {
+                    match skill {
+                        ffb_model::enums::SkillId::StandFirm => { self.standing_firm.insert(pid, *use_skill); }
+                        _ => { self.side_stepping.insert(pid, *use_skill); }
+                    }
                 }
             }
             Action::PushTo { coord } => {

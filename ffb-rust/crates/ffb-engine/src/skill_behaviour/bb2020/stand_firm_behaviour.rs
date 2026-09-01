@@ -133,9 +133,16 @@ impl StepModifierTrait for StandFirmStepModifier {
         // `h00` ends at 12,7 in Java and 11,6 in Rust, on identical dice — Take Root 2, block die 3
         // = pushback).
         //
-        // Auto-ACCEPT to mirror the harness, then fall through to the refusal below.
+        // The heuristic SCORES `SkillUse` and spends two sampler draws on it (Java's driver
+        // answers the DialogSkillUseParameter through its useSkill sampler), so the old inline
+        // auto-ACCEPT -- written for the RANDOM contract's free always-use answer -- left Rust
+        // two draws short and split the streams (dark_elf bb2020 seed 1 i=11: Helmut Wulf's
+        // Stand Firm against the blitz). Park the offer exactly like the bb2025 Sidestep
+        // behaviour; `StepPushback` turns it into the prompt and files the answer back into
+        // `standing_firm`.
         if !state.standing_firm.contains_key(&defender_id) {
-            state.standing_firm.insert(defender_id.clone(), true);
+            state.pending_skill_use = Some((defender_id.clone(), SkillId::StandFirm));
+            return true;
         }
 
         // Java: state.doPush = true; pushbackStack.clear(); publish STARTING_PUSHBACK_SQUARE=null;
@@ -268,8 +275,13 @@ mod tests {
     ///
     /// This test previously asserted auto-DECLINE, which is what let the defender be pushed where
     /// Java leaves it standing (halfling bb2020 seed 1 i=100; halfling 5→98, wood_elf 15→98).
+    /// Java: `if (!standingFirm.containsKey(id)) showDialog(DialogSkillUseParameter(StandFirm))`
+    /// and CONTINUE — the offer is a DIALOG the heuristic driver answers with two sampler draws.
+    /// The old inline auto-accept (written for the random contract's free always-use) left Rust
+    /// two draws short (dark_elf bb2020 seed 1 i=11: Helmut Wulf). The hook PARKS the offer;
+    /// StepPushback turns it into the SkillUse prompt and files the answer into `standing_firm`.
     #[test]
-    fn stand_firm_not_decided_headless_auto_accepts() {
+    fn stand_firm_not_decided_parks_the_offer() {
         let mut game = make_game();
         game.team_away.players.push(player_with_skills("def1", vec![SkillId::StandFirm]));
         game.field_model.set_player_coordinate("def1", FieldCoordinate::new(5, 5));
@@ -278,10 +290,9 @@ mod tests {
         let m = StandFirmStepModifier;
         let mut hs = default_hook_state("def1");
         let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
-        assert!(result, "undecided Stand Firm auto-accepts and stops pushback processing");
-        assert_eq!(hs.standing_firm.get("def1"), Some(&true));
-        assert!(hs.do_push, "the push is converted to a stay-put");
-        assert!(hs.pushback_squares.is_empty(), "pushback stack cleared");
+        assert!(result, "the pending offer stops pushback processing (Java CONTINUEs)");
+        assert_eq!(hs.pending_skill_use, Some(("def1".into(), SkillId::StandFirm)));
+        assert!(!hs.standing_firm.contains_key("def1"), "undecided until the answer arrives");
     }
 
     #[test]
@@ -323,9 +334,9 @@ mod tests {
             "avoid-push must publish FOLLOWUP_CHOICE(false), got {:?}", hs.published);
     }
 
-    /// The auto-accepted (never-prompted) path takes the same branch and must publish it too.
+    /// The re-entry after an ACCEPTED answer takes the avoid-push branch and publishes it.
     #[test]
-    fn stand_firm_auto_accept_publishes_followup_choice_false() {
+    fn stand_firm_answered_use_publishes_followup_choice_false() {
         let mut game = make_game();
         game.team_away.players.push(player_with_skills("def1", vec![SkillId::StandFirm]));
         game.field_model.set_player_coordinate("def1", FieldCoordinate::new(5, 5));
@@ -333,6 +344,7 @@ mod tests {
 
         let m = StandFirmStepModifier;
         let mut hs = default_hook_state("def1");
+        hs.standing_firm.insert("def1".into(), true); // the filed answer
         m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
 
         assert!(

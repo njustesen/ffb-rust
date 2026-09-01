@@ -1474,6 +1474,18 @@ public class ParityRunner {
             // This matches Rust's AgentResponse::PlayerChoice { player_id: "" } for all
             // PlayerChoice prompts. RandomStrategy used non-seeded RANDOM here, causing
             // 1-6% divergence per race when optional player selections were made.
+            case PUNT_TO_CROWD: {
+                // A boundary punter (sideline/endzone) is asked whether to punt into the crowd.
+                // Without this case the dialog fell to the NON-SEEDED RandomStrategy
+                // (comm.sendPuntToCrowd(RANDOM.nextBoolean())) - silent nondeterminism, live for
+                // the first time now that PUNT is a handled acting action. DECLINE
+                // deterministically, zero draws; the Rust InitPunt auto-declines identically.
+                comm.clearCaptured();
+                comm.sendPuntToCrowd(false);
+                injectCaptured(dialog, game, gameState);
+                break;
+            }
+
             case PLAYER_CHOICE:
             case KICK_SKILL: {
                 // Most PlayerChoice modes: decline with empty selection.
@@ -3021,6 +3033,19 @@ public class ParityRunner {
             case RAIDING_PARTY:
                 property = com.fumbbl.ffb.model.property.NamedProperties.canMoveOpenTeamMate;
                 break;
+            case BLACK_INK:
+                // Kiroth's gaze. The heuristic declared it BARE (ActingPlayer(BLACK_INK)) and
+                // phase 2's sendConcreteAction switch has no BLACK_INK case, so its default arm
+                // DESELECTED the activation: the gaze silently never happened (dark_elf bb2020
+                // seed 1 i=6 - probes in StepBlackInk and the phase-2 arm both never fired).
+                // The RANDOM path already declares it as the command pair below; route the
+                // heuristic through the same pair.
+                property = com.fumbbl.ffb.model.property.NamedProperties.canGazeAutomatically;
+                break;
+            case AUTO_GAZE_ZOAT:
+                // Zolcath's gaze - same shape as BLACK_INK (dark_elf bb2025 seed 1 i=9).
+                property = com.fumbbl.ffb.model.property.NamedProperties.canGazeAutomaticallyThreeSquaresAway;
+                break;
             default:
                 return false;
         }
@@ -3934,6 +3959,13 @@ public class ParityRunner {
             case BLACK_INK:
             case MULTIPLE_BLOCK:
             case RAIDING_PARTY:
+            // PUNT is forceDispatch(): the bare ActingPlayer(pid, PUNT) declaration pushes the
+            // punt sequence at once, and the INIT_PUNT square wait is already driven by
+            // sendPuntTarget. The missing case sent every heuristic punt through the
+            // UNHANDLED_ACTING_ACTION deselect, while the Rust agent DECLARED it -- the whole
+            // Punt family ran on one side only (dark_elf bb2025 seed 1 k=67).
+            case PUNT:
+            case PUNT_MOVE:
             case LOOK_INTO_MY_EYES:
             case BALEFUL_HEX:
             case CATCH_OF_THE_DAY:

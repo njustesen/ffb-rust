@@ -999,6 +999,12 @@ mod tests {
         // hp1 is the acting-team ball carrier, so stunning it triggers a ball scatter + end turn —
         // observable evidence that stunPlayer's returned StepParameters are now published, not discarded.
         game.field_model.ball_coordinate = Some(coord);
+        // A HELD ball is in play and not moving — `UtilPlayer.hasBall` (the 1:1 helper the
+        // injury drop-site uses since the chaos_pact loose-ball fix) requires both, so the
+        // fabricated carrier state must say so or the END_TURN publish this test asserts is
+        // correctly withheld.
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = false;
         game.acting_player.player_id = Some("hp1".into());
 
         step.kickoff_result = Some(KickoffResult::OficiousRef);

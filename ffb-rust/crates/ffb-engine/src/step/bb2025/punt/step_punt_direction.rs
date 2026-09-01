@@ -120,6 +120,9 @@ impl StepPuntDirection {
         //       direction = mechanic.interpretThrowInDirectionRoll(baseDirection, roll);
         let base_direction = coord_from.direction_to(coord_to).unwrap_or(Direction::North);
         let roll = rng.d6();
+        if std::env::var_os("FFB_TRACE").is_some() {
+            eprintln!("RPUNTDIR from={coord_from:?} to={coord_to:?} base={base_direction:?} roll={roll}");
+        }
         let direction = ThrowInMechanic::new().interpret_throw_in_direction_roll_with_template(base_direction, roll);
         self.direction = Some(direction);
         let indicator = coord_from.step(direction, 1);
