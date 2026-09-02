@@ -199,3 +199,31 @@ From baseline (0/0/2, 17/85/15, 0/69/3). bb2016 nine-of-three GREEN. Remaining:
   casualty. The B&C compulsory walk must CONTINUE after the mover is knocked down/injured.
 - bb2020 @1.0 33 reds / @1e6 14; bb2025 @1.0 6 / @0 7 / @1e6 1 — mix of the same B&C-walk
   nuance and draw-count splits to root-cause per seed.
+
+## Remaining frontier — the B&C compulsory-walk-off-the-edge case (NOT yet fixed)
+
+Extensive tracing (bb2020 @0 seed 92, bb2025 @0 seed 7) localized the dominant remaining fault
+to a Ball & Chain Fanatic's compulsory random walk in a near-empty blizzard pitch. Precise
+findings (probes reverted):
+
+- The Fanatic scatters off the pitch edge repeatedly; each OOB is a crowd push. The mover is
+  put into the RESERVE box (RSV_HOME_X=-1, first free row) and the walk CONTINUES scattering
+  from the box coordinate.
+- bb2025 seed 7 i=56 (home_04): the board is BIT-IDENTICAL at i=55 (verified: same reserve
+  occupancy, both empty). During home_04's move, Rust boxes ONLY home_04 (row 0 → (-1,0));
+  Java boxes home_04 to row 3 → (-1,3), implying 3 other home players were crowd-pushed to
+  reserve first. Square 3's scatter runs FROM the box coordinate: Java from (-1,3) lands on a
+  teammate at (0,2) and BLOCKS (rng 138-140 = 3 block dice) → turnover, home's turn ends;
+  Rust from (-1,0) scatters to (0,-1) OOB → casualty, turn continues. This is the i=57
+  `J=THROW_BOMB / R=Move` divergence (Java flipped to away, Rust continued home).
+- Root not fully cracked: why Java reserves 3 more players than Rust during the SAME move with
+  the SAME dice, when the board matched at i=55 and Rust boxes only the mover. Likely a
+  B&C-blocks-teammate → crowd-push interaction (the mover blocking/pushing own players off the
+  edge) that Rust resolves differently — plus goblin's Troll/secret-weapons are nr>11 and
+  HASH-BLIND, so an earlier box-occupancy divergence in those could go uncaught.
+- Constants and per-step logic verified 1:1 (RSV/KO columns, putPlayerIntoBox row scan,
+  InjuryTypeCrowd's `!casualty && !KO → RESERVE` guard, StepFallDown defer-not-apply). The gap
+  is in the multi-square walk's block/crowd-push resolution, needing dedicated porting.
+
+Status: bb2016 100/100 x3 GREEN + pushed. bb2020 67/99/86, bb2025 94/93/99 — the remaining
+reds are this B&C case + sampled draw splits. Not yet fully green.
