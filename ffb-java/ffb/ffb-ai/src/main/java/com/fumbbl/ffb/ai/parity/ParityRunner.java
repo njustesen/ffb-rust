@@ -1841,6 +1841,7 @@ public class ParityRunner {
         String hash = String.format("%016x", hashLong);
         if (DEBUG) {
             System.err.println("JSTEP i=" + stepIndex + " rng_calls=" + callCount + " mode=" + game.getTurnMode()
+                + " mv=" + (game.getFieldModel().isBallMoving() ? "1" : "0")
                 + " chosen=" + chosen + " state=" + canonicalStr);
         }
         if (System.getenv("FFB_IDSTATE") != null) {
