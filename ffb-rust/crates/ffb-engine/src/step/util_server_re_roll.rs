@@ -97,7 +97,22 @@ pub fn ask_for_reroll_if_available_for(
     let td = game.turn_data();
     let team_re_roll_allowed = crate::mechanic::roll_mechanic_for(game.rules)
         .allows_team_re_roll(game.turn_mode);
-    if td.rerolls > 0 && !td.reroll_used && team_re_roll_allowed {
+    // Java RollMechanic.isTeamReRollAvailable, the four bomb-mode terms:
+    //   (turnMode != BOMB_HOME || homeHasPlayer) && (turnMode != BOMB_HOME_BLITZ || homeHasPlayer)
+    //   && (turnMode != BOMB_AWAY || awayHasPlayer) && (turnMode != BOMB_AWAY_BLITZ || awayHasPlayer)
+    // — during a bomb, only a roller on the bomb-OWNING team may be offered the team re-roll.
+    // An intercepted-and-re-thrown bomb flips home_playing to the re-thrower, whose team's
+    // re-roll Rust then offered for the inaccurate re-throw; Java offers nothing (goblin
+    // bb2016 seed 39 k=12: Rust 2 extra sampler draws on a declined PASS TRR offer).
+    let bomb_side_ok = {
+        use ffb_model::enums::TurnMode;
+        match (game.turn_mode, player_id) {
+            (TurnMode::BombHome | TurnMode::BombHomeBlitz, Some(pid)) => game.team_home.has_player(pid),
+            (TurnMode::BombAway | TurnMode::BombAwayBlitz, Some(pid)) => game.team_away.has_player(pid),
+            _ => true,
+        }
+    };
+    if td.rerolls > 0 && !td.reroll_used && team_re_roll_allowed && bomb_side_ok {
         return Some(AgentPrompt::ReRollOffer {
             source: ReRollSource::new("TRR"),
             action: rerolled_action.to_owned(),

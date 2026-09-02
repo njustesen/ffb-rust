@@ -149,3 +149,11 @@ ITER11 (with ITER10): the retire carve-out must read the ACTING PLAYER's used se
 team Player's set, which mark_skill_used no longer writes for a per-activation skill. Both
 retire sites (change + to_none) fixed. @0 1-20 green; @1.0 reds moved later (21: 1→51,
 81: 9→53) — further faults behind.
+
+## ITER12 — a team re-roll during a bomb belongs to the bomb-OWNING side
+
+bb2016 @1.0 seeds 39/21: equal dice, Rust 2 sampler draws ahead — Rust offered (and the agent
+declined) a PASS team re-roll for the INACCURATE re-throw of an intercepted bomb. Java's
+RollMechanic.isTeamReRollAvailable carries four bomb-mode terms — during BOMB_HOME/AWAY(_BLITZ)
+the roller must be on the bomb-owning team — so the away re-thrower of home's bomb gets no
+offer. Ported the four terms into ask_for_reroll_if_available_for.
