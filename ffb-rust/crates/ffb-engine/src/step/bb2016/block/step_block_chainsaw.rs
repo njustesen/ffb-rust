@@ -83,10 +83,16 @@ impl StepBlockChainsaw {
             let re_rolled = is_chainsaw_reroll && self.re_roll.re_roll_source.is_some();
             // Java: if (!reRolled) getResult().setSound(SoundId.CHAINSAW) — not ported
 
-            // Java: int roll = getGameState().getDiceRoller().rollChainsaw()  (rolls d8)
-            let roll = rng.d8();
-            // Java: DiceInterpreter.getInstance().minimumRollChainsaw() → 4
-            let minimum_roll = 4;
+            // Java: int roll = getGameState().getDiceRoller().rollChainsaw() — a D6
+            // (DiceRoller.rollChainsaw = rollDice(6); the old comment claimed d8 and the
+            // code rolled one: goblin bb2016 seed 24 i=151 — Java d6=1 kickback+turnover,
+            // Rust d8=5 hit).
+            let roll = rng.d6();
+            // Java: DiceInterpreter.getInstance().minimumRollChainsaw() → 2 (the chainsaw
+            // kicks back only on a natural 1; the old hardcoded 4 turned every 2-3 into a
+            // phantom kickback — goblin bb2016 seed 51 i=136: Java roll 3 = HIT on away_04,
+            // Rust roll 3 = kickback + turnover).
+            let minimum_roll = 2;
             let successful = roll >= minimum_roll;
 
             // Java: getResult().addReport(new ReportChainsawRoll(actingPlayer.getPlayerId(), successful, roll, minimumRoll, reRolled, null))
@@ -168,6 +174,16 @@ impl StepBlockChainsaw {
 
             let mut outcome = StepOutcome::goto(&self.goto_label_on_failure);
             if let Some(ev) = pending_event { outcome = outcome.with_event(ev); }
+
+            if std::env::var("FFB_BOMB").is_ok() {
+                eprintln!(
+                    "RKICKBACK armor_roll={:?} broken={} injury={:?} mods={:?}",
+                    injury_result.injury_context().armor_roll,
+                    injury_result.injury_context().armor_broken,
+                    injury_result.injury_context().injury,
+                    injury_result.injury_context().armor_modifiers.iter().map(|m| m.name).collect::<Vec<_>>()
+                );
+            }
 
             // Java: if (injuryResultAttacker.injuryContext().isArmorBroken()) {
             //         publishParameters(UtilServerInjury.dropPlayer(this, actingPlayer.getPlayer(), ATTACKER))

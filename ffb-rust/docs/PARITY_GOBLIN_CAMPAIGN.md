@@ -107,3 +107,20 @@ for a player in the crowd. Java only rolls (the THROWN_PLAYER apothecary applies
 player stays FALLING and RightStuff skips. Removed the early apply — same class as the
 ITER78-81 random-campaign "TTM landing drop-before-apply" fix. NOTE: the hit-player branch's
 `apply_to` is the same suspect class (hash-blind, unexposed) — left for evidence.
+
+## ITER7 — the bb2016 chainsaw kickback roll is a D6, not a D8
+
+bb2016 @0 seed 24 (i=151): with the chainsaw twin now LIVE (ITER5), the Looney's block rolls
+the kickback — Java `DiceRoller.rollChainsaw()` = rollDice(6) → d6=1 → KICKBACK, attacker
+down, turnover; Rust rolled a d8 (=5 on the same stream position) → "hit". The Rust twin's
+own comment claimed "(rolls d8)". One-character fix; the bb2016 FOUL chainsaw twin already
+rolled d6.
+
+## ITER8 — the bb2016 chainsaw kickback happens only on a 1 (minimum roll 2, not 4)
+
+bb2016 @0 seed 51 (i=136), post-ITER7: identical chainsaw d6=3 — Java (DiceInterpreter
+minimumRollChainsaw() = 2) HITS away_04 (armour+injury on the DEFENDER, no turnover, home
+continues); Rust's hardcoded minimum 4 turned the 3 into a phantom KICKBACK (armour+injury on
+the Looney, drop, END_TURN). The four dice were identical either way — the JSTATE final row
+(A4:4 stunned, H14 standing) named the real target. The bb2016 FOUL chainsaw twin already
+used 2.
