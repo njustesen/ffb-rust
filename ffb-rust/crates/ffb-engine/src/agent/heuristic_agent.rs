@@ -346,6 +346,21 @@ struct Features {
 
 /// Order-independent position hash. `player_coordinates` is a `HashMap`, so this must not depend on
 /// iteration order — a wrapping sum of per-player hashes does not.
+/// splitmix64 finalizer: full-avalanche mix of one term before it enters the
+/// order-independent sum below. Without it the sum is a WEAK additive hash:
+/// a chain push moving two players one square each produced byte-level deltas
+/// that cancelled exactly (dark_elf_league_fumbbl bb2016 seed 3, pre-push ==
+/// post-push stamp), so the follow-up decision reused the pre-push tackle-zone
+/// raster and diverged from Java, which recomputes live at the dialog.
+fn mix64(mut h: u64) -> u64 {
+    h ^= h >> 30;
+    h = h.wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    h ^= h >> 27;
+    h = h.wrapping_mul(0x94d0_49bb_1331_11eb);
+    h ^= h >> 31;
+    h
+}
+
 fn positions_stamp(g: &Game) -> u64 {
     let mut acc: u64 = 0;
     for (id, &c) in &g.field_model.player_coordinates {
@@ -357,7 +372,7 @@ fn positions_stamp(g: &Game) -> u64 {
         h ^= ((c.x as u64) << 8) ^ (c.y as u64);
         let st = g.field_model.player_state(id).map(|s| s.id() as u64).unwrap_or(0);
         h = h.wrapping_mul(31).wrapping_add(st);
-        acc = acc.wrapping_add(h);
+        acc = acc.wrapping_add(mix64(h));
     }
     let b = g
         .field_model
@@ -4409,6 +4424,46 @@ fn handoff_weight(f: &Features, g: &Game, tc: FieldCoordinate, rcv: &str, m: &Mo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The feature-cache stamp must change when a chain push moves two players one
+    /// square each. The old stamp summed weakly-mixed per-player terms, and this
+    /// EXACT board transition (dark_elf_league_fumbbl bb2016 seed 3, i=60: home_01
+    /// pushed (16,5)->(16,6) FALLING, home_02 chained (16,6)->(16,7) STANDING)
+    /// produced byte deltas that cancelled -- pre-push stamp == post-push stamp --
+    /// so the follow-up decision reused the pre-push tackle-zone raster and
+    /// diverged from Java, which recomputes live at the FOLLOWUP dialog.
+    #[test]
+    fn chain_push_changes_the_positions_stamp() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::PlayerState;
+        let mut home = crate::step::framework::test_team("home", 0);
+        let away = crate::step::framework::test_team("away", 0);
+        for nr in 1..=2 {
+            home.players.push(Player {
+                id: format!("home_{:02}", nr),
+                nr,
+                movement: 6,
+                strength: 3,
+                agility: 3,
+                armour: 8,
+                ..Default::default()
+            });
+        }
+        let mut g = Game::new(home, away, Rules::Bb2016);
+        // Pre-push: defender home_01 FALLING at (16,5), home_02 STANDING at (16,6).
+        g.field_model.set_player_coordinate("home_01", FieldCoordinate::new(16, 5));
+        g.field_model.set_player_state("home_01", PlayerState::new(267));
+        g.field_model.set_player_coordinate("home_02", FieldCoordinate::new(16, 6));
+        g.field_model.set_player_state("home_02", PlayerState::new(257));
+        let pre = positions_stamp(&g);
+
+        // Post-push: home_01 -> (16,6), home_02 chained -> (16,7); states unchanged.
+        g.field_model.set_player_coordinate("home_01", FieldCoordinate::new(16, 6));
+        g.field_model.set_player_coordinate("home_02", FieldCoordinate::new(16, 7));
+        let post = positions_stamp(&g);
+
+        assert_ne!(pre, post, "a chain push must invalidate the feature cache");
+    }
 
     #[test]
     fn p_roll_matches_the_table() {
