@@ -76,18 +76,17 @@ impl StepModifierTrait for SideStepStepModifier {
             && !is_prone_or_stunned
             && !old_is_prone_or_stunned
         {
-            // Java shows a DialogSkillUseParameter ("use Side Step?"). The parity harness
-            // (ParityRunner SKILL_USE) auto-USES every offered skill except DumpOff /
-            // PrimalSavagery / SafePairOfHands (`useSkill = !DumpOff && !PrimalSavagery &&
-            // !SafePairOfHands`), so a Side Step defender DOES pick its own square. Mirror that:
-            // auto-ACCEPT when undecided. This previously auto-DECLINED, so a Side Step player was
-            // pushed to a standard behind-the-defender square instead of choosing any square
-            // adjacent to itself (elf bb2016 seed 1 step 58: an Elf Blitzer — Block/Side Step — is
-            // Pow'd by home_03 at (13,8); Java pushes it to (13,7) with `homeChoice=false` (the
-            // DEFENDER's team chooses), Rust offered [(15,7),(15,8),(15,9)] and pushed to (15,7)).
-            // Same class as the bb2016 Stand Firm auto-use fix.
+            // Java: `if (!sideStepping.containsKey(id))` shows a DialogSkillUseParameter and
+            // waits for the coach's answer. The old auto-ACCEPT mirrored the RANDOM contract
+            // (ParityRunner answers every SKILL_USE for free), but the HEURISTIC scores the
+            // dialog and spends two sampler draws on it — a prompt Rust never emitted
+            // desynchronised the streams from the game's first block (elf bb2016 seed 98 k=2:
+            // Java draws 12→14 through SKILL_USE SideStep, Rust jumped straight to the push).
+            // Park the offer exactly like StandFirm (dwarf ITER1) and the bb2025 twin (Estelle);
+            // StepPushback raises the prompt and files the answer into `side_stepping`.
             if !state.side_stepping.contains_key(&defender_id) {
-                state.side_stepping.insert(defender_id.clone(), true);
+                state.pending_skill_use = Some((defender_id.clone(), SkillId::SideStep));
+                return true;
             }
 
             if *state.side_stepping.get(&defender_id).unwrap_or(&false) {
@@ -251,17 +250,12 @@ mod tests {
         assert!(!result, "SideStep should not fire when defender is prone/stunned");
     }
 
-    /// Java shows a DialogSkillUseParameter for Side Step, and the parity harness
-    /// (ParityRunner SKILL_USE) auto-USES every offered skill except DumpOff / PrimalSavagery /
-    /// SafePairOfHands — so an undecided Side Step must auto-ACCEPT, not decline. Accepting switches
-    /// the push to SIDE_STEP mode, where the squares are chosen around the DEFENDER (with
-    /// `home_choice` set to the defender's own team) instead of the standard squares behind it.
-    ///
-    /// elf bb2016 seed 1 step 58: an Elf Blitzer (Block/Side Step) is Pow'd by home_03 at (13,8);
-    /// Java pushes it to (13,7) with `homeChoice=false`, while the auto-decline offered only
-    /// [(15,7),(15,8),(15,9)] and pushed to (15,7). Same class as the bb2016 Stand Firm auto-use fix.
+    /// Java shows a DialogSkillUseParameter for an undecided Side Step and waits; the hook
+    /// parks the offer in `pending_skill_use` so StepPushback raises AgentPrompt::SkillUse —
+    /// the heuristic agent spends two sampler draws on it exactly like Java's HeuristicDriver
+    /// (elf bb2016 seed 98). The answer re-enters via `side_stepping`.
     #[test]
-    fn side_step_headless_auto_uses() {
+    fn side_step_undecided_parks_the_offer() {
         let mut game = make_game();
         game.team_away.players.push(player_with_skills("def1", vec![SkillId::SideStep]));
         game.defender_id = Some("def1".into());
@@ -271,13 +265,11 @@ mod tests {
         let m = SideStepStepModifier;
         let mut hs = default_hook_state("def1", true);
         let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
-        assert!(result, "side step handled should return true");
-        assert_eq!(hs.side_stepping.get("def1"), Some(&true),
-            "the harness uses the offered Side Step, so an undecided defender side-steps");
-        assert_eq!(hs.pushback_mode, PushbackMode::SIDE_STEP,
-            "accepting Side Step switches the push to SIDE_STEP mode");
-        assert!(hs.pushback_squares.iter().all(|sq| !sq.home_choice),
-            "an AWAY-team side-stepper chooses its own square (home_choice = false)");
+        assert!(result, "undecided offer stops the step this pass");
+        assert_eq!(hs.pending_skill_use, Some(("def1".into(), SkillId::SideStep)));
+        assert!(!hs.side_stepping.contains_key("def1"), "undecided until the answer arrives");
+        assert_eq!(hs.pushback_mode, PushbackMode::REGULAR,
+            "no mode switch while the dialog is open");
     }
 
     #[test]

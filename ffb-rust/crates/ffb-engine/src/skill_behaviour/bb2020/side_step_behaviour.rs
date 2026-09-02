@@ -104,10 +104,17 @@ impl StepModifierTrait for SideStepStepModifier {
             // offered the three-square REGULAR fan instead of every free adjacent square, and picked a
             // different destination (ogre bb2020 seed 57 i=133: the Snotling away_05 ends at (12,9) in
             // Java, (13,9) in Rust). Record the harness's answer instead.
-            // Java returns here and re-enters the step once the coach answers; Rust has no dialog
-            // round trip for this hook, so record the harness's answer and fall straight through to
-            // the mode switch below - the same state Java reaches on its second pass.
-            state.side_stepping.entry(defender_id.clone()).or_insert(true);
+            // Java returns here and re-enters the step once the coach answers. The old
+            // `or_insert(true)` mirrored the RANDOM contract (ParityRunner answers every
+            // SKILL_USE for free); the HEURISTIC scores the dialog and spends two sampler
+            // draws, so park the offer like StandFirm and the bb2016/bb2025 twins — the
+            // shared StepPushback raises AgentPrompt::SkillUse and files the answer back
+            // into `side_stepping` (elf bb2016 seed 98 exposed the bb2016 twin; this one
+            // is the same fault in bb2020).
+            if !state.side_stepping.contains_key(&defender_id) {
+                state.pending_skill_use = Some((defender_id.clone(), SkillId::SideStep));
+                return true;
+            }
 
             // Java: if (state.sideStepping.get(id)) { switch to SIDE_STEP mode }
             if *state.side_stepping.get(&defender_id).unwrap_or(&false) {
@@ -245,11 +252,11 @@ mod tests {
         assert_eq!(m.priority(), 3);
     }
 
-    /// Java's hook shows a `DialogSkillUseParameter` and re-enters the step with the answer; the
-    /// parity harness answers every SKILL_USE with USE=true except DumpOff / PrimalSavagery /
-    /// SafePairOfHands / Swoop, so Side Step is always USED. Rust used to record `false`
-    /// ("auto-decline") and return, so `pushback_mode` never became SIDE_STEP and the defender got
-    /// the three-square REGULAR fan instead of every free adjacent square (ogre bb2020 seed 57).
+    /// Java's hook shows a `DialogSkillUseParameter` for an undecided Side Step and waits.
+    /// The hook parks the offer in `pending_skill_use` so the shared StepPushback raises
+    /// AgentPrompt::SkillUse — the heuristic spends two sampler draws on it exactly like
+    /// Java's HeuristicDriver (elf bb2016 seed 98 exposed the bb2016 twin). Once the answer
+    /// is USE=true, a second pass switches the push to SIDE_STEP mode.
     #[test]
     fn side_step_is_used_and_switches_the_pushback_mode() {
         let mut game = make_game();
@@ -260,14 +267,12 @@ mod tests {
 
         let m = SideStepStepModifier;
         let mut hs = default_hook_state("def1", true);
-        assert!(hs.side_stepping.is_empty(), "no answer recorded yet");
+        hs.side_stepping.insert("def1".into(), true);
         let handled = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
 
         assert!(handled, "the hook handles the step when Side Step applies");
-        assert_eq!(hs.side_stepping.get("def1"), Some(&true),
-            "the harness answer is USE=true, not a decline");
         assert_eq!(hs.pushback_mode, PushbackMode::SIDE_STEP,
-            "recording the answer must fall through to the mode switch in the same pass,              since Rust has no dialog round trip to re-enter on");
+            "an accepted Side Step switches the push to SIDE_STEP mode");
     }
 
     #[test]
@@ -298,13 +303,10 @@ mod tests {
         assert!(!result, "SideStep should not fire when no free squares around defender");
     }
 
-    /// Superseded by `side_step_is_used_and_switches_the_pushback_mode`. This test asserted the
-    /// old "headless auto-decline" (`side_stepping = false`), which was a Rust-only shortcut with no
-    /// Java counterpart: the harness answers SKILL_USE with USE=true for Side Step, so Java always
-    /// side-steps. The assertion is inverted here rather than deleted, to keep a guard on the value
-    /// actually recorded for an eligible defender.
+    /// An UNDECIDED eligible Side Step parks the offer (`pending_skill_use`) and records
+    /// nothing — the answer arrives via the prompt round trip, mirroring Java's dialog.
     #[test]
-    fn side_step_records_the_harness_answer_not_a_decline() {
+    fn side_step_undecided_parks_the_offer() {
         let mut game = make_game();
         game.team_away.players.push(player_with_skills("def1", vec![SkillId::SideStep]));
         game.defender_id = Some("def1".into());
@@ -314,8 +316,10 @@ mod tests {
         let m = SideStepStepModifier;
         let mut hs = default_hook_state("def1", true);
         let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
-        assert!(result, "an eligible Side Step handles the step");
-        assert_eq!(hs.side_stepping.get("def1"), Some(&true));
+        assert!(result, "the parked offer stops the step this pass");
+        assert_eq!(hs.pending_skill_use, Some(("def1".into(), SkillId::SideStep)));
+        assert!(!hs.side_stepping.contains_key("def1"), "undecided until the answer arrives");
+        assert_eq!(hs.pushback_mode, PushbackMode::REGULAR);
     }
 
     #[test]
