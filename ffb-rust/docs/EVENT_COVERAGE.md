@@ -206,3 +206,21 @@ run over a FUMBBL-imported team.
 
 The one engine fix this race (mix64 feature-cache stamp) is agent-infrastructure, not
 roster-specific — recorded in PARITY_DARK_ELF_LEAGUE_FUMBBL_CAMPAIGN.md.
+
+---
+
+# Event coverage — HeuristicAgent, elf v elf (harvested 2026-09-02)
+
+Per-edition detail: `EVENT_COVERAGE_elf_bb2016.md` / `_bb2020.md` / `_bb2025.md` (each a clean
+100-seed run at scale 1.0; parity 100/100 in all three).
+
+- AG4 everywhere: the highest catch volume of the campaign (catchRolls 327/…/277, catch
+  successes 257/208 bb2016/bb2025) with Catcher Catch re-rolls and Nerves of Steel live.
+- Pass game: 234/220 pass rolls (bb2016/bb2025); the bb2025 Thrower's native Hail Mary Pass
+  exercises the ITER2 Pass-skill re-roll PROMPT (accept and decline both hit across seeds).
+- Side Step now runs the full dialog round trip in bb2016/bb2020 (ITER1) — every Blitzer push
+  answers the SKILL_USE prompt and picks the defender-chosen square; exercised-unevented,
+  the nine 100/100 gates are the record.
+- Blocks 882/812, blitzes 953/978, dodges ~1270/1225 per edition; touchdowns 109/87.
+- Fumblerooski (bb2025 lineman) / Diving Catch: no dedicated events fired this harvest —
+  same agent-rarely-creates bucket as prior races; 900-game parity is the standing proof.

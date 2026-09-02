@@ -75,3 +75,17 @@ reRolledAction=PASS with the source only on ACCEPT — a DECLINE stands on the f
 NOT fall back to the team re-roll. Mirrors StepPass's earlier identical fix. Tests:
 `fumbled_hmp_prompts_for_the_pass_skill_reroll`, `accepted_pass_skill_reroll_rolls_again`,
 `declined_pass_skill_reroll_stands_on_the_fumble`.
+
+## Nine gates — GREEN (2026-09-02)
+
+After ITER1+2: bb2016 / bb2020 / bb2025 × scales 1.0 / 0 / 1e6 all **100/100**; randoms ×3
+100/100; `cargo test -p ffb-engine` 7392/0. TWO fixes took the matrix from
+0/100-1/100-87/100 to green — both the same fault class: a RANDOM-contract auto-use
+(free SKILL_USE answer) surviving into the heuristic era, where Java samples the dialog.
+Standing regressions (amazon, lineman, dwarf, chaos, chaos_dwarf, chaos_pact, dark_elf,
+dark_elf_league_fumbbl ×3 @1.0) below.
+Regressions: amazon, lineman, dwarf, chaos, chaos_dwarf, chaos_pact, dark_elf,
+dark_elf_league_fumbbl — each ×3 editions @1.0 — **all 100/100** (24/24 gates).
+Coverage harvested ×3 → EVENT_COVERAGE_elf_*.md + summary in EVENT_COVERAGE.md.
+**🏁 CAMPAIGN COMPLETE 2026-09-02** — nine gates + randoms + 24 regression gates green,
+trees agree, suite 7392/0. Next race alphabetically: goblin.
