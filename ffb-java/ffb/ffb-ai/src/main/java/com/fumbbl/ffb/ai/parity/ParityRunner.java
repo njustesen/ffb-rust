@@ -3089,6 +3089,60 @@ public class ParityRunner {
                 // Zolcath's gaze - same shape as BLACK_INK (dark_elf bb2025 seed 1 i=9).
                 property = com.fumbbl.ffb.model.property.NamedProperties.canGazeAutomaticallyThreeSquaresAway;
                 break;
+            case WISDOM_OF_THE_WHITE_DWARF: {
+                // Grombrindal. Same command pair the RANDOM path's handleStep arm sends: the
+                // client offers WISDOM from the ordinary action modules and sends
+                // ClientCommandUseTeamMatesWisdom; the declared action stays MOVE. The heuristic
+                // declared it BARE (ActingPlayer(WISDOM..)) and phase 2's sendConcreteAction has
+                // no case, so the default arm DESELECTED it while Rust executed it (dwarf bb2025
+                // seeds 3/19/20 at the first Wisdom declaration).
+                MatchRunner.inject(gameState,
+                    new ClientCommandActingPlayer(playerId, PlayerAction.MOVE, false));
+                MatchRunner.inject(gameState,
+                    new com.fumbbl.ffb.net.commands.ClientCommandUseTeamMatesWisdom());
+                return true;
+            }
+            case THROW_KEG: {
+                // Thorsson's Beer Barrel Bash. Same pair + target pick as the RANDOM path's
+                // handleStep arm: targets are ThrowKegLogicModule.isValidTarget (distance <= 3,
+                // base STANDING, opposing team), coordinate-sorted, ONE actionRng draw. The bare
+                // heuristic declaration fell to phase 2's default DESELECT while Rust threw the
+                // keg (dwarf bb2025 seed 2 i=2: Java no-ops the activation, Rust fumbles a keg).
+                FieldModel kegFm = game.getFieldModel();
+                FieldCoordinate kegCoord = playerCoordinate(game, playerId);
+                Team kegOpponent = game.isHomePlaying() ? game.getTeamAway() : game.getTeamHome();
+                List<Player<?>> kegTargets = new ArrayList<>();
+                if (kegCoord != null) {
+                    for (Player<?> op : kegOpponent.getPlayers()) {
+                        FieldCoordinate oc = kegFm.getPlayerCoordinate(op);
+                        PlayerState ops = kegFm.getPlayerState(op);
+                        if (oc == null || ops == null) continue;
+                        if (oc.distanceInSteps(kegCoord) <= 3
+                            && ops.getBase() == PlayerState.STANDING) {
+                            kegTargets.add(op);
+                        }
+                    }
+                }
+                sortPlayersByCoordinate(kegTargets, kegFm);
+                if (kegTargets.isEmpty()) {
+                    // No valid click for the coach: the declaration never completes. Deselect
+                    // with NO kegIdx draw, exactly like the random path.
+                    if (DEBUG) System.err.println("JAVA_KEG_DESELECT pid=" + playerId
+                        + " (no valid keg target, heuristic)");
+                    MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));
+                    return true;
+                }
+                int kegIdx = (int) Long.remainderUnsigned(actionRng.nextLong(), kegTargets.size());
+                Player<?> kegTarget = kegTargets.get(kegIdx);
+                if (DEBUG) System.err.println("JAVA_KEG_PICK pid=" + playerId + " N="
+                    + kegTargets.size() + " idx=" + kegIdx + " target=" + kegTarget.getId()
+                    + " (heuristic)");
+                MatchRunner.inject(gameState,
+                    new ClientCommandActingPlayer(playerId, PlayerAction.THROW_KEG, false));
+                MatchRunner.inject(gameState,
+                    new com.fumbbl.ffb.net.commands.ClientCommandThrowKeg(kegTarget.getId()));
+                return true;
+            }
             default:
                 return false;
         }
@@ -3705,6 +3759,8 @@ public class ParityRunner {
                         && ((com.fumbbl.ffb.mechanics.GameMechanic) game.getMechanic(
                                 com.fumbbl.ffb.mechanics.Mechanic.Type.GAME))
                             .isWisdomAvailable(game, p)) {
+                    if (DEBUG) System.err.println("JAVA_WISDOM_OFFER pid=" + p.getId()
+                        + " usedProp=" + p.isUsed(com.fumbbl.ffb.model.property.NamedProperties.canGrantSkillsToTeamMates));
                     actions.add(PlayerAction.WISDOM_OF_THE_WHITE_DWARF);
                 }
 

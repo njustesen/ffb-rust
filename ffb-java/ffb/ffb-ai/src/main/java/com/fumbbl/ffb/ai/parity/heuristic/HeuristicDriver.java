@@ -217,10 +217,18 @@ public final class HeuristicDriver {
 
         float wUse = consequence * 0.833f * scarcity;
         wUse = Math.max(0.0f, Math.min(1.0f, wUse));
+        if (Boolean.getBoolean("ffb.parityDebug")) {
+            System.err.println("JREROLLW action=" + action + " cons=" + consequence + " scarcity=" + scarcity
+                + " turn=" + td.getTurnNr() + " rr=" + td.getReRolls() + " carry=" + weCarry + " wUse=" + wUse);
+        }
         sampler.clear();
         sampler.push(wUse);          // index 0: use it
         sampler.push(1.0f - wUse);   // index 1: decline
-        return sampler.pick(0.20f) == 0;
+        int pick = sampler.pick(0.20f);
+        if (Boolean.getBoolean("ffb.parityDebug")) {
+            System.err.println("JREROLLA pick=" + pick + " use=" + (pick == 0));
+        }
+        return pick == 0;
     }
 
     /**
