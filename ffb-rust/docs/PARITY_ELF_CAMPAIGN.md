@@ -59,3 +59,19 @@ Post-ITER1 gates: bb2016 100/100 ×3 ✅, bb2020 100/100 ×3 ✅, randoms ×3 10
 tests 7390/0. bb2025 UNCHANGED (87/13 @1.0, 91/9 @1e6, @0 green) — its Sidestep already
 parked (Estelle), so the bb2025 reds are a different fault. ITER2 target: bb2025 seed 51
 (fails step 3).
+
+## ITER2 — the fumbled Hail Mary Pass's Pass-skill re-roll must PROMPT (bb2025)
+
+bb2025 seed 51 fails step 3: candsum k=4 equal n (2288) but draws 12 vs 14 — Java runs
+`SKILL_USE skill=Pass` (JSKILL w_use=0.5 idx=1, DECLINED) while resolving the elf Thrower's
+HailMaryPass. Java PassBehaviour's StepHailMaryPass modifier shows a DialogSkillUseParameter
+for the fumbled HMP's Pass-skill re-roll; `step_hail_mary_pass.rs` auto-used it (comment even
+said "auto-used by both harnesses" — true only of the RANDOM contract). So Rust was 2 sampler
+draws short AND re-rolled a fumble Java's heuristic declined.
+
+Fix (1:1 with PassBehaviour handleCommandHook): `pass_skill_source` offer field + SkillUse
+prompt in the fumble cascade (once per step via `pass_skill_used`); the answer sets
+reRolledAction=PASS with the source only on ACCEPT — a DECLINE stands on the fumble and does
+NOT fall back to the team re-roll. Mirrors StepPass's earlier identical fix. Tests:
+`fumbled_hmp_prompts_for_the_pass_skill_reroll`, `accepted_pass_skill_reroll_rolls_again`,
+`declined_pass_skill_reroll_stands_on_the_fumble`.

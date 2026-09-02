@@ -37,6 +37,9 @@ pub struct StepHailMaryPass {
     pub result: Option<PassOutcome>,
     /// Java: state.passSkillUsed -- whether the pass skill re-roll was already consumed
     pub pass_skill_used: bool,
+    /// The re-roll source named in the outstanding pass-skill offer, so an ACCEPT can spend
+    /// the right skill (mirrors StepPass.pass_skill_source).
+    pub pass_skill_source: Option<String>,
     /// Java: state.usingModifyingSkill (Boolean tristate)
     pub using_modifying_skill: Option<bool>,
     /// Java: state.usingSafePass (Boolean tristate)
@@ -58,6 +61,7 @@ impl StepHailMaryPass {
             goto_label_on_failure,
             result: None,
             pass_skill_used: false,
+            pass_skill_source: None,
             using_modifying_skill: None,
             using_safe_pass: None,
             minimum_roll: 0,
@@ -97,6 +101,21 @@ impl Step for StepHailMaryPass {
                     self.re_rolled_action = hook_state.re_rolled_action;
                     self.re_roll_source = hook_state.re_roll_source;
                 }
+            }
+            Action::UseSkill { skill_id, use_skill }
+                if !skill_id.properties().contains(&NamedProperties::CAN_ADD_STRENGTH_TO_PASS)
+                    && !skill_id.properties().contains(&NamedProperties::DONT_DROP_FUMBLES)
+                    && self.pass_skill_source.is_some() =>
+            {
+                // Java PassBehaviour's StepHailMaryPass handleCommandHook, verbatim:
+                //   step.setReRolledAction(PASS);
+                //   step.setReRollSource(useSkillCommand.isSkillUsed() ? getReRollSource() : null);
+                // A DECLINE does not fall back on the team re-roll: the re-entry sees the
+                // re-rolled action set with a null source and stands on the fumbled roll.
+                // Same contract as StepPass.pass_skill_source (elf bb2025 seed 51).
+                let source = self.pass_skill_source.take();
+                self.re_rolled_action = Some(REROLLED_ACTION_PASS.into());
+                self.re_roll_source = if *use_skill { source } else { None };
             }
             Action::UseSkill { skill_id, use_skill } => {
                 if skill_id.properties().contains(&NamedProperties::CAN_ADD_STRENGTH_TO_PASS) {
@@ -233,13 +252,30 @@ impl StepHailMaryPass {
         self.saved_fumble = raw_result == ffb_mechanics::pass_result::PassResult::SAVED_FUMBLE
             || (is_fumble && self.using_safe_pass == Some(true));
 
-        // Java PassBehaviour :159-176 — fumble reroll cascade: a skill reroll source for PASS
-        // (the Pass skill dialog, auto-used by both harnesses) FIRST, then the team reroll offer.
+        // Java PassBehaviour :159-176 — fumble reroll cascade: the pass-skill re-roll is a
+        // DialogSkillUseParameter (the coach may decline!), then the team reroll offer.
+        // The old code auto-used the skill source: correct for the RANDOM contract
+        // (ParityRunner answers every SKILL_USE with USE for free) but the HEURISTIC scores
+        // it (HeuristicDriver.useSkill "Pass" w=0.50, two sampler draws) and can DECLINE —
+        // elf bb2025 seed 51: Java declines the fumbled HMP's Pass re-roll (JSKILL idx=1)
+        // while Rust silently re-rolled. Prompt like StepPass.pass_skill_offer instead.
         if is_fumble && !self.saved_fumble && self.re_rolled_action.is_none() {
-            if let Some(source) = crate::step::abstract_step_with_re_roll::find_skill_reroll_source(game, REROLLED_ACTION_PASS) {
-                self.re_rolled_action = Some(REROLLED_ACTION_PASS.into());
-                self.re_roll_source = Some(source.name.clone());
-                return self.execute_step(game, rng);
+            if !self.pass_skill_used {
+                if let Some(source) = crate::step::abstract_step_with_re_roll::find_skill_reroll_source(game, REROLLED_ACTION_PASS) {
+                    // Java: state.passSkillUsed = true; showDialog(DialogSkillUseParameter(
+                    //   throwerId, passingReroll.getSkill(game), state.minimumRoll, modificationSkill))
+                    self.pass_skill_used = true;
+                    self.pass_skill_source = Some(source.name.clone());
+                    let skill_id = ffb_model::enums::SkillId::from_class_name(&source.name)
+                        .unwrap_or(ffb_model::enums::SkillId::Pass);
+                    return StepOutcome::cont().with_prompt(
+                        ffb_model::prompts::AgentPrompt::SkillUse {
+                            player_id: game.thrower_id.clone().unwrap_or_default(),
+                            skill_id: skill_id as u16,
+                            skill_name: source.name.clone(),
+                        },
+                    );
+                }
             }
             if let Some(prompt) = ask_for_reroll_if_available(game, REROLLED_ACTION_PASS, self.minimum_roll, true) {
                 self.re_rolled_action = Some(REROLLED_ACTION_PASS.into());
@@ -455,11 +491,7 @@ mod tests {
             "ACCURATE roll should be stored as Inaccurate per Java line 149");
     }
 
-    /// The elf seed 83 shape: a fumbled HMP by a Pass-skill thrower must consume the SKILL
-    /// reroll (Java PassBehaviour :163-172 shows the Pass dialog; both harnesses auto-use) and
-    /// roll a SECOND die.
-    #[test]
-    fn fumbled_hmp_uses_the_pass_skill_reroll_and_rolls_again() {
+    fn fumbled_hmp_with_pass_thrower() -> (Game, StepHailMaryPass) {
         use ffb_model::model::skill_def::SkillWithValue;
         let mut game = make_game_with_thrower(2);
         if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == "thrower") {
@@ -470,10 +502,56 @@ mod tests {
         game.acting_player.player_action = Some(ffb_model::enums::PlayerAction::HailMaryPass);
         let mut step = StepHailMaryPass::new("fail".into());
         step.roll = 2; // modified 2-3 <= 1 → FUMBLE for the PA2 thrower
+        (game, step)
+    }
+
+    /// Java PassBehaviour shows a DialogSkillUseParameter for the fumbled HMP's Pass-skill
+    /// re-roll — the coach may DECLINE. The old auto-use matched only the RANDOM contract;
+    /// the heuristic scores the dialog (w=0.50, two draws) and Java declined it on elf
+    /// bb2025 seed 51 while Rust silently re-rolled. The step must PROMPT.
+    #[test]
+    fn fumbled_hmp_prompts_for_the_pass_skill_reroll() {
+        let (mut game, mut step) = fumbled_hmp_with_pass_thrower();
+        let out = step.start(&mut game, &mut GameRng::new(7));
+        assert_eq!(out.action, StepAction::Continue, "the step waits on the SkillUse dialog");
+        match out.prompt {
+            Some(ffb_model::prompts::AgentPrompt::SkillUse { ref skill_name, .. }) =>
+                assert_eq!(skill_name, "Pass"),
+            other => panic!("expected a Pass SkillUse prompt, got {other:?}"),
+        }
+        assert!(step.pass_skill_used, "offered once per step");
+        assert_eq!(step.roll, 2, "no re-roll before the coach answers");
+    }
+
+    /// ACCEPT: Java handleCommandHook sets reRolledAction=PASS + the source; the re-entry's
+    /// retry-consumption branch rolls a fresh die.
+    #[test]
+    fn accepted_pass_skill_reroll_rolls_again() {
+        let (mut game, mut step) = fumbled_hmp_with_pass_thrower();
         let _ = step.start(&mut game, &mut GameRng::new(7));
-        assert_eq!(step.re_rolled_action.as_deref(), Some("PASS"),
-            "the fumble must trigger the reroll cascade");
-        assert_ne!(step.roll, 2, "the skill reroll must produce a fresh roll");
+        let _ = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Pass, use_skill: true },
+            &mut game, &mut GameRng::new(7),
+        );
+        assert_eq!(step.re_rolled_action.as_deref(), Some("PASS"));
+        assert_ne!(step.roll, 2, "the accepted skill reroll must produce a fresh roll");
+    }
+
+    /// DECLINE: reRolledAction=PASS with a null source — the fumble stands, no fresh die,
+    /// and the team re-roll is NOT offered afterwards (Java skips the cascade on re-entry).
+    #[test]
+    fn declined_pass_skill_reroll_stands_on_the_fumble() {
+        let (mut game, mut step) = fumbled_hmp_with_pass_thrower();
+        let _ = step.start(&mut game, &mut GameRng::new(7));
+        let out = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Pass, use_skill: false },
+            &mut game, &mut GameRng::new(7),
+        );
+        assert_eq!(step.re_rolled_action.as_deref(), Some("PASS"));
+        assert!(step.re_roll_source.is_none(), "a decline clears the source");
+        assert_eq!(step.roll, 2, "no fresh die on a decline");
+        assert!(out.prompt.is_none(), "no team re-roll offer after the declined skill dialog");
+        assert_eq!(step.result, Some(PassOutcome::Fumble));
     }
 
     #[test]
