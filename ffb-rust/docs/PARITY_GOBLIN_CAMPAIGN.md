@@ -46,3 +46,26 @@ phantom-arm lesson recorded at the Rust default arm.
 Fix: drop ThrowBomb|AllYouCanEat from the Rust pass-generation arm — they fall through to the
 default immediate push(0.40) like TTM/KTM; the phase-2 unconditional `fold_pass_receiver`
 override still supplies the declaration target.
+Post-ITER1 matrix: bb2016 61/95/79, bb2020 17/84/15, bb2025 0/69/31→(1e6) 3. Randoms ×3
+green, suite 7392/0. Commit 174efc9b7. Remaining reds: @0 frontiers small (bb2016 5 seeds:
+29/51/71/81/85; bb2020 16; bb2025 31), sampled scales large ⇒ at least one draw-count split
+plus possibly more eligibility gaps. ITER2 target: bb2016 @0 seed 29 (step 60).
+
+## ITER3 — a falling Ball & Chain player must roll InjuryTypeBallAndChain (bb2016 StepFallDown)
+
+bb2016 @0 seed 29: hashes diverge at idx 60, but the candidate diff at the first count
+mismatch (k=63) shows a fully-diverged board — downstream noise (the dicediff lesson).
+The real split: rng_calls first differ at i=59 (R 87 vs J 89), states still EQUAL.
+FFB_DICE_TRACE stacks name the two extra Java dice: during i=58 the crowd-pushed FANATIC's
+StepFallDown → UtilServerInjury.dropPlayer → `placedProneCausesInjuryRoll` (Ball & Chain) →
+InjuryTypeBallAndChain 2d6 (Java dice 88,89). Rust's bb2016 step_fall_down called the
+RNG-LESS `drop_player_no_sph`, whose B&C branch silently skips the roll (`if let Some(rng)`).
+Every die after shifted (the next Really Stupid roll read 1 vs 3) — states coincidentally
+matched for two more activations, hiding the split from the state hash.
+
+Fix: `drop_player_rng(game, rng, &player_id, false, ApothecaryMode::Attacker)` — the same
+rng-aware variant the Pitch-Invasion stun fix introduced (random campaign ITER78-81).
+LATENT: other rng-less `drop_player_no_sph` callers (step_stab, drop_diving_tackler ×2,
+right_stuff/bb2025 right_stuff_command) have the same skip; unreachable for a B&C player in
+mirror matches (a Fanatic can't be TTM'd, dive-tackle, and mirror goblins have no Stab) —
+noted for the mixed-matchup era.

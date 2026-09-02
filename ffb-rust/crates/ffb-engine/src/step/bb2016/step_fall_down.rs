@@ -7,7 +7,7 @@ use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::util_server_injury::{
-    drop_player_no_sph, handle_injury_by_name, injury_type_causes_turnover,
+    drop_player_rng, handle_injury_by_name, injury_type_causes_turnover,
 };
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2016.StepFallDown.
@@ -81,7 +81,14 @@ impl StepFallDown {
         // — the 3-arg overload, which defaults `eligibleForSafePairOfHands = false`. A
         // falling player (failed dodge/GFI/jump) never gets a Safe Pair of Hands reroll
         // offer for the ball they drop.
-        let drop_params = drop_player_no_sph(game, &player_id);
+        //
+        // The RNG-AWARE variant: Java's dropPlayer, for a `placedProneCausesInjuryRoll`
+        // player (Ball & Chain), rolls InjuryTypeBallAndChain (2d6) and publishes the
+        // InjuryResult instead of placing PRONE. The old rng-less `drop_player_no_sph`
+        // silently SKIPPED that roll, leaving Rust two dice short the moment a Fanatic
+        // fell (goblin bb2016 seed 29 i=58: the crowd-pushed Fanatic's StepFallDown —
+        // Java dice 88,89 InjuryTypeBallAndChain, Rust none, every roll after shifted).
+        let drop_params = drop_player_rng(game, rng, &player_id, false, ApothecaryMode::Attacker);
 
         // Java: if (actingPlayer.isSufferingBloodLust())
         if game.acting_player.suffering_blood_lust {
