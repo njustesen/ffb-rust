@@ -58,6 +58,12 @@ impl StepBombardier {
                     .map(|id| game.team_home.players.iter().any(|p| p.id == id))
                     .unwrap_or(false);
 
+                if std::env::var("FFB_BOMB").is_ok() {
+                    eprintln!(
+                        "RBOMBARDIER set mode from {:?} is_home={} pid={:?}",
+                        game.turn_mode, is_home, game.acting_player.player_id
+                    );
+                }
                 game.turn_mode = if is_home {
                     if game.turn_mode == TurnMode::Blitz { TurnMode::BombHomeBlitz } else { TurnMode::BombHome }
                 } else {

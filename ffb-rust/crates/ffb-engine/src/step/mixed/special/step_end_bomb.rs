@@ -46,6 +46,12 @@ impl StepEndBomb {
 
         if self.end_turn || self.catcher_id.is_none() || self.bomb_exploded {
             // Restore home_playing from bomb turn mode
+            if std::env::var("FFB_BOMB").is_ok() {
+                eprintln!(
+                    "RENDBOMB tm={:?} home_playing={} end_turn={} catcher={:?} exploded={}",
+                    game.turn_mode, game.home_playing, self.end_turn, self.catcher_id, self.bomb_exploded
+                );
+            }
             if game.turn_mode.is_bomb_turn() {
                 game.home_playing = matches!(
                     game.turn_mode,

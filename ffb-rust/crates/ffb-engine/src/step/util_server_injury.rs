@@ -427,14 +427,31 @@ fn drop_player_with_base_rng(
         params.push(StepParameter::DroppedBallCarrier(Some(player_id.to_owned())));
     }
 
-    let ball_at_coord = game.field_model.ball_coordinate == Some(coord);
+    // Java: `if (playerCoordinate.equals(ballCoordinate) && game.getTurnMode() != TurnMode.BLITZ)`
+    let ball_at_coord = game.field_model.ball_coordinate == Some(coord)
+        && game.turn_mode != ffb_model::enums::TurnMode::Blitz;
     if ball_at_coord {
         game.field_model.ball_moving = true;
         params.push(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall));
 
         if has_ball {
-            let acting_team_has_player = game.active_team().players.iter().any(|p| p.id.as_str() == player_id);
-            if acting_team_has_player {
+            // Java: the turnover switch on game.getTurnMode() — during a BOMB the turnover
+            // belongs to the team WHOSE TURN the bomb interrupted (BOMB_HOME → a HOME carrier
+            // down is the turnover), NOT the momentary acting team: an intercepted-and-re-thrown
+            // bomb flips home_playing to the re-thrower's side, and judging by the acting team
+            // ended HOME's turn when home_05's re-thrown bomb dropped an AWAY carrier (goblin
+            // bb2016 seed 85 i=80: Java home continues, Rust flipped to away t8). PASS_BLOCK
+            // never turns over.
+            use ffb_model::enums::TurnMode;
+            let end_turn = match game.turn_mode {
+                TurnMode::BombHome | TurnMode::BombHomeBlitz =>
+                    game.team_home.players.iter().any(|p| p.id.as_str() == player_id),
+                TurnMode::BombAway | TurnMode::BombAwayBlitz =>
+                    game.team_away.players.iter().any(|p| p.id.as_str() == player_id),
+                TurnMode::PassBlock => false,
+                _ => game.active_team().players.iter().any(|p| p.id.as_str() == player_id),
+            };
+            if end_turn {
                 params.push(StepParameter::EndTurn(true));
             }
         }

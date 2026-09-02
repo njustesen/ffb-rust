@@ -69,3 +69,16 @@ LATENT: other rng-less `drop_player_no_sph` callers (step_stab, drop_diving_tack
 right_stuff/bb2025 right_stuff_command) have the same skip; unreachable for a B&C player in
 mirror matches (a Fanatic can't be TTM'd, dive-tackle, and mirror goblins have no Stab) —
 noted for the mixed-matchup era.
+
+## ITER4 — a bomb turnover belongs to the INTERRUPTED team, not the momentary acting team
+
+bb2016 @0 seed 85 (step 80): identical dice through the whole bomb hot-potato (home_05 throws,
+away_02 intercepts and re-throws, explosion drops an AWAY ball carrier — die-for-die equal to
+190), then Rust ends HOME's turn (t8 away) while Java's home continues. Probing the LIVE
+EndBomb (the bb2016 step_end_bomb.rs is a DEAD FILE — driver routes all editions to
+mixed/special; the probe-dead-file lesson re-confirmed) showed Rust arriving with
+end_turn=TRUE. Publisher: `drop_player`'s ball-drop turnover used `active_team()` — during a
+re-thrown bomb home_playing is flipped to the re-thrower, so an AWAY carrier down looked like
+an acting-team turnover. Java's dropPlayer switches on TURN MODE: BOMB_HOME → a HOME carrier
+is the turnover, BOMB_AWAY → AWAY, PASS_BLOCK → never, default → acting team; and the whole
+ball-scatter block is gated `turnMode != BLITZ`. Ported 1:1 (util_server_injury.rs).

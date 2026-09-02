@@ -42,6 +42,12 @@ impl StepEndBomb {
 
         self.end_turn |= check_touchdown(game);
 
+        if std::env::var("FFB_BOMB").is_ok() {
+            eprintln!(
+                "RENDBOMB tm={:?} home_playing={} end_turn={} catcher={:?} exploded={}",
+                game.turn_mode, game.home_playing, self.end_turn, self.catcher_id, self.bomb_exploded
+            );
+        }
         if self.end_turn || self.catcher_id.is_none() || self.bomb_exploded {
             // Restore home_playing from the bomb turn mode
             game.home_playing = matches!(game.turn_mode, TurnMode::BombHome | TurnMode::BombHomeBlitz);
