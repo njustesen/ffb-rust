@@ -134,3 +134,18 @@ gate); Java's ParityRunner gates THROW_BOMB on `!td.isBombUsed()` + the enableTh
 PROPERTY and kept offering it. bombUsed is only ever set by bb2020/bb2025 StepInitBomb — in
 bb2016 the bomb stays available all game. Fixed the gate + property check; test updated to
 pin "a used pass slot must NOT withdraw ThrowBomb".
+
+## ITER10 — the bomber's markSkillUsed must hit the ACTING PLAYER's set (Estelle family)
+
+bb2016 @1.0 seed 21: candsum k=55 equal n, Rust +2 draws — but the true origin is k=2: after
+away5's ThrowBomb (identical dice incl. a catch-and-re-throw by away_07), JELIG drops Away5
+while RELIG keeps all 11. Java's BombardierBehaviour calls actingPlayer.markSkillUsed
+(Bombardier) — a term of derived hasActed() — so when EndBomb hands the acting slot to the
+bomb CATCHER, changeActingPlayer retires the acted bomber. Rust's step_bombardier wrote only
+the team Player's used_skills; hasActed() stayed false and the bomber remained eligible all
+turn, skewing every later activation list. Fix: `mark_skill_used` (writes both sets).
+ITER11 (with ITER10): the retire carve-out must read the ACTING PLAYER's used set — Java is
+`UtilCards.hasUnusedSkillWithProperty(actingPlayer, enableThrowBombAction)`; Rust read the
+team Player's set, which mark_skill_used no longer writes for a per-activation skill. Both
+retire sites (change + to_none) fixed. @0 1-20 green; @1.0 reds moved later (21: 1→51,
+81: 9→53) — further faults behind.

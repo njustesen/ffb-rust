@@ -44,13 +44,14 @@ impl StepBombardier {
                 Some(PlayerAction::ThrowBomb) | Some(PlayerAction::HailMaryBomb)
             );
             if is_bomb_action {
-                // Java: actingPlayer.markSkillUsed(Bombardier)
-                if let Some(ref pid) = game.acting_player.player_id.clone() {
-                    if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == *pid) {
-                        p.used_skills.insert(SkillId::Bombardier);
-                    } else if let Some(p) = game.team_away.players.iter_mut().find(|p| p.id == *pid) {
-                        p.used_skills.insert(SkillId::Bombardier);
-                    }
+                // Java: actingPlayer.markSkillUsed(Bombardier) — the ACTING PLAYER's set is a
+                // term of derived hasActed() (the Estelle-fault family). Writing only the team
+                // Player's used_skills left hasActed()=false, so when EndBomb's re-throw handed
+                // the acting slot to the bomb CATCHER, the original bomber was never retired and
+                // stayed eligible for the whole turn (goblin bb2016 seed 21 k=2: Java drops
+                // Away5 after its bomb, Rust kept all 11). `mark_skill_used` writes both sets.
+                if let Some(pid) = game.acting_player.player_id.clone() {
+                    crate::step::util_server_steps::mark_skill_used(game, &pid, SkillId::Bombardier);
                 }
 
                 // Java: set turn mode based on team and current turn mode

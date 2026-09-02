@@ -193,6 +193,13 @@ impl Step for StepInitPassing {
             game.thrower_id = game.acting_player.player_id.clone();
             game.thrower_action = game.acting_player.player_action;
         }
+        if std::env::var("FFB_BOMB").is_ok() {
+            eprintln!(
+                "RINITPASS acting={:?} act={:?} thrower={:?} pass_coord={:?} defender={:?}",
+                game.acting_player.player_id, game.acting_player.player_action,
+                game.thrower_id, game.pass_coordinate, game.defender_id
+            );
+        }
         self.execute_step(game)
     }
 

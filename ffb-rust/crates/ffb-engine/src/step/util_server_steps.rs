@@ -145,11 +145,20 @@ fn retire_old_acting_player(game: &mut Game) {
         Some(ffb_model::enums::PlayerAction::ThrowBomb)
             | Some(ffb_model::enums::PlayerAction::HailMaryBomb)
     );
-    let bombardier_spent = game.player(&old_id).map(|p| {
+    // Java: `UtilCards.hasUnusedSkillWithProperty(actingPlayer, enableThrowBombAction)` —
+    // the ACTING PLAYER's used set, not the team Player's. BombardierBehaviour marks the
+    // skill used on the acting player (mark_skill_used writes that set; the Player-level
+    // write is gated on track_outside_activation), so reading the Player here kept the
+    // bomber ACTIVE after its own bomb (goblin bb2016 seed 21: Java A5:1:i, Rust A5:1:a).
+    let bombardier_spent = {
         use ffb_model::model::property::NamedProperties;
-        p.has_skill_property(NamedProperties::ENABLE_THROW_BOMB_ACTION)
-            && !p.has_unused_skill_with_property(NamedProperties::ENABLE_THROW_BOMB_ACTION)
-    }).unwrap_or(false);
+        let has_prop = game.player(&old_id)
+            .map(|p| p.has_skill_property(NamedProperties::ENABLE_THROW_BOMB_ACTION))
+            .unwrap_or(false);
+        let acting_used = game.acting_player.used_skills.iter().any(|sk|
+            sk.properties_for(game.rules).contains(&NamedProperties::ENABLE_THROW_BOMB_ACTION));
+        has_prop && acting_used
+    };
     let retire_inactive = game.acting_player.acted() && (!is_bomb_action || bombardier_spent);
     let new_state = if retire_inactive {
         state.change_base(PS_STANDING).change_active(false)
@@ -308,11 +317,16 @@ pub fn change_player_action_to_none(game: &mut Game) {
                     Some(ffb_model::enums::PlayerAction::ThrowBomb)
                         | Some(ffb_model::enums::PlayerAction::HailMaryBomb)
                 );
-                let bombardier_spent = game.player(&old_id).map(|p| {
+                // Same acting-player-set carve-out as retire_old_acting_player above.
+                let bombardier_spent = {
                     use ffb_model::model::property::NamedProperties;
-                    p.has_skill_property(NamedProperties::ENABLE_THROW_BOMB_ACTION)
-                        && !p.has_unused_skill_with_property(NamedProperties::ENABLE_THROW_BOMB_ACTION)
-                }).unwrap_or(false);
+                    let has_prop = game.player(&old_id)
+                        .map(|p| p.has_skill_property(NamedProperties::ENABLE_THROW_BOMB_ACTION))
+                        .unwrap_or(false);
+                    let acting_used = game.acting_player.used_skills.iter().any(|sk|
+                        sk.properties_for(game.rules).contains(&NamedProperties::ENABLE_THROW_BOMB_ACTION));
+                    has_prop && acting_used
+                };
                 let retire_inactive = game.acting_player.acted()
                     && (!is_bomb_action || bombardier_spent);
                 let new_state = if retire_inactive {
