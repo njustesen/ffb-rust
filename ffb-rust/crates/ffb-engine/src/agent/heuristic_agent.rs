@@ -3336,10 +3336,14 @@ impl HeuristicAgent {
                     }
                 }
                 // PassMove: same shape, with the throw at the end of the run-up.
-                PlayerActionChoice::Pass
-                | PlayerActionChoice::ThrowBomb
-                | PlayerActionChoice::HailMaryPass
-                | PlayerActionChoice::AllYouCanEat
+                // Java's ActivationChoice switch routes ONLY "Pass" and "HailMaryPass" here
+                // (PlanBuilder.passCandidates); "ThrowBomb" and "AllYouCanEat" land in its
+                // `default:` — ONE immediate candidate at wPlayer*max(0.40, floor)+novelty.
+                // Rust listing them in this arm built one row per receiver×run-up spot (all
+                // weight 0 via pass_weight — no ball to deliver), so the Bombardier NEVER
+                // threw a bomb while Java scored THROW_BOMB at ~0.368 and did (goblin bb2016
+                // seed 1 k=1: R n=1959 vs J n=1890, and Java's i=12 THROW_BOMB pick).
+                PlayerActionChoice::Pass | PlayerActionChoice::HailMaryPass
                     if !matches!(self.mode, Mode::WideNoBall | Mode::WideNoPass) =>
                 {
                     let here = m_coord(g, pid);
