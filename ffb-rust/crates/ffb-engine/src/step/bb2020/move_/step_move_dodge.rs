@@ -137,7 +137,7 @@ impl StepMoveDodge {
         }
 
         let factory = DodgeModifierFactory::for_rules(game.rules);
-        let (minimum_roll, mod_names): (i32, Vec<String>) = if let Some(pid) = player_id.as_deref() {
+        let (minimum_roll, mod_names, has_bt, min_no_bt, names_no_bt): (i32, Vec<String>, bool, i32, Vec<String>) = if let Some(pid) = player_id.as_deref() {
             let acting = game.acting_player.clone();
             let src = self.coordinate_from.unwrap_or(FieldCoordinate::new(0, 0));
             let tgt = self.coordinate_to.unwrap_or(FieldCoordinate::new(0, 0));
@@ -148,10 +148,45 @@ impl StepMoveDodge {
             let agility = game.player(pid).map(|p| p.agility as i32).unwrap_or(3);
             let min = DodgeModifierFactory::minimum_roll(agility, &all);
             let names: Vec<String> = all.iter().map(|m| m.get_report_string().to_string()).collect();
-            (min, names)
+            // Java: `Optional<DodgeModifier> btModifier = dodgeModifiers.stream()
+            //   .filter(DodgeModifier::isUseStrength).findFirst()` — the Break Tackle axis.
+            let without_bt: Vec<&ffb_mechanics::modifiers::dodge_modifier::DodgeModifier> =
+                all.iter().copied().filter(|m| !m.use_strength).collect();
+            let has_bt = without_bt.len() != all.len();
+            let min_no_bt = DodgeModifierFactory::minimum_roll(agility, &without_bt);
+            let names_no_bt: Vec<String> = without_bt.iter().map(|m| m.get_report_string().to_string()).collect();
+            (min, names, has_bt, min_no_bt, names_no_bt)
         } else {
-            (2, vec![])
+            (2, vec![], false, 2, vec![])
         };
+        // Java StepMoveDodge (the btModifier block after `successful` is computed):
+        // - SUCCESS + BT present: recompute WITHOUT Break Tackle; if the roll still succeeds, BT
+        //   was not needed — the reported minimum drops and BT is NOT consumed. Otherwise BT is
+        //   what saved the dodge: `fUsingBreakTackle = true; actingPlayer.markSkillUsed(btSkill)`
+        //   (bb2025:516-521) — ONE Break Tackle per activation. Rust never marked it, so the
+        //   Deathroller's SECOND dodge of the activation got -3 again where Java rolled bare
+        //   (dwarf bb2025 seed 43 k=31: J min=6 mods=1 Tacklezone, R min=3 with BT ST 5+).
+        // - FAILURE + BT present: Java removes the modifier before reporting (WOULD_NOT_HELP);
+        //   BT is not consumed.
+        let bt_saved_it = has_bt
+            && DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll)
+            && !DiceInterpreter::is_skill_roll_successful(self.dodge_roll, min_no_bt);
+        let (minimum_roll, mod_names) = if has_bt && !bt_saved_it {
+            (min_no_bt, names_no_bt)
+        } else {
+            (minimum_roll, mod_names)
+        };
+        if bt_saved_it {
+            self.using_break_tackle = true;
+            if let Some(pid) = player_id.as_deref() {
+                // Rust convention: the factory gate reads Player.used_skills; acted() reads the
+                // acting set — write both (the keg/Zzharg lesson).
+                if let Some(p) = game.team_home.player_mut(pid).or_else(|| game.team_away.player_mut(pid)) {
+                    p.used_skills.insert(ffb_model::enums::SkillId::BreakTackle);
+                }
+                game.acting_player.used_skills.insert(ffb_model::enums::SkillId::BreakTackle);
+            }
+        }
         let successful = DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll);
 
         // Java line 333-335: addReport(new ReportDodgeRoll(...))

@@ -183,7 +183,7 @@ impl StepMoveDodge {
         }
 
         let factory = DodgeModifierFactory::for_rules(game.rules);
-        let (minimum_roll, mod_names): (i32, Vec<String>) = if let Some(pid) = player_id.as_deref() {
+        let (minimum_roll, mod_names, has_bt, min_no_bt, names_no_bt): (i32, Vec<String>, bool, i32, Vec<String>) = if let Some(pid) = player_id.as_deref() {
             let acting = game.acting_player.clone();
             let src = self.coordinate_from.unwrap_or(FieldCoordinate::new(0, 0));
             let tgt = self.coordinate_to.unwrap_or(FieldCoordinate::new(0, 0));
@@ -194,11 +194,51 @@ impl StepMoveDodge {
             let agility = game.player(pid).map(|p| p.agility as i32).unwrap_or(3);
             let min = DodgeModifierFactory::minimum_roll(agility, &all);
             let names: Vec<String> = all.iter().map(|m| m.get_report_string().to_string()).collect();
-            (min, names)
+            // Java: `Optional<DodgeModifier> btModifier = dodgeModifiers.stream()
+            //   .filter(DodgeModifier::isUseStrength).findFirst()` — the Break Tackle axis.
+            let without_bt: Vec<&ffb_mechanics::modifiers::dodge_modifier::DodgeModifier> =
+                all.iter().copied().filter(|m| !m.use_strength).collect();
+            let has_bt = without_bt.len() != all.len();
+            let min_no_bt = DodgeModifierFactory::minimum_roll(agility, &without_bt);
+            let names_no_bt: Vec<String> = without_bt.iter().map(|m| m.get_report_string().to_string()).collect();
+            (min, names, has_bt, min_no_bt, names_no_bt)
         } else {
-            (2, vec![])
+            (2, vec![], false, 2, vec![])
         };
+        // Java StepMoveDodge (the btModifier block after `successful` is computed):
+        // - SUCCESS + BT present: recompute WITHOUT Break Tackle; if the roll still succeeds, BT
+        //   was not needed — the reported minimum drops and BT is NOT consumed. Otherwise BT is
+        //   what saved the dodge: `fUsingBreakTackle = true; actingPlayer.markSkillUsed(btSkill)`
+        //   (bb2025:516-521) — ONE Break Tackle per activation. Rust never marked it, so the
+        //   Deathroller's SECOND dodge of the activation got -3 again where Java rolled bare
+        //   (dwarf bb2025 seed 43 k=31: J min=6 mods=1 Tacklezone, R min=3 with BT ST 5+).
+        // - FAILURE + BT present: Java removes the modifier before reporting (WOULD_NOT_HELP);
+        //   BT is not consumed.
+        let bt_saved_it = has_bt
+            && DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll)
+            && !DiceInterpreter::is_skill_roll_successful(self.dodge_roll, min_no_bt);
+        let (minimum_roll, mod_names) = if has_bt && !bt_saved_it {
+            (min_no_bt, names_no_bt)
+        } else {
+            (minimum_roll, mod_names)
+        };
+        if bt_saved_it {
+            self.using_break_tackle = true;
+            if let Some(pid) = player_id.as_deref() {
+                // Rust convention: the factory gate reads Player.used_skills; acted() reads the
+                // acting set — write both (the keg/Zzharg lesson).
+                if let Some(p) = game.team_home.player_mut(pid).or_else(|| game.team_away.player_mut(pid)) {
+                    p.used_skills.insert(ffb_model::enums::SkillId::BreakTackle);
+                }
+                game.acting_player.used_skills.insert(ffb_model::enums::SkillId::BreakTackle);
+            }
+        }
         let successful = DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll);
+        if std::env::var_os("FFB_TRACE").is_some() {
+            eprintln!("RDODGEMIN pid={} roll={} min={} from={:?} to={:?} mods={:?} ok={}",
+                player_id.as_deref().unwrap_or("-"), self.dodge_roll, minimum_roll,
+                self.coordinate_from, self.coordinate_to, mod_names, successful);
+        }
 
         // Java line 333-335: addReport(new ReportDodgeRoll(...))
         let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
@@ -349,6 +389,80 @@ impl StepMoveDodge {
 
 #[cfg(test)]
 mod tests {
+    // ── Break Tackle consumption (Java StepMoveDodge bb2025:363-380 + 516-521) ────────────
+
+    /// Java: when the dodge succeeds ONLY thanks to Break Tackle, `fUsingBreakTackle = true;
+    /// actingPlayer.markSkillUsed(btSkill)` — ONE BT per activation. Rust never marked it, so the
+    /// Deathroller's second dodge of the activation got the -3 again (dwarf bb2025 seed 43 k=31:
+    /// Java min=6 mods="1 Tacklezone", Rust min=3 with "Break Tackle ST 5+").
+    #[test]
+    fn break_tackle_that_saved_the_dodge_is_consumed() {
+        use ffb_model::enums::SkillId;
+        let (mut game, mut step) = bt_dodge_fixture();
+        // roll 3: base AG4 + 1 TZ = min 5 fails bare; with BT ST5+ (-3) min 2 succeeds.
+        step.dodge_roll = 3;
+        let mut rng = GameRng::new(0);
+        let out = step.execute_step(&mut game, &mut rng);
+        assert_eq!(out.action, crate::step::framework::StepAction::NextStep);
+        assert!(step.using_break_tackle, "BT saved the dodge -> fUsingBreakTackle");
+        assert!(game.player("dodger").unwrap().used_skills.contains(&SkillId::BreakTackle),
+            "BT must be marked used (one per activation)");
+        assert!(game.acting_player.used_skills.contains(&SkillId::BreakTackle));
+    }
+
+    /// Java: when the roll succeeds even WITHOUT Break Tackle, the modifier is dropped and BT is
+    /// NOT consumed (the reported minimum is the bare one).
+    #[test]
+    fn break_tackle_not_needed_is_not_consumed() {
+        use ffb_model::enums::SkillId;
+        let (mut game, mut step) = bt_dodge_fixture();
+        step.dodge_roll = 6; // succeeds bare
+        let mut rng = GameRng::new(0);
+        step.execute_step(&mut game, &mut rng);
+        assert!(!step.using_break_tackle);
+        assert!(!game.player("dodger").unwrap().used_skills.contains(&SkillId::BreakTackle),
+            "BT unused when the bare roll already succeeds");
+    }
+
+    fn bt_dodge_fixture() -> (Game, StepMoveDodge) {
+        use ffb_model::enums::{PlayerAction, PS_STANDING, PlayerState as PSt, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = Game::new(
+            crate::step::framework::test_team("home", 0),
+            crate::step::framework::test_team("away", 0),
+            ffb_model::enums::Rules::Bb2025,
+        );
+        let mut dodger = ffb_model::model::player::Player {
+            id: "dodger".into(), name: "d".into(), nr: 1, position_id: "pos".into(),
+            player_type: ffb_model::enums::PlayerType::Regular,
+            gender: ffb_model::enums::PlayerGender::Male,
+            movement: 4, strength: 7, agility: 4, passing: 6, armour: 11,
+            ..Default::default()
+        };
+        dodger.starting_skills.push(SkillWithValue { skill_id: SkillId::BreakTackle, value: None });
+        game.team_home.players.push(dodger);
+        let mut marker = ffb_model::model::player::Player {
+            id: "marker".into(), name: "m".into(), nr: 2, position_id: "pos".into(),
+            player_type: ffb_model::enums::PlayerType::Regular,
+            gender: ffb_model::enums::PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            ..Default::default()
+        };
+        let _ = &mut marker;
+        game.team_away.players.push(marker);
+        game.field_model.set_player_coordinate("dodger", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("dodger", PSt::new(PS_STANDING));
+        // marker adjacent to the DESTINATION so the dodge has 1 TZ
+        game.field_model.set_player_coordinate("marker", FieldCoordinate::new(7, 5));
+        game.field_model.set_player_state("marker", PSt::new(PS_STANDING));
+        game.acting_player.set_player("dodger".into(), PlayerAction::Move);
+        game.acting_player.dodging = true;
+        let mut step = StepMoveDodge::new(String::new());
+        step.coordinate_from = Some(FieldCoordinate::new(5, 5));
+        step.coordinate_to = Some(FieldCoordinate::new(6, 5));
+        (game, step)
+    }
+
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::{StepAction, StepParameter};
