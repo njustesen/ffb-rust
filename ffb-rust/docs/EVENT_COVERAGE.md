@@ -150,3 +150,33 @@ punt unevented beyond the declaration; hashes + RPUNTDIR trace are the record); 
 DECLINE by contract (ITER6 — the pins are now HARD: a 0.0 wUse through the 1e6 softmax was a
 coin flip); Stab/Shadowing (Assassins) present in rosters, no dedicated event — parity is the
 proof.
+
+
+---
+
+# Event coverage — HeuristicAgent, dwarf v dwarf (harvested 2026-09-02)
+
+Per-edition detail: `EVENT_COVERAGE_dwarf_bb2016.md` / `_bb2020.md` / `_bb2025.md` (each a clean
+100-seed run at scale 1.0; parity 100/100 in all three).
+
+## What dwarf reached that no earlier race did
+
+- **Beer Barrel Bash executes under the heuristic**: bb2025 declared `ThrowKeg` 385× with 249
+  resolved `kegThrow` rolls (fumbles, re-rolls through Thorsson's Loner, and the ONCE_PER_DRIVE
+  reset across touchdown drives all live).
+- **Wisdom of the White Dwarf**: 176 declarations (bb2025) — grants resolve through the
+  PLAYER_CHOICE + SELECT_SKILL chain; the un-acted-deselect mark revert (ITER5) keeps it
+  re-offerable exactly as stock Java does.
+- **Hail Mary Pass (bb2016)**: 8 declarations resolve through the previously-dead bb2016 twin +
+  MissedPass 3-scatter chain (ITER3/4).
+- **Break Tackle** (ST-tiered -3/-2/-1) and **Diving Tackle** are exercised-unevented: the proof
+  is the nine 100/100 gates plus the kept RDODGEMIN traces — BT consumed only by the dodge it
+  saves and covering the rest of the move (ITER7/9), the DT-threat pre-emptive re-roll offer on
+  successful dodges (ITER8).
+- **Stand Firm prompts** in all three editions (ITER1) — dwarf's Deathrollers exercise the
+  bb2016/bb2025 parks the dark_elf campaign only fixed for bb2020.
+- Highest dodge volume yet under Break Tackle (748/707/683 dodgeRolls) on a Dodge-less roster.
+
+Buckets: ThrowKeg/Wisdom/HMP exercised+evented; BreakTackle/DivingTackle/StandFirm/Tackle
+exercised-unevented (parity + kept gated probes are the record); Defensive/Sprint/Hatred(troll)
+present on the roster with no dedicated event — parity is the proof.
