@@ -103,15 +103,18 @@ impl StepModifierTrait for StandFirmStepModifier {
             return false;
         }
 
-        // Java shows a DialogSkillUseParameter (use Stand Firm?). The parity harness
-        // (ParityRunner) auto-USES every offered skill except DumpOff/PrimalSavagery/
-        // SafePairOfHands/Swoop (comm.sendUseSkill(skill, true, ...)), so a Stand Firm defender
-        // AVOIDS the push. Mirror that: auto-ACCEPT when undecided (a prone/stunned defender was
-        // already forced to decline above, and a Juggernaut-blitz cancel likewise). Previously this
-        // auto-DECLINED, so a bb2016 Stand Firm player (dwarf Deathroller) was wrongly pushed +
-        // followed-up while Java left it prone in place (dwarf seed1 i=36).
+        // Java: `if (!standingFirm.containsKey(id)) showDialog(DialogSkillUseParameter(defender,
+        // StandFirm, 0))` and (bb2016 shape) falls through to a `containsKey` re-check, so an
+        // undecided defender returns true WITHOUT pushing; the answer re-enters through
+        // handleCommandHook. Under the RANDOM contract the old inline auto-ACCEPT was
+        // stream-neutral, but the heuristic driver answers the dialog through its useSkill
+        // sampler (2 draws) — dwarf bb2016 seed 3: Java draws SKILL_USE StandFirm at total=17
+        // during the k=6 Trollslayer blitz while Rust drew nothing (k=7 draws 17 vs 19). Park the
+        // offer exactly like the bb2020 twin (dark_elf ITER2); StepPushback raises the prompt and
+        // files the answer into `standing_firm`.
         if !state.standing_firm.contains_key(&defender_id) {
-            state.standing_firm.insert(defender_id.clone(), true);
+            state.pending_skill_use = Some((defender_id.clone(), SkillId::StandFirm));
+            return true;
         }
 
         // Java: state.doPush = true; pushbackStack.clear(); publish STARTING_PUSHBACK_SQUARE=null;
@@ -243,9 +246,10 @@ mod tests {
     }
 
     #[test]
-    fn stand_firm_not_decided_headless_auto_uses() {
-        // The parity harness auto-USES Stand Firm (ParityRunner sendUseSkill=true), so an undecided
-        // standing defender stands firm and the push is cancelled (do_push set, squares cleared).
+    fn stand_firm_not_decided_parks_the_offer() {
+        // Java: an undecided standing defender gets a DialogSkillUseParameter and the hook
+        // returns true WITHOUT pushing; the answer re-enters via handleCommandHook. Rust parks
+        // the offer in pending_skill_use for StepPushback to raise as a prompt — dwarf bb2016 seed 3 (heuristic: 2 sampler draws).
         let mut game = make_game();
         game.team_away.players.push(player_with_skills("def1", vec![SkillId::StandFirm]));
         game.field_model.set_player_coordinate("def1", FieldCoordinate::new(5, 5));
@@ -254,9 +258,10 @@ mod tests {
         let m = StandFirmStepModifier;
         let mut hs = default_hook_state("def1");
         let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
-        assert!(result, "undecided standing defender auto-uses Stand Firm → cancels push");
-        assert_eq!(hs.standing_firm.get("def1"), Some(&true));
-        assert!(hs.do_push, "do_push set so the (empty) pushback stack is applied without moving the defender");
+        assert!(result, "undecided offer stops the step this pass");
+        assert_eq!(hs.pending_skill_use, Some(("def1".into(), SkillId::StandFirm)));
+        assert!(!hs.standing_firm.contains_key("def1"), "undecided until the answer arrives");
+        assert!(!hs.do_push, "no push while the dialog is open");
     }
 
     /// Java `StandFirmBehaviour` publishes BOTH `STARTING_PUSHBACK_SQUARE = null` and

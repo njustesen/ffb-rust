@@ -305,6 +305,25 @@ impl RandomAgent {
         }
     }
 
+    /// The parity contract's Beer Barrel Bash target pick: opponents within 3, STANDING
+    /// (`legal_throw_keg_targets`, coordinate-sorted), ONE actionRng draw — 1:1 with
+    /// `ParityRunner.sendStarSpecialDeclaration`'s THROW_KEG arm (kegIdx =
+    /// remainderUnsigned(actionRng.nextLong(), kegTargets.size())). `pub(crate)` because the
+    /// HEURISTIC folds the same pick into its declaration: Java's heuristic driver reaches the
+    /// identical arm via sendStarSpecialDeclaration, while Rust's candidate carries no target —
+    /// without this fold the keg ran with a NULL target and spent no target draw (dwarf bb2025
+    /// seed 2: kegThrow target_id=null, streams 4 draws apart at the keg re-roll offer).
+    /// Empty targets → None (Java deselects with NO kegIdx draw).
+    pub(crate) fn fold_keg_target(&mut self, game: &ffb_model::model::game::Game, player_id: &str) -> Option<String> {
+        let targets = crate::legal_actions::legal_throw_keg_targets(game, player_id);
+        if targets.is_empty() {
+            None
+        } else {
+            let tidx = self.pick_action(targets.len());
+            Some(targets[tidx].clone())
+        }
+    }
+
     fn pick_action(&mut self, len: usize) -> usize {
         self.action_rng_count += 1;
         if len == 0 { 0 } else { (self.action_rng.next_u64() as usize) % len }
@@ -592,15 +611,7 @@ impl Agent for RandomAgent {
                     // ThrowKegLogicModule.isValidTarget (<=3 steps, STANDING, opposing team),
                     // coordinate-sorted, 1 actionRng — identical to ParityRunner's arm.
                     // Empty → None → deselect below (Java has no valid click either).
-                    PlayerActionChoice::ThrowKeg => {
-                        let targets = crate::legal_actions::legal_throw_keg_targets(&gs.game, player_id);
-                        if targets.is_empty() {
-                            None
-                        } else {
-                            let tidx = self.pick_action(targets.len());
-                            Some(targets[tidx].clone())
-                        }
-                    }
+                    PlayerActionChoice::ThrowKeg => self.fold_keg_target(&gs.game, player_id),
                     PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate => {
                         self.fold_ttm_target(&gs.game, player_id)
                     }

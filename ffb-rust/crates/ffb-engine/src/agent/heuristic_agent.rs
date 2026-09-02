@@ -2572,15 +2572,27 @@ impl HeuristicAgent {
         let mut taken = self.take(i);
         if let Action::ActivatePlayer {
             ref player_id,
-            player_action: PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate,
+            player_action:
+                pac @ (PlayerActionChoice::ThrowTeamMate
+                | PlayerActionChoice::KickTeamMate
+                | PlayerActionChoice::ThrowKeg),
             ref mut block_defender_id,
         } = taken
         {
             if block_defender_id.is_none() {
                 let pid = player_id.clone();
-                let t = self.parity.fold_ttm_target(g, &pid);
+                // Beer Barrel Bash folds ParityRunner's kegIdx pick (opponents within 3,
+                // coord-sorted, ONE actionRng) the same way — dwarf bb2025 seed 2: the keg ran
+                // with target_id=null and no target draw, 4 draws short of Java by the re-roll
+                // offer. A None fold (no valid target) is a known gap: Java deselects; recorded
+                // in docs/PARITY_DWARF_CAMPAIGN.md.
+                let t = if pac == PlayerActionChoice::ThrowKeg {
+                    self.parity.fold_keg_target(g, &pid)
+                } else {
+                    self.parity.fold_ttm_target(g, &pid)
+                };
                 if std::env::var_os("FFB_TRACE").is_some() {
-                    eprintln!("RTTMFOLD pid={pid} target={t:?}");
+                    eprintln!("RTTMFOLD pid={pid} pac={pac:?} target={t:?}");
                 }
                 *block_defender_id = t;
             }
@@ -2819,10 +2831,14 @@ impl HeuristicAgent {
         // throwable teammates, ONE actionRng). The Rust candidate (built by the same default arm
         // as Java's chooser) carries NO target, and a targetless declaration deselects instantly
         // — so fold the identical pick, from the identical action_rng stream, into the answer.
-        let target = if matches!(c.pac, PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate)
+        let target = if matches!(c.pac, PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate | PlayerActionChoice::ThrowKeg)
             && c.target.is_none()
         {
-            let t = self.parity.fold_ttm_target(g, &c.player);
+            let t = if c.pac == PlayerActionChoice::ThrowKeg {
+                self.parity.fold_keg_target(g, &c.player)
+            } else {
+                self.parity.fold_ttm_target(g, &c.player)
+            };
             if std::env::var_os("FFB_TRACE").is_some() {
                 eprintln!("RTTMFOLD pid={} pac={:?} target={:?}", c.player, c.pac, t);
             }

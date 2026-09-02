@@ -47,6 +47,10 @@ pub struct StepPushback {
     pub standing_firm: HashMap<String, bool>,
     /// Java: pushbackStack — (playerId, coordinate) pairs (LIFO).
     pub pushback_stack: Vec<(String, FieldCoordinate)>,
+    /// A skill hook parked a DialogSkillUseParameter (Java: UtilServerDialog.showDialog from
+    /// inside the behaviour); the step raises it as a prompt and routes the answer back into the
+    /// map the offer came from. Same bridge as the bb2025 twin.
+    pub pending_skill_use: Option<(String, ffb_model::enums::SkillId)>,
     /// Java: state.defender — the player CURRENTLY being pushed. For a chain push (the previous
     /// player was pushed onto an occupied square) this is the OCCUPANT of that square, recomputed
     /// each iteration (StepPushback.java line 168: `state.defender = fieldModel.getPlayer(
@@ -65,6 +69,7 @@ impl StepPushback {
             side_stepping: HashMap::new(),
             standing_firm: HashMap::new(),
             pushback_stack: Vec::new(),
+            pending_skill_use: None,
             defender_id: None,
         }
     }
@@ -82,14 +87,29 @@ impl Step for StepPushback {
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        if let Action::PushTo { coord } = action {
-            // Java: CLIENT_PUSHBACK — pushbackStack.push(pushback). The pushed player is the current
-            // step-local defender (the occupant computed in execute_step), NOT game.defender_id: a
-            // chain push moves the OCCUPANT of the square, not the block's original defender.
-            let pushed = self.defender_id.clone().or_else(|| game.defender_id.clone());
-            if let Some(pushed_id) = pushed {
-                self.pushback_stack.push((pushed_id, *coord));
+        match action {
+            // Java `StandFirmBehaviour.handleCommandHook` (bb2016): `state.standingFirm.put(
+            // useSkillCommand.getPlayerId(), isSkillUsed()); return EXECUTE_STEP;` — the answer is
+            // filed against the player the parked offer named, then the step re-executes. Mirrors
+            // the bb2025 twin's routing (dark_elf ITER2 / dwarf bb2016 seed 3).
+            Action::UseSkill { use_skill, .. } => {
+                if let Some((pid, skill)) = self.pending_skill_use.take() {
+                    match skill {
+                        ffb_model::enums::SkillId::StandFirm => { self.standing_firm.insert(pid, *use_skill); }
+                        _ => { self.side_stepping.insert(pid, *use_skill); }
+                    }
+                }
             }
+            Action::PushTo { coord } => {
+                // Java: CLIENT_PUSHBACK — pushbackStack.push(pushback). The pushed player is the current
+                // step-local defender (the occupant computed in execute_step), NOT game.defender_id: a
+                // chain push moves the OCCUPANT of the square, not the block's original defender.
+                let pushed = self.defender_id.clone().or_else(|| game.defender_id.clone());
+                if let Some(pushed_id) = pushed {
+                    self.pushback_stack.push((pushed_id, *coord));
+                }
+            }
+            _ => {}
         }
         self.execute_step(game, rng)
     }
@@ -175,6 +195,21 @@ impl StepPushback {
                 self.grabbing = hook_state.grabbing;
                 self.starting_pushback_square = hook_state.starting_pushback_square;
                 do_push = hook_state.do_push;
+                // Java shows `DialogSkillUseParameter` from inside the behaviour and returns; the
+                // Rust hook cannot raise a prompt, so it parks the request and the step asks. The
+                // answer comes back as `Action::UseSkill` and re-enters via handle_command. Same
+                // bridge as the bb2025 twin (dwarf bb2016 seed 3: the Deathroller's Stand Firm
+                // against the Trollslayer blitz must PROMPT — the heuristic spends 2 draws on it).
+                if let Some((ref pid, skill_id)) = hook_state.pending_skill_use {
+                    self.pending_skill_use = Some((pid.clone(), skill_id));
+                    return StepOutcome::cont().with_prompt(
+                        ffb_model::prompts::AgentPrompt::SkillUse {
+                            player_id: pid.clone(),
+                            skill_id: skill_id as u16,
+                            skill_name: format!("{skill_id:?}"),
+                        },
+                    );
+                }
                 // Java: behaviour hooks call `step.publishParameter(...)` directly (Stand Firm
                 // publishes FOLLOWUP_CHOICE=false when it cancels the push). Drain them into this
                 // step's published output, exactly as the bb2025 StepPushback does.

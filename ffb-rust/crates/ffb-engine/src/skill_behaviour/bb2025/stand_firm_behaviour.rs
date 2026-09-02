@@ -132,14 +132,22 @@ impl StepModifierTrait for StandFirmStepModifier {
             return false;
         }
 
-        // Java shows a Stand Firm skill-use dialog here (`DialogSkillUseParameter`). The parity
-        // harness (ParityRunner SKILL_USE handler) ALWAYS uses the skill, so for headless parity we
-        // auto-ACCEPT — record `true` and fall through to cancel the push. Previously this
-        // auto-DECLINED, so a Stand Firm defender who was never prompted (e.g. the dwarf Deathroller
-        // blitzed at dwarf seed 1 step 101) was wrongly pushed instead of holding its square,
-        // desyncing the field state for the rest of the game.
+        // Java: `if (!standingFirm.containsKey(id)) showDialog(DialogSkillUseParameter(defender,
+        // StandFirm, 0)); return true` — the answer re-enters through handleCommandHook and the
+        // step re-executes with the entry present. Under the RANDOM contract the old inline
+        // auto-ACCEPT was stream-neutral (ParityRunner answers USE for free), but the heuristic
+        // driver answers the dialog through its useSkill sampler (2 draws) — dwarf bb2025 seed 2:
+        // Java draws SKILL_USE StandFirm for the blitzed Deathroller at total=12 while Rust drew
+        // nothing, splitting the streams. Park the offer exactly like the bb2020 twin (dark_elf
+        // ITER2); StepPushback raises the prompt and files the answer into `standing_firm`.
+        //
+        // NOTE (deferred, no Rust plumbing yet): Java bb2025 additionally publishes
+        // BALL_KNOCKED_LOSE=false and CATCH_SCATTER_THROW_IN_MODE=null and reports a strip-ball
+        // prevention event in the accepted branch; no StepParameter variants exist for the first
+        // two. Recorded in docs/PARITY_DWARF_CAMPAIGN.md.
         if !state.standing_firm.contains_key(&defender_id) {
-            state.standing_firm.insert(defender_id.clone(), true);
+            state.pending_skill_use = Some((defender_id.clone(), SkillId::StandFirm));
+            return true;
         }
 
         // Java: state.doPush = true; pushbackStack.clear(); publish StartingPushbackSquare(null);
@@ -287,11 +295,10 @@ mod tests {
     }
 
     #[test]
-    fn stand_firm_not_decided_headless_auto_uses() {
-        // Defender has StandFirm, no pre-populated standing_firm map. Java shows a skill-use dialog
-        // and the parity harness (ParityRunner SKILL_USE) ALWAYS uses the skill, so headless must
-        // auto-USE Stand Firm: cancel the push (do_push=true, return true) and suppress the
-        // attacker's follow-up via a published FOLLOWUP_CHOICE(false).
+    fn stand_firm_not_decided_parks_the_offer() {
+        // Java: an undecided standing defender gets a DialogSkillUseParameter and the hook
+        // returns true WITHOUT pushing; the answer re-enters via handleCommandHook. Rust parks
+        // the offer in pending_skill_use for StepPushback to raise as a prompt — dwarf bb2025 seed 2 (heuristic: 2 sampler draws).
         let mut game = make_game();
         game.team_away.players.push(player_with_skills("def1", vec![SkillId::StandFirm]));
         game.field_model.set_player_coordinate("def1", FieldCoordinate::new(5, 5));
@@ -299,15 +306,11 @@ mod tests {
 
         let m = StandFirmStepModifier;
         let mut hs = default_hook_state("def1");
-        // standing_firm map is empty → auto-use
         let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
-        assert!(result, "stand firm should be used (push cancelled)");
-        assert_eq!(hs.standing_firm.get("def1"), Some(&true));
-        assert!(hs.do_push, "do_push should be set (push resolved without moving the defender)");
-        assert!(
-            hs.published.iter().any(|p| matches!(p, crate::step::framework::StepParameter::FollowupChoice(false))),
-            "must publish FOLLOWUP_CHOICE(false) to suppress the follow-up"
-        );
+        assert!(result, "undecided offer stops the step this pass");
+        assert_eq!(hs.pending_skill_use, Some(("def1".into(), SkillId::StandFirm)));
+        assert!(!hs.standing_firm.contains_key("def1"), "undecided until the answer arrives");
+        assert!(!hs.do_push, "no push while the dialog is open");
     }
 
     #[test]
