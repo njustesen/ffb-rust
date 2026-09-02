@@ -163,12 +163,15 @@ mod tests {
         assert_eq!(game.turn_mode, TurnMode::BombAway);
     }
 
+    /// Java: actingPlayer.markSkillUsed(Bombardier) — the ACTING PLAYER's set (a term of
+    /// hasActed(), read by changeActingPlayer's THROW_BOMB retire carve-out). The team
+    /// Player's set is only written for skills whose usage tracks outside the activation.
     #[test]
     fn marks_bombardier_skill_used() {
-        let (mut game, pid) = make_game_with_bombardier();
+        let (mut game, _pid) = make_game_with_bombardier();
         StepBombardier::new().start(&mut game, &mut GameRng::new(0));
-        let player = game.team_home.players.iter().find(|p| p.id == pid).unwrap();
-        assert!(player.used_skills.contains(&SkillId::Bombardier));
+        assert!(game.acting_player.used_skills.contains(&SkillId::Bombardier),
+            "the acting player's used set drives hasActed() and the retire carve-out");
     }
 
     #[test]

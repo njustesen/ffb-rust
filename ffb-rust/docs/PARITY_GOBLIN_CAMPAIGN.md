@@ -157,3 +157,6 @@ declined) a PASS team re-roll for the INACCURATE re-throw of an intercepted bomb
 RollMechanic.isTeamReRollAvailable carries four bomb-mode terms — during BOMB_HOME/AWAY(_BLITZ)
 the roller must be on the bomb-owning team — so the away re-thrower of home's bomb gets no
 offer. Ported the four terms into ask_for_reroll_if_available_for.
+Post-ITER12: **bb2016 100/100 × 3 GREEN** 🎉 (from 0/0/2 at baseline, 12 iterations).
+bb2020 19/85/15, bb2025 0/71/3 — edition-specific faults next. Suite 7392/0 after
+updating marks_bombardier_skill_used to the acting-set contract.
