@@ -608,7 +608,18 @@ impl StepEndTurn {
                 game.turn_mode = TurnMode::Setup;
                 game.setup_offense = false;
                 // Stub: kickoffGenerator / endGenerator pushes → skip
-                // Stub: ball clear, sound, resetSpecialSkillAtEndOfDrive → skip
+                // Stub: ball clear, sound → skip (the setup/kickoff path already re-places the
+                // ball; greens prove the equivalence)
+                // Java StepEndTurn (bb2025:394, in the fTouchdown branch):
+                // `stateMechanic.resetSpecialSkillAtEndOfDrive(game)` — ONCE_PER_DRIVE skills
+                // (Beer Barrel Bash!) come back after a touchdown drive. Rust only ran this
+                // reset from the HALF-TIME path, so Thorsson's keg stayed marked used across
+                // TD drives: Java re-offers THROW_KEG, Rust's candidate list is one row short
+                // and every later same-draw pick shifts (dwarf bb2025 seed 22 k=50).
+                {
+                    let sm = crate::mechanic::state_mechanic_for(game.rules);
+                    sm.reset_special_skill_at_end_of_drive(game);
+                }
             } else {
                 match game.turn_mode {
                     TurnMode::Kickoff => {
@@ -1249,6 +1260,31 @@ mod tests {
         assert_eq!(p.armour_with_modifiers(), p.armour, "Dodgy Snack -AV must be cleared at drive end");
         assert!(p.temporary_stat_mods.iter().all(|(s, _, _, _, _)| s != "Dodgy Snack"),
             "Dodgy Snack stat-mods must be removed at drive end");
+    }
+
+    #[test]
+    fn touchdown_resets_once_per_drive_skills() {
+        use ffb_model::enums::SkillId;
+        // Java StepEndTurn (bb2025:394, fTouchdown branch): resetSpecialSkillAtEndOfDrive —
+        // ONCE_PER_DRIVE skills (Beer Barrel Bash!) come back after a touchdown drive. Rust ran
+        // the reset only at half time, so Thorsson's keg stayed used across TD drives (dwarf
+        // bb2025 seed 22 k=50: Java re-offers THROW_KEG, Rust one candidate short).
+        let mut game = make_game();
+        game.team_home.players.push(make_player("kegger"));
+        game.team_home.players.push(make_player("scorer"));
+        game.field_model.set_player_coordinate("kegger", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("kegger", PlayerState::new(PS_STANDING));
+        // scorer stands in the AWAY end zone (x=25) carrying the ball → touchdown
+        game.field_model.set_player_coordinate("scorer", FieldCoordinate::new(25, 7));
+        game.field_model.set_player_state("scorer", PlayerState::new(PS_STANDING));
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(25, 7));
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = false;
+        game.player_mut("kegger").unwrap().used_skills.insert(SkillId::BeerBarrelBash);
+        let mut step = StepEndTurn::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.player("kegger").unwrap().used_skills.contains(&SkillId::BeerBarrelBash),
+            "ONCE_PER_DRIVE marks must reset at a touchdown drive end");
     }
 
     #[test]

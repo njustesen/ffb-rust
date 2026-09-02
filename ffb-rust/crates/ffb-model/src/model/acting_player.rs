@@ -147,6 +147,9 @@ impl ActingPlayer {
             // Java setPlayerId: fUsedSkills.clear() — per-activation skill-use resets so
             // negatraits like Bone Head roll fresh for each new activation.
             self.used_skills.clear();
+            // Java setPlayerId: skillsGrantedBy.clear() — the granted-skill ledger is
+            // per-activation; UtilActingPlayer's deselect cleanup reads it BEFORE this reset.
+            self.skills_granted_by.clear();
         }
         // Java setPlayerAction: always (re)assign the action.
         self.player_action = Some(action);

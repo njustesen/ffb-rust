@@ -154,7 +154,7 @@ impl StepWisdomOfTheWhiteDwarf {
 
         // Java: game.getFieldModel().addWisdomSkill(target.getId(), gainedSkill)
         if let Some(target_mut) = game.player_mut(&target_id) {
-            target_mut.add_prayer_skill("Granted by Wisdom of the White Dwarf", skill, value);
+            target_mut.add_prayer_skill(crate::step::util_server_steps::WISDOM_ENHANCEMENT_SOURCE, skill, value);
         }
         game.report_list.add(ReportPlayerEvent::new(
             Some(target_id.clone()),

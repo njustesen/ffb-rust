@@ -67,6 +67,69 @@ pub fn check_command_with_acting_player(game: &Game, acting_player_id: &str) -> 
 /// it only in `change_player_action_to_none`, so a bomber handing the slot to his bomb's catcher
 /// was never deactivated (goblin bb2016 seed 2 — surfaced the moment the state hash learned to
 /// see the ACTIVE bit). MUST be evaluated BEFORE `set_player` resets the acting struct.
+/// Java `UtilActingPlayer.changeActingPlayer`, the `if (!actingPlayer.hasActed())` block that
+/// runs when the OLD acting player leaves without having acted:
+///
+/// ```java
+/// enhancementsToRemoveAtEndOfTurn.forEach(e -> fieldModel.removeSkillEnhancements(oldPlayer, e));
+/// actingPlayer.getSkillsGrantedBy().forEach((skillName, playerIds) -> playerIds.forEach(pid -> {
+///     if (pid == oldPlayer.getId()) player.markUnused(skill, game);   // the GRANTER's mark reverts
+///     else fieldModel.removeSkillEnhancements(player, skill.enhancementSourceName());
+/// }));
+/// ```
+///
+/// The bb2025 `enhancementsToRemoveAtEndOfTurn` set is exactly {Wisdom of the White Dwarf}. The
+/// consequence that bit: a Grombrindal whose activation ends un-acted gets his ONCE_PER_GAME
+/// Wisdom mark REVERTED — stock Java re-offers Wisdom every such activation (probed:
+/// JAVA_WISDOM_MARK usedAfter=true, next JAVA_WISDOM_OFFER usedProp=false — dwarf bb2025 seed 21
+/// k=16: Java offers away3's Wisdom again, Rust had withdrawn it, one candidate short, 15/100
+/// gate reds all first-pick-of-turn splits).
+fn cleanup_granted_skills_on_deselect(game: &mut Game) {
+    if game.acting_player.acted() {
+        return;
+    }
+    let Some(acting_id) = game.acting_player.player_id.clone() else { return };
+    // Java: enhancementsToRemoveAtEndOfTurn — bb2025 {WisdomOfTheWhiteDwarf.enhancementSourceName()};
+    // removing a source the player does not carry is a no-op, so no edition gate is needed.
+    if let Some(p) = game.team_home.player_mut(&acting_id)
+        .or_else(|| game.team_away.player_mut(&acting_id))
+    {
+        p.remove_enhancements(WISDOM_ENHANCEMENT_SOURCE);
+    }
+    let granted: Vec<(ffb_model::enums::SkillId, Vec<String>)> = game
+        .acting_player
+        .skills_granted_by
+        .iter()
+        .map(|(k, v)| (*k, v.clone()))
+        .collect();
+    for (skill, pids) in granted {
+        for pid in pids {
+            if let Some(p) = game.team_home.player_mut(&pid)
+                .or_else(|| game.team_away.player_mut(&pid))
+            {
+                if pid == acting_id {
+                    // Java: player.markUnused(skill, game)
+                    p.used_skills.remove(&skill);
+                } else {
+                    // Java: removeSkillEnhancements(player, skill.enhancementSourceName())
+                    p.remove_enhancements(enhancement_source_for(skill));
+                }
+            }
+        }
+    }
+}
+
+/// The source string the bb2025 wisdom step uses for the granted temporary skill; the deselect
+/// cleanup must remove by the SAME source.
+pub(crate) const WISDOM_ENHANCEMENT_SOURCE: &str = "Granted by Wisdom of the White Dwarf";
+
+fn enhancement_source_for(skill: ffb_model::enums::SkillId) -> &'static str {
+    match skill {
+        ffb_model::enums::SkillId::WisdomOfTheWhiteDwarf => WISDOM_ENHANCEMENT_SOURCE,
+        _ => "",
+    }
+}
+
 fn retire_old_acting_player(game: &mut Game) {
     use ffb_model::enums::{PS_MOVING, PS_PRONE, PS_STANDING};
     let Some(old_id) = game.acting_player.player_id.clone() else { return };
@@ -116,6 +179,9 @@ pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerActi
         // the THROW_BOMB carve-out) BEFORE the new player takes the slot.
         if changed && game.acting_player.player_id.is_some() {
             retire_old_acting_player(game);
+            // Java: the `if (!actingPlayer.hasActed())` granted-skill cleanup runs in the SAME
+            // oldPlayer!=newPlayer branch, OUTSIDE the base==MOVING guard.
+            cleanup_granted_skills_on_deselect(game);
         }
         // Java UtilActingPlayer.changeActingPlayer: standingUp = (oldState.base == PRONE). A prone
         // player being activated is "standing up" this activation, which lets StepStandUp resolve the
@@ -259,6 +325,9 @@ pub fn change_player_action_to_none(game: &mut Game) {
                 game.field_model.set_player_state(&old_id, new_state);
             }
         }
+        // Java: the `if (!actingPlayer.hasActed())` granted-skill cleanup (unmark the granter,
+        // strip the receivers' enhancements) — same placement as the non-null path.
+        cleanup_granted_skills_on_deselect(game);
         // Java UtilActingPlayer.changeActingPlayer `if (changed)` block: reset transient
         // BLOCKED/MOVING states (same as the non-null path in change_player_action).
         reset_blocked_and_moving_players(game);
@@ -280,6 +349,8 @@ pub fn change_player_action_to_none(game: &mut Game) {
     ap.standing_up = false;
     ap.took_square = false;
     ap.old_player_state = None;
+    // Java setPlayerId: skillsGrantedBy.clear().
+    ap.skills_granted_by.clear();
 }
 
 /// Java `checkTouchdown(GameState)`.
@@ -404,6 +475,69 @@ mod tests {
         let s1 = game.field_model.player_state("p1").unwrap();
         assert_eq!(s1.base(), PS_STANDING);
         assert!(!s1.is_active(), "an acted mover must retire inactive when the slot changes hands");
+    }
+
+    fn granted_test_player(id: &str) -> ffb_model::model::player::Player {
+        ffb_model::model::player::Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "pos".into(),
+            player_type: ffb_model::enums::PlayerType::Regular,
+            gender: ffb_model::enums::PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            ..Default::default()
+        }
+    }
+
+    
+    #[test]
+    #[test]
+    fn deselect_without_acting_reverts_the_granted_skill_marks() {
+        // Java UtilActingPlayer.changeActingPlayer `if (!hasActed())`: the granter's used-mark
+        // is REVERTED (markUnused) and the receiver's granted enhancement stripped. Stock Java
+        // therefore re-offers Wisdom after an un-acted activation (dwarf bb2025 seed 21 k=16).
+        use ffb_model::enums::{Rules, SkillId, PlayerAction};
+        let mut game = ffb_model::model::game::Game::new(
+            crate::step::framework::test_team("home", 2),
+            crate::step::framework::test_team("away", 0),
+            Rules::Bb2025,
+        );
+        game.team_home.players.push(granted_test_player("granter"));
+        game.team_home.players.push(granted_test_player("target"));
+        let granter = "granter".to_string();
+        let target = "target".to_string();
+        game.acting_player.set_player(granter.clone(), PlayerAction::Move);
+        // the wisdom step's writes:
+        game.team_home.player_mut("granter").unwrap().used_skills.insert(SkillId::WisdomOfTheWhiteDwarf);
+        game.team_home.player_mut("target").unwrap().add_prayer_skill(WISDOM_ENHANCEMENT_SOURCE, SkillId::Dauntless, None);
+        game.acting_player.add_granted_skill(SkillId::WisdomOfTheWhiteDwarf, Some(granter.clone()));
+        game.acting_player.add_granted_skill(SkillId::WisdomOfTheWhiteDwarf, Some(target.clone()));
+        assert!(!game.acting_player.acted());
+        change_player_action_to_none(&mut game);
+        assert!(!game.team_home.player("granter").unwrap().used_skills.contains(&SkillId::WisdomOfTheWhiteDwarf),
+            "an un-acted granter's ONCE_PER_GAME mark must revert (Java markUnused)");
+        assert!(!game.team_home.player("target").unwrap().all_skill_ids().any(|s| s == SkillId::Dauntless),
+            "the receiver's granted enhancement must be stripped");
+        assert!(game.acting_player.skills_granted_by.is_empty(), "ledger reset with the player");
+    }
+
+    #[test]
+    fn deselect_after_acting_keeps_the_granted_skill_mark() {
+        // Java: the cleanup is gated on !hasActed() — an acted granter keeps the mark.
+        use ffb_model::enums::{Rules, SkillId, PlayerAction};
+        let mut game = ffb_model::model::game::Game::new(
+            crate::step::framework::test_team("home", 2),
+            crate::step::framework::test_team("away", 0),
+            Rules::Bb2025,
+        );
+        game.team_home.players.push(granted_test_player("granter"));
+        let granter = "granter".to_string();
+        game.acting_player.set_player(granter.clone(), PlayerAction::Move);
+        game.team_home.player_mut("granter").unwrap().used_skills.insert(SkillId::WisdomOfTheWhiteDwarf);
+        game.acting_player.add_granted_skill(SkillId::WisdomOfTheWhiteDwarf, Some(granter.clone()));
+        game.acting_player.has_moved = true; // a term of acted()
+        assert!(game.acting_player.acted());
+        change_player_action_to_none(&mut game);
+        assert!(game.team_home.player("granter").unwrap().used_skills.contains(&SkillId::WisdomOfTheWhiteDwarf),
+            "an ACTED granter keeps the ONCE_PER_GAME mark");
     }
 
     #[test]
