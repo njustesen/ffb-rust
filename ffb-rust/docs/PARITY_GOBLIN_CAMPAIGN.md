@@ -160,3 +160,14 @@ offer. Ported the four terms into ask_for_reroll_if_available_for.
 Post-ITER12: **bb2016 100/100 × 3 GREEN** 🎉 (from 0/0/2 at baseline, 12 iterations).
 bb2020 19/85/15, bb2025 0/71/3 — edition-specific faults next. Suite 7392/0 after
 updating marks_bombardier_skill_used to the acting-set contract.
+
+## ITER13 — the parity game enables ALLOW_BALL_AND_CHAIN_RE_ROLL (bb2020/25 Fanatic)
+
+bb2020 @0 seed 6 (i=103): identical dice through the Fanatic's move, then Java rolls THREE
+directions + BlockProne armour (5 dice, r3→r2) vs Rust's two + a block. A temporary stock
+JBCMOVE probe showed Java's second roll REPEATING the same from/orig — a TEAM RE-ROLL of the
+scatter direction. Java's mixed StepMoveBallAndChain offers that re-roll only when
+ALLOW_BALL_AND_CHAIN_RE_ROLL is enabled, and UtilServerStartGame.addDefaultGameOptions
+(STANDALONE — the harness mode) sets it TRUE for every parity game; Rust's
+BASELINE_SETUP_OPTIONS (the Rust mirror of that table) lacked it, so the offer never fired.
+Added the option (same class as the mbStacksAgainstChainsaw baseline fix, random campaign).

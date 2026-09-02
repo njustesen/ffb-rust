@@ -103,6 +103,12 @@ impl StepMoveBallAndChain {
             self.player_scatter = Some(scatter_dir);
 
             let new_coord = scatter_one_square(coord_from, scatter_dir);
+            if std::env::var("FFB_BOMB").is_ok() {
+                eprintln!(
+                    "RBCMOVE from={:?} orig_to={:?} roll={} base={:?} dir={:?} new={:?}",
+                    coord_from, original_coord_to, scatter_roll, base_dir, scatter_dir, new_coord
+                );
+            }
             self.coordinate_to = Some(new_coord);
 
             // Java: getResult().addReport(new ReportScatterPlayer(fCoordinateFrom, fCoordinateTo, new Direction[]{playerScatter}, new int[]{scatterRoll}))
@@ -117,7 +123,12 @@ impl StepMoveBallAndChain {
                 });
 
             // Java: if (getReRollSource() == null) { ... askForReRoll? ... }
-            if self.re_roll_state.re_roll_source.is_none() {
+            // Java bb2016's OWN StepMoveBallAndChain has no re-roll dialog at all — the offer
+            // exists only in this mixed (bb2020/bb2025) step. Rust routes bb2016 here too, so
+            // gate the offer on edition (enabling ALLOW_BALL_AND_CHAIN_RE_ROLL for the parity
+            // game otherwise broke bb2016: 10/10 → 5/10 on the spot check).
+            if game.rules != ffb_model::enums::Rules::Bb2016
+                && self.re_roll_state.re_roll_source.is_none() {
                 if should_ask_for_reroll(self.re_roll_setting.as_deref(), game, new_coord) {
                     // Java: `ReRollSource reRollSource = UtilCards.getUnusedRerollSource(actingPlayer,
                     //   RE_ROLLED_ACTION); if (reRollSource != null) { showDialog(...); return; }

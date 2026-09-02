@@ -14,7 +14,7 @@ use ffb_model::model::player::Player;
 use ffb_model::model::roster_position::RosterPosition;
 use ffb_model::model::team::Team;
 use ffb_model::prompts::AgentPrompt;
-use ffb_model::option::game_option_id::{INDUCEMENTS, MAX_PLAYERS_ON_FIELD, MIN_PLAYERS_ON_LOS, MAX_PLAYERS_IN_WIDE_ZONE, MB_STACKS_AGAINST_CHAINSAW, CLAW_DOES_NOT_STACK, ENABLE_STALLING_CHECK};
+use ffb_model::option::game_option_id::{INDUCEMENTS, MAX_PLAYERS_ON_FIELD, MIN_PLAYERS_ON_LOS, MAX_PLAYERS_IN_WIDE_ZONE, MB_STACKS_AGAINST_CHAINSAW, CLAW_DOES_NOT_STACK, ENABLE_STALLING_CHECK, ALLOW_BALL_AND_CHAIN_RE_ROLL};
 use crate::log_format::{GameLog, LogLine, java_log_path_for, rust_log_path_for, rust_events_path_for};
 use crate::state_hash::state_hash;
 use ffb_model::util::state_hash::state_string;
@@ -35,6 +35,12 @@ pub const BASELINE_SETUP_OPTIONS: &[(&str, &str)] = &[
     // Java — otherwise a fallen Looney's armour holds (chainsaw-only +3) where Java breaks it
     // (chainsaw +3 + Mighty Blow +2), diverging the dice (goblin seed 99).
     (MB_STACKS_AGAINST_CHAINSAW, "true"),
+    // Java UtilServerStartGame.addDefaultGameOptions (STANDALONE = the parity harness):
+    // `ballAndChainRr.setValue(true); game.getOptions().addOption(ballAndChainRr)` — the
+    // mixed StepMoveBallAndChain offers a TEAM re-roll of the scatter direction only when
+    // this is enabled; Java re-rolled a Fanatic's direction (JBCMOVE same from/orig, fresh
+    // roll, r3→r2) while Rust never offered (goblin bb2020 seed 6 i=103).
+    (ALLOW_BALL_AND_CHAIN_RE_ROLL, "true"),
     // Same shape, opposite direction. Java's `UtilServerStartGame:247-249` explicitly sets
     // clawDoesNotStack=false, but Rust never applies its equivalent defaults: the list in
     // `util_server_start_game.rs` exists and `add_default_game_options` is DEAD CODE, called from

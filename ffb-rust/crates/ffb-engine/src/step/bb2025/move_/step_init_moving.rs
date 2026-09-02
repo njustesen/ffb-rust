@@ -357,12 +357,16 @@ impl StepInitMoving {
                 events: Vec::new(),
                 pushes: Vec::new(),
                 prompt: None,
-                published: vec![
+                published: {
+                    if std::env::var("FFB_BOMB").is_ok() {
+                        eprintln!("RPATH from={:?} first={:?} rest={:?}", coordinate_from, coordinate_to, new_stack);
+                    }
+                    vec![
                     StepParameter::BallAndChainRrSetting(self.ball_and_chain_rr_setting.clone()),
                     StepParameter::MoveStack(new_stack),
                     StepParameter::CoordinateFrom(coordinate_from),
                     StepParameter::CoordinateTo(coordinate_to),
-                ],
+                ]},
                 clear_stack: false, push_self: false
             };
         }
