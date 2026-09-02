@@ -2575,21 +2575,34 @@ impl HeuristicAgent {
             player_action:
                 pac @ (PlayerActionChoice::ThrowTeamMate
                 | PlayerActionChoice::KickTeamMate
-                | PlayerActionChoice::ThrowKeg),
+                | PlayerActionChoice::ThrowKeg
+                | PlayerActionChoice::HailMaryPass
+                | PlayerActionChoice::ThrowBomb
+                | PlayerActionChoice::AllYouCanEat),
             ref mut block_defender_id,
         } = taken
         {
-            if block_defender_id.is_none() {
+            // HailMaryPass/ThrowBomb/AllYouCanEat have no move variant: Java's phase-2 routes
+            // them to sendPassAction UNCONDITIONALLY — it ignores any plan target and re-picks
+            // from the coord-sorted on-pitch teammates with ONE actionRng draw. The heuristic's
+            // pass plan pre-sets its own receiver, so the override must not be gated on
+            // target-is-none (dwarf bb2016 seed 20: Java picked (12,9), Rust kept its plan's
+            // square and the HMP scatter walk diverged).
+            let pass_family = matches!(pac,
+                PlayerActionChoice::HailMaryPass
+                | PlayerActionChoice::ThrowBomb
+                | PlayerActionChoice::AllYouCanEat);
+            if block_defender_id.is_none() || pass_family {
                 let pid = player_id.clone();
                 // Beer Barrel Bash folds ParityRunner's kegIdx pick (opponents within 3,
                 // coord-sorted, ONE actionRng) the same way — dwarf bb2025 seed 2: the keg ran
                 // with target_id=null and no target draw, 4 draws short of Java by the re-roll
                 // offer. A None fold (no valid target) is a known gap: Java deselects; recorded
                 // in docs/PARITY_DWARF_CAMPAIGN.md.
-                let t = if pac == PlayerActionChoice::ThrowKeg {
-                    self.parity.fold_keg_target(g, &pid)
-                } else {
-                    self.parity.fold_ttm_target(g, &pid)
+                let t = match pac {
+                    PlayerActionChoice::ThrowKeg => self.parity.fold_keg_target(g, &pid),
+                    _ if pass_family => self.parity.fold_pass_receiver(g, &pid),
+                    _ => self.parity.fold_ttm_target(g, &pid),
                 };
                 if std::env::var_os("FFB_TRACE").is_some() {
                     eprintln!("RTTMFOLD pid={pid} pac={pac:?} target={t:?}");
@@ -2831,13 +2844,20 @@ impl HeuristicAgent {
         // throwable teammates, ONE actionRng). The Rust candidate (built by the same default arm
         // as Java's chooser) carries NO target, and a targetless declaration deselects instantly
         // — so fold the identical pick, from the identical action_rng stream, into the answer.
-        let target = if matches!(c.pac, PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate | PlayerActionChoice::ThrowKeg)
-            && c.target.is_none()
+        // The pass-family immediates are overridden UNCONDITIONALLY — Java's sendPassAction
+        // ignores any plan target and re-picks with one actionRng (dwarf bb2016 seed 20).
+        let deep_pass_family = matches!(c.pac,
+            PlayerActionChoice::HailMaryPass
+            | PlayerActionChoice::ThrowBomb
+            | PlayerActionChoice::AllYouCanEat);
+        let target = if (matches!(c.pac, PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate
+            | PlayerActionChoice::ThrowKeg)
+            && c.target.is_none()) || deep_pass_family
         {
-            let t = if c.pac == PlayerActionChoice::ThrowKeg {
-                self.parity.fold_keg_target(g, &c.player)
-            } else {
-                self.parity.fold_ttm_target(g, &c.player)
+            let t = match c.pac {
+                PlayerActionChoice::ThrowKeg => self.parity.fold_keg_target(g, &c.player),
+                _ if deep_pass_family => self.parity.fold_pass_receiver(g, &c.player),
+                _ => self.parity.fold_ttm_target(g, &c.player),
             };
             if std::env::var_os("FFB_TRACE").is_some() {
                 eprintln!("RTTMFOLD pid={} pac={:?} target={:?}", c.player, c.pac, t);

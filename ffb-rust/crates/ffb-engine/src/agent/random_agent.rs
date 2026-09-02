@@ -324,6 +324,24 @@ impl RandomAgent {
         }
     }
 
+    /// The parity contract's pass-target pick — `ParityRunner.sendPassAction`: on-pitch
+    /// teammates, coordinate-sorted, ONE actionRng draw. PASS / THROW_BOMB / HAIL_MARY_PASS /
+    /// ALL_YOU_CAN_EAT all ride it (phase 2 routes them to the same method). `pub(crate)`
+    /// because the HEURISTIC's immediate declarations (no move variant: HMP, bomb) reach the
+    /// identical Java code while Rust's candidate carries no target — dwarf bb2016 seed 20:
+    /// Java's Farblast HMP targeted (12,9) via this rule, Rust's picked its own square and the
+    /// scatter walk diverged. Empty → None.
+    pub(crate) fn fold_pass_receiver(&mut self, game: &ffb_model::model::game::Game, player_id: &str) -> Option<String> {
+        let side = if game.home_playing { TeamSide::Home } else { TeamSide::Away };
+        let receivers = legal_pass_receivers(game, player_id, side);
+        if receivers.is_empty() {
+            None
+        } else {
+            let ridx = self.pick_action(receivers.len());
+            Some(receivers[ridx].clone())
+        }
+    }
+
     fn pick_action(&mut self, len: usize) -> usize {
         self.action_rng_count += 1;
         if len == 0 { 0 } else { (self.action_rng.next_u64() as usize) % len }
@@ -581,18 +599,11 @@ impl Agent for RandomAgent {
                     PlayerActionChoice::Pass | PlayerActionChoice::ThrowBomb
                     | PlayerActionChoice::AllYouCanEat
                     | PlayerActionChoice::HailMaryPass => {
-                        let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
-                        let receivers = legal_pass_receivers(&gs.game, player_id, side);
-                        if receivers.is_empty() {
-                            None
-                        } else {
-                            let ridx = self.pick_action(receivers.len());
-                            if std::env::var("FFB_ACT_TRACE").is_ok() {
-                                eprintln!("RPASSPICK pid={} n={} idx={} recv={}",
-                                    player_id, receivers.len(), ridx, receivers[ridx]);
-                            }
-                            Some(receivers[ridx].clone())
+                        let r = self.fold_pass_receiver(&gs.game, player_id);
+                        if std::env::var("FFB_ACT_TRACE").is_ok() {
+                            eprintln!("RPASSPICK pid={} recv={:?}", player_id, r);
                         }
+                        r
                     }
                     // Throw/Kick Team-Mate: pick the thrown player (an adjacent standing Right Stuff
                     // teammate), coordinate-sorted, 1 actionRng. Empty → None → StepInitSelecting
