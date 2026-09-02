@@ -24,6 +24,7 @@ use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_cards::UtilCards;
+use ffb_model::prompts::AgentPrompt;
 use ffb_model::report::mixed::report_thrown_keg::ReportThrownKeg;
 use crate::action::Action;
 use crate::drop_player_context::DropPlayerContext;
@@ -133,6 +134,17 @@ impl StepThrowKeg {
         if !is_re_rolling {
             if let Some(prompt) = ask_for_reroll_if_available(game, THROW_KEG, MINIMUM_THROW_KEG_ROLL, false) {
                 self.re_roll.re_rolled_action = Some(ffb_model::model::re_rolled_action::ReRolledAction::new(THROW_KEG));
+                // Java: the client's answer (ClientCommandUseReRoll) CARRIES the source and
+                // AbstractStepWithReRoll.handleCommand stores it. Rust's UseReRoll{true} carries
+                // none, so the step must remember the source it OFFERED — the TRR prompt above.
+                // Without this an ACCEPTED keg re-roll found source=None and silently no-oped:
+                // no TRR spent, no Loner roll, no fresh keg die, while Java spent the re-roll,
+                // rolled Loner 5 (pass) and fumbled the re-rolled keg (dwarf bb2025 seed 3 i=48:
+                // Java turnover, Rust played on). Same family as the chaos_dwarf declined-HMP
+                // re-roll fix, on the ACCEPT path. The decline arm clears it.
+                if let AgentPrompt::ReRollOffer { ref source, .. } = prompt {
+                    self.re_roll.re_roll_source = Some(source.clone());
+                }
                 return StepOutcome::cont().with_prompt(prompt).with_event(keg_event);
             }
         }
@@ -293,6 +305,27 @@ mod tests {
         let mut step = StepThrowKeg::new();
         let rejected = !step.set_parameter(&StepParameter::EndTurn(true));
         assert!(rejected);
+    }
+
+    #[test]
+    fn failed_throw_reroll_offer_stores_the_offered_source() {
+        // Java: the client's ClientCommandUseReRoll CARRIES the source; Rust's UseReRoll{true}
+        // does not, so the step must remember what it OFFERED. Without it an ACCEPTED keg
+        // re-roll found source=None and silently no-oped — no TRR spend, no Loner, no fresh
+        // die (dwarf bb2025 seed 3 i=48: Java re-rolls and fumbles, Rust plays on).
+        let seed = (1u64..).find(|&s| { let mut r = GameRng::new(s); r.d6() == 2 }).unwrap();
+        let mut step = StepThrowKeg::new();
+        let mut game = make_game();
+        game.turn_data_mut().rerolls = 2;
+        add_player(&mut game, "thrower", vec![SkillId::BeerBarrelBash]);
+        set_acting(&mut game, "thrower");
+        add_player(&mut game, "target", vec![]);
+        step.player_id = Some("target".into());
+        let mut rng = GameRng::new(seed);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::Continue, "failed keg with TRR available must offer");
+        assert!(step.re_roll.re_roll_source.is_some(),
+            "the offered source must be stored so an ACCEPT can consume it");
     }
 
     #[test]

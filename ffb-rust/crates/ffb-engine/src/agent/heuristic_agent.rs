@@ -3711,9 +3711,16 @@ impl HeuristicAgent {
                     0.0
                 };
                 let w_use = (consequence * 0.833 * scarcity).clamp(0.0, 1.0);
+                if std::env::var_os("FFB_DRAWS").is_some() {
+                    eprintln!("RREROLLW action={} cons={consequence} scarcity={scarcity} turn={} rr={} carry={} wUse={w_use}",
+                        action, td.turn_nr, td.rerolls, we_carry);
+                }
                 self.buf.push(Action::UseReRoll { use_reroll: true }, w_use, Rule::Reroll, w_use);
                 self.buf.push(Action::UseReRoll { use_reroll: false }, 1.0 - w_use, Rule::Reroll, 0.0);
                 let i = self.sample(0.20);
+                if std::env::var_os("FFB_DRAWS").is_some() {
+                    eprintln!("RREROLLA action={action} pick={i} use={}", i == 0);
+                }
                 self.take(i)
             }
 

@@ -711,11 +711,17 @@ impl StepInitSelecting {
                 // no defender; without this it routes into the Pass sequence and StepInitPassing returns
                 // Continue with no target coordinate and no prompt → the drive stalls (goblin seed 1
                 // i=56: away_03 Bombardier ThrowBomb). Deselecting matches Java exactly.
+                // Same for THROW_KEG: targets are opponents within 3 (ThrowKegLogicModule.
+                // isValidTarget); when none exists the coach has no square to click, so the
+                // declaration never completes and ParityRunner (both agent paths) deselects with
+                // NO target draw. Rust's fold likewise returns None; without this the keg ROLLED
+                // with a null target — a fumble (roll 1) even ended the thrower's team turn
+                // (dwarf bb2025 seed 2 i=34, seed 3 i=22).
                 if matches!(dispatch,
                         PlayerAction::HandOver | PlayerAction::Pass
                         | PlayerAction::ThrowTeamMate | PlayerAction::KickTeamMate
                         | PlayerAction::ThrowBomb | PlayerAction::HailMaryBomb
-                        | PlayerAction::HailMaryPass)
+                        | PlayerAction::HailMaryPass | PlayerAction::ThrowKeg)
                     && game.defender_id.is_none()
                 {
                     return StepOutcome::goto(label)
@@ -1214,6 +1220,31 @@ mod tests {
             "target-less ThrowBomb must deselect");
         assert!(!out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(Some(PlayerAction::ThrowBomb)))),
             "target-less ThrowBomb must NOT dispatch a passing sequence");
+    }
+
+    #[test]
+    fn throw_keg_activation_without_target_deselects() {
+        use ffb_model::enums::PlayerAction;
+        // Java: a THROW_KEG whose valid-target list (opponents within 3, STANDING) is empty never
+        // completes — the coach has no square to click and ParityRunner (both agent paths)
+        // deselects with NO target draw. Rust's fold likewise returns None; the activation must
+        // EndPlayerAction rather than roll a targetless keg (a fumble even ended the thrower's
+        // team turn — dwarf bb2025 seed 2 i=34 / seed 3 i=22).
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.defender_id = None;
+        let mut step = StepInitSelecting::new("end_label".into());
+        let action = Action::ActivatePlayer {
+            player_id: "p1".into(),
+            player_action: PlayerActionChoice::ThrowKeg,
+            block_defender_id: None,
+        };
+        let out = step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(out.goto_label.as_deref(), Some("end_label"));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))),
+            "target-less ThrowKeg must deselect");
+        assert!(out.pushes.is_empty(), "no keg sequence may be pushed for a targetless keg");
     }
 
     /// Rewritten for §12. This used to assert that a prone Blitz proceeds via `next()` so the

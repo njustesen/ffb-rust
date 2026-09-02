@@ -155,6 +155,9 @@ fn loner_roll(game: &mut Game, player_id: &str, rng: &mut GameRng) -> bool {
     };
     let roll = rng.d6();
     let success = crate::dice_interpreter::DiceInterpreter::is_skill_roll_successful(roll, minimum_roll);
+    if std::env::var_os("FFB_DRAWS").is_some() {
+        eprintln!("RLONER pid={player_id} roll={roll} min={minimum_roll} success={success}");
+    }
     game.report_list.add(ffb_model::report::report_re_roll::ReportReRoll::new(
         Some(player_id.to_string()),
         ReRollSource::new("Loner"),

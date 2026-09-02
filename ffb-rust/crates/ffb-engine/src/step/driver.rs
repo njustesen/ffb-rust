@@ -514,6 +514,13 @@ pub fn make_step_for(id: StepId, rules: Rules) -> Box<dyn Step> {
             // StepRightStuff instead GOTOs its (unset) goto-label param → 'goto unknown label ""' →
             // stack drained → game ends abnormally (orc bb2016 seed35 i=249: the Troll throws a Goblin
             // → Rust bailed on the landing, Java continued). Route bb2016 to its own StepRightStuff.
+            // BB2016 Hail Mary Pass: the shared table's bb2025 twin resolves an inaccurate HMP
+            // with ONE scatter; Java bb2016 (PassBehaviour hook on bb2016 StepHailMaryPass) rolls
+            // the d6 and hands the INACCURATE ball to StepMissedPass's 3-scatter (+ bounce) chain
+            // (dwarf bb2016 seed 20 i=8: Java d6=4 + four d8s, Rust one d8). Route to the bb2016
+            // twin, which was translated 1:1 but never dispatched (dead-twin fault pattern).
+            StepId::HailMaryPass =>
+                return Box::new(crate::step::bb2016::pass::step_hail_mary_pass::StepHailMaryPass::new()),
             StepId::RightStuff =>
                 return Box::new(crate::step::bb2016::ttm::step_right_stuff::StepRightStuff::new()),
             // BB2016 Throw-Team-Mate step-set. The bb2016 TTM generator pushes these StepIds; without
