@@ -180,3 +180,29 @@ Per-edition detail: `EVENT_COVERAGE_dwarf_bb2016.md` / `_bb2020.md` / `_bb2025.m
 Buckets: ThrowKeg/Wisdom/HMP exercised+evented; BreakTackle/DivingTackle/StandFirm/Tackle
 exercised-unevented (parity + kept gated probes are the record); Defensive/Sprint/Hatred(troll)
 present on the roster with no dedicated event — parity is the proof.
+
+---
+
+# Event coverage — HeuristicAgent, dark_elf_league_fumbbl v same (harvested 2026-09-02)
+
+Per-edition detail: `EVENT_COVERAGE_dark_elf_league_fumbbl_bb2016.md` / `_bb2020.md` /
+`_bb2025.md` (each a clean 100-seed run at scale 1.0; parity 100/100 in all three).
+
+The FUMBBL import (numeric roster id 37734-38) builds its REAL roster — Witch Elves
+(Dodge/Frenzy/Jump Up), Assassins (Stab/Shadowing), Runners (Dump-Off), Blitzers (Block) —
+via the make_team alias fix from the random-agent campaign; this is the first HEURISTIC
+run over a FUMBBL-imported team.
+
+- Block-heavy elf game: 2136/1831/1885 blockRolls (bb2016/20/25), all five block results,
+  1-die/2-dice/2-against all present; Blitz 1034/895/940.
+- Dodge volume through Witch Elf Dodge: 749/1177/1329 dodgeRolls (successes 435/963/1084 —
+  the Dodge re-roll path is live under the heuristic).
+- Touchdowns 47/66/76; pass rolls live in bb2016 (124) via the give-chain.
+- Frenzy/Jump Up/Block: exercised-unevented — the nine 100/100 gates are the record.
+- Stab/Shadowing/Dump-Off: no dedicated events fired this harvest — Stab needs the agent to
+  pick the special over a normal block, Shadowing an opponent leaving the Assassin's zone,
+  Dump-Off a carrier being blocked; classified agent-rarely-creates for this matchup, same
+  bucket as prior races. Parity across 900 games is the standing proof for the roster.
+
+The one engine fix this race (mix64 feature-cache stamp) is agent-infrastructure, not
+roster-specific — recorded in PARITY_DARK_ELF_LEAGUE_FUMBBL_CAMPAIGN.md.
