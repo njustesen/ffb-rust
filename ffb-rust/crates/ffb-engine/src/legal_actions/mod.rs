@@ -222,8 +222,14 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             }
         }
 
-        // ThrowBomb: Bombardier skill, uses pass-action slot
-        if !turn_data.pass_used && player.has_skill(SkillId::Bombardier) {
+        // ThrowBomb: Java ParityRunner gates on `!td.isBombUsed()` + the
+        // enableThrowBombAction PROPERTY (never the pass slot: Java kept offering
+        // THROW_BOMB after the team's pass — goblin bb2016 seed 2 k=58, the one-row
+        // candidate gap). bombUsed is only ever SET by bb2020/bb2025 StepInitBomb,
+        // so in bb2016 the bomb stays available all game, exactly like Java.
+        if !turn_data.bomb_used
+            && player.has_skill_property(ffb_model::model::property::NamedProperties::ENABLE_THROW_BOMB_ACTION)
+        {
             actions.push(Action::ActivatePlayer {
                 player_id: pid.clone(),
                 player_action: PlayerActionChoice::ThrowBomb,
@@ -2008,11 +2014,17 @@ mod tests {
         let a1 = legal_activate_player_actions(&game, TeamSide::Home);
         assert!(has_action(&a1, "cindy", PlayerActionChoice::ThrowBomb));
         assert!(!has_action(&a1, "cindy", PlayerActionChoice::AllYouCanEat));
-        // pass slot used withdraws both
+        // a thrown bomb (bombUsed, set by bb2020/25 StepInitBomb) withdraws both;
+        // the pass slot does NOT (Java offers THROW_BOMB after a pass).
         if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == "cindy") {
             p.used_skills.clear();
         }
         game.turn_data_home.pass_used = true;
+        let a1b = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&a1b, "cindy", PlayerActionChoice::ThrowBomb),
+            "a used pass slot must NOT withdraw ThrowBomb");
+        game.turn_data_home.pass_used = false;
+        game.turn_data_home.bomb_used = true;
         let a2 = legal_activate_player_actions(&game, TeamSide::Home);
         assert!(!has_action(&a2, "cindy", PlayerActionChoice::ThrowBomb));
         assert!(!has_action(&a2, "cindy", PlayerActionChoice::AllYouCanEat));

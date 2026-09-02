@@ -124,3 +124,13 @@ continues); Rust's hardcoded minimum 4 turned the 3 into a phantom KICKBACK (arm
 the Looney, drop, END_TURN). The four dice were identical either way — the JSTATE final row
 (A4:4 stunned, H14 standing) named the real target. The bb2016 FOUL chainsaw twin already
 used 2.
+
+## ITER9 — ThrowBomb is gated on bombUsed (never the pass slot)
+
+bb2016 @1.0 seed 2: candsum first mismatch k=58, n off by ONE with equal draws — the classic
+availability split. RELIG/JELIG diff: after the team's PASS (pass=true), Rust's
+`legal_activate_player_actions` dropped the Bombardier's ThrowBomb (`!turn_data.pass_used`
+gate); Java's ParityRunner gates THROW_BOMB on `!td.isBombUsed()` + the enableThrowBombAction
+PROPERTY and kept offering it. bombUsed is only ever set by bb2020/bb2025 StepInitBomb — in
+bb2016 the bomb stays available all game. Fixed the gate + property check; test updated to
+pin "a used pass slot must NOT withdraw ThrowBomb".
