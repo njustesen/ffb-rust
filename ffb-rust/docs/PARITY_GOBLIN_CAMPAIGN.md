@@ -184,3 +184,18 @@ re-enters with playerScatter set and doRoll=false, and Rust returned NEXT_STEP w
 COORDINATE_TO, so the following StepMove kept the stale planned square. Restructured: the
 publish/blocker block now runs unconditionally from self.coordinate_to, matching Java. Latent
 before ITER13 (no re-roll offer → no doRoll=false re-entry for a scatter).
+
+## Matrix checkpoint after ITER14 (2026-09-02, pushed 3bc264ac8)
+
+| edition | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| bb2016 | **100** | **100** | **100** ✅ |
+| bb2020 | 67 | 99 | 86 |
+| bb2025 | 94 | 93 | 99 |
+
+From baseline (0/0/2, 17/85/15, 0/69/3). bb2016 nine-of-three GREEN. Remaining:
+- bb2020 @0 seed 92: a B&C Fanatic knocked down mid-walk — Java scatters ONE more square
+  (rng 221 throwIn) → OOB crowd-push (222/223) → B&C injury (224/225); Rust stops after its
+  casualty. The B&C compulsory walk must CONTINUE after the mover is knocked down/injured.
+- bb2020 @1.0 33 reds / @1e6 14; bb2025 @1.0 6 / @0 7 / @1e6 1 — mix of the same B&C-walk
+  nuance and draw-count splits to root-cause per seed.
