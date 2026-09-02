@@ -50,6 +50,9 @@ impl StepBlockChainsaw {
             .map(|p| p.has_skill_property(NamedProperties::BLOCKS_LIKE_CHAINSAW))
             .unwrap_or(false);
 
+        if std::env::var("FFB_BOMB").is_ok() {
+            eprintln!("RCHAINSAW acting={} has_chainsaw={}", acting_id, attacker_has_chainsaw);
+        }
         if !attacker_has_chainsaw {
             // Java: getResult().setNextAction(StepAction.NEXT_STEP)
             return StepOutcome::next();

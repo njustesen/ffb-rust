@@ -523,6 +523,20 @@ pub fn make_step_for(id: StepId, rules: Rules) -> Box<dyn Step> {
                 return Box::new(crate::step::bb2016::pass::step_hail_mary_pass::StepHailMaryPass::new()),
             StepId::RightStuff =>
                 return Box::new(crate::step::bb2016::ttm::step_right_stuff::StepRightStuff::new()),
+            // BB2016 chainsaw block: the shared table's bb2020 twin gates on the UsingChainsaw
+            // step parameter, which only bb2020/bb2025 InitBlocking publishes — in a bb2016 game
+            // it stays false and the step silently NEXT_STEPs, so the Looney made NORMAL block
+            // rolls where Java bb2016 (no usingChainsaw concept: the chainsaw is mandatory when
+            // the attacker has blocksLikeChainsaw) rolled the chainsaw attack (goblin bb2016
+            // seed 51 i=136: Java rollChainsaw+armour+injury, Rust two block dice). The bb2016
+            // twin was translated 1:1 but never dispatched — the dead-twin fault pattern again.
+            StepId::BlockChainsaw =>
+                return Box::new(crate::step::bb2016::block::step_block_chainsaw::StepBlockChainsaw::new()),
+            // BB2016 chainsaw foul: same dead-twin fault as BlockChainsaw above — the mixed
+            // twin gates on UsingChainsaw (bb2020/bb2025 concept); Java bb2016 StepFoulChainsaw
+            // gates on the blocksLikeChainsaw property alone (the chainsaw foul is mandatory).
+            StepId::FoulChainsaw =>
+                return Box::new(crate::step::bb2016::foul::step_foul_chainsaw::StepFoulChainsaw::new()),
             // BB2016 Throw-Team-Mate step-set. The bb2016 TTM generator pushes these StepIds; without
             // routing they fall through to the bb2025 TTM impls, whose scatter differs (bb2016 scatters
             // the thrown player 3× d8 via StepInitScatterPlayer/UtilThrowTeamMateSequence; bb2025 uses

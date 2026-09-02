@@ -82,3 +82,17 @@ re-thrown bomb home_playing is flipped to the re-thrower, so an AWAY carrier dow
 an acting-team turnover. Java's dropPlayer switches on TURN MODE: BOMB_HOME → a HOME carrier
 is the turnover, BOMB_AWAY → AWAY, PASS_BLOCK → never, default → acting team; and the whole
 ball-scatter block is gated `turnMode != BLITZ`. Ported 1:1 (util_server_injury.rs).
+
+## ITER5 — bb2016 chainsaw block AND foul: dead twins (driver routing)
+
+bb2016 @0 seed 51 (i=136): the Looney (home_14) declares BLOCK — Java rolls
+rollChainsaw + armour/injury 2d6s; Rust rolled TWO BLOCK DICE. The FFB_BOMB probe in the
+bb2016 StepBlockChainsaw printed ZERO times: the generator schedules the step, but the
+driver's bb2016 override table had no BlockChainsaw arm, so the SHARED bb2020 twin ran —
+and it gates on the UsingChainsaw step parameter, which only bb2020/25 InitBlocking
+publishes. In bb2016 the flag stays false → silent NEXT_STEP → normal block. Java bb2016
+has no usingChainsaw: the chainsaw is MANDATORY when the attacker has blocksLikeChainsaw.
+Routed bb2016 to its own translated-but-never-dispatched twin (dead-twin fault pattern,
+third instance this sweep). Java bb2016 StepFoulChainsaw has the same property-only gate
+vs the mixed twin's usingChainsaw gate — routed the bb2016 FoulChainsaw twin in the same
+change (unit-port rule: one mechanism, one change set).
