@@ -409,6 +409,8 @@ public final class ActivationChoice {
         }
         String probeWant = System.getenv("FFB_CAND");
         if (probeWant != null && Integer.parseInt(probeWant) == PROBE_ACT) {
+            System.err.println("JFEAT k=" + PROBE_ACT + " ball=" + f.ball
+                + " carried=" + f.ballCarried + " carrier=" + f.carrierAt);
             for (Eligible e : eligible) {
                 System.err.println("JELIG k=" + PROBE_ACT + " pid=" + e.id
                     + " at=(" + e.at.getX() + ", " + e.at.getY() + ")"

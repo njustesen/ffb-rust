@@ -2452,6 +2452,10 @@ impl HeuristicAgent {
                             }
                         }
                     }
+                    eprintln!(
+                        "RFEAT k={} ball={:?} carried={} carrier={:?}",
+                        self.probe_act, f.ball, f.ball_carried, f.carrier
+                    );
                     for (i, c) in cands.iter().enumerate() {
                         eprintln!(
                             "RCAND k={} i={} pid={} pac={:?} tgt={:?} dest={:?} w={:08x}",
