@@ -103,24 +103,13 @@ impl StepMoveBallAndChain {
             self.player_scatter = Some(scatter_dir);
 
             let new_coord = scatter_one_square(coord_from, scatter_dir);
-            if std::env::var("FFB_BOMB").is_ok() {
-                eprintln!(
-                    "RBCMOVE from={:?} orig_to={:?} roll={} base={:?} dir={:?} new={:?}",
-                    coord_from, original_coord_to, scatter_roll, base_dir, scatter_dir, new_coord
-                );
-            }
             self.coordinate_to = Some(new_coord);
 
             // Java: getResult().addReport(new ReportScatterPlayer(fCoordinateFrom, fCoordinateTo, new Direction[]{playerScatter}, new int[]{scatterRoll}))
             game.report_list.add(ReportScatterPlayer::new(coord_from, new_coord, vec![scatter_dir], vec![scatter_roll], None));
 
-            // Emit scatter report
-            let pid = game.acting_player.player_id.clone().unwrap_or_default();
-            let mut outcome = StepOutcome::next()
-                .with_event(ffb_model::events::GameEvent::ScatterPlayer {
-                    player_id: pid.clone(),
-                    coords: vec![new_coord],
-                });
+            // The scatter event is emitted from the unconditional publish block below (fired
+            // once per scatter, from self.coordinate_to).
 
             // Java: if (getReRollSource() == null) { ... askForReRoll? ... }
             // Java bb2016's OWN StepMoveBallAndChain has no re-roll dialog at all — the offer
@@ -167,7 +156,27 @@ impl StepMoveBallAndChain {
                     }
                 }
             }
+        }
 
+        // Java: the in-bounds check, COORDINATE_TO publish, and blocker check are OUTSIDE the
+        // `if (doRoll)` block — so when a re-roll is DECLINED (re-entry with playerScatter set
+        // and doRoll=false), Java still re-publishes the already-computed fCoordinateTo and
+        // re-checks for a blocker. Rust had them INSIDE do_roll, so a declined B&C re-roll
+        // returned NEXT_STEP with no COORDINATE_TO — the following StepMove kept InitMoving's
+        // ORIGINAL planned square instead of the scattered one, and the multi-square walk
+        // forked (goblin bb2020 seed 6 i=103; dormant until ITER13 enabled the re-roll offer).
+        // Guard on a computed scatter so an ordinary (non-B&C) move that reached here with no
+        // coordinate_to still no-ops.
+        let Some(new_coord) = self.coordinate_to else {
+            return StepOutcome::next();
+        };
+        {
+            let pid = game.acting_player.player_id.clone().unwrap_or_default();
+            let mut outcome = StepOutcome::next()
+                .with_event(ffb_model::events::GameEvent::ScatterPlayer {
+                    player_id: pid.clone(),
+                    coords: vec![new_coord],
+                });
             // Java: if (!FieldCoordinateBounds.FIELD.isInBounds(fCoordinateTo))
             if !is_in_bounds(new_coord) {
                 // Java: publishParameter(INJURY_TYPE, new InjuryTypeCrowdPush())

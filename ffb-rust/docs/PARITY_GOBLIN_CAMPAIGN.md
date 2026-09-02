@@ -171,3 +171,16 @@ ALLOW_BALL_AND_CHAIN_RE_ROLL is enabled, and UtilServerStartGame.addDefaultGameO
 (STANDALONE — the harness mode) sets it TRUE for every parity game; Rust's
 BASELINE_SETUP_OPTIONS (the Rust mirror of that table) lacked it, so the offer never fired.
 Added the option (same class as the mbStacksAgainstChainsaw baseline fix, random campaign).
+
+## ITER14 — the B&C COORDINATE_TO publish must run OUTSIDE `if (doRoll)` (dormant, exposed by ITER13)
+
+bb2020 @0 seed 6 (i=103): the Fanatic's multi-square compulsory walk forked — StepMove applied
+InitMoving's ORIGINAL planned square (10,6) instead of the B&C-scattered (10,7). Probes
+(RSTEPMOVE/RMOVE_SETTO) proved StepMove NEVER received the B&C's CoordinateTo republish. Root
+cause: in Java's mixed StepMoveBallAndChain the in-bounds check, `publishParameter(COORDINATE_TO)`
+and the blocker check are OUTSIDE the `if (doRoll)` block; Rust had them INSIDE. With ITER13
+enabling ALLOW_BALL_AND_CHAIN_RE_ROLL, every scatter now OFFERS a re-roll — on decline the step
+re-enters with playerScatter set and doRoll=false, and Rust returned NEXT_STEP with no
+COORDINATE_TO, so the following StepMove kept the stale planned square. Restructured: the
+publish/blocker block now runs unconditionally from self.coordinate_to, matching Java. Latent
+before ITER13 (no re-roll offer → no doRoll=false re-entry for a scatter).
