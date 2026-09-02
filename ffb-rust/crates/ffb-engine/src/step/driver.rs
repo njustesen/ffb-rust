@@ -987,8 +987,8 @@ impl DriverGameState {
                 }
                 let st = g.field_model.player_state(&p.id);
                 pl.push(format!(
-                    "{side}{}:{}:{}",
-                    p.nr,
+                    "{side}{}@{},{}:{}:{}",
+                    p.nr, c.x, c.y,
                     st.map(|s| s.base()).unwrap_or(0),
                     st.map(|s| if s.is_active() { "a" } else { "i" }).unwrap_or("?")
                 ));
@@ -1006,8 +1006,9 @@ impl DriverGameState {
             })
             .unwrap_or_else(|| "-".into());
         eprintln!(
-            "RSTATE step={step:?} prompt={pr} mode={:?} home={} tH={} tA={} ap={} act={:?} acted={} has_acted={} moved={} cm={} pl=[{}]",
+            "RSTATE step={step:?} prompt={pr} mode={:?} home={} tH={} tA={} ball={:?} moving={} inplay={} ap={} act={:?} acted={} has_acted={} moved={} cm={} pl=[{}]",
             g.turn_mode, g.home_playing, g.turn_data_home.turn_nr, g.turn_data_away.turn_nr,
+            g.field_model.ball_coordinate, g.field_model.ball_moving, g.field_model.ball_in_play,
             ap.player_id.as_deref().map(jersey).unwrap_or_else(|| "null".into()),
             ap.player_action, ap.acted(), ap.has_acted, ap.has_moved, ap.current_move,
             pl.join(",")

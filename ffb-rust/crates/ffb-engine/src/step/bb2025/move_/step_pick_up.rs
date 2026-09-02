@@ -204,6 +204,13 @@ impl StepPickUp {
         };
 
         let successful = DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
+        if std::env::var_os("FFB_TRACE").is_some() {
+            let pid = player_id.as_deref().unwrap_or("-");
+            let coord = game.field_model.player_coordinate(pid);
+            let tz = ffb_model::util::util_player::UtilPlayer::find_tacklezones(game, pid);
+            eprintln!("RPICKUP pid={pid} roll={} min={} coord={:?} tz={} mods={:?}",
+                self.roll, minimum_roll, coord, tz, mod_names);
+        }
 
         // Java line 191: addReport(new ReportPickupRoll(...))
         {

@@ -150,7 +150,12 @@ impl StepMoveDodge {
             .as_ref().map(|a| a.name == "DODGE").unwrap_or(false);
         let using_modifier_ignoring = self.using_modifier_ignoring_skill == Some(true);
 
-        if already_rerolled && !using_modifier_ignoring {
+        // Java re-entry gate: `if (DODGE == reRolledAction && !usingModifierIgnoringSkill
+        // && !(dtRerollAsked && getReRollSource() == null))` — DECLINING the pre-emptive
+        // Diving-Tackle re-roll keeps the (successful) original roll and proceeds to the DT
+        // decision; it must not consume anything or fail the dodge.
+        if already_rerolled && !using_modifier_ignoring
+            && !(self.dt_reroll_asked && self.re_roll_state.re_roll_source.is_none()) {
             let pid = player_id.as_deref().unwrap_or("").to_owned();
             let source_opt = self.re_roll_state.re_roll_source.clone();
             if std::env::var_os("FFB_TRACE").is_some() {
@@ -267,6 +272,67 @@ impl StepMoveDodge {
         };
 
         if successful {
+            // Java bb2025 StepMoveDodge (the success branch, :439-475): when the dodge SUCCEEDS
+            // but an eligible Diving Tackler could flip it (the DIVING_TACKLE modifier is a flat
+            // +2, so minWithDt = minimumRoll + 2), Java first tries an unused Break Tackle rescue,
+            // then PRE-EMPTIVELY OFFERS A RE-ROLL ("Diving Tackle can make this dodge fail.
+            // Reroll the dodge now?") — the heuristic answers it through its reroll sampler and
+            // an accept spends the TRR and rolls a fresh die (dwarf bb2025 seed 3 i=164: Java
+            // dodge 4-success → DT threat → TRR accepted → fresh 6, r 2→1; Rust sailed on with
+            // one die and the streams split). dtRerollAsked stops a second ask.
+            if self.using_diving_tackle.is_none() && !self.dt_reroll_asked {
+                let from = self.coordinate_from.unwrap_or(FieldCoordinate::new(0, 0));
+                let to = self.coordinate_to.unwrap_or(FieldCoordinate::new(0, 0));
+                let leaving_tz_only = ffb_model::option::util_game_option::is_option_enabled(
+                    game, ffb_model::option::game_option_id::DIVING_TACKLE_LEAVING_TZ_ONLY);
+                let dt_tacklers = ffb_model::util::util_player::UtilPlayer::find_eligible_diving_tacklers(
+                    game, from, to, leaving_tz_only);
+                if !dt_tacklers.is_empty() {
+                    let min_with_dt = minimum_roll + 2;
+                    let mut fails_with_dt =
+                        !DiceInterpreter::is_skill_roll_successful(self.dodge_roll, min_with_dt);
+                    if fails_with_dt && !self.using_break_tackle {
+                        // Java: an UNUSED canAddStrengthToDodge that makes minWithDtBt succeed is
+                        // consumed on the spot (fUsingBreakTackle + markSkillUsed + publish).
+                        let bt_mod = player_id.as_deref().and_then(|pid| game.player(pid)).and_then(|p| {
+                            use ffb_model::enums::SkillId;
+                            if p.has_skill(SkillId::BreakTackle)
+                                && !p.used_skills.contains(&SkillId::BreakTackle)
+                            {
+                                let st = p.strength_with_modifiers();
+                                Some(if st >= 5 { -3 } else if st == 4 { -2 } else { -1 })
+                            } else {
+                                None
+                            }
+                        });
+                        if let Some(bt) = bt_mod {
+                            if DiceInterpreter::is_skill_roll_successful(self.dodge_roll, min_with_dt + bt) {
+                                self.using_break_tackle = true;
+                                if let Some(pid) = player_id.as_deref() {
+                                    if let Some(p) = game.team_home.player_mut(pid)
+                                        .or_else(|| game.team_away.player_mut(pid))
+                                    {
+                                        p.used_skills.insert(ffb_model::enums::SkillId::BreakTackle);
+                                    }
+                                    game.acting_player.used_skills.insert(ffb_model::enums::SkillId::BreakTackle);
+                                }
+                                fails_with_dt = false;
+                            }
+                        }
+                    }
+                    if fails_with_dt && !self.re_roll_used {
+                        if let Some(prompt) = ask_for_reroll_if_available(game, "DODGE", min_with_dt, false) {
+                            self.dt_reroll_asked = true;
+                            use ffb_model::model::re_rolled_action::ReRolledAction;
+                            self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("DODGE"));
+                            self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
+                            return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
+                        }
+                    }
+                    // Reaching here: DT can't flip it, BT saved it, or no re-roll available —
+                    // the DT usage decision itself follows in StepDivingTackle.
+                }
+            }
             StepOutcome::next()
                 .with_event(roll_event)
                 .publish(StepParameter::ReRollUsed(self.re_roll_used || re_rolled))
