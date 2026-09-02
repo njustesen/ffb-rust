@@ -87,6 +87,13 @@ impl StepInitScatterPlayer {
         let mut outcome = StepOutcome::next();
         let mut player_landed_upon: Option<String> = None;
 
+        if std::env::var("FFB_BOMB").is_ok() {
+            eprintln!(
+                "RSCATTER start={:?} end={:?} in_bounds={} at_end={:?}",
+                start_coord, end_coord, scatter_result.in_bounds,
+                game.field_model.player_at(end_coord)
+            );
+        }
         if scatter_result.in_bounds {
             // Java: playerLandedUpon = game.getFieldModel().getPlayer(endCoordinate)
             //       (skip if same as thrown player)
@@ -152,7 +159,12 @@ impl StepInitScatterPlayer {
                     ApothecaryMode::ThrownPlayer,
                 )
             };
-            injury_result.apply_to(game);
+            // Java only ROLLS here (handleInjury publishes; the THROWN_PLAYER apothecary step
+            // applies it later) — the player must stay FALLING so StepRightStuff's FALLING
+            // check skips the landing roll. The old immediate apply_to sent a KO'd player to
+            // the box, the FALLING check missed, and Rust rolled a phantom landing d6 for a
+            // player in the crowd (goblin bb2016 seed 71 i=175: Java 8 dice, Rust 9). Same
+            // class as the ITER78-81 "TTM landing drop-before-apply" fix in land_injury.
             outcome = outcome.publish(StepParameter::InjuryResult(Box::new(injury_result)));
 
             if self.thrown_player_has_ball {

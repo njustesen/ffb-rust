@@ -60,6 +60,12 @@ impl StepRightStuff {
     }
 
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        if std::env::var("FFB_BOMB").is_ok() {
+            eprintln!(
+                "RRIGHTSTUFF drop={} thrown={:?} roll={}",
+                self.drop_thrown_player, self.thrown_player_id, self.roll
+            );
+        }
         let player_id = match &self.thrown_player_id {
             Some(id) => id.clone(),
             None     => return StepOutcome::next(),

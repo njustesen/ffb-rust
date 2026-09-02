@@ -96,3 +96,14 @@ Routed bb2016 to its own translated-but-never-dispatched twin (dead-twin fault p
 third instance this sweep). Java bb2016 StepFoulChainsaw has the same property-only gate
 vs the mixed twin's usingChainsaw gate — routed the bb2016 FoulChainsaw twin in the same
 change (unit-port rule: one mechanism, one change set).
+
+## ITER6 — an out-of-bounds thrown player stays FALLING until the apothecary applies (bb2016)
+
+bb2016 @0 seeds 71+81: a TTM throw scatters out of bounds; both engines roll the crowd
+injury 2d6, then Rust rolls a phantom LANDING d6 (9 dice vs Java's 8). The bb2016
+InitScatterPlayer OOB branch set FALLING then immediately `apply_to`'d the injury — a KO'd
+player went to the box, so StepRightStuff's FALLING check missed and the landing roll fired
+for a player in the crowd. Java only rolls (the THROWN_PLAYER apothecary applies later); the
+player stays FALLING and RightStuff skips. Removed the early apply — same class as the
+ITER78-81 random-campaign "TTM landing drop-before-apply" fix. NOTE: the hit-player branch's
+`apply_to` is the same suspect class (hash-blind, unexposed) — left for evidence.
