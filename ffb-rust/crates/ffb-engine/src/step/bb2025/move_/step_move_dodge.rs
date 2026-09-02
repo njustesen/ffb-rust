@@ -192,7 +192,13 @@ impl StepMoveDodge {
             let acting = game.acting_player.clone();
             let src = self.coordinate_from.unwrap_or(FieldCoordinate::new(0, 0));
             let tgt = self.coordinate_to.unwrap_or(FieldCoordinate::new(0, 0));
-            let ctx = DodgeContext::new(game, &acting, src, tgt);
+            // Java: `modifierFactory.findModifiers(new DodgeContext(game, actingPlayer,
+            //   fCoordinateFrom, fCoordinateTo, fUsingBreakTackle))` — once Break Tackle is
+            // committed (fUsingBreakTackle), it applies to EVERY remaining dodge of the move
+            // via the context's isUseBreakTackle() disjunct, even though the skill is marked
+            // used (dwarf bb2025 @1e6 seed 57 i=118: Java's second dodge keeps BT, min 2;
+            // Rust's factory saw only used_skills and dropped it, min 5 → fall → turnover).
+            let ctx = DodgeContext::new_with_break_tackle(game, &acting, src, tgt, self.using_break_tackle);
             let mods = factory.find_applicable(&ctx);
             let skill_mods = factory.find_skill_modifiers(&ctx);
             let all: Vec<&ffb_mechanics::modifiers::dodge_modifier::DodgeModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();

@@ -141,7 +141,8 @@ impl StepMoveDodge {
             let acting = game.acting_player.clone();
             let src = self.coordinate_from.unwrap_or(FieldCoordinate::new(0, 0));
             let tgt = self.coordinate_to.unwrap_or(FieldCoordinate::new(0, 0));
-            let ctx = DodgeContext::new(game, &acting, src, tgt);
+            // Java passes fUsingBreakTackle — a committed BT covers the rest of the move.
+            let ctx = DodgeContext::new_with_break_tackle(game, &acting, src, tgt, self.using_break_tackle);
             let mods = factory.find_applicable(&ctx);
             let skill_mods = factory.find_skill_modifiers(&ctx);
             let all: Vec<&ffb_mechanics::modifiers::dodge_modifier::DodgeModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();

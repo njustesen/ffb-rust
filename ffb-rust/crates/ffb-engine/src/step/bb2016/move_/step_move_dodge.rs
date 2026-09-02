@@ -134,7 +134,28 @@ impl StepMoveDodge {
             self.dodge_roll = rng.d6();
         }
 
-        let (minimum_roll, mod_names) = self.dodge_modifiers_and_minimum_roll(game, player_id.as_deref());
+        let (minimum_roll, mod_names, has_bt, min_no_bt, names_no_bt) =
+            self.dodge_modifiers_and_minimum_roll(game, player_id.as_deref());
+        // Java bb2016 StepMoveDodge (the btModifier block): consume Break Tackle only when it
+        // saved the dodge; drop it (reported minimum and mods) otherwise — ONE per activation
+        // (dwarf bb2016 @1e6 seeds 56/70/87/90: every red resolved at a Deathroller Move).
+        let bt_saved_it = has_bt
+            && DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll)
+            && !DiceInterpreter::is_skill_roll_successful(self.dodge_roll, min_no_bt);
+        let (minimum_roll, mod_names) = if has_bt && !bt_saved_it {
+            (min_no_bt, names_no_bt)
+        } else {
+            (minimum_roll, mod_names)
+        };
+        if bt_saved_it {
+            self.using_break_tackle = true;
+            if let Some(pid) = player_id.as_deref() {
+                if let Some(p) = game.team_home.player_mut(pid).or_else(|| game.team_away.player_mut(pid)) {
+                    p.used_skills.insert(ffb_model::enums::SkillId::BreakTackle);
+                }
+                game.acting_player.used_skills.insert(ffb_model::enums::SkillId::BreakTackle);
+            }
+        }
         let successful = DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll);
 
         // Java: getResult().addReport(new ReportDodgeRoll(actingPlayer.getPlayerId(), successful,
@@ -215,13 +236,14 @@ impl StepMoveDodge {
     /// modifiers (regular + skill-based). Java: DodgeModifierFactory.findModifiers(...) combined
     /// with the acting player's skill-registered modifiers, fed into
     /// `dodgeModifiers.toArray(new DodgeModifier[0])` for the ReportDodgeRoll constructor.
-    fn dodge_modifiers_and_minimum_roll(&self, game: &Game, player_id: Option<&str>) -> (i32, Vec<String>) {
+    fn dodge_modifiers_and_minimum_roll(&self, game: &Game, player_id: Option<&str>) -> (i32, Vec<String>, bool, i32, Vec<String>) {
         let factory = DodgeModifierFactory::for_rules(game.rules);
         if let Some(pid) = player_id {
             let acting = game.acting_player.clone();
             let src = self.coordinate_from.unwrap_or(FieldCoordinate::new(0, 0));
             let tgt = self.coordinate_to.unwrap_or(FieldCoordinate::new(0, 0));
-            let ctx = DodgeContext::new(game, &acting, src, tgt);
+            // Java passes fUsingBreakTackle — a committed BT covers the rest of the move.
+            let ctx = DodgeContext::new_with_break_tackle(game, &acting, src, tgt, self.using_break_tackle);
             let mods = factory.find_applicable(&ctx);
             let skill_mods = factory.find_skill_modifiers(&ctx);
             let all: Vec<&ffb_mechanics::modifiers::dodge_modifier::DodgeModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
@@ -233,9 +255,18 @@ impl StepMoveDodge {
             let strength = game.player(pid).map(|p| p.strength as i32).unwrap_or(3);
             let min = DodgeModifierFactory::minimum_roll_edition(strength, agility, &all, game.rules);
             let names: Vec<String> = all.iter().map(|m| m.get_report_string().to_string()).collect();
-            (min, names)
+            // Java bb2016 StepMoveDodge: the same Break Tackle axis as the later editions —
+            // the use-strength modifier (ST-for-AG substitution) is dropped when the roll
+            // succeeds without it or fails regardless, and consumed (markSkillUsed) only when
+            // it saved the dodge (bb2016:207-227 + 266-270).
+            let without_bt: Vec<&ffb_mechanics::modifiers::dodge_modifier::DodgeModifier> =
+                all.iter().copied().filter(|m| !m.use_strength).collect();
+            let has_bt = without_bt.len() != all.len();
+            let min_no_bt = DodgeModifierFactory::minimum_roll_edition(strength, agility, &without_bt, game.rules);
+            let names_no_bt: Vec<String> = without_bt.iter().map(|m| m.get_report_string().to_string()).collect();
+            (min, names, has_bt, min_no_bt, names_no_bt)
         } else {
-            (2, vec![])
+            (2, vec![], false, 2, vec![])
         }
     }
 
@@ -481,7 +512,7 @@ mod tests {
         add_player(&mut game, "p1");
         game.team_home.players[0].starting_skills.push(SkillWithValue::new(SkillId::TwoHeads));
         let step = StepMoveDodge::new("fail".into());
-        let (_min, names) = step.dodge_modifiers_and_minimum_roll(&game, Some("p1"));
+        let (_min, names, _has_bt, _min_no_bt, _names_no_bt) = step.dodge_modifiers_and_minimum_roll(&game, Some("p1"));
         assert!(
             names.iter().any(|n| n == "Two Heads"),
             "expected 'Two Heads' in roll modifiers, got: {:?}", names
