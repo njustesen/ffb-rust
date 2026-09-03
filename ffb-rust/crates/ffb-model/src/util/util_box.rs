@@ -2,7 +2,7 @@
 ///
 /// Manages player placement into dugout boxes based on player state.
 use crate::enums::{
-    PlayerState,
+    PlayerState, SendToBoxReason,
     PS_RESERVE, PS_EXHAUSTED, PS_SETUP_PREVENTED,
     PS_KNOCKED_OUT, PS_BADLY_HURT, PS_SERIOUS_INJURY, PS_RIP, PS_BANNED, PS_MISSING,
 };
@@ -74,10 +74,40 @@ impl UtilBox {
 
     /// Java: UtilBox.refreshBoxes(Game)
     ///
-    /// Clears and re-sorts box contents so all players in each dugout column
-    /// are packed contiguously from y=0. Stub — not critical for current parity phase.
-    pub fn refresh_boxes(_game: &mut Game) {
-        // TODO(refreshBoxes): full implementation — clear then re-pack each dugout column.
+    /// Re-packs each dugout column so its occupants are contiguous from y=0 (no gaps left by
+    /// players who moved out onto the pitch). Java calls this at the end of setup, at end of turn,
+    /// on ejection and on injury — without it, reserves that were boxed alongside the eleven
+    /// fielded players keep their original high rows (e.g. rows 11-13) instead of collapsing to
+    /// rows 0-2 after the fielded players leave, and the B&C walk-continuation scatters from the
+    /// wrong box coordinate (goblin B&C Fanatic box-row divergence).
+    pub fn refresh_boxes(game: &mut Game) {
+        for box_x in [
+            RSV_HOME_X, RSV_AWAY_X, KO_HOME_X, KO_AWAY_X, BH_HOME_X, BH_AWAY_X,
+            SI_HOME_X, SI_AWAY_X, RIP_HOME_X, RIP_AWAY_X, BAN_HOME_X, BAN_AWAY_X,
+            MNG_HOME_X, MNG_AWAY_X,
+        ] {
+            UtilBox::refresh_box(game, box_x);
+        }
+    }
+
+    /// Java: UtilBox.refreshBox(Game, int) — collect the column's coordinates, sort by y, and
+    /// reassign them to y = 0,1,2,… Processing in ascending-y order guarantees each target row is
+    /// ≤ the original row being moved, so no unprocessed occupant is ever overwritten.
+    fn refresh_box(game: &mut Game, box_x: i32) {
+        let mut coords: Vec<FieldCoordinate> = game
+            .field_model
+            .player_coordinates
+            .values()
+            .filter(|c| c.x == box_x)
+            .copied()
+            .collect();
+        coords.sort_by_key(|c| c.y);
+        for (y, coord) in coords.iter().enumerate() {
+            if let Some(player_id) = game.field_model.player_at(*coord).cloned() {
+                game.field_model
+                    .set_player_coordinate(&player_id, FieldCoordinate::new(box_x, y as i32));
+            }
+        }
     }
 
     /// Java: UtilBox.putAllPlayersIntoBox(game).
@@ -97,6 +127,46 @@ impl UtilBox {
                     game.field_model.set_player_state(&id, state.change_base(PS_RESERVE));
                 }
                 UtilBox::put_player_into_box(game, &id);
+            }
+        }
+    }
+
+    /// Java: the boxing loop of `GameCache.addTeamToGame` (`ffb-server GameCache.java:271-297`).
+    /// When a team joins the game — before it starts — Java gives EVERY player a real dugout
+    /// coordinate: RESERVE (or MISSING, if recovering from a lasting injury) plus a box slot via
+    /// `putPlayerIntoBox`. Setup then moves only the fielded players OUT; the un-fielded reserves
+    /// stay boxed. The headless parity harness runs this via `HeadlessGameSetup` → `addTeamToGame`,
+    /// but the synchronous engine constructors build the game directly, so they replicate it here.
+    /// Without it a reserve keeps a `None` coordinate; the state hash is blind to that (nr>11), but
+    /// the B&C walk-continuation reads the reserve column's occupancy (so the Fanatic's crowd-push
+    /// box row diverges from Java). The reserves MUST be PS_RESERVE (not standing): the agent's
+    /// legal-action adjacency scans are on-pitch-guarded, and the block/blitz scans additionally
+    /// gate on `has_tacklezones` (false for RESERVE), so a boxed reserve never leaks into scoring.
+    pub fn box_all_players_at_game_start(game: &mut Game) {
+        let players: Vec<(String, bool, bool, i32)> = game
+            .team_home
+            .players
+            .iter()
+            .map(|p| (p.id.clone(), true, p.recovering_injury.is_some(), p.current_spps))
+            .chain(
+                game.team_away
+                    .players
+                    .iter()
+                    .map(|p| (p.id.clone(), false, p.recovering_injury.is_some(), p.current_spps)),
+            )
+            .collect();
+        for (player_id, home_team, has_recovering_injury, current_spps) in players {
+            if has_recovering_injury {
+                game.field_model.set_player_state(&player_id, PlayerState::new(PS_MISSING));
+                let tr = if home_team { &mut game.game_result.home } else { &mut game.game_result.away };
+                tr.player_result_mut(&player_id).send_to_box_reason = Some(SendToBoxReason::Mng);
+            } else {
+                game.field_model.set_player_state(&player_id, PlayerState::new(PS_RESERVE));
+            }
+            UtilBox::put_player_into_box(game, &player_id);
+            if current_spps > 0 {
+                let tr = if home_team { &mut game.game_result.home } else { &mut game.game_result.away };
+                tr.player_result_mut(&player_id).current_spps = current_spps;
             }
         }
     }
@@ -251,5 +321,44 @@ mod tests {
         // Player coordinate should be unchanged (still at original position).
         let coord = game.field_model.player_coordinate("h1").expect("player should still have a coordinate");
         assert_eq!(coord, original);
+    }
+
+    // Java UtilBox.refreshBox: after fielded players leave, the reserve column collapses so the
+    // remaining occupants are contiguous from y=0. Mirrors the real bug: three reserves boxed at
+    // rows 11,12,13 (alongside eleven now-fielded players) must repack to rows 0,1,2.
+    #[test]
+    fn refresh_boxes_collapses_gaps_in_reserve_column() {
+        let mut game = make_game_with_players(&["h12", "h13", "h14"], &[]);
+        game.field_model.set_player_coordinate("h12", FieldCoordinate::new(RSV_HOME_X, 11));
+        game.field_model.set_player_coordinate("h13", FieldCoordinate::new(RSV_HOME_X, 12));
+        game.field_model.set_player_coordinate("h14", FieldCoordinate::new(RSV_HOME_X, 13));
+
+        UtilBox::refresh_boxes(&mut game);
+
+        assert_eq!(game.field_model.player_coordinate("h12").unwrap(), FieldCoordinate::new(RSV_HOME_X, 0));
+        assert_eq!(game.field_model.player_coordinate("h13").unwrap(), FieldCoordinate::new(RSV_HOME_X, 1));
+        assert_eq!(game.field_model.player_coordinate("h14").unwrap(), FieldCoordinate::new(RSV_HOME_X, 2));
+    }
+
+    // Java GameCache.addTeamToGame: every player is RESERVE + boxed at game start; the box columns
+    // fill contiguously from y=0 in squad-number order.
+    #[test]
+    fn box_all_players_at_game_start_boxes_every_player() {
+        let mut game = make_game_with_players(&["h1", "h2", "h3"], &["a1", "a2"]);
+        UtilBox::box_all_players_at_game_start(&mut game);
+
+        for id in ["h1", "h2", "h3"] {
+            let c = game.field_model.player_coordinate(id).expect("home player boxed");
+            assert_eq!(c.x, RSV_HOME_X);
+            assert_eq!(game.field_model.player_state(id).unwrap().base(), PS_RESERVE);
+        }
+        for id in ["a1", "a2"] {
+            let c = game.field_model.player_coordinate(id).expect("away player boxed");
+            assert_eq!(c.x, RSV_AWAY_X);
+        }
+        let mut rows: Vec<i32> = ["h1", "h2", "h3"].iter()
+            .map(|id| game.field_model.player_coordinate(id).unwrap().y).collect();
+        rows.sort();
+        assert_eq!(rows, vec![0, 1, 2]);
     }
 }

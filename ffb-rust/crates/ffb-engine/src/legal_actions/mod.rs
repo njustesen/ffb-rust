@@ -83,7 +83,9 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             if !turn_data.blitz_used {
                 let adj_opponent = opponent_team.players.iter().any(|op| {
                     game.field_model.player_coordinate(&op.id)
-                        .map(|oc| oc.is_adjacent(coord))
+                        // ON-PITCH only — mirror Java's universal Features.onPitch filter (a boxed
+                        // reserve at RSV_HOME_X=-1 is Chebyshev-adjacent to the x=0 sideline).
+                        .map(|oc| oc.is_on_pitch() && oc.is_adjacent(coord))
                         .unwrap_or(false)
                         && game.field_model.player_state(&op.id)
                             .map(|os| os.has_tacklezones())
@@ -118,7 +120,7 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
         if !turn_data.blitz_used {
             let adj_standing_opponent = opponent_team.players.iter().any(|op| {
                 game.field_model.player_coordinate(&op.id)
-                    .map(|oc| oc.is_adjacent(coord))
+                    .map(|oc| oc.is_on_pitch() && oc.is_adjacent(coord))
                     .unwrap_or(false)
                     && game.field_model.player_state(&op.id)
                         .map(|os| os.has_tacklezones())
@@ -190,7 +192,7 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             if std::env::var_os("FFB_TRACE").is_some() {
                 let mates: Vec<String> = team.players.iter().filter(|tp| tp.id != pid).map(|tp| {
                     let tc = game.field_model.player_coordinate(&tp.id);
-                    format!("{}@{:?}adj={:?}", tp.id, tc, tc.map(|c| c.is_adjacent(coord)))
+                    format!("{}@{:?}adj={:?}", tp.id, tc, tc.map(|c| c.is_on_pitch() && c.is_adjacent(coord)))
                 }).collect();
                 eprintln!("RHANDOFF pid={pid} coord={coord:?} adj={teammate_adjacent} {}", mates.join(" "));
             }
@@ -207,7 +209,7 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
         if !turn_data.foul_used {
             let foul_target_exists = opponent_team.players.iter().any(|op| {
                 game.field_model.player_coordinate(&op.id)
-                    .map(|oc| oc.is_adjacent(coord))
+                    .map(|oc| oc.is_on_pitch() && oc.is_adjacent(coord))
                     .unwrap_or(false)
                     && game.field_model.player_state(&op.id)
                         .map(|os| !os.has_tacklezones() && (os.base() == PS_PRONE || os.base() == ffb_model::enums::PS_STUNNED))
@@ -266,7 +268,12 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             let adjacent_teammate = team.players.iter().any(|tp| {
                 tp.id != pid
                     && game.field_model.player_coordinate(&tp.id)
-                        .map(|tc| tc.is_adjacent(coord))
+                        // ON-PITCH teammates only (mirrors the HandOff site above and Java's
+                        // universal Features.onPitch filter): a boxed reserve at RSV_HOME_X=-1 is
+                        // Chebyshev-adjacent to the x=0 sideline, so without this guard a boxed
+                        // teammate injected a phantom TTM/KTM action → the agent's action list grew
+                        // by one → its modulo pick shifted (chaos_pact bb2020 @1.0 seed 50).
+                        .map(|tc| tc.is_on_pitch() && tc.is_adjacent(coord))
                         .unwrap_or(false)
             });
             if adjacent_teammate {
@@ -293,7 +300,12 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             let adjacent_teammate = team.players.iter().any(|tp| {
                 tp.id != pid
                     && game.field_model.player_coordinate(&tp.id)
-                        .map(|tc| tc.is_adjacent(coord))
+                        // ON-PITCH teammates only (mirrors the HandOff site above and Java's
+                        // universal Features.onPitch filter): a boxed reserve at RSV_HOME_X=-1 is
+                        // Chebyshev-adjacent to the x=0 sideline, so without this guard a boxed
+                        // teammate injected a phantom TTM/KTM action → the agent's action list grew
+                        // by one → its modulo pick shifted (chaos_pact bb2020 @1.0 seed 50).
+                        .map(|tc| tc.is_on_pitch() && tc.is_adjacent(coord))
                         .unwrap_or(false)
             });
             if adjacent_teammate {
@@ -371,7 +383,7 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
                 if tc.distance_in_steps(coord) > 5 { return false; }
                 let open = !opponent_team.players.iter().any(|op| {
                     game.field_model.player_coordinate(&op.id)
-                        .map(|oc| oc.is_adjacent(tc)
+                        .map(|oc| oc.is_on_pitch() && oc.is_adjacent(tc)
                             && game.field_model.player_state(&op.id)
                                 .map(|os| os.has_tacklezones()).unwrap_or(false))
                         .unwrap_or(false)
@@ -551,7 +563,7 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
         {
             let opponent_adjacent = opponent_team.players.iter().any(|op| {
                 game.field_model.player_coordinate(&op.id)
-                    .map(|oc| oc.is_adjacent(coord))
+                    .map(|oc| oc.is_on_pitch() && oc.is_adjacent(coord))
                     .unwrap_or(false)
                     && game.field_model.player_state(&op.id)
                         .map(|os| (os.is_standing() || os.base() == PS_PRONE) && !os.is_distracted())
@@ -1000,7 +1012,7 @@ pub fn legal_block_targets(game: &Game, player_id: &str, side: TeamSide) -> Vec<
     let mut targets: Vec<PlayerId> = opponent_team.players.iter()
         .filter(|p| {
             game.field_model.player_coordinate(&p.id)
-                .map(|c| c.is_adjacent(coord))
+                .map(|c| c.is_on_pitch() && c.is_adjacent(coord))
                 .unwrap_or(false)
         })
         .filter(|p| {
@@ -1041,7 +1053,7 @@ pub fn legal_handoff_receivers(game: &Game, player_id: &str, side: TeamSide) -> 
         .filter(|p| p.id != player_id)
         .filter(|p| {
             game.field_model.player_coordinate(&p.id)
-                .map(|c| c.is_adjacent(coord))
+                .map(|c| c.is_on_pitch() && c.is_adjacent(coord))
                 .unwrap_or(false)
         })
         .map(|p| p.id.clone())
@@ -1084,7 +1096,7 @@ pub fn legal_throw_team_mate_targets(game: &Game, player_id: &str, side: TeamSid
         .filter(|p| p.can_be_thrown(game.rules))
         .filter(|p| {
             game.field_model.player_coordinate(&p.id)
-                .map(|c| c.is_adjacent(coord))
+                .map(|c| c.is_on_pitch() && c.is_adjacent(coord))
                 .unwrap_or(false)
                 && game.field_model.player_state(&p.id)
                     .map(|s| s.base() == PS_STANDING)
@@ -1139,7 +1151,8 @@ pub fn legal_foul_targets(game: &Game, player_id: &str, side: TeamSide) -> Vec<P
     let mut targets: Vec<PlayerId> = opponent_team.players.iter()
         .filter(|p| {
             game.field_model.player_coordinate(&p.id)
-                .map(|c| c.is_adjacent(coord))
+                // ON-PITCH only — mirror Java's universal Features.onPitch filter.
+                .map(|c| c.is_on_pitch() && c.is_adjacent(coord))
                 .unwrap_or(false)
         })
         .filter(|p| {

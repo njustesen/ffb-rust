@@ -693,6 +693,12 @@ impl DriverGameState {
     pub fn new_full_pregame(home: Team, away: Team, rules: Rules, seed: u64, options: &[(&str, &str)]) -> Self {
         let mut game = Game::new(home, away, rules);
         for (key, value) in options { game.options.set(*key, *value); }
+        // Java: GameCache.addTeamToGame boxes every player (RESERVE + a dugout coordinate) at
+        // team-join, before the game starts. The headless parity harness does this via
+        // HeadlessGameSetup.addTeamToGame; this synchronous constructor has no join handler, so
+        // replicate it. Un-fielded reserves must occupy the reserve column so the Ball & Chain
+        // walk-continuation's crowd-push box row matches Java (the state hash is blind to nr>11).
+        ffb_model::util::util_box::UtilBox::box_all_players_at_game_start(&mut game);
         let mut gs = DriverGameState::from_game(game, seed);
         gs.initial_hash = state_hash(&gs.game);
         let seq = match rules {
@@ -720,6 +726,12 @@ impl DriverGameState {
         use crate::step::sequences::start_game_sequence_for;
         let mut game = Game::new(home, away, rules);
         for (key, value) in options { game.options.set(*key, *value); }
+        // Java: GameCache.addTeamToGame boxes every player (RESERVE + a dugout coordinate) at
+        // team-join, before the game starts. The headless parity harness does this via
+        // HeadlessGameSetup.addTeamToGame; this synchronous constructor has no join handler, so
+        // replicate it. Un-fielded reserves must occupy the reserve column so the Ball & Chain
+        // walk-continuation's crowd-push box row matches Java (the state hash is blind to nr>11).
+        ffb_model::util::util_box::UtilBox::box_all_players_at_game_start(&mut game);
         let mut gs = DriverGameState::from_game(game, seed);
         gs.initial_hash = state_hash(&gs.game);
         // Java StepBuyInducements.leaveStep grants the special-rule / skill inducements

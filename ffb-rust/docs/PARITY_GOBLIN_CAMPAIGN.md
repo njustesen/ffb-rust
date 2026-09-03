@@ -303,3 +303,46 @@ home_04 scatters its box-continuation from `(-2,0)` (KO column) while ending at 
 die resolves differently, shifting the box the walk resumes from. Needs a fresh sub-step trace to
 localise. bb2020 @1.0 (67) / @1e6 (86) unchanged by this fix — a separate family (sampled draw
 splits) still to root-cause per seed.
+
+## ITER16 — the composite fix: on_pitch guards (agent) + reserve boxing (engine) (2026-09-03)
+
+ITER15 found the right engine fix (box un-fielded reserves so the B&C walk-continuation's crowd-push
+box row matches Java) but it regressed closed roster chaos_pact by exposing a separate AGENT bug.
+Two Explore passes over the Rust heuristic agent and the Java `ffb-ai/.../parity/heuristic/*` agent
+pinned it exactly: **Java filters `onPitch` at every board-read; the Rust legal-action adjacency
+scans in `legal_actions/mod.rs` did not.** A boxed HOME reserve at `RSV_HOME_X = -1` (the only dugout
+column Chebyshev-adjacent to the pitch, at x=0) was injected as a phantom **ThrowTeamMate/KickTeamMate**
+target for a home actor at x=0 → the agent's action list grew by one → its modulo pick shifted. Block/
+Blitz/Foul scans were state-gated on `has_tacklezones` (false for `PS_RESERVE`) so only TTM/KTM leaked.
+
+**Phase 1 (agent, 1:1 with Java):** added the `is_on_pitch()` guard to every player-adjacency scan in
+`legal_actions/mod.rs` (TTM, KTM, Block/Blitz, prone-Blitz, Foul, `legal_foul_targets`, TTM/KTM target
+lists, the open-square check) — mirroring the HandOff site that already had it. **Inert at baseline**
+(reserves are `@NONE`): nine goblin gates + amazon/lineman ×3 @1.0 all UNCHANGED. It also correctly
+excludes any mid-game crowd-pushed reserve at `(-1,y)`, so it is a real correctness fix.
+
+**Phase 2 (engine):** re-applied `UtilBox::box_all_players_at_game_start` (1:1 `GameCache.addTeamToGame`
+boxing loop; reserves get `PS_RESERVE`) from both `DriverGameState` constructors, and implemented
+`UtilBox::refresh_boxes`/`refresh_box` (was a stub; `StepSetup` already calls it). Colocated tests.
+
+Result — goblin nine gates (@1.0 / @0 / @1e6), baseline → now:
+
+| edition | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| bb2016 | 100 | 100 | 100 |
+| bb2020 | 67 | 99 | 86 (unchanged — its reds are a separate family) |
+| bb2025 | 94→**96** | 93→**97** | 99 |
+
+No gate dropped. **Closed-roster regression suite ×3 @1.0 all 100/100, INCLUDING chaos_pact (the
+ITER15 regression, now fixed by the Phase-1 guard):** amazon, lineman, dwarf, chaos, chaos_dwarf,
+chaos_pact confirmed 100/100; dark_elf/dark_elf_league_fumbbl/elf running (expected clean — Phase 1
+was inert on them). ffb-engine 7392/0, ffb-model 2801/0.
+
+**Remaining reds → Phase 3 (the standard three-loop):**
+- bb2025 @0 seeds **20 / 80** and bb2020 @0 seed **92** — the *deeper* B&C walk-continuation engine
+  divergence (identical rng_calls + full `FFB_IDSTATE` board entering `home_04`'s Move, yet the walk
+  resolves to a different crowd-push box coordinate — Rust ends `home_04` at (0,2) vs Java (0,4)).
+  NOT the agent bug (a guard that stopped the walk on crowd-surf was tried and reverted — Java
+  continues the walk too). Needs per-scatter windowing of the one activation.
+- bb2025 @0 seed 98 (ThrowTeamMate) + bb2025 @1.0 (~4) + bb2020 @1.0 (~33) / @1e6 (~14) — sampled
+  draw-splits to root-cause per seed via `first_state_divergence.sh` + `FFB_CANDSUM`/`FFB_DICE_TRACE`.
