@@ -93,9 +93,16 @@ impl StepAlwaysHungry {
             None => return StepOutcome::next(),
         };
 
-        // Java: doAlwaysHungry = hasUnusedSkillWithProperty(actingPlayer, mightEatPlayerToThrow)
+        // Java: `doAlwaysHungry = UtilCards.hasUnusedSkillWithProperty(actingPlayer,
+        // mightEatPlayerToThrow)` — the ACTING PLAYER overload, so "unused" is judged against the
+        // acting player's per-activation used set (the same set `markSkillUsed` writes below), NOT
+        // the team Player's. Reading the Player here while the write went to the acting set would
+        // split the two halves of one contract.
         let mut do_always_hungry = game.player(&acting_player_id)
-            .map(|p| UtilCards::has_unused_skill_with_property(p, NamedProperties::MIGHT_EAT_PLAYER_TO_THROW))
+            .map(|p| p.all_skill_ids().any(|id| {
+                id.properties().contains(&NamedProperties::MIGHT_EAT_PLAYER_TO_THROW)
+                    && !game.acting_player.used_skills.contains(&id)
+            }))
             .unwrap_or(false);
         // Java: doEscape = hasSkillWithProperty(actingPlayer.getPlayer(), mightEatPlayerToThrow) && !doAlwaysHungry
         let has_eat_skill = game.player(&acting_player_id)
@@ -167,15 +174,25 @@ impl StepAlwaysHungry {
         }
 
         if do_escape {
-            // Java: skill = getUnusedSkillWithProperty(actingPlayer, mightEatPlayerToThrow); markSkillUsed(skill)
-            let skill_id = game.player(&acting_player_id)
-                .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::MIGHT_EAT_PLAYER_TO_THROW));
+            // Java: `getUnusedSkillWithProperty(actingPlayer, mightEatPlayerToThrow)` then
+            // `actingPlayer.markSkillUsed(skill)` — both on the ACTING PLAYER's used set (what
+            // `hasActed()` reads), with the Player-level write gated on
+            // `getSkillUsageType().isTrackOutsideActivation()`. Writing only the Player's set left
+            // `acted()` false, so the thrower was not retired inactive (see the bb2025 twin).
+            let skill_id = game.player(&acting_player_id).and_then(|p| {
+                p.all_skill_ids().find(|id| {
+                    id.properties().contains(&NamedProperties::MIGHT_EAT_PLAYER_TO_THROW)
+                        && !game.acting_player.used_skills.contains(id)
+                })
+            });
             if let Some(sid) = skill_id {
-                let is_home = game.team_home.player(&acting_player_id).is_some();
-                if is_home {
-                    if let Some(p) = game.team_home.player_mut(&acting_player_id) { p.used_skills.insert(sid); }
-                } else if let Some(p) = game.team_away.player_mut(&acting_player_id) {
-                    p.used_skills.insert(sid);
+                game.acting_player.used_skills.insert(sid);
+                if sid.usage_type().track_outside_activation() {
+                    if let Some(p) = game.team_home.player_mut(&acting_player_id)
+                        .or_else(|| game.team_away.player_mut(&acting_player_id))
+                    {
+                        p.used_skills.insert(sid);
+                    }
                 }
             }
 
@@ -431,9 +448,8 @@ mod tests {
     fn successful_escape_publishes_pass_result_fumble() {
         // Force do_escape path: skill already used (always_hungry already consumed)
         let mut game = make_game_with_always_hungry();
-        if let Some(p) = game.team_home.player_mut("thrower") {
-            p.used_skills.insert(SkillId::AlwaysHungry);
-        }
+        // Java `hasUnusedSkillWithProperty(actingPlayer, ..)` reads the ACTING player's used set.
+        game.acting_player.used_skills.insert(SkillId::AlwaysHungry);
         let seed = seed_for_d6(6); // escape roll succeeds
         let mut step = StepAlwaysHungry::new("fail".into(), "ok".into());
         step.thrown_player_id = Some("thrown".into());
@@ -449,9 +465,8 @@ mod tests {
     #[test]
     fn failed_escape_with_trr_offers_escape_reroll() {
         let mut game = make_game_with_always_hungry();
-        if let Some(p) = game.team_home.player_mut("thrower") {
-            p.used_skills.insert(SkillId::AlwaysHungry);
-        }
+        // Java `hasUnusedSkillWithProperty(actingPlayer, ..)` reads the ACTING player's used set.
+        game.acting_player.used_skills.insert(SkillId::AlwaysHungry);
         game.turn_data_home.rerolls = 1;
         let seed = seed_for_d6(1); // 1 < 2 → escape fails
         let mut step = StepAlwaysHungry::new("fail".into(), "ok".into());
@@ -467,9 +482,8 @@ mod tests {
     #[test]
     fn decline_escape_reroll_gotos_failure() {
         let mut game = make_game_with_always_hungry();
-        if let Some(p) = game.team_home.player_mut("thrower") {
-            p.used_skills.insert(SkillId::AlwaysHungry);
-        }
+        // Java `hasUnusedSkillWithProperty(actingPlayer, ..)` reads the ACTING player's used set.
+        game.acting_player.used_skills.insert(SkillId::AlwaysHungry);
         let mut step = StepAlwaysHungry::new("fail".into(), "ok".into());
         step.thrown_player_id = Some("thrown".into());
         step.re_rolled_action = Some("ESCAPE".into());

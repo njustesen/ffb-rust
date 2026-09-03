@@ -89,9 +89,16 @@ impl StepAlwaysHungry {
             None => return StepOutcome::next(),
         };
 
-        // Java: doAlwaysHungry = hasUnusedSkillWithProperty(actingPlayer, mightEatPlayerToThrow)
+        // Java: `doAlwaysHungry = UtilCards.hasUnusedSkillWithProperty(actingPlayer,
+        // mightEatPlayerToThrow)` — the ACTING PLAYER overload, so "unused" is judged against the
+        // acting player's per-activation used set (the same set `markSkillUsed` writes below), NOT
+        // the team Player's. Reading the Player here while the write went to the acting set would
+        // split the two halves of one contract.
         let mut do_always_hungry = game.player(&acting_player_id)
-            .map(|p| UtilCards::has_unused_skill_with_property(p, NamedProperties::MIGHT_EAT_PLAYER_TO_THROW))
+            .map(|p| p.all_skill_ids().any(|id| {
+                id.properties().contains(&NamedProperties::MIGHT_EAT_PLAYER_TO_THROW)
+                    && !game.acting_player.used_skills.contains(&id)
+            }))
             .unwrap_or(false);
         // Java: doEscape = hasSkillWithProperty(actingPlayer.getPlayer(), mightEatPlayerToThrow) && !doAlwaysHungry
         let has_eat_skill = game.player(&acting_player_id)
@@ -163,15 +170,36 @@ impl StepAlwaysHungry {
         }
 
         if do_escape {
-            // Java: skill = getUnusedSkillWithProperty(actingPlayer, mightEatPlayerToThrow); markSkillUsed(skill)
-            let skill_id = game.player(&acting_player_id)
-                .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::MIGHT_EAT_PLAYER_TO_THROW));
+            // Java: `Skill skill = UtilCards.getUnusedSkillWithProperty(actingPlayer,
+            // mightEatPlayerToThrow); actingPlayer.markSkillUsed(skill);` — BOTH the lookup and the
+            // write are on the ACTING PLAYER, not the team Player. `markSkillUsed` always adds to
+            // the acting player's used set (`fUsedSkills`), and writes the Player-level set ONLY
+            // for skills whose usage type `isTrackOutsideActivation()`.
+            //
+            // Rust wrote ONLY the Player's set, so `ActingPlayer::acted()` — which reads
+            // `!used_skills.is_empty()` on the ACTING player — stayed false for a Troll whose
+            // Always Hungry failed. `UtilActingPlayer.changeActingPlayer` then took its
+            // `else { changeBase(STANDING) }` branch instead of Java's
+            // `hasActed() → changeBase(STANDING).changeActive(false)`, leaving the thrower ACTIVE
+            // where Java retires it (goblin bb2025 seed 98 i=130: `a00:9,4,Standing,4/5/5/10,`
+            // Rust `1` vs Java `0`). Same "acting set, not the Player set" fault as the Bombardier
+            // fix recorded in `util_server_steps::retire_old_acting_player`.
+            let skill_id = game.player(&acting_player_id).and_then(|p| {
+                p.all_skill_ids().find(|id| {
+                    id.properties().contains(&NamedProperties::MIGHT_EAT_PLAYER_TO_THROW)
+                        && !game.acting_player.used_skills.contains(id)
+                })
+            });
             if let Some(sid) = skill_id {
-                let is_home = game.team_home.player(&acting_player_id).is_some();
-                if is_home {
-                    if let Some(p) = game.team_home.player_mut(&acting_player_id) { p.used_skills.insert(sid); }
-                } else if let Some(p) = game.team_away.player_mut(&acting_player_id) {
-                    p.used_skills.insert(sid);
+                game.acting_player.used_skills.insert(sid);
+                // Java markSkillUsed: `if (skill.getSkillUsageType().isTrackOutsideActivation()
+                // && !getPlayer().isUsed(skill)) getPlayer().markUsed(skill, game)`.
+                if sid.usage_type().track_outside_activation() {
+                    if let Some(p) = game.team_home.player_mut(&acting_player_id)
+                        .or_else(|| game.team_away.player_mut(&acting_player_id))
+                    {
+                        p.used_skills.insert(sid);
+                    }
                 }
             }
 
@@ -376,9 +404,8 @@ mod tests {
         // Force do_escape path: skill already used (always_hungry already consumed)
         let mut game = make_game_with_always_hungry();
         // Mark AlwaysHungry as used → doAlwaysHungry=false, doEscape=true
-        if let Some(p) = game.team_home.player_mut("thrower") {
-            p.used_skills.insert(SkillId::AlwaysHungry);
-        }
+        // Java `hasUnusedSkillWithProperty(actingPlayer, ..)` reads the ACTING player's used set.
+        game.acting_player.used_skills.insert(SkillId::AlwaysHungry);
         let seed = seed_for_d6(6); // escape roll succeeds
         let mut step = StepAlwaysHungry::new("fail".into(), "ok".into());
         step.thrown_player_id = Some("thrown".into());
@@ -393,9 +420,8 @@ mod tests {
     fn failed_escape_with_trr_offers_escape_reroll() {
         let mut game = make_game_with_always_hungry();
         // Mark AlwaysHungry as used → doEscape=true
-        if let Some(p) = game.team_home.player_mut("thrower") {
-            p.used_skills.insert(SkillId::AlwaysHungry);
-        }
+        // Java `hasUnusedSkillWithProperty(actingPlayer, ..)` reads the ACTING player's used set.
+        game.acting_player.used_skills.insert(SkillId::AlwaysHungry);
         game.turn_data_home.rerolls = 1;
         let seed = seed_for_d6(1); // 1 < 2 → escape fails
         let mut step = StepAlwaysHungry::new("fail".into(), "ok".into());
@@ -410,9 +436,8 @@ mod tests {
     fn decline_escape_reroll_gotos_failure() {
         let mut game = make_game_with_always_hungry();
         // Mark skill used so do_always_hungry=false → do_escape=true
-        if let Some(p) = game.team_home.player_mut("thrower") {
-            p.used_skills.insert(SkillId::AlwaysHungry);
-        }
+        // Java `hasUnusedSkillWithProperty(actingPlayer, ..)` reads the ACTING player's used set.
+        game.acting_player.used_skills.insert(SkillId::AlwaysHungry);
         let mut step = StepAlwaysHungry::new("fail".into(), "ok".into());
         step.thrown_player_id = Some("thrown".into());
         step.re_rolled_action = Some("ESCAPE".into());

@@ -417,3 +417,63 @@ chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl, elf ×3 @1.0).
   sampler draws (25 vs 19), spent on three B&C DIRECTION team-re-roll offers Java never makes. Not
   an engine-dice divergence (argmax @0 is 100/100) — a prompt/draw-count split to root-cause with
   `FFB_DRAWS` + `FFB_CANDSUM`.
+
+## ITER18 — Always Hungry marked the PLAYER's used set, not the ACTING player's (2026-09-03)
+
+**SEVEN of nine gates GREEN; bb2016 and bb2025 are now 3/3 each.**
+
+Java's `StepAlwaysHungry` escape branch does
+`actingPlayer.markSkillUsed(getUnusedSkillWithProperty(actingPlayer, mightEatPlayerToThrow))`.
+`ActingPlayer.markSkillUsed` (`ffb-common ActingPlayer.java`) ALWAYS adds to the acting player's
+`fUsedSkills` — the set `hasActed()` reads — and writes the team Player's set only when
+`skill.getSkillUsageType().isTrackOutsideActivation()`. The availability read one line above is the
+matching ACTING-PLAYER overload (`hasUnusedSkillWithProperty(actingPlayer, ..)`, `:122`), while
+`doEscape` deliberately reads the PLAYER's *skills* (`hasSkillWithProperty(actingPlayer.getPlayer(),
+..)`, `:123`).
+
+All three Rust twins wrote (and read) only the **team Player's** set. Consequence for a Troll whose
+Always Hungry roll FAILS: `ActingPlayer::acted()` stayed false, so
+`UtilActingPlayer.changeActingPlayer`'s retire took its `else { changeBase(STANDING) }` branch
+instead of Java's `hasActed() → changeBase(STANDING).changeActive(false)`, leaving the thrower ACTIVE
+where Java retires it — goblin bb2025 seed 98 i=130, the ONLY state difference being
+`a00:9,4,Standing,4/5/5/10,` Rust `1` vs Java `0`. Same "acting set, not the Player set" fault as the
+Bombardier fix in `util_server_steps::retire_old_acting_player`.
+
+Fix (bb2016/bb2020/bb2025, one change set): write `game.acting_player.used_skills`, gate the
+Player-level write on `usage_type().track_outside_activation()`, and move the `doAlwaysHungry`
+"unused" READ onto the acting set too. **Fixing only the write regressed bb2016 @0 to 97** — the read
+and the write are two halves of one contract ("two callers of one helper aren't one contract"); the
+9 colocated tests that simulated "already used" via the Player's set were corrected to Java's
+semantics (they now mark the acting set).
+
+Gate movement, ITER17 → ITER18:
+
+| edition | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| bb2016 | **100** | **100** | **100** ✅ |
+| bb2020 | 67 → 68 | **100** ✅ | 86 |
+| bb2025 | **100** ✅ | 99 → **100** ✅ | **100** ✅ |
+
+**Closed-roster regression suite 27/27 gates 100/100 — ZERO regressions.** ffb-engine 7392/0.
+
+## Remaining frontier — bb2020 @1.0 (68) and @1e6 (86) ONLY
+
+Localized to a single CANDIDATE-COUNT (draw-accounting) divergence; the engine is right (@0 is
+100/100 in every edition, and argmax consumes no draws). bb2020 @1.0 seed 2, via `FFB_CANDSUM` +
+`FFB_CAND=16`:
+
+- Activations k=1..15 match EXACTLY (n and cumulative draws). First divergence **k=16**:
+  Rust `n=297 draws=51` vs Java `n=286 draws=49`.
+- The whole 11-candidate gap is one player: **away1, the Troll** — Rust offers **37** Move
+  destinations, Java **27** (away11 differs by 1; away10 matches).
+- Diffing the destination cell indices: Rust adds 11 squares — (11,3) (12,3) (13,3) (14,3) (15,3)
+  (10,6) (10,7) (10,8) (14,8) (10,9) (11,9) — i.e. one extra ring at the FAR EDGE of the Troll's
+  range; Java has one square Rust lacks: **(13,6)**, which looks like the Troll's own/adjacent
+  square.
+- Shape: Rust's reachability extends one step further than Java's while excluding a near square.
+  Suspect the `Reach.search` budget for this player (MA / spent / GFI accounting, or the
+  "stay put" destination) in `heuristic_agent`'s destination enumeration vs
+  `ffb-ai/.../parity/heuristic/Reach.java` (`gfiHere = ncost + b.spent > b.ma`, `r.gfi[j]`).
+  bb2016/bb2025 are unaffected, so look for an edition-conditioned budget term.
+- The draw-count split only bites at sampled scales: at @1.0 the extra 2 draws at k=16 shift every
+  later sampler draw (the 32 reds), at @1e6 fewer (14 reds).

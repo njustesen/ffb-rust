@@ -67,9 +67,10 @@ impl StepAlwaysHungry {
         let has_property = game.player(&acting_id)
             .map(|p| p.has_skill_property(NamedProperties::MIGHT_EAT_PLAYER_TO_THROW))
             .unwrap_or(false);
-        let skill_unused = game.player(&acting_id)
-            .map(|p| !p.used_skills.contains(&SkillId::AlwaysHungry))
-            .unwrap_or(false);
+        // `hasUnusedSkillWithProperty(actingPlayer, ...)` judges "unused" against the ACTING
+        // PLAYER's per-activation used set — the same set `markSkillUsed` writes below — not the
+        // team Player's. Reading one and writing the other splits a single contract in half.
+        let skill_unused = !game.acting_player.used_skills.contains(&SkillId::AlwaysHungry);
 
         let do_always_hungry = has_property && skill_unused;
         // Java: boolean doEscape = hasSkillWithProperty && !doAlwaysHungry
@@ -135,13 +136,17 @@ impl StepAlwaysHungry {
         }
 
         if do_escape {
-            let player_in_home = game.team_home.player(&acting_id).is_some();
-            if player_in_home {
-                if let Some(p) = game.team_home.player_mut(&acting_id) {
+            // Java: `actingPlayer.markSkillUsed(skill)` writes the ACTING PLAYER's used set (what
+            // `hasActed()` reads); the Player-level set is written only for skills whose usage type
+            // `isTrackOutsideActivation()`. Writing only the Player's set left `acted()` false, so
+            // the thrower was not retired inactive (see the bb2025 twin).
+            game.acting_player.used_skills.insert(SkillId::AlwaysHungry);
+            if SkillId::AlwaysHungry.usage_type().track_outside_activation() {
+                if let Some(p) = game.team_home.player_mut(&acting_id)
+                    .or_else(|| game.team_away.player_mut(&acting_id))
+                {
                     p.used_skills.insert(SkillId::AlwaysHungry);
                 }
-            } else if let Some(p) = game.team_away.player_mut(&acting_id) {
-                p.used_skills.insert(SkillId::AlwaysHungry);
             }
 
             // Java: if (reRolledAction == ESCAPE) { if (source == null || !useReRoll(..., thrownPlayer)) {
@@ -370,7 +375,7 @@ mod tests {
         let mut game = make_game();
         add_always_hungry_player(&mut game, "ogre");
         // mark AlwaysHungry as already used
-        game.team_home.player_mut("ogre").unwrap().used_skills.insert(SkillId::AlwaysHungry);
+        game.acting_player.used_skills.insert(SkillId::AlwaysHungry);
         add_thrown_player(&mut game, "gob");
         let mut step = StepAlwaysHungry::new();
         step.goto_label_on_failure = "fail".into();
@@ -385,7 +390,7 @@ mod tests {
     fn escape_success_publishes_pass_result_fumble() {
         let mut game = make_game();
         add_always_hungry_player(&mut game, "ogre");
-        game.team_home.player_mut("ogre").unwrap().used_skills.insert(SkillId::AlwaysHungry);
+        game.acting_player.used_skills.insert(SkillId::AlwaysHungry);
         add_thrown_player(&mut game, "gob");
         let mut step = StepAlwaysHungry::new();
         step.goto_label_on_failure = "fail".into();
@@ -418,7 +423,7 @@ mod tests {
         use ffb_model::model::re_rolled_action::ReRolledAction;
         let mut game = make_game();
         add_always_hungry_player(&mut game, "ogre");
-        game.team_home.player_mut("ogre").unwrap().used_skills.insert(SkillId::AlwaysHungry);
+        game.acting_player.used_skills.insert(SkillId::AlwaysHungry);
         add_thrown_player(&mut game, "gob");
         let mut step = StepAlwaysHungry::new();
         step.goto_label_on_failure = "fail".into();
@@ -456,7 +461,7 @@ mod tests {
         use ffb_model::report::report_id::ReportId;
         let mut game = make_game();
         add_always_hungry_player(&mut game, "ogre");
-        game.team_home.player_mut("ogre").unwrap().used_skills.insert(SkillId::AlwaysHungry);
+        game.acting_player.used_skills.insert(SkillId::AlwaysHungry);
         add_thrown_player(&mut game, "gob");
         let mut step = StepAlwaysHungry::new();
         step.goto_label_on_failure = "fail".into();
