@@ -557,3 +557,26 @@ Java's, so it is specifically the DECLARED blitz-block dispatch that is missing 
 minimum in `StepInitSelecting`), then port it 1:1 into Rust's blitz-block dispatch out of
 `StepInitMoving` (`Action::Block` → `dispatchPlayerAction(BLITZ)`). Verify with the `cm` table
 above, then `RSUM`/`JSUM` `n=`/`draws=` equality at every k for bb2020 seed 2.
+
+### Refinement — the +1 is the `MOVE` step in the post-block sequence resume
+
+Traced further (all read-only): the +1 is NOT in the blitz dispatch and NOT in the follow-up.
+- `StepInitMoving.dispatchPlayerAction` only publishes `DISPATCH_PLAYER_ACTION` and
+  `GOTO_LABEL_AND_REPEAT` — no `setCurrentMove`.
+- `bb2020/block/StepFollowup` moves the blitzer with `updatePlayerAndBallPosition` and only READS
+  `getCurrentMove() - 1` for its (client-only) TrackNumber — no `setCurrentMove`.
+
+Java's `BlitzMove` sequence is `INIT_MOVING → MOVE_BALL_AND_CHAIN → MOVE → GO_FOR_IT ×2 → …`
+(`generator/bb2020/BlitzMove.java:22-29`); Rust's mirror has the same order
+(`generator/bb2020/blitz_move.rs:33-47`, `StepId::Move` at line 43). So after the block
+sub-sequence finishes, **Java resumes the BlitzMove sequence at the step AFTER `INIT_MOVING`,
+running `MOVE_BALL_AND_CHAIN` and then `MOVE` (+1)**, and only then loops to a fresh `INIT_MOVING`
+— which is why Java's first post-block `INIT_MOVING` already reads `cm=1`. Rust instead arrives at
+a fresh `InitMoving` with `cm=0`, i.e. its `MOVE` never ran for that leg.
+
+So the fix is in Rust's **sequence control after a declared blitz block** (how the Block sequence
+returns into `BlitzMove`), not in any single step's arithmetic. Compare Java's
+`StepEndMoving.pushSequenceForPlayerAction(BLITZ)` + the `GOTO_LABEL_AND_REPEAT` resume against
+Rust's `step_end_moving` Branch 3 / `push_sequence_for_player_action` and the label the Block
+sequence returns to. Confirm the fix with the `cm` table above (Java 1/1/2 vs Rust 0/0/1), then
+`RSUM`/`JSUM` `n=`/`draws=` equality at every k for bb2020 seed 2, then the nine gates.
