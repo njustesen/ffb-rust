@@ -7,7 +7,7 @@ use ffb_model::enums::{
     PS_KNOCKED_OUT, PS_PRONE, PS_RIP, PS_RESERVE, PS_SERIOUS_INJURY, PS_STUNNED,
 };
 use ffb_model::model::SoundId;
-use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
+use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
@@ -365,14 +365,18 @@ fn drop_player_with_base_rng(
     let coord: Option<FieldCoordinate> = game.field_model.player_coordinate(player_id);
     let state: Option<PlayerState> = game.field_model.player_state(player_id);
 
+    // Java guards ONLY on `(playerCoordinate != null) && (playerState != null)` — there is NO
+    // in-bounds test. Rust had one, and it silently skipped the whole body for a player already in
+    // the dugout box. That cost the Ball & Chain chain injury on EVERY crowd-push after the first:
+    // a Fanatic whose compulsory walk scatters off the edge is boxed by the first push, so the
+    // second push found an out-of-bounds (box) coordinate and returned early, rolling 2 fewer d6
+    // than Java and reading Java's chain-injury dice as its next scatter direction
+    // (goblin bb2025 seed 20 pos 147/148: Java rolls InjuryTypeBallAndChain [1,4] where Rust took
+    // pos 147 as a scatter roll of 1 instead of Java's 5 at pos 149).
     let (coord, state) = match (coord, state) {
         (Some(c), Some(s)) => (c, s),
         _ => return params,
     };
-
-    if !FieldCoordinateBounds::FIELD.is_in_bounds(coord) {
-        return params;
-    }
 
     // Java: `if (hasSkillProperty(placedProneCausesInjuryRoll)) { publish INJURY_RESULT(
     //        handleInjury(new InjuryTypeBallAndChain(), ...)) } else { ...place PRONE/STUNNED... }`
@@ -1003,8 +1007,14 @@ mod tests {
         assert_eq!(state.base(), PS_PRONE);
     }
 
+    /// Java's `dropPlayer` guards ONLY on `(playerCoordinate != null) && (playerState != null)` —
+    /// it has NO in-bounds test, so a player already off the pitch (in a dugout box) is still
+    /// dropped: a STANDING one is placed PRONE. This test used to assert the opposite (an
+    /// off-field player was a no-op), which encoded a Rust-only early return; that early return
+    /// silently skipped the Ball & Chain chain injury for every crowd-push after the first, since
+    /// the first push boxes the Fanatic (goblin bb2025 seeds 20/80, bb2020 seed 92).
     #[test]
-    fn off_field_player_is_noop() {
+    fn off_field_player_is_still_dropped() {
         let mut game = make_game();
         // Place player out of bounds (x=26 is out of bounds for 26-wide field)
         game.team_home.players.push(Player {
@@ -1020,10 +1030,11 @@ mod tests {
         game.field_model.set_player_coordinate("p2", FieldCoordinate::new(26, 5));
         game.field_model.set_player_state("p2", PlayerState::new(PS_STANDING));
         let params = drop_player_no_sph(&mut game, "p2");
+        // No ball involved, so no DROPPED_BALL_CARRIER / SCATTER_BALL parameters.
         assert!(params.is_empty());
-        // state unchanged
+        // Java still runs the place-PRONE branch for an off-field player.
         let state = game.field_model.player_state("p2").unwrap();
-        assert_eq!(state.base(), PS_STANDING);
+        assert_eq!(state.base(), PS_PRONE);
     }
 
     #[test]

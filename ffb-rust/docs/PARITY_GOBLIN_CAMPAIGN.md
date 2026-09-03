@@ -346,3 +346,74 @@ was inert on them). ffb-engine 7392/0, ffb-model 2801/0.
   continues the walk too). Needs per-scatter windowing of the one activation.
 - bb2025 @0 seed 98 (ThrowTeamMate) + bb2025 @1.0 (~4) + bb2020 @1.0 (~33) / @1e6 (~14) — sampled
   draw-splits to root-cause per seed via `first_state_divergence.sh` + `FFB_CANDSUM`/`FFB_DICE_TRACE`.
+
+## ITER17 — dropPlayer has NO in-bounds guard: the B&C chain injury was skipped once boxed (2026-09-03)
+
+**Six of nine gates GREEN.** The B&C-Fanatic frontier that ITER15/16 chased is closed, and the fix
+was one non-Java line.
+
+`drop_player_with_base_rng` (the shared port of Java's private
+`UtilServerInjury.dropPlayer(step, player, playerBase, mode, eligibleForSafePairOfHands)`) opened with
+a Rust-only early return:
+
+```rust
+if !FieldCoordinateBounds::FIELD.is_in_bounds(coord) { return params; }
+```
+
+Java guards ONLY on `(playerCoordinate != null) && (playerState != null)` — there is no in-bounds
+test (`UtilServerInjury.java:338`). The consequence for a Ball & Chain Fanatic whose compulsory walk
+scatters off the pitch: the FIRST crowd-push boxes it, so on EVERY LATER push its coordinate is a box
+coordinate → the early return fired → the `placedProneCausesInjuryRoll` branch never ran → **2 fewer
+d6 than Java**. Rust then read Java's chain-injury dice as its next scatter direction, and the walk
+forked.
+
+Proven bit-exactly with the aligned `pos` counter (Java's `DICE_TRACE pos` is `Xoshiro256StarStar.
+callCount`, the SAME global counter behind `rng_calls`, so it aligns with Rust's `call_count`
+directly — the earlier belief that it was per-drive was wrong). goblin bb2025 seed 20, home_04:
+
+| pos | die | Java's use (from `caller=`) | Rust's use |
+|---|---|---|---|
+| 136 | d6=3 | B&C scatter direction | same |
+| 137 | d6=1 | B&C scatter direction | same |
+| 138,139 | 2,6 | `InjuryTypeCrowd` (crowd push) | same |
+| 140,141 | 6,6 | **`InjuryTypeBallAndChain`** (chain injury) | same |
+| 142,143 | d16=2,d6=3 | casualty roll | same |
+| 144 | d6=2 | B&C scatter direction | same |
+| 145,146 | 3,3 | `InjuryTypeCrowd` (crowd push) | same |
+| 147,148 | 1,4 | **`InjuryTypeBallAndChain`** | **MISSING — Rust took pos 147 as its scatter** |
+| 149 | d6=5 | B&C scatter direction | (Rust never got here) |
+
+Fix: delete the in-bounds guard (1:1 with Java). The colocated test `off_field_player_is_noop`
+asserted the REMOVED behaviour, so it encoded the bug; corrected to Java's semantics and renamed
+`off_field_player_is_still_dropped` (an off-field STANDING player is still placed PRONE).
+
+Gate movement (heuristic, seeds 1-100, tier 3), ITER16 → ITER17:
+
+| edition | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| bb2016 | **100** | **100** | **100** ✅ |
+| bb2020 | 67 | 99 → **100** ✅ | 86 |
+| bb2025 | 96 → **100** ✅ | 97 → **99** | 99 → **100** ✅ |
+
+Closed seeds: bb2025 @0 20/80, bb2020 @0 92 (the walk), plus the whole bb2025 @1.0/@1e6 tails.
+**Closed-roster regression suite 27/27 gates 100/100 — ZERO regressions** (amazon, lineman, dwarf,
+chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl, elf ×3 @1.0). ffb-engine 7392/0.
+
+**Remaining 3 gates:**
+- **bb2025 @0 seed 98** — an away_01 Troll THROW_TEAM_MATE at i=129. Dice and board agree; the ONLY
+  state difference at i=130 is the thrower's ACTIVE bit (`a00:9,4,Standing,4/5/5/10,` Rust `1` vs
+  Java `0`). Java's `UtilActingPlayer.changeActingPlayer` retires a MOVING old acting player as
+  `changeBase(STANDING).changeActive(false)` when `hasActed()`; Rust's `retire_old_acting_player`
+  reaches the same block (the Troll IS `MOVING`/base 2) but takes the `else` branch, so `acted()`
+  reads FALSE there while Java's `hasActed()` is TRUE. Next step: find which flag Java's TTM sets
+  (`hasMoved`/`usedSkills`/`hasTriggeredEffect`) that Rust's TTM path does not.
+  NOTE: Rust's `acted()` also carries an extra `|| self.has_acted` term that Java's derived
+  `hasActed()` does not have — worth auditing separately.
+  ALSO latent (hash-blind, unfixed): BANNED secret-weapon players are left with NO coordinate in
+  Rust, where Java boxes them in the BAN column (`FFB_IDSTATE` seed 98 i=129: Rust `A4=?/d` vs Java
+  `A4=35,0/d`, likewise `A7` and `H4=-6,0/d`).
+- **bb2020 @1.0 (67) / @1e6 (86)** — a distinct DRAW-COUNT family: 26 of ~28 reds resolve at a Blitz
+  by the bb2020 Fanatic (nr 3). Candidate lists agree through k=3 and then Rust has consumed 6 MORE
+  sampler draws (25 vs 19), spent on three B&C DIRECTION team-re-roll offers Java never makes. Not
+  an engine-dice divergence (argmax @0 is 100/100) — a prompt/draw-count split to root-cause with
+  `FFB_DRAWS` + `FFB_CANDSUM`.
