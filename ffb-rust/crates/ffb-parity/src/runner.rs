@@ -605,6 +605,28 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
         } else {
             None
         };
+        // FFB_IDSTATE: full-board coordinate + state dump for EVERY player (both teams, all nr),
+        // keyed by parity step index — the Rust mirror of ParityRunner's JIDSTATE. Diff the two by
+        // `i=` to see any player (including hash-blind nr>11) whose coord/state diverges.
+        let pre_idstate = if std::env::var_os("FFB_IDSTATE").is_some() {
+            let g = &engine.game;
+            let mut s = String::new();
+            for team in [&g.team_home, &g.team_away] {
+                for p in &team.players {
+                    let c = g.field_model.player_coordinate(&p.id);
+                    let st = g.field_model.player_state(&p.id);
+                    s.push_str(&format!(
+                        "{}={}/{} ",
+                        p.id,
+                        c.map(|c| format!("{},{}", c.x, c.y)).unwrap_or_else(|| "?".into()),
+                        st.map(|st| format!("{:x}", st.base())).unwrap_or_else(|| "?".into())
+                    ));
+                }
+            }
+            Some(s)
+        } else {
+            None
+        };
         let probe = (
             pre_hash.clone(),
             engine.rng_call_count(),
@@ -664,6 +686,9 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
             eprintln!("RUST_STEP i={} rng_calls={} turn={} half={} active={} chosen={} state={}", step_index, pre_rng, turn_nr, half, active_str, chosen, pre_state_str.as_deref().unwrap_or("?"));
         }
         if log_step && turn_nr >= 1 {
+            if let Some(ref ids) = pre_idstate {
+                eprintln!("RIDSTATE i={} {}", step_index, ids);
+            }
             pending_steps.push(PendingStep {
                 i: step_index,
                 turn: turn_nr,

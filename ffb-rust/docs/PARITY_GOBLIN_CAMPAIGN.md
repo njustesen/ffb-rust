@@ -227,3 +227,79 @@ findings (probes reverted):
 
 Status: bb2016 100/100 x3 GREEN + pushed. bb2020 67/99/86, bb2025 94/93/99 — the remaining
 reds are this B&C case + sampled draw splits. Not yet fully green.
+
+## ITER15 — root cause of the B&C-Fanatic divergence found; fix REVERTED (exposes an agent-parity bug) (2026-09-03)
+
+**Outcome: DIAGNOSIS committed (this entry) + a new `FFB_IDSTATE` full-board trace tool; the
+engine fix itself is REVERTED** because although it is Java-faithful it regresses a closed roster.
+The root cause below is correct and re-appliable once the agent-parity bug it exposes is fixed.
+
+**Root cause of the dominant B&C-Fanatic divergence, finally cracked.** The ITER14 "Remaining
+frontier" section guessed "3 other home players were crowd-pushed to reserve first" — wrong. The
+3 were the team's **un-fielded reserves** (goblin drafts 14 players; 11 are set up, nr 12-14 sit
+out). Java's headless parity harness runs `HeadlessGameSetup.addTeamToGame` →
+`GameCache.addTeamToGame`, which sets EVERY player to RESERVE (or MISSING) and calls
+`putPlayerIntoBox` at team-join, before the game starts. The Rust **synchronous engine
+constructor** (`DriverGameState::new_with_options` / `new_full_pregame`) built the game with
+`Game::new` + the start sequence and **never boxed the reserves** — they kept a `None` coordinate
+all game.
+
+The per-step **state hash cannot see this**: `collect_player_parts` takes only the first 11 by nr
+(reserves are nr>11) AND clamps any off-pitch coord to `-1,-1` (so boxed ≡ @NONE for the hashed
+eleven). But the **heuristic agent sees the real board**, and scores the Fanatic's compulsory-move
+target off it — Rust (reserves @NONE) picked a different `orig_to` than Java (reserves boxed at
+`-1,0/-1,1/-1,2`), so the very first B&C scatter took a different base direction. Proven with a new
+`FFB_IDSTATE` full-board dump (mirrors Java's `JIDSTATE`, keyed by parity step index): at bb2025
+seed 51 i=42 the ONLY board difference was `H12/13/14 = ?/?` (Rust) vs `-1,0/-1,1/-1,2` (Java).
+
+Two fixes, both 1:1 from Java, colocated tests:
+1. `UtilBox::box_all_players_at_game_start` — the boxing loop of `GameCache.addTeamToGame`
+   (RESERVE/MISSING + `put_player_into_box`, spps, send-to-box reason), called from both engine
+   constructors right after `Game::new`.
+2. `UtilBox::refresh_boxes` / `refresh_box` — **was a no-op stub**. Java repacks each dugout column
+   (collect coords, sort by y, reassign 0,1,2…) at end of setup/turn/eject/injury. Without it, the
+   reserves boxed alongside the eleven fielded players kept rows 11-13 (put_player_into_box's
+   first-free scan) instead of collapsing to 0-2 after the fielded players left — the agent saw the
+   wrong rows. `StepSetup` already CALLED `refresh_boxes`; implementing it made the call effective.
+   (Boxing WITHOUT refreshBoxes regressed amazon bb2025 @1.0 seed 22 → 99; refreshBoxes fixed it.)
+
+Gate movement (heuristic, seeds 1-100, tier 3):
+
+| edition | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| bb2016 | **100** | **100** | **100** ✅ |
+| bb2020 | 67 | 99 | 86 |
+| bb2025 | 96 (was 94) | 97 (was 93) | 99 |
+
+Regression suite MOSTLY clean: amazon ×3 @1.0, lineman ×3 @1.0, dwarf ×3, chaos ×3, chaos_dwarf ×3,
+dark_elf ×3, dark_elf_league_fumbbl ×3, elf ×3 all 100/100 — EXCEPT **chaos_pact bb2020 @1.0 → 99
+(seed 50)**, a closed-roster REGRESSION this fix causes. Revert-test confirmed: seed 50 passes
+WITHOUT boxing, fails WITH. ffb-engine 7392/0, ffb-model 2801/0, ffb-parity 50/0.
+
+**STATUS: FIX REVERTED — it is correct (Java boxes reserves) but a global change that EXPOSES a
+latent AGENT-PARITY bug, regressing closed roster chaos_pact bb2020 @1.0 (100→99).** The heuristic
+agent's board reading depends on reserve/box positions; the Rust agent and the Java agent disagree
+for certain configurations, and boxing merely SHIFTS which seeds hit the disagreement (fixes goblin
+bb2025 @0 seeds 7/37/51/89/96, newly-reds seed 80 + chaos_pact 50). So boxing is necessary but not
+sufficient — the Rust↔Java heuristic agent must first be made bit-identical in how it scores off a
+boxed/reserve board. Evidence that it is an agent (not engine) divergence:
+chaos_pact bb2020 seed 50: through i=54 the rng_call count AND
+the ENTIRE hashed state string AND the full-board `FFB_IDSTATE` dump (all players, coord+state) are
+BIT-IDENTICAL between Rust and Java, yet step 54 (an away_04 HAND_OVER_MOVE that resolves a
+block/armour/injury on home defenders) resolves differently — Java makes 9 rng-calls, Rust 4; home
+`h00` ends Stunned (Java) vs Prone (Rust). Deterministic (stable over 3 runs, so NOT HashMap-order
+flakiness). The divergent factor is therefore OUTSIDE rng_calls and the hashed state — a
+`used_skills`/temporary-property flag or a mechanic that reads the boxed reserve's box position,
+DORMANT while the reserve had no coordinate (@NONE) and only triggered once boxing gives it one.
+goblin bb2025 @0 seeds 20/80 are the same class (identical board entering home_04's move, divergent
+B&C-walk resolution). Cracking this needs per-roll windowing of one activation in both engines.
+
+**Remaining B&C frontier (deeper, NOT the walk-continuation):** bb2025 @0 seeds 20/80, bb2020 @0
+seed 92. The Fanatic's compulsory walk DOES correctly continue scattering from the box after a
+crowd-push (a guard that stopped it broke the now-passing seeds 7/51/89/96 and was reverted — Java
+continues too). The residual divergence is the **box COLUMN/injury outcome**: for seed 20 Rust's
+home_04 scatters its box-continuation from `(-2,0)` (KO column) while ending at `(0,2)` vs Java's
+`(0,4)` — the crowd-push injury (`InjuryTypeCrowdPush` → RESERVE/KO/casualty) or an earlier walk
+die resolves differently, shifting the box the walk resumes from. Needs a fresh sub-step trace to
+localise. bb2020 @1.0 (67) / @1e6 (86) unchanged by this fix — a separate family (sampled draw
+splits) still to root-cause per seed.
