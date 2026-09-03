@@ -484,3 +484,76 @@ Localized to a single CANDIDATE-COUNT (draw-accounting) divergence; the engine i
 - The draw-count split only bites at sampled scales: the 2 extra draws at k=16 shift every later
   sampler draw (32 reds @1.0, 14 @1e6). At @0 (argmax) no draws are taken, which is why bb2020 @0
   is 100/100 and the ENGINE is not implicated.
+
+## Frontier update — the bb2020 fault is a `currentMove` offset on the BLITZ block, not the Reach
+
+The ITER18 frontier note above scoped this to "the Troll's Move destination set at k=16, 37 vs 27".
+That scoping was **wrong and is superseded**: k=16 is DOWNSTREAM of the real divergence (seed 2's
+first hash diff is idx **15**, and the candidate lists match exactly for k=1..15), so k=16 was
+comparing an already-diverged board. The 37-vs-27 count is a symptom, not the cause.
+
+**Ruled out by measurement (do not re-chase any of these):**
+- The Reach BUDGET: probe printed `pid=away_01 start=13,6 ma=1 spent=0 cap=3 gate=1 ag=5
+  dodge=false sure_feet=false gt=2 team_rr=true`, and Java's `budgetOf` computes the identical
+  `cap=3`. `STAND_UP_COST=3` both sides; the two Dijkstra cap checks are identical.
+  (My earlier "Rust reaches distance 4" claim used the WRONG ORIGIN — the true start is (13,6),
+  and all 37 Rust cells are within Chebyshev 3, consistent with `cap=3`.)
+- The BOARD: `FFB_IDSTATE` diffs at i=12/13/14 **and i=15** are EMPTY (all players, both teams,
+  incl. hash-blind nr>11).
+- The reach ALGORITHM and the destination enumeration: two independent reads found
+  `reach_with`/`Reach.search` and `top_moves`/`Plans.topMoves` line-for-line equivalent — same
+  8-neighbourhood, same `f.occupied`, same `cost >= cap` / `ncost > cap`, same key-only relaxation,
+  start excluded both sides, and **both** emit one candidate per settled cell with
+  `usize::MAX` / `Integer.MAX_VALUE` (no top-K, no probability floor, no dedup).
+- The TZ raster: Rust `st.has_tacklezones()` vs Java `Snap.standing`, and `Features.java:459`
+  builds the Snap with `ps.hasTacklezones()` — identical.
+- `dodge_target`/`gfi_target` vs `dodgeTarget`/`gfiTarget` — identical (Rust's `_ =>` arm covers
+  bb2020 and bb2025 exactly as Java's `!bb2016` does), so this is NOT an edition-gated formula.
+- `team_rr` (`td.rerolls > 0 && !td.reroll_used`) and `spentBy` — identical formulas.
+- `StepMove`'s early `return` when `coordinate_to` is `None`: probed, `coordinate_to` is always
+  `Some(..)` on this path, so the increment is not being skipped there. (NOTE: the bb2020
+  `step_move.rs` is a **DEAD FILE** — `driver.rs:127` dispatches `StepId::Move` to
+  `bb2025::move_::step_move` for both editions. A probe there prints nothing; probe the bb2025 one.)
+
+**The actual divergence — bb2020 seed 2, i=15, the Fanatic's (away_03, nr 3) BLITZ.**
+Both engines declare `Activate(away_03, Blitz)` and the board is identical entering it; the blitz
+then resolves to different squares (i=16: A3 Rust (13,7) vs Java (14,8); A1 Rust (13,6) vs Java
+(13,7)). Rust burns 6 dice, Java 4.
+
+`FFB_MOVEP` shows the mechanism exactly. At the SAME prompt — Fanatic at (12,7), the SAME four
+offered squares `[11,7 11,8 13,6 13,8]` — the two agents pick the same FIRST step but different
+path lengths:
+
+```
+RMOVEP k=15 away_03 at=(13,8) n=5 offered=[12,9 13,9 14,7 14,8 14,9] ans=Block{home_01}   <-- Rust only
+RMOVEP k=15 away_03 at=(12,7) n=4 offered=[11,7 11,8 13,6 13,8] ans=Move{[13,6, 13,5, 14,4]}  (3 squares)
+JMOVEP k=15 Away3   at=12,7   n=4 offered=[11,7 11,8 13,6 13,8] ans=[13,6 14,6]               (2 squares)
+```
+
+Rust's path is exactly ONE square longer, and the matching `cm` (currentMove) traces show Java
+running exactly **1 ahead** of Rust from the post-block `INIT_MOVING` onward:
+
+| step | Java `cm` | Rust `cm` |
+|---|---|---|
+| BLOCK_ROLL | 0 | 0 |
+| PUSHBACK | 0 | 0 |
+| **INIT_MOVING** (post-block) | **1** | **0** |
+| MOVE_BALL_AND_CHAIN | 1 | 0 |
+| MOVE_BALL_AND_CHAIN | 2 | 1 |
+
+`spent = currentMove` feeds `cap = ma + 2 - spent`, so Rust's cap is one higher at the (12,7) move
+prompt → it reaches one square further → picks a different destination → the B&C base direction
+(`coord_from` vs `original_coord_to`) changes → the scatters differ → the whole activation forks.
+
+**So: Java charges the BLITZ's block one movement point; Rust does not.** Note the prompt shapes
+also differ — Rust emits an extra Move prompt at (13,8) that the agent answers with
+`Block{home_01}` (the declared-blitz-block path), where Java goes straight through
+SELECT_BLITZ_TARGET/BLOCK_ROLL. Rust's declared-blitz-block path appears to skip the +1 that Java
+applies (Rust's B&C block branch in `step_move_ball_and_chain` DOES `current_move += 1`, matching
+Java's, so it is specifically the DECLARED blitz-block dispatch that is missing it).
+
+**Next step:** find where Java charges that movement point for a declared blitz block (Java's only
+`setCurrentMove` +1 sites are `StepMove`, `StepGoForIt`, `StepMoveBallAndChain` and the stand-up
+minimum in `StepInitSelecting`), then port it 1:1 into Rust's blitz-block dispatch out of
+`StepInitMoving` (`Action::Block` → `dispatchPlayerAction(BLITZ)`). Verify with the `cm` table
+above, then `RSUM`/`JSUM` `n=`/`draws=` equality at every k for bb2020 seed 2.
