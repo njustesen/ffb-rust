@@ -466,14 +466,21 @@ Localized to a single CANDIDATE-COUNT (draw-accounting) divergence; the engine i
   Rust `n=297 draws=51` vs Java `n=286 draws=49`.
 - The whole 11-candidate gap is one player: **away1, the Troll** — Rust offers **37** Move
   destinations, Java **27** (away11 differs by 1; away10 matches).
-- Diffing the destination cell indices: Rust adds 11 squares — (11,3) (12,3) (13,3) (14,3) (15,3)
-  (10,6) (10,7) (10,8) (14,8) (10,9) (11,9) — i.e. one extra ring at the FAR EDGE of the Troll's
-  range; Java has one square Rust lacks: **(13,6)**, which looks like the Troll's own/adjacent
-  square.
-- Shape: Rust's reachability extends one step further than Java's while excluding a near square.
-  Suspect the `Reach.search` budget for this player (MA / spent / GFI accounting, or the
-  "stay put" destination) in `heuristic_agent`'s destination enumeration vs
-  `ffb-ai/.../parity/heuristic/Reach.java` (`gfiHere = ncost + b.spent > b.ma`, `r.gfi[j]`).
-  bb2016/bb2025 are unaffected, so look for an edition-conditioned budget term.
-- The draw-count split only bites at sampled scales: at @1.0 the extra 2 draws at k=16 shift every
-  later sampler draw (the 32 reds), at @1e6 fewer (14 reds).
+- **The budget is NOT the cause** (measured, do not re-chase it): a probe in `budget_of` at that
+  exact decision prints `pid=away_01 ma_base=4 prone=true ma=1 spent=0 cap=3 gate=1`, and Java's
+  `Reach.budgetOf` computes the identical `cap = max(ma + 2 - spent, 0) = 3` from the identical
+  inputs. `STAND_UP_COST` is 3 on both sides; the two `cap` checks in the Dijkstra are also
+  identical (`cost >= cap` / `ncost > cap`).
+- The **board is identical too**: `FFB_IDSTATE` full-board diffs at i=12/13/14 are EMPTY (every
+  player, both teams, including the hash-blind nr>11 pieces), and the hashed state string agrees on
+  the Troll itself (`a00:13,7,Prone,4/5/5/10,1` in both).
+- So with the SAME board and the SAME `cap=3`, Rust's Dijkstra admits **37** destinations where
+  Java's admits **27**. The divergence is therefore in the reach **step-admissibility / pruning**,
+  not the allowance: compare `reach_with` (`heuristic_agent.rs`, the `-log(p_step)` Dijkstra, its
+  `gate`, any arrival-probability cutoff and how `tops`/`dests` are truncated) against
+  `Reach.search` (`ffb-ai/.../parity/heuristic/Reach.java:183-280`) step by step. A per-square
+  admissibility difference (occupancy of the START square, a probability floor, or the
+  "stay put"/own-square destination) is the shape to look for.
+- The draw-count split only bites at sampled scales: the 2 extra draws at k=16 shift every later
+  sampler draw (32 reds @1.0, 14 @1e6). At @0 (argmax) no draws are taken, which is why bb2020 @0
+  is 100/100 and the ENGINE is not implicated.
