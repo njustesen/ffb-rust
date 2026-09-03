@@ -221,6 +221,24 @@ impl BlitzBlock {
         seq.add(StepId::Apothecary, vec![
             StepParameter::ApothecaryMode(ApothecaryMode::Defender),
         ]);
+        // 43b GO_FOR_IT (ball-and-chain GFI) — BB2020 ONLY.
+        //
+        // `bb2020/BlitzBlock.java:89-90` places a SECOND `GO_FOR_IT` here, immediately after
+        // `APOTHECARY(DEFENDER)` and before the ATTACKER_DROPPED path, carrying
+        // `BALL_AND_CHAIN_GFI = true` ("GFI for ball & chain should go here"). BB2025's
+        // `BlitzBlock` has no such step. `StepGoForIt.executeStep` computes
+        // `runGfi = player.hasSkillProperty(goForItAfterBlock) == ballAndChainGfi`, so for a
+        // Ball-and-Chain blitzer ONLY this copy runs — and it is the copy that charges the blitz
+        // its movement point (`PlayerAction.BLITZ` → `setBlitzUsed(true)` and
+        // `setCurrentMove(getCurrentMove() + 1)`). Without it a BB2020 Ball-and-Chain blitzer
+        // resumed its post-block move with `currentMove` one too LOW, so the agent's reach budget
+        // (`cap = ma + 2 - currentMove`) was one square too generous.
+        if params.rules == Rules::Bb2020 {
+            seq.add(StepId::GoForIt, vec![
+                StepParameter::BallAndChainGfi(true),
+                StepParameter::GotoLabelOnFailure(labels::DROP_FALLING_PLAYERS.into()),
+            ]);
+        }
         // 44 STEADY_FOOTING [ATTACKER_DROPPED] (attacker)
         seq.add_labelled(StepId::SteadyFooting, labels::ATTACKER_DROPPED, vec![
             StepParameter::ApothecaryMode(ApothecaryMode::Attacker),
@@ -293,6 +311,62 @@ mod tests {
         assert!(gfi_idx < fa_idx);
     }
 
+    /// From `bb2020/BlitzBlock.java:89-90` vs `bb2025/BlitzBlock.java`:
+    ///
+    /// ```java
+    /// // GFI for ball & chain should go here.
+    /// sequence.add(StepId.GO_FOR_IT, from(StepParameterKey.GOTO_LABEL_ON_FAILURE, IStepLabel.DROP_FALLING_PLAYERS),
+    ///     from(StepParameterKey.BALL_AND_CHAIN_GFI, true));
+    /// ```
+    ///
+    /// BB2020 has TWO `GO_FOR_IT` steps in the blitz-block sequence — the leading one and this
+    /// ball-and-chain copy, which sits immediately after `APOTHECARY(DEFENDER)` (the step that
+    /// follows `PLACE_BALL [DEFENDER_DROPPED]`). BB2025 has exactly ONE.
+    #[test]
+    fn bb2020_has_ball_and_chain_gfi_after_defender_apothecary_and_bb2025_does_not() {
+        let bb2020 = BlitzBlock::build_sequence(&BlitzBlockParams {
+            rules: Rules::Bb2020, ..Default::default()
+        });
+        let bb2025 = BlitzBlock::build_sequence(&BlitzBlockParams {
+            rules: Rules::Bb2025, ..Default::default()
+        });
+
+        let bc = |steps: &[SequenceStep]| -> usize {
+            steps.iter().filter(|s| {
+                s.step_id == StepId::GoForIt
+                    && s.params.iter().any(|p| matches!(p, StepParameter::BallAndChainGfi(true)))
+            }).count()
+        };
+        assert_eq!(bc(&bb2020), 1, "bb2020 carries the ball-and-chain GFI");
+        assert_eq!(bc(&bb2025), 0, "bb2025 has no ball-and-chain GFI");
+        assert_eq!(
+            bb2020.iter().filter(|s| s.step_id == StepId::GoForIt).count(), 2,
+            "bb2020 BlitzBlock has exactly two GO_FOR_IT steps"
+        );
+        assert_eq!(
+            bb2025.iter().filter(|s| s.step_id == StepId::GoForIt).count(), 1,
+            "bb2025 BlitzBlock has exactly one GO_FOR_IT step"
+        );
+
+        // Placement: directly after the APOTHECARY(DEFENDER) that follows PLACE_BALL
+        // [DEFENDER_DROPPED], and before PLACE_BALL [ATTACKER_DROPPED].
+        let place_def = bb2020.iter()
+            .position(|s| s.step_id == StepId::PlaceBall && s.label.as_deref() == Some(labels::DEFENDER_DROPPED))
+            .expect("PLACE_BALL [DEFENDER_DROPPED]");
+        let gfi = bb2020.iter().rposition(|s| s.step_id == StepId::GoForIt).unwrap();
+        let place_att = bb2020.iter()
+            .position(|s| s.step_id == StepId::PlaceBall && s.label.as_deref() == Some(labels::ATTACKER_DROPPED))
+            .expect("PLACE_BALL [ATTACKER_DROPPED]");
+        assert_eq!(bb2020[place_def + 1].step_id, StepId::Apothecary);
+        assert_eq!(gfi, place_def + 2, "the B&C GFI follows APOTHECARY(DEFENDER)");
+        assert!(gfi < place_att);
+
+        // GOTO_LABEL_ON_FAILURE = DROP_FALLING_PLAYERS.
+        assert!(bb2020[gfi].params.iter().any(|p| matches!(
+            p, StepParameter::GotoLabelOnFailure(l) if l == labels::DROP_FALLING_PLAYERS
+        )));
+    }
+
     #[test]
     fn blitz_block_has_horns() {
         let steps = BlitzBlock::build_sequence(&BlitzBlockParams::default());
@@ -359,8 +433,9 @@ mod tests {
         }
         let bb2025 = BlitzBlock::build_sequence(&BlitzBlockParams::default());
         let bb2020 = BlitzBlock::build_sequence(&BlitzBlockParams { rules: Rules::Bb2020, ..Default::default() });
-        // Two entries are edition-gated: this PICK_UP and the FOUL_APPEARANCE below.
-        assert_eq!(bb2020.len(), bb2025.len() - 2);
+        // Three entries are edition-gated: this PICK_UP and the FOUL_APPEARANCE below are BB2025
+        // only, and the ball-and-chain GO_FOR_IT (`bb2020/BlitzBlock.java:89-90`) is BB2020 only.
+        assert_eq!(bb2020.len(), bb2025.len() - 2 + 1);
     }
 
     /// `bb2020/BlitzBlock.java:31-33` adds FOUL_APPEARANCE here only for a frenzy follow-up; the

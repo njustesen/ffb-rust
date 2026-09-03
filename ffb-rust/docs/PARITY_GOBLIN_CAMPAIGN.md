@@ -580,3 +580,123 @@ returns into `BlitzMove`), not in any single step's arithmetic. Compare Java's
 Rust's `step_end_moving` Branch 3 / `push_sequence_for_player_action` and the label the Block
 sequence returns to. Confirm the fix with the `cm` table above (Java 1/1/2 vs Rust 0/0/1), then
 `RSUM`/`JSUM` `n=`/`draws=` equality at every k for bb2020 seed 2, then the nine gates.
+
+## ITER19 — the missing BB2020 ball-and-chain `GO_FOR_IT` in the blitz-block sequence
+
+**The `currentMove` +1 predicted by the ITER18 refinement is real, and it is a MISSING STEP.**
+
+The refinement note guessed the +1 came from a `MOVE` step in a post-block sequence *resume*. It
+does not. A per-step `RCM step=<id> cm=<n>` probe in `driver.rs` on bb2020 seed 2 printed the whole
+Fanatic activation, and the blitz-block sequence Rust actually ran was:
+
+```
+InitBlocking  GoForIt  SteadyFooting  DumpOff  BlockStatistics  Dauntless  Horns  Trickster
+CatchScatterThrowIn  Stab  BlockChainsaw  SteadyFooting  ProjectileVomit  BreatheFire
+SteadyFooting  SteadyFooting  HandleDropPlayerContext  Chomp  BlockRoll  BlockChoice
+Pushback  RemoveTargetSelectionState  Apothecary  Followup  PickUp  GotoLabel
+DropFallingPlayers  SteadyFooting  HandleDropPlayerContext  RemoveTargetSelectionState
+ResetFumblerooskie  PlaceBall  Apothecary  SteadyFooting  PlaceBall  Apothecary  TrapDoor
+Apothecary  CatchScatterThrowIn  RemoveTargetSelectionState  EndBlocking
+```
+
+That is the **BB2025** shape, and it contains exactly **one** `GO_FOR_IT`.
+`bb2020/BlitzBlock.java` contains **two**:
+
+```java
+sequence.add(StepId.GO_FOR_IT, from(StepParameterKey.GOTO_LABEL_ON_FAILURE, IStepLabel.FALL_DOWN));
+...
+sequence.add(StepId.PLACE_BALL, IStepLabel.DEFENDER_DROPPED);
+sequence.add(StepId.APOTHECARY, from(StepParameterKey.APOTHECARY_MODE, ApothecaryMode.DEFENDER));
+// GFI for ball & chain should go here.
+sequence.add(StepId.GO_FOR_IT, from(StepParameterKey.GOTO_LABEL_ON_FAILURE, IStepLabel.DROP_FALLING_PLAYERS),
+    from(StepParameterKey.BALL_AND_CHAIN_GFI, true));
+```
+
+`StepGoForIt.executeStep` gates on
+`runGfi = player.hasSkillProperty(goForItAfterBlock) == ballAndChainGfi`, and the +1 lives INSIDE
+that gate:
+
+```java
+if (runGfi) {
+  if ((PlayerAction.BLITZ == actingPlayer.getPlayerAction()) && (getReRolledAction() == null)) {
+    game.getTurnData().setBlitzUsed(true);
+    actingPlayer.setCurrentMove(actingPlayer.getCurrentMove() + 1);
+```
+
+So for a **Ball-and-Chain** blitzer (`goForItAfterBlock = true`) the leading `GO_FOR_IT` is a no-op
+(`true == false`) and **only the second copy charges the blitz its movement point**. Rust never had
+that copy, so the Fanatic came out of its block with `currentMove` one too low; the agent's reach
+budget `cap = ma + 2 - currentMove` was one square too generous, it picked a further destination,
+the Ball-and-Chain base direction changed, and the activation forked. Exactly the `cm` table
+ITER18 measured (Java 1/1/2 vs Rust 0/0/1), and exactly why only the sampled scales were red.
+
+Why the step was missing: `driver.rs` runs the **BB2025** step-set for BB2020, so the live generator
+is `generator/bb2025/blitz_block.rs`, which already carries two `params.rules != Rules::Bb2020`
+gates (PICK_UP, FOUL_APPEARANCE). `generator/bb2020/blitz_block.rs` is a faithful BB2020 port that
+**nothing live calls** — the same dead-twin trap the ledger already records for `step_move.rs`.
+
+**Fix** (`generator/bb2025/blitz_block.rs`): a third edition gate — `if params.rules ==
+Rules::Bb2020`, add the ball-and-chain `GO_FOR_IT` immediately after `APOTHECARY(DEFENDER)`, with
+`GOTO_LABEL_ON_FAILURE = DROP_FALLING_PLAYERS`, exactly where `bb2020/BlitzBlock.java` puts it.
+Colocated test `bb2020_has_ball_and_chain_gfi_after_defender_apothecary_and_bb2025_does_not`
+written from the two Java generators (two GFIs in bb2020, one in bb2025, placement and failure
+label pinned); the existing `pick_up_before_catch_scatter_is_bb2025_only` length assertion was
+updated from `-2` to `-2 + 1`.
+
+Gate movement, ITER18 → ITER19 (all nine re-measured on the built binary):
+
+| edition | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| bb2016 | **100** ✅ | **100** ✅ | **100** ✅ |
+| bb2020 | 68 → **95** | **100** ✅ | 86 → **97** |
+| bb2025 | **100** ✅ | **100** ✅ | **100** ✅ |
+
+`cargo test -p ffb-engine` 7393 passed / 0 failed.
+
+### Remaining frontier — bb2020 @1.0 (95) and @1e6 (97): a Troll THROW_TEAM_MATE
+
+All FIVE bb2020 @1.0 reds are ONE family. `first_state_divergence.sh` on each:
+
+| seed | first hash diff | the activation that resolved differently |
+|---|---|---|
+| 35 | i=95 | `Activate(away_01, ThrowTeamMate)` |
+| 47 | i=101 | `Activate(home_01, ThrowTeamMate)` |
+| 53 | i=79 | `Activate(away_01, ThrowTeamMate)` |
+| 88 | i=23 | `Activate(away_01, ThrowTeamMate)` |
+| 89 | i=98 | `Activate(home_01, ThrowTeamMate)` |
+
+`away_01` / `home_01` is the **Troll**. Measured on seed 88 (the earliest index, therefore the
+cheapest repro):
+
+- **The agent is not implicated.** `FFB_CANDSUM` `RSUM`/`JSUM` agree EXACTLY on `n=` and `draws=`
+  at every k through and past the throw (k=23 `n=1384 draws=63`, k=24 `n=1252 draws=65`,
+  k=25 `n=1097 draws=66`, k=26 `n=970 draws=68` — identical per-player breakdowns too).
+- **The board is identical.** `FFB_IDSTATE` at i=24 diffs EMPTY: all 26 pieces, both teams,
+  including the hash-blind nr>11 players, same coordinates and same state base.
+- So the differing hash at i=24 is a **non-positional hashed field** — the ball, a turn-data
+  counter, a re-roll bank, or an acting-player/active bit. That is the same shape as the ITER18
+  bb2025 seed-98 Troll TTM red (`used_skills` written to the Player set instead of the acting set,
+  leaving the thrower ACTIVE), so start by re-reading the BB2020 side of that same
+  `Always Hungry` / `changeActingPlayer` contract before looking anywhere else.
+
+**Do NOT re-derive state from `parity/goblin_vs_goblin/*.jsonl`** — that directory is shared across
+editions, so after a bb2025 run the bb2020 lines are stale (this cost a wrong reading here: seed 88
+line 24 still carried `teamGoblinParity25Home1`). Re-run the seed with `FFB_IDSTATE`/`FFB_STEPTRACE`
+and read the live trace.
+
+**Also known but NOT measured** (recorded so the next iteration does not rediscover them): beyond
+the ball-and-chain GFI, the live BB2025 blitz-block sequence still differs from
+`bb2020/BlitzBlock.java` by TENTACLES and SHADOWING after FOLLOWUP, by a second
+`DROP_FALLING_PLAYERS`/`HANDLE_DROP_PLAYER_CONTEXT`/`FALL_DOWN` block, and by the BB2025-only
+`STEADY_FOOTING` entries. None of them is on any currently-failing path — bb2020 @0 is 100/100 —
+so they were deliberately left alone rather than shipped untested.
+
+One more pointer for that dig: `driver.rs:400-420` records (from the ogre bb2020 campaign) that
+BB2020's TTM chain is *partly* routed to bb2020 twins and that routing the WHOLE set — including
+`AlwaysHungry` — was measured and is WORSE, so BB2020's TTM differences must be edition-gated
+INSIDE the shared chain. Check which of the BB2020 TTM steps are live before assuming a twin runs.
+The per-step state string (`ffb-model/src/util/state_hash.rs`) hashes half/turns/active/score,
+ball, the four once-per-turn flags, both re-roll banks, the acting player + its `currentMove`, and
+each player's coordinate/state/ACTIVE bit — `FFB_IDSTATE` shows only the coordinate and the state
+base, so an ACTIVE-bit or a turn-flag difference is invisible to it. That is precisely the shape of
+the ITER18 bb2025 seed-98 red.
