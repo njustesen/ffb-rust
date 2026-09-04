@@ -700,3 +700,144 @@ ball, the four once-per-turn flags, both re-roll banks, the acting player + its 
 each player's coordinate/state/ACTIVE bit — `FFB_IDSTATE` shows only the coordinate and the state
 base, so an ACTIVE-bit or a turn-flag difference is invisible to it. That is precisely the shape of
 the ITER18 bb2025 seed-98 red.
+
+
+## ITER20 — the BB2020 Troll TTM family: three faults, all in the landing chain
+
+The four bb2020 @1.0 reds (47/53/88/89) and one of the two @1e6 reds (27) were ONE activation shape
+— a Troll `THROW_TEAM_MATE` — hiding three separate BB2020-vs-BB2025 divergences, each of which
+only became visible once the one in front of it was fixed. bb2020 @1.0 **95 → 100**, @1e6
+**97 → 99**.
+
+### Fault 1 — `StepSwoop` never retired the thrower (ACTIVE bit)
+
+Repro bb2020 seed 88, i=24. `FFB_TRACE` prints both engines' full state STRINGS (`RUST_STEP … state=`
+and, because it also sets `-Dffb.parityDebug=true`, `JSTEP i=… state=`). They differed in exactly one
+character:
+
+```
+J  a00:14,8,Standing,4/5/5/10,0
+R  a00:14,8,Standing,4/5/5/10,1
+```
+
+`a00` = `away_01`, the Troll that threw at i=23. `FFB_IDSTATE` cannot see this — it prints coordinate
+and state BASE only, and the base agrees.
+
+A temporary `RRETIRE`/`RRESET`/`RNONE` probe set in `util_server_steps.rs` showed
+`retire_old_acting_player` was never called for the thrower; he left MOVING through
+`reset_blocked_and_moving_players` instead (`RRESET id=away_01 base=2 act=true`), which changes the
+base and leaves ACTIVE alone. Cause, in `bb2025/ttm/step_swoop.rs`: Java's
+
+```java
+game.getFieldModel().setPlayerCoordinate(thrownPlayer, passCoordinate);
+UtilActingPlayer.changeActingPlayer(game, state.thrownPlayerId, PlayerAction.SWOOP, false);
+```
+
+had been ported as four hand-written field writes that install the THROWN player and never touch the
+OUTGOING one. The missing half is `changeActingPlayer`'s `oldPlayer != newPlayer` branch:
+`if (currentState.getBase() == MOVING) { if (actingPlayer.hasActed() …)
+setPlayerState(oldPlayer, currentState.changeBase(STANDING).changeActive(false)); }`. The thrower is
+MOVING and has acted, so Java retires him STANDING **and INACTIVE**. A file comment had even recorded
+the gap as unportable ("this crate has no port of `UtilActingPlayer` at all") — it does have one.
+
+**Fix**, mirroring Java's own two-layer split:
+
+1. `util_server_steps.rs` — `change_player_action` (Java `UtilServerSteps.changePlayerAction`) now
+   wraps a new `pub fn change_acting_player` (Java `UtilActingPlayer.changeActingPlayer`); the
+   wrapper adds only `updateMoveSquares` + `updateDiceDecorations`, exactly as Java does. No
+   behaviour change for existing callers.
+2. `bb2025/ttm/step_swoop.rs` — call `change_acting_player`. Java's `StepSwoop` calls the BARE
+   helper, so the move-square/dice refresh is correctly absent; `setCurrentMove(MA - 3)` still runs
+   after.
+
+`bb2025/ttm/step_swoop.rs` is the LIVE step for all three editions (`driver.rs:243`), and Java's
+`mixed/ttm/StepSwoop` and `bb2025/ttm/StepSwoop` carry the identical call, so covering all three is
+correct rather than convenient. Test
+`a_landing_swoop_retires_the_thrower_standing_and_inactive`.
+
+Measured alone: bb2020 @1.0 95 → 96, @1e6 97 → 98, everything else unchanged, closed-roster 27/27.
+
+### Faults 2 and 3 — BB2020's landing re-roll: Swoop is not a BB2020 re-roll source
+
+With fault 1 fixed, seed 88's divergence moved from i=23 to i=93 — still the Troll TTM, now a
+DRAW-COUNT split. `FFB_STEPTRACE`, the same activation on both sides:
+
+| | Java (`JSTATE`) | Rust (`RSTATE`) |
+|---|---|---|
+| 1 | `INIT_SELECTING` (activation pick) | `InitSelecting` |
+| 2 | `INIT_THROW_TEAM_MATE` | `InitThrowTeamMate prompt=ThrowTeamMateTarget` |
+| 3 | `SWOOP` | `Swoop prompt=SwoopTarget` |
+| 4 | **`RIGHT_STUFF dialog=RE_ROLL`** | *(no prompt at all)* |
+| 5 | `INIT_SELECTING ap=null` | `InitSelecting ap=null` |
+
+`FFB_CANDSUM` quantified it: `draws=257` on both sides before the throw, `260` (Java) vs `258`
+(Rust) after, with IDENTICAL candidate sets either side (`k=99 n=1136`, `k=100 n=854`, same players,
+same per-player counts). Nothing about the board had drifted; the two engines were simply two draws
+apart in the decision stream, and the next pick split.
+
+Two distinct BB2025-isms were feeding a BB2020 landing:
+
+**Fault 2 — the step's `usingSwoop` shortcut.** `bb2025/ttm/StepRightStuff.java`'s failure branch is
+`if (usingSwoop) { setReRollSource(SWOOP); REPEAT; } else { askForReRollIfAvailable(...); }`, and its
+`handleCommand` has a `CLIENT_USE_SKILL` arm setting the same source.
+`bb2020/ttm/StepRightStuff.java` has NEITHER — no `usingSwoop` field, no `CLIENT_USE_SKILL` override,
+just `setReRolledAction(RIGHT_STUFF); doRoll = askForReRollIfAvailable(...)`. The shared Rust step
+serves BB2020 too, so both sites are now gated on `game.rules == Rules::Bb2025`. Test
+`the_swoop_reroll_source_is_bb2025_only`.
+
+**Fault 3 — the SKILL re-roll table.** Gating the step was not enough: an `RRS-SKILLSRC` probe showed
+`find_skill_reroll_source(game, "RIGHT_STUFF")` returning `Some("Swoop")` anyway, so BB2020 still
+re-rolled silently instead of asking. `SkillId::reroll_sources()` is documented as a cross-edition
+UNION, safe only while each edition's steps ask about action strings no other edition uses —
+and `RIGHT_STUFF` breaks exactly that, because BOTH editions' `StepRightStuff` ask for it while Java
+registers the source in one edition only:
+
+```java
+// ffb-common/.../skill/bb2025/Swoop.java
+registerRerollSource(ReRolledActions.RIGHT_STUFF, ReRollSources.SWOOP);
+// ffb-common/.../skill/bb2020/Swoop.java  — three registerProperty calls, no re-roll source
+// ffb-common/.../skill/bb2016/Swoop.java  — likewise
+```
+
+**Fix**: a new `SkillId::reroll_sources_for(rules)`, the sibling of the existing
+`properties_for(rules)`, returning `&[]` for `(Swoop, Bb2016 | Bb2020)` and delegating otherwise;
+`find_skill_reroll_source` now goes through it. Test
+`the_swoop_right_stuff_reroll_source_is_bb2025_only` (skill_id.rs — the split entry plus two
+unchanged controls).
+
+Faults 2+3 together took bb2020 @1.0 96 → **100** and @1e6 98 → **99**.
+
+### Gate movement, ITER19 → ITER20 (all nine re-measured on the final binary)
+
+| edition | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| bb2016 | **100** ✅ | **100** ✅ | **100** ✅ |
+| bb2020 | 95 → **100** ✅ | **100** ✅ | 97 → **99** |
+| bb2025 | **100** ✅ | **100** ✅ | **100** ✅ |
+
+`cargo test -p ffb-engine` 7395 / 0, `ffb-model` 2802 / 0. Random controls ×3 editions 100/100 under
+`FFB_PARITY_ROOT=parity_random`. Closed-roster regression suite 27/27 gates 100/100.
+
+### The ONE remaining gate — bb2020 @1e6 seed 83: a TTM landing injury, KO vs Badly Hurt
+
+Not a regression: seed 83 was already red before this iteration's fixes (the ITER19 @1e6 reds were
+27 and 83; 27 is now closed). The divergence is at i=14, resolving the away Troll's
+`THROW_TEAM_MATE` at i=13, and the two state strings differ in ONE field:
+
+```
+J  a02:-1,-1,Bh,3/7/3/8,0
+R  a02:-1,-1,Ko,3/7/3/8,0
+```
+
+`a02` is `away_03`, NOT the thrown player (`away_10`, who lands prone at 12,8 in both). Everything
+else — all 22 parts, ball, flags, banks, weather — is identical, and `rng_calls` is **51 on both
+sides at i=14** (36 at i=13), so the two engines spent the SAME number of dice on the activation:
+this is not a missing or extra roll, it is the same rolls read differently. Java ends with a
+casualty (Badly Hurt, off pitch); Rust ends with a Knock-Out.
+
+Start next iteration at the BB2020 TTM landing injury path — `InjuryTypeTTMLanding` and the
+`ApothecaryMode.THROWN_PLAYER` step that follows it in `bb2020/ttm/StepRightStuff.java` — since an
+apothecary is precisely the thing that turns a casualty into a KO without spending a die. Confirm
+with `FFB_DICE_TRACE` (Java's `pos` is the same global counter as `rng_calls`, so the two align
+directly) that both engines read the same injury total and the same d16, then find which side
+applies the apothecary.

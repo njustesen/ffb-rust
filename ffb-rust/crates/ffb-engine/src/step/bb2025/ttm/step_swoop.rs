@@ -29,7 +29,7 @@ use crate::util::util_server_player_swoop::UtilServerPlayerSwoop;
 ///     // client-only: render animation(thrownPlayerCoordinate -> passCoordinate)
 ///     // client-only: syncGameModel
 ///     setPlayerCoordinate(thrownPlayer, passCoordinate)
-///     changeActingPlayer(thrownPlayerId, SWOOP) — implemented (sets acting_player fields)
+///     UtilActingPlayer.changeActingPlayer(thrownPlayerId, SWOOP) — ported (retires the thrower)
 ///     // no-op: blitzTurnState.changeActingPlayer() — BlitzTurnState not ported
 ///     if thrownPlayerHasBall: setBallCoordinate(passCoordinate)
 ///     setCurrentMove(thrownPlayer.movementWithModifiers - 3)
@@ -51,11 +51,9 @@ use crate::util::util_server_player_swoop::UtilServerPlayerSwoop;
 ///
 /// Unported utilities (all documented, out-of-scope structural gaps — not invented workarounds):
 ///   client-only: UtilServerDialog.showDialog (Swoop skill dialog) — headless waits via `Continue`.
-///   TODO: UtilActingPlayer.changeActingPlayer(game, thrownPlayerId, SWOOP) — this crate has no port
-///     of `UtilActingPlayer` at all (it manages old-acting-player state transitions — MOVING/PRONE/
-///     STANDING — across the whole engine, not just this step); this step only sets the *new* acting
-///     player's id/action inline rather than calling the shared utility. A real fix would mean porting
-///     `UtilActingPlayer` itself, which is a codebase-wide subsystem, not a narrow one-file change.
+///   (RESOLVED) UtilActingPlayer.changeActingPlayer(game, thrownPlayerId, SWOOP) is ported as
+///     `util_server_steps::change_acting_player` and called here, so the outgoing thrower is
+///     retired (STANDING + INACTIVE once he has acted) exactly as Java retires him.
 ///   client-only: fieldModel animation, syncGameModel — client rendering/sync, no server-state effect.
 ///   no-op: game.blitzTurnState.changeActingPlayer() — `BlitzTurnState` is not ported (headless no-op).
 ///   TODO(hook-infra): executeStepHooks (Swoop scatter/deflection hook) — this crate's `SkillBehaviour`
@@ -302,13 +300,17 @@ impl StepSwoop {
                 // for the agents: Java offered the landed player another activation and Rust's
                 // inactive-skip rejected it, burning an extra decisionRng draw and picking a
                 // different player from there on (goblin bb2020 seed 9 i=248).
-                let old_state = game.field_model.player_state(&player_id).unwrap_or_default();
-                game.acting_player.player_id = Some(player_id.clone());
-                game.acting_player.player_action = Some(PlayerAction::Swoop);
-                game.acting_player.old_player_state = Some(old_state);
-                game.acting_player.standing_up = old_state.base() == ffb_model::enums::PS_PRONE;
-                game.field_model.set_player_state(
-                    &player_id, old_state.change_base(ffb_model::enums::PS_MOVING));
+                // Hand-setting those fields was still not the helper: Java's
+                // `UtilActingPlayer.changeActingPlayer` FIRST retires the OUTGOING acting player —
+                // the thrower, who is MOVING and hasActed, so he leaves STANDING **and INACTIVE**
+                // — then runs the un-acted granted-skill cleanup and the transient
+                // BLOCKED/MOVING reset. Skipping that left the Troll ACTIVE for the rest of the
+                // drive; the state hash sees the ACTIVE bit, so every bb2020 goblin TTM seed went
+                // red one step after the throw (seed 88 i=24: Java `a00:...,0`, Rust `a00:...,1`).
+                // Java calls the bare `UtilActingPlayer` helper here, NOT
+                // `UtilServerSteps.changePlayerAction`, so no move-square/dice refresh.
+                crate::step::util_server_steps::change_acting_player(
+                    game, &player_id, PlayerAction::Swoop, false);
                 // no-op: blitzTurnState.changeActingPlayer() — BlitzTurnState not ported (headless no-op)
                 if self.thrown_player_has_ball {
                     game.field_model.ball_coordinate = Some(pass_coord);
@@ -393,6 +395,67 @@ mod tests {
             ..Default::default()
         });
         game.field_model.set_player_coordinate(id, FieldCoordinate { x: 3, y: 3 });
+    }
+
+    /// Java `StepSwoop.executeStep`, the `throwScatter` branch, line-for-line:
+    ///
+    /// ```java
+    /// game.getFieldModel().setPlayerCoordinate(thrownPlayer, passCoordinate);
+    /// UtilActingPlayer.changeActingPlayer(game, state.thrownPlayerId, PlayerAction.SWOOP, false);
+    /// ```
+    ///
+    /// and `UtilActingPlayer.changeActingPlayer`'s `oldPlayer != newPlayer` branch:
+    ///
+    /// ```java
+    /// if (currentState.getBase() == PlayerState.MOVING) {
+    ///   if (actingPlayer.hasActed() && ...) {
+    ///     setPlayerState(oldPlayer, currentState.changeBase(STANDING).changeActive(false));
+    /// ```
+    ///
+    /// So the THROWER — MOVING and `hasActed()` after his throw — must come out of the landing
+    /// STANDING and INACTIVE, and the thrown player must take the acting slot as MOVING with
+    /// `currentMove = MA - 3`. Rust hand-set only the new acting player's fields and never retired
+    /// the old one, so the Troll stayed ACTIVE for the rest of the drive (goblin bb2020 seed 88
+    /// i=24: Java `a00:14,8,Standing,4/5/5/10,0`, Rust `...,1`).
+    #[test]
+    fn a_landing_swoop_retires_the_thrower_standing_and_inactive() {
+        use ffb_model::enums::{PS_MOVING, PS_STANDING};
+        let mut game = make_game();
+        add_player(&mut game, "thrower");
+        add_player(&mut game, "thrown");
+        game.field_model.set_player_coordinate("thrower", FieldCoordinate { x: 3, y: 3 });
+        game.field_model.set_player_coordinate("thrown", FieldCoordinate { x: 4, y: 3 });
+        game.field_model.set_player_state("thrower", PlayerState::new(PS_MOVING).change_active(true));
+        game.field_model.set_player_state("thrown", PlayerState::new(PS_STANDING).change_active(true));
+        // The thrower is mid-activation and HAS acted (he threw).
+        game.acting_player.set_player("thrower".into(), PlayerAction::ThrowTeamMate);
+        game.acting_player.has_passed = true;
+        assert!(game.acting_player.acted());
+        game.pass_coordinate = Some(FieldCoordinate { x: 8, y: 6 });
+
+        let mut step = StepSwoop::new("fall".into());
+        step.thrown_player_id = Some("thrown".into());
+        step.thrown_player_coordinate = Some(FieldCoordinate { x: 4, y: 3 });
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        step.throw_scatter = true;
+        step.using_swoop = Some(true);
+        // coordinateTo already set → Java falls straight through the CLIENT_SWOOP wait.
+        step.coordinate_to = Some(FieldCoordinate { x: 8, y: 6 });
+        step.start(&mut game, &mut GameRng::new(0));
+
+        let thrower_state = game.field_model.player_state("thrower").unwrap();
+        assert_eq!(thrower_state.base(), PS_STANDING, "the thrower leaves MOVING for STANDING");
+        assert!(!thrower_state.is_active(),
+            "an acted thrower must be retired INACTIVE by changeActingPlayer");
+        assert_eq!(game.acting_player.player_id.as_deref(), Some("thrown"),
+            "the thrown player takes the acting slot");
+        assert_eq!(game.acting_player.player_action, Some(PlayerAction::Swoop));
+        assert_eq!(game.field_model.player_state("thrown").unwrap().base(), PS_MOVING,
+            "the new acting player shows as MOVING");
+        assert!(game.field_model.player_state("thrown").unwrap().is_active(),
+            "the landing player stays ACTIVE (goblin bb2020 seed 9 i=248)");
+        assert_eq!(game.acting_player.current_move, 6 - 3,
+            "setCurrentMove(movementWithModifiers - 3)");
     }
 
     #[test]

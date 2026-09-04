@@ -170,7 +170,33 @@ fn retire_old_acting_player(game: &mut Game) {
     game.field_model.set_player_state(&old_id, new_state);
 }
 
+/// Java `UtilServerSteps.changePlayerAction(step, id, action, jumping)`:
+///
+/// ```java
+/// UtilServerGame.changeActingPlayer(step, id, action, jumping);   // -> UtilActingPlayer
+/// if (StringTool.isProvided(id)) {
+///     UtilServerPlayerMove.updateMoveSquares(...);
+///     ServerUtilBlock.updateDiceDecorations(...);
+/// }
+/// ```
+///
+/// The inner half is `change_acting_player` below. Callers that mirror a Java site invoking
+/// `UtilActingPlayer.changeActingPlayer` DIRECTLY (e.g. `StepSwoop`) must call THAT, not this one.
 pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerAction, jumping: bool) {
+    change_acting_player(game, player_id, action, jumping);
+    if !player_id.is_empty() {
+        // Java: UtilServerPlayerMove.updateMoveSquares(pStep.getGameState(), actingPlayer.isJumping());
+        crate::util::util_server_player_move::UtilServerPlayerMove::update_move_squares(game, jumping);
+        // Java: ServerUtilBlock.updateDiceDecorations(pStep.getGameState());
+        crate::util::server_util_block::ServerUtilBlock::update_dice_decorations(game);
+    }
+}
+
+/// Java `UtilActingPlayer.changeActingPlayer(game, id, action, jumping)` — the acting-player
+/// swap ALONE, with no move-square / dice-decoration refresh. Retires the outgoing acting player
+/// (STANDING + INACTIVE when he has acted), runs the un-acted granted-skill cleanup, installs the
+/// new player as MOVING, and resets the transient BLOCKED/MOVING states.
+pub fn change_acting_player(game: &mut Game, player_id: &str, action: PlayerAction, jumping: bool) {
     // Java UtilServerGame.changeActingPlayer: `if (pPlayerAction.getDelegate() != null)
     // actualAction = pPlayerAction.getDelegate();` — a declared ALL_YOU_CAN_EAT is stored as
     // THROW_BOMB, so the pass/bomb dispatch and every downstream site see a plain bomb action.
@@ -253,10 +279,6 @@ pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerActi
         // BLOCKED/MOVING states whenever the acting player changes. A block declared then cancelled
         // (e.g. failed Bone Head) leaves the defender BLOCKED until this runs (human seed 16 i=11).
         reset_blocked_and_moving_players(game);
-        // Java: UtilServerPlayerMove.updateMoveSquares(pStep.getGameState(), actingPlayer.isJumping());
-        crate::util::util_server_player_move::UtilServerPlayerMove::update_move_squares(game, jumping);
-        // Java: ServerUtilBlock.updateDiceDecorations(pStep.getGameState());
-        crate::util::server_util_block::ServerUtilBlock::update_dice_decorations(game);
     }
 }
 

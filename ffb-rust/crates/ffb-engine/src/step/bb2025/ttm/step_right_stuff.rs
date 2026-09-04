@@ -136,7 +136,11 @@ impl Step for StepRightStuff {
             Action::UseSkill { skill_id, use_skill: true } => {
                 // Java: CLIENT_USE_SKILL with ttmScattersInSingleDirection skill:
                 //   setReRolledAction(RIGHT_STUFF); setReRollSource(SWOOP)
-                if skill_id.properties().contains(&NamedProperties::TTM_SCATTERS_IN_SINGLE_DIRECTION) {
+                // BB2025 only — `bb2020/ttm/StepRightStuff.java` overrides no `handleCommand`
+                // CLIENT_USE_SKILL arm, so a BB2020 Swoop must not become a re-roll source here
+                // either (same gate, same reason, as the executeStep branch above).
+                if game.rules == Rules::Bb2025
+                    && skill_id.properties().contains(&NamedProperties::TTM_SCATTERS_IN_SINGLE_DIRECTION) {
                     self.re_roll_state.set_re_rolled_action(ReRolledAction::new("RIGHT_STUFF"));
                     self.re_roll_state.set_re_roll_source(ReRollSource::new("SWOOP"));
                 }
@@ -360,9 +364,18 @@ impl StepRightStuff {
             if !already_rerolled {
                 self.re_roll_state.set_re_rolled_action(ReRolledAction::new("RIGHT_STUFF"));
 
-                // Java: usingSwoop path → setReRoll(RIGHT_STUFF, SWOOP); pushCurrentStep; NEXT_STEP
-                // In Rust: set re-roll state to SWOOP and Repeat (re-enter executeStep)
-                if self.using_swoop {
+                // Java: usingSwoop path → setReRollSource(SWOOP); StepAction.REPEAT.
+                //
+                // BB2025 ONLY. `bb2020/ttm/StepRightStuff.java`'s failure branch is just
+                // `setReRolledAction(RIGHT_STUFF); doRoll = askForReRollIfAvailable(...)` — it has
+                // no `usingSwoop` field at all, and neither does the bb2016 twin. This shared step
+                // serves BB2020 as well (`driver.rs` has no BB2020 RightStuff arm), so an ungated
+                // Swoop shortcut SWALLOWED BB2020's re-roll dialog: Java offered a team re-roll on
+                // the failed landing and drew for it, Rust silently re-rolled off SWOOP and drew
+                // nothing, so the two decision streams desynced one draw inside every BB2020 throw
+                // (goblin bb2020 seed 88: Java `RIGHT_STUFF dialog=RE_ROLL`, Rust no prompt;
+                // `FFB_CANDSUM` draws 260 vs 258 with identical candidate sets either side).
+                if self.using_swoop && game.rules == Rules::Bb2025 {
                     self.re_roll_state.set_re_roll_source(ReRollSource::new("SWOOP"));
                     self.roll = 0;
                     return self.execute_step(game, rng);
@@ -517,6 +530,44 @@ mod tests {
         step.handle_command(&Action::UseSkill { skill_id: SkillId::Swoop, use_skill: true }, &mut game, &mut GameRng::new(0));
         assert_eq!(step.re_roll_state.re_rolled_action.as_ref().map(|a| a.name.as_str()), Some("RIGHT_STUFF"));
         assert_eq!(step.re_roll_state.re_roll_source.as_ref().map(|s| s.name.as_str()), Some("SWOOP"));
+    }
+
+    /// `bb2020/ttm/StepRightStuff.java` declares `private boolean fDropThrownPlayer, kickedPlayer;`
+    /// — no `usingSwoop` — overrides no `handleCommand` CLIENT_USE_SKILL arm, and its failure
+    /// branch is unconditionally
+    ///
+    /// ```java
+    /// if (getReRolledAction() != ReRolledActions.RIGHT_STUFF) {
+    ///   setReRolledAction(ReRolledActions.RIGHT_STUFF);
+    ///   doRoll = UtilServerReRoll.askForReRollIfAvailable(gameState, thrownPlayer,
+    ///       ReRolledActions.RIGHT_STUFF, minimumRoll, false);
+    /// }
+    /// ```
+    ///
+    /// The Swoop re-roll source is `bb2025/ttm/StepRightStuff.java` only (its `usingSwoop` branch
+    /// and its CLIENT_USE_SKILL arm). This shared step also serves BB2020, so both sites are
+    /// edition-gated; ungated, the Swoop shortcut swallowed BB2020's landing re-roll dialog.
+    #[test]
+    fn the_swoop_reroll_source_is_bb2025_only() {
+        use ffb_mechanics::skills::SkillId;
+        // BB2025: the Swoop skill becomes the RIGHT_STUFF re-roll source.
+        let mut g25 = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let mut s25 = StepRightStuff::new("ok".into());
+        s25.handle_command(&Action::UseSkill { skill_id: SkillId::Swoop, use_skill: true },
+            &mut g25, &mut GameRng::new(0));
+        assert_eq!(s25.re_roll_state.re_roll_source.as_ref().map(|s| s.name.as_str()), Some("SWOOP"),
+            "bb2025 StepRightStuff.handleCommand sets ReRollSources.SWOOP");
+
+        // BB2020: the same command must leave the re-roll state untouched, so the failure branch
+        // still reaches askForReRollIfAvailable.
+        let mut g20 = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        let mut s20 = StepRightStuff::new("ok".into());
+        s20.handle_command(&Action::UseSkill { skill_id: SkillId::Swoop, use_skill: true },
+            &mut g20, &mut GameRng::new(0));
+        assert!(s20.re_roll_state.re_roll_source.is_none(),
+            "bb2020 StepRightStuff has no CLIENT_USE_SKILL Swoop arm");
+        assert!(s20.re_roll_state.re_rolled_action.is_none(),
+            "bb2020 StepRightStuff does not pre-set the re-rolled action from a skill command");
     }
 
     #[test]

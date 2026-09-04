@@ -62,7 +62,11 @@ pub fn find_skill_reroll_source(game: &Game, rerolled_action: &str) -> Option<Re
     player.all_skill_ids()
         .filter(|id| !player.used_skills.contains(id))
         .filter_map(|id| {
-            id.reroll_sources()
+            // Edition-aware: Java registers a skill's re-roll sources in the PER-EDITION skill
+            // class' postConstruct, and `Swoop` genuinely differs (bb2025 registers RIGHT_STUFF,
+            // bb2016/bb2020 register nothing). The union table would hand a BB2020 landing a
+            // silent Swoop re-roll where Java offers the coach a team re-roll.
+            id.reroll_sources_for(game.rules)
                 .iter()
                 .find(|(action, _)| *action == rerolled_action)
                 .map(|(_, priority)| (id, *priority))

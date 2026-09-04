@@ -1647,6 +1647,37 @@ impl SkillId {
             _ => &[],
         }
     }
+
+    /// Edition-aware view of [`reroll_sources`], the sibling of [`properties_for`].
+    ///
+    /// `reroll_sources` is a cross-edition UNION, which is safe only while each edition's steps ask
+    /// about action strings no other edition uses. `RIGHT_STUFF` breaks that: BOTH the BB2020 and
+    /// the BB2025 `StepRightStuff` ask for it, and Java registers the source in ONE edition only —
+    ///
+    /// ```java
+    /// // ffb-common/.../skill/bb2025/Swoop.java
+    /// registerProperty(NamedProperties.ttmScattersInSingleDirection);
+    /// registerRerollSource(ReRolledActions.RIGHT_STUFF, ReRollSources.SWOOP);
+    ///
+    /// // ffb-common/.../skill/bb2020/Swoop.java — no registerRerollSource at all
+    /// registerProperty(NamedProperties.preventStuntyDodgeModifier);
+    /// registerProperty(NamedProperties.ttmScattersInSingleDirection);
+    /// registerProperty(new CancelSkillProperty(NamedProperties.ignoreTacklezonesWhenDodging));
+    /// ```
+    ///
+    /// (bb2016's `Swoop` registers no re-roll source either.) With the union, a BB2020 Doom Diver
+    /// that failed its landing found `Swoop` as a SKILL re-roll and re-rolled silently, where Java
+    /// found none and put a team-re-roll dialog to the coach — one decision draw apart, every
+    /// BB2020 throw (goblin bb2020 seed 88: `JSTATE … step=RIGHT_STUFF dialog=RE_ROLL` with no
+    /// Rust counterpart).
+    pub fn reroll_sources_for(self, rules: crate::enums::Rules) -> &'static [(&'static str, i32)] {
+        use crate::enums::Rules;
+        match (self, rules) {
+            // Java: bb2016/Swoop and bb2020/Swoop register NO re-roll source.
+            (SkillId::Swoop, Rules::Bb2016 | Rules::Bb2020) => &[],
+            _ => self.reroll_sources(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1657,6 +1688,26 @@ mod tests {
     /// canBeThrownIfStrengthIs3orLess INSTEAD of canBeThrown, bb2025 grants canBeThrown alone.
     /// The edition-agnostic union made a BB2020 Right Stuff player answer true to canBeThrown, so
     /// Rust offered a Throw Team-Mate target where Java's list is empty (chaos_pact bb2020 seed 22).
+    /// Java registers a skill's re-roll sources in the PER-EDITION skill class' postConstruct.
+    /// `bb2025/Swoop.postConstruct` calls `registerRerollSource(ReRolledActions.RIGHT_STUFF,
+    /// ReRollSources.SWOOP)`; `bb2020/Swoop.postConstruct` and `bb2016/Swoop.postConstruct` call
+    /// `registerRerollSource` not at all. Both editions' `StepRightStuff` ask for `RIGHT_STUFF`, so
+    /// the cross-edition union is wrong here and the lookup has to go through `reroll_sources_for`.
+    #[test]
+    fn the_swoop_right_stuff_reroll_source_is_bb2025_only() {
+        use crate::enums::Rules;
+
+        assert_eq!(SkillId::Swoop.reroll_sources_for(Rules::Bb2025), &[("RIGHT_STUFF", 1)],
+            "bb2025/Swoop registers RIGHT_STUFF -> SWOOP");
+        assert!(SkillId::Swoop.reroll_sources_for(Rules::Bb2020).is_empty(),
+            "bb2020/Swoop registers no re-roll source");
+        assert!(SkillId::Swoop.reroll_sources_for(Rules::Bb2016).is_empty(),
+            "bb2016/Swoop registers no re-roll source");
+        // Everything else is unchanged by the edition view.
+        assert_eq!(SkillId::Dodge.reroll_sources_for(Rules::Bb2020), SkillId::Dodge.reroll_sources());
+        assert_eq!(SkillId::Catch.reroll_sources_for(Rules::Bb2016), SkillId::Catch.reroll_sources());
+    }
+
     #[test]
     fn right_stuff_properties_are_edition_specific() {
         use crate::enums::Rules;
