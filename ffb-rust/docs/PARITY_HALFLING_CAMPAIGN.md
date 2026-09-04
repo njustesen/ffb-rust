@@ -212,3 +212,107 @@ bb2025 **100/100 each**.
 Closed-roster regressions @1.0: bb2025 × {goblin, amazon, lineman, dwarf, chaos, chaos_dwarf,
 chaos_pact, dark_elf, dark_elf_league_fumbbl, elf} all **100/100**; goblin and elf also 100/100 on
 bb2016 and bb2020. Nothing regressed. `TIMING java_total=63.6s rust_total=24.9s` (bb2020 @1e6).
+
+## ITER3 — `StepAllYouCanEat` never remembered the re-roll it offered, so an ACCEPTED re-roll ejected the star
+
+**Frontier.** `frontier.sh bb2025` over the five `@1e6` reds named one dominant family:
+
+```
+seed 44   idx 64   R t3 away Activate(away_15,HandOffMove)
+seed 66   idx 24   R t4 home Activate(home_02,AllYouCanEat)   [after side/turn flip]
+seed 70   idx 89   R t4 home Activate(home_01,PassMove)
+seed 72   idx 6    R t2 home Activate(home_02,AllYouCanEat)
+seed 90   idx 6    R t1 home Activate(home_02,AllYouCanEat)
+```
+
+Three of five rows are `Activate(home_02, AllYouCanEat)`, and the `@1.0` table's rows 44 and 94 were
+the same declaration — five rows across two gates, one family. Declarations identical on both sides.
+
+**Mechanism** (bb2025 seed 90 `@1e6`, parity idx 5 → the hash splits at idx 6).
+
+* `FFB_IDSTATE`: the boards are byte-identical at `i=6` and Java's `i=7` is byte-identical again —
+  Java's whole ALL_YOU_CAN_EAT activation changes nothing. Rust's `i=7` has
+  `home_02=-1,-1/Reserve`: **the star was sent off**, and the home turn ended (`R t2 away` against
+  `J t1 home`).
+* `FFB_DICE_TRACE`, first divergence `pos=61`; Java's `caller=` stack prices the three dice before
+  it: `pos=47 rollSkill … StepAllYouCanEat.executeStep:64` (the 4+ eat roll, **2 — a miss**),
+  `pos=48 RollMechanic.checkForLoner … useReRoll … StepAllYouCanEat.executeStep:57
+  StepAllYouCanEat.handleCommand:39` (the Loner check for the team re-roll the coach ACCEPTED),
+  `pos=49 rollSkill … StepAllYouCanEat.executeStep:64 … handleCommand:39` (**4 — the re-roll
+  succeeds**). Java plays on.
+* Rust's `FFB_TRACE` `LOOP` chain over the same activation ends
+  `… → ReRollOffer { source: TRR, action: "ALL_YOU_CAN_EAT" } → UseReRoll →
+  ActivatePlayer{away…}` — the coach accepted, and the very next prompt is the OPPONENT's turn.
+  `FFB_DIE_AT=61` puts Rust's `pos=61` in `StepCatchScatterThrowIn` (a d8 bounce) where Java is
+  still rolling bomb armour: by then the two games are different games.
+
+**The Java rule.** `StepAllYouCanEat.executeStep`:
+
+```java
+if (getReRolledAction() == ReRolledActions.ALL_YOU_CAN_EAT) {
+    if (getReRollSource() == null || !UtilServerReRoll.useReRoll(this, getReRollSource(), player)) {
+        doRoll = false;
+    }
+}
+…
+if (!success) { push EJECT_PLAYER; push BRIBES; }
+```
+
+`getReRollSource()` is filled by `AbstractStepWithReRoll.handleCommand`, which on
+`CLIENT_USE_RE_ROLL` does `setReRolledAction(cmd.getReRolledAction())` **and**
+`reRollSourceSuccessfully(cmd.getReRollSource())` — non-null when the coach accepts, null when they
+decline (`ParityRunner`'s decline is `sendUseReRoll(action, null)`).
+
+Rust has no such base class: every step carries the pair itself, setting `re_roll_source` when it
+raises the dialog and clearing it in `handle_command` on `UseReRoll { use_reroll: false }` (see
+`bb2025/move_/step_pick_up.rs:274,285` and its `handle_command`). **`StepAllYouCanEat` did
+neither.** It set only `re_rolled_action`, and its `handle_command` ignored the action entirely. So
+on the re-entry `re_roll_source` was always `None` → `do_roll = false` → the "declined" tail →
+Bribes + EjectPlayer. An *accepted* re-roll ejected the bombardier, every time, in both editions
+that have the step. The AllYouCanEat 4+ misses half the time, and the bb2025 halfling team spec
+fields Cindy Piewhistle at jersey 2 in every game — which is why one bug carried five reds.
+
+**The unit** (`crates/ffb-engine/src/step/mixed/pass/step_all_you_can_eat.rs`), all three parts of
+Java's contract for this step:
+
+1. Remember the offered source: `re_roll_state.re_roll_source = Some(prompt_re_roll_source(&prompt))`
+   (read off the `ReRollOffer` the helper returned, as Java reads it off the returning command).
+2. Clear it in `handle_command` on `UseReRoll { use_reroll: false }`.
+3. Ask through the **PLAYER** overload with the original bombardier —
+   `askForReRollIfAvailable(getGameState(), player, ALL_YOU_CAN_EAT, 4, false)`, `player` resolved
+   from `passState.getOriginalBombardier()`. Rust had called the acting-player entry, which skips
+   the `actingTeam.hasPlayer(player)` gate; this is the last caller of the pair ITER2 split.
+
+Colocated test `an_accepted_re_roll_rolls_again_and_a_declined_one_ejects`, written from the Java
+above, pins both halves (accept ⇒ a fresh die + one team re-roll spent + no eject; decline ⇒ no die
+and the Bribes→EjectPlayer push). The pre-existing prompt test had leaned on the missing membership
+gate (its bombardier was on no team) and was corrected to field a real home player.
+
+**Gates (seeds 1-100, tier 3), before → after:**
+
+| edition | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| bb2016 | 97 → **97** | 99 → **99** | 99 → **99** |
+| bb2020 | 98 → **98** | 100 → **100** ✅ | 98 → **98** |
+| bb2025 | 96 → **98** | 100 → **100** ✅ | 95 → **98** |
+
+18 reds → **13**. bb2025 `@1.0` seeds 44 and 94 green; `@1e6` seeds 66, 72 and 90 green. No gate
+moved down; bb2016's and bb2020's red seed SETS are byte-identical (bb2016 1/21/58, 63, 6;
+bb2020 4/69, —, 50/90). Remaining bb2025 reds: `@1.0` 62, 68; `@1e6` 44, 70.
+`TIMING java_total=52.6s rust_total=25.7s` (bb2025 @1e6).
+
+**Next.** The bb2025 frontier is now four rows over two gates and its two biggest neighbours are
+bb2016 `@1.0` (1, 21, 58) and bb2020 (4, 69, 50, 90). Re-run `frontier.sh` per edition before
+picking: seed 44 is red at `@1e6` only (green at `@1.0` and `@0`) and resolved on
+`Activate(away_15, HandOffMove)` — **jersey 15**, a player the state hash cannot see (only `nr<=11`
+are hashed), so read `FFB_IDSTATE` there rather than the hash. bb2016's three `@1.0` rows were
+`HandOffMove` / `Move` / `Move` on the TREEMEN (`*_01`), which is Take Root surface and has never
+been examined in this campaign.
+
+**Verification (all measured this iteration; every parity line quoted is the positive `PARITY:`):**
+`cargo test -p ffb-engine` **7401/0** (+1 new test), `ffb-model` **2802/0**.
+Random controls (`FFB_PARITY_ROOT=parity_random`, `--agent random`): halfling bb2016 / bb2020 /
+bb2025 **100/100 each**.
+Closed-roster regressions @1.0: bb2025 × {goblin, amazon, lineman, dwarf, chaos, chaos_dwarf,
+chaos_pact, dark_elf, dark_elf_league_fumbbl, elf} all **100/100**; goblin and elf also 100/100 on
+bb2016 and bb2020. Nothing regressed.

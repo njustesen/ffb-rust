@@ -19,6 +19,17 @@ const RE_ROLLED_ACTION: &str = "ALL_YOU_CAN_EAT";
 /// Java: `int minimumRoll = 4`
 const MINIMUM_ROLL: i32 = 4;
 
+/// The `ReRollSource` carried by a `ReRollOffer` prompt — Java's
+/// `ClientCommandUseReRoll.getReRollSource()`, which the client echoes back from the dialog it was
+/// shown. Any other prompt shape cannot reach the AllYouCanEat re-roll, so it falls back to `TRR`,
+/// the source `askForReRollIfAvailable` offers when no skill applies.
+fn prompt_re_roll_source(prompt: &ffb_model::prompts::AgentPrompt) -> ffb_model::enums::ReRollSource {
+    match prompt {
+        ffb_model::prompts::AgentPrompt::ReRollOffer { source, .. } => source.clone(),
+        _ => ffb_model::enums::ReRollSource::new("TRR"),
+    }
+}
+
 /// Java: `StepAllYouCanEat` (mixed/pass, BB2020 + BB2025).
 /// Extends AbstractStepWithReRoll.
 #[derive(Debug, Default)]
@@ -95,10 +106,25 @@ impl StepAllYouCanEat {
 
             if !success && !rerolled {
                 // Java: if (!success && !reRolled && askForReRollIfAvailable(...)) { return; }
-                if let Some(prompt) = crate::step::util_server_re_roll::ask_for_reroll_if_available(
-                    game, RE_ROLLED_ACTION, MINIMUM_ROLL, false,
+                // Java passes the PLAYER overload the original bombardier, NOT the acting player:
+                //   askForReRollIfAvailable(getGameState(), player, ALL_YOU_CAN_EAT, 4, false)
+                // (`StepAllYouCanEat.executeStep`, the `player` resolved from
+                // `passState.getOriginalBombardier()` at the top of the method).
+                if let Some(prompt) = crate::step::util_server_re_roll::ask_for_reroll_if_available_for(
+                    game, Some(&player_id), RE_ROLLED_ACTION, MINIMUM_ROLL, false,
                 ) {
                     self.re_roll_state.re_rolled_action = Some(ReRolledAction::new(RE_ROLLED_ACTION));
+                    // Java's `AbstractStepWithReRoll.handleCommand` fills BOTH fields from the
+                    // incoming `ClientCommandUseReRoll` (`setReRolledAction` +
+                    // `reRollSourceSuccessfully(cmd.getReRollSource())`), so on the re-entry
+                    // `getReRollSource()` is the source the coach accepted. Rust's steps carry
+                    // that themselves: remember the offered source now, and clear it in
+                    // `handle_command` when the coach declines. Without this the source stayed
+                    // `None`, `use_reroll` was never called, `doRoll` went false and an ACCEPTED
+                    // re-roll ejected the bombardier (bb2025 halfling seed 90 i=6: Java rolls the
+                    // Loner check and a fresh 4+ and plays on, Rust sent Cindy off and ended the
+                    // drive).
+                    self.re_roll_state.re_roll_source = Some(prompt_re_roll_source(&prompt));
                     // `outcome_base` was built from `StepOutcome::next()` (action == NextStep),
                     // which the driver's dispatch silently drops `.prompt` for. Rebuild from
                     // `cont()` so the reroll dialog actually reaches the agent, carrying over
@@ -146,7 +172,13 @@ impl Step for StepAllYouCanEat {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: `AbstractStepWithReRoll.handleCommand` sets fReRollSource from the command, which
+        // the harness sends as null when the coach declines (`sendUseReRoll(action, null)`).
+        // `executeStep` then sees `getReRollSource() == null` → `doRoll = false` → eject.
+        if let Action::UseReRoll { use_reroll: false } = action {
+            self.re_roll_state.re_roll_source = None;
+        }
         self.execute_step(game, rng)
     }
 
@@ -167,6 +199,97 @@ mod tests {
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
+    }
+
+    /// A home-team bombardier holding the ALL_YOU_CAN_EAT re-roll offer's preconditions:
+    /// Java's `RollMechanic.isTeamReRollAvailable` gates on `actingTeam.hasPlayer(player)`, and
+    /// `StepAllYouCanEat` hands it the ORIGINAL BOMBARDIER, so the player has to really be on the
+    /// acting team for the dialog to be raised at all.
+    fn add_home_bombardier(game: &mut Game, id: &str) {
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: id.into(), name: id.into(), nr: 2, position_id: "star".into(),
+            movement: 5, strength: 2, agility: 3, passing: 3, armour: 7,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate(id, ffb_model::types::FieldCoordinate::new(12, 5));
+        game.original_bombardier = Some(id.into());
+        game.acting_player.player_id = Some(id.into());
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        game.turn_data_home.reroll_used = false;
+    }
+
+    /// Java `StepAllYouCanEat.executeStep`, the re-roll re-entry:
+    ///
+    /// ```java
+    /// if (getReRolledAction() == ReRolledActions.ALL_YOU_CAN_EAT) {
+    ///     if (getReRollSource() == null || !UtilServerReRoll.useReRoll(this, getReRollSource(), player)) {
+    ///         doRoll = false;
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// `getReRollSource()` is filled by `AbstractStepWithReRoll.handleCommand` from the incoming
+    /// `ClientCommandUseReRoll` — non-null when the coach ACCEPTS, null when they decline. So an
+    /// accepted re-roll must spend the team re-roll and roll a fresh die; only a declined one
+    /// falls through to Bribes + EjectPlayer.
+    #[test]
+    fn an_accepted_re_roll_rolls_again_and_a_declined_one_ejects() {
+        // ── accepted ────────────────────────────────────────────────────────────────────────
+        let mut game = make_game();
+        add_home_bombardier(&mut game, "home_02");
+        // Seed the failing roll: walk seeds until the first d6 is a miss (< 4) so the step
+        // offers the re-roll.
+        let mut accepted = None;
+        for seed in 0u64..200 {
+            let mut step = StepAllYouCanEat::new();
+            let mut rng = GameRng::new(seed);
+            let out = step.start(&mut game, &mut rng);
+            if out.prompt.is_some() {
+                assert!(step.re_roll_state.re_roll_source.is_some(),
+                    "offering the dialog must remember the source, as Java's handleCommand sets it \
+                     from the returning command");
+                let before = rng.call_count;
+                let rerolls_before = game.turn_data_home.rerolls;
+                let out2 = step.handle_command(
+                    &Action::UseReRoll { use_reroll: true }, &mut game, &mut rng);
+                assert!(rng.call_count > before,
+                    "an accepted ALL_YOU_CAN_EAT re-roll must roll a fresh d6");
+                assert_eq!(game.turn_data_home.rerolls, rerolls_before - 1,
+                    "an accepted team re-roll is spent");
+                accepted = Some(out2);
+                break;
+            }
+        }
+        let accepted = accepted.expect("expected a failing roll with a TRR available");
+        // Java only pushes BRIBES/EJECT_PLAYER when the (re-)roll failed; a successful re-roll
+        // leaves the stack alone.
+        if accepted.events.iter().any(|e| matches!(e,
+            ffb_model::events::GameEvent::AllYouCanEatRoll { success: true, .. })) {
+            assert!(accepted.pushes.is_empty(),
+                "a successful re-roll must not eject the bombardier");
+        }
+
+        // ── declined ────────────────────────────────────────────────────────────────────────
+        let mut game = make_game();
+        add_home_bombardier(&mut game, "home_02");
+        for seed in 0u64..200 {
+            let mut step = StepAllYouCanEat::new();
+            let mut rng = GameRng::new(seed);
+            let out = step.start(&mut game, &mut rng);
+            if out.prompt.is_some() {
+                let before = rng.call_count;
+                let out2 = step.handle_command(
+                    &Action::UseReRoll { use_reroll: false }, &mut game, &mut rng);
+                assert_eq!(rng.call_count, before,
+                    "a declined re-roll rolls nothing (doRoll == false)");
+                assert_eq!(out2.pushes.len(), 1);
+                assert_eq!(out2.pushes[0][0].step_id, StepId::Bribes);
+                assert_eq!(out2.pushes[0][1].step_id, StepId::EjectPlayer);
+                return;
+            }
+        }
+        panic!("expected a failing roll with a TRR available");
     }
 
     #[test]
@@ -265,10 +388,7 @@ mod tests {
     #[test]
     fn reroll_offer_returns_continue_action_with_prompt() {
         let mut game = make_game();
-        game.thrower_id = Some("bard".into());
-        game.home_playing = true;
-        game.turn_data_home.rerolls = 1;
-        game.turn_data_home.reroll_used = false;
+        add_home_bombardier(&mut game, "bard");
         // Try seeds until we get a failing roll (1-3 for a 4+ target), which should
         // trigger a reroll offer since a TRR is available.
         let mut found_prompt = false;
