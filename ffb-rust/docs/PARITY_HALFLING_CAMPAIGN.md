@@ -316,3 +316,106 @@ bb2025 **100/100 each**.
 Closed-roster regressions @1.0: bb2025 × {goblin, amazon, lineman, dwarf, chaos, chaos_dwarf,
 chaos_pact, dark_elf, dark_elf_league_fumbbl, elf} all **100/100**; goblin and elf also 100/100 on
 bb2016 and bb2020. Nothing regressed.
+
+## ITER4 — a TTM landing that hits a player must DROP it, not apply the injury: the skipped drop left a Treeman rooted for the rest of the game
+
+**Frontier.** `frontier.sh bb2016` over the three `@1.0` reds named one family outright:
+
+```
+seed 1    first hash diff idx 55    resolving idx 54   R t6 home Activate(home_01,HandOffMove)  dice=[]
+seed 21   first hash diff idx 37    resolving idx 36   R t6 away Activate(away_01,Move)         dice=[]
+seed 58   first hash diff idx 169   resolving idx 168  R t8 home Activate(home_01,Move)         dice=[]
+```
+
+All three resolve on a `*_01` — the bb2016 halfling **Treeman** — with identical declarations and
+no dice at the prompt. Take Root surface, which this campaign had never examined.
+
+**Mechanism** (bb2016 seed 21 `@1.0`, parity idx 37).
+
+* `FFB_DICE_TRACE`, first divergence `pos=70`. Java's `caller=` stack prices it exactly:
+  `pos=70 rollSkill … TakeRootBehaviour$1.handleExecuteStepHook:56 … StepTakeRoot.executeStep:44`
+  (the Take Root d6), `pos=71 rollSkill … StepStandUp.executeStep:103` (the stand-up d6 — a bb2016
+  Treeman is MA 2, below `Constant.MINIMUM_MOVE_TO_STAND_UP` = 3, so standing up is a roll).
+  Rust's `pos=70` is the **stand-up** die and there is no Take Root die at all: `FFB_DIE_AT=70`
+  puts it in `StepStandUp::start`. Rust was exactly one negatrait roll short.
+* Rust's Take Root step *was* entered — a probe on `StepTakeRoot::execute_step` printed
+  `player=away_01 started_standing=true is_rooted=true field_ps=Some(1282) has_skill=true` and took
+  the `is_rooted` early return. `1282 = 0x502` = MOVING | ACTIVE | **ROOTED**.
+* Both engines rooted away_01 at `pos=22` (Take Root d6 = 1, `minimumRollConfusion(true)` = 2), and
+  a probe listing every Rust Take Root roll against Java's shows them agreeing on 22, 25, 32, 41 and
+  then Rust going silent where Java keeps rolling at 70, 78, 89 — i.e. Java's away_01 had LOST the
+  rooted bit somewhere and Rust's had not. `changeBase` does not drop it (`_BASE_MASK[PRONE]` is
+  `0xfff00`, which keeps `_BIT_ROOTED` `0x400`), and `recoverTacklezones()` only clears
+  hypnotised/confused, so the only Java site that can is `UtilServerInjury.dropPlayer`.
+* `FFB_IDSTATE` says away_01 went PRONE between `i=34` and `i=35`, during
+  `Activate(away_01, ThrowTeamMate)` — the Treeman threw a team-mate and the thrown halfling
+  **scattered back onto the thrower's own square**. A `set_player_state` probe with a backtrace
+  caught the write: `InjuryResult::apply_to` inside `bb2016::ttm::StepInitScatterPlayer`,
+  `1282 -> 1283` — PRONE, ROOTED intact.
+
+**The Java rule.** `bb2016/ttm/StepInitScatterPlayer.executeStep`, in-bounds with a player landed
+upon, only **publishes** the hit result and then, at the very end of the step, drops the victim:
+
+```java
+InjuryResult injuryResultHitPlayer = UtilServerInjury.handleInjury(this, new InjuryTypeTTMHitPlayer(),
+    null, playerLandedUpon, endCoordinate, null, null, ApothecaryMode.HIT_PLAYER);
+publishParameter(new StepParameter(StepParameterKey.INJURY_RESULT, injuryResultHitPlayer));
+…
+if (playerLandedUpon != null) {
+    publishParameters(UtilServerInjury.dropPlayer(this, playerLandedUpon, ApothecaryMode.HIT_PLAYER, true));
+}
+```
+
+`applyTo` is the job of the `ScatterPlayer` sequence's `APOTHECARY [APOTHECARY_HIT_PLAYER]` step
+(`generator/bb2016/ScatterPlayer.java:39`), which Rust's generator already builds. And
+`UtilServerInjury.dropPlayer`'s whole body is guarded:
+
+```java
+if ((playerState.getBase() != PlayerState.PRONE) && (playerState.getBase() != PlayerState.STUNNED)) {
+    if (playerState.getBase() != PlayerState.HIT_ON_GROUND) { playerState = playerState.changeRooted(false); }
+    playerState = playerState.changeBase(pPlayerBase);
+    …
+}
+```
+
+So applying the injury early is not merely premature — it **cancels the drop**. Rust's
+`injury_result.apply_to(game)` left the victim already PRONE, `drop_player` then no-opped, and the
+`changeRooted(false)` (and the `changeActive(false)` beside it) never ran. A rooted Treeman landed
+on by its own thrown team-mate stayed rooted for the rest of the game and never rolled Take Root
+again — one missing d6 per later activation, every one of them shifting the whole stream.
+
+**The unit** (`crates/ffb-engine/src/step/bb2016/ttm/step_init_scatter_player.rs`): delete the
+`injury_result.apply_to(game)` from the hit-player branch, leaving publish-then-`drop_player`
+exactly as Java has it. This is the same correction the out-of-bounds branch of this very step
+already carried (its comment: *"Java only ROLLS here … the old immediate `apply_to` sent a KO'd
+player to the box"*) — the in-bounds twin had been missed. Colocated test
+`landing_on_a_rooted_player_drops_it_and_clears_the_root`, written from the Java above, pins it:
+the occupant is rooted before the throw, and after the step it is PRONE **and un-rooted**, with
+`DROP_THROWN_PLAYER` and `INJURY_RESULT` published.
+
+**Gates (seeds 1-100, tier 3), before → after:**
+
+| edition | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| bb2016 | 97 → **99** | 99 → **100** ✅ | 99 → **99** |
+| bb2020 | 98 → **98** | 100 → **100** ✅ | 98 → **98** |
+| bb2025 | 98 → **98** | 100 → **100** ✅ | 98 → **98** |
+
+13 reds → **11**. bb2016 `@1.0` seeds 21 and 58 green, `@0` seed 63 green. No gate moved down, and
+bb2020's and bb2025's red seed SETS are byte-identical to ITER3 (bb2020 4/69, —, 50/90;
+bb2025 62/68, —, 44/70). Remaining bb2016 reds: `@1.0` seed 1, `@1e6` seed 6.
+
+**Next.** The frontier is now four editions-worth of two-seed tables. bb2016 `@1.0` seed 1 is the
+last member of the Treeman family (`Activate(home_01, HandOffMove)`, idx 55) and is the natural
+next read — it may be a second Take Root/Timmm-ber! site or may be unrelated; run
+`MATCHUP=halfling sh scripts/first_state_divergence.sh bb2016 1` and take `FFB_DICE_TRACE` before
+theorising. bb2020 (4, 69, 50, 90) is the biggest remaining single-edition set.
+
+**Verification (all measured this iteration; every parity line quoted is the positive `PARITY:`):**
+`cargo test -p ffb-engine` **7402/0** (+1 new test), `ffb-model` **2802/0**.
+Random controls (`FFB_PARITY_ROOT=parity_random`, `--agent random`): halfling bb2016 / bb2020 /
+bb2025 **100/100 each**.
+Closed-roster regressions @1.0: goblin on **all three** editions 100/100 (it is the bb2016 Troll-TTM
+roster this change is most likely to disturb), elf bb2016 100/100, and bb2025 ×
+{amazon, lineman, dwarf, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl, elf}
+all 100/100. Nothing regressed.

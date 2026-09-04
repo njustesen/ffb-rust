@@ -112,7 +112,17 @@ impl StepInitScatterPlayer {
                     None, &hit_player_id, end_coord, None, None,
                     ApothecaryMode::HitPlayer,
                 );
-                injury_result.apply_to(game);
+                // Java PUBLISHES this result and does NOT apply it here — the ScatterPlayer
+                // sequence's `APOTHECARY [APOTHECARY_HIT_PLAYER]` step calls `applyTo` later.
+                // Applying it here is not merely early, it CANCELS the drop below: `InjuryResult
+                // .applyTo` only does `playerState.changeBase(...)`, so the hit player is already
+                // PRONE by the time `UtilServerInjury.dropPlayer` runs, and dropPlayer's whole
+                // body is guarded by `if (base != PRONE && base != STUNNED)` — the branch that
+                // carries `playerState.changeRooted(false)`. A rooted Treeman landed on by a
+                // thrown team-mate therefore stayed rooted forever and never rolled Take Root
+                // again (halfling bb2016 seed 21: Java rolls Take Root at die pos 70 then the
+                // stand-up d6 at 71, Rust rolled only the stand-up, shifting every later die).
+                // Same class as the out-of-bounds branch below, which was corrected earlier.
                 outcome = outcome.publish(StepParameter::InjuryResult(Box::new(injury_result)));
 
                 // Java: if (isHomePlaying && teamHome.hasPlayer(hit)) || (!isHome && teamAway.hasPlayer(hit)) → END_TURN
@@ -335,6 +345,69 @@ mod tests {
         // If went OOB, should have INJURY_RESULT published
         // (if stayed in-bounds, still has ThrownPlayerId)
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::ThrownPlayerId(_))));
+    }
+
+    #[test]
+    fn landing_on_a_rooted_player_drops_it_and_clears_the_root() {
+        // Java bb2016 StepInitScatterPlayer.executeStep, in-bounds + playerLandedUpon != null:
+        //   publishParameter(DROP_THROWN_PLAYER, true);
+        //   InjuryResult injuryResultHitPlayer = UtilServerInjury.handleInjury(
+        //       this, new InjuryTypeTTMHitPlayer(), null, playerLandedUpon, endCoordinate, ...);
+        //   publishParameter(new StepParameter(INJURY_RESULT, injuryResultHitPlayer));
+        //   ...
+        //   if (playerLandedUpon != null) {
+        //       publishParameters(UtilServerInjury.dropPlayer(this, playerLandedUpon,
+        //           ApothecaryMode.HIT_PLAYER, true));
+        //   }
+        // Java never calls injuryResultHitPlayer.applyTo(...) here — the sequence's
+        // APOTHECARY [APOTHECARY_HIT_PLAYER] step does. So when dropPlayer runs, the hit player is
+        // still STANDING/MOVING and dropPlayer's non-PRONE/STUNNED branch fires:
+        //   `if (base != HIT_ON_GROUND) playerState = playerState.changeRooted(false);`
+        //   `playerState = playerState.changeBase(pPlayerBase /* PRONE */);`
+        // i.e. being landed on UNROOTS a rooted Treeman.
+        let seed = 42u64;
+        let start = FieldCoordinate::new(12, 7);
+
+        // Where does the 3× d8 scatter of this seed end? The step draws no dice before the
+        // scatter, so a fresh GameRng with the same seed reproduces it exactly.
+        let end = {
+            let mut probe = make_game();
+            add_home_player(&mut probe, "thrown", start);
+            let r = crate::step::action::ttm::util_throw_team_mate_sequence::scatter_player(
+                &mut probe, &mut GameRng::new(seed), start, true);
+            assert!(r.in_bounds, "seed must scatter in-bounds for this test");
+            r.last_valid_coordinate
+        };
+        assert_ne!(end, start, "the occupant must not be the thrown player itself");
+
+        let mut game = make_game();
+        add_home_player(&mut game, "thrown", start);
+        add_home_player(&mut game, "occupant", end);
+        // The occupant is a Treeman that has already failed its Take Root roll.
+        let rooted = game.field_model.player_state("occupant").unwrap().change_rooted(true);
+        game.field_model.set_player_state("occupant", rooted);
+        assert!(game.field_model.player_state("occupant").unwrap().is_rooted());
+        game.pass_coordinate = Some(start);
+
+        let mut step = StepInitScatterPlayer::new();
+        step.thrown_player_id = Some("thrown".into());
+        step.thrown_player_coordinate = Some(start);
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        step.throw_scatter = true;
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DropThrownPlayer(true))),
+            "Java publishes DROP_THROWN_PLAYER for a landing on a player");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))),
+            "Java publishes the TTM-hit InjuryResult (the apothecary step applies it later)");
+
+        let after = game.field_model.player_state("occupant").unwrap();
+        assert!(!after.is_rooted(),
+            "dropPlayer must clear ROOTED — an applyTo here would leave the occupant PRONE first \
+             and skip dropPlayer's whole branch");
+        assert_eq!(after.base(), ffb_model::enums::PS_PRONE,
+            "dropPlayer places the hit player PRONE");
     }
 
     // ── report wiring (bb2016 has no addReport calls in Java) ─────────────────
