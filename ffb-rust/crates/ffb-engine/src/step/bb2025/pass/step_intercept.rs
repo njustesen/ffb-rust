@@ -80,10 +80,37 @@ impl StepIntercept {
             Some(c) => c,
             None => return Vec::new(),
         };
+        // Java `UtilPassing.findInterceptors`:
+        //   boolean passesNotIntercepted = pThrower.hasSkillProperty(passesAreNotIntercepted);
+        //   ...
+        //   if (passesNotIntercepted && !UtilCards.hasSkillToCancelProperty(otherPlayer,
+        //           passesAreNotIntercepted)) continue;
+        // This is BB2025 **Cloud Burster**: the thrower's passes cannot be intercepted at all
+        // unless the would-be interceptor carries a skill that cancels the property (BB2025 Very
+        // Long Legs). Rust had no such gate, so a Phoenix Warrior's pass was offered for
+        // interception, the heuristic spent two sampler draws on the dialog Java never showed and
+        // then rolled an interception die — on a success the ball teleported onto the opponent and
+        // the away turn ended in a turnover Java never had (high_elf bb2025 @1.0 seed 37, i=9:
+        // away_05's pass to a teammate at (13,6) ended on home_00 at (12,5), Rust flipping to the
+        // home turn while Java played on with `Away2 HAND_OVER_MOVE`).
+        // Asked EDITION-AWARE, exactly as Java's per-edition skill classes resolve it: BB2020's
+        // Cloud Burster registers `canForceInterceptionRerollOfLongPasses` instead and must NOT
+        // suppress interceptions (`SkillId::properties_for`). This file is the ONLY arm
+        // `driver.rs` has for `StepId::Intercept`, so it runs for every edition and the gate has
+        // to be edition-gated INSIDE it.
+        let passes_not_intercepted = game.player(&thrower_id)
+            .map(|p| p.has_skill_property_in(game.rules, NamedProperties::PASSES_ARE_NOT_INTERCEPTED))
+            .unwrap_or(false);
         // Opponents: the team that is NOT the active team
         let opponent_team = game.inactive_team();
         opponent_team.players.iter()
             .filter(|player| {
+                if passes_not_intercepted
+                    && !player.has_skill_to_cancel_property_in(
+                        game.rules, NamedProperties::PASSES_ARE_NOT_INTERCEPTED)
+                {
+                    return false;
+                }
                 // Must be on the pitch
                 let coord = match game.field_model.player_coordinate(&player.id) {
                     Some(c) => c,
@@ -496,6 +523,64 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         // Goes to failure (no possible interceptors or declined)
         assert_eq!(out.goto_label.as_deref(), Some("fail"));
+    }
+
+    /// Java `UtilPassing.findInterceptors`:
+    /// ```java
+    /// boolean passesNotIntercepted = pThrower.hasSkillProperty(NamedProperties.passesAreNotIntercepted);
+    /// for (Player<?> otherPlayer : otherPlayers) {
+    ///   if (passesNotIntercepted && !UtilCards.hasSkillToCancelProperty(otherPlayer,
+    ///           NamedProperties.passesAreNotIntercepted)) {
+    ///     continue;
+    ///   }
+    ///   ...
+    /// }
+    /// ```
+    /// BB2025 Cloud Burster: an otherwise perfectly legal corridor interceptor is skipped, so the
+    /// step finds NO possible interceptors and jumps straight to its failure label — no dialog,
+    /// no die. BB2020's Cloud Burster registers `canForceInterceptionRerollOfLongPasses` instead
+    /// (`SkillId::properties_for`) and must NOT suppress the interception; this file is the only
+    /// `StepId::Intercept` arm in `driver.rs`, so both editions run it.
+    #[test]
+    fn a_bb2025_cloud_burster_thrower_has_no_interceptors_but_a_bb2020_one_does() {
+        use ffb_model::enums::PlayerState as PS;
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::skill_def::SkillWithValue;
+
+        for (rules, expect_failure) in [(Rules::Bb2025, true), (Rules::Bb2020, false)] {
+            let mut home = test_team("home", 0);
+            let mut away = test_team("away", 0);
+
+            let mut thrower = ffb_model::model::player::Player::default();
+            thrower.id = "t1".into();
+            thrower.agility = 3;
+            thrower.starting_skills = vec![SkillWithValue::new(SkillId::CloudBurster)];
+            home.players.push(thrower);
+
+            let mut opp = ffb_model::model::player::Player::default();
+            opp.id = "opp1".into();
+            opp.agility = 3;
+            away.players.push(opp);
+
+            let mut game = Game::new(home, away, rules);
+            game.home_playing = true;
+            game.thrower_id = Some("t1".into());
+            game.thrower_action = Some(PlayerAction::Pass);
+            game.pass_coordinate = Some(FieldCoordinate::new(14, 7));
+            game.field_model.set_player_coordinate("t1", FieldCoordinate::new(1, 7));
+            game.field_model.set_player_coordinate("opp1", FieldCoordinate::new(7, 7));
+            game.field_model.set_player_state("opp1", PS::new(ffb_model::enums::PS_STANDING));
+
+            let mut step = StepIntercept::new("fail".into());
+            let out = step.start(&mut game, &mut GameRng::new(0));
+            if expect_failure {
+                assert_eq!(out.goto_label.as_deref(), Some("fail"),
+                    "{rules:?}: Cloud Burster's passes are not intercepted — no candidates at all");
+            } else {
+                assert_ne!(out.goto_label.as_deref(), Some("fail"),
+                    "{rules:?}: Cloud Burster does not register passesAreNotIntercepted here");
+            }
+        }
     }
 
     #[test]

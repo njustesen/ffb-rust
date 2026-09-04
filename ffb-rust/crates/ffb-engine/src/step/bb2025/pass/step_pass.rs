@@ -333,7 +333,26 @@ impl StepPass {
             let result = if let Some(thrower) = game.thrower() {
                 if let Some(dist) = passing_dist {
                     let mechanic = crate::mechanic::pass_mechanic_for(game.rules);
-                    mechanic.evaluate_pass_simple(thrower, self.roll, dist, &pass_modifiers, is_bomb)
+                    // The `bombAction` flag each edition's `StepPass` hands to `evaluatePass` is
+                    // NOT the same expression. bb2020/bb2025 pass `isBomb` and their mechanics
+                    // ignore it outright. bb2016 passes the INVERSE — literally
+                    // `PlayerAction.THROW_BOMB != game.getThrowerAction()`
+                    // (`bb2016/StepPass:172`) — and its mechanic is the only one that reads it:
+                    // `if (isModifiedFumble(...)) { if (hasSkillProperty(dontDropFumbles) &&
+                    // !bombAction) return SAVED_FUMBLE; else return FUMBLE; }`. So on a REGULAR
+                    // bb2016 pass the flag is TRUE and Safe Throw never saves a modified fumble;
+                    // only a THROW_BOMB (never HAIL_MARY_BOMB) makes it false. Rust passed
+                    // `is_bomb`, inverting the meaning, so every bb2016 Safe Throw thrower turned
+                    // a modified fumble into a SAVED_FUMBLE that Java scores as a plain FUMBLE:
+                    // Java scattered the ball off the thrower and turned the drive over while Rust
+                    // kept it and played on (high_elf bb2016 @1.0 seeds 49/91/94 — all three the
+                    // same family, each a `PassMove` by a Thrower).
+                    let bomb_action = if game.rules == ffb_model::enums::Rules::Bb2016 {
+                        game.thrower_action != Some(PlayerAction::ThrowBomb)
+                    } else {
+                        is_bomb
+                    };
+                    mechanic.evaluate_pass_simple(thrower, self.roll, dist, &pass_modifiers, bomb_action)
                 } else {
                     // No passing distance → auto-fumble
                     PassResult::FUMBLE
@@ -634,6 +653,97 @@ mod tests {
 
     fn make_step() -> StepPass {
         StepPass::new("end".into(), "missed".into(), "saved_fumble".into())
+    }
+
+    /// `bb2016/StepPass.handleFailedPass`:
+    /// ```java
+    /// if (PassResult.SAVED_FUMBLE == state.result) {
+    ///   ... setBallCoordinate(throwerCoordinate); setBallMoving(false);
+    ///   getResult().setNextAction(StepAction.GOTO_LABEL, state.goToLabelOnEnd);
+    /// }
+    /// ```
+    /// bb2016's Java `init` does not even accept GOTO_LABEL_ON_SAVED_FUMBLE, so Rust's bb2016
+    /// generator supplies it as END_PASSING (see `generator::bb2016::pass`) — this shared step is
+    /// the only `StepId::Pass` arm in `driver.rs` and must route every edition off the SAME field.
+    /// With the key unset the jump went to the empty string and the driver stopped dispatching for
+    /// the rest of the game (high_elf bb2016 @1.0 seed 94: 19 Rust steps against Java's 164).
+    #[test]
+    fn a_saved_fumble_always_jumps_to_the_saved_fumble_label() {
+        for (rules, expected) in [
+            (Rules::Bb2016, "saved_fumble"),
+            (Rules::Bb2025, "saved_fumble"),
+        ] {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+            game.thrower_id = Some("t1".into());
+            game.thrower_action = Some(ffb_model::enums::PlayerAction::Pass);
+            game.field_model.set_player_coordinate("t1", FieldCoordinate::new(10, 5));
+
+            let mut step = make_step();
+            // Already re-rolled → Java's `getReRolledAction() == PASS` suppresses any further
+            // offer, so the step routes straight through handleFailedPass.
+            step.re_rolled_action = Some("PASS".into());
+            step.re_roll_source = None;
+            step.roll = 3;
+            step.pass_result = Some(PassResult::SAVED_FUMBLE);
+            // bb2025 alone asks the Safe Pass dialog; answer it so both editions reach the routing.
+            step.using_safe_pass = Some(true);
+
+            let out = step.start(&mut game, &mut GameRng::new(0));
+            assert_eq!(out.action, StepAction::GotoLabel, "{rules:?}");
+            assert_eq!(out.goto_label.as_deref(), Some(expected),
+                "{rules:?}: saved-fumble routing");
+        }
+    }
+
+    /// `bb2016/StepPass:172` hands `evaluatePass` the flag
+    /// `PlayerAction.THROW_BOMB != game.getThrowerAction()`, and `bb2016/PassMechanic` reads it as
+    /// ```java
+    /// if (isModifiedFumble(roll, distance, modifiers)) {
+    ///   if (thrower.hasSkillProperty(NamedProperties.dontDropFumbles) && !bombAction) {
+    ///     return PassResult.SAVED_FUMBLE;
+    ///   } else { return PassResult.FUMBLE; }
+    /// }
+    /// ```
+    /// So on a REGULAR bb2016 pass the flag is TRUE and a Safe Throw thrower's modified fumble is
+    /// a plain FUMBLE — the ball scatters off the thrower and the drive turns over. Only a
+    /// THROW_BOMB makes it false. Passing `is_bomb` here inverted that (high_elf bb2016 @1.0
+    /// seeds 49/91/94).
+    #[test]
+    fn a_bb2016_regular_pass_modified_fumble_is_not_saved_by_safe_throw() {
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+
+        for (action, expect_saved) in [
+            (ffb_model::enums::PlayerAction::Pass, false),
+            (ffb_model::enums::PlayerAction::ThrowBomb, true),
+        ] {
+            let mut home = test_team("home", 0);
+            let mut thrower = Player::default();
+            thrower.id = "t1".into();
+            thrower.agility = 4;
+            // bb2016 Safe Throw registers canCancelInterceptions + dontDropFumbles.
+            thrower.starting_skills = vec![SkillWithValue::new(SkillId::SafeThrow)];
+            home.players.push(thrower);
+
+            let mut game = Game::new(home, test_team("away", 0), Rules::Bb2016);
+            game.home_playing = true;
+            game.thrower_id = Some("t1".into());
+            game.thrower_action = Some(action);
+            // A LongBomb: modifier2016 = -2, so a roll of 3 is a modified fumble (3 - 2 <= 1).
+            game.field_model.set_player_coordinate("t1", FieldCoordinate::new(2, 7));
+            game.pass_coordinate = Some(FieldCoordinate::new(14, 7));
+
+            let mut step = make_step();
+            step.roll = 3;
+            step.re_rolled_action = Some("PASS".into()); // suppress the re-roll offer
+            step.re_roll_source = None;
+            step.using_safe_pass = Some(true);
+
+            step.start(&mut game, &mut GameRng::new(0));
+            assert_eq!(step.pass_result == Some(PassResult::SAVED_FUMBLE), expect_saved,
+                "{action:?}: bb2016 bombAction flag is `THROW_BOMB != throwerAction`");
+        }
     }
 
     #[test]

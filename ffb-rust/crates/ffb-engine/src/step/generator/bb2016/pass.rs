@@ -67,9 +67,20 @@ impl Pass {
         // accurate pass — Java rolls the receiver catch d6, Rust skipped it → 1 die short → desync).
         // Route the accurate branch through StepResolvePass (the missed/fumble branch still uses
         // GotoLabelOnMissedPass → StepMissedPass, unchanged).
+        // A SAVED_FUMBLE (bb2016 Safe Throw registers `dontDropFumbles`) goes to END_PASSING:
+        // `bb2016/StepPass.handleFailedPass` ends it with
+        // `setNextAction(GOTO_LABEL, state.goToLabelOnEnd)` and bb2016's GOTO_LABEL_ON_END *is*
+        // `IStepLabel.END_PASSING` — the ball is put back on the thrower and the pass sequence is
+        // over, with no catch and no scatter. Rust re-points GOTO_LABEL_ON_END at RESOLVE_PASS
+        // (see above), so the saved-fumble target has to be named separately or it is lost: the
+        // shared step jumped to the EMPTY label and the driver stopped dispatching for the rest of
+        // the game (high_elf bb2016 @1.0 seed 94 — 19 Rust steps against Java's 164, every hash
+        // matching up to the stall). bb2020/bb2025 name the key themselves; only bb2016's Java
+        // `init` does not accept it, which is exactly why it needs supplying here.
         seq.add_labelled(StepId::Pass, labels::PASS, vec![
             StepParameter::GotoLabelOnEnd(labels::RESOLVE_PASS.into()),
             StepParameter::GotoLabelOnMissedPass(labels::MISSED_PASS.into()),
+            StepParameter::GotoLabelOnSavedFumble(fl.into()),
         ]);
         // 13 GOTO_LABEL → SCATTER_BALL (StepPass fall-through, e.g. a saved fumble)
         seq.jump(labels::SCATTER_BALL);
@@ -129,6 +140,28 @@ mod tests {
         let steps = Pass::build_sequence(&PassParams::default());
         let p = steps.iter().find(|s| s.step_id == StepId::Pass && s.label.is_some()).unwrap();
         assert_eq!(p.label.as_deref(), Some(labels::PASS));
+    }
+
+    /// `bb2016/StepPass.handleFailedPass`:
+    /// ```java
+    /// if (PassResult.SAVED_FUMBLE == state.result) {
+    ///   ... setBallCoordinate(throwerCoordinate); setBallMoving(false);
+    ///   getResult().setNextAction(StepAction.GOTO_LABEL, state.goToLabelOnEnd);   // = END_PASSING
+    /// }
+    /// ```
+    /// Rust re-points this step's GOTO_LABEL_ON_END at RESOLVE_PASS so an accurate pass reaches
+    /// the catch, so the saved-fumble target must be named separately — otherwise the shared step
+    /// jumps to an empty label and the driver stops dispatching (high_elf bb2016 @1.0 seed 94).
+    #[test]
+    fn pass_saved_fumble_goes_to_end_passing() {
+        let steps = Pass::build_sequence(&PassParams::default());
+        let p = steps.iter().find(|s| s.step_id == StepId::Pass && s.label.is_some()).unwrap();
+        let saved = p.params.iter().find_map(|prm| match prm {
+            StepParameter::GotoLabelOnSavedFumble(l) => Some(l.clone()),
+            _ => None,
+        });
+        assert_eq!(saved.as_deref(), Some(labels::END_PASSING),
+            "a bb2016 saved fumble ends the pass sequence — no catch, no scatter");
     }
 
     #[test]
