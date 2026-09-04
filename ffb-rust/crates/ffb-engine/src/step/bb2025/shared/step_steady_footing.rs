@@ -8,7 +8,7 @@ use crate::action::Action;
 use crate::drop_player_context::SteadyFootingContext;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
-use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use crate::step::util_server_re_roll::use_reroll;
 
 /// Minimum d6 roll required for Steady Footing (Java: MINMUM_ROLL = 6).
 const MINIMUM_ROLL: i32 = 6;
@@ -193,9 +193,15 @@ impl StepSteadyFooting {
         // Java: Player player = game.getPlayerById(playerId)
         // Java: Optional<Skill> skill = UtilCards.getSkillWithProperty(player, canAvoidFallingDown)
         // Java: UtilCards.getSkillWithProperty(player, NamedProperties.canAvoidFallingDown)
-        let has_steady_footing = game.player(&player_id)
-            .map(|p| p.has_skill_property(NamedProperties::CAN_AVOID_FALLING_DOWN))
-            .unwrap_or(false);
+        // Java resolves the SKILL, not just a boolean: the dialog and the ReportSkillUse both
+        // name `player.getSkillWithProperty(canAvoidFallingDown)`. SteadyFooting is the only
+        // bb2025 skill that REGISTERS the property (bb2025 BallAndChain only lists it as a
+        // `registerConflictingProperty`), so the resolved skill is SteadyFooting in practice --
+        // but resolve it rather than assume it, exactly as Java does.
+        let avoid_fall_skill: Option<ffb_model::enums::SkillId> = game.player(&player_id)
+            .and_then(|p| p.all_skill_ids()
+                .find(|id| id.properties().contains(&NamedProperties::CAN_AVOID_FALLING_DOWN)));
+        let has_steady_footing = avoid_fall_skill.is_some();
 
         // Java: PlayerState playerState = game.getFieldModel().getPlayerState(player)
         let player_state = game.field_model.player_state(&player_id)
@@ -214,9 +220,30 @@ impl StepSteadyFooting {
 
         // Java: if (useSkill == null) → show dialog, CONTINUE
         if self.use_skill.is_none() {
-            // client-only: publish dialog prompt for canAvoidFallingDown skill use
-            // For now: auto-accept (use_skill = true) so the random agent rolls.
-            self.use_skill = Some(true);
+            // Java:
+            //   UtilServerDialog.showDialog(getGameState(),
+            //     new DialogSkillUseParameter(player.getId(),
+            //       player.getSkillWithProperty(canAvoidFallingDown), MINMUM_ROLL),
+            //     !game.getActingTeam().hasPlayer(player));
+            //   getResult().setNextAction(StepAction.CONTINUE);
+            //
+            // Rust used to auto-ACCEPT here, written for the random contract's free always-use
+            // answer. Java's ParityRunner SKILL_USE arm routes the dialog through
+            // `heuristic.useSkill(skillName)`, which SPENDS TWO SAMPLER DRAWS, so the silent
+            // auto-accept left Rust two draws short of Java at the very first Steady Footing
+            // fall and split the two random streams for the rest of the game (high_elf bb2025
+            // @1.0 seed 1: `JDRAW cls=SKILL_USE total=16 skill=SteadyFooting
+            // pid=teamHighElfParity25Home1` with no matching RDRAW — that was every one of the
+            // 100 bb2025 sampled reds). Raise the prompt; the answer comes back through
+            // `handle_command` as `Action::UseSkill` and re-enters `start`.
+            let skill_id = avoid_fall_skill.unwrap_or(ffb_model::enums::SkillId::SteadyFooting);
+            return StepOutcome::cont().with_prompt(
+                ffb_model::prompts::AgentPrompt::SkillUse {
+                    player_id: player_id.clone(),
+                    skill_id: skill_id as u16,
+                    skill_name: format!("{skill_id:?}"),
+                },
+            );
         }
 
         let re_rolled = self.re_rolled_action.as_deref() == Some("STEADY_FOOTING")
@@ -228,7 +255,9 @@ impl StepSteadyFooting {
             use ffb_model::model::skill_use::SkillUse;
             use ffb_model::report::report_skill_use::ReportSkillUse;
             game.report_list.add(ReportSkillUse::new(
-                Some(player_id.clone()), SkillId::SteadyFooting,
+                // Java: `new ReportSkillUse(player.getId(), skill.get(), useSkill, AVOID_FALLING)`
+                // — `skill.get()` is the resolved canAvoidFallingDown skill, not a constant.
+                Some(player_id.clone()), avoid_fall_skill.unwrap_or(SkillId::SteadyFooting),
                 self.use_skill.unwrap_or(false), SkillUse::AVOID_FALLING,
             ));
         }
@@ -257,9 +286,21 @@ impl StepSteadyFooting {
             return self.succeed(game, &player_id, player_state);
         }
 
-        // Java: if (!reRolled && askForReRollIfAvailable(...)) { setReRolledAction; CONTINUE }
+        // Java:
+        //   if (!reRolled && UtilServerReRoll.askForReRollIfAvailable(getGameState(), player,
+        //         ReRolledActions.STEADY_FOOTING, MINMUM_ROLL, false)) { ... }
+        //
+        // That is the PLAYER overload, and `player` is the FALLER — who is very often on the
+        // NON-acting team (a blocked defender). `RollMechanic.isTeamReRollAvailable` gates on
+        // `actingTeam.hasPlayer(pPlayer)`, so Java offers nothing there. Rust called the
+        // ACTING-PLAYER overload, which skips that membership gate and additionally resolves a
+        // re-roll source from the acting player's skills by action — so Rust raised a re-roll
+        // offer (2 heuristic sampler draws) for a defender's failed Steady Footing where Java
+        // raises none (high_elf bb2025 @1.0 seed 4: `RDRAW cls=reroll total=28
+        // action=STEADY_FOOTING` for `away_02` with no matching `JDRAW`, while home was playing).
         if !re_rolled {
-            if let Some(prompt) = ask_for_reroll_if_available(game, "STEADY_FOOTING", MINIMUM_ROLL, false) {
+            if let Some(prompt) = crate::step::util_server_re_roll::ask_for_reroll_if_available_for(
+                game, Some(player_id.as_str()), "STEADY_FOOTING", MINIMUM_ROLL, false) {
                 self.re_rolled_action = Some("STEADY_FOOTING".into());
                 self.re_roll_source = Some("TRR".into());
                 return StepOutcome::cont().with_prompt(prompt);
@@ -460,6 +501,65 @@ mod tests {
         panic!("could not find a seed producing roll < 6");
     }
 
+    /// Java's failure branch calls the PLAYER overload:
+    /// ```java
+    /// if (!reRolled && UtilServerReRoll.askForReRollIfAvailable(getGameState(), player,
+    ///       ReRolledActions.STEADY_FOOTING, MINMUM_ROLL, false)) { ... }
+    /// ```
+    /// and `RollMechanic.isTeamReRollAvailable` gates the TRR on
+    /// `actingTeam.hasPlayer(pPlayer) && !turnData.isReRollUsed() && amount > 0`. A blocked
+    /// DEFENDER is on the non-acting team, so Java raises NO re-roll dialog for their failed
+    /// Steady Footing — and the heuristic driver therefore spends no sampler draws on it.
+    #[test]
+    fn failed_roll_offers_no_reroll_to_a_non_acting_team_faller() {
+        for seed in 0..200u64 {
+            let mut rng = GameRng::new(seed);
+            if rng.d6() < 6 {
+                // home is playing; the faller is an AWAY player (a blocked defender).
+                let mut g = make_game();
+                let mut p = bare_player("a1");
+                p.starting_skills.push(SkillWithValue::new(SkillId::SteadyFooting));
+                g.team_away.players.push(p);
+                g.field_model.set_player_state("a1", PlayerState::new(PS_FALLING));
+                g.home_playing = true;
+                g.turn_data_mut().rerolls = 3;
+                g.turn_data_mut().reroll_used = false;
+
+                let mut s = StepSteadyFooting::new("fail_lbl".into(), "ok_lbl".into());
+                s.context = Some(make_context("a1"));
+                s.player_id = Some("a1".into());
+                s.use_skill = Some(true);
+                let out = s.start(&mut g, &mut GameRng::new(seed));
+                assert!(out.prompt.is_none(),
+                    "seed={seed}: the acting team does not own the faller, so Java offers no TRR");
+                assert_eq!(out.action, StepAction::GotoLabel, "seed={seed}");
+                assert_eq!(out.goto_label.as_deref(), Some("fail_lbl"));
+
+                // The SAME faller on the ACTING team IS offered the team re-roll.
+                let mut g2 = make_game();
+                let mut p2 = bare_player("a1");
+                p2.starting_skills.push(SkillWithValue::new(SkillId::SteadyFooting));
+                g2.team_away.players.push(p2);
+                g2.field_model.set_player_state("a1", PlayerState::new(PS_FALLING));
+                g2.home_playing = false;
+                g2.turn_data_mut().rerolls = 3;
+                g2.turn_data_mut().reroll_used = false;
+
+                let mut s2 = StepSteadyFooting::new("fail_lbl".into(), "ok_lbl".into());
+                s2.context = Some(make_context("a1"));
+                s2.player_id = Some("a1".into());
+                s2.use_skill = Some(true);
+                let out2 = s2.start(&mut g2, &mut GameRng::new(seed));
+                assert_eq!(out2.action, StepAction::Continue, "seed={seed}");
+                assert!(matches!(out2.prompt,
+                    Some(ffb_model::prompts::AgentPrompt::ReRollOffer { .. })),
+                    "seed={seed}: got {:?}", out2.prompt);
+                return;
+            }
+        }
+        panic!("could not find a seed producing roll < 6");
+    }
+
     /// skip=true → fail path immediately.
     #[test]
     fn skip_true_fails_immediately() {
@@ -489,6 +589,69 @@ mod tests {
         step.player_id = Some("p1".into());
 
         let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(out.goto_label.as_deref(), Some("fail"));
+    }
+
+    /// Java `executeStep`:
+    /// ```java
+    /// if (useSkill == null) {
+    ///   UtilServerDialog.showDialog(getGameState(),
+    ///     new DialogSkillUseParameter(player.getId(),
+    ///       player.getSkillWithProperty(NamedProperties.canAvoidFallingDown), MINMUM_ROLL),
+    ///     !game.getActingTeam().hasPlayer(player));
+    ///   getResult().setNextAction(StepAction.CONTINUE);
+    ///   return;
+    /// }
+    /// ```
+    /// An UNDECIDED offer must ASK and consume NO die — never auto-accept. `ParityRunner`'s
+    /// SKILL_USE arm routes this dialog through `heuristic.useSkill(skillName)`, which spends two
+    /// sampler draws, so a silent auto-accept desynchronises the two random streams.
+    #[test]
+    fn undecided_use_skill_raises_a_skill_use_prompt_and_rolls_nothing() {
+        let mut game = make_game();
+        add_player_with_steady_footing(&mut game, "p1");
+
+        let mut step = StepSteadyFooting::new("fail".into(), "ok".into());
+        step.context = Some(make_context("p1"));
+        step.player_id = Some("p1".into());
+        assert!(step.use_skill.is_none());
+
+        let mut rng = GameRng::new(0);
+        let before = rng.d6();
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+
+        assert_eq!(out.action, StepAction::Continue, "Java sets CONTINUE and waits for the answer");
+        match out.prompt {
+            Some(ffb_model::prompts::AgentPrompt::SkillUse { ref player_id, ref skill_name, .. }) => {
+                assert_eq!(player_id, "p1");
+                // Java's dialog names getSkillWithProperty(canAvoidFallingDown).
+                assert_eq!(skill_name, "SteadyFooting");
+            }
+            other => panic!("expected a SkillUse prompt, got {other:?}"),
+        }
+        assert!(step.use_skill.is_none(), "the step must not answer its own dialog");
+        assert_eq!(rng.d6(), before, "no die may be drawn before the answer arrives");
+    }
+
+    /// The answer arrives as `Action::UseSkill` (Java: `CLIENT_USE_SKILL` →
+    /// `useSkill = useSkillCommand.isSkillUsed(); EXECUTE_STEP`) and a DECLINE fails the step.
+    #[test]
+    fn declined_offer_answer_fails_the_step() {
+        let mut game = make_game();
+        add_player_with_steady_footing(&mut game, "p1");
+
+        let mut step = StepSteadyFooting::new("fail".into(), "ok".into());
+        step.context = Some(make_context("p1"));
+        step.player_id = Some("p1".into());
+        let mut rng = GameRng::new(0);
+        let _ = step.start(&mut game, &mut rng);
+
+        let out = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::SteadyFooting, use_skill: false },
+            &mut game, &mut rng);
+        assert_eq!(step.use_skill, Some(false));
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("fail"));
     }
