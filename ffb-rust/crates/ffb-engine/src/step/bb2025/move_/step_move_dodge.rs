@@ -8,7 +8,7 @@ use crate::drop_player_context::SteadyFootingContext;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::abstract_step_with_re_roll::{ReRollState, find_skill_reroll_source};
-use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available, ask_for_reroll_if_available_for, use_reroll};
 use ffb_mechanics::modifiers::dodge_modifier_factory::DodgeModifierFactory;
 use ffb_mechanics::modifiers::dodge_context::DodgeContext;
 
@@ -379,8 +379,30 @@ impl StepMoveDodge {
                     return out;
                 }
 
-                // TRR offer
-                if let Some(prompt) = ask_for_reroll_if_available(game, "DODGE", minimum_roll, false) {
+                // TRR offer.
+                //
+                // Java reaches this branch with `skillRerollSource == null` — the Dodge skill
+                // re-roll is used or CANCELLED — and calls the PLAYER overload with an explicit
+                // `reRollSkill` of null:
+                //
+                // ```java
+                // UtilServerReRoll.askForReRollIfAvailable(getGameState(), actingPlayer.getPlayer(),
+                //     ReRolledActions.DODGE, minimumRoll, false, modifyingSkill, null)
+                // ```
+                //
+                // `RollMechanic.askForReRollIfAvailable` then adds exactly ONE skill term of its
+                // own — `getUnusedSkillWithProperty(player, canRerollSingleDieOncePerPeriod)` —
+                // and never re-derives an action-keyed source. `ask_for_reroll_if_available` is
+                // Rust's ACTING-PLAYER overload: it calls `find_skill_reroll_source(game, "DODGE")`
+                // again, which resurrects the very Dodge source the Tackle filter above had just
+                // nulled. The offer then went out as `ReRollOffer{source: Dodge}`, the agent took
+                // it, and `use_reroll` charged an empty team-re-roll bank (human bb2025 @1e6
+                // seed 3 i=32: home_10, a Halfling Hopeful with Dodge, dodging out of a Tackle
+                // tacklezone with `r0` — Java takes the failure and the turnover, Rust re-rolled
+                // and drove the bank to `r-1`).
+                if let Some(prompt) = ask_for_reroll_if_available_for(
+                    game, player_id.as_deref(), "DODGE", minimum_roll, false)
+                {
                     self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
                     self.dodge_roll = 0; // reset so the re-roll gets a fresh d6
                     return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
@@ -494,6 +516,62 @@ mod tests {
         assert!(!step.using_break_tackle);
         assert!(!game.player("dodger").unwrap().used_skills.contains(&SkillId::BreakTackle),
             "BT unused when the bare roll already succeeds");
+    }
+
+    /// Java `StepMoveDodge.dodge` FAILURE branch: `uncanceledDodgeRerollSource` returns null when
+    /// an adjacent opponent cancels the Dodge re-roll (Tackle registers
+    /// `CancelSkillProperty(canRerollDodge)`), and the fall-back ask is the PLAYER overload with an
+    /// explicit `reRollSkill` of null:
+    ///
+    /// ```java
+    /// UtilServerReRoll.askForReRollIfAvailable(getGameState(), actingPlayer.getPlayer(),
+    ///     ReRolledActions.DODGE, minimumRoll, false, modifyingSkill, null)
+    /// ```
+    ///
+    /// With an empty team-re-roll bank `RollMechanic.askForReRollIfAvailable` shows NO dialog, so
+    /// the failed dodge stands and the step goes to its failure label. Rust used the ACTING-PLAYER
+    /// overload, which re-derived the Dodge source the Tackle filter had just nulled and offered it
+    /// (human bb2025 @1e6 seed 3 i=32).
+    #[test]
+    fn tackle_cancelled_dodge_reroll_is_not_re_offered_with_an_empty_bank() {
+        use ffb_model::enums::{PlayerAction, PS_STANDING, PlayerState as PSt, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let mut dodger = Player {
+            id: "dodger".into(), name: "d".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 5, strength: 2, agility: 3, passing: 4, armour: 7,
+            ..Default::default()
+        };
+        dodger.starting_skills.push(SkillWithValue { skill_id: SkillId::Dodge, value: None });
+        game.team_home.players.push(dodger);
+        let mut tackler = Player {
+            id: "tackler".into(), name: "t".into(), nr: 2, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            ..Default::default()
+        };
+        tackler.starting_skills.push(SkillWithValue { skill_id: SkillId::Tackle, value: None });
+        game.team_away.players.push(tackler);
+        game.field_model.set_player_coordinate("dodger", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("dodger", PSt::new(PS_STANDING));
+        game.field_model.set_player_coordinate("tackler", FieldCoordinate::new(5, 6));
+        game.field_model.set_player_state("tackler", PSt::new(PS_STANDING));
+        game.home_playing = true;
+        game.turn_mode = TurnMode::Regular;
+        // Java `isTeamReRollAvailable`: an empty bank offers nothing.
+        game.turn_data_home.rerolls = 0;
+        game.acting_player.set_player("dodger".into(), PlayerAction::Move);
+        game.acting_player.dodging = true;
+        let mut step = StepMoveDodge::new("fail".into());
+        step.coordinate_from = Some(FieldCoordinate::new(5, 5));
+        step.coordinate_to = Some(FieldCoordinate::new(6, 4));
+        step.dodge_roll = 1; // a natural 1 always fails
+        let out = step.execute_step(&mut game, &mut GameRng::new(0));
+        assert!(out.prompt.is_none(),
+            "Tackle cancels the Dodge re-roll and the bank is empty: Java shows no dialog, got {:?}",
+            out.prompt);
+        assert_eq!(out.action, StepAction::GotoLabel, "the failed dodge goes to the failure label");
     }
 
     fn bt_dodge_fixture() -> (Game, StepMoveDodge) {

@@ -744,6 +744,36 @@ impl StepInitSelecting {
                         .publish(StepParameter::CheckForgo(true));
                 }
                 let standing_up = game.acting_player.standing_up;
+                // Java `StepInitSelecting.executeStep` PARKS on a plain MOVE declaration: with
+                // `fDispatchPlayerAction == null` it falls into the final `else`, runs
+                // `prepareStandingUp()` and sets NO next action for a moving PlayerAction (only
+                // REMOVE_CONFUSION / STAND_UP / STAND_UP_BLITZ get `NEXT_STEP`). The Select
+                // sequence's activation block — BONE_HEAD, REALLY_STUPID, TAKE_ROOT,
+                // UNCHANNELLED_FURY, BLOOD_LUST, JUMP_UP, STAND_UP — therefore runs only once a
+                // CLIENT_MOVE arrives (`:185` then sets `fDispatchPlayerAction = MOVE`). A player
+                // with no square to step into never gets that command: the client answers the move
+                // window with `ClientCommandActingPlayer(null, null, false)`, which is
+                // `fEndPlayerAction` → `GOTO END_SELECTING`, so Java rolls NO negatrait die at all
+                // for that activation.
+                //
+                // Rust folds declaration and dispatch into one `ActivatePlayer`. For an
+                // ALREADY-STANDING player that still matches Java: `goto(label)` pushes the Move
+                // sequence and `StepInitMoving.execute_step` takes its own `end_player_action`
+                // branch to END_MOVING, which is BEFORE `StepId::BoneHead` in the Move sequence.
+                // The `standing_up` carve-out below is the one path that runs the activation block
+                // immediately, so a PRONE negatrait carrier boxed in on all eight sides rolled a
+                // Bone Head die Java never rolls (human bb2020 @0 seed 45 i=201: the away Ogre at
+                // (13,7) with all eight neighbours occupied — one extra d6 that shifted every
+                // later die and cost the seed).
+                if standing_up
+                    && matches!(dispatch, PlayerAction::Move)
+                    && game.acting_player.player_id.as_deref()
+                        .map(|pid| crate::legal_actions::legal_move_targets(game, pid).is_empty())
+                        .unwrap_or(false)
+                {
+                    return StepOutcome::goto(label)
+                        .publish(StepParameter::EndPlayerAction(true));
+                }
                 // Rust bridging: the agent chose its target at activation time
                 // (Action::ActivatePlayer.block_defender_id → game.defender_id), whereas Java's
                 // client sends it later via CLIENT_BLOCK/CLIENT_FOUL/CLIENT_PASS/CLIENT_HAND_OVER.
@@ -915,6 +945,54 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2025)
+    }
+
+    /// Java `StepInitSelecting.executeStep` sets NO next action for a plain MOVE declaration (only
+    /// REMOVE_CONFUSION / STAND_UP / STAND_UP_BLITZ get `NEXT_STEP`), so the Select sequence's
+    /// activation block — BONE_HEAD, REALLY_STUPID, TAKE_ROOT, UNCHANNELLED_FURY, BLOOD_LUST,
+    /// JUMP_UP, STAND_UP — runs only once a CLIENT_MOVE arrives (`:185`). A player with no square
+    /// to step into never sends one: the client answers the move window with
+    /// `ClientCommandActingPlayer(null, null, false)` → `fEndPlayerAction` → `GOTO END_SELECTING`,
+    /// and Java rolls NO negatrait die for the activation.
+    ///
+    /// Rust folds declaration and dispatch into one `ActivatePlayer`, and the `standing_up`
+    /// carve-out runs that block immediately — one extra Bone Head die for a prone Ogre boxed in on
+    /// all eight sides (human bb2020 @0 seed 45 i=201).
+    #[test]
+    fn prone_move_with_no_move_targets_deselects_instead_of_running_the_activation_block() {
+        use ffb_model::enums::{PS_PRONE, PS_STANDING, PlayerState as PSt, PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        let mut mk = |id: &str, nr: i32, home: bool, x: i32, y: i32, prone: bool, g: &mut Game| {
+            let p = Player {
+                id: id.into(), name: id.into(), nr, position_id: "pos".into(),
+                player_type: PlayerType::Regular, gender: PlayerGender::Male,
+                movement: 5, strength: 3, agility: 3, passing: 4, armour: 9,
+                ..Default::default()
+            };
+            if home { g.team_home.players.push(p); } else { g.team_away.players.push(p); }
+            g.field_model.set_player_coordinate(id, FieldCoordinate::new(x, y));
+            g.field_model.set_player_state(id, PSt::new(if prone { PS_PRONE } else { PS_STANDING }));
+        };
+        mk("mover", 1, true, 13, 7, true, &mut game);
+        let mut nr = 2;
+        for (dx, dy) in [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)] {
+            mk(&format!("box{nr}"), nr, nr % 2 == 0, 13 + dx, 7 + dy, false, &mut game);
+            nr += 1;
+        }
+        game.home_playing = true;
+        game.acting_player.set_player("mover".into(), PlayerAction::Move);
+        game.acting_player.standing_up = true;
+        let mut step = StepInitSelecting::new("end".into());
+        step.dispatch_player_action = Some(PlayerAction::Move);
+        let out = step.execute_step(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel,
+            "Java's deselect is GOTO END_SELECTING, not NEXT_STEP into the activation block");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))),
+            "the deselect publishes END_PLAYER_ACTION, got {:?}", out.published);
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::DispatchPlayerAction(_))),
+            "no action is dispatched: the declaration never completed");
     }
 
     #[test]
