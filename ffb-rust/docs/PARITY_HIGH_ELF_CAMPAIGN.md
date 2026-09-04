@@ -1,4 +1,4 @@
-# High Elf — heuristic-agent parity campaign
+# High Elf — heuristic-agent parity campaign — 🏁 **CLOSED 2026-09-04, nine gates 100/100**
 
 **Goal**: high_elf v high_elf, HeuristicAgent both sides, per-step state-hash parity 100/100,
 seeds 1-100, tier 3, editions bb2016/bb2020/bb2025 × scales 1.0/0/1e6 (nine gates), plus random
@@ -137,7 +137,8 @@ faults are most likely resolution, not draw counts. The still-unexercised bb2025
 ## ITER2 (2026-09-04) — Cloud Burster, and two bb2016 pass faults
 
 **bb2025 95/95/96 → 100/100/100. bb2016 97/99/98 → 100/100/100. bb2020 100/99/100 unchanged.**
-21 reds → **1** (bb2020 @0 seed 71). Three engine bugs, all in the pass sequence.
+21 reds → **0**. Four engine bugs, all in the pass sequence. The first three were committed as
+`175ce3939` (which left one red); the fourth, below, closed the race.
 
 ### 1. Cloud Burster: a pass that cannot be intercepted
 
@@ -246,11 +247,10 @@ BB2025 Cloud Burster thrower has no interceptors while a BB2020 one does; a bb20
 routed to END_PASSING by the generator; a bb2016 REGULAR pass's modified fumble is not saved by
 Safe Throw while a THROW_BOMB's is.
 
-### Remaining: bb2020 @0 seed 71 — the last red, and it is Cloud Burster again
+### 4. The last red: a BB2020 PASS_MOVE built its sequence as BB2025
 
-`first_state_divergence.sh` puts it at `idx 200 R t7 away Activate(away_01,PassMove)` — a pass, at
-argmax, so a **resolution** fault, not a draw count. The dice diff is clean to `pos=166`; Java's
-callers name every die in the window:
+bb2020 @0 seed 71 — `idx 200 R t7 away Activate(away_01,PassMove)`, at argmax, so a resolution
+fault. Java's dice callers name every die in the window:
 
 ```
 pos=162 d6=1  StepPass.executeStep:214  StepPass.start:132          <- the pass roll
@@ -262,56 +262,92 @@ pos=167 d6    StepPickUp.pickUp:188
 ```
 
 That second `StepIntercept` entered from a fresh `start`, not from `handleCommand` — it is
-**BB2020 Cloud Burster**. `CloudBursterBehaviour` registers a whole standalone step at
-`@StepHook(HookPoint.PASS_INTERCEPT)`; on a LONG_PASS/LONG_BOMB it reports, sets
-`deflectionSuccessful = false` and **re-pushes a fresh INTERCEPT**, forcing the interception to be
-re-rolled. away_01 is a Phoenix Warrior, and BB2020's Cloud Burster registers
-`canForceInterceptionRerollOfLongPasses` (BB2025's registers `passesAreNotIntercepted` — bug 1
-above; the same skill, two entirely different mechanics). So in Java the natural 6 at `pos=164`
-deflects, Cloud Burster forces the re-roll, `pos=165` comes back a 1, the deflection is **undone**,
-and the ball — never having moved onto the interceptor — takes `case SCATTER_BALL`, bounces once
-and is picked up.
+**BB2020 Cloud Burster**, the other half of the same skill. `CloudBursterBehaviour` registers a
+whole standalone step at `@StepHook(HookPoint.PASS_INTERCEPT)`; on a LONG_PASS/LONG_BOMB it
+reports, sets `deflectionSuccessful = false` and **re-pushes a fresh INTERCEPT**, forcing the
+interception to be re-rolled. away_01 is a Phoenix Warrior; BB2020's Cloud Burster registers
+`canForceInterceptionRerollOfLongPasses` where BB2025's registers `passesAreNotIntercepted` —
+the same skill, two entirely different mechanics. So in Java the natural 6 at `pos=164` deflects,
+Cloud Burster forces the re-roll, `pos=165` comes back a 1, the deflection is **undone**, and the
+ball — never having moved onto the interceptor — takes `case SCATTER_BALL`, bounces once and is
+picked up. Rust kept the first deflection (`FFB_BALLCHG step=ResolvePass (13,8) -> (9,4)
+(rng=164)`, i.e. between dice 164 and 165, so nothing ran in between), spent `pos=165` on the
+deflected CATCH, failed it and took `FAILED_DEFLECTION_CONVERSION -> THREE_SQUARE_SCATTER` — the
+three d8 at 166-168 — plus a further bounce at 169.
 
-Rust instead keeps the first deflection: `FFB_BALLCHG` shows
-`step=ResolvePass (13,8) -> (9,4) (rng=164)` — the ball moved onto the interceptor **between dice
-164 and 165**, i.e. `StepResolvePass` ran with no Cloud Burster step in between. Rust then spends
-`pos=165` on the deflected CATCH, fails it, and takes
-`FAILED_DEFLECTION_CONVERSION -> THREE_SQUARE_SCATTER` — the three d8 at 166-168 — plus a further
-bounce at 169, reaching the same pickup only at `pos=170`.
-
-**Root cause found (not yet shipped — see below).** The plumbing is all present:
-`skill_behaviour/step_hook.rs` maps `(Bb2020, PassIntercept) -> [StepId::CloudBurster]`,
-`generator/bb2025/pass.rs:93` calls `seq.insert_hooks(params.rules, HookPoint::PassIntercept, …)`,
-`driver.rs:204` builds the step, and `bb2025/pass/step_intercept.rs:410` publishes
-`DeflectionSuccessful(true)` for BB2020. The failure is the **edition-gated-generator-default
-trap** one more time:
+The cause is the **edition-gated-generator-default trap**, one push site over from the
+`MoveParams::default()` case the campaign rules already warn about:
 
 ```rust
-// crates/ffb-engine/src/step/bb2025/move_/step_end_moving.rs:408
+// crates/ffb-engine/src/step/bb2025/move_/step_end_moving.rs
 PlayerAction::HandOver | PlayerAction::HandOverMove | PlayerAction::Pass
 | PlayerAction::PassMove | PlayerAction::HailMaryPass => {
     Some(Pass::build_sequence(&PassParams::default()))     // <- rules = Bb2025, ALWAYS
 }
 ```
 
-`PassParams::default()` hard-codes `rules: Rules::Bb2025`, so a **PASS_MOVE** — which reaches the
-pass sequence through `StepEndMoving`, not `StepEndSelecting` — builds its sequence with
-`insert_hooks(Bb2025, …)`, and BB2025 registers no PASS_INTERCEPT hook. `StepCloudBurster` is
-therefore absent from the stack entirely, which is exactly what the trace shows: `StepResolvePass`
-ran between dice 164 and 165 with nothing in between. Its sibling
-`bb2025/shared/step_end_selecting.rs:346` already passes `rules: game.rules` — only the
-`StepEndMoving` site was missed, so a plain PASS is fine and a PASS_MOVE is not. (Same defect class
-as the `MoveParams::default()` note in the campaign rules, and as the hard-coded `Rules::Bb2025`
-that `generator/bb2025/pass.rs:87-92` already documents having fixed at the other call site.)
+`generator/bb2025/pass.rs` uses `params.rules` for
+`seq.insert_hooks(params.rules, HookPoint::PassIntercept, …)`, and the hook set is per-edition
+(BB2016 → `StepSafeThrow`, BB2020 → `StepCloudBurster`, BB2025 → nothing, matching Java's own
+`StepFactory`). `PassParams::default()` hard-codes `rules: Rules::Bb2025`, so the insertion was an
+unconditional **no-op for every pass that reaches the sequence through `StepEndMoving`** — every
+PASS_MOVE and hand-over move. Its sibling `bb2025/shared/step_end_selecting.rs:346` already passes
+`game.rules`, which is why a plain PASS was fine and a PASS_MOVE was not, and why `StepCloudBurster`
+had never dispatched in any BB2020 game.
 
-The one-line fix is `PassParams { target_coordinate: None, rules: game.rules }`. It is NOT shipped
-in this iteration: the closed-roster regression sweep that validates the three fixes above was
-already running against the current binary, and changing the generator would have invalidated it.
-ITER3 should apply it, add a generator/`StepEndMoving` test that a BB2020 PASS_MOVE sequence
-contains `StepId::CloudBurster`, then re-measure the nine gates and the full closed-roster set —
-and, because this changes a SHARED generator call site for every edition, that regression set must
-be the full one, not just bb2025 @1.0.
+Fix: `PassParams { target_coordinate: None, rules }` — `rules` is already threaded into
+`push_sequence_for_player_action` for exactly this reason. Colocated test
+`a_bb2020_pass_move_sequence_contains_the_cloud_burster_hook` asserts the hook is present for
+BB2020, `StepSafeThrow` for BB2016 and neither for BB2025, across PASS_MOVE, PASS and
+HAND_OVER_MOVE.
 
-Ruled out for this seed: draw counts (argmax spends none) and the ITER2 fixes — the interception
-gate is inert in BB2020 (Cloud Burster does not register `passesAreNotIntercepted` there) and both
-pass fixes are bb2016-gated; bb2020 @0 measured 99 both before and after.
+## Final result — high_elf CLOSED
+
+**Nine gates, seeds 1-100 tier 3, fresh JVM, no `--reuse-java`, all re-measured on the final
+binary:**
+
+| edition | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| bb2016 | **100** ✅ | **100** ✅ | **100** ✅ |
+| bb2020 | **100** ✅ | **100** ✅ | **100** ✅ |
+| bb2025 | **100** ✅ | **100** ✅ | **100** ✅ |
+
+Baseline was 97/99/98, 100/99/100, 0/86/0 — **221 reds → 0**.
+
+Tests: `cargo test -p ffb-engine` **7416 / 0**, `ffb-model` **2802 / 0**; four new colocated tests
+written from the Java.
+
+**Closed-roster regressions** (all re-run on the final binary, seeds 1-100 tier 3): goblin and
+halfling × bb2016/bb2020/bb2025 × @1.0/@0/@1e6, plus amazon, lineman, dwarf, chaos, chaos_dwarf,
+chaos_pact, dark_elf, dark_elf_league_fumbbl and elf × three editions @1.0 — **45 runs, every one
+100/100**. (The three fixes of `175ce3939` were separately gated against the same 45-run set before
+that commit; both sweeps are clean.)
+
+**Random controls** (`FFB_PARITY_ROOT=parity_random`, `--agent random`, seeds 1-100):
+bb2016 **100/100**, bb2020 **100/100**, bb2025 **99/100** (seed 72).
+
+That bb2025 random red is **pre-existing and not caused by this campaign** — verified, not assumed:
+seed 72 fails identically on the committed `175ce3939` binary AND with the Cloud Burster
+interception gate temporarily forced off (`passes_not_intercepted = false`, rebuilt and re-run),
+producing the same `step 297 … rust=None` early end each time. It is a *random-agent* divergence in
+bb2025 high_elf that predates ITER1; the heuristic gate is 100/100 on the same matchup at all three
+scales. It should be picked up as its own item rather than folded into this race.
+
+**Coverage harvested** for all three editions (`scripts/harvest_coverage.sh`, run alone):
+`docs/EVENT_COVERAGE_high_elf_bb2016.md`, `_bb2020.md`, `_bb2025.md`, each from a 100/100 run.
+
+### What generalises from this race
+
+- **One skill, two mechanics.** BB2025 Cloud Burster (`passesAreNotIntercepted`, suppresses the
+  interception entirely) and BB2020 Cloud Burster (`canForceInterceptionRerollOfLongPasses`, forces
+  a re-roll of a successful one) share a name and nothing else. Both halves were dead in Rust and
+  each cost a gate. Check `SkillId::properties_for` per edition before assuming a skill is ported.
+- **The dead-file trap bit again.** `driver.rs` has ONE `StepId::Intercept` arm, so
+  `bb2016/pass/step_intercept.rs` — which already had the `passesAreNotIntercepted` gate — is a
+  dead twin and its gate never ran anywhere.
+- **`..Default::default()` on an edition-gated params struct is still the highest-yield bug class
+  in this codebase.** This is at least the third instance. Any `XxxParams::default()` at a push
+  site where `rules` is in scope is a defect until proven otherwise.
+- **A `LENGTH differs` row in `frontier.sh` is a STALL, not a divergence** — chase it with
+  `FFB_DRIVE_TRACE` (which simply stops on the offending step) rather than the state hash, and
+  suspect an unset goto label.

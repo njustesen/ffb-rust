@@ -405,7 +405,19 @@ impl StepEndMoving {
             | PlayerAction::Pass
             | PlayerAction::PassMove
             | PlayerAction::HailMaryPass => {
-                Some(Pass::build_sequence(&PassParams::default()))
+                // `PassParams::default()` hard-codes `rules: Rules::Bb2025`, and
+                // `generator/bb2025/pass.rs` uses that field for
+                // `insert_hooks(params.rules, HookPoint::PassIntercept, …)`. The PASS_INTERCEPT
+                // hook set is per-EDITION (BB2016 -> StepSafeThrow, BB2020 -> StepCloudBurster,
+                // BB2025 -> nothing), so defaulting it made the call an unconditional no-op for
+                // every pass that reaches the sequence through THIS step — i.e. every PASS_MOVE,
+                // hand-over move and Hail Mary. `bb2025/shared/step_end_selecting.rs` already
+                // passes `game.rules`, so a plain PASS was fine and a PASS_MOVE was not:
+                // BB2020's StepCloudBurster never dispatched, its forced interception re-roll
+                // never happened, and a deflection Java undoes stood (high_elf bb2020 @0 seed 71
+                // i=200 — Java re-rolls the interception at dice pos 165 and fails it, Rust keeps
+                // the deflection and scatters the ball three squares Java never scatters).
+                Some(Pass::build_sequence(&PassParams { target_coordinate: None, rules }))
             }
             // Java: THROW_TEAM_MATE | THROW_TEAM_MATE_MOVE → ThrowTeamMate(thrown, false)
             PlayerAction::ThrowTeamMate | PlayerAction::ThrowTeamMateMove => {
@@ -981,6 +993,40 @@ mod tests {
             // The BB2025 sequence does, so this pins the gate rather than the absence.
             assert_eq!(pick_ups_before_block_roll(action, Rules::Bb2025), 1,
                 "BB2025 {action:?} must still pick up before the block dice");
+        }
+    }
+
+    /// The same `..Default::default()` trap, one push site over. `generator/bb2025/pass.rs` calls
+    /// `insert_hooks(params.rules, HookPoint::PassIntercept, …)`, and Java's PASS_INTERCEPT hook
+    /// set is per-EDITION: `CloudBursterBehaviour` (BB2020) registers a whole standalone
+    /// `StepId.CLOUD_BURSTER` at that hook point, BB2016 registers `StepSafeThrow`, BB2025
+    /// registers nothing. This push site used `PassParams::default()`, whose `rules` is BB2025, so
+    /// the insertion was an unconditional no-op for every pass that reaches the sequence through
+    /// EndMoving — every PASS_MOVE and hand-over move. BB2020's Cloud Burster therefore never
+    /// forced its interception re-roll, and a deflection Java undoes stood (high_elf bb2020 @0
+    /// seed 71 i=200). A plain PASS was unaffected because `step_end_selecting.rs` already passes
+    /// `game.rules`.
+    #[test]
+    fn a_bb2020_pass_move_sequence_contains_the_cloud_burster_hook() {
+        use crate::step::framework::StepId;
+
+        let hooks = |action: PlayerAction, rules: Rules| {
+            let steps = StepEndMoving::default()
+                .push_sequence_for_player_action(action, rules, None)
+                .expect("sequence must be built");
+            (
+                steps.iter().filter(|s| s.step_id == StepId::CloudBurster).count(),
+                steps.iter().filter(|s| s.step_id == StepId::SafeThrow).count(),
+            )
+        };
+
+        for action in [PlayerAction::PassMove, PlayerAction::Pass, PlayerAction::HandOverMove] {
+            assert_eq!(hooks(action, Rules::Bb2020), (1, 0),
+                "BB2020 {action:?} must insert StepCloudBurster at PASS_INTERCEPT");
+            assert_eq!(hooks(action, Rules::Bb2016), (0, 1),
+                "BB2016 {action:?} must insert StepSafeThrow at PASS_INTERCEPT");
+            assert_eq!(hooks(action, Rules::Bb2025), (0, 0),
+                "BB2025 registers no PASS_INTERCEPT hook (matching Java's own StepFactory)");
         }
     }
 }
