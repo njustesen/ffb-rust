@@ -49,14 +49,19 @@ impl StepInitPassing {
         // here with no dialog; the prompt only surfaces that wait so the agent can decline.
         if game.thrower_id.is_none() || game.thrower_action.is_none() {
             if let Some(pid) = game.acting_player.player_id.clone() {
-                if matches!(
-                    game.turn_mode,
-                    TurnMode::BombHome | TurnMode::BombAway
-                        | TurnMode::BombHomeBlitz | TurnMode::BombAwayBlitz
-                ) {
-                    return StepOutcome::cont()
-                        .with_prompt(AgentPrompt::BombRethrow { player_id: pid });
-                }
+                // The park is NOT bomb-specific. `ParityRunner`'s INIT_PASSING handler gates on
+                // `game.getThrower() == null && actingPlayer != null && getPlayerId() != null`
+                // and nothing else, then answers with `sendPassAction` — the ordinary
+                // teammate-coordinate pick, one actionRng draw. The bomb re-throw is only the
+                // most common way to reach it; a BB2016 Take Root failure on a HAND_OVER_MOVE /
+                // PASS_MOVE reaches it too, because `bb2016.StepTakeRoot.cancelPlayerAction`
+                // (unlike its bb2020/bb2025 twins) reverts the action to HAND_OVER / PASS
+                // WITHOUT setting the thrower, and `StepEndMoving` then pushes the Pass
+                // sequence. Restricting the prompt to the bomb turn modes left that park with no
+                // prompt at all and the driver stalled the game outright
+                // (halfling bb2016 seed 1 idx 55).
+                return StepOutcome::cont()
+                    .with_prompt(AgentPrompt::BombRethrow { player_id: pid });
             }
             return StepOutcome::cont();
         }
@@ -328,6 +333,38 @@ mod tests {
             "Java only sets hasPassed inside a matched branch");
         assert!(!game.turn_data().pass_used,
             "an out-of-range throw never consumes the team's pass action");
+    }
+
+    /// The null-thrower park is not bomb-specific. `ParityRunner`'s INIT_PASSING handler is
+    /// ```java
+    /// ActingPlayer bombAp = game.getActingPlayer();
+    /// if (game.getThrower() == null && bombAp != null && bombAp.getPlayerId() != null) {
+    ///     sendPassAction(game, gameState, bombAp.getPlayerId());
+    /// } else { ...EndTurn... }
+    /// ```
+    /// — no turn-mode condition at all. A BB2016 Take Root failure on a HAND_OVER_MOVE reverts the
+    /// action to HAND_OVER without setting the thrower, and `StepEndMoving` then pushes the Pass
+    /// sequence, so the park is reached in a REGULAR turn.
+    #[test]
+    fn a_null_thrower_park_prompts_in_a_regular_turn_too() {
+        use ffb_model::types::FieldCoordinate;
+        for mode in [TurnMode::Regular, TurnMode::BombHome] {
+            let mut game = make_game();
+            add_player(&mut game, "p1", FieldCoordinate::new(12, 7));
+            game.turn_mode = mode;
+            game.home_playing = true;
+            game.acting_player.player_id = Some("p1".into());
+            game.acting_player.player_action = Some(ffb_model::enums::PlayerAction::HandOver);
+            game.thrower_id = None;
+            game.thrower_action = None;
+
+            let mut step = StepInitPassing::new();
+            step.goto_label_on_end = "end".into();
+            let out = step.start(&mut game, &mut GameRng::new(0));
+
+            assert!(matches!(out.prompt, Some(AgentPrompt::BombRethrow { .. })),
+                "{mode:?}: the park must surface a prompt, not stall the driver");
+        }
     }
 
     #[test]

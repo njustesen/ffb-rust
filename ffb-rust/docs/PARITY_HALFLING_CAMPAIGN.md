@@ -5,6 +5,9 @@ seeds 1-100, tier 3, editions bb2016/bb2020/bb2025 × scales 1.0/0/1e6 (nine gat
 controls and the standing regression set. Procedure: `.claude/commands/amz-iter.md` with
 `MATCHUP=halfling`. Started 2026-09-04, immediately after goblin closed (`fc58b0e1c`).
 
+> **🏁 CLOSED 2026-09-04 (ITER5).** All nine gates 100/100, randoms ×3 100/100, the closed-roster
+> regression set 100/100, coverage harvested ×3. See the ITER5 entry at the end of this file.
+
 ## Surface
 
 Roster in ALL THREE editions. Two Treemen every edition — this race is dominated by the
@@ -419,3 +422,158 @@ Closed-roster regressions @1.0: goblin on **all three** editions 100/100 (it is 
 roster this change is most likely to disturb), elf bb2016 100/100, and bb2025 ×
 {amazon, lineman, dwarf, chaos, chaos_dwarf, chaos_pact, dark_elf, dark_elf_league_fumbbl, elf}
 all 100/100. Nothing regressed.
+
+## ITER5 — 🏁 ALL NINE GATES 100/100. Three Take Root faults: a pinned player's first move, and the two places `bb2016.StepTakeRoot` is not its bb2020/bb2025 twin
+
+**Frontier.** `frontier.sh` over every `@1.0` red of all three editions named ONE family outright —
+every row a `*_01`, the TREEMAN, with identical declarations on both sides and no dice at the prompt:
+
+```
+bb2016  seed 1    first hash diff idx 55    resolving idx 54   R t6 home Activate(home_01,HandOffMove)  dice=[]
+bb2020  seed 4    first hash diff idx 19    resolving idx 18   R t3 home Activate(home_01,HandOffMove)  dice=[]  [after side/turn flip]
+bb2020  seed 69   first hash diff idx 46    resolving idx 45   R t5 away Activate(away_01,PassMove)     dice=[]  [after side/turn flip]
+bb2025  seed 62   first hash diff idx 117   resolving idx 116  R t8 home Activate(home_01,PassMove)     dice=[]
+bb2025  seed 68   first hash diff idx 112   resolving idx 111  R t6 away Activate(away_01,HandOffMove)  dice=[]  [after side/turn flip]
+```
+
+### Fault 1 — a PINNED player's first move command must END the activation (all editions)
+
+**Mechanism** (bb2020 seed 4, parity idx 19). Both engines declare `Home1 HAND_OVER_MOVE`, both
+offer the same five move squares and both answer the same path — `RMOVEP`/`JMOVEP` at `k=20` are
+byte-identical, `offered=[11,6 11,7 11,8 13,6 13,8] ans=[11,8 11,9]` — and NEITHER moves (`home_01`
+stays at 12,7 in both `RIDSTATE` and `JIDSTATE`; the Treeman had been rooted at idx 13, where a
+failed Take Root d6 cancelled an earlier give). But:
+
+* Java's activation is a **complete no-op**: `post_hash == pre_hash` (`85214b967331d504`), and the
+  next two `JSTEP`s still show `f0000,0000` and `h00:…,1` — the team hand-over unspent, the
+  Treeman's ACTIVE bit intact, the home turn continuing with `Home7 MOVE`.
+* Rust's `RUST_STEP i=20` reads `f0010,0000` and `h00:12,7,Standing,2/6/5/11,0` — hand-over
+  CONSUMED, ACTIVE bit LOST. `LOOP` shows why: `applied=Move→(11,9)` (the engine no-ops it and
+  re-prompts) then `applied=HandOff→home_10`, and the give terminal fired.
+* `FFB_DICE_TRACE` agrees on values through `pos=42` but Java's `caller=` stack shows the streams
+  had already parted: Java `pos=43` is `rollSkill … TakeRootBehaviour$1.handleExecuteStepHook:60 …
+  StepTakeRoot.executeStep:41`, Rust's `pos=43` is `sides=16` — `FFB_DIE_AT=43` puts it in
+  `RollMechanic::roll_casualty` under `StepDropFallingPlayers`. Equal `(sides,result)` pairs are NOT
+  proof of equal semantics when both are d6.
+
+**The Java rule.** The FIRST move command of a `*_MOVE` activation does not reach `StepInitMoving`
+in Java at all. `StepInitSelecting.executeStep` sets no `nextAction` for a `*_MOVE` declaration, so
+the step PARKS (that is the harness's `JAVA_P2`); its `CLIENT_MOVE` arm then does
+
+```java
+fDispatchPlayerAction = PlayerAction.MOVE;   // NOT the declared HAND_OVER_MOVE
+```
+
+and `StepEndSelecting.dispatchPlayerAction` runs, before the fall-through that pushes the Move
+sequence,
+
+```java
+case MOVE:
+  if (playerState.isPinned()) { endGenerator.pushSequence(endParams); break; }   // bb2025
+  if (playerState.isRooted()) { endGenerator.pushSequence(endParams); break; }   // bb2016 / bb2020
+  // fall through … PASS_MOVE … HAND_OVER_MOVE … → moveGenerator.pushSequence(...)
+```
+
+So the activation ends there: `StepInitMoving.executeStep` never runs, so
+`turnData.setHandOverUsed(true)` never runs, and `actingPlayer.hasActed()` stays false so
+`UtilActingPlayer.changeActingPlayer` restores STANDING **with the ACTIVE bit**.
+
+**The unit.** Rust pushes the Move sequence at declaration time and raises the move prompt from
+`StepInitMoving`, so that is where the first command lands. Added the guard to the `Action::Move`
+arm of both live files — `bb2025/move_/step_init_moving.rs` (live for bb2020 **and** bb2025, using
+`is_pinned()` like its `StepEndSelecting` sibling) and `bb2016/move_/step_init_moving.rs` (using
+`is_rooted()`, as bb2016's `StepEndSelecting` does) — gated on `!acting_player.has_moved`, which is
+exactly "the command Java routes through `StepInitSelecting`" (a mid-activation move lands in
+`StepInitMoving`, which has NO pinned guard; `StepMove` is what skips the square there). Colocated
+tests `a_pinned_players_first_move_ends_the_activation` /
+`a_rooted_players_first_move_ends_the_activation` pin both halves, including that the continuation
+move is still processed.
+
+This alone took bb2020 to **100/100/100** and bb2025 to **100/100/100**.
+
+### Faults 2 + 3 — `bb2016.StepTakeRoot` is NOT the bb2020/bb2025 step, and the live file is the bb2025 one
+
+**Dead-file trap again.** `driver.rs` has exactly one `StepId::TakeRoot` arm
+(`step_take_root::StepTakeRoot`, from the `bb2025::shared` glob) and NO bb2016 override:
+`step/bb2016/step_take_root.rs` and `step/bb2020/shared/step_take_root.rs` are dead twins. The live
+file already gates the bb2025-only `startedStanding` condition — but not the other two differences.
+
+**Mechanism** (bb2016 seed 1 idx 55, and seed 6 @1e6 idx 52 — the same shape). Java: Take Root d6=1
+fails, the team re-roll is declined, `cancelPlayerAction` reverts `HAND_OVER_MOVE → HAND_OVER`, the
+Pass sequence is pushed, `StepInitPassing` PARKS with a null thrower, and `ParityRunner`'s
+`INIT_PASSING` handler answers it (`JAVA_PASS pid=Home1 coord=(13,7)`, then `rng=99 d6=4` — the
+catch). The give happens, `f0010`, and the home turn plays on with `Home10 MOVE`.
+Rust ended the whole home TURN instead. `FFB_BOMB` printed
+`RINITPASS acting=Some("home_01") act=Some(HandOver) thrower=Some("home_01") pass_coord=None` —
+the thrower was set, so `StepInitPassing` took a refusal branch and `goto`'d END_PASSING (the
+`FFB_DRIVE_TRACE` stack fell 38 → 17 in one step).
+
+**The Java rule.** `bb2016.StepTakeRoot` differs from the bb2020/bb2025 twin in two more places:
+
+```java
+// bb2016                                   // bb2020 / bb2025
+actingPlayer.setGoingForIt(false);          actingPlayer.setGoingForIt(true);
+case PASS_MOVE:                             case PASS_MOVE:
+  changeActingPlayer(..., PASS, ...);         changeActingPlayer(..., PASS, ...);
+  break;                                      game.setThrowerId(actingPlayer.getPlayerId());
+case HAND_OVER_MOVE:                          game.setThrowerAction(PlayerAction.PASS);
+  changeActingPlayer(..., HAND_OVER, ...);    break;                    // same for HAND_OVER_MOVE
+  break;
+```
+
+and `bb2016.StepTakeRoot.executeStep` calls `recoverTacklezones()` on the acting player before
+running the hooks, which neither of the other two steps does.
+
+**The unit** (`bb2025/shared/step_take_root.rs`): all three bb2016 differences, edition-gated —
+`goes_for_it = !bb2016`, the `thrower_id`/`thrower_action` writes skipped under bb2016, and the
+bb2016-only `recover_tacklezones()`. Colocated tests
+`bb2016_cancel_leaves_the_thrower_alone_and_clears_going_for_it` (a 3-edition × 2-action table) and
+`bb2016_recovers_tacklezones_before_the_roll`.
+
+**Fault 3 (the same seed, one step later).** With the thrower correctly left null, Rust's
+`StepInitPassing` parked on a bare `cont()` with **no prompt** and the driver stalled the game
+outright (`rust=None` at step 55). `ParityRunner`'s `INIT_PASSING` handler gates only on
+`game.getThrower() == null && actingPlayer != null && getPlayerId() != null` — there is **no
+turn-mode condition**; the bomb re-throw is merely the commonest way to reach that park. Rust had
+restricted its park prompt to the four BOMB turn modes. Widened it in
+`bb2016/pass/step_init_passing.rs` to match the harness's gate, with colocated test
+`a_null_thrower_park_prompts_in_a_regular_turn_too`.
+
+### Gates (seeds 1-100, tier 3), before → after
+
+| edition | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| bb2016 | 99 → **100** ✅ | 100 → **100** ✅ | 99 → **100** ✅ |
+| bb2020 | 98 → **100** ✅ | 100 → **100** ✅ | 98 → **100** ✅ |
+| bb2025 | 98 → **100** ✅ | 100 → **100** ✅ | 98 → **100** ✅ |
+
+**11 reds → 0. 🏁 The halfling parity frontier is EMPTY.** Measured in two rounds: after Fault 1
+(bb2020 and bb2025 all three green; bb2016 99/100/99, reds 1 and 6), then after Faults 2+3 (all
+nine). `TIMING` for the final round: `rust_total=` 26.9s / 39.4s / 23.2s (bb2016),
+28.2s / 40.1s / 25.8s (bb2020), 29.3s / 40.1s / 31.4s (bb2025).
+
+### Verification (all measured this iteration; every parity line quoted is the positive `PARITY:`)
+
+* `cargo test -p ffb-engine` **7408/0** (+5 new tests), `ffb-model` **2802/0**.
+* Nine halfling gates **100/100** each (the table above).
+* Random controls (`FFB_PARITY_ROOT=parity_random`, `--agent random`): halfling bb2016 / bb2020 /
+  bb2025 **100/100 each**.
+* Closed-roster regressions, heuristic `@1.0`: goblin and elf on **all three** editions
+  **100/100** each; bb2025 × {amazon, lineman, dwarf, chaos, chaos_dwarf, chaos_pact, dark_elf,
+  dark_elf_league_fumbbl} all **100/100**; plus **wood_elf bb2016 100/100** as an extra check,
+  since it is the other Treeman roster and the Take Root comments in the code cite its seeds.
+  Nothing regressed.
+* Coverage harvested ×3 (each run alone): `docs/EVENT_COVERAGE_halfling_bb2016.md`,
+  `…_bb2020.md`, `…_bb2025.md`.
+
+### Notes for the next race
+
+* **Equal dice values are not equal semantics.** Two d6 at the same `pos` always agree; only Java's
+  `caller=` stack (or `FFB_DIE_AT` on the Rust side) shows whether the same STEP drew them. The
+  bb2020 seed-4 diagnosis went one step wrong until both sides were priced by step, not by value.
+* **`driver.rs` has ONE `TakeRoot` arm.** Every negatrait/step family should be grepped in
+  `driver.rs` before an edition difference is "ported" into a per-edition file — three of the four
+  `step_take_root.rs`-shaped files in the tree are dead twins.
+* The `MoveParams::default()` in `bb2025/shared/step_end_selecting.rs`'s `with_param == false`
+  branch supplies `rules = BB2025` for every edition (the edition-gated-generator-default trap).
+  It did not bite this race, but it is still there.

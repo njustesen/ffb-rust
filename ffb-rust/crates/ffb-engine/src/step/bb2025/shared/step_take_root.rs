@@ -112,6 +112,17 @@ impl StepTakeRoot {
             None => return StepOutcome::next(),
         };
 
+        // BB2016 ONLY. `bb2016.StepTakeRoot.executeStep` recovers the acting player's tacklezones
+        // before running the hooks:
+        //   `PlayerState playerState = ...getPlayerState(actingPlayer.getPlayer()).recoverTacklezones();
+        //    game.getFieldModel().setPlayerState(actingPlayer.getPlayer(), playerState);`
+        // Neither `bb2020.shared.StepTakeRoot` nor `bb2025.shared.StepTakeRoot` has that line.
+        if game.rules == ffb_model::enums::Rules::Bb2016 {
+            if let Some(state) = game.field_model.player_state(&player_id) {
+                game.field_model.set_player_state(&player_id, state.recover_tacklezones());
+            }
+        }
+
         // Java: actingPlayer.getOldPlayerState().getBase() == PlayerState.STANDING. Read it from the
         // ActingPlayer (captured at activation in change_player_action), falling back to the
         // step-parameter copy, then the conservative STANDING default. A prone Treeman blitzing has
@@ -221,7 +232,14 @@ impl StepTakeRoot {
 /// Returns the StepOutcome (NEXT_STEP, no extra published parameters).
 fn cancel_take_root_player_action(game: &mut Game, player_id: &str) -> StepOutcome {
     // Java: actingPlayer.setGoingForIt(true); actingPlayer.setDodging(false);
-    game.acting_player.goes_for_it = true;
+    //
+    // …except in BB2016, where the very same line reads `actingPlayer.setGoingForIt(FALSE)`
+    // (`bb2016.StepTakeRoot.cancelPlayerAction`, first statement). bb2020 and bb2025 both pass
+    // `true`. This file is the LIVE StepTakeRoot for all three editions (driver.rs has no bb2016
+    // override for StepId::TakeRoot — `bb2016/step_take_root.rs` is a dead twin), so the edition
+    // differences have to be gated here.
+    let bb2016 = game.rules == ffb_model::enums::Rules::Bb2016;
+    game.acting_player.goes_for_it = !bb2016;
     // Clearing `dodging` is essential: StepInitMoving runs BEFORE StepTakeRoot in the move sequence
     // and may already have set dodging=true for the queued destination (a tackle-zone square). Without
     // this, the rooted player — whose StepMove is skipped via isPinned — would still reach
@@ -240,9 +258,14 @@ fn cancel_take_root_player_action(game: &mut Game, player_id: &str) -> StepOutco
         }
         Some(PlayerAction::PassMove) => {
             game.acting_player.player_action = Some(PlayerAction::Pass);
-            let pid = player_id.to_string();
-            game.thrower_id = Some(pid.clone());
-            game.thrower_action = Some(PlayerAction::Pass);
+            // BB2020/BB2025 only: `game.setThrowerId(...); game.setThrowerAction(PASS);`
+            // `bb2016.StepTakeRoot.cancelPlayerAction`'s PASS_MOVE arm is the
+            // `changeActingPlayer` call and NOTHING else — it leaves the thrower alone.
+            if !bb2016 {
+                let pid = player_id.to_string();
+                game.thrower_id = Some(pid.clone());
+                game.thrower_action = Some(PlayerAction::Pass);
+            }
         }
         Some(PlayerAction::ThrowTeamMateMove) => {
             game.acting_player.player_action = Some(PlayerAction::ThrowTeamMate);
@@ -252,9 +275,15 @@ fn cancel_take_root_player_action(game: &mut Game, player_id: &str) -> StepOutco
         }
         Some(PlayerAction::HandOverMove) => {
             game.acting_player.player_action = Some(PlayerAction::HandOver);
-            let pid = player_id.to_string();
-            game.thrower_id = Some(pid.clone());
-            game.thrower_action = Some(PlayerAction::HandOver);
+            // BB2020/BB2025 only, exactly as the PASS_MOVE arm above. Setting the thrower under
+            // BB2016 is what left `StepInitPassing` with `thrower_id = the Treeman` and
+            // `pass_coordinate = None`: it then refused instead of parking, and the whole team turn
+            // ended a move early (halfling bb2016 seed 1 idx 55, seed 6 @1e6 idx 52).
+            if !bb2016 {
+                let pid = player_id.to_string();
+                game.thrower_id = Some(pid.clone());
+                game.thrower_action = Some(PlayerAction::HandOver);
+            }
         }
         Some(PlayerAction::FoulMove) => {
             game.acting_player.player_action = Some(PlayerAction::Foul);
@@ -521,6 +550,74 @@ mod tests {
         assert_eq!(game.acting_player.player_action, Some(PlayerAction::Pass));
         assert_eq!(game.thrower_id.as_deref(), Some("p1"));
         assert_eq!(game.thrower_action, Some(PlayerAction::Pass));
+    }
+
+    /// `bb2016.StepTakeRoot.cancelPlayerAction` differs from the bb2020/bb2025 twin in two places,
+    /// and this file is the LIVE step for all three editions:
+    ///
+    /// ```java
+    /// // bb2016                                   // bb2020 / bb2025
+    /// actingPlayer.setGoingForIt(false);          actingPlayer.setGoingForIt(true);
+    /// case PASS_MOVE:                             case PASS_MOVE:
+    ///   changeActingPlayer(..., PASS, ...);         changeActingPlayer(..., PASS, ...);
+    ///   break;                                      game.setThrowerId(actingPlayer.getPlayerId());
+    ///                                               game.setThrowerAction(PlayerAction.PASS);
+    /// case HAND_OVER_MOVE:                          break;
+    ///   changeActingPlayer(..., HAND_OVER, ...);  case HAND_OVER_MOVE:
+    ///   break;                                      changeActingPlayer(..., HAND_OVER, ...);
+    ///                                               game.setThrowerId(...); setThrowerAction(HAND_OVER);
+    /// ```
+    #[test]
+    fn bb2016_cancel_leaves_the_thrower_alone_and_clears_going_for_it() {
+        for (rules, expect_thrower, expect_gfi) in [
+            (Rules::Bb2016, false, false),
+            (Rules::Bb2020, true, true),
+            (Rules::Bb2025, true, true),
+        ] {
+            for (declared, base) in [
+                (PlayerAction::HandOverMove, PlayerAction::HandOver),
+                (PlayerAction::PassMove, PlayerAction::Pass),
+            ] {
+                let mut game = make_game_with_rules(rules);
+                add_player_with_take_root(&mut game, "p1");
+                game.acting_player.player_id = Some("p1".into());
+                game.acting_player.player_action = Some(declared);
+                game.thrower_id = None;
+                game.thrower_action = None;
+                game.acting_player.goes_for_it = !expect_gfi;
+
+                cancel_take_root_player_action(&mut game, "p1");
+
+                assert_eq!(game.acting_player.player_action, Some(base),
+                    "{rules:?} {declared:?}: the *_MOVE action reverts to its base form");
+                assert_eq!(game.acting_player.goes_for_it, expect_gfi,
+                    "{rules:?}: setGoingForIt({expect_gfi})");
+                assert_eq!(game.thrower_id.is_some(), expect_thrower,
+                    "{rules:?} {declared:?}: only bb2020/bb2025 set the thrower here");
+                assert_eq!(game.thrower_action.is_some(), expect_thrower,
+                    "{rules:?} {declared:?}: throwerAction follows throwerId");
+            }
+        }
+    }
+
+    /// `bb2016.StepTakeRoot.executeStep` recovers the acting player's tacklezones before running
+    /// the behaviour hooks; the bb2020 and bb2025 steps do not.
+    #[test]
+    fn bb2016_recovers_tacklezones_before_the_roll() {
+        for (rules, expect_confused) in [(Rules::Bb2016, false), (Rules::Bb2020, true)] {
+            let mut game = make_game_with_rules(rules);
+            add_player_with_take_root(&mut game, "p1");
+            game.acting_player.player_id = Some("p1".into());
+            game.acting_player.player_action = Some(PlayerAction::Move);
+            let st = game.field_model.player_state("p1").unwrap();
+            game.field_model.set_player_state("p1", st.change_confused(true));
+
+            let mut step = StepTakeRoot::new();
+            let _ = step.start(&mut game, &mut GameRng::new(1));
+
+            assert_eq!(game.field_model.player_state("p1").unwrap().is_confused(), expect_confused,
+                "{rules:?}: only bb2016 calls recoverTacklezones() here");
+        }
     }
 
     /// Java: TakeRootBehaviour.handleExecuteStepHook always adds a ReportConfusionRoll when

@@ -68,6 +68,36 @@ impl Step for StepInitMoving {
             // Java: CLIENT_MOVE / CLIENT_BLITZ_MOVE — agent provides the path to move through
             // UtilServerPlayerMove.isValidMove + fetchMoveStack not ported; trust agent path
             Action::Move { path } if !path.is_empty() => {
+                // A PINNED (rooted / chomped) player cannot take the first step of a MOVE.
+                //
+                // Java routes the FIRST move command of a `*_MOVE` activation through
+                // `StepInitSelecting`, whose CLIENT_MOVE arm sets
+                // `fDispatchPlayerAction = PlayerAction.MOVE` — it does NOT re-use the declared
+                // HAND_OVER_MOVE / PASS_MOVE / THROW_TEAM_MATE_MOVE. `StepEndSelecting`
+                // (bb2025/shared, `dispatchPlayerAction`) then runs
+                // `case MOVE: if (playerState.isPinned()) { endGenerator.pushSequence(endParams); break; }`
+                // BEFORE the fall-through that pushes the Move sequence. So a rooted Treeman that
+                // declares a give and is told to walk simply ENDS ITS ACTIVATION: it never moves,
+                // `StepInitMoving.executeStep` never runs and therefore never sets
+                // `turnData.setHandOverUsed(true)`, and because `actingPlayer.hasActed()` stays
+                // false `UtilActingPlayer.changeActingPlayer` puts the player back to STANDING with
+                // its ACTIVE bit intact.
+                //
+                // Rust pushes the Move sequence at declaration time and raises the move prompt from
+                // here, so this arm is where that first command lands; `!has_moved` is what makes it
+                // the command Java hands to StepInitSelecting rather than to StepInitMoving (which
+                // has no pinned guard). Without it the rooted Treeman consumed the team hand-over,
+                // lost its ACTIVE bit and went on to fire the give terminal — halfling bb2020 seed 4
+                // idx 19, where Java's whole activation is a no-op (`post_hash == pre_hash`).
+                if !game.acting_player.has_moved
+                    && game.acting_player.player_id.as_deref()
+                        .and_then(|id| game.field_model.player_state(id))
+                        .map(|ps| ps.is_pinned())
+                        .unwrap_or(false)
+                {
+                    self.end_player_action = true;
+                    return self.execute_step(game, rng);
+                }
                 if self.move_stack.is_empty() {
                     self.move_stack = path.clone();
                 }
@@ -434,6 +464,73 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2025)
+    }
+
+    /// A game with one on-pitch home player, rooted, activated with the given action.
+    fn rooted_mover(action: PlayerAction, has_moved: bool) -> (Game, String) {
+        use ffb_model::enums::{PlayerState, PS_MOVING};
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        let pid = "home_01".to_string();
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: pid.clone(), name: pid.clone(), nr: 1, position_id: "pos".into(),
+            movement: 2, strength: 6, agility: 5, passing: 11, armour: 11,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate(&pid, FieldCoordinate::new(12, 7));
+        game.field_model.set_player_state(&pid,
+            PlayerState::new(PS_MOVING).change_active(true).change_rooted(true));
+        game.home_playing = true;
+        game.acting_player.player_id = Some(pid.clone());
+        game.acting_player.player_action = Some(action);
+        game.acting_player.has_moved = has_moved;
+        (game, pid)
+    }
+
+    /// Java `bb2025/shared/StepEndSelecting.dispatchPlayerAction`:
+    /// ```java
+    /// case MOVE:
+    ///   if (game.getFieldModel().getPlayerState(actingPlayer.getPlayer()).isPinned()) {
+    ///     endGenerator.pushSequence(endParams);
+    ///     break;
+    ///   }
+    ///   // fall through … HAND_OVER_MOVE … → moveGenerator.pushSequence(...)
+    /// ```
+    /// The FIRST move command of a `*_MOVE` activation is dispatched as `PlayerAction.MOVE` by
+    /// `StepInitSelecting`'s CLIENT_MOVE arm, so a ROOTED player told to walk ends its activation:
+    /// no square, no `setHandOverUsed(true)` (that lives in `StepInitMoving.executeStep`, which
+    /// never runs), and `hasActed()` stays false so `changeActingPlayer` keeps the ACTIVE bit.
+    #[test]
+    fn a_pinned_players_first_move_ends_the_activation() {
+        let (mut game, _pid) = rooted_mover(PlayerAction::HandOverMove, false);
+        let mut step = StepInitMoving::new("end".into());
+        let out = step.handle_command(
+            &Action::Move { path: vec![ffb_model::types::FieldCoordinate::new(11, 8)] },
+            &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(out.goto_label.as_deref(), Some("end"));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))),
+            "Java ends the player action instead of pushing the Move sequence");
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::CoordinateTo(_))),
+            "a rooted player never takes the square");
+        assert!(!game.turn_data_home.hand_over_used,
+            "the declared team hand-over is NOT consumed — StepInitMoving.executeStep never runs");
+        assert!(!game.acting_player.has_moved,
+            "hasActed() must stay false so the player keeps its ACTIVE bit");
+    }
+
+    /// The guard is only for the command Java routes through `StepInitSelecting`. A move command
+    /// that arrives mid-activation lands in `StepInitMoving`, whose CLIENT_MOVE arm has NO pinned
+    /// check — `StepMove` is what then skips the actual step.
+    #[test]
+    fn a_pinned_player_that_has_already_moved_is_not_guarded() {
+        let (mut game, _pid) = rooted_mover(PlayerAction::HandOverMove, true);
+        let mut step = StepInitMoving::new("end".into());
+        let out = step.handle_command(
+            &Action::Move { path: vec![ffb_model::types::FieldCoordinate::new(11, 8)] },
+            &mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::CoordinateTo(_))),
+            "the continuation move is processed exactly as before");
     }
 
     /// §12: a blitzer suffering Blood Lust must still throw its BLOCK. The early-out here was

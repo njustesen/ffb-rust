@@ -71,6 +71,31 @@ impl Step for StepInitMoving {
         let player_action = game.acting_player.player_action;
         match action {
             Action::Move { path } if !path.is_empty() => {
+                // A ROOTED player cannot take the first step of a MOVE.
+                //
+                // Java routes the FIRST move command of a `*_MOVE` activation through
+                // `bb2016.move.StepInitSelecting`, whose CLIENT_MOVE arm sets
+                // `fDispatchPlayerAction = PlayerAction.MOVE` — it does NOT re-use the declared
+                // HAND_OVER_MOVE / PASS_MOVE / THROW_TEAM_MATE_MOVE. `bb2016.move.StepEndSelecting`
+                // then runs `case MOVE: if (isRooted()) { endGenerator.pushSequence(endParams); break; }`
+                // BEFORE the fall-through that pushes the Move sequence, so the activation ENDS: no
+                // move, no `turnData.setHandOverUsed(true)` (that lives in StepInitMoving.executeStep,
+                // which never runs), and since `actingPlayer.hasActed()` stays false
+                // `UtilActingPlayer.changeActingPlayer` leaves the player STANDING and ACTIVE.
+                //
+                // Rust pushes the Move sequence at declaration time and raises the move prompt from
+                // here, so this arm is where that first command lands; `!has_moved` is what makes it
+                // the command Java hands to StepInitSelecting rather than to StepInitMoving (which
+                // has no rooted guard).
+                if !game.acting_player.has_moved
+                    && game.acting_player.player_id.as_deref()
+                        .and_then(|id| game.field_model.player_state(id))
+                        .map(|ps| ps.is_rooted())
+                        .unwrap_or(false)
+                {
+                    self.end_player_action = true;
+                    return self.execute_step(game, rng);
+                }
                 if self.move_stack.is_empty() {
                     // Java: UtilServerPlayerMove.fetchMoveStack(moveCommand) → fMoveStack
                     self.move_stack = path.clone();
@@ -319,6 +344,61 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2016)
+    }
+
+    /// Java `bb2016/move/StepEndSelecting.dispatchPlayerAction`:
+    /// ```java
+    /// case MOVE:
+    ///   if (game.getFieldModel().getPlayerState(actingPlayer.getPlayer()).isRooted()) {
+    ///     endGenerator.pushSequence(endParams);
+    ///     break;
+    ///   }
+    ///   // fall through … HAND_OVER_MOVE … → moveGenerator.pushSequence(...)
+    /// ```
+    /// The FIRST move command of a `*_MOVE` activation is dispatched as `PlayerAction.MOVE` by
+    /// `bb2016/move/StepInitSelecting`'s CLIENT_MOVE arm, so a ROOTED player told to walk ends its
+    /// activation: no square, no `setHandOverUsed(true)` (`StepInitMoving.executeStep` never runs),
+    /// and `hasActed()` stays false so `changeActingPlayer` keeps the ACTIVE bit.
+    #[test]
+    fn a_rooted_players_first_move_ends_the_activation() {
+        use ffb_model::enums::{PlayerState, PS_MOVING};
+        use ffb_model::types::FieldCoordinate;
+
+        let mut game = make_game();
+        let pid = "home_01".to_string();
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: pid.clone(), name: pid.clone(), nr: 1, position_id: "pos".into(),
+            movement: 2, strength: 6, agility: 1, passing: 10, armour: 10,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate(&pid, FieldCoordinate::new(13, 8));
+        game.field_model.set_player_state(&pid,
+            PlayerState::new(PS_MOVING).change_active(true).change_rooted(true));
+        game.home_playing = true;
+        game.acting_player.player_id = Some(pid.clone());
+        game.acting_player.player_action = Some(PlayerAction::HandOverMove);
+
+        let mut step = StepInitMoving::new("end".into());
+        let out = step.handle_command(
+            &Action::Move { path: vec![FieldCoordinate::new(13, 9)] },
+            &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(out.goto_label.as_deref(), Some("end"));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))));
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::CoordinateTo(_))),
+            "a rooted player never takes the square");
+        assert!(!game.turn_data_home.hand_over_used,
+            "the declared team hand-over is NOT consumed");
+        assert!(!game.acting_player.has_moved,
+            "hasActed() must stay false so the player keeps its ACTIVE bit");
+
+        // The continuation command (Java: StepInitMoving's own CLIENT_MOVE arm) has no guard.
+        game.acting_player.has_moved = true;
+        let mut step2 = StepInitMoving::new("end".into());
+        let out2 = step2.handle_command(
+            &Action::Move { path: vec![FieldCoordinate::new(13, 9)] },
+            &mut game, &mut GameRng::new(0));
+        assert!(out2.published.iter().any(|p| matches!(p, StepParameter::CoordinateTo(_))));
     }
 
     /// A give arriving mid-move must leave `StepInitPassing` everything it needs.
