@@ -952,7 +952,16 @@ impl StepCatchScatterThrowIn {
                 //         return catchBall();
                 //       }
                 let mut hook_state = StepCatchHookState::new(cid.clone());
-                dispatch::execute_step_hooks(game, rng, StepId::CatchScatterThrowIn, &mut hook_state);
+                // Java: `boolean stopProcessing = getGameState().executeStepHooks(this, state);`
+                // and the team-re-roll offer below is wrapped in `if (!stopProcessing) { ... }`.
+                // bb2025's CatchBehaviour hook returns TRUE whenever the catcher has Catch, so a
+                // Catch-carrying player who fails a BOMB catch is handled entirely by the hook —
+                // and because `catchWorksForBombs` is off the skill re-roll does NOT apply either.
+                // Java therefore offers NO re-roll at all; dropping the returned flag let Rust fall
+                // through to the team-re-roll offer (halfling bb2025 seed 92 step 24: the Halfling
+                // Catcher home_04 fluffed the bomb catch, Rust spent a TRR, caught it and re-threw
+                // while Java exploded the bomb on his square). The bb2020 twin already gates on it.
+                let stop_processing = dispatch::execute_step_hooks(game, rng, StepId::CatchScatterThrowIn, &mut hook_state);
                 self.re_roll_state.re_rolled_action = hook_state.re_rolled_action.or(self.re_roll_state.re_rolled_action.clone());
                 self.re_roll_state.re_roll_source = hook_state.re_roll_source.or(self.re_roll_state.re_roll_source.clone());
 
@@ -966,14 +975,16 @@ impl StepCatchScatterThrowIn {
 
                 // Java passes the CATCHER (`bb2025/shared/StepCatchScatterThrowIn:590-592`), so a
                 // catch by a player on the non-acting team gets no team re-roll.
-                if let Some(prompt) = ask_for_reroll_if_available_for(
-                    game, Some(cid.as_str()), "CATCH", min_roll, false)
-                {
-                    self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("CATCH"));
-                    self.re_roll_state.re_roll_source = Some(ffb_model::enums::ReRollSource::new("TRR"));
-                    self.roll = 0;
-                    self.pending_prompt = Some(prompt);
-                    return self.catch_scatter_throw_in_mode;
+                if !stop_processing {
+                    if let Some(prompt) = ask_for_reroll_if_available_for(
+                        game, Some(cid.as_str()), "CATCH", min_roll, false)
+                    {
+                        self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("CATCH"));
+                        self.re_roll_state.re_roll_source = Some(ffb_model::enums::ReRollSource::new("TRR"));
+                        self.roll = 0;
+                        self.pending_prompt = Some(prompt);
+                        return self.catch_scatter_throw_in_mode;
+                    }
                 }
             }
         }
@@ -1271,6 +1282,40 @@ mod tests {
         assert!(game.player("c1").unwrap().used_skills.contains(&SkillId::Catch),
             "the Catch re-roll must be consumed (skill marked used)");
         assert_ne!(step.roll, 1, "the re-roll must draw a FRESH catch die, not reuse the failed roll");
+    }
+
+    #[test]
+    fn failed_bomb_catch_by_a_catch_skill_player_offers_no_team_reroll() {
+        // Java bb2025 StepCatchScatterThrowIn.catchBall(), failure path:
+        //   boolean stopProcessing = getGameState().executeStepHooks(this, state);
+        //   if (state.rerollCatch && (!mode.isBomb() || catchForBombs.isEnabled())) { return catchBall(); }
+        //   if (!stopProcessing) { if (askForReRollIfAvailable(...)) { ... } }
+        // bb2025 CatchBehaviour's hook returns TRUE for any catcher holding Catch, and
+        // CATCH_WORKS_FOR_BOMBS is off by default — so a Catch player who fluffs a BOMB catch is
+        // offered NOTHING: the skill re-roll is excluded for bombs and stopProcessing suppresses
+        // the team re-roll. Rust dropped the returned flag and offered the TRR.
+        use ffb_model::enums::{SkillId, PS_STANDING};
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 4;
+        let coord = FieldCoordinate::new(7, 1);
+        game.field_model.bomb_coordinate = Some(coord);
+        let mut catcher = make_player("c1", 3);
+        catcher.starting_skills.push(SkillWithValue { skill_id: SkillId::Catch, value: None });
+        game.team_home.players.push(catcher);
+        game.field_model.set_player_coordinate("c1", coord);
+        game.field_model.set_player_state("c1", PlayerState::new(PS_STANDING));
+
+        let mut step = StepCatchScatterThrowIn::new();
+        step.catch_scatter_throw_in_mode = Some(CatchScatterThrowInMode::CatchAccurateBomb);
+        step.catcher_id = Some("c1".into());
+        step.roll = 1; // a certain failure against any minimum
+        let _ = step.catch_ball(&mut game, &mut GameRng::new(3));
+
+        assert!(step.pending_prompt.is_none(),
+            "a Catch player's failed BOMB catch must not be offered a team re-roll, got {:?}",
+            step.pending_prompt);
     }
 
     // ── failed_catch tests ────────────────────────────────────────────────────────
