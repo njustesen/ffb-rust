@@ -841,3 +841,106 @@ apothecary is precisely the thing that turns a casualty into a KO without spendi
 with `FFB_DICE_TRACE` (Java's `pos` is the same global counter as `rng_calls`, so the two align
 directly) that both engines read the same injury total and the same d16, then find which side
 applies the apothecary.
+
+
+## ITER21 — the ninth gate: BB2020's TTM landing runs `dropPlayer` INLINE, not deferred
+
+bb2020 @1e6 seed 83 closes, and **all nine goblin gates are 100/100**.
+
+### It was not the landing injury, and not an apothecary
+
+The ITER20 hand-off pointed at `InjuryTypeTTMLanding` / `ApothecaryMode.THROWN_PLAYER`. That was
+wrong, and `FFB_DICE_TRACE` said so before a line of code changed. Java's `caller=` stack names the
+step behind every die, and positions 43–48 of seed 83 are:
+
+```
+pos=43 sides=6 result=3  InjuryTypeTTMHitPlayer.handleInjury:44  StepInitScatterPlayer.executeStep:220
+pos=44 sides=6 result=5  InjuryTypeTTMHitPlayer.handleInjury:44  StepInitScatterPlayer.executeStep:220
+pos=45 sides=6 result=6  InjuryTypeBallAndChain.handleInjury:28  UtilServerInjury.dropPlayer:341  StepInitScatterPlayer.executeStep:259
+pos=46 sides=6 result=5  InjuryTypeBallAndChain.handleInjury:28  UtilServerInjury.dropPlayer:341  StepInitScatterPlayer.executeStep:259
+pos=47 sides=16 result=4 RollMechanic.rollCasualty:58 …InjuryTypeBallAndChain
+pos=48 sides=6  result=1 RollMechanic.rollCasualty:58 …InjuryTypeBallAndChain
+```
+
+Rust's per-die trace is byte-identical at every one of those positions (and at 49–51, the landing
+armour roll). So the differing player is not the thrown Goblin at all: `a02` is the away **Fanatic**
+(3/7/3/8), who was standing on the landing square. He takes TWO injuries in one step — the
+`TTMHitPlayer` roll for being landed on (3+5 = 8 → Knocked Out), and then the `BallAndChain` chain
+injury for being dropped (6+5 = 11 → casualty, d16=4/d6=1 → Badly Hurt). Both engines rolled both.
+Only the *surviving* result differed.
+
+An `FFB_INJPROBE` probe pair (one line in `util_server_injury::handle_injury`, one in
+`InjuryResult::apply_to`) made it exact:
+
+```
+RINJ   def=away_03 apo=HitPlayer injury=PlayerState(5) ko=true            <- TTMHitPlayer  → KO
+RINJ   def=away_03 apo=HitPlayer injury=PlayerState(6) cas=Some([4, 1])   <- BallAndChain  → Badly Hurt
+RAPPLY def=away_03 new=PlayerState(5) set=true                            <- the KO is what gets applied
+```
+
+### The mechanism: a `Map` slot, and which write lands in it last
+
+`bb2020/ttm/StepInitScatterPlayer` resolves a landing-on-a-player INLINE:
+
+```java
+InjuryResult injuryResultHitPlayer = UtilServerInjury.handleInjury(this, new InjuryTypeTTMHitPlayer(), …);
+publishParameter(new StepParameter(StepParameterKey.INJURY_RESULT, injuryResultHitPlayer));
+…
+publishParameter(THROWN_PLAYER_ID / THROWN_PLAYER_STATE / THROWN_PLAYER_HAS_BALL / IS_KICKED_PLAYER);
+if (playerLandedUpon != null) {
+  publishParameters(UtilServerInjury.dropPlayer(this, playerLandedUpon, ApothecaryMode.HIT_PLAYER, true));
+}
+```
+
+`StepParameterSet` is a `Map<StepParameterKey, StepParameter>` (`fParameterById.put(...)`), so the
+SECOND `INJURY_RESULT` — the one `dropPlayer` publishes from its `placedProneCausesInjuryRoll`
+branch for a Ball & Chain player — **replaces** the first, and the apothecary step applies the chain
+injury. Order is the whole semantics.
+
+`bb2025/ttm/StepInitScatterPlayer` has a different shape: it publishes no `INJURY_RESULT`, and
+instead wraps the hit injury plus a deferred `DropPlayerCommand` in a `STEADY_FOOTING_CONTEXT`.
+`StepSteadyFooting.fail()` then runs the deferred commands FIRST and republishes the context's own
+injury result AFTERWARDS — the exact inverse order. Correct for BB2025, whose `ScatterPlayer`
+generator contains the Steady Footing step.
+
+Rust ran the BB2025 shape under BB2020, because `driver.rs` routes `InitScatterPlayer` to the
+bb2025 impl for both editions and `bb2025/ttm/step_dispatch_scatter_player.rs` builds the bb2025
+`ScatterPlayer` sequence. Note the trap this hides: `generator/bb2020/scatter_player.rs` exists,
+correctly has NO Steady Footing step, and even carries a test asserting so — and is **dead** on this
+path. Reading it is what makes "BB2020 has no Steady Footing, so the deferred command can never run"
+look true; in fact the bb2025 generator was live, the step did run, and it ran in the wrong order.
+
+### The fix
+
+`crates/ffb-engine/src/step/bb2025/ttm/step_init_scatter_player.rs`, landing-on-a-player branch,
+gated `game.rules == Rules::Bb2020` (bb2016 has its own routed step, so only bb2020 reaches here):
+publish `INJURY_RESULT` for the hit player, `END_TURN` when `alwaysTurnOver || own team`,
+`THROWN_PLAYER_COORDINATE` / `CRASH_LANDING(false)` / `PLAYER_ENTERING_SQUARE`; then, AFTER the
+four always-published parameters, run `util_server_injury::drop_player_rng(…, HIT_PLAYER, true)`
+inline and publish everything it returns. No `SteadyFootingContext`, no deferred commands, and no
+`ReportPlayerEvent("was hit")` (the bb2020 step has none). BB2025 is untouched.
+
+Rust's `apply_effects` drains `outcome.published` in order, calling `set_parameter` per step, so a
+later `InjuryResult` overwrites an earlier one exactly as Java's map does — the ordering fix is
+sufficient and needs no new machinery.
+
+Three colocated tests written from the Java: BB2020 landing on a Ball & Chain player publishes
+`INJURY_RESULT` twice with the chain one LAST and no `SteadyFootingContext`; BB2020 landing on a
+plain player publishes it once (`dropPlayer`'s else branch places PRONE and publishes nothing);
+BB2025 still publishes a `SteadyFootingContext` and no `INJURY_RESULT`.
+
+After the fix the probe reads `RAPPLY def=away_03 new=PlayerState(6) set=true` and seed 83 is
+`PARITY: 1/1 games match`.
+
+### 🏁 Gate movement, ITER20 → ITER21 — ALL NINE GREEN
+
+| edition | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| bb2016 | **100** ✅ | **100** ✅ | **100** ✅ |
+| bb2020 | **100** ✅ | **100** ✅ | 99 → **100** ✅ |
+| bb2025 | **100** ✅ | **100** ✅ | **100** ✅ |
+
+All nine re-measured on the final release binary (goblin v goblin, seeds 1-100, tier 3, heuristic,
+`--heur-classes all`), each printing `PARITY: 100/100 games match`. `cargo test -p ffb-engine`
+7398 / 0, `ffb-model` 2802 / 0. Random controls ×3 editions 100/100 under
+`FFB_PARITY_ROOT=parity_random`.

@@ -213,6 +213,9 @@ impl StepInitScatterPlayer {
         end_coord: FieldCoordinate,
     ) -> StepOutcome {
         let mut outcome = StepOutcome::next();
+        // BB2020 only: the id of the player landed upon, whose `dropPlayer` Java runs INLINE at the
+        // very end of the step (see the BB2020 branch below).
+        let mut bb2020_inline_drop: Option<String> = None;
 
         // Java: playerLandedUpon = fieldModel.getPlayer(endCoordinate), null if same player
         let at_end = game.field_model.player_at(end_coord)
@@ -298,6 +301,45 @@ impl StepInitScatterPlayer {
                 game.team_away.has_player(&hit_player_id)
             };
 
+            // ── BB2020: no Steady Footing, no deferred commands ───────────────────────────
+            // `bb2020/ttm/StepInitScatterPlayer` resolves the landing INLINE:
+            //
+            //   publishParameter(INJURY_RESULT, injuryResultHitPlayer);
+            //   if (alwaysTurnOver || own team) publishParameter(END_TURN, true);
+            //   crashLanding = false;
+            //   publishParameter(THROWN_PLAYER_COORDINATE, endCoordinate);
+            //   publishParameter(CRASH_LANDING, crashLanding);
+            //   publishParameter(PLAYER_ENTERING_SQUARE, thrownPlayerId);
+            //   ... (the four always-published parameters) ...
+            //   if (playerLandedUpon != null)
+            //     publishParameters(UtilServerInjury.dropPlayer(this, playerLandedUpon, HIT_PLAYER, true));
+            //
+            // The ORDER is the whole point. `StepParameterSet` is a `Map<StepParameterKey, …>`, so
+            // the SECOND `INJURY_RESULT` — the one `dropPlayer` publishes for a Ball & Chain player
+            // it must injure rather than place prone — REPLACES the hit-player result, and the
+            // apothecary step therefore applies the CHAIN injury. Wrapping both in a
+            // `SteadyFootingContext` (the BB2025 shape) inverts that: `StepSteadyFooting.fail()`
+            // runs the deferred `DropPlayerCommand` FIRST and republishes the context's own injury
+            // result AFTERWARDS, so the hit-player result wins. Under BB2025 that is correct, since
+            // its `ScatterPlayer` generator has the Steady Footing step; under BB2020 the generator
+            // has none, and the chain injury was being discarded (goblin bb2020 seed 83 i=14: the
+            // away Fanatic landed on by a thrown Goblin ends Badly Hurt in Java — chain injury 6+5,
+            // casualty d16=4/d6=1 — but Knocked Out in Rust, the hit-player injury 3+5).
+            if game.rules == Rules::Bb2020 {
+                outcome = outcome.publish(StepParameter::InjuryResult(Box::new(injury_result)));
+                if always_turn_over || hit_own_team {
+                    outcome = outcome.publish(StepParameter::EndTurn(true));
+                }
+                // Java: crashLanding = false — a crash landing only happens in empty squares.
+                outcome = outcome
+                    .publish(StepParameter::ThrownPlayerCoordinate(Some(end_coord)))
+                    .publish(StepParameter::CrashLanding(false))
+                    .publish(StepParameter::PlayerEnteringSquare(thrown_player_id.to_string()));
+                // The inline `dropPlayer` runs AFTER the always-published block below, exactly
+                // where Java has it — that is what makes its INJURY_RESULT the surviving one.
+                bb2020_inline_drop = Some(hit_player_id.clone());
+            } else {
+
             // Java: commands = [HitPlayerTurnOverCommand (conditional), DropPlayerCommand(...)]
             // Note: EndTurn is NOT published here directly — Java only sets it via the
             // deferred HitPlayerTurnOverCommand, which StepSteadyFooting executes only on
@@ -329,6 +371,7 @@ impl StepInitScatterPlayer {
             outcome = outcome
                 .publish(StepParameter::ThrownPlayerCoordinate(Some(end_coord)))
                 .publish(StepParameter::PlayerEnteringSquare(thrown_player_id.to_string()));
+            }
         } else {
             // Java: put thrown player in target coordinate; end loop
             game.field_model.set_player_coordinate(thrown_player_id, end_coord);
@@ -353,6 +396,17 @@ impl StepInitScatterPlayer {
 
         if let Some(old_state) = self.old_player_state {
             outcome = outcome.publish(StepParameter::OldDefenderState(old_state));
+        }
+
+        // Java (bb2020): `if (playerLandedUpon != null) publishParameters(UtilServerInjury.dropPlayer(
+        //   this, playerLandedUpon, ApothecaryMode.HIT_PLAYER, true));` — published LAST, so a Ball
+        // & Chain player's chain INJURY_RESULT replaces the hit-player one in the parameter map.
+        if let Some(ref hit_player_id) = bb2020_inline_drop {
+            for p in util_server_injury::drop_player_rng(
+                game, rng, hit_player_id, true, ApothecaryMode::HitPlayer,
+            ) {
+                outcome = outcome.publish(p);
+            }
         }
 
         // Java: game.getFieldModel().setPlayerCoordinate(thrownPlayer, endCoordinate)
@@ -1003,6 +1057,89 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::PLAYER_EVENT),
             "PLAYER_EVENT report must be added when thrown player lands on another player");
+    }
+
+    // ── BB2020 inline landing (no Steady Footing) ─────────────────────────────
+
+    /// Build a game in `rules` where a thrown home player bullseyes onto an away player at (10,7).
+    /// `hit_has_ball_and_chain` gives that away player Ball & Chain (`placedProneCausesInjuryRoll`).
+    fn landing_on_player(rules: Rules, hit_has_ball_and_chain: bool) -> (Game, StepOutcome) {
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+        game.home_playing = true;
+        add_player(&mut game, "thrown", FieldCoordinate::new(8, 7));
+        let land = FieldCoordinate::new(10, 7);
+        let skills = if hit_has_ball_and_chain {
+            vec![SkillWithValue { skill_id: SkillId::BallAndChain, value: None }]
+        } else {
+            vec![]
+        };
+        game.team_away.players.push(Player {
+            id: "target".into(), name: "target".into(), nr: 2,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 2, starting_skills: skills, extra_skills: vec![],
+            temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0,
+            career_spps: 0, race: None, ..Default::default()
+        });
+        game.field_model.set_player_coordinate("target", land);
+        game.field_model.set_player_state("target", PlayerState::new(PS_STANDING));
+        game.pass_coordinate = Some(land);
+
+        let mut step = StepInitScatterPlayer::new();
+        step.thrown_player_id = Some("thrown".into());
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        step.thrown_player_coordinate = Some(FieldCoordinate::new(8, 7));
+        step.using_bullseye = true;
+        let out = step.start(&mut game, &mut GameRng::new(7));
+        (game, out)
+    }
+
+    fn injury_result_count(out: &StepOutcome) -> usize {
+        out.published.iter().filter(|p| matches!(p, StepParameter::InjuryResult(_))).count()
+    }
+
+    /// Java `bb2020/ttm/StepInitScatterPlayer` publishes `INJURY_RESULT` for the hit player and
+    /// then, at the very end, `publishParameters(UtilServerInjury.dropPlayer(this, playerLandedUpon,
+    /// HIT_PLAYER, true))`. For a Ball & Chain player `dropPlayer` takes the
+    /// `placedProneCausesInjuryRoll` branch and publishes a SECOND `INJURY_RESULT` — which, since
+    /// `StepParameterSet` is a `Map<StepParameterKey, …>`, REPLACES the first. The chain injury is
+    /// therefore the one the apothecary step applies.
+    #[test]
+    fn bb2020_landing_on_a_ball_and_chain_player_publishes_the_chain_injury_last() {
+        let (_game, out) = landing_on_player(Rules::Bb2020, true);
+        assert_eq!(injury_result_count(&out), 2,
+            "BB2020 must publish INJURY_RESULT twice: the hit-player injury, then dropPlayer's chain injury");
+        let last_injury = out.published.iter().rposition(|p| matches!(p, StepParameter::InjuryResult(_)));
+        let first_injury = out.published.iter().position(|p| matches!(p, StepParameter::InjuryResult(_)));
+        assert!(last_injury > first_injury,
+            "the chain injury must be published AFTER the hit-player injury so it wins the map slot");
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))),
+            "BB2020's ScatterPlayer sequence has no Steady Footing step — no context may be published");
+    }
+
+    /// The same landing on a player WITHOUT Ball & Chain: Java's `dropPlayer` takes the else branch
+    /// (place PRONE) and publishes no `INJURY_RESULT`, so only the hit-player one is published.
+    #[test]
+    fn bb2020_landing_on_a_plain_player_publishes_one_injury_result() {
+        let (_game, out) = landing_on_player(Rules::Bb2020, false);
+        assert_eq!(injury_result_count(&out), 1,
+            "a non-Ball-&-Chain hit player is placed PRONE by dropPlayer, which publishes no INJURY_RESULT");
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))));
+    }
+
+    /// BB2025 keeps its own shape: `bb2025/ttm/StepInitScatterPlayer` publishes a
+    /// `STEADY_FOOTING_CONTEXT` carrying the injury result plus the deferred `DropPlayerCommand`,
+    /// and no `INJURY_RESULT` of its own.
+    #[test]
+    fn bb2025_landing_on_a_player_still_publishes_a_steady_footing_context() {
+        let (_game, out) = landing_on_player(Rules::Bb2025, true);
+        assert_eq!(injury_result_count(&out), 0,
+            "BB2025 defers the injury into the SteadyFootingContext");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))),
+            "BB2025 must publish STEADY_FOOTING_CONTEXT");
     }
 
     #[test]
