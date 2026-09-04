@@ -44,8 +44,15 @@ pub fn ask_for_reroll_if_available(
     minimum_roll: i32,
     fumble: bool,
 ) -> Option<AgentPrompt> {
+    // Java `UtilServerReRoll.askForReRollIfAvailable(GameState, ActingPlayer, …)`:
+    //   ReRollSource reRollSource = UtilCards.getUnusedRerollSource(actingPlayer, reRolledAction, …);
+    //   Skill reRollSkill = reRollSource != null ? reRollSource.getSkill(game) : null;
+    //   return askForReRollIfAvailable(gameState, actingPlayer.getPlayer(), …, reRollSkill);
+    // The action-keyed skill lookup belongs to THIS overload only — it reads the ACTING player.
     let acting = game.acting_player.player_id.clone();
-    ask_for_reroll_if_available_for(game, acting.as_deref(), rerolled_action, minimum_roll, fumble)
+    let reroll_skill = find_skill_reroll_source(game, rerolled_action);
+    ask_for_reroll_if_available_inner(
+        game, acting.as_deref(), rerolled_action, minimum_roll, fumble, reroll_skill)
 }
 
 /// As [`ask_for_reroll_if_available`], but for a roll made by `player_id` — which may be on the
@@ -57,8 +64,28 @@ pub fn ask_for_reroll_if_available_for(
     game: &Game,
     player_id: Option<&str>,
     rerolled_action: &str,
+    minimum_roll: i32,
+    fumble: bool,
+) -> Option<AgentPrompt> {
+    // Java's PLAYER overload does NOT look a re-roll source up by action. Only the ACTING-PLAYER
+    // overload does that (`UtilCards.getUnusedRerollSource(actingPlayer, reRolledAction, …)`);
+    // reaching `RollMechanic.askForReRollIfAvailable` with `reRollSkill == null` the mechanic
+    // considers exactly one skill term, `getUnusedSkillWithProperty(player,
+    // canRerollSingleDieOncePerPeriod)` — see `ask_for_reroll_if_available_inner`.
+    ask_for_reroll_if_available_inner(game, player_id, rerolled_action, minimum_roll, fumble, None)
+}
+
+/// Java: `RollMechanic.askForReRollIfAvailable(GameState, Player, ReRolledAction, int, boolean,
+///        Skill modificationSkill, Skill reRollSkill, …)` — the single method both public
+/// overloads funnel into. `reroll_skill` is the caller-supplied source: `Some` only from the
+/// ACTING-PLAYER overload, which resolves it from the acting player's skills by action.
+fn ask_for_reroll_if_available_inner(
+    game: &Game,
+    player_id: Option<&str>,
+    rerolled_action: &str,
     _minimum_roll: i32,
     _fumble: bool,
+    reroll_skill: Option<ReRollSource>,
 ) -> Option<AgentPrompt> {
     // Java `RollMechanic.isTeamReRollAvailable`: `actingTeam.hasPlayer(pPlayer) && ...`.
     // A catch by the opposing team is offered NO team re-roll — Rust offered one and spent it,
@@ -80,8 +107,27 @@ pub fn ask_for_reroll_if_available_for(
         game.team_away.id.clone()
     };
 
-    // Skill re-roll check (highest priority)
-    if let Some(source) = find_skill_reroll_source(game, rerolled_action) {
+    // Java: `if (reRollSkill == null) { reRollSkill = getUnusedSkillWithProperty(player,
+    //        canRerollSingleDieOncePerPeriod).orElse(null); }` — the ONLY skill term the mechanic
+    // adds on its own, and it reads the PLAYER it was given, not the acting player.
+    //
+    // Rust instead called `find_skill_reroll_source` here unconditionally, and that helper reads
+    // `game.acting_player` regardless of the `player_id` argument. So a step that correctly passed
+    // a non-acting player still had the ACTING player's skills consulted: bb2020 halfling seed 24
+    // @1e6 i=41, a Halfling Catcher throws a pass, the (Catch-less) receiver fluffs the catch and
+    // Rust raised `ReRollOffer{source: Catch}` off the THROWER's Catch — Java offers nothing (the
+    // catcher's own Catch is consumed by `CatchBehaviour`'s hook, and the bank was empty), bounces
+    // the ball at d8 pos=104 and the two engines' dice split there.
+    let skill_source = reroll_skill.or_else(|| {
+        let pid = player_id?;
+        let player = game.player(pid)?;
+        player.all_skill_ids()
+            .filter(|id| !player.used_skills.contains(id))
+            .find(|id| id.properties()
+                .contains(&ffb_model::model::property::named_properties::NamedProperties::CAN_REROLL_SINGLE_DIE_ONCE_PER_PERIOD))
+            .map(|id| ReRollSource::new(format!("{:?}", id)))
+    });
+    if let Some(source) = skill_source {
         return Some(AgentPrompt::ReRollOffer {
             source,
             action: rerolled_action.to_owned(),
@@ -525,6 +571,49 @@ mod tests {
             ..Default::default()
 });
         game.field_model.set_player_coordinate(id, coord);
+    }
+
+    /// Java has TWO `askForReRollIfAvailable` families and they are not the same contract:
+    ///
+    /// ```java
+    /// // ACTING-PLAYER overload (UtilServerReRoll:43-53)
+    /// ReRollSource reRollSource = UtilCards.getUnusedRerollSource(actingPlayer, reRolledAction, ignoreSkills);
+    /// Skill reRollSkill = reRollSource != null ? reRollSource.getSkill(game) : null;
+    /// return askForReRollIfAvailable(gameState, actingPlayer.getPlayer(), …, reRollSkill);
+    ///
+    /// // PLAYER overload → RollMechanic:239-269 — no action-keyed lookup at all
+    /// if (reRollSkill == null) {
+    ///     Optional<Skill> reRollOnce = UtilCards.getUnusedSkillWithProperty(player, canRerollSingleDieOncePerPeriod);
+    ///     if (reRollOnce.isPresent()) { reRollSkill = reRollOnce.get(); }
+    /// }
+    /// ```
+    ///
+    /// `StepCatchScatterThrowIn` calls the PLAYER overload with `state.catcher`. Rust collapsed
+    /// both into one function whose skill lookup always read `game.acting_player`, so the THROWER's
+    /// Catch was offered for a team-mate's failed catch (bb2020 halfling seed 24 @1e6).
+    #[test]
+    fn the_player_overload_does_not_read_the_acting_players_skill_reroll() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.turn_data_home.rerolls = 0; // empty bank: only a skill source could open a dialog
+        add_player_with_skill(&mut game, "thrower", SkillId::Catch);
+        add_player_with_skill(&mut game, "catcher", SkillId::Block); // no Catch
+        game.acting_player.player_id = Some("thrower".into());
+
+        // The ACTING-PLAYER overload still finds the acting player's Catch — unchanged.
+        assert!(
+            matches!(ask_for_reroll_if_available(&game, "CATCH", 4, false),
+                     Some(AgentPrompt::ReRollOffer { .. })),
+            "the acting-player overload must still resolve the acting player's own Catch"
+        );
+        // The PLAYER overload, asked about the CATCHER, must offer nothing: the catcher has no
+        // Catch, there is no team re-roll left, and Java never consults the acting player here.
+        assert!(
+            ask_for_reroll_if_available_for(&game, Some("catcher"), "CATCH", 4, false).is_none(),
+            "a Catch-less catcher with an empty bank must be offered no re-roll, \
+             regardless of what the thrower holds"
+        );
     }
 
     #[test]

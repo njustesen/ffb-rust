@@ -108,3 +108,107 @@ bb2025 **100/100 each**.
 Closed-roster regressions @1.0: bb2025 × {goblin, amazon, lineman, dwarf, chaos, chaos_dwarf,
 chaos_pact, dark_elf, dark_elf_league_fumbbl, elf} all **100/100**; goblin and elf also 100/100 on
 bb2016 and bb2020. Nothing regressed.
+
+## ITER2 — Java has TWO `askForReRollIfAvailable` families; Rust had collapsed them into one
+
+**Frontier.** Nine gates re-measured on `e99b7e0a2` first (they reproduced ITER1 exactly: bb2016
+97/99/99, bb2020 98/100/95, bb2025 96/100/95 — 21 reds). `frontier.sh` over the three most populated
+red gates named one dominant family:
+
+```
+bb2020 @1e6 (5 reds)          bb2025 @1.0 (4 reds)                bb2016 @1.0 (3 reds)
+seed 24  Activate(away_03,PassMove)   seed 44  Activate(away_02,AllYouCanEat)   seed 1   Activate(home_01,HandOffMove)
+seed 34  Activate(home_03,PassMove)   seed 62  Activate(home_01,PassMove)       seed 21  Activate(away_01,Move)
+seed 50  Activate(home_01,PassMove)   seed 68  Activate(away_01,HandOffMove)    seed 58  Activate(home_01,Move)
+seed 85  Activate(home_03,PassMove)   seed 94  Activate(away_02,AllYouCanEat)
+seed 90  Activate(away_02,PassMove)
+```
+
+**ALL FIVE** bb2020 @1e6 rows are `PassMove`, and every declaration is identical on both sides — so
+the split is in the RESOLUTION of a pass, not in what the agent declared.
+
+**Mechanism** (bb2020 seed 24 @1e6, i=41, away_03 throws to away_08 at (14,0)).
+
+* `FFB_DICE_TRACE` first divergence at `pos=104`. Java's `caller=` stack is decisive:
+  `pos=102 StepPass.executeStep:214` (the pass), `pos=103 StepCatchScatterThrowIn.catchBall:527`
+  (d6=2, the catch, failed), `pos=104 StepCatchScatterThrowIn.bounceBall:680` **sides=8** — Java
+  goes straight from the failed catch to the bounce. Rust's `pos=104` is a **d6**.
+* `FFB_TRACE`'s Rust `LOOP` chain says what that d6 was:
+  `Activate(away_03,PassMove)` → `Move→(11,2)` → `Pass(14,0)` →
+  `ReRollOffer { source: ReRollSource { name: "Catch" }, action: "CATCH" }` → `UseReRoll`.
+  Rust **offered the coach a `Catch` re-roll** for the failed catch, and the agent took it. The
+  `RUST_STEP` state strings bracket the cost: `r0,0` at i=41 becomes `r0,-1` at i=42 — a re-roll
+  spent out of an empty bank.
+* The catcher (away_08) has no Catch. The offer's source is the **thrower's** Catch: away_03 is a
+  bb2020 Halfling Catcher.
+
+**The Java rule.** `askForReRollIfAvailable` exists in two families and they are NOT one contract:
+
+```java
+// ACTING-PLAYER overload — UtilServerReRoll:43-53
+ReRollSource reRollSource = UtilCards.getUnusedRerollSource(actingPlayer, reRolledAction, ignoreSkills);
+Skill reRollSkill = reRollSource != null ? reRollSource.getSkill(game) : null;
+return askForReRollIfAvailable(gameState, actingPlayer.getPlayer(), …, reRollSkill);
+
+// PLAYER overload — bb2020/RollMechanic:239-269. NO action-keyed lookup at all:
+if (reRollSkill == null) {
+    Optional<Skill> reRollOnce = UtilCards.getUnusedSkillWithProperty(player, canRerollSingleDieOncePerPeriod);
+    if (reRollOnce.isPresent()) { reRollSkill = reRollOnce.get(); }
+}
+dialogShown = (teamReRollOption || proOption || singleUseReRollOption || reRollSkill != null || modificationSkill != null);
+```
+
+`StepCatchScatterThrowIn` calls the **PLAYER** overload with `state.catcher`
+(bb2016:412, bb2020:583-585, bb2025:590-592). So the catcher's own Catch never appears here — it is
+consumed earlier by `CatchBehaviour.handleExecuteStepHook`, which is exactly what `stopProcessing`
+(ITER1) exists to report — and the thrower's Catch is invisible to this call entirely. With the bank
+empty Java shows no dialog, and the ball bounces.
+
+Rust had ONE function. `ask_for_reroll_if_available_for(game, player_id, …)` did the acting-player
+overload's action-keyed lookup via `find_skill_reroll_source`, and **that helper reads
+`game.acting_player` regardless of the `player_id` argument** — so passing the catcher fixed the
+team-re-roll gate (an earlier fix) but left the SKILL term reading the thrower.
+
+**The unit** (`crates/ffb-engine/src/step/util_server_re_roll.rs`): split the two families.
+`ask_for_reroll_if_available` (acting-player entry) resolves `find_skill_reroll_source` itself and
+passes it down; `ask_for_reroll_if_available_for` (player entry) passes `None` and the shared inner
+function then applies Java's single own term, `canRerollSingleDieOncePerPeriod` **on the player it
+was given**. Regression test `the_player_overload_does_not_read_the_acting_players_skill_reroll`,
+written from the Java above, pins both halves (the acting-player overload must still find its own
+Catch). Also switched the bb2016 and bb2020 `StepCatchScatterThrowIn` twins to the player entry with
+the catcher, matching bb2025 and matching Java — **note the bb2020 file is a DEAD TWIN** (`driver.rs`
+`make_step` routes `StepId::CatchScatterThrowIn` to the bb2025 step for BB2020; only bb2016 has its
+own arm), so that half is alignment, not behaviour.
+
+**Gates (seeds 1-100, tier 3), before → after:**
+
+| edition | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| bb2016 | 97 → **97** | 99 → **99** | 99 → **99** |
+| bb2020 | 98 → **98** | 100 → **100** ✅ | 95 → **98** |
+| bb2025 | 96 → **96** | 100 → **100** ✅ | 95 → **95** |
+
+21 reds → **18**. bb2020 @1e6 seeds 24, 34 and 85 are green; 50 and 90 remain. No gate moved down,
+and the red SEED SETS at every other gate are byte-identical to before the change
+(bb2016 1/21/58, 63, 6; bb2020 4/69; bb2025 44/62/68/94, 44/66/70/72/90).
+
+**Remaining frontier.** bb2025 @1e6 (44 66 70 72 90) and @1.0 (44 62 68 94) are now the biggest;
+seed 44 is red at both sampled scales and green at argmax. The bb2025 @1.0 table has its own family
+worth a unit: TWO of its four rows are `Activate(away_02, AllYouCanEat)` — jersey 2 is the bb2025
+halfling team spec's star, and `AllYouCanEat` is a declared player action neither the goblin nor the
+earlier campaigns ever drove. Attack that family next.
+
+**Ruled out this iteration:** the ITER1 hand-off's prior ("bb2025 @0 is green, so the sampled reds
+are draw-count splits — read RSUM/JSUM `n=`/`draws=` before tracing dice") was NOT how the biggest
+family fell. bb2020 @1e6's five `PassMove` rows were a resolution divergence with identical
+declarations, and the dice trace found it in one pass. Do not skip `FFB_DICE_TRACE` on a sampled-only
+red.
+
+**Verification (all measured this iteration; every parity line quoted is the positive `PARITY:`):**
+`cargo test -p ffb-engine` **7400/0** (+1 new test), `ffb-model` **2802/0**, `ffb-mechanics`
+**1165/0**.
+Random controls (`FFB_PARITY_ROOT=parity_random`, `--agent random`): halfling bb2016 / bb2020 /
+bb2025 **100/100 each**.
+Closed-roster regressions @1.0: bb2025 × {goblin, amazon, lineman, dwarf, chaos, chaos_dwarf,
+chaos_pact, dark_elf, dark_elf_league_fumbbl, elf} all **100/100**; goblin and elf also 100/100 on
+bb2016 and bb2020. Nothing regressed. `TIMING java_total=63.6s rust_total=24.9s` (bb2020 @1e6).

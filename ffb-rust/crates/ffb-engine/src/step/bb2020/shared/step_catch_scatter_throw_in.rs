@@ -18,7 +18,7 @@ use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter, Seq
 use crate::step::generator::common::SpikedBallApo;
 use ffb_model::option::game_option_id;
 use crate::step::util_server_catch_scatter_throw_in::UtilServerCatchScatterThrowIn;
-use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available_for, use_reroll};
 use ffb_model::report::report_catch_roll::ReportCatchRoll;
 use ffb_model::report::report_scatter_ball::ReportScatterBall;
 use ffb_model::report::report_throw_in::ReportThrowIn;
@@ -961,8 +961,19 @@ impl StepCatchScatterThrowIn {
                     return self.catch_ball(game, rng);
                 }
 
+                // Java passes the CATCHER (`bb2020/shared/StepCatchScatterThrowIn:583-585`:
+                // `askForReRollIfAvailable(getGameState(), state.catcher, ReRolledActions.CATCH,
+                // minimumRoll, false)`), NOT the acting player. Two things ride on that: the
+                // team-re-roll gate is `actingTeam.hasPlayer(catcher)`, and the skill re-roll
+                // source is looked up on the CATCHER. Rust passed the acting player, so a THROWER
+                // holding Catch made the engine offer a `Catch` re-roll for a team-mate's failed
+                // catch — an offer Java never raises (the catcher's own Catch is consumed by
+                // `CatchBehaviour`'s hook above, which is why `stop_processing` exists).
+                // bb2025 already passed the catcher; bb2020/bb2016 were the drifted copies.
                 if !stop_processing {
-                    if let Some(prompt) = ask_for_reroll_if_available(game, "CATCH", min_roll, false) {
+                    if let Some(prompt) = ask_for_reroll_if_available_for(
+                        game, Some(cid.as_str()), "CATCH", min_roll, false)
+                    {
                         self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("CATCH"));
                         self.re_roll_state.re_roll_source = Some(ffb_model::enums::ReRollSource::new("TRR"));
                         self.roll = 0;

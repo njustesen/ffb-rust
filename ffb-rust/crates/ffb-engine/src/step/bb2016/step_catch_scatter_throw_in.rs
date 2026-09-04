@@ -20,7 +20,7 @@ use crate::step::generator::common::SpikedBallApo;
 use ffb_model::option::game_option_id;
 use crate::step::util_server_catch_scatter_throw_in::UtilServerCatchScatterThrowIn;
 use crate::step::util_server_injury::{drop_player, handle_injury};
-use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available_for, use_reroll};
 use ffb_model::report::report_catch_roll::ReportCatchRoll;
 use ffb_model::report::report_scatter_ball::ReportScatterBall;
 use ffb_model::report::report_throw_in::ReportThrowIn;
@@ -673,8 +673,13 @@ impl StepCatchScatterThrowIn {
                 let catcher_can_team_re_roll = game.player(&cid)
                     .map(|c| crate::util::util_server_re_roll::UtilServerReRoll::is_team_re_roll_available(game, c))
                     .unwrap_or(false);
+                // The player argument must be the CATCHER for the SKILL source too, not only for
+                // the team gate: Java looks the re-roll source up on `state.catcher`, so a thrower
+                // holding Catch must not produce a `Catch` offer for a team-mate's failed catch.
                 if catcher_can_team_re_roll {
-                    if let Some(prompt) = ask_for_reroll_if_available(game, "CATCH", min_roll, false) {
+                    if let Some(prompt) = ask_for_reroll_if_available_for(
+                        game, Some(cid.as_str()), "CATCH", min_roll, false)
+                    {
                         self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("CATCH"));
                         self.re_roll_state.re_roll_source = Some(ffb_model::enums::ReRollSource::new("TRR"));
                         self.pending_prompt = Some(prompt);
