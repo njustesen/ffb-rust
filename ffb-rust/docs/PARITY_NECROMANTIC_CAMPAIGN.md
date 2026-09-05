@@ -48,86 +48,64 @@ before and after — 32 seeds, zero fixed, zero newly broken. Kept because they 
 and fix a real 25-vs-24 roster difference, not because they improved a number. Regression: khemri
 (Regeneration on all 12) 60/60 unchanged; `ffb-engine` 7419/0.
 
-## The remaining frontier — both engines pick the SAME plan, then execute it differently
+## ITER2 — CLOSED. One fix took bb2025 from 68/83/78 to 100/100/100
 
-bb2025 remains **68 / 83 / 78**. This session drove the frontier down four layers with matched
-probes on BOTH engines (the Java harness is co-editable). Every layer is recorded because each one
-**disproved the layer above it** — three of my own conclusions were wrong and are corrected here.
+**Root cause.** Java only ever SETS `game.defenderId` for an action that can block —
+`StepInitBlocking` (block), `StepInitFouling` (foul), `StepEndMoving` (the blitz's block defender).
+A `PASS_MOVE` / `HAND_OVER_MOVE` leaves it null, so Java's `getDefender()` is null inside
+`StepFoulAppearance` and it rolls nothing.
 
-**Layer 1 — WRONG: "Rust spends one extra die before the pass".** The dice trace with `caller=`
-stacks shows Java and Rust agreeing value-for-value on `pos=40..45`.
+Rust reuses `Action::ActivatePlayer.block_defender_id` as a **generic target channel**
+(`step_init_selecting.rs:382` — TTM and the give chain need it), so a pass **receiver** lands in
+`game.defender_id`. `StepFoulAppearance` then rolled a Foul Appearance check **against our own
+receiver** whenever that receiver happened to have the skill — one d6 Java never spends, putting
+Rust's entire dice stream one ahead for the rest of the game.
 
-**Layer 2 — WRONG: "the pass re-roll ask at `step_pass.rs:562` is the cause".** It does use the
-acting-player overload with a hard-coded `"TRR"` (the same shape as the human Dodge/Tackle and
-nippon trapdoor fixes) and is worth fixing on its own, but Rust *does* offer and the agent
-*declines* — `LOOP applied=NoReRoll` — so it is downstream.
+Seed 6, i=20: away_10's PassMove resolved `defender=away_05`, a **Wraith** (Foul Appearance).
+Rust's die 44 is `StepFoulAppearance`; its pass roll therefore lands at 46 = **5** (INACCURATE, ball
+to (14,7)) where Java's is 45 = **2** (FUMBLE, ball to (17,4)).
 
-**Layer 3 — WRONG: "exposure differs" / "the support raster differs".** Both came from comparing
-probe streams **positionally** when the two engines emit different numbers of entries. Gating both
-probes to the single activation (`FFB_CAND`) made them agree: exposure, `threat_reach`,
-`threat_str`, `threat_mark` and the mover are all identical.
+**Fix**: gate the step on the acting ACTION rather than on the channel, so the legitimate
+`BLITZ_MOVE` case (whose defender `StepEndMoving` publishes) is untouched. Also mirrors Java's
+strict either/or defender resolution — when a `TargetSelectionState` exists it is the ONLY source,
+even if its selected id is null; Rust had filtered on `is_selected`/`is_committed` and then fallen
+back to the stale `game.defender_id`.
 
-**Layer 4 — the verified fact.** At the deciding activation (k=22, seed 6):
+**How it was found — and five wrong turns worth remembering.** Layers 1-5 all chased consequences,
+and each was disproved by the next:
 
-* the candidate lists are **IDENTICAL** — 1740 rows, same pid/pac/target/dest/weight throughout;
-* both engines **pick the same row**: `idx=1633, away_10, Pass, tgt=away_05, dest=94` — i.e. run to
-  **(16,3)** and throw to away_05. Rust's stored path is **5 squares**;
-* the **move replay also agrees**. `FFB_MOVEP` (Rust `RMOVEP` / Java `JMOVEP`, a mirror that
-  already existed) shows both engines answering the first move prompt with the **identical
-  5-square path** `[20,5 19,4 18,3 17,2 16,3]`, both arriving at (16,3), and both being prompted
-  again there.
+1. "Rust spends an extra die *before* the pass" — the dice agree value-for-value to `pos=43`.
+2. "The pass re-roll ask at `step_pass.rs:562` is the cause" — Rust offers, the agent **declines**,
+   and a step probe shows the pass die is rolled exactly **once**; the re-roll banks are `r2,1` on
+   both sides throughout.
+3. "Exposure differs" and 4. "the support raster differs" — both artefacts of comparing probe
+   streams **positionally** when the two engines emit different entry counts. Gating both probes to
+   one activation made every raster agree.
+5. "Rust walks 5 squares where Java walks 4" — inferred from counting `JAVA_GFI` lines, which stop
+   at `currentMove=4`. `JMOVEP` shows Java delivering the identical 5-square path.
 
-**Layer 5 — WRONG, and corrected here: "Rust walks 5 steps where Java walks 4".** That came from
-counting `JAVA_GFI` lines (which stop at `currentMove=4`) instead of reading the move answer.
-`JMOVEP` shows Java delivering all five squares. Do not count GFI trace lines to infer path length.
+What actually cracked it was **`FFB_DIE_AT`**, which prints a Rust backtrace at a chosen die index:
+die 44 = `StepFoulAppearance`, die 45 = `StepGoForIt`, die 46 = `StepPass`. Every earlier layer had
+tried to attribute a die by arithmetic. **Attribute dice with the backtrace, not by counting.**
 
-**Layer 6 — narrowed to the move, and the pass exonerated.** `getCallCount()` is per-DIE and equals
-`DICE_TRACE`'s `pos`, so the two engines' spends during activation i=20 are directly comparable:
+## Gates
 
-| | dice in i=20 | breakdown |
-|---|---:|---|
-| Java | **4** | 1 GFI, pass=**2** (FUMBLE), 2 bounce d8 |
-| Rust | **7** | **2 GFI**, pass=**5** (INACCURATE), 3 scatter d8, 1 catch |
+| edition | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| bb2016 | **100** | **100** | **100** |
+| bb2020 | **100** | **100** | **100** |
+| bb2025 | **100** | **100** | **100** |
 
-A step-level probe on `StepPass.execute_step` shows it is entered **twice** and rolls the pass die
-**exactly once** in both engines (`roll=0 → roll=5`, then a re-entry after the declined offer with
-`source=None`, which correctly does NOT re-roll). The re-roll banks are `r2,1` on both sides at
-i=19, 20 and 21, so **no team re-roll is consumed by either engine**. The pass step is therefore
-NOT at fault: it rolls one die, and that die differs only because the stream is already one ahead.
+Random controls: bb2016/bb2020/bb2025 **100/100** each. `cargo test -p ffb-engine` **7422/0**.
 
-**The remaining fact: Rust rolls TWO d6 during the 5-square walk where Java rolls ONE**, for an
-identical path. With MA=4 and five steps, `StepGoForIt`'s rule (`going_for_it && current_move > ma`)
-should rush exactly once, and `RUST_GFI` does report `MA=4` with `currentMove=1..5`. So one of
-Rust's two move d6 is something other than the expected single rush.
+Closed-roster regressions, bb2025 @1.0, seeds 1-100 — the step is shared by every race and edition:
+chaos, chaos_dwarf, nurgle, lizardman, nippon, khemri, human, goblin, amazon, dark_elf, elf, dwarf
+— **all 100/100**.
 
-**Next tool, and it is an instrumentation gap, not a guess.** Java's `DICE_TRACE` carries a
-`caller=` stack that names the rolling step; **Rust's does not** — it prints only `pos/sides/result`.
-That is why every attempt above had to infer a die's owner from arithmetic, and it is why layers 1
-and 5 went wrong. Add a step tag to Rust's dice trace, then read off which step rolls Rust's second
-d6 in that walk. Do not attribute another die by counting.
+Three colocated tests had set the roll up with no blocking action; corrected FROM THE JAVA, since
+the roll is only reachable under a block/blitz/foul. New test
+`pass_move_does_not_roll_foul_appearance_against_its_receiver` asserts **zero** dice are spent.
 
-**What is actually left (superseded — see Layer 6).** Both engines choose the same plan, walk the same path, and arrive at the
-same square — yet Rust's pass roll is `pos=46`=**5** (INACCURATE, ball to (14,7)) and Java's is
-`pos=45`=**2** (FUMBLE, ball to (17,4)). Rust spends **exactly one more die** than Java between the
-start of the game and the throw, and the dice values agree up to `pos=43`. Java's `pos=40..44` are
-five consecutive `rollGoingForIt` calls, so the extra Rust die is somewhere in `pos=44..45` during
-this walk.
+Coverage harvested ×3.
 
-Pinning it needs a **per-activation dice marker** on both sides — the current traces cannot say
-which activation a given `pos` belongs to, because Java's `rng_calls` counts CALLS while `pos`
-counts DICE. That marker is the next iteration's first job; without it every `pos`-based inference
-here is guesswork, which is how layers 1 and 5 went wrong.
-
-### Landed this session
-
-`heuristic_agent.rs` Pass candidates now record the run-up square as `dest` (Java's
-`PlanBuilder.passCandidates` does; Rust passed `None`). **Behaviour-neutral** — `dest` is only a
-path fallback and the run-up path was already stored — and the gates confirm it: 68/83/78 before and
-after. It is kept for *reporting fidelity*: every Pass row read `dest=null`, so no Pass candidate
-could be compared against Java's. That blindness is what sent layers 1-3 chasing consequences, and
-it is the same failure mode as `FFB_CANDSUM`'s `n` (a count that matched while the contents did not).
-
-## Not yet done
-
-Random controls, closed-roster regressions for necromantic itself, coverage harvest, and the nine
-gates. This race is NOT closed.
+**🏁 necromantic CLOSED.** Frontier empty.
