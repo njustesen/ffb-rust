@@ -1,6 +1,6 @@
 # Event coverage — HeuristicAgent, halfling v halfling, bb2025, --heur-scale 1.0, seeds 1-100
 
-Harvested 2026-09-04 by `MATCHUP=halfling scripts/harvest_coverage.sh bb2025 1.0`. Parity for the run: `PARITY: 100/100 games match, but required coverage items are MISSING.`.
+Harvested 2026-09-05 by `MATCHUP=halfling scripts/harvest_coverage.sh bb2025 1.0`. Parity for the run: `PARITY: 100/100 games match, but required coverage items are MISSING.`.
 
 ## Tier-3 checklist (as written by the run)
 
@@ -144,4 +144,5 @@ Total events: 84026
 ## Skill uses / re-rolls seen
 
 ```
+    118 Dodge used=true
 ```

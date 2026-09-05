@@ -1,6 +1,6 @@
 # Event coverage — HeuristicAgent, dark_elf_league_fumbbl v dark_elf_league_fumbbl, bb2025, --heur-scale 1.0, seeds 1-100
 
-Harvested 2026-09-02 by `MATCHUP=dark_elf_league_fumbbl scripts/harvest_coverage.sh bb2025 1.0`. Parity for the run: `PARITY: 100/100 games match, but required coverage items are MISSING.`.
+Harvested 2026-09-05 by `MATCHUP=dark_elf_league_fumbbl scripts/harvest_coverage.sh bb2025 1.0`. Parity for the run: `PARITY: 100/100 games match, but required coverage items are MISSING.`.
 
 ## Tier-3 checklist (as written by the run)
 
@@ -134,4 +134,6 @@ Total events: 105237
 ## Skill uses / re-rolls seen
 
 ```
+    130 DumpOff used=false
+    125 Dodge used=true
 ```

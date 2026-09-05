@@ -3954,6 +3954,44 @@ Note the true scope of E6 is narrower than assumed: SkillUse has **five** emit s
 Dodge, Dump Off, Horns, Juggernaut, Wrestle), so most skills really are silent — but not all of
 them, and `GameEvent::ReRoll` having zero emit sites is the part that stands unchanged.
 
+### E6c. Skill-use re-harvest of all closed races (done 2026-09-05) — what it found
+
+Re-harvested bb2025 for all 13 closed matchups on the fixed script. Skill usage that had been
+invisible in every prior document:
+
+| race | skillUse (bb2025) |
+|---|---|
+| chaos | 609 Horns |
+| chaos_dwarf | 368 Horns |
+| chaos_pact | 268 Horns, 3 Dodge |
+| amazon | 251 Dodge |
+| dark_elf | 232 DumpOff **declined**, 72 Dodge, 37/2 Juggernaut |
+| dark_elf_league_fumbbl | 130 DumpOff **declined**, 125 Dodge |
+| halfling | 118 Dodge |
+| goblin | 116 Dodge |
+| high_elf | 64/43 Wrestle |
+| human | 45 Dodge, 25 Tackle, 25 Dodge-declined |
+| dwarf | 17 Juggernaut |
+| elf / lineman / khemri | none — correct, no emitting skill on those rosters |
+
+**No new dead mechanic was found.** Every nonzero count tracks the roster, and each zero is
+explained by the roster carrying none of the five emitting skills. The Brawler hole (E8) remains
+the only one of its kind discovered so far.
+
+**But the sweep did surface a second class of untested path**, already known to the agent and
+documented at `heuristic_agent.rs:3789`: four skills are pinned to `w_use = 0.0`, i.e. deliberately
+always DECLINED, because their USE path cannot be driven by either harness —
+**DumpOff** (enters an undriveable `INIT_PASSING`; taking it once made stock Java's
+`StepBlockStatistics` NPE and poisoned the batched JVM for 63 consecutive seeds),
+**PrimalSavagery** and **Swoop** (open target dialogs), **SafePairOfHands** (a PLACE_BALL coach
+dialog). Mirrored in Java's `HeuristicDriver.useSkill`, so both sides decline together and parity
+is genuine.
+
+That makes **five** mechanics with no parity evidence: Brawler (unreachable — E8) plus these four
+(reachable but pinned off). The dark_elf DumpOff counts are the visible trace: 232 offers, zero
+uses. Unlike Brawler these are consciously suppressed, and DumpOff's suppression is blocked on a
+STOCK-JAVA crash, so it cannot be lifted by a Rust-side change alone.
+
 ### E7. bb2016 move twins emit no `playerMoved` / `goForItRoll` (docs/EVENT_COVERAGE.md F3)
 
 bb2016: 13,104 Move actions, 60 touchdowns, ZERO movement events; bb2020/25 emit ~62k and ~4.8k.
