@@ -117,9 +117,19 @@ impl StepTrapDoor {
                 .with_published(self.trap_door_triggered_params(game, player_coord));
         }
 
-        // Offer a re-roll if one is available
-        if let Some(prompt) = crate::step::util_server_re_roll::ask_for_reroll_if_available(
-            game, RE_ROLLED_ACTION, 2, false,
+        // Offer a re-roll if one is available.
+        //
+        // Java passes the trapdoor VICTIM: `askForReRollIfAvailable(getGameState(), player,
+        // RE_ROLLED_ACTION, 2, false)` (StepTrapDoor.java:122). Rust called the ACTING-PLAYER
+        // overload, which re-derives the source from whoever is currently activated — the
+        // ATTACKER. A player pushed onto a trapdoor is usually an OPPONENT of the acting team, so
+        // Java finds no usable re-roll for them and shows no dialog while Rust found the acting
+        // team's and burned two sampler draws, splitting the agent streams
+        // (nippon bb2020 seed 29 i=52: away_03 falls, Java goes straight on, Rust asked
+        // TRR/TRAP_DOOR). Same wrong-overload shape as the Dodge/Tackle fix in
+        // bb2025/move_/step_move_dodge.rs.
+        if let Some(prompt) = crate::step::util_server_re_roll::ask_for_reroll_if_available_for(
+            game, Some(&player_id), RE_ROLLED_ACTION, 2, false,
         ) {
             self.re_roll_state.re_rolled_action = Some(ReRolledAction::new(RE_ROLLED_ACTION));
             // Stash the *offered* source here (mirroring `AgentPrompt::ReRollOffer.source`) so
@@ -139,8 +149,17 @@ impl StepTrapDoor {
                 .with_prompt(prompt);
         }
 
-        // No re-roll available — fall through
+        // No re-roll available — fall through the trap door.
+        //
+        // Java runs the FULL `trapDoorTriggered(...)` here (StepTrapDoor.java:122-123), whose first
+        // act is `handleInjury(InjuryTypeTrapDoorFall..., ApothecaryMode.TRAP_DOOR)` — an armour and
+        // an injury roll. This path published the parameters and removed the player but never rolled
+        // the injury, so Rust came out TWO DICE short of Java for every trapdoor fall that was not
+        // re-rolled (nippon bb2020 seed 29 i=52: R52 vs J54). The re-rolled branch above already
+        // calls `trap_door_triggered`; this one has to as well.
         let mut outcome = outcome_base;
+        let triggered = self.trap_door_triggered(game, rng, player_id.clone(), player_coord);
+        outcome = outcome.with_events(triggered.events);
         for p in self.trap_door_triggered_params(game, player_coord) {
             outcome = outcome.publish(p);
         }
@@ -477,6 +496,15 @@ mod tests {
         let mut game = make_game();
         game.field_model.set_player_coordinate("p1", coord);
         game.field_model.trap_doors.push(coord);
+        // The victim must really BE on the home team: Java asks for the re-roll on behalf of the
+        // trapdoor VICTIM (StepTrapDoor.java:122), so an id that belongs to no team resolves to no
+        // re-roll and no dialog. Previously this test leaned on the acting-player overload, which
+        // read the home TRR regardless of whose player p1 was.
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "lineman".into(),
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            ..Default::default()
+        });
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         game.turn_data_home.reroll_used = false;
@@ -501,6 +529,15 @@ mod tests {
         let mut game = make_game();
         game.field_model.set_player_coordinate("p1", coord);
         game.field_model.trap_doors.push(coord);
+        // The victim must really BE on the home team: Java asks for the re-roll on behalf of the
+        // trapdoor VICTIM (StepTrapDoor.java:122), so an id that belongs to no team resolves to no
+        // re-roll and no dialog. Previously this test leaned on the acting-player overload, which
+        // read the home TRR regardless of whose player p1 was.
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "lineman".into(),
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            ..Default::default()
+        });
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         game.turn_data_home.reroll_used = false;
