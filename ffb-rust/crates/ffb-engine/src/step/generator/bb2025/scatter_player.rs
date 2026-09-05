@@ -18,9 +18,13 @@ pub struct ScatterPlayerParams {
     /// WILDLY_INACCURATE throw — a result BB2025 does not have at all (its evaluatePass returns
     /// FUMBLE there), so BB2025 always leaves this false and its behaviour is unchanged.
     pub deviates: bool,
-    /// Whether the player was KICKED rather than thrown. Carried explicitly for the same reason
-    /// `deviates` is: the published `IsKickedPlayer` parameter does not reach `StepInitScatterPlayer`,
-    /// and BB2020 picks a different crowd injury for a kicked player.
+    /// Whether the player was KICKED rather than thrown.
+    ///
+    /// NOT passed on to `INIT_SCATTER_PLAYER`: neither Java `ScatterPlayer` generator
+    /// (bb2020 nor bb2025) lists `IS_KICKED_PLAYER` among that step's parameters. The step
+    /// only ever learns it from a PUBLISHED parameter, which is exactly where the two editions
+    /// differ (see `StepDispatchScatterPlayer`). Kept on the params struct because the
+    /// dispatch/end steps thread it through their own publishes.
     pub is_kicked: bool,
 }
 
@@ -56,7 +60,6 @@ impl ScatterPlayer {
             StepParameter::ThrownPlayerHasBall(params.thrown_player_has_ball),
             StepParameter::ThrowScatter(params.throw_scatter),
             StepParameter::PassDeviates(params.deviates),
-            StepParameter::IsKickedPlayer(params.is_kicked),
         ];
         if let Some(ref id) = params.thrown_player_id {
             init_params.push(StepParameter::ThrownPlayerId(Some(id.clone())));

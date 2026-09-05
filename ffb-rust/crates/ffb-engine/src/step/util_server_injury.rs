@@ -124,12 +124,22 @@ fn evaluate_injury_context(
 
     // Java lines 106–113: serious injury sub-table
     if ctx.is_serious_injury() {
-        ctx.serious_injury = interpret_serious_injury_roll(ctx.casualty_roll);
-        // Java: requiresSecondCasualtyRoll (Decay skill) → second SI interpretation, using the
-        // fresh casualty_roll_decay dice rolled in `do_injury_roll_for_player`, not a
-        // reinterpretation of the primary roll.
+        // Java: `rollMechanic.interpretSeriousInjuryRoll(game, injuryContext)` — the EDITION
+        // mechanic, not a fixed table. Rust called a local BB2025-only helper here, so a BB2020
+        // game never reached `bb2020::RollMechanic::map_si_roll`: it neither applied the BB2020
+        // table + casualty modifiers, nor — when the rolled injury cannot reduce a stat the
+        // defender still has — did Java's `Collections.shuffle(injuriesWithReduceableStats)`
+        // remap. That shuffle draws from the SHARED java.util.Collections stream, so the missing
+        // draws desynced every later shuffle: ogre bb2020 seed 91 then picked prayer 10 at the
+        // Cheering Fans where Java (four draws further along) picked 4 = Iron Man, and Java's h01
+        // carried +1 AV from i=227 on.
+        let mechanic = crate::mechanic::roll_mechanic_for(game.rules);
+        ctx.serious_injury = mechanic.interpret_serious_injury_roll(game, ctx);
+        // Java: requiresSecondCasualtyRoll (Decay skill) → `interpretSeriousInjuryRoll(game, ctx,
+        // true)`. Only the bb2016 mechanic actually reads `casualtyRollDecay`; bb2020/bb2025
+        // delegate to the primary roll (RollMechanic.java:122-123).
         if defender.map(|d| d.has_skill_property(NamedProperties::REQUIRES_SECOND_CASUALTY_ROLL)).unwrap_or(false) {
-            ctx.serious_injury_decay = interpret_serious_injury_roll(ctx.casualty_roll_decay);
+            ctx.serious_injury_decay = mechanic.interpret_serious_injury_roll_decay(game, ctx, true);
         }
     }
 
@@ -186,12 +196,6 @@ fn evaluate_injury_context(
     }
 }
 
-/// Maps the stored casualty roll to a `SeriousInjuryKind` using the BB2025 table.
-/// Port of `RollMechanic.interpretSeriousInjuryRoll()` (simplified, no modifiers yet).
-fn interpret_serious_injury_roll(casualty_roll: Option<[i32; 2]>) -> Option<SeriousInjuryKind> {
-    // Uses d16 (index 0) for the BB2025 table lookup
-    casualty_roll.and_then(|r| ffb_mechanics::injury::serious_injury_kind_bb2025(r[0]))
-}
 
 /// Dispatch `InjuryMechanic.canUseApo()` to the appropriate edition mechanic.
 fn can_use_apo_for_edition(game: &Game, defender: &ffb_model::model::player::Player, state: PlayerState) -> bool {
@@ -670,6 +674,57 @@ fn handle_raise_dead(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Java `UtilServerInjury.evaluateInjuryContext` calls
+    /// `rollMechanic.interpretSeriousInjuryRoll(game, injuryContext)` — the EDITION mechanic.
+    /// Under BB2020 that is `bb2020/RollMechanic.mapSIRoll`: the d6 indexes the BB2020 SI table,
+    /// and when the rolled injury cannot reduce a stat the defender still has, Java remaps it via
+    /// `Collections.shuffle(injuriesWithReduceableStats)` on the SHARED java.util.Collections
+    /// stream. Rust used a BB2025-only helper here, so a BB2020 game got the BB2025 answer AND
+    /// skipped four draws of that shared stream (ogre bb2020 seed 91: the later Cheering-Fans
+    /// prayer pick then differed from Java's).
+    #[test]
+    fn bb2020_serious_injury_uses_the_bb2020_mechanic_and_its_shared_shuffle() {
+        use ffb_model::enums::{SeriousInjuryKind, PS_SERIOUS_INJURY};
+        use ffb_model::util::java_random::{JavaRandom, collections_shuffle};
+
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        add_player(&mut game, "d1", PS_STANDING);
+        // ST 1 is at the BB2020 reduction threshold, so DISLOCATED_SHOULDER (-ST) is the one
+        // entry of the table this defender cannot take; every other stat is still reduceable.
+        game.team_home.players[0].strength = 1;
+        game.collections_rng =
+            ffb_model::model::game::CollectionsRng::new(JavaRandom::new(12345));
+
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        ctx.defender_id = Some("d1".into());
+        ctx.injury = Some(PlayerState::new(PS_SERIOUS_INJURY));
+        // d16 = 13 -> BB2020 SI detail table; d6 = 6 -> DISLOCATED_SHOULDER (-ST).
+        ctx.casualty_roll = Some([13, 6]);
+        let flags = InjuryTypeFlags {
+            stun_is_ko: false, can_use_apo: false,
+            send_to_box_reason: None, should_play_fall_sound: false,
+        };
+        evaluate_injury_context(&flags, "d1", &mut ctx, &game);
+
+        // The BB2025 table would answer DISLOCATED_HIP for d16 = 13 and never look at the d6.
+        assert_ne!(ctx.serious_injury, Some(SeriousInjuryKind::DislocatedHipAg),
+            "a BB2020 game must not be scored on the BB2025 casualty table");
+        let reduceable = [SeriousInjuryKind::HeadInjuryAv, SeriousInjuryKind::SmashedKneeMa,
+                          SeriousInjuryKind::BrokenArmPa, SeriousInjuryKind::NeckInjuryAg];
+        assert!(reduceable.contains(&ctx.serious_injury.expect("a serious injury must be set")),
+            "the un-reduceable DISLOCATED_SHOULDER must be remapped to a reduceable injury, got {:?}",
+            ctx.serious_injury);
+
+        // ...and that remap must have consumed the shared Collections stream: exactly the four
+        // nextInt draws a 5-element `Collections.shuffle` makes.
+        let mut reference = JavaRandom::new(12345);
+        let mut five = [0u8; 5];
+        collections_shuffle(&mut five, &mut reference);
+        assert_eq!(game.collections_rng.lock().next_int(1_000), reference.next_int(1_000),
+            "the BB2020 SI remap must advance the shared Collections stream by one 5-element shuffle");
+    }
+
     use crate::step::framework::test_team;
     use crate::injury::{InjuryContext, InjuryTypeServer};
     use ffb_model::enums::{Rules, PS_STANDING, PS_PRONE, PS_BADLY_HURT};

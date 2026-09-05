@@ -1,5 +1,5 @@
 use ffb_model::events::GameEvent;
-use ffb_model::enums::{PassOutcome, PlayerState};
+use ffb_model::enums::{PassOutcome, PlayerState, Rules};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
@@ -154,13 +154,31 @@ impl StepDispatchScatterPlayer {
             is_kicked: self.is_kicked_player,
         });
 
-        StepOutcome::next()
+        // Java bb2025 StepDispatchScatterPlayer:129-131 publishes USING_BULLSEYE,
+        // IS_KICKED_PLAYER and OLD_DEFENDER_STATE after pushing the scatter sequence.
+        // Java bb2020 StepDispatchScatterPlayer publishes NOTHING (it only consumes
+        // IS_KICKED_PLAYER in setParameter, which stops the delivery). Neither edition's
+        // ScatterPlayer generator hands IS_KICKED_PLAYER to INIT_SCATTER_PLAYER either, so under
+        // BB2020 that step's isKickedPlayer is *always false* — its `isKickedPlayer && throwScatter`
+        // kickPlayer branch and its InjuryTypeKTMCrowd arm are unreachable in stock Java bb2020.
+        // Rust published unconditionally, so a BB2020 kicked Snotling booted into the crowd took
+        // the auto-KO KTMCrowd where Java rolled a CrowdPush injury (ogre bb2020 seed 73 i=231:
+        // identical scatter dice 2,7,1 out of bounds, then Java 6+5=11 -> casualty d16 Badly Hurt
+        // against Rust's dice-free knock-out).
+        // Only the IS_KICKED_PLAYER publish is edition-gated here. USING_BULLSEYE is a BB2025
+        // concept that is simply false under BB2020, and OLD_DEFENDER_STATE is published further
+        // up the BB2020 chain in stock Java (StepInitThrowTeamMate) but only here in the shared
+        // Rust chain, so suppressing either of those two loses state Java still has (measured:
+        // suppressing all three regressed ogre bb2020 seeds 5 and 55).
+        let mut outcome = StepOutcome::next()
             .push_seq(seq)
-            .publish(StepParameter::UsingBullseye(self.using_bullseye))
-            .publish(StepParameter::IsKickedPlayer(self.is_kicked_player))
-            .publish(StepParameter::OldDefenderState(
-                self.old_player_state.unwrap_or(PlayerState(0)),
-            ))
+            .publish(StepParameter::UsingBullseye(self.using_bullseye));
+        if game.rules != Rules::Bb2020 {
+            outcome = outcome.publish(StepParameter::IsKickedPlayer(self.is_kicked_player));
+        }
+        outcome.publish(StepParameter::OldDefenderState(
+            self.old_player_state.unwrap_or(PlayerState(0)),
+        ))
     }
 }
 
@@ -173,6 +191,31 @@ mod tests {
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
+    }
+
+    /// Java bb2025 `StepDispatchScatterPlayer` publishes IS_KICKED_PLAYER (line 129) after
+    /// pushing the scatter sequence; the Java bb2020 twin publishes NOTHING, and neither
+    /// edition's `ScatterPlayer` generator lists IS_KICKED_PLAYER among INIT_SCATTER_PLAYER's
+    /// parameters. So under BB2020 `StepInitScatterPlayer.isKickedPlayer` is always false and its
+    /// InjuryTypeKTMCrowd / kickPlayer arms are unreachable, while under BB2025 it is true.
+    #[test]
+    fn is_kicked_player_reaches_init_scatter_only_in_bb2025() {
+        for (rules, expect_publish) in [(Rules::Bb2025, true), (Rules::Bb2020, false)] {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+            let mut step = StepDispatchScatterPlayer::new();
+            step.pass_result = PassOutcome::Complete;
+            step.is_kicked_player = true;
+            let out = step.start(&mut game, &mut GameRng::new(0));
+            let init = out.pushes[0].iter()
+                .find(|s| s.step_id == StepId::InitScatterPlayer)
+                .expect("the scatter sequence must be pushed");
+            assert!(!init.params.iter().any(|p| matches!(p, StepParameter::IsKickedPlayer(_))),
+                "neither Java ScatterPlayer generator passes IS_KICKED_PLAYER to INIT_SCATTER_PLAYER ({rules:?})");
+            let published = out.published.iter()
+                .any(|p| matches!(p, StepParameter::IsKickedPlayer(true)));
+            assert_eq!(published, expect_publish,
+                "only the bb2025 dispatch republishes IS_KICKED_PLAYER ({rules:?})");
+        }
     }
 
     #[test]
