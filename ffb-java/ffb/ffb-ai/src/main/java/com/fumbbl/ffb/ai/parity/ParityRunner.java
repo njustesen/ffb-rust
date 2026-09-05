@@ -1010,6 +1010,34 @@ public class ParityRunner {
                 break;
             }
 
+            case INIT_BLOCKING: {
+                // StepInitBlocking parks WITHOUT setting a next action when it was pushed with
+                // ASK_FOR_BLOCK_KIND -- bb2020/bb2025 StepInitBlocking:199 sets
+                // TurnMode.SELECT_BLOCK_KIND and waits for a CLIENT_BLOCK naming the block kind.
+                // StepEndBlocking:282 turns that flag on for a FORCED SECOND BLOCK (Frenzy) when
+                // the attacker still has an unused `providesBlockAlternative` skill -- which a
+                // plain Ulfwerener acquires the moment the Stiletto prayer hands him a temporary
+                // Stab (norse bb2020 seed 90 i=87). There was no handler, so the runner fell
+                // through to the UNHANDLED_STEP default and ENDED THE TURN in the middle of a
+                // frenzy follow-up, while Rust -- which never asks -- threw the second block.
+                // Answer the way the plain block is chosen everywhere else in this runner: same
+                // defender, no stab/chainsaw/vomit/fire/chomp. That leaves the step exactly where
+                // an askForBlockKind=false push would have left it, which is Rust's behaviour.
+                ActingPlayer ibAp = game.getActingPlayer();
+                String ibDefenderId = game.getDefenderId();
+                if (game.getTurnMode() == TurnMode.SELECT_BLOCK_KIND && ibAp != null
+                    && ibAp.getPlayerId() != null && ibDefenderId != null) {
+                    if (DEBUG) System.err.println("JAVA_BLOCKKIND pid=" + ibAp.getPlayerId()
+                        + " def=" + ibDefenderId);
+                    MatchRunner.inject(gameState, new ClientCommandBlock(
+                        ibAp.getPlayerId(), ibDefenderId, false, false, false, false, false));
+                } else {
+                    System.err.println("UNHANDLED_STEP: " + stepId + " turnMode=" + game.getTurnMode());
+                    MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
+                }
+                break;
+            }
+
             case PUSHBACK:
                 sendPushback(game, gameState);
                 break;

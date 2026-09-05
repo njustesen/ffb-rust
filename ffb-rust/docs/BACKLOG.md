@@ -4014,3 +4014,26 @@ dead across 8,700 games until the harness declared it, and switching it on expos
 Closing it: teach both agents to answer the Brawler `SINGLE_BOTH_DOWN` re-roll offer (the offer
 itself already resolves — see `abstract_step_with_re_roll.rs:228`), then re-gate khemri bb2025.
 Own iteration; agent + harness change on both sides.
+
+### E9. Rust `StepEndBlocking` never computes `askForBlockKind` for a forced second block
+
+Found while closing norse (2026-09-05, `docs/PARITY_NORSE_CAMPAIGN.md`). Java
+`ffb-server/.../step/bb2020/block/StepEndBlocking.java:282` (and its bb2025 twin) computes
+
+```java
+boolean askForBlockKind = UtilCards.hasUnusedSkillWithProperty(actingPlayer.getPlayer(), providesBlockAlternative)
+    || (UtilCards.hasUnusedSkillWithProperty(actingPlayer.getPlayer(), providesBlockAlternativeDuringBlitz) && isBlitz);
+```
+
+and passes it into the `Block` / `BlitzBlock` sequence it pushes for a Frenzy-style forced second
+block. `StepInitBlocking` then parks in `TurnMode.SELECT_BLOCK_KIND` until the client names the block
+kind. Rust's `step/bb2020/block/step_end_blocking.rs` (and the bb2025 twin) omits the computation
+entirely — the re-push always carries `ask_for_block_kind: false`. Rust's `StepInitBlocking` *does*
+implement the flag; it simply never receives it.
+
+It is reachable: the **Stiletto** prayer grants a temporary `Stab`, and a Frenzy carrier who has it
+hits this exact branch (norse bb2020 seed 90 i=87). Parity is currently genuine anyway because
+`ParityRunner`'s new `INIT_BLOCKING` handler answers the ask with the plain block, which is a no-op
+in state and RNG — so both sides land in the same place. Closing it properly needs a new
+`AgentPrompt` (block kind) plus an answer in BOTH agents, for zero measurable gate movement; filed
+rather than done. Only start it if a race turns up where the block kind actually gets *chosen*.
