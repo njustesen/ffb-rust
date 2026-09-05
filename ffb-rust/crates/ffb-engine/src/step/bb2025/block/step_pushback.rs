@@ -322,9 +322,13 @@ impl StepPushback {
                 // Java: if (!ArrayTool.isProvided(state.pushbackSquares)) → Crowd push
                 if !pushback_squares_found && !stop_processing {
                     // Java: boolean sameTeam = state.defender != null && state.defender.getTeam() == game.getActingTeam();
-                    let same_team = game.defender_id.as_deref()
-                        .map(|id| game.is_active_team_player(id))
-                        .unwrap_or(false);
+                    // Chain-aware, like every other use of `defender_id` in this block: Java
+                    // reassigns `state.defender = fieldModel.getPlayer(defenderCoordinate)` before
+                    // the crowd-push branch, so on a CHAIN push the player shoved into the crowd is
+                    // the OCCUPANT of the starting pushback square, not the block's original
+                    // defender. Reading `game.defender_id` here surfed the wrong player
+                    // (nippon bb2020+bb2025 seed 37 i=167).
+                    let same_team = game.is_active_team_player(&defender_id);
 
                     // Java: if (hasFanInteraction(actingTeam) && !sameTeam) → CrowdPushForSpp w/ attacker = actingPlayer
                     //       else → CrowdPush, no attacker
@@ -343,16 +347,14 @@ impl StepPushback {
                     let injury_result = handle_injury_by_name(
                         game, rng, injury_type_name,
                         attacker_id.as_deref(),
-                        game.defender_id.as_deref().unwrap_or(""),
+                        &defender_id,
                         crowd_push_coord,
                         None, None, ApothecaryMode::CrowdPush,
                     );
                     extra_params.push(StepParameter::InjuryResult(Box::new(injury_result)));
 
                     // Java: game.getFieldModel().remove(state.defender)
-                    if let Some(defender_id) = game.defender_id.clone() {
-                        game.field_model.remove_player(&defender_id);
-                    }
+                    game.field_model.remove_player(&defender_id);
 
                     // Java: if (defenderCoordinate.equals(game.getFieldModel().getBallCoordinate()))
                     //   setBallCoordinate(null)
@@ -848,6 +850,40 @@ mod tests {
         );
         assert_eq!(out.action, StepAction::NextStep);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::DefenderPushed(true))));
+    }
+
+    /// Regression (nippon bb2020 + bb2025 seed 37, i=167): on a CHAIN push into the crowd, the
+    /// player removed must be the OCCUPANT of the starting pushback square, not the block's
+    /// original defender. Java reassigns `state.defender = fieldModel.getPlayer(defenderCoordinate)`
+    /// (bb2025 StepPushback:154) before the crowd-push branch, so `remove(state.defender)` takes the
+    /// chain occupant. Rust read `game.defender_id` there and surfed the wrong player: Java pushed
+    /// h00 into (0,5) and sent h01 to the crowd, Rust sent h00 to the crowd and left h01 standing —
+    /// with the ball stranded a square away.
+    #[test]
+    fn chain_crowd_push_removes_the_occupant_not_the_original_defender() {
+        let mut step = StepPushback::new();
+        let mut game = make_game();
+
+        // The block's original defender, already shoved along earlier in the chain.
+        game.defender_id = Some("p1".into());
+        game.field_model.set_player_coordinate("p1", FieldCoordinate::new(1, 5));
+
+        // The chain occupant sits on the starting pushback square, hard against the sideline, so
+        // every pushback square behind it is off-pitch and the crowd-push branch is taken.
+        let edge = FieldCoordinate::new(0, 5);
+        game.field_model.set_player_coordinate("p2", edge);
+        step.starting_pushback_square = Some(PushbackSquare::new(edge, Direction::West, true));
+
+        let _ = step.start(&mut game, &mut GameRng::new(0));
+
+        assert_eq!(
+            game.field_model.player_coordinate("p2"), None,
+            "the chain occupant standing on the starting pushback square is the one pushed into              the crowd"
+        );
+        assert_eq!(
+            game.field_model.player_coordinate("p1"), Some(FieldCoordinate::new(1, 5)),
+            "the block's original defender must NOT be removed by a chain crowd push"
+        );
     }
 
     // ── chain pushback moves the occupant, not the original defender ─────────
