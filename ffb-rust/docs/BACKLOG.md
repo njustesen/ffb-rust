@@ -3937,3 +3937,20 @@ magnitude; parity, not events, is the proof they run.
 bb2016: 13,104 Move actions, 60 touchdowns, ZERO movement events; bb2020/25 emit ~62k and ~4.8k.
 `step/bb2016/move_/*` (the twins the driver dispatches for bb2016) never emit them. The checklist's
 `GFI rolls 0` for bb2016 is this gap. Add the emits where the bb2025 twins have them.
+
+### E8. bb2025 Brawler is unreachable by both agents — no parity evidence exists for it
+
+Found while closing khemri (2026-09-05, `docs/PARITY_KHEMRI_CAMPAIGN.md`). `re_roll_source` becomes
+`"Brawler"` **only** via `Action::UseBrawler` (`bb2025/block/step_block_roll.rs:83`). Nothing in
+`crates/ffb-engine/src/agent/` emits that action, and `ParityRunner.java` has zero occurrences of
+`BRAWLER`, so the implicit-re-roll path at `step_block_roll.rs:213` was never taken in any of the
+900 khemri games. Both sides agree because neither takes the branch — parity is genuine but Brawler
+is **untested**.
+
+khemri's bb2025 Tomb Guardian is the only Brawler on any race in the heuristic sweep, so no other
+roster will incidentally cover it. This is the Throw-Team-Mate shape (`parity_tier_ttm.md`): TTM sat
+dead across 8,700 games until the harness declared it, and switching it on exposed ten engine bugs.
+
+Closing it: teach both agents to answer the Brawler `SINGLE_BOTH_DOWN` re-roll offer (the offer
+itself already resolves — see `abstract_step_with_re_roll.rs:228`), then re-gate khemri bb2025.
+Own iteration; agent + harness change on both sides.
