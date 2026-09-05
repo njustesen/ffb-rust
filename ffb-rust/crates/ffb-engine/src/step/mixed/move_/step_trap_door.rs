@@ -27,6 +27,18 @@ const RE_ROLLED_ACTION: &str = "TRAP_DOOR";
 pub struct StepTrapDoor {
     /// Java: `playerId` — player on the trap door (consumed from PLAYER_ENTERING_SQUARE).
     pub player_id: Option<String>,
+    /// Every id published as PLAYER_ENTERING_SQUARE, in order.
+    ///
+    /// Java's `setParameter` assigns `playerId` ONLY when that player stands on a trap door
+    /// (`StepTrapDoor.java:68`), so a later publish for a NON-trapdoor square cannot overwrite an
+    /// earlier one that was. Rust's `set_parameter` has no `&Game`, so ids are collected here and
+    /// filtered in `execute_step` — same precedence (the last id actually on a trapdoor wins).
+    ///
+    /// Without this the attacker's FOLLOW-UP into the vacated square overwrote the player just
+    /// pushed ONTO the trapdoor, and it never fired (nippon bb2020 seed 29 i=51: away_03 pushed to
+    /// the trapdoor at (19,13), then home_01's follow-up into (18,13) clobbered it — Java dropped
+    /// away_03 through with an InjuryTypeCrowd, Rust left it Prone, 3 dice apart).
+    pub entering_square_ids: Vec<String>,
     /// Java: `thrownPlayerHasBall` — Some(bool) only in TTM context.
     pub thrown_player_has_ball: Option<bool>,
     /// Java: `playerWasPushed` — whether the push came from a block (consumed).
@@ -39,6 +51,13 @@ impl StepTrapDoor {
     pub fn new() -> Self { Self::default() }
 
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        if self.player_id.is_none() {
+            self.player_id = self.entering_square_ids.iter().rev()
+                .find(|id| game.field_model.player_coordinate(id)
+                    .map(|c| game.field_model.has_trap_door(c))
+                    .unwrap_or(false))
+                .cloned();
+        }
         let player_id = match self.player_id.clone() {
             Some(id) => id,
             None => return StepOutcome::next(),
@@ -243,10 +262,12 @@ impl Step for StepTrapDoor {
             StepParameter::PlayerEnteringSquare(id) => {
                 // Java: consume and set player_id if that square has a trap door
                 // Without the consume mechanism here, just store the id.
-                self.player_id = Some(id.clone());
+                self.entering_square_ids.push(id.clone());
                 true
             }
             StepParameter::ThrownPlayerHasBall(v) => { self.thrown_player_has_ball = Some(*v); true }
+            // Java StepTrapDoor:76 — PLAYER_WAS_PUSHED is stored and consumed.
+            StepParameter::PlayerWasPushed(v) => { self.player_was_pushed = *v; true }
             _ => false,
         }
     }
@@ -273,6 +294,36 @@ mod tests {
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
+    }
+
+    /// Regression (nippon bb2020 seed 29, i=51): a block publishes PLAYER_ENTERING_SQUARE twice —
+    /// once for the player it pushes and again for the attacker's follow-up. Java only assigns
+    /// `playerId` when that player is standing on a trap door (`StepTrapDoor.java:68`), so the
+    /// follow-up onto an ordinary square cannot overwrite the pushed player who landed on one.
+    /// Rust assigned unconditionally, so the follow-up clobbered it and the trapdoor never fired:
+    /// Java dropped away_03 through the trapdoor at (19,13) with an InjuryTypeCrowd, Rust left it
+    /// Prone on the pitch — a 3-dice divergence.
+    #[test]
+    fn follow_up_onto_a_plain_square_does_not_steal_the_trapdoor_victim() {
+        let mut step = StepTrapDoor::new();
+        let mut game = make_game();
+
+        let trap = FieldCoordinate::new(19, 13);
+        game.field_model.add_trap_door(trap);
+
+        // The pushed player lands ON the trapdoor; the attacker follows up onto a plain square.
+        game.field_model.set_player_coordinate("pushed", trap);
+        game.field_model.set_player_coordinate("follower", FieldCoordinate::new(18, 13));
+
+        assert!(step.set_parameter(&StepParameter::PlayerEnteringSquare("pushed".into())));
+        assert!(step.set_parameter(&StepParameter::PlayerEnteringSquare("follower".into())));
+
+        let _ = step.start(&mut game, &mut GameRng::new(0));
+
+        assert_eq!(
+            step.player_id.as_deref(), Some("pushed"),
+            "the trapdoor must resolve to the player standing ON it, not the later follow-up"
+        );
     }
 
     #[test]
