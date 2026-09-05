@@ -63,13 +63,49 @@ impl StepFoulAppearance {
             return StepOutcome::next();
         }
 
-        // Java: resolve defender from TargetSelectionState (if selected+committed) or game.defender_id
-        let defender_id = {
-            let from_ts = game.field_model.target_selection_state.as_ref()
-                .filter(|ts| ts.is_selected() && ts.is_committed())
-                .and_then(|ts| ts.get_selected_player_id().cloned());
-            from_ts.or_else(|| game.defender_id.clone())
+        // Java (`bb2025/FoulAppearanceBehaviour.handleExecuteStepHook`, and the bb2016/bb2020
+        // twins alike) resolves the defender as a strict either/or:
+        //
+        //     if (game.getFieldModel().getTargetSelectionState() != null) {
+        //         defender = game.getPlayerById(targetSelectionState.getSelectedPlayerId());
+        //     } else {
+        //         defender = game.getDefender();
+        //     }
+        //
+        // When a TargetSelectionState EXISTS it is the only source — even if its selected id is
+        // null, in which case `hasSkill(null, skill)` is false and Java rolls nothing. Java never
+        // falls back to `game.getDefender()` while a TargetSelectionState is present.
+        //
+        // Rust filtered on `is_selected() && is_committed()` and then fell back to
+        // `game.defender_id`, which is STALE — it still names the victim of an earlier block. On a
+        // PASS_MOVE with a target-selection state open, that resurrected a Foul Appearance
+        // defender and rolled a d6 Java never rolls, putting Rust one die ahead for the rest of the
+        // game (necromantic bb2025 seed 6 i=20: Rust's die 44 is StepFoulAppearance, so its pass
+        // roll lands at 46 = 5 INACCURATE where Java's is 45 = 2 FUMBLE).
+        let defender_id = match game.field_model.target_selection_state.as_ref() {
+            Some(ts) => ts.get_selected_player_id().cloned(),
+            None => game.defender_id.clone(),
         };
+        // Java only ever SETS `game.defenderId` for actions that can actually block: StepInitBlocking
+        // (block), StepInitFouling (foul) and StepEndMoving (the blitz's block defender). A
+        // PASS_MOVE / HAND_OVER_MOVE leaves it null, so Java's `game.getDefender()` is null here and
+        // it rolls nothing.
+        //
+        // Rust reuses `Action::ActivatePlayer.block_defender_id` as a GENERIC target channel
+        // (`step_init_selecting.rs:382` — TTM and the give chain need it), so a pass RECEIVER lands
+        // in `game.defender_id`. That made this step roll a Foul Appearance check against our own
+        // receiver whenever the receiver happened to have the skill — one d6 Java never spends,
+        // putting Rust's whole dice stream one ahead (necromantic bb2025 seed 6 i=20: away_10's
+        // PassMove resolved `defender=away_05`, a Wraith with Foul Appearance).
+        //
+        // Gate on the acting action instead of on the channel, so the legitimate BLITZ_MOVE case
+        // (whose defender StepEndMoving publishes) is untouched.
+        let action_can_block = game.acting_player.player_action
+            .map(|pa| pa.is_block_action() || pa.is_blitzing() || pa.is_kicking_downed())
+            .unwrap_or(false);
+        if !action_can_block {
+            return StepOutcome::next();
+        }
         let defender_has_fa = defender_id.as_deref()
             .and_then(|id| game.player(id))
             .map(|p| p.has_skill(SkillId::FoulAppearance))
@@ -342,12 +378,43 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
     }
 
+    /// Regression (necromantic bb2025 seed 6, i=20): Java only ever SETS `game.defenderId` for an
+    /// action that can block — StepInitBlocking, StepInitFouling, or StepEndMoving's blitz defender.
+    /// A PASS_MOVE leaves it null, so Java's `getDefender()` is null here and it rolls nothing.
+    /// Rust reuses `block_defender_id` as a generic target channel, so a pass RECEIVER lands in
+    /// `game.defender_id`; without this guard the step rolled a Foul Appearance check against our
+    /// OWN receiver, spending a d6 Java never spends and putting the whole dice stream one ahead.
+    #[test]
+    fn pass_move_does_not_roll_foul_appearance_against_its_receiver() {
+        let mut game = make_game();
+        add_player(&mut game, "thrower", vec![]);
+        add_player(&mut game, "receiver", vec![SkillId::FoulAppearance]);
+        game.acting_player.player_id = Some("thrower".into());
+        game.acting_player.player_action = Some(ffb_model::enums::PlayerAction::PassMove);
+        // The receiver arrives through the same channel a block defender would.
+        game.defender_id = Some("receiver".into());
+
+        let mut rng = GameRng::new(0);
+        let before = rng.call_count;
+        let out = StepFoulAppearance::new("fail").start(&mut game, &mut rng);
+
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(
+            rng.call_count, before,
+            "a PassMove must spend NO dice on Foul Appearance — Java's defenderId is null here"
+        );
+    }
+
     #[test]
     fn successful_roll_returns_next_step() {
         let mut game = make_game();
         add_player(&mut game, "atk", vec![]);
         add_player(&mut game, "def", vec![SkillId::FoulAppearance]);
         game.acting_player.player_id = Some("atk".into());
+        // Java only ever sets `defenderId` for a block/blitz/foul, so the roll is only reachable
+        // under such an action; give the acting player one rather than relying on the old
+        // action-blind behaviour.
+        game.acting_player.player_action = Some(ffb_model::enums::PlayerAction::Block);
         game.defender_id = Some("def".into());
         let mut step = StepFoulAppearance::new("fail");
         step.roll = 2; // success (>= 2)
@@ -364,6 +431,10 @@ mod tests {
         add_player(&mut game, "atk", vec![]);
         add_player(&mut game, "def", vec![SkillId::FoulAppearance]);
         game.acting_player.player_id = Some("atk".into());
+        // Java only ever sets `defenderId` for a block/blitz/foul, so the roll is only reachable
+        // under such an action; give the acting player one rather than relying on the old
+        // action-blind behaviour.
+        game.acting_player.player_action = Some(ffb_model::enums::PlayerAction::Block);
         game.defender_id = Some("def".into());
         let mut step = StepFoulAppearance::new("fa_fail");
         step.roll = 1;
@@ -383,6 +454,10 @@ mod tests {
         add_player(&mut game, "atk", vec![]);
         add_player(&mut game, "def", vec![SkillId::FoulAppearance]);
         game.acting_player.player_id = Some("atk".into());
+        // Java only ever sets `defenderId` for a block/blitz/foul, so the roll is only reachable
+        // under such an action; give the acting player one rather than relying on the old
+        // action-blind behaviour.
+        game.acting_player.player_action = Some(ffb_model::enums::PlayerAction::Block);
         game.defender_id = Some("def".into());
         let mut step = StepFoulAppearance::new("fail");
         step.roll = 1;
