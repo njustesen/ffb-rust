@@ -76,9 +76,15 @@ impl StepFallDown {
             None, ApothecaryMode::Attacker,
         );
 
-        // Java line 88: `publishParameters(UtilServerInjury.dropPlayer(this, actingPlayer,
-        // ApothecaryMode.ATTACKER))` — the THREE-arg overload, so eligibleForSafePairOfHands is
-        // FALSE (this file used to pass true).
+        // Java line 88 (bb2025 ONLY): `publishParameters(UtilServerInjury.dropPlayer(this,
+        // actingPlayer.getPlayer(), ApothecaryMode.ATTACKER, TRUE))` — the FOUR-arg overload, so
+        // eligibleForSafePairOfHands is **TRUE** here. The bb2016 and bb2020 twins call the
+        // three-arg overload (false); only bb2025 opts in. Passing false here conflated this file
+        // with its bb2020 twin and silently suppressed the Safe Pair of Hands offer for a carrier
+        // who falls during a MOVE — Java raised the dialog and spent two sampler draws answering
+        // it, Rust raised nothing, and the two agents' streams split for the rest of the game
+        // (lizardman bb2025 seed 59 i=100: the star Boa Kon'ssstriktr, who has Safe Pair of Hands,
+        // fell at (17,3) holding the ball; Java SKILL_USE@315 vs Rust activate@313).
         //
         // `drop_player_rng` is the full port. It does the `placedProneCausesInjuryRoll` (Ball &
         // Chain) branch — a falling Fanatic takes a chain injury instead of being placed prone —
@@ -86,7 +92,7 @@ impl StepFallDown {
         // injury half and return no drop parameters, which lost the ball handling exactly as
         // `StepHandleDropPlayerContext` did before it.
         let drop_params = drop_player_rng(
-            game, rng, &player_id, false, ApothecaryMode::Attacker,
+            game, rng, &player_id, true, ApothecaryMode::Attacker,
         );
 
         // Java: if (fInjuryType.fallingDownCausesTurnover() && getTurnMode() != PASS_BLOCK)
@@ -142,6 +148,35 @@ mod tests {
         game.field_model.set_player_coordinate(id, FieldCoordinate::new(5, 5));
         game.field_model.set_player_state(id, ffb_model::enums::PlayerState::new(PS_STANDING));
         game.acting_player.player_id = Some(id.into());
+    }
+
+    /// Regression (lizardman bb2025 seed 59 i=100): Java's **bb2025** StepFallDown:88 calls the
+    /// FOUR-arg `dropPlayer(..., ApothecaryMode.ATTACKER, true)`, so a carrier who falls during a
+    /// MOVE is eligible for Safe Pair of Hands; the bb2016/bb2020 twins call the three-arg
+    /// overload (false). Rust passed false here, conflating this file with its bb2020 twin, so no
+    /// DROPPED_BALL_CARRIER was published, StepPlaceBall bailed at its `playerId == null` guard,
+    /// and the Safe Pair of Hands dialog Java shows never appeared — costing two sampler draws.
+    #[test]
+    fn falling_carrier_is_eligible_for_safe_pair_of_hands() {
+        let mut game = make_game();
+        add_acting_player(&mut game, "p1");
+        // Give p1 the ball, standing on it: UtilPlayer::has_ball needs in-play, not moving, same square.
+        let coord = FieldCoordinate::new(5, 5);
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = false;
+
+        let mut step = StepFallDown::new();
+        step.injury_type_name = Some("InjuryTypeDropGFI".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(
+            out.published.iter().any(|p| matches!(
+                p,
+                StepParameter::DroppedBallCarrier(Some(id)) if id == "p1"
+            )),
+            "a falling ball carrier must publish DROPPED_BALL_CARRIER in bb2025 so StepPlaceBall              can raise the Safe Pair of Hands offer (Java bb2025 StepFallDown:88 passes true)"
+        );
     }
 
     #[test]
