@@ -81,7 +81,32 @@ probes to the single activation (`FFB_CAND`) made them agree: exposure, `threat_
 counting `JAVA_GFI` lines (which stop at `currentMove=4`) instead of reading the move answer.
 `JMOVEP` shows Java delivering all five squares. Do not count GFI trace lines to infer path length.
 
-**What is actually left.** Both engines choose the same plan, walk the same path, and arrive at the
+**Layer 6 — narrowed to the move, and the pass exonerated.** `getCallCount()` is per-DIE and equals
+`DICE_TRACE`'s `pos`, so the two engines' spends during activation i=20 are directly comparable:
+
+| | dice in i=20 | breakdown |
+|---|---:|---|
+| Java | **4** | 1 GFI, pass=**2** (FUMBLE), 2 bounce d8 |
+| Rust | **7** | **2 GFI**, pass=**5** (INACCURATE), 3 scatter d8, 1 catch |
+
+A step-level probe on `StepPass.execute_step` shows it is entered **twice** and rolls the pass die
+**exactly once** in both engines (`roll=0 → roll=5`, then a re-entry after the declined offer with
+`source=None`, which correctly does NOT re-roll). The re-roll banks are `r2,1` on both sides at
+i=19, 20 and 21, so **no team re-roll is consumed by either engine**. The pass step is therefore
+NOT at fault: it rolls one die, and that die differs only because the stream is already one ahead.
+
+**The remaining fact: Rust rolls TWO d6 during the 5-square walk where Java rolls ONE**, for an
+identical path. With MA=4 and five steps, `StepGoForIt`'s rule (`going_for_it && current_move > ma`)
+should rush exactly once, and `RUST_GFI` does report `MA=4` with `currentMove=1..5`. So one of
+Rust's two move d6 is something other than the expected single rush.
+
+**Next tool, and it is an instrumentation gap, not a guess.** Java's `DICE_TRACE` carries a
+`caller=` stack that names the rolling step; **Rust's does not** — it prints only `pos/sides/result`.
+That is why every attempt above had to infer a die's owner from arithmetic, and it is why layers 1
+and 5 went wrong. Add a step tag to Rust's dice trace, then read off which step rolls Rust's second
+d6 in that walk. Do not attribute another die by counting.
+
+**What is actually left (superseded — see Layer 6).** Both engines choose the same plan, walk the same path, and arrive at the
 same square — yet Rust's pass roll is `pos=46`=**5** (INACCURATE, ball to (14,7)) and Java's is
 `pos=45`=**2** (FUMBLE, ball to (17,4)). Rust spends **exactly one more die** than Java between the
 start of the game and the throw, and the dice values agree up to `pos=43`. Java's `pos=40..44` are
