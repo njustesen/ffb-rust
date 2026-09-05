@@ -66,9 +66,24 @@ independently re-measured.
 ## Coverage, honestly bucketed
 
 Harvested ×3 → `docs/EVENT_COVERAGE_khemri_bb2016.md`, `_bb2020.md`, `_bb2025.md`.
-Per BACKLOG §E6/E7 the "Skill uses / re-rolls seen" section is **empty in all three** — skill uses
-are not evented — so each khemri skill is classified by what the code and the event stream actually
-show:
+
+**Correction (same day).** The first version of this section said the empty "Skill uses / re-rolls
+seen" block was BACKLOG §E6 (skill uses not evented). **That attribution was wrong**, and the
+challenge that produced the re-check was right. `GameEvent::SkillUse` *is* emitted, from five sites
+— block-result Dodge, Dump Off, Horns, Juggernaut, Wrestle — and dark_elf bb2025 logs **343** of
+them. The section was empty because `harvest_coverage.sh` filtered the events through
+`"skill[A-Za-z_]*":"[^"]+"`, which requires a **quoted** value, while the event serialises
+`"skill_id":127` as a bare number. It therefore matched nothing **in all 26 coverage docs ever
+harvested**, for every closed race, no matter what actually fired. Fixed by
+`scripts/skill_use_report.py` (resolves ids through the `SkillId` enum's declaration order),
+validated on a known-positive (dark_elf seed 1 → `2 Dodge used=true, 1 DumpOff used=false`;
+127=Dodge, 5=DumpOff) and a known-zero (khemri) before being trusted. khemri was then re-harvested
+×3 on the fixed script — the three runs above are the fixed ones. `GameEvent::ReRoll` having no emit
+site at all *is* real, and that half of §E6 stands.
+
+**The khemri conclusion is unchanged**: it genuinely logs zero `skillUse` events, because it carries
+none of the five emitting skills. But it now rests on a verified measurement rather than a
+mis-cited one. Per-skill buckets:
 
 | skill | bucket | evidence |
 |---|---|---|

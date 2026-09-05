@@ -126,4 +126,10 @@ Total events: 29489
 ## Skill uses / re-rolls seen
 
 ```
+(no skillUse events in this run)
+
+Note: GameEvent::SkillUse is emitted by only five sites --
+block-result Dodge, Dump Off, Horns, Juggernaut, Wrestle. A roster
+with none of those legitimately produces zero. Every other skill is
+used silently (BACKLOG E6); GameEvent::ReRoll has no emit site at all.
 ```

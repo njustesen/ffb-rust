@@ -45,7 +45,10 @@ PAR=$(grep -E "^PARITY:" /tmp/cov_$E.log)
   echo "## Skill uses / re-rolls seen"
   echo
   echo '```'
-  grep -E '"type":"(skillUse|reRoll|useReRoll|skillWasted)"' /tmp/allev_$E.txt | grep -oE '"skill[A-Za-z_]*":"[^"]+"|"source":"[^"]+"|"action":"[^"]+"' | sort | uniq -c | sort -rn | head -60
+  # skill_id serialises as a NUMBER ("skill_id":127); the old grep here required a
+  # quoted value and so matched nothing for EVERY race, including ones with hundreds
+  # of skillUse events. Resolve ids to names instead (found closing khemri 2026-09-05).
+  python scripts/skill_use_report.py /tmp/allev_$E.txt
   echo '```'
 } > $OUT
 echo "wrote $OUT ($PAR)"

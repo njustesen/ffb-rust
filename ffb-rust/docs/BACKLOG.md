@@ -3932,6 +3932,28 @@ sites into the event stream (the report list is already 1:1), and emit the block
 Until then `harvest_coverage.sh` under-reports skill usage on skilled rosters by an order of
 magnitude; parity, not events, is the proof they run.
 
+### E6b. `harvest_coverage.sh` silently reported ZERO skill uses for every race (FIXED 2026-09-05)
+
+Found while closing khemri, after the empty "Skill uses / re-rolls seen" section was challenged.
+The section filtered skillUse events through `"skill[A-Za-z_]*":"[^"]+"`, which requires a quoted
+value, but `GameEvent::SkillUse` serialises `"skill_id":127` as a bare number. The grep matched
+nothing **in all 26 coverage docs ever harvested**, across every closed race — dark_elf bb2025 logs
+343 skillUse events and reported none of them. The empty section was widely read as evidence for
+E6 ("skill uses are not evented"); it was actually a reporting bug sitting on top of E6.
+
+Fixed by `scripts/skill_use_report.py`, called from the script, resolving ids through the `SkillId`
+enum's declaration order. Validated both ways before use: dark_elf seed 1 → `2 Dodge used=true,
+1 DumpOff used=false`; khemri → a genuine zero with an explanatory note.
+
+**Follow-up: the coverage docs for every previously-closed race are stale** — amazon, lineman,
+dwarf, chaos*, dark_elf*, elf, goblin, halfling, high_elf, human — and under-report skill usage.
+Re-harvest them on the fixed script to find out what those rosters were actually exercising.
+Cheap (one clean run per race/edition) and it needs no engine change.
+
+Note the true scope of E6 is narrower than assumed: SkillUse has **five** emit sites (block-result
+Dodge, Dump Off, Horns, Juggernaut, Wrestle), so most skills really are silent — but not all of
+them, and `GameEvent::ReRoll` having zero emit sites is the part that stands unchanged.
+
 ### E7. bb2016 move twins emit no `playerMoved` / `goForItRoll` (docs/EVENT_COVERAGE.md F3)
 
 bb2016: 13,104 Move actions, 60 touchdowns, ZERO movement events; bb2020/25 emit ~62k and ~4.8k.
