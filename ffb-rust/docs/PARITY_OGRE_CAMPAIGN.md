@@ -59,10 +59,33 @@ probe showed h09 rolling d=[1,4] → total 5 → Stunned, converted to KO by
 * Stunty is NOT the cause: Java's Badly Hurt comes from a **casualty** roll, not from the
   9-and-stunty injury-table row.
 
-**So the divergence is the square the kick STARTS its scatter from** — the target square walked to
-before scattering, or the kicked player's origin. Next step: probe the kick's start/target
-coordinates and the three intermediate scatter squares on both sides for seed 73 i=231. Seed 91 has
-not yet been classified; check whether it is the same family before assuming.
+**So the divergence is the square the scatter STARTS from**, and it has been narrowed to one
+assignment.
+
+* A probe on `kick_player` never fired: the live `StepId::InitScatterPlayer` (`driver.rs:240`) is the
+  **bb2025** twin, which imports only `scatter_player`. The bb2020 twin — the one carrying the
+  `isKickedPlayer && throwScatter → kick_player` branch at its line 114 — is **DEAD**, the usual
+  dead-file trap. Java's own stack shows `scatterPlayer` called directly too, so `kick_player` is
+  probably not the missing piece; the dead twin is recorded because a probe there proves nothing.
+* Java bb2020 `StepInitScatterPlayer:183-191`:
+
+  ```java
+  FieldCoordinate startCoordinate = thrownPlayerCoordinate;
+  if (deviate) { ... }
+  else if (throwScatter) { ...; startCoordinate = game.getPassCoordinate(); }
+  ```
+
+* Rust's live twin has the same branch, but guarded:
+  `else if self.throw_scatter { if let Some(pc) = game.pass_coordinate { start_coord = pc; } }`.
+
+**When `game.pass_coordinate` is `None`, Rust silently keeps the thrown player's square while Java
+would take the pass coordinate.** That is the prime suspect: for a KICK Team-Mate the target square
+may never be written into `pass_coordinate` on the Rust side.
+
+**Next step**: print `game.pass_coordinate`, `throw_scatter`, `is_kicked_player` and the resolved
+`start_coord` on both sides at seed 73 i=231. If Rust's is `None`, find where a KTM should set it
+(Java's `StepKickTeamMate` / the KTM sequence) rather than patching the guard — the guard is a
+symptom. Seed 91 is unclassified; check it is the same family before assuming.
 
 ## Not yet done
 
