@@ -55,26 +55,51 @@ runs the bb2025 step.
 `ffb-engine` 7420/0. Regression spot-check bb2025 @1.0 seeds 1-60: lizardman, chaos, amazon
 all 60/60.
 
-## Open: bb2020 @1.0 seed 29 — a SEPARATE fault
+## ITER2 — seed 29 closed by three more fixes, all in `StepTrapDoor`
 
-Localised, not root-caused. First state-string divergence is at **i=52**, and it is a **single
-token**:
+The bb2020 @1.0 red turned out to be the **Treacherous Trapdoor** prayer (trapdoors at (6,1) and
+(19,13)) and took three separate faults, each uncovered only once the previous one was fixed.
 
-```
-R  a02:19,13,Prone,7/3/3/9,1
-J  a02:-1,-1,Reserve,7/3/3/9,0
-```
+**(a) A follow-up onto a plain square stole the trapdoor victim.** A block publishes
+`PLAYER_ENTERING_SQUARE` twice — once for the player it pushes, again for the attacker's follow-up.
+Java assigns `playerId` ONLY when that player stands on a trap door (`StepTrapDoor.java:68`), so the
+follow-up cannot overwrite the pushed player who just landed on one. Rust assigned unconditionally,
+so the follow-up clobbered it and the step no-oped entirely. Rust's `set_parameter` has no `&Game`,
+so the ids are collected and the same filter applied in `execute_step`. Also stores
+`PLAYER_WAS_PUSHED`, which Java consumes and Rust previously ignored — the existing comment had
+already flagged it.
 
-a02 stood at (18,13) through i=51 in both engines. After the i=51 block (`home_01, Block`):
+**(b) The re-roll was asked for the wrong player.** Java asks on behalf of the trapdoor VICTIM
+(`askForReRollIfAvailable(gameState, player, ...)`, `:122`). Rust called the ACTING-PLAYER overload,
+which re-derives the source from whoever is activated — the ATTACKER. A player pushed onto a
+trapdoor is normally an OPPONENT of the acting team, so Java finds no usable re-roll and shows no
+dialog while Rust found the acting team's and burned two sampler draws. **Same wrong-overload shape
+as the Dodge/Tackle fix in `bb2025/move_/step_move_dodge.rs`** — that makes two races running.
 
-* **Java** removed it from the pitch — a crowd push.
-* **Rust** pushed it to (19,13) and knocked it Prone.
+**(c) The no-re-roll path never rolled the fall injury.** Java runs the full `trapDoorTriggered(...)`
+there, whose first act is `handleInjury(InjuryTypeTrapDoorFall..., ApothecaryMode.TRAP_DOOR)` — an
+armour and an injury roll. Rust published the parameters and removed the player but skipped the
+injury, coming TWO DICE short for every un-rerolled fall (i=52: R52 vs J54). The re-rolled branch
+already called it.
 
-(19,13) is comfortably in bounds (the pitch is x 0..25, y 0..14), so this is **not** the sideline
-chain-push fault fixed above — Java found no legal pushback square where Rust found one. Next step:
-dump the pushback-square set for that block on both sides and compare the candidate squares and
-their occupancy, rather than assuming an edge case.
+**Two colocated tests had to be corrected FROM THE JAVA**, not kept: they gave the victim a
+coordinate but no team, so they only ever passed because the acting-player overload read the home
+TRR regardless of whose player it was. They now put the victim on the home team, which is what
+Java's player overload actually requires.
 
-## Not yet done
+## Final gates
 
-Random controls, the closed-roster regression set, and coverage harvest. This race is NOT closed.
+| edition | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| bb2016 | **100** | **100** | **100** |
+| bb2020 | **100** | **100** | **100** |
+| bb2025 | **100** | **100** | **100** |
+
+Random controls: bb2016 **100/100**, bb2020 **100/100**, bb2025 **100/100**.
+`cargo test -p ffb-engine` **7421/0**.
+Closed-roster regressions bb2020 @1.0 seeds 1-60: lizardman, goblin, chaos, khemri, human all 60/60
+(the trapdoor step is shared by every race and every edition).
+
+Coverage harvested ×3.
+
+**🏁 nippon CLOSED.** Frontier empty.
