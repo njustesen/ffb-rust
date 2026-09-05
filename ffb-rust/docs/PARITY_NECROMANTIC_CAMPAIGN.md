@@ -72,15 +72,26 @@ probes to the single activation (`FFB_CAND`) made them agree: exposure, `threat_
 * the candidate lists are **IDENTICAL** — 1740 rows, same pid/pac/target/dest/weight throughout;
 * both engines **pick the same row**: `idx=1633, away_10, Pass, tgt=away_05, dest=94` — i.e. run to
   **(16,3)** and throw to away_05. Rust's stored path is **5 squares**;
-* yet **Rust executes 5 move steps (two rushes) and Java executes 4 (one rush)**. Rust's extra rush
-  consumes `pos=45`, so Rust's pass roll is `pos=46`=**5** (INACCURATE, ball to (14,7)) where Java's
-  is `pos=45`=**2** (FUMBLE, ball to (17,4)).
+* the **move replay also agrees**. `FFB_MOVEP` (Rust `RMOVEP` / Java `JMOVEP`, a mirror that
+  already existed) shows both engines answering the first move prompt with the **identical
+  5-square path** `[20,5 19,4 18,3 17,2 16,3]`, both arriving at (16,3), and both being prompted
+  again there.
 
-So this is **not** planning, scoring, candidate order, or the value model. Same plan in, different
-number of executed steps out. The next iteration should instrument the move REPLAY — how many
-squares of the delivered path each engine actually walks, and each side's movement-left/rush budget
-at the moment of the 5th step (both agree the player has 3 free movement, since Java's 4th step is
-already a rush).
+**Layer 5 — WRONG, and corrected here: "Rust walks 5 steps where Java walks 4".** That came from
+counting `JAVA_GFI` lines (which stop at `currentMove=4`) instead of reading the move answer.
+`JMOVEP` shows Java delivering all five squares. Do not count GFI trace lines to infer path length.
+
+**What is actually left.** Both engines choose the same plan, walk the same path, and arrive at the
+same square — yet Rust's pass roll is `pos=46`=**5** (INACCURATE, ball to (14,7)) and Java's is
+`pos=45`=**2** (FUMBLE, ball to (17,4)). Rust spends **exactly one more die** than Java between the
+start of the game and the throw, and the dice values agree up to `pos=43`. Java's `pos=40..44` are
+five consecutive `rollGoingForIt` calls, so the extra Rust die is somewhere in `pos=44..45` during
+this walk.
+
+Pinning it needs a **per-activation dice marker** on both sides — the current traces cannot say
+which activation a given `pos` belongs to, because Java's `rng_calls` counts CALLS while `pos`
+counts DICE. That marker is the next iteration's first job; without it every `pos`-based inference
+here is guesswork, which is how layers 1 and 5 went wrong.
 
 ### Landed this session
 
