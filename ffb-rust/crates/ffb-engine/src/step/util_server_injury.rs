@@ -242,6 +242,22 @@ pub fn handle_regeneration_reporting(
             if successful {
                 let new_state = state.change_base(PS_RESERVE);
                 game.field_model.set_player_state(player_id, new_state);
+                // Java `UtilServerInjury.handleRegeneration` success branch also clears the
+                // player result's serious injury and MOVES THE PLAYER INTO ITS BOX:
+                //     playerResult.setSeriousInjury(null); playerResult.setSeriousInjuryDecay(null);
+                //     UtilBox.putPlayerIntoBox(game, pPlayer); UtilBox.refreshBoxes(game);
+                // Without these the regenerated player kept the RIP box column (x=-5) while its
+                // state said RESERVE (x=-1) — invisible to the state hash, which clamps every
+                // off-pitch coordinate to (-1,-1) (necromantic bb2025 seed 6 i=6).
+                {
+                    let is_home = game.team_home.has_player(player_id);
+                    let tr = if is_home { &mut game.game_result.home } else { &mut game.game_result.away };
+                    let pr = tr.player_result_mut(player_id);
+                    pr.serious_injury = None;
+                    pr.serious_injury_decay = None;
+                }
+                ffb_model::util::util_box::UtilBox::put_player_into_box(game, player_id);
+                ffb_model::util::util_box::UtilBox::refresh_boxes(game);
             }
             let event = ffb_model::events::GameEvent::RegenerationRoll {
                 player_id: player_id.to_string(),

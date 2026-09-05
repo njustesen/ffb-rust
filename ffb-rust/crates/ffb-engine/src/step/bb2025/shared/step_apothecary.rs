@@ -199,6 +199,24 @@ impl StepApothecary {
                                 );
                             if let Some(ev) = ev { self.pending_regeneration.push(ev); }
                             if regenerated {
+                                // Java bb2025 StepApothecary:280-284 — handleRegeneration's javadoc
+                                // says "Callers need to apply that to the injury context
+                                // themselves", and every Java call site does exactly this:
+                                //     injuryContext().setInjury(fieldModel.getPlayerState(player));
+                                //     injuryContext().setApothecaryStatus(RESULT_CHOICE);
+                                //     injuryContext().setSeriousInjury(null);
+                                // Without it the context still reads RIP after a SUCCESSFUL
+                                // regeneration, and handleInjurySideEffects -> handleRaiseDead
+                                // (which gates on injuryContext.playerState == RIP) raised a
+                                // zombie for a player who had just got back up: Rust fielded 25
+                                // players where Java had 24 (necromantic bb2025 seed 6).
+                                let new_state = game.field_model.player_state(&defender_id);
+                                if let Some(ir) = self.injury_result.as_mut() {
+                                    ir.injury_context.injury = new_state;
+                                    ir.injury_context.apothecary_status =
+                                        ffb_model::enums::ApothecaryStatus::ResultChoice;
+                                    ir.injury_context.serious_injury = None;
+                                }
                                 self.cure_poison(game);
                             } else if game.rules == ffb_model::enums::Rules::Bb2025
                                 && game.player(&defender_id)
