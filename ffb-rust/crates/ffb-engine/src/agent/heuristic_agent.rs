@@ -3368,7 +3368,14 @@ impl HeuristicAgent {
                                 Some(rcv.clone()),
                                 PlanKind::Pass { receiver: rcv.clone() },
                                 path,
-                                None,
+                                // Java's PlanBuilder.passCandidates records the RUN-UP square as
+                                // the candidate's dest; Rust passed None. `dest` is only a path
+                                // fallback in execution (the run-up path is already stored above),
+                                // so this is reporting fidelity — but it blinded FFB_CAND exactly
+                                // the way CANDSUM's `n` did: every Pass row read `dest=null` and
+                                // could not be compared against Java's, hiding which run-up spot
+                                // each row actually meant.
+                                Some(j),
                                 Rule::Flat,
                                 format!(
                                     "{} pass to {}{}",

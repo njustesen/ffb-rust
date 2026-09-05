@@ -48,53 +48,48 @@ before and after — 32 seeds, zero fixed, zero newly broken. Kept because they 
 and fix a real 25-vs-24 roster difference, not because they improved a number. Regression: khemri
 (Regeneration on all 12) 60/60 unchanged; `ffb-engine` 7419/0.
 
-## The remaining frontier — now localised to TWO SQUARES
+## The remaining frontier — both engines pick the SAME plan, then execute it differently
 
-Re-measured on `1566f936b` after the lizardman/nippon fixes: bb2025 still **68 / 83 / 78**,
-unchanged. The frontier was chased down several layers this session; each layer is recorded because
-each one disproved the layer above it.
+bb2025 remains **68 / 83 / 78**. This session drove the frontier down four layers with matched
+probes on BOTH engines (the Java harness is co-editable). Every layer is recorded because each one
+**disproved the layer above it** — three of my own conclusions were wrong and are corrected here.
 
-**Layer 1 (wrong).** The earlier handoff said "Rust spends one extra die before the pass". The dice
-trace disproves it: with callers, Java and Rust agree value-for-value on `pos=40..45` — five GFI
-rolls and the pass roll (both **2**). They split at `pos=46`, where **Rust rolls a d6** and Java
-rolls a d8 (`bounceBall`). Rust re-rolls the pass and gets 5 → INACCURATE; Java keeps the 2 →
-FUMBLE, ball to (17,4). So it is not an extra die *before* the pass.
+**Layer 1 — WRONG: "Rust spends one extra die before the pass".** The dice trace with `caller=`
+stacks shows Java and Rust agreeing value-for-value on `pos=40..45`.
 
-**Layer 2 (also not the cause).** `bb2025/pass/step_pass.rs:562` calls the ACTING-PLAYER re-roll
-overload and hard-codes `re_roll_source = "TRR"` — the same shape as the human ITER1 Dodge/Tackle
-fix and the nippon trapdoor fix. It is worth fixing on its own merits, but it is downstream: Rust
-makes **no re-roll draws at all** on this seed, so the pass re-roll is a consequence, not the cause.
+**Layer 2 — WRONG: "the pass re-roll ask at `step_pass.rs:562` is the cause".** It does use the
+acting-player overload with a hard-coded `"TRR"` (the same shape as the human Dodge/Tackle and
+nippon trapdoor fixes) and is worth fixing on its own, but Rust *does* offer and the agent
+*declines* — `LOOP applied=NoReRoll` — so it is downstream.
 
-**Layer 3 — the actual first divergence.** `FFB_CANDSUM` reports its first split at k=25, but that
-is already downstream. At **k=24** the summary line matches (`n=1375` both) while the candidate
-CONTENT differs from index 0 — **`n` is a count, so it hid the difference**. Dumping the lists with
-`FFB_CAND=24`:
+**Layer 3 — WRONG: "exposure differs" / "the support raster differs".** Both came from comparing
+probe streams **positionally** when the two engines emit different numbers of entries. Gating both
+probes to the single activation (`FFB_CAND`) made them agree: exposure, `threat_reach`,
+`threat_str`, `threat_mark` and the mover are all identical.
 
-* home_03 (a **Flesh Golem**, moving from (13,14)) has **exactly the same 85 destinations** in both
-  engines — the reachable SET is right.
-* The ORDER differs, because **exactly two of the 85 carry a different weight**:
+**Layer 4 — the verified fact.** At the deciding activation (k=22, seed 6):
 
-  | dest | square | Rust | Java |
-  |---|---|---:|---:|
-  | 276 | (16,10) | **0.026214** | 0.014563 |
-  | 277 | (17,10) | **0.026214** | 0.014563 |
+* the candidate lists are **IDENTICAL** — 1740 rows, same pid/pac/target/dest/weight throughout;
+* both engines **pick the same row**: `idx=1633, away_10, Pass, tgt=away_05, dest=94` — i.e. run to
+  **(16,3)** and throw to away_05. Rust's stored path is **5 squares**;
+* yet **Rust executes 5 move steps (two rushes) and Java executes 4 (one rush)**. Rust's extra rush
+  consumes `pos=45`, so Rust's pass roll is `pos=46`=**5** (INACCURATE, ball to (14,7)) where Java's
+  is `pos=45`=**2** (FUMBLE, ball to (17,4)).
 
-  The other **83 match bit-for-bit**, so `DetMath` and the shared scoring are sound — this is not a
-  float-drift problem.
+So this is **not** planning, scoring, candidate order, or the value model. Same plan in, different
+number of executed steps out. The next iteration should instrument the move REPLAY — how many
+squares of the delivered path each engine actually walks, and each side's movement-left/rush budget
+at the moment of the 5th step (both agree the player has 3 free movement, since Java's 4th step is
+already a rush).
 
-Rust's higher weight makes (16,10)/(17,10) sort to the front, so home_03 walks to **(10,11)** where
-Java walks to **(11,11)** (both 3 steps, diverging on the last one). That one-square difference is
-what the state hash first shows at i=23, and it cascades into the different pass a few activations
-later.
+### Landed this session
 
-**Next step**: `arrival_parts` is `pa*v − (1−pa)*c_turnover(gfi) − rush_penalty(gfi)`. Neither
-square is in a tackle zone (the nearest opponent, away_06 at (14,10), is two away), so the suspects
-are the route's `gfi` (rush count) or `cost` for those two cells, which the goblin campaign already
-identified as route-dependent: `cost[]` is NOT minimised, because Dijkstra settles on the
-probability key, so which route wins decides the step count. Put a matching probe on BOTH sides —
-Rust's `arrival_parts` and Java's `Plans`/`Reach` equivalent (the harness is co-editable) — and diff
-`pa`, `v`, `gfi` and `cost` for cells 276/277 at k=24. Do NOT chase the pass again; it is
-three layers downstream.
+`heuristic_agent.rs` Pass candidates now record the run-up square as `dest` (Java's
+`PlanBuilder.passCandidates` does; Rust passed `None`). **Behaviour-neutral** — `dest` is only a
+path fallback and the run-up path was already stored — and the gates confirm it: 68/83/78 before and
+after. It is kept for *reporting fidelity*: every Pass row read `dest=null`, so no Pass candidate
+could be compared against Java's. That blindness is what sent layers 1-3 chasing consequences, and
+it is the same failure mode as `FFB_CANDSUM`'s `n` (a count that matched while the contents did not).
 
 ## Not yet done
 
