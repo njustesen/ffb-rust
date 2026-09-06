@@ -4088,3 +4088,22 @@ Two related loose ends from the same campaign:
   dispatched from `INIT_MOVING` leaves `StepAnimalSavagery.catcherId` null. That is **Java's own
   behaviour** and must not be "fixed" — recorded here only so the next reader does not re-diagnose
   it as a Rust bug.
+
+### E12. The heuristic agent cannot Leap — `StepJump` is unreachable from the harness
+
+Found while closing slann (2026-09-06, `docs/PARITY_SLANN_CAMPAIGN.md`). Every slann position
+except the Kroxigor carries **Leap** and **Very Long Legs**, and slann was picked for the sweep
+partly to exercise the jump/leap chain. It did not run **once**: `jumpRoll` (a real `GameEvent`,
+`ffb-model/src/events/game_event.rs:39`) has a count of **ZERO** in all three
+`docs/EVENT_COVERAGE_slann_*.md` harvests, i.e. across 300 games.
+
+The reason is the agent, not the engine. `grep -ri "leap" crates/ffb-engine/src/agent/` returns
+nothing at all, and the only `JUMP` in the agent is the re-roll-action name list in
+`heuristic_agent.rs` (`"GFI" | "DODGE" | "PICKUP" | "CATCH" | "JUMP" | "ESCAPE"`) — i.e. the agent
+can ANSWER a jump re-roll prompt but has no way to DECLARE a jump, so the `StepJump` chain
+(bb2016 / bb2020 / bb2025 twins all present and translated) is never entered.
+
+Consequence: **slann's nine green gates are not evidence about Leap in any edition**, and neither
+will wood_elf's or slann_fumbbl's be. Closing this needs a `Jump` arm in `Reach`/the candidate
+builder on BOTH agents, with the cross-language goldens updated deliberately — it is an
+agent-capability item, not a parity red.
