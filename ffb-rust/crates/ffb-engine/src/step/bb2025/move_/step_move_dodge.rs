@@ -188,7 +188,13 @@ impl StepMoveDodge {
         }
 
         let factory = DodgeModifierFactory::for_rules(game.rules);
-        let (minimum_roll, mod_names, has_bt, min_no_bt, names_no_bt): (i32, Vec<String>, bool, i32, Vec<String>) = if let Some(pid) = player_id.as_deref() {
+        // `agility` and the UNCLAMPED modifier sums travel out of this block alongside the
+        // clamped minima: Java re-enters `AgilityMechanic.minimumRollDodge` with the augmented
+        // modifier SET whenever it wants a what-if minimum (Diving Tackle, Break Tackle), so the
+        // `Math.max(2, ...)` clamp is applied exactly once, to `agility + everything`. Adding a
+        // modifier to an already-clamped minimum is a different function whenever the clamp binds.
+        let (minimum_roll, mod_names, has_bt, min_no_bt, names_no_bt, dodge_agility, total_all, total_no_bt):
+            (i32, Vec<String>, bool, i32, Vec<String>, i32, i32, i32) = if let Some(pid) = player_id.as_deref() {
             let acting = game.acting_player.clone();
             let src = self.coordinate_from.unwrap_or(FieldCoordinate::new(0, 0));
             let tgt = self.coordinate_to.unwrap_or(FieldCoordinate::new(0, 0));
@@ -212,9 +218,11 @@ impl StepMoveDodge {
             let has_bt = without_bt.len() != all.len();
             let min_no_bt = DodgeModifierFactory::minimum_roll(agility, &without_bt);
             let names_no_bt: Vec<String> = without_bt.iter().map(|m| m.get_report_string().to_string()).collect();
-            (min, names, has_bt, min_no_bt, names_no_bt)
+            let total_all: i32 = all.iter().map(|m| m.get_modifier()).sum();
+            let total_no_bt: i32 = without_bt.iter().map(|m| m.get_modifier()).sum();
+            (min, names, has_bt, min_no_bt, names_no_bt, agility, total_all, total_no_bt)
         } else {
-            (2, vec![], false, 2, vec![])
+            (2, vec![], false, 2, vec![], 2, 0, 0)
         };
         // Java StepMoveDodge (the btModifier block after `successful` is computed):
         // - SUCCESS + BT present: recompute WITHOUT Break Tackle; if the roll still succeeds, BT
@@ -228,10 +236,10 @@ impl StepMoveDodge {
         let bt_saved_it = has_bt
             && DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll)
             && !DiceInterpreter::is_skill_roll_successful(self.dodge_roll, min_no_bt);
-        let (minimum_roll, mod_names) = if has_bt && !bt_saved_it {
-            (min_no_bt, names_no_bt)
+        let (minimum_roll, mod_names, dodge_total) = if has_bt && !bt_saved_it {
+            (min_no_bt, names_no_bt, total_no_bt)
         } else {
-            (minimum_roll, mod_names)
+            (minimum_roll, mod_names, total_all)
         };
         if bt_saved_it {
             self.using_break_tackle = true;
@@ -294,7 +302,17 @@ impl StepMoveDodge {
                 let dt_tacklers = ffb_model::util::util_player::UtilPlayer::find_eligible_diving_tacklers(
                     game, from, to, leaving_tz_only);
                 if !dt_tacklers.is_empty() {
-                    let min_with_dt = minimum_roll + 2;
+                    // Java: `withDt = new HashSet<>(dodgeModifiers); withDt.addAll(forType(
+                    // DIVING_TACKLE)); minimumWithDt = mechanic.minimumRollDodge(game, player,
+                    // withDt, statBasedRollModifier)` — the DIVING_TACKLE DodgeModifier is +2 and
+                    // the mechanic is `Math.max(2, agility + sum(modifiers))`. So the +2 goes in
+                    // BEFORE the clamp, not after it. `minimum_roll + 2` is the same number only
+                    // when the clamp does not bind; for an AG1 Kroxigor dodging out of a bare
+                    // square Java gets max(2, 1+2) = 3 where the old code got max(2,1)+2 = 4, so a
+                    // dodge roll of 3 read as "Diving Tackle can flip this" and Rust pre-emptively
+                    // offered — and the heuristic accepted — a team re-roll Java never asked for
+                    // (slann bb2025 @0 seed 43 i=85: two extra dice and r2,2 → r1,2).
+                    let min_with_dt = (dodge_agility + dodge_total + 2).max(2);
                     let mut fails_with_dt =
                         !DiceInterpreter::is_skill_roll_successful(self.dodge_roll, min_with_dt);
                     if fails_with_dt && !self.using_break_tackle {
@@ -312,7 +330,12 @@ impl StepMoveDodge {
                             }
                         });
                         if let Some(bt) = bt_mod {
-                            if DiceInterpreter::is_skill_roll_successful(self.dodge_roll, min_with_dt + bt) {
+                            // Java: `minimumWithDtBt = mechanic.minimumRollDodge(game, player,
+                            // withDtAndBt, btStat)` = max(2, agility + sum + 2 - btStat). Same
+                            // clamp-once rule as `min_with_dt` above; `bt` is the already-negated
+                            // strength modifier (-3/-2/-1).
+                            let min_with_dt_bt = (dodge_agility + dodge_total + 2 + bt).max(2);
+                            if DiceInterpreter::is_skill_roll_successful(self.dodge_roll, min_with_dt_bt) {
                                 self.using_break_tackle = true;
                                 if let Some(pid) = player_id.as_deref() {
                                     if let Some(p) = game.team_home.player_mut(pid)
@@ -483,6 +506,86 @@ impl StepMoveDodge {
 
 #[cfg(test)]
 mod tests {
+    // ── The Diving-Tackle what-if minimum is clamped ONCE (Java StepMoveDodge bb2025:415-441) ──
+
+    /// AG1 dodger, bare destination square, an adjacent opposing Diving Tackler that is not
+    /// adjacent to the destination, and a full re-roll bank.
+    fn dt_threat_fixture(agility: i32) -> (Game, StepMoveDodge) {
+        use ffb_model::enums::{PlayerAction, PS_STANDING, PlayerState as PSt, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = Game::new(
+            crate::step::framework::test_team("home", 0),
+            crate::step::framework::test_team("away", 0),
+            ffb_model::enums::Rules::Bb2025,
+        );
+        let dodger = ffb_model::model::player::Player {
+            id: "dodger".into(), name: "d".into(), nr: 1, position_id: "pos".into(),
+            player_type: ffb_model::enums::PlayerType::Regular,
+            gender: ffb_model::enums::PlayerGender::Male,
+            movement: 6, strength: 5, agility, passing: 0, armour: 9,
+            ..Default::default()
+        };
+        game.team_home.players.push(dodger);
+        let mut tackler = ffb_model::model::player::Player {
+            id: "tackler".into(), name: "t".into(), nr: 2, position_id: "pos".into(),
+            player_type: ffb_model::enums::PlayerType::Regular,
+            gender: ffb_model::enums::PlayerGender::Male,
+            movement: 7, strength: 3, agility: 3, passing: 4, armour: 8,
+            ..Default::default()
+        };
+        tackler.starting_skills.push(SkillWithValue { skill_id: SkillId::DivingTackle, value: None });
+        game.team_away.players.push(tackler);
+        game.field_model.set_player_coordinate("dodger", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("dodger", PSt::new(PS_STANDING));
+        // Adjacent to the SOURCE only: an eligible Diving Tackler that adds no tacklezone to the
+        // destination, so the bare dodge minimum is `max(2, agility)`.
+        game.field_model.set_player_coordinate("tackler", FieldCoordinate::new(4, 4));
+        game.field_model.set_player_state("tackler", PSt::new(PS_STANDING));
+        game.home_playing = true;
+        game.turn_mode = TurnMode::Regular;
+        game.turn_data_home.rerolls = 2;
+        game.turn_data_away.rerolls = 2;
+        game.acting_player.set_player("dodger".into(), PlayerAction::Move);
+        game.acting_player.dodging = true;
+        let mut step = StepMoveDodge::new(String::new());
+        step.coordinate_from = Some(FieldCoordinate::new(5, 5));
+        step.coordinate_to = Some(FieldCoordinate::new(6, 5));
+        (game, step)
+    }
+
+    /// Java computes the Diving-Tackle what-if as `mechanic.minimumRollDodge(game, player, withDt,
+    /// stat)` where the mechanic is `Math.max(2, agility + sum(modifiers))` and the DIVING_TACKLE
+    /// DodgeModifier is +2 — so the clamp is applied ONCE, after the +2. For an AG1 Kroxigor with
+    /// no other modifiers that is `max(2, 1 + 2) = 3`, and a dodge roll of 3 still succeeds, so
+    /// Java asks for nothing. Rust used to add +2 to the ALREADY-clamped minimum (`max(2,1) + 2 =
+    /// 4`), read the 3 as flippable, and pre-emptively offered a team re-roll the heuristic then
+    /// spent (slann bb2025 @0 seed 43 i=85: two extra dice, home re-rolls 2 → 1).
+    #[test]
+    fn diving_tackle_what_if_minimum_is_clamped_once_for_ag1() {
+        let (mut game, mut step) = dt_threat_fixture(1);
+        step.dodge_roll = 3;
+        let mut rng = GameRng::new(0);
+        let out = step.execute_step(&mut game, &mut rng);
+        assert!(out.prompt.is_none(),
+            "max(2, 1+2) = 3 <= roll 3: Diving Tackle cannot flip this dodge, so Java offers no \
+             re-roll — got {:?}", out.prompt);
+        assert_eq!(out.action, crate::step::framework::StepAction::NextStep);
+    }
+
+    /// The companion case that must NOT change: when the clamp does not bind, adding the Diving
+    /// Tackle +2 still turns a bare success into a threat and Java DOES pre-emptively offer the
+    /// re-roll. AG3, no modifiers → min 3; with DT → max(2, 3+2) = 5, and a roll of 3 fails it.
+    #[test]
+    fn diving_tackle_what_if_still_offers_the_reroll_when_the_clamp_does_not_bind() {
+        let (mut game, mut step) = dt_threat_fixture(3);
+        step.dodge_roll = 3;
+        let mut rng = GameRng::new(0);
+        let out = step.execute_step(&mut game, &mut rng);
+        assert!(out.prompt.is_some(),
+            "AG3: min 3 succeeds bare but max(2, 3+2) = 5 fails, so Java asks 'Diving Tackle can \
+             make this dodge fail. Reroll the dodge now?'");
+    }
+
     // ── Break Tackle consumption (Java StepMoveDodge bb2025:363-380 + 516-521) ────────────
 
     /// Java: when the dodge succeeds ONLY thanks to Break Tackle, `fUsingBreakTackle = true;
