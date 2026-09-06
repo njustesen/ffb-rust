@@ -3172,6 +3172,30 @@ public class ParityRunner {
                     new com.fumbbl.ffb.net.commands.ClientCommandThrowKeg(kegTarget.getId()));
                 return true;
             }
+            case TREACHEROUS: {
+                // Hakflem's Treacherous (renegades bb2020 seed 97 i=1). Unlike every other star
+                // special in this switch, the client declares Treacherous as a BALL action: it is
+                // Treacherous itself that adds the pass entries to a non-carrier's menu, so the
+                // command pair is ActingPlayer(PASS_MOVE) + UseSkill(treacherous) -- exactly what
+                // the RANDOM path's handleStep arm sends. Declaring it with MOVE (the generic tail
+                // below) would leave StepTreacherous.markActionUsed with a MOVE action and never
+                // set turnData.passUsed. There was no case at all, so the heuristic path fell to
+                // `default: return false` and declared TREACHEROUS BARE: StepInitSelecting never
+                // saw a CLIENT_USE_SKILL, never dispatched, and phase 2 deselected the activation,
+                // so Java no-opped it while Rust stabbed the ball carrier. Same family as
+                // BLACK_INK / WISDOM_OF_THE_WHITE_DWARF / THROW_KEG above.
+                Player<?> tp = game.getPlayerById(playerId);
+                java.util.Optional<com.fumbbl.ffb.model.skill.Skill> tSkill =
+                    com.fumbbl.ffb.util.UtilCards.getUnusedSkillWithProperty(tp,
+                        com.fumbbl.ffb.model.property.NamedProperties.canStabTeamMateForBall);
+                MatchRunner.inject(gameState,
+                    new ClientCommandActingPlayer(playerId, PlayerAction.PASS_MOVE, false));
+                if (tSkill.isPresent()) {
+                    MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(
+                        tSkill.get(), true, playerId, null, false));
+                }
+                return true;
+            }
             default:
                 return false;
         }

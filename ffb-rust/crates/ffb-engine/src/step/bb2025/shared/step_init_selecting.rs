@@ -437,6 +437,37 @@ impl Step for StepInitSelecting {
             }
             // Java: CLIENT_SYNCHRONOUS_MULTI_BLOCK (bb2025 shared StepInitSelecting:328-334) —
             // publish BLOCK_TARGETS, changePlayerAction(MULTIPLE_BLOCK), dispatch, EXECUTE.
+            // Java `StepInitSelecting:177` CLIENT_MOVE — the FIRST move command of an activation
+            // whose declared action is a `*_MOVE` variant reaches THIS step, not StepInitMoving:
+            //
+            //     case CLIENT_MOVE:
+            //       ... publishParameter(MOVE_START, fetchFromSquare(...));
+            //           publishParameter(MOVE_STACK, fetchMoveStack(...));
+            //           fDispatchPlayerAction = PlayerAction.MOVE;
+            //           commandStatus = EXECUTE_STEP;
+            //
+            // Note what it does NOT do: it never rewrites the acting player's action, so a
+            // PASS_MOVE stays PASS_MOVE and a later CLIENT_PASS can still fire the throw. Only
+            // the DISPATCH becomes MOVE.
+            //
+            // Rust normally raises its move prompt from the Move sequence's StepInitMoving, so
+            // this arm was missing entirely and an `Action::Move` answered here fell through to
+            // `execute_step`, which re-raised the same prompt forever. It is reachable now that
+            // the heuristic answers the post-Treacherous PASS_MOVE park with a move (the Java
+            // heuristic's `sendConcreteAction` does exactly that); nothing else sends
+            // `Action::Move` to this step. Mirrors the bb2016 twin's CLIENT_MOVE arm
+            // (`step/bb2016/move_/step_init_selecting.rs:111`).
+            Action::Move { path } if !path.is_empty() => {
+                let from = game.acting_player.player_id.clone()
+                    .and_then(|pid| game.field_model.player_coordinate(&pid));
+                self.dispatch_player_action = Some(PlayerAction::Move);
+                let mut out = self.execute_step(game, rng)
+                    .publish(StepParameter::MoveStack(path.clone()));
+                if let Some(c) = from {
+                    out = out.publish(StepParameter::MoveStart(c));
+                }
+                return out;
+            }
             Action::MultiBlock { targets } => {
                 if let Some(pid) = game.acting_player.player_id.clone() {
                     util_server_steps::change_player_action(game, &pid, PlayerAction::MultipleBlock, false);
@@ -1071,6 +1102,47 @@ mod tests {
         assert_eq!(step2.dispatch_player_action, Some(PlayerAction::Treacherous));
         assert!(step2.force_goto_on_dispatch);
         let _ = out2;
+    }
+
+    /// Java `StepInitSelecting:177` CLIENT_MOVE: the FIRST move command of a `*_MOVE` activation
+    /// lands on THIS step. It publishes MOVE_START + MOVE_STACK and sets
+    /// `fDispatchPlayerAction = PlayerAction.MOVE` — and crucially it does NOT rewrite the acting
+    /// player's action, so a PASS_MOVE is still a PASS_MOVE and its throw can still be fired later.
+    ///
+    /// Written from that Java arm, not from the Rust: before the fix there was no `Action::Move`
+    /// arm at all here, the command fell through to `execute_step`, and the post-Treacherous
+    /// PASS_MOVE park re-raised its own prompt forever.
+    #[test]
+    fn client_move_dispatches_move_and_keeps_the_declared_pass_move() {
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_STANDING};
+        use ffb_model::model::player::Player;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.team_home.players.push(Player {
+            id: "h1".into(), name: "h1".into(), nr: 1, position_id: "star".into(),
+            player_type: PlayerType::Star, gender: PlayerGender::Male,
+            movement: 9, strength: 3, agility: 2, passing: 3, armour: 8,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("h1", FieldCoordinate::new(12, 7));
+        game.field_model.set_player_state("h1", PlayerState::new(PS_STANDING));
+        crate::step::util_server_steps::change_player_action(
+            &mut game, "h1", PlayerAction::PassMove, false);
+
+        let mut step = StepInitSelecting::new("end".into());
+        let dest = FieldCoordinate::new(13, 7);
+        let out = step.handle_command(
+            &Action::Move { path: vec![dest] }, &mut game, &mut GameRng::new(0));
+
+        assert_eq!(step.dispatch_player_action, Some(PlayerAction::Move),
+            "Java sets fDispatchPlayerAction = MOVE");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::MoveStack(v) if v == &vec![dest])),
+            "Java publishes MOVE_STACK = fetchMoveStack(command)");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::MoveStart(c) if *c == FieldCoordinate::new(12, 7))),
+            "Java publishes MOVE_START = fetchFromSquare(command)");
+        assert_eq!(game.acting_player.player_action, Some(PlayerAction::PassMove),
+            "the CLIENT_MOVE arm never rewrites the acting player's declared action");
     }
 
     /// The activation pre-stand writes MOVING, not STANDING. Java's `changeActingPlayer` puts the

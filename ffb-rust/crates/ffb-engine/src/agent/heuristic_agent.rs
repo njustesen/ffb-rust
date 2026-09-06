@@ -3467,7 +3467,13 @@ impl Agent for HeuristicAgent {
         // read only the cheap core (tackle zones, occupancy, who has the ball), and the two that
         // read the value rasters. Measurement is what forced the middle tier — building the rasters
         // for a `BlockChoice` took it from 11 µs to 86 µs, and it does not read one of them.
-        let needs_features = matches!(
+        // The post-Treacherous PASS_MOVE park is answered with the MOVE logic (see the
+        // `BombRethrow` arm in `act_with_features`), so it needs the full feature block --
+        // including the heavy rasters `handle_move`'s re-plan reads. Every OTHER `BombRethrow`
+        // (the genuine bomb re-throw) stays boardless and reaches the parity contract unchanged.
+        let pass_move_park = matches!(prompt, AgentPrompt::BombRethrow { .. })
+            && g.acting_player.player_action == Some(PlayerAction::PassMove);
+        let needs_features = pass_move_park || matches!(
             prompt,
             AgentPrompt::Move { .. }
                 | AgentPrompt::ActivatePlayer { .. }
@@ -3480,8 +3486,8 @@ impl Agent for HeuristicAgent {
         if !needs_features {
             return self.act_boardless(gs, g, prompt);
         }
-        let needs_heavy =
-            matches!(prompt, AgentPrompt::Move { .. } | AgentPrompt::ActivatePlayer { .. });
+        let needs_heavy = pass_move_park
+            || matches!(prompt, AgentPrompt::Move { .. } | AgentPrompt::ActivatePlayer { .. });
         let stamp = positions_stamp(g);
         let usable = self
             .feat
@@ -3531,6 +3537,43 @@ impl HeuristicAgent {
                 Mode::Wide | Mode::WideNoBall | Mode::WideNoPass | Mode::WideNoHandOff => self.handle_move(g, f, player_id, squares),
                 Mode::Deep => self.handle_move_deep(g, f, player_id, squares),
             },
+
+            // The post-special PASS_MOVE continuation (Treacherous). StepInitSelecting raises
+            // `BombRethrow` here because Java's engine shows no dialog at all: it simply parks
+            // with the acting player still set to PASS_MOVE and waits for the client's next
+            // command. Which command that is depends on WHICH AGENT is driving --
+            // `ParityRunner.sendConcreteAction` splits exactly here:
+            //
+            //     case PASS_MOVE: case HAND_OVER_MOVE:
+            //         if (activation != null) { sendMoveAction(game, gameState, pid); break; }
+            //         sendBallAction(game, gameState, pid, pa);
+            //
+            // The random contract throws (`sendBallAction`), which is what `self.parity.act`
+            // below reproduces; the HEURISTIC moves, because the MOVE variant of a ball action
+            // exists to buy a movement phase before the throw. Delegating this prompt to the
+            // parity contract made the Rust heuristic throw where the Java heuristic walked --
+            // the whole renegades bb2020 frontier (11 seeds, every one of them Hakflem's
+            // Treacherous; seed 97 i=1: Java walks the star 22,6 -> 15,2 with the stolen ball,
+            // Rust threw a quick pass to away_07).
+            //
+            // Gated on PASS_MOVE so the GENUINE bomb re-throw window is untouched: the two other
+            // producers of this prompt (`step/mixed/pass/step_init_passing.rs`,
+            // `step/bb2016/pass/step_init_passing.rs`) only raise it when the acting action
+            // `is_bomb()` or the turn mode is Bomb*, and there both agents do send the throw.
+            AgentPrompt::BombRethrow { ref player_id }
+                if g.acting_player.player_action == Some(PlayerAction::PassMove) =>
+            {
+                // Java's `sendMoveAction` computes the offered squares itself
+                // (`freeNeighbours`), because in Java no dialog carried them. `legal_move_targets`
+                // is the Rust engine's own answer to the same question and is what every real
+                // `AgentPrompt::Move` carries.
+                let pid = player_id.clone();
+                let squares = crate::legal_actions::legal_move_targets(g, &pid);
+                match self.mode {
+                    Mode::Deep => self.handle_move_deep(g, f, pid, squares),
+                    _ => self.handle_move(g, f, pid, squares),
+                }
+            }
 
             AgentPrompt::ActivatePlayer { eligible_players } => match self.mode {
                 Mode::Wide | Mode::WideNoBall | Mode::WideNoPass | Mode::WideNoHandOff => self.handle_activate(g, f, eligible_players),

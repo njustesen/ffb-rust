@@ -4037,3 +4037,31 @@ hits this exact branch (norse bb2020 seed 90 i=87). Parity is currently genuine 
 in state and RNG — so both sides land in the same place. Closing it properly needs a new
 `AgentPrompt` (block kind) plus an answer in BOTH agents, for zero measurable gate movement; filed
 rather than done. Only start it if a race turns up where the block kind actually gets *chosen*.
+
+### E10. Rust `find_treacherous_target` hand-rolls a search Java gets from `UtilPlayer`
+
+Found while closing renegades (2026-09-06, `docs/PARITY_RENEGADES_CAMPAIGN.md`). Java
+`StepTreacherous.treacherousTarget` is
+
+```java
+if (!actingPlayer.hasActedIgnoringNegativeTraits() || actingPlayer.justStoodUp()) {
+    return Arrays.stream(UtilPlayer.findAdjacentBlockablePlayers(game, game.getActingTeam(), coord))
+        .filter(p -> UtilPlayer.hasBall(game, p)).findFirst();
+}
+```
+
+Both Rust copies (`step/bb2025/step_treacherous.rs`, the live one, and the DEAD
+`step/bb2020/step_treacherous.rs`) reimplement it inline and drift from it in three places:
+
+1. no `PlayerState::can_be_blocked()` filter (bb2025 twin only — the bb2020 twin has it);
+2. bare `ball_coordinate == pc` instead of `UtilPlayer::has_ball`, which also requires
+   `ballInPlay && !ballMoving`;
+3. `!acting_player.has_acted` where Java derives `hasActedIgnoringNegativeTraits()` (the
+   "stored flag where Java derives" shape), and `acting_player.standing_up` for `justStoodUp()`,
+   which in Java is a three-branch computation involving Jump Up and `currentMove`.
+
+No seed in the renegades campaign distinguishes them, and all three were suspected and then
+DISPROVED as the cause of that campaign's frontier — so this is hygiene, not a known-live bug.
+Fix by calling `UtilPlayer::find_adjacent_blockable_players` + `UtilPlayer::has_ball` and by
+porting `ActingPlayer::has_acted_ignoring_negative_traits` / `just_stood_up`, then re-gate
+renegades bb2020 (the only matchup in the sweep that fields a Treacherous star).

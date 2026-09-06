@@ -91,8 +91,25 @@ impl StepFallDown {
         // AND the ball handling that Java puts OUTSIDE that if/else. This step used to inline the
         // injury half and return no drop parameters, which lost the ball handling exactly as
         // `StepHandleDropPlayerContext` did before it.
+        //
+        // EDITION GATE. This shared file is the live StepFallDown for BOTH bb2020 and bb2025
+        // (`make_step_for` routes only bb2016 away), and the two Java classes differ on exactly
+        // this argument:
+        //     bb2020/move/StepFallDown:88  dropPlayer(this, player, ATTACKER)         // 3-arg → false
+        //     bb2025/move/StepFallDown:88  dropPlayer(this, player, ATTACKER, true)   // 4-arg → true
+        // Hardcoding `true` gave every BB2020 game a Safe Pair of Hands offer Java never raises:
+        // DROPPED_BALL_CARRIER was published, StepPlaceBall showed the dialog, and the heuristic's
+        // useSkill sampler spent TWO draws the Java side never spent — splitting the agents' RNG
+        // streams for the rest of the game (renegades bb2020 seed 38 i=31: the Renegade Human
+        // Thrower home_05, who carries Safe Pair of Hands in bb2020, failed a GFI holding the
+        // ball; Rust `RDRAW cls=skill skill=SafePairOfHands total=84`, Java went straight on, and
+        // the next activation picked a different player from an IDENTICAL candidate list).
+        // Routing the whole step to the bb2020 twin is NOT the fix — that file is staler
+        // (`drop_player` instead of `drop_player_rng`: no Ball & Chain branch, no PlayerFellDown
+        // event). Gate the one argument that differs, per the bb2016/bb2020 campaign lesson.
+        let eligible_for_safe_pair_of_hands = game.rules == ffb_model::enums::Rules::Bb2025;
         let drop_params = drop_player_rng(
-            game, rng, &player_id, true, ApothecaryMode::Attacker,
+            game, rng, &player_id, eligible_for_safe_pair_of_hands, ApothecaryMode::Attacker,
         );
 
         // Java: if (fInjuryType.fallingDownCausesTurnover() && getTurnMode() != PASS_BLOCK)
@@ -176,6 +193,30 @@ mod tests {
                 StepParameter::DroppedBallCarrier(Some(id)) if id == "p1"
             )),
             "a falling ball carrier must publish DROPPED_BALL_CARRIER in bb2025 so StepPlaceBall              can raise the Safe Pair of Hands offer (Java bb2025 StepFallDown:88 passes true)"
+        );
+    }
+
+    /// The BB2020 half of the same Java line. `bb2020/move/StepFallDown:88` calls the THREE-arg
+    /// `dropPlayer(this, player, ATTACKER)`, whose `eligibleForSafePairOfHands` default is FALSE —
+    /// so a BB2020 carrier who falls during a move publishes NO `DROPPED_BALL_CARRIER` and Java
+    /// never raises the Safe Pair of Hands dialog, however many Safe Pair of Hands the roster has.
+    /// (renegades bb2020 seed 38 i=31.)
+    #[test]
+    fn bb2020_falling_carrier_is_not_eligible_for_safe_pair_of_hands() {
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        add_acting_player(&mut game, "p1");
+        let coord = FieldCoordinate::new(5, 5);
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = false;
+
+        let mut step = StepFallDown::new();
+        step.injury_type_name = Some("InjuryTypeDropGFI".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(
+            !out.published.iter().any(|p| matches!(p, StepParameter::DroppedBallCarrier(Some(_)))),
+            "bb2020 uses the 3-arg dropPlayer overload: no Safe Pair of Hands offer"
         );
     }
 
