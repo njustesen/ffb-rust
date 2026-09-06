@@ -4065,3 +4065,26 @@ DISPROVED as the cause of that campaign's frontier — so this is hygiene, not a
 Fix by calling `UtilPlayer::find_adjacent_blockable_players` + `UtilPlayer::has_ball` and by
 porting `ActingPlayer::has_acted_ignoring_negative_traits` / `just_stood_up`, then re-gate
 renegades bb2020 (the only matchup in the sweep that fields a Treacherous star).
+### E11. `StepInitSelecting` has no `CLIENT_HAND_OVER` arm; the give is a fold, not a port
+
+Found while closing skaven (2026-09-06, `docs/PARITY_SKAVEN_CAMPAIGN.md`). Java's
+`StepInitSelecting:260-268` has a `case CLIENT_HAND_OVER` that publishes `TARGET_COORDINATE` and
+re-declares `PlayerAction.HAND_OVER`. Rust has the matching `Action::Pass { coord }` arm but no
+`Action::HandOff` arm at all: it reaches the same state by FOLDING the receiver into
+`ActivatePlayer.block_defender_id` and unpacking it in the dispatch tail's `target_params`.
+
+The skaven fix made the heuristic agent declare the IMMEDIATE `HandOff`/`Pass` form whenever the
+run-up is empty, which is what makes that fold fire, and the nine gates plus twenty closed-roster
+regressions are green on it. But the fold and the port are not the same object: anything that ever
+needs the give to arrive as a separate command after the declaration (a second look at
+INIT_SELECTING, a client-driven flow, deep mode) has nowhere to put it.
+
+Two related loose ends from the same campaign:
+
+* **Deep mode** (`handle_activate_deep`) still declares the move-variant for every give, because its
+  stage-2 candidate carries no route yet (`path: Vec::new()`) and an empty path there does not mean
+  "no run-up". No gate runs deep mode, so there is no evidence either way.
+* `StepEndMoving` pushes `Pass.SequenceParams(gameState)` with a NULL target coordinate, so a give
+  dispatched from `INIT_MOVING` leaves `StepAnimalSavagery.catcherId` null. That is **Java's own
+  behaviour** and must not be "fixed" — recorded here only so the next reader does not re-diagnose
+  it as a Rust bug.

@@ -95,6 +95,45 @@ fn move_variant(pac: PlayerActionChoice) -> PlayerActionChoice {
     }
 }
 
+/// Which `PlayerActionChoice` the WIDE declaration actually sends for a candidate.
+///
+/// Java declares a ball action in **two** commands and the second one arrives while the engine is
+/// still inside `StepInitSelecting`: `ParityRunner.sendConcreteAction:2145` answers a
+/// `HAND_OVER_MOVE` / `PASS_MOVE` declaration with `sendMoveAction`, and `MoveReplay:100` returns
+/// `Verdict.FIRE_TERMINAL` the moment `pathEmpty && !fired && targetOnPitch`. That fires
+/// `CLIENT_HAND_OVER` / `CLIENT_PASS` at phase 2, and `StepInitSelecting:260` answers it by
+/// re-declaring the **immediate** action and publishing `TARGET_COORDINATE` (the receiver's
+/// square).
+///
+/// Rust folds declaration and concrete command into one `ActivatePlayer`, so the fold must make the
+/// same choice. The immediate form is the only one whose bridging (`StepInitSelecting`'s
+/// `target_params`) carries the receiver's square into the pushed Pass sequence, and that square is
+/// what `StepAnimalSavagery.init` resolves its `catcherId` from. Declaring the move-variant with an
+/// empty run-up routed Rust through `StepEndMoving`, which pushes `Pass.SequenceParams(gameState)`
+/// with a NULL target coordinate: a Rat Ogre whose Animal Savagery failed then read
+/// `hitTargetTeamMate == false`, skipped the `USE_ALTERNATE_LABEL` jump to `END_PASSING`, and ran
+/// `StepHandOver` on a catcher the lash-out had just knocked out -- leaving `ballMoving = true`
+/// under a carrier Java still has holding the ball (skaven bb2020 @0 seed 66 i=75; the per-step
+/// state hash cannot see `ballMoving`).
+fn declared_pac(pac: PlayerActionChoice, run_up_empty: bool, has_target: bool) -> PlayerActionChoice {
+    if folds_terminal(pac, run_up_empty, has_target) {
+        pac
+    } else {
+        move_variant(pac)
+    }
+}
+
+/// True when `declared_pac` folded the give/throw into the declaration itself. Java's counterpart
+/// is `ParityRunner`'s `activation.markFired()` on `Verdict.FIRE_TERMINAL`: without the same mark
+/// the plan is still unfired at the move prompt the engine raises once the give has resolved and
+/// the agent would send the SAME hand-off twice, where `MoveReplay` returns `END_PLAYER_ACTION`
+/// (`fired && kind != PICKUP && kind != BLITZ`).
+fn folds_terminal(pac: PlayerActionChoice, run_up_empty: bool, has_target: bool) -> bool {
+    run_up_empty
+        && has_target
+        && matches!(pac, PlayerActionChoice::Pass | PlayerActionChoice::HandOff)
+}
+
 /// Run-up squares a PassMove considers throwing from, besides standing still.
 const THROW_SPOTS: usize = 6;
 /// Squares next to a receiver a HandOverMove considers giving from.
@@ -2372,12 +2411,9 @@ impl HeuristicAgent {
             self.buf.push_note(
                 Action::ActivatePlayer {
                     player_id: c.player.clone(),
-                    // Declare the MOVE-variant for a ball action, as the real Java client does:
-                    // HAND_OVER_MOVE / PASS_MOVE give a movement phase before the give, which is
-                    // what makes carrier-move + give + receiver-move possible in one turn. The
-                    // parity agents keep declaring the immediate form, so their streams are
-                    // untouched.
-                    player_action: move_variant(c.pac),
+                    // `declared_pac` mirrors Java's two-command declaration: the move-variant
+                    // normally, the IMMEDIATE form when the run-up is already empty.
+                    player_action: declared_pac(c.pac, c.path.is_empty(), c.target.is_some()),
                     block_defender_id: c.target.clone(),
                 },
                 c.weight,
@@ -2468,8 +2504,9 @@ impl HeuristicAgent {
                         }
                     }
                     eprintln!(
-                        "RFEAT k={} ball={:?} carried={} carrier={:?}",
-                        self.probe_act, f.ball, f.ball_carried, f.carrier
+                        "RFEAT k={} ball={:?} carried={} carrier={:?} inplay={} moving={}",
+                        self.probe_act, f.ball, f.ball_carried, f.carrier,
+                        g.field_model.ball_in_play, g.field_model.ball_moving
                     );
                     for (i, c) in cands.iter().enumerate() {
                         eprintln!(
@@ -2542,6 +2579,7 @@ impl HeuristicAgent {
         }
         if i < cands.len() {
             let c = cands.swap_remove(i);
+            let run_up_was_empty = c.path.is_empty();
             // The path is walked back HERE, once, for the option that won — see `Candidate::dest`.
             let path = if !c.path.is_empty() {
                 c.path
@@ -2558,12 +2596,20 @@ impl HeuristicAgent {
             } else {
                 Vec::new()
             };
+            // A give/throw whose run-up was empty went out WITH the declaration (see the
+            // immediate-form fold above), which is Java's `Verdict.FIRE_TERMINAL` at phase 2 --
+            // and ParityRunner answers that verdict with `activation.markFired()`. Without the
+            // same mark the plan is still unfired at the move prompt the engine raises after the
+            // give resolves, and the agent sends the SAME hand-off a second time; Java's
+            // `MoveReplay` returns END_PLAYER_ACTION there (`fired && kind != PICKUP && kind !=
+            // BLITZ`).
+            let folded_terminal = folds_terminal(c.pac, run_up_was_empty, c.target.is_some());
             self.plan = Some(Plan {
                 player: c.player.clone(),
                 kind: c.kind,
                 path,
                 delivered: false,
-                fired: false,
+                fired: folded_terminal,
             });
             if std::env::var_os("FFB_BALLMOVE").is_some()
                 && matches!(
@@ -6169,6 +6215,68 @@ mod tests {
     ///    silently costs a draw fewer, and the stream desynchronises from there.
     ///
     /// `cargo test -p ffb-engine --lib agent::heuristic_agent::tests::emit_draw_golden -- --ignored`
+    /// Java declares a give in TWO commands, and `MoveReplay:100` fires the SECOND one
+    /// (`Verdict.FIRE_TERMINAL`) while the engine is still in `StepInitSelecting` as soon as
+    /// `pathEmpty && !fired && targetOnPitch`. `StepInitSelecting:260` answers that
+    /// `CLIENT_HAND_OVER` by re-declaring the IMMEDIATE `PlayerAction.HAND_OVER` and publishing
+    /// `TARGET_COORDINATE`. So: an empty run-up must declare the immediate form (the only one
+    /// whose bridging carries the receiver's square into the Pass sequence), and a non-empty
+    /// run-up must keep the move-variant, because Java's phase 2 then sends `CLIENT_MOVE` and the
+    /// terminal fires later at `INIT_MOVING`.
+    #[test]
+    fn an_empty_run_up_declares_the_immediate_give() {
+        assert_eq!(
+            declared_pac(PlayerActionChoice::HandOff, true, true),
+            PlayerActionChoice::HandOff
+        );
+        assert_eq!(
+            declared_pac(PlayerActionChoice::Pass, true, true),
+            PlayerActionChoice::Pass
+        );
+        assert_eq!(
+            declared_pac(PlayerActionChoice::HandOff, false, true),
+            PlayerActionChoice::HandOffMove
+        );
+        assert_eq!(
+            declared_pac(PlayerActionChoice::Pass, false, true),
+            PlayerActionChoice::PassMove
+        );
+    }
+
+    /// A targetless ball declaration must NOT collapse to the immediate form: `StepInitSelecting`
+    /// deselects a HAND_OVER / PASS / THROW_BOMB dispatch whose `defender_id` is `None`, which is
+    /// Java's "the coach has no square to click" behaviour. Keeping the move-variant leaves the
+    /// declaration where a later prompt can still supply the target.
+    #[test]
+    fn a_targetless_ball_declaration_keeps_the_move_variant() {
+        assert_eq!(
+            declared_pac(PlayerActionChoice::HandOff, true, false),
+            PlayerActionChoice::HandOffMove
+        );
+        assert!(!folds_terminal(PlayerActionChoice::HandOff, true, false));
+    }
+
+    /// Only the two ball actions have a move-variant to collapse; everything else declares itself
+    /// and never counts as a folded terminal (marking a plain Move or a Blitz `fired` would end
+    /// the activation before it moved).
+    #[test]
+    fn only_ball_actions_fold_their_terminal() {
+        assert!(folds_terminal(PlayerActionChoice::HandOff, true, true));
+        assert!(folds_terminal(PlayerActionChoice::Pass, true, true));
+        assert!(!folds_terminal(PlayerActionChoice::Move, true, true));
+        assert!(!folds_terminal(PlayerActionChoice::Blitz, true, true));
+        assert!(!folds_terminal(PlayerActionChoice::Foul, true, true));
+        assert!(!folds_terminal(PlayerActionChoice::HandOff, false, true));
+        assert_eq!(
+            declared_pac(PlayerActionChoice::Move, true, true),
+            PlayerActionChoice::Move
+        );
+        assert_eq!(
+            declared_pac(PlayerActionChoice::Blitz, true, true),
+            PlayerActionChoice::Blitz
+        );
+    }
+
     /// The two turn guards the random contract has always applied, mirrored from
     /// `ParityRunner`'s INIT_SELECTING arm: a team whose turn counter is still 0 does not act, and
     /// a non-REGULAR turn mode allows exactly ONE activation.

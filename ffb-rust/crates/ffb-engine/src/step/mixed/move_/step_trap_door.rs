@@ -69,6 +69,21 @@ impl StepTrapDoor {
             None => return StepOutcome::next(),
         };
 
+        // Java `StepTrapDoor.executeStep:104`:
+        //   boolean hasBall = thrownPlayerHasBall == null ? UtilPlayer.hasBall(game, player)
+        //                                                 : thrownPlayerHasBall;
+        // It is read HERE, while the player is still on the pitch. Rust used to recompute it
+        // inside the parameter builder AFTER `remove_player`, where `player_coordinate` is `None`
+        // and the comparison is always false -- so a carrier who fell through published neither
+        // SCATTER_BALL nor END_TURN, and the ball was left sitting, un-bounced and still counted
+        // as carried, on the trap-door square (skaven bb2020 @1e6 seed 93 i=54: Java bounced it
+        // with a d8 at rng 93 and the ball ended at (7,0); Rust rolled nothing and left it at
+        // (6,1)). Bare coordinate equality was wrong too - Java's `UtilPlayer.hasBall` is
+        // `ballInPlay && !ballMoving && coords equal`.
+        let has_ball = self.thrown_player_has_ball.unwrap_or_else(|| {
+            ffb_model::util::util_player::UtilPlayer::has_ball(game, &player_id)
+        });
+
         // Java: if (!isOnTrapDoor(fieldModel, playerCoordinate)) { nextStep; return; }
         if !game.field_model.has_trap_door(player_coord) {
             return StepOutcome::next();
@@ -84,7 +99,7 @@ impl StepTrapDoor {
                     false
                 };
                 if !did_reroll {
-                    return self.trap_door_triggered(game, rng, player_id, player_coord);
+                    return self.trap_door_triggered(game, rng, player_id, player_coord, has_ball);
                 }
                 // fall through to roll again
             }
@@ -112,9 +127,15 @@ impl StepTrapDoor {
         // Java: else if (getReRolledAction() != null || !UtilServerReRoll.askForReRollIfAvailable(...))
         if self.re_roll_state.re_rolled_action.is_some() {
             // already re-rolled once — fall through the trap door
+            //
+            // `trap_door_triggered` IS Java's `trapDoorTriggered`: it publishes INJURY_RESULT and,
+            // for a carrier, SCATTER_BALL + END_TURN. Only its EVENTS used to be carried over
+            // here, and the parameters were rebuilt from a board the call had already emptied, so
+            // every one of those publishes was lost. Merge what the call actually produced.
+            let triggered = self.trap_door_triggered(game, rng, player_id, player_coord, has_ball);
             return outcome_base
-                .with_events(self.trap_door_triggered(game, rng, player_id, player_coord).events)
-                .with_published(self.trap_door_triggered_params(game, player_coord));
+                .with_events(triggered.events)
+                .with_published(triggered.published);
         }
 
         // Offer a re-roll if one is available.
@@ -157,18 +178,17 @@ impl StepTrapDoor {
         // the injury, so Rust came out TWO DICE short of Java for every trapdoor fall that was not
         // re-rolled (nippon bb2020 seed 29 i=52: R52 vs J54). The re-rolled branch above already
         // calls `trap_door_triggered`; this one has to as well.
-        let mut outcome = outcome_base;
-        let triggered = self.trap_door_triggered(game, rng, player_id.clone(), player_coord);
-        outcome = outcome.with_events(triggered.events);
-        for p in self.trap_door_triggered_params(game, player_coord) {
-            outcome = outcome.publish(p);
-        }
-        game.field_model.remove_player(&player_id);
-        outcome
+        // Same merge as the re-rolled branch above: take the events AND the published parameters
+        // the call produced, and do not rebuild them - or remove the player a second time - from a
+        // board it has already changed.
+        let triggered = self.trap_door_triggered(game, rng, player_id, player_coord, has_ball);
+        outcome_base
+            .with_events(triggered.events)
+            .with_published(triggered.published)
     }
 
     /// Java: `trapDoorTriggered` — apply injury, remove player, scatter ball if needed.
-    fn trap_door_triggered(&mut self, game: &mut Game, rng: &mut GameRng, player_id: String, coord: FieldCoordinate) -> StepOutcome {
+    fn trap_door_triggered(&mut self, game: &mut Game, rng: &mut GameRng, player_id: String, coord: FieldCoordinate, has_ball: bool) -> StepOutcome {
         // Java: eligibleForSpp = playerWasPushed && attacker != null && prayerState.hasFanInteraction(attacker.getTeam())
         let attacker_id = game.acting_player.player_id.clone();
         let eligible_for_spp = self.player_was_pushed
@@ -199,7 +219,7 @@ impl StepTrapDoor {
         // trap-door casualty came out as `Reserve` where Java has `Injured` — wood_elf bb2020
         // seed 50 i=300, `h05`, on identical dice (injury 5+5, casualty d16=1/d6=5).
         let mut outcome = StepOutcome::next().publish(StepParameter::InjuryResult(Box::new(ir)));
-        for p in self.trap_door_triggered_params(game, coord) {
+        for p in self.trap_door_triggered_params(game, has_ball) {
             outcome = outcome.publish(p);
         }
         // Java: game.getFieldModel().remove(player)
@@ -208,17 +228,12 @@ impl StepTrapDoor {
     }
 
     /// Build the parameters to publish when the trap door triggers.
-    fn trap_door_triggered_params(&self, game: &Game, coord: FieldCoordinate) -> Vec<StepParameter> {
+    fn trap_door_triggered_params(&self, game: &Game, has_ball: bool) -> Vec<StepParameter> {
         let mut params = Vec::new();
         let player_id = match self.player_id.clone() {
             Some(id) => id,
             None => return params,
         };
-
-        let has_ball = self.thrown_player_has_ball.unwrap_or_else(|| {
-            // Java: UtilPlayer.hasBall(game, player)
-            game.field_model.ball_coordinate == game.field_model.player_coordinate(&player_id)
-        });
 
         if has_ball {
             params.push(StepParameter::CatchScatterThrowInMode(
@@ -345,6 +360,62 @@ mod tests {
         );
     }
 
+    /// Java `trapDoorTriggered` (StepTrapDoor.java:133-140) reads `hasBall` at the TOP of
+    /// `executeStep`, while the victim is still on the pitch, and then publishes
+    /// `CATCH_SCATTER_THROW_IN_MODE = SCATTER_BALL` plus, for a player of the acting team,
+    /// `END_TURN = true`. Rust computed `hasBall` in the parameter builder AFTER `remove_player`
+    /// had already taken the victim off the board, so it was always false and BOTH publishes were
+    /// lost: the ball stayed on the trap-door square, un-bounced and still counted as carried
+    /// (skaven bb2020 @1e6 seed 93 i=54 - Java's d8 bounce at rng 93 had no Rust counterpart).
+    #[test]
+    fn a_carrier_who_falls_through_scatters_the_ball_and_ends_the_turn() {
+        let trap = FieldCoordinate::new(6, 1);
+        let mut game = make_game();
+        game.home_playing = true;
+        game.field_model.add_trap_door(trap);
+        // The victim must be ON the acting team for Java's END_TURN branch to apply.
+        let carrier = String::from("carrier");
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: carrier.clone(), name: carrier.clone(), nr: 1,
+            position_id: "lineman".into(),
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate(&carrier, trap);
+        game.field_model.ball_coordinate = Some(trap);
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = false;
+
+        let mut step = StepTrapDoor::new();
+        step.player_id = Some(carrier.clone());
+        // No re-roll is available on a bare test team, so a roll of 1 falls straight through.
+        // Pick the first seed whose leading d6 is a 1 rather than hard-coding one.
+        let seed = (0u64..1000).find(|&n| GameRng::new(n).d6() == 1)
+            .expect("some seed rolls a 1");
+        let mut rng = GameRng::new(seed);
+        let out = step.start(&mut game, &mut rng);
+
+        let fell = out.events.iter().any(|e| matches!(
+            e, ffb_model::events::GameEvent::TrapDoor { escaped: false, .. }));
+        assert!(fell, "the fixture must fail the trap-door roll; got {:?}", out.events);
+        assert!(
+            out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))),
+            "the injury must be published for the APOTHECARY(TRAP_DOOR) step, got {:?}",
+            out.published);
+        assert!(
+            out.published.iter().any(|p| matches!(
+                p,
+                StepParameter::CatchScatterThrowInMode(
+                    ffb_model::model::catch_scatter_throw_in_mode::CatchScatterThrowInMode::ScatterBall
+                ))),
+            "a carrier who falls through must publish SCATTER_BALL, got {:?}",
+            out.published);
+        assert!(
+            out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "an ACTING-team carrier who falls through must publish END_TURN, got {:?}",
+            out.published);
+    }
+
     #[test]
     fn no_player_id_returns_next() {
         let mut step = StepTrapDoor::new();
@@ -449,7 +520,7 @@ mod tests {
         game.field_model.trap_doors.push(coord);
 
         let out = step.trap_door_triggered(
-            &mut game, &mut GameRng::new(3), "p1".into(), coord);
+            &mut game, &mut GameRng::new(3), "p1".into(), coord, false);
 
         assert!(
             out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))),
