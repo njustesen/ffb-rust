@@ -4107,3 +4107,8 @@ Consequence: **slann's nine green gates are not evidence about Leap in any editi
 will wood_elf's or slann_fumbbl's be. Closing this needs a `Jump` arm in `Reach`/the candidate
 builder on BOTH agents, with the cross-language goldens updated deliberately — it is an
 agent-capability item, not a parity red.
+
+**Confirmed again on slann_fumbbl (2026-09-06):** `jumpRoll` is ZERO in all three
+`docs/EVENT_COVERAGE_slann_fumbbl_*.md` harvests too — another 300 games with Leap on the pitch
+and not one jump declared. That is 600 games of evidence that this is an agent gap, not a dice
+accident.
