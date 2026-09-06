@@ -243,10 +243,157 @@ public final class ActivationDriver {
 
         MoveReplay.Verdict v = MoveReplay.decide(kind, isMine, pathEmpty,
             plan != null && plan.delivered, plan != null && plan.fired, facts);
+        // BACKLOG E12 -- the LEAP arm, layered on top of DELIVER_PATH exactly as Rust's
+        // `handle_move` layers it. A jump is a SEPARATE command that has to reach the engine
+        // BEFORE the move (ClientCommandActingPlayer(pid, action, jumping = true), then
+        // ClientCommandMove), because it is what makes the distance-2 square legal at all. So the
+        // path is NOT delivered on this prompt: the first step is dropped -- it is the square the
+        // jump flies over -- and the next prompt, with `isJumping()` set and the jump squares
+        // offered, delivers a path whose head is now the LANDING square.
+        if (v == MoveReplay.Verdict.DELIVER_PATH && ap != null && !ap.isJumping()
+                && jumpOverFirstStep(game, playerId, plan.path)) {
+            plan.path.remove(0);
+            return MoveReplay.Verdict.DECLARE_JUMP;
+        }
         if (v == MoveReplay.Verdict.END_PLAYER_ACTION) {
             plan = null;
         }
         return v;
+    }
+
+    /**
+     * Opposing tackle zones on {@code coord}, from {@code moverId}'s point of view.
+     *
+     * <p>{@code UtilPlayer.findAdjacentPlayersWithTacklezones(game, otherTeam, coord, false)} --
+     * the same call {@code DodgeModifierFactory} and {@code JumpModifierFactory} both count with.
+     * Rust {@code tz_on}.
+     */
+    private static int tzOn(Game game, String moverId, FieldCoordinate coord) {
+        Player<?> mover = game.getPlayerById(moverId);
+        if (mover == null || coord == null) {
+            return 0;
+        }
+        com.fumbbl.ffb.model.Team other = com.fumbbl.ffb.util.UtilPlayer.findOtherTeam(game, mover);
+        return com.fumbbl.ffb.util.UtilPlayer
+            .findAdjacentPlayersWithTacklezones(game, other, coord, false).length;
+    }
+
+    /**
+     * Is an opposing player who could Diving Tackle a jump standing next to {@code coord}?
+     *
+     * <p>A deliberately WIDE reading of the engine's own predicate: BB2025 uses
+     * {@code UtilPlayer.findEligibleDivingTacklers(from, to, ...)} and BB2020
+     * {@code findAdjacentOpposingPlayersWithProperty(from, canAttemptToTackleJumpingPlayer, true)}.
+     * This asks the simpler question both are a subset of, so the two agents cannot disagree about
+     * which edition's predicate applies. Rust {@code adjacent_diving_tackler}.
+     */
+    private static boolean adjacentDivingTackler(Game game, String moverId, FieldCoordinate coord) {
+        Player<?> mover = game.getPlayerById(moverId);
+        if (mover == null || coord == null) {
+            return false;
+        }
+        com.fumbbl.ffb.model.Team other = com.fumbbl.ffb.util.UtilPlayer.findOtherTeam(game, mover);
+        for (Player<?> p : com.fumbbl.ffb.util.UtilPlayer
+                .findAdjacentPlayersWithTacklezones(game, other, coord, false)) {
+            if (p != null && p.hasSkillProperty(
+                    com.fumbbl.ffb.model.property.NamedProperties.canAttemptToTackleJumpingPlayer)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Should the mover LEAP the first step of its planned path? Rust {@code jump_over_first_step}.
+     *
+     * <p>A jump is a SINGLE move command that travels two squares and costs two movement
+     * ({@code StepMove}: {@code currentMove + (isJumping() ? 2 : 1)}), so it replaces the first TWO
+     * steps of the path with one roll that ignores the tackle zone it is leaving. It is worth
+     * considering exactly when the path has at least two steps left, the second of them is two
+     * steps from where the mover stands, and the mover is MARKED -- an unmarked walk costs no roll
+     * at all, so jumping out of it can only lose.
+     *
+     * <p>Gated on the mover actually carrying <b>Leap</b>: BB2020/BB2025 also let anyone jump OVER
+     * a downed player, but that half needs a prone raster the agent does not have. Recorded in
+     * BACKLOG E12 as the remaining half.
+     */
+    private static boolean jumpOverFirstStep(Game game, String playerId,
+            List<FieldCoordinate> path) {
+        if (path == null || path.size() < 2) {
+            return false;
+        }
+        FieldCoordinate here = coordOf(game, playerId);
+        FieldCoordinate dest = path.get(1);
+        if (here == null || dest == null || here.distanceInSteps(dest) != 2) {
+            return false;
+        }
+        Player<?> player = game.getPlayerById(playerId);
+        if (player == null
+                || !player.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canLeap)) {
+            return false;
+        }
+        // The engine's own two gates, so the agent never proposes a jump the engine would refuse:
+        // canStillJump + the movement budget a jump spends two of, and isValidJump(from, to).
+        com.fumbbl.ffb.mechanics.JumpMechanic mechanic =
+            (com.fumbbl.ffb.mechanics.JumpMechanic) game
+                .getFactory(com.fumbbl.ffb.FactoryType.Factory.MECHANIC)
+                .forName(com.fumbbl.ffb.mechanics.Mechanic.Type.JUMP.name());
+        if (mechanic == null
+                || !mechanic.canStillJump(game, game.getActingPlayer())
+                || !com.fumbbl.ffb.util.UtilPlayer.isNextMovePossible(game, true)
+                || !mechanic.isValidJump(game, player, here, dest)) {
+            return false;
+        }
+
+        int tzHere = tzOn(game, playerId, here);
+        if (tzHere == 0) {
+            return false;
+        }
+        // Do not leap where a Diving Tackle can reach the jump. Two reasons, and the second is the
+        // load-bearing one:
+        //
+        //  * On its own terms it is right: a leap a Diving Tackler can flip is worth less than the
+        //    comparison below prices it, because the +2 is applied AFTER the roll is known.
+        //  * `StepJump.checkDivingTackle` is NOT ported to Rust (BACKLOG E12). In Java a
+        //    SUCCESSFUL BB2025 jump next to an eligible Diving Tackler re-opens the roll, and
+        //    BB2020's raises the DIVING_TACKLE player choice instead; Rust's `StepJump` does
+        //    neither, so a jump into that situation desynchronises the engines (slann bb2025 seed
+        //    84). Until that chain is ported the agent must not create the situation.
+        if (adjacentDivingTackler(game, playerId, here)
+                || adjacentDivingTackler(game, playerId, dest)) {
+            return false;
+        }
+        FieldCoordinate mid = path.get(0);
+        int tzMid = tzOn(game, playerId, mid);
+        int tzDest = tzOn(game, playerId, dest);
+        int ag = player.getAgilityWithModifiers();
+        boolean bb2016 = editionIsBb2016(game);
+        boolean hasDodge = hasSkillOn(player, "Dodge");
+        // The two ordinary steps the jump replaces. Only a step that LEAVES a marked square dodges.
+        float pWalk = stepP(bb2016, ag, hasDodge, true, tzMid) * stepP(bb2016, ag, hasDodge,
+            tzMid > 0, tzDest);
+        boolean vll = hasSkillOn(player, "Very Long Legs");
+        float pJump = Reach.pRoll(
+            Reach.jumpTarget(bb2016, editionIsBb2025(game), ag, tzHere, tzDest, vll, true));
+        return pJump > pWalk;
+    }
+
+    /** One ordinary walking step's success chance, as {@code jumpOverFirstStep} prices it. */
+    private static float stepP(boolean bb2016, int ag, boolean hasDodge, boolean leaving,
+            int tzTo) {
+        if (!leaving) {
+            return 1.0f;
+        }
+        float raw = Reach.pRoll(Reach.dodgeTarget(bb2016, ag, tzTo));
+        return hasDodge ? Reach.pWithReRoll(raw, 1.0f) : raw;
+    }
+
+    /** BB2025 is told apart the same way {@link #editionIsBb2016} tells BB2016 apart. */
+    private static boolean editionIsBb2025(Game game) {
+        com.fumbbl.ffb.mechanics.Mechanic m = (com.fumbbl.ffb.mechanics.Mechanic) game
+            .getFactory(com.fumbbl.ffb.FactoryType.Factory.MECHANIC)
+            .forName(com.fumbbl.ffb.mechanics.Mechanic.Type.AGILITY.name());
+        return m != null && m.getClass().getName().contains("bb2025");
     }
 
     /**

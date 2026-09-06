@@ -182,6 +182,164 @@ fn dodge_target(rules: Rules, ag: i32, tz_on_dest: i32) -> i32 {
     }
 }
 
+/// The d6 target for a JUMP, `AgilityMechanic.minimumRollJump` with the jump modifiers.
+///
+/// BB2016's `JumpModifierCollection` is EMPTY, so nothing but the mutation's own
+/// `JumpModifier("Very Long Legs", -1, REGULAR)` can apply: the roll is INDEPENDENT of tackle
+/// zones, which is the whole reason a leap beats a dodge when the mover is marked.
+///
+/// BB2020/BB2025 (`modifiers.mixed.JumpModifierCollection` + `factory.mixed.JumpModifierFactory`)
+/// add `max(TZ at from, TZ at to)` — `numberOfTacklezones` takes the MAXIMUM of the two ends, not
+/// the destination alone as a dodge does. Very Long Legs is `REGULAR` in BB2025 (always in the
+/// set) but `DEPENDS_ON_SUM_OF_OTHERS` in BB2020 (`accumulated > 1`); Leap's own -1 is
+/// `DEPENDS_ON_SUM_OF_OTHERS` in both, applying at `accumulated > 1 || (accumulated > 0 && count > 1)`.
+///
+/// Prehensile Tail is NOT modelled here: the agent has no prone/tail raster, and the term is worth
+/// at most +1. This is the agent's price, not the engine's roll — it only has to be the SAME
+/// price in both languages (`Reach.jumpTarget`).
+#[inline]
+fn jump_target(rules: Rules, ag: i32, tz_from: i32, tz_to: i32, vll: bool, leap: bool) -> i32 {
+    if rules == Rules::Bb2016 {
+        return ((7 - ag.min(6)) + if vll { -1 } else { 0 }).max(2);
+    }
+    let mut acc = tz_from.max(tz_to);
+    let mut count = if acc > 0 { 1 } else { 0 };
+    if rules == Rules::Bb2025 && vll {
+        // REGULAR: part of the set the sum AND the count are taken from.
+        acc -= 1;
+        count += 1;
+    } else if vll && acc > 1 {
+        // BB2020 makes it DEPENDS_ON_SUM_OF_OTHERS. A dependent modifier mutates the running sum
+        // (`context.addModifierValue`) but NOT the count, and the next dependent one sees the
+        // reduced sum — which is why BB2020's Leap and Very Long Legs never both fire off a
+        // single +2.
+        acc -= 1;
+    }
+    if leap && (acc > 1 || (acc > 0 && count > 1)) {
+        acc -= 1;
+    }
+    (ag + acc).max(2)
+}
+
+/// Opposing tackle zones on `coord`, from `mover_id`'s point of view.
+///
+/// Java `UtilPlayer.findAdjacentPlayersWithTacklezones(game, otherTeam, coord, false).length`, the
+/// same call `DodgeModifierFactory` and `JumpModifierFactory` both count with.
+fn tz_on(g: &Game, mover_id: &str, coord: FieldCoordinate) -> i32 {
+    use ffb_model::util::util_player::UtilPlayer;
+    let other = UtilPlayer::find_other_team(g, mover_id);
+    UtilPlayer::find_adjacent_players_with_tacklezones(g, other, coord, false).len() as i32
+}
+
+/// Is an opposing player who could Diving Tackle a jump standing next to `coord`?
+///
+/// A deliberately WIDE reading of the engine's own predicate: BB2025 uses
+/// `UtilPlayer.findEligibleDivingTacklers(from, to, ...)` and BB2020
+/// `findAdjacentOpposingPlayersWithProperty(from, canAttemptToTackleJumpingPlayer, true)`. This
+/// asks the simpler question both are a subset of, so the two agents cannot disagree about which
+/// edition's predicate applies. Java twin: `ActivationDriver.adjacentDivingTackler`.
+fn adjacent_diving_tackler(g: &Game, mover_id: &str, coord: FieldCoordinate) -> bool {
+    use ffb_model::model::property::named_properties::NamedProperties;
+    use ffb_model::util::util_player::UtilPlayer;
+    let other = UtilPlayer::find_other_team(g, mover_id);
+    UtilPlayer::find_adjacent_players_with_tacklezones(g, other, coord, false)
+        .iter()
+        .any(|id| g.player(id.as_str())
+            // EDITION-AWARE, and it has to be: `bb2016.DivingTackle` registers only
+            // `canAttemptToTackleDodgingPlayer`, so a BB2016 Diving Tackler cannot touch a jump at
+            // all. The edition-agnostic `has_skill_property` reads the UNION and answered true,
+            // which stopped every BB2016 slann leap the Java agent still took (slann bb2016 @1.0
+            // 100/100 -> 95/100).
+            .map(|p| p.has_skill_property_in(
+                g.rules, NamedProperties::CAN_ATTEMPT_TO_TACKLE_JUMPING_PLAYER))
+            .unwrap_or(false))
+}
+
+/// Should the mover LEAP the first step of its planned path? (BACKLOG E12.)
+///
+/// A jump is a SINGLE move command that travels two squares and costs two movement
+/// (`StepMove`: `currentMove + (isJumping() ? 2 : 1)`), so it replaces the first TWO steps of the
+/// path with one roll that ignores the tackle zone it is leaving. It is therefore worth
+/// considering exactly when the path has at least two steps left, the second of them is two steps
+/// from where the mover stands, and the mover is MARKED — an unmarked walk costs no roll at all,
+/// so jumping out of it can only lose.
+///
+/// The arm is gated on the mover actually carrying **Leap**: BB2020/BB2025 also let anyone jump
+/// OVER a downed player, but that half needs a prone raster the agent does not have, and the
+/// engine's own BB2025 `isValidJump` had the prone-path term stubbed out until this change set.
+/// Recorded in BACKLOG E12 as the remaining half.
+///
+/// Both engines' agents run this identical function; the Java twin is
+/// `ActivationDriver.jumpOverFirstStep`.
+fn jump_over_first_step(g: &Game, player_id: &str, path: &[FieldCoordinate]) -> bool {
+    use ffb_mechanics::jump_mechanic::JumpMechanic as _;
+    use ffb_model::model::property::named_properties::NamedProperties;
+    use ffb_model::util::util_player::UtilPlayer;
+
+    if path.len() < 2 {
+        return false;
+    }
+    let Some(here) = g.field_model.player_coordinate(player_id) else { return false };
+    let dest = path[1];
+    if here.distance_in_steps(dest) != 2 {
+        return false;
+    }
+    let Some(player) = g.player(player_id) else { return false };
+    if !player.has_skill_property(NamedProperties::CAN_LEAP) {
+        return false;
+    }
+    // The engine's own two gates, so the agent never proposes a jump the engine would refuse:
+    // `JumpMechanic.isAvailableAsNextMove(game, actingPlayer, true)` (canStillJump + the movement
+    // budget, which a jump spends two of) and `isValidJump(from, to)`.
+    let mechanic = crate::mechanic::jump_mechanic_for(g.rules);
+    if !mechanic.can_still_jump(g, &g.acting_player) {
+        return false;
+    }
+    if !UtilPlayer::is_next_move_possible(g, true) {
+        return false;
+    }
+    if !mechanic.is_valid_jump(g, player, here, dest) {
+        return false;
+    }
+
+    let tz_here = tz_on(g, player_id, here);
+    if tz_here == 0 {
+        return false;
+    }
+    // Do not leap where a Diving Tackle can reach the jump. Two reasons, and the second is the
+    // load-bearing one:
+    //
+    //  * On its own terms it is right: a leap a Diving Tackler can flip is worth less than the
+    //    comparison below prices it, because the +2 is applied AFTER the roll is known.
+    //  * `StepJump.checkDivingTackle` is NOT ported to Rust (BACKLOG E12). In Java a SUCCESSFUL
+    //    BB2025 jump next to an eligible Diving Tackler re-opens the roll — the same pre-emptive
+    //    "Diving Tackle can make this jump fail. Reroll the jump now?" offer `StepMoveDodge` makes
+    //    for a dodge — and BB2020's raises the DIVING_TACKLE player choice instead. Rust's
+    //    `StepJump` does neither, so a jump into that situation desynchronises the engines
+    //    (slann bb2025 seed 84: Java re-rolls a jump Rust lets stand). Until that chain is ported
+    //    the agent must not create the situation.
+    if adjacent_diving_tackler(g, player_id, here) || adjacent_diving_tackler(g, player_id, dest) {
+        return false;
+    }
+    let mid = path[0];
+    let tz_mid = tz_on(g, player_id, mid);
+    let tz_dest = tz_on(g, player_id, dest);
+    let ag = player.agility_with_modifiers();
+    let has_dodge = player.has_skill(SkillId::Dodge);
+    let step = |leaving: bool, tz_to: i32| -> f32 {
+        if !leaving {
+            return 1.0;
+        }
+        let raw = p_roll(dodge_target(g.rules, ag, tz_to));
+        if has_dodge { p_with_reroll(raw, 1.0) } else { raw }
+    };
+    // The two ordinary steps the jump replaces. Only a step that LEAVES a marked square dodges.
+    let p_walk = step(true, tz_mid) * step(tz_mid > 0, tz_dest);
+    let vll = player.has_skill(SkillId::VeryLongLegs);
+    let p_jump = p_roll(jump_target(g.rules, ag, tz_here, tz_dest, vll, true));
+    p_jump > p_walk
+}
+
 /// `GoForItModifierFactory::minimum_roll_going_for_it` — base 2, **Blizzard +1 in every edition**.
 #[inline]
 fn gfi_target(weather: Weather) -> i32 {
@@ -2110,6 +2268,20 @@ impl HeuristicAgent {
             );
             match verdict {
                 Replay::DeliverPath => {
+                    // BACKLOG E12 — the LEAP arm. A jump is a SEPARATE command that has to reach
+                    // the engine BEFORE the move (Java: `ClientCommandActingPlayer(pid, action,
+                    // jumping = true)`, then `ClientCommandMove`), because it is what makes the
+                    // distance-2 square legal in the first place. So this returns without a path:
+                    // the engine re-emits the move prompt with the jump squares, and the very next
+                    // call delivers `path` — whose head is now the LANDING square, the first step
+                    // having been dropped as the one the jump flies over.
+                    if !g.acting_player.jumping
+                        && jump_over_first_step(g, &player_id, &pl.path)
+                    {
+                        pl.path.remove(0);
+                        self.plan = Some(pl);
+                        return Action::DeclareJump;
+                    }
                     let path = std::mem::take(&mut pl.path);
                     pl.delivered = true;
                     self.plan = Some(pl);
@@ -4570,6 +4742,69 @@ mod tests {
         assert!((p_roll(2) - 0.8333).abs() < 1e-3);
         assert!((p_roll(4) - 0.5).abs() < 1e-3);
         assert!((p_roll(6) - 0.1667).abs() < 1e-3);
+    }
+
+    /// BACKLOG E12, written FROM the two Java skill classes: `skill/mixed/DivingTackle`
+    /// (BB2020 + BB2025) registers BOTH `canAttemptToTackleDodgingPlayer` and
+    /// `canAttemptToTackleJumpingPlayer`, while `skill/bb2016/DivingTackle` registers only the
+    /// DODGING one. A BB2016 Diving Tackler therefore cannot touch a jump, and the agent must not
+    /// refuse to leap next to one.
+    #[test]
+    fn diving_tackle_only_reaches_a_jump_from_bb2020_on() {
+        use ffb_model::enums::SkillId;
+        for (rules, expected) in [
+            (Rules::Bb2016, false),
+            (Rules::Bb2020, true),
+            (Rules::Bb2025, true),
+        ] {
+            assert_eq!(
+                SkillId::DivingTackle.properties_for(rules)
+                    .contains(&ffb_model::model::property::named_properties::NamedProperties::CAN_ATTEMPT_TO_TACKLE_JUMPING_PLAYER),
+                expected,
+                "{rules:?}");
+        }
+    }
+
+    /// BACKLOG E12. Written FROM the Java modifier classes, not from the Rust:
+    ///
+    /// * `bb2016.JumpModifierCollection` is EMPTY and `bb2016.AgilityMechanic.minimumRollJump` is
+    ///   `max(2, getAgilityRollBase(ag) + modifiers)`, so an AG3 leaper needs a 4+ no matter how
+    ///   many opponents mark it — one worse than the same player's UNMARKED dodge (which gets
+    ///   Dodge's own +1) and far better than its MARKED one.
+    /// * `bb2016.VeryLongLegs` registers a plain `REGULAR` -1, so it always applies.
+    /// * `mixed.JumpModifierFactory.numberOfTacklezones` is `max(from, to)` — NOT the destination
+    ///   alone, which is what a dodge counts.
+    /// * `bb2025.VeryLongLegs` is `REGULAR` (always), `bb2020.VeryLongLegs` is
+    ///   `DEPENDS_ON_SUM_OF_OTHERS` with `accumulated > 1`.
+    /// * `Leap` is `DEPENDS_ON_SUM_OF_OTHERS` in both, at
+    ///   `accumulated > 1 || (accumulated > 0 && count > 1)`.
+    #[test]
+    fn jump_target_follows_the_edition_modifiers() {
+        // BB2016: tackle zones do not touch the jump roll at all.
+        assert_eq!(jump_target(Rules::Bb2016, 3, 0, 0, false, true), 4);
+        assert_eq!(jump_target(Rules::Bb2016, 3, 3, 2, false, true), 4);
+        // ... and Very Long Legs is an unconditional -1 there.
+        assert_eq!(jump_target(Rules::Bb2016, 3, 3, 2, true, true), 3);
+
+        // BB2025 AG3, unmarked at both ends: the bare agility target, no Leap bonus (nothing to
+        // depend on).
+        assert_eq!(jump_target(Rules::Bb2025, 3, 0, 0, false, true), 3);
+        // Marked once at the far end only: max(0, 1) = +1, still no Leap bonus (acc == 1, count 1).
+        assert_eq!(jump_target(Rules::Bb2025, 3, 0, 1, false, true), 4);
+        // Marked twice: acc == 2 > 1, so Leap's -1 fires.
+        assert_eq!(jump_target(Rules::Bb2025, 3, 2, 0, false, true), 4);
+        // BB2025 Very Long Legs applies at once and CANCELS the single tackle zone, which then
+        // leaves Leap nothing to depend on (accumulated 0), so the target is the bare agility.
+        assert_eq!(jump_target(Rules::Bb2025, 3, 1, 0, true, true), 3);
+        // BB2020 Very Long Legs needs accumulated > 1 first, so a single tackle zone gets nothing.
+        assert_eq!(jump_target(Rules::Bb2020, 3, 1, 0, true, true), 4);
+        // Two tackle zones: Very Long Legs applies and takes the sum to 1, at which point Leap's
+        // own condition (`acc > 1`, or `acc > 0 && count > 1` — the count is still 1, because a
+        // dependent modifier does not raise it) is FALSE. Exactly ONE of the two -1s fires. This
+        // golden moved deliberately: it was 3, from a model that applied both.
+        assert_eq!(jump_target(Rules::Bb2020, 3, 2, 0, true, true), 4);
+        // The floor is 2, as `Math.max(2, ...)`.
+        assert_eq!(jump_target(Rules::Bb2025, 1, 0, 0, true, true), 2);
     }
 
     /// D1: the GFI target is 3+ in a Blizzard, in EVERY edition.

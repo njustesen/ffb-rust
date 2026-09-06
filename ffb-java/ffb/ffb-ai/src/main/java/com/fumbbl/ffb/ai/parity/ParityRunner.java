@@ -3017,6 +3017,54 @@ public class ParityRunner {
         return targets;
     }
 
+    /**
+     * The squares a player who has DECLARED a jump may land on: empty, on pitch, within two steps,
+     * and accepted by the edition's {@code JumpMechanic.isValidJump}.
+     *
+     * <p>Java: the {@code steps = jumping ? 2 : 1} arm of
+     * {@code UtilServerPlayerMove.updateMoveSquares} plus {@code addMoveSquare}'s
+     * {@code if (jumping && !jumpMechanic.isValidJump(...)) return;} guard. Rust
+     * {@code legal_actions::jump_move_targets}, which the Rust engine offers at the same prompt.
+     */
+    private static List<FieldCoordinate> jumpTargets(Game game, String playerId,
+            FieldCoordinate start) {
+        com.fumbbl.ffb.model.Player<?> player = game.getPlayerById(playerId);
+        List<FieldCoordinate> targets = new ArrayList<>();
+        if (player == null) {
+            return targets;
+        }
+        com.fumbbl.ffb.mechanics.JumpMechanic mechanic =
+            (com.fumbbl.ffb.mechanics.JumpMechanic) game
+                .getFactory(com.fumbbl.ffb.FactoryType.Factory.MECHANIC)
+                .forName(com.fumbbl.ffb.mechanics.Mechanic.Type.JUMP.name());
+        if (mechanic == null) {
+            return targets;
+        }
+        com.fumbbl.ffb.model.FieldModel fm = game.getFieldModel();
+        for (int dy = -2; dy <= 2; dy++) {
+            for (int dx = -2; dx <= 2; dx++) {
+                if (dx == 0 && dy == 0) {
+                    continue;
+                }
+                int nx = start.getX() + dx;
+                int ny = start.getY() + dy;
+                if (nx < 0 || nx > 25 || ny < 0 || ny > 14) {
+                    continue;
+                }
+                FieldCoordinate c = new FieldCoordinate(nx, ny);
+                if (fm.getPlayer(c) != null) {
+                    continue;
+                }
+                if (mechanic.isValidJump(game, player, start, c)) {
+                    targets.add(c);
+                }
+            }
+        }
+        targets.sort(Comparator.comparingInt(FieldCoordinate::getX)
+            .thenComparingInt(FieldCoordinate::getY));
+        return targets;
+    }
+
     /** The block/foul target the heuristic chose, for the phase-2 dispatch. */
     private String heuristicTarget;
 
@@ -3346,7 +3394,10 @@ public class ParityRunner {
             return;
         }
 
-        List<FieldCoordinate> targets = freeNeighbours(game, coord, java.util.Collections.emptyList());
+        List<FieldCoordinate> targets = game.getActingPlayer() != null
+            && game.getActingPlayer().isJumping()
+            ? jumpTargets(game, playerId, coord)
+            : freeNeighbours(game, coord, java.util.Collections.emptyList());
 
         // The heuristic replays the plan its activation made, rather than picking a neighbour.
         if (activation != null) {
@@ -3357,6 +3408,19 @@ public class ParityRunner {
                 case DELIVER_PATH:
                     path = activation.takePath();
                     break;
+                case DECLARE_JUMP:
+                    // BACKLOG E12. The jump declaration IS a ClientCommandActingPlayer re-sent for
+                    // the player who is already acting, with jumping = true and the SAME
+                    // PlayerAction (sending MOVE here would downgrade a BLITZ_MOVE).
+                    // `StepInitMoving`'s CLIENT_ACTING_PLAYER arm routes it through
+                    // `UtilServerSteps.changePlayerAction`, which sets `ActingPlayer.jumping` and
+                    // recomputes the move squares as the distance-2 jump squares. The step then
+                    // waits with an empty move stack, so the harness comes straight back here and
+                    // the path is delivered on the next iteration.
+                    probeMoveVerdict(playerId, coord, "DECLARE_JUMP", targets);
+                    MatchRunner.inject(gameState, new ClientCommandActingPlayer(playerId,
+                        game.getActingPlayer().getPlayerAction(), true));
+                    return;
                 case FIRE_TERMINAL:
                     probeMoveVerdict(playerId, coord, "FIRE_TERMINAL", targets);
                     activation.markFired();

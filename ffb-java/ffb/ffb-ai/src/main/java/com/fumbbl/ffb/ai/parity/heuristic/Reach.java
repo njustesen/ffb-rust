@@ -136,6 +136,48 @@ public final class Reach {
         return Math.max(ag + tzOnDest, 2);
     }
 
+    /**
+     * Rust {@code jump_target} — the d6 target for a JUMP, {@code AgilityMechanic.minimumRollJump}
+     * with the jump modifiers.
+     *
+     * <p>BB2016's {@code JumpModifierCollection} is EMPTY, so nothing but the mutation's own
+     * {@code JumpModifier("Very Long Legs", -1, REGULAR)} can apply: the roll is INDEPENDENT of
+     * tackle zones, which is the whole reason a leap beats a dodge when the mover is marked.
+     *
+     * <p>BB2020/BB2025 add {@code max(TZ at from, TZ at to)} — {@code numberOfTacklezones} takes
+     * the MAXIMUM of the two ends, not the destination alone as a dodge does. Very Long Legs is
+     * {@code REGULAR} in BB2025 (always in the set) but {@code DEPENDS_ON_SUM_OF_OTHERS} in BB2020
+     * ({@code accumulated > 1}); Leap's own -1 is {@code DEPENDS_ON_SUM_OF_OTHERS} in both, at
+     * {@code accumulated > 1 || (accumulated > 0 && count > 1)}.
+     *
+     * <p>Prehensile Tail is NOT modelled: the agent has no prone/tail raster and the term is worth
+     * at most +1. This is the agent's price, not the engine's roll — it only has to be the SAME
+     * price on both sides.
+     */
+    public static int jumpTarget(boolean bb2016, boolean bb2025, int ag, int tzFrom, int tzTo,
+            boolean vll, boolean leap) {
+        if (bb2016) {
+            return Math.max((7 - Math.min(ag, 6)) + (vll ? -1 : 0), 2);
+        }
+        int acc = Math.max(tzFrom, tzTo);
+        int count = acc > 0 ? 1 : 0;
+        if (bb2025 && vll) {
+            // REGULAR: part of the set the sum AND the count are taken from.
+            acc -= 1;
+            count += 1;
+        } else if (vll && acc > 1) {
+            // BB2020 makes it DEPENDS_ON_SUM_OF_OTHERS. A dependent modifier mutates the running
+            // sum (context.addModifierValue) but NOT the count, and the next dependent one sees
+            // the reduced sum -- which is why BB2020's Leap and Very Long Legs never both fire
+            // off a single +2.
+            acc -= 1;
+        }
+        if (leap && (acc > 1 || (acc > 0 && count > 1))) {
+            acc -= 1;
+        }
+        return Math.max(ag + acc, 2);
+    }
+
     /** Rust {@code gfi_target}: base 2, and Blizzard is 3 in EVERY edition. */
     public static int gfiTarget(boolean blizzard) {
         return blizzard ? 3 : 2;

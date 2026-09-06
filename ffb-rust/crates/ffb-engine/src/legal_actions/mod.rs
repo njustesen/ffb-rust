@@ -871,9 +871,44 @@ pub fn legal_move_targets(game: &Game, player_id: &str) -> Vec<FieldCoordinate> 
     if cur >= ma + STANDARD_GFI_SQUARES {
         return vec![];
     }
+    // Java `UtilServerPlayerMove.updateMoveSquares(gameState, jumping)`: a JUMP walks
+    // `steps = 2` and `addMoveSquare` then drops every candidate the edition's
+    // `JumpMechanic.isValidJump` refuses — which for BB2020/BB2025 is everything at a distance
+    // other than 2. A declared jump therefore REPLACES the ordinary one-step list rather than
+    // extending it, and that is what makes the declaration a commitment.
+    if game.acting_player.jumping {
+        return jump_move_targets(game, player_id, start);
+    }
     let mut targets: Vec<FieldCoordinate> = start.neighbours().into_iter()
         .filter(|n| n.is_on_pitch() && game.field_model.player_at(*n).is_none())
         .collect();
+    targets.sort_by_key(|c| (c.x, c.y));
+    targets
+}
+
+/// The squares a player who has DECLARED a jump may land on: empty, on pitch, within two steps,
+/// and accepted by the edition's `JumpMechanic.isValidJump`.
+///
+/// Java: the `steps = jumping ? 2 : 1` arm of `UtilServerPlayerMove.updateMoveSquares` plus
+/// `addMoveSquare`'s `if (jumping && !jumpMechanic.isValidJump(...)) return;` guard.
+fn jump_move_targets(game: &Game, player_id: &str, start: FieldCoordinate) -> Vec<FieldCoordinate> {
+    let Some(player) = game.player(player_id) else { return vec![] };
+    let mechanic = crate::mechanic::jump_mechanic_for(game.rules);
+    let mut targets: Vec<FieldCoordinate> = Vec::new();
+    for dy in -2i32..=2 {
+        for dx in -2i32..=2 {
+            if dx == 0 && dy == 0 {
+                continue;
+            }
+            let c = FieldCoordinate::new(start.x + dx, start.y + dy);
+            if !c.is_on_pitch() || game.field_model.player_at(c).is_some() {
+                continue;
+            }
+            if mechanic.is_valid_jump(game, player, start, c) {
+                targets.push(c);
+            }
+        }
+    }
     targets.sort_by_key(|c| (c.x, c.y));
     targets
 }

@@ -130,7 +130,15 @@ impl StepJump {
             if !consumed {
                 return self.handle_failure(game);
             }
-            // Roll was reset to 0 when the re-roll offer was issued; fresh d6 below
+            // Java NEVER clears `roll` when it OFFERS a re-roll: `doRoll` is `reRolled || ...`,
+            // so a fresh die is drawn only once a re-roll has actually been CONSUMED. Zeroing it
+            // at the offer made a DECLINED offer reach the failure path with `roll == 0`, and the
+            // `roll > 1` test there is what decides whether a failed leaper lands on the target
+            // square or is put back where he started
+            // (`updatePlayerAndBallPosition(player, moveStart)`). Declining a jump re-roll
+            // therefore teleported the faller back onto his own square - slann bb2025 seed 22,
+            // where Java stunned him at (12,4) and Rust at (13,2).
+            self.roll = 0;
         }
 
         if self.roll == 0 {
@@ -176,10 +184,23 @@ impl StepJump {
             ));
         }
 
+        // `GameEvent::JumpRoll` existed in `ffb-model` with a coverage-report consumer and a wire
+        // encoder but NO PRODUCER anywhere in the engine, so `jumpRoll` would have read 0 in every
+        // harvest even once the agent learned to declare a jump (BACKLOG E12). Emitted here on the
+        // same rule as `StepMoveDodge`'s `DodgeRoll`: one event per RESOLVED roll, the re-rolled
+        // resolution producing its own.
+        let roll_event = ffb_model::events::GameEvent::JumpRoll {
+            player_id: player_id.clone().unwrap_or_default(),
+            target: minimum_roll,
+            roll: self.roll,
+            success: successful,
+        };
+
         if successful {
             game.acting_player.jumping = false;
             StepOutcome::next()
                 .publish(StepParameter::Jumped(true))
+                .with_event(roll_event)
         } else {
             // Try re-roll on first failure
             if !already_rerolled {
@@ -193,17 +214,18 @@ impl StepJump {
                     use_reroll(game, &source, &pid, rng);
                     self.re_roll_state.re_roll_source = Some(source);
                     self.roll = 0;
-                    return self.execute_step(game, rng);
+                    let mut out = self.execute_step(game, rng);
+                    out.events.insert(0, roll_event);
+                    return out;
                 }
                 // TRR offer
                 if let Some(prompt) = ask_for_reroll_if_available(game, "JUMP", minimum_roll, false) {
                     self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
-                    self.roll = 0; // reset so the re-roll gets a fresh d6
-                    return StepOutcome::cont().with_prompt(prompt);
+                    return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
                 }
             }
 
-            self.handle_failure(game)
+            self.handle_failure(game).with_event(roll_event)
         }
     }
 

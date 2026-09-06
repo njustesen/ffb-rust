@@ -63,10 +63,25 @@ impl Step for StepInitMoving {
 
         match action {
             Action::Move { path } if !path.is_empty() => {
+                // Java (all three `StepInitMoving`s, CLIENT_MOVE / CLIENT_BLITZ_MOVE):
+                //   publishParameter(new StepParameter(MOVE_START, fetchFromSquare(moveCommand, ...)));
+                // Rust published MOVE_START only from `StepInitSelecting`, and the heuristic's
+                // move answers land HERE, not there - so `StepJump` and `StepGoForIt` both read a
+                // MISSING move start. That made `JumpContext.from` collapse onto the LANDING
+                // square, so the jump's tackle-zone modifier was counted at the destination alone
+                // and a leap out of two tackle zones rolled its bare agility (slann bb2020 seed 17:
+                // Rust target 4, Java 5). Unreachable before the agent could declare a jump -
+                // `StepGoForIt`'s only other reader gates on `jumping` too.
+                let move_start = game.acting_player.player_id.clone()
+                    .and_then(|pid| game.field_model.player_coordinate(&pid));
                 if self.move_stack.is_empty() {
                     self.move_stack = path.clone();
                 }
-                return self.execute_step(game, rng);
+                let out = self.execute_step(game, rng);
+                return match move_start {
+                    Some(c) => out.publish(StepParameter::MoveStart(c)),
+                    None => out,
+                };
             }
 
             Action::Block { .. } => {
@@ -132,6 +147,22 @@ impl Step for StepInitMoving {
             // Java: CLIENT_ACTING_PLAYER with no playerId (deselect) → fEndPlayerAction = true, EXECUTE_STEP
             Action::EndPlayerAction => {
                 self.end_player_action = true;
+                return self.execute_step(game, rng);
+            }
+
+            // Java: CLIENT_ACTING_PLAYER with a playerId and `isJumping() == true`, re-sent while
+            // the player is already acting. `UtilServerSteps.changePlayerAction` forwards it to
+            // `UtilActingPlayer.changeActingPlayer`, which (same player, so `changed == false`)
+            // only runs `actingPlayer.setJumping(jumping)`, and then refreshes the move squares
+            // through `updateMoveSquares(gameState, isJumping())` — the distance-2 jump squares.
+            // The PlayerAction is re-asserted unchanged, exactly as the client re-sends the one
+            // already declared; sending MOVE here would downgrade a BLITZ_MOVE.
+            Action::DeclareJump => {
+                if let Some(pid) = game.acting_player.player_id.clone() {
+                    if let Some(pa) = game.acting_player.player_action {
+                        crate::step::util_server_steps::change_player_action(game, &pid, pa, true);
+                    }
+                }
                 return self.execute_step(game, rng);
             }
 

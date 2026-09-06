@@ -98,10 +98,25 @@ impl Step for StepInitMoving {
                     self.end_player_action = true;
                     return self.execute_step(game, rng);
                 }
+                // Java (all three `StepInitMoving`s, CLIENT_MOVE / CLIENT_BLITZ_MOVE):
+                //   publishParameter(new StepParameter(MOVE_START, fetchFromSquare(moveCommand, ...)));
+                // Rust published MOVE_START only from `StepInitSelecting`, and the heuristic's
+                // move answers land HERE, not there - so `StepJump` and `StepGoForIt` both read a
+                // MISSING move start. That made `JumpContext.from` collapse onto the LANDING
+                // square, so the jump's tackle-zone modifier was counted at the destination alone
+                // and a leap out of two tackle zones rolled its bare agility (slann bb2020 seed 17:
+                // Rust target 4, Java 5). Unreachable before the agent could declare a jump -
+                // `StepGoForIt`'s only other reader gates on `jumping` too.
+                let move_start = game.acting_player.player_id.clone()
+                    .and_then(|pid| game.field_model.player_coordinate(&pid));
                 if self.move_stack.is_empty() {
                     self.move_stack = path.clone();
                 }
-                return self.execute_step(game, rng);
+                let out = self.execute_step(game, rng);
+                return match move_start {
+                    Some(c) => out.publish(StepParameter::MoveStart(c)),
+                    None => out,
+                };
             }
 
             // Java: CLIENT_BLOCK → dispatchPlayerAction(BLITZ/KICK_EM_BLITZ)
@@ -222,6 +237,22 @@ impl Step for StepInitMoving {
                     game.acting_player.has_moved = false;
                 }
                 self.end_player_action = true;
+                return self.execute_step(game, rng);
+            }
+
+            // Java: CLIENT_ACTING_PLAYER with a playerId and `isJumping() == true`, re-sent while
+            // the player is already acting. `UtilServerSteps.changePlayerAction` forwards it to
+            // `UtilActingPlayer.changeActingPlayer`, which (same player, so `changed == false`)
+            // only runs `actingPlayer.setJumping(jumping)`, and then refreshes the move squares
+            // through `updateMoveSquares(gameState, isJumping())` — the distance-2 jump squares.
+            // The PlayerAction is re-asserted unchanged, exactly as the client re-sends the one
+            // already declared; sending MOVE here would downgrade a BLITZ_MOVE.
+            Action::DeclareJump => {
+                if let Some(pid) = game.acting_player.player_id.clone() {
+                    if let Some(pa) = game.acting_player.player_action {
+                        crate::step::util_server_steps::change_player_action(game, &pid, pa, true);
+                    }
+                }
                 return self.execute_step(game, rng);
             }
 
@@ -814,6 +845,66 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         // Java: setDodging(moveSquare.isDodging() && !actingPlayer.isJumping()) → false when jumping
         assert!(!game.acting_player.dodging, "dodging suppressed while jumping");
+    }
+
+    #[test]
+    fn declare_jump_sets_jumping_and_keeps_the_declared_action() {
+        // BACKLOG E12, written FROM Java's `StepInitSelecting`/`StepInitMoving`
+        // CLIENT_ACTING_PLAYER arm: a command naming the player who is ALREADY acting reaches
+        // `UtilServerSteps.changePlayerAction(this, id, playerAction, isJumping())`, which sets
+        // `ActingPlayer.jumping` and re-runs `updateMoveSquares(gameState, true)`. It must NOT
+        // change the declared action — the client re-sends the one already in force, so a
+        // BLITZ_MOVE stays a BLITZ_MOVE.
+        use ffb_model::enums::{PlayerState, PS_MOVING};
+        let mut game = make_game();
+        let pid = "home_01".to_string();
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: pid.clone(), name: pid.clone(), nr: 1, position_id: "pos".into(),
+            movement: 7, strength: 3, agility: 3, passing: 4, armour: 8,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate(&pid, FieldCoordinate::new(12, 7));
+        game.field_model.set_player_state(&pid, PlayerState::new(PS_MOVING).change_active(true));
+        game.home_playing = true;
+        game.acting_player.player_id = Some(pid.clone());
+        game.acting_player.player_action = Some(PlayerAction::BlitzMove);
+
+        let mut step = StepInitMoving::new("end".into());
+        let out = step.handle_command(&Action::DeclareJump, &mut game, &mut GameRng::new(0));
+        assert!(game.acting_player.jumping, "the declaration sets the jumping flag");
+        assert_eq!(game.acting_player.player_action, Some(PlayerAction::BlitzMove),
+            "the declared action is re-asserted, not downgraded to MOVE");
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::Move { .. })),
+            "the step waits again with a fresh move prompt, now over the jump squares");
+    }
+
+    #[test]
+    fn a_move_publishes_the_square_it_started_from() {
+        // The other half of the same Java line, in `StepInitMoving`'s CLIENT_MOVE arm:
+        // `publishParameter(new StepParameter(MOVE_START, fetchFromSquare(moveCommand, ...)))`.
+        // `StepJump` builds its `JumpContext` from that square, so without it the jump's
+        // tackle-zone modifier is counted at the LANDING square alone.
+        use ffb_model::enums::{PlayerState, PS_MOVING};
+        let mut game = make_game();
+        let pid = "home_01".to_string();
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: pid.clone(), name: pid.clone(), nr: 1, position_id: "pos".into(),
+            movement: 7, strength: 3, agility: 3, passing: 4, armour: 8,
+            ..Default::default()
+        });
+        let from = FieldCoordinate::new(12, 7);
+        game.field_model.set_player_coordinate(&pid, from);
+        game.field_model.set_player_state(&pid, PlayerState::new(PS_MOVING).change_active(true));
+        game.home_playing = true;
+        game.acting_player.player_id = Some(pid.clone());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+
+        let mut step = StepInitMoving::new("end".into());
+        let out = step.handle_command(
+            &Action::Move { path: vec![FieldCoordinate::new(13, 7)] },
+            &mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::MoveStart(c) if *c == from)),
+            "MOVE_START must carry the pre-move square, got {:?}", out.published);
     }
 
     #[test]

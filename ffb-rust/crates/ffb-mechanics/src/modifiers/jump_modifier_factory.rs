@@ -123,36 +123,57 @@ impl JumpModifierFactory {
         let rules = ctx.game.rules;
         let player = &ctx.player;
         let mut result = Vec::new();
+        // Java `mixed/bb2016 JumpModifierFactory.findModifiers`, in ITS order:
+        //
+        //   modifiers.addAll(super.findModifiers(context));            // REGULAR skill modifiers
+        //   int sum = modifiers.stream().mapToInt(::getModifier).sum();
+        //   context.setAccumulatedModifiers(sum + context.getAccumulatedModifiers());
+        //   context.addModifierCount(modifiers.size());
+        //   for (Skill skill : player.getSkills())                     // DEPENDS_ON_SUM_OF_OTHERS
+        //       ... if (modifier.appliesToContext(skill, context)) ...  // MUTATES the context
+        //
+        // Two things this got wrong, and both changed the roll a Leap + Very Long Legs player
+        // needs (BACKLOG E12, slann bb2020 seed 17):
+        //
+        //  * a REGULAR skill modifier (BB2016/BB2025 Very Long Legs) belongs to the set the sum
+        //    and the COUNT are taken from, not to the dependent pass;
+        //  * every dependent modifier that applies calls `context.addModifierValue`, so the NEXT
+        //    one sees the REDUCED sum. Evaluating them all against one frozen `accumulated` let
+        //    BB2020's Leap and Very Long Legs BOTH fire off a +2 tackle-zone modifier (target 4)
+        //    where Java fires exactly one of them (target 5). `addModifierCount` is NOT called
+        //    again, so the count does not move during that pass.
+        let mut acc = accumulated_modifier;
+        let mut count = modifier_count;
+        let has = |want: SkillId| player.all_skill_ids().any(|id| id == want);
+        if rules != Rules::Bb2020 && has(SkillId::VeryLongLegs) {
+            // BB2016 and BB2025 register it as REGULAR — always in the set.
+            result.push(JumpModifier::new("Very Long Legs", -1, ModifierType::REGULAR));
+            acc -= 1;
+            count += 1;
+        }
         for skill_id in player.all_skill_ids() {
             match skill_id {
-                SkillId::VeryLongLegs => {
-                    match rules {
-                        Rules::Bb2020 => {
-                            // DEPENDS_ON_SUM_OF_OTHERS: applies only when accumulated modifier > 1.
-                            if accumulated_modifier > 1 {
-                                result.push(JumpModifier::new(
-                                    "Very Long Legs", -1, ModifierType::DEPENDS_ON_SUM_OF_OTHERS,
-                                ));
-                            }
-                        }
-                        _ => {
-                            // BB2025 and BB2016: REGULAR — always applies.
-                            result.push(JumpModifier::new("Very Long Legs", -1, ModifierType::REGULAR));
-                        }
+                SkillId::VeryLongLegs if rules == Rules::Bb2020 => {
+                    // BB2020 registers it DEPENDS_ON_SUM_OF_OTHERS: `accumulated > 1`.
+                    if acc > 1 {
+                        result.push(JumpModifier::new(
+                            "Very Long Legs", -1, ModifierType::DEPENDS_ON_SUM_OF_OTHERS,
+                        ));
+                        acc -= 1;
                     }
                 }
                 SkillId::Leap => {
                     match rules {
                         Rules::Bb2020 => {
-                            if accumulated_modifier > 1 {
+                            if acc > 1 {
                                 result.push(JumpModifier::new("Leap", -1, ModifierType::DEPENDS_ON_SUM_OF_OTHERS));
+                                acc -= 1;
                             }
                         }
                         Rules::Bb2025 | Rules::Common => {
-                            if accumulated_modifier > 1
-                                || (accumulated_modifier > 0 && modifier_count > 1)
-                            {
+                            if acc > 1 || (acc > 0 && count > 1) {
                                 result.push(JumpModifier::new("Leap", -1, ModifierType::DEPENDS_ON_SUM_OF_OTHERS));
+                                acc -= 1;
                             }
                         }
                         _ => {} // BB2016: no Leap jump modifier
@@ -352,5 +373,58 @@ mod tests {
         let ctx = crate::modifiers::jump_context::JumpContext::new(&game, &player, FieldCoordinate::new(5, 5), FieldCoordinate::new(6, 5));
         // BB2016 Leap has no JumpModifier — always empty
         assert!(factory.find_skill_modifiers(&ctx, 5, 3).is_empty());
+    }
+
+    /// BACKLOG E12, written FROM `mixed/JumpModifierFactory.findModifiers` and the two skills:
+    ///
+    /// * `bb2020.Leap` and `bb2020.VeryLongLegs` both register `-1` as
+    ///   `DEPENDS_ON_SUM_OF_OTHERS` with the condition `accumulated > 1`, and each one that
+    ///   APPLIES calls `context.addModifierValue(-1)`. So off a `+2` tackle-zone modifier the
+    ///   FIRST one drops the sum to 1 and the SECOND no longer qualifies — exactly one fires,
+    ///   total `+1`. Evaluating both against a frozen `accumulated` fired both (total `0`) and
+    ///   let a marked BB2020 leaper jump on its bare agility.
+    #[test]
+    fn bb2020_leap_and_very_long_legs_do_not_both_fire() {
+        use ffb_model::model::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+        let (mut game, mut player) = make_game_with_jumping_player(Rules::Bb2020);
+        player.starting_skills.push(SkillWithValue::new(SkillId::Leap));
+        player.starting_skills.push(SkillWithValue::new(SkillId::VeryLongLegs));
+        game.team_home.players[0] = player.clone();
+        let factory = JumpModifierFactory::for_rules(Rules::Bb2020);
+        let ctx = crate::modifiers::jump_context::JumpContext::new(
+            &game, &player, FieldCoordinate::new(5, 5), FieldCoordinate::new(7, 5));
+        let mods = factory.find_skill_modifiers(&ctx, 2, 1);
+        let total: i32 = mods.iter().map(|m| m.get_modifier()).sum();
+        assert_eq!(total, -1, "exactly one dependent -1 applies off a +2, not both");
+        assert_eq!(mods.len(), 1);
+        // One tackle zone is not enough for either of them.
+        assert!(factory.find_skill_modifiers(&ctx, 1, 1).is_empty());
+    }
+
+    /// BB2025 spells Very Long Legs `REGULAR`, so Java puts it in the set BEFORE the sum and the
+    /// COUNT are taken (`modifiers.addAll(super.findModifiers(context))`, then
+    /// `setAccumulatedModifiers` / `addModifierCount`). That raised count to 2, which is the arm
+    /// of BB2025 Leap's condition (`accumulated > 0 && count > 1`) that fires off a single tackle
+    /// zone — so both DO apply there, and the difference from BB2020 is the spelling of the
+    /// mutation, not of Leap.
+    #[test]
+    fn bb2025_regular_very_long_legs_counts_toward_leaps_condition() {
+        use ffb_model::model::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+        let (mut game, mut player) = make_game_with_jumping_player(Rules::Bb2025);
+        player.starting_skills.push(SkillWithValue::new(SkillId::Leap));
+        player.starting_skills.push(SkillWithValue::new(SkillId::VeryLongLegs));
+        game.team_home.players[0] = player.clone();
+        let factory = JumpModifierFactory::for_rules(Rules::Bb2025);
+        let ctx = crate::modifiers::jump_context::JumpContext::new(
+            &game, &player, FieldCoordinate::new(5, 5), FieldCoordinate::new(7, 5));
+        // One tackle zone: acc 1, count 1 → VLL is REGULAR so acc 0, count 2 → Leap's
+        // `acc > 0 && count > 1` is FALSE at acc 0, so only VLL applies.
+        let one = factory.find_skill_modifiers(&ctx, 1, 1);
+        assert_eq!(one.iter().map(|m| m.get_modifier()).sum::<i32>(), -1);
+        // Two tackle zones: acc 2 → VLL → acc 1, count 2 → Leap's second arm fires → -2 total.
+        let two = factory.find_skill_modifiers(&ctx, 2, 1);
+        assert_eq!(two.iter().map(|m| m.get_modifier()).sum::<i32>(), -2);
     }
 }

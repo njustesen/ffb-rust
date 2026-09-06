@@ -128,6 +128,22 @@ impl Step for StepInitSelecting {
                 return self.execute_step(game, rng)
                     .publish(StepParameter::BlockDefenderId(defender_id.clone()));
             }
+            // Java `StepInitSelecting` CLIENT_ACTING_PLAYER, the branch where the command names
+            // the player who is ALREADY acting: it falls through to
+            // `UtilServerSteps.changePlayerAction(this, id, playerAction, isJumping())` and
+            // EXECUTE_STEP. BB2016 is the edition where this matters, because its two-command
+            // activation leaves INIT_SELECTING — not INIT_MOVING — as the step holding the move
+            // prompt, so a jump declared at that prompt lands here (BACKLOG E12; without this arm
+            // the Rust agent's `DeclareJump` fell through the match and was silently dropped while
+            // Java's harness declared it, which is exactly the one-extra-step length difference
+            // slann bb2016 seed 5 showed).
+            Action::DeclareJump => {
+                if let Some(pa) = player_action {
+                    change_player_action(game, &acting_pid, pa, true);
+                }
+                return self.execute_step(game, rng);
+            }
+
             Action::HypnoticGaze { target_id } => {
                 // Java: CLIENT_GAZE → changePlayerAction(GAZE), dispatch
                 change_player_action(game, &acting_pid, PlayerAction::Gaze, false);

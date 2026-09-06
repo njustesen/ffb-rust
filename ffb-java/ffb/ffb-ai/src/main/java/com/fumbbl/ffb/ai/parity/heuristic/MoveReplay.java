@@ -33,6 +33,14 @@ public final class MoveReplay {
     public enum Verdict {
         /** Deliver the whole remaining path in one answer; the engine walks it. */
         DELIVER_PATH,
+        /**
+         * Declare a JUMP (Leap) over the first step, then deliver the path on the NEXT prompt.
+         *
+         * <p>{@link #decide} never returns this: like Rust's {@code handle_move}, the jump test is
+         * layered on TOP of {@code DELIVER_PATH} by {@code ActivationDriver.replayMove}, because it
+         * needs the board and this class is deliberately a pure function of the facts it is handed.
+         */
+        DECLARE_JUMP,
         /** Send the plan's terminal action. */
         FIRE_TERMINAL,
         END_PLAYER_ACTION,

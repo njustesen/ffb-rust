@@ -6,44 +6,44 @@ Harvested 2026-09-06 by `MATCHUP=slann scripts/harvest_coverage.sh bb2020 1.0`. 
 
 | Item | Count | Status | Note |
 |---|---:|---|---|
-| action Move | 12501 | ok |  |
+| action Move | 12547 | ok |  |
 | action StandUp | 0 | absent (optional) | not a distinct action: mapped into the Move choice by both agents |
 | action Block | 718 | ok |  |
-| action Blitz | 818 | ok |  |
+| action Blitz | 812 | ok |  |
 | action StandUpBlitz | 0 | absent (optional) | not a distinct action: mapped into the Blitz choice by both agents |
-| action Foul | 250 | ok |  |
-| action Pass | 25 | ok | needs a ball carrier |
+| action Foul | 248 | ok |  |
+| action Pass | 26 | ok | needs a ball carrier |
 | action HandOver | 5 | ok | needs carrier + adjacent teammate |
-| dodge success | 502 | ok |  |
-| dodge failure | 388 | ok |  |
-| GFI rolls | 4639 | ok | BLOCKED on the one-move-per-activation decision: both harnesses move exactly ONE square per activation (measured 1:1, player_moved_events == activations.Move), so a carrier cannot cross the pitch and nothing accumulates the movement a rush needs. See BACKLOG. |
-| pickup success | 222 | ok |  |
-| pickup failure | 147 | ok | turnover + scatter |
-| catch success | 131 | ok |  |
-| catch failure | 119 | ok |  |
-| ball scatters | 576 | ok | failed pickup / dropped ball / bounces |
-| throw-ins | 30 | ok | ball out of bounds |
-| pass rolls | 167 | ok |  |
-| pass deviates | 48 | ok | wildly inaccurate passes only |
+| dodge success | 494 | ok |  |
+| dodge failure | 375 | ok |  |
+| GFI rolls | 4659 | ok | BLOCKED on the one-move-per-activation decision: both harnesses move exactly ONE square per activation (measured 1:1, player_moved_events == activations.Move), so a carrier cannot cross the pitch and nothing accumulates the movement a rush needs. See BACKLOG. |
+| pickup success | 219 | ok |  |
+| pickup failure | 142 | ok | turnover + scatter |
+| catch success | 134 | ok |  |
+| catch failure | 120 | ok |  |
+| ball scatters | 569 | ok | failed pickup / dropped ball / bounces |
+| throw-ins | 29 | ok | ball out of bounds |
+| pass rolls | 165 | ok |  |
+| pass deviates | 46 | ok | wildly inaccurate passes only |
 | interceptions | 0 | absent (optional) | contract: agents decline voluntary interference |
-| block 1 die | 528 | ok |  |
+| block 1 die | 522 | ok |  |
 | block 2 dice | 470 | ok |  |
-| block 2 dice against | 278 | ok | defender's choice |
+| block 2 dice against | 279 | ok | defender's choice |
 | block 3 dice | 183 | ok | needs ST5+ differential via assists |
 | block result Skull | 206 | ok |  |
-| block result BothDown | 216 | ok |  |
-| block result Pushback | 480 | ok |  |
-| block result PowPushback | 255 | ok |  |
-| block result Pow | 302 | ok |  |
-| pushbacks | 1029 | ok |  |
+| block result BothDown | 212 | ok |  |
+| block result Pushback | 479 | ok |  |
+| block result PowPushback | 256 | ok |  |
+| block result Pow | 301 | ok |  |
+| pushbacks | 1028 | ok |  |
 | crowd surfs | 0 | absent (optional) | push off pitch — board-position dependent |
-| players fell | 1502 | ok |  |
-| armor held | 1160 | ok |  |
-| stunned | 589 | ok | injury 2-7 |
-| KO | 252 | ok |  |
-| casualty (d16) | 171 | ok |  |
+| players fell | 1504 | ok |  |
+| armor held | 1154 | ok |  |
+| stunned | 591 | ok | injury 2-7 |
+| KO | 253 | ok |  |
+| casualty (d16) | 170 | ok |  |
 | death | 19 | ok | d16 = 15-16 only |
-| fouls | 240 | ok |  |
+| fouls | 238 | ok |  |
 | argue the call | 58 | ok | referee spotted a foul (doubles) |
 | argue success | 13 | ok | d6 = 6 only |
 | players ejected | 50 | ok |  |
@@ -55,13 +55,13 @@ Harvested 2026-09-06 by `MATCHUP=slann scripts/harvest_coverage.sh bb2020 1.0`. 
 ## Kickoff results
 
 - Blitz: 27
-- Brilliant Coaching: 39
+- Brilliant Coaching: 38
 - Cheering Fans: 31
 - Get the Ref: 7
 - High Kick: 27
 - Officious Ref: 14
 - Pitch Invasion: 5
-- Quick Snap: 21
+- Quick Snap: 22
 - Solid Defence: 17
 - Time-out: 13
 - Weather Change: 27
@@ -76,45 +76,46 @@ Result: ALL REQUIRED ITEMS PRESENT
 
 ## GameEvent catalog (from parity/bb2020/slann_vs_slann/seed_*_rust_events.jsonl)
 
-Total events: 98658
+Total events: 98877
 
 ```
-  62054 playerMoved
-  14317 playerAction
-   4639 goForItRoll
+  62245 playerMoved
+  14356 playerAction
+   4659 goForItRoll
    3402 turnEnd
-   2172 injury
-   1651 confusionRoll
-   1502 playerFellDown
-   1459 blockRoll
-   1459 block
-   1029 pushback
-    890 dodgeRoll
-    576 scatterBall
+   2168 injury
+   1652 confusionRoll
+   1504 playerFellDown
+   1454 blockRoll
+   1454 block
+   1028 pushback
+    869 dodgeRoll
+    569 scatterBall
     423 apothecaryRoll
-    369 pickupRoll
-    250 catchRoll
-    240 refereeSpotsFoul
-    240 foul
+    361 pickupRoll
+    254 catchRoll
+    238 refereeSpotsFoul
+    238 foul
     228 kickoffScatter
     228 kickoffResultEvent
-    222 ballPickedUp
+    219 ballPickedUp
     200 winningsRoll
     200 startHalf
     200 mvpRoll
-    167 passRoll
-     99 handOver
+    165 passRoll
+    101 handOver
      58 argueTheCall
      50 playerEjected
-     48 passDeviate
-     35 kickoffExtraReRoll
+     46 passDeviate
+     34 kickoffExtraReRoll
      33 touchdown
      31 cheeringFans
-     30 throwIn
+     29 throwIn
      27 weatherChange
      27 blitzRoll
      23 prayerRoll
-     21 quickSnapRoll
+     23 jumpRoll
+     22 quickSnapRoll
      17 solidDefenceRoll
      14 kickoffOfficiousRef
      13 kickoffTimeout
@@ -126,13 +127,13 @@ Total events: 98658
 ## Player actions declared
 
 ```
-  12267 Move
-    818 BlitzMove
+  12313 Move
+    812 BlitzMove
     718 Block
-    250 Foul
-    135 PassMove
-     99 HandOverMove
-     25 Pass
+    248 Foul
+    133 PassMove
+    101 HandOverMove
+     26 Pass
       5 HandOver
 ```
 

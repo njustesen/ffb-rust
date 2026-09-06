@@ -49,11 +49,13 @@ impl JumpMechanicTrait for JumpMechanic {
     fn is_valid_jump(&self, game: &Game, player: &Player, from: FieldCoordinate, to: FieldCoordinate) -> bool {
         from != to
             && to.distance_in_steps(from) == 2
-            && (player.has_skill_property(NamedProperties::CAN_LEAP) || {
-                // TODO: PathFinderExtension::has_prone_or_stunned_player_on_path(game, from, to)
-                let _ = game;
-                false
-            })
+            && (player.has_skill_property(NamedProperties::CAN_LEAP)
+                // Java: `extension.hasProneOrStunnedPlayerOnPath(game, from, to)`. This was a
+                // hardcoded `false`, so a BB2025 player WITHOUT Leap could never jump a downed
+                // player — the half of the rule that has nothing to do with the skill. The port
+                // already exists in `ffb-model`; the BB2020 twin has always called its own copy.
+                || ffb_model::util::pathfinding::PathFinderExtension::new()
+                    .has_prone_or_stunned_player_on_path(game, from, to))
     }
 }
 

@@ -182,3 +182,20 @@ wood_elf) until the agent learns to declare a jump.
 
 Sweep: **27 races closed**. Remaining: slann_fumbbl, underworld, wood_elf (undead and vampire
 are outside this sweep).
+
+---
+
+## BACKLOG E12 — the agents learned to Leap (2026-09-06)
+
+The "what was NOT exercised" section above is now out of date in one respect: **the heuristic agent
+declares jumps**, and `jumpRoll` is non-zero. The full write-up — how Java expects a jump to be
+declared, the shape of the agent arm, the five engine bugs the gap was hiding, and what is
+deliberately left for a follow-up — is in `docs/BACKLOG.md` §E12, which this closes.
+
+The one-line summary for a reader of THIS file: `jumpRoll` was zero across 300 slann games because
+neither agent could send the second `ClientCommandActingPlayer(..., jumping = true)` that makes a
+distance-2 square legal — and, independently, because nothing in the Rust engine ever emitted the
+`JumpRoll` event. Both are fixed; the slann gates were re-run (nine gates, 100/100) and the numbers
+are recorded with the sweep-wide re-gate in §E12. The three `docs/EVENT_COVERAGE_slann_*.md` files
+above were re-harvested on the new binary and now read **`jumpRoll` 28 / 23 / 9** for
+bb2016 / bb2020 / bb2025, against 0 / 0 / 0 when this file was written.

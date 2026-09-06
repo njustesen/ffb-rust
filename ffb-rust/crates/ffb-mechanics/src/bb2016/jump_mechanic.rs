@@ -27,9 +27,19 @@ impl JumpMechanicTrait for JumpMechanic {
     }
 
     fn can_still_jump(&self, game: &Game, acting_player: &ActingPlayer) -> bool {
+        // Java: `UtilCards.hasUnusedSkillWithProperty(actingPlayer, canLeap)` — the ACTING PLAYER
+        // overload, which reads `actingPlayer.isSkillUsed(skill)`. This called the `Player<?>`
+        // overload instead, and BB2016's Leap is marked used on the ACTING PLAYER
+        // (`LeapBehaviour`: `actingPlayer.markSkillUsed(skill)`), never on the Player — so the
+        // once-per-activation limit was invisible here.
         acting_player.player_id.as_deref()
             .and_then(|id| game.player(id))
-            .map(|p| UtilCards::has_unused_skill_with_property(p, NamedProperties::CAN_LEAP))
+            .map(|p| {
+                p.all_skill_ids().any(|id| {
+                    id.properties().contains(&NamedProperties::CAN_LEAP)
+                        && !acting_player.used_skills.contains(&id)
+                })
+            })
             .unwrap_or(false)
     }
 
@@ -123,7 +133,13 @@ mod tests {
     fn can_still_jump_false_when_leap_used() {
         let mut game = make_game();
         add_player_with_leap(&mut game, "p1");
-        game.team_home.player_mut("p1").unwrap().used_skills.insert(SkillId::Leap);
+        // Corrected FROM the Java: `canStillJump` is
+        // `UtilCards.hasUnusedSkillWithProperty(actingPlayer, canLeap)`, the ACTING-PLAYER
+        // overload reading `actingPlayer.isSkillUsed(skill)`; and `LeapBehaviour` spends the skill
+        // with `actingPlayer.markSkillUsed(skill)`. This marked the PLAYER's set, which is the
+        // store neither half of that rule uses — it passed only because the implementation read
+        // the same wrong store.
+        game.acting_player.used_skills.insert(SkillId::Leap);
         let ap = game.acting_player.clone();
         assert!(!JumpMechanic::new().can_still_jump(&game, &ap));
     }

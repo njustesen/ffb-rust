@@ -39,6 +39,16 @@ pub enum Action {
     // ── Movement ────────────────────────────────────────────────────────────
     /// Move the active player along the given path.
     Move { path: Vec<FieldCoordinate> },
+    /// Declare that the NEXT step of the move is a JUMP (Leap).
+    ///
+    /// Java: `ClientCommandActingPlayer(playerId, <the action already declared>, jumping = true)`
+    /// re-sent mid-move. `StepInitMoving`'s `CLIENT_ACTING_PLAYER` arm routes it through
+    /// `UtilServerSteps.changePlayerAction(..., isJumping)`, which sets `ActingPlayer.jumping`
+    /// and recomputes the move squares as the distance-2 jump squares
+    /// (`UtilServerPlayerMove.updateMoveSquares(gameState, true)`). It is a SEPARATE command from
+    /// the move that follows, so it is a separate `Action` here: the engine re-emits
+    /// `AgentPrompt::Move` and the agent then answers with the jump destination.
+    DeclareJump,
 
     // ── Block ────────────────────────────────────────────────────────────────
     /// Declare a block against a target.

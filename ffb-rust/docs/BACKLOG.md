@@ -4098,7 +4098,7 @@ Two related loose ends from the same campaign:
   behaviour** and must not be "fixed" — recorded here only so the next reader does not re-diagnose
   it as a Rust bug.
 
-### E12. The heuristic agent cannot Leap — `StepJump` is unreachable from the harness
+### E12. ~~The heuristic agent cannot Leap~~ — CLOSED 2026-09-06
 
 Found while closing slann (2026-09-06, `docs/PARITY_SLANN_CAMPAIGN.md`). Every slann position
 except the Kroxigor carries **Leap** and **Very Long Legs**, and slann was picked for the sweep
@@ -4125,6 +4125,154 @@ accident.
 **Confirmed a third time on wood_elf (2026-09-06):** `jumpRoll` is ZERO in all three
 `docs/EVENT_COVERAGE_wood_elf_*.md` harvests. Every wood elf Wardancer carries Leap in every
 edition and is fielded in every drafted squad. That is 900 games of evidence across three rosters.
+
+#### CLOSED 2026-09-06 — the agents can Leap, and six engine bugs were hiding behind the gap
+
+Both heuristic agents now DECLARE a jump, and `jumpRoll` is non-zero in a fresh harvest. The unit
+landed as one change set across the Rust engine, the Rust agent and the Java agent.
+
+**How a jump is declared** (established from the Java engine first, as the brief required): it is
+NOT a move command variant. It is a second `ClientCommandActingPlayer(playerId, <the action already
+declared>, jumping = true)` sent for the player who is already acting. `StepInitSelecting` /
+`StepInitMoving` route it through `UtilServerSteps.changePlayerAction`, which reaches
+`UtilActingPlayer.changeActingPlayer` — same player, so `changed == false` and the ONLY effect is
+`actingPlayer.setJumping(true)` — and then re-runs `UtilServerPlayerMove.updateMoveSquares(gameState,
+true)`. That walks `steps = 2` and drops everything `JumpMechanic.isValidJump` refuses, so declaring
+a jump REPLACES the one-step move list with the distance-2 jump squares: the declaration is a
+commitment, and the move that follows is a separate command. `StepId.JUMP` is already in the Move
+and BlitzMove sequences of all three editions, so the chain is live once the flag is set.
+
+#### The agent arm (both languages, identical)
+
+`Action::DeclareJump` / `MoveReplay.Verdict.DECLARE_JUMP`, layered on top of `DELIVER_PATH` — see
+`heuristic_agent::jump_over_first_step` and `ActivationDriver.jumpOverFirstStep`. A jump travels two
+squares for two movement, so it replaces the first TWO steps of the planned path with one roll that
+ignores the tackle zone it is leaving. It is offered when the path has two steps left, the second is
+exactly two steps away, the mover is MARKED (an unmarked walk costs no roll, so jumping out of it can
+only lose), the engine's own `canStillJump` / `isNextMovePossible(true)` / `isValidJump` all pass,
+and `p(jump) > p(step1) * p(step2)`. On the declaration the first step is dropped — it is the square
+the jump flies over — and the next prompt delivers a path whose head is the landing square.
+
+**A property the agent tests must be read AT THE EDITION.** The Diving-Tackle gate below was
+written with Rust's edition-agnostic `has_skill_property`, which reads the UNION of a skill's
+properties across rulesets. `skill/bb2016/DivingTackle` registers only
+`canAttemptToTackleDodgingPlayer` — the jumping half arrives in `skill/mixed/DivingTackle` for
+BB2020/BB2025 — so the Rust agent refused BB2016 leaps the Java agent still took, and slann bb2016
+@1.0 went 100/100 → 95/100 on a change that was a no-op in the other two editions. Any agent-side
+skill test must use `has_skill_property_in(rules, …)`; `properties_for` already carries the split.
+(The arm's other property test, `canLeap`, is NOT split — `properties_for` has no `Leap` entry, so
+it falls through to the union — and is left on the plain reader deliberately, so the shipped binary
+is the one the gate below measured.)
+
+**Deliberately scoped to Leap carriers.** BB2020/BB2025 also let ANY player jump over an adjacent
+downed one, but the agent has no prone raster and BB2025's own `isValidJump` had that term stubbed
+to `false` until this change set. See "what is left" below.
+
+#### Six engine bugs the gap was hiding
+
+All six are on the jump path, all six were unreachable while no agent could declare a jump, and
+four of them changed the roll a leaper needs or where the leaper ends up:
+
+1. **`GameEvent::JumpRoll` had no producer.** It had a coverage-report consumer and a wire encoder
+   but nothing in any of the three `StepJump`s emitted it, so `jumpRoll` would have read 0 in a
+   harvest even with the agent jumping. Emitted now on `StepMoveDodge`'s rule: one event per
+   RESOLVED roll.
+2. **`StepInitMoving` never published `MOVE_START`.** Java publishes it from the CLIENT_MOVE arm of
+   every edition's `StepInitMoving`; Rust published it only from `StepInitSelecting`, and the
+   heuristic's move answers land in `StepInitMoving`. `JumpContext.from` therefore collapsed onto
+   the LANDING square and the jump's tackle-zone modifier was counted at the destination alone
+   (slann bb2020 seed 17: Rust target 4 against Java's 5).
+3. **Dependent jump modifiers were evaluated against a frozen sum.** Java's `appliesToContext` calls
+   `context.addModifierValue`, so the second `DEPENDS_ON_SUM_OF_OTHERS` modifier sees the REDUCED
+   sum; a REGULAR skill modifier (BB2016/BB2025 Very Long Legs) belongs to the set the sum AND the
+   count are taken from, not to the dependent pass. Rust let BB2020's Leap and Very Long Legs BOTH
+   fire off one `+2` tackle zone.
+4. **BB2016's `StepJump` used the BB2020 agility formula AND dropped Very Long Legs.** `minimumRollJump`
+   there is `max(2, (7 - AG) + modifiers)`, and `LeapBehaviour.leap` does call
+   `modifierFactory.findModifiers(...)`, which picks up the mutation's REGULAR `-1`. The two errors
+   CANCEL for the only players who could reach the code (AG3 leapers with the mutation), so they are
+   one fix, not two.
+5. **A DECLINED jump re-roll teleported the faller back to his own square.** Rust zeroed `roll`
+   when it OFFERED the re-roll, so a decline reached `handleFailure` with `roll == 0` — and that
+   method's `roll > 1` test is what decides whether a failed leaper lands on the target square or
+   is put back at `moveStart`. Java never clears `roll` at the offer: `doRoll` is `reRolled || …`,
+   so a fresh die is drawn only once a re-roll has actually been CONSUMED (slann bb2025 seed 22:
+   Java stunned him at (12,4), Rust at (13,2)).
+6. **BB2016's Leap was never spent.** `LeapBehaviour` marks the skill used on the ACTING PLAYER in
+   both the success and the failure arm — that mark is the whole once-per-activation rule — and
+   `bb2016.JumpMechanic.canStillJump` read the `Player<?>` overload of
+   `hasUnusedSkillWithProperty` rather than the `ActingPlayer` one, i.e. a different store from the
+   one the rule writes.
+
+Plus one plain gap filled: BB2025's `isValidJump` had `hasProneOrStunnedPlayerOnPath` hardcoded to
+`false`, so a BB2025 player without Leap could never jump a downed opponent. The port already
+existed in `ffb-model`; the BB2020 twin had always called its own copy.
+
+#### The gate — every row 100/100, all on the shipped binary
+
+**The five Leap carriers** (`grep -rln "Leap" data/rosters/` → slann, slann_fumbbl, wood_elf, nippon,
+goblin; `"Very Long Legs"` → the two slann + bb2016 goblin), NINE gates each — three editions ×
+`--heur-scale 0 / 1.0 / 1e6`, seeds 1-100, `--heur-classes all`:
+
+| | bb2016 | bb2020 | bb2025 |
+|---|---|---|---|
+| slann | 100/100 ×3 | 100/100 ×3 | 100/100 ×3 |
+| slann_fumbbl | 100/100 ×3 | 100/100 ×3 | 100/100 ×3 |
+| wood_elf | 100/100 ×3 | 100/100 ×3 | 100/100 ×3 |
+| nippon | 100/100 ×3 | 100/100 ×3 | 100/100 ×3 |
+| goblin | 100/100 ×3 | 100/100 ×3 | 100/100 ×3 |
+
+**Every other closed race**, bb2025 @1.0 seeds 1-100 — all **100/100**: amazon, chaos, chaos_dwarf,
+chaos_pact, dark_elf, dark_elf_league_fumbbl, dwarf, elf, halfling, high_elf, human, khemri,
+khemri_fumbbl, lineman, lizardman, necromantic, norse, nurgle, ogre, orc, renegades, skaven,
+underworld. (The last eleven of those were re-measured a second time, alone: their first pass
+overlapped another bb2025 process, which the campaign's concurrency rule forbids. Both passes read
+100/100; the clean pass is the one recorded.)
+
+**Random controls** (`FFB_PARITY_ROOT=parity_random --agent random`, seeds 1-100): slann
+100/100 × bb2016/bb2020/bb2025, wood_elf 100/100 × bb2016/bb2020/bb2025.
+
+`cargo test -p ffb-engine` 7439/0 (15 ignored), `-p ffb-mechanics` 1167/0, `-p ffb-model` 2802/0;
+`mvn -o -pl ffb-ai test` 39/0; `scripts/check_java_trees.py` agree.
+
+#### The evidence that it WORKS
+
+A fresh `MATCHUP=slann scripts/harvest_coverage.sh <edition> 1.0`, each run alone and each
+100/100, now reports **`jumpRoll` 28 (bb2016) / 23 (bb2020) / 9 (bb2025)** where all three read
+**0** before — the count this item was opened on. The three
+`docs/EVENT_COVERAGE_slann_*.md` files are regenerated from those runs.
+
+The BB2025 count is the smallest because BB2025 is the edition whose Diving-Tackle chain the agent
+now steps around (see below), and slann Blitzers carry Diving Tackle.
+
+#### What is left
+
+* **The prone-jump half.** Any BB2020/BB2025 player may jump an adjacent downed one. Wiring it into
+  the agent needs a prone/stunned raster in `Features` (the agent has none), and it widens the
+  candidate set for every race in two editions. Worth its own unit.
+* **`Reach` is still jump-blind.** The Dijkstra walks empty squares only, so no plan ever WANTS a
+  jump for its own sake — the arm can only improve a step of a path the walk already chose. That is
+  why a leap fires a few times per 100 games rather than every time a screen is in the way. Making
+  `Reach` jump-aware would move its cross-language golden and is a much larger unit.
+* **`StepJump.checkDivingTackle` is not ported — and it is what currently BOUNDS the arm.** In
+  Java a SUCCESSFUL jump next to an eligible Diving Tackler re-opens the roll: BB2025 makes the
+  same pre-emptive "Diving Tackle can make this jump fail. Reroll the jump now?" offer that
+  `StepMoveDodge` makes for a dodge (`dtRerollAsked`), and BB2020 raises the DIVING_TACKLE player
+  choice instead. Rust's `StepJump` does neither. Both agents are therefore gated NOT to leap when
+  an opposing player with `canAttemptToTackleJumpingPlayer` stands next to either end of the jump
+  (`adjacent_diving_tackler` / `ActivationDriver.adjacentDivingTackler`) — right on its own terms,
+  since a leap a Diving Tackle can flip is worth less than the model prices it, but it is FIRST a
+  deferral. Porting `checkDivingTackle` (both edition variants, plus the player-choice dialog) is
+  the next unit here, and slann/wood_elf/nippon are the rosters that exercise it: slann Blitzers
+  carry Diving Tackle. Found on slann bb2025 seed 84, where Java re-rolls a jump Rust lets stand.
+* **Two smaller `bb2020.JumpMechanic.canStillJump` mismatches, noticed but NOT fixed here.** It
+  reads the `Player<?>` overload of `hasUnusedSkillWithProperty` where Java reads the
+  `ActingPlayer` one (the same shape as bug 6, but BB2020 never marks Leap used, so both stores
+  stay empty and it is currently unobservable), and it spells Java's `!actingPlayer.hasJumped()`
+  as `!acting_player.jumping`. Both live on the prone-jump branch, which no agent reaches yet.
+* **The wire cannot carry the declaration.** `ffb-protocol`'s `ClientActingPlayer` carries
+  `standing_up` where Java's command carries `jumping`, so `network_encoder` returns `None` for
+  `Action::DeclareJump`. Harmless for the headless harness, which never goes through the encoder.
 
 ### E13. `ThrowTeamMate` is declared on a roster with no throwable player
 

@@ -51,6 +51,14 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
             }))
         }
 
+        // Java is `ClientCommandActingPlayer(playerId, action, jumping = true)`, but this crate's
+        // `ClientActingPlayer` carries `standing_up` where the Java command carries `jumping`, so
+        // there is no field to put the flag in. The headless parity harness never goes through the
+        // network encoder — it hands `Action` straight to the step — so the declaration is only
+        // unrepresentable on the WIRE. Filed in BACKLOG E12; encoding it needs the protocol struct
+        // to grow the `jumping` field Java has.
+        Action::DeclareJump => None,
+
         Action::EndTurn => Some(ClientCommand::ClientEndTurn(ClientEndTurn)),
 
         Action::Move { path } => Some(ClientCommand::ClientMove(ClientMove {
