@@ -4121,3 +4121,43 @@ agent-capability item, not a parity red.
 `docs/EVENT_COVERAGE_slann_fumbbl_*.md` harvests too — another 300 games with Leap on the pitch
 and not one jump declared. That is 600 games of evidence that this is an agent gap, not a dice
 accident.
+
+**Confirmed a third time on wood_elf (2026-09-06):** `jumpRoll` is ZERO in all three
+`docs/EVENT_COVERAGE_wood_elf_*.md` harvests. Every wood elf Wardancer carries Leap in every
+edition and is fielded in every drafted squad. That is 900 games of evidence across three rosters.
+
+### E13. `ThrowTeamMate` is declared on a roster with no throwable player
+
+Found while closing wood_elf (2026-09-06, `docs/PARITY_WOOD_ELF_CAMPAIGN.md`). The heuristic agent
+declares `ThrowTeamMate` **254 / 201 / 66** times per 100 games (bb2016 / bb2020 / bb2025) on a
+roster where `grep -il "right stuff" data/rosters/*/roster_wood_elf.json` returns **nothing** — the
+Treeman has Throw Team-Mate but there is no legal target anywhere on the team, so every one of those
+declarations is immediately deselected.
+
+This is **not a parity bug** — both engines deselect identically and all nine wood_elf gates are
+100/100 — and it is not the BB2020 TTM filter bug from `docs/PARITY_TTM.md` (that was a harness
+filter disagreeing with the engine; this is plain roster composition). It is wasted agent
+deliberation and it makes `ThrowTeamMate` counts in a coverage harvest misleading: 254 declarations
+and 0 `throwTeamMateRoll` looks exactly like the old bug.
+
+Fix: require a non-empty throwable-target list before scoring the declaration, in BOTH agents, with
+the cross-language goldens re-blessed deliberately.
+
+### E14. The live `StepTakeRoot` emits no `GameEvent`, so coverage is blind to it
+
+Found while closing wood_elf (2026-09-06). `takeRoot` / `confusionRoll` is absent from all three
+`docs/EVENT_COVERAGE_wood_elf_*.md` harvests, yet an `FFB_TAKEROOT` probe at the roll site measured
+**51 / 49 / 6** Take Root d6 rolls in five games (bb2016 / bb2020 / bb2025).
+
+The live file is `crates/ffb-engine/src/step/bb2025/shared/step_take_root.rs` — `driver.rs:217`
+routes `StepId::TakeRoot` there via the `bb2025::shared::*` glob, and neither the `Rules::Bb2020`
+nor the `Rules::Bb2016` arm of `make_step_for` overrides it, so all three editions run that one
+file with their differences gated inside it. It emits no event; only the **dead** twin
+`step/bb2016/step_take_root.rs:115` emits `GameEvent::ConfusionRoll`.
+
+(The low bb2025 count is correct, not a second bug: the edition gate in that file is that a PRONE
+player standing up rolls Take Root in bb2016/bb2020 but not in bb2025.)
+
+Fix: emit `GameEvent::ConfusionRoll` from the shared step the way the dead bb2016 twin does. Pure
+instrumentation — it must not change any state hash, so it can be verified by re-running a single
+green gate.
