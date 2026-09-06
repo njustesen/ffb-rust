@@ -4038,6 +4038,15 @@ in state and RNG — so both sides land in the same place. Closing it properly n
 `AgentPrompt` (block kind) plus an answer in BOTH agents, for zero measurable gate movement; filed
 rather than done. Only start it if a race turns up where the block kind actually gets *chosen*.
 
+**Amended 2026-09-06 (underworld, `docs/PARITY_UNDERWORLD_CAMPAIGN.md`).** E9 is not a prayer-only
+corner. The bb2025 Underworld **Gutter Runner carries a permanent `Stab`**
+(`data/rosters/bb2025/roster_underworld.json`) and is fielded in every game of the drafted squad;
+across 100 bb2025 games the harvest shows **zero** stab events of any kind
+(`docs/EVENT_COVERAGE_underworld_bb2025.md`). So a permanent Stab carrier is as unreachable as the
+Stiletto-granted one: the block-kind prompt is the single blocker, exactly as
+`crates/ffb-engine/src/agent/uniform_agent.rs:311` states. Nine green underworld gates are
+therefore **not evidence about Stab** in any edition.
+
 ### E10. Rust `find_treacherous_target` hand-rolls a search Java gets from `UtilPlayer`
 
 Found while closing renegades (2026-09-06, `docs/PARITY_RENEGADES_CAMPAIGN.md`). Java
