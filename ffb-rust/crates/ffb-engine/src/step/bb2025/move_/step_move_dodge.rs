@@ -294,7 +294,19 @@ impl StepMoveDodge {
             // an accept spends the TRR and rolls a fresh die (dwarf bb2025 seed 3 i=164: Java
             // dodge 4-success → DT threat → TRR accepted → fresh 6, r 2→1; Rust sailed on with
             // one die and the streams split). dtRerollAsked stops a second ask.
-            if self.using_diving_tackle.is_none() && !self.dt_reroll_asked {
+            //
+            // BB2025 ONLY. `driver::make_step_for` has no `Rules::Bb2020` arm for `MoveDodge`, so
+            // BB2020 games run THIS step — but the BB2020 Java StepMoveDodge's success branch is
+            // bare `status = ActionStatus.SUCCESS`: it never calls `findEligibleDivingTacklers`
+            // and never pre-emptively offers a re-roll (grep the bb2020 file — `DIVING_TACKLE`
+            // appears only in the `fUsingDivingTackle` modifier path, never in a what-if). So for
+            // BB2020 this block invented a re-roll offer Java does not make, the heuristic
+            // accepted it, and the fresh die replaced a dodge that had already SUCCEEDED
+            // (slann bb2020 @0 seed 3 i=18: a Blitzer's 5 beat min 4, Rust re-rolled it to a 1,
+            // fell prone and handed over the turn). Edition-gate the ONE differing behaviour
+            // inside the shared step rather than routing BB2020 to its staler twin.
+            if game.rules == ffb_model::enums::Rules::Bb2025
+                && self.using_diving_tackle.is_none() && !self.dt_reroll_asked {
                 let from = self.coordinate_from.unwrap_or(FieldCoordinate::new(0, 0));
                 let to = self.coordinate_to.unwrap_or(FieldCoordinate::new(0, 0));
                 let leaving_tz_only = ffb_model::option::util_game_option::is_option_enabled(
@@ -511,12 +523,16 @@ mod tests {
     /// AG1 dodger, bare destination square, an adjacent opposing Diving Tackler that is not
     /// adjacent to the destination, and a full re-roll bank.
     fn dt_threat_fixture(agility: i32) -> (Game, StepMoveDodge) {
+        dt_threat_fixture_for(agility, ffb_model::enums::Rules::Bb2025)
+    }
+
+    fn dt_threat_fixture_for(agility: i32, rules: ffb_model::enums::Rules) -> (Game, StepMoveDodge) {
         use ffb_model::enums::{PlayerAction, PS_STANDING, PlayerState as PSt, SkillId};
         use ffb_model::model::skill_def::SkillWithValue;
         let mut game = Game::new(
             crate::step::framework::test_team("home", 0),
             crate::step::framework::test_team("away", 0),
-            ffb_model::enums::Rules::Bb2025,
+            rules,
         );
         let dodger = ffb_model::model::player::Player {
             id: "dodger".into(), name: "d".into(), nr: 1, position_id: "pos".into(),
@@ -584,6 +600,24 @@ mod tests {
         assert!(out.prompt.is_some(),
             "AG3: min 3 succeeds bare but max(2, 3+2) = 5 fails, so Java asks 'Diving Tackle can \
              make this dodge fail. Reroll the dodge now?'");
+    }
+
+    /// The whole pre-emptive Diving-Tackle re-roll is a BB2025 addition. `make_step_for` has no
+    /// `Rules::Bb2020` arm for `MoveDodge`, so BB2020 runs this same file — but the BB2020 Java
+    /// StepMoveDodge's success branch is bare `status = ActionStatus.SUCCESS` and never calls
+    /// `findEligibleDivingTacklers`. Offering here re-rolled dodges that had already succeeded
+    /// (slann bb2020 @0 seed 3 i=18: Blitzer's 5 beat min 4, the fresh die was a 1 → prone →
+    /// turnover).
+    #[test]
+    fn bb2020_never_pre_emptively_offers_the_diving_tackle_reroll() {
+        let (mut game, mut step) = dt_threat_fixture_for(3, ffb_model::enums::Rules::Bb2020);
+        step.dodge_roll = 3;
+        let mut rng = GameRng::new(0);
+        let out = step.execute_step(&mut game, &mut rng);
+        assert!(out.prompt.is_none(),
+            "BB2020 Java's success branch is bare SUCCESS — no Diving-Tackle what-if, no re-roll \
+             offer — got {:?}", out.prompt);
+        assert_eq!(out.action, crate::step::framework::StepAction::NextStep);
     }
 
     // ── Break Tackle consumption (Java StepMoveDodge bb2025:363-380 + 516-521) ────────────
