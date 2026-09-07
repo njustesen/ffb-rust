@@ -94,3 +94,72 @@ the engines to nine-gate parity and, in doing so, found and fixed a long list of
 the trap-door chain, Treacherous, the Diving-Tackle clamp, and six more behind the unreachable
 Leap declaration). Engine agreement on the rosters we have is genuinely strong. Roster
 *correctness* for bb2016/bb2020, and coverage of 7 official teams, are the open questions.
+
+## 8. Roster / squad drafting requirements
+
+Section 1 says a green cell needs "a roster that belongs to that ruleset". This section says what
+the drafted SQUAD must look like. The distinction matters: `data/rosters/<ed>/` is the team's
+*roster definition* (which positionals exist, their stats and costs); `data/teams/<ed>/` is the
+*drafted squad* we actually field in a parity game. A correct roster definition proves nothing if
+the squad never fields half of it.
+
+### R1 — Realistic and rule-legal
+A squad must be one a coach could actually field: positional quantity limits respected, budget
+respected, sensible re-rolls / dedicated fans / apothecary. Not a degenerate stack.
+
+### R2 — Every positional must be fielded
+Every positional in the ruleset's roster definition must appear in the squad, so that every
+position's stat line and starting skills are exercised. A positional that is never fielded has NO
+parity evidence, exactly like an unreachable skill: the gate is green because the code never ran.
+
+### R3 — Variants where R2 is impossible
+Some rulesets forbid fielding every positional at once. The BB2025 pages carry an explicit
+restriction — "*A <team> team may have a single Big Guy, chosen from the following*" — for:
+
+| team | big-guy options | allowed at once | variants required |
+|---|---:|---:|---:|
+| Chaos Chosen | 3 (Troll, Ogre, Minotaur) | 1 | **3** |
+| Underworld Denizens | 2 | 1 | **2** |
+| Old World Alliance | 2 (Ogre, Altern Forest Treeman) | 1 | **2** |
+
+Where a restriction makes R2 unsatisfiable in one squad, draft **one variant per mutually exclusive
+option**, so that the UNION of the variants covers every positional. R2 is therefore a requirement
+on the variant SET, not on any single squad. Each variant is gated like any other matchup.
+
+### R4 — The union must be complete
+For every (roster, ruleset) cell, the union of that cell's squads must field 100% of the ruleset's
+positionals. Anything less is 🔴 under §1, because the unfielded positional has no parity evidence.
+
+### Measured state of R2/R4 today (2026-09-07)
+
+**10 drafted squads do not field every positional — 13 positional slots have NO parity evidence**,
+and most of the misses are big guys, i.e. precisely the positions carrying the negatraits and
+Throw/Kick Team-Mate chains that this campaign spent weeks fixing:
+
+| ruleset | race | never fielded |
+|---|---|---|
+| bb2016 | orc | lineman |
+| bb2020 | chaos | chaosogre, chaostroll |
+| bb2020 | chaos_pact | renegadetroll |
+| bb2020 | dwarf | trollslayer |
+| bb2020 | renegades | 37730 |
+| bb2020 | undead | skeleton |
+| bb2020 | underworld | underworldsnotling, underworldtroll |
+| bb2025 | chaos | ogre, troll |
+| bb2025 | renegades | 37733 |
+| bb2025 | underworld | 37844 |
+
+Note **chaos** in bb2020 AND bb2025 fields only the Minotaur, so the Chaos Troll's Always Hungry and
+the Chaos Ogre's Bone Head have never been exercised in those rulesets — while chaos was reported
+green. That is not a roster-definition error (the official page does list all three at 0-1 with a
+single-Big-Guy cap); it is a missing VARIANT, and it is the clearest example of why R3 exists.
+
+Of the 16 (roster, ruleset) cells whose roster offers 2+ big guys, **7 field only some of them**:
+bb2020 chaos / chaos_pact / renegades / underworld, and bb2025 chaos / renegades / underworld.
+
+### Consequence for the work list
+§6 item 3 ("draft the 7 missing teams") is amended: each new team must satisfy R1-R4, which for
+Old World Alliance means **2 variants** (Ogre and Treeman) and for Snotling however many its own
+Big Guy rule requires. A new §6 item is added: **re-draft or add variants for the 10 squads above**,
+which is cheaper than drafting a new team and closes 13 slots of missing evidence on races already
+reported green.
