@@ -35,6 +35,7 @@ fn parse_roster(json: &str) -> RosterJson {
 pub static BB2020_ROSTERS_JSON: Lazy<Vec<&'static str>> = Lazy::new(|| {
     vec![
         include_roster!("bb2020", "amazon"),
+        include_roster!("bb2020", "black_orc"),
         include_roster!("bb2020", "chaos"),
         include_roster!("bb2020", "chaos_dwarf"),
         include_roster!("bb2020", "chaos_pact"),
@@ -42,12 +43,15 @@ pub static BB2020_ROSTERS_JSON: Lazy<Vec<&'static str>> = Lazy::new(|| {
         include_roster!("bb2020", "dark_elf_league_fumbbl"),
         include_roster!("bb2020", "dwarf"),
         include_roster!("bb2020", "elf"),
+        include_roster!("bb2020", "gnome"),
         include_roster!("bb2020", "goblin"),
         include_roster!("bb2020", "halfling"),
         include_roster!("bb2020", "high_elf"),
         include_roster!("bb2020", "human"),
+        include_roster!("bb2020", "imperial_nobility"),
         include_roster!("bb2020", "khemri"),
         include_roster!("bb2020", "khemri_fumbbl"),
+        include_roster!("bb2020", "khorne"),
         include_roster!("bb2020", "lizardman"),
         include_roster!("bb2020", "necromantic"),
         include_roster!("bb2020", "nippon"),
@@ -103,6 +107,7 @@ pub static BB2016_ROSTERS_JSON: Lazy<Vec<&'static str>> = Lazy::new(|| {
 pub static BB2025_ROSTERS_JSON: Lazy<Vec<&'static str>> = Lazy::new(|| {
     vec![
         include_roster!("bb2025", "amazon"),
+        include_roster!("bb2025", "black_orc"),
         include_roster!("bb2025", "chaos"),
         include_roster!("bb2025", "chaos_dwarf"),
         include_roster!("bb2025", "chaos_pact"),
@@ -110,12 +115,15 @@ pub static BB2025_ROSTERS_JSON: Lazy<Vec<&'static str>> = Lazy::new(|| {
         include_roster!("bb2025", "dark_elf_league_fumbbl"),
         include_roster!("bb2025", "dwarf"),
         include_roster!("bb2025", "elf"),
+        include_roster!("bb2025", "gnome"),
         include_roster!("bb2025", "goblin"),
         include_roster!("bb2025", "halfling"),
         include_roster!("bb2025", "high_elf"),
         include_roster!("bb2025", "human"),
+        include_roster!("bb2025", "imperial_nobility"),
         include_roster!("bb2025", "khemri"),
         include_roster!("bb2025", "khemri_fumbbl"),
+        include_roster!("bb2025", "khorne"),
         include_roster!("bb2025", "lizardman"),
         include_roster!("bb2025", "necromantic"),
         include_roster!("bb2025", "nippon"),
@@ -380,7 +388,7 @@ mod tests {
     #[test]
     fn bb2020_rosters_load() {
         let rosters = bb2020_rosters();
-        assert_eq!(rosters.len(), 29, "expected 29 BB2020 rosters");
+        assert_eq!(rosters.len(), 33, "expected 33 BB2020 rosters");
         let human = rosters.iter().find(|r| r.name == "Human").unwrap();
         assert!(human.reroll_cost > 0);
         assert!(!human.positions.is_empty());
@@ -490,6 +498,93 @@ mod tests {
         }
     }
 
+    /// Provenance guard for the four rosters authored 2026-09-07 (Black Orc, Gnome,
+    /// Imperial Nobility, Khorne), which exist in bb2020 + bb2025 and NOT in bb2016.
+    ///
+    /// A roster definition is invisible to per-step parity: both engines are fed the SAME
+    /// generated data, so a roster carrying the wrong edition's stats makes the engines agree
+    /// perfectly on the wrong input (docs/PARITY_COVERAGE_REQUIREMENTS.md §1.2). These asserts
+    /// pin, per edition, a stat/skill that DIFFERS between the two official pages, so a
+    /// cross-edition copy-paste fails loudly instead of gating green.
+    #[test]
+    fn new_2026_09_rosters_carry_their_own_edition_stats() {
+        fn pos<'a>(rs: &'a [RosterJson], roster: &str, pid: &str) -> &'a PositionJson {
+            let r = rs.iter().find(|r| r.name == roster)
+                .unwrap_or_else(|| panic!("roster {roster} missing"));
+            r.positions.iter().find(|p| p.id == pid)
+                .unwrap_or_else(|| panic!("{roster}: position {pid} missing"))
+        }
+        fn skill_names(p: &PositionJson) -> Vec<String> {
+            p.skills.iter().map(|s| s.name().to_string()).collect()
+        }
+
+        let r20 = bb2020_rosters();
+        let r25 = bb2025_rosters();
+
+        // None of the four exists in bb2016.
+        for name in ["Black Orc", "Gnome", "Imperial Nobility", "Khorne"] {
+            assert!(bb2016_rosters().iter().all(|r| r.name != name),
+                "{name} must not exist in bb2016");
+            assert!(r20.iter().any(|r| r.name == name), "bb2020 {name} missing");
+            assert!(r25.iter().any(|r| r.name == name), "bb2025 {name} missing");
+        }
+
+        // Black Orc: the Goblin Bruiser is 0-12 in bb2020 and 0-16 in bb2025; the Trained Troll
+        // has Loner (3+) in bb2020 and NO Loner at all in bb2025 (matching the audited bb2025
+        // goblin Trained Troll, and unlike the bb2025 Orc Troll which does have Loner 4+).
+        assert_eq!(pos(&r20, "Black Orc", "blackorc.goblin_bruiser_lineman").quantity, 12);
+        assert_eq!(pos(&r25, "Black Orc", "blackorc.goblin_bruiser").quantity, 16);
+        assert!(skill_names(pos(&r20, "Black Orc", "blackorc.trained_troll"))
+            .contains(&"Loner".to_string()));
+        assert!(!skill_names(pos(&r25, "Black Orc", "blackorc.trained_troll"))
+            .contains(&"Loner".to_string()));
+
+        // Gnome: the Woodland Fox's Side Step is spelled "Side Step" in bb2020 Java and
+        // "Sidestep" in bb2025 Java — an exact-match SkillFactory.forName difference.
+        assert!(skill_names(pos(&r20, "Gnome", "gnome.woodland_fox"))
+            .contains(&"Side Step".to_string()));
+        assert!(skill_names(pos(&r25, "Gnome", "gnome.woodland_fox"))
+            .contains(&"Sidestep".to_string()));
+        // The Fox has no PA at all on both pages.
+        assert_eq!(pos(&r20, "Gnome", "gnome.woodland_fox").pa, 0);
+        assert_eq!(pos(&r25, "Gnome", "gnome.woodland_fox").pa, 0);
+
+        // Imperial Nobility: the Retainer is AG4+ in bb2020 and AG3+ in bb2025; the Bodyguard
+        // is MA6/90k in bb2020 and MA5/85k in bb2025; the Thrower PA3+ -> PA2+ and gains
+        // Give and Go (a bb2025-only skill class) in place of bb2020's Running Pass.
+        assert_eq!(pos(&r20, "Imperial Nobility", "imperialnobility.imperial_retainer_lineman").ag, 4);
+        assert_eq!(pos(&r25, "Imperial Nobility", "imperialnobility.imperial_retainer").ag, 3);
+        assert_eq!(pos(&r20, "Imperial Nobility", "imperialnobility.bodyguard").ma, 6);
+        assert_eq!(pos(&r25, "Imperial Nobility", "imperialnobility.bodyguard").ma, 5);
+        assert!(skill_names(pos(&r20, "Imperial Nobility", "imperialnobility.imperial_thrower"))
+            .contains(&"Running Pass".to_string()));
+        assert!(skill_names(pos(&r25, "Imperial Nobility", "imperialnobility.imperial_thrower"))
+            .contains(&"Give and Go".to_string()));
+
+        // Khorne: the Khorngor is 0-4 in bb2020 and 0-2 (with Jump Up + Thick Skull) in bb2025;
+        // the Bloodspawn has no PA in bb2020 and PA6+ in bb2025.
+        assert_eq!(pos(&r20, "Khorne", "khorne.khorngor").quantity, 4);
+        assert_eq!(pos(&r25, "Khorne", "khorne.khorngor").quantity, 2);
+        assert!(skill_names(pos(&r25, "Khorne", "khorne.khorngor"))
+            .contains(&"Thick Skull".to_string()));
+        assert_eq!(pos(&r20, "Khorne", "khorne.bloodspawn").pa, 0);
+        assert_eq!(pos(&r25, "Khorne", "khorne.bloodspawn").pa, 6);
+
+        // Every position must convert to a live RosterPosition whose skills all resolved, and
+        // the Big Guy flag must reach the model (the negatrait/TTM chains hang off it).
+        for (rules, rosters) in [(Rules::Bb2020, &r20), (Rules::Bb2025, &r25)] {
+            for name in ["Black Orc", "Gnome", "Imperial Nobility", "Khorne"] {
+                let roster = rosters.iter().find(|r| r.name == name).unwrap();
+                for p in &roster.positions {
+                    let rp = position_json_to_roster_position(p, &roster.id, false, rules);
+                    assert_eq!(rp.skills.len(), p.skills.len(),
+                        "{rules:?}/{name}/{}: {} of {} starting skills resolved",
+                        p.id, rp.skills.len(), p.skills.len());
+                }
+            }
+        }
+    }
+
     #[test]
     fn bb2016_rosters_load_all() {
         let rosters = bb2016_rosters();
@@ -503,7 +598,7 @@ mod tests {
     #[test]
     fn bb2025_rosters_load_all() {
         let rosters = bb2025_rosters();
-        assert_eq!(rosters.len(), 29, "expected 29 BB2025 rosters");
+        assert_eq!(rosters.len(), 33, "expected 33 BB2025 rosters");
         // Every roster must have a positive reroll cost.
         for r in &rosters {
             assert!(r.reroll_cost > 0, "roster '{}' has zero reroll cost", r.name);

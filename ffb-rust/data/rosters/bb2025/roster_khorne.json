@@ -1,0 +1,149 @@
+{
+  "id": "khorne.lrb6",
+  "name": "Khorne",
+  "reroll_cost": 60000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "khorne.bloodborn_marauder",
+      "name": "Bloodborn Marauder",
+      "display_name": "Bloodborn Marauder",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 50000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "skills": [
+        "Frenzy"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Mutation"
+        ],
+        "double": [
+          "Agility",
+          "Strength",
+          "Devious"
+        ]
+      },
+      "keywords": [
+        "Lineman",
+        "Human"
+      ]
+    },
+    {
+      "id": "khorne.khorngor",
+      "name": "Khorngor",
+      "display_name": "Khorngor",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 70000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 9,
+      "skills": [
+        "Horns",
+        "Juggernaut",
+        "Jump Up",
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Mutation",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Passing",
+          "Devious"
+        ]
+      },
+      "keywords": [
+        "Runner",
+        "Beastman"
+      ]
+    },
+    {
+      "id": "khorne.bloodseeker",
+      "name": "Bloodseeker",
+      "display_name": "Bloodseeker",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 105000,
+      "ma": 5,
+      "st": 4,
+      "ag": 4,
+      "pa": 6,
+      "av": 10,
+      "skills": [
+        "Frenzy"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Mutation",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Devious"
+        ]
+      },
+      "keywords": [
+        "Blocker",
+        "Human"
+      ]
+    },
+    {
+      "id": "khorne.bloodspawn",
+      "name": "Bloodspawn",
+      "display_name": "Bloodspawn",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 160000,
+      "ma": 5,
+      "st": 5,
+      "ag": 4,
+      "pa": 6,
+      "av": 9,
+      "skills": [
+        "Claws",
+        "Frenzy",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Mighty Blow",
+        "Unchannelled Fury"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Mutation",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General"
+        ]
+      },
+      "keywords": [
+        "Big Guy",
+        "Spawn"
+      ]
+    }
+  ],
+  "special_rules": [
+    "Favoured of Khorne",
+    "Brawlin' Brutes"
+  ]
+}

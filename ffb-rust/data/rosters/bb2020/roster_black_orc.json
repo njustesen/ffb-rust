@@ -1,0 +1,108 @@
+{
+  "id": "blackorc.lrb6",
+  "name": "Black Orc",
+  "reroll_cost": 60000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "blackorc.goblin_bruiser_lineman",
+      "name": "Goblin Bruiser Lineman",
+      "display_name": "Goblin Bruiser Lineman",
+      "type": "Regular",
+      "quantity": 12,
+      "cost": 45000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Agility"
+        ],
+        "double": [
+          "General",
+          "Passing",
+          "Strength"
+        ]
+      },
+      "skills": [
+        "Dodge",
+        "Right Stuff",
+        "Stunty",
+        "Thick Skull"
+      ]
+    },
+    {
+      "id": "blackorc.black_orc",
+      "name": "Black Orc",
+      "display_name": "Black Orc",
+      "type": "Regular",
+      "quantity": 6,
+      "cost": 90000,
+      "ma": 4,
+      "st": 4,
+      "ag": 4,
+      "pa": 5,
+      "av": 10,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Passing"
+        ]
+      },
+      "skills": [
+        "Brawler",
+        "Grab"
+      ]
+    },
+    {
+      "id": "blackorc.trained_troll",
+      "name": "Trained Troll",
+      "display_name": "Trained Troll",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 115000,
+      "ma": 4,
+      "st": 5,
+      "ag": 5,
+      "pa": 5,
+      "av": 10,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General",
+          "Passing"
+        ]
+      },
+      "skills": [
+        "Always Hungry",
+        {
+          "name": "Loner",
+          "value": 3
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Projectile Vomit",
+        "Really Stupid",
+        "Regeneration",
+        "Throw Team-mate"
+      ]
+    }
+  ]
+}

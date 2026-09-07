@@ -1,0 +1,156 @@
+{
+  "id": "imperialnobility.lrb6",
+  "name": "Imperial Nobility",
+  "reroll_cost": 70000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "imperialnobility.imperial_retainer_lineman",
+      "name": "Imperial Retainer Lineman",
+      "display_name": "Imperial Retainer Lineman",
+      "type": "Regular",
+      "quantity": 12,
+      "cost": 45000,
+      "ma": 6,
+      "st": 3,
+      "ag": 4,
+      "pa": 4,
+      "av": 8,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "General"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      },
+      "skills": [
+        "Fend"
+      ]
+    },
+    {
+      "id": "imperialnobility.imperial_thrower",
+      "name": "Imperial Thrower",
+      "display_name": "Imperial Thrower",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 75000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 3,
+      "av": 9,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Passing"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      },
+      "skills": [
+        "Pass",
+        "Running Pass"
+      ]
+    },
+    {
+      "id": "imperialnobility.noble_blitzer",
+      "name": "Noble Blitzer",
+      "display_name": "Noble Blitzer",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 105000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 9,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General"
+        ],
+        "double": [
+          "Passing",
+          "Strength"
+        ]
+      },
+      "skills": [
+        "Block",
+        "Catch"
+      ]
+    },
+    {
+      "id": "imperialnobility.bodyguard",
+      "name": "Bodyguard",
+      "display_name": "Bodyguard",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 90000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 5,
+      "av": 9,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility"
+        ]
+      },
+      "skills": [
+        "Stand Firm",
+        "Wrestle"
+      ]
+    },
+    {
+      "id": "imperialnobility.ogre",
+      "name": "Ogre",
+      "display_name": "Ogre",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 140000,
+      "ma": 5,
+      "st": 5,
+      "ag": 4,
+      "pa": 5,
+      "av": 10,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General"
+        ]
+      },
+      "skills": [
+        "Bone Head",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Thick Skull",
+        "Throw Team-mate"
+      ]
+    }
+  ]
+}

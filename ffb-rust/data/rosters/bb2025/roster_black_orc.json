@@ -1,0 +1,115 @@
+{
+  "id": "blackorc.lrb6",
+  "name": "Black Orc",
+  "reroll_cost": 60000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "blackorc.goblin_bruiser",
+      "name": "Goblin Bruiser",
+      "display_name": "Goblin Bruiser",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 45000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "skills": [
+        "Dodge",
+        "Right Stuff",
+        "Stunty",
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "Devious"
+        ],
+        "double": [
+          "General",
+          "Passing",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Lineman",
+        "Goblin"
+      ]
+    },
+    {
+      "id": "blackorc.black_orc",
+      "name": "Black Orc",
+      "display_name": "Black Orc",
+      "type": "Regular",
+      "quantity": 6,
+      "cost": 90000,
+      "ma": 4,
+      "st": 4,
+      "ag": 4,
+      "pa": 5,
+      "av": 10,
+      "skills": [
+        "Brawler",
+        "Grab"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Devious"
+        ]
+      },
+      "keywords": [
+        "Blocker",
+        "Orc"
+      ]
+    },
+    {
+      "id": "blackorc.trained_troll",
+      "name": "Trained Troll",
+      "display_name": "Trained Troll",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 115000,
+      "ma": 4,
+      "st": 5,
+      "ag": 5,
+      "pa": 5,
+      "av": 10,
+      "skills": [
+        "Always Hungry",
+        "Mighty Blow",
+        "Projectile Vomit",
+        "Really Stupid",
+        "Regeneration",
+        "Throw Team-mate"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General",
+          "Passing"
+        ]
+      },
+      "keywords": [
+        "Big Guy",
+        "Troll"
+      ]
+    }
+  ],
+  "special_rules": [
+    "Bribery and Corruption",
+    "Brawlin' Brutes"
+  ]
+}

@@ -1,0 +1,160 @@
+{
+  "id": "gnome.lrb6",
+  "name": "Gnome",
+  "reroll_cost": 50000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "gnome.gnome_lineman",
+      "name": "Gnome Lineman",
+      "display_name": "Gnome Lineman",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 40000,
+      "ma": 5,
+      "st": 2,
+      "ag": 3,
+      "pa": 4,
+      "av": 7,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Agility"
+        ],
+        "double": [
+          "General",
+          "Strength"
+        ]
+      },
+      "skills": [
+        "Jump Up",
+        "Right Stuff",
+        "Stunty",
+        "Wrestle"
+      ]
+    },
+    {
+      "id": "gnome.gnome_beastmaster",
+      "name": "Gnome Beastmaster",
+      "display_name": "Gnome Beastmaster",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 55000,
+      "ma": 5,
+      "st": 2,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Agility"
+        ],
+        "double": [
+          "General",
+          "Strength"
+        ]
+      },
+      "skills": [
+        "Guard",
+        "Jump Up",
+        "Stunty",
+        "Wrestle"
+      ]
+    },
+    {
+      "id": "gnome.gnome_illusionist",
+      "name": "Gnome Illusionist",
+      "display_name": "Gnome Illusionist",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 50000,
+      "ma": 5,
+      "st": 2,
+      "ag": 3,
+      "pa": 3,
+      "av": 7,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "Passing"
+        ],
+        "double": [
+          "General"
+        ]
+      },
+      "skills": [
+        "Jump Up",
+        "Stunty",
+        "Trickster",
+        "Wrestle"
+      ]
+    },
+    {
+      "id": "gnome.woodland_fox",
+      "name": "Woodland Fox",
+      "display_name": "Woodland Fox",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 50000,
+      "ma": 7,
+      "st": 2,
+      "ag": 2,
+      "pa": 0,
+      "av": 6,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [],
+        "double": [
+          "Agility"
+        ]
+      },
+      "skills": [
+        "Dodge",
+        "My Ball",
+        "Side Step",
+        "Stunty"
+      ]
+    },
+    {
+      "id": "gnome.altern_forest_treeman",
+      "name": "Altern Forest Treeman",
+      "display_name": "Altern Forest Treeman",
+      "type": "Big Guy",
+      "quantity": 2,
+      "cost": 120000,
+      "ma": 2,
+      "st": 6,
+      "ag": 5,
+      "pa": 5,
+      "av": 11,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General",
+          "Passing"
+        ]
+      },
+      "skills": [
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Stand Firm",
+        "Strong Arm",
+        "Take Root",
+        "Thick Skull",
+        "Throw Team-mate",
+        "Timmm-ber!"
+      ]
+    }
+  ]
+}
