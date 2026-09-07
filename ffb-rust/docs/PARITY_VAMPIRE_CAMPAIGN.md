@@ -334,3 +334,50 @@ state (1 vs 3), and the active side/turn diverge (R `t3 home`, J `t2 away`).
 Next instrument: dump the `state_string` COMPONENTS (half, both turn counters, active, scores,
 ball) per step index on both sides and diff at `i=8`/`i=9`. Do not diff the player board again —
 it is already proven equal at the first-diff index.
+
+## ITER3 — 2026-09-07: bb2016 is 46/100, and 52 of 54 failures carry NO state divergence
+
+Measured on a fresh gate (`FFB_PARITY_ROOT=parity_vloop`, one gate at a time, pinned to 4 of 16
+CPUs via `ProcessorAffinity`): bb2016 **@1.0 = 46/100**, **@0 = 33/100**. Against ITER1's recorded
+0/100. `scripts/vamp_loop.ps1` drives the nine gates.
+
+### The failures are a game-LENGTH problem, not a rule divergence
+
+Per-seed classification of all 54 bb2016 `@1.0` failures, comparing the per-step `state_hash`
+over the common prefix:
+
+| family | seeds |
+|---|---|
+| **hashes agree over the whole common prefix, Rust log LONGER** | **38** |
+| **hashes agree over the whole common prefix, Rust log SHORTER** | **14** |
+| turn/active/half differ at the first diff | 1 |
+| same turn+active+half, hash differs | 1 |
+
+**52 of 54 failures share a bit-identical prefix and differ only in how many steps each engine
+logs.** Only two seeds diverge on state at all, both at index 69-70. Vampire bb2016 is therefore
+mostly an end-of-game / step-accounting disagreement, not a rules disagreement — which is
+consistent with the Java harness emitting `UNHANDLED_STEP WINNINGS turnMode=END_GAME` and
+`UNHANDLED_DIALOG WINNINGS_RE_ROLL turnMode=END_GAME` **10,500 times each** across the gate
+(105 per game, every game).
+
+Of the 14 SHORTER seeds, Rust's terminal declaration is `HandOffMove` in **14 of the whole set**
+of terminal declarations (the give chain), `Move` in 33, `Blitz` 3, `Block` 2.
+
+Also present, and not yet explained: `UNHANDLED_STEP INIT_BLOCKING turnMode=REGULAR` 53 times, and
+`UNHANDLED_ACTING_ACTION_AT_PICK GAZE ... deselecting, no step logged` 4,105 times (the expected
+bb2016 GAZE re-pick, mirrored by Fix 4).
+
+### Two analysis mistakes worth not repeating
+
+1. **I classified from `parity/` while the gate wrote `parity_vloop/`.** The stale directory gave a
+   confident, entirely wrong split (31 hash-diff / 19 short / 4 turn) and a "1-seed" HandOffMove
+   family. `FFB_PARITY_ROOT` moves the output tree — always classify from the root the gate
+   actually used. This is [[stale_parity_jsonl]] in a new costume.
+2. **A regex looking for `rust=None` inside the failure block** reported "37 of 54 = Rust ends
+   early, 69%". It was matching a `rust=None` belonging to a different comparison in the same
+   block. Seed 25 supposedly "ended at step 1" while its Rust log had 94 steps. Classify from the
+   jsonl, not from the failure prose.
+
+Next: find why the two engines log different step counts on a bit-identical prefix. Start at
+END_GAME (the WINNINGS pair above), not in the rules — and check whether the 38 Rust-LONGER seeds
+are Java stopping early rather than Rust running on.
