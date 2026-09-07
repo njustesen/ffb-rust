@@ -12,9 +12,9 @@
 	<apothecaries>0</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1100000</currentTeamValue>
+	<currentTeamValue>1030000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>0</treasury>
+	<treasury>70000</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamDwarfParity16Home1">
@@ -32,9 +32,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamDwarfParity16Home3">
-		<name>Troll Slayer 3</name>
+		<name>Blitzer 3</name>
 		<gender>male</gender>
-		<positionId>dwarf.trollslayer</positionId>
+		<positionId>dwarf.blitzer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -46,9 +46,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamDwarfParity16Home5">
-		<name>Blitzer 5</name>
+		<name>Runner 5</name>
 		<gender>male</gender>
-		<positionId>dwarf.blitzer</positionId>
+		<positionId>dwarf.runner</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -60,9 +60,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamDwarfParity16Home7">
-		<name>Runner 7</name>
+		<name>Blocker 7</name>
 		<gender>male</gender>
-		<positionId>dwarf.runner</positionId>
+		<positionId>dwarf.blocker</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -96,13 +96,6 @@
 	</player>
 	<player nr="12" id="teamDwarfParity16Home12">
 		<name>Blocker 12</name>
-		<gender>male</gender>
-		<positionId>dwarf.blocker</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="13" id="teamDwarfParity16Home13">
-		<name>Blocker 13</name>
 		<gender>male</gender>
 		<positionId>dwarf.blocker</positionId>
 		<skillList/>

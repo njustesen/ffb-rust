@@ -40,7 +40,7 @@
 		<movement>7</movement>
 		<strength>3</strength>
 		<agility>3</agility>
-		<passing>5</passing>
+		<passing>0</passing>
 		<armour>8</armour>
 		<skillList>
 			<skill>Block</skill>
@@ -62,7 +62,7 @@
 		<movement>9</movement>
 		<strength>2</strength>
 		<agility>4</agility>
-		<passing>4</passing>
+		<passing>0</passing>
 		<armour>7</armour>
 		<skillList>
 			<skill>Dodge</skill>
@@ -84,7 +84,7 @@
 		<movement>7</movement>
 		<strength>3</strength>
 		<agility>3</agility>
-		<passing>2</passing>
+		<passing>0</passing>
 		<armour>7</armour>
 		<skillList>
 			<skill>Pass</skill>
@@ -107,7 +107,7 @@
 		<movement>7</movement>
 		<strength>3</strength>
 		<agility>3</agility>
-		<passing>4</passing>
+		<passing>0</passing>
 		<armour>7</armour>
 		<skillList/>
 		<skillCategoryList>

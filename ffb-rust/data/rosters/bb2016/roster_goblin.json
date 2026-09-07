@@ -1,253 +1,236 @@
 {
-  "id": "goblin.lrb6",
-  "name": "Goblin",
-  "reroll_cost": 60000,
-  "max_rerolls": 8,
-  "apothecary": true,
-  "undead": false,
-  "necromancer": false,
-  "positions": [
+ "id": "goblin.lrb6",
+ "name": "Goblin",
+ "reroll_cost": 60000,
+ "max_rerolls": 8,
+ "apothecary": true,
+ "undead": false,
+ "necromancer": false,
+ "positions": [
+  {
+   "id": "goblin.goblin",
+   "name": "Goblin",
+   "display_name": "Goblin",
+   "type": "Regular",
+   "quantity": 16,
+   "cost": 40000,
+   "ma": 6,
+   "st": 2,
+   "ag": 3,
+   "av": 7,
+   "shorthand": "G",
+   "skills": [
+    "Dodge",
+    "Right Stuff",
+    "Stunty"
+   ],
+   "skill_categories": {
+    "normal": [
+     "Agility"
+    ],
+    "double": [
+     "General",
+     "Strength",
+     "Passing"
+    ]
+   }
+  },
+  {
+   "id": "goblin.troll",
+   "name": "Troll",
+   "display_name": "Troll",
+   "type": "Big Guy",
+   "quantity": 2,
+   "cost": 110000,
+   "ma": 4,
+   "st": 5,
+   "ag": 1,
+   "av": 9,
+   "shorthand": "T",
+   "skills": [
+    "Loner",
+    "Always Hungry",
+    "Mighty Blow",
+    "Really Stupid",
+    "Regeneration",
+    "Throw Team-Mate"
+   ],
+   "skill_categories": {
+    "normal": [
+     "Strength"
+    ],
+    "double": [
+     "General",
+     "Agility",
+     "Passing"
+    ]
+   }
+  },
+  {
+   "id": "goblin.bombardier",
+   "name": "Bombardier",
+   "display_name": "Bombardier",
+   "type": "Regular",
+   "quantity": 1,
+   "cost": 40000,
+   "ma": 6,
+   "st": 2,
+   "ag": 3,
+   "av": 7,
+   "shorthand": "B",
+   "skills": [
+    "Bombardier",
+    "Dodge",
+    "Secret Weapon",
+    "Stunty"
+   ],
+   "skill_categories": {
+    "normal": [
+     "Agility"
+    ],
+    "double": [
+     "General",
+     "Strength",
+     "Passing"
+    ]
+   }
+  },
+  {
+   "id": "goblin.pogoer",
+   "name": "Pogoer",
+   "display_name": "Pogoer",
+   "type": "Regular",
+   "quantity": 1,
+   "cost": 70000,
+   "ma": 7,
+   "st": 2,
+   "ag": 3,
+   "av": 7,
+   "shorthand": "P",
+   "skills": [
+    "Dodge",
+    "Leap",
+    "Stunty",
+    "Very Long Legs"
+   ],
+   "skill_categories": {
+    "normal": [
+     "Agility"
+    ],
+    "double": [
+     "General",
+     "Strength",
+     "Passing"
+    ]
+   }
+  },
+  {
+   "id": "goblin.looney",
+   "name": "Looney",
+   "display_name": "Looney",
+   "type": "Regular",
+   "quantity": 1,
+   "cost": 40000,
+   "ma": 6,
+   "st": 2,
+   "ag": 3,
+   "av": 7,
+   "shorthand": "L",
+   "skills": [
+    "Chainsaw",
+    "Secret Weapon",
+    "Stunty"
+   ],
+   "skill_categories": {
+    "normal": [
+     "Agility"
+    ],
+    "double": [
+     "General",
+     "Strength",
+     "Passing"
+    ]
+   }
+  },
+  {
+   "id": "goblin.fanatic",
+   "name": "Fanatic",
+   "display_name": "Fanatic",
+   "type": "Regular",
+   "quantity": 1,
+   "cost": 70000,
+   "ma": 3,
+   "st": 7,
+   "ag": 3,
+   "av": 7,
+   "shorthand": "F",
+   "skills": [
+    "Ball and Chain",
+    "No Hands",
+    "Secret Weapon",
+    "Stunty"
+   ],
+   "skill_categories": {
+    "normal": [
+     "Strength"
+    ],
+    "double": [
+     "General",
+     "Agility",
+     "Passing"
+    ]
+   }
+  }
+ ],
+ "name_generator": "default",
+ "infamous_staff": [
+  {
+   "id": "47520",
+   "name": "Josef Bugman",
+   "display_name": "Josef Bugman",
+   "type": "Infamous Staff",
+   "quantity": 1,
+   "cost": 100000,
+   "ma": 5,
+   "st": 3,
+   "ag": 3,
+   "av": 9,
+   "shorthand": "JB",
+   "skills": [
+    "Bugman's XXXXXX",
+    "Keen Player",
     {
-      "id": "goblin.goblin",
-      "name": "Goblin",
-      "display_name": "Goblin",
-      "type": "Regular",
-      "quantity": 16,
-      "cost": 40000,
-      "ma": 6,
-      "st": 2,
-      "ag": 3,
-      "pa": 4,
-      "av": 7,
-      "shorthand": "G",
-      "skills": [
-        "Dodge",
-        "Right Stuff",
-        "Stunty",
-        "Thick Skull",
-        "Animosity",
-        "Regeneration"
-      ],
-      "skill_categories": {
-        "normal": [
-          "Agility"
-        ],
-        "double": [
-          "General",
-          "Strength",
-          "Passing"
-        ]
-      }
+     "name": "Loner",
+     "value": 5
     },
+    "Tackle",
+    "Thick Skull",
+    "Wrestle"
+   ]
+  },
+  {
+   "id": "47520",
+   "name": "Josef Bugman",
+   "display_name": "Josef Bugman",
+   "type": "Infamous Staff",
+   "quantity": 1,
+   "cost": 100000,
+   "ma": 5,
+   "st": 3,
+   "ag": 3,
+   "av": 9,
+   "shorthand": "JB",
+   "skills": [
+    "Bugman's XXXXXX",
+    "Keen Player",
     {
-      "id": "goblin.troll",
-      "name": "Troll",
-      "display_name": "Troll",
-      "type": "Big Guy",
-      "quantity": 2,
-      "cost": 110000,
-      "ma": 4,
-      "st": 5,
-      "ag": 1,
-      "pa": 5,
-      "av": 9,
-      "shorthand": "T",
-      "skills": [
-        "Always Hungry",
-        "Loner",
-        "Mighty Blow",
-        "Really Stupid",
-        "Regeneration",
-        "Throw Team-Mate",
-        "Regeneration"
-      ],
-      "skill_categories": {
-        "normal": [
-          "Strength"
-        ],
-        "double": [
-          "General",
-          "Agility",
-          "Passing"
-        ]
-      }
+     "name": "Loner",
+     "value": 5
     },
-    {
-      "id": "goblin.bombardier",
-      "name": "Bombardier",
-      "display_name": "Bombardier",
-      "type": "Regular",
-      "quantity": 1,
-      "cost": 40000,
-      "ma": 6,
-      "st": 2,
-      "ag": 3,
-      "pa": 4,
-      "av": 7,
-      "shorthand": "B",
-      "skills": [
-        "Bombardier",
-        "Dodge",
-        "Secret Weapon",
-        "Stunty",
-        "Regeneration"
-      ],
-      "skill_categories": {
-        "normal": [
-          "Agility"
-        ],
-        "double": [
-          "General",
-          "Strength",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "goblin.pogoer",
-      "name": "Pogoer",
-      "display_name": "Pogoer",
-      "type": "Regular",
-      "quantity": 1,
-      "cost": 70000,
-      "ma": 7,
-      "st": 2,
-      "ag": 3,
-      "pa": 5,
-      "av": 7,
-      "shorthand": "P",
-      "skills": [
-        "Dodge",
-        "Leap",
-        "Stunty",
-        "Very Long Legs",
-        "Animosity",
-        "Regeneration"
-      ],
-      "skill_categories": {
-        "normal": [
-          "Agility"
-        ],
-        "double": [
-          "General",
-          "Strength",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "goblin.looney",
-      "name": "Looney",
-      "display_name": "Looney",
-      "type": "Regular",
-      "quantity": 1,
-      "cost": 40000,
-      "ma": 6,
-      "st": 2,
-      "ag": 3,
-      "pa": 0,
-      "av": 7,
-      "shorthand": "L",
-      "skills": [
-        "Chainsaw",
-        "Secret Weapon",
-        "Stunty",
-        "Animosity",
-        "Regeneration"
-      ],
-      "skill_categories": {
-        "normal": [
-          "Agility"
-        ],
-        "double": [
-          "General",
-          "Strength",
-          "Passing"
-        ]
-      }
-    },
-    {
-      "id": "goblin.fanatic",
-      "name": "Fanatic",
-      "display_name": "Fanatic",
-      "type": "Regular",
-      "quantity": 1,
-      "cost": 70000,
-      "ma": 3,
-      "st": 7,
-      "ag": 3,
-      "pa": 0,
-      "av": 7,
-      "shorthand": "F",
-      "skills": [
-        "Ball and Chain",
-        "No Hands",
-        "Secret Weapon",
-        "Stunty"
-      ],
-      "skill_categories": {
-        "normal": [
-          "Strength"
-        ],
-        "double": [
-          "General",
-          "Agility",
-          "Passing"
-        ]
-      }
-    }
-  ],
-  "name_generator": "default",
-  "infamous_staff": [
-    {
-      "id": "47520",
-      "name": "Josef Bugman",
-      "display_name": "Josef Bugman",
-      "type": "Infamous Staff",
-      "quantity": 1,
-      "cost": 100000,
-      "ma": 5,
-      "st": 3,
-      "ag": 3,
-      "pa": 6,
-      "av": 9,
-      "shorthand": "JB",
-      "skills": [
-        "Bugman's XXXXXX",
-        "Keen Player",
-        {
-          "name": "Loner",
-          "value": 5
-        },
-        "Tackle",
-        "Thick Skull",
-        "Wrestle"
-      ]
-    },
-    {
-      "id": "47520",
-      "name": "Josef Bugman",
-      "display_name": "Josef Bugman",
-      "type": "Infamous Staff",
-      "quantity": 1,
-      "cost": 100000,
-      "ma": 5,
-      "st": 3,
-      "ag": 3,
-      "pa": 6,
-      "av": 9,
-      "shorthand": "JB",
-      "skills": [
-        "Bugman's XXXXXX",
-        "Keen Player",
-        {
-          "name": "Loner",
-          "value": 5
-        },
-        "Tackle",
-        "Thick Skull",
-        "Wrestle"
-      ]
-    }
-  ]
+    "Tackle",
+    "Thick Skull",
+    "Wrestle"
+   ]
+  }
+ ]
 }

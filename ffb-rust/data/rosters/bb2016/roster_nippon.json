@@ -17,7 +17,6 @@
       "ma": 6,
       "st": 3,
       "ag": 3,
-      "pa": 4,
       "av": 9,
       "shorthand": "L",
       "skill_categories": {
@@ -42,7 +41,6 @@
       "ma": 7,
       "st": 3,
       "ag": 3,
-      "pa": 4,
       "av": 9,
       "shorthand": "Bl",
       "skills": [
@@ -69,7 +67,6 @@
       "ma": 7,
       "st": 3,
       "ag": 3,
-      "pa": 0,
       "av": 8,
       "shorthand": "WM",
       "skills": [
@@ -96,7 +93,6 @@
       "ma": 8,
       "st": 2,
       "ag": 2,
-      "pa": 4,
       "av": 8,
       "shorthand": "N",
       "skills": [
@@ -128,7 +124,6 @@
       "ma": 5,
       "st": 3,
       "ag": 3,
-      "pa": 6,
       "av": 9,
       "shorthand": "JB",
       "skills": [

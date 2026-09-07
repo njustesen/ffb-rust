@@ -2,7 +2,7 @@
 
 <roster id="lizardman.bb2020">
 	<name>Lizardman</name>
-	<reRollCost>60000</reRollCost>
+	<reRollCost>70000</reRollCost>
 	<maxReRolls>8</maxReRolls>
 	<apothecary>true</apothecary>
 	<position id="lizardman.skink">

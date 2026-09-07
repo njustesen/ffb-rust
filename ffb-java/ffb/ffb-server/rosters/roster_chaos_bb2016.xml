@@ -6,7 +6,7 @@
 	<maxReRolls>8</maxReRolls>
 	<apothecary>true</apothecary>
 	<position id="chaos.beastman">
-		<quantity>12</quantity>
+		<quantity>16</quantity>
 		<name>Chaos Beastman</name>
 		<displayName>Chaos Beastman</displayName>
 		<type>Regular</type>
@@ -14,7 +14,7 @@
 		<movement>6</movement>
 		<strength>3</strength>
 		<agility>3</agility>
-		<passing>4</passing>
+		<passing>0</passing>
 		<armour>8</armour>
 		<skillList>
 			<skill>Horns</skill>
@@ -36,7 +36,7 @@
 		<movement>5</movement>
 		<strength>4</strength>
 		<agility>3</agility>
-		<passing>5</passing>
+		<passing>0</passing>
 		<armour>9</armour>
 		<skillList/>
 		<skillCategoryList>

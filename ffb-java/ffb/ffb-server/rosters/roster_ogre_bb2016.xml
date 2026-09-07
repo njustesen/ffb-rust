@@ -14,7 +14,7 @@
 		<movement>5</movement>
 		<strength>1</strength>
 		<agility>3</agility>
-		<passing>5</passing>
+		<passing>0</passing>
 		<armour>5</armour>
 		<skillList>
 			<skill>Dodge</skill>
@@ -39,7 +39,7 @@
 		<movement>5</movement>
 		<strength>5</strength>
 		<agility>2</agility>
-		<passing>5</passing>
+		<passing>0</passing>
 		<armour>9</armour>
 		<skillList>
 			<skill>Bone-Head</skill>

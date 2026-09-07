@@ -1,7 +1,7 @@
 {
   "id": "amazon.lrb6",
   "name": "Amazon",
-  "reroll_cost": 50000,
+  "reroll_cost": 60000,
   "max_rerolls": 8,
   "apothecary": true,
   "undead": false,

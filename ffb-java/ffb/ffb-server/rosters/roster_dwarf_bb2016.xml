@@ -2,11 +2,11 @@
 
 <roster id="dwarf.bb2016">
 	<name>Dwarf</name>
-	<reRollCost>40000</reRollCost>
+	<reRollCost>50000</reRollCost>
 	<maxReRolls>8</maxReRolls>
 	<apothecary>true</apothecary>
 	<position id="dwarf.blocker">
-		<quantity>12</quantity>
+		<quantity>16</quantity>
 		<name>Blocker</name>
 		<displayName>Blocker</displayName>
 		<type>Regular</type>
@@ -14,7 +14,7 @@
 		<movement>4</movement>
 		<strength>3</strength>
 		<agility>2</agility>
-		<passing>5</passing>
+		<passing>0</passing>
 		<armour>9</armour>
 		<skillList>
 			<skill>Block</skill>
@@ -37,7 +37,7 @@
 		<movement>5</movement>
 		<strength>3</strength>
 		<agility>3</agility>
-		<passing>4</passing>
+		<passing>0</passing>
 		<armour>9</armour>
 		<skillList>
 			<skill>Block</skill>
@@ -59,7 +59,7 @@
 		<movement>6</movement>
 		<strength>3</strength>
 		<agility>3</agility>
-		<passing>4</passing>
+		<passing>0</passing>
 		<armour>8</armour>
 		<skillList>
 			<skill>Sure Hands</skill>
@@ -108,6 +108,7 @@
 		<passing>0</passing>
 		<armour>10</armour>
 		<skillList>
+			<skill>Loner</skill>
 			<skill>Break Tackle</skill>
 			<skill>Dirty Player</skill>
 			<skill>Juggernaut</skill>

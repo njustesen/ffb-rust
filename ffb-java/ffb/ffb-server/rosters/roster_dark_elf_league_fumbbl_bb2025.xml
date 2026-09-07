@@ -25,6 +25,10 @@
 			<double>Strength</double>
 			<double>Passing</double>
 		</skillCategoryList>
+		<keywords>
+			<keyword>Blitzer</keyword>
+			<keyword>Dark Elf</keyword>
+		</keywords>
 	</position>
 	<position id="37734">
 		<quantity>12</quantity>
@@ -43,6 +47,10 @@
 			<normal>Agility</normal>
 			<double>Strength</double>
 		</skillCategoryList>
+		<keywords>
+			<keyword>Lineman</keyword>
+			<keyword>Dark Elf</keyword>
+		</keywords>
 	</position>
 	<position id="37737">
 		<quantity>2</quantity>
@@ -65,6 +73,10 @@
 			<double>Strength</double>
 			<double>Passing</double>
 		</skillCategoryList>
+		<keywords>
+			<keyword>Assassin</keyword>
+			<keyword>Dark Elf</keyword>
+		</keywords>
 	</position>
 	<position id="37735">
 		<quantity>2</quantity>
@@ -86,6 +98,10 @@
 			<normal>Passing</normal>
 			<double>Strength</double>
 		</skillCategoryList>
+		<keywords>
+			<keyword>Runner</keyword>
+			<keyword>Dark Elf</keyword>
+		</keywords>
 	</position>
 	<position id="37738">
 		<quantity>2</quantity>
@@ -109,5 +125,9 @@
 			<double>Strength</double>
 			<double>Passing</double>
 		</skillCategoryList>
+		<keywords>
+			<keyword>Witch Elf</keyword>
+			<keyword>Dark Elf</keyword>
+		</keywords>
 	</position>
 </roster>

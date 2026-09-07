@@ -2,7 +2,7 @@
 
 <roster id="dwarf.bb2020">
 	<name>Dwarf</name>
-	<reRollCost>40000</reRollCost>
+	<reRollCost>50000</reRollCost>
 	<maxReRolls>8</maxReRolls>
 	<apothecary>true</apothecary>
 	<position id="dwarf.dwarfblockerlineman">

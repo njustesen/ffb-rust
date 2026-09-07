@@ -66,6 +66,11 @@ pub struct PositionJson {
     pub ma: i32,
     pub st: i32,
     pub ag: i32,
+    /// LRB6/CRP has NO PA characteristic -- passing is AG-based there -- and the bb2016 team
+    /// pages carry no PA column, so bb2016 rosters omit the field entirely. Defaulting to 0 is
+    /// safe on that path: only the bb2020/bb2025 `RollMechanic`s map `InjuryAttribute::PA` to
+    /// `player.passing`, and `state_string` hashes MA/ST/AG/AV only, never passing.
+    #[serde(default)]
     pub pa: i32,
     pub av: i32,
     #[serde(default)]
@@ -100,6 +105,11 @@ pub struct StarPlayerJson {
     pub ma: i32,
     pub st: i32,
     pub ag: i32,
+    /// LRB6/CRP has NO PA characteristic -- passing is AG-based there -- and the bb2016 team
+    /// pages carry no PA column, so bb2016 rosters omit the field entirely. Defaulting to 0 is
+    /// safe on that path: only the bb2020/bb2025 `RollMechanic`s map `InjuryAttribute::PA` to
+    /// `player.passing`, and `state_string` hashes MA/ST/AG/AV only, never passing.
+    #[serde(default)]
     pub pa: i32,
     pub av: i32,
     #[serde(default)]

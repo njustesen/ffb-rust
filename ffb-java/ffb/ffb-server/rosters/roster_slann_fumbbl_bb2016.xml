@@ -14,7 +14,7 @@
 		<movement>7</movement>
 		<strength>3</strength>
 		<agility>3</agility>
-		<passing>-1</passing>
+		<passing>0</passing>
 		<armour>8</armour>
 		<skillList>
 			<skill>Diving Tackle</skill>
@@ -38,7 +38,7 @@
 		<movement>7</movement>
 		<strength>2</strength>
 		<agility>4</agility>
-		<passing>-1</passing>
+		<passing>0</passing>
 		<armour>7</armour>
 		<skillList>
 			<skill>Diving Catch</skill>
@@ -61,7 +61,7 @@
 		<movement>6</movement>
 		<strength>5</strength>
 		<agility>1</agility>
-		<passing>-1</passing>
+		<passing>0</passing>
 		<armour>9</armour>
 		<skillList>
 			<skill>Bone-Head</skill>
@@ -86,7 +86,7 @@
 		<movement>6</movement>
 		<strength>3</strength>
 		<agility>3</agility>
-		<passing>-1</passing>
+		<passing>0</passing>
 		<armour>8</armour>
 		<skillList>
 			<skill>Leap</skill>

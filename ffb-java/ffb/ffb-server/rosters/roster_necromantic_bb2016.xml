@@ -17,7 +17,7 @@
 		<movement>8</movement>
 		<strength>3</strength>
 		<agility>3</agility>
-		<passing>4</passing>
+		<passing>0</passing>
 		<armour>8</armour>
 		<skillList>
 			<skill>Claw</skill>
@@ -85,7 +85,7 @@
 		<movement>7</movement>
 		<strength>3</strength>
 		<agility>3</agility>
-		<passing>4</passing>
+		<passing>0</passing>
 		<armour>7</armour>
 		<skillList>
 			<skill>Dodge</skill>
@@ -102,7 +102,7 @@
 		<name>Zombie</name>
 		<displayName>Zombie</displayName>
 		<type>Regular</type>
-		<cost>30000</cost>
+		<cost>40000</cost>
 		<movement>4</movement>
 		<strength>3</strength>
 		<agility>2</agility>

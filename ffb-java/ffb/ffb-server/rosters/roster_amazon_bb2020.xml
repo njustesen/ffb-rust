@@ -2,7 +2,7 @@
 
 <roster id="amazon.bb2020">
 	<name>Amazon</name>
-	<reRollCost>50000</reRollCost>
+	<reRollCost>60000</reRollCost>
 	<maxReRolls>8</maxReRolls>
 	<apothecary>true</apothecary>
 	<position id="amazon.linewoman">

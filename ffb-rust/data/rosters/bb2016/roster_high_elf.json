@@ -17,7 +17,6 @@
       "ma": 6,
       "st": 3,
       "ag": 4,
-      "pa": 4,
       "av": 8,
       "skill_categories": {
         "normal": [
@@ -40,7 +39,6 @@
       "ma": 6,
       "st": 3,
       "ag": 4,
-      "pa": 2,
       "av": 8,
       "skills": [
         "Pass",
@@ -67,7 +65,6 @@
       "ma": 7,
       "st": 3,
       "ag": 4,
-      "pa": 4,
       "av": 8,
       "skills": [
         "Block"
@@ -93,7 +90,6 @@
       "ma": 8,
       "st": 3,
       "ag": 4,
-      "pa": 5,
       "av": 7,
       "skills": [
         "Catch"
@@ -121,7 +117,6 @@
       "ma": 5,
       "st": 3,
       "ag": 3,
-      "pa": 6,
       "av": 9,
       "shorthand": "JB",
       "skills": [

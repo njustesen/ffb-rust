@@ -16,7 +16,7 @@
 		<movement>6</movement>
 		<strength>4</strength>
 		<agility>4</agility>
-		<passing>3</passing>
+		<passing>0</passing>
 		<armour>8</armour>
 		<skillList>
 			<skill>Blood Lust</skill>
@@ -39,7 +39,7 @@
 		<movement>6</movement>
 		<strength>3</strength>
 		<agility>3</agility>
-		<passing>5</passing>
+		<passing>0</passing>
 		<armour>7</armour>
 		<skillList/>
 		<skillCategoryList>

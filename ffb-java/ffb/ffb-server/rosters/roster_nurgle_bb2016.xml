@@ -15,7 +15,7 @@
 		<movement>5</movement>
 		<strength>3</strength>
 		<agility>3</agility>
-		<passing>6</passing>
+		<passing>0</passing>
 		<armour>8</armour>
 		<skillList>
 			<skill>Decay</skill>
@@ -38,7 +38,7 @@
 		<movement>6</movement>
 		<strength>3</strength>
 		<agility>3</agility>
-		<passing>4</passing>
+		<passing>0</passing>
 		<armour>8</armour>
 		<skillList>
 			<skill>Horns</skill>
@@ -62,7 +62,7 @@
 		<movement>4</movement>
 		<strength>4</strength>
 		<agility>2</agility>
-		<passing>6</passing>
+		<passing>0</passing>
 		<armour>9</armour>
 		<skillList>
 			<skill>Disturbing Presence</skill>

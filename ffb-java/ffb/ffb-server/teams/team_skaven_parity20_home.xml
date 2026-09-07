@@ -12,9 +12,9 @@
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1080000</currentTeamValue>
+	<currentTeamValue>1050000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>10000</treasury>
+	<treasury>40000</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamSkavenParity20Home1">

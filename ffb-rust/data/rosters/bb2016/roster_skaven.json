@@ -17,7 +17,6 @@
       "ma": 6,
       "st": 5,
       "ag": 2,
-      "pa": 0,
       "av": 8,
       "skills": [
         "Loner",
@@ -48,7 +47,6 @@
       "ma": 7,
       "st": 3,
       "ag": 3,
-      "pa": 5,
       "av": 8,
       "skills": [
         "Block"
@@ -75,7 +73,6 @@
       "ma": 9,
       "st": 2,
       "ag": 4,
-      "pa": 4,
       "av": 7,
       "skills": [
         "Dodge"
@@ -102,7 +99,6 @@
       "ma": 7,
       "st": 3,
       "ag": 3,
-      "pa": 2,
       "av": 7,
       "skills": [
         "Pass",
@@ -130,7 +126,6 @@
       "ma": 7,
       "st": 3,
       "ag": 3,
-      "pa": 4,
       "av": 7,
       "skill_categories": {
         "normal": [

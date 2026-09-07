@@ -1,7 +1,7 @@
 {
   "id": "skaven.lrb6",
   "name": "Skaven",
-  "reroll_cost": 60000,
+  "reroll_cost": 50000,
   "max_rerolls": 8,
   "apothecary": true,
   "undead": false,

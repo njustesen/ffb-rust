@@ -17,7 +17,6 @@
       "ma": 4,
       "st": 5,
       "ag": 1,
-      "pa": 0,
       "av": 9,
       "skills": [
         "Decay",
@@ -44,7 +43,6 @@
       "ma": 6,
       "st": 3,
       "ag": 2,
-      "pa": 6,
       "av": 8,
       "skills": [
         "Block",
@@ -71,7 +69,6 @@
       "ma": 6,
       "st": 3,
       "ag": 2,
-      "pa": 3,
       "av": 7,
       "skills": [
         "Pass",
@@ -99,7 +96,6 @@
       "ma": 5,
       "st": 3,
       "ag": 2,
-      "pa": 6,
       "av": 7,
       "skills": [
         "Regeneration",

@@ -14,15 +14,12 @@
 		<movement>6</movement>
 		<strength>2</strength>
 		<agility>3</agility>
-		<passing>4</passing>
+		<passing>0</passing>
 		<armour>7</armour>
 		<skillList>
 			<skill>Dodge</skill>
 			<skill>Right Stuff</skill>
 			<skill>Stunty</skill>
-			<skill>Thick Skull</skill>
-			<skill>Animosity</skill>
-			<skill>Regeneration</skill>
 		</skillList>
 		<skillCategoryList>
 			<normal>Agility</normal>
@@ -40,16 +37,15 @@
 		<movement>4</movement>
 		<strength>5</strength>
 		<agility>1</agility>
-		<passing>5</passing>
+		<passing>0</passing>
 		<armour>9</armour>
 		<skillList>
-			<skill>Always Hungry</skill>
 			<skill>Loner</skill>
+			<skill>Always Hungry</skill>
 			<skill>Mighty Blow</skill>
 			<skill>Really Stupid</skill>
 			<skill>Regeneration</skill>
 			<skill>Throw Team-Mate</skill>
-			<skill>Regeneration</skill>
 		</skillList>
 		<skillCategoryList>
 			<normal>Strength</normal>
@@ -67,14 +63,13 @@
 		<movement>6</movement>
 		<strength>2</strength>
 		<agility>3</agility>
-		<passing>4</passing>
+		<passing>0</passing>
 		<armour>7</armour>
 		<skillList>
 			<skill>Bombardier</skill>
 			<skill>Dodge</skill>
 			<skill>Secret Weapon</skill>
 			<skill>Stunty</skill>
-			<skill>Regeneration</skill>
 		</skillList>
 		<skillCategoryList>
 			<normal>Agility</normal>
@@ -92,15 +87,13 @@
 		<movement>7</movement>
 		<strength>2</strength>
 		<agility>3</agility>
-		<passing>5</passing>
+		<passing>0</passing>
 		<armour>7</armour>
 		<skillList>
 			<skill>Dodge</skill>
 			<skill>Leap</skill>
 			<skill>Stunty</skill>
 			<skill>Very Long Legs</skill>
-			<skill>Animosity</skill>
-			<skill>Regeneration</skill>
 		</skillList>
 		<skillCategoryList>
 			<normal>Agility</normal>
@@ -124,8 +117,6 @@
 			<skill>Chainsaw</skill>
 			<skill>Secret Weapon</skill>
 			<skill>Stunty</skill>
-			<skill>Animosity</skill>
-			<skill>Regeneration</skill>
 		</skillList>
 		<skillCategoryList>
 			<normal>Agility</normal>

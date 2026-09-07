@@ -2,9 +2,9 @@
 
 <roster id="vampire.bb2020">
 	<name>Vampire</name>
-	<reRollCost>70000</reRollCost>
+	<reRollCost>60000</reRollCost>
 	<maxReRolls>8</maxReRolls>
-	<apothecary>false</apothecary>
+	<apothecary>true</apothecary>
 	<undead>true</undead>
 	<raisedPositionId>vampire.thrall</raisedPositionId>
 	<position id="vampire.thrall">

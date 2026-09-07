@@ -37,7 +37,7 @@
 		<movement>6</movement>
 		<strength>3</strength>
 		<agility>2</agility>
-		<passing>6</passing>
+		<passing>0</passing>
 		<armour>8</armour>
 		<skillList>
 			<skill>Block</skill>
@@ -59,7 +59,7 @@
 		<movement>6</movement>
 		<strength>3</strength>
 		<agility>2</agility>
-		<passing>3</passing>
+		<passing>0</passing>
 		<armour>7</armour>
 		<skillList>
 			<skill>Pass</skill>
@@ -82,7 +82,7 @@
 		<movement>5</movement>
 		<strength>3</strength>
 		<agility>2</agility>
-		<passing>6</passing>
+		<passing>0</passing>
 		<armour>7</armour>
 		<skillList>
 			<skill>Regeneration</skill>

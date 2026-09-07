@@ -14,7 +14,7 @@
 		<movement>4</movement>
 		<strength>5</strength>
 		<agility>1</agility>
-		<passing>5</passing>
+		<passing>0</passing>
 		<armour>9</armour>
 		<skillList>
 			<skill>Loner</skill>
@@ -40,7 +40,7 @@
 		<movement>6</movement>
 		<strength>3</strength>
 		<agility>3</agility>
-		<passing>4</passing>
+		<passing>0</passing>
 		<armour>9</armour>
 		<skillList>
 			<skill>Block</skill>
@@ -80,7 +80,7 @@
 		<movement>5</movement>
 		<strength>3</strength>
 		<agility>3</agility>
-		<passing>3</passing>
+		<passing>0</passing>
 		<armour>8</armour>
 		<skillList>
 			<skill>Pass</skill>
@@ -102,7 +102,7 @@
 		<movement>6</movement>
 		<strength>2</strength>
 		<agility>3</agility>
-		<passing>4</passing>
+		<passing>0</passing>
 		<armour>7</armour>
 		<skillList>
 			<skill>Right Stuff</skill>
@@ -125,7 +125,7 @@
 		<movement>5</movement>
 		<strength>3</strength>
 		<agility>3</agility>
-		<passing>4</passing>
+		<passing>0</passing>
 		<armour>9</armour>
 		<skillList/>
 		<skillCategoryList>

@@ -1,9 +1,9 @@
 {
   "id": "vampire.lrb6",
   "name": "Vampire",
-  "reroll_cost": 70000,
+  "reroll_cost": 60000,
   "max_rerolls": 8,
-  "apothecary": false,
+  "apothecary": true,
   "undead": true,
   "necromancer": false,
   "positions": [

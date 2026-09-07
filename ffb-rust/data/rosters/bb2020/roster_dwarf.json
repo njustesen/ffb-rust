@@ -1,7 +1,7 @@
 {
   "id": "dwarf.lrb6",
   "name": "Dwarf",
-  "reroll_cost": 40000,
+  "reroll_cost": 50000,
   "max_rerolls": 8,
   "apothecary": true,
   "undead": false,

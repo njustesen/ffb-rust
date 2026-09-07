@@ -1,7 +1,7 @@
 {
   "id": "lizardman.lrb6",
   "name": "Lizardman",
-  "reroll_cost": 60000,
+  "reroll_cost": 70000,
   "max_rerolls": 8,
   "apothecary": true,
   "undead": false,

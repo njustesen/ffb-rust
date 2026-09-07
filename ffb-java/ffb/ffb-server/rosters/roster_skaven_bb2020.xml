@@ -2,7 +2,7 @@
 
 <roster id="skaven.bb2020">
 	<name>Skaven</name>
-	<reRollCost>60000</reRollCost>
+	<reRollCost>50000</reRollCost>
 	<maxReRolls>8</maxReRolls>
 	<apothecary>true</apothecary>
 	<position id="skaven.lineman">

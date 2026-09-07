@@ -28,6 +28,10 @@
 			<double>Agility</double>
 			<double>Strength</double>
 		</skillCategoryList>
+		<keywords>
+			<keyword>Thrower</keyword>
+			<keyword>Skeleton</keyword>
+		</keywords>
 	</position>
 	<position id="2892">
 		<quantity>16</quantity>
@@ -50,6 +54,10 @@
 			<double>Strength</double>
 			<double>Passing</double>
 		</skillCategoryList>
+		<keywords>
+			<keyword>Lineman</keyword>
+			<keyword>Skeleton</keyword>
+		</keywords>
 	</position>
 	<position id="2895">
 		<quantity>4</quantity>
@@ -72,6 +80,10 @@
 			<double>Agility</double>
 			<double>Passing</double>
 		</skillCategoryList>
+		<keywords>
+			<keyword>Blocker</keyword>
+			<keyword>Skeleton</keyword>
+		</keywords>
 	</position>
 	<position id="2894">
 		<quantity>2</quantity>
@@ -94,5 +106,9 @@
 			<double>Agility</double>
 			<double>Passing</double>
 		</skillCategoryList>
+		<keywords>
+			<keyword>Blitzer</keyword>
+			<keyword>Skeleton</keyword>
+		</keywords>
 	</position>
 </roster>

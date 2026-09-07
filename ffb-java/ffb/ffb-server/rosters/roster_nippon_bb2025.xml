@@ -23,6 +23,10 @@
 			<double>Strength</double>
 			<double>Passing</double>
 		</skillCategoryList>
+		<keywords>
+			<keyword>Lineman</keyword>
+			<keyword>Human</keyword>
+		</keywords>
 	</position>
 	<position id="43572">
 		<quantity>4</quantity>
@@ -44,6 +48,10 @@
 			<double>Agility</double>
 			<double>Passing</double>
 		</skillCategoryList>
+		<keywords>
+			<keyword>Blitzer</keyword>
+			<keyword>Human</keyword>
+		</keywords>
 	</position>
 	<position id="43573">
 		<quantity>2</quantity>
@@ -65,6 +73,10 @@
 			<double>Strength</double>
 			<double>Passing</double>
 		</skillCategoryList>
+		<keywords>
+			<keyword>Special</keyword>
+			<keyword>Human</keyword>
+		</keywords>
 	</position>
 	<position id="43574">
 		<quantity>2</quantity>
@@ -87,5 +99,9 @@
 			<double>Strength</double>
 			<double>Passing</double>
 		</skillCategoryList>
+		<keywords>
+			<keyword>Special</keyword>
+			<keyword>Human</keyword>
+		</keywords>
 	</position>
 </roster>
