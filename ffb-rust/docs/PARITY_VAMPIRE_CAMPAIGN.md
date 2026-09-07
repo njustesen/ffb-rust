@@ -250,3 +250,60 @@ Practical rules: keep it to two or three streams; build the gating binary into a
 `CARGO_TARGET_DIR`; and treat any 0/100 that contradicts a neighbouring scale of the same race as a
 suspect measurement until it has been reproduced alone. Every red in this iteration that was NOT
 reproducible alone came from one of these two causes, not from the engine.
+
+## ITER2 — 2026-09-07: the bb2016 baseline was STALE and the sampler is exonerated
+
+**The recorded frontier was wrong, not unsolved.** ITER1 left bb2016 at "0/100 at baseline, 0/20
+after Fix 4" and named the two-level re-pick sampler as the suspect, on the evidence that at
+bb2016 seed 8 the candidate lists agreed in order, the weights were bit-identical (`w=3db16873`,
+all 2018 entries) and both sides reported `draws=7`, yet Java picked H11/MOVE and Rust H10/MOVE.
+
+That is no longer reproducible. **Seed 8 now passes** (`PARITY: 1/1 games match`), and bb2016
+`@1.0` measures **4/8 on seeds 1-8**, not 0. The intervening sweep fixes (skaven's give
+declaration, slann's dodge pair, the trap-door chain, and the rest of the 30-race sweep) closed
+it; nobody re-measured vampire afterwards. **Re-measure a stale red before designing an
+instrument for it** — the whole ITER1 frontier section was describing a fixed bug.
+
+### The sampler is not the fault, and the old probe could not have shown that
+
+Added `FFB_GRP=1` to BOTH agents, printing the level that actually decides — group count, the
+temperature, the RAW draw as bits, the pick, and the group weights: `RGRP` in Rust's
+`softmax_pick` (`heuristic_agent.rs`), `JGRP` in `Sampler.softmaxPick` (the co-editable parity
+harness). On seed 8 the two streams are **239 picks, byte-identical after normalisation** — same
+lengths, same `t`, same `r`, same picks, same weights.
+
+**Why `FFB_CANDSUM` could never have settled this.** It aggregates candidates per
+`(player, action)` through a `BTreeMap`, so two NON-ADJACENT runs of one declaration merge into a
+single count there, while `group_declarations` (contiguous runs) hands the sampler two groups.
+The probe the ITER1 frontier relied on is structurally blind to the group boundaries that set
+`gi`, so "lists identical, weights identical, draws equal" was never evidence that the group-level
+inputs agreed. It happens that they do agree — but that had not been measured.
+
+Both samplers were also read line-for-line and are faithful: same `len <= 1` guard, same
+`-Float.MAX_VALUE` / `f32::MIN` max seed, same sequential accumulation, same normalisation, same
+`r < c` walk with the `len - 1` fall-through. Rust's real EndTurn option at weight 0.0 and Java's
+virtual `allW[endIdx] = 0.0f` slot are equivalent, and `groupDeclarations` matches
+`group_declarations` key-for-key.
+
+### The real frontier
+
+`MATCHUP=vampire sh scripts/first_state_divergence.sh bb2016 3`:
+
+```
+seed 3    first hash diff idx 9     resolving idx 8    R t2 home Activate(home_01,Blitz)
+   i=8    R t2  home Activate(home_06,Move)   | J t2  home Activate(Home6,MOVE)
+   i=9    R t2  home Activate(home_01,Blitz)  | J t2  home Activate(Home1,BLITZ_MOVE)
+   i=10   R t3  home Activate(home_08,Move)   | J t2  away Activate(Away11,MOVE)   <-- DIFF
+```
+
+The declarations AGREE — `Move`/`MOVE` and `Blitz`/`BLITZ_MOVE` are the two engines' log spellings
+of the same declaration (the matching `i=7`/`i=8` pairs prove the casing is cosmetic). The hash
+diff at `idx 9` is produced by the RESOLUTION of `i=8`, home_06's Move. Seed 2 fails the same way
+(step 20, pre-state hash already apart).
+
+Next: diff the board at `i=8`/`i=9` for seed 3 with `FFB_IDSTATE`/`JIDSTATE` — the hash cannot see
+players `nr > 11` or a player's ACTIVE bit, so use the id-state dump, not the hash.
+
+Measured: bb2016 `@1.0` seeds 1-8 = 4/8 (seeds 2, 3 and two of 5-8 red). bb2020/bb2025 not
+re-measured this iteration; their ITER1 numbers (100/98/100 and 99/95/100) are also suspect for
+the same staleness reason.
