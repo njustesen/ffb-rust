@@ -842,3 +842,43 @@ caveat applies to every bb2016 🟢 carried over from §11.
    than a crash: every one of those gates would have been reported against the wrong column. The
    batch runner now reads the scale back out of each run's own banner. **`ffb-parity`'s
    `unwrap_or(0.0)` on the scale argument should reject a bad value instead** — filed as follow-up.
+
+## 14. The matrix after the R1-R5 roster corrections — 2026-09-07
+
+84 gates re-measured on the corrected data (`scripts/gate_batch.ps1`: one gate at a time, pinned to
+4 of 16 CPUs, per-gate `FFB_PARITY_ROOT`). Every bb2016 race was re-gated at all three scales
+because the PA strip touched all 29 of its rosters; the 5 changed bb2020 races were re-gated too.
+The bb2025 column was not touched by these changes and carries forward from §13.
+
+**Stripping PA is behaviour-neutral, measured not assumed.** Three pure PA-only controls (human,
+orc, khemri) and every other unchanged bb2016 race came back 100/100 at all three scales.
+
+| | bb2016 | bb2020 | bb2025 | total |
+|---|---|---|---|---|
+| 🟢 | 21 | 24 | 24 | **69** |
+| 🔴 | 3 | 5 | 6 | **14** |
+| N/A | 8 | 4 | 1 | 13 |
+
+Against §13's 59/24 and §11's 49/34. Ten cells flipped green on the provenance fixes alone:
+bb2016 `chaos` `dwarf` `goblin` `halfling` `undead` `wood_elf`, bb2020 `amazon` `dwarf`
+`lizardman` `skaven`.
+
+### The corrections exposed TWO new reds, which is the point
+
+Both were green before and are red on rule-legal data. Neither is a regression: the old squads were
+illegal (over budget, or fielding a position that is not on the CRP page), and an illegal squad
+cannot reach the paths a legal one does.
+
+1. **`necromantic` bb2016 — 98/100 @1.0, 99/100 @0, 99/100 @1e6.** Its Zombie cost was 30k against
+   the page's 40k, which had kept the squad 60,000 OVER budget. Both @1.0 failures (seeds 47, 56)
+   diverge at the **first activation of half 2**.
+2. **`underworld` bb2016 @0 — 99/100 (seed 100).** Its roster listed a Mutant Rat Ogre that is not
+   on the CRP page at all, and its squad fielded two of them plus 3 skaven linemen (cap 2) and 2
+   warpstone trolls (cap 1). On the re-drafted legal squad the divergence is at `i=68`, half 1
+   turn 5, resolving a **Blitz at i=67** into a **Foul** declaration. @1.0 and @1e6 are 100/100.
+
+### A reading note on this batch
+
+Seven gates print `100/100 games match, but required coverage items are MISSING` and exit 1. That
+is the **tier-3 coverage checklist**, not parity: those cells are parity-GREEN and counted as such
+here, consistent with how §12 counted the same trailer.
