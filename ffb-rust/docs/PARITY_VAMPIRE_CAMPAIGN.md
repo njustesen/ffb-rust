@@ -181,6 +181,19 @@ human, khemri, lizardman, necromantic, nippon, norse, nurgle, ogre, orc, renegad
 slann_fumbbl, underworld, wood_elf. (The Leap carriers' remaining six gates each are PENDING — see
 the measurement note below.)
 
+## Event coverage (harvested alone, `MATCHUP=vampire scripts/harvest_coverage.sh <edition> 1.0`)
+
+`docs/EVENT_COVERAGE_vampire_bb2016.md` / `_bb2020.md` / `_bb2025.md`. Per notable skill:
+
+| skill | verdict | evidence |
+|---|---|---|
+| **Bloodlust** | exercised + evented | `bloodLustRoll` 4,389 (bb2016) / 5,359 (bb2020) / 6,592 (bb2025) over 100 games each |
+| **feeding after a failed Bloodlust** | exercised + evented | `biteSpectator` 628 / 1,093 / 1,317 — that event is the FAILED-to-feed branch (`StepInitFeeding` with no ST<=3 adjacent victim); a SUCCESSFUL feed on a thrall has no event of its own and is hash-verified only |
+| **Regeneration** | exercised + evented | `regenerationRoll` 41 / 73 / 78 |
+| **Juggernaut** (Vampire Blitzer) | exercised + evented | `skillUse` 47 (bb2020) / 36 (bb2025), all `Juggernaut`, both `used=true` and `used=false` |
+| **Hypnotic Gaze** | **UNREACHABLE under the parity contract** | bb2016 is the only edition whose eligible list offers `PlayerAction.GAZE`, and `ParityRunner.isHandledActingAction` has no GAZE arm, so BOTH harnesses now discard the declaration (`UNHANDLED_ACTING_ACTION_AT_PICK: GAZE`, no step logged). The declared-action histogram has no Gaze row in any edition. This is a harness-contract gap, not a Rust gap — filed as BACKLOG E17 |
+| **Claws / Frenzy / Loner 4** (Vargheist) | exercised, unevented | no emit site (BACKLOG E6, the general "skills are used silently" finding). Frenzy is visible only as extra blocks: 1,368 `blockRoll` for 1,304 `block` in bb2020 |
+
 ## Frontier / next step
 
 1. **bb2016 @1.0, 52 reds — unclassified.** This is the biggest block left and no family analysis

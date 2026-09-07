@@ -4362,3 +4362,27 @@ already known and should not be re-derived:
   about the engine.
 
 Also open, and smaller: bb2025 `@1.0` 1 red / `@0` 5 reds, bb2020 `@0` 2 reds — all unclassified.
+
+### E17. Hypnotic Gaze is unreachable under the parity contract (harness gap)
+
+Found closing vampire on 2026-09-07, `docs/PARITY_VAMPIRE_CAMPAIGN.md`. Both engines implement the
+gaze (`step/bb2016/move_/step_hypnotic_gaze.rs` and the bb2020+ `SelectGazeTarget`/`LookIntoMyEyes`
+family), but no parity run can ever execute one:
+
+* Only bb2016's eligible-action builder offers it: `computeEligiblePlayers` adds
+  `PlayerAction.GAZE` for `canGazeDuringMove`, a bb2016-only property. bb2020/bb2025 use it as a
+  mid-move skill, and the agents never declare it there.
+* `ParityRunner.isHandledActingAction` has no `GAZE` case — only `AUTO_GAZE_ZOAT` and `BLACK_INK`,
+  the two star gazes that are declared as command PAIRS. So a declared GAZE falls to the
+  `sendConcreteAction` default arm, which deselects.
+* As of the vampire iteration, Rust's heuristic agent mirrors that discard, so both sides now
+  agree to do nothing. The declared-action histogram has no `Gaze` row in ANY edition
+  (`docs/EVENT_COVERAGE_vampire_bb2016.md`), and the gate log prints
+  `UNHANDLED_ACTING_ACTION_AT_PICK: GAZE ...` for each one.
+
+To close it, `sendConcreteAction` needs a `case GAZE:` that injects what the client sends — a
+`ClientCommandGaze(playerId, victimId)` after the `ActingPlayer(GAZE)` declaration — plus a target
+rule both agents can share (the coordinate-sorted adjacent opponents, one actionRng draw, same
+shape as `sendBlitzTargetSelection`). Expect it to expose engine bugs on first execution: this is
+the same "declared then instantly deselected in both engines, so the mechanic is dead and every
+matrix is green because of it" shape as Kick Team-Mate (§TTM) and Furious Outburst.
