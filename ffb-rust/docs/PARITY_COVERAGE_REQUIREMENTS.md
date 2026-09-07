@@ -163,3 +163,37 @@ Old World Alliance means **2 variants** (Ogre and Treeman) and for Snotling howe
 Big Guy rule requires. A new §6 item is added: **re-draft or add variants for the 10 squads above**,
 which is cheaper than drafting a new team and closes 13 slots of missing evidence on races already
 reported green.
+
+## 9. bb2016 characteristics — the conversion, stated correctly
+
+`rules/bb2016/teams/*.md` warn: *"LRB6 prints bare characteristics; BB2020+ prints roll targets.
+AG 4 here is not AG 4+ there."* That warning has been misread once already, so the facts, verified
+against the engine and the data:
+
+**The LRB6 agility TABLE, not an off-by-one.** BB2016 resolves an agility test through
+`dodge_target` (`crates/ffb-engine/src/agent/heuristic_agent.rs:180`):
+
+```rust
+Rules::Bb2016 => ((7 - ag.min(6)) - 1 + tz_on_dest).max(2),   // bb2016: bare AG -> target
+_             => (ag + tz_on_dest).max(2),                     // bb2020+: ag IS the target
+```
+
+So the bare-characteristic to roll-target mapping is `target = 6 - AG`:
+
+| bare AG (LRB6) | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|
+| equivalent roll target | 5+ | 4+ | 3+ | **2+** | 1+ (clamped 2+) | 0+ (clamped 2+) |
+
+**AG 4 becomes 2+, NOT 4+.** An earlier note in this campaign said "AG 4 -> 4+"; that was wrong.
+
+**Therefore no storage conversion is required.** `data/rosters/bb2016/*.json` already stores the
+BARE characteristic exactly as the page prints it — verified: the LRB6 Amazon Blitzer/Catcher/
+Thrower print AG 3 and the JSON stores `ag: 3`. The edition formula above does the conversion at
+roll time. A bb2016 reconciliation must therefore compare **bare page value against bare stored
+value, with NO arithmetic**. Applying any conversion during the audit would corrupt all 22 bb2016
+rosters.
+
+**Open question for the audit, do not assume:** LRB6 has no PA characteristic at all (passing is
+AG-based), yet the bb2016 JSONs carry e.g. `pa: 5`. Establish what that field means for bb2016
+(schema filler? derived?) and whether it should be excluded from the reconciliation, rather than
+"fixing" it against a page that never prints it.
