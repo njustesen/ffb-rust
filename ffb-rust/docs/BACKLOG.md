@@ -4404,3 +4404,90 @@ rule both agents can share (the coordinate-sorted adjacent opponents, one action
 shape as `sendBlitzTargetSelection`). Expect it to expose engine bugs on first execution: this is
 the same "declared then instantly deselected in both engines, so the mechanic is dead and every
 matrix is green because of it" shape as Kick Team-Mate (§TTM) and Furious Outburst.
+
+# §F — Prioritised work queue, 2026-09-07
+
+Ranked by **red cells closed per unit of effort**, with the evidence each item already has. 13 red
+cells remain of 83 (see PARITY_COVERAGE_REQUIREMENTS.md §13). Cell counts are official-team cells.
+
+## F0 — `--heur-scale` must reject a malformed value (do first, ~15 min)
+
+`ffb-parity` parses the scale with `unwrap_or(0.0)`. A CRLF job file made `--heur-scale "1.0\r"`
+parse to **0.0**, silently running **70 gates at the wrong scale**; nothing in the output said so.
+A parse fallback that swallows a malformed value is worse than a crash, because every downstream
+number is then attributed to the wrong column. Reject and exit non-zero.
+
+Same family, same file: the verdict goes to **stdout** when a gate passes (`100/100 games match`)
+and **stderr** when it fails (`N/100 passed, M FAILED`). Any harness reading one stream reports a
+green gate as missing. Make it consistent, or document it at the parse site.
+
+**Why first:** it costs minutes and it protects the correctness of every measurement below.
+
+## F1 — vampire: the give chain ends the game (3 cells: bb2016, bb2020, bb2025)
+
+**The best-evidenced bug on the board.** 37 of 54 bb2016 @1.0 failures share one signature: Rust's
+log stops right after a `HandOffMove`, emitting `game_end` in **half 1, turn 2, score 0-0**, while
+Java plays on. Seed 10 is minimal (Rust 9 steps, Java 105). `FFB_STEPTRACE`:
+
+```
+RSTATE step=InitPassing prompt=- ap=A4 act=Some(HandOver)
+LOOP   applied=HandOff->away_09   prompt_after=None finished=false
+RUST_END
+```
+
+The give RESOLVES, then the engine yields no prompt with `finished=false` — the step stack has
+emptied and nothing pushed `EndPlayerAction`. Already ruled out as faithful: the bb2016 `Pass`
+generator tail (matches `bb2016/Pass.java` line-for-line, correctly no `ResetToMove`),
+`StepEndPassing`'s two push sites, and `StepInitPassing`'s `thrower_id` assignment. Next probe:
+does `StepEndPassing` run on this path at all, and which branch — Java's only no-push path is the
+dump-off `else`, and Rust gates that on `thrower_id == acting_player.player_id`.
+
+Current: bb2016 46/33/67, bb2020 100/98/100, bb2025 99/95/100.
+
+## F2 — snotling: diverges at STEP 0 of every seed (2 cells: bb2020, bb2025)
+
+0/100, 1/100, 0/100 and 0/0/0. A **pre-game** divergence: nothing has happened yet, so the search
+space is the smallest of any red here — team build, setup, or kickoff before the first activation.
+A newly drafted team that has never been exercised, so expect genuinely unported paths rather than
+a subtle desync. **Cheapest diagnosis on the board.**
+
+## F3 — gnome: Rust STALLS (2 cells: bb2020, bb2025)
+
+bb2020 38/53/58, bb2025 35/10/51, failures dominated by stalls (**80 of 90** at bb2025 @0). A stall
+is a distinct, self-announcing failure (`NO_PROGRESS`, 50 iterations on an unchanged hash) and names
+its own prompt and step — unlike a hash desync, it does not need bisection. Also a never-exercised
+new team.
+
+## F4 — imperial_nobility bb2025 (1 cell)
+
+84/100 @1.0, 100/100 @0, **33/100 @1e6**. Green at argmax and badly red at uniform means the option
+SET is wrong, not the weights — @1e6 samples uniformly over the same candidates, so a red only there
+points at candidate count/order. bb2020 is 100/100 × 3, so it is bb2025-specific.
+
+## F5 — black_orc (2 cells: bb2020, bb2025)
+
+97/100/98 and 99/100/98 — a handful of seeds each, no signature yet. Two cells for one likely fix,
+but needs a frontier pass first.
+
+## F6 — necromantic bb2016 (1 cell) — NEW, and self-inflicted in a good way
+
+Was green; now 98/100 @1.0, 99/100 @0, 99/100 @1e6 after its Zombie cost was corrected 30k -> 40k
+and the squad re-drafted legally. Both @1.0 failures (seeds 47, 56) diverge at the **first
+activation of half 2**. The old squad was 60k over budget and never reached this half-transition
+path. Small, fresh, and precisely located.
+
+## F7 — the one-seed tail (2 cells)
+
+`old_world_alliance` bb2025 (both variants 99/100 at @1e6 only) and `renegades` bb2020
+(`renegades_37730` 99/100 @1.0). One seed each. Do last: lowest yield, and a one-seed red is the
+most likely to be a shared cause already fixed by F1-F6.
+
+## F8 — data follow-ups (no gate impact, correctness of the source)
+
+1. **halfling.treeman `Loner`** — kept against the LRB6 page because every CRP Big Guy has Loner and
+   the page row looks defective. Confirm against a second CRP source, then either apply or record
+   the page defect permanently. This is the only remaining bb2016 provenance mismatch (23/24).
+2. **Derived keywords on 4 non-official rosters** — `nippon`, `slann`, `dark_elf_league_fumbbl`,
+   `khemri_fumbbl` have no official page, so their bb2025 `keywords` were DERIVED (role from
+   position name + quantity, species from the roster). bb2025 logic reads keywords, so if any of
+   these four ever gates red, suspect the derivation first.
