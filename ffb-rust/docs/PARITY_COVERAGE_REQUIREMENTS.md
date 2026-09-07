@@ -333,3 +333,26 @@ gold piece.
 
 `--r5` reports **4 shared rosters and 29 bb2016 PA carriers**, also matching §10's independent
 count. Those are data changes and are NOT applied by this script.
+
+### Re-measured the same day, after the R3 variant drafting landed
+
+The squad tree was being re-drafted while the checker was written, so the run above is a
+snapshot. Re-run on the finished tree — 111 squads: 29 bb2016 / 41 bb2020 / 41 bb2025 —
+the result is:
+
+```
+=== bb2016: 29 squads, 0 R1 violations, 0 cells with unfielded positionals ===
+=== bb2020: 41 squads, 0 R1 violations, 0 cells with unfielded positionals ===
+=== bb2025: 41 squads, 0 R1 violations, 0 cells with unfielded positionals ===
+TOTAL: 0 R1 violations, 0 unfielded positional slots
+```
+
+**All 13 slots are closed and R1/R2/R4 are clean.** The nine new files are exactly the R3
+variants this document called for — bb2020 `team_chaos_chaosogre`, `team_chaos_chaostroll`,
+`team_chaos_pact_renegadetroll`, `team_renegades_37730`, `team_underworld_underworldtroll`;
+bb2025 `team_chaos_ogre`, `team_chaos_troll`, `team_renegades_37733`,
+`team_underworld_37844` — plus in-place re-drafts for bb2016 `orc`, bb2020 `dwarf` and
+bb2020 `undead`. Variants are matched by their `race` field, so each set unions into its
+own cell.
+
+`--r5` is unchanged: 4 shared rosters, 29 bb2016 PA carriers. That work is still open.
