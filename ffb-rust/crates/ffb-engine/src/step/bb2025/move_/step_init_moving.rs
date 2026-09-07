@@ -63,11 +63,37 @@ impl Step for StepInitMoving {
         let player_action = game.acting_player.player_action;
         let has_blocked = game.acting_player.has_blocked;
         let has_fouled = game.acting_player.has_fouled;
+        // A failed Blood Lust roll owes ONE move-stack discard, and it is owed against the
+        // activation's FIRST command — the one Java's client sends at `StepInitSelecting` phase 2,
+        // BEFORE its `StepBloodLust` runs (see `ActingPlayer::blood_lust_discards_move_stack`).
+        // Whatever that first command is, it settles the debt: Java's
+        // `publishParameter(new StepParameter(MOVE_STACK, null))` throws away a move stack if one
+        // is there and is a no-op otherwise. A blitzer whose first command is a BLOCK therefore
+        // keeps its post-block movement (bb2025 seed 17 i=3: Rust discarded that walk and ended the
+        // activation while Java walked it).
+        let blood_lust_discards_stack =
+            std::mem::take(&mut game.acting_player.blood_lust_discards_move_stack);
 
         match action {
             // Java: CLIENT_MOVE / CLIENT_BLITZ_MOVE — agent provides the path to move through
             // UtilServerPlayerMove.isValidMove + fetchMoveStack not ported; trust agent path
             Action::Move { path } if !path.is_empty() => {
+                // The deferred blood-lust discard. Java's
+                // `BloodLustBehaviour.handleExecuteStepHook` FAILURE branch is
+                //     step.publishParameter(new StepParameter(StepParameterKey.MOVE_STACK, null));
+                //     getResult().setNextAction(StepAction.GOTO_LABEL, state.goToLabelOnFailure);
+                // and the stack it discards is the one the client delivered at `StepInitSelecting`
+                // phase 2. Rust asks for that path HERE instead, one step after the roll, so the
+                // discard lands on this first delivery: the vampire takes no square, the sequence
+                // jumps to END_MOVING, and `StepEndMoving` pushes a fresh Move sequence whose
+                // empty-stack prompt is Java's second look — where the agent's plan is already
+                // spent and `MoveReplay` answers END_PLAYER_ACTION (or, for a PICKUP plan,
+                // re-plans and walks, which is what bb2020 seed 8 does).
+                if blood_lust_discards_stack {
+                    let label = self.goto_label_on_end.clone();
+                    return StepOutcome::goto(&label)
+                        .publish(StepParameter::MoveStack(Vec::new()));
+                }
                 // A PINNED (rooted / chomped) player cannot take the first step of a MOVE.
                 //
                 // Java routes the FIRST move command of a `*_MOVE` activation through
@@ -427,63 +453,11 @@ impl StepInitMoving {
                 clear_stack: false, push_self: false
             };
         }
-        // A Vampire overcome by Blood Lust (failed the roll this activation) takes NO move: Java's
-        // server reaches StepInitMoving with an EMPTY move stack (the client is never asked for a move)
-        // and just proceeds — the vampire stays put, rolling only the Bloodlust die, then feeds
-        // (turnover if no adjacent thrall). Confirmed via gated Java instrumentation (JMOVE_EXEC
-        // suffering=true fMoveStackProvided=false). Rust's harness instead PROMPTS the agent on an
-        // empty stack (below), which supplies a path and moves the vampire (seed 1 i=43: prone home_01
-        // moved to (11,8)+dodge vs Java staying at (12,7)). Skip straight to END_MOVING so the move
-        // steps (Move/GoForIt/MoveDodge) are bypassed and the sequence proceeds to feeding.
-        if game.acting_player.suffering_blood_lust {
-            // §12: this early-out was written for a plain MOVE, where "no move, then feed" IS the
-            // whole activation. On the chain path a BLITZ reaches this step too - its second pass
-            // dispatches BLITZ_MOVE - and a blitzer still owes its BLOCK. Ending the player action
-            // here killed it: vampire seed 1 in BOTH editions has main reaching StepInitBlocking
-            // with the blood-lust flag set and blocking anyway (7 InitBlocking executions to the
-            // branch's 6), while the branch never got there.
-            //
-            // Simply dropping the EndPlayerAction is NOT the fix - the activation then has no
-            // terminator at all and the driver loops forever (measured: the engine hangs). The
-            // blitzer instead takes the same route the agent's Block answer would have taken,
-            // dispatching BLITZ so the block sequence runs and ends the activation itself. The
-            // vampire still takes no MOVE, which is the behaviour this guard exists to preserve.
-            if matches!(game.acting_player.player_action,
-                        Some(PlayerAction::BlitzMove) | Some(PlayerAction::KickEmBlitz))
-                && !game.acting_player.has_blocked
-                && game.defender_id.is_some()
-            {
-                let dispatch = if game.acting_player.player_action == Some(PlayerAction::KickEmBlitz) {
-                    PlayerAction::KickEmBlitz
-                } else {
-                    PlayerAction::Blitz
-                };
-                return self.dispatch_player_action(dispatch);
-            }
-            // POST-BLOCK leg of a blood-lust blitz. Java has no early-out at all here: with an
-            // empty MOVE_STACK `StepInitMoving.executeStep` sets NO next action, so the step PARKS
-            // and the client is asked (ParityRunner `case INIT_MOVING` -> sendMoveAction ->
-            // MoveReplay). Measured on bb2025 vampire seed 3 step 54: Java's blood-lust blitzer
-            // moved four more squares after its block (JSTATE INIT_MOVING cm=1 -> cm=5) while this
-            // branch ended the activation, so the post-hash diverged on an identical declaration.
-            // Fall through to the empty-stack prompt below whenever the activation has ALREADY
-            // done something — the vampire has moved a square or thrown its block. Measured on
-            // bb2020 vampire seed 7: at i=29 Java's blood-lust MOVE had `hasMoved=false` at the
-            // BLOOD_LUST look and its single INIT_MOVING look ended the activation (cm stayed 3 —
-            // Rust already matched); at i=30 the SAME failure with `hasMoved=true` (StepInitMoving
-            // had already popped the client's first square) took four more squares, cm 0 -> 4.
-            // Same shape post-block on bb2025 seed 3 step 54 (cm 1 -> 5). The early-out is only
-            // right for an activation that has not started; Java itself has no early-out at all —
-            // `StepInitMoving.executeStep` with an empty MOVE_STACK sets no next action, so the
-            // step parks and ParityRunner answers `case INIT_MOVING` with sendMoveAction/MoveReplay.
-            let activation_already_started =
-                game.acting_player.has_moved || game.acting_player.has_blocked;
-            if !activation_already_started {
-                let label = self.goto_label_on_end.clone();
-                return StepOutcome::goto(&label)
-                    .publish(StepParameter::EndPlayerAction(true));
-            }
-        }
+        // Java's `StepInitMoving.executeStep` has NO blood-lust branch at all: with an empty
+        // MOVE_STACK it sets no next action, so the step PARKS and the client is asked
+        // (`ParityRunner case INIT_MOVING` -> `sendMoveAction` -> `MoveReplay`). The discard a
+        // failed roll owes is applied to the first delivered path in `handle_command`, which is
+        // where Rust receives what Java received at `StepInitSelecting` phase 2.
         // Empty move stack — compute legal move targets and prompt the agent for a destination.
         // The live driver.rs/step architecture never carried this over from the pre-driver.rs
         // engine.rs (`Step::InitMoving` there did exactly this via the same `legal_move_targets`/
@@ -584,17 +558,17 @@ mod tests {
             "the continuation move is processed exactly as before");
     }
 
-    /// §12: a blitzer suffering Blood Lust must still throw its BLOCK. The early-out here was
-    /// written for a plain MOVE ("no move, then feed"), but the blitz chain routes a BLITZ through
-    /// this step too, and publishing END_PLAYER_ACTION killed the block - vampire was 57/100
-    /// (bb2025) and 53/100 (bb2020) until this was fixed.
+    /// Java's `bb2025/move/StepInitMoving` has NO blood-lust branch: with an empty MOVE_STACK
+    /// `executeStep` sets no next action, so the step PARKS and the client is asked
+    /// (`ParityRunner case INIT_MOVING` -> `sendMoveAction` -> `MoveReplay`). A blood-lust blitzer
+    /// must therefore be OFFERED its move, not auto-dispatched into a block by the engine: the
+    /// agent's `MoveReplay` is what decides between the run-up and `FIRE_TERMINAL`, and Java's
+    /// engine only dispatches BLITZ from the CLIENT_BLOCK arm of `handleCommand`.
     ///
-    /// Simply dropping the terminator is NOT the fix and must not be re-introduced: with no
-    /// END_PLAYER_ACTION the activation never ends and the driver loops forever (measured - the
-    /// engine hangs). The blitzer dispatches BLITZ instead, so the block sequence runs and ends
-    /// the activation itself.
+    /// This test replaces one that asserted the auto-dispatch, i.e. that encoded the invented
+    /// early-out this step used to carry (vampire ITER3).
     #[test]
-    fn blood_lust_blitzer_dispatches_block_instead_of_ending_the_action() {
+    fn blood_lust_blitzer_is_offered_its_move_not_auto_dispatched() {
         let mut game = make_game();
         game.acting_player.player_id = Some("h1".into());
         game.acting_player.player_action = Some(PlayerAction::BlitzMove);
@@ -602,12 +576,12 @@ mod tests {
         game.defender_id = Some("a1".into());
         let mut step = StepInitMoving::new("end".into());
         let out = step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(out.action, StepAction::GotoLabel);
-        assert!(out.published.iter().any(|p|
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::Move { .. })),
+            "Java parks and asks; the engine must not decide for the agent: {:?}", out.prompt);
+        assert!(!out.published.iter().any(|p|
             matches!(p, StepParameter::DispatchPlayerAction(Some(PlayerAction::Blitz)))),
-            "a blood-lust blitzer must dispatch BLITZ so the block still happens");
-        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))),
-            "it must NOT end the player action - the block sequence ends the activation");
+            "the BLITZ dispatch belongs to the CLIENT_BLOCK arm, not to executeStep");
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))));
     }
 
     /// The POST-BLOCK leg of the same blitz. Java has no early-out in `StepInitMoving`: an empty
@@ -650,20 +624,79 @@ mod tests {
         assert!(!out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))));
     }
 
-    /// The plain-MOVE case this guard exists for is unchanged: no dispatch, and the activation
-    /// ends here. Without this the fix above could silently widen to every blood-lust move.
+    /// The plain-MOVE blood-lust case, ported from where Java actually decides it.
+    ///
+    /// `BloodLustBehaviour.handleExecuteStepHook` (bb2025), FAILURE branch:
+    /// ```java
+    /// step.publishParameter(new StepParameter(StepParameterKey.MOVE_STACK, null));
+    /// getResult().setNextAction(StepAction.GOTO_LABEL, state.goToLabelOnFailure);   // END_MOVING
+    /// ```
+    /// The stack it throws away is the path the client delivered at `StepInitSelecting` phase 2,
+    /// one step BEFORE the roll. Rust asks for that path here instead, so the discard is deferred
+    /// onto the first command of the activation (`blood_lust_discards_move_stack`): the vampire
+    /// takes NO square, the sequence goes to END_MOVING, and `StepEndMoving` pushes a fresh Move
+    /// sequence whose prompt is Java's second look.
     #[test]
-    fn blood_lust_plain_move_still_ends_the_player_action() {
+    fn blood_lusts_first_delivered_path_is_discarded_and_takes_no_square() {
         let mut game = make_game();
         game.acting_player.player_id = Some("h1".into());
         game.acting_player.player_action = Some(PlayerAction::Move);
         game.acting_player.suffering_blood_lust = true;
+        game.acting_player.blood_lust_discards_move_stack = true;
         let mut step = StepInitMoving::new("end".into());
-        let out = step.start(&mut game, &mut GameRng::new(0));
+        let out = step.handle_command(
+            &Action::Move { path: vec![ffb_model::types::FieldCoordinate::new(11, 8)] },
+            &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))));
-        assert!(!out.published.iter().any(|p|
-            matches!(p, StepParameter::DispatchPlayerAction(_))));
+        assert_eq!(out.goto_label.as_deref(), Some("end"));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::MoveStack(v) if v.is_empty())),
+            "Java publishes MOVE_STACK = null");
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::CoordinateTo(_))),
+            "the discarded path must not move the vampire");
+        assert!(!game.acting_player.has_moved);
+        assert!(!game.acting_player.blood_lust_discards_move_stack,
+            "the discard is owed exactly once, like Java's single BLOOD_LUST failure");
+    }
+
+    /// The SECOND look (Java's `case INIT_MOVING`) is an ordinary move prompt again: once the
+    /// discard is spent, a path the agent re-plans is walked. bb2020 seed 8 i=26 is exactly this —
+    /// a PICKUP plan re-plans at the second look and the blood-lusting vampire walks three squares.
+    #[test]
+    fn blood_lusts_second_delivered_path_is_walked() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("h1".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        game.acting_player.suffering_blood_lust = true;
+        game.acting_player.blood_lust_discards_move_stack = false;
+        let mut step = StepInitMoving::new("end".into());
+        let out = step.handle_command(
+            &Action::Move { path: vec![ffb_model::types::FieldCoordinate::new(11, 8)] },
+            &mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::CoordinateTo(_))),
+            "with the debt settled the move is processed exactly as any other");
+    }
+
+    /// The debt is owed against the activation's FIRST command, whatever it is: Java's
+    /// `MOVE_STACK, null` discards a stack if one is there and is a no-op otherwise. A blitzer
+    /// whose first command is a BLOCK keeps its post-block movement (bb2025 seed 17 i=3, where
+    /// discarding that walk ended the activation while Java walked it).
+    #[test]
+    fn a_first_command_that_is_not_a_move_still_settles_the_discard() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("h1".into());
+        game.acting_player.player_action = Some(PlayerAction::BlitzMove);
+        game.acting_player.suffering_blood_lust = true;
+        game.acting_player.blood_lust_discards_move_stack = true;
+        let mut step = StepInitMoving::new("end".into());
+        let _ = step.handle_command(
+            &Action::Block { defender_id: "a1".into() }, &mut game, &mut GameRng::new(0));
+        assert!(!game.acting_player.blood_lust_discards_move_stack,
+            "the BLOCK settles the debt; Java had no stack to throw away either");
+        let out = step.handle_command(
+            &Action::Move { path: vec![ffb_model::types::FieldCoordinate::new(11, 8)] },
+            &mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::CoordinateTo(_))),
+            "the post-block movement must NOT be discarded");
     }
 
     #[test]

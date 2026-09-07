@@ -630,3 +630,118 @@ execute there (`blockRoll` 1,085 in bb2016).
    Both editions' `@1.0`/`@1e6` are green, so these are argmax-specific declaration paths.
 3. **BACKLOG E17** — give `sendConcreteAction` a `case GAZE:` so Hypnotic Gaze stops being a dead
    mechanic in every edition.
+
+---
+
+## ITER3 — 2026-09-07: NINE GATES 100/100. The blood-lust move-stack discard, ported from where Java actually does it
+
+The whole of the remaining frontier (bb2025 `@1.0` seed 75, bb2025 `@0` seeds 8/30/50/65/71,
+bb2020 `@0` seeds 8/76) was ONE mechanism, and its root cause is an **ordering** difference
+between the two engines' clients, not a rule difference.
+
+### The ordering, measured
+
+`FFB_STEPTRACE=1` + `FFB_MOVEP=1` on bb2025 seed 3 (`home_05`, i=37) and bb2020 seed 7
+(`away_04`, i=30) give the two halves of it:
+
+```
+JSTATE i=38 step=INIT_SELECTING ap=H5 act=MOVE acted=false moved=false cm=3
+JMOVEP k=40 pid=...Home5 at=13,13 ans=[14,12 15,11 16,10 17,9 18,10]   <- phase-2 delivery
+JSTATE i=38 step=BLOOD_LUST dialog=RE_ROLL_PROPERTIES ap=H5 moved=false cm=3
+JSTATE i=38 step=INIT_MOVING ap=H5 acted=true moved=false cm=3
+JMOVEP k=40 pid=...Home5 at=13,13 ans=EndPlayerAction                   <- second look, unmoved
+```
+
+```
+RSTATE step=InitSelecting prompt=ActivatePlayer ap=null
+RSTATE step=BloodLust     prompt=ReRollOffer    ap=H5 cm=3 moved=false
+RSTATE step=InitMoving    prompt=Move           ap=H5 cm=3 moved=false
+RMOVEP k=40 pid=home_05 at=(13,13) ans=Move{[14,12 15,11 16,10 17,9 18,10]}  <- and it WALKED
+```
+
+Java's client delivers the activation's first move path at `StepInitSelecting` **phase 2**, one
+step BEFORE the activation's `StepBloodLust` runs, and `BloodLustBehaviour.handleExecuteStepHook`'s
+FAILURE branch then throws that path away:
+
+```java
+step.publishParameter(new StepParameter(StepParameterKey.MOVE_STACK, null));
+getResult().setNextAction(StepAction.GOTO_LABEL, state.goToLabelOnFailure);   // END_MOVING
+```
+
+`StepEndMoving` sees an empty `fMoveStack`, takes the `UtilPlayer.isNextMovePossible` branch and
+pushes a FRESH Move sequence, whose empty-stack `StepInitMoving` parks — and THAT is the prompt
+`ParityRunner case INIT_MOVING` answers with `MoveReplay`. By then the plan is spent
+(`pathEmpty && delivered`), so a MOVE plan answers `END_PLAYER_ACTION` and the vampire never moves,
+while a PICKUP plan falls to `REPLAN`, re-plans and walks (bb2020 seed 8 i=26, three squares).
+
+Rust asks for that first path one step LATER — the empty-stack prompt in `StepInitMoving` — so when
+the roll fails there is no stack to throw away, and the path is delivered afterwards and walked.
+
+### What was there before, and why it looked right
+
+An invented early-out in `step/bb2025/move_/step_init_moving.rs`: `if suffering_blood_lust && !has_moved
+&& !has_blocked { GOTO END_MOVING + END_PLAYER_ACTION }`, plus an invented auto-dispatch of BLITZ.
+It reproduces the COMMON case (a MOVE plan, whose second look is `END_PLAYER_ACTION` anyway) and
+nothing else, which is exactly the 95-99/100 shape it produced. Deleting it outright — the strict
+1:1 reading, and what ITER2 tried — measures 0/11 and, re-measured this iteration on the full gate,
+**bb2025 `@1.0` 13/100 and bb2020 `@0` 6/100**: without the discard, every blood-lusting vampire
+walks a path Java threw away.
+
+### The fix (ENGINE, one unit, three files)
+
+1. `crates/ffb-model/src/model/acting_player.rs` — `blood_lust_discards_move_stack`, a Rust-only
+   bridge flag in the spirit of the existing `took_square` ("Java gets the same fact from step
+   ORDER"), reset with the rest of the per-activation state in `set_player`.
+2. `crates/ffb-engine/src/step/bb2025/shared/step_blood_lust.rs` — both sites that mirror Java's
+   `MOVE_STACK, null` (the direct failure and the WAIT_FOR_ACTION_CHANGE branch) set the flag
+   **only when `!has_moved`**. `has_moved` is the discriminator because it is `StepInitMoving`
+   popping a delivered square that sets it (`actingPlayer.setHasMoved(true)`): when it is already
+   true the publish has a real stack to discard and nothing is owed. bb2020 seed 7 is the pair that
+   proves it — i=29 fails with `moved=false` (vampire never moves), i=30 with `moved=true`
+   (walks four more squares).
+3. `crates/ffb-engine/src/step/bb2025/move_/step_init_moving.rs` — the invented early-out and the
+   invented BLITZ auto-dispatch are DELETED; `handle_command` takes the flag at the TOP (so any
+   first command settles the debt, `std::mem::take`) and the `Action::Move` arm, when the debt is
+   owed, publishes `MoveStack(vec![])` and goes to `GOTO_LABEL_ON_END` instead of taking the square.
+
+That third detail cost a measurement: settling the debt only on a `Move` made a blood-lust blitzer
+whose first command is a BLOCK discard its POST-BLOCK walk (bb2025 seed 17 i=3, `RMOVEP k=3` ans=Block
+then a discarded path where Java walked). Java's `MOVE_STACK, null` is a no-op when there is no
+stack, which is precisely "any first command settles it".
+
+### Tests (each verified to FAIL without its own half of the fix)
+
+* `blood_lusts_first_delivered_path_is_discarded_and_takes_no_square` — fails with the discard arm
+  disabled.
+* `a_first_command_that_is_not_a_move_still_settles_the_discard` — fails when the flag is cleared
+  inside the `Move` arm instead of at the top of `handle_command`.
+* `a_failure_after_a_square_owes_nothing` — fails without the `!has_moved` guard.
+* `a_failure_before_any_square_owes_the_move_stack_discard`, `blood_lusts_second_delivered_path_is_walked`,
+  and `blood_lust_blitzer_is_offered_its_move_not_auto_dispatched` pin the rest.
+
+Two ITER2 tests ENCODED the invented early-out (`blood_lust_blitzer_dispatches_block_instead_of_ending_the_action`,
+`blood_lust_plain_move_still_ends_the_player_action`) and were rewritten from the Java, not deleted
+quietly — Java's `StepInitMoving.executeStep` has no blood-lust branch at all, and its only BLITZ
+dispatch is in the CLIENT_BLOCK arm of `handleCommand`.
+
+### GATES — nine of nine, seeds 1-100, tier 3, `--heur-classes all`, final binary
+
+|            | scale 1.0 | argmax (0) | 1e6 |
+|---|---|---|---|
+| **bb2016** | **100/100** | **100/100** | **100/100** |
+| **bb2020** | **100/100** | **100/100** (was 98) | **100/100** |
+| **bb2025** | **100/100** (was 99) | **100/100** (was 95) | **100/100** |
+
+`cargo test -p ffb-engine`: **7,455 passed / 0 failed / 15 ignored** (+4 net this iteration).
+
+### Conclusions of MINE and of earlier iterations that turned out WRONG
+
+* ITER2's "the guard is load-bearing **for the Rust agent contract** — the Rust agent does not
+  reduce to `MoveReplay`'s END_PLAYER_ACTION" is **retracted**. `replay_plan` is already a
+  bit-faithful mirror of `MoveReplay.decide`; what differed was the ENGINE state it was handed,
+  because Rust had not yet thrown the path away. No agent code was touched this iteration.
+* The comment the guard carried — "Java's server reaches StepInitMoving with an EMPTY move stack,
+  the client is never asked for a move" — is **false**. Java is asked twice per blood-lust
+  activation (`JMOVEP` prints both), and the first answer is the one it discards.
+* My own first attempt settled the debt only against a `Move` command; bb2025 seed 17 (13/20 on
+  seeds 1-20) showed a blitzer losing its post-block walk to it.

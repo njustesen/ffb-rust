@@ -41,6 +41,16 @@ pub struct ActingPlayer {
     pub has_blocked: bool,
     /// Java: fSufferingBloodLust — Vampire player must feed this turn or go frenzy.
     pub suffering_blood_lust: bool,
+    /// Rust-only bridge flag (no Java field): a failed Blood Lust roll owes ONE move-stack discard.
+    ///
+    /// Java gets the same fact from step ORDER. Its client delivers the activation's first move
+    /// path at `StepInitSelecting` phase 2, BEFORE the activation's `StepBloodLust` runs, so
+    /// `BloodLustBehaviour.handleExecuteStepHook`'s failure branch can throw that path away with
+    /// `publishParameter(new StepParameter(MOVE_STACK, null))` + `GOTO_LABEL(goToLabelOnFailure)`.
+    /// Rust asks for the path one step LATER (the empty-stack prompt in `StepInitMoving`), so when
+    /// the roll fails there is no stack to discard yet; this flag defers the discard to the first
+    /// path that arrives. Reset with the rest of the per-activation state in `set_player`.
+    pub blood_lust_discards_move_stack: bool,
     /// Java: forgone — player chose to forgo their action (e.g. held by Take Root or flagged as stalling).
     pub forgone: bool,
     /// Java: fStrength — effective strength at block time (with modifiers; 0 = not set).
@@ -137,6 +147,7 @@ impl ActingPlayer {
             self.old_player_state = None;
             self.jumping = false;
             self.suffering_blood_lust = false;
+            self.blood_lust_discards_move_stack = false;
             self.suffering_animosity = false;
             self.fumblerooskie_pending = false;
             self.held_in_place = false;

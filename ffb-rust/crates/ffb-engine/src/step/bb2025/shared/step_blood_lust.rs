@@ -133,6 +133,17 @@ impl StepBloodLust {
                 out = out.publish(StepParameter::DispatchPlayerAction(player_action));
             } else {
                 out = out.publish(StepParameter::MoveStack(vec![]));
+                // Java's `MOVE_STACK, null` here throws away the path the client delivered at
+                // `StepInitSelecting` phase 2. Rust sometimes asks for that path LATER, at
+                // `StepInitMoving` — and then this publish discards nothing, so the discard is
+                // owed to the first path that arrives. `has_moved` is the discriminator, because
+                // it is `StepInitMoving` popping a delivered square that sets it (Java
+                // `StepInitMoving.executeStep`: `actingPlayer.setHasMoved(true)`); when it is
+                // already true the publish above has a real stack to throw away and nothing is
+                // owed. See `ActingPlayer::blood_lust_discards_move_stack`.
+                if !game.acting_player.has_moved {
+                    game.acting_player.blood_lust_discards_move_stack = true;
+                }
             }
             out = out.publish(StepParameter::BloodLustAction(self.bloodlust_action));
             return out;
@@ -262,6 +273,15 @@ impl StepBloodLust {
             Some(ref l) if !l.is_empty() => StepOutcome::goto(l),
             _ => StepOutcome::next(),
         };
+        // Java: `publishParameter(new StepParameter(MOVE_STACK, null))` — the discard of the path
+        // the client delivered at `StepInitSelecting` phase 2. When Rust has not been handed a
+        // path yet (`!has_moved`, i.e. no square has been popped) that publish discards nothing,
+        // so the discard is owed to the first path that arrives — see
+        // `ActingPlayer::blood_lust_discards_move_stack`. bb2020 seed 7 i=29/i=30 is the pair that
+        // separates the two: the same failure with `has_moved` true already had a real stack.
+        if !game.acting_player.has_moved {
+            game.acting_player.blood_lust_discards_move_stack = true;
+        }
         let out = base.publish(StepParameter::MoveStack(vec![]));
         match bloodlust_param {
             Some(action) => out.publish(StepParameter::BloodLustAction(Some(action))),
@@ -425,6 +445,45 @@ mod tests {
         let out = StepBloodLust::new("fail").start(&mut game, &mut GameRng::new(seed));
         assert_ne!(out.action, StepAction::Continue);
         assert!(game.acting_player.suffering_blood_lust);
+    }
+
+    /// Java `BloodLustBehaviour.handleExecuteStepHook`, FAILURE branch:
+    /// ```java
+    /// step.publishParameter(new StepParameter(StepParameterKey.MOVE_STACK, null));
+    /// getResult().setNextAction(StepAction.GOTO_LABEL, state.goToLabelOnFailure);
+    /// ```
+    /// The stack it discards is the path the client delivered at `StepInitSelecting` phase 2. When
+    /// Rust reaches this step with NO square popped yet (`has_moved == false`) that publish throws
+    /// nothing away, because Rust asks for the path later, at `StepInitMoving` — so the discard is
+    /// owed to the first path that arrives. bb2025 seed 3 i=37 and bb2020 seed 8 i=26 are both this
+    /// shape; without the debt the vampire walked a path Java had thrown away.
+    #[test]
+    fn a_failure_before_any_square_owes_the_move_stack_discard() {
+        let seed = seed_for_d6(1);
+        let mut game = make_game(vec![SkillId::BloodLust], Some(PlayerAction::Move));
+        game.acting_player.has_moved = false;
+        let out = StepBloodLust::new("fail").start(&mut game, &mut GameRng::new(seed));
+        assert_ne!(out.action, StepAction::Continue);
+        assert!(game.acting_player.suffering_blood_lust);
+        assert!(game.acting_player.blood_lust_discards_move_stack,
+            "no square has been popped, so Java's MOVE_STACK=null discarded nothing here");
+    }
+
+    /// The other half of the pair, and the one that keeps the debt from double-counting: when a
+    /// square HAS been popped (`StepInitMoving.executeStep`'s `actingPlayer.setHasMoved(true)`) the
+    /// publish above throws away a real stack, exactly as Java does, and nothing is owed. bb2020
+    /// seed 7 separates them — i=29 fails with `moved=false` and the vampire never moves, i=30
+    /// fails with `moved=true` and walks four more squares.
+    #[test]
+    fn a_failure_after_a_square_owes_nothing() {
+        let seed = seed_for_d6(1);
+        let mut game = make_game(vec![SkillId::BloodLust], Some(PlayerAction::Move));
+        game.acting_player.has_moved = true;
+        let out = StepBloodLust::new("fail").start(&mut game, &mut GameRng::new(seed));
+        assert_ne!(out.action, StepAction::Continue);
+        assert!(game.acting_player.suffering_blood_lust);
+        assert!(!game.acting_player.blood_lust_discards_move_stack,
+            "the MOVE_STACK=null publish already discarded the delivered path");
     }
 
     #[test]

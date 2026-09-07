@@ -1,6 +1,6 @@
 # Event coverage — HeuristicAgent, vampire v vampire, bb2025, --heur-scale 1.0, seeds 1-100
 
-Harvested 2026-09-07 by `MATCHUP=vampire scripts/harvest_coverage.sh bb2025 1.0`. Parity for the run: `PARITY: 99/100 passed, 1 FAILED.`.
+Harvested 2026-09-07 by `MATCHUP=vampire scripts/harvest_coverage.sh bb2025 1.0`. Parity for the run: `PARITY: 100/100 games match.`.
 
 ## Tier-3 checklist (as written by the run)
 
@@ -15,13 +15,13 @@ Harvested 2026-09-07 by `MATCHUP=vampire scripts/harvest_coverage.sh bb2025 1.0`
 | action Pass | 17 | ok | needs a ball carrier |
 | action HandOver | 2 | ok | needs carrier + adjacent teammate |
 | dodge success | 408 | ok |  |
-| dodge failure | 162 | ok |  |
-| GFI rolls | 2993 | ok | BLOCKED on the one-move-per-activation decision: both harnesses move exactly ONE square per activation (measured 1:1, player_moved_events == activations.Move), so a carrier cannot cross the pitch and nothing accumulates the movement a rush needs. See BACKLOG. |
-| pickup success | 177 | ok |  |
+| dodge failure | 161 | ok |  |
+| GFI rolls | 2994 | ok | BLOCKED on the one-move-per-activation decision: both harnesses move exactly ONE square per activation (measured 1:1, player_moved_events == activations.Move), so a carrier cannot cross the pitch and nothing accumulates the movement a rush needs. See BACKLOG. |
+| pickup success | 178 | ok |  |
 | pickup failure | 74 | ok | turnover + scatter |
 | catch success | 81 | ok |  |
 | catch failure | 61 | ok |  |
-| ball scatters | 457 | ok | failed pickup / dropped ball / bounces |
+| ball scatters | 458 | ok | failed pickup / dropped ball / bounces |
 | throw-ins | 4 | ok | ball out of bounds |
 | pass rolls | 109 | ok |  |
 | pass deviates | 0 | absent (optional) | wildly inaccurate passes only |
@@ -37,8 +37,8 @@ Harvested 2026-09-07 by `MATCHUP=vampire scripts/harvest_coverage.sh bb2025 1.0`
 | block result Pow | 252 | ok |  |
 | pushbacks | 967 | ok |  |
 | crowd surfs | 0 | absent (optional) | push off pitch — board-position dependent |
-| players fell | 1161 | ok |  |
-| armor held | 1144 | ok |  |
+| players fell | 1160 | ok |  |
+| armor held | 1143 | ok |  |
 | stunned | 310 | ok | injury 2-7 |
 | KO | 139 | ok |  |
 | casualty (d16) | 102 | ok |  |
@@ -76,23 +76,23 @@ Result: ALL REQUIRED ITEMS PRESENT
 
 ## GameEvent catalog (from parity/bb2025/vampire_vs_vampire/seed_*_rust_events.jsonl)
 
-Total events: 74025
+Total events: 74035
 
 ```
-  39526 playerMoved
+  39534 playerMoved
   10155 playerAction
    6592 bloodLustRoll
    3401 turnEnd
-   2993 goForItRoll
-   1695 injury
-   1317 biteSpectator
+   2994 goForItRoll
+   1694 injury
+   1318 biteSpectator
    1304 blockRoll
    1304 block
-   1161 playerFellDown
+   1160 playerFellDown
     967 pushback
-    570 dodgeRoll
-    457 scatterBall
-    251 pickupRoll
+    569 dodgeRoll
+    458 scatterBall
+    252 pickupRoll
     215 kickoffScatter
     215 kickoffResultEvent
     200 winningsRoll
@@ -100,7 +100,7 @@ Total events: 74025
     200 mvpRoll
     197 refereeSpotsFoul
     197 foul
-    177 ballPickedUp
+    178 ballPickedUp
     142 catchRoll
     109 passRoll
      78 regenerationRoll
