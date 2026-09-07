@@ -19,7 +19,7 @@ cd /c/Users/Admin/niels/ffb-rust/ffb-rust
 E=$1; S=$2
 M=${MATCHUP:-amazon}
 if [ "$3" != "--no-rerun" ]; then
-  ./target/release/ffb-parity --home $M --away $M --edition $E --tier 3 \
+  ${FFB_PARITY_BIN:-./target/release/ffb-parity} --home $M --away $M --edition $E --tier 3 \
       --seeds $S-$S --no-abort --agent heuristic --heur-scale ${HEUR_SCALE:-1.0} --heur-classes all >/dev/null 2>&1
 fi
 python - "parity/$E/${M}_vs_${M}/seed_${S}_rust.jsonl" "parity/$E/${M}_vs_${M}/seed_${S}_java.jsonl" "$S" <<'PY'

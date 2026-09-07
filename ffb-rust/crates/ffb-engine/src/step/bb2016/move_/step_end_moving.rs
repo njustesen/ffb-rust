@@ -115,7 +115,21 @@ impl StepEndMoving {
                 change_player_action(game, pid, dispatch_action, jumping);
             }
             if let Some(seq) = self.push_sequence_for_player_action(dispatch_action) {
-                return StepOutcome::next().push_seq(seq);
+                // Java (bb2016 `StepEndMoving.dispatchPlayerAction`, lines 191-199):
+                //   if (pushSequenceForPlayerAction(pPlayerAction)) {
+                //       getResult().setNextAction(StepAction.NEXT_STEP_AND_REPEAT);
+                //   }
+                //   return StepCommandStatus.SKIP_STEP;
+                // SKIP_STEP leaves the received CLIENT_BLOCK/CLIENT_FOUL/... UNCONSUMED and
+                // NEXT_STEP_AND_REPEAT re-delivers it to the first step of the sequence just
+                // pushed -- which is how the block target reaches `StepInitBlocking`
+                // (`case CLIENT_BLOCK: fBlockDefenderId = blockCommand.getDefenderId()`).
+                // Rust returned a plain NextStep, so a blitz whose target was chosen at the MOVE
+                // prompt (rather than folded into the activation) arrived at InitBlocking with no
+                // defender at all: it prompted `BlockTarget`, the agent answered EndPlayerAction
+                // and the blitz was silently dropped (vampire bb2016 seed 10 i=2 -- Java rolled
+                // the blitz block die at DICE_TRACE pos=18, Rust rolled nothing).
+                return StepOutcome::next_and_repeat().push_seq(seq);
             }
         }
         self.execute_step(game, rng)
@@ -311,6 +325,34 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert!(!out.pushes.is_empty());
+    }
+
+    /// Java `bb2016/move/StepEndMoving.dispatchPlayerAction`:
+    /// ```java
+    /// if (pushSequenceForPlayerAction(pPlayerAction)) {
+    ///     getResult().setNextAction(StepAction.NEXT_STEP_AND_REPEAT);
+    /// }
+    /// return StepCommandStatus.SKIP_STEP;
+    /// ```
+    /// SKIP_STEP leaves the received CLIENT_BLOCK unconsumed and NEXT_STEP_AND_REPEAT re-delivers
+    /// it to the first step of the pushed sequence — that is the ONLY way the block target reaches
+    /// `StepInitBlocking` when the blitzer's target was chosen at the move prompt rather than
+    /// folded into the activation. A plain NEXT_STEP dropped it and the blitz was silently
+    /// abandoned (vampire bb2016 seed 10 i=2).
+    #[test]
+    fn dispatch_player_action_forwards_the_command_to_the_pushed_sequence() {
+        let mut game = make_game();
+        let mut step = StepEndMoving::new();
+        step.dispatch_player_action = Some(PlayerAction::Blitz);
+        game.acting_player.set_player("home_01".into(), PlayerAction::BlitzMove);
+        let out = step.handle_command(
+            &Action::Block { defender_id: "away_01".into() },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert_eq!(out.action, StepAction::NextStepAndRepeat,
+            "Java sets NEXT_STEP_AND_REPEAT so the CLIENT_BLOCK reaches StepInitBlocking");
+        assert!(!out.pushes.is_empty(), "the blitz-block sequence must be pushed");
     }
 
     #[test]

@@ -226,6 +226,24 @@ impl Step for StepInitPassing {
                 }
                 self.execute_step(game)
             }
+            // Java (bb2016 `StepInitPassing.handleCommand`, `case CLIENT_HAND_OVER`):
+            //   fCatcherId = handOverCommand.getCatcherId();
+            //   game.setPassCoordinate(fieldModel.getPlayerCoordinate(catcher));
+            //   game.setThrowerId(actingPlayer.getPlayerId());
+            //   game.setThrowerAction(PlayerAction.HAND_OVER);
+            //   commandStatus = EXECUTE_STEP;
+            // Reachable only once `StepEndMoving.dispatchPlayerAction` re-delivers the command
+            // (NEXT_STEP_AND_REPEAT) the way Java does; without this arm the forwarded HandOff
+            // fell into the catch-all `cont()` with no prompt and the driver stalled outright
+            // (vampire bb2016 seed 10, away turn 2: `RSTATE step=InitPassing prompt=-`, 9 Rust
+            // steps against Java's 105).
+            Action::HandOff { receiver_id } => {
+                self.catcher_id = Some(receiver_id.clone());
+                game.pass_coordinate = game.field_model.player_coordinate(receiver_id);
+                game.thrower_id = game.acting_player.player_id.clone();
+                game.thrower_action = Some(PlayerAction::HandOver);
+                self.execute_step(game)
+            }
             Action::EndTurn => {
                 self.end_turn = true;
                 self.execute_step(game)
@@ -285,6 +303,38 @@ mod tests {
         game.team_home.players.push(player);
         game.field_model.set_player_coordinate(id, coord);
         game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+    }
+
+    /// Java `bb2016/pass/StepInitPassing.handleCommand`, `case CLIENT_HAND_OVER`:
+    /// ```java
+    /// fCatcherId = handOverCommand.getCatcherId();
+    /// Player<?> catcher = game.getPlayerById(fCatcherId);
+    /// game.setPassCoordinate(game.getFieldModel().getPlayerCoordinate(catcher));
+    /// game.setThrowerId(actingPlayer.getPlayerId());
+    /// game.setThrowerAction(PlayerAction.HAND_OVER);
+    /// commandStatus = StepCommandStatus.EXECUTE_STEP;
+    /// ```
+    /// The command arrives here because `StepEndMoving.dispatchPlayerAction` re-delivers it
+    /// (NEXT_STEP_AND_REPEAT). Without this arm the forwarded HandOff hit the catch-all and the
+    /// step parked with NO prompt, stalling the driver (vampire bb2016 seed 10, away turn 2).
+    #[test]
+    fn hand_over_command_sets_catcher_thrower_and_pass_coordinate() {
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        add_player(&mut game, "thrower", FieldCoordinate::new(12, 7));
+        add_player(&mut game, "catcher", FieldCoordinate::new(13, 7));
+        game.acting_player.set_player("thrower".into(), PlayerAction::HandOverMove);
+        let mut step = StepInitPassing::new();
+        step.goto_label_on_end = "end".into();
+        let _ = step.handle_command(
+            &Action::HandOff { receiver_id: "catcher".into() },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert_eq!(step.catcher_id.as_deref(), Some("catcher"));
+        assert_eq!(game.pass_coordinate, Some(FieldCoordinate::new(13, 7)));
+        assert_eq!(game.thrower_id.as_deref(), Some("thrower"));
+        assert_eq!(game.thrower_action, Some(PlayerAction::HandOver));
     }
 
     #[test]

@@ -464,6 +464,12 @@ impl StepOutcome {
     pub fn cont() -> Self {
         StepOutcome { action: StepAction::Continue, goto_label: None, published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None, clear_stack: false, push_self: false }
     }
+    /// Java `getResult().setNextAction(StepAction.NEXT_STEP_AND_REPEAT)`: advance to the next
+    /// step in the sequence AND re-deliver the command that produced this outcome to it
+    /// (Java's `StepCommandStatus.SKIP_STEP` leaves the received command unconsumed).
+    pub fn next_and_repeat() -> Self {
+        StepOutcome { action: StepAction::NextStepAndRepeat, goto_label: None, published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None, clear_stack: false, push_self: false }
+    }
     pub fn goto(label: &str) -> Self {
         StepOutcome { action: StepAction::GotoLabel, goto_label: Some(label.to_owned()), published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None, clear_stack: false, push_self: false }
     }

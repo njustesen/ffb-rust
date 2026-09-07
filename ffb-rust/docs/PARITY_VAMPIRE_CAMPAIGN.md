@@ -451,3 +451,182 @@ output and it names the fix.
 
 bb2020/bb2025 are green at `@1.0`, so whatever this is, it is bb2016-specific or specific to the
 bb2016 twin of the shared step.
+
+---
+
+## ITER2 — bb2016 48/90/59 -> **100/100/100**; the bb2016 blitz-dispatch command chain
+
+Frontier at the start: bb2016 `@1.0` 48/100 (52 unclassified reds), `@0` 90/100, `@1e6` 59/100.
+The inherited hypothesis was "argmax-green + scale-red means a residual SAMPLER/draw-count
+divergence". **That hypothesis was WRONG**, and it is the ITER1 conclusion this iteration retracts:
+every bb2016 red traced to ONE engine mechanism — the bb2016 blitz's *second* client command is
+never re-delivered — and argmax was less red only because it declares fewer blitzes whose target is
+chosen at the move prompt. No sampler, buffer or draw-count work was needed.
+
+Instruments that named it: `first_state_divergence.sh` (bb2016 seed 10 -> "first hash diff idx 2,
+resolving idx 1, `Activate(away_02,Blitz)`, declarations AGREE") and then `FFB_STEPTRACE=1` +
+`FFB_MOVEP=1` + `FFB_DICE_TRACE=1` on that one seed. The decisive lines:
+
+```
+J  JMOVEP k=2 pid=...Away2 at=13,6 n=6 offered=[] ans=FIRE_TERMINAL
+J  DICE_TRACE pos=18 ... rollBlockDice ... StepBlockRoll.executeStep:106
+R  RMOVEP k=2 pid=away_02 at=Some((13, 6)) n=6 offered=[...] ans=Block { defender_id: "home_01" }
+R  RSTATE step=InitBlocking prompt=BlockTarget ...            <- and then the turn just ended
+```
+
+Same declaration, same offered count, same answer — and Java rolled the blitz block die while Rust
+rolled nothing.
+
+### Fix 1 (ENGINE) — `StepEndMoving.dispatchPlayerAction` must RE-DELIVER the command
+
+`bb2016/move/StepEndMoving.java:191-199`:
+
+```java
+private StepCommandStatus dispatchPlayerAction(PlayerAction pPlayerAction) {
+    UtilServerSteps.changePlayerAction(this, actingPlayer.getPlayerId(), pPlayerAction, actingPlayer.isJumping());
+    if (pushSequenceForPlayerAction(pPlayerAction)) {
+        getResult().setNextAction(StepAction.NEXT_STEP_AND_REPEAT);
+    }
+    return StepCommandStatus.SKIP_STEP;
+}
+```
+
+`SKIP_STEP` leaves the received `CLIENT_BLOCK` **unconsumed** and `NEXT_STEP_AND_REPEAT` re-delivers
+it to the first step of the sequence just pushed, which is `StepInitBlocking` —
+`case CLIENT_BLOCK: fBlockDefenderId = blockCommand.getDefenderId()`. That is the *only* route by
+which the defender id reaches the block sequence when the blitzer's target was chosen at the MOVE
+prompt instead of folded into the activation. (`bb2016/move/StepInitMoving.dispatchPlayerAction`
+already used `GOTO_LABEL_AND_REPEAT`, so the command did reach `StepEndMoving`; the chain broke at
+the second hop.)
+
+Rust returned a plain `NextStep`, so `StepInitBlocking` ran with `block_defender_id == None`,
+prompted `AgentPrompt::BlockTarget`, and the agent's `BlockTarget => Action::EndPlayerAction` arm
+threw the blitz away.
+
+Fix: `StepOutcome::next_and_repeat()` (new, additive, in `step/framework.rs` — the driver already
+implemented `StepAction::NextStepAndRepeat` and its `forwarded` command slot) at that one site.
+Test `dispatch_player_action_forwards_the_command_to_the_pushed_sequence`, verified to FAIL on
+`StepOutcome::next()`.
+
+### Fix 2 (ENGINE) — `bb2016 StepInitPassing` had no `CLIENT_HAND_OVER` arm
+
+Fix 1 made the re-delivery real, and the first thing it re-delivered was a hand-off: bb2016 seed 10
+then produced **9 Rust steps against Java's 105**, stalled at `RSTATE step=InitPassing prompt=-`
+(a bare `cont()` with no prompt = `waiting_for_command` with nothing to ask). Ported
+`bb2016/pass/StepInitPassing.handleCommand`'s `case CLIENT_HAND_OVER` verbatim (catcher id, pass
+coordinate from the catcher's square, thrower = acting player, `throwerAction = HAND_OVER`,
+`EXECUTE_STEP`). Test `hand_over_command_sets_catcher_thrower_and_pass_coordinate`, verified to
+FAIL without the arm. bb2016 seeds 1-20: 12/20 -> 17/20.
+
+### Fix 3 (ENGINE) — a blood-lusting blitzer is BLITZ_MOVE, not MOVE
+
+`bb2016/move/StepEndSelecting.executeStep`:
+
+```java
+} else if (actingPlayer.isSufferingBloodLust()) {
+    if (fDispatchPlayerAction != null) {
+        if (!fDispatchPlayerAction.isMoving()) { fDispatchPlayerAction = PlayerAction.MOVE; }
+        dispatchPlayerAction(fDispatchPlayerAction, false);
+```
+
+Both the GUI client and `ParityRunner` declare a bb2016 blitz as **BLITZ_MOVE**
+(`declared = (action == BLITZ) ? BLITZ_MOVE : action`), which `isMoving()` accepts — so Java does
+NOT rewrite it, dispatches the **BlitzMove** sequence, and leaves the acting player on BLITZ_MOVE.
+Rust stores that same declaration as `PlayerAction::Blitz` (the codebase already carries this
+accommodation in `prepare_standing_up`), and `Blitz.is_moving()` is false, so a blood-lusting
+blitzer was silently downgraded to a plain MOVE. The agent then could not fire its block at all,
+because its move handler mirrors `MoveReplay.decide`:
+
+```java
+case BLITZ:
+    dispatchable = ("BlitzMove".equals(f.paNow) || "KickEmBlitz".equals(f.paNow))
+        && !f.hasBlocked && f.targetAdjacent;
+```
+
+`paNow` was `Blitz`, so `dispatchable` was false and Rust walked away where Java threw the block
+(seed 2 i=75: `JMOVEP k=96 ans=FIRE_TERMINAL` vs `RMOVEP k=96 ans=Move{...}`). Fix: recognise
+`PlayerAction::Blitz` in that branch, write BLITZ_MOVE onto the acting player via
+`change_player_action` (the state Java has had since its activation) and dispatch BlitzMove. Test
+`blood_lust_keeps_a_declared_blitz_as_blitz_move` asserts both the action and that the pushed
+sequence is step-for-step `BlitzMove::build_sequence`. bb2016 seeds 1-20: 17/20 -> **20/20**.
+
+### GATES (all nine re-measured on the final binary, seeds 1-100, tier 3, `--heur-classes all`)
+
+|              | scale 1.0 | argmax (0) | 1e6 |
+|---|---|---|---|
+| **bb2016**   | **100/100** (was 48) | **100/100** (was 90) | **100/100** (was 59) |
+| **bb2020**   | 100/100 | 98/100 (seeds 8, 76) | 100/100 |
+| **bb2025**   | 99/100 (seed 75) | 95/100 (seeds 8, 30, 50, 65, 71) | 100/100 |
+
+TIMING at scale 1.0: bb2016 `rust_total=40.8s`, bb2020 `59.6s`, bb2025 `54.4s`.
+Random controls (`FFB_PARITY_ROOT=parity_random`, `--agent random`, seeds 1-100): bb2016 100/100,
+bb2020 100/100, bb2025 100/100.
+`cargo test -p ffb-engine`: **7,451 passed / 0 failed / 15 ignored** (+3 this iteration).
+
+**Regressions — every closed roster, seeds 1-100, `@1.0`, ALL 100/100.** Fix 1 and Fix 2 are in
+bb2016 step files that EVERY bb2016 race runs (not just Blood Lust carriers), so bb2016 was gated
+too, which is the measurement that actually mattered:
+
+* `bb2016`: amazon chaos dwarf goblin human khemri lizardman necromantic nippon norse nurgle ogre
+  orc renegades skaven slann slann_fumbbl underworld wood_elf — 19/19 at 100/100.
+* `bb2025`: the same 18 required rosters — 18/18 at 100/100 (Fix 3 is blood-lust-only, so
+  vampire-only; Fix 1/2 are bb2016 files; `StepOutcome::next_and_repeat` is additive).
+
+No agent, `Reach` or candidate-building code was touched this iteration, so the Leap carriers'
+nine gates are not implicated by these fixes; their bb2016 `@1.0` gates are in the list above.
+
+### Event coverage (re-harvested x3, each run ALONE)
+
+`docs/EVENT_COVERAGE_vampire_bb20{16,20,25}.md`. bb2016's numbers moved because blitzes now actually
+execute there (`blockRoll` 1,085 in bb2016).
+
+| skill | verdict | evidence (bb2016 / bb2020 / bb2025, 100 games each) |
+|---|---|---|
+| **Bloodlust** | exercised + evented | `bloodLustRoll` 4,399 / 5,359 / 6,592 |
+| **feeding after a failed Bloodlust** | exercised + evented | `biteSpectator` 631 / 1,093 / 1,317 (the FAILED-to-feed branch; a successful feed on a thrall has no event and is hash-verified only) |
+| **Regeneration** | exercised + evented | `regenerationRoll` 40 / 73 / 78 |
+| **Juggernaut** | exercised + evented | `skillUse` — / 47 / 36 (bb2016 emits no `skillUse` at all in this run) |
+| **Hypnotic Gaze** | **UNREACHABLE** | still zero `gaze` rows in ALL THREE editions' declared-action histograms (BACKLOG E17 — unchanged; a harness-contract gap, not a Rust gap) |
+| **Claws / Frenzy / Loner 4** | exercised, unevented | no emit site (BACKLOG E6) |
+
+### Conclusions of mine that turned out WRONG
+
+* **"argmax-green + scale-red means a sampler/draw-count divergence"** (inherited from ITER1's
+  "sharpest verified fact", and the first thing I planned to chase). It was a rule divergence in the
+  blitz dispatch chain. What argmax actually changes is WHICH declarations happen, and the broken
+  path needed a blitz whose target is picked at the move prompt.
+* **`activation_already_started || standing_up`** in `step/bb2025/move_/step_init_moving.rs`,
+  proposed for bb2025 seed 75 (a prone vampire stands up, fails Blood Lust, and Java still walks it
+  over two more prompts). Measured bb2025 seeds 70-80: **0/11** (from 10/11). Reverted.
+* **Deleting that early-out entirely** — which is what a strict 1:1 port says, since Java's
+  `StepInitMoving` has no such branch at all and `ParityRunner case INIT_MOVING` answers
+  `sendMoveAction` whenever `activation != null`. Also measured **0/11**. Reverted. So the guard is
+  load-bearing *for the Rust agent contract*: the Rust agent, when handed that move prompt, does not
+  reduce to `MoveReplay`'s `END_PLAYER_ACTION` the way Java's does. Seed 75 is an AGENT gap, not an
+  engine gap, and the engine early-out cannot be removed before the agent mirrors MoveReplay.
+
+### Measurement notes
+
+* Everything above was gated from a PRIVATE `CARGO_TARGET_DIR=C:/Users/Admin/niels/target-vamp`
+  binary, with at most three concurrent streams and one `FFB_PARITY_ROOT` per stream. No phantom
+  reds this iteration.
+* `scripts/first_state_divergence.sh` now honours `FFB_PARITY_BIN` (one-line change) so it can be
+  pointed at that private binary.
+* `check_java_trees.py` reports `DIFFERS: .../heuristic/Sampler.java`. It is **not mine** — no Java
+  was edited this iteration — and it is inert: the only difference is an env-gated `FFB_GRP` debug
+  probe (`diff` of both files with comments stripped is exactly that 15-line block). The jar (14:53)
+  is newer than that edit (13:38), so the gates ran with the probe compiled in and unset. Not
+  `--fix`ed, to avoid clobbering the other session's work.
+
+### Frontier / next step
+
+1. **bb2025 `@1.0` seed 75** — root-caused, not fixed. `home_07` is PRONE, stands up (`cm=3`), fails
+   Blood Lust with `hasMoved=false`; Java's harness answers the empty-stack `INIT_MOVING` prompt with
+   a real path twice (`(20,14)->(20,13)->(25,8)`), Rust's engine early-out ends home's turn. Both
+   candidate engine fixes measured 0/11 (above). The next concrete step is on the AGENT: make the
+   heuristic's move handler reduce to `MoveReplay`'s verdict for a blood-lust activation, then delete
+   the invented early-out and re-gate.
+2. **bb2025 `@0` (seeds 8, 30, 50, 65, 71) and bb2020 `@0` (seeds 8, 76)** — still unclassified.
+   Both editions' `@1.0`/`@1e6` are green, so these are argmax-specific declaration paths.
+3. **BACKLOG E17** — give `sendConcreteAction` a `case GAZE:` so Hypnotic Gaze stops being a dead
+   mechanic in every edition.

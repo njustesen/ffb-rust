@@ -4336,7 +4336,7 @@ evidence of unreached code until the CARRIER's own declared-action histogram has
 "Ported but unreached" and "the carrier is never in the situation" produce identical event
 histograms.
 
-### E16. vampire bb2016 heuristic — 48/100, the residual Blood-Lust/GAZE frontier
+### E16. ~~vampire bb2016 heuristic — 48/100~~ RESOLVED 2026-09-07; the argmax-only reds remain
 
 Found closing (partly) vampire on 2026-09-07, `docs/PARITY_VAMPIRE_CAMPAIGN.md`. bb2016 went
 0/100 -> 48/100 in one iteration; the remaining 52 are NOT yet classified into families. What is
@@ -4360,6 +4360,24 @@ already known and should not be re-derived:
   which is what the harness's `MoveReplay` reduces to. Any further work here should start by
   proving what Java's `case INIT_MOVING` answers for the failing activation, not by reasoning
   about the engine.
+
+**RESOLVED (ITER2, 2026-09-07).** bb2016 is **100/100 at all three scales**. The 52 reds were ONE
+engine mechanism, not the suspected sampler divergence: `bb2016 StepEndMoving.dispatchPlayerAction`
+returned a plain `NextStep` where Java returns `SKIP_STEP` + `NEXT_STEP_AND_REPEAT`, so the
+`CLIENT_BLOCK` naming the blitz target was never re-delivered to `StepInitBlocking` and every blitz
+whose target was chosen at the MOVE prompt was silently dropped. Two follow-on ports were needed
+(`bb2016 StepInitPassing` had no `CLIENT_HAND_OVER` arm; `bb2016 StepEndSelecting`'s blood-lust
+branch downgraded a declared `Blitz` to `MOVE` instead of keeping Java's `BLITZ_MOVE`). Details and
+the retracted hypothesis: `docs/PARITY_VAMPIRE_CAMPAIGN.md` ITER2.
+
+STILL OPEN, and the honest remainder of this entry: **bb2025 `@1.0` seed 75**, **bb2025 `@0` seeds
+8/30/50/65/71**, **bb2020 `@0` seeds 8/76**. Seed 75 is root-caused and is an AGENT gap — a prone
+blood-lust vampire that has stood up: Java's `case INIT_MOVING` answers `sendMoveAction` (two real
+paths), Rust's invented `suffering_blood_lust` early-out in `step/bb2025/move_/step_init_moving.rs`
+ends the turn. Both engine-side repairs (adding `standing_up` to the started test; deleting the
+early-out, which is what a strict 1:1 port says) measured **0/11** on bb2025 seeds 70-80 and were
+reverted — the Rust agent does not reduce to `MoveReplay`'s `END_PLAYER_ACTION` when handed that
+prompt, so the agent must be fixed first.
 
 Also open, and smaller: bb2025 `@1.0` 1 red / `@0` 5 reds, bb2020 `@0` 2 reds — all unclassified.
 

@@ -148,7 +148,29 @@ impl StepEndSelecting {
         // Java: else if (actingPlayer.isSufferingBloodLust()) → force action to MOVE if not moving
         if game.acting_player.suffering_blood_lust {
             let effective_action = if let Some(da) = self.dispatch_player_action {
-                if !da.is_moving() { PlayerAction::Move } else { da }
+                // Java: `if (!fDispatchPlayerAction.isMoving()) fDispatchPlayerAction = MOVE;`
+                // then `dispatchPlayerAction(fDispatchPlayerAction, false)`.
+                //
+                // Both the GUI client and ParityRunner declare a bb2016 blitz as **BLITZ_MOVE**
+                // (`declared = (action == BLITZ) ? BLITZ_MOVE : action`), which IS moving — so Java
+                // does NOT rewrite it to MOVE and dispatches the BlitzMove sequence with the
+                // acting player's action still BLITZ_MOVE. Rust stores that same declaration as
+                // `PlayerAction::Blitz` (see `prepare_standing_up`, which carries the identical
+                // accommodation), and `Blitz.is_moving()` is false, so a blood-lusting blitzer was
+                // rewritten to MOVE: it ran the Move sequence with `player_action == Blitz`, and the
+                // agent's move handler — which mirrors `MoveReplay.decide`'s
+                // `case BLITZ: "BlitzMove".equals(f.paNow) && !hasBlocked && targetAdjacent` — could
+                // not fire its terminal, so Rust walked away where Java threw the block
+                // (vampire bb2016 seed 2 i=75: Java `JMOVEP k=96 ans=FIRE_TERMINAL`, Rust
+                // `RMOVEP k=96 ans=Move{...}`).
+                if da == PlayerAction::Blitz {
+                    let pid = game.acting_player.player_id.clone();
+                    let jumping = game.acting_player.jumping;
+                    if let Some(id) = pid.as_deref() {
+                        change_player_action(game, id, PlayerAction::BlitzMove, jumping);
+                    }
+                    PlayerAction::BlitzMove
+                } else if !da.is_moving() { PlayerAction::Move } else { da }
             } else {
                 match game.acting_player.player_action {
                     Some(a) if !a.is_moving() => {
@@ -404,6 +426,46 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert!(!out.pushes.is_empty());
+    }
+
+    /// Java `bb2016/move/StepEndSelecting.executeStep`, the blood-lust branch:
+    /// ```java
+    /// } else if (actingPlayer.isSufferingBloodLust()) {
+    ///     if (fDispatchPlayerAction != null) {
+    ///         if (!fDispatchPlayerAction.isMoving()) { fDispatchPlayerAction = PlayerAction.MOVE; }
+    ///         dispatchPlayerAction(fDispatchPlayerAction, false);
+    /// ```
+    /// The client declares a bb2016 blitz as **BLITZ_MOVE**, which `isMoving()` accepts, so Java
+    /// keeps it and dispatches the **BlitzMove** sequence with the acting player's action still
+    /// BLITZ_MOVE. Rust stores that declaration as `PlayerAction::Blitz`, whose `is_moving()` is
+    /// false — so it must be recognised here or a blood-lusting blitzer is downgraded to a plain
+    /// MOVE and the agent can never fire its block (`MoveReplay.decide` requires
+    /// `"BlitzMove".equals(f.paNow)`).
+    #[test]
+    fn blood_lust_keeps_a_declared_blitz_as_blitz_move() {
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        let pid = "home_01".to_string();
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: pid.clone(), name: pid.clone(), nr: 1, position_id: "lineman".into(),
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate(&pid, FieldCoordinate::new(12, 7));
+        game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING));
+        game.acting_player.set_player(pid.clone(), PlayerAction::Blitz);
+        game.acting_player.suffering_blood_lust = true;
+        let mut step = StepEndSelecting::new();
+        step.dispatch_player_action = Some(PlayerAction::Blitz);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(game.acting_player.player_action, Some(PlayerAction::BlitzMove),
+            "Java's acting player is BLITZ_MOVE here, not MOVE");
+        let pushed = out.pushes.first().expect("a sequence must be pushed");
+        let ids: Vec<_> = pushed.iter().map(|s| s.step_id).collect();
+        let want: Vec<_> = BlitzMove::build_sequence(&BlitzMoveParams::default())
+            .iter().map(|s| s.step_id).collect();
+        assert_eq!(ids, want, "Java dispatches BLITZ_MOVE -> the BlitzMove sequence");
     }
 
     #[test]
