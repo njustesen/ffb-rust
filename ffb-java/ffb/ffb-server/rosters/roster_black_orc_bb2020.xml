@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="black_orc.bb2020">
+	<name>Black Orc</name>
+	<reRollCost>60000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="blackorc.goblin_bruiser_lineman">
+		<quantity>12</quantity>
+		<name>Goblin Bruiser Lineman</name>
+		<displayName>Goblin Bruiser Lineman</displayName>
+		<type>Regular</type>
+		<cost>45000</cost>
+		<movement>6</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+			<skill>Stunty</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>General</double>
+			<double>Passing</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="blackorc.black_orc">
+		<quantity>6</quantity>
+		<name>Black Orc</name>
+		<displayName>Black Orc</displayName>
+		<type>Regular</type>
+		<cost>90000</cost>
+		<movement>4</movement>
+		<strength>4</strength>
+		<agility>4</agility>
+		<passing>5</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Brawler</skill>
+			<skill>Grab</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+	<position id="blackorc.trained_troll">
+		<quantity>1</quantity>
+		<name>Trained Troll</name>
+		<displayName>Trained Troll</displayName>
+		<type>Big Guy</type>
+		<cost>115000</cost>
+		<movement>4</movement>
+		<strength>5</strength>
+		<agility>5</agility>
+		<passing>5</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Always Hungry</skill>
+			<skill value="3">Loner</skill>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Projectile Vomit</skill>
+			<skill>Really Stupid</skill>
+			<skill>Regeneration</skill>
+			<skill>Throw Team-mate</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+</roster>

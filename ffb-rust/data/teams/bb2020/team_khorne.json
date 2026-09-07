@@ -1,0 +1,64 @@
+{
+  "edition": "bb2020",
+  "race": "khorne",
+  "roster_id": "khorne.lrb6",
+  "rerolls": 2,
+  "reroll_cost": 60000,
+  "apothecaries": 1,
+  "dedicated_fans": 3,
+  "fan_factor": 0,
+  "treasury": 50000,
+  "spent": 1050000,
+  "team_value": 1040000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "khorne.bloodspawn"
+    },
+    {
+      "nr": 2,
+      "position_id": "khorne.bloodseeker"
+    },
+    {
+      "nr": 3,
+      "position_id": "khorne.bloodseeker"
+    },
+    {
+      "nr": 4,
+      "position_id": "khorne.khorngor"
+    },
+    {
+      "nr": 5,
+      "position_id": "khorne.khorngor"
+    },
+    {
+      "nr": 6,
+      "position_id": "khorne.bloodborn_marauder_lineman"
+    },
+    {
+      "nr": 7,
+      "position_id": "khorne.bloodborn_marauder_lineman"
+    },
+    {
+      "nr": 8,
+      "position_id": "khorne.bloodborn_marauder_lineman"
+    },
+    {
+      "nr": 9,
+      "position_id": "khorne.bloodborn_marauder_lineman"
+    },
+    {
+      "nr": 10,
+      "position_id": "khorne.bloodborn_marauder_lineman"
+    },
+    {
+      "nr": 11,
+      "position_id": "khorne.bloodborn_marauder_lineman"
+    },
+    {
+      "nr": 12,
+      "position_id": "khorne.bloodborn_marauder_lineman"
+    }
+  ],
+  "special_rules": []
+}

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="gnome.bb2020">
+	<name>Gnome</name>
+	<reRollCost>50000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="gnome.gnome_lineman">
+		<quantity>16</quantity>
+		<name>Gnome Lineman</name>
+		<displayName>Gnome Lineman</displayName>
+		<type>Regular</type>
+		<cost>40000</cost>
+		<movement>5</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Jump Up</skill>
+			<skill>Right Stuff</skill>
+			<skill>Stunty</skill>
+			<skill>Wrestle</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>General</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="gnome.gnome_beastmaster">
+		<quantity>2</quantity>
+		<name>Gnome Beastmaster</name>
+		<displayName>Gnome Beastmaster</displayName>
+		<type>Regular</type>
+		<cost>55000</cost>
+		<movement>5</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Guard</skill>
+			<skill>Jump Up</skill>
+			<skill>Stunty</skill>
+			<skill>Wrestle</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>General</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="gnome.gnome_illusionist">
+		<quantity>2</quantity>
+		<name>Gnome Illusionist</name>
+		<displayName>Gnome Illusionist</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>5</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>3</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill>Jump Up</skill>
+			<skill>Stunty</skill>
+			<skill>Trickster</skill>
+			<skill>Wrestle</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>Passing</normal>
+			<double>General</double>
+		</skillCategoryList>
+	</position>
+	<position id="gnome.woodland_fox">
+		<quantity>2</quantity>
+		<name>Woodland Fox</name>
+		<displayName>Woodland Fox</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>7</movement>
+		<strength>2</strength>
+		<agility>2</agility>
+		<passing>0</passing>
+		<armour>6</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>My Ball</skill>
+			<skill>Side Step</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<double>Agility</double>
+		</skillCategoryList>
+	</position>
+	<position id="gnome.altern_forest_treeman">
+		<quantity>2</quantity>
+		<name>Altern Forest Treeman</name>
+		<displayName>Altern Forest Treeman</displayName>
+		<type>Big Guy</type>
+		<cost>120000</cost>
+		<movement>2</movement>
+		<strength>6</strength>
+		<agility>5</agility>
+		<passing>5</passing>
+		<armour>11</armour>
+		<skillList>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Stand Firm</skill>
+			<skill>Strong Arm</skill>
+			<skill>Take Root</skill>
+			<skill>Thick Skull</skill>
+			<skill>Throw Team-mate</skill>
+			<skill>Timmm-ber!</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+</roster>

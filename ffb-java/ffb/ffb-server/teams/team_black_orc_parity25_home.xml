@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamBlackOrcParity25Home">
+
+	<coach>Home</coach>
+	<name>Black Orc Parity25 Home</name>
+	<race>Black Orc</race>
+	<rosterId>black_orc.bb2025</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1050000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>40000</treasury>
+	<specialRules>
+		<rule>Bribery and Corruption</rule>
+		<rule>Brawlin' Brutes</rule>
+	</specialRules>
+
+	<player nr="1" id="teamBlackOrcParity25Home1">
+		<name>Trained Troll 1</name>
+		<gender>male</gender>
+		<positionId>blackorc.trained_troll</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamBlackOrcParity25Home2">
+		<name>Black Orc 2</name>
+		<gender>male</gender>
+		<positionId>blackorc.black_orc</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamBlackOrcParity25Home3">
+		<name>Black Orc 3</name>
+		<gender>male</gender>
+		<positionId>blackorc.black_orc</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamBlackOrcParity25Home4">
+		<name>Black Orc 4</name>
+		<gender>male</gender>
+		<positionId>blackorc.black_orc</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamBlackOrcParity25Home5">
+		<name>Black Orc 5</name>
+		<gender>male</gender>
+		<positionId>blackorc.black_orc</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamBlackOrcParity25Home6">
+		<name>Black Orc 6</name>
+		<gender>male</gender>
+		<positionId>blackorc.black_orc</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamBlackOrcParity25Home7">
+		<name>Black Orc 7</name>
+		<gender>male</gender>
+		<positionId>blackorc.black_orc</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamBlackOrcParity25Home8">
+		<name>Goblin Bruiser 8</name>
+		<gender>male</gender>
+		<positionId>blackorc.goblin_bruiser</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamBlackOrcParity25Home9">
+		<name>Goblin Bruiser 9</name>
+		<gender>male</gender>
+		<positionId>blackorc.goblin_bruiser</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamBlackOrcParity25Home10">
+		<name>Goblin Bruiser 10</name>
+		<gender>male</gender>
+		<positionId>blackorc.goblin_bruiser</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamBlackOrcParity25Home11">
+		<name>Goblin Bruiser 11</name>
+		<gender>male</gender>
+		<positionId>blackorc.goblin_bruiser</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamBlackOrcParity25Home12">
+		<name>Goblin Bruiser 12</name>
+		<gender>male</gender>
+		<positionId>blackorc.goblin_bruiser</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

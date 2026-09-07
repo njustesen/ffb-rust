@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamKhorneParity25Home">
+
+	<coach>Home</coach>
+	<name>Khorne Parity25 Home</name>
+	<race>Khorne</race>
+	<rosterId>khorne.bb2025</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1085000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>5000</treasury>
+	<specialRules>
+		<rule>Favoured of Khorne</rule>
+		<rule>Brawlin' Brutes</rule>
+	</specialRules>
+
+	<player nr="1" id="teamKhorneParity25Home1">
+		<name>Bloodspawn 1</name>
+		<gender>male</gender>
+		<positionId>khorne.bloodspawn</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamKhorneParity25Home2">
+		<name>Bloodseeker 2</name>
+		<gender>male</gender>
+		<positionId>khorne.bloodseeker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamKhorneParity25Home3">
+		<name>Bloodseeker 3</name>
+		<gender>male</gender>
+		<positionId>khorne.bloodseeker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamKhorneParity25Home4">
+		<name>Bloodseeker 4</name>
+		<gender>male</gender>
+		<positionId>khorne.bloodseeker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamKhorneParity25Home5">
+		<name>Khorngor 5</name>
+		<gender>male</gender>
+		<positionId>khorne.khorngor</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamKhorneParity25Home6">
+		<name>Khorngor 6</name>
+		<gender>male</gender>
+		<positionId>khorne.khorngor</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamKhorneParity25Home7">
+		<name>Bloodborn Marauder 7</name>
+		<gender>male</gender>
+		<positionId>khorne.bloodborn_marauder</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamKhorneParity25Home8">
+		<name>Bloodborn Marauder 8</name>
+		<gender>male</gender>
+		<positionId>khorne.bloodborn_marauder</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamKhorneParity25Home9">
+		<name>Bloodborn Marauder 9</name>
+		<gender>male</gender>
+		<positionId>khorne.bloodborn_marauder</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamKhorneParity25Home10">
+		<name>Bloodborn Marauder 10</name>
+		<gender>male</gender>
+		<positionId>khorne.bloodborn_marauder</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamKhorneParity25Home11">
+		<name>Bloodborn Marauder 11</name>
+		<gender>male</gender>
+		<positionId>khorne.bloodborn_marauder</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamKhorneParity25Home12">
+		<name>Bloodborn Marauder 12</name>
+		<gender>male</gender>
+		<positionId>khorne.bloodborn_marauder</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

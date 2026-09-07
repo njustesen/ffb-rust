@@ -1,0 +1,67 @@
+{
+  "edition": "bb2025",
+  "race": "khorne",
+  "roster_id": "khorne.lrb6",
+  "rerolls": 2,
+  "reroll_cost": 60000,
+  "apothecaries": 1,
+  "dedicated_fans": 3,
+  "fan_factor": 0,
+  "treasury": 5000,
+  "spent": 1095000,
+  "team_value": 1085000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "khorne.bloodspawn"
+    },
+    {
+      "nr": 2,
+      "position_id": "khorne.bloodseeker"
+    },
+    {
+      "nr": 3,
+      "position_id": "khorne.bloodseeker"
+    },
+    {
+      "nr": 4,
+      "position_id": "khorne.bloodseeker"
+    },
+    {
+      "nr": 5,
+      "position_id": "khorne.khorngor"
+    },
+    {
+      "nr": 6,
+      "position_id": "khorne.khorngor"
+    },
+    {
+      "nr": 7,
+      "position_id": "khorne.bloodborn_marauder"
+    },
+    {
+      "nr": 8,
+      "position_id": "khorne.bloodborn_marauder"
+    },
+    {
+      "nr": 9,
+      "position_id": "khorne.bloodborn_marauder"
+    },
+    {
+      "nr": 10,
+      "position_id": "khorne.bloodborn_marauder"
+    },
+    {
+      "nr": 11,
+      "position_id": "khorne.bloodborn_marauder"
+    },
+    {
+      "nr": 12,
+      "position_id": "khorne.bloodborn_marauder"
+    }
+  ],
+  "special_rules": [
+    "Favoured of Khorne",
+    "Brawlin' Brutes"
+  ]
+}

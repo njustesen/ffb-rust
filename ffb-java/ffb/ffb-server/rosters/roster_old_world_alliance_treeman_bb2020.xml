@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="old_world_alliance_treeman.bb2020">
+	<name>Old World Alliance</name>
+	<reRollCost>70000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="oldworldalliance.human_lineman">
+		<quantity>12</quantity>
+		<name>Old World Human Lineman</name>
+		<displayName>Old World Human Lineman</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList/>
+		<skillCategoryList>
+			<normal>General</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="oldworldalliance.human_thrower">
+		<quantity>1</quantity>
+		<name>Old World Human Thrower</name>
+		<displayName>Old World Human Thrower</displayName>
+		<type>Regular</type>
+		<cost>80000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>3</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill value="oldworldalliance.dwarf_blitzer;oldworldalliance.dwarf_blocker;oldworldalliance.dwarf_runner;oldworldalliance.trollslayer;oldworldalliance.halfling_hopeful">Animosity</skill>
+			<skill>Pass</skill>
+			<skill>Sure Hands</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Passing</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="oldworldalliance.human_catcher">
+		<quantity>1</quantity>
+		<name>Old World Human Catcher</name>
+		<displayName>Old World Human Catcher</displayName>
+		<type>Regular</type>
+		<cost>65000</cost>
+		<movement>8</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill value="oldworldalliance.dwarf_blitzer;oldworldalliance.dwarf_blocker;oldworldalliance.dwarf_runner;oldworldalliance.trollslayer;oldworldalliance.halfling_hopeful">Animosity</skill>
+			<skill>Catch</skill>
+			<skill>Dodge</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>General</normal>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="oldworldalliance.dwarf_blitzer">
+		<quantity>1</quantity>
+		<name>Old World Dwarf Blitzer</name>
+		<displayName>Old World Dwarf Blitzer</displayName>
+		<type>Regular</type>
+		<cost>80000</cost>
+		<movement>5</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill value="3">Loner</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+		</skillCategoryList>
+	</position>
+	<position id="oldworldalliance.dwarf_blocker">
+		<quantity>2</quantity>
+		<name>Old World Dwarf Blocker</name>
+		<displayName>Old World Dwarf Blocker</displayName>
+		<type>Regular</type>
+		<cost>75000</cost>
+		<movement>4</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>5</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Arm Bar</skill>
+			<skill>Brawler</skill>
+			<skill value="3">Loner</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+		</skillCategoryList>
+	</position>
+	<position id="oldworldalliance.dwarf_runner">
+		<quantity>1</quantity>
+		<name>Old World Dwarf Runner</name>
+		<displayName>Old World Dwarf Runner</displayName>
+		<type>Regular</type>
+		<cost>85000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill value="3">Loner</skill>
+			<skill>Sure Hands</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Passing</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="oldworldalliance.human_blitzer">
+		<quantity>1</quantity>
+		<name>Old World Human Blitzer</name>
+		<displayName>Old World Human Blitzer</displayName>
+		<type>Regular</type>
+		<cost>90000</cost>
+		<movement>7</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill value="oldworldalliance.dwarf_blitzer;oldworldalliance.dwarf_blocker;oldworldalliance.dwarf_runner;oldworldalliance.trollslayer;oldworldalliance.halfling_hopeful">Animosity</skill>
+			<skill>Block</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+		</skillCategoryList>
+	</position>
+	<position id="oldworldalliance.trollslayer">
+		<quantity>1</quantity>
+		<name>Old World Dwarf Troll Slayer</name>
+		<displayName>Old World Dwarf Troll Slayer</displayName>
+		<type>Regular</type>
+		<cost>95000</cost>
+		<movement>5</movement>
+		<strength>3</strength>
+		<agility>4</agility>
+		<passing>0</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Block</skill>
+			<skill>Dauntless</skill>
+			<skill>Frenzy</skill>
+			<skill value="3">Loner</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+		</skillCategoryList>
+	</position>
+	<position id="oldworldalliance.halfling_hopeful">
+		<quantity>2</quantity>
+		<name>Old World Halfling Hopefuls</name>
+		<displayName>Old World Halfling Hopefuls</displayName>
+		<type>Regular</type>
+		<cost>30000</cost>
+		<movement>5</movement>
+		<strength>2</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>7</armour>
+		<skillList>
+			<skill value="oldworldalliance.human_lineman;oldworldalliance.human_thrower;oldworldalliance.human_catcher;oldworldalliance.human_blitzer;oldworldalliance.dwarf_blitzer;oldworldalliance.dwarf_blocker;oldworldalliance.dwarf_runner;oldworldalliance.trollslayer">Animosity</skill>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>General</double>
+			<double>Strength</double>
+		</skillCategoryList>
+	</position>
+	<position id="oldworldalliance.ogre">
+		<quantity>1</quantity>
+		<name>Ogre</name>
+		<displayName>Ogre</displayName>
+		<type>Big Guy</type>
+		<cost>140000</cost>
+		<movement>5</movement>
+		<strength>5</strength>
+		<agility>4</agility>
+		<passing>5</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Bone Head</skill>
+			<skill value="4">Loner</skill>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Thick Skull</skill>
+			<skill>Throw Team-mate</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+		</skillCategoryList>
+	</position>
+	<position id="oldworldalliance.altern_forest_treeman">
+		<quantity>1</quantity>
+		<name>Altern Forest Treeman</name>
+		<displayName>Altern Forest Treeman</displayName>
+		<type>Big Guy</type>
+		<cost>120000</cost>
+		<movement>2</movement>
+		<strength>6</strength>
+		<agility>5</agility>
+		<passing>5</passing>
+		<armour>11</armour>
+		<skillList>
+			<skill value="4">Loner</skill>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Stand Firm</skill>
+			<skill>Strong Arm</skill>
+			<skill>Take Root</skill>
+			<skill>Thick Skull</skill>
+			<skill>Throw Team-mate</skill>
+			<skill>Timmm-ber!</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+</roster>

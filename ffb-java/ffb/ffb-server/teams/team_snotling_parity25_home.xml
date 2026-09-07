@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamSnotlingParity25Home">
+
+	<coach>Home</coach>
+	<name>Snotling Parity25 Home</name>
+	<race>Snotling</race>
+	<rosterId>snotling.bb2025</rosterId>
+	<reRolls>5</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1060000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>30000</treasury>
+	<specialRules>
+		<rule>Bribery and Corruption</rule>
+		<rule>Low Cost Linemen</rule>
+		<rule>Swarming</rule>
+	</specialRules>
+
+	<player nr="1" id="teamSnotlingParity25Home1">
+		<name>Trained Troll 1</name>
+		<gender>male</gender>
+		<positionId>snotling.trained_troll</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamSnotlingParity25Home2">
+		<name>Trained Troll 2</name>
+		<gender>male</gender>
+		<positionId>snotling.trained_troll</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamSnotlingParity25Home3">
+		<name>Pump Wagon 3</name>
+		<gender>male</gender>
+		<positionId>snotling.pump_wagon</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamSnotlingParity25Home4">
+		<name>Pump Wagon 4</name>
+		<gender>male</gender>
+		<positionId>snotling.pump_wagon</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamSnotlingParity25Home5">
+		<name>Fungus Flinga 5</name>
+		<gender>male</gender>
+		<positionId>snotling.fungus_flinga</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamSnotlingParity25Home6">
+		<name>Fungus Flinga 6</name>
+		<gender>male</gender>
+		<positionId>snotling.fungus_flinga</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamSnotlingParity25Home7">
+		<name>Stilty Runna 7</name>
+		<gender>male</gender>
+		<positionId>snotling.stilty_runna</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamSnotlingParity25Home8">
+		<name>Stilty Runna 8</name>
+		<gender>male</gender>
+		<positionId>snotling.stilty_runna</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamSnotlingParity25Home9">
+		<name>Fun-hoppa 9</name>
+		<gender>male</gender>
+		<positionId>snotling.fun_hoppa</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamSnotlingParity25Home10">
+		<name>Fun-hoppa 10</name>
+		<gender>male</gender>
+		<positionId>snotling.fun_hoppa</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamSnotlingParity25Home11">
+		<name>Snotling Lineman 11</name>
+		<gender>male</gender>
+		<positionId>snotling.snotling_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamSnotlingParity25Home12">
+		<name>Snotling Lineman 12</name>
+		<gender>male</gender>
+		<positionId>snotling.snotling_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamSnotlingParity25Home13">
+		<name>Snotling Lineman 13</name>
+		<gender>male</gender>
+		<positionId>snotling.snotling_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="14" id="teamSnotlingParity25Home14">
+		<name>Snotling Lineman 14</name>
+		<gender>male</gender>
+		<positionId>snotling.snotling_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="15" id="teamSnotlingParity25Home15">
+		<name>Snotling Lineman 15</name>
+		<gender>male</gender>
+		<positionId>snotling.snotling_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="16" id="teamSnotlingParity25Home16">
+		<name>Snotling Lineman 16</name>
+		<gender>male</gender>
+		<positionId>snotling.snotling_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

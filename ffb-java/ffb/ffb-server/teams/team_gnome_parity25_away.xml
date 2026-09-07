@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamGnomeParity25Away">
+
+	<coach>Away</coach>
+	<name>Gnome Parity25 Away</name>
+	<race>Gnome</race>
+	<rosterId>gnome.bb2025</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1030000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>60000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamGnomeParity25Away1">
+		<name>Altern Forest Treeman 1</name>
+		<gender>male</gender>
+		<positionId>gnome.altern_forest_treeman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamGnomeParity25Away2">
+		<name>Altern Forest Treeman 2</name>
+		<gender>male</gender>
+		<positionId>gnome.altern_forest_treeman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamGnomeParity25Away3">
+		<name>Gnome Beastmaster 3</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_beastmaster</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamGnomeParity25Away4">
+		<name>Gnome Beastmaster 4</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_beastmaster</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamGnomeParity25Away5">
+		<name>Gnome Illusionist 5</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_illusionist</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamGnomeParity25Away6">
+		<name>Gnome Illusionist 6</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_illusionist</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamGnomeParity25Away7">
+		<name>Woodland Fox 7</name>
+		<gender>male</gender>
+		<positionId>gnome.woodland_fox</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamGnomeParity25Away8">
+		<name>Woodland Fox 8</name>
+		<gender>male</gender>
+		<positionId>gnome.woodland_fox</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamGnomeParity25Away9">
+		<name>Gnome Lineman 9</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamGnomeParity25Away10">
+		<name>Gnome Lineman 10</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamGnomeParity25Away11">
+		<name>Gnome Lineman 11</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamGnomeParity25Away12">
+		<name>Gnome Lineman 12</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamGnomeParity25Away13">
+		<name>Gnome Lineman 13</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="14" id="teamGnomeParity25Away14">
+		<name>Gnome Lineman 14</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="15" id="teamGnomeParity25Away15">
+		<name>Gnome Lineman 15</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

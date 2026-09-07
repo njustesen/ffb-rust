@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="snotling.bb2020">
+	<name>Snotling</name>
+	<reRollCost>60000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="snotling.snotling_lineman">
+		<quantity>16</quantity>
+		<name>Snotling Lineman</name>
+		<displayName>Snotling Lineman</displayName>
+		<type>Regular</type>
+		<cost>15000</cost>
+		<movement>5</movement>
+		<strength>1</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>6</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+			<skill>Side Step</skill>
+			<skill>Stunty</skill>
+			<skill>Swarming</skill>
+			<skill>Titchy</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>General</double>
+		</skillCategoryList>
+	</position>
+	<position id="snotling.fungus_flinga">
+		<quantity>2</quantity>
+		<name>Fungus Flinga</name>
+		<displayName>Fungus Flinga</displayName>
+		<type>Regular</type>
+		<cost>30000</cost>
+		<movement>5</movement>
+		<strength>1</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>6</armour>
+		<skillList>
+			<skill>Bombardier</skill>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+			<skill>Secret Weapon</skill>
+			<skill>Side Step</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<normal>Passing</normal>
+			<double>General</double>
+		</skillCategoryList>
+	</position>
+	<position id="snotling.fun_hoppa">
+		<quantity>2</quantity>
+		<name>Fun-Hoppa</name>
+		<displayName>Fun-Hoppa</displayName>
+		<type>Regular</type>
+		<cost>20000</cost>
+		<movement>6</movement>
+		<strength>1</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>6</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Pogo Stick</skill>
+			<skill>Right Stuff</skill>
+			<skill>Side Step</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>General</double>
+		</skillCategoryList>
+	</position>
+	<position id="snotling.stilty_runna">
+		<quantity>2</quantity>
+		<name>Stilty Runna</name>
+		<displayName>Stilty Runna</displayName>
+		<type>Regular</type>
+		<cost>20000</cost>
+		<movement>6</movement>
+		<strength>1</strength>
+		<agility>3</agility>
+		<passing>5</passing>
+		<armour>6</armour>
+		<skillList>
+			<skill>Dodge</skill>
+			<skill>Right Stuff</skill>
+			<skill>Side Step</skill>
+			<skill>Sprint</skill>
+			<skill>Stunty</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Agility</normal>
+			<double>General</double>
+		</skillCategoryList>
+	</position>
+	<position id="snotling.pump_wagon">
+		<quantity>2</quantity>
+		<name>Pump Wagon</name>
+		<displayName>Pump Wagon</displayName>
+		<type>Big Guy</type>
+		<cost>105000</cost>
+		<movement>4</movement>
+		<strength>5</strength>
+		<agility>5</agility>
+		<passing>0</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill value="1">Dirty Player</skill>
+			<skill>Juggernaut</skill>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Really Stupid</skill>
+			<skill>Secret Weapon</skill>
+			<skill>Stand Firm</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+		</skillCategoryList>
+	</position>
+	<position id="snotling.trained_troll">
+		<quantity>2</quantity>
+		<name>Trained Troll</name>
+		<displayName>Trained Troll</displayName>
+		<type>Big Guy</type>
+		<cost>115000</cost>
+		<movement>4</movement>
+		<strength>5</strength>
+		<agility>5</agility>
+		<passing>5</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Always Hungry</skill>
+			<skill value="3">Loner</skill>
+			<skill value="1">Mighty Blow</skill>
+			<skill>Projectile Vomit</skill>
+			<skill>Really Stupid</skill>
+			<skill>Regeneration</skill>
+			<skill>Throw Team-mate</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+			<double>Passing</double>
+		</skillCategoryList>
+	</position>
+</roster>

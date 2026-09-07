@@ -1909,8 +1909,124 @@ mod team_file_tests {
                 }
                 checked += 1;
             }
-            assert_eq!(checked, 29, "{edition}: expected 29 team files, found {checked}");
+            // bb2016 has the 29 original drafts; bb2025 adds the 8 coverage squads of
+            // PARITY_COVERAGE_REQUIREMENTS §8 (6 new teams + Bretonnian + the two R3
+            // Old World Alliance Big-Guy variants, which share one roster).
+            let want = if edition == "bb2025" { 37 } else { 29 };
+            assert_eq!(checked, want, "{edition}: expected {want} team files, found {checked}");
         }
+    }
+}
+
+/// The coverage squads added for PARITY_COVERAGE_REQUIREMENTS §8 must build their REAL roster.
+///
+/// `make_team` ends in `unwrap_or_else(|_| make_lineman_team(..))`, so a typo'd roster_id or
+/// position_id yields an all-lineman team that STILL produces perfectly matched parity games —
+/// a green gate on nothing. This bit the FUMBBL variants once (see `fumbbl_roster_tests`).
+/// These tests therefore go through the live `make_team` path and assert, per squad:
+///   * the exact fielded position_id multiset (fallback players are all `position_id == "lineman"`)
+///   * every player's stat line equals its roster position's (fallback is uniformly 6/3/3/4/8)
+///   * a fingerprint positional carries a fingerprint starting skill (fallback has none)
+///   * R2/R4: every positional of the roster is fielded by the cell's squad set
+#[cfg(test)]
+mod coverage_squad_tests {
+    use super::*;
+    use ffb_model::enums::SkillId;
+
+    /// (edition, squad CLI name, roster race, fingerprint position, fingerprint skill)
+    const SQUADS: &[(&str, &str, &str, &str, SkillId)] = &[
+        ("bb2025", "black_orc", "black_orc", "blackorc.trained_troll", SkillId::AlwaysHungry),
+        ("bb2025", "gnome", "gnome", "gnome.woodland_fox", SkillId::MyBall),
+        ("bb2025", "imperial_nobility", "imperial_nobility", "imperialnobility.ogre", SkillId::BoneHead),
+        ("bb2025", "khorne", "khorne", "khorne.bloodspawn", SkillId::UnchannelledFury),
+        ("bb2025", "old_world_alliance_ogre", "old_world_alliance", "oldworldalliance.ogre", SkillId::BoneHead),
+        ("bb2025", "old_world_alliance_treeman", "old_world_alliance", "oldworldalliance.altern_forest_treeman", SkillId::TakeRoot),
+        ("bb2025", "snotling", "snotling", "snotling.trained_troll", SkillId::AlwaysHungry),
+        ("bb2025", "bretonnian", "bretonnian", "bretonnian.grail_knight", SkillId::Dauntless),
+        ("bb2020", "black_orc", "black_orc", "blackorc.trained_troll", SkillId::AlwaysHungry),
+        ("bb2020", "gnome", "gnome", "gnome.woodland_fox", SkillId::MyBall),
+        ("bb2020", "imperial_nobility", "imperial_nobility", "imperialnobility.ogre", SkillId::BoneHead),
+        ("bb2020", "khorne", "khorne", "khorne.bloodspawn", SkillId::UnchannelledFury),
+        ("bb2020", "old_world_alliance_ogre", "old_world_alliance", "oldworldalliance.ogre", SkillId::BoneHead),
+        ("bb2020", "old_world_alliance_treeman", "old_world_alliance", "oldworldalliance.altern_forest_treeman", SkillId::TakeRoot),
+        ("bb2020", "snotling", "snotling", "snotling.trained_troll", SkillId::AlwaysHungry),
+    ];
+
+    fn spec_of(edition: &str, squad: &str) -> TeamFileJson {
+        let path = team_file_path(squad, edition)
+            .unwrap_or_else(|| panic!("data/teams/{edition}/team_{squad}.json missing"));
+        serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn coverage_squads_build_their_real_roster_not_the_lineman_fallback() {
+        for &(edition, squad, _race, fp_pos, fp_skill) in SQUADS {
+            let spec = spec_of(edition, squad);
+            let rosters = if edition == "bb2020" { bb2020_rosters() } else { bb2025_rosters() };
+            let roster = rosters.iter().find(|r| r.id == spec.roster_id)
+                .unwrap_or_else(|| panic!("{edition}/{squad}: roster id {} missing", spec.roster_id));
+
+            for side in ["home", "away"] {
+                // The LIVE path, fallback included: this is what a gate measures.
+                let team = make_team(squad, side, edition);
+                assert_ne!(team.roster_id, "lineman",
+                    "{edition}/{squad}/{side}: fell back to the lineman fixture");
+                assert_eq!(team.players.len(), spec.players.len(),
+                    "{edition}/{squad}/{side}: player count");
+
+                let mut want: Vec<&str> = spec.players.iter()
+                    .map(|p| p.position_id.as_str()).collect();
+                let mut got: Vec<&str> = team.players.iter()
+                    .map(|p| p.position_id.as_str()).collect();
+                want.sort_unstable();
+                got.sort_unstable();
+                assert_eq!(got, want, "{edition}/{squad}/{side}: fielded positions");
+
+                for p in &team.players {
+                    let pos = roster.positions.iter().find(|q| q.id == p.position_id)
+                        .unwrap_or_else(|| panic!("{edition}/{squad}: {} not in roster", p.position_id));
+                    assert_eq!(
+                        (p.movement, p.strength, p.agility, p.armour),
+                        (pos.ma, pos.st, pos.ag, pos.av),
+                        "{edition}/{squad}/{side}: stat line of {} (fallback is 6/3/3/8)", p.position_id);
+                }
+
+                let fp = team.players.iter().find(|p| p.position_id == fp_pos)
+                    .unwrap_or_else(|| panic!("{edition}/{squad}/{side}: {fp_pos} not fielded"));
+                assert!(fp.starting_skills.iter().any(|s| s.skill_id == fp_skill),
+                    "{edition}/{squad}/{side}: {fp_pos} lacks its fingerprint skill {fp_skill:?} \
+                     (a fallback lineman has no starting skills at all)");
+            }
+        }
+    }
+
+    /// R2 / R4: the union of a cell's squads fields 100% of that roster's positionals.
+    #[test]
+    fn coverage_cells_field_every_positional() {
+        let mut by_cell: std::collections::BTreeMap<(&str, &str), std::collections::BTreeSet<String>> =
+            Default::default();
+        for &(edition, squad, race, _, _) in SQUADS {
+            let spec = spec_of(edition, squad);
+            by_cell.entry((edition, race)).or_default()
+                .extend(spec.players.iter().map(|p| p.position_id.clone()));
+        }
+        for ((edition, race), fielded) in by_cell {
+            let rosters = if edition == "bb2020" { bb2020_rosters() } else { bb2025_rosters() };
+            let spec = spec_of(edition, race_squad_name(edition, race));
+            let roster = rosters.iter().find(|r| r.id == spec.roster_id).unwrap();
+            for pos in roster.positions.iter().filter(|p| p.quantity > 0) {
+                assert!(fielded.contains(&pos.id),
+                    "{edition}/{race}: positional {} is never fielded (R2/R4)", pos.id);
+            }
+        }
+    }
+
+    /// Any squad name of the cell serves to resolve the shared roster_id.
+    fn race_squad_name(edition: &'static str, race: &'static str) -> &'static str {
+        SQUADS.iter()
+            .find(|s| s.0 == edition && s.2 == race)
+            .map(|s| s.1)
+            .expect("cell has at least one squad")
     }
 }
 

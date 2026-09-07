@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<roster id="khorne.bb2025">
+	<name>Khorne</name>
+	<reRollCost>60000</reRollCost>
+	<maxReRolls>8</maxReRolls>
+	<apothecary>true</apothecary>
+	<position id="khorne.bloodborn_marauder">
+		<quantity>16</quantity>
+		<name>Bloodborn Marauder</name>
+		<displayName>Bloodborn Marauder</displayName>
+		<type>Regular</type>
+		<cost>50000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>8</armour>
+		<skillList>
+			<skill>Frenzy</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<double>Agility</double>
+			<double>Strength</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Lineman</keyword>
+			<keyword>Human</keyword>
+		</keywords>
+	</position>
+	<position id="khorne.khorngor">
+		<quantity>2</quantity>
+		<name>Khorngor</name>
+		<displayName>Khorngor</displayName>
+		<type>Regular</type>
+		<cost>70000</cost>
+		<movement>6</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>4</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Horns</skill>
+			<skill>Juggernaut</skill>
+			<skill>Jump Up</skill>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Passing</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Runner</keyword>
+			<keyword>Beastman</keyword>
+		</keywords>
+	</position>
+	<position id="khorne.bloodseeker">
+		<quantity>4</quantity>
+		<name>Bloodseeker</name>
+		<displayName>Bloodseeker</displayName>
+		<type>Regular</type>
+		<cost>105000</cost>
+		<movement>5</movement>
+		<strength>4</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>10</armour>
+		<skillList>
+			<skill>Frenzy</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>General</normal>
+			<normal>Mutation</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>Devious</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Blocker</keyword>
+			<keyword>Human</keyword>
+		</keywords>
+	</position>
+	<position id="khorne.bloodspawn">
+		<quantity>1</quantity>
+		<name>Bloodspawn</name>
+		<displayName>Bloodspawn</displayName>
+		<type>Big Guy</type>
+		<cost>160000</cost>
+		<movement>5</movement>
+		<strength>5</strength>
+		<agility>4</agility>
+		<passing>6</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Claws</skill>
+			<skill>Frenzy</skill>
+			<skill value="4">Loner</skill>
+			<skill>Mighty Blow</skill>
+			<skill>Unchannelled Fury</skill>
+		</skillList>
+		<skillCategoryList>
+			<normal>Mutation</normal>
+			<normal>Strength</normal>
+			<double>Agility</double>
+			<double>General</double>
+		</skillCategoryList>
+		<keywords>
+			<keyword>Big Guy</keyword>
+			<keyword>Spawn</keyword>
+		</keywords>
+	</position>
+</roster>

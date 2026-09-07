@@ -167,8 +167,24 @@ def main() -> int:
         for tf in sorted((ROOT / "data" / "teams" / edition).glob("team_*.json")):
             race = tf.stem.replace("team_", "")
             team = json.loads(tf.read_text(encoding="utf-8"))
-            roster = json.loads((ROOT / "data" / "rosters" / edition /
-                                 f"roster_{race}.json").read_text(encoding="utf-8"))
+            # A squad normally shares its name with its roster file. R3 VARIANTS
+            # (docs/PARITY_COVERAGE_REQUIREMENTS.md §8) do not: `team_old_world_alliance_ogre`
+            # reuses `roster_old_world_alliance`, naming it through its own `roster_id` field —
+            # exactly how the Rust side resolves it (make_team_from_file matches on roster_id).
+            rpath = ROOT / "data" / "rosters" / edition / f"roster_{race}.json"
+            if rpath.exists():
+                roster = json.loads(rpath.read_text(encoding="utf-8"))
+            else:
+                roster = None
+                for cand in sorted((ROOT / "data" / "rosters" / edition).glob("roster_*.json")):
+                    d = json.loads(cand.read_text(encoding="utf-8"))
+                    if d["id"] == team["roster_id"]:
+                        roster = d
+                        break
+                if roster is None:
+                    raise SystemExit(
+                        f"{tf}: no roster_{race}.json and no roster with id "
+                        f"{team['roster_id']!r} in data/rosters/{edition}")
             # filter special rules to the Java-resolvable set; persist into the
             # team JSON so Rust uses the identical list
             raw = roster.get("special_rules") or []
