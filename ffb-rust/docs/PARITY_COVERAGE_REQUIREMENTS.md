@@ -164,6 +164,56 @@ Big Guy rule requires. A new §6 item is added: **re-draft or add variants for t
 which is cheaper than drafting a new team and closes 13 slots of missing evidence on races already
 reported green.
 
+### CLOSED 2026-09-07 — all 13 slots covered
+
+`python scripts/validate_teams.py` now prints **0 R1 violations, 0 unfielded positional slots**
+for all three editions. The draft is `scripts/draft_r2_squads.py` (purchase table + arithmetic +
+invariants, same shape as `draft_coverage_teams.py`).
+
+Two shapes of fix, decided per cell by the official page:
+
+| ruleset | race | slot(s) | fix |
+|---|---|---|---|
+| bb2016 | orc | `orc.lineman` | **AMENDED** — 1 Black Orc Blocker traded for 1 Orc Lineman |
+| bb2020 | dwarf | `dwarf.trollslayer` | **AMENDED** — Troll Slayer added, re-rolls 3→2 to pay for it |
+| bb2020 | undead | `undead.skeleton` | **AMENDED** — 1 Zombie traded for 1 Skeleton (same cost) |
+| bb2020 | underworld | `37844.underworldsnotling` | **AMENDED** — 2 Snotlings added (treasury 30k→0) |
+| bb2020 | chaos | `chaos.chaosogre`, `chaos.chaostroll` | variants `team_chaos_chaosogre`, `team_chaos_chaostroll` |
+| bb2020 | chaos_pact | `chaospact.renegadetroll` | variant `team_chaos_pact_renegadetroll` |
+| bb2020 | renegades | `37730` | variant `team_renegades_37730` |
+| bb2020 | underworld | `37844.underworldtroll` | variant `team_underworld_underworldtroll` |
+| bb2025 | chaos | `chaos.ogre`, `chaos.troll` | variants `team_chaos_ogre`, `team_chaos_troll` |
+| bb2025 | renegades | `37733` | variant `team_renegades_37733` |
+| bb2025 | underworld | `37844` | variant `team_underworld_37844` |
+
+The variants exist because the positional CANNOT join the base squad: Chaos Chosen and Underworld
+Denizens pages say "may have a single Big Guy" in **both** editions, and the Chaos Renegades page
+says "up to three Big Guys" while the roster offers four — the base renegades / chaos_pact squads
+were already at that cap. R2 is met by the UNION (R4); the base squads are untouched, so their
+existing gates still describe the squad they were run on.
+
+**Re-gate list.** The four AMENDED squads are different teams from the ones their earlier gates
+measured, so `bb2016 orc`, `bb2020 dwarf`, `bb2020 undead` and `bb2020 underworld` must be
+re-gated. The nine variants are new matchups and need their first gate.
+
+**Non-fallback proof.** `make_team()` falls back to an ALL-LINEMAN team on a bad roster_id /
+position_id with a `log::warn!` only, and a fallback team still gates green. Every one of the 19
+squads in this cell set (13 new/changed + the base squads of the variant cells) is therefore
+asserted in `runner::coverage_squad_tests` to build its real roster: exact fielded `position_id`
+multiset, every player's stat line equal to its roster position's, and a fingerprint positional
+carrying a fingerprint starting skill (Bone Head on the Ogres, Always Hungry on the Trolls,
+Animal Savagery on the Rat Ogres, Unchannelled Fury on the Minotaurs, Frenzy on the Troll Slayer,
+Right Stuff on the Snotling, Regeneration on the Skeleton). All 13 matchups then run
+`--tier 3 --seeds 5` at **5/5 games match**, which is the Java-side proof as well: a per-step
+state-hash match against a Rust team known to contain the Chaos Troll means Java fielded it too.
+
+**One generator bug fixed on the way.** `gen_java_parity_data.py` built the Java `<team id=..>`
+from the squad's `race` field, but `ffb-parity` asks Java for `java_team_id(<CLI matchup name>)`
+= the FILE STEM in PascalCase. For an R3 variant the two differ, so every variant of a cell got
+the SAME team id — `team_old_world_alliance_{ogre,treeman}_parity25_home.xml` both declared
+`teamOldWorldAllianceParity25Home`, an id ffb-parity never asks for. The id now comes from the
+stem; all four Old World Alliance variants re-verified at 5/5.
+
 ## 9. bb2016 characteristics — the conversion, stated correctly
 
 `rules/bb2016/teams/*.md` warn: *"LRB6 prints bare characteristics; BB2020+ prints roll targets.

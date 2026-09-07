@@ -106,8 +106,15 @@ def roster_xml(d: dict, roster_id: str, drafted_star_ids: set = frozenset()) -> 
     return "\n".join(L) + "\n"
 
 
-def team_xml(team: dict, roster: dict, roster_id: str, side: str, suffix: str) -> str:
-    race = team["race"]
+def team_xml(team: dict, roster: dict, roster_id: str, side: str, suffix: str,
+             squad: str | None = None) -> str:
+    # The team id must be the SQUAD name (the team_<squad>.json stem), not the roster race:
+    # ffb-parity passes runner::java_team_id(<CLI matchup name>, ..) = the squad name in
+    # PascalCase, and the CLI matchup name IS the file stem. For an R3 VARIANT
+    # (team_chaos_chaostroll.json, race "chaos") the two differ, and keying off `race` gave
+    # every variant of a cell the SAME <team id=..> -- so Java either could not find the id
+    # ffb-parity asked for, or loaded the wrong variant.
+    race = squad if squad is not None else team["race"]
     team_id = f"team{pascal(race)}Parity{suffix}{side.capitalize()}"
     pos_by_id = {p["id"]: p for p in roster["positions"]}
     L = ['<?xml version="1.0" encoding="UTF-8"?>', "", f'<team id="{team_id}">', ""]
@@ -230,7 +237,7 @@ def main() -> int:
                      roster_xml(roster, roster_id, drafted_star_ids))
                 for side in ("home", "away"):
                     emit(server / "teams" / f"team_{race}_parity{suffix}_{side}.xml",
-                         team_xml(team, roster, roster_id, side, suffix))
+                         team_xml(team, roster, roster_id, side, suffix, squad=race))
     if check:
         print(f"{mismatched} mismatched files")
         return 1 if mismatched else 0

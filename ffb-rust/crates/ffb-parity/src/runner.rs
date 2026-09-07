@@ -1911,8 +1911,10 @@ mod team_file_tests {
             }
             // bb2016 has the 29 original drafts; bb2025 adds the 8 coverage squads of
             // PARITY_COVERAGE_REQUIREMENTS §8 (6 new teams + Bretonnian + the two R3
-            // Old World Alliance Big-Guy variants, which share one roster).
-            let want = if edition == "bb2025" { 37 } else { 29 };
+            // Old World Alliance Big-Guy variants, which share one roster) and the 4 R3
+            // variants drafted to close the §8 R2/R4 misses on existing races
+            // (chaos_ogre, chaos_troll, renegades_37733, underworld_37844).
+            let want = if edition == "bb2025" { 41 } else { 29 };
             assert_eq!(checked, want, "{edition}: expected {want} team files, found {checked}");
         }
     }
@@ -1950,7 +1952,42 @@ mod coverage_squad_tests {
         ("bb2020", "old_world_alliance_ogre", "old_world_alliance", "oldworldalliance.ogre", SkillId::BoneHead),
         ("bb2020", "old_world_alliance_treeman", "old_world_alliance", "oldworldalliance.altern_forest_treeman", SkillId::TakeRoot),
         ("bb2020", "snotling", "snotling", "snotling.trained_troll", SkillId::AlwaysHungry),
+
+        // ---- §8 R2/R4 closure on EXISTING races -------------------------------------------
+        // 13 positionals were never fielded by any squad, so their stat lines and starting
+        // skills had no parity evidence at all. Four squads were AMENDED (bb2016 orc,
+        // bb2020 dwarf/undead/underworld); the rest of the misses are Big Guys behind a
+        // "may have a single Big Guy" / "up to three Big Guys" page cap, so they are R3
+        // VARIANTS reusing the base roster. Both the base squad and its variants are listed
+        // here, because the R4 union check below is what proves the cell complete.
+        ("bb2016", "orc", "orc", "orc.troll", SkillId::AlwaysHungry),
+        ("bb2020", "chaos", "chaos", "chaos.minotaur", SkillId::UnchannelledFury),
+        ("bb2020", "chaos_chaosogre", "chaos", "chaos.chaosogre", SkillId::BoneHead),
+        ("bb2020", "chaos_chaostroll", "chaos", "chaos.chaostroll", SkillId::AlwaysHungry),
+        ("bb2020", "chaos_pact", "chaos_pact", "chaospact.renegadeogre", SkillId::BoneHead),
+        ("bb2020", "chaos_pact_renegadetroll", "chaos_pact", "chaospact.renegadetroll", SkillId::AlwaysHungry),
+        ("bb2020", "dwarf", "dwarf", "dwarf.trollslayer", SkillId::Frenzy),
+        ("bb2020", "renegades", "renegades", "37732", SkillId::UnchannelledFury),
+        ("bb2020", "renegades_37730", "renegades", "37730", SkillId::AlwaysHungry),
+        ("bb2020", "undead", "undead", "undead.skeleton", SkillId::Regeneration),
+        ("bb2020", "underworld", "underworld", "37844.underworldsnotling", SkillId::RightStuff),
+        ("bb2020", "underworld_underworldtroll", "underworld", "37844.underworldtroll", SkillId::AlwaysHungry),
+        ("bb2025", "chaos", "chaos", "chaos.minotaur", SkillId::UnchannelledFury),
+        ("bb2025", "chaos_ogre", "chaos", "chaos.ogre", SkillId::BoneHead),
+        ("bb2025", "chaos_troll", "chaos", "chaos.troll", SkillId::AlwaysHungry),
+        ("bb2025", "renegades", "renegades", "37732", SkillId::UnchannelledFury),
+        ("bb2025", "renegades_37733", "renegades", "37733", SkillId::AnimalSavagery),
+        ("bb2025", "underworld", "underworld", "underworld.troll.warpstone", SkillId::AlwaysHungry),
+        ("bb2025", "underworld_37844", "underworld", "37844", SkillId::AnimalSavagery),
     ];
+
+    fn rosters_for(edition: &str) -> Vec<ffb_model::data::roster_json::RosterJson> {
+        match edition {
+            "bb2016" => bb2016_rosters(),
+            "bb2020" => bb2020_rosters(),
+            _ => bb2025_rosters(),
+        }
+    }
 
     fn spec_of(edition: &str, squad: &str) -> TeamFileJson {
         let path = team_file_path(squad, edition)
@@ -1962,27 +1999,31 @@ mod coverage_squad_tests {
     fn coverage_squads_build_their_real_roster_not_the_lineman_fallback() {
         for &(edition, squad, _race, fp_pos, fp_skill) in SQUADS {
             let spec = spec_of(edition, squad);
-            let rosters = if edition == "bb2020" { bb2020_rosters() } else { bb2025_rosters() };
+            let rosters = rosters_for(edition);
             let roster = rosters.iter().find(|r| r.id == spec.roster_id)
                 .unwrap_or_else(|| panic!("{edition}/{squad}: roster id {} missing", spec.roster_id));
+            // A drafted star (spec.stars, §9) is injected as an extra rostered player whose
+            // position_id is the star's own id and whose stat line comes from
+            // data/star_players/, not from the roster — hold it out of the roster checks.
+            let star_ids: Vec<&str> = spec.stars.iter().map(|s| s.star_id.as_str()).collect();
 
             for side in ["home", "away"] {
                 // The LIVE path, fallback included: this is what a gate measures.
                 let team = make_team(squad, side, edition);
                 assert_ne!(team.roster_id, "lineman",
                     "{edition}/{squad}/{side}: fell back to the lineman fixture");
-                assert_eq!(team.players.len(), spec.players.len(),
+                assert_eq!(team.players.len(), spec.players.len() + star_ids.len(),
                     "{edition}/{squad}/{side}: player count");
 
                 let mut want: Vec<&str> = spec.players.iter()
-                    .map(|p| p.position_id.as_str()).collect();
+                    .map(|p| p.position_id.as_str()).chain(star_ids.iter().copied()).collect();
                 let mut got: Vec<&str> = team.players.iter()
                     .map(|p| p.position_id.as_str()).collect();
                 want.sort_unstable();
                 got.sort_unstable();
                 assert_eq!(got, want, "{edition}/{squad}/{side}: fielded positions");
 
-                for p in &team.players {
+                for p in team.players.iter().filter(|p| !star_ids.contains(&p.position_id.as_str())) {
                     let pos = roster.positions.iter().find(|q| q.id == p.position_id)
                         .unwrap_or_else(|| panic!("{edition}/{squad}: {} not in roster", p.position_id));
                     assert_eq!(
@@ -2011,7 +2052,7 @@ mod coverage_squad_tests {
                 .extend(spec.players.iter().map(|p| p.position_id.clone()));
         }
         for ((edition, race), fielded) in by_cell {
-            let rosters = if edition == "bb2020" { bb2020_rosters() } else { bb2025_rosters() };
+            let rosters = rosters_for(edition);
             let spec = spec_of(edition, race_squad_name(edition, race));
             let roster = rosters.iter().find(|r| r.id == spec.roster_id).unwrap();
             for pos in roster.positions.iter().filter(|p| p.quantity > 0) {

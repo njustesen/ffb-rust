@@ -102,9 +102,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="13" id="teamUndeadParity20Home13">
-		<name>Zombie Lineman 13</name>
+		<name>Skeleton Lineman 13</name>
 		<gender>male</gender>
-		<positionId>undead.zombie</positionId>
+		<positionId>undead.skeleton</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

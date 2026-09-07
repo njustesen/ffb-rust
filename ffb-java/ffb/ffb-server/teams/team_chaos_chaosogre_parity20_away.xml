@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamChaosChaosogreParity20Away">
+
+	<coach>Away</coach>
+	<name>Chaos Parity20 Away</name>
+	<race>Chaos</race>
+	<rosterId>chaos_chaosogre.bb2020</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1070000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>20000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamChaosChaosogreParity20Away1">
+		<name>Chaos Ogre 1</name>
+		<gender>male</gender>
+		<positionId>chaos.chaosogre</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamChaosChaosogreParity20Away2">
+		<name>Chosen Blocker 2</name>
+		<gender>male</gender>
+		<positionId>chaos.chosenblocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamChaosChaosogreParity20Away3">
+		<name>Beastman Runner Lineman 3</name>
+		<gender>male</gender>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamChaosChaosogreParity20Away4">
+		<name>Beastman Runner Lineman 4</name>
+		<gender>male</gender>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamChaosChaosogreParity20Away5">
+		<name>Beastman Runner Lineman 5</name>
+		<gender>male</gender>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamChaosChaosogreParity20Away6">
+		<name>Beastman Runner Lineman 6</name>
+		<gender>male</gender>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamChaosChaosogreParity20Away7">
+		<name>Beastman Runner Lineman 7</name>
+		<gender>male</gender>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamChaosChaosogreParity20Away8">
+		<name>Beastman Runner Lineman 8</name>
+		<gender>male</gender>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamChaosChaosogreParity20Away9">
+		<name>Beastman Runner Lineman 9</name>
+		<gender>male</gender>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamChaosChaosogreParity20Away10">
+		<name>Beastman Runner Lineman 10</name>
+		<gender>male</gender>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamChaosChaosogreParity20Away11">
+		<name>Beastman Runner Lineman 11</name>
+		<gender>male</gender>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamChaosChaosogreParity20Away12">
+		<name>Beastman Runner Lineman 12</name>
+		<gender>male</gender>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

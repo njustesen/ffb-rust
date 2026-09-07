@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<team id="teamOldWorldAllianceParity20Away">
+<team id="teamOldWorldAllianceTreemanParity20Away">
 
 	<coach>Away</coach>
 	<name>Old World Alliance Parity20 Away</name>
@@ -17,84 +17,84 @@
 	<treasury>30000</treasury>
 	<specialRules/>
 
-	<player nr="1" id="teamOldWorldAllianceParity20Away1">
+	<player nr="1" id="teamOldWorldAllianceTreemanParity20Away1">
 		<name>Altern Forest Treeman 1</name>
 		<gender>male</gender>
 		<positionId>oldworldalliance.altern_forest_treeman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="2" id="teamOldWorldAllianceParity20Away2">
+	<player nr="2" id="teamOldWorldAllianceTreemanParity20Away2">
 		<name>Old World Dwarf Troll Slayer 2</name>
 		<gender>male</gender>
 		<positionId>oldworldalliance.trollslayer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="3" id="teamOldWorldAllianceParity20Away3">
+	<player nr="3" id="teamOldWorldAllianceTreemanParity20Away3">
 		<name>Old World Human Blitzer 3</name>
 		<gender>male</gender>
 		<positionId>oldworldalliance.human_blitzer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="4" id="teamOldWorldAllianceParity20Away4">
+	<player nr="4" id="teamOldWorldAllianceTreemanParity20Away4">
 		<name>Old World Dwarf Runner 4</name>
 		<gender>male</gender>
 		<positionId>oldworldalliance.dwarf_runner</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="5" id="teamOldWorldAllianceParity20Away5">
+	<player nr="5" id="teamOldWorldAllianceTreemanParity20Away5">
 		<name>Old World Human Thrower 5</name>
 		<gender>male</gender>
 		<positionId>oldworldalliance.human_thrower</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="6" id="teamOldWorldAllianceParity20Away6">
+	<player nr="6" id="teamOldWorldAllianceTreemanParity20Away6">
 		<name>Old World Dwarf Blitzer 6</name>
 		<gender>male</gender>
 		<positionId>oldworldalliance.dwarf_blitzer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="7" id="teamOldWorldAllianceParity20Away7">
+	<player nr="7" id="teamOldWorldAllianceTreemanParity20Away7">
 		<name>Old World Dwarf Blocker 7</name>
 		<gender>male</gender>
 		<positionId>oldworldalliance.dwarf_blocker</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="8" id="teamOldWorldAllianceParity20Away8">
+	<player nr="8" id="teamOldWorldAllianceTreemanParity20Away8">
 		<name>Old World Human Catcher 8</name>
 		<gender>male</gender>
 		<positionId>oldworldalliance.human_catcher</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="9" id="teamOldWorldAllianceParity20Away9">
+	<player nr="9" id="teamOldWorldAllianceTreemanParity20Away9">
 		<name>Old World Halfling Hopefuls 9</name>
 		<gender>male</gender>
 		<positionId>oldworldalliance.halfling_hopeful</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="10" id="teamOldWorldAllianceParity20Away10">
+	<player nr="10" id="teamOldWorldAllianceTreemanParity20Away10">
 		<name>Old World Human Lineman 10</name>
 		<gender>male</gender>
 		<positionId>oldworldalliance.human_lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="11" id="teamOldWorldAllianceParity20Away11">
+	<player nr="11" id="teamOldWorldAllianceTreemanParity20Away11">
 		<name>Old World Human Lineman 11</name>
 		<gender>male</gender>
 		<positionId>oldworldalliance.human_lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="12" id="teamOldWorldAllianceParity20Away12">
+	<player nr="12" id="teamOldWorldAllianceTreemanParity20Away12">
 		<name>Old World Human Lineman 12</name>
 		<gender>male</gender>
 		<positionId>oldworldalliance.human_lineman</positionId>

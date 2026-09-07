@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamUnderworld37844Parity25Home">
+
+	<coach>Home</coach>
+	<name>Underworld Parity25 Home</name>
+	<race>Underworld</race>
+	<rosterId>underworld_37844.bb2025</rosterId>
+	<reRolls>4</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1055000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>35000</treasury>
+	<specialRules>
+		<rule>Bribery and Corruption</rule>
+	</specialRules>
+
+	<player nr="1" id="teamUnderworld37844Parity25Home1">
+		<name>Rat Ogre 1</name>
+		<gender>male</gender>
+		<positionId>37844</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamUnderworld37844Parity25Home2">
+		<name>Skaven Blitzer 2</name>
+		<gender>male</gender>
+		<positionId>underworld.skaven.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamUnderworld37844Parity25Home3">
+		<name>Gutter Runner 3</name>
+		<gender>male</gender>
+		<positionId>underworld.gutter_runner</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamUnderworld37844Parity25Home4">
+		<name>Skaven Thrower 4</name>
+		<gender>male</gender>
+		<positionId>underworld.skaven.thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamUnderworld37844Parity25Home5">
+		<name>Skaven Clanrat 5</name>
+		<gender>male</gender>
+		<positionId>underworld.skaven.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamUnderworld37844Parity25Home6">
+		<name>Skaven Clanrat 6</name>
+		<gender>male</gender>
+		<positionId>underworld.skaven.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamUnderworld37844Parity25Home7">
+		<name>Skaven Clanrat 7</name>
+		<gender>male</gender>
+		<positionId>underworld.skaven.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamUnderworld37844Parity25Home8">
+		<name>Goblin Lineman 8</name>
+		<gender>male</gender>
+		<positionId>underworld.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamUnderworld37844Parity25Home9">
+		<name>Goblin Lineman 9</name>
+		<gender>male</gender>
+		<positionId>underworld.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamUnderworld37844Parity25Home10">
+		<name>Snotling Lineman 10</name>
+		<gender>male</gender>
+		<positionId>underworld.snotling_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamUnderworld37844Parity25Home11">
+		<name>Snotling Lineman 11</name>
+		<gender>male</gender>
+		<positionId>underworld.snotling_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamUnderworld37844Parity25Home12">
+		<name>Snotling Lineman 12</name>
+		<gender>male</gender>
+		<positionId>underworld.snotling_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamUnderworld37844Parity25Home13">
+		<name>Snotling Lineman 13</name>
+		<gender>male</gender>
+		<positionId>underworld.snotling_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="14" id="teamUnderworld37844Parity25Home14">
+		<name>Snotling Lineman 14</name>
+		<gender>male</gender>
+		<positionId>underworld.snotling_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="15" id="teamUnderworld37844Parity25Home15">
+		<name>Snotling Lineman 15</name>
+		<gender>male</gender>
+		<positionId>underworld.snotling_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

@@ -6,15 +6,15 @@
 	<name>Dwarf Parity20 Home</name>
 	<race>Dwarf</race>
 	<rosterId>dwarf.bb2020</rosterId>
-	<reRolls>3</reRolls>
+	<reRolls>2</reRolls>
 	<fanFactor>0</fanFactor>
 	<dedicatedFans>3</dedicatedFans>
 	<apothecaries>0</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1085000</currentTeamValue>
+	<currentTeamValue>1070000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>5000</treasury>
+	<treasury>20000</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamDwarfParity20Home1">
@@ -25,9 +25,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamDwarfParity20Home2">
-		<name>Runner 2</name>
+		<name>Troll Slayer 2</name>
 		<gender>male</gender>
-		<positionId>dwarf.runner</positionId>
+		<positionId>dwarf.trollslayer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -39,9 +39,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="4" id="teamDwarfParity20Home4">
-		<name>Dwarf Blocker Lineman 4</name>
+		<name>Runner 4</name>
 		<gender>male</gender>
-		<positionId>dwarf.dwarfblockerlineman</positionId>
+		<positionId>dwarf.runner</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
