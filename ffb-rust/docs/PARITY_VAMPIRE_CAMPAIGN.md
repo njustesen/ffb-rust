@@ -307,3 +307,30 @@ players `nr > 11` or a player's ACTIVE bit, so use the id-state dump, not the ha
 Measured: bb2016 `@1.0` seeds 1-8 = 4/8 (seeds 2, 3 and two of 5-8 red). bb2020/bb2025 not
 re-measured this iteration; their ITER1 numbers (100/98/100 and 99/95/100) are also suspect for
 the same staleness reason.
+
+### ITER2 addendum — the seed-3 divergence is NOT on the player board
+
+`FFB_IDSTATE=1` / `JIDSTATE` full-board diff for seed 3, all 26 players both teams (including the
+hash-blind `nr > 11`), coordinate + base state:
+
+| i | players | diffs |
+|---|---|---|
+| 7 | 26/26 | 0 |
+| 8 | 26/26 | 0 |
+| 9 | 26/26 | **0** |
+| 10 | 26/26 | 1 — `away_02` R=`13,6`/base`1` J=`14,5`/base`3` |
+
+**The hash at `i=9` differs while every player's coordinate and base state agrees.** So the
+divergence at the reported first-diff index is in a component the id-state dump does not print.
+`state_string` (`ffb-model/src/util/state_hash.rs:18`) hashes half, `turn_home`, `turn_away`,
+active side, both scores and the ball coordinate/`in_play` BEFORE it reaches the first 11 players —
+and `first_state_divergence.sh` prints only the active side and ONE turn number, so a
+`turn_away` or ball-coordinate drift is invisible in its output too. Both instruments were
+consistent with "the boards agree", and both were hiding the same class of difference.
+
+By `i=10` the drift has reached the board: `away_02` sits one square away with a different base
+state (1 vs 3), and the active side/turn diverge (R `t3 home`, J `t2 away`).
+
+Next instrument: dump the `state_string` COMPONENTS (half, both turn counters, active, scores,
+ball) per step index on both sides and diff at `i=8`/`i=9`. Do not diff the player board again —
+it is already proven equal at the first-diff index.
