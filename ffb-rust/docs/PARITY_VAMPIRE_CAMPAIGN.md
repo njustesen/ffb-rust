@@ -381,3 +381,73 @@ bb2016 GAZE re-pick, mirrored by Fix 4).
 Next: find why the two engines log different step counts on a bit-identical prefix. Start at
 END_GAME (the WINNINGS pair above), not in the rules — and check whether the 38 Rust-LONGER seeds
 are Java stopping early rather than Rust running on.
+
+## ITER4 — 2026-09-07: RETRACTION of ITER3's table, and the real dominant bug
+
+### Retract ITER3's classification
+
+**ITER3's 38/14/1/1 table is void.** All three bb2016 gates in that loop ran with a single
+`FFB_PARITY_ROOT=parity_vloop`, and all three scales of one edition share the
+`bb2016/vampire_vs_vampire/` matchup dir — so `@0` and `@1e6` **overwrote** `@1.0`'s jsonl before I
+classified it. The gate verdicts in ITER3 are sound (they come from the run logs); only the
+per-seed classification was computed against the wrong files.
+
+`scripts/vamp_loop.ps1` now uses a per-GATE root (`parity_vloop_<ed>_<sc>`). It also reads the
+verdict from BOTH streams: **`PARITY: 100/100 games match.` goes to STDOUT, while
+`PARITY: N/100 passed, M FAILED.` goes to STDERR** — reading only one stream makes a green gate
+look like a missing one, which is how bb2020 `@1.0` and `@1e6` first read as "no verdict".
+
+### The true nine-gate baseline
+
+| edition | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| bb2016 | 46/100 | 33/100 | 67/100 |
+| bb2020 | **100/100** | 98/100 | **100/100** |
+| bb2025 | 99/100 | 95/100 | **100/100** (parity green; coverage items MISSING) |
+
+**3 of 9 gates green.** bb2016 carries 154 of the 162 seed failures.
+
+### 37 of 54 bb2016 @1.0 failures are ONE bug: the give ends the game
+
+Re-measured into an isolated root (`parity_one_bb2016_1.0`, 46/100 reproduced exactly) and
+classified there:
+
+| family | seeds |
+|---|---|
+| **prefix identical, Rust log SHORTER — terminal declaration `HandOffMove` in ALL 37** | **37** |
+| state diverges (same turn/active) | 15 |
+| state diverges (turn/active differ) | 2 |
+
+Seed 10 is the minimal case: Rust logs 9 steps to Java's 105 and emits `game_end` at `i=10` in
+**half 1, turn 2, score 0-0**. `FFB_STEPTRACE` names the exact stall:
+
+```
+RSTATE step=InitSelecting  prompt=Move  ap=A4 act=Some(HandOverMove)
+LOOP   applied=Activate(away_04,HandOffMove)  prompt_after=Some(Move{...})
+RSTATE step=InitMoving     prompt=Move  ap=A4 act=Some(HandOverMove)
+LOOP   applied=Move->(21,5)                   prompt_after=Some(Move{...})
+RSTATE step=InitPassing    prompt=-     ap=A4 act=Some(HandOver)
+LOOP   applied=HandOff->away_09               prompt_after=None finished=false
+RUST_END
+```
+
+The give RESOLVES (the ball reaches `away_09`), then the engine yields **no prompt with
+`finished=false`** — the step stack has emptied, the harness has nothing to drive, and the game
+ends mid-first-half. Java plays on for another 96 steps.
+
+Verified faithful, so the bug is NOT in them: the bb2016 `Pass` generator tail matches Java's
+`bb2016/Pass.java` line-for-line (`HAND_OVER`, `CATCH_SCATTER_THROW_IN`, `END_PASSING`, and
+correctly NO `RESET_TO_MOVE` — that is bb2025-only); `StepEndPassing`'s two `EndPlayerAction`
+push sites mirror Java's; bb2016 `StepInitPassing` sets `thrower_id` at the same sites Java does.
+
+Remaining suspect, and the next thing to probe: Java pushes `EndPlayerAction` in BOTH branches
+whenever the thrower IS the acting player, and its only no-push path is the dump-off `else`
+(`game.setDefenderAction(null)`). Rust's `thrower_is_acting_player` requires
+`game.thrower_id == game.acting_player.player_id` — and the trace shows the acting player moving
+from `ap=A4` to `apa03` across the hand-off. If `thrower_id`/`acting_player` disagree at
+`StepEndPassing` on the MOVE variant, Rust takes the dump-off path and pushes nothing. Probe
+whether `StepEndPassing` runs at all on this path and which branch it takes — that is one line of
+output and it names the fix.
+
+bb2020/bb2025 are green at `@1.0`, so whatever this is, it is bb2016-specific or specific to the
+bb2016 twin of the shared step.

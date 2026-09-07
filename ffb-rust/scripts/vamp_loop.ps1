@@ -21,7 +21,10 @@ foreach ($ed in @("bb2016","bb2020","bb2025")) {
     if (Test-Path $stop) { Add-Content $log "STOPPED by stop file"; exit 0 }
     $tag = "vampire_${ed}_${sc}"
     $out = Join-Path $scr "g_$tag.log"
-    $env:FFB_PARITY_ROOT = "parity_vloop"
+    # A per-GATE root. All three scales of one edition share a matchup dir, so a single
+    # "parity_vloop" root lets @0 and @1e6 overwrite @1.0's jsonl -- which silently invalidates
+    # any per-seed classification done afterwards. Learned the hard way on 2026-09-07.
+    $env:FFB_PARITY_ROOT = "parity_vloop_${ed}_${sc}"
     $t0 = Get-Date
     $p = Start-Process -FilePath $exe -WorkingDirectory $repo -NoNewWindow -PassThru `
          -ArgumentList @("--home","vampire","--away","vampire","--edition",$ed,"--tier","3",
@@ -34,10 +37,14 @@ foreach ($ed in @("bb2016","bb2020","bb2025")) {
     $mins = [math]::Round(((Get-Date) - $t0).TotalMinutes,1)
     # The PARITY verdict goes to STDERR, not stdout, and the stream carries NUL bytes that make
     # Select-String treat the file as binary -- read the .err file and filter in PowerShell.
+    # "PARITY: 100/100 games match." goes to STDOUT; "PARITY: N/100 passed, M FAILED." goes to
+    # STDERR. Read BOTH or a green gate reads as "no verdict" and a red one as missing.
     $verdict = $null
-    if (Test-Path "$out.err") {
-      $verdict = (Get-Content "$out.err" -ErrorAction SilentlyContinue |
-                  Where-Object { $_ -match '^PARITY: ' } | Select-Object -Last 1)
+    foreach ($f in @($out, "$out.err")) {
+      if (-not (Test-Path $f)) { continue }
+      $hit = (Get-Content $f -ErrorAction SilentlyContinue |
+              Where-Object { $_ -match '^PARITY: ' } | Select-Object -Last 1)
+      if ($hit) { if (-not $verdict -or $hit -match 'games match') { $verdict = $hit } }
     }
     if (-not $verdict) { $verdict = "NO PARITY LINE (crash?) exit=" + $p.ExitCode }
     Add-Content $log ("{0,-24} {1,6}m  {2}" -f $tag, $mins, $verdict)
