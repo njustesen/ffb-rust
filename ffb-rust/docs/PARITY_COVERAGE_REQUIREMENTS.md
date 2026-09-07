@@ -523,3 +523,243 @@ Five repo rosters map to no official page in any edition and are excluded from �
 bb2016 `renegades` (a FUMBBL Chaos Renegades import; CRP prints Chaos Pact, which the repo
 already has as `chaos_pact`). All five are gated 100/100 × 9 and green as *engine* parity;
 they simply have no ruleset page to be faithful to.
+
+## 12. The measured gate matrix — 2026-09-07, the honest numbers
+
+This section is a **measurement**, not a claim of completion. Every number below comes from a run
+that printed `PARITY: …` and did not panic; nothing is rounded, nothing is omitted, and the red
+cells are reported exactly as they came out.
+
+### 12.1 What was run
+
+```
+./target/release/ffb-parity --home <M> --away <M> --edition <E> --tier 3 \
+    --seeds 1-100 --no-abort --agent heuristic --heur-scale <S> --heur-classes all
+```
+
+**120 gates**, each 100 seeds: every new matchup (the 7 new teams and all 9 R3 variants) at
+`1.0` / `0` / `1e6` in each edition it exists; all four AMENDED races at nine gates each; and a
+15-race regression sample at bb2025 `@1.0`.
+
+Provenance of the binaries under test:
+
+| | |
+|---|---|
+| repo HEAD when the batch started | `279e59cc0` |
+| Rust binary | built 13:30 from HEAD plus the then-uncommitted vampire **ITER1** edits (since committed as `3ff581f51`); frozen in a private `CARGO_TARGET_DIR` for the whole batch so a concurrent session's rebuilds could not move it |
+| Java harness jar | `ffb-ai-jar-with-dependencies.jar` built 13:18 from the same ITER1 harness source. It was rebuilt at 14:54 by the concurrent vampire session, i.e. **mid-batch** — but `git diff --numstat --ignore-all-space -- ffb-java` over that window is **empty** and there is no committed `ffb-java` change after `3ff581f51`, so the two jars are behaviourally identical for these runs |
+| data | `python scripts/gen_java_parity_data.py` re-run first: "wrote 666 XML files across 2 server dirs", with **no XML drift** against the committed tree. `python scripts/check_java_trees.py`: *trees agree* |
+| bb2016 caveat | vampire ITER2–ITER4 later edited bb2016 `step_end_moving` / `step_end_selecting` / `step_init_passing` / `framework.rs`. The bb2016 numbers below predate those edits |
+
+Pre-flight checks, all clean: `scripts/validate_teams.py` → **0 R1 violations, 0 unfielded
+positional slots** (29 bb2016 / 41 bb2020 / 41 bb2025 squads); `scripts/check_skill_names.py` →
+**0 unresolvable skill names**; `cargo test -p ffb-model all_roster_starting_skills_resolve` →
+1 passed.
+
+### 12.2 (a) The new matchups — 24 cells, 72 gates
+
+| edition | matchup | @1.0 | @0 | @1e6 | cell |
+|---|---|---:|---:|---:|---|
+| bb2020 | black_orc | **97/100** | 100/100 | **98/100** | 🔴 |
+| bb2020 | gnome | **38/100** | **53/100** | **58/100** | 🔴 |
+| bb2020 | imperial_nobility | 100/100 | 100/100 | 100/100 | 🟢 |
+| bb2020 | khorne | 100/100 | 100/100 | 100/100 | 🟢 |
+| bb2020 | old_world_alliance_ogre | 100/100 | 100/100 | 100/100 | 🟢 |
+| bb2020 | old_world_alliance_treeman | 100/100 | 100/100 | 100/100 | 🟢 |
+| bb2020 | snotling | **0/100** | **1/100** | **0/100** | 🔴 |
+| bb2020 | chaos_chaosogre *(R3 variant)* | 100/100 | 100/100 | 100/100 | 🟢 |
+| bb2020 | chaos_chaostroll *(R3)* | 100/100 | 100/100 | 100/100 \* | 🟢 |
+| bb2020 | chaos_pact_renegadetroll *(R3)* | 100/100 | 100/100 | 100/100 | 🟢 |
+| bb2020 | renegades_37730 *(R3)* | **99/100** | 100/100 | 100/100 | 🔴 |
+| bb2020 | underworld_underworldtroll *(R3)* | 100/100 | 100/100 | 100/100 | 🟢 |
+| bb2025 | black_orc | **99/100** | 100/100 | **98/100** | 🔴 |
+| bb2025 | gnome | **35/100** | **10/100** | **51/100** | 🔴 |
+| bb2025 | imperial_nobility | **84/100** | 100/100 | **33/100** | 🔴 |
+| bb2025 | khorne | 100/100 | 100/100 | 100/100 | 🟢 |
+| bb2025 | old_world_alliance_ogre | 100/100 | 100/100 | **99/100** | 🔴 |
+| bb2025 | old_world_alliance_treeman | 100/100 | 100/100 | **99/100** | 🔴 |
+| bb2025 | snotling | **0/100** | **0/100** | **0/100** | 🔴 |
+| bb2025 | bretonnian | 100/100 | 100/100 | 100/100 | 🟢 |
+| bb2025 | chaos_ogre *(R3)* | 100/100 | 100/100 | 100/100 \* | 🟢 |
+| bb2025 | chaos_troll *(R3)* | 100/100 | 100/100 | 100/100 | 🟢 |
+| bb2025 | renegades_37733 *(R3)* | 100/100 | 100/100 | 100/100 | 🟢 |
+| bb2025 | underworld_37844 *(R3)* | 100/100 | 100/100 | 100/100 | 🟢 |
+
+\* prints the `…, but required coverage items are MISSING` trailer — that is the tier-3 coverage
+checklist, not parity, and is a PASS for the parity half (as established in the wood_elf ledger).
+
+**New-matchup cells: 14 🟢 / 10 🔴.** All **nine R3 variants** are green except `renegades_37730`,
+which loses one seed. Of the 7 new teams, `khorne` and `bretonnian` are green at every gate they
+have, and both Old World Alliance variants are green in bb2020; `snotling` is the worst red on the
+board and `gnome` the second.
+
+### 12.3 (b) The AMENDED squads re-gated — 12 cells, 36 gates
+
+Their earlier gates were void: those squads were re-drafted in place by the §8 R2/R4 closure
+(bb2016 `orc`, bb2020 `dwarf`, bb2020 `undead`, bb2020 `underworld`). Nine gates were re-run per
+race — all three editions, because these races share code paths across editions.
+
+| race | bb2016 @1.0 / @0 / @1e6 | bb2020 @1.0 / @0 / @1e6 | bb2025 @1.0 / @0 / @1e6 |
+|---|---|---|---|
+| orc | 100/100 · 100/100 · 100/100 | 100/100 · 100/100 · 100/100 \* | 100/100 · 100/100 · 100/100 |
+| dwarf | 100/100 \* · 100/100 · 100/100 | 100/100 · 100/100 · 100/100 | 100/100 · 100/100 · 100/100 |
+| undead | 100/100 · 100/100 · 100/100 | 100/100 · 100/100 · 100/100 | 100/100 · 100/100 · 100/100 |
+| underworld | 100/100 · 100/100 · 100/100 \* | 100/100 · 100/100 · 100/100 | 100/100 · 100/100 · 100/100 |
+
+**36 of 36 gates at 100/100.** The in-place re-drafts cost nothing: the Orc Lineman traded in, the
+Troll Slayer added, the Skeleton swapped for a Zombie and the two Snotlings added are all at parity
+on their first measurement.
+
+### 12.4 (c) Regression sample — 15 races, bb2025 @1.0
+
+Run to show the §8 data change and the `gen_java_parity_data.py` team-id fix disturbed no race that
+nobody touched:
+
+| race | result | | race | result |
+|---|---|---|---|---|
+| nurgle | 100/100 | | ogre | 100/100 |
+| necromantic | 100/100 | | orc | 100/100 |
+| khemri | 100/100 | | skaven | 100/100 |
+| human | 100/100 | | slann | 100/100 |
+| goblin | 100/100 | | wood_elf | 100/100 |
+| amazon | 100/100 | | undead | 100/100 |
+| chaos_dwarf | 100/100 | | dwarf | 100/100 |
+| norse | 100/100 | | | |
+
+**15 of 15 at 100/100.** (`orc`, `dwarf` and `undead` are the §12.3 runs of the same cell — one
+measurement reported under both headings, not run twice.)
+
+### 12.5 Totals
+
+| | gates | 100/100 | below 100 |
+|---|---:|---:|---:|
+| (a) new matchups | 72 | 51 | **21** |
+| (b) amended re-gate | 36 | 36 | 0 |
+| (c) regression sample | 12 (+3 shared with b) | 12 | 0 |
+| **total** | **120** | **99** | **21** |
+
+No run panicked (`panics=0` on all 120). Cell verdicts over the 36 cells measured:
+**26 🟢 / 10 🔴**.
+
+### 12.6 Every red, classified from its own log
+
+Classification only — **no engine fix was attempted in this phase**, by instruction.
+
+| gate | fails | of which STALLS (`rust=None`) | first failing seed / step | shape |
+|---|---:|---:|---|---|
+| snotling bb2020 @1.0 | 100 | 0 | seed 1, **step 0** | every seed, first step |
+| snotling bb2020 @0 | 99 | 0 | seed 1, **step 0** | " |
+| snotling bb2020 @1e6 | 100 | 0 | seed 1, **step 0** | " |
+| snotling bb2025 @1.0 | 100 | 0 | seed 1, **step 0** | " |
+| snotling bb2025 @0 | 100 | 0 | seed 1, **step 0** | " |
+| snotling bb2025 @1e6 | 100 | 0 | seed 1, **step 0** | " |
+| gnome bb2025 @0 | 90 | **80** | seed 1, step 135 | mostly Rust STALLS |
+| imperial_nobility bb2025 @1e6 | 67 | 1 | seed 4, step 43 | state divergence |
+| gnome bb2025 @1.0 | 65 | 16 | seed 1, step 87 | mixed |
+| gnome bb2020 @1.0 | 62 | 13 | seed 2, step 86 | mixed |
+| gnome bb2025 @1e6 | 49 | 11 | seed 1, step 59 | mixed |
+| gnome bb2020 @0 | 47 | 2 | seed 2, step 242 | state divergence |
+| gnome bb2020 @1e6 | 42 | 10 | seed 4, step 38 | mixed |
+| imperial_nobility bb2025 @1.0 | 16 | 0 | seed 3, step 67 | state divergence |
+| black_orc bb2020 @1.0 | 3 | 0 | seed 14, step 71 (seeds 14, 33, 37) | state divergence |
+| black_orc bb2020 @1e6 | 2 | 0 | seed 34, step 35 (seeds 34, 40) | state divergence |
+| black_orc bb2025 @1e6 | 2 | 0 | seed 3, step 45 (seeds 3, 24) | state divergence |
+| black_orc bb2025 @1.0 | 1 | 0 | seed 33, step 79 | state divergence |
+| renegades_37730 bb2020 @1.0 | 1 | 0 | seed 33, step 93 | state divergence |
+| old_world_alliance_ogre bb2025 @1e6 | 1 | 0 | seed 68, step 89 | state divergence |
+| old_world_alliance_treeman bb2025 @1e6 | 1 | 0 | seed 93, step 119 | state divergence |
+
+Two findings worth recording before anyone picks a target:
+
+1. **`snotling` is not an agent disagreement — it is a PRE-GAME divergence.** All 600 snotling
+   games fail at **step 0**, with the two `state_hash` values already different *before the first
+   activation is applied*, in both editions and at all three scales. The distinctive roster feature
+   is **`Swarming`** on the Snotling Lineman (it changes how many players are set up), plus **four
+   secret-weapon players** (2 Fungus Flingas, 2 Pump Wagons) and `Pogo Stick` / `Projectile Vomit`.
+   A setup-time difference is the hypothesis the log supports; it has **not** been verified and must
+   not be assumed.
+2. **`gnome` is dominated by Rust STALLS, not by wrong decisions.** 80 of the 90 bb2025 `@0`
+   failures carry `rust=None` — Rust ran out of steps while Java kept playing. That is the
+   "shorter Rust log with no state mismatch" fingerprint the heuristic campaign documents as a
+   *dead action*, not a subtle divergence. The gnome roster's distinctive skills are `My Ball`,
+   `Trickster`, `Timmm-ber!` and `Take Root`, and its Woodland Fox is a PA-0 positional.
+
+### 12.7 How each new matchup was proved NOT to be the silent lineman fallback
+
+`make_team()` ends in `.unwrap_or_else(|e| { log::warn!(..); make_lineman_team(side, roster_name) })`
+and the fallback team keeps the *requested* `roster_id`, so a fallback is invisible in the ids and
+still gates green. Three independent proofs were used, and all three hold for all 30 squads in this
+batch (13 new/changed plus the base squads of the variant cells):
+
+1. **Rust side, on the live path, asserted per squad.** `cargo test -p ffb-parity coverage_squad`
+   → **2 passed, 0 failed** on the binary under test.
+   `coverage_squads_build_their_real_roster_not_the_lineman_fallback` calls the same
+   `make_team(squad, side, edition)` a gate calls, for **home and away of all 30 squads**, and
+   asserts: the exact fielded `position_id` multiset against the squad JSON; every player's
+   `(ma, st, ag, av)` equal to its roster position's (**the fallback is 6/3/3/8**); and a fingerprint
+   positional carrying a fingerprint starting skill — Bone Head on the Ogres, Always Hungry on the
+   Trolls, `My Ball` on the Woodland Fox, `Unchannelled Fury` on Bloodspawn and Minotaur, `Take Root`
+   on the Altern Forest Treeman, `Dauntless` on the Grail Knight, `Right Stuff` on the Snotling,
+   `Regeneration` on the Skeleton, `Frenzy` on the Troll Slayer, `Animal Savagery` on the Rat Ogres.
+   A fallback lineman has **no starting skills at all**, so the last assertion alone kills it.
+   `coverage_cells_field_every_positional` re-checks R2/R4 over the same set.
+2. **Java side, read out of the runs themselves.** `gen_java_parity_data.py` derives the Java
+   `<team id=..>` from the squad **file stem**, so the player ids Java prints name the team XML it
+   actually loaded. Harvested from this batch's own logs: `teamBlackOrcParity20/25`,
+   `teamGnomeParity20/25`, `teamImperialNobilityParity25`, `teamKhorneParity25`,
+   `teamOldWorldAllianceOgreParity25`, `teamOldWorldAllianceTreemanParity25`,
+   `teamSnotlingParity20/25`, `teamBretonnianParity25`, `teamRenegades37730Parity20`,
+   `teamChaosOgreParity25`, `teamChaosTrollParity25`, `teamRenegades37733Parity25`,
+   `teamUnderworld37844Parity25`, `teamOrcParity25`, `teamDwarfParity25`, `teamUndeadParity25`,
+   `teamUnderworldParity25`. Note that **each R3 variant prints its OWN id** — the generator bug
+   fixed in `279e59cc0` staying fixed. `grep -rl teamLineman logs/` over the whole batch returns
+   **nothing**. (A fully green log that never rolls a pickup prints no player id at all; that is an
+   absence of evidence in the log, not evidence of a fallback, and proof 1 covers those cells.)
+3. **Transitively, for every green cell.** A per-step state-hash match over 100 seeds against a Rust
+   team proven by (1) to hold the real roster means Java fielded the same team — a fallback on one
+   side only cannot produce 100/100. For the red cells the divergence itself, plus (2), rules the
+   fallback out.
+
+### 12.8 A measurement trap this batch fell into, and the guard added
+
+The first attempt ran 7 lanes concurrently. Two things went wrong, and both produced
+*plausible-looking* results:
+
+* **Resource exhaustion looks like a gate.** With 7 JVMs the machine ran out of memory, `fork()`
+  began failing, and jobs exited `rc=127` after 2–4 s having written only their banner line. Those
+  rows had **no `PARITY:` line** — which is exactly why the "a sweep counts only if it prints
+  `PARITY: N/M`" rule exists; counting the absence of `PARITY FAIL` would have scored them green.
+  Concurrency was cut to 3 lanes and the runner now retries a job up to 3× when no `PARITY:` line
+  appears.
+* **A CRLF job file silently changed `--heur-scale`.** The second round's job list was written by a
+  Python script in text mode, so every line ended `\r`. `--heur-scale "1.0\r"` hits
+  `raw[i + 1].parse().unwrap_or(0.0)` in `crates/ffb-parity/src/main.rs:131` and becomes **0.0** —
+  so 70 runs labelled `@1.0` / `@0` / `@1e6` had **all three run at scale 0**, and the only giveaway
+  was that a cell's three scales printed *identical* numbers. Those results were re-scoped to `@0`
+  (27 usable, the 43 duplicates discarded) and every `@1.0` / `@1e6` gate was re-run. Where a
+  round-1 `@0` result and a re-scoped round-2 `@0` result both existed for a cell they **agreed in
+  every case** — a free determinism check. The runner now reads the scale back out of the run's own
+  banner (`scale=1` / `scale=0` / `scale=1000000`) and stamps each row `scale-ok` or
+  `SCALE-MISMATCH`; only `scale-ok` rows are counted, and every row in §12.2–12.4 is `scale-ok`
+  (the round-1 rows were verified retrospectively by grepping all 108 of their banners).
+
+*Lesson, in its general form: an argument the CLI parses with `unwrap_or(<default>)` cannot report a
+bad value, so a typo in a harness script silently becomes a different experiment. Read the setting
+back out of the run; do not trust the flag you passed.* A third, smaller trap: the lane loop fed its
+job list on stdin and the first `ffb-parity` consumed the rest of it, so each lane silently ran
+exactly one job — the runner now reads the list into an array and gives the binary `< /dev/null`.
+
+### 12.9 What §11.1 now owes
+
+§11.1 marked 21 cells red for "no standing gate (`d`)". This batch settles the parity half for the
+36 cells above and leaves the roster-provenance half (`c`) exactly where it was. Re-measured live
+for this section: `audit_rosters.py --edition bb2025 --report` → **0 rosters differ**;
+`--edition bb2020` → **24 of 29 match their page, 5 differ** (amazon, dwarf, lizardman, skaven,
+vampire — and all seven NEW bb2020 rosters are in the clean list); `--edition bb2016` → **16 of 24
+match, 8 differ**. `validate_teams.py --r5` is unchanged: 4 shared rosters, 29 bb2016 PA carriers.
+
+So §11.1 should become: the four AMENDED cells and the nine R3 variant cells lose their `d`;
+`khorne`, `bretonnian` and the two bb2020 Old World Alliance variants become 🟢; and `black_orc`,
+`gnome`, `imperial_nobility`, `snotling` and the two bb2025 Old World Alliance cells keep `d` on the
+numbers above. That edit is deliberately **not** made here — §11.1's green also requires (c), and
+rewriting it belongs with the provenance work, not with a measurement.
