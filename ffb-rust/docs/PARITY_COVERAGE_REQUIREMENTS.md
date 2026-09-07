@@ -763,3 +763,82 @@ So §11.1 should become: the four AMENDED cells and the nine R3 variant cells lo
 `gnome`, `imperial_nobility`, `snotling` and the two bb2025 Old World Alliance cells keep `d` on the
 numbers above. That edit is deliberately **not** made here — §11.1's green also requires (c), and
 rewriting it belongs with the provenance work, not with a measurement.
+
+## 13. The matrix, updated from §12's measurements — 2026-09-07
+
+§11 was computed when the 7 new teams, the 9 R3 variants and the 4 amended squads were all
+UNGATED. §12 measured them. Three groups of cells move:
+
+* **The 4 amended squads are re-gated 36/36 at 100/100** (§12b), so bb2016 `orc`, bb2020 `undead`
+  and bb2020 `underworld` clear condition (d). bb2020 `dwarf` stays 🔴 on provenance (c).
+* **All 9 R3 variants are green bar `renegades_37730`** (bb2020, 99/100 @1.0), so `chaos` and
+  `underworld` clear in both editions and bb2025 `renegades` clears; bb2020 `renegades` does not.
+* **The 7 new teams measured 14 green / 10 red cells**, per-cell in §12a.
+
+| team | bb2016 | bb2020 | bb2025 |
+|---|---|---|---|
+| amazon | 🟢 | 🔴 c | 🟢 |
+| black_orc | N/A | 🔴 97/100/98 | 🔴 99/100/98 |
+| bretonnian | N/A | N/A | 🟢 |
+| chaos | 🔴 c | 🟢 | 🟢 |
+| chaos_dwarf | 🟢 | 🟢 | 🟢 |
+| chaos_pact | 🟢 | N/A | N/A |
+| dark_elf | 🟢 | 🟢 | 🟢 |
+| dwarf | 🔴 c | 🔴 c | 🟢 |
+| elf | 🟢 | 🟢 | 🟢 |
+| gnome | N/A | 🔴 38/53/58 | 🔴 35/10/51 |
+| goblin | 🔴 c | 🟢 | 🟢 |
+| halfling | 🔴 c | 🟢 | 🟢 |
+| high_elf | 🟢 | 🟢 | 🟢 |
+| human | 🟢 | 🟢 | 🟢 |
+| imperial_nobility | N/A | 🟢 | 🔴 84/100/33 |
+| khemri | 🟢 | 🟢 | 🟢 |
+| khorne | N/A | 🟢 | 🟢 |
+| lizardman | 🟢 | 🔴 c | 🟢 |
+| necromantic | 🔴 c | 🟢 | 🟢 |
+| norse | 🟢 | 🟢 | 🟢 |
+| nurgle | 🟢 | 🟢 | 🟢 |
+| ogre | 🟢 | 🟢 | 🟢 |
+| old_world_alliance | N/A | 🟢 | 🔴 both variants 99 @1e6 |
+| orc | 🟢 | 🟢 | 🟢 |
+| renegades | N/A | 🔴 variant 99/100 | 🟢 |
+| skaven | 🟢 | 🔴 c | 🟢 |
+| slann | 🟢 | N/A | N/A |
+| snotling | N/A | 🔴 0/1/0 | 🔴 0/0/0 |
+| undead | 🔴 c | 🟢 | 🟢 |
+| underworld | 🔴 c | 🟢 | 🟢 |
+| vampire | 🔴 46/33/67 | 🔴 c + 100/98/100 | 🔴 99/95/100 |
+| wood_elf | 🔴 c | 🟢 | 🟢 |
+
+| | bb2016 | bb2020 | bb2025 | total |
+|---|---|---|---|---|
+| 🟢 | 15 | 20 | 24 | **59** |
+| 🔴 | 9 | 9 | 6 | **24** |
+| N/A | 8 | 4 | 1 | 13 |
+
+**59 🟢 / 24 🔴**, up from §11's 49/34. The 13 provenance-only reds (`c`) are unchanged — no
+roster data was corrected, so those cells cannot move until the bb2020 6 numbers and the bb2016 18
+lines are applied.
+
+### Caveat on the bb2016 column
+
+§12 records that its bb2016 numbers **predate** the vampire ITER2-ITER4 edits to bb2016
+`step_end_moving` / `step_end_selecting` / `step_init_passing` / `framework.rs`. bb2016 `orc`'s
+🟢 therefore rests on a pre-edit measurement and should be re-gated before it is trusted; the same
+caveat applies to every bb2016 🟢 carried over from §11.
+
+### The two remaining engine faults worth naming
+
+* **`snotling` diverges at STEP 0 of every seed, both editions** — a pre-game divergence, not an
+  agent disagreement. Cheapest red on the board to diagnose: nothing has happened yet.
+* **`gnome` failures are dominated by Rust STALLS** (80 of 90 at bb2025 @0).
+
+### Two measurement traps §12 recorded, both worth carrying forward
+
+1. **7 concurrent JVMs exhausted RAM**, producing `rc=127` runs with no PARITY line. Concurrency
+   here is bounded by MEMORY, not cores.
+2. **A CRLF job file made `--heur-scale "1.0\r"` parse to 0.0 via `unwrap_or(0.0)`**, silently
+   running 70 gates at the WRONG scale. A parse fallback that swallows a malformed value is worse
+   than a crash: every one of those gates would have been reported against the wrong column. The
+   batch runner now reads the scale back out of each run's own banner. **`ffb-parity`'s
+   `unwrap_or(0.0)` on the scale argument should reject a bad value instead** — filed as follow-up.
