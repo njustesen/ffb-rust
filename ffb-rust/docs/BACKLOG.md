@@ -4309,3 +4309,29 @@ player standing up rolls Take Root in bb2016/bb2020 but not in bb2025.)
 Fix: emit `GameEvent::ConfusionRoll` from the shared step the way the dead bb2016 twin does. Pure
 instrumentation — it must not change any state hash, so it can be verified by re-running a single
 green gate.
+
+### E15. bb2025 Eye Gouge has no parity evidence: its only carrier never blocks
+
+Found while closing undead (2026-09-07, `docs/PARITY_UNDEAD_CAMPAIGN.md`). Same shape as E8
+(Brawler) but with a different cause, and worth recording separately because the *diagnosis* is
+different.
+
+`EyeGougeBehaviour` is correctly registered in `skill_behaviour/registry.rs:132` (`build_bb2025`)
+and its step modifier is a faithful port of the Java `handleExecuteStepHook`. Across 100 bb2025
+undead-vs-undead games with **1116 `pushback` events**, zero `skillUse` reports with
+`SkillUse::EYE_GOUGED` were emitted.
+
+The reason is roster composition, not wiring: the hook fires only when the *pusher* carries
+`canRemoveOpponentAssists`, and the only bb2025 undead carrier is the Zombie — of which the drafted
+squad fields exactly **one**, at jersey 13 of 13, so usually a reserve. Its full action log over the
+100 games is 56 Move, 1 Foul, 1 PassMove, 1 HandOverMove — **zero Block, zero Blitz**.
+
+Two ways to close it, either is fine:
+- draft a second/earlier Zombie into `data/teams/bb2025/team_undead.json` (needs
+  `scripts/gen_java_parity_data.py` re-run and every undead gate re-measured), or
+- close it under the same fixture-test route as E8.
+
+The reusable lesson, which also belongs next to E8: **a per-carrier skill with no events is not
+evidence of unreached code until the CARRIER's own declared-action histogram has been counted.**
+"Ported but unreached" and "the carrier is never in the situation" produce identical event
+histograms.
