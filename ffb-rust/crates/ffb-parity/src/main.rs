@@ -79,6 +79,31 @@ struct ParityArgs {
     heur_classes: String,
 }
 
+/// Parse a numeric flag value STRICTLY, exiting with a clear message instead of substituting a
+/// default. A silent fallback here is worse than a crash: a job file with CRLF line endings made
+/// `--heur-scale` receive a value with a trailing carriage return, which `unwrap_or(0.0)` turned
+/// into 0.0 -- so 70 gates ran at ARGMAX while every one of them was reported as the 1.0 column,
+/// and nothing in the output said so.
+///
+/// Surrounding ASCII whitespace (a trailing carriage return included) is trimmed first, so a CRLF
+/// job file does the RIGHT thing rather than merely failing loudly; anything else is rejected.
+fn parse_flag_value<T: std::str::FromStr>(raw: &str) -> Result<T, ()> {
+    raw.trim().parse::<T>().map_err(|_| ())
+}
+
+fn parse_flag<T: std::str::FromStr>(flag: &str, raw: &str) -> T {
+    match parse_flag_value::<T>(raw) {
+        Ok(v) => v,
+        Err(_) => {
+            eprintln!(
+                "ffb-parity: {flag} expects a number, got {raw:?}. Refusing to substitute a \
+                 default -- that would silently mis-attribute every result of this run."
+            );
+            std::process::exit(2);
+        }
+    }
+}
+
 impl ParityArgs {
     fn parse() -> Self {
         let raw: Vec<String> = std::env::args().skip(1).collect();
@@ -120,16 +145,16 @@ impl ParityArgs {
                 "--visualize" => visualize = true,
                 "--reuse-java" => reuse_java = true,
                 "--heuristic" if i + 1 < raw.len() => {
-                    heuristic = raw[i + 1].parse().ok(); i += 1;
+                    heuristic = Some(parse_flag::<f32>("--heuristic", &raw[i + 1])); i += 1;
                 }
                 "--heuristic-away" if i + 1 < raw.len() => {
-                    heuristic_away = raw[i + 1].parse().ok(); i += 1;
+                    heuristic_away = Some(parse_flag::<f32>("--heuristic-away", &raw[i + 1])); i += 1;
                 }
                 "--out" if i + 1 < raw.len() => { out_dir = raw[i + 1].clone(); i += 1; }
                 "--agent" if i + 1 < raw.len() => { agent = raw[i + 1].clone(); i += 1; }
-                "--multimove" if i + 1 < raw.len() => { multimove = raw[i + 1].parse().unwrap_or(0); i += 1; }
+                "--multimove" if i + 1 < raw.len() => { multimove = parse_flag::<usize>("--multimove", &raw[i + 1]); i += 1; }
                 "--heur-scale" if i + 1 < raw.len() => {
-                    heur_scale = raw[i + 1].parse().unwrap_or(0.0); i += 1;
+                    heur_scale = parse_flag::<f32>("--heur-scale", &raw[i + 1]); i += 1;
                 }
                 "--heur-classes" if i + 1 < raw.len() => { heur_classes = raw[i + 1].clone(); i += 1; }
                 "--mode" if i + 1 < raw.len() => { agent_mode = raw[i + 1].clone(); i += 1; }
@@ -137,14 +162,22 @@ impl ParityArgs {
                 "--home" if i + 1 < raw.len() => { home = raw[i + 1].clone(); i += 1; }
                 "--away" if i + 1 < raw.len() => { away = raw[i + 1].clone(); i += 1; }
                 "--edition" if i + 1 < raw.len() => { edition = raw[i + 1].clone(); i += 1; }
-                "--tier" if i + 1 < raw.len() => { tier = raw[i + 1].parse().unwrap_or(2); i += 1; }
+                "--tier" if i + 1 < raw.len() => { tier = parse_flag::<u8>("--tier", &raw[i + 1]); i += 1; }
                 "--seeds" if i + 1 < raw.len() => {
-                    let s = &raw[i + 1];
+                    // Same rule as the numeric flags above, and the failure here is nastier: the
+                    // old `unwrap_or(100)` turned a malformed `--seeds 1-50` into seeds 1-100,
+                    // silently running MORE seeds than asked and attributing them to the wrong
+                    // range. Reject instead.
+                    let s = raw[i + 1].trim();
                     if let Some(dash) = s.find('-') {
-                        seed_start = s[..dash].parse().unwrap_or(1);
-                        seed_end   = s[dash+1..].parse().unwrap_or(100);
+                        seed_start = parse_flag::<u64>("--seeds (start)", &s[..dash]);
+                        seed_end   = parse_flag::<u64>("--seeds (end)", &s[dash + 1..]);
                     } else {
-                        seed_end = s.parse().unwrap_or(100);
+                        seed_end = parse_flag::<u64>("--seeds", s);
+                    }
+                    if seed_end < seed_start {
+                        eprintln!("ffb-parity: --seeds {s:?} ends before it starts");
+                        std::process::exit(2);
                     }
                     i += 1;
                 }
@@ -569,13 +602,16 @@ fn main() {
         String::new()
     };
 
+    // The verdict ALWAYS goes to stdout, whatever it says. It used to go to stdout when green and
+    // stderr when red, so any harness reading a single stream saw a passing gate as "no verdict"
+    // and a failing one as missing entirely. The exit code still distinguishes the outcomes.
     if failed == 0 && checklist_ok {
         println!("PARITY: {passed}/{total} games match.{panic_note}");
     } else if failed == 0 {
-        eprintln!("PARITY: {passed}/{total} games match, but required coverage items are MISSING.{panic_note}");
+        println!("PARITY: {passed}/{total} games match, but required coverage items are MISSING.{panic_note}");
         std::process::exit(1);
     } else {
-        eprintln!("PARITY: {passed}/{total} passed, {failed} FAILED.{panic_note}");
+        println!("PARITY: {passed}/{total} passed, {failed} FAILED.{panic_note}");
         std::process::exit(1);
     }
 }
@@ -644,5 +680,37 @@ mod roster_name_tests {
             make_team_from_roster(race, "home", "bb2025")
                 .unwrap_or_else(|e| panic!("{race} must resolve without fallback: {e}"));
         }
+    }
+}
+
+#[cfg(test)]
+mod flag_parse_tests {
+    use super::parse_flag_value;
+
+    /// A job file with CRLF line endings made `--heur-scale` receive "1.0\r", which
+    /// `unwrap_or(0.0)` turned into 0.0 -- running 70 gates at argmax while reporting them as the
+    /// 1.0 column. A trailing carriage return must parse to the value the author wrote.
+    #[test]
+    fn crlf_scale_parses_to_the_written_value() {
+        assert_eq!(parse_flag_value::<f32>("1.0\r"), Ok(1.0));
+        assert_eq!(parse_flag_value::<f32>("1e6\r\n"), Ok(1e6));
+        assert_eq!(parse_flag_value::<f32>(" 0 "), Ok(0.0));
+    }
+
+    /// The whole point of the fix: a malformed value is REFUSED, never silently defaulted. If this
+    /// ever returns Ok, the caller substitutes a default and mis-attributes every result.
+    #[test]
+    fn malformed_values_are_refused_not_defaulted() {
+        assert_eq!(parse_flag_value::<f32>("abc"), Err(()));
+        assert_eq!(parse_flag_value::<f32>(""), Err(()));
+        assert_eq!(parse_flag_value::<f32>("1.0.0"), Err(()));
+        assert_eq!(parse_flag_value::<usize>("-1"), Err(()));
+        assert_eq!(parse_flag_value::<usize>("2.5"), Err(()));
+    }
+
+    #[test]
+    fn well_formed_values_still_parse() {
+        assert_eq!(parse_flag_value::<f32>("1.0"), Ok(1.0));
+        assert_eq!(parse_flag_value::<usize>("3"), Ok(3));
     }
 }
