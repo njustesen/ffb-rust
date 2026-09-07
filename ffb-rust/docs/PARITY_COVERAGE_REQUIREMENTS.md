@@ -356,3 +356,120 @@ bb2020 `undead`. Variants are matched by their `race` field, so each set unions 
 own cell.
 
 `--r5` is unchanged: 4 shared rosters, 29 bb2016 PA carriers. That work is still open.
+
+## 11. The coverage matrix — 2026-09-07
+
+Cell semantics are §1, tightened by the user on 2026-09-07: **🟢 = the two engines agree
+100/100 × 9 gates using a roster from *that* ruleset that follows the R1–R5 roster
+requirements.** Anything else is 🔴 — including a roster that reconciles clean but whose
+squad has been re-drafted since it was last gated. N/A = the team does not exist in that
+ruleset, so there is nothing to cover.
+
+A cell is 🟢 only if **all four** hold:
+
+| | condition | source |
+|---|---|---|
+| a | a roster exists for that ruleset | `data/rosters/<ed>/` |
+| b | its squad(s) satisfy R1–R4 | `scripts/validate_teams.py` — 0 violations, 0 unfielded slots |
+| c | the roster reconciles clean against that ruleset's official pages | `scripts/audit_rosters.py --edition <ed> --report` |
+| d | nine gates 100/100 **on the current squad** | per-race ledger `docs/PARITY_<RACE>_CAMPAIGN.md` |
+
+### 11.1 Official teams — 32 distinct, 83 real cells
+
+| team | bb2016 | bb2020 | bb2025 |
+|---|---|---|---|
+| amazon | 🟢 | 🔴 c | 🟢 |
+| black_orc | N/A | 🔴 d | 🔴 d |
+| bretonnian | N/A | N/A | 🔴 d |
+| chaos | 🔴 c | 🔴 d | 🔴 d |
+| chaos_dwarf | 🟢 | 🟢 | 🟢 |
+| chaos_pact | 🟢 | N/A | N/A |
+| dark_elf | 🟢 | 🟢 | 🟢 |
+| dwarf | 🔴 c | 🔴 c d | 🟢 |
+| elf | 🟢 | 🟢 | 🟢 |
+| gnome | N/A | 🔴 d | 🔴 d |
+| goblin | 🔴 c | 🟢 | 🟢 |
+| halfling | 🔴 c | 🟢 | 🟢 |
+| high_elf | 🟢 | 🟢 | 🟢 |
+| human | 🟢 | 🟢 | 🟢 |
+| imperial_nobility | N/A | 🔴 d | 🔴 d |
+| khemri | 🟢 | 🟢 | 🟢 |
+| khorne | N/A | 🔴 d | 🔴 d |
+| lizardman | 🟢 | 🔴 c | 🟢 |
+| necromantic | 🔴 c | 🟢 | 🟢 |
+| norse | 🟢 | 🟢 | 🟢 |
+| nurgle | 🟢 | 🟢 | 🟢 |
+| ogre | 🟢 | 🟢 | 🟢 |
+| old_world_alliance | N/A | 🔴 d | 🔴 d |
+| orc | 🔴 d | 🟢 | 🟢 |
+| renegades | N/A | 🔴 d | 🔴 d |
+| skaven | 🟢 | 🔴 c | 🟢 |
+| slann | 🟢 | N/A | N/A |
+| snotling | N/A | 🔴 d | 🔴 d |
+| undead | 🔴 c | 🔴 d | 🟢 |
+| underworld | 🔴 c | 🔴 d | 🔴 d |
+| vampire | 🔴 d | 🔴 c d | 🔴 d |
+| wood_elf | 🔴 c | 🟢 | 🟢 |
+
+`c` = condition (c) fails, the roster does not reconcile against that ruleset's pages.
+`d` = condition (d) fails, no valid nine-gate result stands on the current squad.
+
+| | bb2016 | bb2020 | bb2025 | total |
+|---|---|---|---|---|
+| 🟢 | 14 | 15 | 20 | **49** |
+| 🔴 | 10 | 14 | 10 | **34** |
+| N/A | 8 | 4 | 1 | 13 |
+| cells | 24 | 29 | 30 | 83 |
+
+### 11.2 Why each red is red
+
+**Provenance only (`c`) — 13 cells.** The roster carries numbers the ruleset's own pages
+contradict. Measured live at `f9e1e45d6`, not inferred:
+
+* bb2020, 5 teams / 6 numbers: `amazon`/`dwarf`/`lizardman` `reroll_cost` too cheap,
+  `skaven`/`vampire` too expensive, `vampire.apothecary` false → true. Zero positional
+  mismatches over 155 positions. `dwarf` 40k and `skaven` 60k are LRB6 numbers never
+  updated for BB2020.
+* bb2016, 8 teams / 18 lines (§4.2). The `goblin` and `underworld` extras — `Animosity`,
+  `Regeneration`, `Thick Skull`, and a `Regeneration` listed twice — are BB2020-era
+  contamination that the legacy negative `--cleanup` pass could not find, because those
+  skills are not in its `BB2016_REMOVE_SKILLS` list.
+
+**No standing gate (`d`) — 21 cells.** Three distinct causes:
+
+1. **Never gated — 7 teams, 13 cells.** `black_orc`, `gnome`, `imperial_nobility`,
+   `khorne`, `old_world_alliance`, `snotling` (bb2020+bb2025) and `bretonnian` (bb2025).
+   Rosters and squads exist as of `8bf1e2cfe`; no parity run has ever been made.
+2. **Squad re-drafted in place since its gate — 4 cells.** bb2016 `orc`, bb2020 `dwarf`,
+   bb2020 `undead`, bb2020 `underworld`. Each was gated 100/100 × 9, but on a *different*
+   squad; the R4 re-draft voided that result. These are the cheapest reds on the board —
+   re-run, no engine work expected.
+3. **R3 variant not gated — `chaos`, `chaos_pact`, `renegades`, `underworld`.** R4 asks the
+   *union* of a cell's squads to cover every positional, so the base squad's green does not
+   cover the cell once a variant supplies the rest of the coverage. Nine new variant squads
+   are still uncommitted.
+
+**`vampire` is the only genuine engine red.** Nine gates measured
+bb2020 100/98/100, bb2025 99/95/100, **bb2016 0/100** — the frontier is the bb2016 re-pick
+sampler (`docs/PARITY_VAMPIRE_CAMPAIGN.md` §Frontier).
+
+### 11.3 One deviation carried by every bb2016 cell
+
+All 29 bb2016 rosters store a `pa` value. **LRB6 defines no PA characteristic — passing is
+AG-based — and the pages have no PA column** (§2). The reconciliation deliberately neither
+reports nor zeroes it, and it was *verified inert*: bb2016 never produces
+`PlayerStatKey::PA`, and `draw_passing()` is false on that path, so it cannot move a parity
+result.
+
+Under a strict reading of R5 ("a roster for each ruleset, faithful to that ruleset") every
+bb2016 🟢 above is provisional until `pa` is stripped. It is listed here rather than folded
+into the dots because it is provably unable to change any gate outcome — but it is the
+user's call, and stripping it is cheap.
+
+### 11.4 Non-official rosters — not part of the matrix
+
+Five repo rosters map to no official page in any edition and are excluded from §11.1
+(§4 covers them): `nippon`, `dark_elf_league_fumbbl`, `khemri_fumbbl`, `slann_fumbbl`, and
+bb2016 `renegades` (a FUMBBL Chaos Renegades import; CRP prints Chaos Pact, which the repo
+already has as `chaos_pact`). All five are gated 100/100 × 9 and green as *engine* parity;
+they simply have no ruleset page to be faithful to.
