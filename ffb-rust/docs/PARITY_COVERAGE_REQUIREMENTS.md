@@ -246,3 +246,90 @@ should therefore report bb2016 PA as contamination to REMOVE, not as a value to 
    ruleset (`nippon` is official in none; `slann` and `chaos_pact` are official in bb2016 only).
 3. Extend `validate_teams.py` with an R5 check: fail if two rulesets' rosters for one team are
    byte-identical, and fail if a bb2016 roster carries PA.
+
+## 11. `scripts/validate_teams.py` — the squad legality checker
+
+R1-R5 above are now machine-checked. Nothing else in the repo checks a drafted SQUAD:
+`scripts/check_skill_names.py` and `all_roster_starting_skills_resolve` only check skill
+SPELLING in the roster *definitions*, and parity is structurally blind to a bad squad — both
+engines read the same generated data, so an illegal squad produces a perfectly MATCHED green.
+
+```
+python scripts/validate_teams.py                 # all three editions
+python scripts/validate_teams.py --edition bb2025
+python scripts/validate_teams.py --r5            # + the roster-sharing / bb2016-PA check
+python scripts/validate_teams.py --selftest      # validate the CHECKER
+```
+
+Exit 0 = clean, 1 = violations, 2 = selftest failed. The script is **read-only with respect to
+`data/`** — there is deliberately no `--apply`.
+
+### What it checks, per `data/teams/<ed>/team_*.json`
+
+| id | check | why |
+|---|---|---|
+| C1 | `roster_id` resolves in `data/rosters/<ed>/` | **CRITICAL.** `make_team()` (`crates/ffb-parity/src/runner.rs`) ends in `.unwrap_or_else(\|e\| { log::warn!(..); make_lineman_team(..) })`. A typo'd id is a warning and an ALL-LINEMAN team — and a green gate on a team that was never fielded. |
+| C2 | every `players[].position_id` is in that roster | same failure mode |
+| C3 | 11..16 rostered players; players + fielded stars ≤ 16 | R1 |
+| C4 | per-position count ≤ that position's `quantity` | R1 |
+| C5 | spend reconciles (formula below) | R1 |
+| C6 | `rerolls ≤ max_rerolls`; apothecary only if the roster allows one; `dedicated_fans` 1..6 (bb2020+) / `fan_factor` 0..9 (bb2016), and neither field set in the edition that has no such concept | R1 |
+| C7 | squad numbers unique and in 1..16 | the harness indexes activation snapshots into the nr-sorted player list |
+| C8 | every `stars[].star_id` resolves in `data/star_players/all_editions.json` | R1 |
+| BG | a roster whose official page says "*may have a single Big Guy*" fields at most one | R1/R3 |
+| R2/R4 | per **(edition, race) cell**, the union of that cell's squads fields every positional in the roster | R2/R4 |
+| R5 | (`--r5`) no roster content-identical across two rulesets; no bb2016 roster carries PA | §10 |
+
+Variants are grouped by the spec's own `race` field, **not** by filename prefix: filenames
+collide (`team_dark_elf.json` and `team_dark_elf_league_fumbbl.json` are different cells, while
+`team_old_world_alliance_{ogre,treeman}.json` are one cell).
+
+### The C5 money formula, derived from the data
+
+An earlier ad-hoc validator reported **73 false violations** because it omitted the fan cost.
+The formula below was therefore derived empirically and reproduces the declared
+`team_value` / `spent` / `treasury` for **100% of the squads in the tree**, all three editions:
+
+```
+players = sum(position.cost)          # star players are NOT counted: they are inducements,
+                                      # and no declared team_value includes them
+staff   = rerolls * roster.reroll_cost + apothecaries * 50_000
+
+bb2016:   team_value = players + staff + fan_factor * 10_000    # LRB6 Fan Factor costs 10k
+          spent      = team_value                               # and DOES count in TV
+
+bb2020/   team_value = players + staff                          # Dedicated Fans are NOT TV;
+bb2025:   spent      = team_value + (dedicated_fans - 1) * 5_000  # the first one is free
+
+all:      spent + treasury == 1_100_000                         # the drafting budget
+```
+
+### How the checker itself is validated
+
+`--selftest` copies `data/teams/bb2025` to a temp dir and asserts **0 violations** on that
+known-good tree, then breaks one squad nine ways (C1-C8, BG, and a dropped positional for
+R2) and asserts each check fires. It never writes to `data/`.
+
+### Current state (measured 2026-09-07, 102 squads: 29 bb2016 / 36 bb2020 / 37 bb2025)
+
+**0 R1 violations.** Every drafted squad — including the seven teams added after §5 was
+written — resolves its roster, is inside its quantity caps and budget, and reconciles to the
+gold piece.
+
+**13 unfielded positional slots in 10 cells**, exactly the §8 list, independently reproduced:
+
+| ruleset | cell | never fielded |
+|---|---|---|
+| bb2016 | orc | `orc.lineman` |
+| bb2020 | chaos | `chaos.chaostroll`, `chaos.chaosogre` |
+| bb2020 | chaos_pact | `chaospact.renegadetroll` |
+| bb2020 | dwarf | `dwarf.trollslayer` |
+| bb2020 | renegades | `37730` |
+| bb2020 | undead | `undead.skeleton` |
+| bb2020 | underworld | `37844.underworldsnotling`, `37844.underworldtroll` |
+| bb2025 | chaos | `chaos.troll`, `chaos.ogre` |
+| bb2025 | renegades | `37733` |
+| bb2025 | underworld | `37844` |
+
+`--r5` reports **4 shared rosters and 29 bb2016 PA carriers**, also matching §10's independent
+count. Those are data changes and are NOT applied by this script.
