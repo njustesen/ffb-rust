@@ -136,3 +136,16 @@ never fire. "Unreached" and "no carrier ever in the situation" produce identical
 ## Frontier
 
 Empty. Remaining in the two-race carve-out after this entry: **vampire**.
+
+## Provenance of this entry
+
+The five files of this iteration (this ledger, the three `EVENT_COVERAGE_undead_*` harvests and the
+BACKLOG E15 append) were staged by this campaign but swept into `57a0141a7`
+("docs: parity coverage requirements…") by a **concurrent agent sharing this working directory**,
+which ran a `git commit` over the shared index while they sat staged. The content is exactly as
+written here; only the commit message is not this campaign's. Recorded so the git history is not
+read as this iteration having produced no commit of its own.
+
+Operational note for the next iteration: `git add` + `git commit` are **not** safe against a shared
+index when another agent is live in the same checkout. Stage and commit in one call, or work in a
+worktree.
