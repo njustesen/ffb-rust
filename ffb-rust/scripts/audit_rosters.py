@@ -5,16 +5,24 @@ fetched into rules/teams/*.md (bloodbowlbase.ru/bb2025).
 BB2020: reconciles data/rosters/bb2020/*.json against rules/bb2020/teams/*.md
 (bloodbowlbase.ru/bb2020) the same way -- stats, cost, quantity, skills and
 skill categories, per team per position.
-BB2016: cleans BB2020-era contamination out of data/rosters/bb2016/*.json per
-docs/BB2016_DRAFTING_AND_ROSTERS.md section 2.1, and can regenerate that doc's
-reference tables.
+BB2016: reconciles data/rosters/bb2016/*.json against the LRB6 / Competition
+Rules Pack team pages in rules/bb2016/teams/*.md -- a POSITIVE check (stats,
+cost, quantity, skills, skill categories, re-roll cost/limit) rather than the
+old negative "strip BB2020 contamination" pass, which is still available as
+--cleanup. See docs/ROSTER_PROVENANCE_BB2016.md for the standing inventory.
+
+  *** LRB6 prints BARE characteristics; BB2020+ prints ROLL TARGETS. The
+  bb2016 roster JSONs store BARE characteristics too, so the conversion for
+  ma/st/ag/av is the IDENTITY -- see the long note above OFFICIAL_BB2016. ***
 
 Usage:
   python scripts/audit_rosters.py --edition bb2025 --report          # diff only
   python scripts/audit_rosters.py --edition bb2025 --apply           # rewrite JSONs
   python scripts/audit_rosters.py --edition bb2020 --report          # diff only
   python scripts/audit_rosters.py --edition bb2020 --apply           # rewrite JSONs
-  python scripts/audit_rosters.py --edition bb2016 --report|--apply  # contamination cleanup
+  python scripts/audit_rosters.py --edition bb2016 --report          # LRB6 reconciliation
+  python scripts/audit_rosters.py --edition bb2016 --selftest        # validate the checker
+  python scripts/audit_rosters.py --edition bb2016 --cleanup --apply # legacy cleanup
   python scripts/audit_rosters.py --edition bb2016 --tables          # regen doc tables
 """
 
@@ -926,6 +934,660 @@ def regen_bb2016_tables() -> None:
     print(f"Regenerated tables in {DOC_BB2016}")
 
 
+# ---------------------------------------------------------------------------
+# BB2016 reconciliation (LRB6 / CRP team pages)
+# ---------------------------------------------------------------------------
+#
+# THE CONVERSION (read this before touching anything)
+# ---------------------------------------------------
+# The LRB6/CRP pages in rules/bb2016/teams/ print BARE characteristics
+# ("AG 4"), while the BB2020+ pages print ROLL TARGETS ("AG 4+"), and the
+# BB2020/BB2025 roster JSONs store those roll targets verbatim.
+#
+# The data/rosters/bb2016/*.json files, however, ALSO store BARE
+# characteristics: they were built from LRB6 and never converted. Verified on
+# every team before this checker was written, e.g.
+#
+#   page  Wood Elf Lineman   MA 7 ST 3 AG 4 AV 7  <->  JSON ma 7 st 3 ag 4 av 7
+#   page  Ogre     Ogre      MA 5 ST 5 AG 2 AV 9  <->  JSON ma 5 st 5 ag 2 av 9
+#   page  Dwarf    Blocker   MA 4 ST 3 AG 2 AV 9  <->  JSON ma 4 st 3 ag 2 av 9
+#
+# and confirmed globally: the bb2016 rosters hold ag values 1..5 (bare AG
+# range) with the LOW values on the big guys -- a roll-target encoding would
+# invert that (a Treeman would be ag 6, not ag 1).
+#
+# ==> THE CONVERSION FOR ma / st / ag / av IS THE IDENTITY. <==
+#
+# Nothing here rewrites a bare characteristic into a roll target. Doing so
+# ("AG 4 -> 4+") would corrupt all 24 bb2016 rosters at once, which is why the
+# page header carries that warning and why this comment exists.
+#
+# PA in BB2016
+# ------------
+# LRB6 has NO Passing characteristic at all -- passing is AG-based. The pages
+# have no PA column, so `pa` has no page-side truth and CANNOT be reconciled.
+# It is deliberately NOT diffed. Its status in the engine:
+#   * ffb-mechanics/src/bb2016/pass_mechanic.rs computes the pass minimum from
+#     `agility_with_modifiers()`; `passing` is never read.
+#   * ffb-mechanics/src/bb2016/stats_mechanic.rs `draw_passing()` is false.
+#   * ffb-engine/src/mechanic/bb2016/roll_mechanic.rs has no InjuryAttribute::PA
+#     arm (bb2020/bb2025 do).
+#   * ffb-engine/src/step/bb2016/start/step_buy_inducements.rs DOES copy
+#     `position.pa` into `player.passing`, and ffb-parity/src/runner.rs ships
+#     the same `pa` to the Java side in the team spec -- so the value is
+#     symmetric across the two engines and inert for every bb2016 roll.
+# ==> `pa` on a bb2016 roster is a CARRIED-OVER BB2020 ARTEFACT: inert,
+#     parity-neutral, and out of scope for LRB6 reconciliation. It is reported
+#     as an informational note, never as a mismatch.
+#
+# APOTHECARY / MAX RE-ROLLS
+# -------------------------
+# The pages state the re-roll cost and the 0-8 re-roll limit but say nothing
+# about the apothecary, so `apothecary` is checked against the LRB6 *rule*
+# (Khemri, Necromantic, Nurgle, Undead and Vampire teams may not hire one)
+# rather than against page text, and that is labelled as such.
+
+TEAMS_DIR_BB2016 = ROOT / "rules" / "bb2016" / "teams"
+
+# repo race key (roster_<key>.json) -> LRB6/CRP page slug in rules/bb2016/teams/
+OFFICIAL_BB2016 = {
+    "amazon": "Amazon",
+    "chaos": "Chaos",
+    "chaos_dwarf": "Chaos_Dwarf",
+    "chaos_pact": "Chaos_Pact",
+    "dark_elf": "Dark_Elf",
+    "dwarf": "Dwarf",
+    "elf": "Elf",
+    "goblin": "Goblin",
+    "halfling": "Halfling",
+    "high_elf": "High_Elf",
+    "human": "Human",
+    "khemri": "Khemri",
+    "lizardman": "Lizardman",
+    "necromantic": "Necromantic",
+    "norse": "Norse",
+    "nurgle": "Nurgle",
+    "ogre": "Ogre",
+    "orc": "Orc",
+    "skaven": "Skaven",
+    "slann": "Slann",
+    "undead": "Undead",
+    "underworld": "Underworld",
+    "vampire": "Vampire",
+    "wood_elf": "Wood_Elf",
+}
+
+# bb2016 rosters with no LRB6/CRP page: FUMBBL imports (numeric position ids)
+# and non-CRP races. `renegades` is FUMBBL's Chaos Renegades import, a variant
+# of the CRP "Chaos Pact" team with its own 10-position line-up; it is NOT
+# reconciled against Chaos_Pact.md, which would produce nothing but phantom
+# add/remove pairs.
+BB2016_NO_PAGE = {
+    "nippon": "not an LRB6/CRP team",
+    "renegades": "FUMBBL Chaos Renegades import (CRP prints Chaos Pact instead)",
+    "dark_elf_league_fumbbl": "FUMBBL import",
+    "khemri_fumbbl": "FUMBBL import",
+    "slann_fumbbl": "FUMBBL import",
+}
+
+# LRB6 teams that may NOT hire an apothecary (CRP, Apothecary rules).
+BB2016_NO_APOTHECARY = {"khemri", "necromantic", "nurgle", "undead", "vampire"}
+
+# Every skill an LRB6/CRP roster line can print, plus the "None" marker. This
+# is a VOCABULARY, not a source of truth for any team's skills: it exists only
+# so the parser can tell a wrapped POSITION TITLE ("Chaos Dwarf" / "Blockers")
+# apart from a wrapped SKILL LIST ("... Mighty" / "Blow, Thick Skull").
+LRB6_SKILLS = [
+    "None",
+    # General
+    "Block", "Dauntless", "Dirty Player", "Fend", "Frenzy", "Grab", "Guard",
+    "Juggernaut", "Kick", "Kick-Off Return", "Mighty Blow", "Multiple Block",
+    "Nerves of Steel", "Pass Block", "Pile On", "Pro", "Shadowing",
+    "Stand Firm", "Strip Ball", "Sure Hands", "Tackle", "Wrestle",
+    # Agility
+    "Catch", "Diving Catch", "Diving Tackle", "Dodge", "Jump Up", "Leap",
+    "Side Step", "Sneaky Git", "Sprint", "Sure Feet",
+    # Passing
+    "Accurate", "Dump-Off", "Hail Mary Pass", "Leader", "Pass", "Safe Throw",
+    # Strength
+    "Break Tackle", "Piling On", "Strong Arm", "Thick Skull",
+    # Mutation
+    "Big Hand", "Claw", "Claws", "Disturbing Presence", "Extra Arms",
+    "Foul Appearance", "Horns", "Prehensile Tail", "Tentacles", "Two Heads",
+    "Very Long Legs",
+    # Extraordinary / traits
+    "Always Hungry", "Animosity", "Ball & Chain", "Blood Lust", "Bombardier",
+    "Bone-head", "Chainsaw", "Decay", "Hypnotic Gaze", "Loner", "No Hands",
+    "Nurgle's Rot", "Really Stupid", "Regeneration", "Right Stuff",
+    "Secret Weapon", "Stab", "Stunty", "Take Root", "Throw Team-Mate",
+    "Titchy", "Wild Animal",
+]
+LRB6_SKILLS_NORM = {norm(s) for s in LRB6_SKILLS}
+
+# LRB6 page spelling -> engine-canonical bb2016 spelling, same idea and same
+# direction as SKILL_ALIASES_BB2020/BB2025. Both entries are verified against
+# the engine, not guessed:
+#   * "Ball & Chain" is an ALIAS in Java SkillFactory.forName and in Rust
+#     skill_factory.rs (for_class_name registers it explicitly); the canonical
+#     class name is "Ball and Chain", which is what the goblin roster stores.
+#   * SkillId::Claw's canonical name is "Claw" and skill_id.rs accepts
+#     "claw" | "claws"; the LRB6 pages print the plural.
+# Without these, a roster storing the canonical name is reported as a data
+# error for using it -- a pure tool bug.
+SKILL_ALIASES_BB2016 = {
+    "Ball & Chain": "Ball and Chain",
+    "Claws": "Claw",
+}
+
+# The LRB6 pages are PDF text extractions and three of Underworld's rows came
+# out scrambled: the qty/title and the stat block landed on different lines,
+# the wrapped half of the title landed AFTER the skills, and the Warpstone
+# Troll's skill-category cell floated up above its own row. These are exact,
+# reviewable repairs of the page text -- no data values are invented.
+BB2016_PAGE_FIXUPS: dict[str, list[tuple[str, str]]] = {
+    "Underworld": [
+        ("0-12 Underworld\n40,000 6 2 3 7 Right Stuff, Dodge, Stunty AM GSP\nGoblins\n",
+         "0-12 Underworld Goblins 40,000 6 2 3 7 Right Stuff, Dodge, Stunty AM GSP\n"),
+        ("0-2 Skaven 50,000 7 3 3 7 Animosity GM ASP\nLinemen\n",
+         "0-2 Skaven Linemen 50,000 7 3 3 7 Animosity GM ASP\n"),
+        ("0-2 Skaven\n70,000 7 3 3 7 Animosity, Pass, Sure Hands GPM AS\nThrowers\n",
+         "0-2 Skaven Throwers 70,000 7 3 3 7 Animosity, Pass, Sure Hands GPM AS\n"),
+        ("Animosity, Block GSM AP\nSM GAP\n0-1 Warpstone Troll 110,000 4 5 1 9 Loner, Always Hungry,\n",
+         "Animosity, Block GSM AP\n0-1 Warpstone Troll 110,000 4 5 1 9 Loner, Always Hungry, SM GAP\n"),
+    ],
+}
+
+LRB6_HEADER_RE = re.compile(
+    r"^Qty\s+Title\s+Cost\s+MA\s+ST\s+AG\s+AV\s*Skills\s+Normal\s+Double\s*$", re.M)
+LRB6_ROW_RE = re.compile(
+    r"^(\d+)-(\d+)\s+(.+?)\s+(\d{2,3},\d{3})\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(.+)$")
+LRB6_CATS_RE = re.compile(r"^(.*?)\s+([GASPM]{1,5})\s+([GASPM]{1,5})$")
+LRB6_REROLL_RE = re.compile(r"^0-(\d+)\s+Re-roll counters:\s*(\d{2,3},\d{3})", re.M)
+
+
+def _lrb6_skill_prefix_ok(text: str) -> bool:
+    """True if `text` is a valid comma-separated LRB6 skill list, possibly cut
+    off mid-name (the page wraps skill cells across lines)."""
+    segs = [s.strip() for s in text.split(",") if s.strip()]
+    if not segs:
+        return True
+    for s in segs[:-1]:
+        if norm(s) not in LRB6_SKILLS_NORM:
+            return False
+    last = norm(segs[-1])
+    if last in LRB6_SKILLS_NORM:
+        return True
+    return any(k.startswith(last) for k in LRB6_SKILLS_NORM) if last else True
+
+
+def _lrb6_join(acc: str, extra: str) -> str:
+    """Join a wrapped skill cell. A trailing hyphen is a WORD break, not a
+    space ("Throw Team-" + "Mate" == "Throw Team-Mate"), which is how the
+    Halfling/Ogre Treeman and Ogre rows print."""
+    if not acc:
+        return extra
+    if acc.endswith("-"):
+        return acc + extra
+    return acc + " " + extra
+
+
+def parse_lrb6_page(path: Path) -> dict:
+    """Parse one LRB6/CRP team page into the same shape parse_team_page yields.
+
+    Stats are taken BARE, exactly as printed -- see the conversion note at the
+    top of this section. There is no PA column and none is synthesised.
+    """
+    text = path.read_text(encoding="utf-8")
+    for old, new in BB2016_PAGE_FIXUPS.get(path.stem, []):
+        if old not in text:
+            raise ValueError(f"{path.name}: page fixup no longer applies: {old[:50]!r}")
+        text = text.replace(old, new)
+
+    hdr = LRB6_HEADER_RE.search(text)
+    if not hdr:
+        raise ValueError(f"{path.name}: no LRB6 positionals header")
+    rr = LRB6_REROLL_RE.search(text, hdr.end())
+    if not rr:
+        raise ValueError(f"{path.name}: no re-roll counters line")
+    body = text[hdr.end():rr.start()]
+
+    out = {"positions": [], "reroll_cost": int(rr.group(2).replace(",", "")),
+           "max_rerolls": int(rr.group(1))}
+
+    lines = [ln for ln in body.split("\n") if ln.strip()]
+    cur = None
+    for ln in lines:
+        m = LRB6_ROW_RE.match(ln.strip())
+        if m:
+            rest = m.group(9)
+            cm = LRB6_CATS_RE.match(rest)
+            if not cm:
+                raise ValueError(f"{path.name}: no skill categories in row {ln.strip()!r}")
+            cur = {
+                "quantity": int(m.group(2)),
+                "display_name": m.group(3).strip(),
+                "cost": int(m.group(4).replace(",", "")),
+                "ma": int(m.group(5)), "st": int(m.group(6)),
+                "ag": int(m.group(7)), "av": int(m.group(8)),
+                "_skill_text": cm.group(1).strip(),
+                "normal": [CATEGORY_LETTERS[c] for c in cm.group(2)],
+                "double": [CATEGORY_LETTERS[c] for c in cm.group(3)],
+            }
+            out["positions"].append(cur)
+            continue
+        if cur is None:
+            raise ValueError(f"{path.name}: stray table line {ln.strip()!r}")
+        # continuation line: a prefix of its words may belong to the wrapped
+        # POSITION TITLE, the remainder continues the wrapped SKILL cell. Take
+        # the smallest title-prefix that leaves a parseable skill list.
+        words = ln.split()
+        for k in range(len(words) + 1):
+            cand = _lrb6_join(cur["_skill_text"], " ".join(words[k:])) if k < len(words) \
+                else cur["_skill_text"]
+            if _lrb6_skill_prefix_ok(cand):
+                if k:
+                    cur["display_name"] = cur["display_name"] + " " + " ".join(words[:k])
+                cur["_skill_text"] = cand
+                break
+        else:
+            raise ValueError(f"{path.name}: cannot place continuation {ln.strip()!r}")
+
+    for p in out["positions"]:
+        txt = p.pop("_skill_text")
+        segs = [s.strip() for s in txt.split(",") if s.strip()]
+        if segs == ["None"]:
+            segs = []
+        for s in segs:
+            if norm(s) not in LRB6_SKILLS_NORM:
+                raise ValueError(f"{path.name}: {p['display_name']}: unknown skill {s!r}")
+        p["skills"] = [SKILL_ALIASES_BB2016.get(s, s) for s in segs]
+    if not out["positions"]:
+        raise ValueError(f"{path.name}: no position rows parsed")
+    return out
+
+
+_LRB6_PLURALS = (
+    ("women", "woman"), ("men", "man"), ("ies", "y"), ("ies", "ie"),
+    ("ves", "f"), ("ses", "s"), ("xes", "x"), ("s", ""),
+)
+
+
+def lrb6_singulars(name: str) -> set[str]:
+    """Candidate singulars of a page title.
+
+    The LRB6 pages print positions in the PLURAL ("Linewomen", "Mummies",
+    "Werewolves", "Thro-Ras", "Treemen") while the roster JSONs store them in
+    the SINGULAR, so a matcher without this reports every position as BOTH
+    "missing from JSON" and "not on page".
+
+    Returns a SET rather than one string because "-ies" is ambiguous:
+    "Mummies" -> "Mummy" but "Zombies" -> "Zombie". Guessing one of those
+    produced exactly that phantom missing/orphan pair for undead and
+    necromantic, so both readings are offered and any match is accepted.
+    """
+    out = {name}
+    low = name.lower()
+    for suf, rep in _LRB6_PLURALS:
+        if low.endswith(suf) and len(low) > len(suf):
+            out.add(name[: len(name) - len(suf)] + rep)
+    return out
+
+
+def match_position_id_bb2016(race: str, official_name: str, existing: list) -> str | None:
+    """Pair one page row with a roster position id.
+
+    Tries the page title and its singular against each position's `name` and
+    `display_name`, exact first and then suffix-wise (the JSONs prefix the race
+    for some positions: "Orc Blitzer" vs the page's "Blitzers"). Never
+    consults POSITION_ID_ALIASES -- that table is keyed on BB2025 page names.
+    """
+    cands = {norm(s) for s in lrb6_singulars(official_name)}
+    cands.discard("")
+    for p in existing:
+        for fld in (p.get("display_name") or "", p["name"]):
+            if fld and {norm(s) for s in lrb6_singulars(fld)} & cands:
+                return p["id"]
+    for p in existing:
+        for fld in (p.get("display_name") or "", p["name"]):
+            if not fld:
+                continue
+            for f in {norm(s) for s in lrb6_singulars(fld)}:
+                for t in cands:
+                    if not f or not t:
+                        continue
+                    if (t.endswith(f) or f.endswith(t)) and abs(len(f) - len(t)) <= len(race) + 8:
+                        return p["id"]
+    return None
+
+
+def pair_positions_bb2016(race: str, page: dict, cur: dict):
+    existing = [p for p in cur["positions"]
+                if p.get("type") not in ("Star", "Infamous Staff")]
+    pairs: list[tuple[dict, str | None]] = []
+    used: set[str] = set()
+    for op in page["positions"]:
+        pid = match_position_id_bb2016(
+            race, op["display_name"], [p for p in existing if p["id"] not in used])
+        if pid is None or pid in used:
+            pairs.append((op, None))
+            continue
+        used.add(pid)
+        pairs.append((op, pid))
+    orphans = [p for p in existing if p["id"] not in used]
+    return existing, pairs, orphans
+
+
+def diff_roster_bb2016(race: str, page: dict, cur: dict) -> tuple[list[str], list[str]]:
+    """Reconcile one bb2016 roster JSON against its LRB6/CRP page.
+
+    Returns (real mismatches, notes). ma/st/ag/av are compared BARE with NO
+    conversion; `pa` is not compared at all (LRB6 has no PA); `type`
+    (Regular / Big Guy) has no page-side truth on an LRB6 page and is not
+    compared; `apothecary` is checked against the LRB6 rule, not the page.
+    """
+    real: list[str] = []
+    notes: list[str] = []
+
+    if page["reroll_cost"] != cur.get("reroll_cost"):
+        real.append(f"  reroll_cost: {cur.get('reroll_cost')} -> {page['reroll_cost']}")
+    if page["max_rerolls"] != cur.get("max_rerolls"):
+        real.append(f"  max_rerolls: {cur.get('max_rerolls')} -> {page['max_rerolls']}")
+    want_apo = race not in BB2016_NO_APOTHECARY
+    if bool(cur.get("apothecary")) != want_apo:
+        real.append(f"  apothecary: {cur.get('apothecary')} -> {want_apo} "
+                    f"[LRB6 rule, not page text]")
+
+    existing, pairs, orphans = pair_positions_bb2016(race, page, cur)
+    matched: dict[str, dict] = {}
+    for op, pid in pairs:
+        if pid is None:
+            real.append(f"  + position MISSING from JSON: {op['display_name']!r} "
+                        f"(0-{op['quantity']}, {op['cost'] // 1000}k, "
+                        f"{op['ma']}/{op['st']}/{op['ag']}/{op['av']} bare)")
+        else:
+            matched[pid] = op
+    for p in orphans:
+        real.append(f"  - position NOT ON PAGE: {p['id']} "
+                    f"({(p.get('display_name') or p['name'])!r})")
+
+    for pid, op in matched.items():
+        c = next(p for p in existing if p["id"] == pid)
+        for f in ("quantity", "cost", "ma", "st", "ag", "av"):
+            if c.get(f) != op[f]:
+                real.append(f"  {pid}.{f}: {c.get(f)} -> {op[f]}")
+        cs = sorted(skill_key(s) for s in c.get("skills", []))
+        ps = sorted(skill_key(s) for s in op["skills"])
+        if cs != ps:
+            real.append(f"  {pid}.skills: {[skill_label(s) for s in c.get('skills', [])]} "
+                        f"-> {[skill_label(s) for s in op['skills']]}")
+        else:
+            for a, b in zip(sorted(c.get("skills", []), key=skill_key),
+                            sorted(op["skills"], key=skill_key)):
+                if skill_name(a) != skill_name(b):
+                    notes.append(f"  [cosmetic] {pid}.skills: {skill_name(a)!r} "
+                                 f"spelled {skill_name(b)!r} on the page")
+        cur_cats = c.get("skill_categories") or {}
+        for key, page_val in (("normal", op["normal"]), ("double", op["double"])):
+            if category_set(cur_cats.get(key)) != category_set(page_val):
+                real.append(f"  {pid}.categories.{key}: {cur_cats.get(key)} -> {page_val}")
+        pa = c.get("pa")
+        if pa not in (None, 0):
+            notes.append(f"  [pa] {pid}.pa = {pa}: LRB6 has no PA characteristic "
+                         f"(bb2016 passing is AG-based); inert + parity-neutral, NOT compared")
+    return real, notes
+
+
+def audit_bb2016_reconcile(verbose: bool = False, show_pa: bool = False) -> int:
+    changed = 0
+    clean: list[str] = []
+    for race, slug in sorted(OFFICIAL_BB2016.items()):
+        page_path = TEAMS_DIR_BB2016 / f"{slug}.md"
+        json_path = ROSTERS["bb2016"] / f"roster_{race}.json"
+        if not json_path.exists():
+            print(f"== {race} ({slug}) NO ROSTER JSON")
+            continue
+        page = parse_lrb6_page(page_path)
+        cur = json.loads(json_path.read_text(encoding="utf-8"))
+        real, notes = diff_roster_bb2016(race, page, cur)
+        print(f"== {race} ({slug}) {'MISMATCH' if real else 'MATCHES PAGE'}")
+        if verbose:
+            _, pairs, orphans = pair_positions_bb2016(race, page, cur)
+            for op, pid in pairs:
+                print(f"  [pair] {op['display_name']!r} <- {pid or 'NO MATCH'}")
+            for p in orphans:
+                print(f"  [pair] (no page row) <- {p['id']}")
+        if real:
+            changed += 1
+            print("\n".join(real))
+        else:
+            clean.append(race)
+        for n in notes:
+            if n.lstrip().startswith("[pa]") and not show_pa:
+                continue
+            print(n)
+    pages = {p.stem for p in TEAMS_DIR_BB2016.glob("*.md")}
+    unmapped = sorted(pages - set(OFFICIAL_BB2016.values()))
+    rosters = {p.stem.replace("roster_", "") for p in ROSTERS["bb2016"].glob("roster_*.json")}
+    print(f"\n{len(OFFICIAL_BB2016)} LRB6 teams mapped; "
+          f"{len(clean)} match their page, {changed} differ")
+    if clean:
+        print(f"clean: {', '.join(sorted(clean))}")
+    if unmapped:
+        print(f"LRB6 pages with NO roster: {', '.join(unmapped)}")
+    nopage = sorted(rosters - set(OFFICIAL_BB2016))
+    for r in nopage:
+        print(f"no LRB6 page (not reconciled): {r} -- {BB2016_NO_PAGE.get(r, 'unmapped')}")
+    return changed
+
+
+def selftest_bb2016() -> int:
+    """Validate the bb2016 checker on known-good and known-bad inputs.
+
+    Two ad-hoc validators earlier in this campaign produced false alarms (73
+    "illegal" squads, 81 "parity reds") and BOTH were tool bugs, so this
+    checker is not believed until it passes:
+
+      parser     : every page parses, and the parsed BARE stats of three
+                   hand-read rows must equal what the page prints.
+      no-conversion: the parsed page stats must equal the roster JSON's stats
+                   for a hand-verified team -- proving the comparison is
+                   bare-vs-bare and that a roll-target conversion is NOT
+                   happening (that conversion is the corruption hazard).
+      known-good : `human` must produce zero real mismatches, AND all page
+                   rows must pair 1:1 with distinct JSON positions (a matcher
+                   that pairs nothing would also report "clean").
+      known-bad  : `dwarf`'s reroll_cost really is 40k against the page's 50k.
+      mutations  : each field the checker claims to cover is perturbed IN
+                   MEMORY on the known-good pair and must be caught.
+      cosmetics  : case/punctuation/order-only perturbations, and any `pa`
+                   value, must NOT be reported as mismatches.
+    """
+    fails = 0
+
+    def check(label: str, ok: bool) -> None:
+        nonlocal fails
+        print(f"  {'PASS' if ok else 'FAIL'}  {label}")
+        if not ok:
+            fails += 1
+
+    print("parser (all LRB6 pages):")
+    parsed = {}
+    for race, slug in sorted(OFFICIAL_BB2016.items()):
+        try:
+            parsed[race] = parse_lrb6_page(TEAMS_DIR_BB2016 / f"{slug}.md")
+        except Exception as exc:  # noqa: BLE001
+            check(f"{race} parses", False)
+            print(f"        {exc}")
+    check(f"all {len(OFFICIAL_BB2016)} pages parsed", len(parsed) == len(OFFICIAL_BB2016))
+
+    # hand-read rows, transcribed from the pages by eye
+    expect = {
+        ("wood_elf", "Linemen"): dict(quantity=16, cost=70000, ma=7, st=3, ag=4, av=7,
+                                      skills=[]),
+        ("halfling", "Treemen"): dict(quantity=2, cost=120000, ma=2, st=6, ag=1, av=10,
+                                      skills=["Mighty Blow", "Stand Firm", "Strong Arm",
+                                              "Take Root", "Thick Skull", "Throw Team-Mate"]),
+        ("chaos_dwarf", "Chaos Dwarf Blockers"): dict(quantity=6, cost=70000, ma=4, st=3,
+                                                      ag=2, av=9,
+                                                      skills=["Block", "Tackle", "Thick Skull"]),
+        ("underworld", "Warpstone Troll"): dict(quantity=1, cost=110000, ma=4, st=5, ag=1,
+                                                av=9,
+                                                skills=["Loner", "Always Hungry",
+                                                        "Mighty Blow", "Really Stupid",
+                                                        "Regeneration", "Throw Team-mate"]),
+    }
+    print("parser (hand-read rows must come back verbatim):")
+    for (race, title), want in expect.items():
+        row = next((p for p in parsed.get(race, {}).get("positions", [])
+                    if p["display_name"] == title), None)
+        check(f"{race}: row {title!r} found", row is not None)
+        if not row:
+            continue
+        for f, v in want.items():
+            got = row[f]
+            if f == "skills":
+                ok = [norm(s) for s in got] == [norm(s) for s in v]
+            else:
+                ok = got == v
+            check(f"{race}.{title}.{f} == {v!r}", ok)
+            if not ok:
+                print(f"        got {got!r}")
+
+    print("no roll-target conversion (bare page stats == bare JSON stats):")
+    for race in ("wood_elf", "ogre", "dwarf", "vampire"):
+        cur = json.loads((ROSTERS["bb2016"] / f"roster_{race}.json").read_text(encoding="utf-8"))
+        _, pairs, _ = pair_positions_bb2016(race, parsed[race], cur)
+        same = 0
+        for op, pid in pairs:
+            if pid is None:
+                continue
+            c = next(p for p in cur["positions"] if p["id"] == pid)
+            if (c["ma"], c["st"], c["ag"], c["av"]) == (op["ma"], op["st"], op["ag"], op["av"]):
+                same += 1
+        check(f"{race}: {same}/{len(pairs)} paired rows have identical bare ma/st/ag/av",
+              same == len(pairs))
+    # and the negative: if the checker DID convert, ag would differ by 7-x
+    cur = json.loads((ROSTERS["bb2016"] / "roster_wood_elf.json").read_text(encoding="utf-8"))
+    m = json.loads(json.dumps(cur))
+    for p in m["positions"]:
+        p["ag"] = 7 - p["ag"]           # the roll-target encoding
+    real, _ = diff_roster_bb2016("wood_elf", parsed["wood_elf"], m)
+    check("roll-target-encoded ag WOULD be flagged", any(".ag:" in x for x in real))
+
+    # A matcher that fails to pair is THE false-alarm generator here: it emits
+    # a phantom "position MISSING from JSON" + "position NOT ON PAGE" pair that
+    # reads exactly like a data error. Require every page row on every team to
+    # pair with a distinct JSON position; unpaired JSON positions are listed so
+    # a genuine extra (underworld's FUMBBL-only Rat Ogre) stays visible.
+    print("pairing (every page row on every team must pair, plural titles included):")
+    for race in sorted(OFFICIAL_BB2016):
+        rcur = json.loads((ROSTERS["bb2016"] / f"roster_{race}.json").read_text(encoding="utf-8"))
+        _, pairs, orphans = pair_positions_bb2016(race, parsed[race], rcur)
+        unpaired = [op["display_name"] for op, pid in pairs if pid is None]
+        ok = not unpaired and len({pid for _, pid in pairs}) == len(pairs)
+        check(f"{race}: {len(pairs)} rows paired 1:1", ok)
+        if unpaired:
+            print(f"        unpaired page rows: {unpaired}")
+        if orphans:
+            print(f"        (JSON positions with no page row: "
+                  f"{[p['id'] for p in orphans]})")
+
+    print("page-spelling aliases must not masquerade as data errors:")
+    for race, frag in (("necromantic", "Claw"), ("goblin", "Ball")):
+        rcur = json.loads((ROSTERS["bb2016"] / f"roster_{race}.json").read_text(encoding="utf-8"))
+        rreal, _ = diff_roster_bb2016(race, parsed[race], rcur)
+        check(f"{race}: no .skills mismatch mentioning {frag!r}",
+              not any(".skills" in m and frag in m for m in rreal))
+
+    print("known-good (human):")
+    page, cur = parsed["human"], json.loads(
+        (ROSTERS["bb2016"] / "roster_human.json").read_text(encoding="utf-8"))
+    real, _ = diff_roster_bb2016("human", page, cur)
+    check("no real mismatches", real == [])
+    if real:
+        print("        " + "\n        ".join(real))
+    existing, pairs, orphans = pair_positions_bb2016("human", page, cur)
+    check(f"all {len(pairs)} page rows paired", all(pid for _, pid in pairs))
+    check("no unmatched JSON positions", orphans == [])
+    check("pairing is 1:1", len({pid for _, pid in pairs}) == len(pairs) == len(existing))
+
+    print("known-bad (dwarf reroll_cost 40k vs page 50k):")
+    dcur = json.loads((ROSTERS["bb2016"] / "roster_dwarf.json").read_text(encoding="utf-8"))
+    dreal, _ = diff_roster_bb2016("dwarf", parsed["dwarf"], dcur)
+    check("reroll_cost reported", any("reroll_cost" in m for m in dreal))
+    check("40000 -> 50000 stated", any("40000 -> 50000" in m for m in dreal))
+
+    print("known-bad (mutated copies of the known-good pair):")
+    muts = [
+        ("ma", lambda p: p.update(ma=p["ma"] + 1), ".ma"),
+        ("st", lambda p: p.update(st=p["st"] + 1), ".st"),
+        ("ag", lambda p: p.update(ag=p["ag"] + 1), ".ag"),
+        ("av", lambda p: p.update(av=p["av"] + 1), ".av"),
+        ("cost", lambda p: p.update(cost=p["cost"] + 10000), ".cost"),
+        ("quantity", lambda p: p.update(quantity=p["quantity"] - 1), ".quantity"),
+        ("skill dropped", lambda p: p.update(skills=p["skills"][1:]), ".skills"),
+        ("skill added", lambda p: p.update(skills=p["skills"] + ["Frenzy"]), ".skills"),
+        # append a category the target does NOT already have -- appending
+        # "Strength" to a Blitzer's ["General", "Strength"] is a set no-op and
+        # the test would measure nothing.
+        ("category added",
+         lambda p: p["skill_categories"]["normal"].append(
+             next(c for c in ("Mutation", "Passing", "Agility", "Strength")
+                  if c not in p["skill_categories"]["normal"])), ".categories"),
+        ("category removed",
+         lambda p: p["skill_categories"].__setitem__("double", []), ".categories"),
+    ]
+    for label, mutate, expect_frag in muts:
+        m = json.loads(json.dumps(cur))
+        target = next(p for p in m["positions"]
+                      if p.get("type") not in ("Star", "Infamous Staff") and p.get("skills"))
+        mutate(target)
+        real, _ = diff_roster_bb2016("human", page, m)
+        check(f"{label} -> {expect_frag}", any(expect_frag in x for x in real))
+
+    m = json.loads(json.dumps(cur))
+    dropped = m["positions"][0]
+    m["positions"] = m["positions"][1:]
+    real, _ = diff_roster_bb2016("human", page, m)
+    check("position deleted -> MISSING from JSON", any("MISSING from JSON" in x for x in real))
+    m = json.loads(json.dumps(cur))
+    m["positions"].append(dict(dropped, id="human.invented", name="Invented Guy",
+                               display_name="Invented Guy"))
+    real, _ = diff_roster_bb2016("human", page, m)
+    check("position invented -> NOT ON PAGE", any("NOT ON PAGE" in x for x in real))
+    m = json.loads(json.dumps(cur))
+    m["max_rerolls"] = 6
+    real, _ = diff_roster_bb2016("human", page, m)
+    check("max_rerolls mutated -> reported", any("max_rerolls" in x for x in real))
+    m = json.loads(json.dumps(cur))
+    m["apothecary"] = False
+    real, _ = diff_roster_bb2016("human", page, m)
+    check("apothecary mutated -> reported", any("apothecary" in x for x in real))
+
+    print("cosmetic-only perturbations must NOT be reported:")
+    m = json.loads(json.dumps(cur))
+    for p in m["positions"]:
+        p["skills"] = [skill_name(s).lower().replace("-", " ") for s in p.get("skills", [])]
+    real, notes = diff_roster_bb2016("human", page, m)
+    check("skill names lower-cased / de-hyphenated", real == [])
+    check("... and reported as cosmetic", any("[cosmetic]" in n for n in notes))
+    m = json.loads(json.dumps(cur))
+    for p in m["positions"]:
+        sc = p.get("skill_categories") or {}
+        for k in sc:
+            sc[k] = list(reversed(sc[k]))
+    real, _ = diff_roster_bb2016("human", page, m)
+    check("categories reordered", real == [])
+    m = json.loads(json.dumps(cur))
+    for p in m["positions"]:
+        p["pa"] = 99
+    real, _ = diff_roster_bb2016("human", page, m)
+    check("pa rewritten to 99 -> NOT a mismatch", real == [])
+
+    print(f"\nselftest: {'ALL PASS' if not fails else str(fails) + ' FAILURES'}")
+    return fails
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--edition", choices=["bb2016", "bb2020", "bb2025"], required=True)
@@ -933,14 +1595,21 @@ def main() -> int:
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--tables", action="store_true")
     ap.add_argument("--verbose", action="store_true",
-                    help="bb2020: also print the page-row -> JSON-position pairing")
+                    help="bb2016/bb2020: also print the page-row -> JSON-position pairing")
     ap.add_argument("--selftest", action="store_true",
-                    help="bb2020: validate the checker on known-good/known-bad inputs")
+                    help="bb2016/bb2020: validate the checker on known-good/known-bad inputs")
+    ap.add_argument("--cleanup", action="store_true",
+                    help="bb2016: the legacy BB2020-contamination cleanup (negative check); "
+                         "the default --report is the positive LRB6 reconciliation")
+    ap.add_argument("--show-pa", action="store_true",
+                    help="bb2016: also print the per-position [pa] notes (LRB6 has no PA)")
     args = ap.parse_args()
     if args.selftest:
-        if args.edition != "bb2020":
-            ap.error("--selftest only supports bb2020")
-        return 1 if selftest_bb2020() else 0
+        if args.edition == "bb2020":
+            return 1 if selftest_bb2020() else 0
+        if args.edition == "bb2016":
+            return 1 if selftest_bb2016() else 0
+        ap.error("--selftest supports bb2016 and bb2020")
     if args.tables:
         if args.edition != "bb2016":
             ap.error("--tables only supports bb2016")
@@ -950,8 +1619,14 @@ def main() -> int:
         audit_bb2025(args.apply)
     elif args.edition == "bb2020":
         audit_bb2020(args.apply, args.verbose)
-    else:
+    elif args.cleanup:
         audit_bb2016(args.apply)
+    else:
+        if args.apply:
+            ap.error("bb2016 reconciliation is report-only: the LRB6 pages are PDF text "
+                     "extractions and several rows need reviewed fixups, so mismatches are "
+                     "resolved by hand. Use --cleanup --apply for the legacy cleanup.")
+        audit_bb2016_reconcile(args.verbose, args.show_pa)
     return 0
 
 
