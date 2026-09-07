@@ -197,3 +197,52 @@ rosters.
 AG-based), yet the bb2016 JSONs carry e.g. `pa: 5`. Establish what that field means for bb2016
 (schema filler? derived?) and whether it should be excluded from the reconciliation, rather than
 "fixing" it against a page that never prints it.
+
+## 10. R5 — one roster per ruleset, never shared
+
+**Requirement: every (team, ruleset) pair gets its OWN roster, authored from that ruleset's own
+source. A roster is never reused across rulesets, even when the team name is identical.**
+
+Rationale: roster rules change between rulesets — positionals, stats, costs, quantities and skills
+all move, and the characteristic CONVENTION itself changes (§9). A shared roster is therefore wrong
+in at least one ruleset by construction. And it is invisible to parity: both engines read the same
+generated data, so a roster that belongs to another ruleset produces perfect engine agreement on a
+wrong input. `data/rosters/<ed>/` already provides the structure; R5 says the CONTENT must be
+independently derived too.
+
+### Measured violations (2026-09-07)
+
+**R5a — 4 races reuse a roster across rulesets** (byte-identical position/stat/cost/skill content,
+i.e. not authored per ruleset):
+
+| race | shared across |
+|---|---|
+| `dark_elf_league_fumbbl` | bb2016 == bb2020 == bb2025 |
+| `khemri_fumbbl` | bb2016 == bb2020 == bb2025 |
+| `nippon` | bb2020 == bb2025 |
+| `slann` | bb2020 == bb2025 |
+
+**R5b — ALL 29 bb2016 rosters carry a PA value, and LRB6 has no PA characteristic.**
+In the old rules **AG is the passing stat**, which is exactly why no PA is printed. The engine
+already encodes this: `bb2016/PassMechanic` has no PA conjunct ("LRB6 passing is AG-based, the stat
+may be 0 for everyone"). So every `pa` in a bb2016 roster is a BB2020+ artefact — the precise
+contamination the page header warns about, which the existing bb2016 *cleanup* mode does not strip.
+Values range 2-6, and `khemri_fumbbl` / `slann_fumbbl` carry `pa: -1` sentinels.
+
+This makes the bb2016 provenance 🔴 substantively true, not merely procedural: 29 of 29 rosters
+contain a field their ruleset does not define.
+
+### Latent hazard this creates
+A bb2016 `pa` is inert ONLY IF every read of it is edition-gated. This campaign has repeatedly
+found shared steps reading the wrong edition's field (the BB2025-hardcoded serious-injury helper
+that blinded every bb2020 game; `StepFallDown`'s Safe Pair of Hands argument; the BB2025-only
+Diving-Tackle re-roll running under bb2020). An ungated `passing_with_modifiers()` read in shared
+code would make bb2016 behave as though PA existed — and both engines would agree on it. The audit
+should therefore report bb2016 PA as contamination to REMOVE, not as a value to reconcile.
+
+### Work implied
+1. Strip `pa` from all 29 bb2016 rosters (or set it null) and grep for ungated reads.
+2. Re-author the 4 shared rosters per ruleset, or delete the ones whose team is not official in that
+   ruleset (`nippon` is official in none; `slann` and `chaos_pact` are official in bb2016 only).
+3. Extend `validate_teams.py` with an R5 check: fail if two rulesets' rosters for one team are
+   byte-identical, and fail if a bb2016 roster carries PA.
