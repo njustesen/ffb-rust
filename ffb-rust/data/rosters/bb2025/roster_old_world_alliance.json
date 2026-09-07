@@ -1,0 +1,369 @@
+{
+  "id": "oldworldalliance.lrb6",
+  "name": "Old World Alliance",
+  "reroll_cost": 70000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "oldworldalliance.human_lineman",
+      "name": "Human Lineman",
+      "display_name": "Human Lineman",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 50000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 9,
+      "skills": [],
+      "skill_categories": {
+        "normal": [
+          "General"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Lineman",
+        "Human"
+      ]
+    },
+    {
+      "id": "oldworldalliance.halfling_hopeful",
+      "name": "Halfling Hopeful",
+      "display_name": "Halfling Hopeful",
+      "type": "Regular",
+      "quantity": 3,
+      "cost": 30000,
+      "ma": 5,
+      "st": 2,
+      "ag": 3,
+      "pa": 4,
+      "av": 7,
+      "skills": [
+        "Dodge",
+        "Right Stuff",
+        "Stunty"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility"
+        ],
+        "double": [
+          "General",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Lineman",
+        "Halfling"
+      ]
+    },
+    {
+      "id": "oldworldalliance.human_catcher",
+      "name": "Human Catcher",
+      "display_name": "Human Catcher",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 75000,
+      "ma": 8,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "skills": [
+        "Catch",
+        "Dodge"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General"
+        ],
+        "double": [
+          "Passing",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Catcher",
+        "Human"
+      ]
+    },
+    {
+      "id": "oldworldalliance.dwarf_lineman",
+      "name": "Dwarf Lineman",
+      "display_name": "Dwarf Lineman",
+      "type": "Regular",
+      "quantity": 3,
+      "cost": 70000,
+      "ma": 4,
+      "st": 3,
+      "ag": 4,
+      "pa": 5,
+      "av": 10,
+      "skills": [
+        "Block",
+        "Defensive",
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Devious",
+          "General"
+        ],
+        "double": [
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Lineman",
+        "Dwarf"
+      ]
+    },
+    {
+      "id": "oldworldalliance.human_thrower",
+      "name": "Human Thrower",
+      "display_name": "Human Thrower",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 75000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 3,
+      "av": 9,
+      "skills": [
+        "Pass",
+        "Sure Hands"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Passing"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Thrower",
+        "Human"
+      ]
+    },
+    {
+      "id": "oldworldalliance.dwarf_runner",
+      "name": "Dwarf Runner",
+      "display_name": "Dwarf Runner",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 80000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 9,
+      "skills": [
+        "Sprint",
+        "Sure Hands",
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Passing"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Runner",
+        "Dwarf"
+      ]
+    },
+    {
+      "id": "oldworldalliance.human_blitzer",
+      "name": "Human Blitzer",
+      "display_name": "Human Blitzer",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 85000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 9,
+      "skills": [
+        "Block",
+        "Tackle"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility"
+        ]
+      },
+      "keywords": [
+        "Blitzer",
+        "Human"
+      ]
+    },
+    {
+      "id": "oldworldalliance.dwarf_blitzer",
+      "name": "Dwarf Blitzer",
+      "display_name": "Dwarf Blitzer",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 100000,
+      "ma": 5,
+      "st": 3,
+      "ag": 4,
+      "pa": 4,
+      "av": 10,
+      "skills": [
+        "Block",
+        "Diving Tackle",
+        "Tackle",
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Passing"
+        ]
+      },
+      "keywords": [
+        "Blitzer",
+        "Dwarf"
+      ]
+    },
+    {
+      "id": "oldworldalliance.trollslayer",
+      "name": "Troll Slayer",
+      "display_name": "Troll Slayer",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 95000,
+      "ma": 5,
+      "st": 3,
+      "ag": 4,
+      "pa": 5,
+      "av": 9,
+      "skills": [
+        "Block",
+        "Dauntless",
+        "Frenzy",
+        {
+          "name": "Hatred",
+          "value": "troll"
+        },
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility"
+        ]
+      },
+      "keywords": [
+        "Special",
+        "Dwarf"
+      ]
+    },
+    {
+      "id": "oldworldalliance.ogre",
+      "name": "Ogre",
+      "display_name": "Ogre",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 140000,
+      "ma": 5,
+      "st": 5,
+      "ag": 4,
+      "pa": 5,
+      "av": 10,
+      "skills": [
+        "Bone Head",
+        {
+          "name": "Loner",
+          "value": 3
+        },
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-mate"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General"
+        ]
+      },
+      "keywords": [
+        "Big Guy",
+        "Ogre"
+      ]
+    },
+    {
+      "id": "oldworldalliance.altern_forest_treeman",
+      "name": "Altern Forest Treeman",
+      "display_name": "Altern Forest Treeman",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 120000,
+      "ma": 2,
+      "st": 6,
+      "ag": 5,
+      "pa": 5,
+      "av": 11,
+      "skills": [
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Mighty Blow",
+        "Stand Firm",
+        "Strong Arm",
+        "Take Root",
+        "Thick Skull",
+        "Throw Team-mate",
+        "Timmm-ber!"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General",
+          "Passing"
+        ]
+      },
+      "keywords": [
+        "Big Guy",
+        "Treeman"
+      ]
+    }
+  ],
+  "special_rules": []
+}

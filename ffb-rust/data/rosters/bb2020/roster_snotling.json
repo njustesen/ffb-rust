@@ -1,0 +1,206 @@
+{
+  "id": "snotling.lrb6",
+  "name": "Snotling",
+  "reroll_cost": 60000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "snotling.snotling_lineman",
+      "name": "Snotling Lineman",
+      "display_name": "Snotling Lineman",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 15000,
+      "ma": 5,
+      "st": 1,
+      "ag": 3,
+      "pa": 5,
+      "av": 6,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Agility"
+        ],
+        "double": [
+          "General"
+        ]
+      },
+      "skills": [
+        "Dodge",
+        "Right Stuff",
+        "Side Step",
+        "Stunty",
+        "Swarming",
+        "Titchy"
+      ]
+    },
+    {
+      "id": "snotling.fungus_flinga",
+      "name": "Fungus Flinga",
+      "display_name": "Fungus Flinga",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 30000,
+      "ma": 5,
+      "st": 1,
+      "ag": 3,
+      "pa": 4,
+      "av": 6,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "Passing"
+        ],
+        "double": [
+          "General"
+        ]
+      },
+      "skills": [
+        "Bombardier",
+        "Dodge",
+        "Right Stuff",
+        "Secret Weapon",
+        "Side Step",
+        "Stunty"
+      ]
+    },
+    {
+      "id": "snotling.fun_hoppa",
+      "name": "Fun-Hoppa",
+      "display_name": "Fun-Hoppa",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 20000,
+      "ma": 6,
+      "st": 1,
+      "ag": 3,
+      "pa": 5,
+      "av": 6,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Agility"
+        ],
+        "double": [
+          "General"
+        ]
+      },
+      "skills": [
+        "Dodge",
+        "Pogo Stick",
+        "Right Stuff",
+        "Side Step",
+        "Stunty"
+      ]
+    },
+    {
+      "id": "snotling.stilty_runna",
+      "name": "Stilty Runna",
+      "display_name": "Stilty Runna",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 20000,
+      "ma": 6,
+      "st": 1,
+      "ag": 3,
+      "pa": 5,
+      "av": 6,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Agility"
+        ],
+        "double": [
+          "General"
+        ]
+      },
+      "skills": [
+        "Dodge",
+        "Right Stuff",
+        "Side Step",
+        "Sprint",
+        "Stunty"
+      ]
+    },
+    {
+      "id": "snotling.pump_wagon",
+      "name": "Pump Wagon",
+      "display_name": "Pump Wagon",
+      "type": "Big Guy",
+      "quantity": 2,
+      "cost": 105000,
+      "ma": 4,
+      "st": 5,
+      "ag": 5,
+      "pa": 0,
+      "av": 9,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General"
+        ]
+      },
+      "skills": [
+        {
+          "name": "Dirty Player",
+          "value": 1
+        },
+        "Juggernaut",
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Really Stupid",
+        "Secret Weapon",
+        "Stand Firm"
+      ]
+    },
+    {
+      "id": "snotling.trained_troll",
+      "name": "Trained Troll",
+      "display_name": "Trained Troll",
+      "type": "Big Guy",
+      "quantity": 2,
+      "cost": 115000,
+      "ma": 4,
+      "st": 5,
+      "ag": 5,
+      "pa": 5,
+      "av": 10,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General",
+          "Passing"
+        ]
+      },
+      "skills": [
+        "Always Hungry",
+        {
+          "name": "Loner",
+          "value": 3
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Projectile Vomit",
+        "Really Stupid",
+        "Regeneration",
+        "Throw Team-mate"
+      ]
+    }
+  ]
+}

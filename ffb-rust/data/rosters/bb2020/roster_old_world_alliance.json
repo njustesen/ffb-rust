@@ -1,0 +1,364 @@
+{
+  "id": "oldworldalliance.lrb6",
+  "name": "Old World Alliance",
+  "reroll_cost": 70000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "oldworldalliance.human_lineman",
+      "name": "Old World Human Lineman",
+      "display_name": "Old World Human Lineman",
+      "type": "Regular",
+      "quantity": 12,
+      "cost": 50000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 9,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "General"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      },
+      "skills": []
+    },
+    {
+      "id": "oldworldalliance.human_thrower",
+      "name": "Old World Human Thrower",
+      "display_name": "Old World Human Thrower",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 80000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 3,
+      "av": 9,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Passing"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      },
+      "skills": [
+        {
+          "name": "Animosity",
+          "value": "oldworldalliance.dwarf_blitzer;oldworldalliance.dwarf_blocker;oldworldalliance.dwarf_runner;oldworldalliance.trollslayer;oldworldalliance.halfling_hopeful"
+        },
+        "Pass",
+        "Sure Hands"
+      ]
+    },
+    {
+      "id": "oldworldalliance.human_catcher",
+      "name": "Old World Human Catcher",
+      "display_name": "Old World Human Catcher",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 65000,
+      "ma": 8,
+      "st": 2,
+      "ag": 3,
+      "pa": 5,
+      "av": 8,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General"
+        ],
+        "double": [
+          "Strength"
+        ]
+      },
+      "skills": [
+        {
+          "name": "Animosity",
+          "value": "oldworldalliance.dwarf_blitzer;oldworldalliance.dwarf_blocker;oldworldalliance.dwarf_runner;oldworldalliance.trollslayer;oldworldalliance.halfling_hopeful"
+        },
+        "Catch",
+        "Dodge"
+      ]
+    },
+    {
+      "id": "oldworldalliance.dwarf_blitzer",
+      "name": "Old World Dwarf Blitzer",
+      "display_name": "Old World Dwarf Blitzer",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 80000,
+      "ma": 5,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 10,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility"
+        ]
+      },
+      "skills": [
+        "Block",
+        {
+          "name": "Loner",
+          "value": 3
+        },
+        "Thick Skull"
+      ]
+    },
+    {
+      "id": "oldworldalliance.dwarf_blocker",
+      "name": "Old World Dwarf Blocker",
+      "display_name": "Old World Dwarf Blocker",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 75000,
+      "ma": 4,
+      "st": 3,
+      "ag": 4,
+      "pa": 5,
+      "av": 10,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility"
+        ]
+      },
+      "skills": [
+        "Arm Bar",
+        "Brawler",
+        {
+          "name": "Loner",
+          "value": 3
+        },
+        "Thick Skull"
+      ]
+    },
+    {
+      "id": "oldworldalliance.dwarf_runner",
+      "name": "Old World Dwarf Runner",
+      "display_name": "Old World Dwarf Runner",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 85000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 9,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Passing"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      },
+      "skills": [
+        {
+          "name": "Loner",
+          "value": 3
+        },
+        "Sure Hands",
+        "Thick Skull"
+      ]
+    },
+    {
+      "id": "oldworldalliance.human_blitzer",
+      "name": "Old World Human Blitzer",
+      "display_name": "Old World Human Blitzer",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 90000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 9,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility"
+        ]
+      },
+      "skills": [
+        {
+          "name": "Animosity",
+          "value": "oldworldalliance.dwarf_blitzer;oldworldalliance.dwarf_blocker;oldworldalliance.dwarf_runner;oldworldalliance.trollslayer;oldworldalliance.halfling_hopeful"
+        },
+        "Block"
+      ]
+    },
+    {
+      "id": "oldworldalliance.trollslayer",
+      "name": "Old World Dwarf Troll Slayer",
+      "display_name": "Old World Dwarf Troll Slayer",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 95000,
+      "ma": 5,
+      "st": 3,
+      "ag": 4,
+      "pa": 0,
+      "av": 9,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility"
+        ]
+      },
+      "skills": [
+        "Block",
+        "Dauntless",
+        "Frenzy",
+        {
+          "name": "Loner",
+          "value": 3
+        },
+        "Thick Skull"
+      ]
+    },
+    {
+      "id": "oldworldalliance.halfling_hopeful",
+      "name": "Old World Halfling Hopefuls",
+      "display_name": "Old World Halfling Hopefuls",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 30000,
+      "ma": 5,
+      "st": 2,
+      "ag": 3,
+      "pa": 4,
+      "av": 7,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Agility"
+        ],
+        "double": [
+          "General",
+          "Strength"
+        ]
+      },
+      "skills": [
+        {
+          "name": "Animosity",
+          "value": "oldworldalliance.human_lineman;oldworldalliance.human_thrower;oldworldalliance.human_catcher;oldworldalliance.human_blitzer;oldworldalliance.dwarf_blitzer;oldworldalliance.dwarf_blocker;oldworldalliance.dwarf_runner;oldworldalliance.trollslayer"
+        },
+        "Dodge",
+        "Right Stuff",
+        "Stunty"
+      ]
+    },
+    {
+      "id": "oldworldalliance.ogre",
+      "name": "Ogre",
+      "display_name": "Ogre",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 140000,
+      "ma": 5,
+      "st": 5,
+      "ag": 4,
+      "pa": 5,
+      "av": 10,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General"
+        ]
+      },
+      "skills": [
+        "Bone Head",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Thick Skull",
+        "Throw Team-mate"
+      ]
+    },
+    {
+      "id": "oldworldalliance.altern_forest_treeman",
+      "name": "Altern Forest Treeman",
+      "display_name": "Altern Forest Treeman",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 120000,
+      "ma": 2,
+      "st": 6,
+      "ag": 5,
+      "pa": 5,
+      "av": 11,
+      "shorthand": "",
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General",
+          "Passing"
+        ]
+      },
+      "skills": [
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Stand Firm",
+        "Strong Arm",
+        "Take Root",
+        "Thick Skull",
+        "Throw Team-mate",
+        "Timmm-ber!"
+      ]
+    }
+  ]
+}

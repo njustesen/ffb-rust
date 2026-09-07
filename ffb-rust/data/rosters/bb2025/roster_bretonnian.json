@@ -1,0 +1,135 @@
+{
+  "id": "bretonnian.lrb6",
+  "name": "Bretonnian",
+  "reroll_cost": 60000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "bretonnian.squire",
+      "name": "Bretonnian Squire",
+      "display_name": "Bretonnian Squire",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 50000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "skills": [
+        "Wrestle"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Lineman",
+        "Human"
+      ]
+    },
+    {
+      "id": "bretonnian.knight_catcher",
+      "name": "Bretonnian Knight Catcher",
+      "display_name": "Bretonnian Knight Catcher",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 85000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 9,
+      "skills": [
+        "Catch",
+        "Dauntless",
+        "Nerves of Steel"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General"
+        ],
+        "double": [
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Catcher",
+        "Human"
+      ]
+    },
+    {
+      "id": "bretonnian.knight_thrower",
+      "name": "Bretonnian Knight Thrower",
+      "display_name": "Bretonnian Knight Thrower",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 80000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 3,
+      "av": 9,
+      "skills": [
+        "Dauntless",
+        "Nerves of Steel",
+        "Pass"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Passing"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      },
+      "keywords": [
+        "Thrower",
+        "Human"
+      ]
+    },
+    {
+      "id": "bretonnian.grail_knight",
+      "name": "Grail Knight",
+      "display_name": "Grail Knight",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 95000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 10,
+      "skills": [
+        "Block",
+        "Dauntless",
+        "Steady Footing"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility"
+        ]
+      },
+      "keywords": [
+        "Blitzer",
+        "Human"
+      ]
+    }
+  ],
+  "special_rules": []
+}

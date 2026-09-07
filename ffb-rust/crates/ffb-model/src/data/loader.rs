@@ -58,11 +58,13 @@ pub static BB2020_ROSTERS_JSON: Lazy<Vec<&'static str>> = Lazy::new(|| {
         include_roster!("bb2020", "norse"),
         include_roster!("bb2020", "nurgle"),
         include_roster!("bb2020", "ogre"),
+        include_roster!("bb2020", "old_world_alliance"),
         include_roster!("bb2020", "orc"),
         include_roster!("bb2020", "renegades"),
         include_roster!("bb2020", "skaven"),
         include_roster!("bb2020", "slann"),
         include_roster!("bb2020", "slann_fumbbl"),
+        include_roster!("bb2020", "snotling"),
         include_roster!("bb2020", "undead"),
         include_roster!("bb2020", "underworld"),
         include_roster!("bb2020", "vampire"),
@@ -108,6 +110,7 @@ pub static BB2025_ROSTERS_JSON: Lazy<Vec<&'static str>> = Lazy::new(|| {
     vec![
         include_roster!("bb2025", "amazon"),
         include_roster!("bb2025", "black_orc"),
+        include_roster!("bb2025", "bretonnian"),
         include_roster!("bb2025", "chaos"),
         include_roster!("bb2025", "chaos_dwarf"),
         include_roster!("bb2025", "chaos_pact"),
@@ -130,11 +133,13 @@ pub static BB2025_ROSTERS_JSON: Lazy<Vec<&'static str>> = Lazy::new(|| {
         include_roster!("bb2025", "norse"),
         include_roster!("bb2025", "nurgle"),
         include_roster!("bb2025", "ogre"),
+        include_roster!("bb2025", "old_world_alliance"),
         include_roster!("bb2025", "orc"),
         include_roster!("bb2025", "renegades"),
         include_roster!("bb2025", "skaven"),
         include_roster!("bb2025", "slann"),
         include_roster!("bb2025", "slann_fumbbl"),
+        include_roster!("bb2025", "snotling"),
         include_roster!("bb2025", "undead"),
         include_roster!("bb2025", "underworld"),
         include_roster!("bb2025", "vampire"),
@@ -388,7 +393,7 @@ mod tests {
     #[test]
     fn bb2020_rosters_load() {
         let rosters = bb2020_rosters();
-        assert_eq!(rosters.len(), 33, "expected 33 BB2020 rosters");
+        assert_eq!(rosters.len(), 35, "expected 35 BB2020 rosters");
         let human = rosters.iter().find(|r| r.name == "Human").unwrap();
         assert!(human.reroll_cost > 0);
         assert!(!human.positions.is_empty());
@@ -598,11 +603,92 @@ mod tests {
     #[test]
     fn bb2025_rosters_load_all() {
         let rosters = bb2025_rosters();
-        assert_eq!(rosters.len(), 33, "expected 33 BB2025 rosters");
+        assert_eq!(rosters.len(), 36, "expected 36 BB2025 rosters");
         // Every roster must have a positive reroll cost.
         for r in &rosters {
             assert!(r.reroll_cost > 0, "roster '{}' has zero reroll cost", r.name);
         }
+    }
+
+    /// Provenance guard for the three rosters authored 2026-09-07 from the official pages
+    /// (docs/PARITY_COVERAGE_REQUIREMENTS.md §5). Each assertion is a stat/skill FINGERPRINT that
+    /// only the real roster can produce, so a silently-empty or lineman-fallback roster fails here
+    /// instead of producing a vacuously green parity gate.
+    #[test]
+    fn newly_authored_rosters_carry_their_official_stat_lines() {
+        fn pos<'a>(r: &'a RosterJson, id: &str) -> &'a crate::data::roster_json::PositionJson {
+            r.positions.iter().find(|p| p.id == id)
+                .unwrap_or_else(|| panic!("{} has no position {id}", r.name))
+        }
+        fn skills(p: &crate::data::roster_json::PositionJson, rules: Rules) -> Vec<SkillId> {
+            position_json_to_roster_position(p, "x", false, rules)
+                .skills.iter().map(|s| s.skill_id).collect()
+        }
+        fn roster<'a>(rs: &'a [RosterJson], name: &str) -> &'a RosterJson {
+            rs.iter().find(|r| r.name == name).unwrap_or_else(|| panic!("no roster {name}"))
+        }
+
+        let r25 = bb2025_rosters();
+        let r20 = bb2020_rosters();
+
+        // -- Old World Alliance: the Altern Forest Treeman is ST 6 / AV 11 / MA 2 with Take Root,
+        //    and the bb2025 Dwarf Blitzer has Diving Tackle that its bb2020 counterpart lacks.
+        let owa25 = roster(&r25, "Old World Alliance");
+        assert_eq!(owa25.positions.len(), 11);
+        let tree = pos(owa25, "oldworldalliance.altern_forest_treeman");
+        assert_eq!((tree.ma, tree.st, tree.ag, tree.pa, tree.av), (2, 6, 5, 5, 11));
+        assert!(skills(tree, Rules::Bb2025).contains(&SkillId::TakeRoot));
+        assert!(skills(pos(owa25, "oldworldalliance.dwarf_blitzer"), Rules::Bb2025)
+            .contains(&SkillId::DivingTackle));
+        assert!(skills(pos(owa25, "oldworldalliance.trollslayer"), Rules::Bb2025)
+            .contains(&SkillId::Hatred));
+
+        let owa20 = roster(&r20, "Old World Alliance");
+        assert_eq!(owa20.positions.len(), 11);
+        // bb2020's Old World Human Catcher is ST 2 (bb2025 raised it to ST 3), and its dwarfs and
+        // halflings all carry Animosity + Loner, which the bb2025 page dropped entirely.
+        let cat20 = pos(owa20, "oldworldalliance.human_catcher");
+        assert_eq!((cat20.ma, cat20.st, cat20.av), (8, 2, 8));
+        assert!(skills(cat20, Rules::Bb2020).contains(&SkillId::Animosity));
+        assert!(skills(pos(owa20, "oldworldalliance.dwarf_blocker"), Rules::Bb2020)
+            .contains(&SkillId::ArmBar));
+        assert!(!skills(pos(owa25, "oldworldalliance.human_catcher"), Rules::Bb2025)
+            .contains(&SkillId::Animosity));
+
+        // -- Snotling: ST 1 / AV 6 linemen, and a Pump Wagon big guy at ST 5.
+        let sn25 = roster(&r25, "Snotling");
+        assert_eq!(sn25.positions.len(), 6);
+        let sl25 = pos(sn25, "snotling.snotling_lineman");
+        assert_eq!((sl25.st, sl25.av, sl25.cost), (1, 6, 15000));
+        let sl25s = skills(sl25, Rules::Bb2025);
+        assert!(sl25s.contains(&SkillId::Insignificant) && sl25s.contains(&SkillId::Titchy));
+        assert!(skills(pos(sn25, "snotling.fun_hoppa"), Rules::Bb2025).contains(&SkillId::Pogo));
+        let pw25 = pos(sn25, "snotling.pump_wagon");
+        assert_eq!((pw25.ma, pw25.st, pw25.av), (5, 5, 9));
+
+        let sn20 = roster(&r20, "Snotling");
+        assert_eq!(sn20.positions.len(), 6);
+        // bb2020 linemen have Swarming as a PLAYER skill (bb2025 moved it to a team special rule)
+        // and no Insignificant; the bb2020 Pump Wagon is MA 4 with Secret Weapon.
+        let sl20s = skills(pos(sn20, "snotling.snotling_lineman"), Rules::Bb2020);
+        assert!(sl20s.contains(&SkillId::Swarming) && !sl20s.contains(&SkillId::Insignificant));
+        let pw20 = pos(sn20, "snotling.pump_wagon");
+        assert_eq!(pw20.ma, 4);
+        assert!(skills(pw20, Rules::Bb2020).contains(&SkillId::SecretWeapon));
+
+        // -- Bretonnian (bb2025 only): four positions, Wrestle squires, Steady Footing knights.
+        let br = roster(&r25, "Bretonnian");
+        assert_eq!(br.positions.len(), 4);
+        let sq = pos(br, "bretonnian.squire");
+        assert_eq!((sq.ma, sq.st, sq.av), (6, 3, 8));
+        assert!(skills(sq, Rules::Bb2025).contains(&SkillId::Wrestle));
+        let gk = pos(br, "bretonnian.grail_knight");
+        assert_eq!((gk.ma, gk.av, gk.cost), (7, 10, 95000));
+        assert!(skills(gk, Rules::Bb2025).contains(&SkillId::SteadyFooting));
+        assert!(!r20.iter().any(|r| r.name == "Bretonnian"), "Bretonnian is bb2025-only");
+        assert!(!bb2016_rosters().iter().any(|r| {
+            matches!(r.name.as_str(), "Bretonnian" | "Snotling" | "Old World Alliance")
+        }), "none of the three exist in bb2016");
     }
 
     #[test]

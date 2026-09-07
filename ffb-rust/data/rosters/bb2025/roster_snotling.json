@@ -1,0 +1,222 @@
+{
+  "id": "snotling.lrb6",
+  "name": "Snotling",
+  "reroll_cost": 70000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "snotling.snotling_lineman",
+      "name": "Snotling Lineman",
+      "display_name": "Snotling Lineman",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 15000,
+      "ma": 5,
+      "st": 1,
+      "ag": 3,
+      "pa": 4,
+      "av": 6,
+      "skills": [
+        "Dodge",
+        "Insignificant",
+        "Right Stuff",
+        "Sidestep",
+        "Stunty",
+        "Titchy"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "Devious"
+        ],
+        "double": [
+          "General"
+        ]
+      },
+      "keywords": [
+        "Lineman",
+        "Snotling"
+      ]
+    },
+    {
+      "id": "snotling.fun_hoppa",
+      "name": "Fun-hoppa",
+      "display_name": "Fun-hoppa",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 20000,
+      "ma": 6,
+      "st": 1,
+      "ag": 3,
+      "pa": 4,
+      "av": 6,
+      "skills": [
+        "Dodge",
+        "Pogo",
+        "Right Stuff",
+        "Sidestep",
+        "Stunty"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "Devious"
+        ],
+        "double": [
+          "General"
+        ]
+      },
+      "keywords": [
+        "Snotling",
+        "Special"
+      ]
+    },
+    {
+      "id": "snotling.stilty_runna",
+      "name": "Stilty Runna",
+      "display_name": "Stilty Runna",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 20000,
+      "ma": 6,
+      "st": 1,
+      "ag": 3,
+      "pa": 4,
+      "av": 6,
+      "skills": [
+        "Dodge",
+        "Right Stuff",
+        "Sidestep",
+        "Sprint",
+        "Stunty"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "Devious"
+        ],
+        "double": [
+          "General"
+        ]
+      },
+      "keywords": [
+        "Runner",
+        "Snotling"
+      ]
+    },
+    {
+      "id": "snotling.fungus_flinga",
+      "name": "Fungus Flinga",
+      "display_name": "Fungus Flinga",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 30000,
+      "ma": 5,
+      "st": 1,
+      "ag": 3,
+      "pa": 4,
+      "av": 6,
+      "skills": [
+        "Bombardier",
+        "Dodge",
+        "Right Stuff",
+        "Secret Weapon",
+        "Sidestep",
+        "Stunty",
+        "Titchy"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "Devious",
+          "Passing"
+        ],
+        "double": [
+          "General"
+        ]
+      },
+      "keywords": [
+        "Snotling",
+        "Special"
+      ]
+    },
+    {
+      "id": "snotling.pump_wagon",
+      "name": "Pump Wagon",
+      "display_name": "Pump Wagon",
+      "type": "Big Guy",
+      "quantity": 2,
+      "cost": 100000,
+      "ma": 5,
+      "st": 5,
+      "ag": 5,
+      "pa": 6,
+      "av": 9,
+      "skills": [
+        "Dirty Player",
+        "Juggernaut",
+        "Mighty Blow",
+        "Really Stupid",
+        "Stand Firm"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Devious",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General"
+        ]
+      },
+      "keywords": [
+        "Big Guy",
+        "Snotling",
+        "Special"
+      ]
+    },
+    {
+      "id": "snotling.trained_troll",
+      "name": "Trained Troll",
+      "display_name": "Trained Troll",
+      "type": "Big Guy",
+      "quantity": 2,
+      "cost": 115000,
+      "ma": 4,
+      "st": 5,
+      "ag": 5,
+      "pa": 5,
+      "av": 10,
+      "skills": [
+        "Always Hungry",
+        "Mighty Blow",
+        "Projectile Vomit",
+        "Really Stupid",
+        "Regeneration",
+        "Throw Team-mate"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General",
+          "Passing"
+        ]
+      },
+      "keywords": [
+        "Big Guy",
+        "Troll"
+      ]
+    }
+  ],
+  "special_rules": [
+    "Bribery and Corruption",
+    "Low Cost Linemen",
+    "Swarming"
+  ]
+}
