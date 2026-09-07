@@ -7,6 +7,11 @@
 # wrote to docs/EVENT_COVERAGE_<edition>.md and append the full GameEvent catalog + per-skill
 # tallies from the run's own event logs (docs/COVERAGE_REPORT.md procedure).
 #
+# FFB_PARITY_BIN overrides the binary. Use it when the shared target/release is being rebuilt by
+# another session in the same working directory: build with
+#   CARGO_TARGET_DIR=<repo>/../target-<tag> cargo build --release -p ffb-parity
+# and point FFB_PARITY_BIN at it, so nobody can rename the binary out from under a harvest.
+#
 # Run it ALONE: T3_COVERAGE.md is rewritten by every ffb-parity invocation -- the random control
 # and the lineman regression included -- so a checklist read while anything else is running is
 # somebody else's. Run editions one after another, never together.
@@ -15,7 +20,7 @@ E=$1; SC=${2:-1.0}
 M=${MATCHUP:-amazon}
 OUT=docs/EVENT_COVERAGE_$E.md
 [ "$M" != "amazon" ] && OUT=docs/EVENT_COVERAGE_${M}_$E.md
-./target/release/ffb-parity --home $M --away $M --edition $E --tier 3 \
+${FFB_PARITY_BIN:-./target/release/ffb-parity} --home $M --away $M --edition $E --tier 3 \
     --seeds 1-100 --no-abort --agent heuristic --heur-scale $SC --heur-classes all > /tmp/cov_$E.log 2>&1
 PAR=$(grep -E "^PARITY:" /tmp/cov_$E.log)
 {

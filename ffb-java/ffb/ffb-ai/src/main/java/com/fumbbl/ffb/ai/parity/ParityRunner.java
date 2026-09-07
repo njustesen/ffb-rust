@@ -3350,7 +3350,17 @@ public class ParityRunner {
         }
     }
 
-    /** Rust {@code has_negatrait}: the traits that make an activation likely to be wasted. */
+    /**
+     * Rust {@code has_negatrait}: the traits that make an activation likely to be wasted.
+     *
+     * <p>Rust matches on {@code SkillId}, which is edition-independent; this side matches on the
+     * skill's DISPLAY NAME, and several of these traits are spelled differently per edition:
+     * {@code Bone-Head}/{@code Bone Head} and {@code Blood Lust} (bb2016
+     * {@code skill/bb2016/BloodLust}) vs {@code Bloodlust} (bb2020+ {@code skill/mixed/Bloodlust}).
+     * Missing one spelling silently drops the 0.55 negatrait discount on that edition only: every
+     * vampire on the pitch was priced 0.402 here and 0.2571 in Rust, and vampire bb2020/bb2025 was
+     * 0/100 from the FIRST activation of every seed.
+     */
     private static boolean hasNegatrait(Player<?> p) {
         for (com.fumbbl.ffb.model.skill.Skill s : p.getSkillsIncludingTemporaryOnes()) {
             if (s == null) {
@@ -3358,7 +3368,8 @@ public class ParityRunner {
             }
             String n = s.getName();
             if ("Bone Head".equals(n) || "Bone-Head".equals(n) || "Really Stupid".equals(n)
-                || "Wild Animal".equals(n) || "Take Root".equals(n) || "Blood Lust".equals(n)) {
+                || "Wild Animal".equals(n) || "Take Root".equals(n) || "Blood Lust".equals(n)
+                || "Bloodlust".equals(n)) {
                 return true;
             }
         }

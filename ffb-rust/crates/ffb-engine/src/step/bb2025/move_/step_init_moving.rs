@@ -460,9 +460,29 @@ impl StepInitMoving {
                 };
                 return self.dispatch_player_action(dispatch);
             }
-            let label = self.goto_label_on_end.clone();
-            return StepOutcome::goto(&label)
-                .publish(StepParameter::EndPlayerAction(true));
+            // POST-BLOCK leg of a blood-lust blitz. Java has no early-out at all here: with an
+            // empty MOVE_STACK `StepInitMoving.executeStep` sets NO next action, so the step PARKS
+            // and the client is asked (ParityRunner `case INIT_MOVING` -> sendMoveAction ->
+            // MoveReplay). Measured on bb2025 vampire seed 3 step 54: Java's blood-lust blitzer
+            // moved four more squares after its block (JSTATE INIT_MOVING cm=1 -> cm=5) while this
+            // branch ended the activation, so the post-hash diverged on an identical declaration.
+            // Fall through to the empty-stack prompt below whenever the activation has ALREADY
+            // done something — the vampire has moved a square or thrown its block. Measured on
+            // bb2020 vampire seed 7: at i=29 Java's blood-lust MOVE had `hasMoved=false` at the
+            // BLOOD_LUST look and its single INIT_MOVING look ended the activation (cm stayed 3 —
+            // Rust already matched); at i=30 the SAME failure with `hasMoved=true` (StepInitMoving
+            // had already popped the client's first square) took four more squares, cm 0 -> 4.
+            // Same shape post-block on bb2025 seed 3 step 54 (cm 1 -> 5). The early-out is only
+            // right for an activation that has not started; Java itself has no early-out at all —
+            // `StepInitMoving.executeStep` with an empty MOVE_STACK sets no next action, so the
+            // step parks and ParityRunner answers `case INIT_MOVING` with sendMoveAction/MoveReplay.
+            let activation_already_started =
+                game.acting_player.has_moved || game.acting_player.has_blocked;
+            if !activation_already_started {
+                let label = self.goto_label_on_end.clone();
+                return StepOutcome::goto(&label)
+                    .publish(StepParameter::EndPlayerAction(true));
+            }
         }
         // Empty move stack — compute legal move targets and prompt the agent for a destination.
         // The live driver.rs/step architecture never carried this over from the pre-driver.rs
@@ -588,6 +608,46 @@ mod tests {
             "a blood-lust blitzer must dispatch BLITZ so the block still happens");
         assert!(!out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))),
             "it must NOT end the player action - the block sequence ends the activation");
+    }
+
+    /// The POST-BLOCK leg of the same blitz. Java has no early-out in `StepInitMoving`: an empty
+    /// MOVE_STACK leaves `executeStep` with no next action, so the step parks and the client is
+    /// asked — ParityRunner answers `case INIT_MOVING` with `sendMoveAction`. Measured on bb2025
+    /// vampire seed 3 step 54: Java carried the blood-lust blitzer four squares past its block
+    /// (JSTATE INIT_MOVING cm=1 -> cm=5); ending the player action here diverged the post-hash on
+    /// an otherwise identical declaration.
+    #[test]
+    fn blood_lust_blitzer_is_offered_its_move_after_the_block() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("h1".into());
+        game.acting_player.player_action = Some(PlayerAction::BlitzMove);
+        game.acting_player.suffering_blood_lust = true;
+        game.acting_player.has_blocked = true;
+        game.defender_id = Some("a1".into());
+        let mut step = StepInitMoving::new("end".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::Move { .. })),
+            "the post-block leg must park and ask, like Java: {:?}", out.prompt);
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))),
+            "it must not end the activation before the move is offered");
+    }
+
+    /// A plain MOVE whose blood lust failed AFTER the first square was already popped. Java at
+    /// bb2020 vampire seed 7 i=30: `JSTATE ... step=BLOOD_LUST ... moved=true cm=0` then two
+    /// INIT_MOVING looks carrying the thrower to cm=4. `hasMoved` is what separates it from i=29,
+    /// where the same failure with `moved=false` ended the activation with no move at all.
+    #[test]
+    fn blood_lust_move_already_under_way_is_offered_the_rest_of_its_move() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("h1".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        game.acting_player.suffering_blood_lust = true;
+        game.acting_player.has_moved = true;
+        let mut step = StepInitMoving::new("end".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::Move { .. })),
+            "an activation already under way must park and ask: {:?}", out.prompt);
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))));
     }
 
     /// The plain-MOVE case this guard exists for is unchanged: no dispatch, and the activation

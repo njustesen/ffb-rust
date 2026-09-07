@@ -2079,6 +2079,21 @@ impl HeuristicAgent {
                 break;
             }
         }
+        // FFB_GRP=1: the two-level pick, at the level that actually decides. FFB_CANDSUM cannot
+        // see this -- it aggregates per (player, action) through a BTreeMap, so two NON-ADJACENT
+        // runs of one declaration merge into a single count there while `group_declarations`
+        // (contiguous runs) hands the sampler two groups. `JGRP` is the Java mirror.
+        if std::env::var_os("FFB_GRP").is_some() {
+            let ws: Vec<String> = if n <= 64 {
+                w.iter().map(|v| format!("{:08x}", v.to_bits())).collect()
+            } else {
+                Vec::new()
+            };
+            eprintln!(
+                "RGRP k={} len={} t={:08x} r={:08x} pick={} w=[{}]",
+                self.probe_act, n, t.to_bits(), r.to_bits(), pick, ws.join(",")
+            );
+        }
         (pick, ps)
     }
 
@@ -2795,9 +2810,49 @@ impl HeuristicAgent {
             if matches!(c.pac, PlayerActionChoice::Pass | PlayerActionChoice::HandOff) {
                 self.awaiting_run = c.target.clone();
             }
+            let unhandled_pac = c.pac;
             self.used_this_turn.insert(c.player);
             *self.seen_action.entry(format!("{:?}", c.pac)).or_insert(0) += 1;
             *self.seen_bucket.entry(bucket).or_insert(0) += 1;
+            // ParityRunner's heuristic pick loop, immediately AFTER `chooseActivation` has done
+            // all of its bookkeeping (`ActivationDriver.chooseActivation`: usedThisTurn.add,
+            // coverage.record, awaitingRun, recordPlan) and before the declaration is injected:
+            //     if (!isHandledActingAction(hAction)) {
+            //         System.err.println("UNHANDLED_ACTING_ACTION_AT_PICK: ...");
+            //         continue;
+            //     }
+            // `continue` injects NOTHING — the engine is still parked at INIT_SELECTING phase 1,
+            // the sampler draws are spent, the player is used and the bucket/action are already
+            // recorded — so the harness simply picks again. The random agent has mirrored this
+            // since the goblin campaign (`random_agent.rs`, `continue 'reselect`); the heuristic
+            // replaced the whole pick loop and inherited none of it.
+            //
+            // GAZE is the action that exposed it. `isHandledActingAction` has no GAZE case (only
+            // AUTO_GAZE_ZOAT and BLACK_INK), and bb2016 is the only edition whose eligible list
+            // offers it — `computeEligiblePlayers` adds PlayerAction.GAZE for `canGazeDuringMove`,
+            // a bb2016-only property. Every bb2016 vampire seed therefore diverged at the first
+            // Hypnotic Gaze declaration: Java logged no step and re-picked, Rust carried the gaze
+            // out and the game fell over (seed 8: `game_end` at i=2 against Java's 91 steps).
+            //
+            // The bookkeeping MUST run before the re-pick. Java records the bucket inside
+            // `chooseActivation`, so the discarded pick still consumes the one-shot `novelty`
+            // bonus: with the recursion placed ahead of `seen_bucket`, every k=2 weight was
+            // exactly 0.08 higher in Rust than in Java, EndTurn (weight 0.0) kept its old share of
+            // the softmax, and the re-pick landed on a different player (bb2016 seed 8: Rust H10,
+            // Java H11).
+            if !crate::agent::random_agent::is_handled_acting_action(unhandled_pac) {
+                if std::env::var("FFB_TRACE").is_ok() {
+                    eprintln!("RUST_UNHANDLED_ACTION_AT_PICK action={unhandled_pac:?}");
+                }
+                // `decide` clears the option buffer before dispatching a prompt to its handler
+                // (`heuristic_agent.rs:3714`); `handle_activate` itself never does. Re-entering it
+                // directly must therefore clear it, or the re-pick's two-level draw reads the
+                // STALE weights of the discarded pick: measured buflen=4243 for candlen=2018 at
+                // bb2016 seed 8 k=2, with `gw[gi]` = 0.2375 (the k=1 value) instead of 0.1575, so
+                // index 1989 named home_11/Move in `cands` and home_10/Move in `buf`.
+                self.buf.clear();
+                return self.handle_activate(g, f, eligible);
+            }
         }
         // Java's heuristic driver declares a TTM/KTM and then, at phase 2, picks the thrown
         // player with the harness's random rule (sendThrowTeamMateAction: coord-sorted adjacent
@@ -3068,6 +3123,32 @@ impl HeuristicAgent {
         let c = cands.swap_remove(a2.min(cands.len() - 1));
         self.used_this_turn.insert(c.player.clone());
         *self.seen_action.entry(format!("{:?}", c.pac)).or_insert(0) += 1;
+        // ParityRunner's heuristic pick loop, immediately AFTER `chooseActivation` has done
+        // all of its bookkeeping (`ActivationDriver.chooseActivation`: usedThisTurn.add,
+        // coverage.record, awaitingRun, recordPlan) and before the declaration is injected:
+        //     if (!isHandledActingAction(hAction)) {
+        //         System.err.println("UNHANDLED_ACTING_ACTION_AT_PICK: ...");
+        //         continue;
+        //     }
+        // `continue` injects NOTHING — the engine is still parked at INIT_SELECTING phase 1,
+        // the sampler draws are spent, the player is used and the bucket/action are already
+        // recorded — so the harness simply picks again. The random agent has mirrored this
+        // since the goblin campaign (`random_agent.rs`, `continue 'reselect`); the heuristic
+        // replaced the whole pick loop and inherited none of it.
+        //
+        // GAZE is the action that exposed it. `isHandledActingAction` has no GAZE case (only
+        // AUTO_GAZE_ZOAT and BLACK_INK), and bb2016 is the only edition whose eligible list
+        // offers it — `computeEligiblePlayers` adds PlayerAction.GAZE for `canGazeDuringMove`,
+        // a bb2016-only property. Every bb2016 vampire seed therefore diverged at the first
+        // Hypnotic Gaze declaration: Java logged no step and re-picked, Rust carried the gaze
+        // out and the game fell over (seed 8: `game_end` at i=2 against Java's 91 steps).
+        //
+        // The bookkeeping MUST run before the re-pick. Java records the bucket inside
+        // `chooseActivation`, so the discarded pick still consumes the one-shot `novelty`
+        // bonus: with the recursion placed ahead of `seen_bucket`, every k=2 weight was
+        // exactly 0.08 higher in Rust than in Java, EndTurn (weight 0.0) kept its old share of
+        // the softmax, and the re-pick landed on a different player (bb2016 seed 8: Rust H10,
+        // Java H11).
         self.plan = Some(Plan {
             player: c.player.clone(),
             kind: c.kind,
@@ -3076,6 +3157,12 @@ impl HeuristicAgent {
             delivered: false,
             fired: false,
         });
+        if !crate::agent::random_agent::is_handled_acting_action(c.pac) {
+            if std::env::var("FFB_TRACE").is_ok() {
+                eprintln!("RUST_UNHANDLED_ACTION_AT_PICK_DEEP action={:?}", c.pac);
+            }
+            return self.handle_activate_deep(g, f, eligible);
+        }
         // Java's heuristic driver declares a TTM/KTM and then, at phase 2, picks the thrown
         // player with the harness's random rule (sendThrowTeamMateAction: coord-sorted adjacent
         // throwable teammates, ONE actionRng). The Rust candidate (built by the same default arm
@@ -6769,6 +6856,73 @@ mod tests {
             matches!(agent.handle_activate(&g, &f, only_inactive), Action::EndTurn),
             "an eligible list of only inactive players leaves nothing to do"
         );
+    }
+
+    /// `ParityRunner`'s heuristic pick loop refuses to DECLARE an action whose
+    /// `sendConcreteAction` switch has no arm — `isHandledActingAction` — and instead re-picks
+    /// without injecting anything (`continue`, no step logged). GAZE is such an action, and
+    /// bb2016's eligible list is the only one that offers it, so a Rust agent that declared it
+    /// diverged on the FIRST activation of every bb2016 vampire seed.
+    #[test]
+    fn an_unhandled_acting_action_is_never_declared_and_the_agent_re_picks() {
+        use ffb_model::enums::{PlayerState, PS_STANDING, Rules};
+        use ffb_model::model::player::Player;
+
+        let mut home = crate::step::framework::test_team("home", 0);
+        let mut away = crate::step::framework::test_team("away", 0);
+        for nr in 1..=2 {
+            home.players.push(Player {
+                id: format!("home_{:02}", nr),
+                nr,
+                movement: 6,
+                strength: 3,
+                agility: 3,
+                armour: 8,
+                ..Default::default()
+            });
+        }
+        away.players.push(Player {
+            id: "away_01".to_string(),
+            nr: 1,
+            movement: 6,
+            strength: 3,
+            agility: 3,
+            armour: 8,
+            ..Default::default()
+        });
+
+        let mut g = Game::new(home, away, Rules::Bb2025);
+        g.home_playing = true;
+        g.turn_data_home.turn_nr = 3;
+        g.turn_data_away.turn_nr = 3;
+        for (id, x, y) in [("home_01", 19, 7), ("home_02", 10, 8), ("away_01", 20, 7)] {
+            g.field_model.set_player_coordinate(id, FieldCoordinate::new(x, y));
+            g.field_model
+                .set_player_state(id, PlayerState::new(PS_STANDING).change_active(true));
+        }
+        g.field_model.ball_coordinate = Some(FieldCoordinate::new(13, 7));
+        g.field_model.ball_in_play = true;
+
+        let f = Features::build(&g, positions_stamp(&g), true);
+
+        // home_01 stands next to away_01 and its ONLY eligible action is the GAZE that
+        // `isHandledActingAction` rejects. Java picks him, logs nothing, and re-picks; with no
+        // unused player left the re-pick ends the turn (`liveRemaining.isEmpty()`). Before the
+        // mirror existed Rust declared `ActivatePlayer { player_action: HypnoticGaze }` here,
+        // which the Java harness would have deselected.
+        let only_gaze = vec![("home_01".to_string(), vec![PlayerAction::Gaze])];
+        for scale in [0.0f32, 1.0] {
+            let mut agent = HeuristicAgent::new(7, scale);
+            let a = agent.handle_activate(&g, &f, only_gaze.clone());
+            assert!(
+                matches!(a, Action::EndTurn),
+                "an eligible list of only unhandled actions must declare nothing (scale {scale}), got {a:?}"
+            );
+        }
+        // And the shared table this depends on must still call GAZE unhandled.
+        assert!(!crate::agent::random_agent::is_handled_acting_action(
+            PlayerActionChoice::HypnoticGaze
+        ));
     }
 
     #[test]

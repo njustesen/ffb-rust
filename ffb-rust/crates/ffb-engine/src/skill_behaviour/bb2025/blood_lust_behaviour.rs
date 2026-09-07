@@ -152,9 +152,13 @@ impl StepModifierTrait for BloodLustStepModifier {
 
 /// Java: failBloodLustForAction — show dialog if action allows it, else direct failure.
 fn fail_for_action(game: &mut Game, state: &mut StepBloodLustHookState) -> StepOutcome {
+    // The live copy of this rule is `step::bb2025::shared::step_blood_lust` (nothing dispatches
+    // this behaviour through `dispatch::execute_step_hooks`); share its predicate so the two
+    // copies cannot drift the way they had by the vampire campaign.
     let current_action = game.acting_player.player_action;
     let needs_dialog = current_action
-        .map(|a| a != PlayerAction::Move && get_alternate_action(a) != a)
+        .map(|a| crate::step::bb2025::shared::step_blood_lust::shows_bloodlust_action_dialog(
+            game.rules, a))
         .unwrap_or(false);
 
     if needs_dialog {

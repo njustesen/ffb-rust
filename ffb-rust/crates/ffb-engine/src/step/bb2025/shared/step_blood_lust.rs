@@ -237,10 +237,9 @@ impl StepBloodLust {
         // block: Java drew ONE die and passed the turn over, Rust drew thirteen
         // (vampire bb2016 seed 1 i=100 — Java 77 rng calls vs Rust 89).
         let current_action = game.acting_player.player_action;
-        let needs_dialog = game.rules != ffb_model::enums::Rules::Bb2016
-            && current_action
-                .map(|a| a != PlayerAction::Move && Self::get_alternate_action(a) != a)
-                .unwrap_or(false);
+        let needs_dialog = current_action
+            .map(|a| shows_bloodlust_action_dialog(game.rules, a))
+            .unwrap_or(false);
 
         if needs_dialog {
             self.status = BloodLustStatus::WaitForActionChange;
@@ -281,6 +280,62 @@ impl StepBloodLust {
             PlayerAction::KickTeamMate => PlayerAction::KickTeamMateMove,
             _ => PlayerAction::Move,
         }
+    }
+}
+
+/// Does a FAILED Blood Lust roll open the action-change dialog for this declared action?
+///
+/// Java is an explicit `Arrays.asList(...).contains(actingPlayer.getPlayerAction())` test, and the
+/// membership list differs per edition — this is the whole edition split:
+///
+/// * `bb2025/BloodLustBehaviour`: `{VICIOUS_VINES, BLOCK, PASS, HAND_OVER, THROW_BOMB,
+///   THROW_TEAM_MATE, KICK_TEAM_MATE, FOUL, STAND_UP, STAND_UP_BLITZ, MULTIPLE_BLOCK,
+///   SECURE_THE_BALL, PUNT}` — note BLITZ_MOVE and GAZE_MOVE are **absent**.
+/// * `bb2020/BloodLustBehaviour`: the same list with `SECURE_THE_BALL`/`PUNT` replaced by
+///   `BLITZ_MOVE` and `GAZE_MOVE`.
+/// * `bb2016/BloodLustBehaviour`: there is no such branch at all — every failure goes straight to
+///   `MOVE_STACK null` + the failure label.
+///
+/// Rust used to approximate the list as "any action whose `getAlternateAction` differs", i.e.
+/// everything except MOVE. That is a superset in bb2025: a vampire who failed Blood Lust on a
+/// BLITZ_MOVE got an extra `BloodlustAction` prompt Java never shows, and the resulting
+/// `MOVE_STACK`/`BLOOD_LUST_ACTION` publish ended the drive where Java carried the blitzer on
+/// (bb2025 vampire seed 3 step 54: same pre-hash, same declaration, different post-hash).
+pub fn shows_bloodlust_action_dialog(rules: ffb_model::enums::Rules, action: PlayerAction) -> bool {
+    use PlayerAction::*;
+    match rules {
+        // bb2016 has no action-change dialog on a failed Blood Lust.
+        ffb_model::enums::Rules::Bb2016 => false,
+        ffb_model::enums::Rules::Bb2020 => matches!(
+            action,
+            ViciousVines | Block | Pass | HandOver | ThrowBomb | ThrowTeamMate | KickTeamMate
+                | Foul | StandUp | StandUpBlitz | BlitzMove | GazeMove | MultipleBlock
+        ),
+        // `Rules::Common` is the edition-agnostic bucket; the bb2025 list is the current one.
+        ffb_model::enums::Rules::Bb2025 | ffb_model::enums::Rules::Common => matches!(
+            action,
+            ViciousVines | Block | Pass | HandOver | ThrowBomb | ThrowTeamMate | KickTeamMate
+                | Foul | StandUp | StandUpBlitz | MultipleBlock | SecureTheBall | Punt
+        ),
+    }
+}
+
+/// Java: `boolean changeToMove = Arrays.asList(...).contains(actingPlayer.getPlayerAction())` — the
+/// flag carried by `DialogBloodlustActionParameter`. It only pre-selects the client's default
+/// button, so no engine state depends on it; kept here so the two lists stay together and so a
+/// future prompt that carries it does not have to re-derive it.
+pub fn bloodlust_dialog_change_to_move(rules: ffb_model::enums::Rules, action: PlayerAction) -> bool {
+    use PlayerAction::*;
+    match rules {
+        ffb_model::enums::Rules::Bb2016 => false,
+        ffb_model::enums::Rules::Bb2020 => matches!(
+            action,
+            ViciousVines | Block | ThrowBomb | StandUp | BlitzMove | GazeMove | MultipleBlock
+        ),
+        ffb_model::enums::Rules::Bb2025 | ffb_model::enums::Rules::Common => matches!(
+            action,
+            ViciousVines | Block | ThrowBomb | StandUp | MultipleBlock | SecureTheBall
+        ),
     }
 }
 
@@ -502,5 +557,84 @@ mod tests {
         let before = rng.call_count;
         let _ = StepBloodLust::new(String::new()).start(&mut game, &mut rng);
         assert_eq!(rng.call_count - before, 1, "a fresh activation rolls Blood Lust again");
+    }
+
+    /// The bb2025 membership list, copied off
+    /// `ffb-server/.../skillbehaviour/bb2025/BloodLustBehaviour.java`:
+    ///     {VICIOUS_VINES, BLOCK, PASS, HAND_OVER, THROW_BOMB, THROW_TEAM_MATE, KICK_TEAM_MATE,
+    ///      FOUL, STAND_UP, STAND_UP_BLITZ, MULTIPLE_BLOCK, SECURE_THE_BALL, PUNT}
+    /// BLITZ_MOVE and GAZE_MOVE are deliberately NOT in it.
+    #[test]
+    fn bb2025_bloodlust_dialog_matches_the_java_action_list() {
+        use PlayerAction::*;
+        let shown = [ViciousVines, Block, Pass, HandOver, ThrowBomb, ThrowTeamMate, KickTeamMate,
+                     Foul, StandUp, StandUpBlitz, MultipleBlock, SecureTheBall, Punt];
+        for a in shown {
+            assert!(shows_bloodlust_action_dialog(Rules::Bb2025, a),
+                "bb2025 Java list contains {a:?}");
+        }
+        // Everything the Java list omits — BLITZ_MOVE is the one that cost the campaign a red.
+        for a in [Move, Blitz, BlitzMove, BlitzSelect, GazeMove, Gaze, PassMove, HandOverMove,
+                  FoulMove, ThrowTeamMateMove, KickTeamMateMove, HailMaryPass, DumpOff, PuntMove] {
+            assert!(!shows_bloodlust_action_dialog(Rules::Bb2025, a),
+                "bb2025 Java list does NOT contain {a:?}");
+        }
+    }
+
+    /// bb2020's list swaps SECURE_THE_BALL/PUNT for BLITZ_MOVE/GAZE_MOVE.
+    #[test]
+    fn bb2020_bloodlust_dialog_matches_the_java_action_list() {
+        use PlayerAction::*;
+        for a in [ViciousVines, Block, Pass, HandOver, ThrowBomb, ThrowTeamMate, KickTeamMate,
+                  Foul, StandUp, StandUpBlitz, BlitzMove, GazeMove, MultipleBlock] {
+            assert!(shows_bloodlust_action_dialog(Rules::Bb2020, a),
+                "bb2020 Java list contains {a:?}");
+        }
+        for a in [Move, Blitz, SecureTheBall, Punt, PassMove, HandOverMove, FoulMove] {
+            assert!(!shows_bloodlust_action_dialog(Rules::Bb2020, a),
+                "bb2020 Java list does NOT contain {a:?}");
+        }
+    }
+
+    /// bb2016/BloodLustBehaviour has no action-change branch whatsoever.
+    #[test]
+    fn bb2016_never_shows_the_bloodlust_dialog() {
+        use PlayerAction::*;
+        for a in [Move, Block, Blitz, BlitzMove, Pass, HandOver, Foul, StandUp, StandUpBlitz,
+                  MultipleBlock, GazeMove, ThrowTeamMate] {
+            assert!(!shows_bloodlust_action_dialog(Rules::Bb2016, a),
+                "bb2016 shows no dialog for {a:?}");
+        }
+    }
+
+    /// End-to-end on the live step: a BB2025 vampire who fails Blood Lust on a BLITZ_MOVE must NOT
+    /// be prompted. Before the fix this returned `Continue` + `BloodlustAction`, which published
+    /// MOVE_STACK/BLOOD_LUST_ACTION and cut the blitz short.
+    #[test]
+    fn bb2025_failed_bloodlust_on_blitz_move_asks_nothing() {
+        let mut game = make_game(vec![SkillId::BloodLust], Some(PlayerAction::BlitzMove));
+        game.rules = Rules::Bb2025;
+        // No team re-roll available, so the failure is final and reaches the failure branch.
+        game.turn_data_home.rerolls = 0;
+        game.turn_data_away.rerolls = 0;
+        let mut rng = GameRng::new(seed_for_d6(1));
+        let out = StepBloodLust::new(String::new()).start(&mut game, &mut rng);
+        assert!(out.prompt.is_none(),
+            "bb2025 BLITZ_MOVE is not in the Java dialog list, so no prompt: {:?}", out.prompt);
+        assert!(game.acting_player.suffering_blood_lust);
+    }
+
+    /// The same failure on a BLOCK — which IS in the bb2025 list — still prompts, so the fix did
+    /// not simply delete the dialog.
+    #[test]
+    fn bb2025_failed_bloodlust_on_block_still_prompts() {
+        let mut game = make_game(vec![SkillId::BloodLust], Some(PlayerAction::Block));
+        game.rules = Rules::Bb2025;
+        game.turn_data_home.rerolls = 0;
+        game.turn_data_away.rerolls = 0;
+        let mut rng = GameRng::new(seed_for_d6(1));
+        let out = StepBloodLust::new(String::new()).start(&mut game, &mut rng);
+        assert!(matches!(out.prompt, Some(AgentPrompt::BloodlustAction { .. })),
+            "BLOCK is in the bb2025 list: {:?}", out.prompt);
     }
 }

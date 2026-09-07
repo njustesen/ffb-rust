@@ -4335,3 +4335,30 @@ The reusable lesson, which also belongs next to E8: **a per-carrier skill with n
 evidence of unreached code until the CARRIER's own declared-action histogram has been counted.**
 "Ported but unreached" and "the carrier is never in the situation" produce identical event
 histograms.
+
+### E16. vampire bb2016 heuristic — 48/100, the residual Blood-Lust/GAZE frontier
+
+Found closing (partly) vampire on 2026-09-07, `docs/PARITY_VAMPIRE_CAMPAIGN.md`. bb2016 went
+0/100 -> 48/100 in one iteration; the remaining 52 are NOT yet classified into families. What is
+already known and should not be re-derived:
+
+* The Hypnotic Gaze declaration is now handled on both sides (`isHandledActingAction` mirror in
+  `heuristic_agent.rs`), and the harness prints `UNHANDLED_ACTING_ACTION_AT_PICK: GAZE ...` for
+  every one of them — grep a gate log for that line to find the activations involved.
+* bb2016's Blood Lust behaviour is the ONE edition with no action-change dialog at all
+  (`shows_bloodlust_action_dialog` returns false for `Rules::Bb2016`), so a failed roll cancels the
+  declared action outright. bb2016 also has no `goodConditions` term: its minimum roll comes from
+  `DiceInterpreter.minimumRollBloodLust()`, not `max(2, value - goodConditions)`.
+* `step/bb2016/step_blood_lust.rs` and `step/bb2020/shared/step_blood_lust.rs` are **DEAD**.
+  `driver.rs:209` is the only `StepId::BloodLust` arm in the file and it builds
+  `step::bb2025::shared::step_blood_lust`; `make_step_for` has no BloodLust arm for either edition
+  (verified by grep — `step_blood_lust` appears exactly once in `driver.rs`). Edition-gate inside
+  the shared step, the way `shows_bloodlust_action_dialog` now does. Their `#[cfg(test)]` suites
+  still pass and so still LOOK authoritative; they are not.
+* The remaining `suffering_blood_lust` early-out in `step/bb2025/move_/step_init_moving.rs` is
+  invented code (Java has no such branch); it is now scoped to activations that have not started,
+  which is what the harness's `MoveReplay` reduces to. Any further work here should start by
+  proving what Java's `case INIT_MOVING` answers for the failing activation, not by reasoning
+  about the engine.
+
+Also open, and smaller: bb2025 `@1.0` 1 red / `@0` 5 reds, bb2020 `@0` 2 reds — all unclassified.
