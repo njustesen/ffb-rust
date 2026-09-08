@@ -107,9 +107,19 @@ impl StepAlwaysHungry {
         let mut do_escape = has_eat_skill && !do_always_hungry;
 
         if do_always_hungry {
-            // Java: if (isKicked) setKtmUsed else setTtmUsed
+            // EDITION TWINS DIFFER on the non-kicked flag, and the driver runs THIS file for
+            // bb2020 as well (`use crate::step::bb2025::ttm::*` + the default StepId arm), so the
+            // correct bb2020 twin in `step/bb2020/ttm/step_always_hungry.rs` is DEAD code:
+            //   bb2020 StepAlwaysHungry:128 -> setPassUsed(true)
+            //   bb2025 StepAlwaysHungry:128 -> setTtmUsed(true)
+            //   bb2016 StepAlwaysHungry:121 -> setPassUsed(true)   (its own live file, correct)
+            // `pass_used` is in the state hash and `ttm_used` is not, so writing the bb2025 flag
+            // under bb2020 diverged the hash one step after every Always Hungry throw
+            // (renegades_37730 bb2020 @1.0 seed 33: J f0001 vs R f0000, the pass_used digit).
             if self.is_kicked {
                 game.turn_data_mut().ktm_used = true;
+            } else if game.rules == ffb_model::enums::Rules::Bb2020 {
+                game.turn_data_mut().pass_used = true;
             } else {
                 game.turn_data_mut().ttm_used = true;
             }
@@ -506,5 +516,31 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(seed));
         assert!(game.report_list.has_report(ReportId::ESCAPE_ROLL),
             "ESCAPE_ROLL report must be added when escape is attempted");
+    }
+
+    /// The edition twins disagree on which turn flag an Always Hungry throw consumes, and this
+    /// file is live for BOTH bb2020 and bb2025 (the bb2020 twin is dead code):
+    ///   bb2020 Java StepAlwaysHungry:128 -> setPassUsed(true)
+    ///   bb2025 Java StepAlwaysHungry:128 -> setTtmUsed(true)
+    /// `pass_used` is hashed by `state_string` and `ttm_used` is not, so getting this wrong
+    /// diverged the state one step after every Always Hungry throw under bb2020
+    /// (renegades_37730 bb2020 @1.0 seed 33).
+    #[test]
+    fn always_hungry_consumes_pass_used_under_bb2020_and_ttm_used_under_bb2025() {
+        for (rules, want_pass, want_ttm) in [
+            (Rules::Bb2020, true, false),
+            (Rules::Bb2025, false, true),
+        ] {
+            let mut game = make_game_with_always_hungry();
+            game.rules = rules;
+            let mut step = StepAlwaysHungry::new("fail".into(), "ok".into());
+            step.thrown_player_id = Some("thrown".to_string());
+            let _ = step.start(&mut game, &mut GameRng::new(seed_for_d6(6)));
+            assert_eq!(game.turn_data_home.pass_used, want_pass,
+                "pass_used under {rules:?}");
+            assert_eq!(game.turn_data_home.ttm_used, want_ttm,
+                "ttm_used under {rules:?}");
+            assert!(!game.turn_data_home.ktm_used, "a thrown (not kicked) mate never sets ktm_used");
+        }
     }
 }
