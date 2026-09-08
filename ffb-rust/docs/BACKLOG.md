@@ -4536,3 +4536,42 @@ full sweep (every gate is a miss), which is why the full matrix still costs ~6.5
 
 Consequence to respect: **do not rebuild the engine while a sweep is running.** A mid-sweep rebuild
 splits the build again and destroys exactly the property the sweep exists to establish.
+
+# §H — snotling: the Swarming mechanic never executes (2026-09-08)
+
+**snotling is 0/100 in bb2020 AND bb2025 because Java swarms at every kickoff and Rust never
+does.** Root cause chain, measured on bb2020 seed 1:
+
+1. Java's kickoff dice: pos6 d8=3 (scatter dir), pos7 d6=3 (scatter dist), **pos8 d3=1 and pos9
+   d3=2 from `DiceRoller.rollSwarmingPlayers` (`SwarmingBehaviour`)**, then pos10 d6=5 + pos11 d6=2
+   = **7 = Brilliant Coaching**, whose two coach d6s land at pos12/13 and grant home +1 re-roll.
+2. Rust never rolls the two d3s, so its kickoff-result roll reads pos8/pos9 instead: 4+2 = **6 =
+   Cheering Fans**. Different event, different ball, and `r5,5` against Java's `r6,5`.
+3. The very FIRST logged state therefore differs in every snotling game -> 0/100 at every scale.
+
+## Three real defects found, one fixed
+
+| # | defect | status |
+|---|---|---|
+| 1 | The live step rolled `rng.d6()`. Java `DiceRoller.rollSwarmingPlayers()` is `rollDice(3)` -- **a d3 in every edition**. The dead `mixed` twin had it right. | **FIXED** |
+| 2 | The live step gates on `team.special_rules.contains(SWARMING)`, but **bb2020 rosters have no `special_rules` field at all**, so bb2020 could never swarm. Java's bb2016/bb2020 `SwarmingBehaviour` is a SKILL behaviour (`UtilCards.hasSkill(player, skill)`); only bb2025's `StepSwarming` uses the special rule + `Keyword.LINEMAN`. | **FIXED** (edition-gated inside the shared step) |
+| 3 | **The step is never constructed in ANY edition.** Probes prove it: an entry probe in `StepSwarming::execute_step` never fires (bb2020 or bb2025), and a probe on the `StepId::Swarming` arm of `driver.rs` never fires either. | **OPEN -- this is the blocker** |
+
+## Where to pick it up
+
+`StepId::Swarming` IS present in two kickoff generators (`generator/mixed/kickoff.rs` lines 40-42
+and `generator/bb2025/kickoff.rs` lines 40-44), correctly ordered between `KickoffScatterRoll` and
+`KickoffResultRoll` -- which matches Java's dice order exactly. But a `build_sequence` probe in
+BOTH generators never fires either, so **neither is called at runtime**: the kickoff sequence that
+actually executes comes from a fourth source still to be found. `generator/kickoff.rs` is only a
+17-line abstract base with no sequence, so it is not the answer.
+
+Find the live kickoff sequence first; the two fixes above are already in place and inert until the
+step runs. Fixes 1 and 2 are unverified by any gate for exactly that reason.
+
+## Also noted
+
+`data/rosters/bb2025/roster_snotling.json` carries the `Swarming` SPECIAL RULE but **no position
+has the Swarming skill**, while bb2020's Snotling Lineman does. That matches the two editions'
+Java (bb2025 keys off the special rule, bb2020 off the skill), so it is probably correct -- but
+worth re-checking against the BB2025 page once the mechanic runs.

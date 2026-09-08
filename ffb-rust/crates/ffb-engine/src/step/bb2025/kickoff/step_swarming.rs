@@ -1,4 +1,4 @@
-use ffb_model::enums::{TurnMode, PS_PRONE, PS_RESERVE};
+use ffb_model::enums::{TurnMode, SkillId, PS_PRONE, PS_RESERVE};
 use ffb_model::model::SpecialRule;
 use ffb_model::report::bb2025::report_swarming_roll::ReportSwarmingRoll;
 use ffb_model::report::report_id::ReportId;
@@ -140,11 +140,25 @@ impl StepSwarming {
         let team_id = self.swarming_team_id(game);
         self.team_id = Some(team_id.clone());
 
-        // Check for the Swarming special rule.
+        // EDITION TWINS DIFFER on how a swarming team is RECOGNISED, and this file is live for
+        // every edition:
+        //   bb2025 `StepSwarming`      -> team.getSpecialRules().contains(SWARMING), reserves by
+        //                                 the LINEMAN keyword;
+        //   bb2020/bb2016 `SwarmingBehaviour` -> a SKILL behaviour: UtilCards.hasSkill(player, skill).
+        // bb2020 rosters carry NO `special_rules` field at all, so the bb2025 gate below was always
+        // false there and bb2020 never swarmed -- snotling bb2020 diverged at the KICKOFF of every
+        // seed (0/100), because Java spent two d3s on `rollSwarmingPlayers` that Rust never spent,
+        // and the kickoff-result roll then read the next pair of dice (4+2=6 Cheering Fans in Rust
+        // against 5+2=7 Brilliant Coaching in Java).
         let team = if game.team_home.id == team_id { &game.team_home } else { &game.team_away };
-        let has_swarming_rule = team.special_rules.iter()
-            .any(|r| SpecialRule::from(r) == Some(SpecialRule::SWARMING));
-        if !has_swarming_rule {
+        let skill_based = game.rules != ffb_model::enums::Rules::Bb2025;
+        let is_swarming_team = if skill_based {
+            team.players.iter().any(|p| p.has_skill(SkillId::Swarming))
+        } else {
+            team.special_rules.iter()
+                .any(|r| SpecialRule::from(r) == Some(SpecialRule::SWARMING))
+        };
+        if !is_swarming_team {
             return StepOutcome::next();
         }
         // Java: partitions the team's players into playersOnPitch (FIELD bounds) and,
@@ -158,7 +172,10 @@ impl StepSwarming {
             if coord.map(|c| FieldCoordinateBounds::FIELD.is_in_bounds(c)).unwrap_or(false) {
                 players_on_pitch.push(p.id.clone());
             } else if game.field_model.player_state(&p.id).map(|s| s.base() == PS_RESERVE).unwrap_or(false) {
-                if p.is_lineman {
+                // bb2025 keys the reserve on the LINEMAN keyword; the bb2016/bb2020 behaviour
+                // keys it on the Swarming SKILL itself.
+                let counts_as_swarmer = if skill_based { p.has_skill(SkillId::Swarming) } else { p.is_lineman };
+                if counts_as_swarmer {
                     has_swarming_reserves = true;
                 } else {
                     players_reserve_no_swarming.push(p.id.clone());
@@ -189,8 +206,9 @@ impl StepSwarming {
 
         game.turn_mode = TurnMode::Swarming;
 
-        // Roll for the number of swarming players (Java: DiceRoller.rollSwarmingPlayers() = d6).
-        self.rolled_amount = rng.d6();
+        // Java `DiceRoller.rollSwarmingPlayers()` is `rollDice(3)` -- a d3 in EVERY edition. This
+        // read d6, so even where the step did fire it consumed the wrong die.
+        self.rolled_amount = rng.d3();
 
         // Java: addReport(new ReportSwarmingRoll(state.teamId, state.rolledAmount))
         game.report_list.add(ReportSwarmingRoll::new(team_id.clone(), self.rolled_amount));
