@@ -907,3 +907,33 @@ Remaining bb2016 reds: `necromantic` (98/99/99, unchanged by this fix) and `vamp
 
 No regression: bb2016 `chaos` `orc` `dwarf` `undead` `goblin` `khemri` 100/100 @1.0 and `amazon`
 `human` 100/100 @0. ffb-engine 7457/0.
+
+## 16. renegades bb2020 CLOSED -- 71 green / 12 red, 2026-09-08
+
+`renegades` bb2020 was red on ONE seed of its R3 variant (`renegades_37730` 99/100 @1.0). Both the
+base squad and the variant are now 100/100 at all three scales.
+
+**Cause: an edition twin the driver never runs.** bb2020's `StepAlwaysHungry` sets
+`setPassUsed(true)` where bb2025 sets `setTtmUsed(true)`, but `driver.rs` builds the bb2025 file
+for bb2020 (`use crate::step::bb2025::ttm::*` plus the default `StepId::AlwaysHungry` arm) -- so
+the correct bb2020 twin was DEAD CODE and bb2020 wrote the bb2025 flag. `pass_used` is hashed by
+`state_string`; `ttm_used` is not. Every bb2020 Always Hungry throw therefore diverged the hash one
+step later.
+
+Fixed by edition-gating INSIDE the shared step, the pattern the TTM campaign already established
+(`[[parity_tier_ttm]]`: routing an edition to its dead twin does not work).
+
+**What made it findable:** at seed 33 the boards were identical (`FFB_IDSTATE`, 0 diffs), the
+declarations were identical, and the ONLY difference in the entire state string was the flag block
+-- `f0001` against `f0000`, the `pass_used` digit of `blitz/foul/hand_over/pass`. The id-state dump
+cannot see turn flags, so the state STRING is the instrument that names this class of bug.
+
+| | bb2016 | bb2020 | bb2025 | total |
+|---|---|---|---|---|
+| 🟢 | 22 | 25 | 24 | **71** |
+| 🔴 | 2 | 4 | 6 | **12** |
+| N/A | 8 | 4 | 1 | 13 |
+
+No regression: goblin, `underworld_underworldtroll`, `chaos_pact` and ogre bb2020 all 100/100
+@1.0 (every other Always Hungry carrier reachable here), and goblin bb2025 + bb2016 100/100 @1.0
+confirming the untouched editions. ffb-engine 7458/0.
