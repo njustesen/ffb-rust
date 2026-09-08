@@ -975,3 +975,53 @@ for it** -- the same lesson vampire bb2016 taught in ITER2, now paid twice.
 Remaining: bb2016 `necromantic` `vampire`; bb2020 `black_orc` `gnome` `snotling`; bb2025
 `black_orc` `gnome` `imperial_nobility` `old_world_alliance` `snotling` `vampire`. The bb2020 and
 bb2025 entries all carry §12-vintage numbers and should be re-measured first.
+
+## 18. THE TRUSTWORTHY MATRIX -- 333 gates, one build, 2026-09-08
+
+The whole matrix re-measured end to end on a single binary: every squad in every edition at all
+three scales, base squads AND the nine R3 variants. **333 gates, 0 without a verdict.** Ran as 4
+sharded workers on 8 of 16 cores (`scripts/sweep_worker.ps1`), sharded by (edition, matchup) so no
+two runs of one matchup ever overlapped. 0.93 gates/min, ~6h.
+
+Previous tables (§11 §13 §14 §16 §17) were each honest per number but MIXED BUILDS, so they are
+superseded. This is the first table where every cell comes from the same engine.
+
+| | bb2016 | bb2020 | bb2025 | total |
+|---|---|---|---|---|
+| 🟢 | 23 | 26 | 25 | **74** |
+| 🔴 | 1 | 3 | 5 | **9** |
+| N/A | 8 | 4 | 1 | 13 |
+
+### The 9 remaining red cells, with their current numbers (@1.0 / @0 / @1e6)
+
+| edition | team | @1.0 | @0 | @1e6 | note |
+|---|---|---|---|---|---|
+| bb2016 | necromantic | 98 | 99 | 99 | exposed by the Zombie-cost correction; both @1.0 seeds diverge at the FIRST ACTIVATION OF HALF 2 |
+| bb2020 | black_orc | 98 | 100 | 98 | |
+| bb2020 | gnome | 38 | 53 | 58 | failures dominated by Rust STALLS |
+| bb2020 | snotling | 0 | 1 | 0 | diverges at STEP 0 of every seed -- pre-game |
+| bb2025 | black_orc | 99 | 100 | 98 | |
+| bb2025 | gnome | 35 | 10 | 51 | STALLS (80 of 90 at @0) |
+| bb2025 | imperial_nobility | 84 | 100 | 33 | green at argmax, worst at uniform => the option SET, not the weights |
+| bb2025 | old_world_alliance | 100 | 100 | 99 | BOTH variants 99 at @1e6 only; one seed each |
+| bb2025 | snotling | 0 | 0 | 0 | pre-game, as bb2020 |
+
+### What the sweep settled that spot-checks could not
+
+* **The chain crowd-push fix held across all of bb2016.** Every bb2016 cell except `necromantic` is
+  green on the current build, including `vampire` (was 46/33/67) and `underworld`. I had only
+  gated 9 races by hand; the edition-wide regression check arrived here, clean.
+* **`vampire` is now green in ALL THREE editions.** Its bb2016 number was the largest red on the
+  board and F1 in the queue; the fix for underworld closed it. The give-chain symptom
+  ("`prompt_after=None` after a HandOffMove") was the frozen pushback chain, not a separate bug.
+* **Six of the nine reds are the newly drafted teams** (`black_orc`, `gnome`, `snotling` -- never
+  exercised before this campaign), plus `imperial_nobility` and `old_world_alliance`. The
+  long-established races are green everywhere except `necromantic` bb2016.
+* **Cross-build seed counts are not comparable even when a cell's colour is unchanged**:
+  `black_orc` bb2020 read 97 at @1.0 on the old build and 98 here. Only same-build numbers can be
+  differenced.
+
+### Non-official rosters (not part of the 83 official cells)
+
+All green on this build: `nippon`, `slann`, `chaos_pact` (bb2020/bb2025), `dark_elf_league_fumbbl`,
+`khemri_fumbbl`, `slann_fumbbl`.
