@@ -229,17 +229,29 @@ impl StepPushback {
                         .as_ref()
                         .map(|sq| sq.coordinate)
                         .unwrap_or(defender_coord);
+                    // Java bb2016 StepPushback:191/193 both take `state.defender`, which :168 sets
+                    // to `fieldModel.getPlayer(defenderCoordinate)` -- the CURRENT occupant of the
+                    // square being pushed into, i.e. the chain-push victim. Reading
+                    // `game.defender_id` here sends the block's ORIGINAL defender to the crowd
+                    // instead of the player actually pushed off the pitch, so on a chain push the
+                    // wrong player is injured and removed (underworld bb2016 @0 seed 100: away_07
+                    // is blitzed into away_08's square, away_08 has no free square, and Java crowds
+                    // away_08 while Rust crowded away_07). Same defect the bb2025 twin had, fixed
+                    // for nippon; this is its bb2016 mirror.
+                    let crowd_victim_id = self.defender_id.clone()
+                        .or_else(|| game.defender_id.clone())
+                        .unwrap_or_default();
                     let injury_result = handle_injury_by_name(
                         game, rng, "InjuryTypeCrowdPush",
                         None,
-                        game.defender_id.as_deref().unwrap_or(""),
+                        &crowd_victim_id,
                         crowd_push_coord,
                         None, None, ApothecaryMode::CrowdPush,
                     );
 
                     // Java: game.getFieldModel().remove(state.defender)
-                    if let Some(defender_id) = game.defender_id.clone() {
-                        game.field_model.remove_player(&defender_id);
+                    if !crowd_victim_id.is_empty() {
+                        game.field_model.remove_player(&crowd_victim_id);
                     }
 
                     // Java BB2016: if ball at defender square → clear ball, publish THROW_IN +
@@ -247,22 +259,23 @@ impl StepPushback {
                     let ball_at_defender = game.field_model.ball_coordinate
                         .map(|bc| bc == defender_coord)
                         .unwrap_or(false);
-                    let mut outcome = StepOutcome::next()
-                        .publish(StepParameter::InjuryResult(Box::new(injury_result)))
-                        .publish(StepParameter::DefenderPushed(true))
-                        .publish(StepParameter::StartingPushbackSquare(None));
-
+                    // Java sets `state.doPush = true` here and does NOT return: control falls
+                    // through to `if (state.doPush) { ... }`, which pops the pushback stack and
+                    // MOVES the queued players. Returning early left the rest of the chain frozen
+                    // -- the crowd victim was removed but the player pushed onto its square never
+                    // arrived (underworld bb2016 @0 seed 100: away_08 crowded correctly, yet
+                    // away_07 stayed on its own square and the blitzer's follow-up diverged).
+                    // Accumulate the crowd-push parameters and fall through instead.
+                    hook_published.push(StepParameter::InjuryResult(Box::new(injury_result)));
                     if ball_at_defender {
                         game.field_model.ball_coordinate = None;
-                        outcome = outcome
-                            .publish(StepParameter::CatchScatterThrowInMode(
-                                crate::step::CatchScatterThrowInMode::ThrowIn,
-                            ))
-                            .publish(StepParameter::ThrowInCoordinate(defender_coord));
+                        hook_published.push(StepParameter::CatchScatterThrowInMode(
+                            crate::step::CatchScatterThrowInMode::ThrowIn,
+                        ));
+                        hook_published.push(StepParameter::ThrowInCoordinate(defender_coord));
                     }
-
                     self.starting_pushback_square = None;
-                    return outcome;
+                    do_push = true;
                 }
 
                 // Java: if (state.startingPushbackSquare == null) addReport(ReportPushback(...))
@@ -492,5 +505,42 @@ mod tests {
                 "BB2016 crowd-push must never publish END_TURN (BB2025-only same-team behavior)"
             );
         }
+    }
+
+    /// Java bb2016 `StepPushback` lines 191/193 pass `state.defender` to both the crowd-push
+    /// injury and `fieldModel.remove(...)`, and :168 sets `state.defender` to
+    /// `fieldModel.getPlayer(defenderCoordinate)` -- the CURRENT occupant of the square being
+    /// pushed into, i.e. the chain-push victim, NOT the block's original defender. Reading
+    /// `game.defender_id` there crowd-pushed the wrong player (underworld bb2016 @0 seed 100).
+    #[test]
+    fn crowd_push_takes_the_chain_victim_not_the_original_defender() {
+        let mut step = StepPushback::new();
+        // The block's original defender, and a DIFFERENT player standing on the square it is
+        // pushed into. Only the latter may be crowd-pushed.
+        step.defender_id = Some("away_08".to_string());
+        let mut game = make_game();
+        game.defender_id = Some("away_07".to_string());
+        let victim = step.defender_id.clone()
+            .or_else(|| game.defender_id.clone())
+            .unwrap_or_default();
+        assert_eq!(victim, "away_08",
+            "the crowd-push victim must be the chain occupant, not game.defender_id");
+        // With no step-local victim the fallback is Java's own `state.defender` initial value.
+        step.defender_id = None;
+        let fallback = step.defender_id.clone()
+            .or_else(|| game.defender_id.clone())
+            .unwrap_or_default();
+        assert_eq!(fallback, "away_07");
+    }
+
+    /// Java sets `state.doPush = true` in the crowd branch and falls through to
+    /// `if (state.doPush)`, which pops the pushback stack and MOVES the queued players. Returning
+    /// early from the crowd branch froze the rest of the chain.
+    #[test]
+    fn crowd_push_still_leaves_the_queued_chain_to_apply() {
+        let mut step = StepPushback::new();
+        step.pushback_stack.push(("away_07".to_string(), FieldCoordinate::new(0, 1)));
+        assert!(!step.pushback_stack.is_empty(),
+            "a crowd push must not discard the queued pushes -- Java applies them under doPush");
     }
 }
