@@ -95,6 +95,9 @@ fn kickoff_tail(rules: ffb_model::enums::Rules) -> Vec<SequenceStep> {
     if bb2020 {
         add_bb2020_kickoff_labels(&mut seq);
     }
+    if rules == Rules::Bb2025 {
+        reorder_swarming_before_scatter(&mut seq);
+    }
     seq
 }
 
@@ -167,10 +170,36 @@ pub fn end_game_sequence(admin_mode: bool) -> Vec<SequenceStep> {
 
 /// The half-2 / post-touchdown kickoff. BB2020 needs the same labels as `kickoff_tail` — its
 /// kickoff table can roll BLITZ here too (bb2020 human seed 38 died at the half-2 kickoff).
+/// BB2025 runs SWARMING x2 BEFORE the kickoff scatter; BB2016/BB2020 run it AFTER.
+///
+/// Java `generator/bb2025/Kickoff.java:35-36` adds both SWARMING steps ahead of
+/// `KICKOFF_SCATTER_ROLL` (:42), while `generator/mixed/Kickoff.java` puts them after the scatter.
+/// The dice prove it: on snotling seed 1 Java bb2025 rolls the two `rollSwarmingPlayers` d3s at
+/// positions 6-7 and scatters at 8-9, whereas bb2020 scatters at 6-7 and swarms at 8-9. The base
+/// sequences here are written in the bb2020 order, so bb2025 moves them.
+fn reorder_swarming_before_scatter(seq: &mut Vec<SequenceStep>) {
+    let swarming: Vec<SequenceStep> = seq.iter()
+        .filter(|s| s.step_id == StepId::Swarming)
+        .cloned()
+        .collect();
+    if swarming.is_empty() {
+        return;
+    }
+    seq.retain(|s| s.step_id != StepId::Swarming);
+    if let Some(at) = seq.iter().position(|s| s.step_id == StepId::KickoffScatterRoll) {
+        for (i, step) in swarming.into_iter().enumerate() {
+            seq.insert(at + i, step);
+        }
+    }
+}
+
 pub fn h2_kickoff_sequence_for(rules: ffb_model::enums::Rules) -> Vec<SequenceStep> {
     let mut seq = h2_kickoff_sequence();
     if rules == ffb_model::enums::Rules::Bb2020 {
         add_bb2020_kickoff_labels(&mut seq);
+    }
+    if rules == ffb_model::enums::Rules::Bb2025 {
+        reorder_swarming_before_scatter(&mut seq);
     }
     seq
 }

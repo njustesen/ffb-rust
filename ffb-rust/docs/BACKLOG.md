@@ -4575,3 +4575,40 @@ step runs. Fixes 1 and 2 are unverified by any gate for exactly that reason.
 has the Swarming skill**, while bb2020's Snotling Lineman does. That matches the two editions'
 Java (bb2025 keys off the special rule, bb2020 off the skill), so it is probably correct -- but
 worth re-checking against the BB2025 page once the mechanic runs.
+
+## §H.2 — bb2025 swarms BEFORE the scatter (2026-09-08)
+
+snotling bb2025 went **0/0/0 -> 100/100/99** with one edition-ordering fix.
+
+The two editions order the kickoff differently, and the dice prove it on snotling seed 1:
+
+| | swarming d3s | scatter |
+|---|---|---|
+| Java bb2020 (`generator/mixed/Kickoff.java`) | pos 8-9 | pos 6-7 (BEFORE) |
+| Java bb2025 (`generator/bb2025/Kickoff.java:35-36` vs `:42`) | pos 6-7 | pos 8-9 (AFTER) |
+
+`sequences.rs` writes the base sequence in bb2020 order, so `reorder_swarming_before_scatter`
+moves the two SWARMING steps ahead of `KICKOFF_SCATTER_ROLL` for bb2025 only, wired into both
+`kickoff_tail` (the opening kickoff) and `h2_kickoff_sequence_for` (half 2 and drive kickoffs).
+
+**Remaining: seed 30 at @1e6 only (100/100/99).** It is NOT a swarming defect. The chain is:
+away_10 declares a Jump, the jump fails, the turnover correctly starts home's turn 4 (`tH=4 tA=3`,
+matching Java) -- and then Rust's AGENT answers `EndTurn` immediately, burning home's turn, where
+Java plays it. Candidate summaries agree exactly through k=34 (n AND draws), then Rust spends 4
+draws in activation k=34 where Java spends 2.
+
+Both engines DO offer the re-roll (Rust `cls=reroll` at total 110, Java `cls=RE_ROLL_PROPERTIES` at
+112), so this is a draw-ORDER difference around a re-roll offer, not a missing prompt.
+
+### This is the same family as `old_world_alliance` bb2025
+
+That cell is also @1e6-only, also one seed per variant, and also shows a small draw delta with a
+re-roll offer in the window (engine dice identical `rng_calls` 155->157, candidate lists identical
+n=1386 with the same target and the same weight bits, yet 239 Rust draws against 237 Java).
+
+**Treat them as ONE investigation.** Both need matched decision-level instrumentation: Java's
+`JDRAW` logs only a few classes (44 entries per game against Rust's 361), so the streams cannot be
+compared positionally -- that trap has already produced one wrong conclusion. The instrument to
+build is a per-decision log on BOTH sides carrying the prompt class, the option count and the raw
+draw, so the first differing DECISION can be named instead of inferred from cumulative totals.
+Closing it plausibly closes two cells at once.
