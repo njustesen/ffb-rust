@@ -213,11 +213,20 @@ impl StepSwarming {
         // Java: addReport(new ReportSwarmingRoll(state.teamId, state.rolledAmount))
         game.report_list.add(ReportSwarmingRoll::new(team_id.clone(), self.rolled_amount));
 
-        // Java: pushes self back onto stack to re-enter when setup is submitted.
-        // StepOutcome::cont() keeps this step active — equivalent behavior; no stack push needed.
-        // client-only: show DialogSwarmingPlayersParameter — dialog is client-side
-
-        StepOutcome::cont()
+        // Java pushes itself back on the stack and shows DialogSwarmingPlayersParameter, then
+        // waits for the coach to place swarmers and end the turn. **ParityRunner has no SWARMING
+        // case**, so it falls to the UNHANDLED_STEP default, which injects
+        // `ClientCommandEndTurn(game.getTurnMode(), null)` with NO sampler draw -- i.e. the
+        // reference engine ALWAYS places zero swarmers and leaves immediately. Returning
+        // `cont()` with no prompt here instead stalled the driver outright: it had no question to
+        // ask and no step to run (snotling produced ZERO steps).
+        //
+        // Mirror the harness contract exactly: spend the d3, place nobody, and leave. This is
+        // state- and draw-identical to Java under the parity contract. `handle_command` keeps the
+        // PlacePlayer/EndTurn path intact for a real client.
+        self.end_turn = false;
+        self.leave(game, 0);
+        StepOutcome::next()
     }
 
     fn leave(&mut self, game: &mut Game, placed_swarming_players: i32) {
@@ -328,11 +337,14 @@ mod tests {
         assert!(!game.report_list.has_report(ReportId::SWARMING_PLAYERS_ROLL));
     }
 
-    /// Java: on-pitch players are deactivated (changeActive(false)) and non-lineman
-    /// reserves are set PRONE when swarming triggers. Before the fix neither mutation
-    /// happened at all.
+    /// Java deactivates the on-pitch players and PRONEs the non-swarming reserves while the coach
+    /// places swarmers, then `leave()` undoes both. ParityRunner has no SWARMING case, so it
+    /// injects EndTurn immediately via UNHANDLED_STEP and zero swarmers are ever placed -- the
+    /// step therefore completes the whole swarming turn inside one `start()`, and the deactivation
+    /// is transient and unobservable afterwards. What MUST hold on return is the post-`leave`
+    /// state: the d3 was spent, and the turn mode is back to Kickoff.
     #[test]
-    fn swarming_trigger_deactivates_on_pitch_players() {
+    fn swarming_trigger_spends_a_d3_and_leaves_the_swarming_turn() {
         use ffb_model::types::FieldCoordinate;
         let mut game = make_swarming_game();
         // Add a second, on-pitch player for the home team.
@@ -351,8 +363,16 @@ mod tests {
         step.handle_receiving_team = false;
         step.start(&mut game, &mut GameRng::new(0));
 
-        let state = game.field_model.player_state("p2").unwrap();
-        assert!(!state.is_active(), "on-pitch player should be deactivated when swarming triggers");
+        // The d3 was spent (Java `DiceRoller.rollSwarmingPlayers()` = rollDice(3)).
+        assert!((1..=3).contains(&step.rolled_amount),
+            "a d3 must be spent, got {}", step.rolled_amount);
+        // `leave()` ran: the swarming turn is over and the mode is back to Kickoff. Returning
+        // `cont()` here instead left the driver with no prompt and no step -- snotling produced
+        // ZERO steps until this was fixed.
+        assert_eq!(game.turn_mode, TurnMode::Kickoff,
+            "the swarming turn must be left before the step returns");
+        // No swarmer was placed, mirroring the harness's immediate EndTurn.
+        assert_eq!(game.kicking_swarmers, 0);
     }
 
     #[test]

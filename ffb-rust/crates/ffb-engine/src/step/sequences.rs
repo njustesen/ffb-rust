@@ -49,6 +49,17 @@ fn kickoff_tail(rules: ffb_model::enums::Rules) -> Vec<SequenceStep> {
         SequenceStep::new(StepId::Setup),
         SequenceStep::new(StepId::Kickoff),
         SequenceStep::new(StepId::KickoffScatterRoll),
+        // SWARMING x2 -- Java `generator/mixed/Kickoff.java` runs it between the scatter and the
+        // kickoff return, once for the kicking team and once for the receiving team. Its absence
+        // here is why `StepSwarming` had NEVER been constructed in any edition: the two kickoff
+        // GENERATORS list it, but this hardcoded sequence is what actually runs, and it did not.
+        // Java spends two d3s per kickoff on `rollSwarmingPlayers`, so every game with a swarming
+        // team read the kickoff-result dice one pair early (snotling 0/100 in bb2020 AND bb2025:
+        // 4+2=6 Cheering Fans in Rust against Java's 5+2=7 Brilliant Coaching). See BACKLOG §H.
+        SequenceStep::with_params(StepId::Swarming,
+            vec![StepParameter::HandleReceivingTeam(false)]),
+        SequenceStep::with_params(StepId::Swarming,
+            vec![StepParameter::HandleReceivingTeam(true)]),
         SequenceStep::new(StepId::KickoffReturn),
         // NOTE: Java's sequence has SWARMING x2 and KICKOFF_RETURN here and this one does not, so
         // `StepKickoffReturn` -- translated 1:1 -- has never run: `FFB_DRIVE_TRACE` counts 3 each
@@ -171,6 +182,17 @@ pub fn h2_kickoff_sequence() -> Vec<SequenceStep> {
         SequenceStep::new(StepId::Setup),
         SequenceStep::new(StepId::Kickoff),
         SequenceStep::new(StepId::KickoffScatterRoll),
+        // SWARMING x2 -- Java `generator/mixed/Kickoff.java` runs it between the scatter and the
+        // kickoff return, once for the kicking team and once for the receiving team. Its absence
+        // here is why `StepSwarming` had NEVER been constructed in any edition: the two kickoff
+        // GENERATORS list it, but this hardcoded sequence is what actually runs, and it did not.
+        // Java spends two d3s per kickoff on `rollSwarmingPlayers`, so every game with a swarming
+        // team read the kickoff-result dice one pair early (snotling 0/100 in bb2020 AND bb2025:
+        // 4+2=6 Cheering Fans in Rust against Java's 5+2=7 Brilliant Coaching). See BACKLOG §H.
+        SequenceStep::with_params(StepId::Swarming,
+            vec![StepParameter::HandleReceivingTeam(false)]),
+        SequenceStep::with_params(StepId::Swarming,
+            vec![StepParameter::HandleReceivingTeam(true)]),
         SequenceStep::new(StepId::KickoffReturn),
         // NOTE: Java's sequence has SWARMING x2 and KICKOFF_RETURN here and this one does not, so
         // `StepKickoffReturn` -- translated 1:1 -- has never run: `FFB_DRIVE_TRACE` counts 3 each
