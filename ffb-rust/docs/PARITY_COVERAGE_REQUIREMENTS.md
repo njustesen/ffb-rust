@@ -937,3 +937,41 @@ cannot see turn flags, so the state STRING is the instrument that names this cla
 No regression: goblin, `underworld_underworldtroll`, `chaos_pact` and ogre bb2020 all 100/100
 @1.0 (every other Always Hungry carrier reachable here), and goblin bb2025 + bb2016 100/100 @1.0
 confirming the untouched editions. ffb-engine 7458/0.
+
+## 17. vampire bb2020 CLOSED -- 72 green / 11 red, 2026-09-08
+
+`vampire` bb2020 measured **100/100 at all three scales on one build** (`CELL: GREEN`). Its
+recorded red was 100/98/100, with two failures at @0.
+
+### No new engine work closed this one, and the attribution matters
+
+Neither engine fix from this session can explain it:
+
+* the bb2016 chain crowd-push fix is bb2016-only;
+* the Always Hungry edition gate needs a carrier with `mightEatPlayerToThrow`, and the vampire
+  roster has none (Thrall, Runner, Blitzer, Thrower, Vargheist -- no Big Guy);
+* F0 only touches argument parsing.
+
+The apothecary correction is NOT the mechanism either: the squad fields `apothecaries: 0`, so the
+roster's `apothecary` flag changes nothing that is played. What remains is the `reroll_cost`
+70k -> 60k correction (spend 1,080,000 -> 1,050,000) and, more likely, that **the 98/100 was
+measured on an older binary** -- §12 records its build as predating engine edits that are now
+committed. Without bisecting the two I cannot say which, so this cell is recorded as **verified,
+not fixed**.
+
+### The generalisable point: some reds may be stale rather than real
+
+Every remaining red except `necromantic` bb2016 and `underworld`/`renegades` (both now closed)
+traces to the §12 batch, measured on a binary built before several committed engine changes. A red
+number is only as current as the build that produced it. **Re-measure a red before designing a fix
+for it** -- the same lesson vampire bb2016 taught in ITER2, now paid twice.
+
+| | bb2016 | bb2020 | bb2025 | total |
+|---|---|---|---|---|
+| 🟢 | 22 | 26 | 24 | **72** |
+| 🔴 | 2 | 3 | 6 | **11** |
+| N/A | 8 | 4 | 1 | 13 |
+
+Remaining: bb2016 `necromantic` `vampire`; bb2020 `black_orc` `gnome` `snotling`; bb2025
+`black_orc` `gnome` `imperial_nobility` `old_world_alliance` `snotling` `vampire`. The bb2020 and
+bb2025 entries all carry §12-vintage numbers and should be re-measured first.
