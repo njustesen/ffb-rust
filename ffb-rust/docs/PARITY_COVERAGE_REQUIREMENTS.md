@@ -882,3 +882,28 @@ cannot reach the paths a legal one does.
 Seven gates print `100/100 games match, but required coverage items are MISSING` and exit 1. That
 is the **tier-3 coverage checklist**, not parity: those cells are parity-GREEN and counted as such
 here, consistent with how §12 counted the same trailer.
+
+## 15. underworld bb2016 CLOSED -- 70 green / 13 red, 2026-09-08
+
+`underworld` bb2016 was the newest red (§14), exposed when its off-page Mutant Rat Ogre was removed
+and its illegal squad re-drafted. **It is now GREEN at all three scales** (100/100 at 1.0, 0 and
+1e6) via two defects in the bb2016 `StepPushback` crowd branch -- see commit for the full account:
+
+1. the crowd-push victim was `game.defender_id` (the block's ORIGINAL defender) where Java uses
+   `state.defender`, the CURRENT occupant of the square being pushed into;
+2. the crowd branch RETURNED where Java sets `doPush = true` and falls through to the block that
+   pops the pushback stack and moves the queued players.
+
+Fixing only (1) moved the frontier instead of closing it, which is what exposed (2) -- the
+half-fix left the crowd victim correct but the rest of the chain frozen.
+
+| | bb2016 | bb2020 | bb2025 | total |
+|---|---|---|---|---|
+| 🟢 | 22 | 24 | 24 | **70** |
+| 🔴 | 2 | 5 | 6 | **13** |
+| N/A | 8 | 4 | 1 | 13 |
+
+Remaining bb2016 reds: `necromantic` (98/99/99, unchanged by this fix) and `vampire` (46/33/67).
+
+No regression: bb2016 `chaos` `orc` `dwarf` `undead` `goblin` `khemri` 100/100 @1.0 and `amazon`
+`human` 100/100 @0. ffb-engine 7457/0.
