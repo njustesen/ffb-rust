@@ -4491,3 +4491,48 @@ most likely to be a shared cause already fixed by F1-F6.
    `khemri_fumbbl` have no official page, so their bb2025 `keywords` were DERIVED (role from
    position name + quantity, species from the roster). bb2025 logic reads keywords, so if any of
    these four ever gates red, suspect the derivation first.
+
+# §G — Measurement economics and the agreed working process, 2026-09-08
+
+## Why a gate costs what it costs (measured, same race/edition/pinning)
+
+| | per 100 seeds | per game |
+|---|---|---|
+| Rust, `--agent random` | 12.2s | **122 ms** |
+| Rust, `--agent heuristic` | 48.8s | **488 ms** |
+| Java, heuristic | 87-97s | ~900 ms |
+
+**There is no Rust performance regression.** The ~100 ms/game figure people remember is the RANDOM
+agent; the heuristic agent costs ~4x that because it scores 1,200-2,200 candidates per activation
+with a Dijkstra reach search per mover. Java is ~63% of each gate.
+
+**A gate does not scale with cores.** 4 cores -> ~120s, 8 cores -> ~138s, because Java's batched JVM
+is largely serial. Throughput comes from running MORE gates concurrently, not fatter ones. Measured
+with 4 workers x 2 cores (8 of 16 total): ~0.86 gates/min, i.e. **~6.5h for the full 333-gate
+matrix**. One worker on 4 cores is ~0.5 gates/min (~11h). Concurrency is bounded by RAM too: 7
+concurrent JVMs once exhausted memory and produced `rc=127` runs with no verdict.
+
+## `--reuse-java` IS trustworthy now (the old rule was stale)
+
+The campaign rule "never gate on `--reuse-java`" came from a 2026-08-27 incident where a stale
+cache turned 100/100 into 30/100. The manifest has since been given the agent fields whose absence
+caused it (`java_fingerprint`, version 1: jar stamp, server-data dir stamp, team ids, tier, edition,
+trace flags, agent, scale, classes). Validated 2026-09-08 on underworld bb2016:
+
+| test | expected | measured |
+|---|---|---|
+| repeat same gate | cache HIT | `java_total=0.026s`, 137.8s -> **43.7s** (3.2x), same verdict |
+| different `--heur-scale` | cache MISS | Java re-ran, 93.4s |
+| a server XML touched | cache MISS | Java re-ran, 97.3s |
+
+Both negative controls reject correctly, so it is safe for RE-RUNS. It does nothing for a first
+full sweep (every gate is a miss), which is why the full matrix still costs ~6.5h.
+
+## The agreed process (user decision, 2026-09-08)
+
+1. Re-run the FULL matrix now, on one build, to get a table that can be trusted.
+2. While working, do NOT pay the regression cost per change -- push new cells to green instead.
+3. When everything is green, re-run the full matrix once and check for regressions then.
+
+Consequence to respect: **do not rebuild the engine while a sweep is running.** A mid-sweep rebuild
+splits the build again and destroys exactly the property the sweep exists to establish.
