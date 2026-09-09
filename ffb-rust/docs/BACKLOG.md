@@ -4897,3 +4897,52 @@ change touches skill-use injection for EVERY race, the regression was deliberate
 bb2025 @1.0, dark_elf bb2025 @1e6 (Side Step), dwarf bb2016 @1.0 (Stand Firm), black_orc bb2020
 @1.0 (Grab), slann bb2025 @1e6 (Diving Tackle), human bb2025 @1.0, undead bb2020 @1.0, goblin bb2016
 @1.0 — all 100/100. ffb-engine 7458/0. Java trees synced, jar rebuilt.
+
+## §H.9 — imperial_nobility bb2025: localized to one extra re-roll ask (2026-09-09)
+
+Still 84/100/33. **Not closed.** But the divergence is pinned to a single extra question, and the
+decision log now carries the ANSWER as well as the option count, which is what made it visible.
+
+### Instrument upgrade (keep): `RPICKED` / `JPICKED`
+
+`FFB_DEC` logged the option COUNT at each pick but not the chosen index, so two agents answering the
+same 2-option question differently looked identical. Both samplers now also emit
+`RPICKED/JPICKED kind=… n=… pick=<idx>`. That immediately separated "asked a different question"
+from "gave a different answer" on this cell, and it is what proved the two agents here AGREE on
+every answer they both make.
+
+### Where imperial_nobility bb2025 seed 3 stands
+
+At the end of half 1 with **`tH=8 tA=8`** (both teams on their last turn), a rush fails and both
+engines offer a team re-roll. Then:
+
+| | Rust | Java |
+|---|---|---|
+| re-roll ask #1 | `n=2 idx=0` (USE) | `n=2 idx=0` (USE) |
+| re-roll ask #2 | *not asked* | `n=2 idx=1` (DECLINE) |
+| next | setup `n=195 idx=98` | setup `n=195 idx=97` |
+
+Both accept the first re-roll, both re-roll (Java's rush dice at engine pos 177=6 and 178=5 are
+matched exactly in Rust), and both then end the half and set up for half 2. The ONLY difference is
+that Java raises the same `RE_ROLL_PROPERTIES` dialog a second time and declines it, spending two
+draws Rust does not spend; the setup pick then lands one square apart (98 vs 97) and the game
+separates.
+
+Every engine die matches through pos 180 — the rush, its re-roll, and the block dice (179=2,
+180=6). The first differing die is 181, and Rust's is a `d12` from `random_player_on_field`, i.e.
+Rust is already into the half-2 kickoff.
+
+### Next measurement
+
+Identify which step raises Java's SECOND `RE_ROLL_PROPERTIES` for the same `ReRolledActions.RUSH`
+(the action object is identical in both dialogs, but `ReRolledActions` are singletons, so identity
+does NOT prove it is the same roll — it may be a second rush). Add the step id to the harness probe
+rather than the dialog fields. Two candidates, and they need different fixes:
+
+1. a SECOND rush later in the same turn that Rust never reaches, or
+2. the same rush re-offered because the ACCEPT did not advance the step — the Trickster shape,
+   where `sendUseReRoll` may not be the command a PROPERTIES dialog expects.
+
+`imperial_nobility` is the only roster with **Pro** in any edition, so a second re-roll source is
+plausible on paper — but the offer here is a plain team re-roll (`source=TRR`) and the player
+involved is Away8, so Pro has NOT been shown to be involved. Do not assume it.

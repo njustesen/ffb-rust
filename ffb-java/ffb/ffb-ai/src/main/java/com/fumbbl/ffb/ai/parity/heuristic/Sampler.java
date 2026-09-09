@@ -140,7 +140,11 @@ public final class Sampler {
                 break;
             }
         }
-        return Math.min(idx, n - 1);
+        int picked = Math.min(idx, n - 1);
+        if (System.getenv("FFB_DEC") != null) {
+            System.err.println("JPICKED kind=flat n=" + n + " pick=" + picked);
+        }
+        return picked;
     }
 
     /**
@@ -193,6 +197,9 @@ public final class Sampler {
                 pick = i;
                 break;
             }
+        }
+        if (System.getenv("FFB_DEC") != null) {
+            System.err.println("JPICKED kind=soft n=" + len + " pick=" + pick);
         }
         return pick;
     }

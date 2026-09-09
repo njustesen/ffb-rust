@@ -2091,6 +2091,9 @@ impl HeuristicAgent {
                 break;
             }
         }
+        if std::env::var_os("FFB_DEC").is_some() {
+            eprintln!("RPICKED kind=soft n={} pick={}", n, pick);
+        }
         (pick, ps)
     }
 
@@ -2123,7 +2126,11 @@ impl HeuristicAgent {
             cum.push(acc);
         }
         let r = self.unit() * acc;
-        cum.partition_point(|&c| c < r).min(n - 1)
+        let picked = cum.partition_point(|&c| c < r).min(n - 1);
+        if std::env::var_os("FFB_DEC").is_some() {
+            eprintln!("RPICKED kind=flat n={} pick={}", n, picked);
+        }
+        picked
     }
 
     fn take(&mut self, i: usize) -> Action {
