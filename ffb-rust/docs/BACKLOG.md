@@ -5051,3 +5051,48 @@ Java asking one more time. Keep it.
 reason is worth keeping: `skill=null` on the dialog does not mean no skill is involved — Pro travels
 in the `reRollProperties` list, not the `reRollSkill` field. Read the property list before
 concluding a re-roll offer is a plain team re-roll.
+
+## §H.11 — necromantic CLOSED: Rust raised Zombies Java refused to raise (2026-09-09)
+
+**Nine gates 100/100** (bb2016/bb2020/bb2025 × 1.0/0/1e6). bb2016 was 98/99/99.
+
+### The bug: an edition-less property read
+
+`InjuryMechanic.can_raise_dead` asked `has_skill_property(PREVENT_RAISE_FROM_DEAD)`. That accessor
+returns the edition-LESS property set, which follows this enum's "latest edition wins" convention —
+and BB2025's `Regeneration` **deliberately drops** `preventRaiseFromDead` (there is a comment on
+`SkillId::Regeneration` recording exactly that, added for an earlier bb2025 fix). bb2016 and bb2020
+Regeneration DO register it in Java.
+
+Net effect: every bb2016/bb2020 Regeneration player silently became raisable. Fixed by reading
+`has_skill_property_in(Rules::Bb2016 | Rules::Bb2020, ..)` in the two older mechanics; bb2025 is
+already correct via the edition-less path and is left alone.
+
+necromantic bb2016 seed 47: a Werewolf (Claw / Frenzy / **Regeneration**) is killed. Java declines
+to raise it; Rust raised a Zombie, fielded it at the next setup, and then offered the agent **18**
+activation candidates against Java's **17** (`RSUM` carried an extra `home_01R1/Move:122`). The
+extra draw split the game.
+
+### A second, edition-sensitive read in the same expression
+
+Java gates on `deadPlayer.getStrength()` — the BASE stat. Rust used `strength_with_modifiers()` at
+all five sites across the three editions. Corrected. Be honest about its weight: it changed nothing
+measurable on seed 47 and the cell closed on the property fix alone.
+
+### The measurement mistake worth remembering
+
+After the strength fix I checked whether the raise had stopped with
+`grep -oE '(home|away)_[0-9]+(R[0-9]+)?' | sort -u | tail -8` and reported "the raise is gone".
+It had not: `home_01R1` sorts ABOVE `home_05`, so `tail` cut the very id being looked for. The next
+`RSUM` dump showed it still there. **Never confirm an absence with a truncated view** — this is the
+same shape as the trace-window lesson in `feedback_trace_window_truncation`, in a new disguise.
+
+Also: the `necromancer` roster flag was a dead end I nearly spent time on. Both engines declare
+`necromancer=true`; a `JRAISE` probe printed `hasNecro=true ... can=false`, which pointed straight
+at the property term. Probe the predicate, do not audit its inputs one at a time.
+
+### Tooling that did the work
+
+`FFB_CANDSUM` (RSUM/JSUM) is the right first instrument for an "n differs by one" activation split:
+it prints the per-player, per-declaration candidate counts, so the extra entry is named rather than
+inferred. `FFB_DEC`/`RPICKED` localises to the decision; `FFB_CANDSUM` identifies the player.

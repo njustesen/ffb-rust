@@ -36,8 +36,8 @@ impl InjuryMechanicTrait for InjuryMechanic {
             && team_result.raised_dead == 0
             && attacker.is_some()
             && attacker.unwrap().has_skill_property(NamedProperties::ALLOWS_RAISING_LINEMAN)
-            && dead_player.strength_with_modifiers() <= 4
-            && !dead_player.has_skill_property(NamedProperties::PREVENT_RAISE_FROM_DEAD)
+            && dead_player.strength <= 4
+            && !dead_player.has_skill_property_in(ffb_model::enums::Rules::Bb2020, NamedProperties::PREVENT_RAISE_FROM_DEAD)
             && !dead_player.has_skill_property(NamedProperties::REQUIRES_SECOND_CASUALTY_ROLL)
     }
 
@@ -55,8 +55,8 @@ impl InjuryMechanicTrait for InjuryMechanic {
             .any(|r| r == SpecialRule::MASTERS_OF_UNDEATH.get_rule_name());
         (masters_of_undeath || team.vampire_lord)
             && team_result.raised_dead == 0
-            && dead_player.strength_with_modifiers() <= 4
-            && !dead_player.has_skill_property(NamedProperties::PREVENT_RAISE_FROM_DEAD)
+            && dead_player.strength <= 4
+            && !dead_player.has_skill_property_in(ffb_model::enums::Rules::Bb2020, NamedProperties::PREVENT_RAISE_FROM_DEAD)
     }
 
     fn raised_nurgle_type(&self) -> PlayerType { PlayerType::PlagueRidden }

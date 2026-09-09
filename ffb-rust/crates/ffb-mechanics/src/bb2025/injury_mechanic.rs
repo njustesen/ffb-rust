@@ -55,7 +55,7 @@ impl InjuryMechanicTrait for InjuryMechanic {
     ) -> bool {
         team.special_rules.iter().any(|r| r == SpecialRule::MASTERS_OF_UNDEATH.get_rule_name())
             && team_result.raised_dead == 0
-            && dead_player.strength_with_modifiers() <= 4
+            && dead_player.strength <= 4
             && !dead_player.has_skill_property(NamedProperties::PREVENT_RAISE_FROM_DEAD)
     }
 

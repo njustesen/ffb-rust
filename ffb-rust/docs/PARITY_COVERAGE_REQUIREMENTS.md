@@ -446,7 +446,7 @@ A cell is 🟢 only if **all four** hold:
 | khemri | 🟢 | 🟢 | 🟢 |
 | khorne | N/A | 🔴 d | 🔴 d |
 | lizardman | 🟢 | 🔴 c | 🟢 |
-| necromantic | 🔴 c | 🟢 | 🟢 |
+| necromantic | 🟢 | 🟢 | 🟢 |
 | norse | 🟢 | 🟢 | 🟢 |
 | nurgle | 🟢 | 🟢 | 🟢 |
 | ogre | 🟢 | 🟢 | 🟢 |
@@ -795,7 +795,7 @@ UNGATED. §12 measured them. Three groups of cells move:
 | khemri | 🟢 | 🟢 | 🟢 |
 | khorne | N/A | 🟢 | 🟢 |
 | lizardman | 🟢 | 🔴 c | 🟢 |
-| necromantic | 🔴 c | 🟢 | 🟢 |
+| necromantic | 🟢 | 🟢 | 🟢 |
 | norse | 🟢 | 🟢 | 🟢 |
 | nurgle | 🟢 | 🟢 | 🟢 |
 | ogre | 🟢 | 🟢 | 🟢 |
@@ -996,7 +996,7 @@ superseded. This is the first table where every cell comes from the same engine.
 
 | edition | team | @1.0 | @0 | @1e6 | note |
 |---|---|---|---|---|---|
-| bb2016 | necromantic | 98 | 99 | 99 | exposed by the Zombie-cost correction; both @1.0 seeds diverge at the FIRST ACTIVATION OF HALF 2 |
+| bb2016 | necromantic | 100 | 100 | 100 | CLOSED 2026-09-09 - bb2016/bb2020 Regeneration lost `preventRaiseFromDead` to the edition-less property accessor, so Rust raised Zombies Java refused to raise (BACKLOG SS-H.11) |
 | bb2020 | black_orc | 98 | 100 | 98 | |
 | bb2020 | gnome | 38 | 53 | 58 | failures dominated by Rust STALLS |
 | bb2020 | snotling | 0 | 1 | 0 | diverges at STEP 0 of every seed -- pre-game |

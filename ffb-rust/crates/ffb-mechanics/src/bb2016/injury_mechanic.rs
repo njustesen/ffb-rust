@@ -34,8 +34,8 @@ impl InjuryMechanicTrait for InjuryMechanic {
     ) -> bool {
         attacker.is_some()
             && attacker.unwrap().has_skill_property(NamedProperties::ALLOWS_RAISING_LINEMAN)
-            && dead_player.strength_with_modifiers() <= 4
-            && !dead_player.has_skill_property(NamedProperties::PREVENT_RAISE_FROM_DEAD)
+            && dead_player.strength <= 4
+            && !dead_player.has_skill_property_in(ffb_model::enums::Rules::Bb2016, NamedProperties::PREVENT_RAISE_FROM_DEAD)
             && !dead_player.has_skill_property(NamedProperties::REQUIRES_SECOND_CASUALTY_ROLL)
     }
 
@@ -49,10 +49,25 @@ impl InjuryMechanicTrait for InjuryMechanic {
     ) -> bool {
         // Java: (roster.hasNecromancer() || roster.hasVampireLord())
         // && raisedDead == 0 && strength <= 4 && !preventRaiseFromDead
+        //
+        // Both reads here are edition-sensitive and BOTH were wrong:
+        //
+        // 1. `strength`, not `strength_with_modifiers()` — Java calls `deadPlayer.getStrength()`,
+        //    the base stat.
+        // 2. `has_skill_property_in(Bb2016, ..)`, not `has_skill_property(..)`. The edition-less
+        //    accessor follows the enum's "latest edition wins" convention, and BB2025's
+        //    Regeneration deliberately drops `preventRaiseFromDead` (see the note on
+        //    `SkillId::Regeneration`) — so every bb2016/bb2020 Regeneration player silently lost
+        //    the property and became raisable. Java's bb2016 Regeneration registers it.
+        //
+        // necromantic bb2016 seed 47: a Werewolf (Claw/Frenzy/REGENERATION) is killed, Java
+        // declines to raise it, Rust raised a Zombie, fielded it at the next setup, and offered
+        // the agent 18 activation candidates against Java's 17 — the extra draw split the game.
+        // Only a necromantic/vampire opponent can reach this, so it needed the roster to exist.
         (team.necromancer || team.vampire_lord)
             && team_result.raised_dead == 0
-            && dead_player.strength_with_modifiers() <= 4
-            && !dead_player.has_skill_property(NamedProperties::PREVENT_RAISE_FROM_DEAD)
+            && dead_player.strength <= 4
+            && !dead_player.has_skill_property_in(ffb_model::enums::Rules::Bb2016, NamedProperties::PREVENT_RAISE_FROM_DEAD)
     }
 
     fn raised_nurgle_type(&self) -> PlayerType { PlayerType::RaisedFromDead }
@@ -170,5 +185,65 @@ mod tests {
         // necromancer takes priority over vampire_lord
         let team = empty_team(true, true);
         assert_eq!(InjuryMechanic.raise_type(&team), RaiseType::ZOMBIE);
+    }
+}
+
+#[cfg(test)]
+mod raise_edition_tests {
+    use super::*;
+    use ffb_model::enums::{Rules, SkillId};
+    use ffb_model::model::skill_def::SkillWithValue;
+
+    fn necro_team() -> Team {
+        Team {
+            id: "t".into(), name: "T".into(), race: "necromantic".into(),
+            roster_id: "necromantic.lrb6".into(), coach: "c".into(),
+            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+            prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+            cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
+            team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
+            vampire_lord: false, necromancer: true,
+        }
+    }
+
+    fn regen_player(st: i32) -> Player {
+        Player {
+            id: "dead".into(), name: "dead".into(), nr: 1, position_id: "pos".into(),
+            movement: 6, strength: st, agility: 3, passing: 3, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Regeneration, value: None }],
+            ..Default::default()
+        }
+    }
+
+    /// bb2016/bb2020 Regeneration registers `preventRaiseFromDead`; BB2025's deliberately does
+    /// not, and the edition-LESS property accessor returns the BB2025 flavour. Reading it here
+    /// let every bb2016 Regeneration player be raised (necromantic bb2016 seed 47: a dead
+    /// Werewolf came back as a Zombie and added an activation candidate Java never had).
+    #[test]
+    fn bb2016_regeneration_still_prevents_being_raised() {
+        assert!(!crate::bb2016::injury_mechanic::InjuryMechanic
+            .can_raise_dead(&necro_team(), &TeamResult::default(), &regen_player(3)),
+            "a bb2016 Regeneration player must not be raisable");
+        // The edition-less accessor is what made this look raisable — pin the difference.
+        assert!(!regen_player(3).has_skill_property(
+            ffb_model::model::property::named_properties::NamedProperties::PREVENT_RAISE_FROM_DEAD),
+            "edition-less lookup returns the BB2025 flavour");
+        assert!(regen_player(3).has_skill_property_in(Rules::Bb2016,
+            ffb_model::model::property::named_properties::NamedProperties::PREVENT_RAISE_FROM_DEAD),
+            "the bb2016 lookup keeps the property");
+    }
+
+    /// Java gates on `deadPlayer.getStrength()`, the BASE stat, not the modified one.
+    #[test]
+    fn the_strength_gate_reads_the_base_stat() {
+        let mut p = regen_player(5);
+        p.starting_skills.clear();
+        assert!(!crate::bb2016::injury_mechanic::InjuryMechanic
+            .can_raise_dead(&necro_team(), &TeamResult::default(), &p),
+            "base ST 5 is above the raise threshold");
+        p.strength = 4;
+        assert!(crate::bb2016::injury_mechanic::InjuryMechanic
+            .can_raise_dead(&necro_team(), &TeamResult::default(), &p),
+            "base ST 4 is raisable");
     }
 }
