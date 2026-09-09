@@ -1973,7 +1973,16 @@ impl HeuristicAgent {
 
     fn unit(&mut self) -> f32 {
         self.probe_draws += 1;
-        (self.rng.next_u64() >> 11) as f32 / (1u64 << 53) as f32
+        let v = (self.rng.next_u64() >> 11) as f32 / (1u64 << 53) as f32;
+        // FFB_DEC: the matched decision log. Java's `Sampler.unit()` carries the identical mirror
+        // (`JDEC`), so the two streams are directly comparable BY INDEX -- which `FFB_DRAWS`/`JDRAW`
+        // are not: they log different prompt taxonomies (361 Rust entries per game against Java's
+        // 44), so diffing them positionally is meaningless and has already produced one wrong
+        // conclusion. Here the first differing index names the decision that diverged.
+        if std::env::var_os("FFB_DEC").is_some() {
+            eprintln!("RDEC i={} r={:08x}", self.probe_draws, v.to_bits());
+        }
+        v
     }
 
     fn argmax(&self) -> usize {
@@ -2043,6 +2052,9 @@ impl HeuristicAgent {
     /// `temp_scale <= 0` degenerates to argmax with all the mass on one entry, as everywhere else.
     fn softmax_pick(&mut self, w: &[f32], t_base: f32) -> (usize, Vec<f32>) {
         let n = w.len();
+        if std::env::var_os("FFB_DEC").is_some() {
+            eprintln!("RPICK kind=soft n={} t={:08x} draws={}", n, t_base.to_bits(), self.probe_draws);
+        }
         if n == 0 {
             return (0, Vec::new());
         }
@@ -2079,26 +2091,14 @@ impl HeuristicAgent {
                 break;
             }
         }
-        // FFB_GRP=1: the two-level pick, at the level that actually decides. FFB_CANDSUM cannot
-        // see this -- it aggregates per (player, action) through a BTreeMap, so two NON-ADJACENT
-        // runs of one declaration merge into a single count there while `group_declarations`
-        // (contiguous runs) hands the sampler two groups. `JGRP` is the Java mirror.
-        if std::env::var_os("FFB_GRP").is_some() {
-            let ws: Vec<String> = if n <= 64 {
-                w.iter().map(|v| format!("{:08x}", v.to_bits())).collect()
-            } else {
-                Vec::new()
-            };
-            eprintln!(
-                "RGRP k={} len={} t={:08x} r={:08x} pick={} w=[{}]",
-                self.probe_act, n, t.to_bits(), r.to_bits(), pick, ws.join(",")
-            );
-        }
         (pick, ps)
     }
 
     fn pick(&mut self, t_base: f32) -> usize {
         let n = self.buf.options.len();
+        if std::env::var_os("FFB_DEC").is_some() {
+            eprintln!("RPICK kind=flat n={} t={:08x} draws={}", n, t_base.to_bits(), self.probe_draws);
+        }
         // §20.10 — nothing to decide, so do not pay for a softmax or consume a draw.
         if n <= 1 {
             return 0;

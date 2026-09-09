@@ -69,7 +69,14 @@ public final class Sampler {
      */
     float unit() {
         draws++;
-        return (float) (rng.nextLong() >>> 11) / (float) (1L << 53);
+        float v = (float) (rng.nextLong() >>> 11) / (float) (1L << 53);
+        // FFB_DEC: mirror of Rust's RDEC. Rust's `unit()` carries the identical line, so the two
+        // streams compare BY INDEX. JDRAW/FFB_DRAWS cannot be compared that way (different prompt
+        // taxonomies, 44 entries here against Rust's 361).
+        if (System.getenv("FFB_DEC") != null) {
+            System.err.println("JDEC i=" + draws + " r=" + String.format("%08x", Float.floatToRawIntBits(v)));
+        }
+        return v;
     }
 
     /** How many {@code nextLong()} calls this sampler has consumed. Test instrumentation only. */
@@ -98,6 +105,10 @@ public final class Sampler {
      * otherwise, on both branches.
      */
     public int pick(float tBase) {
+        if (System.getenv("FFB_DEC") != null) {
+            System.err.println("JPICK kind=flat n=" + size()
+                + " t=" + String.format("%08x", Float.floatToRawIntBits(tBase)) + " draws=" + draws);
+        }
         if (n <= 1) {
             return 0;
         }
@@ -138,6 +149,10 @@ public final class Sampler {
      * one draw when it decides.
      */
     public int softmaxPick(float[] w, int len, float tBase) {
+        if (System.getenv("FFB_DEC") != null) {
+            System.err.println("JPICK kind=soft n=" + len
+                + " t=" + String.format("%08x", Float.floatToRawIntBits(tBase)) + " draws=" + draws);
+        }
         if (len <= 1) {
             return 0;
         }

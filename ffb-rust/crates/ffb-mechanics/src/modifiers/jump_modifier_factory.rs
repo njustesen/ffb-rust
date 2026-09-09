@@ -10,7 +10,8 @@ use crate::modifiers::modifier_type::ModifierType;
 /// 1:1 translation of com.fumbbl.ffb.factory.mixed.JumpModifierFactory (BB2020/BB2025).
 ///
 /// Finds modifiers for an agility (Jump/Leap) roll:
-/// - TACKLEZONE: max(fromZones, toZones) tackle zones from adjacent opponents.
+/// - TACKLEZONE: the tackle zones on the jumper's CURRENT square (Java
+///   `numberOfTacklezones` -> `UtilPlayer.findTacklezones(game, player)`), i.e. `ctx.to`.
 /// - PREHENSILE_TAIL: opponents adjacent to `from` with makesJumpingHarder property.
 /// - BB2016: no modifiers (empty collection).
 pub struct JumpModifierFactory {
@@ -53,14 +54,43 @@ impl JumpModifierFactory {
             &ctx.game.team_home
         };
 
-        // Count tackle zones at `from` and `to` — take max.
+        // Java counts the tackle zones on the JUMPING PLAYER'S CURRENT SQUARE and nothing else:
+        // `mixed/JumpModifierFactory.findModifiers` calls `getTacklezoneModifier(context)`, which
+        // takes `numberOfTacklezones(context)`, and neither the mixed factory nor its base
+        // overrides that -- it is `GenerifiedModifierFactory.numberOfTacklezones` ->
+        // `UtilPlayer.findTacklezones(game, context.getPlayer())`. In `StepJump` the player has
+        // ALREADY been moved when the modifiers are built (`to` is read straight off the field
+        // model), so that square is `ctx.to`.
+        //
+        // Taking `max(from, to)` made the jump harder than Java's whenever the ORIGIN was more
+        // heavily marked than the destination -- which is the whole divergence on snotling bb2025
+        // seed 30: identical engine dice (the jump rolls a 3 on both sides) and AG 3, but Rust
+        // added a tackle-zone modifier from the origin, turning a 3+ into a 4+, so Rust failed the
+        // jump and offered a team re-roll while Java simply carried on and rushed.
+        // Java gates the WHOLE tackle-zone modifier on the jumper's own skills:
+        //   if (!context.getPlayer().hasSkillProperty(ignoreTacklezonesWhenJumping)) { ... }
+        // Pogo (bb2025) / Pogo Stick (bb2020) grant it, so a pogoer jumps with NO marking penalty.
+        // Rust applied the modifier unconditionally, which is the whole snotling bb2025 seed-30
+        // divergence: away_10 is a Fun-hoppa (Pogo), AG 3, and the jump rolled a 3 on BOTH sides --
+        // Java's target was 3+ and succeeded, Rust's was 4+ (one "for being marked") and failed,
+        // so Rust offered a team re-roll where Java carried on and rushed.
+        let ignores_tz = ctx.player.has_skill_property_in(
+            ctx.game.rules, NamedProperties::IGNORE_TACKLEZONES_WHEN_JUMPING);
+        // The count is taken at the jumper's CURRENT square: Java's `numberOfTacklezones` is
+        // `UtilPlayer.findTacklezones(game, context.getPlayer())`, and `StepJump` builds the
+        // context with `to` read straight off the field model, so `to` IS that square.
+        let tz_count = if ignores_tz {
+            0
+        } else {
+            UtilPlayer::find_adjacent_players_with_tacklezones(
+                ctx.game, other_team, ctx.to, false,
+            ).len() as i32
+        };
+        // Prehensile Tail is a different rule and DOES key off the origin: Java
+        // `prehensileTailModifier(findNumberOfPrehensileTails(context.getGame(), context.getFrom()))`.
         let from_ids = UtilPlayer::find_adjacent_players_with_tacklezones(
             ctx.game, other_team, ctx.from, false,
         );
-        let to_ids = UtilPlayer::find_adjacent_players_with_tacklezones(
-            ctx.game, other_team, ctx.to, false,
-        );
-        let tz_count = (from_ids.len() as i32).max(to_ids.len() as i32);
 
         if tz_count > 0 {
             if let Some(m) = self.collection.get_modifiers().iter()

@@ -4612,3 +4612,51 @@ compared positionally -- that trap has already produced one wrong conclusion. Th
 build is a per-decision log on BOTH sides carrying the prompt class, the option count and the raw
 draw, so the first differing DECISION can be named instead of inferred from cumulative totals.
 Closing it plausibly closes two cells at once.
+
+## §H.3 — snotling bb2025 CLOSED, and the instrument that did it (2026-09-09)
+
+`snotling` bb2025 is **GREEN** (100/100 x 3). 74 green / 7 red.
+
+### The tool: a matched decision log (`FFB_DEC` / `JDEC`)
+
+Two @1e6-only reds had resisted every existing probe because **`FFB_DRAWS` and `JDRAW` cannot be
+compared**: they log different prompt taxonomies (361 Rust entries per game against Java's 44), so
+positional diffing is meaningless and had already produced one wrong conclusion.
+
+The fix was to instrument the one function both sides implement identically -- `unit()`, the raw
+draw -- plus the option count at each pick entry:
+
+* Rust `heuristic_agent.rs::unit` -> `RDEC i=<n> r=<bits>`; `pick`/`softmax_pick` -> `RPICK kind=
+  flat|soft n=<n> t=<bits> draws=<n>`
+* Java `Sampler.unit` -> `JDEC ...`; `pick`/`softmaxPick` -> `JPICK ...`
+
+Both streams then compare BY INDEX. On snotling bb2025 seed 30 the first differing event was #205:
+Rust `pick flat/n=2` (a two-option re-roll question) where Java did `pick soft/n=6` then
+`soft/n=41` (a two-level activation) -- with the raw draw values identical either side of it. That
+localised the divergence to one decision instead of a cumulative-total guess. **Keep this
+instrument.**
+
+### The bug: Pogo ignores tackle zones when jumping
+
+`mixed/JumpModifierFactory.findModifiers` gates the WHOLE tackle-zone modifier on the jumper:
+
+```java
+if (!context.getPlayer().hasSkillProperty(NamedProperties.ignoreTacklezonesWhenJumping)) { ... }
+```
+
+Pogo (bb2025) / Pogo Stick (bb2020) grant that property. Rust applied the marking penalty
+unconditionally. Seed 30: `away_10` is a **Fun-hoppa (Pogo)**, AG 3, and the jump rolled a **3 on
+both sides** -- Java's target was 3+ and it succeeded and rushed on; Rust's was 4+ ("1 for being
+marked"), so it failed and offered a team re-roll, and every later decision was unrelated noise.
+
+Two wrong turns on the way, both worth remembering: the tackle-zone SQUARE was also wrong
+(`max(from, to)` where Java counts the jumper's current square only, i.e. `ctx.to` -- Prehensile
+Tail is the rule that legitimately keys off `from`), and I tested `from` before realising neither
+square gives Java's answer of ZERO, which is what pointed at a skill gate rather than a geometry
+bug.
+
+### `old_world_alliance` bb2025 is NOT the same bug
+
+Both variants still measure 99/100 at @1e6 after this fix, so §H.2's "treat them as one
+investigation" is **withdrawn**. Its own first differing decision now needs reading with
+`FFB_DEC` -- the instrument exists, the analysis does not.
