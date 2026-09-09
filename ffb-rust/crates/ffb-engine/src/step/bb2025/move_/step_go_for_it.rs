@@ -235,7 +235,7 @@ impl StepGoForIt {
             let current_move = game.acting_player.current_move;
             let ma = player_id.as_deref()
                 .and_then(|id| game.player(id))
-                .map(|p| p.movement as i32)
+                .map(|p| p.movement_with_modifiers())
                 .unwrap_or(4);
             if jumping && !self.second_go_for_it && current_move > ma + 1 {
                 self.second_go_for_it = true;

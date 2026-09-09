@@ -109,7 +109,7 @@ impl StepGoForIt {
         let current_move = game.acting_player.current_move;
         let ma = player_id.as_deref()
             .and_then(|id| game.player(id))
-            .map(|p| p.movement as i32)
+            .map(|p| p.movement_with_modifiers())
             .unwrap_or(4);
 
         if !going_for_it || current_move <= ma {
@@ -192,7 +192,7 @@ impl StepGoForIt {
             let current_move = game.acting_player.current_move;
             let ma = player_id.as_deref()
                 .and_then(|id| game.player(id))
-                .map(|p| p.movement as i32)
+                .map(|p| p.movement_with_modifiers())
                 .unwrap_or(4);
             if jumping && !self.second_go_for_it && current_move > ma + 1 {
                 self.second_go_for_it = true;
@@ -237,7 +237,7 @@ impl StepGoForIt {
         let pid = game.acting_player.player_id.clone();
         let ma = pid.as_deref()
             .and_then(|id| game.player(id))
-            .map(|p| p.movement as i32)
+            .map(|p| p.movement_with_modifiers())
             .unwrap_or(4);
         // Java: if (jumping && !secondGfi && currentMove > ma+1 && !failedRushForJumpAlwaysLandsInTargetSquare)
         let always_lands = pid.as_deref()

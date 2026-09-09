@@ -166,6 +166,52 @@ fn ask_for_reroll_if_available_inner(
         });
     }
 
+    // Java `RollMechanic.askForReRollIfAvailable` adds `ReRollProperty.PRO` to the SAME dialog
+    // whenever `isProReRollAvailable` holds, and `dialogShown` is true if ANY listed property
+    // `isActualReRoll()` — so Pro alone raises the offer even with the team re-roll gone. Rust
+    // never consulted the Pro check here, so the offer was simply never raised, and the two
+    // engines then disagreed about how many questions the turn contained.
+    //
+    // Only `imperial_nobility` carries Pro in any edition, so this was unreachable until that
+    // roster was drafted: bb2025 seed 3, `Away8` rushes at the end of half 1, fails, spends the
+    // team re-roll, fails the re-rolled Rush too, and Java raises a SECOND offer (Pro) which the
+    // agent declines. Those two extra sampler draws shifted the half-2 setup pick by one square
+    // (98 vs 97) and split the game. All three editions offer Pro; bb2025 alone excludes the two
+    // passive Swoop actions (`passiveReRollActions`).
+    //
+    // The SOURCE recorded is the team re-roll, not Pro, and that is deliberate: Java's dialog
+    // carries Pro as a *property*, but `ParityRunner.reRollSourceFor` answers every
+    // RE_ROLL_PROPERTIES dialog with `ReRollSources.TEAM_RE_ROLL` whatever properties it listed.
+    // Mirroring the answer means recording TRR here, so an accepted offer runs the same
+    // team-re-roll consumption Java runs (and fails the same way when the bank is spent). Pro's
+    // only parity-visible effect is whether the question is ASKED. A non-parity client would need
+    // the Pro source plumbed through `use_reroll`; see BACKLOG §H.10.
+    // EDITION-GATED, and the gate lives in the HARNESS, not the rules. Both dialog types are
+    // shown by all three editions, but `ParityRunner.reRollSourceFor` opens with
+    // `if (!teamReRollOption) return null;` — the heuristic is never consulted and NO sampler
+    // draw is spent. bb2016/bb2020 raise `DialogReRollParameter` and pass the real
+    // `rr.isTeamReRollOption()`, which is FALSE for a Pro-only offer; bb2025 raises
+    // `DialogReRollPropertiesParameter` and passes a hardcoded `true`. So the same Pro-only
+    // question costs two draws in bb2025 and zero in the older editions.
+    //
+    // Measured, not assumed: elf bb2020 seed 1, `Home1` holds Pro from the Blessed Statue of
+    // Nuffle prayer, rushes with the team re-roll spent, and Java's own
+    // `isProReRollAvailable` returns TRUE and shows the dialog (`JPROCHK ... pro=true trr=false`)
+    // — yet the Java decision stream spends nothing there. Offering it unconditionally cost two
+    // draws Java never spends and took elf bb2020 @1.0 from 100/100 to a seed-1 failure.
+    let passive_action = matches!(rerolled_action, "SWOOP_DISTANCE" | "SWOOP_DIRECTION");
+    if game.rules == ffb_model::enums::Rules::Bb2025 && !passive_action {
+        if let Some(player) = player_id.and_then(|pid| game.player(pid)) {
+            if crate::util::util_server_re_roll::UtilServerReRoll::is_pro_re_roll_available(game, player) {
+                return Some(AgentPrompt::ReRollOffer {
+                    source: ReRollSource::new("TRR"),
+                    action: rerolled_action.to_owned(),
+                    team_id: acting_team_id,
+                });
+            }
+        }
+    }
+
     None
 }
 
@@ -315,6 +361,89 @@ pub fn use_reroll(
 
 #[cfg(test)]
 mod tests {
+    /// Java `RollMechanic.askForReRollIfAvailable` lists `ReRollProperty.PRO` alongside TRR and
+    /// shows the dialog when ANY listed property `isActualReRoll()`. So a Pro carrier whose team
+    /// re-roll is already spent is STILL asked. Rust never consulted the Pro check and simply
+    /// stopped asking, which cost two sampler draws per missed question (imperial_nobility bb2025
+    /// seed 3: `Away8` rushes, spends the TRR, fails again, and Java asks a second time).
+    #[test]
+    fn pro_raises_the_offer_when_the_team_reroll_bank_is_spent() {
+        use ffb_model::enums::{Rules, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        for rules in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            let mut game = ffb_model::model::game::Game::new(
+                crate::step::framework::test_team("home", 0),
+                crate::step::framework::test_team("away", 0),
+                rules,
+            );
+            game.home_playing = true;
+            game.team_home.players.push(ffb_model::model::player::Player {
+                id: "pro1".into(), name: "pro1".into(), nr: 1, position_id: "pos".into(),
+                movement: 6, strength: 3, agility: 3, passing: 3, armour: 8,
+                starting_skills: vec![SkillWithValue { skill_id: SkillId::Pro, value: None }],
+                ..Default::default()
+            });
+            game.turn_data_mut().rerolls = 0;
+            // bb2020/bb2025 `eligibleForPro` additionally require the Pro carrier to BE the
+            // acting player, upright, in a Regular/Blitz turn; bb2016's is unconditionally true.
+            game.turn_mode = ffb_model::enums::TurnMode::Regular;
+            game.acting_player.player_id = Some("pro1".into());
+            game.acting_player.has_moved = true;
+
+            let offer = ask_for_reroll_if_available_inner(
+                &game, Some("pro1"), "GFI", 2, false, None);
+            // Only bb2025's dialog reaches the agent; see the edition note on the Pro branch.
+            assert_eq!(offer.is_some(), rules == Rules::Bb2025,
+                "{rules:?}: only bb2025 consults the agent for a Pro-only offer");
+
+            // A player without Pro is asked nothing once the bank is empty.
+            game.team_home.players.push(ffb_model::model::player::Player {
+                id: "plain".into(), name: "plain".into(), nr: 2, position_id: "pos".into(),
+                movement: 6, strength: 3, agility: 3, passing: 3, armour: 8,
+                ..Default::default()
+            });
+            game.acting_player.player_id = Some("plain".into());
+            assert!(ask_for_reroll_if_available_inner(
+                &game, Some("plain"), "GFI", 2, false, None).is_none(),
+                "{rules:?}: without Pro there is nothing left to offer");
+        }
+    }
+
+    /// bb2025 alone carries `passiveReRollActions` (the two Swoop rolls); bb2016/bb2020 have no
+    /// such exclusion, so Pro is offered for every action there.
+    #[test]
+    fn bb2025_excludes_the_passive_swoop_actions_from_the_pro_offer() {
+        use ffb_model::enums::{Rules, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mk = |rules| {
+            let mut game = ffb_model::model::game::Game::new(
+                crate::step::framework::test_team("home", 0),
+                crate::step::framework::test_team("away", 0),
+                rules,
+            );
+            game.home_playing = true;
+            game.team_home.players.push(ffb_model::model::player::Player {
+                id: "pro1".into(), name: "pro1".into(), nr: 1, position_id: "pos".into(),
+                movement: 6, strength: 3, agility: 3, passing: 3, armour: 8,
+                starting_skills: vec![SkillWithValue { skill_id: SkillId::Pro, value: None }],
+                ..Default::default()
+            });
+            game.turn_data_mut().rerolls = 0;
+            game.turn_mode = ffb_model::enums::TurnMode::Regular;
+            game.acting_player.player_id = Some("pro1".into());
+            game.acting_player.has_moved = true;
+            game
+        };
+        for action in ["SWOOP_DISTANCE", "SWOOP_DIRECTION"] {
+            assert!(ask_for_reroll_if_available_inner(
+                &mk(Rules::Bb2025), Some("pro1"), action, 2, false, None).is_none(),
+                "bb2025 must not offer Pro for the passive {action}");
+            assert!(ask_for_reroll_if_available_inner(
+                &mk(Rules::Bb2020), Some("pro1"), action, 2, false, None).is_none(),
+                "bb2020 never consults the agent for a Pro-only offer at all");
+        }
+    }
+
     /// Java `RollMechanic.useTeamReRoll` decrements the bank UNCONDITIONALLY — availability is an
     /// ask-time check only, and the stale-source re-entry (ARM_BAR → StepMoveDodge) legitimately
     /// spends from an empty bank, going negative (chaos bb2025 seed 40 @1e6).

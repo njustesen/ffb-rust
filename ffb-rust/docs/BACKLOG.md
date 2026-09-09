@@ -4946,3 +4946,108 @@ rather than the dialog fields. Two candidates, and they need different fixes:
 `imperial_nobility` is the only roster with **Pro** in any edition, so a second re-roll source is
 plausible on paper — but the offer here is a plain team re-roll (`source=TRR`) and the player
 involved is Away8, so Pro has NOT been shown to be involved. Do not assume it.
+
+## §H.10 — imperial_nobility CLOSED: Pro was never offered (2026-09-09)
+
+**Six gates 100/100** (bb2020 ×3, bb2025 ×3; bb2016 is N/A — no bb2016 imperial_nobility roster).
+Was 84/100/33 at bb2025.
+
+### The bug: the Pro re-roll offer did not exist in Rust
+
+Java's `RollMechanic.askForReRollIfAvailable` builds a property list for one dialog —
+`MASCOT, TRR, <additional>, LONER, PRO` — and shows it when **any** listed property
+`isActualReRoll()`. Pro therefore raises the question **on its own**, with the team re-roll gone.
+All three editions do this; bb2025 alone excludes the two passive Swoop rolls
+(`passiveReRollActions`).
+
+Rust's `ask_for_reroll_if_available_inner` knew about the skill source and the team re-roll and
+nothing else. `is_pro_re_roll_available` already existed and was correct — it was simply never
+called from the general offer path, only from the multi-block steps. So Rust stopped asking where
+Java asked again.
+
+**imperial_nobility is the only roster carrying Pro in any edition**, so this shared gap was
+unreachable until the roster was drafted — the fourth mechanic in this campaign that was dead until
+its team existed (after Swarming, Grab and Trickster).
+
+### Why it cost so much for so little
+
+bb2025 seed 3: at the end of half 1 with both teams on turn 8, `Away8` rushes, fails, spends the
+team re-roll, and fails the re-rolled Rush too. Java raises a second offer — Pro — and the agent
+**declines** it. The decline changes no dice at all; it just spends two sampler draws. That shifted
+the half-2 setup pick by one square (98 vs 97) and the two games separated from there. Every engine
+die matched through the split.
+
+### The correction that cost the most: the gate is in the HARNESS, not the rules
+
+The first version of this fix offered Pro in **all three editions**, which is what the Java
+`RollMechanic` does — and it took `elf bb2020 @1.0` from 100/100 to a seed-1 failure. Attribution
+was checked by restoring the three touched files to HEAD and re-running: elf was green without them,
+so it was mine.
+
+The reason is not in the rules at all. `ParityRunner.reRollSourceFor` opens with:
+
+```java
+if (!teamReRollOption) { return null; }   // no heuristic call, no sampler draw
+```
+
+- bb2016/bb2020 raise `DialogReRollParameter` and the harness passes the real
+  `rr.isTeamReRollOption()` — **false** for a Pro-only offer, so the agent is never consulted.
+- bb2025 raises `DialogReRollPropertiesParameter` and the harness passes a hardcoded **`true`**, so
+  the agent is always consulted.
+
+The same Pro-only question therefore costs two sampler draws in bb2025 and zero in the older
+editions. The Rust offer is gated to bb2025 for exactly that reason, and the comment says so —
+this is a *harness contract* gate, not a rules gate, and it will look wrong to anyone who checks it
+against the Java `RollMechanic` alone.
+
+Measured, not inferred: a temporary `JPROCHK` probe in Java's bb2020 `RollMechanic` printed
+`pid=teamElfParity20Home1 pro=true trr=false hasProp=true` — Java's own availability check says yes
+and the dialog IS shown — while Java's decision stream spends nothing at that point.
+
+### Two beliefs this killed
+
+1. **"Only imperial_nobility carries Pro."** True of the static rosters and of `data/teams/`, and
+   false in play: the **Blessed Statue of Nuffle** prayer grants Pro to a random player on any team,
+   which is exactly how the elf blitzer got it. Grep the rosters to find who *starts* with a skill,
+   never to bound who can *have* it.
+2. **"A green cell proves the mechanic agrees."** elf bb2020 was green with Rust and Java disagreeing
+   about a live Pro skill, because prayer-granted skills are not in the state hash. The cell went red
+   only when the disagreement started costing a draw.
+
+### The one deliberate infidelity, and why
+
+The offer Rust raises for Pro records the source as **TRR, not Pro**. Java's dialog carries Pro as a
+*property*, but `ParityRunner.reRollSourceFor` answers every `RE_ROLL_PROPERTIES` dialog with
+`ReRollSources.TEAM_RE_ROLL` whatever properties it listed — so mirroring the ANSWER means recording
+the team re-roll, and an accepted offer then runs the same team-re-roll consumption Java runs
+(failing the same way when the bank is spent). Pro's only parity-visible effect is whether the
+question is asked.
+
+**Follow-up (not blocking the sweep):** a non-parity client needs the Pro source plumbed through
+`use_reroll` — the Pro d6 and the `usedPro` bit. `step/mixed/step_pro.rs` already implements both;
+only the general offer path routes around it.
+
+### A second fix, Java-faithful but inert here
+
+Java's `StepGoForIt` reads `getMovementWithModifiers()` at **all five** MA sites. Rust's bb2020 and
+bb2025 steps read base `p.movement` at four of them, including the `succeedGfi` jumping test that
+decides whether a jumping rush takes a SECOND roll. bb2016 was already correct at all three of its
+sites, so this was drift in the two later editions, not a translation miss.
+
+Corrected — but be honest about the evidence: it changed **nothing measurable**. Seed 3's decision
+stream was byte-identical before and after, and the cell closed on the Pro fix alone. It is in
+because the Java says so, not because a red turned green. Both jumping races (slann, snotling)
+re-gate 100/100 in bb2020 and bb2025 after it.
+
+### Instrument note
+
+`RPICKED`/`JPICKED` (the pick INDEX, added in `2e61bc46c`) is what made this findable: the option
+counts alone showed both agents asking the same 2-option question, and only the answers revealed
+Java asking one more time. Keep it.
+
+### Correcting an earlier entry
+
+§H.9 said "Pro is NOT implicated: the offer is `source=TRR`". That inference was wrong, and the
+reason is worth keeping: `skill=null` on the dialog does not mean no skill is involved — Pro travels
+in the `reRollProperties` list, not the `reRollSkill` field. Read the property list before
+concluding a re-roll offer is a plain team re-roll.

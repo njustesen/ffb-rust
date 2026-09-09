@@ -442,7 +442,7 @@ A cell is 🟢 only if **all four** hold:
 | halfling | 🔴 c | 🟢 | 🟢 |
 | high_elf | 🟢 | 🟢 | 🟢 |
 | human | 🟢 | 🟢 | 🟢 |
-| imperial_nobility | N/A | 🔴 d | 🔴 d |
+| imperial_nobility | N/A | 🟢 | 🟢 |
 | khemri | 🟢 | 🟢 | 🟢 |
 | khorne | N/A | 🔴 d | 🔴 d |
 | lizardman | 🟢 | 🔴 c | 🟢 |
@@ -574,7 +574,7 @@ positional slots** (29 bb2016 / 41 bb2020 / 41 bb2025 squads); `scripts/check_sk
 | bb2020 | underworld_underworldtroll *(R3)* | 100/100 | 100/100 | 100/100 | 🟢 |
 | bb2025 | black_orc | **99/100** | 100/100 | **98/100** | 🔴 |
 | bb2025 | gnome | **35/100** | **10/100** | **51/100** | 🔴 |
-| bb2025 | imperial_nobility | **84/100** | 100/100 | **33/100** | 🔴 |
+| bb2025 | imperial_nobility | 100/100 | 100/100 | 100/100 | 🟢 |
 | bb2025 | khorne | 100/100 | 100/100 | 100/100 | 🟢 |
 | bb2025 | old_world_alliance_ogre | 100/100 | 100/100 | **99/100** | 🔴 |
 | bb2025 | old_world_alliance_treeman | 100/100 | 100/100 | **99/100** | 🔴 |
