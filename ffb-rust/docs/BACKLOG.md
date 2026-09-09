@@ -4853,3 +4853,47 @@ squad can reach it that way. ffb-engine 7458/0.
 
 Two tests asserted the old auto-accept (`grab_with_occupied_pushback_square_auto_accepts`) and were
 rewritten from the Java to pin the PARK instead.
+
+## §H.8 — gnome CLOSED in BOTH editions, via a HARNESS fix (2026-09-09)
+
+**GREEN: gnome bb2020 and bb2025, 100/100 x 3 each.** 79 green / 2 red.
+
+### Trickster could not be answered at all
+
+`gnome`'s Illusionist carries **Trickster**, and gnome is the ONLY roster with it in any edition
+(`grep -rl '"Trickster"' data/rosters/`), so it had never been exercised before this campaign.
+
+`FFB_DEC` put the divergence at event 471, and `FFB_DRAWS` named it: Java asked
+`SKILL_USE skill=Trickster` at draws 233, **235, 237, 239** — and **500 times** across the game,
+running **1965** agent events against Rust's 536. Rust asked once and moved on.
+
+**Cause (harness).** `StepTrickster.handleCommand` accepts `CLIENT_USE_SKILL` only behind
+`UtilServerSteps.checkCommandIsFromPassivePlayer`, because Trickster is offered to the player being
+blocked — the PASSIVE side — while the blocker's team is current. `ParityRunner.injectCaptured`
+resolves the injecting team via `getDialogTeamId`, which has arms for BlockRollProperties,
+ArgueTheCall, BriberyAndCorruption, PlayerChoice … but **none for `DialogSkillUseParameter`**. So
+the answer was injected as the current team, the gate rejected it, the dialog was never hidden, and
+the step re-showed it until the game ran out.
+
+**THIS IS A HARNESS FIX, called out as such.** `injectCaptured` now resolves a skill-use dialog to
+the team that OWNS the player the dialog names. For every other skill-use dialog that player is on
+the current team, so it resolves to the same side and changes nothing — confirmed by regression.
+No Rust gap is filed: Rust's engine already asks once and proceeds; it was Java that could not be
+driven.
+
+### Also: Trickster pinned to DECLINE in both agents
+
+Accepting Trickster needs a follow-up `CLIENT_FIELD_COORDINATE` naming one of
+`StepTrickster.eligibleSquares`, which ParityRunner never sends — so an ACCEPT still parks the step
+even with the injection fixed. Trickster therefore joins DumpOff / PrimalSavagery /
+SafePairOfHands / Swoop in the pinned-to-decline set, in `HeuristicDriver.useSkill` AND the Rust
+`w_use` table, still spending the sampler draws. **Pinning alone did NOT fix it** (Java still asked
+500 times) — the injection fix is what stopped the loop; both are needed.
+
+### Verification
+
+Four seeds first (bb2020 @1.0 2/3, bb2025 @0 1/3), then both cells 100/100 x 3. Because the harness
+change touches skill-use injection for EVERY race, the regression was deliberately broad: amazon
+bb2025 @1.0, dark_elf bb2025 @1e6 (Side Step), dwarf bb2016 @1.0 (Stand Firm), black_orc bb2020
+@1.0 (Grab), slann bb2025 @1e6 (Diving Tackle), human bb2025 @1.0, undead bb2020 @1.0, goblin bb2016
+@1.0 — all 100/100. ffb-engine 7458/0. Java trees synced, jar rebuilt.

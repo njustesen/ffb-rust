@@ -4139,11 +4139,16 @@ impl HeuristicAgent {
                     "Fend" => 0.85,
                     "Wrestle" => 0.55,
                     "QuickBite" | "AnimalSavagery" => 0.85,
-                    // The four skills whose USE path no harness can drive (DumpOff enters an
+                    // The skills whose USE path no harness can drive (DumpOff enters an
                     // undriveable INIT_PASSING, PrimalSavagery/Swoop open target dialogs,
-                    // SafePairOfHands a PLACE_BALL coach dialog): pinned to DECLINE, still
+                    // SafePairOfHands a PLACE_BALL coach dialog, and TRICKSTER needs a follow-up
+                    // CLIENT_MOVE naming one of `StepTrickster.eligibleSquares` that ParityRunner
+                    // never sends -- so an ACCEPT leaves the step parked and Java re-shows the
+                    // dialog forever: gnome bb2020 seed 2 asked Trickster at draws 233/235/237/239
+                    // and ran 1965 agent events against Rust's 536): pinned to DECLINE, still
                     // spending the sampler draws. Mirrored in HeuristicDriver.useSkill.
-                    "DumpOff" | "PrimalSavagery" | "SafePairOfHands" | "Swoop" => 0.0,
+                    "DumpOff" | "PrimalSavagery" | "SafePairOfHands" | "Swoop"
+                    | "Trickster" => 0.0,
                     _ => 0.50,
                 };
                 self.buf.push(

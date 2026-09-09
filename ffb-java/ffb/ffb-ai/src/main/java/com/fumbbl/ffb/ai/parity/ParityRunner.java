@@ -4062,6 +4062,21 @@ public class ParityRunner {
         com.fumbbl.ffb.net.commands.ClientCommand captured = comm.getCapturedCommand();
         if (captured != null) {
             String teamId = getDialogTeamId(dialog);
+            // HARNESS FIX. A skill-use answer must be injected AS THE TEAM THAT OWNS THE PLAYER
+            // the dialog names, not as the current team. `StepTrickster.handleCommand` accepts
+            // CLIENT_USE_SKILL only behind `checkCommandIsFromPassivePlayer`, and Trickster is
+            // offered to the DEFENDER while the blocker's team is current -- so the answer was
+            // rejected, the dialog was never hidden, and the step re-showed it forever: gnome
+            // bb2020 seed 2 asked Trickster 500 times and ran 1965 agent events against Rust's
+            // 536. For every other skill-use dialog the named player IS on the current team, so
+            // this resolves to the same side and changes nothing.
+            if (teamId == null && dialog instanceof com.fumbbl.ffb.dialog.DialogSkillUseParameter) {
+                String pid = ((com.fumbbl.ffb.dialog.DialogSkillUseParameter) dialog).getPlayerId();
+                com.fumbbl.ffb.model.Player<?> owner = (pid == null) ? null : game.getPlayerById(pid);
+                if (owner != null && owner.getTeam() != null) {
+                    teamId = owner.getTeam().getId();
+                }
+            }
             try {
                 if (teamId != null) {
                     MatchRunner.injectForTeam(gameState, captured,
