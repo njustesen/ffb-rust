@@ -362,7 +362,46 @@ impl StepMoveDodge {
                         }
                     }
                     if fails_with_dt && !self.re_roll_used {
-                        if let Some(prompt) = ask_for_reroll_if_available(game, "DODGE", min_with_dt, false) {
+                        // Java's DT what-if calls the PLAYER overload with an EXPLICIT re-roll
+                        // skill: `askForReRollIfAvailable(gameState, actingPlayer.getPlayer(),
+                        // DODGE, minimumWithDt, false, null, rerollSkill, null, null, message)`
+                        // where `rerollSkill = uncanceledDodgeRerollSource(game, actingPlayer)`.
+                        // Rust called the ACTING-PLAYER overload, which looks a skill source up by
+                        // action WITHOUT the Tackle cancellation the normal failure path below
+                        // applies -- so on a dodge next to a player carrying BOTH Diving Tackle and
+                        // Tackle (the OWA Dwarf Blitzer, and the dwarf Blitzer), Rust offered a
+                        // Dodge-skill re-roll that Java had cancelled. Java showed NO dialog and
+                        // spent NO draw; Rust spent one, and every decision after that diverged
+                        // (old_world_alliance bb2025 @1e6 seeds 68 and 93).
+                        // Java: `rerollSource = uncanceledDodgeRerollSource(game, actingPlayer)`
+                        // and the dialog is shown when `teamReRollOption || reRollSkill != null`.
+                        // So the SKILL term still counts -- but only when it is UNCANCELLED. Tackle
+                        // registers CancelSkillProperty(canRerollDodge), so a dodge next to a player
+                        // carrying both Diving Tackle and Tackle (the OWA Dwarf Blitzer) has NO skill
+                        // source and falls back to the team-only question, which Java does not ask
+                        // when the bank is unavailable. Using the acting-player overload
+                        // unconditionally offered a cancelled Dodge re-roll (OWA seeds 68/93);
+                        // dropping the skill term entirely broke slann bb2025 @1e6, where the source
+                        // is uncancelled and Java DOES ask. Both terms are needed.
+                        let uncancelled_dodge_source = find_skill_reroll_source(game, "DODGE")
+                            .filter(|_| {
+                                use ffb_model::util::util_player::UtilPlayer;
+                                use ffb_model::model::property::NamedProperties;
+                                let acting = game.acting_player.player_id.clone().unwrap_or_default();
+                                let from_sq = self.coordinate_from
+                                    .unwrap_or_else(|| FieldCoordinate::new(0, 0));
+                                UtilPlayer::find_adjacent_opposing_players_with_property(
+                                    game, &acting, from_sq,
+                                    NamedProperties::CANCELS_CAN_REROLL_DODGE, false,
+                                ).is_empty()
+                            });
+                        let dt_prompt = if uncancelled_dodge_source.is_some() {
+                            ask_for_reroll_if_available(game, "DODGE", min_with_dt, false)
+                        } else {
+                            ask_for_reroll_if_available_for(
+                                game, player_id.as_deref(), "DODGE", min_with_dt, false)
+                        };
+                        if let Some(prompt) = dt_prompt {
                             self.dt_reroll_asked = true;
                             use ffb_model::model::re_rolled_action::ReRolledAction;
                             self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("DODGE"));

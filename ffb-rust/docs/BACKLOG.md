@@ -4757,3 +4757,52 @@ Java mirror) — i.e. an MA/movement-budget accounting difference of one square,
    extra DECISION exists, and it says none does before #473.
 2. **Absence of a probe is not absence of behaviour.** "0 diving-tackle mentions" was meaningless:
    there is no `eprintln` for it anywhere in `step_move_dodge.rs`.
+
+## §H.6 — old_world_alliance bb2025 CLOSED (2026-09-09)
+
+**GREEN: both variants 100/100 x 3.** 75 green / 6 red. The user's hunch that Diving Tackle was
+involved was correct — via the Tackle interaction, not the DT modifier itself.
+
+### The bug
+
+bb2025's `StepMoveDodge` has a DIVING TACKLE WHAT-IF on the SUCCESS path: if an eligible diving
+tackler is adjacent and the dodge would fail with DT's +2 applied, the coach is offered a re-roll
+before DT is declared. Java builds that offer as
+
+```java
+ReRollSource rerollSource = uncanceledDodgeRerollSource(game, actingPlayer);
+Skill rerollSkill = rerollSource != null ? rerollSource.getSkill(game) : null;
+askForReRollIfAvailable(gameState, actingPlayer.getPlayer(), DODGE, minimumWithDt, false,
+                        null, rerollSkill, null, null, message);
+```
+
+— the PLAYER overload with an **explicitly uncancelled** skill source. Rust called the
+ACTING-PLAYER overload, which looks a skill source up by action WITHOUT the Tackle cancellation
+(`CancelSkillProperty(canRerollDodge)`) that the normal failure path a few lines below DOES apply.
+
+The OWA Dwarf Blitzer carries **Diving Tackle AND Tackle**. So the same marker that triggers the
+what-if also cancels the dodger's Dodge re-roll: Java finds no skill source, has no team re-roll,
+shows NO dialog and spends NO agent draw. Rust offered the cancelled Dodge re-roll, spent one draw,
+and every decision after that was unrelated noise (seeds 68 and 93, @1e6 only).
+
+Fix: compute the uncancelled source explicitly and pick the overload Java picks — acting-player
+when the source survives, player-only when Tackle cancelled it. **Both terms are required.**
+
+### Two of my own regressions, caught and reverted
+
+1. **Dropping the skill term entirely** (using the player overload unconditionally) fixed OWA and
+   broke `slann` bb2025 @1e6 to 98/100 — slann's Dodge source is uncancelled, so Java DOES ask.
+2. **The jump tackle-zone square.** While fixing Pogo for snotling (`c4453d920`) I also changed the
+   count from `max(from, to)` to `ctx.to` on the reasoning that Java reads the jumper's current
+   square. That regressed `slann` — **the jumping race** — from 100/100 to 98/100 (bb2025 @1e6) and
+   99/100 (bb2020 @0), and it went unnoticed because I regression-tested snotling and goblin, not
+   slann. The **Pogo gate alone** is what snotling needed: a Pogo jumper skips the count entirely,
+   so the square never mattered for it. Square reverted to `max(from, to)`; gate kept.
+
+**Lesson: pick the regression set by who carries the affected SKILL.** Diving Tackle in bb2025 is
+carried by `dwarf`, `old_world_alliance`, `slann` and `slann_fumbbl`; jumps are slann's signature.
+`grep -rl "<skill>" data/rosters/` before choosing what to re-gate.
+
+Verified on the final code: OWA ogre and treeman 100/100 x 3 each; slann bb2025 @1e6 and bb2020 @0
+back to 100/100; snotling bb2025 @1e6 and @0 still 100/100; dwarf bb2025 @1e6 and @0 100/100;
+human bb2025 @1.0 100/100. ffb-engine 7458/0, ffb-mechanics 1167/0.

@@ -76,15 +76,22 @@ impl JumpModifierFactory {
         // so Rust offered a team re-roll where Java carried on and rushed.
         let ignores_tz = ctx.player.has_skill_property_in(
             ctx.game.rules, NamedProperties::IGNORE_TACKLEZONES_WHEN_JUMPING);
-        // The count is taken at the jumper's CURRENT square: Java's `numberOfTacklezones` is
-        // `UtilPlayer.findTacklezones(game, context.getPlayer())`, and `StepJump` builds the
-        // context with `to` read straight off the field model, so `to` IS that square.
+        // The SQUARE stays `max(from, to)`. Java's `numberOfTacklezones` reads the jumper's
+        // current coordinate, and I changed this to `ctx.to` on that reasoning while fixing the
+        // Pogo gate below -- it regressed slann, the jumping race, from 100/100 to 98/100 (bb2025
+        // @1e6) and 99/100 (bb2020 @0). The Pogo gate alone is what snotling bb2025 needed, since
+        // a Pogo jumper skips the count entirely and the square never matters for it. Reverted:
+        // do not touch this again without gating slann, dwarf and OWA in the same run.
         let tz_count = if ignores_tz {
             0
         } else {
-            UtilPlayer::find_adjacent_players_with_tacklezones(
+            let from_tz = UtilPlayer::find_adjacent_players_with_tacklezones(
+                ctx.game, other_team, ctx.from, false,
+            ).len() as i32;
+            let to_tz = UtilPlayer::find_adjacent_players_with_tacklezones(
                 ctx.game, other_team, ctx.to, false,
-            ).len() as i32
+            ).len() as i32;
+            from_tz.max(to_tz)
         };
         // Prehensile Tail is a different rule and DOES key off the origin: Java
         // `prehensileTailModifier(findNumberOfPrehensileTails(context.getGame(), context.getFrom()))`.
