@@ -4708,3 +4708,52 @@ Next: add report-list logging to ParityRunner (harness, legal) emitting `JDODGEM
 minimumRoll from to`, to pair with the **`RDODGEMIN` probe that already exists** in
 `step_move_dodge.rs` under `FFB_TRACE` (pid, roll, min, from, to, mods). That pairing names which
 player each engine dodges with, which is the one fact still missing.
+
+## §H.5 — old_world_alliance bb2025: narrowed hard, still open (2026-09-09)
+
+Still 99/100 @1e6 on both variants. The divergence is now pinned to a single mechanism, and a long
+list of candidates is eliminated. **Read this before touching it again — most obvious leads are
+already dead.**
+
+### Where it is
+
+Aligned by activation `k` (NOT by log position — see the trap below):
+
+* `k=100`: both engines move `away_06` along the **identical path** `13,2 14,2 15,3 16,4 17,5 18,6`.
+* During that identical move Rust asks ONE extra 2-option question (`FFB_DRAWS` `cls=reroll`,
+  `FFB_DEC` event #473 `pick flat/n=2`) that Java never asks. Raw draws are identical either side.
+* `k=101`: the agents therefore activate different players (Rust `away_04` Block, Java `Away8`
+  Move) and the game diverges from there.
+
+Rust's offer is a **TRR (team re-roll) for a failed DODGE or GFI** — all 14 offers in the seed are
+`source=TRR`, none are skill re-rolls.
+
+### Eliminated (each by reading the Java or by measurement)
+
+| candidate | why it is dead |
+|---|---|
+| dodge target formula | identical both sides: `(agility + total).max(2)` |
+| dodge modifier set | Java's `mixed/DodgeModifierCollection` has ONLY prehensile-tail entries, no TACKLEZONE — so `mods=[]` is correct, which is what Rust reports |
+| a missing dodge skill gate (the Pogo shape) | Rust already checks `IGNORE_TACKLEZONES_WHEN_DODGING`, `MAKES_DODGING_HARDER`, `HAS_NO_TACKLEZONE_FOR_DODGING` |
+| Diving Tackle | DT makes a dodge HARDER (+2 target); Java SUCCEEDED where Rust failed, so Java's target was lower. Also already exercised in dwarf bb2025, which is green |
+| candidate set / declaration | `FFB_CAND=8` and the `k=101` dumps are identical: same indices, pids, actions, targets, weight bits |
+| team re-roll availability | Rust `is_team_re_roll_available_amount` and Java `RollMechanic.isTeamReRollAvailable` are term-for-term equivalent |
+| `reroll_used` never being written | Rust writes it (`util_server_re_roll.rs:268`); Java writes it only in bb2016 |
+| a skill re-roll being offered instead of auto-used | all offers are `source=TRR` |
+
+### The next measurement (and only that)
+
+Both engines roll identical dice and walk an identical path, yet one roll fails only in Rust. Rust's
+`away_06` DODGES both succeed (`RDODGEMIN ... roll=3 min=3 ok=true`), so the failing roll is a
+**RUSH/GFI**. The open question is therefore narrow: **does Rust rush on a step Java takes for
+free?** Compare the rush sequence for `k=100` on both sides (`RUST_GFI` exists; find or add the
+Java mirror) — i.e. an MA/movement-budget accounting difference of one square, the `budgetOf` family.
+
+### Two traps this cell has already sprung
+
+1. **`RMOVEP`/`JMOVEP` counts differ (155 vs 143) and that is NOT a divergence.** The Java probe is
+   not emitted for every prompt the Rust one is, so comparing them BY POSITION invents differences.
+   Align by `k` and compare only pid + submitted path. `FFB_DEC` is the authority on whether an
+   extra DECISION exists, and it says none does before #473.
+2. **Absence of a probe is not absence of behaviour.** "0 diving-tackle mentions" was meaningless:
+   there is no `eprintln` for it anywhere in `step_move_dodge.rs`.
