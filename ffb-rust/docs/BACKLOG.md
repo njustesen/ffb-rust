@@ -4660,3 +4660,51 @@ bug.
 Both variants still measure 99/100 at @1e6 after this fix, so §H.2's "treat them as one
 investigation" is **withdrawn**. Its own first differing decision now needs reading with
 `FFB_DEC` -- the instrument exists, the analysis does not.
+
+## §H.4 — old_world_alliance bb2025: localized, not closed (2026-09-09)
+
+Applied the §H.3 approach (`FFB_DEC` matched decision log) to the next cell in line. **Not closed**
+— both variants still 99/100 @1e6 — but the divergence is now pinned to one decision and three
+candidate causes are ruled out by reading against the Java.
+
+### What the decision log gives
+
+Variant `old_world_alliance_ogre`, seed 68, @1e6. First differing event is **#473**:
+
+```
+472  R=('draw', 237, '3f2b98b6')   J=('draw', 237, '3f2b98b6')
+473  R=('pick', 237, 'flat/n=2')   J=('pick', 237, 'soft/n=14')   <<<
+474  R=('draw', 238, '3f2208f3')   J=('draw', 238, '3f2208f3')
+```
+
+Rust asks a **2-option** question (a dodge re-roll offer) where Java makes a two-level **activation**
+pick — and the RAW DRAWS ARE IDENTICAL on both sides of it. So the agent RNG is in lockstep and the
+engines disagree about what is being asked. Identical shape to the snotling bb2025 bug.
+
+### Ruled out (read from the Java, not guessed)
+
+1. **The dodge target formula.** Both are `(agility + total).max(2)`: Rust
+   `DodgeModifierFactory::minimum_roll`, Java `bb2025/AgilityMechanic.minimumRoll` via
+   `minimumRollDodge(getAgilityWithModifiers(), modifiers)`.
+2. **The modifier set.** Java's `mixed/DodgeModifierCollection` contains ONLY the eight
+   PREHENSILE_TAIL entries — **no TACKLEZONE entries at all** — so an empty modifier list is
+   correct for a plain bb2020/bb2025 dodge, which is what Rust reports (`mods=[]`).
+3. **A missing skill gate** of the Pogo kind: Rust's dodge factory already checks
+   `IGNORE_TACKLEZONES_WHEN_DODGING`, `MAKES_DODGING_HARDER` and `HAS_NO_TACKLEZONE_FOR_DODGING`.
+
+Rust's failing dodges are arithmetically right given no modifiers: `pid=home_01 roll=3 min=4`
+with AG 4, and `pid=away_06 roll=3 min=3` with AG 3 succeeds. So **Java must be dodging with a
+different player, or from a different square** — the boards differ subtly at that instant, before
+any state hash has diverged.
+
+### The obstacle, and the next measurement
+
+Java's dodge target lives in the Java ENGINE (`StepMoveDodge` / `AgilityMechanic`), which is
+off-limits. `ReportDodgeRoll` carries `minimumRoll`, but **ParityRunner does not walk the report
+list at all** (`grep reportList` finds nothing), so reading it needs a new harness capability
+rather than a one-line probe.
+
+Next: add report-list logging to ParityRunner (harness, legal) emitting `JDODGEMIN pid roll
+minimumRoll from to`, to pair with the **`RDODGEMIN` probe that already exists** in
+`step_move_dodge.rs` under `FFB_TRACE` (pid, roll, min, from, to, mods). That pairing names which
+player each engine dodges with, which is the one fact still missing.
