@@ -104,17 +104,27 @@ impl StepModifierTrait for GrabStepModifier {
                 }
             }
 
-            // Java shows a `DialogSkillUseParameter(actingPlayer, Grab)` here and leaves
-            // `grabbing` null until the client answers. `ParityRunner`'s SKILL_USE arm ALWAYS
-            // uses the skill except DumpOff / PrimalSavagery / SafePairOfHands / Swoop, and Grab
-            // is not among them -- so Java always USES Grab. Rust left `grabbing` None, which
-            // silently DECLINES it. Same defect the Stand Firm and Side Step behaviours had.
+            // Java shows `DialogSkillUseParameter(actingPlayer, Grab)` here and leaves `grabbing`
+            // null until the client answers. `ParityRunner`'s SKILL_USE arm routes to
+            // `heuristic.useSkill(skillName)` whenever the heuristic owns the class, and Grab is
+            // not in the pinned-to-decline set, so it falls to the DEFAULT `wUse = 0.50` -- a coin
+            // flip that SPENDS ONE SAMPLER DRAW.
             //
-            // Auto-ACCEPT to mirror the harness, then fall through to the grab branch below.
-            // NOTE: no team roster in any edition currently carries Grab (it appears only in
-            // `data/skills/` and `data/star_players/`), so this cannot move the parity matrix --
-            // it is corrected because it is wrong against the Java, not for a score.
+            // This used to AUTO-ACCEPT, on the note that "no team roster in any edition currently
+            // carries Grab, so this cannot move the parity matrix". That note is now STALE:
+            // `black_orc` was drafted into this campaign and its Black Orc positional carries
+            // Brawler + Grab, making it the ONLY Grab roster in bb2020 or bb2025. Auto-accepting
+            // answered correctly but spent NO draw, so Rust asked the pushback square where Java
+            // was still asking about Grab -- the two agents then ran one decision out of phase
+            // (black_orc seed 33, red in BOTH editions at @1.0).
+            //
+            // Park the offer exactly like Stand Firm and Side Step; StepPushback raises the prompt
+            // and files the answer into `grabbing`.
             if state.grabbing.is_none() {
+                if let Some(attacker) = game.acting_player.player_id.clone() {
+                    state.pending_skill_use = Some((attacker, SkillId::Grab));
+                    return true;
+                }
                 state.grabbing = Some(true);
             }
 

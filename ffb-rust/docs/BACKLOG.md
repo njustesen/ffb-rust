@@ -4806,3 +4806,50 @@ carried by `dwarf`, `old_world_alliance`, `slann` and `slann_fumbbl`; jumps are 
 Verified on the final code: OWA ogre and treeman 100/100 x 3 each; slann bb2025 @1e6 and bb2020 @0
 back to 100/100; snotling bb2025 @1e6 and @0 still 100/100; dwarf bb2025 @1e6 and @0 100/100;
 human bb2025 @1.0 100/100. ffb-engine 7458/0, ffb-mechanics 1167/0.
+
+## §H.7 — black_orc CLOSED in BOTH editions (2026-09-09)
+
+**GREEN: black_orc bb2020 and bb2025, 100/100 x 3 each.** 77 green / 4 red. One fix, two cells.
+
+### The bug: Grab was answered without being asked
+
+`black_orc`'s Black Orc positional carries **Brawler + Grab**, and it is the ONLY roster with Grab
+in bb2020 or bb2025 (`grep -rl '"Grab"' data/rosters/` -> black_orc only; bb2016 has none). So Grab
+had never been exercised anywhere until this campaign drafted the team.
+
+Java shows `DialogSkillUseParameter(actingPlayer, Grab)` and returns. `ParityRunner`'s SKILL_USE arm
+routes that to `heuristic.useSkill("Grab")`, which is NOT in the pinned-to-decline set and so falls
+to the DEFAULT `wUse = 0.50` -- a coin flip that **spends one sampler draw**.
+
+Rust's `GrabStepModifier` AUTO-ACCEPTED instead, with this note in the code:
+
+> *"NOTE: no team roster in any edition currently carries Grab ... so this cannot move the parity
+> matrix -- it is corrected because it is wrong against the Java, not for a score."*
+
+The note was true when written and is now stale. Auto-accepting gives the same ANSWER but spends
+NO draw, so Rust asked the pushback square while Java was still asking about Grab -- one decision
+out of phase, and everything after it unrelated noise. `FFB_DEC` event 426: Rust `flat/n=3`
+(pushback) against Java `flat/n=2` (SKILL_USE Grab), with the raw draws identical either side.
+
+Fix: park the offer in `pending_skill_use` exactly as Stand Firm and Side Step do, and route the
+answer into `grabbing` in `StepPushback` -- the `UseSkill` arm matched only `StandFirm` and fell
+everything else through to `side_stepping`, which would have left `grabbing` None and re-asked
+forever. Grab is the ATTACKER's choice, so it has no per-defender map to file under.
+
+### The dead-file trap, again
+
+There are THREE `grab_behaviour.rs` files and each registry builder imports its own edition's. I
+patched the **bb2016** one first and seed 33 did not move -- bb2016 has no Grab roster at all, so
+that file can never run for black_orc. The live files are `bb2020/` and `bb2025/`. Applied there
+too (bb2016 kept, since Java's bb2016 behaviour shows the same dialog).
+
+### Verification
+
+Six failing seeds all pass (bb2020 @1.0 14/33, @1e6 34/40; bb2025 @1.0 33, @1e6 3/24), then both
+cells 100/100 x 3. Regression chosen by the affected skill and by who shares the pushback
+`UseSkill` routing: dark_elf bb2025 @1.0 (Side Step), dwarf bb2016 @1.0 (Stand Firm), chaos bb2025
+@1e6, orc bb2020 @1.0, slann bb2025 @1e6 -- all 100/100. No star player carries Grab, so no drafted
+squad can reach it that way. ffb-engine 7458/0.
+
+Two tests asserted the old auto-accept (`grab_with_occupied_pushback_square_auto_accepts`) and were
+rewritten from the Java to pin the PARK instead.

@@ -161,6 +161,11 @@ impl Step for StepPushback {
                 if let Some((pid, skill)) = self.pending_skill_use.take() {
                     match skill {
                         ffb_model::enums::SkillId::StandFirm => { self.standing_firm.insert(pid, *use_skill); }
+                        // Java's GrabBehaviour.handleCommandHook writes `state.grabbing`, not one
+                        // of the per-defender maps -- Grab is the ATTACKER's choice, so there is no
+                        // defender key to file it under. Falling through to `side_stepping` left
+                        // `grabbing` None and the hook re-asked forever.
+                        ffb_model::enums::SkillId::Grab => { self.grabbing = Some(*use_skill); }
                         _ => { self.side_stepping.insert(pid, *use_skill); }
                     }
                 }

@@ -133,7 +133,20 @@ impl StepModifierTrait for GrabStepModifier {
             // NOTE: no team roster in any edition currently carries Grab (it appears only in
             // `data/skills/` and `data/star_players/`), so this cannot move the parity matrix --
             // it is corrected because it is wrong against the Java, not for a score.
+            // ParityRunner's SKILL_USE arm routes to `heuristic.useSkill(name)`, and Grab is not
+            // in the pinned-to-decline set, so it falls to the DEFAULT wUse = 0.50 -- a coin flip
+            // that SPENDS ONE SAMPLER DRAW. This auto-ACCEPTED, on the note that no roster carried
+            // Grab; `black_orc` (drafted into this campaign) carries Brawler + Grab and is the ONLY
+            // Grab roster in bb2020/bb2025, so the note is stale. Auto-accepting answered correctly
+            // but spent NO draw, leaving Rust asking the pushback square while Java was still
+            // asking about Grab -- one decision out of phase (seed 33, red in BOTH editions @1.0).
+            // Park the offer like Stand Firm / Side Step; StepPushback raises it and files the
+            // answer into `grabbing`.
             if state.grabbing.is_none() {
+                if let Some(attacker) = game.acting_player.player_id.clone() {
+                    state.pending_skill_use = Some((attacker, SkillId::Grab));
+                    return true;
+                }
                 state.grabbing = Some(true);
             }
 
@@ -274,7 +287,7 @@ mod tests {
     /// not in its decline list. Rust left `grabbing` None, silently declining, exactly as the Stand
     /// Firm behaviour did before ITER89.
     #[test]
-    fn grab_with_occupied_pushback_square_auto_accepts() {
+    fn grab_with_occupied_pushback_square_parks_the_offer() {
         let mut game = make_game();
         game.team_home.players.push(player_with_skills("att", vec![SkillId::Grab]));
         game.acting_player.player_id = Some("att".into());
@@ -301,8 +314,18 @@ mod tests {
 
         assert!(m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs),
             "the Grab hook still handles the step");
-        assert_eq!(hs.pushback_mode, PushbackMode::GRAB,
-            "the harness always USES Grab, so the push must switch to GRAB mode");
+        // Java shows `DialogSkillUseParameter(actingPlayer, Grab)` and RETURNS; the answer arrives
+        // as a client command. ParityRunner routes that dialog to `heuristic.useSkill("Grab")`,
+        // which falls to the default wUse = 0.50 and SPENDS A SAMPLER DRAW. So the contract is to
+        // PARK the offer for StepPushback to raise -- not to auto-accept, which answered correctly
+        // but spent no draw and put the two agents one decision out of phase (black_orc seed 33,
+        // red in both editions at @1.0).
+        assert_eq!(hs.pending_skill_use, Some(("att".to_string(), SkillId::Grab)),
+            "the Grab offer must be parked for the step to raise as a prompt");
+        assert_eq!(hs.grabbing, None,
+            "grabbing stays undecided until the agent answers");
+        assert_ne!(hs.pushback_mode, PushbackMode::GRAB,
+            "GRAB mode must not be entered before the offer is answered");
     }
 
     #[test]
