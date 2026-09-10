@@ -8,22 +8,22 @@
 	<rosterId>black_orc.bb2025</rosterId>
 	<reRolls>2</reRolls>
 	<fanFactor>0</fanFactor>
-	<dedicatedFans>3</dedicatedFans>
+	<dedicatedFans>2</dedicatedFans>
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1050000</currentTeamValue>
+	<currentTeamValue>1095000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>40000</treasury>
+	<treasury>0</treasury>
 	<specialRules>
 		<rule>Bribery and Corruption</rule>
 		<rule>Brawlin' Brutes</rule>
 	</specialRules>
 
 	<player nr="1" id="teamBlackOrcParity25Away1">
-		<name>Trained Troll 1</name>
+		<name>Goblin Bruiser 1</name>
 		<gender>male</gender>
-		<positionId>blackorc.trained_troll</positionId>
+		<positionId>blackorc.goblin_bruiser</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -35,16 +35,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamBlackOrcParity25Away3">
-		<name>Black Orc 3</name>
+		<name>Trained Troll 3</name>
 		<gender>male</gender>
-		<positionId>blackorc.black_orc</positionId>
+		<positionId>blackorc.trained_troll</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="4" id="teamBlackOrcParity25Away4">
-		<name>Black Orc 4</name>
+		<name>Goblin Bruiser 4</name>
 		<gender>male</gender>
-		<positionId>blackorc.black_orc</positionId>
+		<positionId>blackorc.goblin_bruiser</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -56,9 +56,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="6" id="teamBlackOrcParity25Away6">
-		<name>Black Orc 6</name>
+		<name>Goblin Bruiser 6</name>
 		<gender>male</gender>
-		<positionId>blackorc.black_orc</positionId>
+		<positionId>blackorc.goblin_bruiser</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -77,9 +77,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="9" id="teamBlackOrcParity25Away9">
-		<name>Goblin Bruiser 9</name>
+		<name>Black Orc 9</name>
 		<gender>male</gender>
-		<positionId>blackorc.goblin_bruiser</positionId>
+		<positionId>blackorc.black_orc</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -91,9 +91,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="11" id="teamBlackOrcParity25Away11">
-		<name>Goblin Bruiser 11</name>
+		<name>Black Orc 11</name>
 		<gender>male</gender>
-		<positionId>blackorc.goblin_bruiser</positionId>
+		<positionId>blackorc.black_orc</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -101,6 +101,13 @@
 		<name>Goblin Bruiser 12</name>
 		<gender>male</gender>
 		<positionId>blackorc.goblin_bruiser</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamBlackOrcParity25Away13">
+		<name>Black Orc 13</name>
+		<gender>male</gender>
+		<positionId>blackorc.black_orc</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

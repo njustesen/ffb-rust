@@ -6,10 +6,10 @@
 	<name>Elf Parity16 Home</name>
 	<race>Elf</race>
 	<rosterId>elf.bb2016</rosterId>
-	<reRolls>2</reRolls>
+	<reRolls>3</reRolls>
 	<fanFactor>0</fanFactor>
 	<dedicatedFans>0</dedicatedFans>
-	<apothecaries>0</apothecaries>
+	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
 	<currentTeamValue>1100000</currentTeamValue>
@@ -18,37 +18,37 @@
 	<specialRules/>
 
 	<player nr="1" id="teamElfParity16Home1">
-		<name>Blitzer 1</name>
+		<name>Lineman 1</name>
 		<gender>male</gender>
-		<positionId>elf.blitzer</positionId>
+		<positionId>elf.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamElfParity16Home2">
-		<name>Blitzer 2</name>
+		<name>Catcher 2</name>
+		<gender>male</gender>
+		<positionId>elf.catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamElfParity16Home3">
+		<name>Thrower 3</name>
+		<gender>male</gender>
+		<positionId>elf.thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamElfParity16Home4">
+		<name>Blitzer 4</name>
 		<gender>male</gender>
 		<positionId>elf.blitzer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="3" id="teamElfParity16Home3">
-		<name>Catcher 3</name>
-		<gender>male</gender>
-		<positionId>elf.catcher</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="4" id="teamElfParity16Home4">
-		<name>Catcher 4</name>
-		<gender>male</gender>
-		<positionId>elf.catcher</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
 	<player nr="5" id="teamElfParity16Home5">
-		<name>Catcher 5</name>
+		<name>Lineman 5</name>
 		<gender>male</gender>
-		<positionId>elf.catcher</positionId>
+		<positionId>elf.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -67,9 +67,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamElfParity16Home8">
-		<name>Thrower 8</name>
+		<name>Blitzer 8</name>
 		<gender>male</gender>
-		<positionId>elf.thrower</positionId>
+		<positionId>elf.blitzer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -81,21 +81,14 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="10" id="teamElfParity16Home10">
-		<name>Lineman 10</name>
+		<name>Catcher 10</name>
 		<gender>male</gender>
-		<positionId>elf.lineman</positionId>
+		<positionId>elf.catcher</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="11" id="teamElfParity16Home11">
 		<name>Lineman 11</name>
-		<gender>male</gender>
-		<positionId>elf.lineman</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="12" id="teamElfParity16Home12">
-		<name>Lineman 12</name>
 		<gender>male</gender>
 		<positionId>elf.lineman</positionId>
 		<skillList/>

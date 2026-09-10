@@ -2,9 +2,11 @@
   "edition": "bb2025",
   "race": "slann_fumbbl",
   "roster_id": "744258",
-  "rerolls": 2,
+  "rerolls": 3,
   "reroll_cost": 50000,
-  "apothecaries": 0,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
   "dedicated_fans": 1,
   "fan_factor": 0,
   "treasury": 0,
@@ -13,19 +15,19 @@
   "players": [
     {
       "nr": 1,
-      "position_id": "2996"
+      "position_id": "2995"
     },
     {
       "nr": 2,
-      "position_id": "2995"
+      "position_id": "2994"
     },
     {
       "nr": 3,
-      "position_id": "2995"
+      "position_id": "2996"
     },
     {
       "nr": 4,
-      "position_id": "2995"
+      "position_id": "2993"
     },
     {
       "nr": 5,
@@ -37,7 +39,7 @@
     },
     {
       "nr": 7,
-      "position_id": "2994"
+      "position_id": "2993"
     },
     {
       "nr": 8,

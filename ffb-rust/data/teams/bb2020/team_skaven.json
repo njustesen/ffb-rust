@@ -1,64 +1,66 @@
 {
- "edition": "bb2020",
- "race": "skaven",
- "roster_id": "skaven.lrb6",
- "rerolls": 3,
- "reroll_cost": 50000,
- "apothecaries": 1,
- "dedicated_fans": 3,
- "fan_factor": 0,
- "treasury": 40000,
- "spent": 1060000,
- "team_value": 1050000,
- "players": [
-  {
-   "nr": 1,
-   "position_id": "skaven.ratogre"
-  },
-  {
-   "nr": 2,
-   "position_id": "skaven.blitzer"
-  },
-  {
-   "nr": 3,
-   "position_id": "skaven.blitzer"
-  },
-  {
-   "nr": 4,
-   "position_id": "skaven.thrower"
-  },
-  {
-   "nr": 5,
-   "position_id": "skaven.gutterrunner"
-  },
-  {
-   "nr": 6,
-   "position_id": "skaven.lineman"
-  },
-  {
-   "nr": 7,
-   "position_id": "skaven.lineman"
-  },
-  {
-   "nr": 8,
-   "position_id": "skaven.lineman"
-  },
-  {
-   "nr": 9,
-   "position_id": "skaven.lineman"
-  },
-  {
-   "nr": 10,
-   "position_id": "skaven.lineman"
-  },
-  {
-   "nr": 11,
-   "position_id": "skaven.lineman"
-  },
-  {
-   "nr": 12,
-   "position_id": "skaven.lineman"
-  }
- ],
- "special_rules": []
+  "edition": "bb2020",
+  "race": "skaven",
+  "roster_id": "skaven.lrb6",
+  "rerolls": 2,
+  "reroll_cost": 50000,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 3,
+  "fan_factor": 0,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1070000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "skaven.lineman"
+    },
+    {
+      "nr": 2,
+      "position_id": "skaven.thrower"
+    },
+    {
+      "nr": 3,
+      "position_id": "skaven.gutterrunner"
+    },
+    {
+      "nr": 4,
+      "position_id": "skaven.blitzer"
+    },
+    {
+      "nr": 5,
+      "position_id": "skaven.ratogre"
+    },
+    {
+      "nr": 6,
+      "position_id": "skaven.lineman"
+    },
+    {
+      "nr": 7,
+      "position_id": "skaven.gutterrunner"
+    },
+    {
+      "nr": 8,
+      "position_id": "skaven.blitzer"
+    },
+    {
+      "nr": 9,
+      "position_id": "skaven.lineman"
+    },
+    {
+      "nr": 10,
+      "position_id": "skaven.gutterrunner"
+    },
+    {
+      "nr": 11,
+      "position_id": "skaven.lineman"
+    },
+    {
+      "nr": 12,
+      "position_id": "skaven.lineman"
+    }
+  ],
+  "special_rules": []
 }

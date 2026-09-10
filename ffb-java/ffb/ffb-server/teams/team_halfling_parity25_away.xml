@@ -6,28 +6,28 @@
 	<name>Halfling Parity25 Away</name>
 	<race>Halfling</race>
 	<rosterId>halfling.bb2025</rosterId>
-	<reRolls>4</reRolls>
+	<reRolls>3</reRolls>
 	<fanFactor>0</fanFactor>
 	<dedicatedFans>3</dedicatedFans>
 	<apothecaries>1</apothecaries>
-	<cheerleaders>0</cheerleaders>
-	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>980000</currentTeamValue>
+	<cheerleaders>5</cheerleaders>
+	<assistantCoaches>6</assistantCoaches>
+	<currentTeamValue>1090000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>110000</treasury>
+	<treasury>0</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamHalflingParity25Away1">
-		<name>Athel Forest Treeman 1</name>
+		<name>Halfling Hopeful 1</name>
 		<gender>male</gender>
-		<positionId>halfling.treeman</positionId>
+		<positionId>halfling.halfling</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamHalflingParity25Away2">
-		<name>Cindy Piewhistle 2</name>
+		<name>Halfling Hefty 2</name>
 		<gender>male</gender>
-		<positionId>halfling.Cindy</positionId>
+		<positionId>halfling.halfling_hefty</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -39,16 +39,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="4" id="teamHalflingParity25Away4">
-		<name>Halfling Catcher 4</name>
+		<name>Athel Forest Treeman 4</name>
 		<gender>male</gender>
-		<positionId>halfling.halfling_catcher</positionId>
+		<positionId>halfling.treeman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamHalflingParity25Away5">
-		<name>Halfling Hefty 5</name>
+		<name>Halfling Hopeful 5</name>
 		<gender>male</gender>
-		<positionId>halfling.halfling_hefty</positionId>
+		<positionId>halfling.halfling</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -60,16 +60,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamHalflingParity25Away7">
-		<name>Halfling Hopeful 7</name>
+		<name>Halfling Catcher 7</name>
 		<gender>male</gender>
-		<positionId>halfling.halfling</positionId>
+		<positionId>halfling.halfling_catcher</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamHalflingParity25Away8">
-		<name>Halfling Hopeful 8</name>
+		<name>Athel Forest Treeman 8</name>
 		<gender>male</gender>
-		<positionId>halfling.halfling</positionId>
+		<positionId>halfling.treeman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -116,9 +116,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="15" id="teamHalflingParity25Away15">
-		<name>Athel Forest Treeman 15</name>
+		<name>Halfling Hopeful 15</name>
 		<gender>male</gender>
-		<positionId>halfling.treeman</positionId>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="16" id="teamHalflingParity25Away16">
+		<name>Halfling Hopeful 16</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

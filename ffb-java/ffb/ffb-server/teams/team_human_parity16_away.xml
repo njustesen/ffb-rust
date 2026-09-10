@@ -7,9 +7,9 @@
 	<race>Human</race>
 	<rosterId>human.bb2016</rosterId>
 	<reRolls>2</reRolls>
-	<fanFactor>3</fanFactor>
+	<fanFactor>0</fanFactor>
 	<dedicatedFans>0</dedicatedFans>
-	<apothecaries>0</apothecaries>
+	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
 	<currentTeamValue>1100000</currentTeamValue>
@@ -18,9 +18,9 @@
 	<specialRules/>
 
 	<player nr="1" id="teamHumanParity16Away1">
-		<name>Ogre 1</name>
+		<name>Human Lineman 1</name>
 		<gender>male</gender>
-		<positionId>human.ogre</positionId>
+		<positionId>human.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -32,37 +32,37 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamHumanParity16Away3">
-		<name>Human Blitzer 3</name>
+		<name>Human Thrower 3</name>
 		<gender>male</gender>
-		<positionId>human.blitzer</positionId>
+		<positionId>human.thrower</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="4" id="teamHumanParity16Away4">
-		<name>Human Blitzer 4</name>
+		<name>Human Catcher 4</name>
 		<gender>male</gender>
-		<positionId>human.blitzer</positionId>
+		<positionId>human.catcher</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamHumanParity16Away5">
-		<name>Human Blitzer 5</name>
+		<name>Ogre 5</name>
 		<gender>male</gender>
-		<positionId>human.blitzer</positionId>
+		<positionId>human.ogre</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="6" id="teamHumanParity16Away6">
-		<name>Human Catcher 6</name>
+		<name>Human Lineman 6</name>
 		<gender>male</gender>
-		<positionId>human.catcher</positionId>
+		<positionId>human.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamHumanParity16Away7">
-		<name>Human Catcher 7</name>
+		<name>Human Blitzer 7</name>
 		<gender>male</gender>
-		<positionId>human.catcher</positionId>
+		<positionId>human.blitzer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -74,30 +74,30 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="9" id="teamHumanParity16Away9">
-		<name>Human Catcher 9</name>
+		<name>Human Blitzer 9</name>
+		<gender>male</gender>
+		<positionId>human.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamHumanParity16Away10">
+		<name>Human Catcher 10</name>
 		<gender>male</gender>
 		<positionId>human.catcher</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="10" id="teamHumanParity16Away10">
-		<name>Human Thrower 10</name>
-		<gender>male</gender>
-		<positionId>human.thrower</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
 	<player nr="11" id="teamHumanParity16Away11">
-		<name>Human Thrower 11</name>
+		<name>Human Blitzer 11</name>
 		<gender>male</gender>
-		<positionId>human.thrower</positionId>
+		<positionId>human.blitzer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="12" id="teamHumanParity16Away12">
-		<name>Human Lineman 12</name>
+		<name>Human Catcher 12</name>
 		<gender>male</gender>
-		<positionId>human.lineman</positionId>
+		<positionId>human.catcher</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

@@ -239,26 +239,4 @@
 			<double>Mutations</double>
 		</skillCategoryList>
 	</position>
-	<position id="39464">
-		<quantity>1</quantity>
-		<name>Hakflem Skuttlespike</name>
-		<displayName>Hakflem Skuttlespike</displayName>
-		<type>Star</type>
-		<cost>180000</cost>
-		<movement>9</movement>
-		<strength>3</strength>
-		<agility>2</agility>
-		<passing>3</passing>
-		<armour>8</armour>
-		<skillList>
-			<skill>Dodge</skill>
-			<skill>Extra Arms</skill>
-			<skill value="4">Loner</skill>
-			<skill>Prehensile Tail</skill>
-			<skill>Treacherous</skill>
-			<skill>Two Heads</skill>
-		</skillList>
-		<skillCategoryList>
-		</skillCategoryList>
-	</position>
 </roster>

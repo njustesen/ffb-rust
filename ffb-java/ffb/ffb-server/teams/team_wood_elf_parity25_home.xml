@@ -6,56 +6,56 @@
 	<name>Wood Elf Parity25 Home</name>
 	<race>Wood Elf</race>
 	<rosterId>wood_elf.bb2025</rosterId>
-	<reRolls>2</reRolls>
+	<reRolls>3</reRolls>
 	<fanFactor>0</fanFactor>
-	<dedicatedFans>3</dedicatedFans>
-	<apothecaries>0</apothecaries>
+	<dedicatedFans>1</dedicatedFans>
+	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1090000</currentTeamValue>
+	<currentTeamValue>1100000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>0</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamWoodElfParity25Home1">
-		<name>Wardancer 1</name>
+		<name>Wood Elf Lineman 1</name>
+		<gender>male</gender>
+		<positionId>woodelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamWoodElfParity25Home2">
+		<name>Wood Elf Thrower 2</name>
+		<gender>male</gender>
+		<positionId>woodelf.thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamWoodElfParity25Home3">
+		<name>Wood Elf Catcher 3</name>
+		<gender>male</gender>
+		<positionId>woodelf.catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamWoodElfParity25Home4">
+		<name>Wardancer 4</name>
 		<gender>male</gender>
 		<positionId>woodelf.wardancer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="2" id="teamWoodElfParity25Home2">
-		<name>Rodney Roachbait 2</name>
-		<gender>male</gender>
-		<positionId>woodelf.Rodney</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="3" id="teamWoodElfParity25Home3">
-		<name>Swiftvine Glimmershard 3</name>
-		<gender>male</gender>
-		<positionId>woodelf.Swiftvine</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="4" id="teamWoodElfParity25Home4">
-		<name>Wood Elf Catcher 4</name>
-		<gender>male</gender>
-		<positionId>woodelf.catcher</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
 	<player nr="5" id="teamWoodElfParity25Home5">
-		<name>Wood Elf Catcher 5</name>
+		<name>Loren Forest Treeman 5</name>
 		<gender>male</gender>
-		<positionId>woodelf.catcher</positionId>
+		<positionId>woodelf.treeman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="6" id="teamWoodElfParity25Home6">
-		<name>Wood Elf Thrower 6</name>
+		<name>Wood Elf Lineman 6</name>
 		<gender>male</gender>
-		<positionId>woodelf.thrower</positionId>
+		<positionId>woodelf.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -91,20 +91,6 @@
 		<name>Wood Elf Lineman 11</name>
 		<gender>male</gender>
 		<positionId>woodelf.lineman</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="12" id="teamWoodElfParity25Home12">
-		<name>Wardancer 12</name>
-		<gender>male</gender>
-		<positionId>woodelf.wardancer</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="13" id="teamWoodElfParity25Home13">
-		<name>Loren Forest Treeman 13</name>
-		<gender>male</gender>
-		<positionId>woodelf.treeman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

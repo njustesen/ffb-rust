@@ -8,19 +8,19 @@
 	<rosterId>black_orc.bb2020</rosterId>
 	<reRolls>2</reRolls>
 	<fanFactor>0</fanFactor>
-	<dedicatedFans>3</dedicatedFans>
+	<dedicatedFans>0</dedicatedFans>
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1050000</currentTeamValue>
+	<currentTeamValue>1095000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>40000</treasury>
+	<treasury>5000</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamBlackOrcParity20Home1">
-		<name>Trained Troll 1</name>
+		<name>Goblin Bruiser Lineman 1</name>
 		<gender>male</gender>
-		<positionId>blackorc.trained_troll</positionId>
+		<positionId>blackorc.goblin_bruiser_lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -32,16 +32,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamBlackOrcParity20Home3">
-		<name>Black Orc 3</name>
+		<name>Trained Troll 3</name>
 		<gender>male</gender>
-		<positionId>blackorc.black_orc</positionId>
+		<positionId>blackorc.trained_troll</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="4" id="teamBlackOrcParity20Home4">
-		<name>Black Orc 4</name>
+		<name>Goblin Bruiser Lineman 4</name>
 		<gender>male</gender>
-		<positionId>blackorc.black_orc</positionId>
+		<positionId>blackorc.goblin_bruiser_lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -53,9 +53,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="6" id="teamBlackOrcParity20Home6">
-		<name>Black Orc 6</name>
+		<name>Goblin Bruiser Lineman 6</name>
 		<gender>male</gender>
-		<positionId>blackorc.black_orc</positionId>
+		<positionId>blackorc.goblin_bruiser_lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -74,9 +74,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="9" id="teamBlackOrcParity20Home9">
-		<name>Goblin Bruiser Lineman 9</name>
+		<name>Black Orc 9</name>
 		<gender>male</gender>
-		<positionId>blackorc.goblin_bruiser_lineman</positionId>
+		<positionId>blackorc.black_orc</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -88,9 +88,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="11" id="teamBlackOrcParity20Home11">
-		<name>Goblin Bruiser Lineman 11</name>
+		<name>Black Orc 11</name>
 		<gender>male</gender>
-		<positionId>blackorc.goblin_bruiser_lineman</positionId>
+		<positionId>blackorc.black_orc</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -98,6 +98,13 @@
 		<name>Goblin Bruiser Lineman 12</name>
 		<gender>male</gender>
 		<positionId>blackorc.goblin_bruiser_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamBlackOrcParity20Home13">
+		<name>Black Orc 13</name>
+		<gender>male</gender>
+		<positionId>blackorc.black_orc</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

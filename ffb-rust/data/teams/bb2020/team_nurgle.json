@@ -2,22 +2,24 @@
   "edition": "bb2020",
   "race": "nurgle",
   "roster_id": "nurgle.lrb6",
-  "rerolls": 3,
+  "rerolls": 2,
   "reroll_cost": 70000,
   "apothecaries": 0,
-  "dedicated_fans": 3,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 0,
   "fan_factor": 0,
   "treasury": 0,
   "spent": 1100000,
-  "team_value": 1090000,
+  "team_value": 1100000,
   "players": [
     {
       "nr": 1,
-      "position_id": "nurgle.rotspawn"
+      "position_id": "nurgle.rotter"
     },
     {
       "nr": 2,
-      "position_id": "nurgle.bloater"
+      "position_id": "nurgle.pestigor"
     },
     {
       "nr": 3,
@@ -25,11 +27,11 @@
     },
     {
       "nr": 4,
-      "position_id": "nurgle.bloater"
+      "position_id": "nurgle.rotspawn"
     },
     {
       "nr": 5,
-      "position_id": "nurgle.pestigor"
+      "position_id": "nurgle.rotter"
     },
     {
       "nr": 6,
@@ -37,7 +39,7 @@
     },
     {
       "nr": 7,
-      "position_id": "nurgle.rotter"
+      "position_id": "nurgle.bloater"
     },
     {
       "nr": 8,
@@ -45,7 +47,7 @@
     },
     {
       "nr": 9,
-      "position_id": "nurgle.rotter"
+      "position_id": "nurgle.bloater"
     },
     {
       "nr": 10,
@@ -53,7 +55,7 @@
     },
     {
       "nr": 11,
-      "position_id": "nurgle.rotter"
+      "position_id": "nurgle.bloater"
     },
     {
       "nr": 12,

@@ -5,6 +5,8 @@
   "rerolls": 3,
   "reroll_cost": 60000,
   "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
   "dedicated_fans": 3,
   "fan_factor": 0,
   "treasury": 0,
@@ -13,11 +15,11 @@
   "players": [
     {
       "nr": 1,
-      "position_id": "amazon.catcher"
+      "position_id": "amazon.linewoman"
     },
     {
-      "nr": 13,
-      "position_id": "amazon.catcher"
+      "nr": 2,
+      "position_id": "amazon.thrower"
     },
     {
       "nr": 3,
@@ -25,11 +27,11 @@
     },
     {
       "nr": 4,
-      "position_id": "amazon.blitzer"
+      "position_id": "amazon.catcher"
     },
     {
       "nr": 5,
-      "position_id": "amazon.thrower"
+      "position_id": "amazon.linewoman"
     },
     {
       "nr": 6,
@@ -37,11 +39,11 @@
     },
     {
       "nr": 7,
-      "position_id": "amazon.linewoman"
+      "position_id": "amazon.blitzer"
     },
     {
       "nr": 8,
-      "position_id": "amazon.linewoman"
+      "position_id": "amazon.catcher"
     },
     {
       "nr": 9,
@@ -60,11 +62,5 @@
       "position_id": "amazon.linewoman"
     }
   ],
-  "special_rules": [],
-  "stars": [
-    {
-      "nr": 2,
-      "star_id": "amazon.Estelle"
-    }
-  ]
+  "special_rules": []
 }

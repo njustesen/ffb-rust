@@ -6,65 +6,65 @@
 	<name>Vampire Parity25 Away</name>
 	<race>Vampire</race>
 	<rosterId>vampire.bb2025</rosterId>
-	<reRolls>2</reRolls>
+	<reRolls>3</reRolls>
 	<fanFactor>0</fanFactor>
 	<dedicatedFans>3</dedicatedFans>
-	<apothecaries>0</apothecaries>
+	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1070000</currentTeamValue>
+	<currentTeamValue>1090000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>20000</treasury>
+	<treasury>0</treasury>
 	<specialRules>
 		<rule>Masters of Undeath</rule>
 	</specialRules>
 
 	<player nr="1" id="teamVampireParity25Away1">
-		<name>Vargheist 1</name>
+		<name>Thrall Lineman 1</name>
+		<gender>male</gender>
+		<positionId>vampire.thrall</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamVampireParity25Away2">
+		<name>Vampire Runner 2</name>
+		<gender>male</gender>
+		<positionId>vampire.vampire_runner</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamVampireParity25Away3">
+		<name>Vampire Thrower 3</name>
+		<gender>male</gender>
+		<positionId>vampire.vampire_thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamVampireParity25Away4">
+		<name>Vampire Blitzer 4</name>
+		<gender>male</gender>
+		<positionId>vampire.vampire_blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamVampireParity25Away5">
+		<name>Vargheist 5</name>
 		<gender>male</gender>
 		<positionId>vampire.vargheist</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="2" id="teamVampireParity25Away2">
-		<name>Vampire Blitzer 2</name>
-		<gender>male</gender>
-		<positionId>vampire.vampire_blitzer</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="3" id="teamVampireParity25Away3">
-		<name>Vampire Blitzer 3</name>
-		<gender>male</gender>
-		<positionId>vampire.vampire_blitzer</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="4" id="teamVampireParity25Away4">
-		<name>Vampire Thrower 4</name>
-		<gender>male</gender>
-		<positionId>vampire.vampire_thrower</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="5" id="teamVampireParity25Away5">
-		<name>Vampire Thrower 5</name>
-		<gender>male</gender>
-		<positionId>vampire.vampire_thrower</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
 	<player nr="6" id="teamVampireParity25Away6">
-		<name>Vampire Runner 6</name>
+		<name>Thrall Lineman 6</name>
 		<gender>male</gender>
-		<positionId>vampire.vampire_runner</positionId>
+		<positionId>vampire.thrall</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamVampireParity25Away7">
-		<name>Vampire Runner 7</name>
+		<name>Vampire Blitzer 7</name>
 		<gender>male</gender>
-		<positionId>vampire.vampire_runner</positionId>
+		<positionId>vampire.vampire_blitzer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -91,6 +91,13 @@
 	</player>
 	<player nr="11" id="teamVampireParity25Away11">
 		<name>Thrall Lineman 11</name>
+		<gender>male</gender>
+		<positionId>vampire.thrall</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamVampireParity25Away12">
+		<name>Thrall Lineman 12</name>
 		<gender>male</gender>
 		<positionId>vampire.thrall</positionId>
 		<skillList/>

@@ -32,9 +32,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamLizardmanParity16Away3">
-		<name>Saurus 3</name>
+		<name>Skink 3</name>
 		<gender>male</gender>
-		<positionId>lizardman.saurus</positionId>
+		<positionId>lizardman.skink</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -46,9 +46,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamLizardmanParity16Away5">
-		<name>Saurus 5</name>
+		<name>Skink 5</name>
 		<gender>male</gender>
-		<positionId>lizardman.saurus</positionId>
+		<positionId>lizardman.skink</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -60,16 +60,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamLizardmanParity16Away7">
-		<name>Saurus 7</name>
+		<name>Skink 7</name>
 		<gender>male</gender>
-		<positionId>lizardman.saurus</positionId>
+		<positionId>lizardman.skink</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamLizardmanParity16Away8">
-		<name>Skink 8</name>
+		<name>Saurus 8</name>
 		<gender>male</gender>
-		<positionId>lizardman.skink</positionId>
+		<positionId>lizardman.saurus</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -81,9 +81,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="10" id="teamLizardmanParity16Away10">
-		<name>Skink 10</name>
+		<name>Saurus 10</name>
 		<gender>male</gender>
-		<positionId>lizardman.skink</positionId>
+		<positionId>lizardman.saurus</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -95,9 +95,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="12" id="teamLizardmanParity16Away12">
-		<name>Skink 12</name>
+		<name>Saurus 12</name>
 		<gender>male</gender>
-		<positionId>lizardman.skink</positionId>
+		<positionId>lizardman.saurus</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

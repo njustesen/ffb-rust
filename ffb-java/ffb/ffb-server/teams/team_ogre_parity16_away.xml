@@ -6,10 +6,10 @@
 	<name>Ogre Parity16 Away</name>
 	<race>Ogre</race>
 	<rosterId>ogre.bb2016</rosterId>
-	<reRolls>2</reRolls>
+	<reRolls>3</reRolls>
 	<fanFactor>0</fanFactor>
 	<dedicatedFans>0</dedicatedFans>
-	<apothecaries>0</apothecaries>
+	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
 	<currentTeamValue>1100000</currentTeamValue>
@@ -18,9 +18,9 @@
 	<specialRules/>
 
 	<player nr="1" id="teamOgreParity16Away1">
-		<name>Ogre 1</name>
+		<name>Snotling 1</name>
 		<gender>male</gender>
-		<positionId>ogre.ogre</positionId>
+		<positionId>ogre.snotling</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -32,9 +32,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamOgreParity16Away3">
-		<name>Ogre 3</name>
+		<name>Snotling 3</name>
 		<gender>male</gender>
-		<positionId>ogre.ogre</positionId>
+		<positionId>ogre.snotling</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -46,9 +46,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamOgreParity16Away5">
-		<name>Ogre 5</name>
+		<name>Snotling 5</name>
 		<gender>male</gender>
-		<positionId>ogre.ogre</positionId>
+		<positionId>ogre.snotling</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -67,9 +67,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamOgreParity16Away8">
-		<name>Snotling 8</name>
+		<name>Ogre 8</name>
 		<gender>male</gender>
-		<positionId>ogre.snotling</positionId>
+		<positionId>ogre.ogre</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -81,9 +81,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="10" id="teamOgreParity16Away10">
-		<name>Snotling 10</name>
+		<name>Ogre 10</name>
 		<gender>male</gender>
-		<positionId>ogre.snotling</positionId>
+		<positionId>ogre.ogre</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

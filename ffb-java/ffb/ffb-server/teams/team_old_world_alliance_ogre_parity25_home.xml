@@ -8,82 +8,82 @@
 	<rosterId>old_world_alliance_ogre.bb2025</rosterId>
 	<reRolls>2</reRolls>
 	<fanFactor>0</fanFactor>
-	<dedicatedFans>3</dedicatedFans>
+	<dedicatedFans>1</dedicatedFans>
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1090000</currentTeamValue>
+	<currentTeamValue>1100000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>0</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamOldWorldAllianceOgreParity25Home1">
-		<name>Ogre 1</name>
+		<name>Human Lineman 1</name>
 		<gender>male</gender>
-		<positionId>oldworldalliance.ogre</positionId>
+		<positionId>oldworldalliance.human_lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamOldWorldAllianceOgreParity25Home2">
-		<name>Dwarf Blitzer 2</name>
-		<gender>male</gender>
-		<positionId>oldworldalliance.dwarf_blitzer</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="3" id="teamOldWorldAllianceOgreParity25Home3">
-		<name>Troll Slayer 3</name>
-		<gender>male</gender>
-		<positionId>oldworldalliance.trollslayer</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="4" id="teamOldWorldAllianceOgreParity25Home4">
-		<name>Human Blitzer 4</name>
-		<gender>male</gender>
-		<positionId>oldworldalliance.human_blitzer</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="5" id="teamOldWorldAllianceOgreParity25Home5">
-		<name>Dwarf Runner 5</name>
-		<gender>male</gender>
-		<positionId>oldworldalliance.dwarf_runner</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="6" id="teamOldWorldAllianceOgreParity25Home6">
-		<name>Human Catcher 6</name>
-		<gender>male</gender>
-		<positionId>oldworldalliance.human_catcher</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="7" id="teamOldWorldAllianceOgreParity25Home7">
-		<name>Human Thrower 7</name>
-		<gender>male</gender>
-		<positionId>oldworldalliance.human_thrower</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="8" id="teamOldWorldAllianceOgreParity25Home8">
-		<name>Dwarf Lineman 8</name>
-		<gender>male</gender>
-		<positionId>oldworldalliance.dwarf_lineman</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="9" id="teamOldWorldAllianceOgreParity25Home9">
-		<name>Halfling Hopeful 9</name>
+		<name>Halfling Hopeful 2</name>
 		<gender>male</gender>
 		<positionId>oldworldalliance.halfling_hopeful</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="10" id="teamOldWorldAllianceOgreParity25Home10">
-		<name>Human Lineman 10</name>
+	<player nr="3" id="teamOldWorldAllianceOgreParity25Home3">
+		<name>Human Catcher 3</name>
 		<gender>male</gender>
-		<positionId>oldworldalliance.human_lineman</positionId>
+		<positionId>oldworldalliance.human_catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamOldWorldAllianceOgreParity25Home4">
+		<name>Dwarf Lineman 4</name>
+		<gender>male</gender>
+		<positionId>oldworldalliance.dwarf_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamOldWorldAllianceOgreParity25Home5">
+		<name>Human Thrower 5</name>
+		<gender>male</gender>
+		<positionId>oldworldalliance.human_thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamOldWorldAllianceOgreParity25Home6">
+		<name>Dwarf Runner 6</name>
+		<gender>male</gender>
+		<positionId>oldworldalliance.dwarf_runner</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamOldWorldAllianceOgreParity25Home7">
+		<name>Human Blitzer 7</name>
+		<gender>male</gender>
+		<positionId>oldworldalliance.human_blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamOldWorldAllianceOgreParity25Home8">
+		<name>Dwarf Blitzer 8</name>
+		<gender>male</gender>
+		<positionId>oldworldalliance.dwarf_blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamOldWorldAllianceOgreParity25Home9">
+		<name>Troll Slayer 9</name>
+		<gender>male</gender>
+		<positionId>oldworldalliance.trollslayer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamOldWorldAllianceOgreParity25Home10">
+		<name>Ogre 10</name>
+		<gender>male</gender>
+		<positionId>oldworldalliance.ogre</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -95,9 +95,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="12" id="teamOldWorldAllianceOgreParity25Home12">
-		<name>Human Lineman 12</name>
+		<name>Halfling Hopeful 12</name>
 		<gender>male</gender>
-		<positionId>oldworldalliance.human_lineman</positionId>
+		<positionId>oldworldalliance.halfling_hopeful</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamOldWorldAllianceOgreParity25Home13">
+		<name>Halfling Hopeful 13</name>
+		<gender>male</gender>
+		<positionId>oldworldalliance.halfling_hopeful</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

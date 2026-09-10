@@ -6,13 +6,13 @@
 	<name>Ogre Parity25 Away</name>
 	<race>Ogre</race>
 	<rosterId>ogre.bb2025</rosterId>
-	<reRolls>2</reRolls>
+	<reRolls>3</reRolls>
 	<fanFactor>0</fanFactor>
-	<dedicatedFans>3</dedicatedFans>
-	<apothecaries>0</apothecaries>
+	<dedicatedFans>1</dedicatedFans>
+	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1090000</currentTeamValue>
+	<currentTeamValue>1100000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>0</treasury>
 	<specialRules>
@@ -21,9 +21,9 @@
 	</specialRules>
 
 	<player nr="1" id="teamOgreParity25Away1">
-		<name>Ogre Runt Punter 1</name>
+		<name>Gnoblar Lineman 1</name>
 		<gender>male</gender>
-		<positionId>ogre.ogre_runt_punter</positionId>
+		<positionId>ogre.snotling</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -35,16 +35,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamOgreParity25Away3">
-		<name>Ogre Blocker 3</name>
+		<name>Ogre Runt Punter 3</name>
 		<gender>male</gender>
-		<positionId>ogre.ogre</positionId>
+		<positionId>ogre.ogre_runt_punter</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="4" id="teamOgreParity25Away4">
-		<name>Ogre Blocker 4</name>
+		<name>Gnoblar Lineman 4</name>
 		<gender>male</gender>
-		<positionId>ogre.ogre</positionId>
+		<positionId>ogre.snotling</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -56,16 +56,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="6" id="teamOgreParity25Away6">
-		<name>Ogre Blocker 6</name>
+		<name>Gnoblar Lineman 6</name>
 		<gender>male</gender>
-		<positionId>ogre.ogre</positionId>
+		<positionId>ogre.snotling</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamOgreParity25Away7">
-		<name>Gnoblar Lineman 7</name>
+		<name>Ogre Blocker 7</name>
 		<gender>male</gender>
-		<positionId>ogre.snotling</positionId>
+		<positionId>ogre.ogre</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -77,9 +77,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="9" id="teamOgreParity25Away9">
-		<name>Gnoblar Lineman 9</name>
+		<name>Ogre Blocker 9</name>
 		<gender>male</gender>
-		<positionId>ogre.snotling</positionId>
+		<positionId>ogre.ogre</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -106,6 +106,13 @@
 	</player>
 	<player nr="13" id="teamOgreParity25Away13">
 		<name>Gnoblar Lineman 13</name>
+		<gender>male</gender>
+		<positionId>ogre.snotling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="14" id="teamOgreParity25Away14">
+		<name>Gnoblar Lineman 14</name>
 		<gender>male</gender>
 		<positionId>ogre.snotling</positionId>
 		<skillList/>

@@ -5,23 +5,25 @@
   "rerolls": 3,
   "reroll_cost": 70000,
   "apothecaries": 0,
+  "assistant_coaches": 1,
+  "cheerleaders": 0,
   "dedicated_fans": 3,
   "fan_factor": 0,
-  "treasury": 10000,
-  "spent": 1090000,
-  "team_value": 1080000,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1090000,
   "players": [
     {
       "nr": 1,
-      "position_id": "undead.mummy"
+      "position_id": "undead.skeleton"
     },
     {
       "nr": 2,
-      "position_id": "undead.mummy"
+      "position_id": "undead.zombie"
     },
     {
       "nr": 3,
-      "position_id": "undead.wight"
+      "position_id": "undead.ghoul"
     },
     {
       "nr": 4,
@@ -29,23 +31,23 @@
     },
     {
       "nr": 5,
-      "position_id": "undead.ghoul"
+      "position_id": "undead.mummy"
     },
     {
       "nr": 6,
-      "position_id": "undead.ghoul"
+      "position_id": "undead.skeleton"
     },
     {
       "nr": 7,
-      "position_id": "undead.skeleton"
+      "position_id": "undead.ghoul"
     },
     {
       "nr": 8,
-      "position_id": "undead.skeleton"
+      "position_id": "undead.wight"
     },
     {
       "nr": 9,
-      "position_id": "undead.skeleton"
+      "position_id": "undead.mummy"
     },
     {
       "nr": 10,
@@ -61,7 +63,7 @@
     },
     {
       "nr": 13,
-      "position_id": "undead.zombie"
+      "position_id": "undead.skeleton"
     }
   ],
   "special_rules": [

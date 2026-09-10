@@ -6,8 +6,8 @@
 	<name>High Elf Parity16 Home</name>
 	<race>High Elf</race>
 	<rosterId>high_elf.bb2016</rosterId>
-	<reRolls>2</reRolls>
-	<fanFactor>0</fanFactor>
+	<reRolls>3</reRolls>
+	<fanFactor>1</fanFactor>
 	<dedicatedFans>0</dedicatedFans>
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
@@ -18,23 +18,23 @@
 	<specialRules/>
 
 	<player nr="1" id="teamHighElfParity16Home1">
-		<name>Blitzer 1</name>
+		<name>Lineman 1</name>
 		<gender>male</gender>
-		<positionId>highelf.blitzer</positionId>
+		<positionId>highelf.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamHighElfParity16Home2">
-		<name>Blitzer 2</name>
+		<name>Thrower 2</name>
 		<gender>male</gender>
-		<positionId>highelf.blitzer</positionId>
+		<positionId>highelf.thrower</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamHighElfParity16Home3">
-		<name>Catcher 3</name>
+		<name>Blitzer 3</name>
 		<gender>male</gender>
-		<positionId>highelf.catcher</positionId>
+		<positionId>highelf.blitzer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -46,30 +46,30 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamHighElfParity16Home5">
-		<name>Catcher 5</name>
+		<name>Lineman 5</name>
 		<gender>male</gender>
-		<positionId>highelf.catcher</positionId>
+		<positionId>highelf.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="6" id="teamHighElfParity16Home6">
-		<name>Catcher 6</name>
+		<name>Blitzer 6</name>
+		<gender>male</gender>
+		<positionId>highelf.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamHighElfParity16Home7">
+		<name>Catcher 7</name>
 		<gender>male</gender>
 		<positionId>highelf.catcher</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="7" id="teamHighElfParity16Home7">
-		<name>Thrower 7</name>
-		<gender>male</gender>
-		<positionId>highelf.thrower</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
 	<player nr="8" id="teamHighElfParity16Home8">
-		<name>Thrower 8</name>
+		<name>Lineman 8</name>
 		<gender>male</gender>
-		<positionId>highelf.thrower</positionId>
+		<positionId>highelf.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

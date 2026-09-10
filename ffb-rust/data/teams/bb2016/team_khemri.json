@@ -5,6 +5,8 @@
   "rerolls": 3,
   "reroll_cost": 70000,
   "apothecaries": 0,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
   "dedicated_fans": 0,
   "fan_factor": 1,
   "treasury": 0,
@@ -17,19 +19,19 @@
     },
     {
       "nr": 2,
-      "position_id": "khemri.tombguardian"
+      "position_id": "khemri.blitzra"
     },
     {
       "nr": 3,
-      "position_id": "khemri.tombguardian"
+      "position_id": "khemri.throra"
     },
     {
       "nr": 4,
-      "position_id": "khemri.tombguardian"
+      "position_id": "khemri.skeleton"
     },
     {
       "nr": 5,
-      "position_id": "khemri.blitzra"
+      "position_id": "khemri.tombguardian"
     },
     {
       "nr": 6,
@@ -41,11 +43,11 @@
     },
     {
       "nr": 8,
-      "position_id": "khemri.throra"
+      "position_id": "khemri.skeleton"
     },
     {
       "nr": 9,
-      "position_id": "khemri.skeleton"
+      "position_id": "khemri.tombguardian"
     },
     {
       "nr": 10,
@@ -53,7 +55,7 @@
     },
     {
       "nr": 11,
-      "position_id": "khemri.skeleton"
+      "position_id": "khemri.tombguardian"
     },
     {
       "nr": 12,

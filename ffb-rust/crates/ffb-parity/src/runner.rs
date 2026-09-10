@@ -813,6 +813,16 @@ pub(crate) struct TeamFileJson {
     pub roster_id: String,
     pub rerolls: i32,
     pub apothecaries: i32,
+    /// Sideline Staff. 0-6 each at 10,000 gold in every edition
+    /// (`rules/core_rules/04_drafting_a_blood_bowl_team.md`). These were absent from the spec
+    /// until 2026-09-10 and hardcoded to 0 on both sides, so Brilliant Coaching and Cheering
+    /// Fans were decided 0-against-0 in all 33,300 games of the matrix — see
+    /// `docs/PARITY_COVERAGE_REQUIREMENTS.md` §19 defect 3. `default` so a spec written before
+    /// the field existed still parses.
+    #[serde(default)]
+    pub assistant_coaches: i32,
+    #[serde(default)]
+    pub cheerleaders: i32,
     pub dedicated_fans: i32,
     pub fan_factor: i32,
     pub treasury: i32,
@@ -820,23 +830,12 @@ pub(crate) struct TeamFileJson {
     #[serde(default)]
     pub special_rules: Vec<String>,
     pub players: Vec<TeamFilePlayer>,
-    /// Star players fielded as extra rostered players (parity tier §9). Each entry names a
-    /// star from data/star_players/all_editions.json by id; gen_java_parity_data.py emits the
-    /// identical star into the Java roster/team XMLs, so both engines field the same player.
-    #[serde(default)]
-    pub stars: Vec<TeamFileStar>,
 }
 
 #[derive(serde::Deserialize)]
 pub(crate) struct TeamFilePlayer {
     pub nr: i32,
     pub position_id: String,
-}
-
-#[derive(serde::Deserialize)]
-pub(crate) struct TeamFileStar {
-    pub nr: i32,
-    pub star_id: String,
 }
 
 /// Locate `data/teams/<edition>/team_<race>.json` (env `FFB_TEAMS_DIR` overrides the root).
@@ -890,38 +889,15 @@ pub fn make_team_from_file(roster_name: &str, side: &str, edition: &str) -> Resu
         ));
     }
 
-    // Star players drafted by the spec's `stars` list — fielded as ordinary rostered players
-    // (no inducement phase; the Java sheets get the identical player from the SAME star data
-    // via gen_java_parity_data.py, so the two engines stay in lockstep).
-    for star_entry in &spec.stars {
-        let star = ffb_model::data::STAR_PLAYERS.star_players.iter()
-            .find(|s| s.id == star_entry.star_id)
-            .ok_or_else(|| format!("star id '{}' not found in data/star_players/all_editions.json",
-                star_entry.star_id))?;
-        let pos_json = ffb_model::data::roster_json::PositionJson {
-            id: star.id.clone(),
-            name: star.name.clone(),
-            display_name: star.display_name.clone(),
-            player_type: star.player_type.clone(),
-            quantity: star.quantity.unwrap_or(1),
-            cost: star.cost,
-            ma: star.ma,
-            st: star.st,
-            ag: star.ag,
-            pa: star.pa,
-            av: star.av,
-            skills: star.skills.clone(),
-            skill_categories: Default::default(),
-            keywords: vec![],
-        };
-        let rp = position_json_to_roster_position(&pos_json, &roster_json.id, roster_json.undead, edition_to_rules(edition));
-        players.push(Player::from_position(
-            format!("{side}_{:02}", star_entry.nr),
-            format!("{} {} {}", side, rp.name, star_entry.nr),
-            star_entry.nr,
-            &rp,
-        ));
-    }
+    // There is deliberately NO star-player path here. A star on a Team Draft List is an
+    // Inducement: Matched Play requires its gold cost AND 2 Skill Points within the team's Tier
+    // allowance ("Skill Points must also be spent if a team wishes to take a Star Player on their
+    // Team Draft List as an Inducement", `rules/core_rules/06_matched_play.md`), and a mirror
+    // match has no inducement gold at all. The squads field none — see
+    // `docs/PARITY_COVERAGE_REQUIREMENTS.md` §19. A `stars` key in a spec is a validation error,
+    // not a supported feature; it is rejected by `validate_teams.py` and by
+    // `all_hand_drafted_team_files_are_legal`.
+
     // Keep the roster in squad-nr order regardless of spec-file order: Java's player list is
     // nr-ordered, and the harness activation snapshots index into the list (idx % N), so an
     // out-of-order list silently pairs the same idx with different players (dwarf bb2016 star
@@ -940,8 +916,8 @@ pub fn make_team_from_file(roster_name: &str, side: &str, edition: &str) -> Resu
         bribes: 0,
         master_chefs: 0,
         prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
-        cheerleaders: 0,
-        assistant_coaches: 0,
+        cheerleaders: spec.cheerleaders,
+        assistant_coaches: spec.assistant_coaches,
         fan_factor: spec.fan_factor,
         dedicated_fans: spec.dedicated_fans,
         team_value: spec.team_value,
@@ -1844,9 +1820,13 @@ mod team_file_tests {
     /// both sides materialize through make_team_from_file.
     #[test]
     fn all_hand_drafted_team_files_are_legal() {
-        for edition in ["bb2016", "bb2025"] {
+        // All THREE editions. This used to iterate ["bb2016", "bb2025"], leaving every one of
+        // the 40 bb2020 squads unchecked by any test in the repo -- only the Python validator
+        // saw them (docs/PARITY_COVERAGE_REQUIREMENTS.md sec.19).
+        for edition in ["bb2016", "bb2020", "bb2025"] {
             let rosters = match edition {
                 "bb2016" => bb2016_rosters(),
+                "bb2020" => bb2020_rosters(),
                 _ => bb2025_rosters(),
             };
             let dir = teams_root().join(edition);
@@ -1879,42 +1859,85 @@ mod team_file_tests {
                     assert!(*cnt <= q, "{edition}/{race}: {cnt}x {pid} exceeds quantity cap {q}");
                 }
 
-                let apo_cost = spec.apothecaries * 50_000;
-                let fans_cost = if edition == "bb2025" {
-                    (spec.dedicated_fans - 1).max(0) * 5_000
-                } else {
-                    spec.fan_factor * 10_000
+                // R6 staff bounds: 0-6 assistant coaches and 0-6 cheerleaders at 10,000 each,
+                // at most one apothecary, and only where the roster may hire one.
+                assert!((0..=6).contains(&spec.assistant_coaches),
+                    "{edition}/{race}: {} assistant coaches", spec.assistant_coaches);
+                assert!((0..=6).contains(&spec.cheerleaders),
+                    "{edition}/{race}: {} cheerleaders", spec.cheerleaders);
+                assert!((0..=1).contains(&spec.apothecaries),
+                    "{edition}/{race}: {} apothecaries", spec.apothecaries);
+                assert!(spec.apothecaries == 0 || roster.apothecary,
+                    "{edition}/{race}: apothecary on a roster that may not hire one");
+
+                // R6 fans, per edition -- getting this wrong is sec.19 defects 4 and 5.
+                // bb2016 CRP: Fan Factor 0-9 at 10,000, and it COUNTS in Team Value.
+                // bb2020 exhibition: Dedicated Fans start at 0, up to 6, at 10,000 each.
+                // bb2025 matched play: Dedicated Fans start at 1, up to 3, at 5,000 each.
+                let (fans_cost, fans_in_tv) = match edition {
+                    "bb2016" => {
+                        assert!((0..=9).contains(&spec.fan_factor),
+                            "{edition}/{race}: fan factor {}", spec.fan_factor);
+                        assert_eq!(spec.dedicated_fans, 0,
+                            "{edition}/{race}: bb2016 has no Dedicated Fans");
+                        (spec.fan_factor * 10_000, true)
+                    }
+                    "bb2020" => {
+                        assert!((0..=6).contains(&spec.dedicated_fans),
+                            "{edition}/{race}: dedicated fans {}", spec.dedicated_fans);
+                        assert_eq!(spec.fan_factor, 0,
+                            "{edition}/{race}: bb2020 has no Fan Factor");
+                        (spec.dedicated_fans * 10_000, false)
+                    }
+                    _ => {
+                        assert!((1..=3).contains(&spec.dedicated_fans),
+                            "{edition}/{race}: dedicated fans {}", spec.dedicated_fans);
+                        assert_eq!(spec.fan_factor, 0,
+                            "{edition}/{race}: bb2025 has no Fan Factor");
+                        ((spec.dedicated_fans - 1).max(0) * 5_000, false)
+                    }
                 };
-                let spend = players_cost + spec.rerolls * roster.reroll_cost + apo_cost + fans_cost;
+
+                let apo_cost = spec.apothecaries * 50_000;
+                let staff_cost = (spec.assistant_coaches + spec.cheerleaders) * 10_000;
+                let spend = players_cost + spec.rerolls * roster.reroll_cost + apo_cost
+                    + staff_cost + fans_cost;
                 assert!(spend <= 1_100_000, "{edition}/{race}: spend {spend} over 1.1M budget");
                 assert_eq!(spend + spec.treasury, 1_100_000,
                     "{edition}/{race}: spend {spend} + treasury {} != 1.1M", spec.treasury);
 
-                // Java UtilTeamValue: rerolls*rrCost + fanFactor*10k + coaches/cheerleaders (0)
-                // + apo*50k + player position costs. Dedicated Fans are NOT part of TV.
-                let tv = spec.rerolls * roster.reroll_cost + spec.fan_factor * 10_000
-                    + apo_cost + players_cost;
+                // Java UtilTeamValue.findTeamValue, 1:1: rerolls*rrCost + fanFactor*10k
+                // + assistantCoaches*10k + cheerleaders*10k + apothecaries*50k + player costs.
+                // Dedicated Fans are NOT part of TV; Fan Factor is.
+                let tv = spec.rerolls * roster.reroll_cost + apo_cost + staff_cost + players_cost
+                    + if fans_in_tv { fans_cost } else { 0 };
                 assert_eq!(spec.team_value, tv, "{edition}/{race}: team_value mismatch");
+
+                // No stars anywhere. A star on a Team Draft List is an Inducement, needing
+                // gold AND Skill Points in Matched Play, and a mirror match has no inducement
+                // gold at all (sec.19 defect 1). The key must be ABSENT, not merely empty.
+                let raw: serde_json::Value = serde_json::from_str(
+                    &std::fs::read_to_string(&path).unwrap()).unwrap();
+                assert!(raw.get("stars").is_none(),
+                    "{edition}/{race}: spec carries a 'stars' list -- stars are Inducements,                      see docs/PARITY_COVERAGE_REQUIREMENTS.md sec.19");
 
                 for side in ["home", "away"] {
                     let team = make_team_from_file(&race, side, edition)
                         .unwrap_or_else(|e| panic!("{edition}/{race}/{side}: {e}"));
-                    // Stars ride on top of the hand-drafted spend: they model an INDUCED star
-                    // player (bought from petty cash in a real game), so they are deliberately
-                    // outside the 1.1M budget/treasury identity checked above.
-                    assert_eq!(team.players.len(), n + spec.stars.len(),
-                        "{edition}/{race}/{side}: player count");
+                    assert_eq!(team.players.len(), n, "{edition}/{race}/{side}: player count");
                     assert_eq!(team.rerolls, spec.rerolls);
                     assert_eq!(team.dedicated_fans, spec.dedicated_fans);
+                    assert_eq!(team.assistant_coaches, spec.assistant_coaches);
+                    assert_eq!(team.cheerleaders, spec.cheerleaders);
                 }
                 checked += 1;
             }
-            // bb2016 has the 29 original drafts; bb2025 adds the 8 coverage squads of
-            // PARITY_COVERAGE_REQUIREMENTS §8 (6 new teams + Bretonnian + the two R3
-            // Old World Alliance Big-Guy variants, which share one roster) and the 4 R3
-            // variants drafted to close the §8 R2/R4 misses on existing races
-            // (chaos_ogre, chaos_troll, renegades_37733, underworld_37844).
-            let want = if edition == "bb2025" { 41 } else { 29 };
+            // 110 cells: 29 bb2016 + 40 bb2020 + 41 bb2025. bb2020 lost
+            // team_chaos_pact_renegadetroll.json in the 2026-09-10 re-draft: it existed to
+            // work around a group Big-Guy cap that the rules do not impose on a roster with no
+            // official page, so the base squad now fields all four Big Guys itself and the
+            // variant had become an exact duplicate of it (sec.19).
+            let want = match edition { "bb2016" => 29, "bb2020" => 40, _ => 41 };
             assert_eq!(checked, want, "{edition}: expected {want} team files, found {checked}");
         }
     }
@@ -1965,7 +1988,6 @@ mod coverage_squad_tests {
         ("bb2020", "chaos_chaosogre", "chaos", "chaos.chaosogre", SkillId::BoneHead),
         ("bb2020", "chaos_chaostroll", "chaos", "chaos.chaostroll", SkillId::AlwaysHungry),
         ("bb2020", "chaos_pact", "chaos_pact", "chaospact.renegadeogre", SkillId::BoneHead),
-        ("bb2020", "chaos_pact_renegadetroll", "chaos_pact", "chaospact.renegadetroll", SkillId::AlwaysHungry),
         ("bb2020", "dwarf", "dwarf", "dwarf.trollslayer", SkillId::Frenzy),
         ("bb2020", "renegades", "renegades", "37732", SkillId::UnchannelledFury),
         ("bb2020", "renegades_37730", "renegades", "37730", SkillId::AlwaysHungry),
@@ -2002,28 +2024,24 @@ mod coverage_squad_tests {
             let rosters = rosters_for(edition);
             let roster = rosters.iter().find(|r| r.id == spec.roster_id)
                 .unwrap_or_else(|| panic!("{edition}/{squad}: roster id {} missing", spec.roster_id));
-            // A drafted star (spec.stars, §9) is injected as an extra rostered player whose
-            // position_id is the star's own id and whose stat line comes from
-            // data/star_players/, not from the roster — hold it out of the roster checks.
-            let star_ids: Vec<&str> = spec.stars.iter().map(|s| s.star_id.as_str()).collect();
 
             for side in ["home", "away"] {
                 // The LIVE path, fallback included: this is what a gate measures.
                 let team = make_team(squad, side, edition);
                 assert_ne!(team.roster_id, "lineman",
                     "{edition}/{squad}/{side}: fell back to the lineman fixture");
-                assert_eq!(team.players.len(), spec.players.len() + star_ids.len(),
+                assert_eq!(team.players.len(), spec.players.len(),
                     "{edition}/{squad}/{side}: player count");
 
                 let mut want: Vec<&str> = spec.players.iter()
-                    .map(|p| p.position_id.as_str()).chain(star_ids.iter().copied()).collect();
+                    .map(|p| p.position_id.as_str()).collect();
                 let mut got: Vec<&str> = team.players.iter()
                     .map(|p| p.position_id.as_str()).collect();
                 want.sort_unstable();
                 got.sort_unstable();
                 assert_eq!(got, want, "{edition}/{squad}/{side}: fielded positions");
 
-                for p in team.players.iter().filter(|p| !star_ids.contains(&p.position_id.as_str())) {
+                for p in team.players.iter() {
                     let pos = roster.positions.iter().find(|q| q.id == p.position_id)
                         .unwrap_or_else(|| panic!("{edition}/{squad}: {} not in roster", p.position_id));
                     assert_eq!(
@@ -2076,6 +2094,14 @@ mod fumbbl_roster_tests {
     use super::make_team;
     use ffb_model::enums::SkillId;
 
+    fn teams_root() -> std::path::PathBuf {
+        for c in ["data/teams", "../data/teams", "../../data/teams"] {
+            let p = std::path::Path::new(c);
+            if p.exists() { return p.to_path_buf(); }
+        }
+        panic!("data/teams not found from test cwd");
+    }
+
     /// Regression (dark_elf_league_fumbbl seed 1 step 9): the FUMBBL league-import rosters have a
     /// numeric FUMBBL `id` and a generic race `name` that collides with the standard roster, so the
     /// CLI key ("dark_elf_league_fumbbl") matched neither. make_team_from_roster returned Err and
@@ -2084,14 +2110,16 @@ mod fumbbl_roster_tests {
     /// first player is a Witch Elf (AG2, Dodge/Frenzy/Jump Up), never a bare AG3 lineman.
     #[test]
     fn fumbbl_dark_elf_builds_real_roster_not_lineman_fallback() {
+        // Addressed by SKILL, not by players[0]: shirt numbers are a drafting output, and the
+        // 2026-09-10 re-draft renumbers every squad round-by-round so the positionals take the
+        // low shirts. A test that pins a positional to shirt 1 breaks on a legal re-draft while
+        // still not checking the thing it cares about.
         let team = make_team("dark_elf_league_fumbbl", "away", "bb2025");
-        let p = &team.players[0];
-        assert_eq!(p.agility, 2, "first fumbbl player must be the AG2 Witch Elf, not the AG3 lineman fallback");
-        assert!(
-            p.starting_skills.iter().any(|s| s.skill_id == SkillId::Dodge),
-            "first fumbbl player must carry the Witch Elf's Dodge skill (fallback lineman has none)",
-        );
-        assert_eq!(team.players.len(), 11);
+        let witch = team.players.iter()
+            .find(|p| p.starting_skills.iter().any(|s| s.skill_id == SkillId::Dodge))
+            .expect("squad must contain a Witch Elf with Dodge; a fallback lineman has no skills");
+        assert_eq!(witch.agility, 2, "the Witch Elf is AG2, not the AG3 lineman fallback");
+        assert!((11..=16).contains(&team.players.len()));
     }
 
     #[test]
@@ -2130,34 +2158,60 @@ mod fumbbl_roster_tests {
         }
     }
 
-    /// §9 star drafting: a team spec's `stars` list fields the star as an ordinary rostered
-    /// player, resolved from data/star_players/all_editions.json (the Java sheets get the
-    /// identical player via gen_java_parity_data.py). The list must come out nr-SORTED even
-    /// though stars are appended after the regular players: the harness activation snapshots
-    /// index by position (idx % N), so an out-of-order list pairs the same idx with different
-    /// players in the two engines (dwarf bb2016 pilot seed 1, half 2: pick=8 N=10 gave Java
-    /// nr 12 and Rust nr 13 — 5/10 seeds red until the sort).
+    /// The squad list must come out nr-SORTED, and every squad must be numbered 1..N with no
+    /// gaps. Both harnesses index their activation snapshots by POSITION in this list
+    /// (`idx % N`), so an out-of-order or gappy list pairs the same idx with different players
+    /// in the two engines. This was found the hard way while stars were still being injected
+    /// after the regular players (dwarf bb2016, seed 1 half 2: pick=8 N=10 gave Java nr 12 and
+    /// Rust nr 13, 5/10 seeds red until the sort). The stars are gone; the invariant is not.
     #[test]
-    fn star_drafting_injects_the_star_nr_sorted() {
-        let team = make_team("dwarf", "home", "bb2016");
-        let barik = team.players.iter().find(|p| p.nr == 11)
-            .expect("bb2016 dwarf spec drafts dwarf.Farblast at nr 11");
-        assert!(barik.name.contains("Barik"), "nr 11 must be the star, got {}", barik.name);
-        assert!(
-            barik.starting_skills.iter().any(|s| s.skill_id == SkillId::HailMaryPass),
-            "Barik must carry Hail Mary Pass",
-        );
-        let nrs: Vec<i32> = team.players.iter().map(|p| p.nr).collect();
-        let mut sorted = nrs.clone();
-        sorted.sort();
-        assert_eq!(nrs, sorted, "players must be nr-sorted");
+    fn every_squad_is_numbered_one_to_n_and_nr_sorted() {
+        for edition in ["bb2016", "bb2020", "bb2025"] {
+            let dir = teams_root().join(edition);
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.extension().and_then(|e| e.to_str()) != Some("json") { continue; }
+                let squad = path.file_stem().unwrap().to_str().unwrap()
+                    .strip_prefix("team_").unwrap().to_string();
+                let team = make_team(&squad, "home", edition);
+                let nrs: Vec<i32> = team.players.iter().map(|p| p.nr).collect();
+                let want: Vec<i32> = (1..=nrs.len() as i32).collect();
+                assert_eq!(nrs, want, "{edition}/{squad}: squad numbers must be 1..N in order");
+            }
+        }
+    }
+
+    /// No squad may field a star player. A star on a Team Draft List is an Inducement: Matched
+    /// Play charges its gold cost AND 2 Skill Points against the team's Tier allowance, and a
+    /// mirror match -- which every parity gate is -- generates no inducement gold at all. The
+    /// injection path in `make_team_from_file` is gone, so this guards the DATA: a `stars` key
+    /// would now be silently ignored, which is worse than failing.
+    /// See docs/PARITY_COVERAGE_REQUIREMENTS.md sec.19 defect 1.
+    #[test]
+    fn no_squad_drafts_a_star_player() {
+        let mut checked = 0;
+        for edition in ["bb2016", "bb2020", "bb2025"] {
+            let dir = teams_root().join(edition);
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.extension().and_then(|e| e.to_str()) != Some("json") { continue; }
+                let raw: serde_json::Value = serde_json::from_str(
+                    &std::fs::read_to_string(&path).unwrap()).unwrap();
+                assert!(raw.get("stars").is_none(),
+                    "{edition}/{:?} carries a 'stars' list", path.file_name().unwrap());
+                checked += 1;
+            }
+        }
+        assert_eq!(checked, 110, "expected 110 squad files, found {checked}");
     }
 
     #[test]
     fn fumbbl_slann_kroxigor_has_no_bonehead_in_bb2025() {
         let team = make_team("slann_fumbbl", "away", "bb2025");
-        let kroxigor = &team.players[0];
-        assert_eq!(kroxigor.strength, 5, "first slann_fumbbl player must be the ST5 Kroxigor");
+        // Found by strength, not by shirt number -- see the note in
+        // fumbbl_dark_elf_builds_real_roster_not_lineman_fallback.
+        let kroxigor = team.players.iter().find(|p| p.strength == 5)
+            .expect("slann_fumbbl squad must contain the ST5 Kroxigor");
         assert!(
             !kroxigor.starting_skills.iter().any(|s| s.skill_id == SkillId::BoneHead),
             "bb2025 Kroxigor must NOT carry Bone Head — the roster's hyphen spelling \"Bone-head\" \

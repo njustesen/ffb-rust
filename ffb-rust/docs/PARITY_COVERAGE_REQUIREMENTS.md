@@ -117,6 +117,12 @@ the squad never fields half of it.
 A squad must be one a coach could actually field: positional quantity limits respected, budget
 respected, sensible re-rolls / dedicated fans / apothecary. Not a degenerate stack.
 
+> **R1 was not enough, and "rule-legal" here did not mean what it says.** It was defined by the
+> C-checks in §11, which were calibrated against the squads themselves — so seven systematic
+> drafting illegalities passed it, including star players paid for with nothing and zero Sideline
+> Staff on all 111 squads. **§19 (R6)** now defines rule-legality by citation to `rules/` and is
+> the authority; read it before drafting or before changing a squad.
+
 ### R2 — Every positional must be fielded
 Every positional in the ruleset's roster definition must appear in the squad, so that every
 position's stat line and starting skills are exercised. A positional that is never fielded has NO
@@ -1035,3 +1041,169 @@ superseded. This is the first table where every cell comes from the same engine.
 
 All green on this build: `nippon`, `slann`, `chaos_pact` (bb2020/bb2025), `dark_elf_league_fumbbl`,
 `khemri_fumbbl`, `slann_fumbbl`.
+
+## 19. R6 — the squad must be legal under the RULEBOOK, not under this document
+
+**2026-09-10. This section exists because §8's R1 and §11's C1-C8 did not require what they
+appeared to require, and every defect listed at the end of this section passed them.**
+
+R1 asks for a squad that is "realistic and rule-legal" and then leaves *rule-legal* to be defined
+by the C-checks. The C-checks were written from the squads. §11 says so in as many words: the C5
+money formula was "DERIVED FROM THE DATA, not assumed", and its evidence is that it "reproduces
+the declared `team_value` / `spent` / `treasury` for 100% of the squads in the tree". It reproduces
+them because the squads were built with it. A checker calibrated against its own subject cannot
+find a systematic error in that subject, and it did not.
+
+**R6: a drafted squad must be legal under the drafting rules of the play format its Team Draft
+Budget implies, as printed in `rules/`.** Every constraint below cites the rule text. Where this
+document and the rulebook disagree, the rulebook wins and this document is wrong.
+
+### The play format is fixed by the budget
+
+The squads are drafted on 1,100,000 gold. That is **not** a League budget:
+
+> "When starting a team during League Play, you will usually have a Team Draft Budget of 1,000,000
+> gold pieces - this is the most common value for a rookie team."
+> — `rules/core_rules/04_drafting_a_blood_bowl_team.md`
+
+For BB2025 it is a **Matched Play** budget:
+
+> "There is no set amount of gold pieces for Matched Play games... the most common values are
+> 1,100,000, 1,150,000 or 1,200,000 gold pieces."
+> — `rules/core_rules/06_matched_play.md`
+
+For BB2020 it is an **Exhibition Play** budget:
+
+> "The Team Draft Budget for exhibition play should be somewhere between 1,100,000 and 1,300,000
+> gold pieces."
+> — `rules/bb2020/core_rules/07_league_and_exhibition_play.md`
+
+For BB2016 the CRP figure is 1,000,000 and this project uses 1,100,000 to hold the three editions
+comparable (already recorded in `docs/BB2016_DRAFTING_AND_ROSTERS.md`). Tournament budgets are
+explicitly variable, so this is a legal choice, not a licence to ignore the rest of the rules.
+
+### R6 constraint table
+
+| | bb2016 (CRP tournament) | bb2020 (Exhibition) | bb2025 (Matched Play) |
+|---|---|---|---|
+| Team Draft Budget | 1,100,000 | 1,100,000 | 1,100,000 |
+| budget fully spent | yes | yes | yes |
+| treasury | 0 | 0 | 0 |
+| players | 11..16 | 11..16 | 11..16 |
+| per-position maximum | team page | team page | team page |
+| group cap (Big Guy) | none in CRP | team page | team page |
+| team re-rolls | 0-8 @ roster cost | 0-8 @ roster cost | 0-8 @ roster cost |
+| assistant coaches | 0-6 @ 10,000 | 0-6 @ 10,000 | 0-6 @ 10,000 |
+| cheerleaders | 0-6 @ 10,000 | 0-6 @ 10,000 | 0-6 @ 10,000 |
+| apothecary | 0-1 @ 50,000, roster permitting | same | same |
+| fans | Fan Factor 0-9 @ 10,000, counts in TV | Dedicated Fans 0→6 @ **10,000**, not in TV | Dedicated Fans 1→3 @ **5,000**, not in TV |
+| Team Value | players + staff + re-rolls + FF×10,000 | players + staff + re-rolls | players + staff + re-rolls |
+| star players | none | none | none |
+
+Citations for the rows that were previously wrong or absent:
+
+**Budget fully spent, treasury 0.**
+> "all the gold pieces a team has must be spent when drafting your team. Any gold pieces not spent
+> are lost, so it is always worth spending any leftover cash on the likes of Assistant Coaches,
+> Cheerleaders, Dedicated Fans or whatever else you can manage to afford." — `06_matched_play.md`
+
+> "when a team is drafted for exhibition play, all of the gold pieces in the Team Draft Budget must
+> be spent. Any gold pieces not spent are lost."
+> — `rules/bb2020/core_rules/07_league_and_exhibition_play.md`
+
+**Players 11..16.**
+> "A team must have at least 11 players on their Team Draft List when it is first drafted."
+> "A team may never have more than 16 players on their Team Draft List."
+> — `04_drafting_a_blood_bowl_team.md`
+
+**Assistant coaches and cheerleaders.**
+> "A team may hire up to a maximum of 6 Assistant Coaches. Each Assistant Coach costs 10,000 gold
+> pieces to hire."
+> "A team may hire up to a maximum of 6 Cheerleaders. Each Cheerleader costs 10,000 gold pieces."
+> — `04_drafting_a_blood_bowl_team.md`; the BB2016 equivalents are in
+> `docs/BB2016_DRAFTING_AND_ROSTERS.md`.
+
+**Team re-rolls, 0-8.**
+> "Teams may purchase a maximum of 8 Team Re-rolls, though they may never have more than 8 Team
+> Re-rolls on their Team Draft Roster." — `04_drafting_a_blood_bowl_team.md`
+
+**BB2025 Dedicated Fans: from 1, up to 3, at 5,000.**
+> "When you draft a team, it will automatically have a Dedicated Fans Characteristic of 1... you
+> may improve the Dedicated Fans Characteristic of your team up to a maximum of 3... at the cost of
+> 5,000 gold pieces per Dedicated Fan improvement." — `04_drafting_a_blood_bowl_team.md`
+
+**BB2020 Dedicated Fans: from 0, up to 6, at 10,000.**
+> "Unlike a team drafted for league play, a team drafted for exhibition play will have a Dedicated
+> Fans characteristic of 0. However, teams drafted for exhibition play can still improve this up to
+> a maximum of 6, at a cost of 10,000 gold pieces per improvement."
+> — `rules/bb2020/core_rules/07_league_and_exhibition_play.md`
+
+**Team Value excludes Dedicated Fans and treasury.**
+> "A team's Team Value (TV) is worked out by adding up the Current Value of all the players on the
+> team, plus the cost of any Sideline Staff and Team Re-rolls the team has. Dedicated Fans and gold
+> pieces in a team's Treasury are not included." — `04_drafting_a_blood_bowl_team.md`
+
+**Star players are an Inducement and cost Skill Points as well as gold.**
+> "Skill Points must also be spent if a team wishes to take a Star Player on their Team Draft List
+> as an Inducement. If a team wishes to take a Star Player, then they must still pay the Star
+> Player's associated cost in gold pieces, and also spend 2 Skill Points to have them on their
+> team. Tier 1 teams may only have 1 Star Player on their team, whilst Tier 2, Tier 3 and Tier 4
+> teams may have up to 2 Star Players." — `06_matched_play.md`
+
+A star on the draft list is therefore legal in Matched Play *only* if it is paid for in gold and in
+Skill Points, within the team's Tier allowance. **This project fields no stars at all**, which is
+stricter than the rule and removes the question. The CRP pages agree on the principle — each bb2016
+team page ends with "Star Players available for Inducement".
+
+### The group Big Guy cap is a ROSTER cap, not a fielding cap
+
+The team pages mark the affected positions with `*` and state the cap:
+
+> "A Chaos Chosen team may have a single Big Guy, chosen from the following."
+> "A Chaos Renegade team may have up to three Big Guys, chosen from the following."
+
+This limits what the team may **contain**, not what it may put on the pitch, and it is a cap across
+a *group* of positions — which the per-position `quantity` field in `data/rosters/` cannot express.
+It must be checked separately. Pages carrying such a sentence:
+
+| ruleset | team | cap |
+|---|---|---|
+| bb2020 | Chaos Chosen, Old World Alliance, Underworld Denizens | 1 |
+| bb2025 | Chaos Chosen, Old World Alliance, Underworld Denizens | 1 |
+| bb2025 | Chaos Renegades | 3 |
+| bb2016 | — (CRP has no group cap; each Big Guy is individually 0-1) | — |
+
+### Skill Points are deliberately not spent
+
+A Matched Play team receives Skill Points by Tier and may spend them on additional skills.
+Nothing requires spending them, so the squads take none. **The Matched Play model is therefore
+partial**, and the additional-skills path has no parity evidence from the matrix. Recorded here so
+it is a known gap rather than an assumed completeness.
+
+### The defects R6 was written to catch
+
+All seven passed §8/§11 and were found only by reading the rulebook against the data:
+
+| # | defect | scope |
+|---|---|---|
+| 1 | star players on the draft list, paid for with neither gold nor Skill Points | 16 stars in 12 squads |
+| 2 | unspent treasury, up to 50,000 gold per squad | most squads |
+| 3 | zero assistant coaches and zero cheerleaders — the spec had no field, and `gen_java_parity_data.py` hardcoded `<cheerleaders>0</cheerleaders>` / `<assistantCoaches>0</assistantCoaches>` | **all 111** |
+| 4 | Dedicated Fans charged at the BB2025 League rate (`(n-1)×5,000`) instead of the Exhibition rate (`n×10,000`) — underpaid by 20,000 | all 41 bb2020 |
+| 5 | Dedicated Fans allowed up to 6 where drafting caps them at 3 | bb2025 checker |
+| 6 | the group Big Guy cap treated as a fielding restriction, and not expressible per-position | 7 pages |
+| 7 | star `available_for` (which teams may hire a star) read by no code and no script | all stars |
+
+Defect 3 is the one with a coverage consequence of its own: with 0 coaches and 0 cheerleaders on
+**both** sides of all 33,300 games, the Brilliant Coaching and Cheering Fans kick-off results were
+decided 0-against-0 for the entire campaign. `docs/EVENT_CENSUS_2026-09-10.md` saw the symptom from
+the other end — "Brilliant Coaching and its bb2016 twin grant 16,423 extra re-rolls that can never
+be spent on a block" — without identifying that neither team had ever bought a single member of
+staff.
+
+### Enforcement
+
+`scripts/draft_all_squads.py` drafts to R6 and asserts it before writing; `scripts/validate_teams.py`
+checks it independently of the drafter, with a `--selftest` case per check so each is proven to
+fire. The rule that a checker may not be calibrated against its own subject is the lesson: every
+R6 constant traces to a quoted line in `rules/`, and none to a value read out of `data/teams/`.

@@ -5,6 +5,8 @@
   "rerolls": 2,
   "reroll_cost": 60000,
   "apothecaries": 0,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
   "dedicated_fans": 2,
   "fan_factor": 0,
   "treasury": 0,
@@ -13,14 +15,14 @@
   "players": [
     {
       "nr": 1,
-      "position_id": "dwarf.deathroller"
+      "position_id": "dwarf.blocker"
     },
     {
-      "nr": 12,
-      "position_id": "dwarf.blitzer"
+      "nr": 2,
+      "position_id": "dwarf.runner"
     },
     {
-      "nr": 13,
+      "nr": 3,
       "position_id": "dwarf.blitzer"
     },
     {
@@ -29,19 +31,19 @@
     },
     {
       "nr": 5,
-      "position_id": "dwarf.runner"
+      "position_id": "dwarf.deathroller"
     },
     {
       "nr": 6,
-      "position_id": "dwarf.runner"
+      "position_id": "dwarf.blocker"
     },
     {
       "nr": 7,
-      "position_id": "dwarf.blocker"
+      "position_id": "dwarf.runner"
     },
     {
       "nr": 8,
-      "position_id": "dwarf.blocker"
+      "position_id": "dwarf.blitzer"
     },
     {
       "nr": 9,
@@ -59,15 +61,5 @@
   "special_rules": [
     "Brawlin' Brutes",
     "Bribery and Corruption"
-  ],
-  "stars": [
-    {
-      "nr": 2,
-      "star_id": "dwarf.Thorsson"
-    },
-    {
-      "nr": 3,
-      "star_id": "dwarf.Grombrindal"
-    }
   ]
 }

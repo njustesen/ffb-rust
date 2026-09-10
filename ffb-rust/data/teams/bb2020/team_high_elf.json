@@ -4,28 +4,30 @@
   "roster_id": "highelf.lrb6",
   "rerolls": 3,
   "reroll_cost": 50000,
-  "apothecaries": 0,
-  "dedicated_fans": 3,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 0,
   "fan_factor": 0,
-  "treasury": 20000,
-  "spent": 1080000,
-  "team_value": 1070000,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1100000,
   "players": [
     {
       "nr": 1,
-      "position_id": "highelf.thrower"
+      "position_id": "highelf.lineman"
     },
     {
       "nr": 2,
-      "position_id": "highelf.blitzer"
-    },
-    {
-      "nr": 3,
       "position_id": "highelf.catcher"
     },
     {
+      "nr": 3,
+      "position_id": "highelf.thrower"
+    },
+    {
       "nr": 4,
-      "position_id": "highelf.lineman"
+      "position_id": "highelf.blitzer"
     },
     {
       "nr": 5,
@@ -33,11 +35,11 @@
     },
     {
       "nr": 6,
-      "position_id": "highelf.lineman"
+      "position_id": "highelf.catcher"
     },
     {
       "nr": 7,
-      "position_id": "highelf.lineman"
+      "position_id": "highelf.blitzer"
     },
     {
       "nr": 8,
@@ -53,10 +55,6 @@
     },
     {
       "nr": 11,
-      "position_id": "highelf.lineman"
-    },
-    {
-      "nr": 12,
       "position_id": "highelf.lineman"
     }
   ],

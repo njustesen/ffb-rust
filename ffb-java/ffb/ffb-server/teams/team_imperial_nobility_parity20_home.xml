@@ -8,26 +8,26 @@
 	<rosterId>imperial_nobility.bb2020</rosterId>
 	<reRolls>2</reRolls>
 	<fanFactor>0</fanFactor>
-	<dedicatedFans>3</dedicatedFans>
+	<dedicatedFans>0</dedicatedFans>
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1065000</currentTeamValue>
+	<currentTeamValue>1095000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>25000</treasury>
+	<treasury>5000</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamImperialNobilityParity20Home1">
-		<name>Ogre 1</name>
+		<name>Imperial Retainer Lineman 1</name>
 		<gender>male</gender>
-		<positionId>imperialnobility.ogre</positionId>
+		<positionId>imperialnobility.imperial_retainer_lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamImperialNobilityParity20Home2">
-		<name>Noble Blitzer 2</name>
+		<name>Imperial Thrower 2</name>
 		<gender>male</gender>
-		<positionId>imperialnobility.noble_blitzer</positionId>
+		<positionId>imperialnobility.imperial_thrower</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -46,37 +46,37 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamImperialNobilityParity20Home5">
-		<name>Bodyguard 5</name>
+		<name>Ogre 5</name>
 		<gender>male</gender>
-		<positionId>imperialnobility.bodyguard</positionId>
+		<positionId>imperialnobility.ogre</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="6" id="teamImperialNobilityParity20Home6">
-		<name>Imperial Thrower 6</name>
+		<name>Imperial Retainer Lineman 6</name>
+		<gender>male</gender>
+		<positionId>imperialnobility.imperial_retainer_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamImperialNobilityParity20Home7">
+		<name>Imperial Thrower 7</name>
 		<gender>male</gender>
 		<positionId>imperialnobility.imperial_thrower</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="7" id="teamImperialNobilityParity20Home7">
-		<name>Imperial Retainer Lineman 7</name>
-		<gender>male</gender>
-		<positionId>imperialnobility.imperial_retainer_lineman</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
 	<player nr="8" id="teamImperialNobilityParity20Home8">
-		<name>Imperial Retainer Lineman 8</name>
+		<name>Noble Blitzer 8</name>
 		<gender>male</gender>
-		<positionId>imperialnobility.imperial_retainer_lineman</positionId>
+		<positionId>imperialnobility.noble_blitzer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="9" id="teamImperialNobilityParity20Home9">
-		<name>Imperial Retainer Lineman 9</name>
+		<name>Bodyguard 9</name>
 		<gender>male</gender>
-		<positionId>imperialnobility.imperial_retainer_lineman</positionId>
+		<positionId>imperialnobility.bodyguard</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

@@ -11,51 +11,51 @@
 	<dedicatedFans>3</dedicatedFans>
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
-	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1060000</currentTeamValue>
+	<assistantCoaches>3</assistantCoaches>
+	<currentTeamValue>1090000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>30000</treasury>
+	<treasury>0</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamSkavenParity25Away1">
-		<name>Rat Ogre 1</name>
+		<name>Skaven Clanrat 1</name>
+		<gender>male</gender>
+		<positionId>skaven.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamSkavenParity25Away2">
+		<name>Skaven Thrower 2</name>
+		<gender>male</gender>
+		<positionId>skaven.thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamSkavenParity25Away3">
+		<name>Gutter Runner 3</name>
+		<gender>male</gender>
+		<positionId>skaven.gutterrunner</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamSkavenParity25Away4">
+		<name>Skaven Blitzer 4</name>
+		<gender>male</gender>
+		<positionId>skaven.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamSkavenParity25Away5">
+		<name>Rat Ogre 5</name>
 		<gender>male</gender>
 		<positionId>skaven.ratogre</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="2" id="teamSkavenParity25Away2">
-		<name>Skaven Blitzer 2</name>
-		<gender>male</gender>
-		<positionId>skaven.blitzer</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="3" id="teamSkavenParity25Away3">
-		<name>Skaven Blitzer 3</name>
-		<gender>male</gender>
-		<positionId>skaven.blitzer</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="4" id="teamSkavenParity25Away4">
-		<name>Gutter Runner 4</name>
-		<gender>male</gender>
-		<positionId>skaven.gutterrunner</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="5" id="teamSkavenParity25Away5">
-		<name>Gutter Runner 5</name>
-		<gender>male</gender>
-		<positionId>skaven.gutterrunner</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
 	<player nr="6" id="teamSkavenParity25Away6">
-		<name>Skaven Thrower 6</name>
+		<name>Skaven Clanrat 6</name>
 		<gender>male</gender>
-		<positionId>skaven.thrower</positionId>
+		<positionId>skaven.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -67,16 +67,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamSkavenParity25Away8">
-		<name>Skaven Clanrat 8</name>
+		<name>Gutter Runner 8</name>
 		<gender>male</gender>
-		<positionId>skaven.lineman</positionId>
+		<positionId>skaven.gutterrunner</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="9" id="teamSkavenParity25Away9">
-		<name>Skaven Clanrat 9</name>
+		<name>Skaven Blitzer 9</name>
 		<gender>male</gender>
-		<positionId>skaven.lineman</positionId>
+		<positionId>skaven.blitzer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

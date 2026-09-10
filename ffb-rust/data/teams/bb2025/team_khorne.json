@@ -5,6 +5,8 @@
   "rerolls": 2,
   "reroll_cost": 60000,
   "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
   "dedicated_fans": 3,
   "fan_factor": 0,
   "treasury": 5000,
@@ -13,11 +15,11 @@
   "players": [
     {
       "nr": 1,
-      "position_id": "khorne.bloodspawn"
+      "position_id": "khorne.bloodborn_marauder"
     },
     {
       "nr": 2,
-      "position_id": "khorne.bloodseeker"
+      "position_id": "khorne.khorngor"
     },
     {
       "nr": 3,
@@ -25,11 +27,11 @@
     },
     {
       "nr": 4,
-      "position_id": "khorne.bloodseeker"
+      "position_id": "khorne.bloodspawn"
     },
     {
       "nr": 5,
-      "position_id": "khorne.khorngor"
+      "position_id": "khorne.bloodborn_marauder"
     },
     {
       "nr": 6,
@@ -37,7 +39,7 @@
     },
     {
       "nr": 7,
-      "position_id": "khorne.bloodborn_marauder"
+      "position_id": "khorne.bloodseeker"
     },
     {
       "nr": 8,
@@ -45,7 +47,7 @@
     },
     {
       "nr": 9,
-      "position_id": "khorne.bloodborn_marauder"
+      "position_id": "khorne.bloodseeker"
     },
     {
       "nr": 10,

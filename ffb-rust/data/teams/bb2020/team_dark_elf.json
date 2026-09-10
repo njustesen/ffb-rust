@@ -4,32 +4,34 @@
   "roster_id": "darkelf.lrb6",
   "rerolls": 3,
   "reroll_cost": 50000,
-  "apothecaries": 0,
-  "dedicated_fans": 3,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 0,
   "fan_factor": 0,
   "treasury": 5000,
   "spent": 1095000,
-  "team_value": 1085000,
+  "team_value": 1095000,
   "players": [
     {
-      "nr": 11,
-      "position_id": "darkelf.witchelf"
+      "nr": 1,
+      "position_id": "darkelf.lineman"
     },
     {
-      "nr": 15,
-      "position_id": "darkelf.blitzer"
-    },
-    {
-      "nr": 10,
-      "position_id": "darkelf.assassin"
-    },
-    {
-      "nr": 4,
+      "nr": 2,
       "position_id": "darkelf.runner"
     },
     {
+      "nr": 3,
+      "position_id": "darkelf.blitzer"
+    },
+    {
+      "nr": 4,
+      "position_id": "darkelf.assassin"
+    },
+    {
       "nr": 5,
-      "position_id": "darkelf.lineman"
+      "position_id": "darkelf.witchelf"
     },
     {
       "nr": 6,
@@ -37,7 +39,7 @@
     },
     {
       "nr": 7,
-      "position_id": "darkelf.lineman"
+      "position_id": "darkelf.blitzer"
     },
     {
       "nr": 8,
@@ -48,31 +50,13 @@
       "position_id": "darkelf.lineman"
     },
     {
-      "nr": 13,
+      "nr": 10,
       "position_id": "darkelf.lineman"
     },
     {
-      "nr": 14,
-      "position_id": "darkelf.lineman"
-    },
-    {
-      "nr": 12,
+      "nr": 11,
       "position_id": "darkelf.lineman"
     }
   ],
-  "special_rules": [],
-  "stars": [
-    {
-      "nr": 3,
-      "star_id": "39465"
-    },
-    {
-      "nr": 1,
-      "star_id": "54496"
-    },
-    {
-      "nr": 2,
-      "star_id": "darkelf.Horkon"
-    }
-  ]
+  "special_rules": []
 }

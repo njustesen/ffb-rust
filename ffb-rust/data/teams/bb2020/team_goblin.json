@@ -5,43 +5,45 @@
   "rerolls": 3,
   "reroll_cost": 60000,
   "apothecaries": 1,
-  "dedicated_fans": 3,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 0,
   "fan_factor": 0,
-  "treasury": 150000,
-  "spent": 950000,
-  "team_value": 940000,
+  "treasury": 5000,
+  "spent": 1095000,
+  "team_value": 1095000,
   "players": [
     {
       "nr": 1,
-      "position_id": "goblin.troll"
+      "position_id": "goblin.goblin"
     },
     {
       "nr": 2,
-      "position_id": "goblin.pogoer"
-    },
-    {
-      "nr": 3,
-      "position_id": "goblin.fanatic"
-    },
-    {
-      "nr": 4,
-      "position_id": "goblin.ooligan"
-    },
-    {
-      "nr": 5,
-      "position_id": "goblin.doomdiver"
-    },
-    {
-      "nr": 6,
       "position_id": "goblin.bomma"
     },
     {
-      "nr": 7,
+      "nr": 3,
       "position_id": "goblin.looney"
     },
     {
+      "nr": 4,
+      "position_id": "goblin.fanatic"
+    },
+    {
+      "nr": 5,
+      "position_id": "goblin.pogoer"
+    },
+    {
+      "nr": 6,
+      "position_id": "goblin.ooligan"
+    },
+    {
+      "nr": 7,
+      "position_id": "goblin.doomdiver"
+    },
+    {
       "nr": 8,
-      "position_id": "goblin.goblin"
+      "position_id": "goblin.troll"
     },
     {
       "nr": 9,
@@ -49,7 +51,7 @@
     },
     {
       "nr": 10,
-      "position_id": "goblin.goblin"
+      "position_id": "goblin.troll"
     },
     {
       "nr": 11,
@@ -61,6 +63,14 @@
     },
     {
       "nr": 13,
+      "position_id": "goblin.goblin"
+    },
+    {
+      "nr": 14,
+      "position_id": "goblin.goblin"
+    },
+    {
+      "nr": 15,
       "position_id": "goblin.goblin"
     }
   ],

@@ -11,30 +11,30 @@
 	<dedicatedFans>3</dedicatedFans>
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
-	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1030000</currentTeamValue>
+	<assistantCoaches>2</assistantCoaches>
+	<currentTeamValue>1090000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>60000</treasury>
+	<treasury>0</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamGnomeParity25Home1">
-		<name>Altern Forest Treeman 1</name>
+		<name>Gnome Lineman 1</name>
 		<gender>male</gender>
-		<positionId>gnome.altern_forest_treeman</positionId>
+		<positionId>gnome.gnome_lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamGnomeParity25Home2">
-		<name>Altern Forest Treeman 2</name>
+		<name>Woodland Fox 2</name>
 		<gender>male</gender>
-		<positionId>gnome.altern_forest_treeman</positionId>
+		<positionId>gnome.woodland_fox</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamGnomeParity25Home3">
-		<name>Gnome Beastmaster 3</name>
+		<name>Gnome Illusionist 3</name>
 		<gender>male</gender>
-		<positionId>gnome.gnome_beastmaster</positionId>
+		<positionId>gnome.gnome_illusionist</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -46,16 +46,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamGnomeParity25Home5">
-		<name>Gnome Illusionist 5</name>
+		<name>Altern Forest Treeman 5</name>
 		<gender>male</gender>
-		<positionId>gnome.gnome_illusionist</positionId>
+		<positionId>gnome.altern_forest_treeman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="6" id="teamGnomeParity25Home6">
-		<name>Gnome Illusionist 6</name>
+		<name>Gnome Lineman 6</name>
 		<gender>male</gender>
-		<positionId>gnome.gnome_illusionist</positionId>
+		<positionId>gnome.gnome_lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -67,23 +67,23 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamGnomeParity25Home8">
-		<name>Woodland Fox 8</name>
+		<name>Gnome Illusionist 8</name>
 		<gender>male</gender>
-		<positionId>gnome.woodland_fox</positionId>
+		<positionId>gnome.gnome_illusionist</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="9" id="teamGnomeParity25Home9">
-		<name>Gnome Lineman 9</name>
+		<name>Gnome Beastmaster 9</name>
 		<gender>male</gender>
-		<positionId>gnome.gnome_lineman</positionId>
+		<positionId>gnome.gnome_beastmaster</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="10" id="teamGnomeParity25Home10">
-		<name>Gnome Lineman 10</name>
+		<name>Altern Forest Treeman 10</name>
 		<gender>male</gender>
-		<positionId>gnome.gnome_lineman</positionId>
+		<positionId>gnome.altern_forest_treeman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -117,6 +117,13 @@
 	</player>
 	<player nr="15" id="teamGnomeParity25Home15">
 		<name>Gnome Lineman 15</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="16" id="teamGnomeParity25Home16">
+		<name>Gnome Lineman 16</name>
 		<gender>male</gender>
 		<positionId>gnome.gnome_lineman</positionId>
 		<skillList/>

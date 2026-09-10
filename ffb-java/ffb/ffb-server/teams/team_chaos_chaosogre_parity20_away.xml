@@ -6,21 +6,21 @@
 	<name>Chaos Parity20 Away</name>
 	<race>Chaos</race>
 	<rosterId>chaos_chaosogre.bb2020</rosterId>
-	<reRolls>3</reRolls>
+	<reRolls>2</reRolls>
 	<fanFactor>0</fanFactor>
-	<dedicatedFans>3</dedicatedFans>
+	<dedicatedFans>1</dedicatedFans>
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1070000</currentTeamValue>
+	<currentTeamValue>1090000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>20000</treasury>
+	<treasury>0</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamChaosChaosogreParity20Away1">
-		<name>Chaos Ogre 1</name>
+		<name>Beastman Runner Lineman 1</name>
 		<gender>male</gender>
-		<positionId>chaos.chaosogre</positionId>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -32,9 +32,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamChaosChaosogreParity20Away3">
-		<name>Beastman Runner Lineman 3</name>
+		<name>Chaos Ogre 3</name>
 		<gender>male</gender>
-		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<positionId>chaos.chaosogre</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -46,9 +46,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamChaosChaosogreParity20Away5">
-		<name>Beastman Runner Lineman 5</name>
+		<name>Chosen Blocker 5</name>
 		<gender>male</gender>
-		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<positionId>chaos.chosenblocker</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -60,9 +60,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamChaosChaosogreParity20Away7">
-		<name>Beastman Runner Lineman 7</name>
+		<name>Chosen Blocker 7</name>
 		<gender>male</gender>
-		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<positionId>chaos.chosenblocker</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

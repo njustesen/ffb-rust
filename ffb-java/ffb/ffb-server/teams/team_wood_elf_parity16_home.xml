@@ -9,7 +9,7 @@
 	<reRolls>2</reRolls>
 	<fanFactor>0</fanFactor>
 	<dedicatedFans>0</dedicatedFans>
-	<apothecaries>0</apothecaries>
+	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
 	<currentTeamValue>1100000</currentTeamValue>
@@ -32,9 +32,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamWoodElfParity16Home3">
-		<name>Wardancer 3</name>
+		<name>Thrower 3</name>
 		<gender>male</gender>
-		<positionId>woodelf.wardancer</positionId>
+		<positionId>woodelf.thrower</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -46,9 +46,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamWoodElfParity16Home5">
-		<name>Catcher 5</name>
+		<name>Lineman 5</name>
 		<gender>male</gender>
-		<positionId>woodelf.catcher</positionId>
+		<positionId>woodelf.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -60,16 +60,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamWoodElfParity16Home7">
-		<name>Thrower 7</name>
+		<name>Lineman 7</name>
 		<gender>male</gender>
-		<positionId>woodelf.thrower</positionId>
+		<positionId>woodelf.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamWoodElfParity16Home8">
-		<name>Lineman 8</name>
+		<name>Catcher 8</name>
 		<gender>male</gender>
-		<positionId>woodelf.lineman</positionId>
+		<positionId>woodelf.catcher</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

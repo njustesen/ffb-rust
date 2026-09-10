@@ -5,58 +5,56 @@
   "rerolls": 2,
   "reroll_cost": 70000,
   "apothecaries": 0,
-  "dedicated_fans": 3,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 1,
   "fan_factor": 0,
-  "treasury": 20000,
-  "spent": 1080000,
-  "team_value": 1070000,
+  "treasury": 5000,
+  "spent": 1095000,
+  "team_value": 1085000,
   "players": [
     {
       "nr": 1,
-      "position_id": "chaospact.minotaur"
+      "position_id": "chaospact.renegadehumanlineman"
     },
     {
       "nr": 2,
-      "position_id": "chaospact.renegaderatogre"
-    },
-    {
-      "nr": 3,
-      "position_id": "chaospact.renegadeogre"
-    },
-    {
-      "nr": 4,
       "position_id": "chaospact.renegadehumanthrower"
     },
     {
-      "nr": 5,
-      "position_id": "chaospact.renegadedarkelf"
-    },
-    {
-      "nr": 6,
-      "position_id": "chaospact.renegadeorc"
-    },
-    {
-      "nr": 7,
-      "position_id": "chaospact.renegadeskaven"
-    },
-    {
-      "nr": 8,
+      "nr": 3,
       "position_id": "chaospact.renegadegoblin"
     },
     {
+      "nr": 4,
+      "position_id": "chaospact.renegadeorc"
+    },
+    {
+      "nr": 5,
+      "position_id": "chaospact.renegadeskaven"
+    },
+    {
+      "nr": 6,
+      "position_id": "chaospact.renegadedarkelf"
+    },
+    {
+      "nr": 7,
+      "position_id": "chaospact.renegadetroll"
+    },
+    {
+      "nr": 8,
+      "position_id": "chaospact.renegadeogre"
+    },
+    {
       "nr": 9,
-      "position_id": "chaospact.renegadehumanlineman"
+      "position_id": "chaospact.minotaur"
     },
     {
       "nr": 10,
-      "position_id": "chaospact.renegadehumanlineman"
+      "position_id": "chaospact.renegaderatogre"
     },
     {
       "nr": 11,
-      "position_id": "chaospact.renegadehumanlineman"
-    },
-    {
-      "nr": 12,
       "position_id": "chaospact.renegadehumanlineman"
     }
   ],

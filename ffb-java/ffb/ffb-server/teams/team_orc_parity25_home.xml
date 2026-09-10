@@ -8,35 +8,35 @@
 	<rosterId>orc.bb2025</rosterId>
 	<reRolls>3</reRolls>
 	<fanFactor>0</fanFactor>
-	<dedicatedFans>3</dedicatedFans>
+	<dedicatedFans>2</dedicatedFans>
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1065000</currentTeamValue>
+	<currentTeamValue>1095000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>25000</treasury>
+	<treasury>0</treasury>
 	<specialRules>
 		<rule>Brawlin' Brutes</rule>
 	</specialRules>
 
 	<player nr="1" id="teamOrcParity25Home1">
-		<name>Troll 1</name>
+		<name>Orc Lineman 1</name>
 		<gender>male</gender>
-		<positionId>orc.troll</positionId>
+		<positionId>orc.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamOrcParity25Home2">
-		<name>Big Un Blocker 2</name>
+		<name>Goblin Lineman 2</name>
 		<gender>male</gender>
-		<positionId>orc.big_un_blocker</positionId>
+		<positionId>orc.goblin</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamOrcParity25Home3">
-		<name>Big Un Blocker 3</name>
+		<name>Orc Thrower 3</name>
 		<gender>male</gender>
-		<positionId>orc.big_un_blocker</positionId>
+		<positionId>orc.thrower</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -48,58 +48,58 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamOrcParity25Home5">
-		<name>Orc Blitzer 5</name>
+		<name>Big Un Blocker 5</name>
 		<gender>male</gender>
-		<positionId>orc.blitzer</positionId>
+		<positionId>orc.big_un_blocker</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="6" id="teamOrcParity25Home6">
-		<name>Orc Thrower 6</name>
+		<name>Troll 6</name>
 		<gender>male</gender>
-		<positionId>orc.thrower</positionId>
+		<positionId>orc.troll</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamOrcParity25Home7">
-		<name>Orc Thrower 7</name>
-		<gender>male</gender>
-		<positionId>orc.thrower</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="8" id="teamOrcParity25Home8">
-		<name>Orc Lineman 8</name>
+		<name>Orc Lineman 7</name>
 		<gender>male</gender>
 		<positionId>orc.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="9" id="teamOrcParity25Home9">
-		<name>Goblin Lineman 9</name>
+	<player nr="8" id="teamOrcParity25Home8">
+		<name>Orc Thrower 8</name>
 		<gender>male</gender>
-		<positionId>orc.goblin</positionId>
+		<positionId>orc.thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamOrcParity25Home9">
+		<name>Orc Blitzer 9</name>
+		<gender>male</gender>
+		<positionId>orc.blitzer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="10" id="teamOrcParity25Home10">
-		<name>Goblin Lineman 10</name>
+		<name>Big Un Blocker 10</name>
 		<gender>male</gender>
-		<positionId>orc.goblin</positionId>
+		<positionId>orc.big_un_blocker</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="11" id="teamOrcParity25Home11">
-		<name>Goblin Lineman 11</name>
+		<name>Orc Lineman 11</name>
 		<gender>male</gender>
-		<positionId>orc.goblin</positionId>
+		<positionId>orc.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="12" id="teamOrcParity25Home12">
-		<name>Goblin Lineman 12</name>
+		<name>Orc Lineman 12</name>
 		<gender>male</gender>
-		<positionId>orc.goblin</positionId>
+		<positionId>orc.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

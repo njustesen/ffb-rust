@@ -11,18 +11,18 @@
 	<dedicatedFans>3</dedicatedFans>
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
-	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1075000</currentTeamValue>
+	<assistantCoaches>1</assistantCoaches>
+	<currentTeamValue>1085000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>15000</treasury>
+	<treasury>5000</treasury>
 	<specialRules>
 		<rule>Favoured of Chaos Undivided</rule>
 	</specialRules>
 
 	<player nr="1" id="teamChaosOgreParity25Away1">
-		<name>Ogre 1</name>
+		<name>Beastman Lineman 1</name>
 		<gender>male</gender>
-		<positionId>chaos.ogre</positionId>
+		<positionId>chaos.beastman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -34,16 +34,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamChaosOgreParity25Away3">
-		<name>Chaos Chosen 3</name>
+		<name>Ogre 3</name>
 		<gender>male</gender>
-		<positionId>chaos.warrior</positionId>
+		<positionId>chaos.ogre</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="4" id="teamChaosOgreParity25Away4">
-		<name>Chaos Chosen 4</name>
+		<name>Beastman Lineman 4</name>
 		<gender>male</gender>
-		<positionId>chaos.warrior</positionId>
+		<positionId>chaos.beastman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -62,9 +62,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamChaosOgreParity25Away7">
-		<name>Beastman Lineman 7</name>
+		<name>Chaos Chosen 7</name>
 		<gender>male</gender>
-		<positionId>chaos.beastman</positionId>
+		<positionId>chaos.warrior</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -76,9 +76,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="9" id="teamChaosOgreParity25Away9">
-		<name>Beastman Lineman 9</name>
+		<name>Chaos Chosen 9</name>
 		<gender>male</gender>
-		<positionId>chaos.beastman</positionId>
+		<positionId>chaos.warrior</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

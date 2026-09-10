@@ -2,9 +2,11 @@
   "edition": "bb2016",
   "race": "elf",
   "roster_id": "elf.lrb6",
-  "rerolls": 2,
+  "rerolls": 3,
   "reroll_cost": 50000,
-  "apothecaries": 0,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
   "dedicated_fans": 0,
   "fan_factor": 0,
   "treasury": 0,
@@ -13,23 +15,23 @@
   "players": [
     {
       "nr": 1,
-      "position_id": "elf.blitzer"
+      "position_id": "elf.lineman"
     },
     {
       "nr": 2,
-      "position_id": "elf.blitzer"
+      "position_id": "elf.catcher"
     },
     {
       "nr": 3,
-      "position_id": "elf.catcher"
+      "position_id": "elf.thrower"
     },
     {
       "nr": 4,
-      "position_id": "elf.catcher"
+      "position_id": "elf.blitzer"
     },
     {
       "nr": 5,
-      "position_id": "elf.catcher"
+      "position_id": "elf.lineman"
     },
     {
       "nr": 6,
@@ -41,7 +43,7 @@
     },
     {
       "nr": 8,
-      "position_id": "elf.thrower"
+      "position_id": "elf.blitzer"
     },
     {
       "nr": 9,
@@ -49,14 +51,10 @@
     },
     {
       "nr": 10,
-      "position_id": "elf.lineman"
+      "position_id": "elf.catcher"
     },
     {
       "nr": 11,
-      "position_id": "elf.lineman"
-    },
-    {
-      "nr": 12,
       "position_id": "elf.lineman"
     }
   ],

@@ -6,10 +6,10 @@
 	<name>Slann Parity16 Away</name>
 	<race>Slann</race>
 	<rosterId>slann_fumbbl.bb2016</rosterId>
-	<reRolls>2</reRolls>
+	<reRolls>3</reRolls>
 	<fanFactor>0</fanFactor>
 	<dedicatedFans>0</dedicatedFans>
-	<apothecaries>0</apothecaries>
+	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
 	<currentTeamValue>1100000</currentTeamValue>
@@ -18,30 +18,30 @@
 	<specialRules/>
 
 	<player nr="1" id="teamSlannFumbblParity16Away1">
-		<name>Kroxigor 1</name>
+		<name>Blitzer 1</name>
+		<gender>male</gender>
+		<positionId>2995</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamSlannFumbblParity16Away2">
+		<name>Catcher 2</name>
+		<gender>male</gender>
+		<positionId>2994</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamSlannFumbblParity16Away3">
+		<name>Kroxigor 3</name>
 		<gender>male</gender>
 		<positionId>2996</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="2" id="teamSlannFumbblParity16Away2">
-		<name>Blitzer 2</name>
-		<gender>male</gender>
-		<positionId>2995</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="3" id="teamSlannFumbblParity16Away3">
-		<name>Blitzer 3</name>
-		<gender>male</gender>
-		<positionId>2995</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
 	<player nr="4" id="teamSlannFumbblParity16Away4">
-		<name>Blitzer 4</name>
+		<name>Lineman 4</name>
 		<gender>male</gender>
-		<positionId>2995</positionId>
+		<positionId>2993</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -60,9 +60,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamSlannFumbblParity16Away7">
-		<name>Catcher 7</name>
+		<name>Lineman 7</name>
 		<gender>male</gender>
-		<positionId>2994</positionId>
+		<positionId>2993</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

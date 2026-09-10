@@ -5,23 +5,25 @@
   "rerolls": 3,
   "reroll_cost": 50000,
   "apothecaries": 1,
+  "assistant_coaches": 2,
+  "cheerleaders": 0,
   "dedicated_fans": 3,
   "fan_factor": 0,
-  "treasury": 60000,
-  "spent": 1040000,
-  "team_value": 1030000,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1090000,
   "players": [
     {
       "nr": 1,
-      "position_id": "gnome.altern_forest_treeman"
+      "position_id": "gnome.gnome_lineman"
     },
     {
       "nr": 2,
-      "position_id": "gnome.altern_forest_treeman"
+      "position_id": "gnome.woodland_fox"
     },
     {
       "nr": 3,
-      "position_id": "gnome.gnome_beastmaster"
+      "position_id": "gnome.gnome_illusionist"
     },
     {
       "nr": 4,
@@ -29,11 +31,11 @@
     },
     {
       "nr": 5,
-      "position_id": "gnome.gnome_illusionist"
+      "position_id": "gnome.altern_forest_treeman"
     },
     {
       "nr": 6,
-      "position_id": "gnome.gnome_illusionist"
+      "position_id": "gnome.gnome_lineman"
     },
     {
       "nr": 7,
@@ -41,15 +43,15 @@
     },
     {
       "nr": 8,
-      "position_id": "gnome.woodland_fox"
+      "position_id": "gnome.gnome_illusionist"
     },
     {
       "nr": 9,
-      "position_id": "gnome.gnome_lineman"
+      "position_id": "gnome.gnome_beastmaster"
     },
     {
       "nr": 10,
-      "position_id": "gnome.gnome_lineman"
+      "position_id": "gnome.altern_forest_treeman"
     },
     {
       "nr": 11,
@@ -69,6 +71,10 @@
     },
     {
       "nr": 15,
+      "position_id": "gnome.gnome_lineman"
+    },
+    {
+      "nr": 16,
       "position_id": "gnome.gnome_lineman"
     }
   ],

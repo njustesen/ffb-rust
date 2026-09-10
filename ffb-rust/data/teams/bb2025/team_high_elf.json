@@ -2,26 +2,28 @@
   "edition": "bb2025",
   "race": "high_elf",
   "roster_id": "highelf.lrb6",
-  "rerolls": 2,
+  "rerolls": 3,
   "reroll_cost": 50000,
   "apothecaries": 1,
-  "dedicated_fans": 2,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 1,
   "fan_factor": 0,
   "treasury": 0,
   "spent": 1100000,
-  "team_value": 1095000,
+  "team_value": 1100000,
   "players": [
     {
       "nr": 1,
-      "position_id": "highelf.dragon_prince"
+      "position_id": "highelf.lineman"
     },
     {
       "nr": 2,
-      "position_id": "highelf.dragon_prince"
+      "position_id": "highelf.phoenix_warrior"
     },
     {
       "nr": 3,
-      "position_id": "highelf.white_lion"
+      "position_id": "highelf.dragon_prince"
     },
     {
       "nr": 4,
@@ -29,7 +31,7 @@
     },
     {
       "nr": 5,
-      "position_id": "highelf.phoenix_warrior"
+      "position_id": "highelf.lineman"
     },
     {
       "nr": 6,
@@ -37,7 +39,7 @@
     },
     {
       "nr": 7,
-      "position_id": "highelf.lineman"
+      "position_id": "highelf.dragon_prince"
     },
     {
       "nr": 8,

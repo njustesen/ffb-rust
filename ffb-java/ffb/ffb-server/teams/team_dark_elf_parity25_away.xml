@@ -6,35 +6,35 @@
 	<name>Dark Elf Parity25 Away</name>
 	<race>Dark Elf</race>
 	<rosterId>dark_elf.bb2025</rosterId>
-	<reRolls>2</reRolls>
+	<reRolls>3</reRolls>
 	<fanFactor>0</fanFactor>
-	<dedicatedFans>3</dedicatedFans>
-	<apothecaries>0</apothecaries>
+	<dedicatedFans>1</dedicatedFans>
+	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1065000</currentTeamValue>
+	<currentTeamValue>1100000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>25000</treasury>
+	<treasury>0</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamDarkElfParity25Away1">
-		<name>Witch Elf 1</name>
+		<name>Dark Elf Lineman 1</name>
 		<gender>male</gender>
-		<positionId>darkelf.witchelf</positionId>
+		<positionId>darkelf.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamDarkElfParity25Away2">
-		<name>Zolcath the Zoat 2</name>
+		<name>Dark Elf Runner 2</name>
 		<gender>male</gender>
-		<positionId>39558</positionId>
+		<positionId>darkelf.runner</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamDarkElfParity25Away3">
-		<name>Dark Elf Blitzer 3</name>
+		<name>Dark Elf Assassin 3</name>
 		<gender>male</gender>
-		<positionId>darkelf.blitzer</positionId>
+		<positionId>darkelf.assassin</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -46,16 +46,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamDarkElfParity25Away5">
-		<name>Dark Elf Assassin 5</name>
+		<name>Witch Elf 5</name>
 		<gender>male</gender>
-		<positionId>darkelf.assassin</positionId>
+		<positionId>darkelf.witchelf</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="6" id="teamDarkElfParity25Away6">
-		<name>Dark Elf Assassin 6</name>
+		<name>Dark Elf Lineman 6</name>
 		<gender>male</gender>
-		<positionId>darkelf.assassin</positionId>
+		<positionId>darkelf.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -67,9 +67,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamDarkElfParity25Away8">
-		<name>Dark Elf Runner 8</name>
+		<name>Witch Elf 8</name>
 		<gender>male</gender>
-		<positionId>darkelf.runner</positionId>
+		<positionId>darkelf.witchelf</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -91,13 +91,6 @@
 		<name>Dark Elf Lineman 11</name>
 		<gender>male</gender>
 		<positionId>darkelf.lineman</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="12" id="teamDarkElfParity25Away12">
-		<name>Witch Elf 12</name>
-		<gender>male</gender>
-		<positionId>darkelf.witchelf</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

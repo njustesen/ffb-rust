@@ -1,17 +1,27 @@
 # BB2016 Parity Team Drafts
 
-Hand-drafted 2026-08-08 under the CRP drafting rules
-(`docs/BB2016_DRAFTING_AND_ROSTERS.md`) with the project heuristics: budget
-1,100,000; all positionals incl. a Big Guy (trim duplicates when tight, keep
-one of each); 12+ players when affordable; 2+ team re-rolls at roster cost;
-apothecary when allowed and affordable after positionals; leftover into Fan
-Factor (max 3 @10k) then treasury. Jerseys run premium positions first, so the
-first 11 jerseys start on the pitch and linemen sit in reserve.
+Re-drafted **2026-09-10** by `scripts/draft_all_squads.py` under the CRP tournament drafting
+rules (`docs/BB2016_DRAFTING_AND_ROSTERS.md`). Superseded the hand drafts of 2026-08-08, which were legal only against
+a checker calibrated on themselves -- see `docs/PARITY_COVERAGE_REQUIREMENTS.md` §19 (R6)
+for the seven defects that survived it.
 
-The frozen teams live in `data/teams/bb2016/team_<race>.json` (one spec per
-race; home/away parity teams are identical builds). TV per the Java
-`UtilTeamValue` formula (includes Fan Factor in BB2016).
+Budget 1,100,000 gold, **spent in full** (in this play format unspent gold is lost, and
+the drafter proves nothing cheaper remained buyable). Fan Factor 0-9 at 10,000 each, which **counts in Team Value**. Team re-rolls 0-8 at the
+roster's cost; assistant coaches and cheerleaders 0-6 each at 10,000; apothecary 50,000
+where the roster allows one. **No star players**: a star is an Inducement, needing gold
+and Skill Points, and a mirror match has no inducement gold.
 
+Purchase order: one of every positional the caps allow; then more players dearest-first
+while 11 bodies, 3 re-rolls and an apothecary stay reachable; then the 11th and 12th
+bodies; 2 re-rolls; apothecary; a 3rd re-roll; a 13th body; fans; assistant coaches and
+cheerleaders; then players to 16 and re-rolls to 8 with anything left.
+
+Jerseys are numbered round-robin over the positions, so one of every positional takes a
+shirt inside the first 11 and starts on the pitch -- both harnesses field the first 11 by
+number, and a positional on the bench has no parity evidence.
+
+Specs: `data/teams/bb2016/team_<cell>.json` (home and away are identical builds).
+TV per the Java `UtilTeamValue.findTeamValue`.
 
 ## `amazon`
 
@@ -20,26 +30,26 @@ race; home/away parity teams are identical builds). TV per the Java
 | Blitzer | 4 | 360k |
 | Catcher | 2 | 140k |
 | Thrower | 2 | 140k |
-| Linewoman | 4 | 200k |
+| Linewoman | 5 | 250k |
 | Team re-rolls @50k | 3 | 150k |
 | Apothecary | 1 | 50k |
-| Fan Factor | 3 | 30k |
-| **Total spent** | | **1070k** |
-| Treasury | | 30k |
+| Fan Factor 0→1 | +1 | 10k |
+| **Total spent** | | **1100k** |
+| Gold lost (unspendable) | | 0k |
 
-12 players, TV 1070k.
+13 players, TV 1100k.
 
 ## `chaos`
 
 | Purchase | Qty | Cost |
 |---|---|---|
 | Minotaur | 1 | 150k |
-| Chaos Warrior | 4 | 400k |
-| Chaos Beastman | 7 | 420k |
+| Chaos Warrior | 3 | 300k |
+| Chaos Beastman | 8 | 480k |
 | Team re-rolls @60k | 2 | 120k |
-| Fan Factor | 1 | 10k |
+| Apothecary | 1 | 50k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
 12 players, TV 1100k.
 
@@ -49,16 +59,17 @@ race; home/away parity teams are identical builds). TV per the Java
 |---|---|---|
 | Minotaur | 1 | 150k |
 | Bull Centaur | 2 | 260k |
-| Chaos Dwarf Blocker | 6 | 420k |
-| Hobgoblin | 3 | 120k |
+| Chaos Dwarf Blocker | 3 | 210k |
+| Hobgoblin | 7 | 280k |
 | Team re-rolls @70k | 2 | 140k |
-| Fan Factor | 1 | 10k |
+| Apothecary | 1 | 50k |
+| Fan Factor 0→1 | +1 | 10k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
-12 players, TV 1100k.
+13 players, TV 1100k.
 
-## `chaos_pact` *(FUMBBL-legacy roster)*
+## `chaos_pact`
 
 | Purchase | Qty | Cost |
 |---|---|---|
@@ -66,44 +77,45 @@ race; home/away parity teams are identical builds). TV per the Java
 | Chaos Ogre | 1 | 140k |
 | Chaos Troll | 1 | 110k |
 | Dark Elf Renegade | 1 | 70k |
-| Marauder | 6 | 300k |
+| Marauder | 7 | 350k |
 | Skaven Renegade | 1 | 50k |
 | Goblin Renegade | 1 | 40k |
 | Team re-rolls @70k | 2 | 140k |
 | Apothecary | 1 | 50k |
-| Fan Factor | 3 | 30k |
-| **Total spent** | | **1080k** |
-| Treasury | | 20k |
+| **Total spent** | | **1100k** |
+| Gold lost (unspendable) | | 0k |
 
-12 players, TV 1080k.
+13 players, TV 1100k.
 
 ## `dark_elf`
 
 | Purchase | Qty | Cost |
 |---|---|---|
-| Witch Elf | 2 | 220k |
-| Blitzer | 4 | 400k |
+| Witch Elf | 1 | 110k |
+| Blitzer | 2 | 200k |
 | Assassin | 1 | 90k |
 | Runner | 1 | 80k |
-| Lineman | 3 | 210k |
-| Team re-rolls @50k | 2 | 100k |
+| Lineman | 6 | 420k |
+| Team re-rolls @50k | 3 | 150k |
+| Apothecary | 1 | 50k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
 11 players, TV 1100k.
 
-## `dark_elf_league_fumbbl` *(FUMBBL-legacy roster)*
+## `dark_elf_league_fumbbl`
 
 | Purchase | Qty | Cost |
 |---|---|---|
-| Witch Elf | 2 | 220k |
-| Blitzer | 4 | 400k |
+| Witch Elf | 1 | 110k |
+| Blitzer | 2 | 200k |
 | Assassin | 1 | 85k |
 | Runner | 1 | 80k |
-| Dark Elf Lineman | 3 | 210k |
-| Team re-rolls @50k | 2 | 100k |
+| Dark Elf Lineman | 6 | 420k |
+| Team re-rolls @50k | 3 | 150k |
+| Apothecary | 1 | 50k |
 | **Total spent** | | **1095k** |
-| Treasury | | 5k |
+| Gold lost (unspendable) | | 5k |
 
 11 players, TV 1095k.
 
@@ -112,30 +124,31 @@ race; home/away parity teams are identical builds). TV per the Java
 | Purchase | Qty | Cost |
 |---|---|---|
 | Deathroller | 1 | 160k |
-| Troll Slayer | 2 | 180k |
-| Blitzer | 2 | 160k |
-| Runner | 2 | 160k |
-| Blocker | 5 | 350k |
-| Team re-rolls @40k | 2 | 80k |
-| Fan Factor | 1 | 10k |
+| Troll Slayer | 1 | 90k |
+| Blitzer | 1 | 80k |
+| Runner | 1 | 80k |
+| Blocker | 7 | 490k |
+| Team re-rolls @50k | 3 | 150k |
+| Apothecary | 1 | 50k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
-12 players, TV 1100k.
+11 players, TV 1100k.
 
 ## `elf`
 
 | Purchase | Qty | Cost |
 |---|---|---|
 | Blitzer | 2 | 220k |
-| Catcher | 4 | 400k |
+| Catcher | 3 | 300k |
 | Thrower | 2 | 140k |
 | Lineman | 4 | 240k |
-| Team re-rolls @50k | 2 | 100k |
+| Team re-rolls @50k | 3 | 150k |
+| Apothecary | 1 | 50k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
-12 players, TV 1100k.
+11 players, TV 1100k.
 
 ## `goblin`
 
@@ -145,42 +158,45 @@ race; home/away parity teams are identical builds). TV per the Java
 | Fanatic | 1 | 70k |
 | Pogoer | 1 | 70k |
 | Bombardier | 1 | 40k |
-| Goblin | 8 | 320k |
+| Goblin | 10 | 400k |
 | Looney | 1 | 40k |
 | Team re-rolls @60k | 3 | 180k |
 | Apothecary | 1 | 50k |
-| Fan Factor | 3 | 30k |
-| **Total spent** | | **1020k** |
-| Treasury | | 80k |
+| Fan Factor 0→3 | +3 | 30k |
+| **Total spent** | | **1100k** |
+| Gold lost (unspendable) | | 0k |
 
-14 players, TV 1020k.
+16 players, TV 1100k.
 
 ## `halfling`
 
 | Purchase | Qty | Cost |
 |---|---|---|
 | Treeman | 2 | 240k |
-| Halfling | 12 | 360k |
-| Team re-rolls @60k | 4 | 240k |
+| Halfling | 14 | 420k |
+| Team re-rolls @60k | 3 | 180k |
 | Apothecary | 1 | 50k |
-| Fan Factor | 3 | 30k |
-| **Total spent** | | **920k** |
-| Treasury | | 180k |
+| Assistant coaches | 6 | 60k |
+| Cheerleaders | 6 | 60k |
+| Fan Factor 0→9 | +9 | 90k |
+| **Total spent** | | **1100k** |
+| Gold lost (unspendable) | | 0k |
 
-14 players, TV 920k.
+16 players, TV 1100k.
 
 ## `high_elf`
 
 | Purchase | Qty | Cost |
 |---|---|---|
 | Blitzer | 2 | 200k |
-| Catcher | 4 | 360k |
-| Thrower | 2 | 180k |
-| Lineman | 3 | 210k |
-| Team re-rolls @50k | 2 | 100k |
+| Catcher | 2 | 180k |
+| Thrower | 1 | 90k |
+| Lineman | 6 | 420k |
+| Team re-rolls @50k | 3 | 150k |
 | Apothecary | 1 | 50k |
+| Fan Factor 0→1 | +1 | 10k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
 11 players, TV 1100k.
 
@@ -191,12 +207,12 @@ race; home/away parity teams are identical builds). TV per the Java
 | Ogre | 1 | 140k |
 | Human Blitzer | 4 | 360k |
 | Human Catcher | 4 | 280k |
-| Human Thrower | 2 | 140k |
-| Human Lineman | 1 | 50k |
+| Human Thrower | 1 | 70k |
+| Human Lineman | 2 | 100k |
 | Team re-rolls @50k | 2 | 100k |
-| Fan Factor | 3 | 30k |
+| Apothecary | 1 | 50k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
 12 players, TV 1100k.
 
@@ -209,13 +225,13 @@ race; home/away parity teams are identical builds). TV per the Java
 | Thro-Ra | 2 | 140k |
 | Skeleton | 4 | 160k |
 | Team re-rolls @70k | 3 | 210k |
-| Fan Factor | 1 | 10k |
+| Fan Factor 0→1 | +1 | 10k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
 12 players, TV 1100k.
 
-## `khemri_fumbbl` *(FUMBBL-legacy roster)*
+## `khemri_fumbbl`
 
 | Purchase | Qty | Cost |
 |---|---|---|
@@ -224,9 +240,9 @@ race; home/away parity teams are identical builds). TV per the Java
 | Anointed Thrower | 2 | 140k |
 | Skeleton Lineman | 4 | 160k |
 | Team re-rolls @70k | 3 | 210k |
-| Fan Factor | 1 | 10k |
+| Fan Factor 0→1 | +1 | 10k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
 12 players, TV 1100k.
 
@@ -239,9 +255,9 @@ race; home/away parity teams are identical builds). TV per the Java
 | Skink | 5 | 300k |
 | Team re-rolls @60k | 2 | 120k |
 | Apothecary | 1 | 50k |
-| Fan Factor | 1 | 10k |
+| Fan Factor 0→1 | +1 | 10k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
 12 players, TV 1100k.
 
@@ -252,15 +268,16 @@ race; home/away parity teams are identical builds). TV per the Java
 | Werewolf | 2 | 240k |
 | Flesh Golem | 2 | 220k |
 | Wight | 2 | 180k |
-| Ghoul | 2 | 140k |
-| Zombie | 6 | 180k |
+| Ghoul | 1 | 70k |
+| Zombie | 6 | 240k |
 | Team re-rolls @70k | 2 | 140k |
+| Fan Factor 0→1 | +1 | 10k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
-14 players, TV 1100k.
+13 players, TV 1100k.
 
-## `nippon` *(FUMBBL-legacy roster)*
+## `nippon`
 
 | Purchase | Qty | Cost |
 |---|---|---|
@@ -270,9 +287,9 @@ race; home/away parity teams are identical builds). TV per the Java
 | Ashigaru | 4 | 200k |
 | Team re-rolls @60k | 3 | 180k |
 | Apothecary | 1 | 50k |
-| Fan Factor | 1 | 10k |
+| Fan Factor 0→1 | +1 | 10k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
 12 players, TV 1100k.
 
@@ -282,16 +299,16 @@ race; home/away parity teams are identical builds). TV per the Java
 |---|---|---|
 | Snow Troll | 1 | 140k |
 | Ulfwerener | 2 | 220k |
-| Berserker | 2 | 180k |
-| Runner | 2 | 180k |
+| Berserker | 1 | 90k |
+| Runner | 1 | 90k |
 | Thrower | 2 | 140k |
-| Lineman | 2 | 100k |
+| Lineman | 5 | 250k |
 | Team re-rolls @60k | 2 | 120k |
-| Fan Factor | 2 | 20k |
+| Apothecary | 1 | 50k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
-11 players, TV 1100k.
+12 players, TV 1100k.
 
 ## `nurgle`
 
@@ -299,24 +316,25 @@ race; home/away parity teams are identical builds). TV per the Java
 |---|---|---|
 | Beast of Nurgle | 1 | 140k |
 | Nurgle Warrior | 4 | 440k |
-| Pestigor | 3 | 240k |
-| Rotter | 3 | 120k |
+| Pestigor | 1 | 80k |
+| Rotter | 7 | 280k |
 | Team re-rolls @70k | 2 | 140k |
-| Fan Factor | 2 | 20k |
+| Fan Factor 0→2 | +2 | 20k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
-11 players, TV 1100k.
+13 players, TV 1100k.
 
 ## `ogre`
 
 | Purchase | Qty | Cost |
 |---|---|---|
-| Ogre | 6 | 840k |
-| Snotling | 6 | 120k |
-| Team re-rolls @70k | 2 | 140k |
+| Ogre | 5 | 700k |
+| Snotling | 7 | 140k |
+| Team re-rolls @70k | 3 | 210k |
+| Apothecary | 1 | 50k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
 12 players, TV 1100k.
 
@@ -326,17 +344,18 @@ race; home/away parity teams are identical builds). TV per the Java
 |---|---|---|
 | Troll | 1 | 110k |
 | Black Orc Blocker | 4 | 320k |
-| Orc Blitzer | 4 | 320k |
-| Orc Thrower | 2 | 140k |
+| Orc Blitzer | 3 | 240k |
+| Orc Thrower | 1 | 70k |
+| Orc Lineman | 1 | 50k |
 | Goblin | 2 | 80k |
-| Team re-rolls @60k | 2 | 120k |
-| Fan Factor | 1 | 10k |
+| Team re-rolls @60k | 3 | 180k |
+| Apothecary | 1 | 50k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
-13 players, TV 1100k.
+12 players, TV 1100k.
 
-## `renegades` *(FUMBBL-legacy roster)*
+## `renegades`
 
 | Purchase | Qty | Cost |
 |---|---|---|
@@ -351,9 +370,9 @@ race; home/away parity teams are identical builds). TV per the Java
 | Renegade Skaven | 1 | 50k |
 | Renegade Goblin | 1 | 40k |
 | Team re-rolls @70k | 2 | 140k |
-| Fan Factor | 1 | 10k |
+| Fan Factor 0→1 | +1 | 10k |
 | **Total spent** | | **1095k** |
-| Treasury | | 5k |
+| Gold lost (unspendable) | | 5k |
 
 11 players, TV 1095k.
 
@@ -361,15 +380,16 @@ race; home/away parity teams are identical builds). TV per the Java
 
 | Purchase | Qty | Cost |
 |---|---|---|
-| Rat Ogre | 1 | 160k |
+| Rat Ogre | 1 | 150k |
 | Blitzer | 2 | 180k |
 | Gutter Runner | 4 | 320k |
-| Thrower | 2 | 140k |
-| Lineman | 3 | 150k |
+| Thrower | 1 | 70k |
+| Lineman | 4 | 200k |
 | Team re-rolls @60k | 2 | 120k |
-| Fan Factor | 3 | 30k |
+| Apothecary | 1 | 50k |
+| Fan Factor 0→1 | +1 | 10k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
 12 players, TV 1100k.
 
@@ -378,26 +398,28 @@ race; home/away parity teams are identical builds). TV per the Java
 | Purchase | Qty | Cost |
 |---|---|---|
 | Kroxigor | 1 | 140k |
-| Blitzer | 4 | 440k |
+| Blitzer | 2 | 220k |
 | Catcher | 3 | 240k |
-| Lineman | 3 | 180k |
-| Team re-rolls @50k | 2 | 100k |
+| Lineman | 5 | 300k |
+| Team re-rolls @50k | 3 | 150k |
+| Apothecary | 1 | 50k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
 11 players, TV 1100k.
 
-## `slann_fumbbl` *(FUMBBL-legacy roster)*
+## `slann_fumbbl`
 
 | Purchase | Qty | Cost |
 |---|---|---|
 | Kroxigor | 1 | 140k |
-| Blitzer | 4 | 440k |
+| Blitzer | 2 | 220k |
 | Catcher | 3 | 240k |
-| Lineman | 3 | 180k |
-| Team re-rolls @50k | 2 | 100k |
+| Lineman | 5 | 300k |
+| Team re-rolls @50k | 3 | 150k |
+| Apothecary | 1 | 50k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
 11 players, TV 1100k.
 
@@ -405,33 +427,34 @@ race; home/away parity teams are identical builds). TV per the Java
 
 | Purchase | Qty | Cost |
 |---|---|---|
-| Mummy | 2 | 220k |
+| Mummy | 2 | 240k |
 | Wight | 2 | 180k |
 | Ghoul | 4 | 280k |
+| Skeleton | 3 | 120k |
 | Zombie | 1 | 40k |
-| Skeleton | 5 | 150k |
 | Team re-rolls @70k | 3 | 210k |
-| Fan Factor | 2 | 20k |
+| Fan Factor 0→3 | +3 | 30k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
-14 players, TV 1100k.
+12 players, TV 1100k.
 
 ## `underworld`
 
 | Purchase | Qty | Cost |
 |---|---|---|
-| Mutant Rat Ogre | 2 | 300k |
-| Warpstone Troll | 2 | 220k |
+| Warpstone Troll | 1 | 110k |
 | Skaven Blitzer | 2 | 180k |
-| Skaven Thrower | 1 | 70k |
-| Skaven Lineman | 3 | 150k |
-| Underworld Goblin | 1 | 40k |
-| Team re-rolls @70k | 2 | 140k |
+| Skaven Thrower | 2 | 140k |
+| Skaven Lineman | 2 | 100k |
+| Underworld Goblin | 7 | 280k |
+| Team re-rolls @70k | 3 | 210k |
+| Apothecary | 1 | 50k |
+| Fan Factor 0→3 | +3 | 30k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
-11 players, TV 1100k.
+14 players, TV 1100k.
 
 ## `vampire`
 
@@ -440,9 +463,9 @@ race; home/away parity teams are identical builds). TV per the Java
 | Vampire | 6 | 660k |
 | Thrall | 7 | 280k |
 | Team re-rolls @70k | 2 | 140k |
-| Fan Factor | 2 | 20k |
+| Fan Factor 0→2 | +2 | 20k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
 13 players, TV 1100k.
 
@@ -451,12 +474,14 @@ race; home/away parity teams are identical builds). TV per the Java
 | Purchase | Qty | Cost |
 |---|---|---|
 | Treeman | 1 | 120k |
-| Wardancer | 2 | 240k |
+| Wardancer | 1 | 120k |
 | Catcher | 3 | 270k |
 | Thrower | 1 | 90k |
-| Lineman | 4 | 280k |
+| Lineman | 5 | 350k |
 | Team re-rolls @50k | 2 | 100k |
+| Apothecary | 1 | 50k |
 | **Total spent** | | **1100k** |
-| Treasury | | 0k |
+| Gold lost (unspendable) | | 0k |
 
 11 players, TV 1100k.
+

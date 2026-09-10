@@ -4,7 +4,9 @@
   "roster_id": "woodelf.lrb6",
   "rerolls": 2,
   "reroll_cost": 50000,
-  "apothecaries": 0,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
   "dedicated_fans": 0,
   "fan_factor": 0,
   "treasury": 0,
@@ -21,7 +23,7 @@
     },
     {
       "nr": 3,
-      "position_id": "woodelf.wardancer"
+      "position_id": "woodelf.thrower"
     },
     {
       "nr": 4,
@@ -29,7 +31,7 @@
     },
     {
       "nr": 5,
-      "position_id": "woodelf.catcher"
+      "position_id": "woodelf.lineman"
     },
     {
       "nr": 6,
@@ -37,11 +39,11 @@
     },
     {
       "nr": 7,
-      "position_id": "woodelf.thrower"
+      "position_id": "woodelf.lineman"
     },
     {
       "nr": 8,
-      "position_id": "woodelf.lineman"
+      "position_id": "woodelf.catcher"
     },
     {
       "nr": 9,

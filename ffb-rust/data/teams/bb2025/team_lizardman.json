@@ -4,20 +4,22 @@
   "roster_id": "lizardman.lrb6",
   "rerolls": 2,
   "reroll_cost": 70000,
-  "apothecaries": 0,
-  "dedicated_fans": 3,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 1,
   "fan_factor": 0,
-  "treasury": 10000,
-  "spent": 1090000,
-  "team_value": 1080000,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1100000,
   "players": [
     {
       "nr": 1,
-      "position_id": "lizardman.kroxigor"
+      "position_id": "lizardman.skink"
     },
     {
-      "nr": 12,
-      "position_id": "lizardman.saurus"
+      "nr": 2,
+      "position_id": "lizardman.chameleon_skink"
     },
     {
       "nr": 3,
@@ -25,15 +27,15 @@
     },
     {
       "nr": 4,
-      "position_id": "lizardman.saurus"
+      "position_id": "lizardman.kroxigor"
     },
     {
       "nr": 5,
-      "position_id": "lizardman.saurus"
+      "position_id": "lizardman.skink"
     },
     {
       "nr": 6,
-      "position_id": "lizardman.saurus"
+      "position_id": "lizardman.chameleon_skink"
     },
     {
       "nr": 7,
@@ -41,11 +43,11 @@
     },
     {
       "nr": 8,
-      "position_id": "lizardman.chameleon_skink"
+      "position_id": "lizardman.skink"
     },
     {
       "nr": 9,
-      "position_id": "lizardman.chameleon_skink"
+      "position_id": "lizardman.saurus"
     },
     {
       "nr": 10,
@@ -54,13 +56,11 @@
     {
       "nr": 11,
       "position_id": "lizardman.skink"
+    },
+    {
+      "nr": 12,
+      "position_id": "lizardman.skink"
     }
   ],
-  "special_rules": [],
-  "stars": [
-    {
-      "nr": 2,
-      "star_id": "lizardman.Boa"
-    }
-  ]
+  "special_rules": []
 }

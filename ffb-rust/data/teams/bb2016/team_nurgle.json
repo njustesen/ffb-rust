@@ -5,6 +5,8 @@
   "rerolls": 2,
   "reroll_cost": 70000,
   "apothecaries": 0,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
   "dedicated_fans": 0,
   "fan_factor": 2,
   "treasury": 0,
@@ -13,11 +15,11 @@
   "players": [
     {
       "nr": 1,
-      "position_id": "nurgle.beast"
+      "position_id": "nurgle.rotter"
     },
     {
       "nr": 2,
-      "position_id": "nurgle.warrior"
+      "position_id": "nurgle.pestigor"
     },
     {
       "nr": 3,
@@ -25,23 +27,23 @@
     },
     {
       "nr": 4,
-      "position_id": "nurgle.warrior"
+      "position_id": "nurgle.beast"
     },
     {
       "nr": 5,
-      "position_id": "nurgle.warrior"
+      "position_id": "nurgle.rotter"
     },
     {
       "nr": 6,
-      "position_id": "nurgle.pestigor"
+      "position_id": "nurgle.warrior"
     },
     {
       "nr": 7,
-      "position_id": "nurgle.pestigor"
+      "position_id": "nurgle.rotter"
     },
     {
       "nr": 8,
-      "position_id": "nurgle.pestigor"
+      "position_id": "nurgle.warrior"
     },
     {
       "nr": 9,
@@ -49,10 +51,18 @@
     },
     {
       "nr": 10,
-      "position_id": "nurgle.rotter"
+      "position_id": "nurgle.warrior"
     },
     {
       "nr": 11,
+      "position_id": "nurgle.rotter"
+    },
+    {
+      "nr": 12,
+      "position_id": "nurgle.rotter"
+    },
+    {
+      "nr": 13,
       "position_id": "nurgle.rotter"
     }
   ],

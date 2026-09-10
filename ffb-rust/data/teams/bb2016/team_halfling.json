@@ -2,14 +2,16 @@
   "edition": "bb2016",
   "race": "halfling",
   "roster_id": "halfling.lrb6",
-  "rerolls": 4,
+  "rerolls": 3,
   "reroll_cost": 60000,
   "apothecaries": 1,
+  "assistant_coaches": 6,
+  "cheerleaders": 6,
   "dedicated_fans": 0,
-  "fan_factor": 3,
-  "treasury": 180000,
-  "spent": 920000,
-  "team_value": 920000,
+  "fan_factor": 9,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1100000,
   "players": [
     {
       "nr": 1,
@@ -17,11 +19,11 @@
     },
     {
       "nr": 2,
-      "position_id": "halfling.treeman"
+      "position_id": "halfling.halfling"
     },
     {
       "nr": 3,
-      "position_id": "halfling.halfling"
+      "position_id": "halfling.treeman"
     },
     {
       "nr": 4,
@@ -65,6 +67,14 @@
     },
     {
       "nr": 14,
+      "position_id": "halfling.halfling"
+    },
+    {
+      "nr": 15,
+      "position_id": "halfling.halfling"
+    },
+    {
+      "nr": 16,
       "position_id": "halfling.halfling"
     }
   ],

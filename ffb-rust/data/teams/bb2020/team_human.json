@@ -5,23 +5,25 @@
   "rerolls": 3,
   "reroll_cost": 50000,
   "apothecaries": 1,
-  "dedicated_fans": 3,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 0,
   "fan_factor": 0,
-  "treasury": 45000,
-  "spent": 1055000,
-  "team_value": 1045000,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1100000,
   "players": [
     {
       "nr": 1,
-      "position_id": "human.ogre"
+      "position_id": "human.lineman"
     },
     {
       "nr": 2,
-      "position_id": "human.blitzer"
+      "position_id": "human.thrower"
     },
     {
       "nr": 3,
-      "position_id": "human.blitzer"
+      "position_id": "human.catcher.old"
     },
     {
       "nr": 4,
@@ -29,35 +31,35 @@
     },
     {
       "nr": 5,
-      "position_id": "human.blitzer"
+      "position_id": "human.halflinghopeful"
     },
     {
       "nr": 6,
-      "position_id": "human.thrower"
+      "position_id": "human.ogre"
     },
     {
       "nr": 7,
-      "position_id": "human.thrower"
+      "position_id": "human.lineman"
     },
     {
       "nr": 8,
-      "position_id": "human.catcher.old"
+      "position_id": "human.thrower"
     },
     {
       "nr": 9,
-      "position_id": "human.halflinghopeful"
+      "position_id": "human.catcher.old"
     },
     {
       "nr": 10,
-      "position_id": "human.halflinghopeful"
+      "position_id": "human.blitzer"
     },
     {
       "nr": 11,
-      "position_id": "human.halflinghopeful"
+      "position_id": "human.blitzer"
     },
     {
       "nr": 12,
-      "position_id": "human.lineman"
+      "position_id": "human.blitzer"
     }
   ],
   "special_rules": []

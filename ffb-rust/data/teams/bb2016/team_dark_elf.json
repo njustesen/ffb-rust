@@ -2,9 +2,11 @@
   "edition": "bb2016",
   "race": "dark_elf",
   "roster_id": "darkelf.lrb6",
-  "rerolls": 2,
+  "rerolls": 3,
   "reroll_cost": 50000,
-  "apothecaries": 0,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
   "dedicated_fans": 0,
   "fan_factor": 0,
   "treasury": 0,
@@ -13,35 +15,35 @@
   "players": [
     {
       "nr": 1,
-      "position_id": "darkelf.witchelf"
+      "position_id": "darkelf.lineman"
     },
     {
       "nr": 2,
-      "position_id": "darkelf.witchelf"
+      "position_id": "darkelf.blitzer"
     },
     {
       "nr": 3,
-      "position_id": "darkelf.blitzer"
+      "position_id": "darkelf.runner"
     },
     {
       "nr": 4,
-      "position_id": "darkelf.blitzer"
-    },
-    {
-      "nr": 5,
-      "position_id": "darkelf.blitzer"
-    },
-    {
-      "nr": 6,
-      "position_id": "darkelf.blitzer"
-    },
-    {
-      "nr": 7,
       "position_id": "darkelf.assassin"
     },
     {
+      "nr": 5,
+      "position_id": "darkelf.witchelf"
+    },
+    {
+      "nr": 6,
+      "position_id": "darkelf.lineman"
+    },
+    {
+      "nr": 7,
+      "position_id": "darkelf.blitzer"
+    },
+    {
       "nr": 8,
-      "position_id": "darkelf.runner"
+      "position_id": "darkelf.lineman"
     },
     {
       "nr": 9,

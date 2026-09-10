@@ -5,6 +5,8 @@
   "rerolls": 2,
   "reroll_cost": 70000,
   "apothecaries": 0,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
   "dedicated_fans": 0,
   "fan_factor": 2,
   "treasury": 0,
@@ -17,7 +19,7 @@
     },
     {
       "nr": 2,
-      "position_id": "vampire.vampire"
+      "position_id": "vampire.thrall"
     },
     {
       "nr": 3,
@@ -25,7 +27,7 @@
     },
     {
       "nr": 4,
-      "position_id": "vampire.vampire"
+      "position_id": "vampire.thrall"
     },
     {
       "nr": 5,
@@ -33,11 +35,11 @@
     },
     {
       "nr": 6,
-      "position_id": "vampire.vampire"
+      "position_id": "vampire.thrall"
     },
     {
       "nr": 7,
-      "position_id": "vampire.thrall"
+      "position_id": "vampire.vampire"
     },
     {
       "nr": 8,
@@ -45,7 +47,7 @@
     },
     {
       "nr": 9,
-      "position_id": "vampire.thrall"
+      "position_id": "vampire.vampire"
     },
     {
       "nr": 10,
@@ -53,7 +55,7 @@
     },
     {
       "nr": 11,
-      "position_id": "vampire.thrall"
+      "position_id": "vampire.vampire"
     },
     {
       "nr": 12,

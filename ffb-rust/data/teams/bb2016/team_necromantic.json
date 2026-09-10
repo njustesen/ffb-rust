@@ -1,64 +1,70 @@
 {
- "edition": "bb2016",
- "race": "necromantic",
- "roster_id": "necromantic.lrb6",
- "rerolls": 2,
- "reroll_cost": 70000,
- "apothecaries": 0,
- "dedicated_fans": 0,
- "fan_factor": 0,
- "treasury": 20000,
- "spent": 1080000,
- "team_value": 1080000,
- "players": [
-  {
-   "nr": 1,
-   "position_id": "necromantic.werewolf"
-  },
-  {
-   "nr": 2,
-   "position_id": "necromantic.werewolf"
-  },
-  {
-   "nr": 3,
-   "position_id": "necromantic.fleshgolem"
-  },
-  {
-   "nr": 4,
-   "position_id": "necromantic.fleshgolem"
-  },
-  {
-   "nr": 5,
-   "position_id": "necromantic.wight"
-  },
-  {
-   "nr": 6,
-   "position_id": "necromantic.wight"
-  },
-  {
-   "nr": 7,
-   "position_id": "necromantic.ghoul"
-  },
-  {
-   "nr": 8,
-   "position_id": "necromantic.ghoul"
-  },
-  {
-   "nr": 9,
-   "position_id": "necromantic.zombie"
-  },
-  {
-   "nr": 10,
-   "position_id": "necromantic.zombie"
-  },
-  {
-   "nr": 11,
-   "position_id": "necromantic.zombie"
-  },
-  {
-   "nr": 12,
-   "position_id": "necromantic.zombie"
-  }
- ],
- "special_rules": []
+  "edition": "bb2016",
+  "race": "necromantic",
+  "roster_id": "necromantic.lrb6",
+  "rerolls": 2,
+  "reroll_cost": 70000,
+  "apothecaries": 0,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 0,
+  "fan_factor": 1,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1100000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "necromantic.werewolf"
+    },
+    {
+      "nr": 2,
+      "position_id": "necromantic.fleshgolem"
+    },
+    {
+      "nr": 3,
+      "position_id": "necromantic.wight"
+    },
+    {
+      "nr": 4,
+      "position_id": "necromantic.ghoul"
+    },
+    {
+      "nr": 5,
+      "position_id": "necromantic.zombie"
+    },
+    {
+      "nr": 6,
+      "position_id": "necromantic.werewolf"
+    },
+    {
+      "nr": 7,
+      "position_id": "necromantic.fleshgolem"
+    },
+    {
+      "nr": 8,
+      "position_id": "necromantic.wight"
+    },
+    {
+      "nr": 9,
+      "position_id": "necromantic.zombie"
+    },
+    {
+      "nr": 10,
+      "position_id": "necromantic.zombie"
+    },
+    {
+      "nr": 11,
+      "position_id": "necromantic.zombie"
+    },
+    {
+      "nr": 12,
+      "position_id": "necromantic.zombie"
+    },
+    {
+      "nr": 13,
+      "position_id": "necromantic.zombie"
+    }
+  ],
+  "special_rules": []
 }

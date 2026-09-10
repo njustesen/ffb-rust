@@ -6,23 +6,23 @@
 	<name>Chaos Parity25 Home</name>
 	<race>Chaos</race>
 	<rosterId>chaos_troll.bb2025</rosterId>
-	<reRolls>2</reRolls>
+	<reRolls>3</reRolls>
 	<fanFactor>0</fanFactor>
-	<dedicatedFans>3</dedicatedFans>
+	<dedicatedFans>1</dedicatedFans>
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1050000</currentTeamValue>
+	<currentTeamValue>1100000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>40000</treasury>
+	<treasury>0</treasury>
 	<specialRules>
 		<rule>Favoured of Chaos Undivided</rule>
 	</specialRules>
 
 	<player nr="1" id="teamChaosTrollParity25Home1">
-		<name>Troll 1</name>
+		<name>Beastman Lineman 1</name>
 		<gender>male</gender>
-		<positionId>chaos.troll</positionId>
+		<positionId>chaos.beastman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -34,16 +34,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamChaosTrollParity25Home3">
-		<name>Chaos Chosen 3</name>
+		<name>Troll 3</name>
 		<gender>male</gender>
-		<positionId>chaos.warrior</positionId>
+		<positionId>chaos.troll</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="4" id="teamChaosTrollParity25Home4">
-		<name>Chaos Chosen 4</name>
+		<name>Beastman Lineman 4</name>
 		<gender>male</gender>
-		<positionId>chaos.warrior</positionId>
+		<positionId>chaos.beastman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -62,9 +62,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamChaosTrollParity25Home7">
-		<name>Beastman Lineman 7</name>
+		<name>Chaos Chosen 7</name>
 		<gender>male</gender>
-		<positionId>chaos.beastman</positionId>
+		<positionId>chaos.warrior</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -76,9 +76,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="9" id="teamChaosTrollParity25Home9">
-		<name>Beastman Lineman 9</name>
+		<name>Chaos Chosen 9</name>
 		<gender>male</gender>
-		<positionId>chaos.beastman</positionId>
+		<positionId>chaos.warrior</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

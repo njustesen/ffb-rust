@@ -9,7 +9,7 @@
 	<reRolls>2</reRolls>
 	<fanFactor>1</fanFactor>
 	<dedicatedFans>0</dedicatedFans>
-	<apothecaries>0</apothecaries>
+	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
 	<currentTeamValue>1100000</currentTeamValue>
@@ -18,16 +18,16 @@
 	<specialRules/>
 
 	<player nr="1" id="teamChaosDwarfParity16Home1">
-		<name>Minotaur 1</name>
+		<name>Hobgoblin 1</name>
 		<gender>male</gender>
-		<positionId>chaosdwarf.minotaur</positionId>
+		<positionId>chaosdwarf.hobgoblin</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamChaosDwarfParity16Home2">
-		<name>Bull Centaur 2</name>
+		<name>Chaos Dwarf Blocker 2</name>
 		<gender>male</gender>
-		<positionId>chaosdwarf.bullcentaur</positionId>
+		<positionId>chaosdwarf.blocker</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -39,16 +39,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="4" id="teamChaosDwarfParity16Home4">
-		<name>Chaos Dwarf Blocker 4</name>
+		<name>Minotaur 4</name>
 		<gender>male</gender>
-		<positionId>chaosdwarf.blocker</positionId>
+		<positionId>chaosdwarf.minotaur</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamChaosDwarfParity16Home5">
-		<name>Chaos Dwarf Blocker 5</name>
+		<name>Hobgoblin 5</name>
 		<gender>male</gender>
-		<positionId>chaosdwarf.blocker</positionId>
+		<positionId>chaosdwarf.hobgoblin</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -60,16 +60,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamChaosDwarfParity16Home7">
-		<name>Chaos Dwarf Blocker 7</name>
+		<name>Bull Centaur 7</name>
 		<gender>male</gender>
-		<positionId>chaosdwarf.blocker</positionId>
+		<positionId>chaosdwarf.bullcentaur</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamChaosDwarfParity16Home8">
-		<name>Chaos Dwarf Blocker 8</name>
+		<name>Hobgoblin 8</name>
 		<gender>male</gender>
-		<positionId>chaosdwarf.blocker</positionId>
+		<positionId>chaosdwarf.hobgoblin</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -96,6 +96,13 @@
 	</player>
 	<player nr="12" id="teamChaosDwarfParity16Home12">
 		<name>Hobgoblin 12</name>
+		<gender>male</gender>
+		<positionId>chaosdwarf.hobgoblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamChaosDwarfParity16Home13">
+		<name>Hobgoblin 13</name>
 		<gender>male</gender>
 		<positionId>chaosdwarf.hobgoblin</positionId>
 		<skillList/>

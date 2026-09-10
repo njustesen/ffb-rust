@@ -2,18 +2,20 @@
   "edition": "bb2020",
   "race": "chaos",
   "roster_id": "chaos.lrb6",
-  "rerolls": 3,
+  "rerolls": 2,
   "reroll_cost": 60000,
   "apothecaries": 1,
-  "dedicated_fans": 3,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 1,
   "fan_factor": 0,
-  "treasury": 20000,
-  "spent": 1080000,
-  "team_value": 1070000,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1090000,
   "players": [
     {
       "nr": 1,
-      "position_id": "chaos.chaosogre"
+      "position_id": "chaos.beastmanrunnerlineman"
     },
     {
       "nr": 2,
@@ -21,7 +23,7 @@
     },
     {
       "nr": 3,
-      "position_id": "chaos.beastmanrunnerlineman"
+      "position_id": "chaos.chaosogre"
     },
     {
       "nr": 4,
@@ -29,7 +31,7 @@
     },
     {
       "nr": 5,
-      "position_id": "chaos.beastmanrunnerlineman"
+      "position_id": "chaos.chosenblocker"
     },
     {
       "nr": 6,
@@ -37,7 +39,7 @@
     },
     {
       "nr": 7,
-      "position_id": "chaos.beastmanrunnerlineman"
+      "position_id": "chaos.chosenblocker"
     },
     {
       "nr": 8,

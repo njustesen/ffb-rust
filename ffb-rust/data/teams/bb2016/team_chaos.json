@@ -4,16 +4,18 @@
   "roster_id": "chaos.lrb6",
   "rerolls": 2,
   "reroll_cost": 60000,
-  "apothecaries": 0,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
   "dedicated_fans": 0,
-  "fan_factor": 1,
+  "fan_factor": 0,
   "treasury": 0,
   "spent": 1100000,
   "team_value": 1100000,
   "players": [
     {
       "nr": 1,
-      "position_id": "chaos.minotaur"
+      "position_id": "chaos.beastman"
     },
     {
       "nr": 2,
@@ -21,11 +23,11 @@
     },
     {
       "nr": 3,
-      "position_id": "chaos.warrior"
+      "position_id": "chaos.minotaur"
     },
     {
       "nr": 4,
-      "position_id": "chaos.warrior"
+      "position_id": "chaos.beastman"
     },
     {
       "nr": 5,
@@ -37,7 +39,7 @@
     },
     {
       "nr": 7,
-      "position_id": "chaos.beastman"
+      "position_id": "chaos.warrior"
     },
     {
       "nr": 8,

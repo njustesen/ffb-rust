@@ -8,7 +8,7 @@
 	<rosterId>amazon.bb2020</rosterId>
 	<reRolls>3</reRolls>
 	<fanFactor>0</fanFactor>
-	<dedicatedFans>3</dedicatedFans>
+	<dedicatedFans>1</dedicatedFans>
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
@@ -18,16 +18,16 @@
 	<specialRules/>
 
 	<player nr="1" id="teamAmazonParity20Home1">
-		<name>Jaguar Warrior Blocker 1</name>
+		<name>Eagle Warrior Linewoman 1</name>
 		<gender>male</gender>
-		<positionId>amazon.jaguarwarriorblocker</positionId>
+		<positionId>amazon.linewoman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamAmazonParity20Home2">
-		<name>Jaguar Warrior Blocker 2</name>
+		<name>Python Warrior Thrower 2</name>
 		<gender>male</gender>
-		<positionId>amazon.jaguarwarriorblocker</positionId>
+		<positionId>amazon.thrower</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -39,16 +39,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="4" id="teamAmazonParity20Home4">
-		<name>Piranha Warrior Blitzer 4</name>
+		<name>Jaguar Warrior Blocker 4</name>
 		<gender>male</gender>
-		<positionId>amazon.blitzer</positionId>
+		<positionId>amazon.jaguarwarriorblocker</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamAmazonParity20Home5">
-		<name>Python Warrior Thrower 5</name>
+		<name>Eagle Warrior Linewoman 5</name>
 		<gender>male</gender>
-		<positionId>amazon.thrower</positionId>
+		<positionId>amazon.linewoman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -60,16 +60,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamAmazonParity20Home7">
-		<name>Eagle Warrior Linewoman 7</name>
+		<name>Piranha Warrior Blitzer 7</name>
 		<gender>male</gender>
-		<positionId>amazon.linewoman</positionId>
+		<positionId>amazon.blitzer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamAmazonParity20Home8">
-		<name>Eagle Warrior Linewoman 8</name>
+		<name>Jaguar Warrior Blocker 8</name>
 		<gender>male</gender>
-		<positionId>amazon.linewoman</positionId>
+		<positionId>amazon.jaguarwarriorblocker</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

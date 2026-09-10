@@ -12,64 +12,64 @@
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1075000</currentTeamValue>
+	<currentTeamValue>1085000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>15000</treasury>
+	<treasury>5000</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamImperialNobilityParity25Home1">
-		<name>Ogre 1</name>
+		<name>Imperial Retainer 1</name>
+		<gender>male</gender>
+		<positionId>imperialnobility.imperial_retainer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamImperialNobilityParity25Home2">
+		<name>Imperial Thrower 2</name>
+		<gender>male</gender>
+		<positionId>imperialnobility.imperial_thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamImperialNobilityParity25Home3">
+		<name>Bodyguard 3</name>
+		<gender>male</gender>
+		<positionId>imperialnobility.bodyguard</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamImperialNobilityParity25Home4">
+		<name>Noble Blitzer 4</name>
+		<gender>male</gender>
+		<positionId>imperialnobility.noble_blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamImperialNobilityParity25Home5">
+		<name>Ogre 5</name>
 		<gender>male</gender>
 		<positionId>imperialnobility.ogre</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="2" id="teamImperialNobilityParity25Home2">
-		<name>Noble Blitzer 2</name>
-		<gender>male</gender>
-		<positionId>imperialnobility.noble_blitzer</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="3" id="teamImperialNobilityParity25Home3">
-		<name>Noble Blitzer 3</name>
-		<gender>male</gender>
-		<positionId>imperialnobility.noble_blitzer</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="4" id="teamImperialNobilityParity25Home4">
-		<name>Bodyguard 4</name>
-		<gender>male</gender>
-		<positionId>imperialnobility.bodyguard</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="5" id="teamImperialNobilityParity25Home5">
-		<name>Bodyguard 5</name>
-		<gender>male</gender>
-		<positionId>imperialnobility.bodyguard</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
 	<player nr="6" id="teamImperialNobilityParity25Home6">
-		<name>Bodyguard 6</name>
+		<name>Imperial Retainer 6</name>
 		<gender>male</gender>
-		<positionId>imperialnobility.bodyguard</positionId>
+		<positionId>imperialnobility.imperial_retainer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamImperialNobilityParity25Home7">
-		<name>Imperial Thrower 7</name>
+		<name>Bodyguard 7</name>
 		<gender>male</gender>
-		<positionId>imperialnobility.imperial_thrower</positionId>
+		<positionId>imperialnobility.bodyguard</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamImperialNobilityParity25Home8">
-		<name>Imperial Thrower 8</name>
+		<name>Noble Blitzer 8</name>
 		<gender>male</gender>
-		<positionId>imperialnobility.imperial_thrower</positionId>
+		<positionId>imperialnobility.noble_blitzer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -81,9 +81,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="10" id="teamImperialNobilityParity25Home10">
-		<name>Imperial Retainer 10</name>
+		<name>Bodyguard 10</name>
 		<gender>male</gender>
-		<positionId>imperialnobility.imperial_retainer</positionId>
+		<positionId>imperialnobility.bodyguard</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -95,9 +95,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="12" id="teamImperialNobilityParity25Home12">
-		<name>Imperial Retainer 12</name>
+		<name>Bodyguard 12</name>
 		<gender>male</gender>
-		<positionId>imperialnobility.imperial_retainer</positionId>
+		<positionId>imperialnobility.bodyguard</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

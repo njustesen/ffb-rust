@@ -1,60 +1,74 @@
 {
- "edition": "bb2016",
- "race": "underworld",
- "roster_id": "underworld.lrb6",
- "rerolls": 2,
- "reroll_cost": 70000,
- "apothecaries": 0,
- "dedicated_fans": 0,
- "fan_factor": 0,
- "treasury": 300000,
- "spent": 800000,
- "team_value": 800000,
- "players": [
-  {
-   "nr": 1,
-   "position_id": "underworld.troll.warpstone"
-  },
-  {
-   "nr": 2,
-   "position_id": "underworld.skaven.blitzer"
-  },
-  {
-   "nr": 3,
-   "position_id": "underworld.skaven.blitzer"
-  },
-  {
-   "nr": 4,
-   "position_id": "underworld.skaven.thrower"
-  },
-  {
-   "nr": 5,
-   "position_id": "underworld.skaven.lineman"
-  },
-  {
-   "nr": 6,
-   "position_id": "underworld.skaven.lineman"
-  },
-  {
-   "nr": 7,
-   "position_id": "underworld.goblin"
-  },
-  {
-   "nr": 8,
-   "position_id": "underworld.goblin"
-  },
-  {
-   "nr": 9,
-   "position_id": "underworld.goblin"
-  },
-  {
-   "nr": 10,
-   "position_id": "underworld.goblin"
-  },
-  {
-   "nr": 11,
-   "position_id": "underworld.goblin"
-  }
- ],
- "special_rules": []
+  "edition": "bb2016",
+  "race": "underworld",
+  "roster_id": "underworld.lrb6",
+  "rerolls": 3,
+  "reroll_cost": 70000,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 0,
+  "fan_factor": 3,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1100000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "underworld.goblin"
+    },
+    {
+      "nr": 2,
+      "position_id": "underworld.skaven.lineman"
+    },
+    {
+      "nr": 3,
+      "position_id": "underworld.skaven.thrower"
+    },
+    {
+      "nr": 4,
+      "position_id": "underworld.skaven.blitzer"
+    },
+    {
+      "nr": 5,
+      "position_id": "underworld.troll.warpstone"
+    },
+    {
+      "nr": 6,
+      "position_id": "underworld.goblin"
+    },
+    {
+      "nr": 7,
+      "position_id": "underworld.skaven.lineman"
+    },
+    {
+      "nr": 8,
+      "position_id": "underworld.skaven.thrower"
+    },
+    {
+      "nr": 9,
+      "position_id": "underworld.skaven.blitzer"
+    },
+    {
+      "nr": 10,
+      "position_id": "underworld.goblin"
+    },
+    {
+      "nr": 11,
+      "position_id": "underworld.goblin"
+    },
+    {
+      "nr": 12,
+      "position_id": "underworld.goblin"
+    },
+    {
+      "nr": 13,
+      "position_id": "underworld.goblin"
+    },
+    {
+      "nr": 14,
+      "position_id": "underworld.goblin"
+    }
+  ],
+  "special_rules": []
 }

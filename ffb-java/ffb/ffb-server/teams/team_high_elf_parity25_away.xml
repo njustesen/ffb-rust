@@ -6,35 +6,35 @@
 	<name>High Elf Parity25 Away</name>
 	<race>High Elf</race>
 	<rosterId>high_elf.bb2025</rosterId>
-	<reRolls>2</reRolls>
+	<reRolls>3</reRolls>
 	<fanFactor>0</fanFactor>
-	<dedicatedFans>2</dedicatedFans>
+	<dedicatedFans>1</dedicatedFans>
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1095000</currentTeamValue>
+	<currentTeamValue>1100000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>0</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamHighElfParity25Away1">
-		<name>Dragon Prince 1</name>
+		<name>High Elf Lineman 1</name>
 		<gender>male</gender>
-		<positionId>highelf.dragon_prince</positionId>
+		<positionId>highelf.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamHighElfParity25Away2">
-		<name>Dragon Prince 2</name>
+		<name>Phoenix Warrior 2</name>
 		<gender>male</gender>
-		<positionId>highelf.dragon_prince</positionId>
+		<positionId>highelf.phoenix_warrior</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamHighElfParity25Away3">
-		<name>White Lion 3</name>
+		<name>Dragon Prince 3</name>
 		<gender>male</gender>
-		<positionId>highelf.white_lion</positionId>
+		<positionId>highelf.dragon_prince</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -46,9 +46,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamHighElfParity25Away5">
-		<name>Phoenix Warrior 5</name>
+		<name>High Elf Lineman 5</name>
 		<gender>male</gender>
-		<positionId>highelf.phoenix_warrior</positionId>
+		<positionId>highelf.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -60,9 +60,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamHighElfParity25Away7">
-		<name>High Elf Lineman 7</name>
+		<name>Dragon Prince 7</name>
 		<gender>male</gender>
-		<positionId>highelf.lineman</positionId>
+		<positionId>highelf.dragon_prince</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

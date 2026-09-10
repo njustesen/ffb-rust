@@ -8,7 +8,7 @@
 	<rosterId>khemri.bb2020</rosterId>
 	<reRolls>3</reRolls>
 	<fanFactor>0</fanFactor>
-	<dedicatedFans>3</dedicatedFans>
+	<dedicatedFans>1</dedicatedFans>
 	<apothecaries>0</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
@@ -18,9 +18,9 @@
 	<specialRules/>
 
 	<player nr="1" id="teamKhemriParity20Home1">
-		<name>Tomb Guardian 1</name>
+		<name>Skeleton Lineman 1</name>
 		<gender>male</gender>
-		<positionId>khemri.tombguardian</positionId>
+		<positionId>khemri.skeleton</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -32,30 +32,30 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamKhemriParity20Home3">
-		<name>Tomb Guardian 3</name>
+		<name>Anointed Thrower 3</name>
 		<gender>male</gender>
-		<positionId>khemri.tombguardian</positionId>
+		<positionId>khemri.anointedthrower</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="4" id="teamKhemriParity20Home4">
-		<name>Tomb Guardian 4</name>
+		<name>Anointed Blitzer 4</name>
 		<gender>male</gender>
-		<positionId>khemri.tombguardian</positionId>
+		<positionId>khemri.anointedblitzer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamKhemriParity20Home5">
-		<name>Anointed Blitzer 5</name>
+		<name>Skeleton Lineman 5</name>
 		<gender>male</gender>
-		<positionId>khemri.anointedblitzer</positionId>
+		<positionId>khemri.skeleton</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="6" id="teamKhemriParity20Home6">
-		<name>Anointed Blitzer 6</name>
+		<name>Tomb Guardian 6</name>
 		<gender>male</gender>
-		<positionId>khemri.anointedblitzer</positionId>
+		<positionId>khemri.tombguardian</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -67,9 +67,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamKhemriParity20Home8">
-		<name>Anointed Thrower 8</name>
+		<name>Anointed Blitzer 8</name>
 		<gender>male</gender>
-		<positionId>khemri.anointedthrower</positionId>
+		<positionId>khemri.anointedblitzer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -81,9 +81,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="10" id="teamKhemriParity20Home10">
-		<name>Skeleton Lineman 10</name>
+		<name>Tomb Guardian 10</name>
 		<gender>male</gender>
-		<positionId>khemri.skeleton</positionId>
+		<positionId>khemri.tombguardian</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -95,9 +95,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="12" id="teamKhemriParity20Home12">
-		<name>Skeleton Lineman 12</name>
+		<name>Tomb Guardian 12</name>
 		<gender>male</gender>
-		<positionId>khemri.skeleton</positionId>
+		<positionId>khemri.tombguardian</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

@@ -8,68 +8,68 @@
 	<rosterId>bretonnian.bb2025</rosterId>
 	<reRolls>3</reRolls>
 	<fanFactor>0</fanFactor>
-	<dedicatedFans>3</dedicatedFans>
+	<dedicatedFans>1</dedicatedFans>
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1050000</currentTeamValue>
+	<currentTeamValue>1100000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>40000</treasury>
+	<treasury>0</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamBretonnianParity25Home1">
-		<name>Grail Knight 1</name>
+		<name>Bretonnian Squire 1</name>
 		<gender>male</gender>
-		<positionId>bretonnian.grail_knight</positionId>
+		<positionId>bretonnian.squire</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamBretonnianParity25Home2">
-		<name>Grail Knight 2</name>
+		<name>Bretonnian Knight Catcher 2</name>
+		<gender>male</gender>
+		<positionId>bretonnian.knight_catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamBretonnianParity25Home3">
+		<name>Bretonnian Knight Thrower 3</name>
+		<gender>male</gender>
+		<positionId>bretonnian.knight_thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamBretonnianParity25Home4">
+		<name>Grail Knight 4</name>
 		<gender>male</gender>
 		<positionId>bretonnian.grail_knight</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="3" id="teamBretonnianParity25Home3">
-		<name>Bretonnian Knight Catcher 3</name>
-		<gender>male</gender>
-		<positionId>bretonnian.knight_catcher</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="4" id="teamBretonnianParity25Home4">
-		<name>Bretonnian Knight Catcher 4</name>
-		<gender>male</gender>
-		<positionId>bretonnian.knight_catcher</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
 	<player nr="5" id="teamBretonnianParity25Home5">
-		<name>Bretonnian Knight Thrower 5</name>
+		<name>Bretonnian Squire 5</name>
 		<gender>male</gender>
-		<positionId>bretonnian.knight_thrower</positionId>
+		<positionId>bretonnian.squire</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="6" id="teamBretonnianParity25Home6">
-		<name>Bretonnian Knight Thrower 6</name>
+		<name>Bretonnian Knight Catcher 6</name>
+		<gender>male</gender>
+		<positionId>bretonnian.knight_catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamBretonnianParity25Home7">
+		<name>Bretonnian Knight Thrower 7</name>
 		<gender>male</gender>
 		<positionId>bretonnian.knight_thrower</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="7" id="teamBretonnianParity25Home7">
-		<name>Bretonnian Squire 7</name>
-		<gender>male</gender>
-		<positionId>bretonnian.squire</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
 	<player nr="8" id="teamBretonnianParity25Home8">
-		<name>Bretonnian Squire 8</name>
+		<name>Grail Knight 8</name>
 		<gender>male</gender>
-		<positionId>bretonnian.squire</positionId>
+		<positionId>bretonnian.grail_knight</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -96,6 +96,13 @@
 	</player>
 	<player nr="12" id="teamBretonnianParity25Home12">
 		<name>Bretonnian Squire 12</name>
+		<gender>male</gender>
+		<positionId>bretonnian.squire</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamBretonnianParity25Home13">
+		<name>Bretonnian Squire 13</name>
 		<gender>male</gender>
 		<positionId>bretonnian.squire</positionId>
 		<skillList/>

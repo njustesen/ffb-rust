@@ -5,15 +5,17 @@
   "rerolls": 3,
   "reroll_cost": 60000,
   "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
   "dedicated_fans": 0,
   "fan_factor": 3,
-  "treasury": 80000,
-  "spent": 1020000,
-  "team_value": 1020000,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1100000,
   "players": [
     {
       "nr": 1,
-      "position_id": "goblin.troll"
+      "position_id": "goblin.goblin"
     },
     {
       "nr": 2,
@@ -21,7 +23,7 @@
     },
     {
       "nr": 3,
-      "position_id": "goblin.fanatic"
+      "position_id": "goblin.bombardier"
     },
     {
       "nr": 4,
@@ -29,11 +31,11 @@
     },
     {
       "nr": 5,
-      "position_id": "goblin.bombardier"
+      "position_id": "goblin.looney"
     },
     {
       "nr": 6,
-      "position_id": "goblin.goblin"
+      "position_id": "goblin.fanatic"
     },
     {
       "nr": 7,
@@ -41,7 +43,7 @@
     },
     {
       "nr": 8,
-      "position_id": "goblin.goblin"
+      "position_id": "goblin.troll"
     },
     {
       "nr": 9,
@@ -65,7 +67,15 @@
     },
     {
       "nr": 14,
-      "position_id": "goblin.looney"
+      "position_id": "goblin.goblin"
+    },
+    {
+      "nr": 15,
+      "position_id": "goblin.goblin"
+    },
+    {
+      "nr": 16,
+      "position_id": "goblin.goblin"
     }
   ],
   "special_rules": []

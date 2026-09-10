@@ -126,8 +126,12 @@ def team_xml(team: dict, roster: dict, roster_id: str, side: str, suffix: str,
     L.append(f"\t<fanFactor>{team['fan_factor']}</fanFactor>")
     L.append(f"\t<dedicatedFans>{team['dedicated_fans']}</dedicatedFans>")
     L.append(f"\t<apothecaries>{team['apothecaries']}</apothecaries>")
-    L.append("\t<cheerleaders>0</cheerleaders>")
-    L.append("\t<assistantCoaches>0</assistantCoaches>")
+    # Sideline Staff, 0-6 each at 10,000 gold. Hardcoded to 0 here until 2026-09-10, so no
+    # parity team ever had a single member of staff and the Brilliant Coaching / Cheering
+    # Fans kick-off results were decided 0-against-0 in every game ever measured. See
+    # docs/PARITY_COVERAGE_REQUIREMENTS.md sec.19 defect 3.
+    L.append(f"\t<cheerleaders>{team['cheerleaders']}</cheerleaders>")
+    L.append(f"\t<assistantCoaches>{team['assistant_coaches']}</assistantCoaches>")
     L.append(f"\t<currentTeamValue>{team['team_value']}</currentTeamValue>")
     L.append("\t<division>[X]</division>")
     L.append(f"\t<treasury>{team['treasury']}</treasury>")
@@ -205,36 +209,19 @@ def main() -> int:
                 if not check:
                     tf.write_text(json.dumps(team, indent=2) + "\n", encoding="utf-8")
             roster_id = f"{race}.{edition}"
-            # Star players drafted by the spec's "stars" list are fielded as ordinary rostered
-            # players: the star's stat block from data/star_players/all_editions.json is emitted
-            # as an extra <position> (type Star) in the roster XML and an extra <player> in the
-            # team XML. The Rust side (make_team_from_file) injects the identical player from the
-            # SAME star data, so both engines stay in lockstep.
-            drafted_star_ids = set()
-            stars = team.get("stars") or []
-            if stars:
-                star_file = json.loads((ROOT / "data" / "star_players" /
-                                        "all_editions.json").read_text(encoding="utf-8"))
-                stars_by_id = {sp["id"]: sp for sp in star_file["star_players"]}
-                roster = dict(roster)
-                roster["positions"] = list(roster["positions"])
-                team = dict(team)
-                team["players"] = list(team["players"])
-                for entry in stars:
-                    sp = stars_by_id.get(entry["star_id"])
-                    if sp is None:
-                        raise SystemExit(f"{tf}: star id {entry['star_id']!r} not in all_editions.json")
-                    if not any(p["id"] == sp["id"] for p in roster["positions"]):
-                        roster["positions"].append(sp)
-                    drafted_star_ids.add(sp["id"])
-                    team["players"].append({"nr": entry["nr"], "position_id": sp["id"]})
-                # nr-sorted, matching the Rust side's players.sort_by_key(nr): the harness
-                # activation snapshots index by position, so both engines must list the
-                # players in the identical order.
-                team["players"] = sorted(team["players"], key=lambda p: p["nr"])
+            # No star players. A star on a Team Draft List is an Inducement, needing its
+            # gold cost AND 2 Skill Points in Matched Play, and a mirror match has no
+            # inducement gold; the squads field none (docs/PARITY_COVERAGE_REQUIREMENTS.md
+            # sec.19). Un-drafted Star / Infamous Staff positions in a roster stay filtered
+            # out of the emitted roster XML by roster_xml().
+            if team.get("stars"):
+                raise SystemExit(
+                    f"{tf}: spec carries a 'stars' list. Star players are Inducements and"
+                    f" are not drafted onto parity squads -- see"
+                    f" docs/PARITY_COVERAGE_REQUIREMENTS.md sec.19.")
             for server in SERVER_DIRS:
                 emit(server / "rosters" / f"roster_{race}_{edition}.xml",
-                     roster_xml(roster, roster_id, drafted_star_ids))
+                     roster_xml(roster, roster_id))
                 for side in ("home", "away"):
                     emit(server / "teams" / f"team_{race}_parity{suffix}_{side}.xml",
                          team_xml(team, roster, roster_id, side, suffix, squad=race))

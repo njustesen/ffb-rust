@@ -12,15 +12,15 @@
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1020000</currentTeamValue>
+	<currentTeamValue>1100000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>80000</treasury>
+	<treasury>0</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamGoblinParity16Home1">
-		<name>Troll 1</name>
+		<name>Goblin 1</name>
 		<gender>male</gender>
-		<positionId>goblin.troll</positionId>
+		<positionId>goblin.goblin</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -32,9 +32,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamGoblinParity16Home3">
-		<name>Fanatic 3</name>
+		<name>Bombardier 3</name>
 		<gender>male</gender>
-		<positionId>goblin.fanatic</positionId>
+		<positionId>goblin.bombardier</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -46,16 +46,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamGoblinParity16Home5">
-		<name>Bombardier 5</name>
+		<name>Looney 5</name>
 		<gender>male</gender>
-		<positionId>goblin.bombardier</positionId>
+		<positionId>goblin.looney</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="6" id="teamGoblinParity16Home6">
-		<name>Goblin 6</name>
+		<name>Fanatic 6</name>
 		<gender>male</gender>
-		<positionId>goblin.goblin</positionId>
+		<positionId>goblin.fanatic</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -67,9 +67,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamGoblinParity16Home8">
-		<name>Goblin 8</name>
+		<name>Troll 8</name>
 		<gender>male</gender>
-		<positionId>goblin.goblin</positionId>
+		<positionId>goblin.troll</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -109,9 +109,23 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="14" id="teamGoblinParity16Home14">
-		<name>Looney 14</name>
+		<name>Goblin 14</name>
 		<gender>male</gender>
-		<positionId>goblin.looney</positionId>
+		<positionId>goblin.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="15" id="teamGoblinParity16Home15">
+		<name>Goblin 15</name>
+		<gender>male</gender>
+		<positionId>goblin.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="16" id="teamGoblinParity16Home16">
+		<name>Goblin 16</name>
+		<gender>male</gender>
+		<positionId>goblin.goblin</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

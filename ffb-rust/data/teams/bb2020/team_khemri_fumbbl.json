@@ -5,27 +5,29 @@
   "rerolls": 3,
   "reroll_cost": 70000,
   "apothecaries": 0,
-  "dedicated_fans": 3,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 1,
   "fan_factor": 0,
-  "treasury": 140000,
-  "spent": 960000,
-  "team_value": 950000,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1090000,
   "players": [
     {
       "nr": 1,
-      "position_id": "2895"
+      "position_id": "2893"
     },
     {
       "nr": 2,
-      "position_id": "2894"
+      "position_id": "2892"
     },
     {
       "nr": 3,
-      "position_id": "2894"
+      "position_id": "2895"
     },
     {
       "nr": 4,
-      "position_id": "2893"
+      "position_id": "2894"
     },
     {
       "nr": 5,
@@ -37,11 +39,11 @@
     },
     {
       "nr": 7,
-      "position_id": "2892"
+      "position_id": "2895"
     },
     {
       "nr": 8,
-      "position_id": "2892"
+      "position_id": "2894"
     },
     {
       "nr": 9,
@@ -49,7 +51,7 @@
     },
     {
       "nr": 10,
-      "position_id": "2892"
+      "position_id": "2895"
     },
     {
       "nr": 11,
@@ -57,11 +59,7 @@
     },
     {
       "nr": 12,
-      "position_id": "2892"
-    },
-    {
-      "nr": 13,
-      "position_id": "2892"
+      "position_id": "2895"
     }
   ],
   "special_rules": []

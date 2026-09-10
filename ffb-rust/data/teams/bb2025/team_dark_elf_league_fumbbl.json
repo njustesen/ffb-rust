@@ -2,9 +2,11 @@
   "edition": "bb2025",
   "race": "dark_elf_league_fumbbl",
   "roster_id": "4959",
-  "rerolls": 2,
+  "rerolls": 3,
   "reroll_cost": 50000,
-  "apothecaries": 0,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
   "dedicated_fans": 2,
   "fan_factor": 0,
   "treasury": 0,
@@ -13,23 +15,23 @@
   "players": [
     {
       "nr": 1,
-      "position_id": "37738"
+      "position_id": "37736"
     },
     {
       "nr": 2,
-      "position_id": "37738"
+      "position_id": "37734"
     },
     {
       "nr": 3,
-      "position_id": "37736"
+      "position_id": "37737"
     },
     {
       "nr": 4,
-      "position_id": "37736"
+      "position_id": "37735"
     },
     {
       "nr": 5,
-      "position_id": "37736"
+      "position_id": "37738"
     },
     {
       "nr": 6,
@@ -37,11 +39,11 @@
     },
     {
       "nr": 7,
-      "position_id": "37737"
+      "position_id": "37734"
     },
     {
       "nr": 8,
-      "position_id": "37735"
+      "position_id": "37734"
     },
     {
       "nr": 9,

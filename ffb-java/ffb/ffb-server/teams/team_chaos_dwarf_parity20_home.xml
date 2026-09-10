@@ -6,35 +6,35 @@
 	<name>Chaos Dwarf Parity20 Home</name>
 	<race>Chaos Dwarf</race>
 	<rosterId>chaos_dwarf.bb2020</rosterId>
-	<reRolls>3</reRolls>
+	<reRolls>2</reRolls>
 	<fanFactor>0</fanFactor>
-	<dedicatedFans>3</dedicatedFans>
+	<dedicatedFans>0</dedicatedFans>
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1080000</currentTeamValue>
+	<currentTeamValue>1100000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>10000</treasury>
+	<treasury>0</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamChaosDwarfParity20Home1">
-		<name>Minotaur 1</name>
+		<name>Hobgoblin Lineman 1</name>
 		<gender>male</gender>
-		<positionId>chaosdwarf.minotaur</positionId>
+		<positionId>chaosdwarf.hobgoblin</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamChaosDwarfParity20Home2">
-		<name>Bull Centaur Blitzer 2</name>
+		<name>Hobgoblin Sneaky Stabba 2</name>
 		<gender>male</gender>
-		<positionId>chaosdwarf.bullcentaur</positionId>
+		<positionId>chaosdwarf.hobgoblinsneakystabba</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamChaosDwarfParity20Home3">
-		<name>Chaos Dwarf Flamesmith 3</name>
+		<name>Chaos Dwarf Blocker 3</name>
 		<gender>male</gender>
-		<positionId>chaosdwarf.chaosdwarfflamesmith</positionId>
+		<positionId>chaosdwarf.blocker</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -46,16 +46,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamChaosDwarfParity20Home5">
-		<name>Hobgoblin Sneaky Stabba 5</name>
+		<name>Bull Centaur Blitzer 5</name>
 		<gender>male</gender>
-		<positionId>chaosdwarf.hobgoblinsneakystabba</positionId>
+		<positionId>chaosdwarf.bullcentaur</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="6" id="teamChaosDwarfParity20Home6">
-		<name>Chaos Dwarf Blocker 6</name>
+		<name>Minotaur 6</name>
 		<gender>male</gender>
-		<positionId>chaosdwarf.blocker</positionId>
+		<positionId>chaosdwarf.minotaur</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -67,9 +67,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamChaosDwarfParity20Home8">
-		<name>Hobgoblin Lineman 8</name>
+		<name>Bull Centaur Blitzer 8</name>
 		<gender>male</gender>
-		<positionId>chaosdwarf.hobgoblin</positionId>
+		<positionId>chaosdwarf.bullcentaur</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -96,6 +96,13 @@
 	</player>
 	<player nr="12" id="teamChaosDwarfParity20Home12">
 		<name>Hobgoblin Lineman 12</name>
+		<gender>male</gender>
+		<positionId>chaosdwarf.hobgoblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamChaosDwarfParity20Home13">
+		<name>Hobgoblin Lineman 13</name>
 		<gender>male</gender>
 		<positionId>chaosdwarf.hobgoblin</positionId>
 		<skillList/>

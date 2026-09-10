@@ -4,7 +4,9 @@
   "roster_id": "chaosdwarf.lrb6",
   "rerolls": 2,
   "reroll_cost": 70000,
-  "apothecaries": 0,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
   "dedicated_fans": 0,
   "fan_factor": 1,
   "treasury": 0,
@@ -13,11 +15,11 @@
   "players": [
     {
       "nr": 1,
-      "position_id": "chaosdwarf.minotaur"
+      "position_id": "chaosdwarf.hobgoblin"
     },
     {
       "nr": 2,
-      "position_id": "chaosdwarf.bullcentaur"
+      "position_id": "chaosdwarf.blocker"
     },
     {
       "nr": 3,
@@ -25,11 +27,11 @@
     },
     {
       "nr": 4,
-      "position_id": "chaosdwarf.blocker"
+      "position_id": "chaosdwarf.minotaur"
     },
     {
       "nr": 5,
-      "position_id": "chaosdwarf.blocker"
+      "position_id": "chaosdwarf.hobgoblin"
     },
     {
       "nr": 6,
@@ -37,11 +39,11 @@
     },
     {
       "nr": 7,
-      "position_id": "chaosdwarf.blocker"
+      "position_id": "chaosdwarf.bullcentaur"
     },
     {
       "nr": 8,
-      "position_id": "chaosdwarf.blocker"
+      "position_id": "chaosdwarf.hobgoblin"
     },
     {
       "nr": 9,
@@ -57,6 +59,10 @@
     },
     {
       "nr": 12,
+      "position_id": "chaosdwarf.hobgoblin"
+    },
+    {
+      "nr": 13,
       "position_id": "chaosdwarf.hobgoblin"
     }
   ],

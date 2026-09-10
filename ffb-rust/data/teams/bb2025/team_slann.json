@@ -2,9 +2,11 @@
   "edition": "bb2025",
   "race": "slann",
   "roster_id": "slann.lrb6",
-  "rerolls": 2,
+  "rerolls": 3,
   "reroll_cost": 50000,
-  "apothecaries": 0,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
   "dedicated_fans": 1,
   "fan_factor": 0,
   "treasury": 0,
@@ -13,11 +15,11 @@
   "players": [
     {
       "nr": 1,
-      "position_id": "slann.kroxigor"
+      "position_id": "slann.lineman"
     },
     {
       "nr": 2,
-      "position_id": "slann.blitzer"
+      "position_id": "slann.catcher"
     },
     {
       "nr": 3,
@@ -25,11 +27,11 @@
     },
     {
       "nr": 4,
-      "position_id": "slann.blitzer"
+      "position_id": "slann.kroxigor"
     },
     {
       "nr": 5,
-      "position_id": "slann.blitzer"
+      "position_id": "slann.lineman"
     },
     {
       "nr": 6,
@@ -37,15 +39,15 @@
     },
     {
       "nr": 7,
-      "position_id": "slann.catcher"
+      "position_id": "slann.blitzer"
     },
     {
       "nr": 8,
-      "position_id": "slann.catcher"
+      "position_id": "slann.lineman"
     },
     {
       "nr": 9,
-      "position_id": "slann.lineman"
+      "position_id": "slann.catcher"
     },
     {
       "nr": 10,

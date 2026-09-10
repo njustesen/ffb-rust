@@ -8,33 +8,33 @@
 	<rosterId>chaos_pact.bb2025</rosterId>
 	<reRolls>2</reRolls>
 	<fanFactor>0</fanFactor>
-	<dedicatedFans>3</dedicatedFans>
+	<dedicatedFans>1</dedicatedFans>
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1050000</currentTeamValue>
+	<currentTeamValue>1100000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>40000</treasury>
+	<treasury>0</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamChaosPactParity25Home1">
-		<name>Minotaur 1</name>
+		<name>Marauder 1</name>
 		<gender>male</gender>
-		<positionId>chaospact.minotaur</positionId>
+		<positionId>chaospact.marauder</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamChaosPactParity25Home2">
-		<name>Chaos Ogre 2</name>
+		<name>Goblin Renegade 2</name>
 		<gender>male</gender>
-		<positionId>chaospact.ogre.chaos</positionId>
+		<positionId>chaospact.goblin.renegade</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamChaosPactParity25Home3">
-		<name>Chaos Troll 3</name>
+		<name>Skaven Renegade 3</name>
 		<gender>male</gender>
-		<positionId>chaospact.troll.chaos</positionId>
+		<positionId>chaospact.skaven.renegade</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -46,23 +46,23 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamChaosPactParity25Home5">
-		<name>Marauder 5</name>
+		<name>Chaos Troll 5</name>
 		<gender>male</gender>
-		<positionId>chaospact.marauder</positionId>
+		<positionId>chaospact.troll.chaos</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="6" id="teamChaosPactParity25Home6">
-		<name>Marauder 6</name>
+		<name>Chaos Ogre 6</name>
 		<gender>male</gender>
-		<positionId>chaospact.marauder</positionId>
+		<positionId>chaospact.ogre.chaos</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamChaosPactParity25Home7">
-		<name>Marauder 7</name>
+		<name>Minotaur 7</name>
 		<gender>male</gender>
-		<positionId>chaospact.marauder</positionId>
+		<positionId>chaospact.minotaur</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -88,16 +88,23 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="11" id="teamChaosPactParity25Home11">
-		<name>Skaven Renegade 11</name>
+		<name>Marauder 11</name>
 		<gender>male</gender>
-		<positionId>chaospact.skaven.renegade</positionId>
+		<positionId>chaospact.marauder</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="12" id="teamChaosPactParity25Home12">
-		<name>Goblin Renegade 12</name>
+		<name>Marauder 12</name>
 		<gender>male</gender>
-		<positionId>chaospact.goblin.renegade</positionId>
+		<positionId>chaospact.marauder</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamChaosPactParity25Home13">
+		<name>Marauder 13</name>
+		<gender>male</gender>
+		<positionId>chaospact.marauder</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

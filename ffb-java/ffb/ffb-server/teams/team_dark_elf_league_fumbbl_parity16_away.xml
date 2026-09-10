@@ -6,10 +6,10 @@
 	<name>Dark Elf Parity16 Away</name>
 	<race>Dark Elf</race>
 	<rosterId>dark_elf_league_fumbbl.bb2016</rosterId>
-	<reRolls>2</reRolls>
+	<reRolls>3</reRolls>
 	<fanFactor>0</fanFactor>
 	<dedicatedFans>0</dedicatedFans>
-	<apothecaries>0</apothecaries>
+	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
 	<currentTeamValue>1095000</currentTeamValue>
@@ -18,37 +18,37 @@
 	<specialRules/>
 
 	<player nr="1" id="teamDarkElfLeagueFumbblParity16Away1">
-		<name>Witch Elf 1</name>
+		<name>Blitzer 1</name>
 		<gender>male</gender>
-		<positionId>37738</positionId>
+		<positionId>37736</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamDarkElfLeagueFumbblParity16Away2">
-		<name>Witch Elf 2</name>
+		<name>Dark Elf Lineman 2</name>
 		<gender>male</gender>
-		<positionId>37738</positionId>
+		<positionId>37734</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamDarkElfLeagueFumbblParity16Away3">
-		<name>Blitzer 3</name>
+		<name>Assassin 3</name>
 		<gender>male</gender>
-		<positionId>37736</positionId>
+		<positionId>37737</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="4" id="teamDarkElfLeagueFumbblParity16Away4">
-		<name>Blitzer 4</name>
+		<name>Runner 4</name>
 		<gender>male</gender>
-		<positionId>37736</positionId>
+		<positionId>37735</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamDarkElfLeagueFumbblParity16Away5">
-		<name>Blitzer 5</name>
+		<name>Witch Elf 5</name>
 		<gender>male</gender>
-		<positionId>37736</positionId>
+		<positionId>37738</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -60,16 +60,16 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamDarkElfLeagueFumbblParity16Away7">
-		<name>Assassin 7</name>
+		<name>Dark Elf Lineman 7</name>
 		<gender>male</gender>
-		<positionId>37737</positionId>
+		<positionId>37734</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamDarkElfLeagueFumbblParity16Away8">
-		<name>Runner 8</name>
+		<name>Dark Elf Lineman 8</name>
 		<gender>male</gender>
-		<positionId>37735</positionId>
+		<positionId>37734</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

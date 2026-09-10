@@ -5,15 +5,17 @@
   "rerolls": 2,
   "reroll_cost": 50000,
   "apothecaries": 1,
+  "assistant_coaches": 1,
+  "cheerleaders": 0,
   "dedicated_fans": 3,
   "fan_factor": 0,
-  "treasury": 15000,
-  "spent": 1085000,
-  "team_value": 1075000,
+  "treasury": 5000,
+  "spent": 1095000,
+  "team_value": 1085000,
   "players": [
     {
       "nr": 1,
-      "position_id": "chaos.ogre"
+      "position_id": "chaos.beastman"
     },
     {
       "nr": 2,
@@ -21,11 +23,11 @@
     },
     {
       "nr": 3,
-      "position_id": "chaos.warrior"
+      "position_id": "chaos.ogre"
     },
     {
       "nr": 4,
-      "position_id": "chaos.warrior"
+      "position_id": "chaos.beastman"
     },
     {
       "nr": 5,
@@ -37,7 +39,7 @@
     },
     {
       "nr": 7,
-      "position_id": "chaos.beastman"
+      "position_id": "chaos.warrior"
     },
     {
       "nr": 8,
@@ -45,7 +47,7 @@
     },
     {
       "nr": 9,
-      "position_id": "chaos.beastman"
+      "position_id": "chaos.warrior"
     },
     {
       "nr": 10,

@@ -18,16 +18,16 @@
 	<specialRules/>
 
 	<player nr="1" id="teamKhemriFumbblParity16Home1">
-		<name>Tomb Guardian 1</name>
+		<name>Anointed Thrower 1</name>
 		<gender>male</gender>
-		<positionId>2895</positionId>
+		<positionId>2893</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamKhemriFumbblParity16Home2">
-		<name>Tomb Guardian 2</name>
+		<name>Skeleton Lineman 2</name>
 		<gender>male</gender>
-		<positionId>2895</positionId>
+		<positionId>2892</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -39,37 +39,37 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="4" id="teamKhemriFumbblParity16Home4">
-		<name>Tomb Guardian 4</name>
+		<name>Anointed Blitzer 4</name>
+		<gender>male</gender>
+		<positionId>2894</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamKhemriFumbblParity16Home5">
+		<name>Anointed Thrower 5</name>
+		<gender>male</gender>
+		<positionId>2893</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamKhemriFumbblParity16Home6">
+		<name>Skeleton Lineman 6</name>
+		<gender>male</gender>
+		<positionId>2892</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamKhemriFumbblParity16Home7">
+		<name>Tomb Guardian 7</name>
 		<gender>male</gender>
 		<positionId>2895</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="5" id="teamKhemriFumbblParity16Home5">
-		<name>Anointed Blitzer 5</name>
-		<gender>male</gender>
-		<positionId>2894</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="6" id="teamKhemriFumbblParity16Home6">
-		<name>Anointed Blitzer 6</name>
-		<gender>male</gender>
-		<positionId>2894</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="7" id="teamKhemriFumbblParity16Home7">
-		<name>Anointed Thrower 7</name>
-		<gender>male</gender>
-		<positionId>2893</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
 	<player nr="8" id="teamKhemriFumbblParity16Home8">
-		<name>Anointed Thrower 8</name>
+		<name>Anointed Blitzer 8</name>
 		<gender>male</gender>
-		<positionId>2893</positionId>
+		<positionId>2894</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -81,9 +81,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="10" id="teamKhemriFumbblParity16Home10">
-		<name>Skeleton Lineman 10</name>
+		<name>Tomb Guardian 10</name>
 		<gender>male</gender>
-		<positionId>2892</positionId>
+		<positionId>2895</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -95,9 +95,9 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="12" id="teamKhemriFumbblParity16Home12">
-		<name>Skeleton Lineman 12</name>
+		<name>Tomb Guardian 12</name>
 		<gender>male</gender>
-		<positionId>2892</positionId>
+		<positionId>2895</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

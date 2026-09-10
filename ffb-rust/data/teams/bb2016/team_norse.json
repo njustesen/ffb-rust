@@ -4,24 +4,26 @@
   "roster_id": "norse.lrb6",
   "rerolls": 2,
   "reroll_cost": 60000,
-  "apothecaries": 0,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
   "dedicated_fans": 0,
-  "fan_factor": 2,
+  "fan_factor": 0,
   "treasury": 0,
   "spent": 1100000,
   "team_value": 1100000,
   "players": [
     {
       "nr": 1,
-      "position_id": "norse.troll.snow"
+      "position_id": "norse.lineman"
     },
     {
       "nr": 2,
-      "position_id": "norse.ulfwerener"
+      "position_id": "norse.thrower"
     },
     {
       "nr": 3,
-      "position_id": "norse.ulfwerener"
+      "position_id": "norse.runner"
     },
     {
       "nr": 4,
@@ -29,15 +31,15 @@
     },
     {
       "nr": 5,
-      "position_id": "norse.berserker"
+      "position_id": "norse.ulfwerener"
     },
     {
       "nr": 6,
-      "position_id": "norse.runner"
+      "position_id": "norse.troll.snow"
     },
     {
       "nr": 7,
-      "position_id": "norse.runner"
+      "position_id": "norse.lineman"
     },
     {
       "nr": 8,
@@ -45,7 +47,7 @@
     },
     {
       "nr": 9,
-      "position_id": "norse.thrower"
+      "position_id": "norse.ulfwerener"
     },
     {
       "nr": 10,
@@ -53,6 +55,10 @@
     },
     {
       "nr": 11,
+      "position_id": "norse.lineman"
+    },
+    {
+      "nr": 12,
       "position_id": "norse.lineman"
     }
   ],

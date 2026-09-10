@@ -11,32 +11,32 @@
 	<dedicatedFans>3</dedicatedFans>
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
-	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1080000</currentTeamValue>
+	<assistantCoaches>1</assistantCoaches>
+	<currentTeamValue>1090000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>10000</treasury>
+	<treasury>0</treasury>
 	<specialRules>
 		<rule>Favoured of Khorne</rule>
 	</specialRules>
 
 	<player nr="1" id="teamNorseParity25Home1">
-		<name>Yhetee 1</name>
+		<name>Norse Raider 1</name>
 		<gender>male</gender>
-		<positionId>norse.troll.snow</positionId>
+		<positionId>norse.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamNorseParity25Home2">
-		<name>Ulfwerener 2</name>
+		<name>Beer Boar 2</name>
 		<gender>male</gender>
-		<positionId>norse.ulfwerener</positionId>
+		<positionId>norse.beer_boar</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamNorseParity25Home3">
-		<name>Ulfwerener 3</name>
+		<name>Norse Berserker 3</name>
 		<gender>male</gender>
-		<positionId>norse.ulfwerener</positionId>
+		<positionId>norse.berserker</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -48,58 +48,58 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamNorseParity25Home5">
-		<name>Valkyrie 5</name>
+		<name>Ulfwerener 5</name>
+		<gender>male</gender>
+		<positionId>norse.ulfwerener</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamNorseParity25Home6">
+		<name>Yhetee 6</name>
+		<gender>male</gender>
+		<positionId>norse.troll.snow</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamNorseParity25Home7">
+		<name>Norse Raider 7</name>
+		<gender>male</gender>
+		<positionId>norse.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamNorseParity25Home8">
+		<name>Beer Boar 8</name>
+		<gender>male</gender>
+		<positionId>norse.beer_boar</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamNorseParity25Home9">
+		<name>Norse Berserker 9</name>
+		<gender>male</gender>
+		<positionId>norse.berserker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamNorseParity25Home10">
+		<name>Valkyrie 10</name>
 		<gender>male</gender>
 		<positionId>norse.thrower</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="6" id="teamNorseParity25Home6">
-		<name>Norse Berserker 6</name>
-		<gender>male</gender>
-		<positionId>norse.berserker</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="7" id="teamNorseParity25Home7">
-		<name>Norse Berserker 7</name>
-		<gender>male</gender>
-		<positionId>norse.berserker</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="8" id="teamNorseParity25Home8">
-		<name>Norse Raider 8</name>
-		<gender>male</gender>
-		<positionId>norse.lineman</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="9" id="teamNorseParity25Home9">
-		<name>Norse Raider 9</name>
-		<gender>male</gender>
-		<positionId>norse.lineman</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="10" id="teamNorseParity25Home10">
-		<name>Norse Raider 10</name>
-		<gender>male</gender>
-		<positionId>norse.lineman</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
 	<player nr="11" id="teamNorseParity25Home11">
-		<name>Beer Boar 11</name>
+		<name>Ulfwerener 11</name>
 		<gender>male</gender>
-		<positionId>norse.beer_boar</positionId>
+		<positionId>norse.ulfwerener</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="12" id="teamNorseParity25Home12">
-		<name>Beer Boar 12</name>
+		<name>Norse Raider 12</name>
 		<gender>male</gender>
-		<positionId>norse.beer_boar</positionId>
+		<positionId>norse.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

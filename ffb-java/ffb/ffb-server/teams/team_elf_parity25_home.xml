@@ -6,28 +6,28 @@
 	<name>Elf Parity25 Home</name>
 	<race>Elf</race>
 	<rosterId>elf.bb2025</rosterId>
-	<reRolls>2</reRolls>
+	<reRolls>3</reRolls>
 	<fanFactor>0</fanFactor>
-	<dedicatedFans>3</dedicatedFans>
-	<apothecaries>0</apothecaries>
+	<dedicatedFans>2</dedicatedFans>
+	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>0</assistantCoaches>
-	<currentTeamValue>1070000</currentTeamValue>
+	<currentTeamValue>1095000</currentTeamValue>
 	<division>[X]</division>
-	<treasury>20000</treasury>
+	<treasury>0</treasury>
 	<specialRules/>
 
 	<player nr="1" id="teamElfParity25Home1">
-		<name>Elf Blitzer 1</name>
+		<name>Elf Lineman 1</name>
 		<gender>male</gender>
-		<positionId>elf.blitzer</positionId>
+		<positionId>elf.lineman</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="2" id="teamElfParity25Home2">
-		<name>Elf Blitzer 2</name>
+		<name>Elf Thrower 2</name>
 		<gender>male</gender>
-		<positionId>elf.blitzer</positionId>
+		<positionId>elf.thrower</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -39,30 +39,30 @@
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="4" id="teamElfParity25Home4">
-		<name>Elf Catcher 4</name>
+		<name>Elf Blitzer 4</name>
+		<gender>male</gender>
+		<positionId>elf.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamElfParity25Home5">
+		<name>Elf Lineman 5</name>
+		<gender>male</gender>
+		<positionId>elf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamElfParity25Home6">
+		<name>Elf Catcher 6</name>
 		<gender>male</gender>
 		<positionId>elf.catcher</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
-	<player nr="5" id="teamElfParity25Home5">
-		<name>Elf Thrower 5</name>
-		<gender>male</gender>
-		<positionId>elf.thrower</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="6" id="teamElfParity25Home6">
-		<name>Elf Thrower 6</name>
-		<gender>male</gender>
-		<positionId>elf.thrower</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
 	<player nr="7" id="teamElfParity25Home7">
-		<name>Elf Lineman 7</name>
+		<name>Elf Blitzer 7</name>
 		<gender>male</gender>
-		<positionId>elf.lineman</positionId>
+		<positionId>elf.blitzer</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -89,13 +89,6 @@
 	</player>
 	<player nr="11" id="teamElfParity25Home11">
 		<name>Elf Lineman 11</name>
-		<gender>male</gender>
-		<positionId>elf.lineman</positionId>
-		<skillList/>
-		<playerStatistics currentSpps="0"/>
-	</player>
-	<player nr="12" id="teamElfParity25Home12">
-		<name>Elf Lineman 12</name>
 		<gender>male</gender>
 		<positionId>elf.lineman</positionId>
 		<skillList/>
