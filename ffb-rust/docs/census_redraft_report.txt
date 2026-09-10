@@ -1,0 +1,215 @@
+# Sweep 2026-09-10 — event-level coverage analysis
+
+gates=330  games=33000  events=27183290
+
+
+## Gates failing the harness required-item checklist: 30/330
+
+  amazon bb2020 @1e6                 action HandOver
+  amazon bb2025 @1e6                 action HandOver
+  chaos bb2020 @1.0                  action HandOver
+  chaos_pact bb2020 @1e6             action HandOver
+  chaos_pact bb2025 @1e6             action HandOver
+  dark_elf bb2016 @1.0               action HandOver
+  dwarf bb2020 @1e6                  action HandOver
+  goblin bb2016 @1.0                 action HandOver
+  halfling bb2025 @1e6               action HandOver
+  human bb2020 @1e6                  action HandOver
+  khemri_fumbbl bb2020 @0            action Pass, pass rolls
+  khemri_fumbbl bb2025 @0            action Pass, pass rolls
+  khorne bb2020 @1.0                 action HandOver
+  necromantic bb2016 @1e6            action HandOver
+  necromantic bb2020 @1e6            action HandOver
+  necromantic bb2025 @1e6            action HandOver
+  nurgle bb2016 @1e6                 action HandOver
+  nurgle bb2025 @0                   action Pass
+  ogre bb2025 @1e6                   action HandOver
+  orc bb2020 @1e6                    action HandOver
+  orc bb2025 @1.0                    action HandOver
+  renegades bb2016 @1e6              action HandOver
+  renegades bb2025 @1e6              action HandOver
+  slann_fumbbl bb2020 @0             action Pass, pass rolls
+  slann_fumbbl bb2025 @0             action Pass, pass rolls
+  snotling bb2020 @0                 action Pass
+  underworld bb2016 @1e6             action HandOver
+  underworld bb2020 @1e6             action HandOver
+  underworld_37844 bb2025 @1e6       action HandOver
+  wood_elf bb2016 @1e6               throw-ins
+
+missing-item frequency: {'action HandOver': 23, 'action Pass': 6, 'pass rolls': 4, 'throw-ins': 1}
+
+
+## Checklist items that are zero in at least one gate (of 333)
+
+  interceptions              330 gates
+  crowd surfs                321 gates
+  pass deviates              239 gates
+  GFI rolls                   87 gates
+  block 3 dice                42 gates
+  action HandOver             23 gates
+  argue success               20 gates
+  touchdowns                   6 gates
+  action Pass                  6 gates
+  pass rolls                   4 gates
+  throw-ins                    1 gates
+
+## Per-cell headline counts (summed over the 3 sampling scales, 300 games)
+
+cell                               events  blocks     inj     cas      TD  passes handovr  fouls  kicks
+amazon bb2016                      102288    6415    5716     403     242     340     340    607    814
+amazon bb2020                      308344    5713    5528     372     229     347     326    431    799
+amazon bb2025                      307395    5822    5628     402     232     331     319    417    805
+black_orc bb2020                   284508    4930    6469     419     189     232     230    405    765
+black_orc bb2025                   283723    4884    6463     447     194     249     237    430    767
+bretonnian bb2025                  325704    6397    6512     317     268     403     418    556    840
+chaos bb2016                       107562    6178    7581     388     171     322     312    503    753
+chaos bb2020                       298729    6271    7711     356     168     288     298    440    752
+chaos bb2025                       302611    6263    7612     380     185     294     315    442    761
+chaos_chaosogre bb2020             301956    5515    7109     314     172     304     306    448    758
+chaos_chaostroll bb2020            300443    5304    6900     285     173     278     303    436    755
+chaos_dwarf bb2016                 103892    5814    6903     354     149     277     259    539    739
+chaos_dwarf bb2020                 299874    5841    6802     355     174     229     248    502    761
+chaos_dwarf bb2025                 297518    5729    6789     353     186     249     232    536    767
+chaos_ogre bb2025                  303449    5565    7121     327     179     296     293    436    754
+chaos_pact bb2016                  110424    5573    6668     442     186     258     248    445    771
+chaos_pact bb2020                  273611    5611    7728     515     176     218     204    373    761
+chaos_pact bb2025                  291416    5371    6562     624     198     269     280    427    784
+chaos_troll bb2025                 306843    5285    6719     310     186     334     345    450    768
+dark_elf bb2016                    101975    6198    6674     415     323     369     311    570    866
+dark_elf bb2020                    328474    6404    6711     335     334     357     386    502    900
+dark_elf bb2025                    331956    6170    6835     398     340     368     387    491    900
+dark_elf_league_fumbbl bb2016       99553    6563    7309     279     176     248     267    563    759
+dark_elf_league_fumbbl bb2020      327859    6329    6631     365     349     433     417    559    885
+dark_elf_league_fumbbl bb2025      328381    6371    6661     377     345     422     429    544    889
+dwarf bb2016                        95607    5690    6051     227     145     231     243    464    740
+dwarf bb2020                       265261    5616    6248     230     174     193     169    482    765
+dwarf bb2025                       268766    6061    6647     230     190     218     208    488    765
+elf bb2016                         100446    6164    6991     495     392     413     385    626    940
+elf bb2020                         327170    6040    6914     463     353     369     432    543    914
+elf bb2025                         327868    6084    6718     445     353     389     451    517    910
+gnome bb2020                       283876    5263    5916     895     305     258     348    442    846
+gnome bb2025                       282260    5285    5877     908     255     223     316    488    811
+goblin bb2016                      108831    4355    7107     846     199    1569     232    368    775
+goblin bb2020                      277287    5297    7659     961     198    1714     223    338    774
+goblin bb2025                      264845    5059    7573     999     195    1523     248    310    776
+halfling bb2016                    100707    4581    6330     720     186     280     251    585    769
+halfling bb2020                    266948    4601    6078     845     188     284     251    374    771
+halfling bb2025                    268429    4721    6122     848     177     288     241    351    758
+high_elf bb2016                    101929    6326    6873     375     332     403     353    557    887
+high_elf bb2020                    326299    6163    6956     363     324     409     433    546    879
+high_elf bb2025                    333919    6544    6651     304     376     408     473    523    928
+human bb2016                       107242    6818    7100     396     280     350     390    592    842
+human bb2020                       322800    6379    6773     410     301     348     431    504    867
+human bb2025                       317656    6521    6907     510     263     367     387    544    832
+imperial_nobility bb2020           304993    5904    6633     369     224     294     351    517    791
+imperial_nobility bb2025           302094    6202    6769     348     213     342     388    498    785
+khemri bb2016                       96010    5642    6874     362     151     222     222    546    739
+khemri bb2020                      284217    5567    7092     368     168     211     170    516    755
+khemri bb2025                      285947    5844    6961     367     162     249     209    537    748
+khemri_fumbbl bb2016                96878    5668    7140     423     164     226     234    527    746
+khemri_fumbbl bb2020               302720    5269    6352     478     244     309     378    527    807
+khemri_fumbbl bb2025               303403    5308    6344     483     250     297     393    515    804
+khorne bb2020                      287737    6819    8057     443     173     268     247    555    761
+khorne bb2025                      292142    6936    8078     453     198     254     265    530    776
+lizardman bb2016                   101872    6179    7010     462     165     217     249    489    753
+lizardman bb2020                   317298    6498    6615     482     238     218     283    472    817
+lizardman bb2025                   317022    6252    6322     538     243     268     251    435    817
+necromantic bb2016                  97386    6262    7360     365     186     278     310    596    768
+necromantic bb2020                 277434    5845    6721     345     179     180     241    506    756
+necromantic bb2025                 279728    5859    6713     332     162     227     241    475    748
+nippon bb2016                      103870    6951    7268     325     238     311     330    546    817
+nippon bb2020                      330782    6846    7032     408     319     335     333    546    886
+nippon bb2025                      332251    6823    6980     407     308     340     327    539    871
+norse bb2016                       107947    6906    6438     436     194     311     302    581    775
+norse bb2020                       300168    6888    6970     647     196     240     302    556    770
+norse bb2025                       302282    7037    7034     635     203     261     285    550    779
+nurgle bb2016                      101559    4716    6621     288     147     248     254    439    735
+nurgle bb2020                      279841    4925    6734     265     176     226     209    440    754
+nurgle bb2025                      284971    5292    6655     249     189     241     212    428    772
+ogre bb2016                        121214    4256    6827    1150     158     243     205    368    752
+ogre bb2020                        279030    4221    7366    1031     160     222     229    378    747
+ogre bb2025                        279525    4277    7425    1130     143     271     175    347    735
+old_world_alliance_ogre bb2020     291521    5949    7008     364     229     248     342    467    799
+old_world_alliance_ogre bb2025     297253    6090    6723     491     251     321     334    431    816
+old_world_alliance_treeman bb2020   290867    6024    7047     410     252     246     328    481    813
+old_world_alliance_treeman bb2025   289202    6086    6761     478     235     294     334    462    803
+orc bb2016                         104007    5273    6336     303     180     339     329    460    769
+orc bb2020                         293814    5944    6953     286     176     261     283    464    762
+orc bb2025                         294963    6127    6768     359     209     343     293    427    780
+renegades bb2016                   104504    5537    7110     333     203     275     255    453    778
+renegades bb2020                   289090    5564    7847     498     192     257     223    456    771
+renegades bb2025                   292511    5801    6849     418     198     264     266    437    778
+renegades_37730 bb2020             294773    5213    7698     486     202     259     275    517    776
+renegades_37733 bb2025             288700    5801    8147     496     209     226     220    404    789
+skaven bb2016                      110824    7430    7240     534     327     320     390    583    890
+skaven bb2020                      331734    6759    8201     671     355     280     367    510    914
+skaven bb2025                      326104    6713    8123     587     331     350     440    559    900
+slann bb2016                       103487    5917    7199     438     234     343     322    551    802
+slann bb2020                       307945    5808    6904     556     236     286     291    501    803
+slann bb2025                       307983    5869    7093     580     229     262     311    501    796
+slann_fumbbl bb2016                102910    5737    6987     432     252     323     328    486    819
+slann_fumbbl bb2020                309439    5714    6893     546     232     205     287    517    801
+slann_fumbbl bb2025                307473    5973    7099     628     269     228     325    455    827
+snotling bb2020                    264758    3981    7166    1308     203    2617     230    355    777
+snotling bb2025                    243551    3908    7667    1355     164    3380     204    316    751
+undead bb2016                       95922    5555    6317     472     183     276     294    501    765
+undead bb2020                      285721    5715    6845     411     221     247     274    505    794
+undead bb2025                      281848    5742    6974     408     204     266     257    475    778
+underworld bb2016                  108020    6327    7204     604     267     335     322    524    837
+underworld bb2020                  318208    6678    7790     959     307     301     337    434    866
+underworld bb2025                  321587    6747    7043     802     291     288     308    462    868
+underworld_37844 bb2025            318334    6628    7584     854     302     289     340    455    867
+underworld_underworldtroll bb2020   314658    6445    6837     764     290     334     337    470    852
+vampire bb2016                      82652    4167    5118     342     124     263     211    342    711
+vampire bb2020                     258019    5044    5540     343     180     288     263    374    762
+vampire bb2025                     257248    5028    5629     359     186     259     282    397    768
+wood_elf bb2016                    103684    6346    6588     454     401     419     400    596    956
+wood_elf bb2020                    319739    6137    6504     414     378     377     422    467    928
+wood_elf bb2025                    323282    6294    6543     427     400     384     423    469    949
+
+## Re-roll usage — GameEvent::ReRoll has NO producer; these are per-roll `rerolled` flags
+
+  goForItRoll                 848148 rolls     43336 rerolled (5.11%)
+  blockRoll                   641347 rolls     90062 rerolled (14.04%)
+  confusionRoll               407964 rolls         0 rerolled (0.00%)
+  dodgeRoll                   296931 rolls     44946 rerolled (15.14%)
+  pickupRoll                  125037 rolls     12185 rerolled (9.75%)
+  catchRoll                    87924 rolls      7384 rerolled (8.40%)
+  refereeSpotsFoul             52917 rolls         0 rerolled (0.00%)
+  bloodLustRoll                44052 rolls         0 rerolled (0.00%)
+  passRoll                     41514 rolls      2749 rerolled (6.62%)
+  animalSavagery               34329 rolls         0 rerolled (0.00%)
+  rightStuffRoll               12417 rolls         0 rerolled (0.00%)
+  argueTheCall                 11658 rolls         0 rerolled (0.00%)
+  foulAppearanceRoll            8117 rolls         0 rerolled (0.00%)
+  spellEffectRoll               8088 rolls         0 rerolled (0.00%)
+  alwaysHungry                  8059 rolls         0 rerolled (0.00%)
+  standUpRoll                   7707 rolls         0 rerolled (0.00%)
+  lonerRoll                     6030 rolls         0 rerolled (0.00%)
+  regenerationRoll              5118 rolls         0 rerolled (0.00%)
+  animosityRoll                 2712 rolls         0 rerolled (0.00%)
+  escapeRoll                    1378 rolls         0 rerolled (0.00%)
+  jumpRoll                       407 rolls         0 rerolled (0.00%)
+  throwAtStallingPlayer          365 rolls         0 rerolled (0.00%)
+  dauntlessRoll                  331 rolls         0 rerolled (0.00%)
+  trapDoor                       302 rolls         0 rerolled (0.00%)
+  chainsawRoll                    48 rolls         0 rerolled (0.00%)
+  safeThrowRoll                    2 rolls         0 rerolled (0.00%)
+
+## Weather results (from weatherChange)
+  all: {'Nice': 9654, 'Blizzard': 192, 'PouringRain': 792, 'SwelteringHeat': 534, 'VerySunny': 535}
+  bb2016: {'Nice': 2985, 'Blizzard': 63, 'PouringRain': 273, 'SwelteringHeat': 167, 'VerySunny': 223}
+  bb2020: {'Nice': 3270, 'SwelteringHeat': 179, 'PouringRain': 260, 'VerySunny': 148, 'Blizzard': 63}
+  bb2025: {'Nice': 3399, 'SwelteringHeat': 188, 'Blizzard': 66, 'PouringRain': 259, 'VerySunny': 164}
+
+## Prayers to Nuffle
+
+  bb2016: catalog=0  rolled=0  events=0
+  bb2020: catalog=16  rolled=16  events=4331
+    never rolled: none
+  bb2025: catalog=16  rolled=0  events=0
+    never rolled: ['TREACHEROUS_TRAPDOOR', 'FRIENDS_WITH_THE_REF', 'STILETTO', 'IRON_MAN', 'KNUCKLE_DUSTERS', 'BAD_HABITS', 'GREASY_CLEATS', 'BLESSING_OF_NUFFLE', 'MOLES_UNDER_THE_PITCH', 'PERFECT_PASSING', 'DAZZLING_CATCHING', 'FAN_INTERACTION', 'FOULING_FRENZY', 'THROW_A_ROCK', 'UNDER_SCRUTINY', 'INTENSIVE_TRAINING']
+
+## Positional coverage — did every drafted player ever take an action?
+
+  every drafted player number took at least one action in every cell

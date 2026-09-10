@@ -1,0 +1,59 @@
+RE-DRAFT MATRIX SWEEP 2026-09-10 - 330 gates, 110 cells x 3 scales
+parity: 311/330 games match, 19 FAILED, 0 without a verdict
+
+summed gate time 1425 min (23.74 h)
+
+PARITY RED - 19 gate(s):
+  dark_elf bb2025 @1.0                   PARITY: 99/100 passed, 1 FAILED.
+  gnome bb2025 @1.0                      PARITY: 99/100 passed, 1 FAILED.
+  goblin bb2016 @0                       PARITY: 98/100 passed, 2 FAILED.
+  goblin bb2016 @1.0                     PARITY: 98/100 passed, 2 FAILED.
+  goblin bb2016 @1e6                     PARITY: 99/100 passed, 1 FAILED.
+  goblin bb2020 @0                       PARITY: 98/100 passed, 2 FAILED.
+  goblin bb2020 @1.0                     PARITY: 98/100 passed, 2 FAILED.
+  goblin bb2020 @1e6                     PARITY: 98/100 passed, 2 FAILED.
+  goblin bb2025 @1.0                     PARITY: 99/100 passed, 1 FAILED.
+  high_elf bb2020 @1e6                   PARITY: 99/100 passed, 1 FAILED.
+  human bb2020 @0                        PARITY: 99/100 passed, 1 FAILED.
+  khemri bb2025 @1.0                     PARITY: 99/100 passed, 1 FAILED.
+  khorne bb2020 @0                       PARITY: 99/100 passed, 1 FAILED.
+  nurgle bb2020 @0                       PARITY: 99/100 passed, 1 FAILED.
+  old_world_alliance_treeman bb2020 @1e6 PARITY: 99/100 passed, 1 FAILED.
+  renegades bb2020 @1.0                  PARITY: 99/100 passed, 1 FAILED.
+  renegades_37733 bb2025 @1.0            PARITY: 99/100 passed, 1 FAILED.
+  renegades_37733 bb2025 @1e6            PARITY: 99/100 passed, 1 FAILED.
+  slann bb2020 @1e6                      PARITY: 99/100 passed, 1 FAILED.
+
+Separately, 29 gate(s) report the mechanic-coverage checklist unmet
+(parity still 100/100 on every one of them):
+
+  amazon bb2020 @1e6
+  amazon bb2025 @1e6
+  chaos bb2020 @1.0
+  chaos_pact bb2020 @1e6
+  chaos_pact bb2025 @1e6
+  dark_elf bb2016 @1.0
+  dwarf bb2020 @1e6
+  halfling bb2025 @1e6
+  human bb2020 @1e6
+  khemri_fumbbl bb2020 @0
+  khemri_fumbbl bb2025 @0
+  khorne bb2020 @1.0
+  necromantic bb2016 @1e6
+  necromantic bb2020 @1e6
+  necromantic bb2025 @1e6
+  nurgle bb2016 @1e6
+  nurgle bb2025 @0
+  ogre bb2025 @1e6
+  orc bb2020 @1e6
+  orc bb2025 @1.0
+  renegades bb2016 @1e6
+  renegades bb2025 @1e6
+  slann_fumbbl bb2020 @0
+  slann_fumbbl bb2025 @0
+  snotling bb2020 @0
+  underworld bb2016 @1e6
+  underworld bb2020 @1e6
+  underworld_37844 bb2025 @1e6
+  wood_elf bb2016 @1e6
+

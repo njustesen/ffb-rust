@@ -5739,3 +5739,92 @@ pipeline early is not worth a silently wrong coverage table.
 `out2/`, and `pass3.py` hardcodes the relative `out3/`, so they must be run with the CWD set to the
 census working directory and `PYTHONPATH` pointing at `scripts/sweep_census` so `from agg import
 gate_dirs` resolves. `pass3.py` ignores its argv.)
+
+## §H.20 — Two cells, one fingerprint: a Take Root Treeman leaves Rust's turn un-ended (2026-09-10)
+
+`gnome` bb2025 @1.0 seed 9 (i=144) and `old_world_alliance_treeman` bb2020 @1e6 seed 7 (i=69) fail
+with the **same signature**, which is why they are one item and not two:
+
+|  | gnome bb2025 | old_world_alliance_treeman bb2020 |
+|---|---|---|
+| Java header | `h2t55aaways0,0 ... f0000,0000` | `h2t22aaways0,0 ... f0000,0000` |
+| Rust header | `h2t54ahomes0,0 ... f0011,0000` | `h2t21ahomes0,0 ... f0011,0000` |
+| slots differing | 4 | 4 |
+| how they differ | ONLY the trailing ACTIVE bit — 1 in Java, 0 in Rust. Every coordinate and state identical. | same |
+
+So Rust is **one turn behind with the home team still active**, its players still flagged active, and
+the turn-flag field reads `f0011` where Java has cleared it to `f0000`. Java has ended the home turn
+and moved to the away team; Rust has not.
+
+Both squads field an **Altern Forest Treeman (2/6/5/11) with Take Root**, and in both it is the
+slot at index 9. `gnome` bb2025 fields two of them. That is the shared ingredient, and this campaign
+has been here before: the rooted flag is invisible to the state hash (base + coordinate only), so a
+rooted/unrooted divergence stays silent until something reads `is_pinned()` — see the halfling
+bb2016 seed 21 note in §H.16.2's neighbourhood and the "rooted Treeman landed on by a thrown
+team-mate stayed rooted forever" fix. Here it surfaces not as a dice difference but as a turn that
+never ends.
+
+Note what is NOT the trigger: `gnome` bb2025's Dedicated Fans did not change (3 before, 3 after).
+Its re-draft delta is one extra lineman (15 -> 16 players) and **2 assistant coaches**, which is a
+Brilliant Coaching lever rather than a fame one. So §H.19's bb2020 fans story does not explain this
+pair — the Treeman does.
+
+**Next measurement.** Dump the Treeman's rooted flag and the turn-data once-per-turn flags at the
+end of the home turn on both sides. The `f` field is the place to start: `f0011` vs `f0000` says
+Rust still believes two once-per-turn actions are spent, which is consistent with the turn never
+having been closed out. Then find what Java's end-of-turn path does for a rooted player that Rust's
+does not.
+
+### And a third, unrelated: `dark_elf` bb2025 @1.0 seed 28
+
+Java's trace stops at step 26 with `END_REASON: finished` while Rust runs to 167. Java's game ended
+NORMALLY after 26 steps — not the `max_iterations` spin of §H.19's khorne. A 26-step game is far too
+short to be a real match, so the question is what Java thinks finished it. Untriaged beyond that.
+
+### Event-name trap when reading coverage by hand
+
+There is **no `brilliantCoaching` event**. Grepping for one returns 0 on every gate and looks like a
+dead mechanic; it is not. The bb2025 kickoff step emits:
+
+| what happened | event |
+|---|---|
+| Cheering Fans result | `cheeringFans` |
+| the extra re-roll granted by Cheering Fans **or** Brilliant Coaching | `kickoffExtraReRoll` |
+| Pitch Invasion | `kickoffPitchInvasion`, plus `kickoffPitchInvasionStun` per stunned player |
+
+Measured on `imperial_nobility` bb2025 @1.0 (100 seeds): `kickoffExtraReRoll` 34 against
+`cheeringFans` 35 — both firing normally. Note the consequence for any coverage claim: in bb2025 the
+re-roll grant does NOT distinguish Brilliant Coaching from Cheering Fans, because both funnel into
+`kickoffExtraReRoll`, so "Brilliant Coaching fired N times" cannot be read off the event stream by
+name alone.
+
+Also confirmed live on this sweep, which is §H.14's done-criterion: `blockRoll` with
+`"rerolled":true` is 192 on `imperial_nobility` bb2025 @1.0 and 225 on `halfling` bb2025 @1.0, where
+the 2026-09-10 census measured **zero across all 660,522 blocks**. `lonerRoll` now has a producer and
+fires (3 on imperial_nobility, whose Ogre carries Loner; 0 on halfling, which fields none).
+
+### §H.20 corrected — the family is the turn boundary, not the Treeman
+
+`renegades_37733` bb2025 @1.0 seed 23 (i=66) has the same *kind* of divergence and **fields no
+Treeman at all**, so the Take Root attribution above is too strong. What the three share is a turn
+that closes on one side and not the other:
+
+| cell | Java | Rust |
+|---|---|---|
+| `gnome` bb2025 seed 9 | `h2t55aaways … f0000` | `h2t54ahomes … f0011` |
+| `old_world_alliance_treeman` bb2020 seed 7 | `h2t22aaways … f0000` | `h2t21ahomes … f0011` |
+| `renegades_37733` bb2025 seed 23 | `h1t66ahomes … f0010` | `h1t67aaways … f0000` |
+
+Note the third is the MIRROR of the first two — there Java is the side that has not moved on, and
+Java holds the set flag. So this is not "Rust fails to end its turn"; it is that the two engines
+close a turn at different moments, and either can be the one still in it. In every case the
+players' ACTIVE bits and the once-per-turn flag field are what disagree, with coordinates and
+states otherwise matching.
+
+The Treeman is therefore a plausible TRIGGER for two of the three (both field an Altern Forest
+Treeman with Take Root, at the same slot) but is not the shared cause. Treat the family as
+"turn-transition / ACTIVE-bit divergence" and start from the `f` flag field, which is the one thing
+that differs in all three.
+
+`renegades_37733` bb2025 @1e6 seed 16 is a different shape again: `h05` Stunned in Java vs Standing
+in Rust and `h06` Prone in Java vs Stunned in Rust — two knock-down states swapped, in a Blizzard.

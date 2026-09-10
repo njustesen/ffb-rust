@@ -98,7 +98,22 @@ if __name__ == '__main__':
                 'unresolved': miss,
             }
     Path('inventory.json').write_text(json.dumps(result, indent=1), encoding='utf-8')
+
+    # fielded.json: skill name -> the cells whose squad fields a player carrying it.
+    # skills.py and build_page.py both READ this and nothing in the pipeline used to WRITE it,
+    # so the skills half of the census could not be reproduced from the committed scripts --
+    # `skills.py` died on FileNotFoundError. It is derived here because this is the step that
+    # already resolves every squad's positions against the roster data.
+    fielded = {}
+    for cell, sq in result['squads'].items():
+        for skill in sq['skills']:
+            fielded.setdefault(skill, []).append(cell)
+    Path('fielded.json').write_text(
+        json.dumps({'fielded': {k: sorted(v) for k, v in sorted(fielded.items())}}, indent=1),
+        encoding='utf-8')
+
     print('skills in enum:', len(names))
+    print('skills fielded by at least one squad:', len(fielded))
     print('squads:', len(result['squads']))
     bad = {k: v['unresolved'] for k, v in result['squads'].items() if v['unresolved']}
     print('squads with unresolved positions/stars:', len(bad))

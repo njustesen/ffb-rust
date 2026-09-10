@@ -1,0 +1,274 @@
+{
+ "gates": 330,
+ "cells": 110,
+ "green": 311,
+ "failed": 19,
+ "noverdict": 0,
+ "short": 29,
+ "summed_minutes": 1424.6,
+ "expected": 330,
+ "complete": true,
+ "red": [
+  {
+   "cell": "dark_elf",
+   "edition": "bb2025",
+   "scale": "1.0",
+   "verdict": "PARITY: 99/100 passed, 1 FAILED."
+  },
+  {
+   "cell": "gnome",
+   "edition": "bb2025",
+   "scale": "1.0",
+   "verdict": "PARITY: 99/100 passed, 1 FAILED."
+  },
+  {
+   "cell": "goblin",
+   "edition": "bb2016",
+   "scale": "0",
+   "verdict": "PARITY: 98/100 passed, 2 FAILED."
+  },
+  {
+   "cell": "goblin",
+   "edition": "bb2016",
+   "scale": "1.0",
+   "verdict": "PARITY: 98/100 passed, 2 FAILED."
+  },
+  {
+   "cell": "goblin",
+   "edition": "bb2016",
+   "scale": "1e6",
+   "verdict": "PARITY: 99/100 passed, 1 FAILED."
+  },
+  {
+   "cell": "goblin",
+   "edition": "bb2020",
+   "scale": "0",
+   "verdict": "PARITY: 98/100 passed, 2 FAILED."
+  },
+  {
+   "cell": "goblin",
+   "edition": "bb2020",
+   "scale": "1.0",
+   "verdict": "PARITY: 98/100 passed, 2 FAILED."
+  },
+  {
+   "cell": "goblin",
+   "edition": "bb2020",
+   "scale": "1e6",
+   "verdict": "PARITY: 98/100 passed, 2 FAILED."
+  },
+  {
+   "cell": "goblin",
+   "edition": "bb2025",
+   "scale": "1.0",
+   "verdict": "PARITY: 99/100 passed, 1 FAILED."
+  },
+  {
+   "cell": "high_elf",
+   "edition": "bb2020",
+   "scale": "1e6",
+   "verdict": "PARITY: 99/100 passed, 1 FAILED."
+  },
+  {
+   "cell": "human",
+   "edition": "bb2020",
+   "scale": "0",
+   "verdict": "PARITY: 99/100 passed, 1 FAILED."
+  },
+  {
+   "cell": "khemri",
+   "edition": "bb2025",
+   "scale": "1.0",
+   "verdict": "PARITY: 99/100 passed, 1 FAILED."
+  },
+  {
+   "cell": "khorne",
+   "edition": "bb2020",
+   "scale": "0",
+   "verdict": "PARITY: 99/100 passed, 1 FAILED."
+  },
+  {
+   "cell": "nurgle",
+   "edition": "bb2020",
+   "scale": "0",
+   "verdict": "PARITY: 99/100 passed, 1 FAILED."
+  },
+  {
+   "cell": "old_world_alliance_treeman",
+   "edition": "bb2020",
+   "scale": "1e6",
+   "verdict": "PARITY: 99/100 passed, 1 FAILED."
+  },
+  {
+   "cell": "renegades",
+   "edition": "bb2020",
+   "scale": "1.0",
+   "verdict": "PARITY: 99/100 passed, 1 FAILED."
+  },
+  {
+   "cell": "renegades_37733",
+   "edition": "bb2025",
+   "scale": "1.0",
+   "verdict": "PARITY: 99/100 passed, 1 FAILED."
+  },
+  {
+   "cell": "renegades_37733",
+   "edition": "bb2025",
+   "scale": "1e6",
+   "verdict": "PARITY: 99/100 passed, 1 FAILED."
+  },
+  {
+   "cell": "slann",
+   "edition": "bb2020",
+   "scale": "1e6",
+   "verdict": "PARITY: 99/100 passed, 1 FAILED."
+  }
+ ],
+ "short_gates": [
+  {
+   "cell": "amazon",
+   "edition": "bb2020",
+   "scale": "1e6"
+  },
+  {
+   "cell": "amazon",
+   "edition": "bb2025",
+   "scale": "1e6"
+  },
+  {
+   "cell": "chaos",
+   "edition": "bb2020",
+   "scale": "1.0"
+  },
+  {
+   "cell": "chaos_pact",
+   "edition": "bb2020",
+   "scale": "1e6"
+  },
+  {
+   "cell": "chaos_pact",
+   "edition": "bb2025",
+   "scale": "1e6"
+  },
+  {
+   "cell": "dark_elf",
+   "edition": "bb2016",
+   "scale": "1.0"
+  },
+  {
+   "cell": "dwarf",
+   "edition": "bb2020",
+   "scale": "1e6"
+  },
+  {
+   "cell": "halfling",
+   "edition": "bb2025",
+   "scale": "1e6"
+  },
+  {
+   "cell": "human",
+   "edition": "bb2020",
+   "scale": "1e6"
+  },
+  {
+   "cell": "khemri_fumbbl",
+   "edition": "bb2020",
+   "scale": "0"
+  },
+  {
+   "cell": "khemri_fumbbl",
+   "edition": "bb2025",
+   "scale": "0"
+  },
+  {
+   "cell": "khorne",
+   "edition": "bb2020",
+   "scale": "1.0"
+  },
+  {
+   "cell": "necromantic",
+   "edition": "bb2016",
+   "scale": "1e6"
+  },
+  {
+   "cell": "necromantic",
+   "edition": "bb2020",
+   "scale": "1e6"
+  },
+  {
+   "cell": "necromantic",
+   "edition": "bb2025",
+   "scale": "1e6"
+  },
+  {
+   "cell": "nurgle",
+   "edition": "bb2016",
+   "scale": "1e6"
+  },
+  {
+   "cell": "nurgle",
+   "edition": "bb2025",
+   "scale": "0"
+  },
+  {
+   "cell": "ogre",
+   "edition": "bb2025",
+   "scale": "1e6"
+  },
+  {
+   "cell": "orc",
+   "edition": "bb2020",
+   "scale": "1e6"
+  },
+  {
+   "cell": "orc",
+   "edition": "bb2025",
+   "scale": "1.0"
+  },
+  {
+   "cell": "renegades",
+   "edition": "bb2016",
+   "scale": "1e6"
+  },
+  {
+   "cell": "renegades",
+   "edition": "bb2025",
+   "scale": "1e6"
+  },
+  {
+   "cell": "slann_fumbbl",
+   "edition": "bb2020",
+   "scale": "0"
+  },
+  {
+   "cell": "slann_fumbbl",
+   "edition": "bb2025",
+   "scale": "0"
+  },
+  {
+   "cell": "snotling",
+   "edition": "bb2020",
+   "scale": "0"
+  },
+  {
+   "cell": "underworld",
+   "edition": "bb2016",
+   "scale": "1e6"
+  },
+  {
+   "cell": "underworld",
+   "edition": "bb2020",
+   "scale": "1e6"
+  },
+  {
+   "cell": "underworld_37844",
+   "edition": "bb2025",
+   "scale": "1e6"
+  },
+  {
+   "cell": "wood_elf",
+   "edition": "bb2016",
+   "scale": "1e6"
+  }
+ ]
+}
