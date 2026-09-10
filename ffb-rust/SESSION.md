@@ -1,6 +1,15 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-21, parity follow-ups: reroll sources + remaining gaps closed)
+## Current Status (2026-09-10) — 🏁 FULL HEURISTIC PARITY MATRIX GREEN
+
+**333/333 gates** (111 roster×ruleset cells × scales 1.0/0/1e6), 33,300 games, 0 failures, 0 panics.
+Tag `parity-matrix-green-2026-09-10`, commit `4e999414b`. Read
+**docs/MILESTONE_FULL_PARITY.md** first, then docs/BACKLOG.md §§H.1–H.12.
+
+Open: 26 of the 333 gates fail the SEPARATE mechanic-coverage checklist (they exit 1 while parity
+passes) — sampled `lizardman bb2025 @1.0` is missing `action HandOver`. Triage in §H.12.
+
+## Previous Status (2026-07-21, parity follow-ups: reroll sources + remaining gaps closed)
 
 **Executed the test-parity follow-up plan** (docs/TEST_PARITY.md "Follow-up session" section has
 the full spec). `cargo test --workspace` **16,294 passed / 0 failed / 1 documented PARITY ignore**

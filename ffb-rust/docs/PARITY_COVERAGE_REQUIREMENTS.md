@@ -1,5 +1,15 @@
 # Parity coverage — requirements and the honest matrix
 
+> ## 🏁 2026-09-10 — FULL MATRIX GREEN: 333/333 gates
+> 111 cells × 3 scales, **all `PARITY: 100/100 games match`**, 0 failures, 0 panics, 33,300 games
+> compared on one build with no `--reuse-java`. See **[MILESTONE_FULL_PARITY.md](MILESTONE_FULL_PARITY.md)**
+> (tag `parity-matrix-green-2026-09-10`) and per-gate verdicts in
+> [SWEEP_2026-09-10.txt](SWEEP_2026-09-10.txt).
+>
+> **Caveat, and it matters:** 26 of those gates additionally report the mechanic-coverage checklist
+> unmet and **exit 1**. Parity is green everywhere; coverage is not. The tables below use the
+> parity clause only — that is what 🟢 means here. BACKLOG §H.12 has the triage.
+
 Written 2026-09-07 after the alphabetical heuristic sweep was reported "30/30 complete" and that
 claim was found to be **scoped to the repo's drafted teams rather than to the game**. This document
 is the source of truth for what coverage means and what is actually covered.
