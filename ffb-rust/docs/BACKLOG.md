@@ -5096,3 +5096,32 @@ at the property term. Probe the predicate, do not audit its inputs one at a time
 `FFB_CANDSUM` (RSUM/JSUM) is the right first instrument for an "n differs by one" activation split:
 it prints the per-player, per-declaration candidate counts, so the extra entry is named rather than
 inferred. `FFB_DEC`/`RPICKED` localises to the decision; `FFB_CANDSUM` identifies the player.
+
+## §H.12 — FULL MATRIX SWEEP 2026-09-10: 333/333 parity green
+
+Re-ran every cell on one build after §H.10 (imperial_nobility / Pro) and §H.11 (necromantic /
+Regeneration): **111 cells × 3 scales = 333 gates, all `PARITY: 100/100 games match`**. Zero
+failures, zero Rust panics, zero missing verdicts. 4 workers pinned to 8 of 16 cores, ~35 min wall.
+Per-gate verdicts in `docs/SWEEP_2026-09-10.txt`.
+
+This is the first sweep in the campaign with **no red cell**.
+
+### Not clean, though: 26 gates fail the mechanic-coverage checklist
+
+26 of the 333 print `100/100 games match, but required coverage items are MISSING` and **exit 1**.
+That is a DIFFERENT check from parity — `failed == 0` on all 333, so the two engines agree
+everywhere; the checklist asks whether the 100 games actually EXERCISED a required mechanic.
+
+Sampled `lizardman bb2025 @1.0`: the missing item is `action HandOver | 0 | MISSING | needs carrier
++ adjacent teammate`. So it is agent behaviour, not engine disagreement — the heuristic never hands
+off with a Saurus/Skink roster in 100 games.
+
+**Do not report the matrix as "all green" without this caveat**: by the harness's own exit code, 26
+gates are not passing. Parity is green; coverage is not. The two were conflated in earlier matrix
+tables, which counted a cell green off the parity clause alone.
+
+Follow-up (unstarted): characterise the missing item for each of the 26 — the sample suggests
+HandOver-class items concentrated at @1e6 and on low-agility or low-mobility rosters. Then decide
+per item whether it is (a) genuinely unreachable for that roster, (b) reachable but the heuristic
+never chooses it, or (c) a checklist requirement that should not apply to that roster. Only (b) is
+an agent-quality bug.

@@ -1,0 +1,32 @@
+FULL MATRIX SWEEP 2026-09-10 - 333 gates, 111 cells x 3 scales
+parity: 333/333 games match, 0 FAILED, 0 panics, 0 missing verdicts
+
+Separately, 26 gates report the mechanic-coverage checklist unmet
+(parity still 100/100 on every one of them):
+
+amazon bb2016 @1e6
+chaos_chaostroll bb2020 @1e6
+chaos_ogre bb2025 @1e6
+chaos_pact bb2016 @1e6
+dwarf bb2016 @1.0
+gnome bb2020 @1e6
+khemri bb2020 @0
+khemri bb2020 @1e6
+khemri bb2025 @0
+khemri bb2025 @1e6
+khemri_fumbbl bb2020 @0
+khemri_fumbbl bb2025 @0
+lizardman bb2025 @1.0
+nippon bb2020 @1e6
+nippon bb2025 @1e6
+norse bb2016 @1e6
+nurgle bb2016 @1e6
+nurgle bb2020 @1e6
+ogre bb2016 @1.0
+ogre bb2016 @1e6
+ogre bb2025 @1e6
+orc bb2020 @1e6
+slann_fumbbl bb2020 @0
+slann_fumbbl bb2025 @0
+vampire bb2016 @1e6
+vampire bb2025 @1e6
