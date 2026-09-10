@@ -371,11 +371,28 @@ impl InjuryResult {
             }
         };
 
-        if should_set {
-            // Java: playerState.changeBase(newBase) — preserves flag bits, replaces base
-            let existing = game.field_model.player_state(defender_id).unwrap_or(new_state);
-            game.field_model.set_player_state(defender_id, existing.change_base(new_state.base()));
+        // Java nests EVERYTHING below inside this guard:
+        //
+        //     if (!basePrecedenceList.contains(old) || indexOf(new) > indexOf(old)) {
+        //         setPlayerState(..);
+        //         ...stunned deactivate...
+        //         if (isCasualty() || isKnockedOut() || isReserve()) { UtilBox.putPlayerIntoBox(..) }
+        //     }
+        //
+        // Rust had the box call OUTSIDE it, so a player whose state was ALREADY equally bad got
+        // re-boxed where Java leaves it alone -- and `putPlayerIntoBox` moves the player to its
+        // box column, so the coordinate changed. goblin bb2016 seed 46 i=38: the Ball & Chain
+        // Fanatic was already RESERVE when the apothecary cured it to RESERVE again; the
+        // precedence test `indexOf(RESERVE) > indexOf(RESERVE)` is false, so Java kept it at the
+        // pitch coordinate (0,6) it was hurt on while Rust re-boxed it to nowhere -- one player
+        // slot apart in the state hash, with no dice difference at all.
+        if !should_set {
+            return;
         }
+
+        // Java: playerState.changeBase(newBase) — preserves flag bits, replaces base
+        let existing = game.field_model.player_state(defender_id).unwrap_or(new_state);
+        game.field_model.set_player_state(defender_id, existing.change_base(new_state.base()));
 
         // 2. If STUNNED → deactivate if on acting team OR on the bombardier's team (bomb hits friendlies).
         if new_state.base() == PS_STUNNED {

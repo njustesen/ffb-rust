@@ -5496,3 +5496,137 @@ where the modifier disagreement flips the outcome. Any perturbation of the decis
 it: §H.14 did, and so did turning off the `reroll` class. **A green cell does not mean the mechanic
 agrees** (§H.10's lesson, again) — here it means the mechanic was never reached in the one shape
 that disagrees.
+
+## §H.16 — The re-drafted squads reopened the Ball & Chain drop family (2026-09-10)
+
+The squad re-draft (`scripts/draft_all_squads.py`, §19/R6 of
+`docs/PARITY_COVERAGE_REQUIREMENTS.md`) changed which players are on the pitch and which shirt they
+wear, and the first thing that fell out was **three separate sites where a Ball & Chain player is
+dropped without Java's chain injury**. All three are the same shape and all three are in the
+`drop_player` family, whose rng-less variant says in its own doc comment that it is only for "call
+sites where no Ball & Chain player can occur" — an assumption the re-draft falsified.
+
+Only the goblin squads field a Fanatic, so the whole family is confined to `goblin` cells.
+
+### H.16.1 — bb2016 Throw a Rock (FIXED)
+
+`step/bb2016/step_apply_kickoff_result.rs::handle_throw_a_rock` used the rng-less `drop_player`.
+Java uses the 3-arg `UtilServerInjury.dropPlayer(this, player, ApothecaryMode.HOME|AWAY)`, i.e. the
+full one with the `placedProneCausesInjuryRoll` branch.
+
+**goblin bb2016 seed 9**, all three scales, diverging at the FIRST logged step:
+
+| | |
+|---|---|
+| kickoff event | 2d6 = 6+5 = 11 → Throw a Rock |
+| victim | `randomPlayer` d11 = 6 → home_06, the Ball & Chain Fanatic |
+| Java | chain injury 1+3 = 4 (Stunned), then the rock injury 6+5 = 11 → casualty d6 2 / d8 2 = **Badly Hurt**. 22 dice into the pre-game. |
+| Rust | rock injury only, reading Java's chain-injury dice as its own → **KO**, 18 dice. |
+
+Regression test: `throw_a_rock_gives_a_ball_and_chain_victim_its_chain_injury` — asserts the
+published shape (2 `INJURY_RESULT` per hit vs 1), because a die count would pass vacuously if the
+roll were made and discarded. Proven to fail without the fix.
+
+### H.16.2 — bb2016 TTM landing (FIXED)
+
+`step/bb2016/ttm/step_init_scatter_player.rs` used the rng-less `drop_player` for the player landed
+upon. Java uses the 4-arg `dropPlayer(this, playerLandedUpon, ApothecaryMode.HIT_PLAYER, true)`.
+**The bb2020/bb2025 twin was already correct** and already had a test
+(`bb2020_landing_on_a_ball_and_chain_player_publishes_the_chain_injury_last`) — only the bb2016 copy
+was missed, which is the recurring shape of this whole campaign.
+
+**goblin bb2016 seed 30 @1.0**, i=60: a Troll's throw landed on the Fanatic. Java rolled the chain
+injury (6+4 = 10 → casualty, d6 5 / d8 5) and had the Fanatic **dead**; Rust never rolled it and
+left it **KO**, four dice apart across the interval (Java 147 vs Rust 143).
+
+Regression test: `landing_on_a_ball_and_chain_player_rolls_its_chain_injury`. Note for whoever
+writes the next one: with `throw_scatter = false` the scatter starts from the thrown player's own
+square and a landing there is filtered out as "landed on itself", so the test must set
+`throw_scatter` and `pass_coordinate` and carpet the target area with victims.
+
+### H.16.3 — `InjuryResult::apply_to` boxed a player Java leaves alone (FIXED, under gate)
+
+Not a dice bug at all — no dice differ. Java nests the whole body of `applyTo` inside the
+precedence guard:
+
+```java
+if (!basePrecedenceList.contains(old) || indexOf(new) > indexOf(old)) {
+    setPlayerState(..);
+    ...stunned deactivate...
+    if (isCasualty() || isKnockedOut() || isReserve()) { UtilBox.putPlayerIntoBox(..) }
+}
+```
+
+Rust had the `putPlayerIntoBox` call OUTSIDE that guard. `putPlayerIntoBox` moves the player to its
+box column (`RSV_HOME_X = -1`, `KO_HOME_X = -2`, …), so re-boxing a player who was already in the
+box CHANGES ITS COORDINATE — and the coordinate is in the state hash.
+
+**goblin bb2016 seed 46 @0**, i=38: the Fanatic was already RESERVE when the apothecary cured it to
+RESERVE again. `indexOf(RESERVE) > indexOf(RESERVE)` is false, so Java kept the pitch coordinate
+`(0,6)` it was hurt on; Rust re-boxed it and lost the coordinate. One player slot apart in the hash,
+zero dice apart — the kind of divergence a dice-stream diff can never find.
+
+### Standing audit item — the rest of the rng-less `drop_player` call sites
+
+Twenty-odd call sites still use the rng-less `drop_player`. Three of them turned out to be reachable
+by a Ball & Chain player once the squads changed; the assumption is unaudited at the others. They
+are listed by `grep -rn "util_server_injury::drop_player(\|drop_player(game" crates/ffb-engine/src/`.
+Prioritise the ones that take an *arbitrary* player rather than the acting player — a rock, a
+landing, a crowd push, a card, a pit trap — since those are the ones a Fanatic can wander into.
+Do NOT fix them speculatively: this campaign has measured a half-fix as worse than none (see
+`feedback_half_fix_measures_worse`). Wait for a red, then fix the site the red names.
+
+### Still open after the three fixes
+
+| cell | scales | state |
+|---|---|---|
+| `goblin` bb2016 | @1.0, @1e6 | **100/100** after H.16.1 + H.16.2 |
+| `goblin` bb2016 | @0 | seed 46 — H.16.3 addresses it, gate running |
+| `goblin` bb2020 | @1.0, @0, @1e6 | 98/100 each, 2 seeds — H.16.3 is in shared code and may cover them; not yet attributed |
+| `high_elf` bb2020 | @1e6 | 99/100, 1 seed — NOT triaged, no Ball & Chain player in that squad, so a different family |
+
+## §H.17 — Cloud Burster re-asks the interception dialog (2026-09-10, NOT fixed)
+
+`high_elf` bb2020 @1e6 seed 45, i=25. All 22 player slots agree; the **ball** is in a different
+square (Java 5,9 — the square the pass was thrown to — Rust 7,8), and Rust has rolled **four dice
+too many** (Java 33 vs Rust 37 across the interval). This is the opposite direction from §H.16 and a
+different family: the high_elf squad fields no Ball & Chain player.
+
+The Rust decision trace shows the interception offered TWICE for one pass:
+
+```
+LOOP applied=Pass(5,9)              prompt_after=Interception { player_id: "away_02", candidates: ["away_02"] }
+LOOP applied=Intercept { attempt: true }  prompt_after=Interception { player_id: "away_02", candidates: ["away_02"] }
+LOOP applied=Intercept { attempt: true }  prompt_after=ActivatePlayer { .. }
+```
+
+**Root cause.** The high_elf BB2020 Thrower has **Cloud Burster**
+(`data/rosters/bb2020/roster_high_elf.json`), which forces a re-roll of an interception of a long
+pass, so the BB2020 pass sequence runs `StepIntercept` again after `StepCloudBurster`. In Java
+`interceptorChosen` lives in the **pass state** (`passState.isInterceptorChosen()`), so the second
+`StepIntercept` sees it already true and goes straight to the roll. In Rust `interceptor_chosen` is a
+field on the STEP (`step/bb2025/pass/step_intercept.rs:40`, and the same in the bb2016 twin), so the
+re-pushed step starts with it `false`, shows the dialog again, and takes a whole second interception
+decision plus its dice.
+
+`set_parameter(StepParameter::InterceptorId(..))` sets `interceptor_id` but deliberately does not set
+`interceptor_chosen` — and it must not, because `execute_step` publishes `InterceptorId(None)` on the
+no-interceptors path, so flipping the flag there would skip the FIRST dialog too. The fix is to put
+`interceptor_chosen` where Java keeps it: on the game's pass state, set when the choice is answered
+and cleared when a new pass begins. That is a model change, not a one-liner, which is why it is
+recorded here rather than fixed alongside §H.16.
+
+Reproduce:
+
+```
+FFB_TRACE=1 FFB_PARITY_ROOT=parity_he45 ./target/release/ffb-parity \
+  --home high_elf --away high_elf --edition bb2020 --tier 3 --seeds 45-45 \
+  --agent heuristic --heur-scale 1e6 --heur-classes all
+python scripts/statediff_step.py <trace> --step 25
+```
+
+`scripts/statediff_step.py` (new) is what localised this: it pulls both engines' state strings out of
+one FFB_TRACE log and names the field that differs — header vs a specific player slot — instead of
+leaving two 2 KB strings to be eyeballed. It is the right first instrument for any hash divergence,
+because it distinguishes "the ball moved" from "a player's state differs" from "the dice diverged"
+before any dice are examined.

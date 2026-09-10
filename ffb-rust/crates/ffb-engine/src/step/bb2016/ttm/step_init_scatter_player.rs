@@ -194,9 +194,19 @@ impl StepInitScatterPlayer {
             .publish(StepParameter::ThrownPlayerState(self.thrown_player_state.unwrap_or_default()))
             .publish(StepParameter::ThrownPlayerHasBall(self.thrown_player_has_ball));
 
-        // Java: if playerLandedUpon != null → dropPlayer
+        // Java: `if (playerLandedUpon != null) { publishParameters(UtilServerInjury.dropPlayer(
+        //        this, playerLandedUpon, ApothecaryMode.HIT_PLAYER, true)); }`
+        //
+        // The 4-arg overload, i.e. the FULL dropPlayer including the `placedProneCausesInjuryRoll`
+        // branch. The rng-less `drop_player` skips that branch, and a thrown team-mate can land on
+        // ANY occupied square -- including the one the Ball & Chain Fanatic is standing on. When it
+        // did, Rust skipped Java's InjuryTypeBallAndChain roll (2d6 + a casualty roll on 10+) and
+        // came out four dice short: goblin bb2016 seed 30 i=60, a Troll's TTM landing on the
+        // Fanatic. Java rolled the chain injury (6+4 = 10, casualty -> d6 5 / d8 5) and had it
+        // DEAD; Rust never rolled it and left it merely KO.
         if let Some(hit_id) = player_landed_upon {
-            let drop_params = util_server_injury::drop_player(game, &hit_id, true);
+            let drop_params = util_server_injury::drop_player_rng(
+                game, rng, &hit_id, true, ApothecaryMode::HitPlayer);
             for p in drop_params {
                 outcome = outcome.publish(p);
             }
@@ -282,6 +292,82 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(matches!(out.action, StepAction::NextStep));
         assert!(out.published.is_empty(), "Java does not publish any parameters on the early-return path");
+    }
+
+    /// Java drops the player landed upon with the 4-arg
+    /// `UtilServerInjury.dropPlayer(this, playerLandedUpon, ApothecaryMode.HIT_PLAYER, true)`,
+    /// which routes to the FULL dropPlayer -- including the branch that gives a
+    /// `placedProneCausesInjuryRoll` player (Ball & Chain) an `InjuryTypeBallAndChain` injury roll
+    /// rather than simply being placed prone. Rust used the rng-LESS `drop_player`, which skips
+    /// that branch, and a thrown team-mate can land on ANY occupied square -- including the
+    /// Fanatic's.
+    ///
+    /// The BB2020/BB2025 twin of this step already had
+    /// `bb2020_landing_on_a_ball_and_chain_player_publishes_the_chain_injury_last`; only the
+    /// bb2016 copy was missed.
+    ///
+    /// Live cost: goblin bb2016 seed 30 i=60. A Troll's throw landed on the Ball & Chain Fanatic;
+    /// Java rolled the chain injury (6+4 = 10, a casualty, then d6 5 / d8 5) and had the Fanatic
+    /// DEAD, while Rust never rolled it and left it merely KO -- four dice apart across the
+    /// interval (Java 147 vs Rust 143).
+    ///
+    /// The scatter rolls happen BEFORE any injury, so both arms below land on the same square on
+    /// the same seed and the comparison is exact: a Ball & Chain victim publishes two
+    /// INJURY_RESULTs (the hit-player injury, then the chain injury from the drop) where an
+    /// otherwise identical victim publishes one. Asserting the published shape rather than a die
+    /// count is deliberate -- a count would pass vacuously if the roll were made and discarded.
+    #[test]
+    fn landing_on_a_ball_and_chain_player_rolls_its_chain_injury() {
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::skill_def::SkillWithValue;
+
+        // The throw scatters from the TARGET square (`throw_scatter` + `pass_coordinate`), so the
+        // thrown player stands elsewhere and the target area is carpeted with victims: wherever it
+        // comes down in bounds, it comes down on one of them. Without `throw_scatter` the scatter
+        // starts from the thrown player's own square, and a landing there is filtered out as
+        // "landed on itself" -- which is why the first version of this test never saw a hit.
+        fn run(seed: u64, ball_and_chain: bool) -> usize {
+            let mut game = make_game();
+            let target = FieldCoordinate::new(13, 7);
+            add_home_player(&mut game, "thrown", FieldCoordinate::new(13, 12));
+            let mut n = 0;
+            for dx in -4i32..=4 {
+                for dy in -4i32..=4 {
+                    let c = FieldCoordinate::new(13 + dx, 7 + dy);
+                    if c == FieldCoordinate::new(13, 12) { continue; }
+                    n += 1;
+                    let id = format!("v{n}");
+                    add_home_player(&mut game, &id, c);
+                    if ball_and_chain {
+                        let v = game.team_home.players.iter_mut()
+                            .find(|p| p.id == id).unwrap();
+                        v.starting_skills = vec![SkillWithValue::new(SkillId::BallAndChain)];
+                    }
+                }
+            }
+            game.pass_coordinate = Some(target);
+            let mut step = StepInitScatterPlayer::new();
+            step.thrown_player_id = Some("thrown".into());
+            step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+            step.thrown_player_coordinate = Some(target);
+            step.throw_scatter = true;
+            let out = step.start(&mut game, &mut GameRng::new(seed));
+            out.published.iter()
+                .filter(|p| matches!(p, StepParameter::InjuryResult(_)))
+                .count()
+        }
+
+        let mut with_bc = 0usize;
+        let mut without_bc = 0usize;
+        for seed in 0..32u64 {
+            with_bc += run(seed, true);
+            without_bc += run(seed, false);
+        }
+        assert!(without_bc > 0, "the throw never landed on anyone -- the test proves nothing");
+        assert_eq!(with_bc, without_bc * 2,
+            "a Ball & Chain player landed upon must take the chain injury as well as the \
+             hit-player injury: {with_bc} INJURY_RESULTs with the skill vs {without_bc} without, \
+             over the same landings (expected exactly double)");
     }
 
     #[test]

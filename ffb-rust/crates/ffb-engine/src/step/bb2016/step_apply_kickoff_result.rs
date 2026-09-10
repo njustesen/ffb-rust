@@ -430,7 +430,20 @@ impl StepApplyKickoffResult {
             // animation, but the d26 roll MUST be consumed to keep the RNG stream aligned
             // (amazon bb2016 seed9 pregame: Rust was 1 die short here → later pass desync).
             let _ = rng.die(26);
-            let drop_params = util_server_injury::drop_player(game, hit_id, false);
+            // Java: `UtilServerInjury.dropPlayer(this, player, ApothecaryMode.HOME|AWAY)` -- the
+            // 3-arg overload, which routes to the FULL dropPlayer including the
+            // `placedProneCausesInjuryRoll` branch. The rng-less `drop_player` skips that branch,
+            // and its own doc comment says it is only for call sites "where no Ball & Chain player
+            // can occur" -- but a rock picks a RANDOM player on the pitch, so a Fanatic can be the
+            // one it hits. When it was, Rust skipped Java's InjuryTypeBallAndChain roll (2d6 plus a
+            // casualty roll on 10+) and came out FOUR dice short: goblin bb2016 seed 9, kickoff
+            // event 2d6=11 Throw a Rock, randomPlayer d11=6 = the Ball & Chain Fanatic. Java rolled
+            // the chain injury (1+3=4, Stunned) and then the rock injury (6+5=11, casualty -> d6/d8
+            // = Badly Hurt); Rust rolled only the rock injury, read the chain-injury dice as its
+            // own, and left the Fanatic KO where Java has it Badly Hurt -- visible in the state
+            // hash at the very first logged step (h05 Bh vs Ko).
+            let drop_params = util_server_injury::drop_player_rng(
+                game, rng, hit_id, false, ApothecaryMode::Home);
             for p in drop_params { outcome = outcome.publish(p); }
             let result = util_server_injury::handle_injury_by_name(
                 game, rng, "InjuryTypeThrowARock", None, hit_id,
@@ -444,7 +457,20 @@ impl StepApplyKickoffResult {
                 .unwrap_or(FieldCoordinate::new(0, 0));
             // Java: rollXCoordinate() for the THROW_A_ROCK animation start (see hit_home above).
             let _ = rng.die(26);
-            let drop_params = util_server_injury::drop_player(game, hit_id, false);
+            // Java: `UtilServerInjury.dropPlayer(this, player, ApothecaryMode.HOME|AWAY)` -- the
+            // 3-arg overload, which routes to the FULL dropPlayer including the
+            // `placedProneCausesInjuryRoll` branch. The rng-less `drop_player` skips that branch,
+            // and its own doc comment says it is only for call sites "where no Ball & Chain player
+            // can occur" -- but a rock picks a RANDOM player on the pitch, so a Fanatic can be the
+            // one it hits. When it was, Rust skipped Java's InjuryTypeBallAndChain roll (2d6 plus a
+            // casualty roll on 10+) and came out FOUR dice short: goblin bb2016 seed 9, kickoff
+            // event 2d6=11 Throw a Rock, randomPlayer d11=6 = the Ball & Chain Fanatic. Java rolled
+            // the chain injury (1+3=4, Stunned) and then the rock injury (6+5=11, casualty -> d6/d8
+            // = Badly Hurt); Rust rolled only the rock injury, read the chain-injury dice as its
+            // own, and left the Fanatic KO where Java has it Badly Hurt -- visible in the state
+            // hash at the very first logged step (h05 Bh vs Ko).
+            let drop_params = util_server_injury::drop_player_rng(
+                game, rng, hit_id, false, ApothecaryMode::Away);
             for p in drop_params { outcome = outcome.publish(p); }
             let result = util_server_injury::handle_injury_by_name(
                 game, rng, "InjuryTypeThrowARock", None, hit_id,
@@ -603,6 +629,82 @@ mod tests {
             assert_eq!(home_gained, roll_home >= roll_away, "seed {seed}: home gain from d3 {roll_home}/{roll_away}");
             assert_eq!(away_gained, roll_away >= roll_home, "seed {seed}: away gain from d3 {roll_home}/{roll_away}");
         }
+    }
+
+    /// Java `handleThrowARock` drops the hit player with the 3-arg
+    /// `UtilServerInjury.dropPlayer(this, player, ApothecaryMode)`, which routes to the FULL
+    /// dropPlayer -- including the branch that gives a `placedProneCausesInjuryRoll` player
+    /// (Ball & Chain) a whole `InjuryTypeBallAndChain` injury roll instead of simply being placed
+    /// prone. Rust used the rng-LESS `drop_player`, whose own doc says it is only for call sites
+    /// "where no Ball & Chain player can occur" -- but the rock picks a RANDOM player on the
+    /// pitch, so it can and does hit a Fanatic.
+    ///
+    /// Asserts the SHAPE Java produces: two INJURY_RESULT parameters for a Ball & Chain victim
+    /// (the chain injury from dropPlayer, then the rock's own injury) against one for anybody
+    /// else. Counting dice would pass vacuously if the chain injury were rolled and discarded;
+    /// counting published results would not.
+    ///
+    /// Live cost of the gap: goblin bb2016 seed 9. Kickoff event 2d6 = 11 (Throw a Rock),
+    /// `randomPlayer` d11 = 6 = the Ball & Chain Fanatic. Java rolled the chain injury (1+3 = 4,
+    /// Stunned) and then the rock injury (6+5 = 11, casualty -> d6 2 / d8 2 = Badly Hurt), 22
+    /// dice into the pre-game; Rust rolled only the rock injury, read Java's chain-injury dice
+    /// as its own, stopped 4 dice short at 18, and left the Fanatic KO where Java has it Badly
+    /// Hurt -- a difference visible in the state hash at the very first logged step.
+    #[test]
+    fn throw_a_rock_gives_a_ball_and_chain_victim_its_chain_injury() {
+        use ffb_model::enums::{SkillId, PS_STANDING};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::player_state::PlayerState;
+        use ffb_model::model::skill_def::SkillWithValue;
+
+        fn victim(id: &str, nr: i32, ball_and_chain: bool) -> Player {
+            let mut p = Player {
+                id: id.into(),
+                name: id.into(),
+                nr,
+                movement: 3,
+                strength: 7,
+                agility: 1,
+                armour: 7,
+                ..Default::default()
+            };
+            if ball_and_chain {
+                p.starting_skills = vec![SkillWithValue::new(SkillId::BallAndChain)];
+            }
+            p
+        }
+
+        // Both teams field exactly one player. The rock's own rolls (2 d6, randomPlayer, the
+        // d26 animation coordinate) all happen BEFORE any injury, so the two arms below hit the
+        // same victims on the same seeds -- only the injuries that follow differ. That makes the
+        // comparison exact: a Ball & Chain victim must publish exactly twice the INJURY_RESULTs
+        // of an otherwise identical victim without the skill.
+        let mut totals = [0usize; 2];
+        for (arm, &ball_and_chain) in [true, false].iter().enumerate() {
+            for seed in 0..24u64 {
+                let mut game = make_game();
+                game.rules = Rules::Bb2016;
+                for (is_home, id) in [(true, "home_01"), (false, "away_01")] {
+                    let team = if is_home { &mut game.team_home } else { &mut game.team_away };
+                    team.players = vec![victim(id, 1, ball_and_chain)];
+                    game.field_model.set_player_coordinate(
+                        id, FieldCoordinate::new(if is_home { 12 } else { 14 }, 7));
+                    game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+                }
+
+                let mut step = StepApplyKickoffResult::new("end".into(), "blitz".into());
+                step.kickoff_result = Some(KickoffResult::ThrowARock);
+                let out = step.start(&mut game, &mut GameRng::new(seed));
+
+                totals[arm] += out.published.iter()
+                    .filter(|p| matches!(p, StepParameter::InjuryResult(_)))
+                    .count();
+            }
+        }
+        let (with_bc, without_bc) = (totals[0], totals[1]);
+        assert!(without_bc > 0, "the rock never hit anyone -- the test proves nothing");
+        assert_eq!(with_bc, without_bc * 2,
+            "a Ball & Chain victim must take the chain injury AND the rock's own injury: got              {with_bc} INJURY_RESULTs with the skill vs {without_bc} without, over the same              hits (expected exactly double)");
     }
 
     #[test]
