@@ -373,6 +373,50 @@ apply();
 """
 
 
+# The reds, classified by hand from the triage recorded in BACKLOG §H.16-§H.19. Keyed by
+# (cell, edition) because a cell's scales share a cause wherever they were traced to one.
+RED_NOTES = {
+    ("goblin", "bb2016"): ("fixed",
+        "The Ball &amp; Chain Fanatic: KO where Java had Badly Hurt or dead, and once a lost "
+        "coordinate with no dice difference at all. Three engine bugs, all fixed &mdash; this cell "
+        "now gates 100/100 on all three scales."),
+    ("goblin", "bb2020"): ("open",
+        "Dice 1-18 agree, then Java asks for a d6 and Rust for a d8. The Fanatic is still standing "
+        "on the ball where Java has it KO. Not the pitch-invasion stun, which is corrected and "
+        "changed nothing here."),
+    ("goblin", "bb2025"): ("open",
+        "A plain Goblin comes out Badly Hurt in Java and KO in Rust &mdash; the same "
+        "casualty-versus-KO boundary that the bb2016 cell turned out to be a missing injury roll."),
+    ("high_elf", "bb2020"): ("open",
+        "The Thrower has Cloud Burster, which forces an interception re-roll, so the pass sequence "
+        "runs the intercept step twice. Java keeps <code>interceptorChosen</code> in the pass "
+        "state; Rust keeps it on the step, so it asks the dialog again and takes a whole second "
+        "decision. Four dice too many, ball in the wrong square."),
+    ("nurgle", "bb2020"): ("open",
+        "One player: Prone in Java, Standing in Rust. Same shape as the human cell."),
+    ("human", "bb2020"): ("open",
+        "One player: KO and off the pitch in Java, Prone and on it in Rust. Same shape as the "
+        "nurgle cell &mdash; two cells showing &ldquo;Java knocks down, Rust does not&rdquo; is one "
+        "investigation, not two."),
+    ("renegades", "bb2020"): ("open",
+        "Already a whole turn apart by the reported step &mdash; Java on the away team&rsquo;s turn "
+        "7, Rust on the home team&rsquo;s &mdash; with the fame field and three players differing. "
+        "Diverges earlier than the first step the harness flags."),
+    ("khorne", "bb2020"): ("harness",
+        "Not a Rust bug. The JAVA side hangs: <code>SPIN: step=SETUP dialog=SETUP_ERROR</code>, "
+        "force-ended at two million iterations, with a KO&rsquo;d home player so the team was "
+        "setting up with fewer than 11 available. Rust plays the game out. This is the reserves "
+        "failure mode the harness has hit before, and it belongs in ParityRunner."),
+    ("slann", "bb2020"): ("open",
+        "A Kroxigor at (20,5) in Java and on the sideline at (20,0) in Rust &mdash; one coordinate, "
+        "no state difference."),
+    ("khemri", "bb2025"): ("open",
+        "Four slots apart including ACTIVE bits, in Sweltering Heat. The most diverged of the set."),
+}
+
+STATUS_LABEL = {"fixed": "fixed", "open": "open", "harness": "harness, not the engine"}
+
+
 def figures(d):
     S = d["squads"]
     n = len(S)
@@ -472,7 +516,68 @@ ORDER = [
 ]
 
 
-def build(d):
+def sweep_section(sw):
+    """The parity results section. `sw` is sweep_verdicts.py --json output, or None."""
+    if not sw:
+        return ""
+    warn = ""
+    if not sw.get("complete"):
+        warn = (f'<p class="cite">Incomplete: {sw["gates"]} of {sw["expected"]} gates reported. '
+                f'Do not read this as a matrix result.</p>')
+
+    # group the red gates by (cell, edition) so a cell's scales share one row
+    groups = {}
+    for r in sw["red"]:
+        groups.setdefault((r["cell"], r["edition"]), []).append(r)
+    rows = []
+    for (cell, ed), rs in sorted(groups.items()):
+        status, note = RED_NOTES.get((cell, ed), ("open", "Not yet triaged."))
+        scales = ", ".join("@" + r["scale"] for r in sorted(rs, key=lambda x: x["scale"]))
+        worst = min(int(r["verdict"].split(":")[1].split("/")[0]) for r in rs
+                    if "/" in r["verdict"]) if any("/" in r["verdict"] for r in rs) else "-"
+        rows.append(
+            f'<tr><td><b>{cell}</b><br><span class="cite">{ed} &middot; {scales}</span></td>'
+            f'<td class="n">{worst}/100</td>'
+            f'<td><span class="tag {"fixed" if status == "fixed" else "open"}">'
+            f'{STATUS_LABEL[status]}</span></td>'
+            f'<td>{note}</td></tr>')
+
+    green_cells = sw["cells"] - len(groups)
+    tiles = [
+        ("hero", f'{sw["green"]}', "gates parity-green", f'of {sw["gates"]}'),
+        ("", f'{len(groups)}', "cells with a red gate", f'{green_cells} cells fully green'),
+        ("", f'{sw["short"]}', "gates short on coverage", "parity green on every one"),
+        ("", f'{sw["summed_minutes"] / 60:.1f}h', "summed gate time", "4 shards, no --reuse-java"),
+    ]
+    figs = "".join(
+        f'<div class="fig {cls}"><span class="num">{num}</span>'
+        f'<span class="cap">{cap}<br><span class="was">{was}</span></span></div>'
+        for cls, num, cap, was in tiles)
+
+    return f"""
+<section>
+  <p class="eyebrow">The matrix, re-run on these squads</p>
+  <h2>Parity results</h2>
+  <p>Every cell, in every ruleset it belongs to, at all three sampling scales, Rust against the
+  stock Java engine under the heuristic agent, 100 seeds each. A gate counts only if the process
+  exits without panicking <b>and</b> prints its verdict; the absence of a failure line is not a
+  measurement.</p>
+  {warn}
+  <div class="figures">{figs}</div>
+
+  <h3 style="margin-top:26px">Every red, and what it is</h3>
+  <p>Nine of these were localised to a named field or a single die before being written up. The
+  squads did not cause them &mdash; they reached them. Most sit in bb2020, where correcting the
+  Dedicated Fans moved the fame term in every kick-off contest off the one value it had always had.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>cell</th><th class="n">worst</th><th>status</th><th>what it is</th></tr></thead>
+    <tbody>{"".join(rows)}</tbody>
+  </table></div>
+</section>
+"""
+
+
+def build(d, sw=None):
     figs = "".join(
         f'<div class="fig {cls}"><span class="num">{num}</span>'
         f'<span class="cap">{cap}<br><span class="was">{was}</span></span></div>'
@@ -572,6 +677,8 @@ def build(d):
   <div class="sheets" id="sheets"></div>
 </section>
 
+{sweep_section(sw)}
+
 <section>
   <p class="eyebrow">My reading of them</p>
   <h2>Are these good teams?</h2>
@@ -664,10 +771,14 @@ def build(d):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="docs/squad_page.html")
+    ap.add_argument("--sweep", help="sweep_verdicts.py --json output, to add the results section")
     args = ap.parse_args()
     d = json.loads((ROOT / "docs" / "squad_report.json").read_text(encoding="utf-8"))
+    sw = None
+    if args.sweep:
+        sw = json.loads((ROOT / args.sweep).read_text(encoding="utf-8"))
     out = ROOT / args.out
-    out.write_text(build(d), encoding="utf-8")
+    out.write_text(build(d, sw), encoding="utf-8")
     print(f"{out}  ({out.stat().st_size / 1024:.0f} KB)")
 
 

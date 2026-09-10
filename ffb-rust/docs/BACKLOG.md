@@ -5630,3 +5630,112 @@ one FFB_TRACE log and names the field that differs — header vs a specific play
 leaving two 2 KB strings to be eyeballed. It is the right first instrument for any hash divergence,
 because it distinguishes "the ball moved" from "a player's state differs" from "the dice diverged"
 before any dice are examined.
+
+## §H.18 — goblin bb2020 Pitch Invasion: a die-SIZE divergence (2026-09-10, NOT fixed)
+
+`goblin` bb2020 seeds 55 and 99, all three scales, diverging at the FIRST logged step. Localised to
+the exact die with `FFB_DICE_TRACE` — note that BOTH engines emit `DICE_TRACE` lines and they are
+told apart by the `caller=` stack, which only Java carries:
+
+| die | Java | Rust | site |
+|---:|---|---|---|
+| 1-18 | identical | identical | fan factor, weather, coin, kick, scatter, kickoff event 2d6 = 12 (Pitch Invasion), `handlePitchInvasion` d6/d6/d3, `stunPlayers` d11=11 / d10=4, 2d6 = 1+2, `rollSkill` d6=1, d8=8 |
+| **19** | **d6 = 1** | **d8 = 7** | both nominally `DiceRoller.rollDice:84` |
+
+The two engines agree on eighteen dice and then ask for **different-sized dice**, which means they
+are executing different code by that point — not a missing or extra roll. The state at step 1 says
+why: `a03`, the Ball & Chain Fanatic (bb2020 goblin fields it at shirt 4), is
+`-1,-1,Ko` in Java and `20,5,Standing` in Rust — still standing, on the ball's square, so the ball
+also differs (Java 20,5 vs Rust 19,5). Java's Fanatic is gone by die 19 and Java rolls something
+else; Rust's is still active and rolls another d8, which reads like its compulsory random walk
+continuing.
+
+**What has already been ruled out.** bb2020's `stun_random_standing_players` did call the rng-less
+`stun_player` where Java calls `UtilServerInjury.stunPlayer(this, player, ApothecaryMode.HOME)` --
+that is a genuine 1:1 mismatch and is now corrected (same family as §H.16) -- but it does **not**
+fix these seeds: the dice count is unchanged at 19 vs Java's 18, and the state difference is
+identical before and after. So the correction is kept as a faithfulness fix, not credited with a
+result, and the real cause is downstream of it: what Java does to a Ball & Chain player stunned by
+a Pitch Invasion, between dice 15 and 18, that leaves it KNOCKED OUT.
+
+**Next measurement.** Dump the Fanatic's `PlayerState` after each of dice 15-18 on both sides. Java
+rolls 2d6 = 1+2 = 3 (which is Stunned on its own) and then a `rollSkill` d6 = 1, so the KO comes
+from something after the chain injury -- a modifier, or a second injury the chain result feeds. Note
+that `stun_player_rng`'s own doc comment claims the published chain-injury result is *not consumed*
+in the Pitch-Invasion path ("the chain injury's dice are rolled but its outcome is NOT applied");
+Java's KO here is evidence that this is wrong for bb2020, whose kickoff sequence presumably does
+have an Apothecary step consuming `APOTHECARY_HOME`. Check that first -- it is a one-grep question
+and it decides whether the outcome should be applied.
+
+## §H.19 — Why the re-draft's reds are almost all bb2020, and what each one is (2026-09-10)
+
+### The mechanism, verified
+
+`step/mixed/start/step_spectators.rs:20` — `game_result.home.fan_factor = team_home.dedicated_fans
++ d3`. bb2020's `handle_pitch_invasion` adds that `fan_factor` to each team's d6, `handle_throw_a_rock`
+adds `fame`, and Cheering Fans / Brilliant Coaching do the same.
+
+Before the re-draft **every one of the 40 bb2020 squads carried Dedicated Fans 3**, because the
+checker charged them at the BB2025 *League* rate of `(n-1)x5,000`. At the Exhibition rate the rules
+actually give — `n x 10,000` from a base of **0** — the spread is 0..6, with 19 squads at 0:
+
+| bb2020 Dedicated Fans | before | after |
+|---|---|---|
+| uniform 3 | 40 | — |
+| 0 / 1 / 2 / 3 / 6 | — | 19 / 14 / 1 / 4 / 2 |
+
+So correcting §19 defect 4 moved the fame term in every bb2020 kickoff contest off the single value
+it had always had. `khorne`, `human` and `nurgle` bb2020 kept the SAME 12/12/13 players and the same
+re-rolls — `DF 3 -> 0` is their only change — and all three went red. That is the re-draft buying
+coverage exactly as intended: these are pre-existing bugs that the old squads could not reach.
+
+### The reds, classified
+
+Classified with `scripts/statediff_step.py`, which names the differing field before any dice are
+looked at. Note the step number in a `PARITY FAIL` line is the 0-based comparison index; the trace
+and the JSONL call the same step `i = index + 1`.
+
+| gate | seed | shape | family |
+|---|---|---|---|
+| `goblin` bb2016 @1.0/@0/@1e6 | 9, 30, 46 | Fanatic KO vs Badly Hurt / dead; coordinate lost | §H.16 — **FIXED**, now 100/100 x3 |
+| `goblin` bb2020 @1.0/@0/@1e6 | 55, 99 | die 19 is d6 in Java, d8 in Rust; Fanatic Standing vs KO | §H.18 — open |
+| `high_elf` bb2020 @1e6 | 45 | ball in the wrong square, Rust 4 dice OVER, interception offered twice | §H.17 Cloud Burster — open |
+| `nurgle` bb2020 @0 | 81 | one slot: `a01` Prone (Java) vs Standing (Rust) | open, untriaged |
+| `human` bb2020 @0 | 63 | one slot: `a09` KO off-pitch (Java) vs Prone on-pitch (Rust) | open, untriaged |
+| `renegades` bb2020 @1.0 | 16 | turn counters AND active team already apart (Java t67 away, Rust t77 home), fame field differs, 3 slots | open, untriaged — diverges before the reported step |
+| `khorne` bb2020 @0 | 93 | **JAVA hangs**: `SPIN: step=SETUP dialog=SETUP_ERROR mode=SETUP`, force-ended at `END_REASON: max_iterations iter=2000000`. Rust plays on to step 234. | **HARNESS**, not the Rust engine |
+| `slann` bb2020 @1e6 | — | not yet examined | open |
+| `khemri` bb2025 @1.0 | — | not yet examined | open |
+
+Two of those shapes deserve emphasis:
+
+**`khorne` is not a Rust bug at all.** The Java side spins in SETUP and the harness force-ends it, so
+the "divergence" is that Java never finished the game. This is the failure mode the reserves fix
+addressed once before (`canonical_setup_action` + `ParityRunner.placeReserves`: filter available
+FIRST, then cap at 11 fielded — placing the first 11 jerseys and filtering afterwards under-fields a
+short squad and Java loops). Java's end state shows a KO'd home player, so the home team was setting
+up with fewer than 11 available. `ParityRunner.java` is co-editable; fix it there.
+
+**`nurgle` and `human` are the same shape as each other**: one player, and Java has it knocked down
+or KO'd where Rust does not. Neither squad fields a Ball & Chain player, so this is not §H.16. Two
+independent cells showing "Java injures, Rust does not" is worth treating as one investigation
+rather than two.
+
+### Instrument trap found while doing this — an incremental census cache lies
+
+`scripts/sweep_census/agg.py` (and pass2/pass3) cache one JSON per gate and skip a gate whose file
+already exists. Running the census against a sweep that is still in flight therefore caches whatever
+was on disk at that moment **and reports itself as complete**. Three gates came back `games=0,
+events=0` while the sweep called two of them 100/100, which looked exactly like the vacuous-green
+trap of §10 — it was not, it was the cache. The event files were all there minutes later.
+
+The empty ones were obvious. The dangerous case is not: a gate cached at 60 of its 100 seeds
+under-counts every mechanic by 40% and looks entirely plausible, because nothing in the report says
+how many seeds a gate contributed. **Never census a running sweep.** If it has been done, delete
+`out/`, `out2/` and `out3/` wholesale rather than trying to spot the bad entries — validating the
+pipeline early is not worth a silently wrong coverage table.
+
+(Also worth knowing when re-running these by hand: `report.py` globs the relative `out/` and
+`out2/`, and `pass3.py` hardcodes the relative `out3/`, so they must be run with the CWD set to the
+census working directory and `PYTHONPATH` pointing at `scripts/sweep_census` so `from agg import
+gate_dirs` resolves. `pass3.py` ignores its argv.)

@@ -808,7 +808,16 @@ impl StepApplyKickoffResult {
             }
             let idx = rng.range(standing.len());
             let id = standing.remove(idx);
-            util_server_injury::stun_player(game, &id);
+            // Java: `UtilServerInjury.stunPlayer(this, stunnedPlayer, ApothecaryMode.HOME)` --
+            // ApothecaryMode.HOME for BOTH teams, which is Java's own quirk here. That is the
+            // rng-AWARE stun, i.e. dropPlayer with base STUNNED, including the
+            // `placedProneCausesInjuryRoll` branch that gives a Ball & Chain player an
+            // InjuryTypeBallAndChain roll instead of simply being stunned. The bb2016 twin of this
+            // step already uses `stun_player_rng`; this bb2020 copy was still on the rng-less
+            // `stun_player`, so a Pitch Invasion that swept up the Fanatic rolled none of Java's
+            // chain-injury dice (goblin bb2020 seeds 55 and 99, both diverging at the first logged
+            // step: kickoff 2d6 = 12 Pitch Invasion, d3 = 2 players stunned per team).
+            util_server_injury::stun_player_rng(game, rng, &id, ffb_model::enums::ApothecaryMode::Home);
         }
     }
 }
