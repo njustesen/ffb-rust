@@ -10,7 +10,7 @@ use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
-use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use crate::step::util_server_re_roll::use_reroll_with_events;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.block.StepBlockRoll.
 /// Rolls block dice (1, 2, or 3), handles all re-roll variants (Brawler, Hatred, Pro,
@@ -75,9 +75,22 @@ impl Step for StepBlockRoll {
                     self.block_result = Some(block_result_for_roll(roll));
                 }
             }
+            // Java: CLIENT_USE_RE_ROLL, handled by `AbstractStepWithReRoll.handleCommand` —
+            // sets the re-rolled action and the source, then re-executes the step, where
+            // `useReRoll` spends the team re-roll (and rolls Loner for a carrier who has it).
+            Action::UseReRoll { use_reroll: true } => {
+                self.re_rolled_action = Some("BLOCK".into());
+                self.re_roll_source = Some("TRR".into());
+            }
+            // Declining is NOT a command in Java: the block dialog has no decline, and answering
+            // it with a null-source re-roll drives `doRoll = false` → `showBlockRollDialog(true)`
+            // → the same dialog forever (the loop `ParityRunner` warned about). The client
+            // declines by answering the SAME dialog with a die choice, so the decline arm returns
+            // straight to the die-choice prompt: re-entering `execute_step` here would roll a
+            // fresh set of block dice, because `re_rolled_action` is still unset.
             Action::UseReRoll { use_reroll: false } => {
-                // Declined — clear source so execute_step shows dialog without re-roll.
                 self.re_roll_source = None;
+                return StepOutcome::cont().with_prompt(self.block_choice_prompt(game));
             }
             // Java: CLIENT_USE_BRAWLER
             Action::UseBrawler { .. } => {
@@ -187,11 +200,16 @@ impl StepBlockRoll {
         let player_id = game.acting_player.player_id.clone().unwrap_or_default();
         let mut do_roll = true;
 
+        // Coverage events produced while consuming the re-roll (the Loner roll), attached to
+        // whichever outcome this pass returns.
+        let mut reroll_events: Vec<ffb_model::events::GameEvent> = Vec::new();
         if self.re_rolled_action.as_deref() == Some("BLOCK") {
             if let Some(ref source_name) = self.re_roll_source.clone() {
                 // Java: !UtilServerReRoll.useReRoll(this, getReRollSource(), player)
                 let source = ReRollSource::new(source_name.as_str());
-                if !use_reroll(game, &source, &player_id, rng) {
+                let (consumed, evs) = use_reroll_with_events(game, &source, &player_id, rng);
+                reroll_events = evs;
+                if !consumed {
                     do_roll = false;
                     // Java: showBlockRollDialog(false) — source was non-null
                 }
@@ -239,13 +257,28 @@ impl StepBlockRoll {
             }
             // Coverage event mirroring ReportBlock: emitted once per block action
             // (initial roll only — re-roll passes have re_rolled_action set).
-            let mut out = StepOutcome::cont().with_prompt(self.block_choice_prompt(game));
+            //
+            // Java shows ONE dialog carrying the dice AND the re-roll options, and the client
+            // answers it with either CLIENT_BLOCK_CHOICE or a re-roll command. Rust asks one
+            // question per prompt, so the same dialog becomes two prompts in sequence: the
+            // re-roll offer first (only when Java would have listed `ReRollProperty.TRR`), then
+            // the die choice. Declining answers the die choice WITHOUT re-rolling — see
+            // `handle_command`. `ParityRunner` mirrors the pair on one dialog: `reRollSourceFor`
+            // then `heuristicBlockChoice`, in that order.
+            let mut out = if self.team_reroll_option(game) {
+                StepOutcome::cont().with_prompt(self.block_reroll_offer_prompt(game))
+            } else {
+                StepOutcome::cont().with_prompt(self.block_choice_prompt(game))
+            };
             if self.re_rolled_action.is_none() {
                 if let Some(ref did) = game.defender_id {
                     out = out.with_event(ffb_model::events::GameEvent::Block {
                         defender_id: did.clone(),
                     });
                 }
+            }
+            for ev in reroll_events {
+                out = out.with_event(ev);
             }
             return out;
         }
@@ -254,18 +287,60 @@ impl StepBlockRoll {
         // Java: if source was null → showBlockRollDialog(noReRollUsed=true)
         //       (presented when the player hasn't interacted with the re-roll dialog yet)
 
-        // Java: if reRolledAction is not set, ask for re-roll if available
-        if self.re_rolled_action.is_none() {
-            if let Some(prompt) = ask_for_reroll_if_available(game, "BLOCK", 0, false) {
-                self.re_rolled_action = Some("BLOCK".into());
-                self.re_roll_source = Some("TRR".into());
-                return StepOutcome::cont().with_prompt(prompt);
-            }
+        // Java: showBlockRollDialog(getReRollSource() == null) — the re-roll was offered and
+        // either failed to be consumed (a failed Loner) or was never accepted, so re-present the
+        // already-rolled dice for selection. This is NOT a place to ask again: Java re-shows the
+        // dialog with `getReRollSource() != null`, which builds an EMPTY property list.
+        //
+        // The offer itself is raised on the roll pass above, not here. It used to be raised here
+        // via `ask_for_reroll_if_available(game, "BLOCK", 0, false)`, which was dead code by
+        // POSITION — `do_roll` starts true and is only cleared inside the `re_rolled_action ==
+        // Some("BLOCK")` arm, so a first pass could never reach it (BACKLOG §H.13.1). It was also
+        // the wrong predicate: that helper is the shared `RollMechanic.askForReRollIfAvailable`
+        // path, which prefers a SKILL source and adds Pro, while Java's block dialog carries those
+        // as `actionToSource` entries the harness never answers and lists only TRR in
+        // `properties`. Offering more than the dialog lists costs sampler draws Java never spends.
+        let mut out = StepOutcome::cont().with_prompt(self.block_choice_prompt(game));
+        for ev in reroll_events {
+            out = out.with_event(ev);
         }
+        out
+    }
 
-        // Java: showBlockRollDialog(true) — no re-roll available/used: re-present the
-        // already-rolled dice for selection.
-        StepOutcome::cont().with_prompt(self.block_choice_prompt(game))
+    /// Java `showBlockRollDialog`: `properties.add(ReRollProperty.TRR)` iff
+    /// `UtilServerReRoll.isTeamReRollAvailable(getGameState(), actingPlayer.getPlayer())`, and
+    /// only while no re-roll has been consumed yet (`getReRollSource() == null` guards the whole
+    /// property-building block).
+    ///
+    /// The `nrOfDice < 0` branch below it cannot clear TRR: it strips the re-roll properties only
+    /// when `noReRollUsed || (properties.stream().noneMatch(isActualReRoll) && actionToSource
+    /// .isEmpty())`, and TRR *is* an actual re-roll, so a first pass with a team re-roll in the
+    /// bank keeps the offer and addresses the dialog to the ACTING team even on 2-dice-against.
+    /// (`noReRollUsed` is true only on the re-show path, which never asks again.) The die choice
+    /// is unaffected either way: both engines derive it from `nr_of_dice >= 0`, not from the
+    /// dialog's choosing team.
+    fn team_reroll_option(&self, game: &Game) -> bool {
+        if self.re_roll_source.is_some() {
+            return false;
+        }
+        let Some(pid) = game.acting_player.player_id.as_deref() else { return false };
+        let Some(player) = game.player(pid) else { return false };
+        crate::util::util_server_re_roll::UtilServerReRoll::is_team_re_roll_available(game, player)
+    }
+
+    /// The TRR half of Java's block dialog, as an agent prompt. The source is `"TRR"` because
+    /// that is what `ParityRunner.reRollSourceFor` answers a block dialog with
+    /// (`ReRollSources.TEAM_RE_ROLL`), and what `use_reroll` consumes.
+    fn block_reroll_offer_prompt(&self, game: &Game) -> ffb_model::prompts::AgentPrompt {
+        ffb_model::prompts::AgentPrompt::ReRollOffer {
+            source: ReRollSource::new("TRR"),
+            action: "BLOCK".to_owned(),
+            team_id: if game.home_playing {
+                game.team_home.id.clone()
+            } else {
+                game.team_away.id.clone()
+            },
+        }
     }
 
     /// Java: `showBlockRollDialog(...)` — the DialogBlockRollParameter presented to the coach,
@@ -945,5 +1020,125 @@ mod tests {
         game.defender_id = Some("def".into());
         step.start(&mut game, &mut GameRng::new(1));
         assert!(game.report_list.has_report(ReportId::BLOCK_ROLL), "ReportBlockRoll must be emitted via showBlockRollDialog");
+    }
+
+    // ── Block re-roll offer (BACKLOG §H.14 phase 1) ───────────────────────────
+    //
+    // Java shows ONE dialog carrying the dice and `ReRollProperty.TRR`; Rust splits it into the
+    // offer prompt then the die-choice prompt. Before this, no block was ever re-rolled in any
+    // edition: 0 of 660,522 in the 2026-09-10 matrix (docs/EVENT_CENSUS_2026-09-10.md).
+
+    /// Set up an acting attacker on the (home) acting team with a team re-roll in the bank.
+    fn game_with_team_reroll() -> Game {
+        let mut game = make_game();
+        add_player_with_skill(&mut game, "atk", SkillId::Block);
+        game.home_playing = true;
+        game.acting_player.player_id = Some("atk".into());
+        game.defender_id = Some("def".into());
+        game.turn_data_home.rerolls = 2;
+        game.turn_data_home.reroll_used = false;
+        game
+    }
+
+    #[test]
+    fn block_offers_the_team_reroll_before_the_die_choice() {
+        let mut step = StepBlockRoll::new();
+        let mut game = game_with_team_reroll();
+        let out = step.start(&mut game, &mut GameRng::new(1));
+        match out.prompt {
+            Some(ffb_model::prompts::AgentPrompt::ReRollOffer { ref source, ref action, .. }) => {
+                assert_eq!(source.name, "TRR");
+                assert_eq!(action, "BLOCK");
+            }
+            other => panic!("expected a BLOCK ReRollOffer, got {other:?}"),
+        }
+        assert!(!step.block_roll.is_empty(), "the dice are rolled before the offer, as in Java");
+    }
+
+    #[test]
+    fn block_asks_nothing_when_the_bank_is_empty() {
+        let mut step = StepBlockRoll::new();
+        let mut game = game_with_team_reroll();
+        game.turn_data_home.rerolls = 0;
+        let out = step.start(&mut game, &mut GameRng::new(1));
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::BlockChoice { .. })));
+    }
+
+    /// Java's `isTeamReRollAvailable` gates on `allowsTeamReRoll(turnMode)`: a block resolved
+    /// during a kick-off event (Quick Snap, Blitz) may not spend one.
+    #[test]
+    fn block_offers_nothing_during_a_kickoff_turn_mode() {
+        use ffb_model::enums::TurnMode;
+        let mut step = StepBlockRoll::new();
+        let mut game = game_with_team_reroll();
+        game.turn_mode = TurnMode::Kickoff;
+        let out = step.start(&mut game, &mut GameRng::new(1));
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::BlockChoice { .. })));
+    }
+
+    /// Java has no decline command: the client answers the same dialog with a die choice. The
+    /// decline must therefore NOT re-enter the roll path — that would roll fresh dice.
+    #[test]
+    fn declining_keeps_the_same_dice_and_asks_for_the_die() {
+        let mut step = StepBlockRoll::new();
+        let mut game = game_with_team_reroll();
+        step.start(&mut game, &mut GameRng::new(1));
+        let rolled = step.block_roll.clone();
+        let out = step.handle_command(
+            &Action::UseReRoll { use_reroll: false }, &mut game, &mut GameRng::new(2));
+        assert_eq!(step.block_roll, rolled, "a decline must not re-roll the block dice");
+        assert_eq!(game.turn_data_home.rerolls, 2, "a decline must not spend a re-roll");
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::BlockChoice { .. })));
+    }
+
+    #[test]
+    fn accepting_spends_the_reroll_and_rolls_again() {
+        let mut step = StepBlockRoll::new();
+        let mut game = game_with_team_reroll();
+        step.start(&mut game, &mut GameRng::new(1));
+        let out = step.handle_command(
+            &Action::UseReRoll { use_reroll: true }, &mut game, &mut GameRng::new(2));
+        assert_eq!(step.re_rolled_action.as_deref(), Some("BLOCK"));
+        assert_eq!(step.re_roll_source.as_deref(), Some("TRR"));
+        assert_eq!(game.turn_data_home.rerolls, 1, "the team re-roll is spent");
+        assert!(
+            matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::BlockChoice { .. })),
+            "after the re-roll the die choice is asked, and the offer is NOT repeated");
+    }
+
+    /// `use_reroll` rolls for Loner and spends the re-roll either way. `GameEvent::LonerRoll` had
+    /// no reachable producer at all while the block offer did not exist.
+    #[test]
+    fn accepting_with_loner_rolls_for_it() {
+        use ffb_model::events::GameEvent;
+        let mut step = StepBlockRoll::new();
+        let mut game = make_game();
+        add_player_with_skill(&mut game, "atk", SkillId::Loner);
+        game.home_playing = true;
+        game.acting_player.player_id = Some("atk".into());
+        game.defender_id = Some("def".into());
+        game.turn_data_home.rerolls = 2;
+        step.start(&mut game, &mut GameRng::new(1));
+        let out = step.handle_command(
+            &Action::UseReRoll { use_reroll: true }, &mut game, &mut GameRng::new(2));
+        assert!(out.events.iter().any(|e| matches!(e, GameEvent::LonerRoll { .. })),
+            "a Loner must roll to use the team re-roll: {:?}", out.events);
+        assert_eq!(game.turn_data_home.rerolls, 1, "spent either way");
+    }
+
+    #[test]
+    fn a_rerolled_block_reports_rerolled_in_its_coverage_event() {
+        use ffb_model::events::GameEvent;
+        let mut step = StepBlockRoll::new();
+        let mut game = game_with_team_reroll();
+        step.start(&mut game, &mut GameRng::new(1));
+        step.handle_command(&Action::UseReRoll { use_reroll: true }, &mut game, &mut GameRng::new(2));
+        let out = step.handle_command(
+            &Action::BlockChoice { die_index: 0, target_id: None }, &mut game, &mut GameRng::new(3));
+        let rerolled = out.events.iter().find_map(|e| match e {
+            GameEvent::BlockRoll { rerolled, .. } => Some(*rerolled),
+            _ => None,
+        });
+        assert_eq!(rerolled, Some(true));
     }
 }

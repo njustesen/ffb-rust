@@ -243,11 +243,13 @@ fn ask_for_reroll_if_available_inner(
 /// is that game: Java rolled the Loner die, Rust did not, and every roll afterwards was one
 /// position out of step. The values happened to agree for ten more dice, so the dice-stream diff
 /// pointed at a d8 scatter forty positions later.
-fn loner_roll(game: &mut Game, player_id: &str, rng: &mut GameRng) -> bool {
+fn loner_roll(game: &mut Game, player_id: &str, rng: &mut GameRng)
+    -> (bool, Option<ffb_model::events::GameEvent>)
+{
     use ffb_model::model::property::named_properties::NamedProperties;
-    let Some(player) = game.player(player_id) else { return true };
+    let Some(player) = game.player(player_id) else { return (true, None) };
     if !player.has_skill_property(NamedProperties::HAS_TO_ROLL_TO_USE_TEAM_REROLL) {
-        return true;
+        return (true, None);
     }
     // Java: RollMechanic.minimumLonerRoll — bb2016 returns a FIXED 4 (`bb2016/RollMechanic.java:209`,
     // the LRB6 Loner has no printed value); bb2020/25 read the skill's value (Loner (4+) etc.).
@@ -271,7 +273,18 @@ fn loner_roll(game: &mut Game, player_id: &str, rng: &mut GameRng) -> bool {
         success,
         roll,
     ));
-    success
+    // Coverage: `GameEvent::LonerRoll` had no producer anywhere in the engine -- the roll was
+    // reported but never evented, so the checklist could not see it and `lonerRoll` read 0 across
+    // the 2026-09-10 matrix even where a Loner did roll. Returned rather than pushed because
+    // `use_reroll` has ~100 call sites; see `use_reroll_with_events`.
+    (
+        success,
+        Some(ffb_model::events::GameEvent::LonerRoll {
+            player_id: player_id.to_string(),
+            roll,
+            success,
+        }),
+    )
 }
 
 pub fn use_reroll(
@@ -280,6 +293,19 @@ pub fn use_reroll(
     player_id: &str,
     rng: &mut GameRng,
 ) -> bool {
+    use_reroll_with_events(game, re_roll_source, player_id, rng).0
+}
+
+/// As [`use_reroll`], but also returns the coverage events the consumption produced (today: the
+/// Loner roll). Identical behaviour otherwise — `use_reroll` is this function with the events
+/// dropped, so no existing call site changes. Steps that want the telemetry call this one and
+/// attach the events to their `StepOutcome`.
+pub fn use_reroll_with_events(
+    game: &mut Game,
+    re_roll_source: &ReRollSource,
+    player_id: &str,
+    rng: &mut GameRng,
+) -> (bool, Vec<ffb_model::events::GameEvent>) {
     // Check if source is a team re-roll (TRR).
     // Java: ReRollSource.hasProperty(ReRollProperty.TRR) etc.
     if re_roll_source.name == "TRR"
@@ -333,7 +359,8 @@ pub fn use_reroll(
             } else if td.reroll_show_star_one_drive > 0 {
                 td.reroll_show_star_one_drive -= 1;
             }
-            return loner_roll(game, player_id, rng);
+            let (success, event) = loner_roll(game, player_id, rng);
+            return (success, event.into_iter().collect());
         }
     }
 
@@ -349,12 +376,12 @@ pub fn use_reroll(
         for id in skill_ids {
             if format!("{:?}", id) == skill_name || id.class_name() == skill_name.as_str() {
                 player.used_skills.insert(id);
-                return true;
+                return (true, Vec::new());
             }
         }
     }
 
-    false
+    (false, Vec::new())
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

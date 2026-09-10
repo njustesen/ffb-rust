@@ -77,6 +77,15 @@ struct ParityArgs {
     /// answered by the embedded parity `RandomAgent`. `none` (rung 0) must reproduce the
     /// random-agent gate exactly. See `agent::PromptClass::name`.
     heur_classes: String,
+    /// `--bench`: Rust-only timing mode. Plays `--seeds` games with no Java, no comparison and no
+    /// progress file, timing setup / agent / engine / hash / log / write separately so the ENGINE
+    /// can be quoted without the parity harness that normally surrounds it. The harness layers are
+    /// off by default and switched on individually with `--bench-hash`, `--bench-log`,
+    /// `--bench-write` (`--bench-harness` = all three, i.e. what a gate actually pays for).
+    bench: bool,
+    bench_hash: bool,
+    bench_log: bool,
+    bench_write: bool,
 }
 
 /// Parse a numeric flag value STRICTLY, exiting with a clear message instead of substituting a
@@ -131,6 +140,10 @@ impl ParityArgs {
         let mut multimove = 0usize;
         let mut heur_scale = 0.0f32;
         let mut heur_classes = "none".to_string();
+        let mut bench = false;
+        let mut bench_hash = false;
+        let mut bench_log = false;
+        let mut bench_write = false;
 
         let mut i = 0;
         while i < raw.len() {
@@ -141,6 +154,11 @@ impl ParityArgs {
                 "--all-rosters" => all_rosters = true,
                 "--all-editions" => all_editions = true,
                 "--no-abort" => no_abort = true,
+                "--bench" => bench = true,
+                "--bench-hash" => bench_hash = true,
+                "--bench-log" => bench_log = true,
+                "--bench-write" => bench_write = true,
+                "--bench-harness" => { bench_hash = true; bench_log = true; bench_write = true; }
                 "--verbose" => verbose = true,
                 "--visualize" => visualize = true,
                 "--reuse-java" => reuse_java = true,
@@ -189,7 +207,7 @@ impl ParityArgs {
         let home_java = runner::java_team_id(&home, "home", &edition);
         let away_java = runner::java_team_id(&away, "away", &edition);
 
-        ParityArgs { network, coverage, uniform, all_rosters, all_editions, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize, tier, reuse_java, heuristic, heuristic_away, out_dir, agent_mode, agent_mode_away, agent, multimove, heur_scale, heur_classes }
+        ParityArgs { network, coverage, uniform, all_rosters, all_editions, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize, tier, reuse_java, heuristic, heuristic_away, out_dir, agent_mode, agent_mode_away, agent, multimove, heur_scale, heur_classes, bench, bench_hash, bench_log, bench_write }
     }
 }
 
@@ -266,6 +284,61 @@ fn main() {
     }
 
     let total = args.seed_end - args.seed_start + 1;
+
+    // ── Bench mode ───────────────────────────────────────────────────────────────
+    // Rust only, no JVM, no comparison. Reports each layer separately so an engine number is
+    // never quoted with harness cost folded into it (see runner::run_bench_game).
+    if args.bench {
+        let spec = match args.agent.as_str() {
+            "heuristic" => {
+                let classes = match ffb_engine::agent::ClassMask::parse(&args.heur_classes) {
+                    Ok(c) => c,
+                    Err(e) => { eprintln!("--heur-classes: {e}"); std::process::exit(2); }
+                };
+                let mode = match args.agent_mode.as_str() {
+                    "deep" => ffb_engine::agent::Mode::Deep,
+                    "wide-noball" => ffb_engine::agent::Mode::WideNoBall,
+                    "wide-nopass" => ffb_engine::agent::Mode::WideNoPass,
+                    "wide-nohandoff" => ffb_engine::agent::Mode::WideNoHandOff,
+                    _ => ffb_engine::agent::Mode::Wide,
+                };
+                runner::AgentSpec::Heuristic { temp_scale: args.heur_scale, mode, classes }
+            }
+            _ => runner::AgentSpec::Random { multimove: args.multimove },
+        };
+        let opts = runner::BenchOpts {
+            hash: args.bench_hash, log: args.bench_log, write: args.bench_write,
+        };
+        let mut t = runner::BenchTotals::default();
+        let wall = std::time::Instant::now();
+        for seed in args.seed_start..=args.seed_end {
+            let (h, a) = runner::run_bench_game(
+                seed, &args.home, &args.away, &args.edition, args.tier, spec, opts, &mut t);
+            std::hint::black_box((h, a));
+        }
+        let wall_ns = wall.elapsed().as_nanos();
+        let g = t.games.max(1) as f64;
+        let ms = |ns: u128| ns as f64 / 1e6 / g;
+        let pct = |ns: u128| 100.0 * ns as f64 / t.total_ns.max(1) as f64;
+        println!("BENCH agent={} scale={} classes={} mode={} tier={} edition={} {} vs {} games={}                   hash={} log={} write={}",
+            args.agent, args.heur_scale, args.heur_classes, args.agent_mode, args.tier,
+            args.edition, args.home, args.away, t.games,
+            args.bench_hash, args.bench_log, args.bench_write);
+        println!("BENCH wall_s={:.3} games_per_s={:.2} ms_per_game={:.3}",
+            wall_ns as f64 / 1e9, g / (wall_ns as f64 / 1e9), wall_ns as f64 / 1e6 / g);
+        println!("BENCH per_game_ms setup={:.3} agent={:.3} engine={:.3} hash={:.3} log={:.3} write={:.3} total={:.3}",
+            ms(t.setup_ns), ms(t.agent_ns), ms(t.engine_ns), ms(t.hash_ns), ms(t.log_ns),
+            ms(t.write_ns), ms(t.total_ns));
+        println!("BENCH share_pct setup={:.1} agent={:.1} engine={:.1} hash={:.1} log={:.1} write={:.1} residual={:.1}",
+            pct(t.setup_ns), pct(t.agent_ns), pct(t.engine_ns), pct(t.hash_ns), pct(t.log_ns),
+            pct(t.write_ns),
+            100.0 - pct(t.setup_ns + t.agent_ns + t.engine_ns + t.hash_ns + t.log_ns + t.write_ns));
+        println!("BENCH per_game decisions={:.1} steps={:.1} events={:.1} rng_calls={:.1} us_per_decision_agent={:.1} us_per_decision_engine={:.1}",
+            t.decisions as f64 / g, t.steps as f64 / g, t.events as f64 / g, t.rng_calls as f64 / g,
+            t.agent_ns as f64 / 1e3 / t.decisions.max(1) as f64,
+            t.engine_ns as f64 / 1e3 / t.decisions.max(1) as f64);
+        return;
+    }
 
     // ── Uniform mode ─────────────────────────────────────────────────────────────
     // Uses `UniformAgent` (samples uniformly over every legal action, including

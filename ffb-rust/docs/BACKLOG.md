@@ -5125,3 +5125,374 @@ HandOver-class items concentrated at @1e6 and on low-agility or low-mobility ros
 per item whether it is (a) genuinely unreachable for that roster, (b) reachable but the heuristic
 never chooses it, or (c) a checklist requirement that should not apply to that roster. Only (b) is
 an agent-quality bug.
+
+## §H.13 — EVENT CENSUS of the 333-gate sweep: what went green without being played (2026-09-10)
+
+Re-tallied every `GameEvent` the sweep left on disk — 333 `parity_sw_*` roots, 2.0 GB,
+**33,300 games, 27,858,969 events**. Full write-up in **`docs/EVENT_CENSUS_2026-09-10.md`**;
+reproduce with `scripts/sweep_census/` (`agg.py` mirrors `coverage_report.rs::tally()`).
+
+The reconstruction **reproduces §H.12's 26 short gates exactly, item for item** — that agreement is
+what licenses the rest of the numbers.
+
+Headline: **77 of 128 `GameEvent` variants** ever fired (26 have an engine emit site the sweep never
+reached, 25 have no producer anywhere), **26 of 58 `PlayerAction` variants** were ever declared, and
+of the **117 skills the 111 squads field**, 45 are provably exercised, 11 have a dedicated event that
+never fired, and **61 emit nothing that names them**.
+
+### Closes the §H.12 follow-up
+
+All 31 missing items across the 26 gates are `action HandOver` ×20, `action Pass` ×6, `pass rolls`
+×5 — case (b), reachable but never chosen, concentrated at `@1e6` and `@0`. No gate is short of
+anything else. Khemri and `khemri_fumbbl` never pass at `@0` in bb2020 or bb2025.
+
+### NEW findings
+
+1. **A block die is never re-rolled — 0 of 660,522.** In any edition, any roster. Dodge 15.9%,
+   rush 6.4%, pickup 11.0%, catch 8.9%, pass 7.9% — blocks never. Superset of **E8** (which scoped
+   this to Brawler): the *team* re-roll on a block is equally dead, and with it `lonerRoll` = 0
+   (Loner is fielded in **73 of 111 cells**), `proRoll` = 0, `teamCaptainRoll` = 0, `leader` = 0,
+   Hatred = 0. Brilliant Coaching grants 16,423 extra re-rolls that can never be spent on a block.
+   Cause is a *harness contract* on both sides, not a rules gap — see §H.14 for the plan.
+2. **The apothecary is offered 62,279 times and never used.** Every event carries
+   `roll:null, new_state:null, new_serious_injury:null`, against 49,530 casualties and 6,239 deaths.
+   `ApothecaryChoice` is never emitted. Cause: `AGENT_CONTRACT.md` §7 answers *Apothecary → decline*
+   and the heuristic has no apothecary `PromptClass`, so the decline is the contract, not a bug —
+   but it means the entire heal/regenerate-after-apo path is unexercised in the matrix.
+3. **Three declared actions never produce their defining roll.** `BalefulHex` 535 declarations →
+   `balefulHexRoll` 0 (64% of its activations contain nothing but `playerMoved`); `AutoGazeZoat` 540
+   → `hypnoticGazeRoll` 0 (80% move-only); `LookIntoMyEyes` 13 → 0 (92%). Traced one Baleful Hex
+   through a log: the action is selected, the caster walks, no hex. Extends **E17** — the star gazes
+   *are* declared and answered, and still cast nothing. `BalefulHexRoll`, `HypnoticGazeRoll`,
+   `LookIntoMyEyesRoll` and `BreatheFireRoll` have **no construction site anywhere in `ffb-engine`**;
+   `ProjectileVomitRoll` (16 cells field it) and `JumpUpRoll` (21 cells) have one and never reach it.
+4. **Dump Off: 3,074 declines, 0 uses.** A reactive pass that has never executed. Only four skills
+   ever record a decline at all (Dodge, Wrestle, Juggernaut, Dump Off) — see **E6**: outside those,
+   absence of a decline is absence of instrumentation.
+5. **Prayers to Nuffle fire in bb2020 and never in bb2025.** bb2020: 4,305 rolls, all 16 catalog
+   entries. bb2025: **0 of 16** across 11,100 games — same mirror matchups, same equal TV, both
+   editions carrying a live `StepPrayers`. One of the two is wrong about the underdog rule.
+   `PrayerAmount` has no producer, so the TV gap each engine computed cannot be read from the logs.
+6. **The whole pre-game economy never runs.** Zero across 33,300 games: `buyInducement`,
+   `inducement`, `pettyCash`, `cardsAndInducementsBought`, `playCard`, `cardEffectRoll`,
+   `cardDeactivated`, `wizardUse`, `masterChefRoll`, `bribesRoll`, `coinThrow`, `receiveChoice`,
+   `gameOptions`, `secretWeaponBan`, `coachBanned`, `heatExhaustion`. "Get the Ref" hands out 2,460
+   free bribes and no bribe is ever rolled. Post-game is healthy: 66,500 winnings + 66,500 MVP rolls.
+7. **83 of 200 skills are never fielded by any squad**, including **Kick, Leader, Team Captain,
+   Pass Block, Piling On, Pile Driver, Sneaky Git, Kick-Off Return**. Ordinary picks on real teams;
+   Kick gates a core kick-off rule no gate touches. Cheapest class here to close — it is a
+   `data/teams/` drafting gap, not an engine gap. **32 of 58 actions were never declared once**
+   (`Stab`, `Chainsaw`, `BreatheFire`, `ProjectileVomit`, `DumpOff`, `Swoop`, `MaximumCarnage`,
+   `PutridRegurgitation*`, `KickEm*`, `TheFlashingBlade`, `ViciousVines`, `Chomp`, `Forgo`, …).
+
+### Confirms and quantifies existing entries
+
+- **E7** (bb2016 emits no `playerMoved`/`goForItRoll`): now measured at matrix scale —
+  bb2016 **0 / 0** across 8,700 games and 1,159,804 `Move` declarations, against bb2020 7,588,679 /
+  443,582. A third of the matrix has no movement or rush telemetry; bb2016 rushing is asserted by
+  nothing but the state hash. `driver.rs:425` is the routing line.
+- **E5** (stale BLOCKED notes): the matrix scores **25,856 touchdowns** and rolls **879,585 rushes**,
+  so the "one square per activation" note is false everywhere. Because both items are `blocked` they
+  cannot fail a gate — which is precisely why E7 stayed invisible. `GFI rolls` is zero in exactly the
+  87 bb2016 gates and nowhere else.
+- **E6** (skill/re-roll events unemitted): 61 fielded skills have no naming event — Mighty Blow 78
+  cells, Thick Skull 69, Block 61, Pass 52, Stunty 44, Frenzy 43, Sure Hands 29, Claw 14, Stab 12,
+  **Diving Tackle 9**, Guard 4. `GameEvent::ReRoll` has no producer at all, so the only re-roll
+  telemetry that exists is the `rerolled` flag on individual roll events.
+
+### What the census does prove
+
+Positional coverage is complete: every drafted player number acted at least once in **every** one of
+the 111 cells. Kick-off (11/11 per edition's own table), weather (5/5 × 3 editions), serious injury
+(20/20) and block result (5/5) are fully covered, with tails at expected frequencies — death is
+12.6% of casualties against a 12.5% d16 expectation, armour holds on 68% of injury events. 45 skills
+are provably exercised, including 435,074 Bone Head / Really Stupid / Take Root rolls, 48,713 Blood
+Lust, 39,892 Animal Savagery / Unchannelled Fury, 15,082 Foul Appearance and 14,542 team-mate throws.
+
+## §H.14 — PLAN: reach the block re-roll (closes §H.13.1, supersedes E8)
+
+**Goal.** A block die can be re-rolled in all three editions, in both engines, and the matrix
+re-gates 333/333 with `blockRoll rerolled=true > 0`, `lonerRoll > 0` and Brawler/Hatred reachable.
+
+**Why first.** It is one prompt shape, and it is the single change that unblocks the most dead
+mechanics at once: team re-roll on a block, **Loner** (73 of 111 cells field it, 0 rolls), **Pro /
+Old Pro**, **Brawler** (E8), **Hatred**, **Team Captain**, **Leader**, and the 16,423 Brilliant
+Coaching re-rolls that currently cannot be spent on a block. Blocks are the most common re-rollable
+event in the game — 660,522 of them — so this is also the largest single blind spot in the matrix.
+
+### It is a harness contract, not an engine bug
+
+Both sides refuse to ask, and they refuse in mirror, which is why parity never noticed:
+
+* **Java engine** fully implements it. `bb2025/block/StepBlockRoll.showBlockRollDialog` builds one
+  dialog carrying the die choice *and* the re-roll options; the client answers with either
+  `CLIENT_BLOCK_CHOICE` or one of `CLIENT_USE_RE_ROLL` (via `AbstractStepWithReRoll.handleCommand`),
+  `CLIENT_USE_BRAWLER`, `CLIENT_USE_HATRED`, `CLIENT_USE_PRO_RE_ROLL_FOR_BLOCK`,
+  `CLIENT_USE_CONSUMMATE_RE_ROLL_FOR_BLOCK`, `CLIENT_USE_SINGLE_BLOCK_DIE_RE_ROLL`,
+  `CLIENT_USE_MULTI_BLOCK_DICE_RE_ROLL`.
+* **The harness never sends any of them.** `ParityRunner.java` `case BLOCK_ROLL_PROPERTIES:` says so
+  in as many words: *"Never use a reroll here (AGENT_CONTRACT.md §7) — a reroll-decline would just
+  re-show the dialog forever."* Same for `BLOCK_ROLL` (bb2016) and `BLOCK_ROLL_PARTIAL_RE_ROLL`
+  (bb2020); all three answer `comm.sendBlockChoice(idx)` unconditionally.
+* **Rust cannot express the question.** `AgentPrompt::BlockChoice` carries only
+  `{attacker_id, defender_id, dice, own_choice, nr_of_dice}`. The step's
+  `ask_for_reroll_if_available(game, "BLOCK", 0, false)` branch sits behind `do_roll == false`,
+  which a first pass cannot reach (`do_roll` starts `true` and is cleared only inside the
+  `re_rolled_action == Some("BLOCK")` arm) — dead code, in both
+  `step/bb2025/block/step_block_roll.rs` and `step/bb2016/block/step_block_roll.rs`.
+
+The harness's stated fear is real and constrains the design: **there is no decline command.**
+Answering `sendUseReRoll(BLOCK, null)` sets `reRolledAction=BLOCK` with a null source, which drives
+`doRoll=false` -> `showBlockRollDialog(true)` -> the same dialog again, forever. The only way to
+decline is to answer with the die choice. Any design that adds a separate "decline" answer is wrong.
+
+### The three Java dialogs, and what each offers
+
+Read these before writing a line — the option gates differ per edition and are NOT the shared
+`RollMechanic` path:
+
+| edition | dialog | re-roll payload | gate |
+|---|---|---|---|
+| bb2016 | `DialogBlockRollParameter` | `teamReRollOption`, `proReRollOption` booleans | `source==null && !turnData.isReRollUsed() && turnData.getReRolls()>0` |
+| bb2020 | `DialogBlockRollPartialReRollParameter` | same two booleans + partial-re-roll payload | `UtilServerReRoll.isTeamReRollAvailable(...)` (`StepBlockRoll:304`) |
+| bb2025 | `DialogBlockRollPropertiesParameter` | `List<ReRollProperty>` + `Map<ReRolledAction,ReRollSource>` | `isTeamReRollAvailable` for TRR; per-action sources for Brawler / Hatred / single-die skills |
+
+All three share the negative-dice twist, and it decides **who is asked**: when `nrOfDice < 0` the
+dialog normally goes to the *defending* team (they pick the die) — but if an actual re-roll is
+available it stays with the **acting** team, so the attacker can re-roll instead of the defender
+picking. bb2025: `(fNrOfDice < 0) && (noReRollUsed || (no actual re-roll && actionToSource.isEmpty()))`;
+bb2016: `(fNrOfDice < 0) && (!pDoRoll || source != null || (!trr && !pro))`. Port the condition
+verbatim; getting it wrong silently swaps which agent answers and desyncs every 2-dice-against block.
+
+### Scope — three phases, gated separately
+
+**Phase 1 — team re-roll only.** Highest value, smallest surface, and it drags Loner in for free
+(`use_reroll` already emits `GameEvent::LonerRoll` and spends the bank either way — see
+`util_server_re_roll.rs` test `a_loner_rolls_for_the_team_reroll_and_spends_it_either_way`).
+
+1. **Rust.** Extend `AgentPrompt::BlockChoice` with the offer (`team_reroll_option: bool`, and the
+   choosing-team id so the harness and the agent agree on who answers), and accept
+   `Action::UseReRoll { use_reroll: true }` as an alternative answer to `Action::BlockChoice`.
+   On accept: `re_rolled_action = Some("BLOCK")`, `re_roll_source = Some(TEAM_RE_ROLL)`, re-execute —
+   which lands in the existing `use_reroll` path, so the bank, the one-drive re-roll and Loner all
+   behave as they already do for dodge/rush. On decline: answer `BlockChoice` exactly as today.
+   Do it in **both** block steps (bb2016 twin and the shared bb2020/bb2025 step — `driver.rs` has no
+   bb2020 `BlockRoll` arm, so the shared step serves two editions).
+2. **Harness.** In all three `case BLOCK_ROLL*` arms: read the option off the dialog, call the
+   heuristic's re-roll decision first, then either `comm.sendUseReRoll(ReRolledActions.BLOCK,
+   ReRollSources.TEAM_RE_ROLL)` or fall through to `sendBlockChoice(idx)`. Replace the
+   "never use a reroll here" comment with the invariant that replaces it: *decline is expressed as
+   the die choice, never as a null-source re-roll*.
+3. **Agent policy.** Add a `"BLOCK"` arm to `heuristic_agent.rs:4088`'s `consequence` match (it
+   currently falls to `_ => 0.45`). Whatever value is chosen must be **identical in both agents**,
+   and the two must consume the **same number of sampler draws** in both the accept and the decline
+   branch — this is the §H.10 failure mode, where a decline that changed no dice still moved the
+   stream by two draws and separated the games.
+
+**Phase 2 — Brawler and Hatred** (closes E8). Both are implicit single-die re-rolls already
+implemented in the step (`Some("Brawler")` / `Some("Hatred")` -> `handle_implicit_reroll_index`), and
+both are reachable *only* through the `re_roll_source` that phase 1 makes settable. Needs
+`Action::UseBrawler` / a Hatred equivalent wired to the new offer, plus Java's availability gates
+(`evaluateBrawlerAvailability` / `evaluateHatredAvailability`, including the keyword intersection and
+the `ALLOW_BRAWLER_ON_BOTH_BLOCKS` option). khemri bb2025's Tomb Guardian is the only Brawler in the
+matrix, so gate on khemri specifically.
+
+**Phase 3 — Pro and the single-die skills.** `CLIENT_USE_PRO_RE_ROLL_FOR_BLOCK` carries a
+`proIndex`, so it re-rolls **one chosen die**, not the set — a different answer shape.
+**Open question to answer from the Java first:** bb2016/bb2020 pass `proReRollOption` explicitly,
+but bb2025's `showBlockRollDialog` never adds `ReRollProperty.PRO` — establish whether bb2025 offers
+Pro on a block at all before implementing it, and remember §H.10's lesson that the *harness's*
+`reRollSourceFor` gate, not the rules, decided whether a Pro-only offer costs sampler draws.
+
+### Traps, named in advance
+
+* **A decline must be free.** If Rust's decline path draws where Java's does not (or vice versa),
+  every 2-dice block desyncs. Verify with `RPICKED`/`JPICKED` (§H.9) before running a gate.
+* **`isReRollUsed` vs the bank.** bb2016 gates on `!turnData.isReRollUsed() && getReRolls() > 0`;
+  bb2020/bb2025 go through `isTeamReRollAvailable`, which additionally gates on
+  `allowsTeamReRoll(turnMode)` — KICKOFF / PASS_BLOCK / DUMP_OFF prohibit it. A block during a Quick
+  Snap or a Blitz kick-off event must NOT offer one.
+* **`useTeamReRoll` never re-checks the bank** (`util_server_re_roll.rs:303`) — availability gates
+  the offer, not the spend. Do not add a defensive check; the tests pin the Java behaviour.
+* **The dead branch stays dead if the prompt is merely extended.** The existing
+  `ask_for_reroll_if_available(..., "BLOCK", ...)` call is unreachable *by position*, not by data.
+  Either move it or bypass it; leaving it in place and expecting it to fire is the
+  probe-never-fires / dead-file trap.
+* **Expect engine bugs on first execution.** This is the Throw-Team-Mate shape: TTM sat dead across
+  8,700 games and switching it on exposed ten Rust bugs. Budget for that, and do not treat the first
+  red as a reason to revert the change.
+
+### Verification ladder
+
+1. Unit: a block that re-rolls, in each of the three editions, plus the negative-dice
+   choosing-team condition, plus a Loner carrier spending the re-roll and failing it.
+2. `--agent random` control on one matchup per edition (`FFB_PARITY_ROOT=parity_random`) — the
+   random contract still declines, so this must stay byte-identical. If it moves, the decline path
+   is costing draws.
+3. Inner loop: one matchup x 3 editions x 3 scales, seeds 1-100, no `--reuse-java`.
+4. Frontier: the rosters that carry the affected skills — Loner is everywhere; khemri (Brawler),
+   imperial_nobility (Pro), the three Hatred cells.
+5. Full matrix re-gate, then re-run `scripts/sweep_census/` and assert the numbers moved:
+   `blockRoll rerolled > 0` in every edition, `lonerRoll > 0`, and the §H.13 census table updated.
+
+**Done means:** 333/333 parity, plus a census showing block re-rolls and Loner rolls in all three
+editions. A green gate with the counters still at zero means the offer is still not being raised —
+that is the vacuous-green trap (§10), and the census is now the instrument that catches it.
+
+### §H.14 phase 1 LANDED 2026-09-10 — the block re-roll is live in all three editions
+
+**The change, both sides.**
+
+*Rust* (`step/bb2025/block/step_block_roll.rs`, `step/bb2016/block/step_block_roll.rs`,
+`step/util_server_re_roll.rs`):
+
+- After the dice are rolled, the step raises `AgentPrompt::ReRollOffer { source: "TRR",
+  action: "BLOCK" }` when Java's dialog would have listed the option, and the die-choice prompt
+  otherwise. Java shows ONE dialog carrying the dice and the re-roll options; Rust asks one
+  question per prompt, so the same dialog becomes offer-then-die-choice.
+- The predicate is the dialog's own, per edition — NOT the shared
+  `RollMechanic.askForReRollIfAvailable` path: the shared bb2020/bb2025 step uses
+  `UtilServerReRoll::is_team_re_roll_available` (acting-team membership, `!reroll_used`,
+  bank > 0, `allows_team_re_roll(turn_mode)`, the four bomb terms) and the bb2016 twin uses its own
+  inline `source == null && !reroll_used && rerolls > 0`. `show_block_roll_dialog` already computed
+  that flag faithfully in bb2016 and threw it away (`let _ = (team_reroll_option, ...)`).
+- `Action::UseReRoll { use_reroll: true }` sets `BLOCK` + `TRR` and re-executes, landing in the
+  existing `use_reroll` path — bank, one-drive counters and Loner all behave as they already do for
+  dodge/rush. **`Action::UseReRoll { use_reroll: false }` returns the die-choice prompt directly**
+  rather than re-entering `execute_step`, which would have rolled a fresh set of dice.
+- Java has NO decline command, and that is the whole design constraint: `sendUseReRoll(BLOCK, null)`
+  drives `doRoll = false` → `showBlockRollDialog(true)` → the same dialog forever, which is exactly
+  what `ParityRunner`'s "never use a reroll here" comment was protecting against. A decline is
+  expressed as the die choice.
+- The dead `ask_for_reroll_if_available(game, "BLOCK", 0, false)` call at the bottom of the bb2025
+  step is gone. It was unreachable *by position*, and it was also the wrong predicate — that helper
+  prefers a SKILL source and adds Pro, both of which Java's block dialog carries as
+  `actionToSource` entries the harness never answers.
+- `GameEvent::LonerRoll` had **no producer anywhere** (§H.13 mis-filed it as an unreached site: the
+  only `GameEvent::LonerRoll` in the tree was inside a doc comment, as was `Leader`'s — the correct
+  census-time split is **24 unreached sites / 27 with no producer**). `loner_roll` now returns the
+  event and a new `use_reroll_with_events` returns it to the caller; `use_reroll` is that function
+  with the events dropped, so none of its ~100 call sites change.
+
+*Harness* (`ParityRunner.java`, one helper + three call sites):
+
+- `answerBlockReRoll(teamReRollOption, dialog, game, gameState)` asks `reRollSourceFor(game,
+  ReRolledActions.BLOCK, teamReRollOption)` and, on an acceptance, answers the dialog with
+  `sendUseReRoll(ReRolledActions.BLOCK, TEAM_RE_ROLL)`; on a decline it returns false and the caller
+  falls through to `sendBlockChoice`, exactly as before.
+- Wired into all three arms with each edition's own flag: `BLOCK_ROLL` (bb2016)
+  `br.hasTeamReRollOption()`, `BLOCK_ROLL_PARTIAL_RE_ROLL` (bb2020) `bpr.hasTeamReRollOption()`,
+  `BLOCK_ROLL_PROPERTIES` (bb2025) `brp.hasProperty(ReRollProperty.TRR)`.
+- No agent change was needed on either side. `PromptClass::ReRollOffer` already existed and both
+  scorers already fall through to `consequence = 0.45` for an action they do not name, so the
+  weights were identical for `BLOCK` before this existed. The random contract still declines at zero
+  sampler cost (`reRollSourceFor` returns null without consulting the heuristic when the class is
+  off, and Rust's `RandomAgent` answers `UseReRoll{false}` with no draw).
+
+**Why the negative-dice branch does not gate the offer.** All three editions strip the re-roll
+properties (and hand the dialog to the defending team) only when
+`nrOfDice < 0 && (noReRollUsed || no actual re-roll is available)`, and TRR *is* an actual re-roll —
+so on a first pass with a re-roll in the bank the offer survives even on 2-dice-against, and the
+dialog is addressed to the ACTING team. `noReRollUsed` is true only on the re-show path, which never
+asks again. The die choice is unaffected either way: both engines derive it from `nr_of_dice >= 0`,
+not from the dialog's choosing team.
+
+**Verification — the ladder from §H.14, in order.**
+
+| step | result |
+|---|---|
+| unit | `cargo test -p ffb-engine` **7,471 passed / 0 failed**, +11 new tests (offer raised, bank empty, kick-off turn mode, decline keeps the dice and spends nothing, accept spends and re-rolls, Loner rolls, `rerolled=true` in the coverage event, and the bb2016 twin's own four) |
+| random control | lineman **bb2016 / bb2020 / bb2025 each 100/100** with `blockRR=0` — the decline is free and the byte-matched contract is untouched |
+| inner loop | amazon × 3 editions × 3 scales, **9/9 gates 100/100** |
+| frontier | ogre bb2020 100/100 (193), imperial_nobility bb2025 100/100 (215 re-rolls, **40 Loner rolls**), khemri bb2025 100/100 (310), vampire bb2016 100/100 (137) |
+
+Block re-rolls per 300 games, measured: amazon bb2016 338 / bb2020 312 / bb2025 304 (45 Loner),
+amazon @0 bb2016 349 / bb2020 284 / bb2025 295 (39 Loner). Every edition, every scale.
+
+**Not done in this phase** (unchanged from the plan): Brawler and Hatred (§H.14 phase 2, closes E8)
+and Pro / the single-die skills (phase 3, and the open question of whether bb2025's block dialog
+offers Pro at all — its `showBlockRollDialog` never adds `ReRollProperty.PRO`). Both are reachable
+only through the `re_roll_source` this phase made settable, so the hard part is behind us.
+
+**Zero engine bugs surfaced.** Worth recording, because the TTM precedent predicted several: the
+block chain was already correct, it was simply never asked to run. The one real defect the work
+exposed was the missing `LonerRoll` producer.
+
+## §H.15 — chaos_dwarf bb2025: a latent Hail Mary Pass divergence, exposed by §H.14 (2026-09-10)
+
+The §H.14 matrix re-gate turned two cells red — `chaos_dwarf bb2025 @1.0` and `@1e6`, 99/100 each,
+both on **seed 30**. Neither is a block-re-roll bug. Both are the same pre-existing divergence on a
+**Hail Mary Pass**, which the re-roll change merely steered the stream into.
+
+### Attribution, measured
+
+| binary | jar | classes | result |
+|---|---|---|---|
+| pre-§H.14 (built in a separate `CARGO_TARGET_DIR`) | pre-session | `all` | **30/30 green** — reproduces the sweep |
+| §H.14 | rebuilt | `all` | seed 30 red |
+| §H.14 | **pre-session** | `all` minus `reroll` | seed **5** red, same HMP signature |
+
+Two candidate confounds were tested and eliminated:
+
+* **The rebuilt jar.** `mvn package` for the ParityRunner change also compiles the harness repo's
+  other uncommitted Java edits (`StatsMechanic`, `PlayerSelector`, `InjuryTypeFoul`, two
+  `StepApplyKickoffResult`, `StepBlackInk`, `StepInitSelecting`, `StepAutoGazeZoat`, `StepEndTurn`,
+  …), which the 2026-09-10 sweep's jar did not contain. Swapping the pre-session jar back in leaves
+  the failure exactly where it was, so the jar is not implicated. **Keep this in mind for any future
+  jar rebuild: the harness tree carries uncommitted engine edits, and rebuilding adopts them.**
+* **`--heur-classes` minus `reroll` is NOT a pre-fix proxy.** It changes the answer to *every*
+  re-roll offer (dodge, rush, pickup, catch, pass), not just the new block one, so it is a
+  configuration the campaign never gates. It produced its own red (seed 5) and was discarded as
+  evidence — the valid test is a pre-fix BINARY, above.
+
+### The divergence
+
+`chaos_dwarf bb2025` fields the star **Zzharg Madeye** (`chaosdwarf.Zzharg`, `nr 2`) — the only
+Hail Mary Pass carrier on the roster, and the only one in the matrix outside two other cells. Both
+engines declare `HAIL_MARY_PASS` for him from an identical pre-state, and both pick the **same
+target**:
+
+```
+JAVA_PASS pid=teamChaosDwarfParity25Home2 coord=(6,6)      <- h06, the blocker standing there
+RTTMFOLD  pid=home_02 pac=HailMaryPass target=Some("home_07")   <- the same player
+```
+
+so `legal_pass_receivers` / `sendPassAction` agree (same filter, same (x,y) sort, one `actionRng`).
+The split is in the THROW:
+
+* **Java** completes it — the ball reaches (6,6), a team-mate catches, and the home turn CONTINUES
+  (@1e6 index 35: Java stays `t6 home` and activates Home3 next).
+* **Rust** fumbles it — `StepHailMaryPass` takes `GotoLabelOnFailure → SCATTER_BALL`
+  (`generator/bb2025/pass.rs:78`), the ball scatters at the thrower (`scatterBall from (15,4)`), and
+  the turn ends (@1e6 index 35: Rust flips to `t5 away`).
+
+Both steps roll a d6 for the pass and the streams are aligned entering the activation (every hash
+matches up to it), so the same die produced a fumble on one side and not the other: **the HMP
+modifier / minimum-roll stack differs**, not the dice. The prime suspect is Zzharg's **Cannoneer**
+(with **Nerves of Steel** second) — a bb2025 passing skill fielded on exactly this one player in the
+whole matrix, and one of the 61 skills the census found have no naming event, so nothing in the
+event stream would ever have shown it firing or not firing.
+
+### The next measurement (and only that)
+
+Dump `minimum_roll`, `roll` and the applied modifier list for that single activation on both sides
+and diff them — Rust via the pass-modifier factory in `step_hail_mary_pass.rs`, Java via
+`-Dffb.parityDebug=true` in the HMP step hook (`StepHailMaryPass.executeStep` delegates to
+`executeStepHooks`, so the hook is where the roll lives). Reproduce with:
+
+```
+FFB_PARITY_ROOT=parity_hmp FFB_TRACE=1 ./target/release/ffb-parity \
+  --home chaos_dwarf --away chaos_dwarf --edition bb2025 --tier 3 --seeds 30 \
+  --no-abort --agent heuristic --heur-scale 1e6 --heur-classes all
+```
+
+(`--seeds 30` is seeds 1-30, and seed 30 is the failing one.)
+
+### Why the 2026-09-10 sweep was green on this cell
+
+Zzharg declares a Hail Mary Pass only in some streams. Across all 333 gates the action was declared
+54 times, every one in a green game — so the bug needs both the star's HMP *and* a configuration
+where the modifier disagreement flips the outcome. Any perturbation of the decision stream can find
+it: §H.14 did, and so did turning off the `reroll` class. **A green cell does not mean the mechanic
+agrees** (§H.10's lesson, again) — here it means the mechanic was never reached in the one shape
+that disagrees.

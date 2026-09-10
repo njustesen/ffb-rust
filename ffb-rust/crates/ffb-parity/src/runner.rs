@@ -2170,3 +2170,204 @@ mod fumbbl_roster_tests {
         );
     }
 }
+
+// ── Benchmark mode (`--bench N`) ───────────────────────────────────────────────
+//
+// The gate's `TIMING java_total=... rust_total=...` line is NOT an engine comparison: the Rust
+// number is one whole harness game (team build + pregame + per-iteration state hash + JSONL
+// logging + event serialization) and the Java number carries JVM start-up plus the same harness
+// work on its side. Reading a speed-up out of it attributes harness cost to the engine.
+//
+// This mode times the Rust side with each layer switchable, so the engine, the agent and the
+// harness can each be quoted on their own:
+//
+//   setup   -- make_team x2 + GameState::new_with_options (the whole pregame)
+//   agent   -- Driver::act
+//   engine  -- GameState::apply
+//   hash    -- state_hash per loop iteration (harness only; the engine never needs it)
+//   log     -- building the LogLine/GameLog structures (harness only)
+//   write   -- writing the step JSONL + the events JSONL (harness only)
+
+#[derive(Clone, Copy)]
+pub struct BenchOpts {
+    /// Compute `state_hash` every iteration, as `run_rust_headless` does.
+    pub hash: bool,
+    /// Build the parity log lines (strings) for every activation, as `run_rust_headless` does.
+    pub log: bool,
+    /// Write the step JSONL and the per-event JSONL to disk, as `run_rust_headless` does.
+    pub write: bool,
+}
+
+#[derive(Default, Clone, Copy)]
+pub struct BenchTotals {
+    pub games: u64,
+    pub setup_ns: u128,
+    pub agent_ns: u128,
+    pub engine_ns: u128,
+    pub hash_ns: u128,
+    pub log_ns: u128,
+    pub write_ns: u128,
+    pub total_ns: u128,
+    pub decisions: u64,
+    pub steps: u64,
+    pub events: u64,
+    pub rng_calls: u64,
+}
+
+/// Run one Rust game with per-layer timing. No Java, no comparison, no progress file.
+pub fn run_bench_game(
+    seed: u64, home_roster: &str, away_roster: &str, edition: &str, tier: u8,
+    agent_spec: AgentSpec, opts: BenchOpts, t: &mut BenchTotals,
+) -> (i32, i32) {
+    let game_t0 = std::time::Instant::now();
+    let rules = edition_to_rules(edition);
+
+    let setup_t0 = std::time::Instant::now();
+    let home = make_team(home_roster, "home", edition);
+    let away = make_team(away_roster, "away", edition);
+    let mut engine = GameState::new_with_options(home, away, rules, seed, BASELINE_SETUP_OPTIONS);
+    let mut agent = Driver::new(agent_spec, seed);
+    t.setup_ns += setup_t0.elapsed().as_nanos();
+
+    let mut lines: Vec<LogLine> = Vec::new();
+    let mut all_events: Vec<GameEvent> = Vec::new();
+    let mut pending_steps: Vec<PendingStep> = Vec::new();
+    let mut step_index = 1u64;
+    if opts.log {
+        let log_t0 = std::time::Instant::now();
+        let initial_hash = engine.initial_state_hash().to_string();
+        lines.push(LogLine::GameStart {
+            i: 0,
+            home: home_roster.to_string(),
+            away: away_roster.to_string(),
+            seed,
+            state_hash: initial_hash,
+        });
+        t.log_ns += log_t0.elapsed().as_nanos();
+    }
+
+    for _ in 0..100_000usize {
+        if engine.is_finished() { break; }
+        if engine.current_prompt().is_none() { break; }
+
+        let hash_t0 = std::time::Instant::now();
+        let pre_hash = if opts.hash { state_hash(&engine.game) } else { String::new() };
+        t.hash_ns += hash_t0.elapsed().as_nanos();
+
+        let turn_nr = if engine.game.home_playing {
+            engine.game.turn_data_home.turn_nr
+        } else {
+            engine.game.turn_data_away.turn_nr
+        };
+        let half = engine.game.half;
+        let active_str = if engine.game.home_playing { "home" } else { "away" };
+
+        let side = engine.active_side();
+        let agent_t0 = std::time::Instant::now();
+        let action = if tier >= 3 {
+            agent.act(&engine)
+        } else {
+            match engine.current_prompt() {
+                Some(AgentPrompt::ActivatePlayer { eligible_players }) => {
+                    agent.pick_t2_activation(eligible_players.len());
+                    ffb_engine::action::Action::EndTurn
+                }
+                _ => agent.act(&engine),
+            }
+        };
+        t.agent_ns += agent_t0.elapsed().as_nanos();
+        t.decisions += 1;
+
+        let log_t0 = std::time::Instant::now();
+        let chosen = if opts.log { action_label(&action) } else { String::new() };
+        let is_activation = matches!(action, ffb_engine::action::Action::ActivatePlayer { .. });
+        t.log_ns += log_t0.elapsed().as_nanos();
+
+        let engine_t0 = std::time::Instant::now();
+        let r = engine.apply(side, action);
+        t.engine_ns += engine_t0.elapsed().as_nanos();
+        match r {
+            Ok(evs) => { t.events += evs.len() as u64; all_events.extend(evs); }
+            Err(_) => break,
+        }
+
+        if opts.log && is_activation && turn_nr >= 1 {
+            let log_t0 = std::time::Instant::now();
+            pending_steps.push(PendingStep {
+                i: step_index,
+                turn: turn_nr,
+                half,
+                active: active_str.to_string(),
+                hash: pre_hash,
+                chosen,
+                state: None,
+            });
+            step_index += 1;
+            t.steps += 1;
+            t.log_ns += log_t0.elapsed().as_nanos();
+        }
+    }
+
+    if opts.log {
+        let log_t0 = std::time::Instant::now();
+        let end_hash = state_hash(&engine.game);
+        for i in 0..pending_steps.len() {
+            let post_hash = if i + 1 < pending_steps.len() {
+                pending_steps[i + 1].hash.clone()
+            } else {
+                end_hash.clone()
+            };
+            let s = &pending_steps[i];
+            lines.push(LogLine::Step {
+                i: s.i,
+                turn: s.turn,
+                half: s.half,
+                active: s.active.clone(),
+                dialog: "None".to_string(),
+                state_hash: s.hash.clone(),
+                actions: vec!["EndTurn".to_string()],
+                chosen: s.chosen.clone(),
+                dice: vec![],
+                post_hash,
+                state: s.state.clone(),
+            });
+        }
+        lines.push(LogLine::GameEnd {
+            i: step_index,
+            home_score: engine.game.game_result.home.score,
+            away_score: engine.game.game_result.away.score,
+            state_hash: end_hash,
+        });
+        t.log_ns += log_t0.elapsed().as_nanos();
+    }
+
+    if opts.write {
+        let write_t0 = std::time::Instant::now();
+        let rust_path = rust_log_path_for(seed, edition, home_roster, away_roster);
+        if let Some(dir) = std::path::Path::new(&rust_path).parent() {
+            std::fs::create_dir_all(dir).ok();
+        }
+        let log = GameLog {
+            seed,
+            home_roster: home_roster.to_string(),
+            away_roster: away_roster.to_string(),
+            lines: lines.clone(),
+        };
+        let _ = log.write_to_file(&rust_path);
+        let events_path = rust_events_path_for(seed, edition, home_roster, away_roster);
+        if let Ok(mut f) = std::fs::File::create(&events_path) {
+            use std::io::Write;
+            for ev in &all_events {
+                if let Ok(line) = serde_json::to_string(ev) {
+                    let _ = writeln!(f, "{}", line);
+                }
+            }
+        }
+        t.write_ns += write_t0.elapsed().as_nanos();
+    }
+
+    t.rng_calls += engine.rng_call_count();
+    t.games += 1;
+    t.total_ns += game_t0.elapsed().as_nanos();
+    (engine.game.game_result.home.score, engine.game.game_result.away.score)
+}
