@@ -6713,3 +6713,75 @@ had the rng-aware call already and the dead twin was fixed twice over. **Fourth 
 has paid for a dead `step/bb20xx/*` twin** — the others were §H.25's kickoff probe, §H.27's
 intercept files, and §H.19's original mis-attribution. Before touching any `step/bb2016/*` or
 `step/bb2020/*` file, grep `driver.rs` for an override of that `StepId` in that edition's arm.
+
+## §H.33 — ITER12: the red queue re-measured; `dark_elf` bb2025 is a HARNESS gap in the Punt family
+
+**Investigation, no fix.** Nothing committed but this record and the corrected queue.
+
+### The queue was stale: `renegades` bb2020 @1.0 is GREEN
+
+Re-measured all five remaining reds on the current binary. One of them has been fixed by an
+intervening change and nobody noticed:
+
+| cell | verdict | seed | first differing step |
+|---|---|---|---|
+| `renegades` bb2020 @1.0 | **100/100 — GREEN** | — | — |
+| `dark_elf` bb2025 @1.0 | 99/100 | 28 | 26 |
+| `khemri` bb2025 @1.0 | 99/100 | 57 | 77 |
+| `slann` bb2020 @1e6 | 99/100 | 32 | 86 |
+| `human` bb2020 @0 | 99/100 | 63 | 231 |
+
+So the real remaining set is **4 gates / 4 cells**, not 5. §H.21's table is out of date; this is the
+current one. (The §H.21 lesson about `goblin` bb2016's stale reds applies to the queue itself: any
+red older than a few fixes is worth re-measuring before investigating.)
+
+### `dark_elf` bb2025 @1.0 seed 28 — classified
+
+§H.20 recorded only the shape ("Java's trace stops at step 26 with `END_REASON: finished` while Rust
+runs to 167 … untriaged beyond that"). It is now classified, and it is **not a Rust engine bug**:
+
+1. Both engines declare the SAME action at i=26: `Activate(home_07, PUNT)`.
+2. Both spend the SAME four dice: throw-in direction d6=5, `StepPuntDistance` d6=6, an ACCEPTED team
+   re-roll, `StepPuntDistance` d6=2, throw-in direction d6=5. Rust's `rng_calls` goes 44 → 48 and
+   Java's 44 → 48. The punt itself is in parity, re-roll included.
+3. Java then emits **`UNHANDLED_STEP: CATCH_SCATTER_THROW_IN turnMode=REGULAR` exactly 500 times**
+   and the harness gives up, reporting `END_REASON: finished iter=595 half=1 turnHome=3 turnAway=2` —
+   a "finished" game in the first half, turn 3. Rust plays on to step 168.
+
+So Java's game never finishes; the harness abandons it. Same family as §H.19/§H.30's `khorne`
+(**HARNESS**, not the engine), and the fix belongs in `ParityRunner.java`.
+
+### Where Java is parked, precisely
+
+`bb2025/shared/StepCatchScatterThrowIn.java:388` is the only `CONTINUE` in the file:
+
+```java
+if ((getReRolledAction() != null) || (game.getDialogParameter() != null)) {
+    getResult().setNextAction(StepAction.CONTINUE);
+}
+```
+
+The harness's `UNHANDLED_STEP` line is emitted for a step that stays current **with no dialog**, so
+the live disjunct is `getReRolledAction() != null`. The step is waiting on a re-roll that was set but
+never surfaced as a dialog, so nothing the harness can send will clear it. Note the punt DID consume
+an accepted re-roll two dice earlier (`JREROLLA pick=0 use=true`) — that acceptance is mirrored on
+the Rust side, so it is not itself the divergence, but it is the obvious source of a
+`reRolledAction` left set.
+
+**Next concrete step:** probe the parked step in `ffb-server` — print the step id, its
+`getReRolledAction()`, `getReRollSource()` and `game.getDialogParameter()` on each
+`UNHANDLED_STEP` iteration. That says whether the punt's re-roll state leaks into the following
+`CatchScatterThrowIn` (in which case the fix is to clear it where Java's own client would) or whether
+a catch re-roll is being requested without a dialog. It needs `mvn -o -pl ffb-server,ffb-ai install`
+and invalidates `--reuse-java`.
+
+**Do not** treat this as a Rust engine divergence: at the last comparable step both engines agree on
+the action, the dice and the count. The only asymmetry is that Java stops playing.
+
+### Note on the Punt family
+
+The campaign has repeatedly recorded Punt as unreachable — `parity_dead_step_frontier` says the
+scoring/Punt family was blocked, and `sendPuntTarget`'s own comment explains the whole family never
+executed because the harness had no handler and "the Rust agent abort[ed] in lockstep". The handler
+now exists and the punt runs, which is why this surfaced at all. Expect more of the family's gaps to
+appear as the agent reaches them.
