@@ -6785,3 +6785,75 @@ scoring/Punt family was blocked, and `sendPuntTarget`'s own comment explains the
 executed because the harness had no handler and "the Rust agent abort[ed] in lockstep". The handler
 now exists and the punt runs, which is why this surfaced at all. Expect more of the family's gaps to
 appear as the agent reaches them.
+
+## §H.34 — ITER13: `dark_elf` bb2025 narrowed to one line; §H.33's cause was WRONG, and so was "finished"
+
+**Investigation, no fix.** Two hypotheses refuted with evidence, one reporting bug found, and the
+question reduced to a single unknown line. Probes were in `ffb-ai` only (no `ffb-server` rebuild),
+and the build tree is back to carrying nothing but §H.30's fix (verified by diff; `khorne` bb2020
+seed 93 re-checked 1/1 afterwards).
+
+### Correction 1: `END_REASON: finished` is a REPORTING DEFAULT, not a game end
+
+`ParityRunner.run` initialises `String endReason = "finished"` and only overwrites it for
+`step_stack_empty` and `max_iterations`. The **`STUCK_STEP` break at line 395 does not set it**, so a
+harness that gives up after 500 unadvanced iterations still reports `END_REASON: finished`.
+
+That is what §H.20 read as "Java's game ended NORMALLY after 26 steps — not the `max_iterations`
+spin", and what §H.33 repeated. It ended nothing; the harness bailed. **Worth fixing on its own** —
+one assignment — because the current output actively misleads triage. The `STUCK_STEP` line is
+printed, so the evidence was there, but `grep END_REASON` alone gives the wrong answer.
+
+### Correction 2: the park is NOT the re-roll condition §H.33 named
+
+§H.33 reasoned that `StepCatchScatterThrowIn.java:388`'s `CONTINUE` fires on
+`getReRolledAction() != null` because the harness reports no dialog. Measured, at the moment of the
+park:
+
+```
+JSTEPPROBE nextAction=CONTINUE step=CATCH_SCATTER_THROW_IN cls=StepCatchScatterThrowIn
+           reRolledAction=null reRollSource=null dialog=null ballInPlay=true ballMoving=true
+```
+
+Both disjuncts of line 388 are **null**. So the step is parked at `CONTINUE` with nothing outstanding
+that either the harness or that condition can explain. A second hypothesis — that the harness's
+`DIALOG_LOOP_CLEARED` safety net had cleared a dialog out from under it — is also refuted: that line
+never fires in this run (`grep -c` = 0).
+
+### What the harness actually sees
+
+With a per-iteration step/dialog log:
+
+```
+iter=92 step=INIT_PUNT          dialog=null              -> sendPuntTarget
+iter=93 step=PUNT_DIRECTION     dialog=RE_ROLL_PROPERTIES -> answered, declined (JREROLLA use=false)
+iter=94 step=PUNT_DISTANCE      dialog=RE_ROLL_PROPERTIES -> answered, ACCEPTED (use=true)
+iter=95 step=CATCH_SCATTER_THROW_IN dialog=null           -> already parked; 500x UNHANDLED_STEP
+```
+
+So the punt's own two re-roll dialogs are handled correctly, the re-rolled distance is rolled
+(rng 47), a throw-in direction is rolled (rng 48), and `CATCH_SCATTER_THROW_IN` then arrives
+**already at CONTINUE with no dialog**. No dice are consumed after rng 48, so the step is not
+re-executing; the harness's default `ClientCommandEndTurn` cannot advance it.
+
+### The one remaining unknown
+
+Which line set `CONTINUE`. Line 388 is the only `setNextAction(StepAction.CONTINUE)` in
+`bb2025/shared/StepCatchScatterThrowIn.java`, and its condition is false at the park — so either it
+was taken earlier while a dialog WAS set (and that dialog was then consumed without the step being
+re-entered), or the CONTINUE comes from inherited machinery
+(`AbstractStepWithReRoll` / `UtilServerDialog.showDialog(gameState, dialog, true)` — note the punt
+path calls the two-arg-plus-flag form) rather than from this file.
+
+**Next concrete step, and it does need the expensive probe:** instrument
+`AbstractStep.setNextAction` (or `getResult().setNextAction`) in `ffb-server` to print a short stack
+trace whenever `CONTINUE` is set on `CATCH_SCATTER_THROW_IN`. That names the setter directly, the way
+§H.22's `publishParameter` stack probe named `StepInitPassing:191` after three rounds of inference
+had failed. Requires `mvn -o -pl ffb-server,ffb-ai install` and invalidates `--reuse-java`.
+
+### Standing red set (re-measured ITER12, unchanged)
+
+4 gates / 4 cells: `dark_elf` bb2025 @1.0 (seed 28, harness), `khemri` bb2025 @1.0 (57),
+`slann` bb2020 @1e6 (32), `human` bb2020 @0 (63, the §H.26 stalling port). Given `dark_elf` now needs
+an `ffb-server` probe, the cheaper next target is `khemri` or `slann`, both untriaged and both plain
+in-game divergences.
