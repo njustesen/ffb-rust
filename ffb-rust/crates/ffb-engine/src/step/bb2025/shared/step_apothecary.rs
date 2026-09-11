@@ -263,6 +263,82 @@ impl StepApothecary {
         self.finish_tail(game, pending_events)
     }
 
+    /// Java `StepApothecary.java:382-407`: the `PlayerState.RIP` arm.
+    ///
+    /// ```java
+    /// } else if (playerState.getBase() == PlayerState.RIP) {
+    ///   Team raisingTeam = game.getOtherTeam(defender.getTeam());
+    ///   if (injuryMechanic.canRaiseDead(raisingTeam, raisingTeamResult, defender) ||
+    ///       injuryMechanic.canRaiseInfectedPlayers(raisingTeam, raisingTeamResult, attacker, defender)) {
+    ///     List<RosterPosition> raisePositions = injuryMechanic.raisePositions(raisingTeam);
+    ///     if (raisePositions.size() == 1) { raisePlayer(..., raisePositions.get(0)); }
+    ///     else if (raisePositions.size() > 1) { showDialog(SELECT_POSITION, RAISE_DEAD); CONTINUE; }
+    ///   }
+    /// }
+    /// ```
+    ///
+    /// The `size() > 1` dialog is NOT ported: it needs an agent answer, and the harness has no
+    /// channel for a RAISE_DEAD position choice. Every BB2025 roster that reaches this branch today
+    /// has exactly one Lineman-keyword position, so the branch is unreachable rather than skipped --
+    /// but a roster with two would silently raise nothing here, so it is logged.
+    ///
+    /// Java's raise type comes from `injuryMechanic.raiseType(raisingTeam)`, unlike
+    /// `UtilServerInjury.handleRaiseDead`'s `hasVampireLord() ? THRALL : ZOMBIE`.
+    fn handle_rip_raise(&self, game: &mut Game) -> Vec<GameEvent> {
+        use ffb_model::enums::PS_RIP;
+
+        let ir = match &self.injury_result { Some(ir) => ir, None => return vec![] };
+        let defender_id = match ir.injury_context.defender_id.clone() { Some(id) => id, None => return vec![] };
+        // Java: `playerState` is the injury context's FINAL state, and the RIP arm is the `else` of
+        // `isSi() && attacker != null`.
+        let is_rip = ir.injury_context.injury.map(|ps| ps.base() == PS_RIP).unwrap_or(false);
+        if !is_rip {
+            return vec![];
+        }
+        let is_si = game.field_model.player_state(&defender_id).map(|s| s.is_si()).unwrap_or(false);
+        if is_si && ir.injury_context.attacker_id.is_some() {
+            return vec![];
+        }
+
+        let defender = match game.player(&defender_id) { Some(p) => p.clone(), None => return vec![] };
+        let attacker = ir.injury_context.attacker_id.as_deref().and_then(|id| game.player(id).cloned());
+
+        // Java: game.getOtherTeam(defender.getTeam())
+        let raising_is_home = !game.team_home.has_player(&defender_id);
+        let raising_team = if raising_is_home { game.team_home.clone() } else { game.team_away.clone() };
+        let raising_team_result = game.game_result.team_result(raising_is_home).clone();
+
+        let mechanic = crate::step::util_server_injury::injury_mechanic_for(game.rules);
+        if !(mechanic.can_raise_dead(&raising_team, &raising_team_result, &defender)
+            || mechanic.can_raise_infected_players(&raising_team, &raising_team_result, attacker.as_ref(), &defender))
+        {
+            return vec![];
+        }
+
+        let raise_positions = mechanic.raise_positions(&raising_team, game.rules);
+        if raise_positions.len() != 1 {
+            if raise_positions.len() > 1 {
+                log::warn!(
+                    "bb2025 raise-dead position choice not ported: {} candidates for roster {}",
+                    raise_positions.len(),
+                    raising_team.roster_id
+                );
+            }
+            return vec![];
+        }
+
+        let raise_type = mechanic.raise_type(&raising_team);
+        crate::step::util_server_injury::raise_player(
+            game,
+            raising_is_home,
+            &defender_id,
+            &defender.name,
+            raise_type,
+            &raise_positions[0],
+            false,
+        )
+    }
+
     /// Java StepApothecary.executeStep tail — Getting Even + injury side effects. Split out so
     /// the bb2025 regeneration re-roll answer (handle_command UseReRoll) can resume here without
     /// re-running the status switches (which would double-report and re-apply).
@@ -300,6 +376,19 @@ impl StepApothecary {
                 )])
             });
 
+            // Java StepApothecary.java:382-407 -- the `else if (playerState.getBase() ==
+            // PlayerState.RIP)` arm of the same if/else the Getting Even block opens. BB2025 raises
+            // the dead from `InjuryMechanic.raisePositions(raisingTeam)` -- a LIST of the roster's
+            // Lineman-keyword positions -- which is BB2025's replacement for BB2016/BB2020's single
+            // `raisedPositionId`. A roster that declares no raise position therefore still raises in
+            // BB2025 (khemri: `undead: true`, `Masters of Undeath` on the team spec, one Lineman
+            // position), and `UtilServerInjury.handleRaiseDead`'s roster-default route -- which both
+            // engines run first -- correctly does nothing for it.
+            //
+            // `canRaiseDead` requires `raisedDead == 0`, so this cannot double-raise after the
+            // roster-default route already raised: that path increments `raised_dead` first.
+            let raise_events = self.handle_rip_raise(game);
+
             // Java: UtilServerInjury.handleInjurySideEffects(this, fInjuryResult)
             let side_events = if let Some(ir) = &self.injury_result {
                 crate::step::util_server_injury::handle_injury_side_effects(game, ir)
@@ -307,6 +396,7 @@ impl StepApothecary {
                 vec![]
             };
             let mut out = StepOutcome::next();
+            for ev in raise_events { out = out.with_event(ev); }
             for ev in pending_events { out = out.with_event(ev); }
             for ev in side_events { out = out.with_event(ev); }
             if let Some(seq) = getting_even { out = out.push_seq(seq); }
@@ -660,6 +750,75 @@ mod tests {
         assert_eq!(run(false), 0, "eaten player (can_use_apo=false) must not roll Regeneration");
         // can_use_apo == true (normal casualty): the Regeneration die IS rolled.
         assert_eq!(run(true), 1, "a regenerating casualty with can_use_apo=true rolls one Regeneration d6");
+    }
+
+    /// Java `StepApothecary.java:382-407`: the `PlayerState.RIP` arm raises the dead player onto
+    /// the OTHER team from `InjuryMechanic.raisePositions(raisingTeam)` -- BB2025's replacement for
+    /// the single roster-level `raisedPositionId`.
+    ///
+    /// Regression (khemri bb2025 @1.0 seed 57): khemri declares no `raisedPositionId` in either
+    /// engine, so `UtilServerInjury.handleRaiseDead`'s roster-default route correctly raises
+    /// nothing -- and this branch was missing, so Rust raised nothing at all where Java added
+    /// `<deadId>R1` to the raising team. A raised player takes `maxPlayerNr + 1`, i.e. above 11,
+    /// which the state hash cannot see, so the extra player stayed invisible until it appeared in
+    /// the agent's eligible set and moved the sampler's choice.
+    ///
+    /// Asserts the SHAPE -- that a player is added to the raising team, with the raise position and
+    /// the `R1` id -- not a die count: this branch rolls no dice at all.
+    #[test]
+    fn a_bb2025_rip_raises_a_lineman_onto_the_other_team_but_bb2020_does_not() {
+        use ffb_model::enums::{PlayerType, PS_RIP};
+        use ffb_model::model::player::Player;
+        use ffb_model::types::FieldCoordinate;
+
+        fn run(rules: Rules) -> (usize, Option<String>) {
+            let mut home = test_team("home", 0);
+            // Java reads the raise positions off the raising team's ROSTER, and `canRaiseDead`
+            // requires the Masters of Undeath special rule on the TEAM (the khemri parity team spec
+            // carries `<rule>Masters of Undeath</rule>`; the roster itself carries only `undead`).
+            home.roster_id = "khemri.lrb6".into();
+            home.special_rules = vec!["Masters of Undeath".into()];
+            let away = test_team("away", 0);
+            let mut game = Game::new(home, away, rules);
+
+            // The dead player is on AWAY, so HOME is the raising team.
+            let mut d = Player { id: "d1".into(), name: "Dead One".into(), nr: 3, ..Default::default() };
+            d.strength = 3; // canRaiseDead: getStrengthWithModifiers() <= 4
+            game.team_away.players.push(d);
+            game.field_model.set_player_coordinate("d1", FieldCoordinate::new(5, 5));
+            game.field_model.set_player_state("d1", PlayerState::new(PS_RIP));
+
+            let before = game.team_home.players.len();
+            let max_nr_before = game.team_home.players.iter().map(|p| p.nr).max().unwrap_or(0);
+            let mut step = StepApothecary::default();
+            step.apothecary_mode = Some(ApothecaryMode::Defender);
+            let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+            ir.injury_context.defender_id = Some("d1".into());
+            ir.injury_context.set_injury(PlayerState::new(PS_RIP));
+            ir.injury_context.apothecary_status = ApothecaryStatus::NoApothecary;
+            step.injury_result = Some(ir);
+
+            step.start(&mut game, &mut GameRng::new(0));
+            let added = game.team_home.players.len() - before;
+            let raised = game.team_home.players.iter().find(|p| p.id == "d1R1").map(|p| {
+                assert_eq!(p.player_type, PlayerType::RaisedFromDead);
+                // Java: raisedPlayer.setNr(necroTeam.getMaxPlayerNr() + 1). On a real 11-16 man
+                // squad that lands above 11, which is the hash's blind spot.
+                assert_eq!(p.nr, max_nr_before + 1, "raised player takes maxPlayerNr + 1");
+                p.position_id.clone()
+            });
+            (added, raised)
+        }
+
+        // BB2025: raisePositions is the roster's Lineman-keyword positions; khemri has exactly one.
+        let (added, raised) = run(Rules::Bb2025);
+        assert_eq!(added, 1, "BB2025 must raise the RIP'd player onto the other team");
+        assert_eq!(raised.as_deref(), Some("khemri.skeleton"),
+            "the raise position is khemri's single Lineman-keyword position");
+
+        // BB2020's raisePositions is Collections.emptyList(), and khemri declares no
+        // raisedPositionId, so nothing is raised.
+        assert_eq!(run(Rules::Bb2020), (0, None), "BB2020 raises only from the roster default");
     }
 
     #[test]

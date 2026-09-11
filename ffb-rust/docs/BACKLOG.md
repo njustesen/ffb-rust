@@ -7127,3 +7127,116 @@ mechanism was dead in three files at once. Two refinements the previous write-up
 `InjuryMechanic.raisePositions` returns for an `undead` team with no `raisedPositionId`, and whether
 Rust's `InjuryMechanic` trait already has a `raise_positions` hook. Gate broadly: every undead /
 necromancer / Nurgle roster can raise.
+
+## §H.38 — ITER17: `khemri` bb2025 CLOSED — BB2025's raise-from-dead list ported
+
+**Cell closed at all three scales.** The BB2025 raise path really was unported, as §H.35 said, but
+§H.35's reading of the TRIGGER was wrong in a way worth recording.
+
+### The correction to §H.35
+
+§H.35 checked the rosters, found `undead: true` and no `raisedPositionId` in either engine, and
+concluded "not a data gap". The first half was right and the second was right for the wrong reason:
+`canRaiseDead` in BB2025 does not read the roster at all —
+
+```java
+return (team.getSpecialRules().contains(SpecialRule.MASTERS_OF_UNDEATH)) &&
+    (teamResult.getRaisedDead() == 0) && (deadPlayer.getStrengthWithModifiers() <= 4) &&
+    !deadPlayer.hasSkillProperty(NamedProperties.preventRaiseFromDead);
+```
+
+`team.getSpecialRules()` is populated from the **TEAM** file's `<rule>` elements, not from the
+roster (`Roster`'s `undead` flag maps to no SpecialRule whatsoever). `team_khemri_parity25_home.xml`
+carries `<rule>Masters of Undeath</rule>` and Rust's `data/teams/bb2025/team_khemri.json` carries
+`special_rules: ["Masters of Undeath"]`, so **both engines agreed on the predicate all along**. Two
+hypotheses were checked and refuted on the way: that `undead: true` implies the special rule (it does
+not), and that `canRaiseInfectedPlayers` was the live predicate (it needs
+`allowsRaisingLineman`, registered only by Nurgle's Rot and Plague Ridden — no khemri position has
+either).
+
+What differed was only the POSITION SOURCE.
+
+### Root cause
+
+BB2016 and BB2020 return `Collections.emptyList()` from `raisePositions` and raise from the roster's
+single `raisedPositionId`. **BB2025 replaces that with a list:**
+
+```java
+return Arrays.stream(team.getRoster().getPositions())
+    .filter(pos -> pos.getKeywords().contains(Keyword.LINEMAN) && pos.getType() != PlayerType.STAR &&
+        pos.getType() != PlayerType.IRREGULAR && pos.getType() != PlayerType.INFAMOUS_STAFF)
+    .collect(Collectors.toList());
+```
+
+Khemri declares no `raisedPositionId`, so `UtilServerInjury.handleRaiseDead`'s roster-default route
+raises nothing — correctly, in BOTH engines: Java's 6-arg `raisePlayer` gets a null position and
+returns null without even incrementing `raisedDead`. Java then raises through
+`bb2025/shared/StepApothecary.java:382-407`, the `PlayerState.RIP` arm of the same if/else the
+Getting Even block opens. Rust had no such arm, so it raised nothing at all.
+
+The raised player takes `maxPlayerNr + 1`, i.e. above 11 — **exactly the state hash's blind spot** —
+which is why an entire extra player stayed invisible until it turned up in the agent's eligible set
+(`JELIG ... teamKhemriParity25Away3R1:Move`) and moved the sampler's choice at i=77, where the hashes
+were still identical.
+
+### The fix, in three parts
+
+1. `InjuryMechanic::raise_positions` ported for real in `ffb-mechanics/src/bb2025`. It now takes
+   `rules` as well as `team`: Java reaches the positions as `team.getRoster()`, but the headless
+   `Team` carries only `roster_id` and `find_roster` is keyed by (roster_id, rules). bb2016/bb2020
+   keep the empty list, with the Java one-liner quoted.
+2. `UtilServerInjury.raisePlayer`'s 7-arg overload split out of `handle_raise_dead` as
+   `raise_player(...)`, so both call sites share one body — Java has exactly the same split.
+3. The RIP arm added to the live `bb2025/shared/step_apothecary.rs` (`handle_rip_raise`).
+
+### Two deliberate omissions, both recorded rather than hidden
+
+- **The `raisePositions.size() > 1` position-choice dialog is NOT ported.** It needs an agent answer
+  and the harness has no RAISE_DEAD position channel. Of the five bb2025 rosters that can raise, only
+  `undead` has two candidates (`undead.skeleton`, `undead.zombie`) — and `undead` declares a
+  `raisedPositionId`, so the roster-default route raises first and `raisedDead == 0` then blocks this
+  branch. The branch is **unreachable today, not skipped**; it `log::warn!`s if that ever changes.
+- Rust's bb2025 `raise_type` carries a `vampire_lord -> THRALL` branch that **Java's bb2025 does
+  not** (that is bb2020's `raiseType`). Masters of Undeath is checked first and holds for every
+  affected roster, so it is latent. Left alone deliberately: folding a second 1:1 correction into
+  this gate would have made a red ambiguous.
+
+### Gate
+
+Sequential, `PARITY_JVM_CORES=1`, fresh JVM throughout (no `--reuse-java`):
+
+| cell | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| **khemri bb2025** (target) | **100/100** (was RED) | 100/100 | 100/100 |
+| necromantic bb2025 | 100/100 | | |
+| undead bb2025 | 100/100 | | |
+| vampire bb2025 | 100/100 | | |
+| nurgle bb2025 | 100/100 | | |
+| khemri_fumbbl bb2025 | 100/100 | | |
+| human bb2025 | 100/100 | | |
+| khemri bb2016 | 100/100 | | |
+| khemri bb2020 | 100/100 | | |
+| undead bb2020 | 100/100 | | |
+| necromantic bb2016 | 100/100 | | |
+
+Every other bb2025 roster that can raise is in there on purpose — they all share the new code path,
+and a newly-raised player changes agent sampling in every later activation, so the blast radius is
+wide by construction. Nothing moved. Workspace tests 15,322 passed / 0 failed.
+
+### Regression test
+
+`a_bb2025_rip_raises_a_lineman_onto_the_other_team_but_bb2020_does_not` asserts the published SHAPE —
+a player added to the raising team, with id `d1R1`, `PlayerType::RaisedFromDead`, position
+`khemri.skeleton`, and `nr == maxPlayerNr + 1` — and that BB2020 with the same fixture raises nothing.
+A die count would be vacuous here: this branch rolls no dice at all. **Shown to fail without the
+fix.**
+
+### Standing red set
+
+**1 gate / 1 cell.**
+
+- `dark_elf` bb2025 @1.0 — harness (§H.34), needs an `ffb-server` stack probe on
+  `setNextAction(CONTINUE)`
+
+**Next concrete step:** the `dark_elf` probe. §H.37 is the precedent to follow — mirror the probe in
+BOTH engines and diff it, rather than reasoning from Rust's side alone.

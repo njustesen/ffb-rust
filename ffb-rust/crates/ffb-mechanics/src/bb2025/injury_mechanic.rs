@@ -1,4 +1,4 @@
-use ffb_model::enums::{PlayerState, PlayerType, SendToBoxReason};
+use ffb_model::enums::{Keyword, PlayerState, PlayerType, Rules, SendToBoxReason};
 use ffb_model::model::{Game, Player, RosterPosition, SpecialRule, Team, TeamResult};
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::raise_type::RaiseType;
@@ -68,11 +68,36 @@ impl InjuryMechanicTrait for InjuryMechanic {
             .is_empty()
     }
 
-    fn raise_positions(&self, _team: &Team) -> Vec<RosterPosition> {
-        // no-op: raise_positions needs roster data (team.getRoster().getPositions() with LINEMAN keyword)
-        // but Roster is not accessible from Team in the headless model; positions loaded separately.
-        // RosterPosition.has_keyword(Keyword::LINEMAN) is now available for when this is wired.
-        vec![]
+    /// 1:1 translation of Java bb2025 `InjuryMechanic.raisePositions`:
+    ///
+    /// ```java
+    /// return Arrays.stream(team.getRoster().getPositions())
+    ///     .filter(pos -> pos.getKeywords().contains(Keyword.LINEMAN) && pos.getType() != PlayerType.STAR &&
+    ///         pos.getType() != PlayerType.IRREGULAR && pos.getType() != PlayerType.INFAMOUS_STAFF)
+    ///     .collect(Collectors.toList());
+    /// ```
+    ///
+    /// This LIST is BB2025's replacement for BB2016/BB2020's single `raisedPositionId`, and it is
+    /// why a roster that declares no raise position (khemri: `undead: true`, no `raisedPositionId`)
+    /// still raises in BB2025 -- its one Lineman-keyword position is the one entry.
+    ///
+    /// Order follows the roster's declaration order, as Java's `Arrays.stream` does.
+    fn raise_positions(&self, team: &Team, rules: Rules) -> Vec<RosterPosition> {
+        let roster = match ffb_model::data::loader::find_roster(&team.roster_id, rules) {
+            Some(r) => r,
+            None => return vec![],
+        };
+        roster
+            .positions
+            .iter()
+            .filter(|pos| {
+                pos.has_keyword(Keyword::LINEMAN)
+                    && pos.player_type != PlayerType::Star
+                    && pos.player_type != PlayerType::Irregular
+                    && pos.player_type != PlayerType::InfamousStaff
+            })
+            .cloned()
+            .collect()
     }
 
     fn raise_type(&self, team: &Team) -> RaiseType {

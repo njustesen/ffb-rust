@@ -1,4 +1,4 @@
-use ffb_model::enums::{PlayerState, PlayerType, SendToBoxReason};
+use ffb_model::enums::{PlayerState, PlayerType, Rules, SendToBoxReason};
 use ffb_model::model::{Game, Player, RosterPosition, SpecialRule, Team, TeamResult};
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::raise_type::RaiseType;
@@ -68,7 +68,9 @@ impl InjuryMechanicTrait for InjuryMechanic {
             .is_empty()
     }
 
-    fn raise_positions(&self, _team: &Team) -> Vec<RosterPosition> { vec![] }
+    /// Java: `Collections.emptyList()` -- BB2016/BB2020 raise from the roster's single
+    /// `raisedPositionId` instead, via `UtilServerInjury.handleRaiseDead`.
+    fn raise_positions(&self, _team: &Team, _rules: Rules) -> Vec<RosterPosition> { vec![] }
 
     fn raise_type(&self, team: &Team) -> RaiseType {
         if team.special_rules.iter().any(|r| r == SpecialRule::MASTERS_OF_UNDEATH.get_rule_name()) {

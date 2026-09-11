@@ -1,4 +1,4 @@
-use ffb_model::enums::{PlayerState, SendToBoxReason};
+use ffb_model::enums::{PlayerState, Rules, SendToBoxReason};
 use ffb_model::enums::PlayerType;
 use ffb_model::model::{Game, Player, RosterPosition, Team, TeamResult};
 use ffb_model::util::raise_type::RaiseType;
@@ -15,6 +15,9 @@ pub trait InjuryMechanic: Mechanic {
     fn can_raise_dead(&self, team: &Team, team_result: &TeamResult, dead_player: &Player) -> bool;
     fn raised_nurgle_type(&self) -> PlayerType;
     fn can_use_apo(&self, game: &Game, defender: &Player, player_state: PlayerState) -> bool;
-    fn raise_positions(&self, team: &Team) -> Vec<RosterPosition>;
+    /// Java: `raisePositions(Team)`. Takes `rules` because the position list is read off the
+    /// team's ROSTER, which the headless `Team` does not carry (only `roster_id`); the loader is
+    /// keyed by (roster_id, rules). Java reaches it as `team.getRoster()`.
+    fn raise_positions(&self, team: &Team, rules: Rules) -> Vec<RosterPosition>;
     fn raise_type(&self, team: &Team) -> RaiseType;
 }

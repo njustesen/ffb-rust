@@ -571,7 +571,7 @@ pub fn handle_injury_side_effects(
 
 /// Dispatch `InjuryMechanic` to the appropriate edition mechanic (boxed, since callers need
 /// several of its methods together rather than one dispatched call at a time).
-fn injury_mechanic_for(rules: ffb_model::enums::Rules) -> Box<dyn ffb_mechanics::injury_mechanic::InjuryMechanic> {
+pub(crate) fn injury_mechanic_for(rules: ffb_model::enums::Rules) -> Box<dyn ffb_mechanics::injury_mechanic::InjuryMechanic> {
     use ffb_model::enums::Rules;
     match rules {
         Rules::Bb2016 => Box::new(ffb_mechanics::bb2016::injury_mechanic::InjuryMechanic::new()),
@@ -636,6 +636,41 @@ fn handle_raise_dead(
         None => return vec![],
     };
 
+    raise_player(game, necro_is_home, &dead_player_id, &dead_player.name, raise_type, &zombie_position, nurgles_rot)
+}
+
+/// Port of `UtilServerInjury.raisePlayer(game, necroTeam, necroTeamResult, playerName, raiseType,
+/// killedId, zombiePosition)` -- the 7-arg overload that takes the position explicitly.
+///
+/// Split out of `handle_raise_dead` because BB2025 reaches it from a second place with a position
+/// the roster default cannot supply: `bb2025/shared/StepApothecary`'s `PlayerState.RIP` branch
+/// picks the position out of `InjuryMechanic.raisePositions(raisingTeam)`.
+///
+/// Callers must have established `canRaiseDead || canRaiseInfectedPlayers` and the `RIP` state
+/// first, exactly as both Java call sites do.
+pub(crate) fn raise_player(
+    game: &mut Game,
+    necro_is_home: bool,
+    dead_player_id: &str,
+    dead_player_name: &str,
+    raise_type: ffb_model::util::raise_type::RaiseType,
+    zombie_position: &ffb_model::model::roster_position::RosterPosition,
+    nurgles_rot: bool,
+) -> Vec<ffb_model::events::GameEvent> {
+    use ffb_model::enums::{PlayerState, PlayerType, SendToBoxReason, PS_MISSING, PS_RESERVE};
+    use ffb_model::events::GameEvent;
+    use ffb_model::model::player::Player;
+    use ffb_model::report::report_raise_dead::ReportRaiseDead;
+    use ffb_model::util::raise_type::RaiseType;
+
+    let mechanic = injury_mechanic_for(game.rules);
+    let necro_team_id = if necro_is_home { game.team_home.id.clone() } else { game.team_away.id.clone() };
+    let max_nr = if necro_is_home {
+        game.team_home.players.iter().map(|p| p.nr).max().unwrap_or(0)
+    } else {
+        game.team_away.players.iter().map(|p| p.nr).max().unwrap_or(0)
+    };
+
     let team_result_mut = game.game_result.team_result_mut(necro_is_home);
     team_result_mut.raised_dead += 1;
     let raised_id = format!("{}R{}", dead_player_id, team_result_mut.raised_dead);
@@ -645,8 +680,7 @@ fn handle_raise_dead(
     } else {
         PlayerType::RaisedFromDead
     };
-    let max_nr = necro_team.players.iter().map(|p| p.nr).max().unwrap_or(0);
-    let mut raised_player = Player::from_position(raised_id.clone(), dead_player.name.clone(), max_nr + 1, &zombie_position);
+    let mut raised_player = Player::from_position(raised_id.clone(), dead_player_name.to_string(), max_nr + 1, zombie_position);
     raised_player.player_type = player_type;
 
     let (send_to_box_reason, new_state) = match raise_type {
@@ -672,10 +706,10 @@ fn handle_raise_dead(
     ffb_model::util::util_box::UtilBox::put_player_into_box(game, &raised_id);
 
     game.report_list.add(ReportRaiseDead::new(raised_id.clone(), Some(zombie_position.name.clone()), nurgles_rot));
-    // Java: getResult().setSound(SoundId.ORGAN) — client-only, no-op in headless
+    // Java: getResult().setSound(SoundId.ORGAN) -- client-only, no-op in headless
 
     vec![GameEvent::PlayerAdded {
-        team_id: necro_team.id.clone(),
+        team_id: necro_team_id,
         player_id: raised_id,
         position_id: zombie_position.id.clone(),
     }]
