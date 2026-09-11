@@ -6251,3 +6251,107 @@ Decay player to trigger at all.
 Group B's last cell: **`human` bb2020 @0 seed 63**, still 99/100, diverging at i=232 (turn 8, half 2,
 home active on both sides). Nothing about it is explained yet beyond that shape. Localise with
 `statediff_step.py --step 232`.
+
+## §H.26 — ITER5: `human` bb2020 @0 seed 63 root-caused, NOT fixed — the bb2020 stalling check is a stub
+
+**This iteration did not close its cell.** `human` bb2020 @0 is still 99/100 on seed 63. The port
+written for it measured exactly neutral and was **REVERTED** per the gate rule; the diff is saved at
+`scratchpad/iter5_stalling_port.patch` (245 lines) and is described well enough below to redo
+mechanically. Gate run on the port before reverting, all neutral: `human` bb2020 @0 99/100 (seed 63,
+unchanged), @1.0 and @1e6 100/100; `nurgle` bb2020 @0, `amazon` bb2020 @1.0, `orc` bb2020 @1.0,
+`human` bb2025 @1.0, `amazon` bb2016 @1.0 all 100/100; workspace 14,816/0.
+
+### What diverges
+
+`statediff_step.py --step 232` names one slot: `away_10` is **Ko off-pitch** in Java, **Prone at
+(5,8)** in Rust. Java threw a rock at it; Rust did not.
+
+Localised by attributing dice to steps (see the method note): the streams agree in value at every
+shared position through 258, and the last step where both engines' dice POSITION agrees is i=228.
+During step 228 Java rolls **one d6 at `StepStallingPlayer.start:55`** (rng 245) and Rust rolls
+nothing, so Rust runs one die behind from there. Three steps later that shifts a blitz's block dice
+from Java's `[3,5]` (Defender Stumbles → armour → injury → KO) to Rust's `[2,3]` (a Push, no
+knockdown).
+
+### Root cause
+
+The d6 is the **Throw a Rock** prayer: an opposing player who *should stall* is hit by a rock on 5+.
+Java's chain is `StepCheckStalling` (records stallers on the prayer state, once per
+`EndPlayerAction`) → `bb2020/StepEndTurn.handleStallers()` (at end of turn, pushes `STALLING_PLAYER`
+for the first still-STANDING staller) → `StepStallingPlayer` (the d6).
+
+Rust has the third link fully implemented (`bb2020/step_stalling_player.rs`, 382 lines, rolls the d6
+and applies the rock injury) and is missing the first two:
+
+- `bb2020/shared/step_check_stalling.rs::start` is an **explicit no-op stub** — its comment says
+  "stalling detection requires pathfinding — headless conservatively reports no stall". That
+  justification is **stale**: `PathFinderWithPassBlockSupport` is ported and has
+  `get_shortest_path_for_player(game, &end_coords, player, current_move)`, exactly Java's
+  `getShortestPath(Game, Set<FieldCoordinate>, Player, int)`.
+- Rust's `bb2020/step_end_turn.rs` has no `handle_stallers` at all, so even a recorded staller would
+  never produce the roll.
+
+Everything else the port needs already exists and was verified present: `PrayerState::add_staller /
+is_stalling / should_not_stall / get_staller_ids / remove_staller / clear_stallers`,
+`UtilPlayer::has_ball`, `UtilPlayer::find_adjacent_players_with_tacklezones`,
+`FieldCoordinateBounds::ENDZONE_HOME/AWAY` (same values as Java) and `coordinates()`, the four
+`rollAtActivation` properties, and `ENABLE_STALLING_CHECK` whose factory default is `true` in BOTH
+engines (`GameOptionFactory.java:269` / `game_option_factory.rs:556`) — so it must be read through
+`is_option_enabled`, which already consults the factory default.
+
+### Why the port was reverted rather than landed
+
+Written and gated, it is behaviourally IDENTICAL to the stub on every gate measured: the new code
+runs, `perform_check` passes (probe: `opt=true sns=true` for the acting team — so the prayer grant
+and `should_not_stall` plumbing are correct), `find_stalling_suspect` returns `home_10`, and then
+`is_considered_stalling` rejects it every time. So the port has **no positive exercise anywhere** —
+zero evidence it is right, only that it is harmless — and whatever fixes the remaining gate will
+likely have to change this same code. Landing ~170 lines of never-firing engine code before a
+certification sweep is what the "failure count must strictly drop, else REVERT" rule is for.
+
+### The remaining gap, measured
+
+Probing each `isConsideredStalling` condition on the failing seed:
+
+| outcome | count |
+|---|---:|
+| `home_10` rejected `not_active` | 11 |
+| `home_08` rejected `not_active` | 4 |
+| `home_10` rejected `is_acting_player` | 3 |
+| `home_10` reached the path check | 1 |
+| `home_08` rejected `is_acting_player` | 1 |
+
+The single time the path check ran, `home_10` was at **(11,10) with MA 7** and the away endzone is
+x=25 — fourteen squares away, so `path=None` was **correct**. The real gate is the eleven
+`not_active` rejections: Java must see `home_10` ACTIVE at a moment Rust sees it inactive, because
+Java records it and throws the rock.
+
+Both engines read the same bit with the same accessor (`PlayerState.isActive()` ↔
+`is_active()`, `BIT_ACTIVE`), and the state hash carries that bit for `home_10` (nr 10, inside the
+first 11) and matched through step 231 — so the bits agree at every STEP BOUNDARY. The call site is
+identical too: exactly one `CHECK_STALLING` in `EndPlayerAction` with `IGNORE_ACTED_FLAG=false`
+(`generator/bb2020/EndPlayerAction.java:33` ↔ `generator/bb2020/end_player_action.rs:43`). So the
+disagreement is BETWEEN step boundaries — either Rust clears the carrier's ACTIVE bit earlier within
+an activation than Java does, or Rust's `EndPlayerAction` sequence reaches CHECK_STALLING at a
+different point inside the activation.
+
+**Next concrete step:** probe Java's `StepCheckStalling.isConsideredStalling` directly — print
+`playerId`, `isActive()`, the coordinate and each conjunct, for every call — and diff against the
+Rust `RSTALLCONS` probe above (both are in `iter5_stalling_port.patch`). That names which conjunct
+and which moment differ, instead of inferring it. This needs an `ffb-server` probe and therefore an
+`mvn -o -pl ffb-server,ffb-ai install`, so it invalidates `--reuse-java`.
+
+### Method notes
+
+- **A one-die-behind offset is invisible to a dice-VALUE diff.** The stream is position-keyed, so
+  both engines always read the same value at the same position; comparing `(sides, result)` pairs
+  positionally reported the first difference 25 steps AFTER the real one. What localises it is
+  attributing dice to steps and finding the last step whose starting POSITION agrees — for this seed
+  i=228, where Java takes one die and Rust none. Worth scripting if it comes up again: parse
+  `JSTEP`/`RUST_STEP` markers plus `DICE_TRACE pos=`, record the count at each step start, and report
+  the last agreeing step. Early steps have attribution noise that self-corrects (kickoff dice land
+  either side of the first step marker), so look for the LAST agreement, not the first mismatch.
+- **The two engines' traces are not interleaved** (Java's block first, then Rust's), which is what
+  makes that attribution possible from a single log.
+- **A stale justification in a stub comment is worth re-checking before trusting it.** This one said
+  pathfinding was unavailable; it has been available for some time.
