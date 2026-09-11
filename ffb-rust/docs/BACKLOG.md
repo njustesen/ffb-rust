@@ -6624,3 +6624,41 @@ commit, and the direction of the copy is worth confirming deliberately rather th
 This iteration's own change was applied to both trees by hand, so the drift is unchanged in size and
 content. **This needs a decision:** sync build → tracked (recording the §H.14 harness half, which
 `BACKLOG` already describes as landed) or leave it.
+
+## §H.31 — ITER10: the Rust harness boxes stranded injured players too; `khorne` bb2020 CLOSED, GROUP D DONE
+
+`khorne` bb2020 **100/100 x3** (was 99 @0 seed 93, and before §H.30 it was a Java HANG). Controls all
+100/100: `nurgle` bb2020 @0, `human` bb2020 @1.0, `high_elf` bb2020 @1e6, `goblin` bb2025 @1.0,
+`gnome` bb2025 @1.0, `human` bb2025 @1.0, `renegades_37733` bb2025 @1.0, `amazon` bb2016 @1.0,
+`necromantic` bb2016 @1.0, `goblin` bb2016 @1.0. Workspace 14,819/0. **Group D is closed.**
+
+### The completion of §H.30
+
+§H.30 fixed the Java harness and exposed the mirror: `h01` Bh boxed at `(-1,-1)` in Java against Bh
+at `(3,2)` in Rust. This adds the same move to the Rust harness's driver loop
+(`crates/ffb-parity/src/runner.rs`), so both harnesses submit the same board.
+
+**Why the harness and not the engine.** Java's engine does NOT box these players either:
+`bb2020/StepEndTurn:615` calls `UtilBox.putAllPlayersIntoBox`, whose loop is gated on
+`canBeSetUpNextDrive()` — the same eight states — so a BADLY_HURT player keeps its pitch coordinate
+in stock Java. `refreshBoxes` only re-sorts players already sitting at a box X. So BOTH engines leave
+such a player on the pitch, symmetrically, and the hash never notices until a setup has to be
+validated. An engine-side fix would therefore be a divergence from Java, not a 1:1 port; the
+harnesses are the co-editable layer and the right home.
+
+### What this pair of fixes says about the state itself
+
+A Badly Hurt player standing on the pitch at setup is a state **stock Java's own server rejects** —
+`checkSetup` counts it and refuses the setup. So it is not a state a real FFB game can set up from,
+and both engines can produce it. That is an upstream question (which injury path fails to box its
+victim) that **parity cannot answer**, because the two engines agree. Recorded here rather than
+chased: the harness-level fix is what makes the matrix measurable, and any engine-level work would
+need the rulebook or the live FFB server as its reference, not Java-vs-Rust.
+
+### Method note
+
+Both halves were found by probing the thing that actually decides, not the thing that looked
+suspicious. §H.30's probe printed the server's own rejection MESSAGE ("You placed 12 Players…"),
+which named the failing rule in one run after a placement-loop hypothesis had already been refuted by
+a second probe (`n=11 placed=11`). The Rust half then needed no probe at all: `statediff_step.py`
+had already named the one differing slot and the only question was where to put the mirror.

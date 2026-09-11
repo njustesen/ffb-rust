@@ -582,6 +582,43 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
         if engine.is_finished() { break; }
         if engine.current_prompt().is_none() { break; }
 
+        // Mirror of `ParityRunner.resetCurrentTeam`'s non-settable branch (§H.30). Java's
+        // `SetupMechanic.checkSetup` counts `playersOnField` purely by COORDINATE, so an injured
+        // player still standing on the pitch counts as fielded and a full 11 makes 12. Java's
+        // engine boxes only `canBeSetUpNextDrive()` players at end of drive
+        // (`bb2020/StepEndTurn:615` -> `UtilBox.putAllPlayersIntoBox`), and BADLY_HURT is not one
+        // of those eight states — so BOTH engines leave such a player on the pitch, symmetrically
+        // and invisibly to the hash, until a setup has to be validated. The Java harness now boxes
+        // them; this is the same move on the Rust side, so the two harnesses submit the same board.
+        //
+        // It lives in the HARNESS, not the engine: Java's engine does not do this either, and an
+        // engine-side version would be a divergence rather than a 1:1 port. `put_player_into_box`
+        // picks the box column FROM the state and leaves the state alone.
+        if let Some(AgentPrompt::TeamSetup { team_id, .. }) = engine.current_prompt().cloned() {
+            let stranded: Vec<String> = {
+                let team = if team_id == engine.game.team_home.id {
+                    &engine.game.team_home
+                } else {
+                    &engine.game.team_away
+                };
+                team.players.iter()
+                    .filter(|p| {
+                        let settable = engine.game.field_model.player_state(&p.id)
+                            .map(|st| st.can_be_set_up_next_drive())
+                            .unwrap_or(true);
+                        let on_pitch = engine.game.field_model.player_coordinate(&p.id)
+                            .map(|c| c.is_on_pitch())
+                            .unwrap_or(false);
+                        !settable && on_pitch
+                    })
+                    .map(|p| p.id.clone())
+                    .collect()
+            };
+            for pid in stranded {
+                ffb_model::util::util_box::UtilBox::put_player_into_box(&mut engine.game, &pid);
+            }
+        }
+
         // Capture state BEFORE the agent acts.
         // Tier 2 logs one step per genuine Phase-1 turn boundary: first ActivatePlayer of a
         // new turn (eligible≠[] AND no player currently active). This excludes Blitz block
