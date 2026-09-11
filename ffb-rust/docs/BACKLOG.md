@@ -6551,3 +6551,76 @@ The fix was found without a probe: `GameEvent::CatchRoll` already carries `targe
 Comparing two catches in the same game — one at 3, one at 4, both AG 2+ — isolated the extra
 modifier immediately. **Check whether an event already carries the number before instrumenting for
 it.**
+
+## §H.30 — ITER9: the khorne SETUP hang is FIXED (harness); the cell is still red underneath
+
+**Partial.** §H.19's group-D item — Java spinning in SETUP and being force-ended at
+`max_iterations` — is fixed and verified: **151 SPIN lines → 0**, and Java now plays the game to
+step 242 instead of never finishing. `khorne` bb2020 @0 is still 99/100 seed 93, but for a real
+state divergence that the hang was hiding. @1.0 and @1e6 are 100/100 (they always were). Controls
+all 100/100 across all three editions: `human` bb2020 @1.0, `nurgle` bb2020 @0, `high_elf` bb2020
+@1e6, `human` bb2025 @1.0, `goblin` bb2025 @1.0, `gnome` bb2025 @1.0, `amazon` bb2016 @1.0,
+`necromantic` bb2016 @1.0.
+
+### Root cause of the hang
+
+`SetupMechanic.checkSetup` counts `playersOnField` **purely by COORDINATE**:
+
+```java
+FieldCoordinate playerCoordinate = game.getFieldModel().getPlayerCoordinate(player);
+if (pHomeTeam && FieldCoordinateBounds.HALF_HOME.isInBounds(playerCoordinate)) {
+    playersOnField++;          // no state filter on this branch at all
+}
+```
+
+`ParityRunner.resetCurrentTeam` boxed only players where `canBeSetUpNextDrive()` — and
+**BADLY_HURT is not one of the eight states that predicate accepts** (STANDING, MOVING, PRONE,
+STUNNED, RESERVE, FALLING, HIT_ON_GROUND, BLOCKED). Khorne's jersey 2 was Badly Hurt and still
+standing at (3,2), so it was neither reset nor moved; the 11 the harness then placed made **12** by
+coordinate. The server answered SETUP_ERROR and the harness re-submitted the identical setup forever.
+
+Found by probing the rejection message itself rather than guessing the rule — the probe printed
+`msgs=[You placed 12 Players on the field. Maximum are 11 players.]`, which named it in one run. An
+earlier probe had already ruled out the placement loop (`n=11 placed=11 losNeeded=0`), refuting my
+first hypothesis that the LoS `while` could exhaust and strand the remaining players. **That trap is
+real but is not this bug**: if `li` runs out while `losNeeded > 0`, every later player also takes the
+exhausted LoS branch and goes unplaced. Worth fixing if it ever fires.
+
+Fix: `resetCurrentTeam` now boxes the non-settable players too. `UtilBox.putPlayerIntoBox` picks the
+box column FROM the state (BH/KO/SI/RIP/RSV) and leaves the state alone, so this is exactly what a
+real client's box shows. Landed in BOTH Java trees.
+
+### What is still red, and it is the mirror of the fix
+
+`statediff_step.py --step 91`: one slot. `h01` is **Bh at (-1,-1)** in Java (boxed) and **Bh at
+(3,2)** in Rust (still on the pitch). Same state, different coordinate.
+
+Both engines leave an injured player's coordinate on the pitch — that part is symmetric and
+therefore invisible to parity. The Java harness now boxes it at setup; Rust's does not, and Rust's
+`canonical_setup_action` additionally counts that on-pitch Badly Hurt player toward its 11-player
+cap (`on_pitch` filters on `is_on_pitch()` with no state test), so **Rust fields 10 healthy players
+where Java now fields 11**. Java is right: a Badly Hurt player is not fielded.
+
+**Next concrete step:** mirror the change on the Rust side. Two parts, and the second is the harder
+one:
+1. `legal_actions/mod.rs::canonical_setup_action` — exclude players that are not
+   `can_be_set_up_next_drive()` from the `on_pitch` cap, so the cap counts only fieldable players.
+2. Something must actually MOVE the Badly Hurt player off the pitch before the setup check, the way
+   `ParityRunner.resetCurrentTeam` now does. Rust's setup is driven differently — the engine's
+   `StepSetup` raises `AgentPrompt::TeamSetup` and the agent answers one `PlacePlayer` at a time, so
+   an agent cannot box anyone; there is no `resetCurrentTeam` analogue. The symmetric home is
+   Rust's own harness (`crates/ffb-parity`), which is where to look first.
+
+### Pre-existing drift between the two Java trees — NOT mine
+
+`python scripts/check_java_trees.py` reported `ParityRunner.java` DIFFERS before this iteration
+touched anything. The **build tree is AHEAD by 48 lines**: it carries §H.14's block-re-roll harness
+work (`answerBlockReRoll`, plus the BB2025 two-step block dialog comment) that the tracked copy at
+`ffb-rust/ffb-java/ffb` never received. So the tracked copy does not reflect what the jar is built
+from, and has not for some time.
+
+I did **not** run `--fix`: it would fold someone else's untracked §H.14 harness work into this
+commit, and the direction of the copy is worth confirming deliberately rather than as a side effect.
+This iteration's own change was applied to both trees by hand, so the drift is unchanged in size and
+content. **This needs a decision:** sync build → tracked (recording the §H.14 harness half, which
+`BACKLOG` already describes as landed) or leave it.

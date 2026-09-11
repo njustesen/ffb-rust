@@ -4103,6 +4103,18 @@ public class ParityRunner {
             if (ps.canBeSetUpNextDrive()) {
                 fm.setPlayerState(p, ps.changeBase(PlayerState.RESERVE));
                 UtilBox.putPlayerIntoBox(game, p);
+            } else {
+                // ...and box the ones that CANNOT be set up, too. `SetupMechanic.checkSetup`
+                // counts `playersOnField` purely by COORDINATE -- there is no state filter on
+                // that branch -- so an injured player still standing on the pitch counts as
+                // fielded. A BADLY_HURT player is not `canBeSetUpNextDrive()`, so it was neither
+                // reset nor moved, and the 11 the harness then placed made 12: the server
+                // answered SETUP_ERROR "You placed 12 Players on the field. Maximum are 11" and
+                // the harness re-submitted the same setup forever (khorne bb2020 seed 93 @0 --
+                // Java force-ended at max_iterations while Rust played on to step 234).
+                // `putPlayerIntoBox` picks the box column FROM the state (BH/KO/SI/RIP/RSV) and
+                // leaves the state alone, so this is exactly what a real client's box shows.
+                UtilBox.putPlayerIntoBox(game, p);
             }
         }
     }
