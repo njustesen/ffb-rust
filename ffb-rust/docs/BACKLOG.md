@@ -6437,3 +6437,62 @@ The interception-never-succeeds coverage hole (0 successes in 330 gates) is NOT 
 engines already attempt interceptions, and on this seed Java's first interception roll is a natural
 6 — a success — which Cloud Burster then re-rolls away. Whether interceptions can ever *land* is a
 separate question from this fix.
+
+## §H.28 — ITER7: `interceptorId` belongs to the pass state too; `high_elf` bb2020 @1e6 STILL RED
+
+**Second partial on the same cell**, and it corrects a mistake in §H.27. Target still 99/100 seed 45;
+@1.0 and @0 100/100. Controls all 100/100: `high_elf` bb2025/bb2016 @1.0, `elf` / `dark_elf` /
+`wood_elf` bb2020 @1.0, `human` bb2025/bb2020 @1.0, `amazon` bb2016 @1.0. Workspace 14,818/0.
+
+### The mistake §H.27 made
+
+I considered moving `interceptor_id` to the pass state alongside the flag, then talked myself out of
+it on the assumption that the published `StepParameter::InterceptorId` would repopulate the
+re-pushed step. It does not. Measured consequence, visible in the drive trace's `rng=` deltas: the
+re-pushed `Intercept` consumed **0 dice** (rng stayed 30) where Java rolls die 31. So §H.27 removed
+the duplicate DIALOG and simultaneously removed the forced RE-ROLL — Rust went from one dialog too
+many to one die too few, which is not an improvement, just a different wrong.
+
+Java reads both halves from the same place: `bb2020/pass/StepIntercept.java:135`
+`Player<?> interceptor = game.getPlayerById(state.getInterceptorId())`, right beside
+`state.isInterceptorChosen()` at :142. They have to move together.
+
+### The fix
+
+`game.pass_interceptor_id` added next to `game.interceptor_chosen`, both written on the choice and
+both read via edition-gated accessors (`uses_pass_state`, i.e. everything but BB2016), and both
+cleared by `StepPass::start()`. Six more test fixtures set `step.interceptor_id` directly and now
+also set the pass state, as Java's fixture would. The regression test additionally asserts the
+re-pushed step recovers the interceptor, which is the half §H.27 missed.
+
+### Measured progress on seed 45
+
+| | before §H.27 | after §H.27 | after §H.28 |
+|---|---|---|---|
+| interception dialogs | 2 | 1 | 1 |
+| 2nd interception roll (Java rolls it) | yes | **no** | yes |
+| home re-rolls at i=25 (Java `r3,3`) | `r2,3` | `r2,3` | **`r3,3`** |
+| extra dice over the pass step | +4 | +4 | **+3** |
+| ball at i=25 (Java `5,9`) | `7,8` | `6,6` | `7,8` |
+
+The spurious team re-roll is gone and the interception now matches Java exactly. Dice 32 and 33 are
+now the catch and the **Catch-skill re-roll** in both engines, with the same values (1 then 3).
+
+### What is still wrong
+
+Java's re-rolled catch of **3 succeeds** — ball stays at (5,9), caught. Rust's fails, and then rolls
+three more d8 and ends with the ball at (7,8).
+
+Two candidates, and they are cheap to separate:
+
+1. **The catch target number.** Java: `minimumRollCatch(catcher, catchModifiers)` =
+   `minimumRoll(getAgilityWithModifiers(), modifiers)`. The catcher is a High Elf Catcher (AG 2+)
+   and the weather is **Pouring Rain**. `CatchModifierFactory` also applies TACKLE ZONES (unless
+   `ignoreTacklezonesWhenCatching`) and Disturbing Presence. Java's min must be ≤ 3 and Rust's ≥ 4,
+   so Rust has one modifier too many (or the wrong AG base).
+2. **The post-failure path.** Three d8 is a 3-square SCATTER, not the single-d8 bounce a failed catch
+   should produce, so Rust may also be resolving the failure on the missed-pass path.
+
+**Next concrete step:** probe Rust's `catch_ball` for `min_roll` and the modifier list, and the
+catch mode, at the moment it handles die 33. If the min roll is 4 where Java's is 3, candidate 1 is
+the whole story and candidate 2 is just its consequence.

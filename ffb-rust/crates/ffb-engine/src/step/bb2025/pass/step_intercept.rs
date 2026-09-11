@@ -292,14 +292,16 @@ impl Step for StepIntercept {
         match action {
             Action::SelectPlayer {player_id } => {
                 // Intercept dialog reply: chosen player id is the interceptor (or empty = decline)
-                self.interceptor_id = if player_id.is_empty() { None } else { Some(player_id.clone()) };
+                let chosen = if player_id.is_empty() { None } else { Some(player_id.clone()) };
+                self.set_interceptor_id(game, chosen);
                 self.set_interceptor_chosen(game);
             }
             // Agents answer the Interception prompt with a bare attempt yes/no (Java:
             // CLIENT_INTERCEPTOR_CHOICE carries a player id or null). Accepting picks the
             // offered candidate — the same first-interceptor the prompt named.
             Action::Intercept { attempt } => {
-                self.interceptor_id = if *attempt { Self::find_interceptors(game).first().cloned() } else { None };
+                let chosen = if *attempt { Self::find_interceptors(game).first().cloned() } else { None };
+                self.set_interceptor_id(game, chosen);
                 self.set_interceptor_chosen(game);
             }
             _ => {}
@@ -342,6 +344,23 @@ impl StepIntercept {
     /// Only the pass-state home survives a re-push of the step, which is what Cloud Burster does.
     fn uses_pass_state(game: &Game) -> bool {
         game.rules != ffb_model::enums::Rules::Bb2016
+    }
+
+    /// `PassState.interceptorId` has the same per-edition split as the flag above, and the Cloud
+    /// Burster re-push reads it (`bb2020/pass/StepIntercept.java:135`).
+    fn interceptor_id(&self, game: &Game) -> Option<String> {
+        if Self::uses_pass_state(game) {
+            game.pass_interceptor_id.clone()
+        } else {
+            self.interceptor_id.clone()
+        }
+    }
+
+    fn set_interceptor_id(&mut self, game: &mut Game, value: Option<String>) {
+        self.interceptor_id = value.clone();
+        if Self::uses_pass_state(game) {
+            game.pass_interceptor_id = value;
+        }
     }
 
     fn interceptor_chosen(&self, game: &Game) -> bool {
@@ -402,7 +421,7 @@ impl StepIntercept {
         // than routed to the dead twin (see step/driver.rs for why routing does not work).
         let is_bb2020 = game.rules == ffb_model::enums::Rules::Bb2020;
         let mut easy = false;
-        let do_intercept = if let Some(ref interceptor_id) = self.interceptor_id.clone() {
+        let do_intercept = if let Some(ref interceptor_id) = self.interceptor_id(game) {
             // Roll the interception
             let (success, easy_intercept) = self.intercept(interceptor_id, game, rng);
             easy = easy_intercept;
@@ -426,7 +445,7 @@ impl StepIntercept {
         };
 
         if do_intercept {
-            let interceptor_id = self.interceptor_id.clone();
+            let interceptor_id = self.interceptor_id(game);
             // Java: publishParameter(StepParameter.from(StepParameterKey.INTERCEPTOR_ID, pInterceptor.getId()))
             // Java: getResult().setNextAction(StepAction.NEXT_STEP)
             let mut out = StepOutcome::next()
@@ -569,6 +588,12 @@ mod tests {
             } else {
                 assert!(!asked_again,
                     "{rules:?} keeps the flag on the PASS STATE, so a re-pushed step must NOT ask again");
+                // ...and it must still KNOW WHO is intercepting, or it skips the forced re-roll
+                // instead of making it. Java reads `state.getInterceptorId()` here
+                // (`bb2020/pass/StepIntercept.java:135`); moving only the flag left this None and
+                // Rust rolled one die FEWER than Java rather than one dialog too many.
+                assert_eq!(second.interceptor_id(&game).as_deref(), Some("opp1"),
+                    "{rules:?}: the re-pushed step must recover the interceptor from the pass state");
             }
         }
     }
@@ -730,6 +755,8 @@ mod tests {
         // BB2020/BB2025 read the flag off the PASS STATE, so the fixture must set it there too -- Java's equivalent is passState.setInterceptorChosen(true).
         game.interceptor_chosen = true;
         step.interceptor_id = Some("unknown_player".into());
+        // BB2020/BB2025 read the interceptor off the PASS STATE too -- Java's fixture equivalent is passState.setInterceptorId(..).
+        game.pass_interceptor_id = Some("unknown_player".into());
 
         // Should go to failure (intercept() returns false for unknown player)
         let out = step.start(&mut game, &mut GameRng::new(42));
@@ -781,6 +808,8 @@ mod tests {
             // BB2020/BB2025 read the flag off the PASS STATE, so the fixture must set it there too -- Java's equivalent is passState.setInterceptorChosen(true).
             game2.interceptor_chosen = true;
             step2.interceptor_id = Some("opp1".into());
+            // BB2020/BB2025 read the interceptor off the PASS STATE too -- Java's fixture equivalent is passState.setInterceptorId(..).
+            game2.pass_interceptor_id = Some("opp1".into());
             step2.pass_result = PassResult::FUMBLE;
             let out = step2.start(&mut game2, &mut GameRng::new(seed));
             if out.action == StepAction::NextStep {
@@ -888,6 +917,8 @@ mod tests {
 
                 let mut step = StepIntercept::new("fail".into());
                 step.interceptor_id = Some("opp1".into());
+                // BB2020/BB2025 read the interceptor off the PASS STATE too -- Java's fixture equivalent is passState.setInterceptorId(..).
+                game.pass_interceptor_id = Some("opp1".into());
                 step.interceptor_chosen = true;
                 // BB2020/BB2025 read the flag off the PASS STATE, so the fixture must set it there too -- Java's equivalent is passState.setInterceptorChosen(true).
                 game.interceptor_chosen = true;
@@ -943,6 +974,8 @@ mod tests {
 
             let mut step = StepIntercept::new("fail".into());
             step.interceptor_id = Some("opp1".into());
+            // BB2020/BB2025 read the interceptor off the PASS STATE too -- Java's fixture equivalent is passState.setInterceptorId(..).
+            game.pass_interceptor_id = Some("opp1".into());
             step.interceptor_chosen = true;
             // BB2020/BB2025 read the flag off the PASS STATE, so the fixture must set it there too -- Java's equivalent is passState.setInterceptorChosen(true).
             game.interceptor_chosen = true;
@@ -1121,6 +1154,8 @@ mod tests {
         // BB2020/BB2025 read the flag off the PASS STATE, so the fixture must set it there too -- Java's equivalent is passState.setInterceptorChosen(true).
         game.interceptor_chosen = true;
         step.interceptor_id = Some("opp1".into());
+        // BB2020/BB2025 read the interceptor off the PASS STATE too -- Java's fixture equivalent is passState.setInterceptorId(..).
+        game.pass_interceptor_id = Some("opp1".into());
         step.pass_result = PassResult::FUMBLE;
         step.start(&mut game, &mut GameRng::new(3));
         assert!(
@@ -1156,6 +1191,8 @@ mod tests {
         // BB2020/BB2025 read the flag off the PASS STATE, so the fixture must set it there too -- Java's equivalent is passState.setInterceptorChosen(true).
         game.interceptor_chosen = true;
         step.interceptor_id = Some("opp1".into());
+        // BB2020/BB2025 read the interceptor off the PASS STATE too -- Java's fixture equivalent is passState.setInterceptorId(..).
+        game.pass_interceptor_id = Some("opp1".into());
         step.pass_result = PassResult::FUMBLE;
         // seed=0 → d6=1, which is < 6, so intercept fails
         step.start(&mut game, &mut GameRng::new(0));

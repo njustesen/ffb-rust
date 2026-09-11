@@ -119,6 +119,7 @@ impl Step for StepPass {
         // `PASS` reads the flag. The HAIL_MARY branch skips `StepPass`, but `StepIntercept` returns
         // early for a Hail Mary too, so the flag is never read there either.
         game.interceptor_chosen = false;
+        game.pass_interceptor_id = None;
         self.execute_step(game, rng)
     }
 

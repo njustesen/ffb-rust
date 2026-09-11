@@ -73,6 +73,15 @@ pub struct Game {
     /// `pGameState.setPassState(new PassState())` — `PassState.populate` carries over only the three
     /// bomb fields, so every other field, this one included, starts fresh for each pass.
     pub interceptor_chosen: bool,
+    /// Java: `PassState.interceptorId` (`step/mixed/pass/state/PassState.java:15`).
+    ///
+    /// Shares `interceptor_chosen`'s lifetime and its reason for existing: the Cloud Burster
+    /// re-push reads BOTH (`bb2020/pass/StepIntercept.java:135`
+    /// `Player<?> interceptor = game.getPlayerById(state.getInterceptorId())`). Moving only the
+    /// flag stopped the second DIALOG but left the re-pushed step with no interceptor, so it also
+    /// skipped the forced re-ROLL Java makes — one die short instead of one dialog too many.
+    /// BB2016 keeps it on the step, like the flag.
+    pub pass_interceptor_id: Option<PlayerId>,
     /// Java: PassState.throwTwoBombs — the All You Can Eat tri-state. Some(true) = committed
     /// to two Throw Bomb actions, first not yet thrown; Some(false) = second bomb thrown,
     /// the 4+ sent-off roll is pending; None = not in an All You Can Eat action.
@@ -166,6 +175,7 @@ impl Game {
             pass_coordinate: None,
             original_bombardier: None,
             interceptor_chosen: false,
+            pass_interceptor_id: None,
             throw_two_bombs: None,
             waiting_for_opponent: false,
             timeout_possible: false,
