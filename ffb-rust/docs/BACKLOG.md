@@ -6355,3 +6355,85 @@ and which moment differ, instead of inferring it. This needs an `ffb-server` pro
   makes that attribution possible from a single log.
 - **A stale justification in a stub comment is worth re-checking before trusting it.** This one said
   pathfinding was unavailable; it has been available for some time.
+
+## §H.27 — ITER6: §H.17's Cloud Burster defect FIXED, but `high_elf` bb2020 @1e6 is STILL RED
+
+**Partial.** The defect §H.17 named is fixed and tested; the cell it was blamed for is unchanged at
+99/100 seed 45, because that seed fails for a SECOND, downstream reason that the first defect was
+hiding. Committed anyway (rather than reverted like §H.26) because this change is positively
+exercised and demonstrably matches Java — see "why this one was kept" below.
+
+Gate: `high_elf` bb2020 @1e6 99/100 seed 45 (**unchanged**), @1.0 and @0 100/100. Controls all
+100/100 across all three editions — `high_elf` bb2025 @1.0, `high_elf` bb2016 @1.0, `elf` bb2020
+@1.0, `dark_elf` bb2020 @1.0, `human` bb2025 @1.0, `human` bb2020 @1.0, `amazon` bb2016 @1.0.
+Workspace 14,818/0.
+
+### The fix
+
+`interceptorChosen` lives in a different place per edition, and ONE Rust step serves all three —
+`driver.rs` has `use crate::step::bb2025::pass::*` and **no `StepId::Intercept` override** in either
+the bb2020 or the bb2016 arm, so `step/bb2016/pass/step_intercept.rs` and
+`step/bb2020/pass/step_intercept.rs` are both DEAD:
+
+| edition | home of the flag |
+|---|---|
+| BB2016 | the STEP — `bb2016/pass/StepIntercept.java:59`, `private boolean fInterceptorChosen` |
+| BB2020 | the PASS STATE — `bb2020/pass/StepIntercept.java:107`, `state.setInterceptorChosen(true)` |
+| BB2025 | the PASS STATE — `bb2025/pass/StepIntercept.java:107`, same |
+
+Rust had the BB2016 shape everywhere. Cloud Burster is a `PASS_INTERCEPT` hook
+(`generator/bb2020/Pass.java:56`) that re-pushes `STEP_INTERCEPT` for one pass, and a fresh step
+instance starts with `interceptor_chosen = false` — so Rust showed the Interception dialog TWICE.
+
+Fix: `game.interceptor_chosen` added as Rust's home for `PassState.interceptorChosen`, read and
+written only outside BB2016 (`uses_pass_state`), and reset in `StepPass::start()` to mirror Java's
+`StepPass` CONSTRUCTOR doing `setPassState(new PassState())` — `PassState.populate` carries over only
+originalBombardier / throwTwoBombs / allowMoveAfterBomb, so every other field starts fresh per pass.
+`StepPass` has no `Repeat` path, precedes `INTERCEPT` in the sequence, and the HAIL_MARY branch that
+skips it also returns early from `StepIntercept`, so `start()` is equivalent to Java's ctor here.
+
+Measured effect on seed 45: the dialog now appears **once**, matching Java. Seven existing tests set
+`step.interceptor_chosen = true` as a fixture and encoded the old home; they now also set the pass
+state, which is what Java's fixture (`passState.setInterceptorChosen(true)`) would do.
+
+### Why this one was kept where §H.26's port was reverted
+
+§H.26's port never fired — no positive exercise, so no evidence it was right. This one fires, and its
+observable behaviour changed to match Java exactly (two dialogs → one). The new test asserts the
+per-edition split in one loop and FAILS without the fix, on the BB2020 arm. The cell staying red is
+a *different* defect, below, not evidence against this change.
+
+### What is still wrong on seed 45
+
+Dice positions now agree through 32 (they diverged earlier before). The pass step still spends
+**4 dice more in Rust than in Java** — Java 6, Rust 10 over step 24, exactly the count §H.17
+recorded, which confirms the extra dice were never the dialog's doing:
+
+| pos | Java | Rust |
+|---|---|---|
+| 29 | `StepPass` pass roll 6 | 6 |
+| 30 | `StepIntercept.intercept:200` from **handleCommand** — 6 | 6 |
+| 31 | `StepIntercept.intercept:200` from **start** (the Cloud Burster re-roll) — 2 | 2 |
+| 32 | `StepCatchScatterThrowIn.catchBall:527` — 1 | 1 |
+| 33 | `catchBall:577` — a CATCH RE-ROLL — 3 | **d8 = 1** |
+| 34-35 | — | **d8, d8** |
+| 36-38 | — | d6, d6, d6 |
+
+So both engines roll the interception twice (Java's own trace proves the re-roll is expected), both
+fail the catch on a 1, and then **Java re-rolls the catch via `catchBall:577` while Rust scatters the
+ball three squares**. Rust also spends a HOME team re-roll there (`r2,3` against Java's `r3,3`) and
+the ball ends at (6,6) instead of Java's (5,9).
+
+**Next concrete step:** `StepCatchScatterThrowIn.catchBall:577` — find what re-roll source Java uses
+for that catch (the recursion at :577 is the same shape as the interception re-roll at
+`intercept:189`), and why Rust instead treats the failed catch as a bounce AND consumes a team
+re-roll. Note the trailer says Rust offered a `ReRollOffer{action: "CATCH"}` to the THROWING team,
+which is suspicious on its own — the catcher here is the thrower's team-mate, so it may be correct,
+but Java spends no team re-roll at all.
+
+### Note
+
+The interception-never-succeeds coverage hole (0 successes in 330 gates) is NOT closed by this: both
+engines already attempt interceptions, and on this seed Java's first interception roll is a natural
+6 — a success — which Cloud Burster then re-rolls away. Whether interceptions can ever *land* is a
+separate question from this fix.

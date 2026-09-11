@@ -58,6 +58,21 @@ pub struct Game {
     /// Java: GameState.getPassState().getOriginalBombardier() — player ID of the bombardier
     /// who fired a bomb this turn; set by bomb-pass steps, cleared at start_turn().
     pub original_bombardier: Option<PlayerId>,
+    /// Java: `PassState.interceptorChosen` (`step/mixed/pass/state/PassState.java:16`).
+    ///
+    /// Lives on the PASS STATE in BB2020/BB2025, not on the step, because the pass sequence can run
+    /// `STEP_INTERCEPT` twice for ONE pass: Cloud Burster is a `PASS_INTERCEPT` hook that forces a
+    /// re-roll of an interception of a long pass, and re-pushes the step. Java's second
+    /// `StepIntercept` sees `interceptorChosen` already true and goes straight to the roll. A step
+    /// field starts false on the re-push and shows the dialog a second time.
+    ///
+    /// BB2016 keeps it on the step instead (`bb2016/pass/StepIntercept.java:59` — a plain
+    /// `fInterceptorChosen`), so the shared Rust step reads this field only outside BB2016.
+    ///
+    /// Reset per pass by `StepPass`, mirroring Java's `StepPass` CONSTRUCTOR doing
+    /// `pGameState.setPassState(new PassState())` — `PassState.populate` carries over only the three
+    /// bomb fields, so every other field, this one included, starts fresh for each pass.
+    pub interceptor_chosen: bool,
     /// Java: PassState.throwTwoBombs — the All You Can Eat tri-state. Some(true) = committed
     /// to two Throw Bomb actions, first not yet thrown; Some(false) = second bomb thrown,
     /// the 4+ sent-off roll is pending; None = not in an All You Can Eat action.
@@ -150,6 +165,7 @@ impl Game {
             thrower_action: None,
             pass_coordinate: None,
             original_bombardier: None,
+            interceptor_chosen: false,
             throw_two_bombs: None,
             waiting_for_opponent: false,
             timeout_possible: false,

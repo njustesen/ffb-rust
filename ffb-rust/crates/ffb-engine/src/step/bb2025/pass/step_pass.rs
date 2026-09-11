@@ -107,6 +107,18 @@ impl Step for StepPass {
     fn id(&self) -> StepId { StepId::Pass }
 
     fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: `StepPass`'s CONSTRUCTOR does `pGameState.setPassState(new PassState())`
+        // (`bb2020/pass/StepPass.java:75`, same in bb2025), and `PassState.populate` carries over
+        // only originalBombardier / throwTwoBombs / allowMoveAfterBomb — so `interceptorChosen`
+        // starts false for every pass and stays set for the rest of THAT pass.
+        //
+        // Rust's `make_step` has no `&mut Game`, so the reset happens here instead. Equivalent for
+        // this field: `StepPass` has no `Repeat` path, so `start()` runs exactly once per pass
+        // sequence, it precedes `INTERCEPT` in that sequence
+        // (`generator/bb2020/Pass.java:48` then `:55`), and nothing between sequence build and
+        // `PASS` reads the flag. The HAIL_MARY branch skips `StepPass`, but `StepIntercept` returns
+        // early for a Hail Mary too, so the flag is never read there either.
+        game.interceptor_chosen = false;
         self.execute_step(game, rng)
     }
 
