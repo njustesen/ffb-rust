@@ -5947,3 +5947,66 @@ names the clause in one run instead of another round of inference.
 Also worth carrying forward: the two `JAVA_GFI` probe lines that straddle the die report
 `runGfi=true, ballChain=false` then `runGfi=false, ballChain=true` for a player who never moves.
 Whatever flips `ballChain` around a rooted ball carrier may be the same thing that ends the turn.
+
+## §H.22 — ITER1: a give with no target hands the ball to itself (2026-09-11) — FIXED
+
+Two of group A's three cells closed. `gnome` bb2025 **100/100 x3** (was 99 @1.0),
+`old_world_alliance_treeman` bb2020 **100/100 x3** (was 99 @1e6). Controls unmoved: `human` bb2025
+and `amazon` bb2016 both 100/100 at @1.0 and @1e6. Workspace 14,814/0.
+
+### The chain, established by probe and not by inference
+
+1. A probe inside Java's `bb2025/pass/StepEndPassing` showed it entering with `fEndTurn` **already
+   true** and every disjunct false (`hasPassed=false`, `td=false`, `passFumble=false`,
+   `catcher=null`, `otherTeamHasCatcher=false`). The turnover was published upstream; the pass logic
+   merely forwarded it. This is what refuted the three §H.21 hypotheses for good.
+2. A stack-trace probe on `AbstractStep.publishParameter`, filtered to `END_TURN=true`, named the
+   publisher: `StepInitPassing:191`, reached via `MatchRunner:1442 <- ParityRunner:685/555` — a
+   **client command**. That is the harness's own documented contract at `ParityRunner:555`: an
+   `INIT_PASSING` park whose thrower is already SET is an invalid declared give, and the answer is
+   `ClientCommandEndTurn` — a zero-dice turnover. Its comment even asserts "Rust's InitPassing
+   refusal also produces END_TURN".
+3. Rust never reached that tail. `mixed/pass/step_init_passing.rs:68-78` derives the catcher from
+   `game.pass_coordinate` when none was handed in — and `pass_coordinate` OUTLIVES the activation
+   that set it. The pass at i=141 put the ball on the Altern Forest Treeman at (4,6), leaving
+   `pass_coordinate` = (4,6). At i=143 that same Treeman declared `HAND_OVER_MOVE`, failed Take Root
+   (so `cancel_take_root_player_action` converted the action to `HAND_OVER` and set the thrower),
+   chose no target, inherited the stale coordinate, and **handed the ball to itself**: the HAND_OVER
+   branch accepted, no dice were rolled, the ball did not move, and the turn carried on with six
+   players still active. Java ended the turn. The site's own comment had warned about exactly this —
+   "gated to the two give actions so no other path can observe a stale `pass_coordinate`".
+
+### The fix
+
+One `.filter()`: the derived catcher can never be the thrower itself. A player cannot give the ball
+to itself, so excluding it drops Rust through to the out-of-range tail that already publishes
+`EndTurn(true)` — the same observable result as the harness contract: turnover, ball unmoved, zero
+dice.
+
+Tests: `a_give_with_a_stale_coordinate_on_the_thrower_ends_the_turn` asserts the OBSERVABLE contract
+(goto the end label + publish `EndTurn(true)`) rather than the internal `catcher_id`, so it keeps
+its value if the branch below stops reading that field; verified to FAIL without the fix. Control
+test `a_give_derived_from_the_coordinate_still_works_for_another_player` proves the guard does not
+reject genuine gives.
+
+### Still open in group A
+
+`renegades_37733` bb2025 @1.0 seed 23 and @1e6 seed 16 are **unchanged** by this fix, so they are a
+different cause despite @1.0 sharing the turn-boundary fingerprint. @0 is green. Next target: seed
+23, whose shape is Java on home's turn 6 with `f0010` against Rust on away's turn 7 with `f0000` —
+the MIRROR of the fixed case (Java is the side still in its turn), and Rust chooses a Foul where
+Java moves.
+
+### Method notes worth keeping
+
+- **Probe the publish path, not the consumer.** One probe on `AbstractStep.publishParameter` filtered
+  to `END_TURN=true`, printing `getId()` plus a short stack trace, named the culprit in a single run
+  after three rounds of inference had failed. Do this first for any "one engine ended the turn"
+  divergence.
+- Probes in `ffb-server` are local and uncommitted: remove them with `git checkout --` of **only the
+  files you probed**, then confirm the campaign's long-standing env-gated traces still fire
+  (`JAVA_DIE`, `JAVA_GFI`, `JAVA_P2`, `JSTEP`, `SPECTATORS`) and that the probe's own output no
+  longer appears. Both mvn rebuilds are unavoidable; `--reuse-java` is invalid across them.
+- CPU discipline (user request, 2026-09-11): gates run **sequentially** in one background job with
+  `PARITY_JVM_CORES=1`, about two cores busy. No 4-shard sweeps without asking. And do not stop work
+  with `Stop-Process` — use the `STOP_SWEEP` file the workers poll, or `TaskStop` on our own jobs.

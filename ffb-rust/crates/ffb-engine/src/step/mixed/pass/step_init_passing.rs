@@ -74,7 +74,26 @@ impl StepInitPassing {
         {
             self.catcher_id = game
                 .pass_coordinate
-                .and_then(|c| game.field_model.player_at(c).cloned());
+                .and_then(|c| game.field_model.player_at(c).cloned())
+                // ...and never the thrower itself. `pass_coordinate` survives the activation that
+                // set it, so a player who declares a give WITHOUT choosing a target inherits the
+                // PREVIOUS give's coordinate -- and if that coordinate is this player's own square,
+                // the derivation above hands the ball to the thrower and the HAND_OVER branch below
+                // accepts it: a give to oneself, zero dice, ball unmoved, turn continues.
+                //
+                // Java cannot reach this code in that situation. Its `StepInitPassing` PARKS
+                // waiting for CLIENT_PASS, and `ParityRunner`'s INIT_PASSING case answers a park
+                // whose thrower is already SET with `ClientCommandEndTurn` (ParityRunner:555) --
+                // the established zero-dice turnover contract. Excluding the thrower drops Rust
+                // through to the out-of-range tail below, which publishes exactly that EndTurn.
+                //
+                // gnome bb2025 seed 9 i=143: a pass put the ball on the Altern Forest Treeman at
+                // (4,6), leaving `pass_coordinate` = (4,6); the Treeman then declared
+                // HAND_OVER_MOVE, failed Take Root (so `cancel_take_root_player_action` converted
+                // the action to HAND_OVER and set the thrower), never chose a target, and handed
+                // the ball to itself. Java ended the turn; Rust played on with six players still
+                // active, and the two were a whole team turn apart from there.
+                .filter(|id| Some(id.as_str()) != game.thrower_id.as_deref());
         }
 
         // Java's StepInitPassing simply PARKS here waiting for a client command. The bomb
@@ -388,6 +407,70 @@ mod tests {
         assert!(game.turn_data().pass_used, "turn_data.pass_used must be set for PASS action");
         assert!(game.turn_data().turn_started);
         assert!(!game.concession_possible);
+    }
+
+    /// A give whose target was never chosen must NOT resolve to the thrower's own square.
+    ///
+    /// `game.pass_coordinate` outlives the activation that set it. A player who declares a give
+    /// without choosing a target therefore inherits the previous give's coordinate, and when that
+    /// coordinate is the player's OWN square the catcher derivation picks the thrower: the
+    /// HAND_OVER branch accepts, no dice are rolled, the ball does not move, and the turn carries
+    /// on. Java cannot get here — its `StepInitPassing` parks for CLIENT_PASS and `ParityRunner`
+    /// answers a park with the thrower already set using `ClientCommandEndTurn` (ParityRunner:555).
+    ///
+    /// Asserts the OBSERVABLE contract, not the internal field: the step must take the
+    /// out-of-range tail, i.e. goto the end label and publish `EndTurn(true)`. Checking
+    /// `catcher_id` alone would keep passing if the branch below ever stopped depending on it.
+    ///
+    /// Live cost: gnome bb2025 seed 9 i=143 — a pass left the ball on the Altern Forest Treeman at
+    /// (4,6); the Treeman declared HAND_OVER_MOVE, failed Take Root (which converts the action to
+    /// HAND_OVER and sets the thrower), chose no target, and gave the ball to itself. Java ended
+    /// the turn; Rust played on with six players still active.
+    #[test]
+    fn a_give_with_a_stale_coordinate_on_the_thrower_ends_the_turn() {
+        for action in [PlayerAction::HandOver, PlayerAction::Pass] {
+            let mut step = StepInitPassing::new();
+            step.goto_label_on_end = "end".into();
+            let mut game = make_game();
+            add_field_player(&mut game, "p1", 4, 6);
+            game.thrower_id = Some("p1".into());
+            game.acting_player.player_id = Some("p1".into());
+            game.thrower_action = Some(action);
+            // The stale coordinate from a previous give: p1's OWN square.
+            game.pass_coordinate = Some(FieldCoordinate::new(4, 6));
+            let mut rng = GameRng::new(0);
+            let out = step.start(&mut game, &mut rng);
+
+            assert_eq!(out.action, StepAction::GotoLabel,
+                "{action:?}: a give to one's own square must fall through to the end-turn tail");
+            assert_eq!(out.goto_label.as_deref(), Some("end"), "{action:?}");
+            assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+                "{action:?}: the tail must publish EndTurn(true) -- ParityRunner's zero-dice \
+                 turnover contract for an INIT_PASSING park with the thrower set");
+            assert!(!game.turn_data().hand_over_used,
+                "{action:?}: no give happened, so hand_over_used must not be set");
+        }
+    }
+
+    /// The control for the test above: a give to a DIFFERENT player on the stale coordinate is a
+    /// real give and must still be accepted, so the guard cannot simply reject every derived
+    /// catcher.
+    #[test]
+    fn a_give_derived_from_the_coordinate_still_works_for_another_player() {
+        let mut step = StepInitPassing::new();
+        step.goto_label_on_end = "end".into();
+        let mut game = make_game();
+        add_field_player(&mut game, "p1", 4, 6);
+        add_field_player(&mut game, "p2", 5, 6);
+        game.thrower_id = Some("p1".into());
+        game.acting_player.player_id = Some("p1".into());
+        game.thrower_action = Some(PlayerAction::HandOver);
+        game.pass_coordinate = Some(FieldCoordinate::new(5, 6)); // p2's square
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::NextStep,
+            "a hand-over to an adjacent team-mate must proceed");
+        assert!(game.turn_data().hand_over_used);
     }
 
     #[test]
