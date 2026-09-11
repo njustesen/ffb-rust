@@ -18,7 +18,7 @@
 /// - Reports/sounds/timers → skip
 /// - FumbblGame update → skip
 use std::collections::HashSet;
-use ffb_model::enums::{TurnMode, Weather, PS_KNOCKED_OUT, PS_EXHAUSTED, PS_RESERVE};
+use ffb_model::enums::{ApothecaryMode, Rules, TurnMode, Weather, PS_KNOCKED_OUT, PS_EXHAUSTED, PS_RESERVE, PS_STANDING};
 use ffb_model::events::GameEvent;
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
@@ -29,7 +29,7 @@ use ffb_model::util::util_box::UtilBox;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
 use crate::step::framework::{Step, StepOutcome};
-use crate::step::framework::{StepId, StepParameter};
+use crate::step::framework::{SequenceStep, StepId, StepParameter};
 use crate::util::util_server_game::UtilServerGame;
 
 pub struct StepEndTurn {
@@ -134,6 +134,70 @@ impl StepEndTurn {
     }
 
     /// Java: UtilServerSteps.checkEndOfHalf — both teams have used all 8 turns.
+    /// 1:1 translation of `bb2020/StepEndTurn.handleStallers()` (Java 621-646).
+    ///
+    /// BB2020 ONLY: `bb2025/StepEndTurn` has no `handleStallers` and neither does the BB2016 step,
+    /// so this is gated on the edition rather than run for every ruleset this shared step serves.
+    ///
+    /// The Throw a Rock prayer makes a stalling ball-carrier a target: `StepCheckStalling` records
+    /// stallers on the prayer state during the turn, and at end of turn the FIRST still-STANDING
+    /// one gets a rock thrown at it -- `STALLING_PLAYER` rolls a d6 and hits on 5+.
+    ///
+    /// Returns `Some(outcome)` when a staller was found, in which case Java returns from
+    /// `executeStep` immediately: the current step is pushed back under the rock sequence so
+    /// end-of-turn resumes afterwards, and `touchdown` is cleared so the touchdown check re-runs
+    /// (a bouncing ball can land in the endzone).
+    fn handle_stallers(&mut self, game: &mut Game) -> Option<StepOutcome> {
+        if game.rules != Rules::Bb2020 {
+            return None;
+        }
+        // Java: `if (!fTouchdown) { ... }` -- no rock on a scoring turn.
+        if !self.touchdown.unwrap_or(false) {
+            // Java: the first staller whose state base is STANDING.
+            let mut standing: Vec<String> = game
+                .prayer_state
+                .get_staller_ids()
+                .iter()
+                .filter(|id| {
+                    game.field_model
+                        .player_state(id)
+                        .map(|st| st.base() == PS_STANDING)
+                        .unwrap_or(false)
+                })
+                .cloned()
+                .collect();
+            // `getStallerIds()` is a HashSet and Java takes `findFirst()` of its iteration order,
+            // which is not defined by the spec. Sort so the pick is deterministic; in practice the
+            // set holds at most one standing staller, because CheckStalling only ever adds the
+            // acting team's single ball carrier and this method removes it again.
+            standing.sort();
+            if let Some(staller_id) = standing.into_iter().next() {
+                game.prayer_state.remove_staller(&staller_id);
+                // Java: pushCurrentStepOnStack(), then push the rock sequence on top of it.
+                let self_seq = vec![SequenceStep::new(StepId::EndTurn)];
+                let rock_seq = vec![
+                    SequenceStep::with_params(
+                        StepId::StallingPlayer,
+                        vec![StepParameter::PlayerId(staller_id)],
+                    ),
+                    SequenceStep::new(StepId::PlaceBall),
+                    SequenceStep::with_params(
+                        StepId::Apothecary,
+                        vec![StepParameter::ApothecaryMode(ApothecaryMode::HitPlayer)],
+                    ),
+                    SequenceStep::new(StepId::CatchScatterThrowIn),
+                ];
+                // Java: `fTouchdown = null` -- force the touchdown check to happen again, in case
+                // the bouncing ball is caught in the end zone.
+                self.touchdown = None;
+                return Some(StepOutcome::next().push_seq(self_seq).push_seq(rock_seq));
+            }
+        }
+        // Java: `prayerState.clearStallers(); return false;`
+        game.prayer_state.clear_stallers();
+        None
+    }
+
     fn check_end_of_half(game: &Game) -> bool {
         game.turn_data_home.turn_nr >= 8 && game.turn_data_away.turn_nr >= 8
     }
@@ -530,6 +594,13 @@ impl StepEndTurn {
         // StarOfTheShow: dialog not translated → always false
         if self.use_star_of_the_show.is_none() {
             self.use_star_of_the_show = Some(false);
+        }
+
+        // Java `bb2020/StepEndTurn.java:290`: `if (handleStallers()) { return; }` -- BEFORE
+        // markPlayedAndSecretWeapons and before the end-of-half check, because the rock can knock
+        // the staller down (and bounce the ball) and the turn must then be re-evaluated.
+        if let Some(out) = self.handle_stallers(game) {
+            return out;
         }
 
         UtilServerGame::mark_played_and_secret_weapons(game);

@@ -7002,3 +7002,128 @@ Two instruments, and each is wrong where the other works:
 
 Run both, and let the state hash decide which to trust: if the first hash mismatch sits where the
 activations still agree, it is a real state divergence and the dice are the lead.
+
+## §H.37 — ITER16: the bb2020 stalling / Throw-a-Rock chain was dead in THREE places
+
+**Two cells closed.** `slann` bb2020 @1e6 seed 32 and `human` bb2020 @0 seed 63 — the pair §H.36
+showed share one cause — both pass. The mechanism needed three fixes, and §H.26's `is_active`
+hypothesis was **wrong**.
+
+### What §H.26 got wrong, and why
+
+§H.26 reverted its port after gating neutral and named the remaining gap as Rust's
+`is_considered_stalling` reading the ball carrier as `not_active` where Java sees it ACTIVE (11 of 15
+probe hits). This iteration put the SAME conjunct probe in both engines
+(`RSTALLCONS` / `JSTALLCONS`, printing all five conjuncts plus the state id and coordinate) and
+diffed them line for line on seed 32. Normalised, the two traces were **identical** —
+`active=false state=1` in Java exactly where Rust had it. `state=1` is `STANDING` with the `0x100`
+ACTIVE bit clear, i.e. a player that has already acted, and both engines agree on when that is.
+
+**The `is_active` conjunct was never the bug.** What the probe actually showed was a COUNT
+difference: Java evaluated the check 164 times and Rust 120, and Java's verdict came out `true`
+twice where Rust never got there. Splitting the gate probe by `ignoreActed` localised it exactly:
+Java had **32** calls with `ignoreActed=true` and Rust had **0**.
+
+### Three dead paths, one mechanism
+
+`CHECK_STALLING` has only two push sites in Java, and everything downstream of it had also landed in
+a file the driver never dispatches.
+
+1. **The push site that matters was missing.** `bb2016/StepEndInducement:102` and
+   `bb2020/inducements/StepEndInducement:115` push `new StepCheckStalling(gameState)` on top of the
+   Select sequence at `START_OF_OWN_TURN`; `bb2025/inducements/StepEndInducement:125` pushes Select
+   alone. The bare constructor is the whole point: it leaves `ignoreActedFlag` at its default `true`,
+   so `performCheck` passes at the start of a turn when nobody has acted yet. The other site
+   (`generator/bb2020/EndPlayerAction:33`) passes `IGNORE_ACTED_FLAG = false`.
+   Rust's `step/bb2020/inducements/step_end_inducement.rs` had this correct **and commented** — and
+   is a dead twin; `driver.rs:58` imports `crate::step::bb2025::inducements::*`, so every edition
+   ran the BB2025 body. Fixed by edition-gating the push into the live bb2025 step
+   (`game.rules != Rules::Bb2025`). Rust's `ignoreActed=true` count went 0 → **32**, matching Java
+   exactly, and the conjunct traces then agreed on both `true` verdicts.
+
+2. **`handle_stallers` was in a dead twin too.** §H.26 put its 1:1 port of
+   `bb2020/StepEndTurn.handleStallers()` (Java 621-646) in `step/bb2020/step_end_turn.rs`, but
+   `driver.rs:73` imports `bb2025::step_end_turn::StepEndTurn` for all three editions. Moved into the
+   live step, gated on `game.rules == Rules::Bb2020` (neither `bb2025/StepEndTurn` nor the BB2016 step
+   has a `handleStallers`), called at the Java call site — before `markPlayedAndSecretWeapons` and
+   before the end-of-half check.
+
+3. **`STALLING_PLAYER` names two entirely different Java classes.** `bb2020.StepStallingPlayer`
+   (@RulesCollection BB2020) IS the Throw a Rock resolution: `rollDice(6)`, hit on 5+, then
+   `dropPlayer` + `InjuryTypeThrowARockStalling`. `bb2025.shared.StepStallingPlayer`
+   (@RulesCollection BB2025) is the unrelated end-of-action stalling penalty and **rolls nothing**.
+   Rust's bb2020 twin was a complete, already-tested 1:1 port sitting dead, and `make_step_for` had no
+   `StallingPlayer` arm, so a bb2020 rock ran the BB2025 penalty step: `DRIVE step=StallingPlayer
+   rng=151` and still `rng=151` after it, against Java's d6 at position 152 from
+   `StepStallingPlayer.start:55`. That is the missing die of §H.36's chain. Routed in
+   `make_step_for`'s `Rules::Bb2020` arm — routing rather than an in-step gate is right here
+   precisely because the two classes share nothing but the StepId.
+
+Only the first is a new port; 2 and 3 are code that already existed and was unreachable.
+
+`step/bb2020/step_end_turn.rs` and `step/bb2020/step_stalling_player.rs` are left as they were:
+the working logic now lives in the live step and in `make_step_for`'s routing, and committing a
+second copy of `handle_stallers` into a file the driver never dispatches would invite exactly the
+mistake this iteration cost. §H.26's twin edit was reverted for the same reason.
+
+### Gate
+
+Nine-gate style, sequential, `PARITY_JVM_CORES=1`, fresh JVM throughout (no `--reuse-java`):
+
+| cell | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| **slann bb2020** (target) | 100/100 | 100/100 | **100/100** (was RED) |
+| **human bb2020** (target) | 100/100 | **100/100** (was RED) | 100/100 * |
+| goblin bb2020 | 100/100 | | |
+| khorne bb2020 | | 100/100 | |
+| nurgle bb2020 | | 100/100 | |
+| high_elf bb2020 | | | 100/100 |
+| amazon bb2016 | 100/100 | | |
+| necromantic bb2016 | 100/100 | | |
+| goblin bb2016 | 100/100 * | | |
+| human bb2025 | 100/100 | | |
+| goblin bb2025 | 100/100 | | |
+
+`*` = `100/100 games match, but required coverage items are MISSING`, which is a PASS. Both bb2016
+controls and both bb2025 controls are there deliberately: bb2016 also opens the new
+`StepEndInducement` gate (harmlessly -- bb2016 has no prayers, so `shouldNotStall` is never set), and
+bb2025 must be byte-for-byte untouched. Nothing moved.
+
+Workspace tests 15,321 passed / 0 failed.
+
+### Regression test
+
+`start_of_own_turn_pushes_check_stalling_before_select_except_in_bb2025` in the live
+`bb2025/inducements/step_end_inducement.rs` asserts the pushed SHAPE per edition: Select first, then
+CheckStalling on top for BB2016/BB2020, Select alone for BB2025. **Shown to fail without the fix**
+(gate forced to `false` → `pushes.len()` is 1 where 2 is required). The `handle_stallers` port and the
+rock step both arrive with the tests §H.26 and the original twin already carried.
+
+### Lesson, for the fifth time
+
+This is the **fifth** dead-twin incident (§H.18 was the fourth), and the first where a single
+mechanism was dead in three files at once. Two refinements the previous write-ups did not have:
+
+- **A correct port can measure neutral because it is unreachable, not because it is wrong.** §H.26
+  reverted on the gate rule and then spent its "next step" on an `is_active` question that the
+  evidence never supported. Before theorising about a conjunct, count the CALLS: had §H.26 compared
+  164 against 120 it would have gone straight to the push site.
+- **Probe BOTH engines with the same probe and diff it.** A one-sided probe ("Rust says not_active")
+  invites a conclusion the other side would have refuted in one line. The decisive artefacts here
+  were `JSTALLGATE` vs `RSTALLGATE` split by `ignoreActed`, and a normalised `diff` of the two
+  conjunct traces that came back with exactly one differing line.
+- **Grep `driver.rs` for BOTH `make_step`'s `use` block and `make_step_for`'s edition arms.** The
+  `use crate::step::bb2025::*` imports at the top of `make_step` are what silently make a whole
+  `step/bb2020/` directory dead; `make_step_for` is the only per-edition dispatch there is.
+
+### Standing red set
+
+2 gates / 2 cells, both root-caused:
+
+- `khemri` bb2025 @1.0 — the BB2025 `raisePositions` / `StepApothecary` RIP-branch port (§H.35)
+- `dark_elf` bb2025 @1.0 — harness; needs an `ffb-server` stack probe on `setNextAction(CONTINUE)` (§H.34)
+
+**Next concrete step:** the khemri raise port — check first what Java's bb2025
+`InjuryMechanic.raisePositions` returns for an `undead` team with no `raisedPositionId`, and whether
+Rust's `InjuryMechanic` trait already has a `raise_positions` hook. Gate broadly: every undead /
+necromancer / Nurgle roster can raise.

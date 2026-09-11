@@ -396,6 +396,19 @@ pub fn make_step_for(id: StepId, rules: Rules) -> Box<dyn Step> {
             // ONE differing event inside the shared step instead — see `handle_cheering_fans`.
             StepId::Prayer =>
                 return Box::new(crate::step::bb2020::StepPrayer::default()),
+            // `STALLING_PLAYER` names two ENTIRELY DIFFERENT Java classes, not two versions of one:
+            // `bb2020.StepStallingPlayer` (@RulesCollection BB2020) is the Throw a Rock resolution
+            // -- roll a d6, hit on 5+, then dropPlayer + InjuryTypeThrowARockStalling -- while
+            // `bb2025.shared.StepStallingPlayer` (@RulesCollection BB2025) is the unrelated
+            // end-of-action stalling PENALTY and rolls nothing. The Rust bb2020 twin was a complete,
+            // tested 1:1 port that simply sat dead: with no BB2020 arm here, a bb2020 rock ran the
+            // BB2025 penalty step and consumed NO die, so the shared stream fell one behind for the
+            // rest of the game (slann bb2020 @1e6 seed 32: Java's d6 at stream position 152 from
+            // `StepStallingPlayer.start:55`, Rust's rock step at rng=151 and still 151 after it).
+            // Routing is right here rather than an in-step edition gate precisely because the two
+            // classes share nothing but the StepId.
+            StepId::StallingPlayer =>
+                return Box::new(crate::step::bb2020::step_stalling_player::StepStallingPlayer::new()),
             // BB2020 Throw-Team-Mate step-set. These twins were translated with the rest of the
             // port and then sat dead: the driver had no BB2020 TTM arm, so a BB2020 throw ran the
             // BB2025 chain. Nothing noticed for as long as it didn't because BB2020 never reached a
