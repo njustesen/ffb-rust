@@ -6939,3 +6939,66 @@ later activation, so expect wide movement rather than a one-cell fix.
 - `khemri` bb2025 @1.0 — this, needs the BB2025 raise port
 - `slann` bb2020 @1e6 — seed 32, untriaged
 - `human` bb2020 @0 — seed 63, the §H.26 stalling port, patch saved at `docs/iter5_stalling_port.patch.txt`
+
+## §H.36 — ITER15: `slann` bb2020 is the SAME defect as `human` bb2020 — the unported stalling check
+
+**Investigation, no fix — but it changes the queue's economics.** `slann` bb2020 @1e6 seed 32 and
+`human` bb2020 @0 seed 63 are **one cause**, not two: Rust never throws the Throw-a-Rock rock,
+because the bb2020 stalling check is a stub (§H.26). The port for it is already written and saved at
+`docs/iter5_stalling_port.patch.txt`.
+
+### The chain
+
+1. `statediff --step 87` names ONE slot: `a03` — the slann Kroxigor (6/5/1/9) — at `20,5` in Java
+   and `20,0` in Rust. Same state, different row.
+2. The activation diff agrees through i=87, so this is a genuine state divergence and not a
+   step-count artefact. `a03` is `away_04`, the player BOTH engines activated at i=86.
+3. At i=86 Java rolls **one `rollSkill` d6 = 1** and the Kroxigor does not move — a failed
+   **Bone-Head**, action lost. Rust rolls Bone-Head too (its `DRIVE step=BoneHead` consumes a die)
+   but passes it and moves to `20,0`.
+4. Both read a different DIE for it: Java's Bone-Head is stream position **154**, Rust's is **153**.
+   The stream is position-keyed, so the values differ and the outcomes differ. Rust is **one die
+   behind**.
+5. Dice positions agree through i=81 (pos 143) and Rust ends one behind after i=82. Across that pair
+   Java rolls 9 dice and Rust 8, and the missing one is identified by its caller:
+
+   ```
+   DICE_TRACE pos=152 sides=6 result=4  StepStallingPlayer.start:55
+   ```
+
+   Java throws a rock at a stalling player during step 82; Rust does not.
+6. Confirmed by the prayer and by count: `JAVA_PRAYERPICK side=home … pick=14` — **14 is
+   THROW_A_ROCK** — and Java makes **2** `StepStallingPlayer` rolls in this game against Rust's
+   **0**. Exactly the same 2-vs-0 as `human` bb2020 seed 63.
+
+### Why this matters more than one cell
+
+§H.26 wrote the port (`StepCheckStalling::start` + `handle_stallers` in `bb2020/step_end_turn.rs`),
+gated it neutral on eight gates, and **reverted it under the gate rule** because its target did not
+improve. That decision was right on the evidence then, but it was costing **two** cells, not one —
+and the reason it measured neutral is known and narrow: Rust's `is_considered_stalling` rejects the
+ball carrier as `not_active` at the moments Java must see it ACTIVE (11 of 15 probe hits), so the
+staller is never recorded and the rock is never thrown.
+
+So the remaining work is not "redo the port" — the port restores the mechanism — it is the single
+`is_active` question §H.26 left named. Two seeds now exercise it, which is strictly better for
+debugging than one: `slann` bb2020 @1e6 seed 32 diverges at i=86 and `human` bb2020 @0 seed 63 at
+i=231, so the slann seed is much cheaper to iterate on.
+
+**Next concrete step:** re-apply `docs/iter5_stalling_port.patch.txt`, then probe Java's
+`StepCheckStalling.isConsideredStalling` (print `playerId`, `isActive()`, the coordinate and each
+conjunct, per call) and diff against the Rust `RSTALLCONS` probe in the same patch. Use **slann
+bb2020 @1e6 seed 32** as the working seed. That needs an `ffb-server` probe and so invalidates
+`--reuse-java`.
+
+### Method note
+
+Two instruments, and each is wrong where the other works:
+
+- When the step COUNTS differ, the dice-position attribution gives a false positive (§H.35's khemri:
+  it flagged i=31, pure boundary noise) and the **activation diff** is what localises.
+- When the activations AGREE, as here, the dice-position attribution is exactly right and the
+  activation diff says nothing.
+
+Run both, and let the state hash decide which to trust: if the first hash mismatch sits where the
+activations still agree, it is a real state divergence and the dice are the lead.
