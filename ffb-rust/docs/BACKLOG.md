@@ -6662,3 +6662,54 @@ suspicious. §H.30's probe printed the server's own rejection MESSAGE ("You plac
 which named the failing rule in one run after a placement-loop hypothesis had already been refuted by
 a second probe (`n=11 placed=11`). The Rust half then needed no probe at all: `statediff_step.py`
 had already named the one differing slot and the only question was where to put the mirror.
+
+## §H.32 — ITER11: the Pitch Invasion's chain injury was rolled and thrown away; GROUP E CLOSED
+
+`goblin` bb2020 **100/100 x3** (was 98/100 at all three scales, seeds 55 and 99) — **three gates in
+one fix**. Controls all 100/100: `goblin` bb2016 @1.0, `goblin` bb2025 @1.0, `ogre` bb2020 @1.0,
+`underworld` bb2020 @1.0 (the other Ball & Chain carriers), `khorne` bb2020 @0, `nurgle` bb2020 @0,
+`human` bb2020 @1.0, `high_elf` bb2020 @1e6, `human` bb2025 @1.0, `amazon` bb2016 @1.0,
+`necromantic` bb2016 @1.0. Workspace 14,820/0. **Group E is closed.**
+
+### §H.18's open question, answered
+
+§H.18 left one: does anything consume the published `INJURY_RESULT` in the Pitch-Invasion path? It
+called this "a one-grep question" and it was — the answer is **yes, in bb2020**:
+`generator/mixed/Kickoff.java:45-46` adds `APOTHECARY(HOME)` and `APOTHECARY(AWAY)` straight after
+`APPLY_KICKOFF_RESULT`, and that mixed sequence serves bb2016 AND bb2020. Only bb2025's own
+`generator/bb2025/Kickoff.java` omits them. Rust's `mixed/kickoff.rs:53-55` already had both steps,
+so the sequence was right all along.
+
+The doc comment on `stun_player_rng` asserted the opposite — "nothing consumes that published
+result, so the chain injury's dice are rolled but its outcome is NOT applied" — and that claim was
+what stopped the previous pass. It is now corrected at the site.
+
+### The chain, complete
+
+1. Pitch Invasion picks the Fanatic to stun (`d3` count, then `d11`/`d10` picks).
+2. Java's `dropPlayer` sees `placedProneCausesInjuryRoll` and does NOT place it STUNNED: it runs
+   `InjuryTypeBallAndChain` — **armour auto-broken** (`injuryContext.setArmorBroken(true)`) — rolls
+   2d6 injury (1+2=3) and **publishes** the `InjuryResult`.
+3. `APOTHECARY(HOME)` consumes and applies it.
+4. Injury 3 reads as Stunned — but **Ball & Chain registers `convertStunToKO`**, so
+   `evaluate_injury_context` turns that Stunned into **KNOCKED_OUT**. Hence Java's `-1,-1,Ko`.
+
+Rust rolled steps 1-2's dice and then **discarded the returned `Vec<StepParameter>`** at the live
+call site, so nothing ever applied it: the Fanatic stayed `20,5,Standing` — on the BALL's square, so
+the ball differed too (Java 20,5 vs Rust 19,5) — and the next die was a block roll in Java against
+another random-walk d8 in Rust. That is the "die-SIZE divergence" §H.18 recorded: not a missing
+roll, a missing *consequence*.
+
+Fix: `stun_random_standing_players` now returns its `StepParameter`s and `handle_pitch_invasion`
+publishes them, the same idiom the Throw-a-Rock path in the same file already used.
+
+### Why the previous attempt measured neutral
+
+§H.18 records a `stun_player` → `stun_player_rng` correction that "does **not** fix these seeds".
+That correction was applied to `step/bb2020/step_apply_kickoff_result.rs` — which ITER4 (§H.25)
+later proved is **DEAD**: `driver.rs:392` deliberately excludes `ApplyKickoffResult` from the bb2020
+routing, so bb2020 runs the shared `step/bb2025/kickoff/step_apply_kickoff_result.rs`. The live file
+had the rng-aware call already and the dead twin was fixed twice over. **Fourth time this campaign
+has paid for a dead `step/bb20xx/*` twin** — the others were §H.25's kickoff probe, §H.27's
+intercept files, and §H.19's original mis-attribution. Before touching any `step/bb2016/*` or
+`step/bb2020/*` file, grep `driver.rs` for an override of that `StepId` in that edition's arm.

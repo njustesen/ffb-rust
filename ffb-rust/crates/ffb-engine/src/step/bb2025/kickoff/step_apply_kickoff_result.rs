@@ -921,17 +921,26 @@ impl StepApplyKickoffResult {
         let stunned = rng.d3();
 
         let mut stun_events = Vec::new();
+        let mut stun_params: Vec<StepParameter> = Vec::new();
         if total_home <= total_away {
-            stun_events.extend(self.stun_random_standing_players(game, rng, true, stunned));
+            let (ev, pr) = self.stun_random_standing_players(game, rng, true, stunned);
+            stun_events.extend(ev);
+            stun_params.extend(pr);
         }
         if total_home >= total_away {
-            stun_events.extend(self.stun_random_standing_players(game, rng, false, stunned));
+            let (ev, pr) = self.stun_random_standing_players(game, rng, false, stunned);
+            stun_events.extend(ev);
+            stun_params.extend(pr);
         }
 
         // client-only: setAnimation(KICKOFF_PITCH_INVASION)
         let mut out = StepOutcome::next()
             .with_event(GameEvent::KickoffPitchInvasion { home_roll: roll_home, away_roll: roll_away });
         for ev in stun_events { out = out.with_event(ev); }
+        // Java: `dropPlayer` published INJURY_RESULT per Ball & Chain victim; the kickoff
+        // sequence's APOTHECARY(HOME)/(AWAY) steps consume and apply it. Same idiom as the
+        // Throw-a-Rock path above.
+        for pr in stun_params { out = out.publish(pr); }
         out
     }
 
@@ -939,8 +948,10 @@ impl StepApplyKickoffResult {
     /// Returns one `KickoffPitchInvasionStun` per player actually stunned — the event had no
     /// construction site in the engine, so a Pitch Invasion reported the team rolls but never WHICH
     /// players it put down (424 pitch invasions per 8,700 games, all invisible). Report-only.
-    fn stun_random_standing_players(&self, game: &mut Game, rng: &mut GameRng, home: bool, count: i32) -> Vec<GameEvent> {
+    fn stun_random_standing_players(&self, game: &mut Game, rng: &mut GameRng, home: bool, count: i32)
+        -> (Vec<GameEvent>, Vec<StepParameter>) {
         let mut events = Vec::new();
+        let mut params: Vec<StepParameter> = Vec::new();
         let team = if home { &game.team_home } else { &game.team_away };
         let mut standing: Vec<String> = team.players.iter()
             .filter(|p| game.field_model.player_state(&p.id)
@@ -955,13 +966,24 @@ impl StepApplyKickoffResult {
             }
             let idx = rng.range(standing.len());
             let id = standing.remove(idx);
-            // Java stunPlayers → UtilServerInjury.stunPlayer(this, player, ApothecaryMode.HOME): a
-            // Ball & Chain player rolls InjuryTypeBallAndChain (2d6) — consumed for parity but its
-            // result is published unconsumed (not applied) — instead of being placed STUNNED.
-            util_server_injury::stun_player_rng(game, rng, &id, ffb_model::enums::ApothecaryMode::Home);
+            // Java stunPlayers → UtilServerInjury.stunPlayer(this, player, ApothecaryMode.HOME).
+            // For a Ball & Chain player Java's dropPlayer does NOT place it STUNNED: it rolls
+            // InjuryTypeBallAndChain (armour auto-broken, 2d6 injury) and PUBLISHES the
+            // InjuryResult, which the kickoff sequence's APOTHECARY(HOME) step then applies
+            // (`generator/mixed/Kickoff.java:45-46` — the mixed sequence serves bb2016 AND bb2020;
+            // bb2025's own generator has no apothecary there). Rust rolled the dice and DISCARDED
+            // the returned parameter, so nothing ever applied it and the Fanatic stayed STANDING.
+            //
+            // The outcome matters doubly because Ball & Chain registers `convertStunToKO`: the
+            // chain injury's Stunned becomes KNOCKED OUT. goblin bb2020 seeds 55 and 99, all three
+            // scales: Java's Fanatic is `-1,-1,Ko` and Rust's `20,5,Standing` on the BALL's square,
+            // so the ball differed too (Java 20,5 vs Rust 19,5) and the next die was a block roll
+            // in Java against another random-walk d8 in Rust.
+            params.extend(util_server_injury::stun_player_rng(
+                game, rng, &id, ffb_model::enums::ApothecaryMode::Home));
             events.push(GameEvent::KickoffPitchInvasionStun { player_id: id });
         }
-        events
+        (events, params)
     }
 
     /// Java: `randomPlayer(playersOnField(game, team))` — random player on field for given side.
@@ -1041,6 +1063,44 @@ mod tests {
         }
         assert!(checked, "no seed in 0..40 reached the stun branch");
     }
+    /// A Pitch Invasion that stuns a Ball & Chain player must PUBLISH the chain injury, not just
+    /// roll it.
+    ///
+    /// Java's `dropPlayer` does not place a `placedProneCausesInjuryRoll` player STUNNED: it rolls
+    /// `InjuryTypeBallAndChain` (armour auto-broken, 2d6 injury) and PUBLISHES the InjuryResult,
+    /// which the kickoff sequence's `APOTHECARY(HOME)`/`(AWAY)` steps then apply —
+    /// `generator/mixed/Kickoff.java:45-46`, and that mixed sequence serves bb2016 AND bb2020
+    /// (bb2025's own generator has no apothecary there). Rust rolled the dice and DISCARDED the
+    /// returned parameter, so nothing applied it and the Fanatic stayed STANDING.
+    ///
+    /// It matters doubly because Ball & Chain registers `convertStunToKO`, so the chain injury's
+    /// Stunned becomes KNOCKED OUT. goblin bb2020 seeds 55 and 99, all three scales: Java's Fanatic
+    /// was `-1,-1,Ko` and Rust's `20,5,Standing` on the BALL's square, so the ball differed too.
+    #[test]
+    fn a_pitch_invasion_publishes_the_ball_and_chain_chain_injury() {
+        use ffb_model::enums::{PlayerState, PS_STANDING, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+
+        let mut game = make_game();
+        let mut fanatic = ffb_model::model::player::Player {
+            id: "h1".into(), name: "Fanatic".into(), nr: 1, position_id: "pos".into(),
+            movement: 3, strength: 7, agility: 3, passing: 6, armour: 8,
+            ..Default::default()
+        };
+        fanatic.starting_skills = vec![SkillWithValue { skill_id: SkillId::BallAndChain, value: None }];
+        game.team_home.players.push(fanatic);
+        game.field_model.set_player_coordinate("h1", FieldCoordinate::new(13, 7));
+        game.field_model.set_player_state("h1", PlayerState::new(PS_STANDING));
+
+        let step = make_step();
+        let mut rng = GameRng::new(7);
+        let (events, params) = step.stun_random_standing_players(&mut game, &mut rng, true, 1);
+        assert_eq!(events.len(), 1, "the Fanatic must be the stunned player");
+        assert!(params.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))),
+            "the Ball & Chain chain injury must be PUBLISHED for the apothecary step to apply;              discarding it leaves the player STANDING where Java has it KO");
+    }
+
     /// Java's `handleOfficiousRef` picks BOTH targets before running `insertSteps` for either, so
     /// on a tie the dice are `d11 home pick, d11 away pick, d6 home ref roll, d6 away ref roll`.
     /// Interleaving pick→insertSteps→pick→insertSteps draws the same NUMBER of dice in a different
