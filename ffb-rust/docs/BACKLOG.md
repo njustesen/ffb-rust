@@ -5893,3 +5893,57 @@ activation; on the Java side, what sets `turnOver` or advances the turn between 
 two `JAVA_GFI` lines straddle the die with `runGfi=true, ballChain=false` then
 `runGfi=false, ballChain=true`, which is worth understanding before anything else: a ball-chain
 flag flipping around a rooted ball carrier is the kind of detail that decides this.
+
+### §H.21 group A — narrowed hard, three hypotheses refuted, needs a Java probe
+
+Everything below is measured on `gnome` bb2025 @1.0 seed 9, first differing step i=144.
+
+**The active bits settle what kind of divergence this is.** Both engines agree at i=143 on
+`10101010111` for the home team (h00..h10). At i=144:
+
+```
+java  10111111111    h03, h05, h07 go 0 -> 1   <- a NEW-TURN reset
+rust  10101010101    only h09 goes 1 -> 0      <- the Treeman acted, turn continues
+```
+
+Rust's transition is exactly right for "that player acted". Java re-activates three
+previously-used players, which only happens when a turn begins — and it does so with **six** home
+players (h00, h02, h04, h06, h08, h10) still available. A turn cannot end naturally with six
+players left, so Java took a **turnover**. Finding what causes it is the whole task.
+
+**Refuted 1 — "a failed Take Root is a turnover in Java".** `bb2025/shared/StepTakeRoot.java`'s
+failure path does exactly one state change, `changeRooted(true)`. The rulebook agrees
+(`rules/core_rules/08_skills_and_traits.md:667`: on a 1 the player becomes Rooted; no turnover).
+
+**Refuted 2 — "Rust is missing Java's HAND_OVER_MOVE -> HAND_OVER conversion".** It is not. Java's
+`cancelPlayerAction` converts the action and sets `throwerId`/`throwerAction`;
+`bb2025/shared/step_take_root.rs:276-286` does the same, edition-gated so bb2016 leaves the thrower
+alone, and it has a test. Rust then really does run the hand-over — the drive trace shows
+`InitPassing -> DispatchPassing -> HandOver -> CatchScatterThrowIn -> ResetToMove -> EndPassing`,
+consuming **no dice** (rng stays at 212), i.e. a hand-over with no catch.
+
+**Refuted 3 — "Rust's StepEndPassing lacks Java's no-catcher end-turn term".** Java bb2025
+`StepEndPassing:238-243` ends the turn on
+`checkTouchdown || (catcher == null && !animosity && !bloodLust && actingPlayer.hasPassed())
+|| findOtherTeam(thrower).hasPlayer(catcher) || fPassFumble`, and Rust has that same disjunction at
+`bb2025/pass/step_end_passing.rs:316-317`. More to the point, **the `hasPassed` term cannot be what
+fires**: `setHasPassed(true)` does not appear anywhere in Java's bb2020 or bb2025 step packages —
+only in `bb2016/pass/StepInitPassing` and the three `ThrowTeamMateBehaviour`s. So for a bb2025
+hand-over `hasPassed()` is false on both sides and that clause is dead.
+
+**What is left.** In that same first branch: `checkTouchdown` (no touchdown — the score is
+unchanged), `findOtherTeam(thrower).hasPlayer(catcher)` (catcher is null, so false), `fPassFumble`.
+Or the turnover is not decided in `StepEndPassing` at all but inside the `EndPlayerAction` sequence
+it pushes, or in `StepEndPlayerAction` / `StepEndTurn`.
+
+**Next measurement — and the trace cannot answer it, so stop reading traces.** Both sides' existing
+output is exhausted: same die, same non-move, same hand-over-with-no-catch, different turn. Add an
+env-gated probe to the Java server (this campaign's normal practice for a local, uncommitted trace —
+it needs `mvn -pl ffb-server,ffb-ai install` and invalidates `--reuse-java`) printing, for the window
+between `JSTEP i=143` and `i=144`: `fEndTurn` / `fEndPlayerAction` on entry to `StepEndPassing`,
+which disjunct set `fEndTurn`, and whether `EndPlayerAction` was pushed with `endTurn=true`. That
+names the clause in one run instead of another round of inference.
+
+Also worth carrying forward: the two `JAVA_GFI` probe lines that straddle the die report
+`runGfi=true, ballChain=false` then `runGfi=false, ballChain=true` for a player who never moves.
+Whatever flips `ballChain` around a rooted ball carrier may be the same thing that ends the turn.
