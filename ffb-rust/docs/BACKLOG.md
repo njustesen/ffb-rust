@@ -5828,3 +5828,68 @@ that differs in all three.
 
 `renegades_37733` bb2025 @1e6 seed 16 is a different shape again: `h05` Stunned in Java vs Standing
 in Rust and `h06` Prone in Java vs Stunned in Rust — two knock-down states swapped, in a Blizzard.
+
+## §H.21 — Driving the matrix green: the ordered queue (2026-09-11)
+
+User decision: **fix reds until the full matrix is green before any coverage work.** This supersedes
+§H.14 phase 2 as the next item, and it agrees with this file's own standing rule ("commit ONLY at
+30/30/30") — phase 2 cannot even be gated cleanly as written, because two of the seven Brawler cells
+(`khemri` bb2025, `old_world_alliance_treeman` bb2020) are red.
+
+### The real remaining set: 16 gates / 13 cells
+
+`goblin` bb2016's three red gates in `SWEEP_2026-09-10_REDRAFT.txt` are **stale** — the sweep ran a
+binary built before §H.16 landed. Re-gated on the committed engine: 100/100 at @1.0, @0 and @1e6.
+
+Grouped so one investigation closes several gates, which is the order to work them:
+
+| # | group | gates | cells |
+|---|---|---:|---|
+| A | turn-boundary / ACTIVE-bit family (§H.20) | 3 | `gnome` bb2025 @1.0, `old_world_alliance_treeman` bb2020 @1e6, `renegades_37733` bb2025 @1.0 |
+| B | "Java knocks down or injures, Rust does not" | 3 | `nurgle` bb2020 @0, `human` bb2020 @0, `goblin` bb2025 @1.0 |
+| C | §H.17 Cloud Burster — known root cause | 1 | `high_elf` bb2020 @1e6 |
+| D | §H.19 khorne — **Java SETUP hang, harness fix** | 1 | `khorne` bb2020 @0 |
+| E | §H.18 die-size divergence | 3 | `goblin` bb2020 @1.0/@0/@1e6 |
+| F | singles, untriaged beyond a one-line shape | 5 | `khemri` bb2025 @1.0, `renegades` bb2020 @1.0, `slann` bb2020 @1e6, `dark_elf` bb2025 @1.0, `renegades_37733` bb2025 @1e6 |
+
+C is worth pulling forward if A stalls: it is the only thing standing between the matrix and
+"an interception never succeeds in 330 gates across 41,514 pass rolls", so it buys a structural
+coverage hole as well as a gate.
+
+### A — localised to one activation, and my first hypothesis is WRONG
+
+`gnome` bb2025 @1.0 seed 9, first differing step i=144. Everything about i=143 matches, including
+every player's active bit, and both engines consume the same single die (rng 212, `rollSkill d6=1`).
+
+At i=143 both activate `home_10` with `HAND_OVER_MOVE` / `HandOffMove`. That player is the
+**Altern Forest Treeman at (4,6), MA 2, holding the ball** (stats `2/6/5/11`). `JAVA_PATH len=3`
+against MA 2 means the move needed a Rush, and Rust's chosen move was `(4,6) -> (1,4)`, also 3
+squares. So both engines tried the same 3-square move with the same die.
+
+**Neither engine moves the Treeman.** At i=144 both have it at (4,6), Standing, ball still (4,6).
+The d6=1 was its **Take Root** roll and it failed. The single difference is:
+
+| | active bit on the Treeman | turn |
+|---|---|---|
+| Java | **1** | away's turn 5 (`h2t55aaways`) |
+| Rust | **0** | still home's turn 5 (`h2t54ahomes`) |
+
+plus three more home players whose active bit is 1 in Java and 0 in Rust, and the `f` flag field
+(`blitz_used, foul_used, hand_over_used, pass_used` per team) reading `f0000` in Java against
+`f0011` in Rust. The `f` and active differences are CONSEQUENCES of the turn having ended on one
+side, not independent facts.
+
+**Hypothesis tried and refuted:** "a failed Take Root is a turnover in Java".
+`bb2025/shared/StepTakeRoot.java` contains exactly one state change —
+`setPlayerState(player, playerState.changeRooted(true))` — and no turnover, no end-turn. So Java
+does not end the turn *because* of Take Root, and the reason Java is on the away turn is still
+unexplained. Do not infer it from step adjacency (see the standing lesson about exactly that).
+
+**The next measurement, and it needs a probe rather than the existing trace.** Both sides' trace is
+exhausted: it shows the same die, the same non-move, and then a different turn. Instrument the
+turn-end path directly — on the Rust side, why `home_11` is still offered after the rooted
+activation; on the Java side, what sets `turnOver` or advances the turn between `JSTEP i=143` and
+`i=144` (the window is 7 lines: `JAVA_P2`, `JAVA_PATH`, the die, two `JAVA_GFI` probes). Note the
+two `JAVA_GFI` lines straddle the die with `runGfi=true, ballChain=false` then
+`runGfi=false, ballChain=true`, which is worth understanding before anything else: a ball-chain
+flag flipping around a rooted ball carrier is the kind of detail that decides this.
