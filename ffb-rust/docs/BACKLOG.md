@@ -6010,3 +6010,70 @@ Java moves.
 - CPU discipline (user request, 2026-09-11): gates run **sequentially** in one background job with
   `PARITY_JVM_CORES=1`, about two cores busy. No 4-shard sweeps without asking. And do not stop work
   with `Stop-Process` — use the `STOP_SWEEP` file the workers poll, or `TaskStop` on our own jobs.
+
+## §H.23 — ITER2: a confused giver lashed out at its own receiver (2026-09-11) — FIXED, GROUP A CLOSED
+
+Both remaining group A gates closed by ONE fix. `renegades_37733` bb2025 **100/100 x3** (was 99 @1.0
+seed 23 and 99 @1e6 seed 16). Controls all 100/100: `skaven` bb2020 @1.0/@1e6 and `skaven` bb2025
+@1.0 (the other Animal Savagery carriers, and bb2020 shares this step), `human` bb2025, `amazon`
+bb2016, plus §H.22's `gnome` bb2025 and `old_world_alliance_treeman` bb2020 re-gated. Workspace
+14,814/0. **Group A is closed; the queue moves to group B.**
+
+### The chain
+
+The `PARITY FAIL` line pointed at step 66, where Java sat on home's turn 6 and Rust had already
+moved to away's turn 7. The cause was three steps earlier, and the dice found it:
+
+1. `statediff_step.py --step 66` named the header plus three player slots — a turn boundary, i.e. a
+   consequence. Last matching state was i=65, where BOTH engines activate `home_08` (h07, the
+   Renegade Ogre) for a Move. Java's Ogre never moves; Rust's walks to (17,12) and ends Prone.
+2. `FFB_DICE_TRACE` showed the dice streams **identical in size and value at every position through
+   108**. So no dice bug — but Java's Bone Head for that Ogre is die **98 (=1, FAIL)** while Rust's
+   is die **100 (=2, PASS)**. Rust was two dice ahead.
+3. Attributing dice to steps from the `FFB_DRIVE_TRACE` `rng=` deltas found the overrun exactly: at
+   i=63 Rust's `AnimalSavagery` consumed dice 97, 98 and 99 where Java consumed only 97.
+
+### The root cause
+
+i=63 is `home_09` — the Rat Ogre — declaring `HAND_OVER_MOVE`. `minimumRollConfusion(false)` is 4
+and a give is not "good conditions", so the shared roll of 3 **failed in both engines**. Java then
+cancels the action and rolls nothing more, because its lash-out target set is empty:
+`adjacentTargets` filters through `UtilPlayer.findAdjacentBlockablePlayers` → `canBeBlocked()`, and
+the only adjacent team-mate, `home_10` at (8,1), is PRONE.
+
+Rust reached that team-mate anyway, through the `game.defender_id` branch. The guard for exactly
+this — added for chaos_dwarf seed 16 step 82, whose comment already says the receiver "travels in
+the command, never in the game state" — listed only `PlayerAction::Pass` and `HandOver`. But those
+are what a give BECOMES once it is attempted. What the agent activates, and what a negatrait rolled
+at the start of the activation sees, is the DECLARED form `HAND_OVER_MOVE` / `PASS_MOVE`. The guard
+never fired on the live path. Rust lashed out at its own prone receiver, spent 2 dice Java never
+spent, and shifted the next player's Bone Head off the failing die.
+
+### The fix
+
+Widen the guard to all four: `Pass | PassMove | HandOver | HandOverMove`. Java has no defender for
+any of them. The existing test was extended to loop over all four; it FAILS without the change,
+naming `HandOverMove`.
+
+### Method notes
+
+- **A turnover one engine has and the other does not is a symptom two or three activations
+  downstream of its cause.** Both §H.22 and this one presented as a turn-boundary header diff and
+  were caused earlier: §H.22 by a stale coordinate, this one by a dice-stream offset.
+- **Compare the dice streams by (sides, result) at every position before theorising.** Identical
+  values with a shifted *consumer* is a distinct and very informative signature: it says one engine
+  rolled dice the other did not, and it says nothing is wrong with the RNG.
+- **`FFB_DRIVE_TRACE`'s `rng=` field attributes dice to steps.** Each `DRIVE` line prints the count
+  BEFORE its step, so the delta to the next line is what that step consumed. That is what turned
+  "Rust is 2 dice ahead" into "AnimalSavagery ate 3 where Java ate 1" in one pass.
+- **A guard listing action variants is a bug magnet.** Both defects this iteration and last came
+  from an action-variant set that was one member short. When a check keys on `PlayerAction`, ask
+  which DECLARED variant reaches the site, not which one the mechanic is named after. The same
+  bridged-target hole plausibly exists for `ThrowTeamMate(Move)` and `KickTeamMate(Move)`; per the
+  campaign's standing rule it is NOT fixed speculatively — wait for a red that names it.
+
+### Next
+
+Group A closed. Next is **group B — "Java knocks down or injures, Rust does not"**: `nurgle` bb2020
+@0, `human` bb2020 @0, `goblin` bb2025 @1.0. Take the cell with the fewest failing seeds first and
+localise with `statediff_step.py` before any hypothesis.

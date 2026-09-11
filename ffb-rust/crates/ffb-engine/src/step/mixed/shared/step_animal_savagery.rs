@@ -581,9 +581,19 @@ fn adjacent_targets(game: &Game, team: &Team, player_coordinate: FieldCoordinate
     // find_adjacent_blockable_players had already (correctly) excluded it; the defender branch was
     // the only way in. Scoped to this read rather than clearing defender_id at dispatch: that was
     // measured and took goblin from 100/100 to 4/100, since the pass path needs the value.
+    // The DECLARED forms count too. `PlayerAction::HandOver`/`Pass` are what the action becomes
+    // once the give is actually attempted; what the agent activates is `HAND_OVER_MOVE` /
+    // `PASS_MOVE`, and a negatrait rolled at the START of the activation sees that declared form.
+    // Java has no defender for either, so all four must be excluded -- renegades_37733 bb2025
+    // seed 23 i=63, where a HAND_OVER_MOVE Rat Ogre failed Animal Savagery and lashed out at its
+    // own PRONE receiver: 2 dice Java never rolled, which shifted the NEXT player's Bone Head
+    // from die 98 (=1, fail) to die 100 (=2, pass) and cost the turnover.
     let action_has_no_java_defender = matches!(
         game.acting_player.player_action,
-        Some(PlayerAction::Pass) | Some(PlayerAction::HandOver)
+        Some(PlayerAction::Pass)
+            | Some(PlayerAction::PassMove)
+            | Some(PlayerAction::HandOver)
+            | Some(PlayerAction::HandOverMove)
     );
     if action_has_no_java_defender {
         return set;
@@ -1386,9 +1396,20 @@ mod tests {
     /// command), so its `adjacentTargets` defender branch contributes nothing. Rust's activation
     /// bridge parks the receiver in `game.defender_id`, which previously let a confused thrower
     /// lash out at its own receiver: chaos_dwarf vs chaos_pact seed 16 step 82.
+    /// ...and the DECLARED forms are the ones that actually reach this code. A negatrait rolled at
+    /// the start of an activation sees `HAND_OVER_MOVE`/`PASS_MOVE`; the bare `HandOver`/`Pass` are
+    /// what the action becomes only once the give is attempted, which a failed negatrait prevents.
+    /// Covering just the two bare variants therefore left the live path unguarded --
+    /// renegades_37733 bb2025 seed 23 i=63, where a HAND_OVER_MOVE Rat Ogre lashed out at its own
+    /// prone receiver and rolled 2 dice Java never rolled.
     #[test]
     fn adjacent_targets_ignores_the_bridged_receiver_on_a_hand_over() {
-        for action in [PlayerAction::HandOver, PlayerAction::Pass] {
+        for action in [
+            PlayerAction::HandOver,
+            PlayerAction::HandOverMove,
+            PlayerAction::Pass,
+            PlayerAction::PassMove,
+        ] {
             let mut game = make_game();
             game.acting_player.player_action = Some(action);
             add_player(&mut game, true, "receiver", vec![]);
