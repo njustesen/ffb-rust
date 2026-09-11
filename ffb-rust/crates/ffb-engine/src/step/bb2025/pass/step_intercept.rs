@@ -472,7 +472,18 @@ impl StepIntercept {
             // then teleported that ball onto the old interceptor without any roll (dwarf bb2025 seed
             // 45: the i=16 pass intercepted, and the unrelated i=17 pass put the ball on away_01 at
             // 13,7 while Java bounced it to 12,4). The bb2016 twin already published None here.
-            StepOutcome::goto(&label).publish(StepParameter::InterceptorId(None))
+            let mut out = StepOutcome::goto(&label).publish(StepParameter::InterceptorId(None));
+            if is_bb2020 {
+                // Java sets it on EVERY pass through the tail, not only on success:
+                // `bb2020/pass/StepIntercept.java:179` `state.setDeflectionSuccessful(doIntercept)`.
+                // That is what lets the Cloud Burster re-push OVERWRITE the first run's `true` with
+                // `false` when the forced re-roll fails. Publishing only the success case left the
+                // ball flagged as deflected, so the catch that followed carried the +1 "Deflected
+                // Pass" modifier and needed 4 instead of Java's 3 (high_elf bb2020 seed 45: the
+                // re-rolled catch of 3 succeeds in Java and failed here).
+                out = out.publish(StepParameter::DeflectionSuccessful(false));
+            }
+            out
         }
     }
 }
@@ -595,6 +606,33 @@ mod tests {
                 assert_eq!(second.interceptor_id(&game).as_deref(), Some("opp1"),
                     "{rules:?}: the re-pushed step must recover the interceptor from the pass state");
             }
+        }
+    }
+
+    /// A FAILED interception must clear `deflectionSuccessful` in BB2020, not just leave the
+    /// previous value standing.
+    ///
+    /// Java sets it on every pass through the tail — `bb2020/pass/StepIntercept.java:179`
+    /// `state.setDeflectionSuccessful(doIntercept)` — which is what lets the Cloud Burster re-push
+    /// overwrite the first run's `true` with `false` when the forced re-roll fails. Rust published
+    /// only the success case, so the ball stayed flagged as deflected and the catch that followed
+    /// carried the +1 "Deflected Pass" catch modifier: target 4 instead of Java's 3, and the
+    /// re-rolled catch of 3 that Java catches was dropped and scattered (high_elf bb2020 seed 45).
+    ///
+    /// BB2016/BB2025 never set the flag in this step at all, so they must publish nothing.
+    #[test]
+    fn a_failed_interception_clears_deflection_successful_in_bb2020_only() {
+        for rules in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            let mut game = game_with_one_interceptor(rules);
+            let mut step = StepIntercept::new("fail".into());
+            // Decline the interception: the tail takes the failure path with no interceptor.
+            let out = step.handle_command(
+                &Action::Intercept { attempt: false }, &mut game, &mut GameRng::new(1));
+            assert_eq!(out.action, StepAction::GotoLabel, "{rules:?}: declining goes to the label");
+            let cleared = out.published.iter()
+                .any(|p| matches!(p, StepParameter::DeflectionSuccessful(false)));
+            assert_eq!(cleared, rules == Rules::Bb2020,
+                "{rules:?}: only BB2020 tracks deflectionSuccessful in StepIntercept");
         }
     }
 

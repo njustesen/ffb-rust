@@ -6496,3 +6496,58 @@ Two candidates, and they are cheap to separate:
 **Next concrete step:** probe Rust's `catch_ball` for `min_roll` and the modifier list, and the
 catch mode, at the moment it handles die 33. If the min roll is 4 where Java's is 3, candidate 1 is
 the whole story and candidate 2 is just its consequence.
+
+## §H.29 — ITER8: a failed interception must CLEAR the deflection; `high_elf` bb2020 CLOSED, GROUP C DONE
+
+`high_elf` bb2020 **100/100 x3** (was 99 @1e6 seed 45). Controls all 100/100: `high_elf`
+bb2025/bb2016 @1.0, `elf` / `dark_elf` / `wood_elf` / `skaven` bb2020 @1.0, `human` bb2025/bb2020
+@1.0, `amazon` bb2016 @1.0, `goblin` bb2025 @1.0. Workspace 14,819/0. **Group C is closed.**
+
+### The third and last defect on this cell
+
+`PassState.deflectionSuccessful` had the same problem as its two neighbours, in two places:
+
+1. `bb2020/pass/StepIntercept.java:179` sets it on EVERY pass through the tail —
+   `state.setDeflectionSuccessful(doIntercept)`. Rust published `DeflectionSuccessful(true)` on
+   success and **nothing at all** on failure, so the Cloud Burster re-push could never overwrite the
+   first run's `true`.
+2. `StepCloudBurster` does `state.setDeflectionSuccessful(false)` before re-pushing `INTERCEPT`.
+   Rust's `step_cloud_burster.rs:128` assigned `self.deflection_successful = false` — its OWN step
+   field, which no downstream step reads. Rust threads this value as a published `StepParameter`, so
+   the reset reached nobody.
+
+Consequence: the ball stayed flagged as deflected after the forced re-roll failed, so the catch that
+followed picked up the **+1 "Deflected Pass"** catch modifier. Measured directly off the event
+stream — `seed_45_rust_events.jsonl` showed `"catchRoll","player_id":"home_06","target":4` where
+the same squad's AG-2+ thrower got `target:3`. Java's target is 3, so its re-rolled catch of **3**
+succeeds and Rust's failed; the three d8 that followed were the deflected ball scattering, not a
+second bug.
+
+Fix: publish `DeflectionSuccessful(false)` at both Java write sites, bb2020-gated (bb2025's
+`StepIntercept` has no such call — only the bb2020 file does, which is why the success path was
+already gated the same way).
+
+### The cell took three iterations and three defects, each hiding the next
+
+| iteration | defect | what it fixed | what it exposed |
+|---|---|---|---|
+| §H.27 | `interceptorChosen` on the step, not the pass state | two interception dialogs → one | the re-pushed step had no interceptor, so it skipped the forced RE-ROLL |
+| §H.28 | `interceptorId` likewise | the re-roll happens again; spurious team re-roll gone (`r2,3` → `r3,3`) | the catch target was 4, not 3 |
+| §H.29 | `deflectionSuccessful` likewise, plus CloudBurster's reset never published | catch target 3, ball caught | — |
+
+All three are the same root cause — **a `PassState` field modelled as a step field** — and the
+per-edition split is the same: BB2016 keeps these on the step, BB2020/BB2025 on the pass state, and
+one shared Rust step serves all three. `PassState.java:15-16` lists the rest of that struct:
+`catcherId`, `passSkillUsed`, `interceptionSuccessful`, `allowMoveAfterBomb`, `result`,
+`throwerCoordinate`, `oldTurnMode`, `usingBlastIt`, `throwTwoBombs`. **Any of those that Rust keeps
+on a step is a latent copy of this bug**, and it only surfaces where a step is re-pushed within one
+pass — which today means Cloud Burster and the Pass-skill re-roll. Worth an audit pass if another
+pass-related red appears, rather than one cell at a time.
+
+### Method note
+
+The fix was found without a probe: `GameEvent::CatchRoll` already carries `target`, so
+`<root>/<edition>/<matchup>/seed_N_rust_events.jsonl` gives the catch target number directly.
+Comparing two catches in the same game — one at 3, one at 4, both AG 2+ — isolated the extra
+modifier immediately. **Check whether an event already carries the number before instrumenting for
+it.**

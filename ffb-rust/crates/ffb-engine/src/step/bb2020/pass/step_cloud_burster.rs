@@ -132,9 +132,15 @@ impl StepCloudBurster {
             //       IStep interceptStep = getGameState().getStepFactory().create(StepId.INTERCEPT, null, params);
             //       getGameState().getStepStack().push(interceptStep);
             //       getResult().setNextAction(StepAction.NEXT_STEP);
-            StepOutcome::next().push_seq(vec![
-                SequenceStep::with_params(StepId::Intercept, vec![StepParameter::GotoLabelOnFailure(label)]),
-            ])
+            // ...and PUBLISH it. Java's `state` is the shared `PassState`, so its readers
+            // (`StepResolvePass`, `StepCatchScatterThrowIn` via the catch mode) see the reset
+            // immediately; Rust threads this field as a published `StepParameter`, so clearing only
+            // the local copy above reached nobody.
+            StepOutcome::next()
+                .publish(StepParameter::DeflectionSuccessful(false))
+                .push_seq(vec![
+                    SequenceStep::with_params(StepId::Intercept, vec![StepParameter::GotoLabelOnFailure(label)]),
+                ])
         } else {
             // Java: getResult().setNextAction(StepAction.GOTO_LABEL, fGotoLabelOnFailure);
             StepOutcome::goto(&label)
