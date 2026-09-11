@@ -6077,3 +6077,90 @@ naming `HandOverMove`.
 Group A closed. Next is **group B — "Java knocks down or injures, Rust does not"**: `nurgle` bb2020
 @0, `human` bb2020 @0, `goblin` bb2025 @1.0. Take the cell with the fewest failing seeds first and
 localise with `statediff_step.py` before any hypothesis.
+
+## §H.24 — ITER3: Mighty Blow's chainsaw exclusion is BB2020-ONLY (2026-09-11) — FIXED
+
+`goblin` bb2025 **100/100 x3** (was 99 @1.0 seed 18). Controls: `goblin` bb2016 @1.0 100/100,
+`ogre` bb2025 @1.0 100/100, `ogre` bb2016 @1.0 100/100 (Mighty-Blow-heavy, and bb2016 is an edition
+this change ALTERS), `human` bb2025 @1.0 100/100, `amazon` bb2016 @1.0 100/100. `goblin` bb2020
+unchanged at 98/100 x3 (seeds 55, 99) — exactly what `SWEEP_2026-09-10_REDRAFT.txt` recorded, and
+unchangeable by construction since the fix keeps bb2020's old behaviour verbatim. Workspace
+14,815/0.
+
+### What diverged
+
+One player slot, and `statediff_step.py` named it immediately: `away_02` is **Bh** in Java and
+**Ko** in Rust, both off-pitch, at the same turn on both sides. Everything else matched, including
+the entire dice stream — armour `[3,3]`, injury `[5,3]`, same positions, same values. A pure
+interpretation difference, with no dice signature at all.
+
+### Root cause: a three-way edition split
+
+A Troll (Mighty Blow) blocks the Looney (Chainsaw + Stunty, AV8). `InjuryTypeBlock.armourRoll` takes
+the chainsaw +3 from the **DEFENDER's** own skill — `chainsaw = allowAttackerChainsaw ? attacker… ;
+if (chainsaw == null) chainsaw = pDefender.getSkillWithProperty(blocksLikeChainsaw)` — so `[3,3]`=6
++3 breaks AV8. Then the injury is `[5,3]`=8 and the question is whether Mighty Blow's +1 reaches it.
+Each edition answers differently:
+
+| edition | Mighty Blow's injury modifier is withheld when |
+|---|---|
+| bb2016 (`MightyBlow.java:44`) | an armour modifier is registered to `affectsEitherArmourOrInjuryOnBlock` |
+| bb2020 (`MightyBlow.java:47`) | …that **or `blocksLikeChainsaw`** |
+| bb2025 (`MightyBlow.java:53`) | …that ONLY — the chainsaw case moved to `!context.isChainsaw()`, the injury TYPE, plus a new `!playerState.isDistracted()` |
+
+`InjuryTypeBlock` is never the chainsaw injury type, so in bb2025 nothing replaces the dropped term
+and Mighty Blow DOES apply: 8 + 1 = 9, and `bb2025/RollMechanic:127` reads `(total == 9) && isStunty`
+as **BADLY_HURT**. Rust carried the bb2020 predicate into all three editions — its own comment at the
+site said so, citing the bb2020 case (goblin bb2020 seed 5 step 241) that motivated it — so Rust
+stopped at 8 and said KO.
+
+Fix: gate the chainsaw term to `Rules::Bb2020`. The test asserts all three editions in one loop and
+fails without the gate, on the bb2025 arm.
+
+### Two things worth keeping
+
+- **The Stunty injury modifier is value 0 in EVERY edition** (`bb2016/Stunty.java:39`,
+  `mixed/Stunty.java:36`). It is a marker, not a +1: the 7→KO / 9→Badly Hurt reinterpretations are
+  what Stunty does, keyed off `isHurtMoreEasily`. Rust models it the same way and is correct. I
+  briefly mis-read it as a +1 and derived a whole table shift from that — the giveaway that the
+  reading was wrong is that a missing +1 on Stunty would redden goblin, halfling and skaven
+  wholesale, not one seed. **When a hypothesis implies a failure rate the gate contradicts, the
+  hypothesis is wrong.**
+- **Java derives `isStunty` from MODIFIER PRESENCE, Rust from the SKILL PROPERTY.** Java:
+  `Arrays.stream(ctx.getInjuryModifiers()).anyMatch(isRegisteredToSkillWithProperty(isHurtMoreEasily))`;
+  Rust: `defender.has_skill(SkillId::Stunty)`. They agree only when the modifier is actually
+  gathered, which is why `do_injury_roll_for_player_no_stunty` exists for the injury types that skip
+  `findInjuryModifiers`. Not touched here, but it is a live difference for any new injury type.
+
+### Probe-hunting note that cost two builds
+
+`crates/ffb-engine/src/mechanic/bb2025/roll_mechanic.rs::interpret_injury_roll` is **DEAD** for this
+path — a probe there printed nothing across a whole game. The live interpretation is
+`crates/ffb-engine/src/injury.rs::interpret_and_set_injury`, reached from
+`do_injury_roll_for_player`; the RollMechanic method is only called from the
+InjuryContextModification alternate-context path. This is the standing "a silent probe means the file
+isn't live" lesson again, in the injury subsystem specifically.
+
+### Group B is NOT one family
+
+The three cells were grouped as "Java knocks down or injures, Rust does not". Only `goblin` bb2025
+was this bug, and the other two **cannot** have been: they are bb2020 cells and this fix is a no-op
+there. Re-measured after the fix, unchanged and each with exactly one failing seed:
+
+| cell | verdict | seed | first differing step |
+|---|---|---|---|
+| `nurgle` bb2020 @0 | 99/100 | 81 | i=47, turn 4 half 1, home both sides |
+| `human` bb2020 @0 | 99/100 | 63 | i=232, turn 8 half 2, home both sides |
+
+Both diverge with the SAME turn/half/active on both sides, so they are in-turn state differences
+like this one rather than group A's turn-boundary family. **Next: `nurgle` bb2020 @0 seed 81** — it
+diverges at i=47, far earlier than human's i=232, so it is the cheaper of the two to localise. Start
+with `statediff_step.py --step 47`.
+
+### Unfixed, noted, not speculated on
+
+bb2025's Mighty Blow predicate also requires `!playerState.isDistracted()` on the ATTACKER (Confused
+or Hypnotized), for BOTH the armour and the injury modifier. Rust's Mighty Blow modifiers
+(`injury_modifier_factory.rs:190`, and the armour twin) check no such thing, and
+`PlayerState::is_distracted()` exists and is unused there. That is a real bb2025-only gap, but no red
+names it yet — per the standing rule it waits for one rather than being fixed on inspection.

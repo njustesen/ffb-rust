@@ -310,15 +310,25 @@ impl ModificationAwareInjuryType for InjuryTypeBlock {
                             .and_then(SkillId::from_class_name)
                             .map(|id| id.properties().contains(&NamedProperties::AFFECTS_EITHER_ARMOUR_OR_INJURY_ON_BLOCK))
                             .unwrap_or(false);
-                        // Java bb2020 MightyBlow's injury predicate is
-                        //   noneMatch(isRegisteredToSkillWithProperty(affectsEitherArmourOrInjuryOnBlock)
-                        //          || isRegisteredToSkillWithProperty(blocksLikeChainsaw))
-                        // over the ARMOUR modifiers — MB is also withheld from the injury when the
-                        // armour roll carried the defender's Chainsaw (+3) modifier (goblin bb2020
-                        // seed 5 step 241: a Troll blocks the Looney; the chainsaw +3 broke armour,
-                        // Java's injury stays 8 → KO, Rust added MB → 9 → Stunty → Badly Hurt).
+                        // The chainsaw term is **BB2020 ONLY**. The three editions write this
+                        // predicate differently, and only bb2020 consults the armour modifiers for a
+                        // chainsaw:
+                        //   bb2016 MightyBlow.java:44  noneMatch(affectsEitherArmourOrInjuryOnBlock)
+                        //   bb2020 MightyBlow.java:47  noneMatch(affectsEither || blocksLikeChainsaw)
+                        //   bb2025 MightyBlow.java:53  noneMatch(affectsEither), with the chainsaw
+                        //                              case moved to `!context.isChainsaw()` — the
+                        //                              injury TYPE, not an armour modifier.
+                        // So in bb2020 MB is withheld from the injury when the armour roll carried
+                        // the defender's Chainsaw (+3) (goblin bb2020 seed 5 step 241: a Troll blocks
+                        // the Looney; chainsaw +3 broke armour, Java's injury stays 8 → KO). In
+                        // bb2025 the SAME block gives MB to the injury: 8 + 1 = 9 → Stunty → Badly
+                        // Hurt (goblin bb2025 seed 18 i=21, the mirror of that bb2020 case). Applying
+                        // the bb2020 rule in bb2025 made Rust say KO where Java says Badly Hurt.
+                        // `InjuryTypeBlock` is never the chainsaw injury type, so bb2025's
+                        // `isChainsaw()` is false here and nothing replaces the term.
+                        let chainsaw_withholds_mb = game.rules == ffb_model::enums::Rules::Bb2020;
                         let armour_used_either_or = self.ctx.armor_modifiers.iter().any(|am| {
-                            am.name == m.get_name() || am.name == "Chainsaw"
+                            am.name == m.get_name() || (chainsaw_withholds_mb && am.name == "Chainsaw")
                         });
                         if affects_either_on_block && armour_used_either_or {
                             continue;
@@ -403,6 +413,48 @@ mod tests {
 
         assert!(!run(true), "Mighty Blow already on the armour roll must NOT also apply to injury");
         assert!(run(false), "with no armour Mighty Blow, the injury roll DOES receive Mighty Blow");
+    }
+
+    /// The chainsaw clause in that exclusion is **BB2020 ONLY**, and getting it wrong flips a
+    /// Badly Hurt into a KO. The three editions write Mighty Blow's injury predicate differently:
+    ///
+    /// | edition | excluded when |
+    /// |---|---|
+    /// | bb2016 (`MightyBlow.java:44`) | an armour modifier is registered to `affectsEither…` |
+    /// | bb2020 (`MightyBlow.java:47`) | …that **or `blocksLikeChainsaw`** |
+    /// | bb2025 (`MightyBlow.java:53`) | …that only — the chainsaw case moved to `!isChainsaw()`, the injury TYPE |
+    ///
+    /// `InjuryTypeBlock` is never the chainsaw injury type, so in bb2025 nothing replaces the term
+    /// and Mighty Blow DOES reach the injury even though the defender's own Chainsaw (+3) is what
+    /// broke the armour. Live cost of applying the bb2020 rule everywhere: goblin bb2025 seed 18
+    /// i=21 — a Troll blocks the Looney, armour [3,3]=6 +3 chainsaw breaks AV8, injury [5,3]=8;
+    /// Java adds MB → 9 → Stunty → **Badly Hurt**, Rust stayed at 8 → **KO**. The bb2020 mirror
+    /// (goblin bb2020 seed 5 step 241) is the same block with the opposite correct answer, which is
+    /// why this is asserted per edition rather than once.
+    #[test]
+    fn a_defenders_chainsaw_on_the_armour_withholds_mighty_blow_from_the_injury_only_in_bb2020() {
+        let mb_reaches_injury = |rules: Rules| -> bool {
+            let mut home = crate::step::framework::test_team("home", 0);
+            home.players.push(make_player("attacker", 7, vec![SkillId::MightyBlow]));
+            let mut away = crate::step::framework::test_team("away", 0);
+            // The Looney: its OWN Chainsaw is what supplies the +3 armour modifier.
+            away.players.push(make_player("defender", 8, vec![SkillId::Chainsaw, SkillId::Stunty]));
+            let game = Game::new(home, away, rules);
+
+            let mut it = InjuryTypeBlock::new(BlockMode::Regular, true);
+            it.injury_context_mut().armor_broken = true;
+            it.injury_context_mut().add_armor_modifier(Modifier::new("Chainsaw", 3, rules));
+            let mut rng = GameRng::new(1);
+            it.injury_roll(&game, &mut rng, Some("attacker"), "defender");
+            it.injury_context().injury_modifiers.iter().any(|m| m.name == "Mighty Blow")
+        };
+
+        assert!(!mb_reaches_injury(Rules::Bb2020),
+            "bb2020 withholds Mighty Blow from the injury when a chainsaw armour modifier is present");
+        assert!(mb_reaches_injury(Rules::Bb2025),
+            "bb2025 dropped the blocksLikeChainsaw clause, so Mighty Blow DOES reach the injury");
+        assert!(mb_reaches_injury(Rules::Bb2016),
+            "bb2016 never had the chainsaw clause either");
     }
 
     /// Regression (halfling seed 38 i=63): a Dodgy-Snacked defender (base AV7, temporary -1 AV →
