@@ -6857,3 +6857,85 @@ had failed. Requires `mvn -o -pl ffb-server,ffb-ai install` and invalidates `--r
 `slann` bb2020 @1e6 (32), `human` bb2020 @0 (63, the §H.26 stalling port). Given `dark_elf` now needs
 an `ffb-server` probe, the cheaper next target is `khemri` or `slann`, both untriaged and both plain
 in-game divergences.
+
+## §H.35 — ITER14: `khemri` bb2025 root-caused — BB2025's raise-from-dead path is not ported
+
+**Investigation, no fix.** The cause is a genuinely unported BB2025 mechanic, and the port is
+substantial enough to deserve its own iteration rather than a rushed one. Nothing changed but this
+record.
+
+### Localisation, and why the reported step was ~50 steps late
+
+The `PARITY FAIL` names step 77, and `statediff --step 78` shows **four** player slots plus the
+header differing (turn counters a whole turn apart). Four coordinates cannot diverge in one step, so
+the reported step is not the cause — Java logs 126 steps and Rust 121, and a step-count desync makes
+`i=78` mean different moments in the two engines.
+
+What localises it is the **first differing ACTIVATION**, not the first differing hash:
+
+| i | Java | Rust |
+|---|---|---|
+| 74-76 | away_11/MOVE, away_02/MOVE, away_07/MOVE | identical |
+| **77** | **home_05/MOVE** (0 dice) | **home_03/Blitz** (5 dice) |
+| 78 | away_01/MOVE (turn ended) | home_11/Move (turn continues) |
+
+At i=77 the state hashes are **identical** (`f0000,0000`, half 2, turn 1, home) — so two agents made
+different choices from the same visible state. The dice-position heuristic from §H.26 is no help
+here: it flags i=31, where all dice match positionally and the +1/-1 is pure step-boundary
+attribution noise. **A false positive; prefer the activation diff when the step counts differ.**
+
+### Root cause
+
+The harness's own built-in candidate probe (`FFB_CANDSUM` gives `JELIG`, already in the jar, no
+rebuild needed) prints Java's eligible set for that activation:
+
+    JELIG k=83 turn=1  Home2:Move  Home3:Move|Block|Blitz  Home5:Move ... Home12:Move
+                       teamKhemriParity25Away3R1:Move
+
+Java's HOME list contains **`teamKhemriParity25Away3R1`** — away's jersey 3 (`a02` is `Rip` in both
+engines), **raised from the dead onto the home team**. Rust's list is home_01 to home_12 only. Rust
+raised nothing at all: no `R1` id and no raise event anywhere in the game.
+
+Both engines agree on `home_03`'s `Move|Block|Blitz`, so the candidate sets match for the real
+players. The extra raised candidate changes the sampler's draw, and the two heuristics pick different
+activations. Raised players take `maxPlayerNr + 1`, i.e. **above 11 — exactly the state hash's
+documented blind spot** — which is why a whole extra player stayed invisible until it moved an
+agent's choice.
+
+### Why Rust never raises, and it is NOT a data gap
+
+`UtilServerInjury.raisePlayer` needs a position. The roster-default route is
+`roster.getRaisedRosterPosition()`, and Rust supports it — `roster_json.rs:42 raised_position_id`,
+`roster.rs:40 raised_roster_position()`, read by `loader.rs:257` — with 12 roster files declaring it
+(necromantic / nurgle / undead / vampire across the 3 editions).
+
+**Khemri declares none, in EITHER engine.** `data/rosters/bb2025/roster_khemri.json` has no such key
+and Java's `roster_khemri_bb2025.xml` has no `raisedPositionId` element (both carry `undead: true`).
+So adding data would be wrong — that is not where Java's raise comes from.
+
+Java raises through a **BB2025-only path** in `bb2025/shared/StepApothecary.java:382-397`, on the
+`PlayerState.RIP` branch: it takes the OTHER team as the raising team, checks
+`injuryMechanic.canRaiseDead(...) || canRaiseInfectedPlayers(...)`, then reads
+`injuryMechanic.raisePositions(raisingTeam)` — a LIST — raising immediately when it holds one entry
+and showing a position-choice dialog when it holds more. That list is BB2025's replacement for the
+single roster-default position.
+
+Rust's `handle_raise_dead` (`util_server_injury.rs:589`) implements only the old roster-default
+route, so for any team whose raising is expressed through `raisePositions` it silently does nothing.
+The same Java logic is duplicated in `bb2025/mutliblock/StepApothecaryMultiple.java:282,487`.
+
+**Next concrete step:** port `InjuryMechanic.raisePositions` and the `StepApothecary` RIP branch for
+BB2025. Check first what Java's bb2025 `InjuryMechanic.raisePositions` returns for an `undead` team
+with no `raisedPositionId` — that is what selects the Skeleton here — and whether Rust's
+`InjuryMechanic` trait already has a `raise_positions` hook. Gate broadly: every `undead`,
+`necromancer` or Nurgle roster can raise, and a newly-raised player changes agent sampling in every
+later activation, so expect wide movement rather than a one-cell fix.
+
+### Standing red set
+
+4 gates / 4 cells, all now root-caused or localised:
+
+- `dark_elf` bb2025 @1.0 — harness (§H.34), needs an ffb-server `setNextAction` stack probe
+- `khemri` bb2025 @1.0 — this, needs the BB2025 raise port
+- `slann` bb2020 @1e6 — seed 32, untriaged
+- `human` bb2020 @0 — seed 63, the §H.26 stalling port, patch saved at `docs/iter5_stalling_port.patch.txt`
