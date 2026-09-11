@@ -138,7 +138,19 @@ fn evaluate_injury_context(
         // Java: requiresSecondCasualtyRoll (Decay skill) → `interpretSeriousInjuryRoll(game, ctx,
         // true)`. Only the bb2016 mechanic actually reads `casualtyRollDecay`; bb2020/bb2025
         // delegate to the primary roll (RollMechanic.java:122-123).
-        if defender.map(|d| d.has_skill_property(NamedProperties::REQUIRES_SECOND_CASUALTY_ROLL)).unwrap_or(false) {
+        // `requiresSecondCasualtyRoll` is registered by `skill/bb2016/Decay.java:28` ONLY;
+        // `skill/mixed/Decay.java` (@RulesCollection BB2020 + BB2025) registers just
+        // cancelsAllowsRaisingLineman. So the edition-aware accessor is mandatory here — the
+        // agnostic `has_skill_property` reports the property for a BB2020 Decay player and Rust
+        // then ran a decay interpretation Java never runs. In BB2020 that interpretation delegates
+        // to the primary one, which re-enters `map_si_roll` and takes a SECOND
+        // `Collections.shuffle` off the shared per-game stream. Measured on nurgle bb2020 seed 81:
+        // Rust shuffled 5,5,16 where Java shuffled 5,16, so Rust's Cheering-Fans pick was 8 draws
+        // in against Java's 4 — Rust drew Stiletto, Java drew Bad Habits, and Bad Habits' D3 then
+        // desynced the DICE stream too (every roll one position early from i=~43 on).
+        // `SkillId::properties_for` already models the split correctly; only this call site was
+        // asking the wrong question.
+        if defender.map(|d| d.has_skill_property_in(game.rules, NamedProperties::REQUIRES_SECOND_CASUALTY_ROLL)).unwrap_or(false) {
             ctx.serious_injury_decay = mechanic.interpret_serious_injury_roll_decay(game, ctx, true);
         }
     }
@@ -723,6 +735,64 @@ mod tests {
         collections_shuffle(&mut five, &mut reference);
         assert_eq!(game.collections_rng.lock().next_int(1_000), reference.next_int(1_000),
             "the BB2020 SI remap must advance the shared Collections stream by one 5-element shuffle");
+    }
+
+    /// ...and a DECAY defender must not double it in BB2020. `requiresSecondCasualtyRoll` is
+    /// registered by `skill/bb2016/Decay.java:28` alone — `skill/mixed/Decay.java`
+    /// (@RulesCollection BB2020 + BB2025) registers only cancelsAllowsRaisingLineman — so outside
+    /// BB2016 Java never runs the decay interpretation. Rust asked the EDITION-AGNOSTIC
+    /// `has_skill_property`, got true, and ran it; in BB2020 it delegates to the primary
+    /// interpretation, which re-enters `map_si_roll` and takes a SECOND shuffle off the shared
+    /// per-game Collections stream.
+    ///
+    /// Live cost (nurgle bb2020 seed 81, whose Rotters all carry Decay): Rust shuffled 5, 5, 16
+    /// where Java shuffled 5, 16, so the Cheering-Fans prayer pick read the stream 8 draws in
+    /// instead of 4 — Rust drew Stiletto (no dice), Java drew Bad Habits (a D3). That D3 then
+    /// shifted the DICE stream by one from i=~43 onward, and the visible failure was a block three
+    /// steps later whose dice were [2,3] in Rust against [3,5] in Java.
+    #[test]
+    fn a_bb2020_decay_defender_does_not_take_a_second_shuffle_off_the_shared_stream() {
+        use ffb_model::enums::{SkillId, PS_SERIOUS_INJURY};
+        use ffb_model::util::java_random::{JavaRandom, collections_shuffle};
+
+        // The property split itself, straight off the registry.
+        let probe = {
+            let mut g = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+            add_player_with_skill(&mut g, "p", PS_STANDING, SkillId::Decay);
+            g.player("p").expect("player").clone()
+        };
+        assert!(probe.has_skill_property_in(Rules::Bb2016, NamedProperties::REQUIRES_SECOND_CASUALTY_ROLL),
+            "bb2016 Decay registers requiresSecondCasualtyRoll");
+        for rules in [Rules::Bb2020, Rules::Bb2025] {
+            assert!(!probe.has_skill_property_in(rules, NamedProperties::REQUIRES_SECOND_CASUALTY_ROLL),
+                "{rules:?} Decay does NOT register requiresSecondCasualtyRoll");
+        }
+
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        add_player_with_skill(&mut game, "d1", PS_STANDING, SkillId::Decay);
+        // As in the test above: ST 1 is at the threshold, so the rolled DISLOCATED_SHOULDER is the
+        // one entry this defender cannot take and the remap (and its 5-element shuffle) fires.
+        game.team_home.players[0].strength = 1;
+        game.collections_rng = ffb_model::model::game::CollectionsRng::new(JavaRandom::new(12345));
+
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        ctx.defender_id = Some("d1".into());
+        ctx.injury = Some(PlayerState::new(PS_SERIOUS_INJURY));
+        ctx.casualty_roll = Some([13, 6]);
+        let flags = InjuryTypeFlags {
+            stun_is_ko: false, can_use_apo: false,
+            send_to_box_reason: None, should_play_fall_sound: false,
+        };
+        evaluate_injury_context(&flags, "d1", &mut ctx, &game);
+
+        // ONE 5-element shuffle, not two — this is the whole assertion.
+        let mut reference = JavaRandom::new(12345);
+        let mut five = [0u8; 5];
+        collections_shuffle(&mut five, &mut reference);
+        assert_eq!(game.collections_rng.lock().next_int(1_000), reference.next_int(1_000),
+            "a BB2020 Decay defender must advance the shared Collections stream by ONE              5-element shuffle; a second one desyncs every later prayer pick");
+        assert!(ctx.serious_injury_decay.is_none(),
+            "BB2020 Decay must not produce a decay serious injury at all");
     }
 
     use crate::step::framework::test_team;

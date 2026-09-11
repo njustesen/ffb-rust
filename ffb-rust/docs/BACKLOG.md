@@ -6164,3 +6164,90 @@ or Hypnotized), for BOTH the armour and the injury modifier. Rust's Mighty Blow 
 (`injury_modifier_factory.rs:190`, and the armour twin) check no such thing, and
 `PlayerState::is_distracted()` exists and is unused there. That is a real bb2025-only gap, but no red
 names it yet — per the standing rule it waits for one rather than being fixed on inspection.
+
+## §H.25 — ITER4: Decay's second casualty roll is BB2016-ONLY, and it desynced the shared shuffle (2026-09-11) — FIXED
+
+`nurgle` bb2020 **100/100 x3** (was 99 @0 seed 81). Controls all 100/100: `nurgle` bb2025 @1.0,
+`nurgle` bb2016 @1.0 (the edition whose behaviour is deliberately UNCHANGED), `necromantic` bb2016
+@1.0, `human` bb2025 @1.0, `amazon` bb2016 @1.0, `goblin` bb2025 @1.0 (§H.24's cell holds).
+Pre-existing reds unmoved and NOT regressions: `khemri` bb2025 @1.0 99/100 seed 57 (group F),
+`human` bb2020 @0 99/100 seed 63. Workspace 14,816/0.
+
+### The chain, and it crossed two RNG streams
+
+1. `statediff_step.py --step 47` named ONE slot: `away_02` Prone in Java, Standing in Rust, same
+   square, same turn. Java knocked a player down and Rust did not.
+2. The block that should have done it had dice `[3,5]` in Java and `[2,3]` in Rust. Rust read dice
+   positions 65-66 where Java read 66-67 — Rust was exactly **one die behind**, so Rust saw a Push
+   where Java saw a Defender Stumbles with an armour roll.
+3. The dice streams agreed in value at every shared position (the stream is position-keyed), and the
+   first *purpose* mismatch was position 63: Java rolled a **d3** from
+   `BadHabitsHandler.affectedPlayers` via `RandomSelectionPrayerHandler.initEffect`; Rust rolled
+   nothing there. So Java had been granted **Bad Habits** at a Cheering Fans kickoff and Rust had
+   been granted something dice-free.
+4. Which prayer you get comes from `Collections.shuffle(availablePrayerRolls)` — the ONE-ARG
+   overload, drawing from `java.util.Collections`' private static Random, which `ParityRunner`
+   seeds per game by reflection (`seed ^ 0x5EEDC0113C7104L`). Java picked 6 (Bad Habits), Rust
+   picked 3 (Stiletto — no dice). Both shuffled 16 candidates, so the LIST was right and the STREAM
+   POSITION was wrong.
+5. Pinned without touching Java: `java.util.Random` + `Collections.shuffle` were reimplemented in a
+   throwaway script and candidate prefixes replayed. Java's observed permutation is reproduced by
+   exactly **4 prior draws** = one 5-element shuffle; Rust's by **8** = two. A probe inside
+   `collections_shuffle` then printed Rust's actual sequence: **`5, 5, 16`** against Java's `5, 16`.
+
+### Root cause
+
+The 5-element shuffle is `bb2020/RollMechanic.mapSIRoll`'s
+`Collections.shuffle(injuriesWithReduceableStats)` — 6 ordered injuries filtered by
+`currentValue > 0`, and a Nurgle Rotter has no passing stat, so BROKEN_ARM (PA) drops out leaving 5.
+Rust ran that remap TWICE because `util_server_injury.rs::evaluate_injury_context` asked the
+EDITION-AGNOSTIC `has_skill_property(REQUIRES_SECOND_CASUALTY_ROLL)`. Nurgle Rotters carry **Decay**,
+and `requiresSecondCasualtyRoll` is registered by `skill/bb2016/Decay.java:28` **only** —
+`skill/mixed/Decay.java` (@RulesCollection BB2020 + BB2025) registers just
+cancelsAllowsRaisingLineman. So Rust entered a decay interpretation Java never enters; in bb2020 that
+delegates straight back to the primary interpretation (`RollMechanic.java:122-123`), re-entering
+`map_si_roll` and taking a second shuffle off the shared stream.
+
+Fix: `has_skill_property_in(game.rules, …)`. `SkillId::properties_for` already models the split
+correctly — `(Decay, Bb2020)` omits the property — so only the call site was asking the wrong
+question. This is the same defect §H.22's neighbourhood already fixed one layer up in
+`injury.rs::interpret_and_set_injury`, which gates its second casualty roll to bb2016 explicitly:
+**the twin site was missed.**
+
+### Lessons
+
+- **A single mis-scoped skill property can desync a stream that has nothing to do with skills.** The
+  visible failure was a block's dice; the cause was a prayer; the mechanism was a shuffle count.
+  Nothing about the failing step pointed at Decay.
+- **The shared Collections stream is a second dice stream and deserves the same discipline.**
+  `Collections.shuffle(n)` consumes exactly n-1 `nextInt` calls, so BOTH the number of shuffles and
+  each list's LENGTH must match Java. A probe inside `collections_shuffle` printing `len` gives the
+  whole picture in one run and should be the first move for any prayer/raise/touchdown-assignment
+  divergence.
+- **You can pin Java's position in a seeded stream without a Java probe.** Reimplement
+  `java.util.Random` + `Collections.shuffle` (both are short and exactly specified), then search
+  prefixes until the permutation Java printed reappears. That converted "the streams disagree" into
+  "Java is 4 draws in, Rust is 8" with no mvn rebuild.
+- **`step/bb2020/step_apply_kickoff_result.rs` is DEAD for ApplyKickoffResult.** A probe in its
+  `handle_cheering_fans` never fired; `driver.rs:392` says in so many words that bb2020 routing
+  deliberately excludes this step, so the live file is
+  `step/bb2025/kickoff/step_apply_kickoff_result.rs` (bb2020-gated inside). Third time this campaign
+  has paid for probing a dead bb20xx twin.
+
+### Unfixed, named, waiting for a red
+
+`crates/ffb-mechanics/src/bb2020/injury_mechanic.rs:41` reads the SAME property agnostically, in
+`can_raise_infected_players`. Java's bb2020 twin
+(`mechanics/bb2020/InjuryMechanic.java:36`) reads it too, but in bb2020 the property is absent so
+`!hasSkillProperty(...)` is always TRUE there; Rust's agnostic read makes it FALSE for a Decay
+player, so Rust would refuse to raise an infected Decay victim where Java allows it. The line two
+above it already uses `has_skill_property_in(Rules::Bb2020, …)`, so the fix is one word — but no red
+names it, and `nurgle` bb2020 is now green at all three scales, so it stays recorded rather than
+speculatively changed. Note it needs a Nurgle attacker with `allowsRaisingLineman` killing an ST<=4
+Decay player to trigger at all.
+
+### Next
+
+Group B's last cell: **`human` bb2020 @0 seed 63**, still 99/100, diverging at i=232 (turn 8, half 2,
+home active on both sides). Nothing about it is explained yet beyond that shape. Localise with
+`statediff_step.py --step 232`.
