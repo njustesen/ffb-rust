@@ -7660,3 +7660,121 @@ contradicted a correct automated diff (Horns), then an automated diff that was i
 wrong thing (per-edition duplication). The rule that would have caught both: before believing any
 Rust-vs-Java COUNT, normalise for the fact that **Java duplicates per edition where Rust shares one
 step** — the same asymmetry behind every dead-twin incident in this backlog.
+
+## §H.43 — 2026-09-12: kick-off setup is now a scored decision (heuristic agent, both engines)
+
+**Ask.** Replace the fixed canonical formation with per-placement heuristics: LOS first for the
+first three, then the whole board with wing/LOS inclusion; offence vs defence rules (weaker team →
+few on the scrimmage, stronger → many, weak-and-fast → deep and off the touchlines, mirrored
+defence; offence → 1–2 handlers deep, fragile positionals protected, Block players on one-contact LOS
+squares, more on the scrimmage than the defence, fast catchers on the wings); never next to the
+sideline, further from it against Frenzy unless Side Step/Stand Firm, slow players near the
+scrimmage and centre. Probabilistic, every player on every square reachable.
+
+**Shipped.** `agent/setup_heuristic.rs` (pure scorer + enumeration + `Game` glue) wired into
+`HeuristicAgent`'s `TeamSetup` arm at `T = 0.30`; `SetupPlacement.java` as its line-for-line mirror,
+`HeuristicDriver.setupPlacement` on the shared sampler, and `ParityRunner`'s `SETUP` case looping it
+when the `setup` class is on (`placeReserves` otherwise). `Player::position_cost` added (Java
+`getPosition().getCost()`); the lineman fixture carries the XML's 50,000. Full design in
+`docs/HEURISTIC_AGENT.md` §6.21.
+
+**Pinned.** `testdata/setup_golden.txt` (12 players × 5 role scores, team strength, 5,678 option
+weights over six boards spanning both roles, both sides, both phases) — `setup_golden_matches_live_scorer`
+in Rust, `SetupPlacementTest` in Java, bit-identical. `full_setups_are_legal_and_cover_the_half`
+drives 240 uniform setups through the real `setup_player` + `check_setup`.
+
+**Gate** (fresh JVM each, `--heur-classes all`, seeds 1–30, own `FFB_PARITY_ROOT`):
+
+| matchup | edition | scale | result |
+|---|---|---|---|
+| human | bb2025 | 1.0 | 30/30 |
+| lineman | bb2025 | 1.0 | 30/30 |
+| amazon | bb2016 | 1.0 | 30/30 |
+| goblin | bb2020 | 1e6 | 30/30 |
+| vampire v ogre | bb2020 | 0 | 30/30 |
+| orc | bb2016 | 1e6 | 30/30 |
+| dwarf | bb2025 | 0 | 30/30 |
+| skaven | bb2020 | 1.0 | 30/30 |
+| wood_elf | bb2025 | 1.0 | 30/30 |
+| halfling | bb2025 | 1e6 | 30/30 |
+| underworld | bb2020 | 1.0 | 30/30 |
+
+Control: `--agent random` human bb2025 5/5 and `--heur-classes` everything-but-setup 5/5 on the new
+jar. `mvn -o -pl ffb-ai test` 40/0.
+
+**Trap recorded.** The first gate ran 0/20 on all three editions at step 1 — not a bug: two
+background `ffb-parity.exe` processes held `target/release/ffb-parity.exe`, `cargo build --release`
+printed its "failed to remove file" error below the warning noise and left the 20:30 binary in
+place, so the OLD Rust (canonical setup) met the NEW Java (heuristic setup). The rebuilt binary is
+`target/release/deps/ffb_parity.exe`; check the timestamp before trusting a gate after a rebuild.
+
+**Not done / open.** The full 330-gate matrix has not been re-run (11 gates here). `SetupError` is
+still answered by the parity contract's Acknowledge (unreachable by construction, untested against a
+malformed board). Swarming/Keen players are counted like everyone else, as `check_setup` does. The
+weights are hand-set priors; the argmax formations read sensibly (3–4 on the LOS with the big guys,
+two wing pairs at depth 1–3, thrower(s) deep on offence, halfling behind friends) but nothing has
+been measured against touchdown rate yet.
+
+## §H.43 — ITER21: E6 bridge landed; matrix NOT certifiable, and why
+
+**E6 done (`fbe72fd83`), certification blocked by a cross-engine feature in flight.**
+
+### E6 — the bridge
+
+`GameEvent::ReRoll` had ZERO emitters and only ~20 hand-rolled `GameEvent::SkillUse` sites existed,
+so coverage saw almost none of the 107 `ReportSkillUse` sites. Fixed by deriving the events from the
+REPORT list — a monotonic watermark in `driver.rs::apply()` — because the report list is the thing
+kept 1:1 with Java, so one choke point cannot drift the way scattered `.with_event()` calls did. The
+list is append-only for a game, so it cannot double-count; no `GameEvent` is in the state hash, so
+it cannot move a parity verdict. Deduplicated against the legacy manual emitters, whose removal needs
+a per-site Java read (some paths may have no report, where deletion would LOSE coverage).
+
+Measured: skillUse 32 -> 96 and distinct skills 2 -> 4 on 5 skill-rich rosters x 8 seeds.
+
+**E6's premise was wrong, and that is the useful part.** The "52 missing `ReportSkillUse` sites" gap
+does not exist: 34 of Java's 51 classes are duplicated across its three edition packages, inflating
+159 raw sites by 74. Collapsed, Java has **85 logical sites against Rust's 107** — Rust reports MORE.
+Before believing any Rust-vs-Java COUNT, normalise for Java duplicating per edition where Rust shares
+one step.
+
+### Skill coverage over 33,000 games (`scripts/skill_coverage_report.py`, new)
+
+Empirical by necessity: a static grep for `SkillId::X` inside `ReportSkillUse::new` cannot answer it,
+because many reports pass a runtime-resolved skill. Eye Gouge is the counter-example — no literal
+site, yet the most-evented skill in a probe.
+
+**12 of 98 roster skills covered**; of the 86 uncovered: **0 real reporting gaps** (no skill Java
+reports and Rust does not), **11 never triggered** though both engines report them (Animal Savagery,
+Ball and Chain, Catch, Chainsaw, Diving Tackle, Eye Gouge, Pass, Right Stuff, Side Step, Steady
+Footing, Unchannelled Fury), and **75 passive/modifier** that emit in neither engine. So E6 leaves no
+porting debt; what remains is coverage and a different instrument for modifier application.
+
+Caveat: ~2/3 of those logs predate the bridge, so this is a LOWER bound (Eye Gouge is misfiled under
+"never triggered" for exactly that reason).
+
+### Why the matrix could not be certified
+
+A cross-engine **heuristic team-setup** feature is in flight in the working tree, in both halves:
+Java `ParityRunner` (+1310/-46, `PromptClass.TEAM_SETUP`, `heuristic.setupPlacement`) and Rust
+(`heuristic_agent.rs` +65, new `agent/setup_heuristic.rs`, `testdata/setup_golden.txt`). The Java
+half was built into the jar at 22:14; the Rust half was not. Two engines setting up differently
+diverge at the FIRST activation, which is what 18 gates showed.
+
+Building both halves (isolated `CARGO_TARGET_DIR=target_check`, nothing of the feature modified)
+takes the failing seeds from 0/1 to 5/5 -- but 5 seeds is not a gate. At 100 seeds the combined tree
+is **red in 5 of 15 sampled gates, all bb2016 and four of them at scale 0**: `chaos` 92/100,
+`chaos_dwarf` 99/100, `dark_elf`, `dark_elf_league_fumbbl` @0 and @1e6.
+
+That concentration is the lead: **@0 is argmax**, so any scoring difference between the two setup
+scorers flips the choice deterministically instead of being averaged out by sampling. bb2016 first,
+scale 0 first.
+
+### Two operational notes
+
+- **`check_java_trees.py` cannot catch this.** It compares the harness copies only, so it is blind to
+  the jar and the Rust binary being built from different states of a cross-engine feature. A build
+  stamp compared at gate time would have named this in seconds instead of an hour.
+- **The machine was shared.** Gate times ran 8.4-9.9m against ~2.5m at equal or higher worker counts,
+  and 7 `ffb-parity` processes were live while this session owned 3. Tuning worker count was treating
+  the wrong variable; a process count settles it in one command. Workers were stopped via the
+  `STOP_SWEEP` file throughout -- nothing killed, no terminal touched.
