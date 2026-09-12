@@ -1,0 +1,14 @@
+FULL MATRIX SWEEP - 330 gates, 110 cells x 3 scales
+parity: 330/330 games match, 0 FAILED, 0 without a verdict
+
+summed gate time 797 min (13.29 h)
+
+Separately, 5 gate(s) report the mechanic-coverage checklist unmet
+(parity still 100/100 on every one of them):
+
+  khemri_fumbbl bb2020 @0
+  khemri_fumbbl bb2025 @0
+  slann_fumbbl bb2020 @0
+  slann_fumbbl bb2025 @0
+  wood_elf bb2016 @1e6
+

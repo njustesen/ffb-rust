@@ -7412,3 +7412,74 @@ Recorded so the number is not read as more than it is:
 
 The matrix-green goal is met. The candidates are the coverage work above, pushing (nothing has been
 pushed to origin this whole campaign), or something else entirely. Do not auto-jump.
+
+## §H.41 — ITER19: BACKLOG **D3** and **D2/E5** closed; matrix re-certified 330/330
+
+```
+FULL MATRIX SWEEP - 330 gates, 110 cells x 3 scales
+parity: 330/330 games match, 0 FAILED, 0 without a verdict
+summed gate time 797 min (13.29 h)
+Separately, 5 gate(s) report the mechanic-coverage checklist unmet   [was 30]
+```
+
+`docs/SWEEP_2026-09-12b.txt`. 0 panics across all 330 gate logs, every denominator 100.
+
+### D3 — `rollXCoordinate` rolled a d24 where Java rolls a d26
+
+Java is `DiceRoller.rollXCoordinate() = rollDice(26) - 1`, x in `[0, 25]`.
+`bb2020/step_stalling_player.rs` rolled `die(24)` and **cited Java for a line that does not exist**
+(the same false-citation shape as §H.39's punt comment). D3 had deferred it as unreachable — true
+when it was written, and no longer true: **§H.37 routed `StepId::StallingPlayer` to that file**, so
+it went live.
+
+Fixed by extracting **`GameRng::roll_x_coordinate()`**, a 1:1 port of Java's `DiceRoller` method,
+and pointing BOTH editions at it. The bb2025 twin was already correct; two hand-written copies of one
+constant is what let them drift, so the fix is one definition rather than a corrected constant.
+
+**Correction to what §H.40's follow-up claimed.** This was reported as a live regression that would
+diverge any game rolling a rock hit. **It cannot diverge anything**, established by reading the two
+RNGs rather than applying the die-size rule:
+
+- Both engines run the identical rejection-sampling `getDieRoll`; `die(24)` and `die(26)` each
+  consume exactly ONE draw (the retry needs a ~1e-18 event on a u64), so the position-keyed stream
+  is in an identical state afterwards either way.
+- Java uses the coordinate only for `new Animation(THROW_A_ROCK, ...)` — client-side. Rust already
+  discarded it (`let _start_coord`).
+
+Writing the test proved it: **the difference is unobservable from the step**, so there is no
+behavioural assertion to make at the call site. The invariant is pinned where it IS observable —
+`roll_x_coordinate` must reach both 0 and 25, neither of which a `die(24)` can produce — and that
+test fails against the original code. A 1:1 fidelity fix, correctly labelled.
+
+### D2 / E5 — the coverage checklist was counting the wrong activations
+
+D2 prescribed changing `t3_checklist.rs`. The actual cause was upstream, in
+`coverage_report.rs::player_action_name`: `PassMove` and `HandOverMove` were mapped into the
+`"Move"` bucket, so `action Pass` / `action HandOver` counted only immediate declarations while
+`action Move` was inflated by the same amount.
+
+**`BlitzMove` had already been fixed for exactly this reason**, in the same function, with a comment
+saying it "drove `action Blitz` to zero — the checklist's own vacuous-green guard — while inflating
+`action Move` by the same amount". Applying the same correction to the pass/give variants is the
+consistent fix, and it needed no checklist change at all.
+
+The heuristic agent declares the MOVE variants deliberately, because that is what buys the movement
+phase before the throw. Evidence from the 2026-09-12 sweep: of 34 missing rows across 330 gates,
+**29 were `action HandOver` (23) and `action Pass` (6)** on runs that simultaneously recorded real
+pass rolls, catches and a working give. The mechanic was exercised; only the counter disagreed.
+
+Coverage-short gates **30 → 5**, and the five that remain are genuine:
+
+| gate | missing |
+|---|---|
+| `wood_elf` bb2016 @1e6 | `throw-ins` |
+| `khemri_fumbbl`, `slann_fumbbl` — bb2020 @0 and bb2025 @0 | `action Pass` + `pass rolls` |
+
+Those four are self-consistent: zero pass ROLLS alongside zero pass DECLARATIONS means those rosters
+genuinely never throw at scale 0. That is a real coverage gap and the honest next target, not an
+artefact.
+
+### Still open, unchanged
+
+D1/D4, E1-E4, E6, F8, and the two tier-decision items (Punt, widening the state hash). §H.14 phase 2
+(Brawler/Hatred) and phase 3 (Pro) remain the largest deferred coverage work.

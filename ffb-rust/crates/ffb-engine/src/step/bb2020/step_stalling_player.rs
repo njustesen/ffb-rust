@@ -23,7 +23,8 @@ use crate::step::util_server_injury::handle_injury_by_name;
 ///  3. If successful:
 ///     a. Look up player coordinate.
 ///     b. Determine `startCoordinate`: if `FieldCoordinateBounds.UPPER_HALF.isInBounds(playerCoordinate)`
-///        (y <= 7) → start at `(rollXCoordinate(), 0)`, else → start at `(rollXCoordinate(), 14)`.
+///        (y <= 7) → start at `(rollXCoordinate(), 0)`, else → start at `(rollXCoordinate(), 14)`,
+///        where `rollXCoordinate()` is `rollDice(26) - 1` (x in [0, 25]).
 ///     c. Set animation (THROW_A_ROCK).
 ///     d. `UtilServerGame.syncGameModel(this)`.
 ///     e. `UtilServerInjury.dropPlayer(this, player, ApothecaryMode.HIT_PLAYER, true)` — publish params
@@ -101,7 +102,23 @@ impl StepStallingPlayer {
             // else →
             //   startCoordinate = new FieldCoordinate(getDiceRoller().rollXCoordinate(), 14)
             let in_upper_half = player_coord.y <= 7;
-            let x = rng.die(24) as i32; // Java rollXCoordinate() = roll in [1..24] (inner pitch x coords)
+            // Java `DiceRoller.rollXCoordinate()` is `rollDice(26) - 1`, i.e. a d26 giving x in
+            // [0, 25] -- NOT a d24. The comment that used to sit here claimed "[1..24] (inner pitch
+            // x coords)" and cited Java for it; no such line exists. The bb2025 twin
+            // (`bb2025/shared/stalling_extension.rs`) has always been right.
+            //
+            // BACKLOG D3 left this alone because the branch was unreachable: this whole file was a
+            // dead twin until §H.37 routed `StepId::StallingPlayer` to it for BB2020. It is live
+            // now, so the deferral no longer applies.
+            //
+            // Parity effect: NONE, and the reason is worth recording so nobody re-derives it. Both
+            // engines run the same rejection-sampling `getDieRoll`, which consumes exactly one draw
+            // for d24 and d26 alike (rejection chance ~1e-18 on a u64), so the position-keyed
+            // stream stays aligned either way; and Java uses this x only for
+            // `new Animation(THROW_A_ROCK, startCoordinate, playerCoordinate)`, which is
+            // client-side, so the value is discarded in both engines. This is a 1:1 fidelity fix,
+            // not a bug fix for an observable divergence.
+            let x = rng.roll_x_coordinate();
             let _start_coord = if in_upper_half {
                 FieldCoordinate::new(x, 0)
             } else {
@@ -311,6 +328,42 @@ mod tests {
             }
         }
         panic!("no seed found");
+    }
+
+    /// BACKLOG D3, the part that IS observable from this step: a hitting rock must read the
+    /// x-coordinate die off the shared stream exactly once, between the rock d6 and the injury
+    /// rolls.
+    ///
+    /// The die SIZE cannot be asserted here, and that is the finding rather than a gap in the test:
+    /// `die(24)` and `die(26)` each consume exactly one draw (the rejection branch needs a ~1e-18
+    /// event on a u64), so the stream is in an identical state afterwards either way, and Java uses
+    /// the resulting coordinate only for a client-side `Animation`. The size is therefore pinned
+    /// where it can be — on `GameRng::roll_x_coordinate` itself, in `ffb-model`.
+    #[test]
+    fn a_hitting_rock_reads_exactly_one_x_coordinate_die() {
+        use ffb_model::enums::PlayerState;
+        use ffb_model::types::FieldCoordinate;
+
+        fn draws(seed: u64, hit: bool) -> u64 {
+            let mut game = make_game();
+            game.team_home.players.push(make_player("staller"));
+            game.field_model.set_player_coordinate("staller", FieldCoordinate::new(10, 5));
+            game.field_model.set_player_state("staller", PlayerState::new(PS_STANDING));
+            let mut step = StepStallingPlayer::new();
+            step.player_id = Some("staller".into());
+            let mut rng = GameRng::new(seed);
+            step.start(&mut game, &mut rng);
+            assert_eq!(GameRng::new(seed).d6() >= 5, hit, "fixture seed has the wrong rock roll");
+            rng.call_count
+        }
+
+        let miss = (0u64..1000).find(|s| GameRng::new(*s).d6() < 5).expect("no missing seed");
+        let hit = (0u64..1000).find(|s| GameRng::new(*s).d6() >= 5).expect("no hitting seed");
+
+        // A miss rolls the rock d6 and stops.
+        assert_eq!(draws(miss, false), 1, "a missed rock consumes only its own d6");
+        // A hit adds the x die and then the injury chain, so it must consume strictly more.
+        assert!(draws(hit, true) > 1, "a hitting rock must read the x die and the injury rolls");
     }
 
     /// handle_command always returns NEXT_STEP (no dialog for this step).

@@ -563,8 +563,7 @@ impl CoverageReport {
 
 pub fn player_action_name(action: &PlayerAction) -> &'static str {
     match action {
-        PlayerAction::Move | PlayerAction::HandOverMove
-        | PlayerAction::PassMove | PlayerAction::FoulMove | PlayerAction::GazeMove
+        PlayerAction::Move | PlayerAction::FoulMove | PlayerAction::GazeMove
         | PlayerAction::KickTeamMateMove | PlayerAction::ThrowTeamMateMove
         | PlayerAction::PuntMove | PlayerAction::PutridRegurgitationMove => "Move",
         PlayerAction::Block | PlayerAction::PutridRegurgitationBlock
@@ -577,8 +576,17 @@ pub fn player_action_name(action: &PlayerAction) -> &'static str {
         PlayerAction::Blitz | PlayerAction::BlitzSelect | PlayerAction::BlitzMove
         | PlayerAction::PutridRegurgitationBlitz | PlayerAction::KickEmBlitz => "Blitz",
         PlayerAction::StandUpBlitz => "StandUpBlitz",
-        PlayerAction::Pass => "Pass",
-        PlayerAction::HandOver => "HandOver",
+        // PassMove / HandOverMove belong HERE, not with Move -- the same correction BlitzMove
+        // needed above, for the same reason. The heuristic agent declares the MOVE variants
+        // DELIBERATELY, because that is what buys the movement phase before the throw, so lumping
+        // them with Move drove `action Pass` and `action HandOver` toward zero while inflating
+        // `action Move` by the same amount. The 2026-09-12 sweep is the evidence: 23 gates flagged
+        // `action HandOver` MISSING and 6 flagged `action Pass`, 29 of the 34 missing rows across
+        // the whole 330-gate matrix -- while those same runs recorded real pass rolls, catches and
+        // a working give. The mechanic was exercised; only the counter disagreed.
+        // (BACKLOG D2 / E5.)
+        PlayerAction::Pass | PlayerAction::PassMove => "Pass",
+        PlayerAction::HandOver | PlayerAction::HandOverMove => "HandOver",
         PlayerAction::Foul => "Foul",
         PlayerAction::StandUp => "StandUp",
         PlayerAction::ThrowTeamMate => "ThrowTeamMate",

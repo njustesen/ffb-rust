@@ -78,6 +78,22 @@ impl GameRng {
     }
 
     /// Roll a single d6 (1–6).
+    /// 1:1 port of Java `DiceRoller.rollXCoordinate()`:
+    ///
+    /// ```java
+    /// public int rollXCoordinate() {
+    ///     return rollDice(26) - 1;
+    /// }
+    /// ```
+    ///
+    /// A d26 minus one, i.e. x in `[0, 25]` — the full pitch width, NOT `[1, 24]`. It exists as a
+    /// named method here for the same reason it does in Java: two call sites (the BB2020 and
+    /// BB2025 Throw-a-Rock steps) need the same die, and one of them had drifted to `die(24)`
+    /// (BACKLOG D3) because the constant was written out by hand at each site.
+    pub fn roll_x_coordinate(&mut self) -> i32 {
+        self.die(26) - 1
+    }
+
     pub fn d6(&mut self) -> i32 {
         self.die(6)
     }
@@ -137,6 +153,37 @@ impl GameRng {
 
 #[cfg(test)]
 mod tests {
+    /// 1:1 with Java `DiceRoller.rollXCoordinate() = rollDice(26) - 1`.
+    ///
+    /// BACKLOG D3: the BB2020 Throw-a-Rock step rolled `die(24)` here, yielding [1, 24] instead of
+    /// [0, 25], with a comment citing Java for a line that does not exist. It had no parity effect
+    /// — both die sizes consume one draw, and Java discards the coordinate into a client-side
+    /// animation — which is exactly why it survived: nothing downstream could see it. The
+    /// invariant is pinned here because this is the only place it is observable.
+    #[test]
+    fn roll_x_coordinate_is_a_d26_minus_one_covering_the_full_pitch_width() {
+        let mut lo = i32::MAX;
+        let mut hi = i32::MIN;
+        for seed in 0u64..4000 {
+            let x = GameRng::new(seed).roll_x_coordinate();
+            assert!((0..=25).contains(&x), "seed {seed}: x={x} outside Java's [0, 25]");
+            lo = lo.min(x);
+            hi = hi.max(x);
+        }
+        // A d24 could never produce 0, and a `die(24)` result could never reach 25 — so pinning
+        // both ends distinguishes this from the old mapping rather than merely bounding it.
+        assert_eq!(lo, 0, "x must be able to reach 0; `die(24)` starts at 1");
+        assert_eq!(hi, 25, "x must be able to reach 25; `die(24)` stops at 24");
+    }
+
+    /// The x die consumes exactly one draw, which is why D3 could not desync the shared stream.
+    #[test]
+    fn roll_x_coordinate_consumes_exactly_one_draw() {
+        let mut rng = GameRng::new(7);
+        rng.roll_x_coordinate();
+        assert_eq!(rng.call_count, 1);
+    }
+
     use super::*;
 
     #[test]

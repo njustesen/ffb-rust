@@ -148,10 +148,10 @@ impl StallingExtension {
             Some(c) => c,
             None => return (event, None),
         };
-        // Java: `rollXCoordinate()` is `rollDice(26) - 1`, i.e. a d26 giving x in [0, 25] --
-        // NOT a d24. (bb2020's twin rolls `die(24)` and is wrong about this; its branch does not
-        // fire in the current gate, so it is left alone rather than fixed blind.)
-        let x = rng.die(26) - 1;
+        // Java: `rollXCoordinate()` is `rollDice(26) - 1`, i.e. a d26 giving x in [0, 25] -- NOT
+        // a d24. Both editions now go through the one `GameRng::roll_x_coordinate`, which is what
+        // stops the two sites drifting apart again (BACKLOG D3: the bb2020 twin had `die(24)`).
+        let x = rng.roll_x_coordinate();
         // Java: FieldCoordinateBounds.UPPER_HALF is (0,0)..(25,7).
         let _start_coord = if player_coord.y <= 7 {
             FieldCoordinate::new(x, 0)
