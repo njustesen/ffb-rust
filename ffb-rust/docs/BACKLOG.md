@@ -7360,3 +7360,55 @@ gated with controls.
 **Next concrete step:** the full 330-gate certification sweep, which is the only thing that can turn
 "every gate I have run is green" into "the matrix is green". It must be agreed with the user first —
 it is 330 gates and the standing constraint is that it must not take every core.
+
+## §H.40 — 🏁 THE MATRIX IS GREEN: 330/330 certified
+
+Full sweep, 2026-09-12, `docs/SWEEP_2026-09-12.txt` / `docs/sweep_2026-09-12.json`.
+
+```
+FULL MATRIX SWEEP - 330 gates, 110 cells x 3 scales
+parity: 330/330 games match, 0 FAILED, 0 without a verdict
+summed gate time 800 min (13.33 h)
+```
+
+110 cells (29 bb2016 / 40 bb2020 / 41 bb2025) x scales `1.0` / `0` / `1e6` x 100 seeds, Rust against
+stock Java under the heuristic agent. **Every gate printed `PARITY: 100/100 games match`.** 0
+failures, 0 panics across all 330 gate logs, 0 missing verdicts, and every denominator the 100 that
+was asked for — the campaign's own definition of a valid measurement.
+
+Run as 4 sharded workers on 8 of 16 cores (2 cores each, explicit affinity masks), sharded by
+(edition, matchup) so all three scales of a matchup stay on one worker and two runs of one matchup
+never overlap. **No `--reuse-java`**: a fresh JVM per gate, because a stale cache once turned a
+100/100 gate into 30/100. ~3.5 h wall for 13.3 h of summed gate time.
+
+### What this loop closed
+
+Starting point was §H.21's 16 red gates / 13 cells. The last four cells, all closed this loop:
+
+| cell | root cause | §
+|---|---|---|
+| `slann` bb2020 @1e6 | bb2020 stalling / Throw-a-Rock chain dead in THREE files | §H.36-37 |
+| `human` bb2020 @0 | the same cause — one port closed both | §H.37 |
+| `khemri` bb2025 @1.0 | BB2025's `raisePositions` LIST never ported | §H.38 |
+| `dark_elf` bb2025 @1.0 | **a stock-Java defect** (JD-001), ported 1:1 with the fix behind a flag | §H.39 |
+
+### Standing caveats on what 330/330 does and does not certify
+
+Recorded so the number is not read as more than it is:
+
+- **30 gates carry the `required coverage items are MISSING` trailer.** That is a PASS for parity —
+  the trailer is the mechanic-coverage checklist, not a comparison result — but it means 30 cells do
+  not exercise everything the checklist asks for. This is exactly what the deferred §H.14 phase 2
+  (Brawler/Hatred) and phase 3 (Pro) work exists to address, and it is the obvious next goal.
+- **`dark_elf` bb2025 passes because BOTH engines now stop at the same step.** Rust reproduces
+  JD-001 faithfully, so the comparison is honest rather than suppressed — but the underlying Java bug
+  is real, and lives in `docs/JAVA_DEFECTS.md`.
+- **Green is not exercised.** A mechanic no drafted roster carries, or that the agent never chooses,
+  is untested however green the gate. The state hash is also blind to `passing`, the rooted flag,
+  casualty severity, prayer-granted skills and every player numbered above 11 — §H.38's khemri raise
+  hid in that last blind spot for an entire campaign.
+
+### Next goal — a USER decision, not an automatic step
+
+The matrix-green goal is met. The candidates are the coverage work above, pushing (nothing has been
+pushed to origin this whole campaign), or something else entirely. Do not auto-jump.

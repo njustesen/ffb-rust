@@ -1,0 +1,39 @@
+FULL MATRIX SWEEP - 330 gates, 110 cells x 3 scales
+parity: 330/330 games match, 0 FAILED, 0 without a verdict
+
+summed gate time 800 min (13.33 h)
+
+Separately, 30 gate(s) report the mechanic-coverage checklist unmet
+(parity still 100/100 on every one of them):
+
+  amazon bb2020 @1e6
+  amazon bb2025 @1e6
+  chaos bb2020 @1.0
+  chaos_pact bb2020 @1e6
+  chaos_pact bb2025 @1e6
+  dark_elf bb2016 @1.0
+  dwarf bb2020 @1e6
+  goblin bb2016 @1.0
+  halfling bb2025 @1e6
+  human bb2020 @1e6
+  khemri_fumbbl bb2020 @0
+  khemri_fumbbl bb2025 @0
+  khorne bb2020 @1.0
+  necromantic bb2016 @1e6
+  necromantic bb2020 @1e6
+  necromantic bb2025 @1e6
+  nurgle bb2016 @1e6
+  nurgle bb2025 @0
+  ogre bb2025 @1e6
+  orc bb2020 @1e6
+  orc bb2025 @1.0
+  renegades bb2016 @1e6
+  renegades bb2025 @1e6
+  slann_fumbbl bb2020 @0
+  slann_fumbbl bb2025 @0
+  snotling bb2020 @0
+  underworld bb2016 @1e6
+  underworld bb2020 @1e6
+  underworld_37844 bb2025 @1e6
+  wood_elf bb2016 @1e6
+
