@@ -73,6 +73,10 @@ pub struct Game {
     /// `pGameState.setPassState(new PassState())` — `PassState.populate` carries over only the three
     /// bomb fields, so every other field, this one included, starts fresh for each pass.
     pub interceptor_chosen: bool,
+    /// Opt-in corrections for stock-Java defects; see `docs/JAVA_DEFECTS.md`. Defaults to every
+    /// flag OFF, i.e. the Java behaviour, so a parity run is byte-comparable unless a caller
+    /// deliberately turns a correction on.
+    pub defect_fixes: crate::model::java_defect_fixes::JavaDefectFixes,
     /// Java: `PassState.interceptorId` (`step/mixed/pass/state/PassState.java:15`).
     ///
     /// Shares `interceptor_chosen`'s lifetime and its reason for existing: the Cloud Burster
@@ -175,6 +179,7 @@ impl Game {
             pass_coordinate: None,
             original_bombardier: None,
             interceptor_chosen: false,
+            defect_fixes: Default::default(),
             pass_interceptor_id: None,
             throw_two_bombs: None,
             waiting_for_opponent: false,

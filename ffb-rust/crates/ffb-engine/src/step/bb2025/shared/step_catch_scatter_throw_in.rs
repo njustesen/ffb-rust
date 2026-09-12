@@ -293,6 +293,25 @@ impl StepCatchScatterThrowIn {
             }
             Some(CatchScatterThrowInMode::ThrowIn) => {
                 self.bomb_mode = false;
+                // JD-001 (docs/JAVA_DEFECTS.md): a throw-in whose coordinate is not on the pitch
+                // EDGE has no direction. Java reaches this with an interior square after a
+                // re-rolled punt distance, and `interpretThrowInDirectionRoll` throws
+                // `IllegalStateException: Unable to determine throwInDirection`. The exception is
+                // swallowed upstream, so the step sets no next action, publishes nothing and adds
+                // no report; the game then makes no progress and the harness gives up.
+                //
+                // Mirror that OBSERVABLE behaviour rather than the exception: return without
+                // touching anything, so the driver's no-progress guard ends the game exactly as
+                // Java's `STUCK_STEP` does. Rust's `interpret_throw_in_direction_roll` panics on
+                // this input, and a panic would abort the whole run rather than the one game.
+                //
+                // This guard is unreachable once `defect_fixes.punt_distance_clears_out_of_bounds`
+                // is on, which is the point of that flag.
+                if let Some(c) = self.throw_in_coordinate {
+                    if !is_throw_in_edge(c) {
+                        return StepOutcome::cont();
+                    }
+                }
                 if self.throw_in_coordinate.is_some() {
                     let new_mode = self.throw_in_ball(game, rng);
                     self.catch_scatter_throw_in_mode = new_mode;
@@ -1030,6 +1049,15 @@ fn to_model_mode(m: CatchScatterThrowInMode) -> CatchScatterThrowInMode {
         CatchScatterThrowInMode::ThreeSquareScatter => CatchScatterThrowInMode::ThreeSquareScatter,
         CatchScatterThrowInMode::ThrowIn => CatchScatterThrowInMode::ThrowIn,
     }
+}
+
+/// Does `c` sit on the pitch edge, i.e. can a throw-in direction be determined from it?
+///
+/// Mirrors the branch coverage of Java's `ThrowInMechanic.interpretThrowInDirectionRoll`, which
+/// tests exactly `x < 1`, `x > 24`, `y < 1` and `y > 13` and throws when none match. Used only to
+/// detect JD-001's impossible throw-in; see `docs/JAVA_DEFECTS.md`.
+fn is_throw_in_edge(c: FieldCoordinate) -> bool {
+    c.x < 1 || c.x > 24 || c.y < 1 || c.y > 13
 }
 
 #[cfg(test)]

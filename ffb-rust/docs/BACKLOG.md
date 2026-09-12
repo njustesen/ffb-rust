@@ -7240,3 +7240,123 @@ fix.**
 
 **Next concrete step:** the `dark_elf` probe. §H.37 is the precedent to follow — mirror the probe in
 BOTH engines and diff it, rather than reasoning from Rust's side alone.
+
+## §H.39 — ITER18: `dark_elf` bb2025 CLOSED — a STOCK JAVA defect, ported and then fixed behind a flag
+
+**The last red, and the only one in this campaign that was never a Rust engine bug.** All 26 steps
+Java produced matched Rust exactly; Java then threw an exception, got stuck, and Rust played on to
+step 167. The divergence was entirely "Java stopped and Rust did not".
+
+New document: **`docs/JAVA_DEFECTS.md`**, holding this as **JD-001** and the house rule for any
+future entry.
+
+### Why §H.34 could not find the line that set CONTINUE
+
+§H.34 reduced this to one unknown — *which line set `CONTINUE` on `CATCH_SCATTER_THROW_IN`* — and
+looked for a setter. **There is none.** `StepResult`'s own CONSTRUCTOR does
+`setNextAction(StepAction.CONTINUE)` (`StepResult.java:28`), so CONTINUE is what a step's result
+holds until something overwrites it. `executeStep()` threw before reaching any `setNextAction`, the
+exception was swallowed upstream, and the constructor's default was still sitting there. That is
+also why the probe found both disjuncts of line 388 null: line 388 never ran.
+
+The stack probe named it in one run — the same lesson as §H.22 and §H.37: when inference has failed
+twice, instrument the setter rather than reason about the callers.
+
+### The defect (JD-001, full write-up in docs/JAVA_DEFECTS.md)
+
+`bb2025/punt/StepPuntDistance.executeStep` sets `outOfBounds` and clears it NOWHERE — no `else`
+branch, and `setOutOfBounds(false)` does not appear in the class. On a distance RE-ROLL that lands
+on the pitch the flag survives from the first roll, so `leave()` publishes a `THROW_IN` whose
+coordinate is an ordinary interior square. `ThrowInMechanic.interpretThrowInDirectionRoll` handles
+only `x < 1`, `x > 24`, `y < 1`, `y > 13` and throws
+`IllegalStateException: Unable to determine throwInDirection` on anything else.
+
+Probe transcript (dark_elf bb2025 @1.0 seed 28), Java dice 46-48:
+
+```
+JAVA_DIE rng=46 d6=6 from=...StepPuntDistance.executeStep:108       <- out of bounds, flag set
+JNEXTACT set=CONTINUE by: <- StepPuntDistance.java:129(executeStep)   <- re-roll offered
+JREROLLA pick=0 use=true                                             <- re-roll accepted
+JAVA_DIE rng=47 d6=2 from=...StepPuntDistance.executeStep:108       <- lands ON the pitch
+JCSTI enter mode=THROW_IN phase=ASK_HOME throwIn=(2,5) catcher=null
+JCSTI THREW java.lang.IllegalStateException: Unable to determine throwInDirection.
+STUCK_STEP: CATCH_SCATTER_THROW_IN unadvanced for 501 iters
+```
+
+**The rules situation is valid**, checked before recording it as a defect: the BB2025 Punt Special
+Action (`rules/core_rules/08_skills_and_traits.md:380-386`) explicitly permits re-rolling the
+distance die and explicitly contemplates the ball ending in the crowd — and Java offers that
+re-roll itself through `UtilServerReRoll.askForReRollIfAvailable`. Ordinary play, not a harness
+artefact.
+
+### A Rust deviation that had been sitting there uncommented
+
+Rust's `step_punt_distance.rs` cleared `out_of_bounds` on the in-bounds path, with a test
+(`on_pitch_landing_clears_stale_out_of_bounds_flag`) whose comment asserted *"Java:
+`fieldModel.setOutOfBounds(false)` runs unconditionally on the in-bounds path"*. **That citation was
+false** — the line does not exist in Java. The test encoded a deviation as if it were the port, and
+the deviation is the only reason Rust did not follow Java into the stuck state. A second instance of
+the standing trap: a test can encode the bug, and here it encoded a *correct behaviour* while
+claiming Java's authority for it.
+
+### Resolution: port the defect, ship the fix behind configuration
+
+Per the user's decision this iteration:
+
+1. **`docs/JAVA_DEFECTS.md`** records the defect, with the rule that every entry is ported 1:1 as
+   the DEFAULT and its correction is opt-in.
+2. **`ffb-model/src/model/java_defect_fixes.rs`** — `JavaDefectFixes` on `Game::defect_fixes`, all
+   flags `false` by default, with a test asserting the default equals `faithful_to_java()`. A parity
+   gate run with any flag on is not a parity measurement, and the doc says so.
+3. **The defect is ported**: `StepPuntDistance` keeps the stale flag unless
+   `defect_fixes.punt_distance_clears_out_of_bounds` is set.
+4. **`StepCatchScatterThrowIn` mirrors the OBSERVABLE consequence, not the exception.** A throw-in
+   from a non-edge square returns with no progress — no report, no published parameter, no next
+   action — so the driver's no-progress guard ends the game exactly as Java's `STUCK_STEP` does.
+   Rust's `interpret_throw_in_direction_roll` PANICS on that input (it is a real invariant, and it
+   caught the §H.34-era `coord.transform()` bug on seeds 6/7/10), and a panic would abort the whole
+   run rather than one game. The guard is unreachable once the fix flag is on.
+
+Both engines now stop at the same step, so every step matches and the seed passes honestly — not by
+suppressing a comparison.
+
+### Two harness corrections, both independent of the above
+
+- **`ParityRunner`'s `STUCK_STEP` break now sets `endReason = "stuck_step"`.** It was leaving the
+  initialiser `"finished"`, so a game the harness GAVE UP on reported `END_REASON: finished`. That
+  single string sent §H.20 and §H.33 after the wrong cause; §H.34 caught it and it is now fixed.
+- **The two Java trees are back in sync.** `check_java_trees.py` had been reporting
+  `ParityRunner.java` DIFFERS since §H.14, with the BUILD tree ahead. The drift was exactly §H.14's
+  `answerBlockReRoll` work — three call sites and one method — which has been live in the jar, and
+  therefore in every measurement this campaign has taken, while the tracked copy sat behind.
+  Syncing makes the tracked copy match the jar that produced the numbers.
+
+### Gate
+
+Sequential, `PARITY_JVM_CORES=1`, fresh JVM throughout (no `--reuse-java`), panics counted
+explicitly:
+
+| cell | @1.0 | @0 | @1e6 |
+|---|---|---|---|
+| **dark_elf bb2025** (target) | **100/100** (was RED) | 100/100 | 100/100 |
+| dark_elf bb2020 | 100/100 | | |
+| dark_elf bb2016 | 100/100 * | | |
+| human bb2025 | 100/100 | | |
+| amazon bb2025 | 100/100 | | |
+| khemri bb2025 | 100/100 | | |
+| slann bb2020 | | | 100/100 |
+| human bb2020 | | 100/100 | |
+| goblin bb2016 | 100/100 * | | |
+
+`*` = coverage-items-missing trailer, which is a PASS. **0 panics on every gate.** Workspace tests
+15,324 passed / 0 failed.
+
+### Standing red set
+
+**EMPTY.** Every cell known to be red at the start of this loop is now green, and the four cells
+this loop closed (`slann` bb2020, `human` bb2020, `khemri` bb2025, `dark_elf` bb2025) were each
+gated with controls.
+
+**Next concrete step:** the full 330-gate certification sweep, which is the only thing that can turn
+"every gate I have run is green" into "the matrix is green". It must be agreed with the user first —
+it is 330 gates and the standing constraint is that it must not take every core.

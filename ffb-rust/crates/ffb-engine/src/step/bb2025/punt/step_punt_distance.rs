@@ -91,7 +91,27 @@ impl StepPuntDistance {
         let landing = coord_from.step(direction, self.distance);
 
         if landing.is_on_pitch() {
-            game.field_model.out_of_bounds = false;
+            // JD-001 (docs/JAVA_DEFECTS.md). Java's `StepPuntDistance.executeStep` has NO else
+            // branch and calls `setOutOfBounds(false)` NOWHERE:
+            //
+            //     if (!FieldCoordinateBounds.FIELD.isInBounds(ballIndicatorCoordinate)) {
+            //         ballIndicatorCoordinate = findLastSquareOnPitch(distance - 1);
+            //         fieldModel.setOutOfBounds(true);
+            //     }
+            //     fieldModel.setBallCoordinate(ballIndicatorCoordinate);
+            //
+            // so a punt that left the pitch and then has its distance RE-ROLLED onto the pitch
+            // keeps `outOfBounds == true` from the first roll. `leave()` then publishes a THROW_IN
+            // from an ordinary INTERIOR square and Java's throw-in mechanic, which handles only
+            // edge squares, throws `Unable to determine throwInDirection`; the exception is
+            // swallowed, the step never sets a next action and the game is stuck (dark_elf bb2025
+            // @1.0 seed 28).
+            //
+            // The defect is the DEFAULT so the two engines stay byte-comparable. The correction is
+            // opt-in.
+            if game.defect_fixes.punt_distance_clears_out_of_bounds {
+                game.field_model.out_of_bounds = false;
+            }
             game.field_model.ball_coordinate = Some(landing);
         } else {
             // Find last valid square on path.
@@ -225,21 +245,37 @@ mod tests {
         assert!(!game.report_list.has_report(ReportId::PUNT_DISTANCE_ROLL));
     }
 
-    // Java: `fieldModel.setOutOfBounds(false)` runs unconditionally on the in-bounds path
-    // (isInBounds(ballIndicatorCoordinate)). If a prior step (e.g. StepPuntDirection) had
-    // left `out_of_bounds = true`, an in-bounds distance roll must clear it — otherwise
-    // downstream CatchScatterThrowIn logic (which reads this flag) would wrongly treat an
-    // on-pitch landing as a throw-in.
+    /// JD-001 (docs/JAVA_DEFECTS.md). The comment this test used to carry — "Java:
+    /// `fieldModel.setOutOfBounds(false)` runs unconditionally on the in-bounds path" — was FALSE.
+    /// Java's `StepPuntDistance` never calls `setOutOfBounds(false)` at all, so a stale `true` from
+    /// an out-of-bounds first roll survives a re-roll that lands on the pitch. The test encoded the
+    /// deviation as if it were the port.
+    ///
+    /// The defect is now the DEFAULT and the correction is opt-in, so this asserts BOTH states.
     #[test]
-    fn on_pitch_landing_clears_stale_out_of_bounds_flag() {
-        let mut game = make_game();
-        game.field_model.out_of_bounds = true; // stale from a prior step
-        let from = FieldCoordinate::new(5, 7); // East: any d6 distance stays on pitch
-        let mut step = StepPuntDistance::new();
-        step.direction = Some(Direction::East);
-        step.coordinate_from = Some(from);
-        let out = step.start(&mut game, &mut GameRng::new(0));
-        assert!(!game.field_model.out_of_bounds, "expected out_of_bounds to be cleared on in-bounds landing");
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::CatchPunt))));
+    fn a_stale_out_of_bounds_survives_an_on_pitch_landing_unless_the_jd001_fix_is_on() {
+        fn run(fix_on: bool) -> (bool, bool) {
+            let mut game = make_game();
+            game.defect_fixes.punt_distance_clears_out_of_bounds = fix_on;
+            game.field_model.out_of_bounds = true; // stale, as after an out-of-bounds first roll
+            let mut step = StepPuntDistance::new();
+            step.direction = Some(Direction::East);
+            step.coordinate_from = Some(FieldCoordinate::new(5, 7)); // East: any d6 stays on pitch
+            let out = step.start(&mut game, &mut GameRng::new(0));
+            let throw_in = out.published.iter().any(|p| matches!(
+                p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ThrowIn)));
+            (game.field_model.out_of_bounds, throw_in)
+        }
+
+        // Default = Java: the flag survives, and `leave()` therefore publishes a THROW_IN even
+        // though the ball is sitting on an ordinary interior square. That is the defect, and it is
+        // what makes the two engines comparable.
+        assert_eq!(run(false), (true, true),
+            "stock Java keeps the stale out_of_bounds and publishes a throw-in from mid-pitch");
+
+        // Fix on: the flag is cleared and the punt resolves as the rules describe.
+        assert_eq!(run(true), (false, false),
+            "with the JD-001 fix the landing is on the pitch, so no throw-in is published");
     }
+
 }

@@ -394,6 +394,12 @@ public class ParityRunner {
                 if (++sameStepNoDialogCount > 500) {
                     System.err.println("STUCK_STEP: " + stepId + " unadvanced for "
                         + sameStepNoDialogCount + " iters — ending game to avoid a MAX_ITERATIONS spin");
+                    // `endReason` is initialised to "finished" and was NOT overwritten here, so a
+                    // game the harness GAVE UP on reported END_REASON: finished — which read as
+                    // "Java ended normally" and sent two iterations (BACKLOG §H.20, §H.33) after the
+                    // wrong cause. The STUCK_STEP line above was always printed, but `grep
+                    // END_REASON` alone gave the opposite answer.
+                    endReason = "stuck_step";
                     break;
                 }
             } else {
@@ -1195,6 +1201,9 @@ public class ParityRunner {
                 // what the byte-matched random contract picks.
                 com.fumbbl.ffb.dialog.DialogBlockRollParameter br =
                     (com.fumbbl.ffb.dialog.DialogBlockRollParameter) dialog;
+                if (answerBlockReRoll(br.hasTeamReRollOption(), dialog, game, gameState)) {
+                    break;
+                }
                 int brIdx = heuristicBlockChoice(game, br.getNrOfDice(), br.getBlockRoll());
                 comm.clearCaptured();
                 comm.sendBlockChoice(brIdx);
@@ -1210,6 +1219,9 @@ public class ParityRunner {
                 // the die index from the heuristic agent, or 0 when the class is off.
                 com.fumbbl.ffb.dialog.DialogBlockRollPartialReRollParameter bpr =
                     (com.fumbbl.ffb.dialog.DialogBlockRollPartialReRollParameter) dialog;
+                if (answerBlockReRoll(bpr.hasTeamReRollOption(), dialog, game, gameState)) {
+                    break;
+                }
                 int bprIdx = heuristicBlockChoice(game, bpr.getNrOfDice(), bpr.getBlockRoll());
                 comm.clearCaptured();
                 comm.sendBlockChoice(bprIdx);
@@ -1218,13 +1230,20 @@ public class ParityRunner {
             }
 
             case BLOCK_ROLL_PROPERTIES: {
-                // BB2025 block roll: the step waits for CLIENT_BLOCK_CHOICE. Never use a reroll
-                // here (AGENT_CONTRACT.md §7) — a reroll-decline would just re-show the dialog
-                // forever. The die index comes from the heuristic agent when `blockchoice` is on,
-                // and is 0 otherwise. Rust raises the SAME `AgentPrompt::BlockChoice` for this
-                // dialog as for BLOCK_ROLL; there is no separate "properties" prompt.
+                // BB2025 block roll. The ONE dialog carries the dice and the re-roll options, so
+                // it is answered in two steps: `answerBlockReRoll` first (the TRR question), then
+                // the die choice. There is no decline COMMAND -- answering with a null-source
+                // re-roll drives doRoll=false -> showBlockRollDialog(true) -> the same dialog
+                // forever -- so a decline is expressed as the die choice, which is exactly what
+                // this arm did unconditionally until BACKLOG §H.14. Rust raises
+                // `AgentPrompt::ReRollOffer{action:"BLOCK"}` then `AgentPrompt::BlockChoice`, in
+                // the same order and with the same two sampler draws.
                 com.fumbbl.ffb.dialog.DialogBlockRollPropertiesParameter brp =
                     (com.fumbbl.ffb.dialog.DialogBlockRollPropertiesParameter) dialog;
+                if (answerBlockReRoll(brp.hasProperty(com.fumbbl.ffb.ReRollProperty.TRR),
+                        dialog, game, gameState)) {
+                    break;
+                }
                 int brpIdx = heuristicBlockChoice(game, brp.getNrOfDice(), brp.getBlockRoll());
                 comm.clearCaptured();
                 comm.sendBlockChoice(brpIdx);
@@ -2902,6 +2921,41 @@ public class ParityRunner {
             if (keep) live.add(a);
         }
         return live.toArray(new PlayerAction[0]);
+    }
+
+    /**
+     * The TRR half of a block-roll dialog. All three editions show ONE dialog carrying the dice
+     * AND the re-roll options; the client answers it with either a die choice or a re-roll
+     * command. This asks the re-roll question first and, on an acceptance, answers with
+     * {@code ReRollSources.TEAM_RE_ROLL} -- Java's {@code AbstractStepWithReRoll} then sets
+     * BLOCK/TEAM_RE_ROLL, {@code useReRoll} spends the re-roll (rolling Loner for a carrier who
+     * has it) and the step rolls the block dice again and re-shows the dialog, this time with an
+     * empty property list.
+     *
+     * <p>There is no decline command: {@code sendUseReRoll(BLOCK, null)} drives
+     * {@code doRoll = false} -> {@code showBlockRollDialog(true)} -> the same dialog forever. A
+     * decline is therefore expressed as the DIE CHOICE, which is what the caller falls through to.
+     *
+     * <p>Rust mirrors the pair as two prompts -- {@code AgentPrompt::ReRollOffer{action:"BLOCK"}}
+     * then {@code AgentPrompt::BlockChoice} -- in this order, so both engines spend the same two
+     * sampler draws on a decline and the same one on an acceptance.
+     * {@code reRollSourceFor} returns null without consulting the heuristic when the option is
+     * absent or the {@code reroll} class is off, so every lower rung keeps its byte-matched stream.
+     *
+     * @return true when a re-roll was requested and the dialog answered; false to fall through to
+     *         the die choice.
+     */
+    private boolean answerBlockReRoll(boolean teamReRollOption, IDialogParameter dialog,
+            Game game, GameState gameState) {
+        com.fumbbl.ffb.ReRollSource source =
+            reRollSourceFor(game, com.fumbbl.ffb.ReRolledActions.BLOCK, teamReRollOption);
+        if (source == null) {
+            return false;
+        }
+        comm.clearCaptured();
+        comm.sendUseReRoll(com.fumbbl.ffb.ReRolledActions.BLOCK, source);
+        injectCaptured(dialog, game, gameState);
+        return true;
     }
 
     /**

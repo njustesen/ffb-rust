@@ -5,6 +5,7 @@ pub mod animation_type;
 pub mod block_roll_properties;
 pub mod catch_scatter_throw_in_mode;
 pub mod client_mode;
+pub mod java_defect_fixes;
 pub mod blood_spot;
 pub mod breathe_fire_result;
 pub mod common_property;
