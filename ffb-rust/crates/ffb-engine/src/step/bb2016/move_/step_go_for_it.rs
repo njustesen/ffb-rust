@@ -187,6 +187,26 @@ impl StepGoForIt {
             vec![],
         ));
 
+        // Coverage event, mirroring `bb2025/move_/step_go_for_it.rs`: one per RESOLVED roll, so an
+        // initial roll and its re-rolled resolution each raise their own.
+        //
+        // This step added the REPORT but never the EVENT, so `cov.go_for_it_rolls` read 0 for
+        // BB2016 while the dice were being rolled and matched all along: the 2026-09-12 sweep shows
+        // `GFI rolls = 0` on all 87 BB2016 gates against 145-6784 on every BB2020/BB2025 gate,
+        // while a 3-seed amazon BB2016 trace rolls 170 `rollGoingForIt` dice (BB2020: 141). The
+        // mechanic is exercised and parity-matched; only the counter was blind.
+        //
+        // Same failure shape as E6b (the skillUse grep that under-reported every closed race) and
+        // §H.41's D2/E5 (PassMove counted as Move): a coverage number reading zero because nothing
+        // reports it, which is indistinguishable from a dead mechanic.
+        let roll_event = ffb_model::events::GameEvent::GoForItRoll {
+            player_id: player_id.clone().unwrap_or_default(),
+            target: minimum_roll,
+            roll: self.roll,
+            success: successful,
+            rerolled: re_rolled,
+        };
+
         if successful {
             // Java: if (actingPlayer.isJumping() && currentMove > MA+1 && !fSecondGoForIt)
             //         → fSecondGoForIt=true, setReRolledAction(null), pushCurrentStepOnStack (Repeat)
@@ -199,9 +219,9 @@ impl StepGoForIt {
             if jumping && current_move > ma + 1 && !self.second_go_for_it {
                 self.second_go_for_it = true;
                 self.re_roll_state.re_rolled_action = None;
-                return StepOutcome::repeat();
+                return StepOutcome::repeat().with_event(roll_event);
             }
-            return StepOutcome::next();
+            return StepOutcome::next().with_event(roll_event);
         }
 
         // First failure: try re-roll
@@ -219,18 +239,19 @@ impl StepGoForIt {
                 use_reroll(game, &source, &pid, rng);
                 self.re_roll_state.re_roll_source = Some(source);
                 self.roll = 0;
-                return self.do_go_for_it(game, rng);
+                // The re-rolled resolution raises its own event; this failed one still counts.
+                return self.do_go_for_it(game, rng).with_event(roll_event);
             }
 
             // TRR offer
             if let Some(prompt) = ask_for_reroll_if_available(game, "GFI", minimum_roll, false) {
                 self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
                 self.roll = 0;
-                return StepOutcome::cont().with_prompt(prompt);
+                return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
             }
         }
 
-        self.fail_gfi(game)
+        self.fail_gfi(game).with_event(roll_event)
     }
 
     fn fail_gfi(&self, _game: &mut Game) -> StepOutcome {

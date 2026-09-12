@@ -7483,3 +7483,180 @@ artefact.
 
 D1/D4, E1-E4, E6, F8, and the two tier-decision items (Punt, widening the state hash). §H.14 phase 2
 (Brawler/Hatred) and phase 3 (Pro) remain the largest deferred coverage work.
+
+## §H.42 — ITER20: BB2016 never reported a single Rush, and a stale note was hiding it (D1/E5)
+
+**Third bug of one family in three iterations**, after E6b's skillUse grep and §H.41's
+`PassMove`-counted-as-`Move`: a coverage number reads zero because nothing reports it, which is
+indistinguishable from a dead mechanic.
+
+### The stale premise, measured
+
+`touchdowns` and `GFI rolls` both shipped `.block(...)` carrying:
+
+> "BLOCKED on the one-move-per-activation decision: both harnesses move exactly ONE square per
+> activation (measured 1:1, player_moved_events == activations.Move)"
+
+That describes the **random** agent and has been false since the heuristic campaign landed (D1 said
+so; the text still shipped in every `T3_COVERAGE.md`). Measured now, amazon, 3 seeds, mean
+`JAVA_PATH len` per activation:
+
+| edition | mean squares | range |
+|---|---|---|
+| bb2016 | **4.87** over 430 activations | 1-8 |
+| bb2020 | **4.78** over 385 activations | 1-9 |
+
+It was never race- or edition-specific: it was a claim about the agent, and it is wrong for every
+race and every edition.
+
+### What the stale block was hiding
+
+A `blocked` item is EXEMPT from the required check. So `GFI rolls = 0` on **all 87 BB2016 gates**
+read as the known limitation. It was not: BB2016 was rolling the dice the whole time and matching
+Java. A 3-seed amazon BB2016 trace has **170 `rollGoingForIt` dice** against BB2020's 141.
+
+`bb2016/move_/step_go_for_it.rs` added `ReportGoForItRoll` but never raised
+`GameEvent::GoForItRoll`, which its bb2025 twin does. The event now fires on all five outcome paths
+(success, the jumping-repeat, both re-roll routes, and failure), mirroring bb2025's "one event per
+RESOLVED roll".
+
+("GFI" is the LRB6/BB2016 name; BB2020+ call the same mechanic **Rush** — and that naming split is
+where the two twins drifted.)
+
+**Measured after the fix, across all 87 BB2016 gates: min 152, mean 3,456, zero gates at zero.**
+Parity unchanged.
+
+Both items are also **un-blocked**, so neither can hide behind a false justification again.
+
+### Gate
+
+```
+FULL MATRIX SWEEP - 330 gates, 110 cells x 3 scales
+parity: 330/330 games match, 0 FAILED, 0 without a verdict
+summed gate time 812 min (13.54 h)
+Separately, 11 gate(s) report the mechanic-coverage checklist unmet
+```
+
+`docs/SWEEP_2026-09-12c.txt`. 0 panics, every denominator 100. Workspace tests 15,327 / 0.
+
+Coverage-short went 5 -> 11, and the increase is the POINT: un-blocking `touchdowns` made six gates
+that genuinely score nothing at `@1e6` say so out loud instead of being exempt.
+
+| missing item | gates |
+|---|---|
+| `touchdowns` | 6 — all @1e6 (halfling/orc bb2016, chaos_chaostroll/nurgle bb2020, dwarf/khemri bb2025) |
+| `action Pass` + `pass rolls` | 4 — khemri_fumbbl and slann_fumbbl, bb2020 @0 and bb2025 @0 |
+| `throw-ins` | 1 — wood_elf bb2016 @1e6 |
+
+Every one is a cell that genuinely does not reach the mechanic, not a counter that cannot see it.
+`GFI rolls` is absent from that list entirely: it went from 0 on all 87 BB2016 gates to min 152.
+
+### Touchdown census (asked for during this iteration)
+
+Every gate is 100 games. TD per GAME:
+
+| `--heur-scale` | mean | median | cells below 1.0 |
+|---|---|---|---|
+| **0** (argmax) | **1.89** | 1.76 | **0 / 110** |
+| 1.0 | 0.36 | 0.27 | 109 / 110 |
+| 1e6 (uniform) | 0.05 | 0.05 | 110 / 110 |
+
+Overall 6 gates score zero and 219/330 are below 1 TD/game — and that is **by design, not a defect**.
+`--heur-scale` is the softmax temperature multiplier, and the agent's own module doc says the same
+agent "can be run as a uniform sampler by setting it very large, or as true argmax by setting it to
+zero". So scale 1e6 IS the random control arm of the heuristic-vs-random A/B; making it score would
+destroy the control. Scoring is fully exercised at scale 0, where every one of the 110 cells is
+above 1 TD/game (min 1.10).
+
+The 6 zero-scoring gates and all 10 lowest are @1e6. User decision this iteration: **no action** —
+it is enough that one setting reaches touchdowns.
+
+### E6 — analysed, NOT yet fixed; the naive fix is wrong
+
+E6 says `GameEvent::ReRoll` has zero emit sites and `SkillUse` only a handful. Confirmed:
+`GameEvent::ReRoll` has **0** construction sites, and Rust has **107 `ReportSkillUse::new` sites vs
+1 `ReportReRoll::new`** (Java: 159 and 22).
+
+The attractive fix is a **report -> event bridge** at one choke point: `driver.rs::apply()` already
+returns `take_events()`, `report_list` is never cleared mid-game (so a watermark works),
+`ReportList::get_reports()` exposes the entries, and `IReport: Any` allows the downcast. The report
+list is already 1:1 with Java, so the bridge would be 1:1 by construction, and coverage only reads
+`source` off `ReRoll`, so no event reshaping is needed.
+
+**But a naive bridge double-counts.** Six files ALREADY emit `GameEvent::SkillUse` manually, and not
+in 1:1 correspondence with their reports:
+
+| file | manual emits | ReportSkillUse adds |
+|---|---|---|
+| `step_dump_off.rs` | 4 | 1 |
+| `step_horns.rs` | 2 | **0** |
+| `step_juggernaut.rs` | 3 | 2 |
+| `step_wrestle.rs` | 5 | 4 |
+| `step_block_choice.rs` | 4 | 2 |
+| `step_catch_scatter_throw_in.rs` | 1 | 2 |
+
+So the bridge must come WITH a per-site reconciliation: where Rust emits an event but adds no report
+(horns), check Java — if Java adds a `ReportSkillUse` there, the fix is the missing REPORT, not a
+hand-rolled event. That keeps "the report list is 1:1" true and makes the bridge the single source.
+
+**Next concrete step:** reconcile those six files against their Java report sites, then add the
+bridge and delete the manual emits. Verify by event count before/after on one gate — the total must
+rise (107 report sites now evented) with no duplicate for any single skill use.
+
+#### E6 reconciliation — measured, and one of my own hand-checks was wrong
+
+The per-file "emits vs reports" table above is misleading on its own, because a report can be added
+in a BEHAVIOUR while the event is emitted in the STEP. `step_horns.rs` says exactly that:
+
+> "If the modifier set using_horns=true it also wrote the report; emit the GameEvent here."
+
+**That comment is TRUE**, and I briefly recorded the opposite. `horns_behaviour.rs:74` adds
+`ReportSkillUse::new(Some(player_id), SkillId::Horns, true, SkillUse::INCREASE_STRENGTH_BY_1)`, an
+exact match for Java's `HornsBehaviour.java:43`. The greps that made me think otherwise looked in
+`ffb-mechanics` (wrong crate — the behaviour lives in `ffb-engine`) and for a `SkillId::Horns`
+literal near the word "report". The file-level diff below had it right the whole time; the hand
+spot-check was what was wrong. Recorded because the lesson generalises: **when an automated diff and
+a spot-check disagree, re-run the spot-check before trusting it** — and that cuts in the direction
+of the tool as often as against it.
+
+The consequence for E6 is the opposite of what a false comment would have meant: `step_horns.rs`'s
+manual `GameEvent::SkillUse` is a **duplicate-in-waiting**, so the bridge must delete it, not
+compensate for it.
+
+#### The measured gap — there isn't one
+
+First pass said Rust had **107** `ReportSkillUse` sites against Java's **159**, a 52-site hole, and
+listed 8 Java files with no Rust counterpart plus 12 where Rust reported fewer. **That comparison is
+invalid**, and the Wrestle entry is what exposed it: Java's 13 `WrestleBehaviour` sites are three
+per-edition COPIES of the same logic (`bb2016` 3, `bb2020` 5, `bb2025` 5), while Rust serves all
+three editions from one shared `step_wrestle.rs` with 4. The "-9" was Java duplicating itself.
+
+Collapsing Java's per-edition duplication (34 of its 51 classes exist in more than one `bbXXXX`
+package, inflating the count by 74 sites):
+
+| | sites |
+|---|---|
+| Java, raw | 159 |
+| Java, per-edition duplication collapsed | **85** |
+| Rust | **107** |
+
+**Rust reports MORE than Java does logically.** There is no bulk port to do. Whatever residue exists
+is a handful of individual sites, and each needs its own Java read — the file-level list is worthless
+for finding them, since it cannot tell a shared Rust step from a missing one.
+
+So E6's actual content is not "add the missing reports". It is:
+
+1. **The bridge is the whole win.** 107 report sites exist and only a handful of steps ever raise a
+   `GameEvent::SkillUse`; the coverage stream sees almost none of them. One watermark diff in
+   `driver.rs::apply()` evented off `report_list` turns all 107 into coverage.
+2. **Delete the six files' manual emits**, which become duplicates the moment the bridge lands
+   (`step_horns.rs` is the worked example — its report is written in `horns_behaviour.rs:74`).
+3. `GameEvent::ReRoll` has 0 emitters and Rust has 1 `ReportReRoll::new` against Java's 22 — that
+   one IS a genuine gap, and it is where the per-site reading is actually warranted.
+4. Verify on one gate: total SkillUse events must RISE sharply, with no single use counted twice.
+
+**Method note.** Two corrections in two ticks, in opposite directions — a hand spot-check that
+contradicted a correct automated diff (Horns), then an automated diff that was itself measuring the
+wrong thing (per-edition duplication). The rule that would have caught both: before believing any
+Rust-vs-Java COUNT, normalise for the fact that **Java duplicates per edition where Rust shares one
+step** — the same asymmetry behind every dead-twin incident in this backlog.

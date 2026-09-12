@@ -1,0 +1,69 @@
+{
+ "gates": 330,
+ "cells": 110,
+ "green": 330,
+ "failed": 0,
+ "noverdict": 0,
+ "short": 11,
+ "summed_minutes": 812.5,
+ "expected": 330,
+ "complete": true,
+ "red": [],
+ "short_gates": [
+  {
+   "cell": "chaos_chaostroll",
+   "edition": "bb2020",
+   "scale": "1e6"
+  },
+  {
+   "cell": "dwarf",
+   "edition": "bb2025",
+   "scale": "1e6"
+  },
+  {
+   "cell": "halfling",
+   "edition": "bb2016",
+   "scale": "1e6"
+  },
+  {
+   "cell": "khemri",
+   "edition": "bb2025",
+   "scale": "1e6"
+  },
+  {
+   "cell": "khemri_fumbbl",
+   "edition": "bb2020",
+   "scale": "0"
+  },
+  {
+   "cell": "khemri_fumbbl",
+   "edition": "bb2025",
+   "scale": "0"
+  },
+  {
+   "cell": "nurgle",
+   "edition": "bb2020",
+   "scale": "1e6"
+  },
+  {
+   "cell": "orc",
+   "edition": "bb2016",
+   "scale": "1e6"
+  },
+  {
+   "cell": "slann_fumbbl",
+   "edition": "bb2020",
+   "scale": "0"
+  },
+  {
+   "cell": "slann_fumbbl",
+   "edition": "bb2025",
+   "scale": "0"
+  },
+  {
+   "cell": "wood_elf",
+   "edition": "bb2016",
+   "scale": "1e6"
+  }
+ ]
+}

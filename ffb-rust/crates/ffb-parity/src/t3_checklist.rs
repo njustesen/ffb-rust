@@ -97,7 +97,16 @@ fn game_flow_items(cov: &CoverageReport) -> Vec<Item> {
         // Reaching an endzone needs ~10+ squares of directed movement by a ball carrier and the
         // agent moves at random, so this will not close by adding seeds — it needs a scoring-biased
         // agent mirrored in ParityRunner.java. Kept required so the gap stays visible.
-        Item { name: "touchdowns",      count: cov.touchdowns,      required: true, blocked: false, note: "" }.block("BLOCKED on the one-move-per-activation decision: both harnesses move exactly ONE square per activation (measured 1:1, player_moved_events == activations.Move), so a carrier cannot cross the pitch and nothing accumulates the movement a rush needs. See BACKLOG."),
+        // Was BLOCKED on "both harnesses move exactly ONE square per activation". That premise is
+        // measured FALSE: under `--agent heuristic` the mean path length is 4.87 squares in BB2016
+        // and 4.78 in BB2020 (amazon, 3 seeds, `JAVA_PATH len`), and the 2026-09-12 sweep scores
+        // touchdowns on 324 of 330 gates. The note described the RANDOM agent and was stale from
+        // the moment the heuristic campaign landed (BACKLOG D1/E5).
+        //
+        // Un-blocked deliberately: a blocked item is exempt from the required check, so a
+        // regression that stopped touchdowns entirely would have passed silently. The 6 gates that
+        // legitimately score none (all at @1e6) now say so.
+        Item { name: "touchdowns",      count: cov.touchdowns,      required: true, blocked: false, note: "" },
         Item { name: "half starts",     count: cov.half_starts,     required: true, blocked: false, note: "" },
         Item { name: "weather changes", count: cov.weather_changes, required: false, blocked: false, note: "kickoff event roll of 8 only" },
         Item { name: "kickoff events",  count: cov.kickoff_events.values().sum(), required: true, blocked: false, note: "per-result table below" },
@@ -126,7 +135,14 @@ pub fn lineman_items(cov: &CoverageReport) -> Vec<Item> {
         // ── Movement / ball ──────────────────────────────────────────────────
         Item { name: "dodge success",   count: cov.dodge_rolls.success,   required: true, blocked: false, note: "" },
         Item { name: "dodge failure",   count: cov.dodge_rolls.failure,   required: true, blocked: false, note: "" },
-        Item { name: "GFI rolls",       count: cov.go_for_it_rolls.total, required: true, blocked: false, note: "" }.block("BLOCKED on the one-move-per-activation decision: both harnesses move exactly ONE square per activation (measured 1:1, player_moved_events == activations.Move), so a carrier cannot cross the pitch and nothing accumulates the movement a rush needs. See BACKLOG."),
+        // Same stale block as touchdowns above, and it was hiding a real reporting bug: BB2016
+        // read 0 on ALL 87 of its gates while rolling GFI dice the whole time, because
+        // `bb2016/move_/step_go_for_it.rs` added the report but never raised
+        // `GameEvent::GoForItRoll`. Blocked, that zero looked like the known limitation instead of
+        // a missing emit. Fixed in the step; un-blocked here so it cannot hide again.
+        //
+        // ("GFI" is the LRB6/BB2016 name; BB2020+ call the same mechanic Rush.)
+        Item { name: "GFI rolls",       count: cov.go_for_it_rolls.total, required: true, blocked: false, note: "" },
         Item { name: "pickup success",  count: cov.pickup_rolls.success,  required: true, blocked: false, note: "" },
         Item { name: "pickup failure",  count: cov.pickup_rolls.failure,  required: true, blocked: false, note: "turnover + scatter" },
         Item { name: "catch success",   count: cov.catch_rolls.success,   required: true, blocked: false, note: "" },
