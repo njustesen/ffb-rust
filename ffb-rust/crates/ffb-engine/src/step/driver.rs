@@ -649,6 +649,9 @@ pub struct DriverGameState {
     forwarded: Option<Action>,
     pub(crate) pending_prompt: Option<AgentPrompt>,
     rng_step_seq: u32,
+    /// How many entries of `game.report_list` have already been turned into coverage
+    /// `GameEvent`s by `drain_report_events`. See that method for why this exists.
+    reports_evented: usize,
     /// True exactly when the most recently dispatched outcome was
     /// `StepAction::Continue` — i.e. the step is waiting for an external
     /// command (whether or not that wait is surfaced as an `AgentPrompt`).
@@ -680,6 +683,7 @@ impl DriverGameState {
         DriverGameState {
             game, rng: GameRng::new(seed), stack: DriverStepStack::new_with_rules(rules),
             current: None, forwarded: None, pending_prompt: None, rng_step_seq: 0,
+            reports_evented: 0,
             waiting_for_command: false, events: Vec::new(),
             initial_hash: String::new(),
         }
@@ -785,7 +789,95 @@ impl DriverGameState {
 
     pub fn apply(&mut self, _side: TeamSide, action: Action) -> Result<Vec<GameEvent>, String> {
         self.apply_action(action);
-        Ok(self.take_events())
+        let mut evs = self.take_events();
+        // Dedup against what the steps already emitted by hand. ~20 sites still build a
+        // `GameEvent::SkillUse` themselves, from before the bridge existed; where the same path
+        // also writes the report (verified for `step_horns.rs` -> `horns_behaviour.rs:74`) the
+        // bridge would otherwise raise it a second time.
+        //
+        // Deleting those sites is the right end state, but it needs each one read against its Java
+        // line first: some paths may have NO report (Java's `StepMissedPass` reports where Rust may
+        // not), and deleting those would LOSE coverage rather than deduplicate it. Suppressing the
+        // duplicate here is lossless in both directions and leaves that audit as its own unit.
+        for ev in self.drain_report_events() {
+            if !evs.contains(&ev) {
+                evs.push(ev);
+            }
+        }
+        Ok(evs)
+    }
+
+    /// Turn newly-added `ReportSkillUse` / `ReportReRoll` entries into coverage `GameEvent`s.
+    ///
+    /// Java records every skill use and every re-roll as a REPORT, and Rust's report list mirrors
+    /// that closely — 107 `ReportSkillUse::new` sites against Java's 85 logical ones (Java's raw
+    /// 159 is inflated by 34 classes duplicated across its three edition packages, where Rust
+    /// serves all three from one shared step). But almost none of those reports reached the EVENT
+    /// stream: a handful of steps hand-rolled a `GameEvent::SkillUse`, and `GameEvent::ReRoll` had
+    /// **zero** emitters anywhere. So `harvest_coverage` under-reported skill usage by an order of
+    /// magnitude, and re-rolls did not appear at all (BACKLOG E6).
+    ///
+    /// Deriving the events from the reports is the fix rather than adding ~100 emit sites: the
+    /// report list is the thing that is already 1:1 with Java, so one watermark here cannot drift
+    /// out of sync with it the way scattered `.with_event(...)` calls did. The list is append-only
+    /// for the life of a game (nothing calls `report_list.clear()` mid-game), so a monotonic index
+    /// is sufficient and cannot double-count.
+    ///
+    /// This is coverage only — no `GameEvent` is part of the state hash, so nothing here can move a
+    /// parity verdict.
+    fn drain_report_events(&mut self) -> Vec<GameEvent> {
+        use ffb_model::report::report_id::ReportId;
+        use ffb_model::report::report_skill_use::ReportSkillUse;
+        use ffb_model::report::report_re_roll::ReportReRoll;
+
+        let reports = self.game.report_list.get_reports();
+        if reports.len() <= self.reports_evented {
+            // Defensive: if a list ever shrinks, resync rather than index past the end.
+            self.reports_evented = reports.len();
+            return Vec::new();
+        }
+
+        let mut out = Vec::new();
+        for r in &reports[self.reports_evented..] {
+            let any = r.as_ref() as &dyn std::any::Any;
+            match r.get_id() {
+                ReportId::SKILL_USE => {
+                    if let Some(su) = any.downcast_ref::<ReportSkillUse>() {
+                        out.push(GameEvent::SkillUse {
+                            player_id: su.player_id.clone().unwrap_or_default(),
+                            skill_id: su.skill as u16,
+                            used: su.used,
+                        });
+                    }
+                }
+                ReportId::RE_ROLL => {
+                    if let Some(rr) = any.downcast_ref::<ReportReRoll>() {
+                        // `ReportReRoll` carries the player, not the team; resolve the team the
+                        // way the rest of the driver does. `rerolled_action` is not on the report
+                        // in EITHER engine, so it is left empty rather than invented.
+                        let team_id = rr
+                            .player_id
+                            .as_deref()
+                            .map(|pid| {
+                                if self.game.team_home.has_player(pid) {
+                                    self.game.team_home.id.clone()
+                                } else {
+                                    self.game.team_away.id.clone()
+                                }
+                            })
+                            .unwrap_or_default();
+                        out.push(GameEvent::ReRoll {
+                            team_id,
+                            source: rr.re_roll_source.clone(),
+                            rerolled_action: String::new(),
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
+        self.reports_evented = self.game.report_list.size();
+        out
     }
 
     pub fn push_sequence(&mut self, seq: Vec<SequenceStep>) { self.stack.push_sequence(seq); }
