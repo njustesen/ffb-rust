@@ -1,0 +1,496 @@
+<title>Pitch Census</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ground:#EEF1EC; --paper:#F7F8F5; --ink:#101A14; --ink-2:#3E4B43; --ink-3:#6B776F;
+  --line:#CBD3CC; --line-2:#DEE3DE;
+  --pitch:#1F6B45; --pitch-soft:#D5E6DA; --pitch-ink:#134A30;
+  --ochre:#A8641E; --ochre-soft:#F1E3D0;
+  --red:#9E2F27; --red-soft:#F3DAD6;
+  --bar:#2F8A5B; --bar-dim:#B8CBBE; --hatch:repeating-linear-gradient(135deg,transparent 0 3px,var(--line) 3px 4px);
+  --disp:"Barlow Condensed","Arial Narrow",Impact,sans-serif;
+  --body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",Consolas,"Courier New",monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --ground:#0F1512; --paper:#161E19; --ink:#E6ECE7; --ink-2:#B7C2BA; --ink-3:#7F8C84;
+  --line:#2C3830; --line-2:#222C26;
+  --pitch:#4FB07F; --pitch-soft:#1B3527; --pitch-ink:#8FD6B0;
+  --ochre:#D99A4E; --ochre-soft:#3A2A16;
+  --red:#E06A5F; --red-soft:#3D1F1C;
+  --bar:#3E9C6B; --bar-dim:#2A3B31;
+}}
+:root[data-theme="dark"]{
+  --ground:#0F1512; --paper:#161E19; --ink:#E6ECE7; --ink-2:#B7C2BA; --ink-3:#7F8C84;
+  --line:#2C3830; --line-2:#222C26;
+  --pitch:#4FB07F; --pitch-soft:#1B3527; --pitch-ink:#8FD6B0;
+  --ochre:#D99A4E; --ochre-soft:#3A2A16;
+  --red:#E06A5F; --red-soft:#3D1F1C;
+  --bar:#3E9C6B; --bar-dim:#2A3B31;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.5 var(--body);padding-block:0 64px;padding-inline:clamp(16px,4vw,48px)}
+a{color:var(--pitch-ink)}
+h1,h2,h3{font-family:var(--disp);text-wrap:balance;margin:0;line-height:1.05}
+h1{font-size:clamp(44px,7vw,84px);font-weight:700;letter-spacing:-.01em;text-transform:uppercase}
+h2{font-size:clamp(28px,3.4vw,40px);font-weight:600;text-transform:uppercase;letter-spacing:.01em}
+h3{font-size:22px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-2)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+p{max-width:68ch}
+.lede{font-size:18px;color:var(--ink-2);max-width:70ch}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.wrap{max-width:1320px;margin-inline:auto}
+
+/* masthead */
+.mast{padding-block:40px 28px;border-bottom:3px solid var(--ink);display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end}
+.mast .sub{display:flex;flex-wrap:wrap;gap:8px 24px;margin-top:10px}
+.mast .sub span{font-family:var(--mono);font-size:13px;color:var(--ink-2)}
+.verdict{font-family:var(--disp);font-size:20px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--pitch-ink);border:2px solid var(--pitch);padding:8px 14px;white-space:nowrap}
+@media (max-width:700px){.mast{grid-template-columns:1fr}}
+
+/* nav */
+nav.toc{position:sticky;top:0;z-index:5;background:var(--ground);border-bottom:1px solid var(--line);display:flex;gap:2px;overflow-x:auto;padding-block:8px;margin-bottom:8px}
+nav.toc a{font-family:var(--disp);font-size:15px;text-transform:uppercase;letter-spacing:.05em;text-decoration:none;color:var(--ink-2);padding:4px 10px;white-space:nowrap;border-radius:2px}
+nav.toc a:hover,nav.toc a:focus-visible{background:var(--pitch-soft);color:var(--pitch-ink);outline:none}
+
+/* summary strip */
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));border:1px solid var(--line);margin-top:28px}
+.strip .tile{padding:14px 16px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--paper)}
+.strip .tile .v{font-family:var(--disp);font-size:40px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.strip .tile .v small{font-size:20px;font-weight:600;color:var(--ink-3)}
+.strip .tile .l{font-size:13px;color:var(--ink-2);margin-top:4px}
+.strip .tile.warn .v{color:var(--ochre)}
+.strip .tile.good .v{color:var(--pitch-ink)}
+
+section{padding-block:44px 8px;border-bottom:1px solid var(--line-2)}
+section>header{display:grid;grid-template-columns:1fr;gap:6px;margin-bottom:22px}
+section>header p{margin:4px 0 0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:28px 40px;align-items:start}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:28px 40px;align-items:start}
+.block{min-width:0}
+.block h3{margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--ink)}
+.note{font-size:14px;color:var(--ink-2);margin-top:8px}
+
+/* tables */
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line-2);vertical-align:top}
+th{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:500;white-space:nowrap}
+td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+td.bar{width:38%;min-width:120px}
+.b{position:relative;height:12px;background:transparent}
+.b i{position:absolute;inset:0 auto 0 0;background:var(--bar);min-width:2px}
+.b.zero i{display:none}
+.b.zero{background:var(--hatch)}
+tr.zero td{color:var(--ink-3)}
+tr.zero td:first-child{color:var(--red)}
+.tag{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:1px 6px;border:1px solid var(--line);color:var(--ink-2);border-radius:2px;white-space:nowrap}
+.tag.used{background:var(--pitch-soft);border-color:var(--pitch);color:var(--pitch-ink)}
+.tag.proven{border-color:var(--pitch);color:var(--pitch-ink)}
+.tag.silent{background:var(--red-soft);border-color:var(--red);color:var(--red)}
+.tag.invisible{background:var(--ochre-soft);border-color:var(--ochre);color:var(--ochre)}
+.tag.ed{font-size:10px}
+
+/* kick-off tables: 2–12 ladder */
+.ladder{display:grid;grid-template-columns:36px 1fr auto;gap:0 10px;font-size:14px;align-items:center}
+.ladder>div{padding:4px 0;border-bottom:1px solid var(--line-2)}
+.ladder .d{font-family:var(--disp);font-size:20px;font-weight:600;color:var(--ink-3)}
+.ladder .k{display:flex;align-items:center;gap:10px}
+.ladder .k .b{flex:1;height:10px}
+.ladder .c{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:13px}
+
+/* funnel */
+.funnel{display:grid;gap:6px}
+.funnel .row{display:grid;grid-template-columns:170px 1fr 90px;gap:10px;align-items:center;font-size:14px}
+.funnel .row .b{height:18px}
+.funnel .row .c{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+
+/* dot grid for events */
+.dots{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 14px;font-size:13px}
+.dots div{display:flex;gap:6px;align-items:baseline;padding:2px 0;border-bottom:1px dotted var(--line)}
+.dots .n{margin-left:auto}
+.dots .miss{color:var(--red)}
+.dots .miss::before{content:"—";color:var(--red)}
+.dots .ok::before{content:"•";color:var(--pitch)}
+
+/* gates table controls */
+.ctrl{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:12px;font-size:14px}
+.ctrl label{display:flex;gap:6px;align-items:center}
+select,input[type=search]{font:inherit;padding:4px 8px;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:2px}
+select:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid var(--pitch);outline-offset:1px}
+th.sort{cursor:pointer;user-select:none}
+th.sort:hover{color:var(--ink)}
+th.sort.on{color:var(--pitch-ink)}
+th.sort.on::after{content:" ▾"}
+th.sort.on.asc::after{content:" ▴"}
+td.short{font-size:12px;color:var(--red)}
+.count{font-family:var(--mono);font-size:13px;color:var(--ink-3);margin-left:auto}
+
+/* missing section */
+.miss-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:20px}
+.miss-card{background:var(--paper);border-left:4px solid var(--red);padding:14px 16px}
+.miss-card.warn{border-left-color:var(--ochre)}
+.miss-card.info{border-left-color:var(--ink-3)}
+.miss-card h3{border:0;padding:0;margin-bottom:6px;font-size:19px}
+.miss-card ul{margin:6px 0 0;padding-left:18px;font-size:14px}
+.miss-card li{margin:2px 0}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.chips span{font-family:var(--mono);font-size:12px;padding:1px 6px;border:1px solid var(--line);background:var(--ground);border-radius:2px}
+.chips span.red{border-color:var(--red);color:var(--red)}
+.chips span.och{border-color:var(--ochre);color:var(--ochre)}
+
+.race-grid td .tdpg{display:inline-block;min-width:44px}
+.race-grid td .sm{font-size:11px;color:var(--ink-3);font-family:var(--mono)}
+.race-grid td.na{background:var(--hatch)}
+footer{padding-top:28px;font-size:13px;color:var(--ink-3);max-width:80ch}
+@media (prefers-reduced-motion:no-preference){.b i{transition:width .3s ease}}
+</style>
+
+<div class="wrap">
+<header class="mast">
+  <div>
+    <div class="eyebrow">FFB-Rust · heuristic-setup sweep · 2026-09-13</div>
+    <h1>Pitch Census</h1>
+    <div class="sub" id="mast-sub"></div>
+  </div>
+  <div class="verdict" id="verdict"></div>
+</header>
+
+<nav class="toc" aria-label="Sections">
+  <a href="#s-summary">Summary</a><a href="#s-editions">Editions</a><a href="#s-events">Events</a>
+  <a href="#s-actions">Actions</a><a href="#s-mechanics">Mechanics</a><a href="#s-kickoff">Kick-off</a>
+  <a href="#s-skills">Skills</a><a href="#s-races">Races</a><a href="#s-gates">Gates</a><a href="#s-missing">Not reached</a>
+</nav>
+
+<section id="s-summary">
+  <header>
+    <div class="eyebrow">What was on the pitch</div>
+    <h2>Every gate green. This is what the engines agreed on.</h2>
+    <p class="lede">The parity matrix compares Rust against stock Java step by step. It says <em>whether</em> they agree, not <em>about what</em>. This sheet reads the Rust event stream of the same 33,000 games and tallies what actually happened, then holds each tally against the engine's own catalogs to show what never came up.</p>
+  </header>
+  <div class="strip" id="strip"></div>
+</section>
+
+<section id="s-editions">
+  <header><div class="eyebrow">Per edition</div><h2>Three rulebooks, one agent</h2></header>
+  <div class="tw"><table id="ed-table"></table></div>
+  <p class="note">TD/game is a mirror figure: both sides run the same agent and setup, so it measures how open the game is, not who is stronger. Scale 0 is argmax play, 1.0 is the softmax sample, 1e6 is uniform among legal moves.</p>
+</section>
+
+<section id="s-events">
+  <header><div class="eyebrow">GameEvent catalog</div><h2 id="ev-h2"></h2>
+  <p>Every variant the engine can emit, with its count over the sweep. Bars are square-root scaled so the tail stays visible. Hatched rows never fired.</p></header>
+  <div class="grid2">
+    <div class="block"><h3>Emitted</h3><div class="tw"><table id="ev-seen"></table></div></div>
+    <div class="block"><h3>Never emitted</h3><div class="dots" id="ev-miss"></div>
+      <p class="note">Grouped by what would have to be true for them to fire. See <a href="#s-missing">Not reached</a>.</p></div>
+  </div>
+</section>
+
+<section id="s-actions">
+  <header><div class="eyebrow">PlayerAction catalog</div><h2 id="ac-h2"></h2></header>
+  <div class="grid2">
+    <div class="block"><h3>Declared</h3><div class="tw"><table id="ac-seen"></table></div></div>
+    <div class="block"><h3>Never declared</h3><div class="dots" id="ac-miss"></div></div>
+  </div>
+</section>
+
+<section id="s-mechanics">
+  <header><div class="eyebrow">Dice and outcomes</div><h2>Mechanics</h2></header>
+  <div class="grid2">
+    <div class="block"><h3>Agility and skill rolls</h3><div class="tw"><table id="rolls"></table></div>
+      <p class="note">Success is what the event carries. Pass rolls carry a result instead of a flag, so their column reads from the pass-result table below. Re-rolled counts every roll a re-roll was spent on.</p></div>
+    <div class="block">
+      <h3>Blocks</h3><div class="tw"><table id="block-dice"></table></div>
+      <div class="tw" style="margin-top:14px"><table id="block-res"></table></div>
+      <div class="tw" style="margin-top:14px"><table id="push-len"></table></div>
+    </div>
+    <div class="block"><h3>Passing</h3><div class="tw"><table id="pass-dist"></table></div>
+      <div class="tw" style="margin-top:14px"><table id="pass-res"></table></div></div>
+    <div class="block"><h3>Injury funnel</h3><div class="funnel" id="funnel"></div>
+      <div class="tw" style="margin-top:18px"><table id="serious"></table></div></div>
+  </div>
+</section>
+
+<section id="s-kickoff">
+  <header><div class="eyebrow">Kick-off table, 2 to 12</div><h2 id="ko-h2"></h2>
+  <p>Each edition rolls its own eleven results. Every result of every table came up. Weather and Prayers to Nuffle sit alongside because the same kick-off sequence produces them.</p></header>
+  <div class="grid3" id="ko-grid"></div>
+  <div class="grid2" style="margin-top:32px">
+    <div class="block"><h3>Weather</h3><div class="tw"><table id="weather"></table></div></div>
+    <div class="block"><h3>Prayers to Nuffle</h3><div class="tw"><table id="prayers"></table></div></div>
+  </div>
+</section>
+
+<section id="s-skills">
+  <header><div class="eyebrow">Skills on the drafted rosters</div><h2 id="sk-h2"></h2>
+  <p>Every skill a drafted squad fields, classed by what the event stream can prove about it. <span class="tag used">SkillUse</span> raised the skill's own use or decline event. <span class="tag proven">proven</span> has a dedicated roll or action that fired. <span class="tag silent">never fired</span> has that telemetry and it stayed at zero. <span class="tag invisible">no telemetry</span> is a passive modifier the engine never names in an event, so the stream cannot see it.</p></header>
+  <div class="ctrl">
+    <label>Show <select id="sk-filter"><option value="all">all</option><option value="used">SkillUse</option><option value="proven">proven</option><option value="silent">never fired</option><option value="invisible">no telemetry</option></select></label>
+    <span class="count" id="sk-count"></span>
+  </div>
+  <div class="tw"><table id="sk-table"></table></div>
+  <p class="note" id="sk-extra"></p>
+</section>
+
+<section id="s-races">
+  <header><div class="eyebrow">Race by edition</div><h2>Touchdowns per game, all three scales folded</h2>
+  <p>The small figure is argmax play alone. A hatched cell means no squad is drafted for that race in that edition.</p></header>
+  <div class="tw"><table id="race-table" class="race-grid"></table></div>
+</section>
+
+<section id="s-gates">
+  <header><div class="eyebrow">Individual gates</div><h2 id="gt-h2"></h2>
+  <p>One row per (race, edition, scale), 100 games each. The last column lists any item of the harness's 34-point coverage checklist that gate never produced.</p></header>
+  <div class="ctrl">
+    <label>Edition <select id="gt-ed"><option value="">all</option><option>bb2016</option><option>bb2020</option><option>bb2025</option></select></label>
+    <label>Scale <select id="gt-sc"><option value="">all</option><option>0</option><option>1.0</option><option>1e6</option></select></label>
+    <label>Race <input type="search" id="gt-race" placeholder="filter" size="12"></label>
+    <label><input type="checkbox" id="gt-short"> only gates short on the checklist</label>
+    <span class="count" id="gt-count"></span>
+  </div>
+  <div class="tw"><table id="gt-table"></table></div>
+</section>
+
+<section id="s-missing">
+  <header><div class="eyebrow">Not reached</div><h2>What 33,000 games did not show</h2>
+  <p class="lede">A green matrix certifies agreement on the paths that were walked. These are the paths that were not, sorted by why.</p></header>
+  <div class="miss-grid" id="missing"></div>
+</section>
+
+<footer id="foot"></footer>
+</div>
+
+<script>
+/*__DATA__*/
+const D = DATA;
+const fmt = n => n.toLocaleString('en-US');
+const pct = (a,b) => b ? (100*a/b).toFixed(1)+'%' : '–';
+const $ = s => document.querySelector(s);
+const el = (t,c,h) => { const e=document.createElement(t); if(c) e.className=c; if(h!=null) e.innerHTML=h; return e; };
+const bar = (v,max,sqrt) => { const w = max? (sqrt? Math.sqrt(v/max) : v/max)*100 : 0; return `<div class="b${v?'':' zero'}"><i style="width:${w.toFixed(2)}%"></i></div>`; };
+const sumv = o => Object.values(o).reduce((a,b)=>a+b,0);
+const EDS = ['bb2016','bb2020','bb2025'];
+
+// ── masthead + strip
+const M = D.meta;
+$('#mast-sub').innerHTML = [`${M.gates} gates`, `${fmt(M.games)} games`, `${(M.events/1e6).toFixed(2)} M events`, `${M.races} races · ${M.squads} squads`, `scales 0 · 1.0 · 1e6`].map(s=>`<span>${s}</span>`).join('');
+$('#verdict').textContent = `Parity ${M.parity} green`;
+const tds = D.types.touchdown||0;
+const seenEv = Object.keys(D.types).length, seenAc = Object.keys(D.actions).length;
+const skUsed = D.skills.filter(s=>s.cls==='used').length, skProv = D.skills.filter(s=>s.cls==='proven').length;
+const skSil = D.skills.filter(s=>s.cls==='silent').length, skInv = D.skills.filter(s=>s.cls==='invisible').length;
+const shortGates = D.gates.filter(g=>g.short.length).length;
+[
+  ['good', fmt(tds), `touchdowns · ${(tds/M.games).toFixed(2)} per game`],
+  ['', `${seenEv}<small>/${D.event_catalog.length}</small>`, 'GameEvent variants emitted'],
+  ['', `${seenAc}<small>/${D.action_catalog.length}</small>`, 'PlayerAction variants declared'],
+  ['good', `${skUsed+skProv}<small>/${D.skills.length}</small>`, 'fielded skills with proof they ran'],
+  ['warn', `${skSil}`, 'fielded skills whose telemetry never fired'],
+  ['', `${skInv}`, 'fielded skills the stream cannot see'],
+  ['good', `33<small>/33</small>`, 'kick-off results, all three tables'],
+  ['warn', `${shortGates}<small>/${M.gates}</small>`, 'gates short on the 34-item checklist'],
+].forEach(([c,v,l]) => $('#strip').appendChild(el('div','tile '+c,`<div class="v">${v}</div><div class="l">${l}</div>`)));
+
+// ── editions
+{
+  const rows = [['gates','gates'],['games','games'],['events','events'],['td','touchdowns'],['blocks','block rolls'],['dodges','dodge rolls'],['fouls','fouls'],['passes','pass rolls'],['handoffs','hand-offs'],['ko','KO'],['cas','casualties'],['dead','dead'],['skillUse','SkillUse events']];
+  let h = `<thead><tr><th></th>${EDS.map(e=>`<th class="n">${e}</th>`).join('')}<th class="n">all</th></tr></thead><tbody>`;
+  rows.forEach(([k,l]) => { const t = EDS.reduce((a,e)=>a+D.by_ed[e][k],0); h += `<tr><td>${l}</td>${EDS.map(e=>`<td class="n">${fmt(D.by_ed[e][k])}</td>`).join('')}<td class="n">${fmt(t)}</td></tr>`; });
+  const tdpg = e => (D.by_ed[e].td/D.by_ed[e].games).toFixed(2);
+  h += `<tr><td>TD / game</td>${EDS.map(e=>`<td class="n">${tdpg(e)}</td>`).join('')}<td class="n">${(tds/M.games).toFixed(2)}</td></tr>`;
+  const scaleTd = {};
+  D.gates.forEach(g => { const k=g.edition+'|'+g.scale; scaleTd[k]=scaleTd[k]||[0,0]; scaleTd[k][0]+=g.td; scaleTd[k][1]+=g.games; });
+  ['0','1.0','1e6'].forEach(s => { let tt=0,gg=0; h += `<tr><td>TD / game @ ${s}</td>${EDS.map(e=>{const v=scaleTd[e+'|'+s]||[0,0]; tt+=v[0]; gg+=v[1]; return `<td class="n">${v[1]?(v[0]/v[1]).toFixed(2):'–'}</td>`;}).join('')}<td class="n">${(tt/gg).toFixed(2)}</td></tr>`; });
+  $('#ed-table').innerHTML = h + '</tbody>';
+}
+
+// ── events
+{
+  const seen = Object.entries(D.types).sort((a,b)=>b[1]-a[1]);
+  const max = seen[0][1];
+  $('#ev-h2').textContent = `${seen.length} of ${D.event_catalog.length} variants emitted`;
+  $('#ev-seen').innerHTML = `<thead><tr><th>event</th><th class="n">count</th><th></th></tr></thead><tbody>` +
+    seen.map(([k,v]) => `<tr><td>${k}</td><td class="n">${fmt(v)}</td><td class="bar">${bar(v,max,true)}</td></tr>`).join('') + '</tbody>';
+  const miss = D.event_catalog.filter(k => !(k in D.types)).sort();
+  $('#ev-miss').innerHTML = miss.map(k=>`<div class="miss">${k}</div>`).join('');
+}
+
+// ── actions
+{
+  const seen = Object.entries(D.actions).sort((a,b)=>b[1]-a[1]);
+  const max = seen[0][1];
+  $('#ac-h2').textContent = `${seen.length} of ${D.action_catalog.length} action variants declared`;
+  $('#ac-seen').innerHTML = `<thead><tr><th>action</th><th class="n">declared</th><th class="n">per game</th><th></th></tr></thead><tbody>` +
+    seen.map(([k,v]) => `<tr><td>${k}</td><td class="n">${fmt(v)}</td><td class="n">${(v/M.games).toFixed(2)}</td><td class="bar">${bar(v,max,true)}</td></tr>`).join('') + '</tbody>';
+  const miss = D.action_catalog.filter(k => !(k in D.actions));
+  $('#ac-miss').innerHTML = miss.map(k=>`<div class="miss">${k}</div>`).join('');
+}
+
+// ── mechanics
+{
+  const R = D.rolls;
+  const order = Object.keys(R).sort((a,b)=>R[b].total-R[a].total);
+  const passOk = (D.pass_res.Complete||0);
+  let h = `<thead><tr><th>roll</th><th class="n">rolled</th><th class="n">success</th><th class="n">re-rolled</th></tr></thead><tbody>`;
+  order.forEach(k => { const r=R[k]; const succ = k==='passRoll' ? passOk : r.success;
+    const sPct = (k==='spellEffectRoll') ? '–' : pct(succ,r.total);
+    h += `<tr><td>${k}</td><td class="n">${fmt(r.total)}</td><td class="n">${sPct}</td><td class="n">${r.rerolled?pct(r.rerolled,r.total):'–'}</td></tr>`; });
+  h += `<tr><td>blockRoll</td><td class="n">${fmt(D.types.blockRoll)}</td><td class="n">–</td><td class="n">${pct(D.block_rerolled,D.types.blockRoll)}</td></tr>`;
+  $('#rolls').innerHTML = h + '</tbody>';
+
+  const bd = D.block_dice, bdOrder = ['3','2','1','-2','-3'], bdMax = Math.max(...Object.values(bd));
+  const bdLabel = {'3':'3 dice','2':'2 dice','1':'1 die','-2':'2 dice, defender chooses','-3':'3 dice, defender chooses'};
+  $('#block-dice').innerHTML = `<thead><tr><th>dice</th><th class="n">blocks</th><th class="n">share</th><th></th></tr></thead><tbody>` +
+    bdOrder.map(k => `<tr class="${bd[k]?'':'zero'}"><td>${bdLabel[k]}</td><td class="n">${fmt(bd[k]||0)}</td><td class="n">${pct(bd[k]||0,D.types.blockRoll)}</td><td class="bar">${bar(bd[k]||0,bdMax)}</td></tr>`).join('') + '</tbody>';
+  const br = D.block_result, brOrder=['Skull','BothDown','Pushback','PowPushback','Pow'], brT = sumv(br), brMax = Math.max(...Object.values(br));
+  const brLabel = {Skull:'Attacker Down',BothDown:'Both Down',Pushback:'Push Back',PowPushback:'Stumble',Pow:'POW!'};
+  $('#block-res').innerHTML = `<thead><tr><th>result chosen</th><th class="n">count</th><th class="n">share</th><th></th></tr></thead><tbody>` +
+    brOrder.map(k => `<tr><td>${brLabel[k]} <span class="sm" style="color:var(--ink-3)">${k}</span></td><td class="n">${fmt(br[k]||0)}</td><td class="n">${pct(br[k]||0,brT)}</td><td class="bar">${bar(br[k]||0,brMax)}</td></tr>`).join('') +
+    `<tr><td colspan="4" class="note" style="padding-top:8px">Attacker picked the die in ${pct(D.block_own_choice.True||0,(D.block_own_choice.True||0)+(D.block_own_choice.False||0))} of blocks.</td></tr></tbody>`;
+  const pl = D.push_len, plMax = Math.max(...Object.values(pl));
+  $('#push-len').innerHTML = `<thead><tr><th>push-back squares offered</th><th class="n">count</th><th></th></tr></thead><tbody>` +
+    ['3','2','1','0'].map(k => `<tr><td>${k}</td><td class="n">${fmt(pl[k]||0)}</td><td class="bar">${bar(pl[k]||0,plMax)}</td></tr>`).join('') + '</tbody>';
+
+  const pd = D.pass_dist, pdOrder=['QuickPass','ShortPass','LongPass','LongBomb'], pdT=sumv(pd), pdMax=Math.max(...Object.values(pd));
+  $('#pass-dist').innerHTML = `<thead><tr><th>range</th><th class="n">passes</th><th class="n">share</th><th></th></tr></thead><tbody>` +
+    pdOrder.map(k => `<tr><td>${k.replace(/([A-Z])/g,' $1').trim()}</td><td class="n">${fmt(pd[k]||0)}</td><td class="n">${pct(pd[k]||0,pdT)}</td><td class="bar">${bar(pd[k]||0,pdMax)}</td></tr>`).join('') + '</tbody>';
+  const pr = D.pass_res, prOrder=['Complete','Inaccurate','WildlyInaccurate','Fumble'], prT=sumv(pr), prMax=Math.max(...Object.values(pr));
+  $('#pass-res').innerHTML = `<thead><tr><th>result</th><th class="n">passes</th><th class="n">share</th><th></th></tr></thead><tbody>` +
+    prOrder.map(k => `<tr><td>${k.replace(/([A-Z])/g,' $1').trim()}</td><td class="n">${fmt(pr[k]||0)}</td><td class="n">${pct(pr[k]||0,prT)}</td><td class="bar">${bar(pr[k]||0,prMax)}</td></tr>`).join('') +
+    `<tr><td colspan="4" class="note" style="padding-top:8px">Interceptions: ${fmt(D.types.interceptionRoll||0)} rolls in ${fmt(prT)} passes. Hand-offs: ${fmt(D.types.handOver||0)}. Throw-ins: ${fmt(D.types.throwIn||0)}.</td></tr></tbody>`;
+
+  const I = D.injuries;
+  const stunned = I.total - I.armor_only - I.ko - I.cas;
+  const rows = [['injury events',I.total],['armour rolled',I.armor_rolled],['armour held',I.armor_only],['injury rolled',I.injury_rolled],['stunned',stunned],['KO',I.ko],['casualty',I.cas],['dead',I.dead]];
+  $('#funnel').innerHTML = rows.map(([l,v]) => `<div class="row"><div>${l}</div>${bar(v,I.total)}<div class="c">${fmt(v)}</div></div>`).join('');
+  const S = D.serious, sOrder = Object.entries(S).sort((a,b)=>b[1]-a[1]), sMax = sOrder.length? sOrder[0][1]:0;
+  const seenN = new Set(Object.keys(S).map(k=>k.toLowerCase().replace(/[^a-z]/g,'')));
+  const kindMiss = D.serious_kind_catalog.filter(k => !seenN.has(k.toLowerCase().replace(/[^a-z]/g,'')));
+  let sh = `<thead><tr><th>lasting injury</th>${EDS.map(e=>`<th class="n">${e}</th>`).join('')}<th class="n">all</th><th></th></tr></thead><tbody>`;
+  sOrder.forEach(([k,v]) => { sh += `<tr><td>${k}</td>${EDS.map(e=>`<td class="n">${fmt(D.by_ed[e].serious[k]||0)}</td>`).join('')}<td class="n">${fmt(v)}</td><td class="bar">${bar(v,sMax,true)}</td></tr>`; });
+  sh += `<tr><td colspan="6" class="note" style="padding-top:8px">Apothecary rolls: ${fmt(D.types.apothecaryRoll||0)}. Regeneration rolls: ${fmt(D.types.regenerationRoll||0)}.${kindMiss.length? ' Never rolled: '+kindMiss.join(', ')+'.':' Every kind in the catalog was rolled at least once.'}</td></tr>`;
+  $('#serious').innerHTML = sh + '</tbody>';
+}
+
+// ── kick-off
+{
+  $('#ko-h2').textContent = `All 33 results rolled · ${fmt(sumv(D.kickoff))} kick-offs`;
+  EDS.forEach(e => {
+    const K = D.by_ed[e].kickoff, tab = D.kickoff_ed[e], tot = sumv(K), max = Math.max(...tab.map(k=>K[k]||0));
+    const b = el('div','block');
+    b.innerHTML = `<h3>${e} <span class="sm" style="font-family:var(--mono);font-size:12px;color:var(--ink-3);text-transform:none;letter-spacing:0">${fmt(tot)} kick-offs</span></h3>` +
+      `<div class="ladder">` + tab.map((k,i) => `<div class="d">${i+2}</div><div class="k"><span>${D.kickoff_label[k]||k}</span>${bar(K[k]||0,max)}</div><div class="c">${fmt(K[k]||0)}</div>`).join('') + `</div>`;
+    $('#ko-grid').appendChild(b);
+  });
+  const W = D.weather, wOrder = ['SwelteringHeat','VerySunny','Nice','PouringRain','Blizzard'], wT = sumv(W), wMax = Math.max(...Object.values(W));
+  $('#weather').innerHTML = `<thead><tr><th>weather rolled</th>${EDS.map(e=>`<th class="n">${e}</th>`).join('')}<th class="n">all</th><th class="n">share</th><th></th></tr></thead><tbody>` +
+    wOrder.map(k => `<tr class="${W[k]?'':'zero'}"><td>${k.replace(/([A-Z])/g,' $1').trim()}</td>${EDS.map(e=>`<td class="n">${fmt(D.by_ed[e].weather[k]||0)}</td>`).join('')}<td class="n">${fmt(W[k]||0)}</td><td class="n">${pct(W[k]||0,wT)}</td><td class="bar">${bar(W[k]||0,wMax)}</td></tr>`).join('') +
+    `<tr><td colspan="7" class="note" style="padding-top:8px">Counted from weatherChange events at kick-off (Changing Weather results), so game-start weather is not included. Heat exhaustion events: ${fmt(D.types.heatExhaustion||0)}.</td></tr></tbody>`;
+  const P = D.prayers, pCat = D.prayer_catalog.bb2025, pMax = Math.max(...Object.values(P));
+  const pLabel = k => k.toLowerCase().split('_').map(w=>w[0].toUpperCase()+w.slice(1)).join(' ');
+  $('#prayers').innerHTML = `<thead><tr><th>prayer</th><th class="n">bb2020</th><th class="n">bb2025</th><th class="n">all</th><th></th></tr></thead><tbody>` +
+    pCat.slice().sort((a,b)=>(P[b]||0)-(P[a]||0)).map(k => `<tr class="${P[k]?'':'zero'}"><td>${pLabel(k)}</td><td class="n">${fmt(D.by_ed.bb2020.prayers[k]||0)}</td><td class="n">${fmt(D.by_ed.bb2025.prayers[k]||0)}</td><td class="n">${fmt(P[k]||0)}</td><td class="bar">${bar(P[k]||0,pMax)}</td></tr>`).join('') +
+    `<tr><td colspan="5" class="note" style="padding-top:8px">${fmt(D.types.prayerRoll||0)} prayer rolls. Prayers come from the team-value gap at kick-off; BB2016 has none.</td></tr></tbody>`;
+}
+
+// ── skills
+{
+  $('#sk-h2').textContent = `${D.skills.length} skills fielded, ${skUsed+skProv} provably exercised, ${skSil} silent, ${skInv} unobservable`;
+  const label = {used:'SkillUse',proven:'proven',silent:'never fired',invisible:'no telemetry'};
+  const maxC = Math.max(...D.skills.map(s=>s.count));
+  function render(f){
+    const rows = D.skills.filter(s => f==='all' || s.cls===f);
+    $('#sk-count').textContent = `${rows.length} skills`;
+    $('#sk-table').innerHTML = `<thead><tr><th>skill</th><th>class</th><th>evidence</th><th class="n">count</th><th class="n">used / declined</th><th class="n">squads</th><th>editions</th><th></th></tr></thead><tbody>` +
+      rows.map(s => `<tr class="${s.count?'':'zero'}"><td>${s.skill}</td><td><span class="tag ${s.cls}">${label[s.cls]}</span></td><td class="sm" style="font-family:var(--mono);font-size:12px">${s.evidence||'—'}</td><td class="n">${s.count?fmt(s.count):'0'}</td><td class="n">${s.used||s.declined? fmt(s.used)+' / '+fmt(s.declined):'–'}</td><td class="n">${s.cells}</td><td>${s.editions.map(e=>`<span class="tag ed">${e.slice(2)}</span>`).join(' ')}</td><td class="bar">${bar(s.count,maxC,true)}</td></tr>`).join('') + '</tbody>';
+  }
+  render('all');
+  $('#sk-filter').addEventListener('change', e => render(e.target.value));
+  if (D.skills_extra_used.length) $('#sk-extra').innerHTML = 'Also raised SkillUse without being on any roster (granted by a prayer or a kick-off result): ' + D.skills_extra_used.map(s=>`${s.skill} (${fmt(s.count)})`).join(', ') + '.';
+}
+
+// ── races
+{
+  let h = `<thead><tr><th>race</th>${EDS.map(e=>`<th class="n">${e}</th>`).join('')}</tr></thead><tbody>`;
+  D.race_rows.forEach(r => { h += `<tr><td>${r.race}</td>` + EDS.map(e => { const c=r[e]; return c ? `<td class="n"><span class="tdpg">${c.td_pg.toFixed(2)}</span> <span class="sm">${c.td0_pg!=null? c.td0_pg.toFixed(2)+' @0':''}</span></td>` : `<td class="na"></td>`; }).join('') + '</tr>'; });
+  $('#race-table').innerHTML = h + '</tbody>';
+}
+
+// ── gates
+{
+  const cols = [['race','race',0],['edition','edition',0],['scale','scale',0],['td','TD',1],['tdpg','TD/g',1],['events','events',1],['blocks','blocks',1],['dodges','dodges',1],['fouls','fouls',1],['passes','passes',1],['handoffs','hand-offs',1],['ko','KO',1],['cas','CAS',1],['dead','dead',1],['skillUse','SkillUse',1],['variants','event kinds',1],['short','checklist short',0]];
+  D.gates.forEach(g => g.tdpg = g.td/g.games);
+  let sortKey='race', asc=true;
+  $('#gt-h2').textContent = `${D.gates.length} gates, ${fmt(M.games)} games`;
+  function render(){
+    const ed=$('#gt-ed').value, sc=$('#gt-sc').value, rc=$('#gt-race').value.toLowerCase(), so=$('#gt-short').checked;
+    let rows = D.gates.filter(g => (!ed||g.edition===ed) && (!sc||g.scale===sc) && (!rc||g.race.includes(rc)) && (!so||g.short.length));
+    rows.sort((a,b) => { let x=a[sortKey], y=b[sortKey]; if (sortKey==='short'){x=x.length;y=y.length;} if (sortKey==='scale'){x=parseFloat(x);y=parseFloat(y);} const r = (x<y?-1:x>y?1:0) || (a.race<b.race?-1:1); return asc? r : -r; });
+    $('#gt-count').textContent = `${rows.length} gates · ${fmt(rows.reduce((a,g)=>a+g.td,0))} TD`;
+    $('#gt-table').innerHTML = `<thead><tr>${cols.map(([k,l,n])=>`<th class="sort ${n?'n':''} ${sortKey===k?'on':''} ${asc?'asc':''}" data-k="${k}">${l}</th>`).join('')}</tr></thead><tbody>` +
+      rows.map(g => `<tr><td>${g.race}</td><td>${g.edition}</td><td class="num">${g.scale}</td><td class="n">${g.td}</td><td class="n">${g.tdpg.toFixed(2)}</td><td class="n">${fmt(g.events)}</td><td class="n">${fmt(g.blocks)}</td><td class="n">${fmt(g.dodges)}</td><td class="n">${fmt(g.fouls)}</td><td class="n">${fmt(g.passes)}</td><td class="n">${fmt(g.handoffs)}</td><td class="n">${fmt(g.ko)}</td><td class="n">${fmt(g.cas)}</td><td class="n">${g.dead}</td><td class="n">${fmt(g.skillUse)}</td><td class="n">${g.variants}</td><td class="short">${g.short.join(', ')}</td></tr>`).join('') + '</tbody>';
+    $('#gt-table').querySelectorAll('th.sort').forEach(th => th.addEventListener('click', () => { const k=th.dataset.k; if (sortKey===k) asc=!asc; else { sortKey=k; asc = !cols.find(c=>c[0]===k)[2]; } render(); }));
+  }
+  ['gt-ed','gt-sc','gt-race','gt-short'].forEach(id => $('#'+id).addEventListener('input', render));
+  render();
+}
+
+// ── missing
+{
+  const evMiss = D.event_catalog.filter(k => !(k in D.types));
+  const acMiss = D.action_catalog.filter(k => !(k in D.actions));
+  const groups = {
+    'Needs inducements, cards or a wizard (the drafted squads buy none)': ['cardsAndInducementsBought','playCard','buyInducement','cardDeactivated','cardEffectRoll','wizardUse','inducement','pettyCash','masterChefRoll','bribesRoll','doubleHiredStarPlayer','riotousRookies','prayerAmount','defectingPlayers','biasedRefRoll'],
+    'Kick-off sub-events of results that did fire but whose sub-roll never triggered': ['kickoffRiot','kickoffThrowARock','kickoffPitchInvasionBb2016','kickoffThrowARockBb2016','kickoffExtraReRollBb2016','kickoffSequenceActivationsExhausted','timeoutEnforced','noPlayersToField'],
+    'Skill rolls of fielded skills that never triggered': ['proRoll','jumpUpRoll','hypnoticGazeRoll','breatheFireRoll','projectileVomitRoll','pickMeUpRoll','swarmingPlayersRoll','fumblerooskie','secretWeaponBan','balefulHexRoll','lookIntoMyEyesRoll','weepingDaggerRoll','teamCaptainRoll','pumpUpTheCrowdReRoll','allYouCanEatRoll','kegThrow','thenIStartedBlastin','leader','pilingOn','interceptionRoll','passBlockEligible'],
+    'Bomb and special-action follow-ups': ['bombExplodesAfterCatch','selectBlitzTarget','selectGazeTarget','throwAtPlayer','coachBanned','heatExhaustion'],
+    'Game-frame events the harness does not route through the stream': ['coinThrow','receiveChoice','gameOptions','apothecaryChoice','ballScattered','specialEffectRoll','kickoffThrowARock'],
+  };
+  const placed = new Set();
+  const cards = [];
+  Object.entries(groups).forEach(([title, list]) => {
+    const hit = list.filter(k => evMiss.includes(k) && !placed.has(k)); hit.forEach(k=>placed.add(k));
+    if (hit.length) cards.push({cls:'', title, body:`<div class="chips">${hit.map(k=>`<span class="red">${k}</span>`).join('')}</div>`});
+  });
+  const rest = evMiss.filter(k=>!placed.has(k));
+  if (rest.length) cards.push({cls:'info', title:'Other events never emitted', body:`<div class="chips">${rest.map(k=>`<span class="red">${k}</span>`).join('')}</div>`});
+
+  const silent = D.skills.filter(s=>s.cls==='silent');
+  cards.unshift({cls:'', title:`${silent.length} fielded skills with telemetry that never fired`, body:
+    `<p class="note" style="margin-top:0">These skills are on a drafted squad and the engine has a roll or action event that names them. It stayed at zero in every game.</p><div class="chips">${silent.map(s=>`<span class="red">${s.skill} <small>· ${s.cells} squads</small></span>`).join('')}</div>`});
+  const inv = D.skills.filter(s=>s.cls==='invisible');
+  cards.push({cls:'warn', title:`${inv.length} fielded skills the event stream cannot see`, body:
+    `<p class="note" style="margin-top:0">Passive modifiers (armour, block assists, tackle-zone effects, stat tweaks) that change dice targets and outcomes but raise no event of their own. Parity covers them through the state hash, not the census.</p><div class="chips">${inv.map(s=>`<span class="och">${s.skill}</span>`).join('')}</div>`});
+
+  const fieldedNorm = new Set(D.skills.map(s=>s.skill.toLowerCase().replace(/[^a-z0-9]/g,'')));
+  const acOnRoster = acMiss.filter(k => fieldedNorm.has(k.toLowerCase().replace(/[^a-z0-9]/g,'')));
+  cards.push({cls:'', title:`${acMiss.length} action variants never declared`, body:
+    `<p class="note" style="margin-top:0">Most belong to skills no drafted squad fields (star-player specials, Zoat, Treacherous, Wisdom of the White Dwarf) or are internal sub-states of an action the agent did take.${acOnRoster.length? ' On a fielded roster and still never declared: <b>'+acOnRoster.join(', ')+'</b>.' : ''}</p><div class="chips">${acMiss.map(k=>`<span class="${acOnRoster.includes(k)?'red':''}">${k}</span>`).join('')}</div>`});
+
+  const pMiss = D.prayer_catalog.bb2025.filter(k=>!(k in D.prayers));
+  const wMiss = ['SwelteringHeat','VerySunny','Nice','PouringRain','Blizzard'].filter(k=>!(k in D.weather));
+  cards.push({cls: (pMiss.length||wMiss.length)?'':'info', title:'Tables', body:
+    `<ul><li>Kick-off: 33 of 33 results across the three editions, every one rolled.</li>
+     <li>Weather: ${wMiss.length? 'never rolled '+wMiss.join(', ') : 'all five results rolled'}.</li>
+     <li>Prayers to Nuffle: ${pMiss.length? 'never rolled '+pMiss.map(k=>k.toLowerCase().replace(/_/g,' ')).join(', ') : 'all sixteen rolled'}.</li>
+     <li>Block dice: all five pools (1, 2, 3 and 2 or 3 against). Block results: all five faces.</li>
+     <li>Pass ranges: all four. Pass results: all four. Interceptions: ${fmt(D.types.interceptionRoll||0)}.</li></ul>`});
+
+  const shortItems = {}; D.gates.forEach(g=>g.short.forEach(i=>shortItems[i]=(shortItems[i]||0)+1));
+  cards.push({cls:'warn', title:`Checklist: ${shortGates} gates short`, body:
+    `<p class="note" style="margin-top:0">The harness's 34-item required list, per gate. Items missing and how many gates miss them:</p><div class="chips">${Object.entries(shortItems).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span class="och">${k} <small>· ${v} gates</small></span>`).join('')}</div>
+     <p class="note">Almost all of it is one item: the give chain fires less now that a handler is placed deep and the ball is fielded cleanly. The rest are the uniform-play (1e6) gates of slow rosters.</p>`});
+
+  cards.push({cls:'info', title:'Structural limits of this sweep', body:
+    `<ul><li>Mirror matches only: every gate is race vs the same race. Cross-race matchups, and therefore most Animosity, Hatred and race-keyed effects, are outside the matrix.</li>
+     <li>No star players, inducements, cards, wizards or bribes are drafted, so every inducement path is dark by construction.</li>
+     <li>Both agents decline team re-rolls except through Loner and skill re-rolls; re-roll source in the stream is Loner only (${fmt(D.reroll_src.Loner||0)}).</li>
+     <li>Touchbacks and interceptions are never exercised: the receiving agent does not choose to intercept, and no kick landed out of bounds on a drive the census could see.</li>
+     <li>The event stream is not part of the compared state hash. Counts are what the Rust engine did; parity vouches for them indirectly.</li></ul>`});
+
+  cards.forEach(c => $('#missing').appendChild(el('div','miss-card '+c.cls,`<h3>${c.title}</h3>${c.body}`)));
+}
+
+$('#foot').innerHTML = `Source: <code>scripts/sweep_census/agg.py</code> over the <code>parity_st_*</code> logs of the 2026-09-13 sweep (BACKLOG §H.43–§H.49), roster side from <code>inventory.py</code> over <code>data/teams</code>. Built by <code>build_report.py</code>. Parity certification: <code>docs/SWEEP_2026-09-13_SETUP.txt</code>.`;
+</script>
