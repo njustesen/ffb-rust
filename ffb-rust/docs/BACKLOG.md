@@ -7953,3 +7953,99 @@ same unguarded read, and the Rust step is the shared COMMON `StepReferee`, so on
 No matrix seed other than goblin bb2025 @1.0 #67 reaches the path (any that did was red before
 and none was), so the default-behaviour change cannot un-green a gate.
 
+## §H.50 — 2026-09-13: the REPORT stream becomes the coverage record, on both engines
+
+The census of the setup sweep (`docs/setup_census_report.html`) said 52 of 128 `GameEvent` variants
+never fired and 40 fielded skills had no telemetry at all. Almost none of that was a play gap.
+
+**Why the event stream under-reports.** `GameEvent` is a Rust-only side channel. The live stream is
+partly DERIVED from reports — `DriverGameState::drain_report_events` (`driver.rs:828`) converts
+`SKILL_USE` and `RE_ROLL` and nothing else, two `ReportId`s of 164 — and 24 event variants have no
+construction site anywhere in the engine. Interception, hypnotic gaze, breathe fire, piling on, the
+coin toss and the receive choice all RUN, add their `Report`, and event nothing. Another ~8 sites
+live in dead twins (`step/bb2016|bb2020/*`, `step/mixed/step_swarming.rs` shadowed by the bb2025
+glob in `make_step`) or in `step/engine.rs`, which no `mod` declaration compiles.
+
+**So use the reports.** `game.report_list` is the 1:1 port of `getResult().addReport(...)`: 442
+add-sites, and — decisively — it carries the roll modifiers BY NAME. A passive skill (Guard, Mighty
+Blow, Claws, Stunty, Break Tackle, Prehensile Tail, Disturbing Presence, Decay, Dirty Player) raises
+no event in either engine and never will; it appears only as a name in
+`rollModifiers` / `armorModifiers` / `injuryModifiers` / `casualtyModifiers`.
+
+**Infrastructure.** `IReport::to_json` exposes the 183 existing `to_json_value` impls through
+`dyn IReport`; `ffb-parity` writes `seed_N_rust_reports.jsonl`; `ParityRunner --reports` plus the new
+`ReportSink` capture Java's from `ServerCommunication.sendModelSync` (the one call that carries a
+step's `ReportList`; the headless server's two `send` overloads stay no-ops, and the ENGINE is
+untouched); `report_compare.rs` aligns the two and prints `REPORTS: n/n games identical` next to
+`PARITY`, advisory and never folded into the verdict. `scripts/report_diff.py` explains one game's
+difference; `scripts/sweep_census/report_census.py` tallies a sweep.
+
+Normalisation matters as much as the capture: the two harnesses spell ids differently
+(`teamHumanParity25Home14` against `home_14`), Rust writes `{x,y}` where Java writes `[x,y]`, Java
+omits unset optionals and some empty arrays, and Java's modifier collections come out of
+`Collectors.toSet()` — so their ORDER is a HashSet artefact and the comparison sorts them.
+
+**Rust report-fidelity fixes (16).** Each 1:1 with Java, each report-only — none touches dice or
+state, which is why `PARITY` is unchanged. `ReportPlayerAction` (216 of Java's ~480 reports per game
+were missing, and it belongs in the `UtilServerGame` wrapper, not in `UtilActingPlayer`, or a
+`swoop` report appears that Java never writes); `ReportTurnEnd` on every turn end with the recovery
+roll and kegs and the real touchdown scorer; `ReportReRoll` for team re-rolls (Java's source
+precedence: one-drive source, else Leader, else the team re-roll) and for skill re-rolls, with the
+duplicate `use_reroll` in `StepMoveDodge` removed; `ReportRegenerationRoll`, `ReportSecretWeaponBan`,
+`ReportQuickSnapRoll`, the bb2025 Changing-Weather `ReportWeather`, `ReportKickoffDodgySnack` plus
+`ReportDodgySnackRoll`, `ReportKickoffPitchInvasion`, the three one-drive re-roll-lost reports, and
+`ReportStartHalf` for the second half (it now lives inside `StateMechanic::start_half`, where Java
+has it). `ReportInjury` carries Java's names: `injuryType` is `InjuryType.getName()` ("block"), the
+modifier lists carry modifier NAMES (they were the `Debug` of the whole `Modifier` struct), serious
+injuries carry the edition display name. The BB2016/BB2020 `StateMechanic` gets its own
+`reportInjury` skip rules — the trait default was bb2025's, so every bb2020 injury was reported
+twice with the wrong `skipInjuryParts`. Modifier NAMES now reach `ReportCatchRoll`,
+`ReportRightStuffRoll`, `ReportPassRoll` (which reported one synthetic `pass_mods` entry),
+`ReportInterceptionRoll` and `ReportThrowTeamMateRoll`, and Stunty plus Thick Skull reach the injury
+context (`skill_to_injury_modifier_untagged` returned `None` for the ENTIRE defender pass, so no
+defender-registered modifier was ever recorded; both are value 0, so nothing numeric moved).
+`PassingDistance` / `PassResult` are spelled as Java spells them; `ReportSkillUse` serialises the
+skill's display name; the bb2025 pickup report carries `secureTheBallUsed`; the single-block
+`ReportBlockRoll` drops a defender id Java's two-argument constructor never sets and is re-written
+on the re-show path; the Blitz!/Charge roll report had its two ints swapped.
+
+**Measured.** A game has ~480 reports. lineman / human / undead bb2025 and goblin bb2020 went from
+122–407 one-sided reports and 44–84 payload differences per game to 0–4 and 1–13. Verification:
+12 matchups x 25 seeds across all three editions, **PARITY 25/25 on every one**; ffb-engine 7499/0,
+ffb-model 2808/0, ffb-mechanics 1169/0, ffb-parity 61/0.
+
+**Coverage gained.** Over a 300-game sample: 70 of 164 report kinds, 34 distinct modifier names
+(Mighty Blow 602, Stunty 522, offensive/defensive assists = Guard, Claws, Dirty Player, Prehensile
+Tail, Break Tackle, Disturbing Presence, Decay, Chainsaw, tackle zones, weather), 8 `SkillUse`
+reasons, 7 re-roll sources, 12 injury types. Ten skills the event stream cannot see are visible in
+the report stream; the census page grew a **Reports** section built by `report_census.py`.
+
+## §H.51 — open, found by the report diff
+
+1. **MVP is awarded differently in the two engines.** `UtilServerStartGame:224` sets
+   `MVP_NOMINATIONS = 6` for the headless game; Rust's option is unset (0), so `StepMvp` takes
+   Java's `else` branch and ROLLS a random MVP per team — two `randomPlayerId` dice Java never
+   throws — where Java nominates through a player-choice dialog `ParityRunner` answers with the
+   first eligible player. The state hash cannot see it (last step of the game; MVP only moves SPP),
+   and the two engines name different MVPs in EVERY game. Setting the option alone is not the fix
+   and was reverted: Rust's dialog branch returns `StepOutcome::cont()` with NO prompt, so the game
+   ends three reports early (`mostValuablePlayers`, `winnings`, `dedicatedFans`) — verified, parity
+   stays 10/10 on three matchups and the payload differences drop to zero, but the tail is lost.
+   The complete fix is the option PLUS a player-choice prompt from `StepMvp` answered with the first
+   eligible player. The commented-out entry and this reasoning sit in `BASELINE_SETUP_OPTIONS`.
+2. **A foul is declared as `FOUL_MOVE` by Java's harness and `FOUL` by Rust's** (same
+   `getType()`, same behaviour, different `playerAction` report). Same for `HAND_OVER_MOVE`.
+   Harmless today; it is the last systematic `playerAction` difference.
+3. **Prayer grants report no `playerEvent`** ("gains Loner (2+)"): Java's
+   `RandomSelectionPrayerHandler` adds one per affected player, Rust's does not. Also
+   `ReportPrayerWasted` when the selection is empty, and `prayerEnd` carries the enum name where
+   Java carries the display name.
+4. **`ReportPassDeviate` is never added** by the bb2020/bb2025 missed-pass step (the bb2016 twin
+   has it); `StepGettingEven`'s report carries an empty `keyword`; `stallerDetected` is written at a
+   slightly different point in the step than Java's; a few serious injuries have no Java display
+   name and fall through to the Rust variant name (`BrokenShoulder`).
+5. **Agent play gaps** (deferred, out of scope for §H.50): Diving Tackle, Shadowing and Tentacles
+   are `PlayerChoice` prompts both harnesses decline, so those mechanics never fire; `Stab`,
+   `Swoop`, `BreatheFire` and `ProjectileVomit` are never offered by `legal_actions`; Hypnotic Gaze
+   and Secure the Ball are offered and then deselected; the `SkillUse` prompt pins Dump-Off, Primal
+   Savagery, Safe Pair of Hands, Swoop and Trickster to decline on both sides.

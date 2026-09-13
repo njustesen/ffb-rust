@@ -87,6 +87,7 @@ tr.zero td:first-child{color:var(--red)}
 .tag{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:1px 6px;border:1px solid var(--line);color:var(--ink-2);border-radius:2px;white-space:nowrap}
 .tag.used{background:var(--pitch-soft);border-color:var(--pitch);color:var(--pitch-ink)}
 .tag.proven{border-color:var(--pitch);color:var(--pitch-ink)}
+.tag.modifier{border-color:var(--ochre);color:var(--ochre);background:var(--ochre-soft)}
 .tag.silent{background:var(--red-soft);border-color:var(--red);color:var(--red)}
 .tag.invisible{background:var(--ochre-soft);border-color:var(--ochre);color:var(--ochre)}
 .tag.ed{font-size:10px}
@@ -159,7 +160,7 @@ footer{padding-top:28px;font-size:13px;color:var(--ink-3);max-width:80ch}
 <nav class="toc" aria-label="Sections">
   <a href="#s-summary">Summary</a><a href="#s-editions">Editions</a><a href="#s-events">Events</a>
   <a href="#s-actions">Actions</a><a href="#s-mechanics">Mechanics</a><a href="#s-kickoff">Kick-off</a>
-  <a href="#s-skills">Skills</a><a href="#s-races">Races</a><a href="#s-gates">Gates</a><a href="#s-missing">Not reached</a>
+  <a href="#s-reports">Reports</a><a href="#s-skills">Skills</a><a href="#s-races">Races</a><a href="#s-gates">Gates</a><a href="#s-missing">Not reached</a>
 </nav>
 
 <section id="s-summary">
@@ -167,6 +168,7 @@ footer{padding-top:28px;font-size:13px;color:var(--ink-3);max-width:80ch}
     <div class="eyebrow">What was on the pitch</div>
     <h2>Every gate green. This is what the engines agreed on.</h2>
     <p class="lede">The parity matrix compares Rust against stock Java step by step. It says <em>whether</em> they agree, not <em>about what</em>. This sheet reads the Rust event stream of the same 33,000 games and tallies what actually happened, then holds each tally against the engine's own catalogs to show what never came up.</p>
+    <p class="lede">The event stream is not the whole record. Both engines also keep the report list the game client renders, and that one carries the roll modifiers by name. A separate sample of 300 games captures it from both sides and compares them report by report — see <a href="#s-reports">Reports</a>.</p>
   </header>
   <div class="strip" id="strip"></div>
 </section>
@@ -222,11 +224,28 @@ footer{padding-top:28px;font-size:13px;color:var(--ink-3);max-width:80ch}
   </div>
 </section>
 
+<section id="s-reports">
+  <header><div class="eyebrow">The other stream</div><h2 id="rp-h2"></h2>
+  <p class="lede">Both engines keep a second, richer record: the <em>report</em> list the Java client renders. It is the 1:1 port, and unlike the event stream it carries the roll modifiers by name. That list is the only place a passive skill shows up at all.</p>
+  <p>Captured from the Rust engine's report list and, on the Java side, from the one call that hands a step's reports on. The two streams are compared game by game next to the parity verdict.</p></header>
+  <div class="strip" id="rp-strip"></div>
+  <div class="grid2" style="margin-top:28px">
+    <div class="block"><h3>Modifiers named in a report</h3>
+      <p class="note" style="margin-top:0">Armour, injury, casualty and agility-roll modifiers. Every name here is a skill, an assist, a tackle zone or the weather doing something the event stream never mentions.</p>
+      <div class="tw"><table id="rp-mods"></table></div></div>
+    <div class="block"><h3>Skill use, re-rolls, injury types</h3><div class="tw"><table id="rp-misc"></table></div></div>
+  </div>
+  <div class="grid2" style="margin-top:28px">
+    <div class="block"><h3>Reports produced</h3><div class="tw"><table id="rp-ids"></table></div></div>
+    <div class="block"><h3>Never produced</h3><div class="dots" id="rp-miss"></div></div>
+  </div>
+</section>
+
 <section id="s-skills">
   <header><div class="eyebrow">Skills on the drafted rosters</div><h2 id="sk-h2"></h2>
-  <p>Every skill a drafted squad fields, classed by what the event stream can prove about it. <span class="tag used">SkillUse</span> raised the skill's own use or decline event. <span class="tag proven">proven</span> has a dedicated roll or action that fired. <span class="tag silent">never fired</span> has that telemetry and it stayed at zero. <span class="tag invisible">no telemetry</span> is a passive modifier the engine never names in an event, so the stream cannot see it.</p></header>
+  <p>Every skill a drafted squad fields, classed by what the event stream can prove about it. <span class="tag used">SkillUse</span> raised the skill's own use or decline event. <span class="tag proven">proven</span> has a dedicated roll or action that fired. <span class="tag modifier">modifier</span> is named in a report's modifier list, which is how a passive skill becomes visible. <span class="tag silent">never fired</span> has that telemetry and it stayed at zero. <span class="tag invisible">no telemetry</span> is a passive modifier the engine never names in an event, so the stream cannot see it.</p></header>
   <div class="ctrl">
-    <label>Show <select id="sk-filter"><option value="all">all</option><option value="used">SkillUse</option><option value="proven">proven</option><option value="silent">never fired</option><option value="invisible">no telemetry</option></select></label>
+    <label>Show <select id="sk-filter"><option value="all">all</option><option value="used">SkillUse</option><option value="proven">proven</option><option value="modifier">modifier</option><option value="silent">never fired</option><option value="invisible">no telemetry</option></select></label>
     <span class="count" id="sk-count"></span>
   </div>
   <div class="tw"><table id="sk-table"></table></div>
@@ -279,15 +298,16 @@ $('#verdict').textContent = `Parity ${M.parity} green`;
 const tds = D.types.touchdown||0;
 const seenEv = Object.keys(D.types).length, seenAc = Object.keys(D.actions).length;
 const skUsed = D.skills.filter(s=>s.cls==='used').length, skProv = D.skills.filter(s=>s.cls==='proven').length;
+const skMod = D.skills.filter(s=>s.cls==='modifier').length;
 const skSil = D.skills.filter(s=>s.cls==='silent').length, skInv = D.skills.filter(s=>s.cls==='invisible').length;
 const shortGates = D.gates.filter(g=>g.short.length).length;
 [
   ['good', fmt(tds), `touchdowns · ${(tds/M.games).toFixed(2)} per game`],
   ['', `${seenEv}<small>/${D.event_catalog.length}</small>`, 'GameEvent variants emitted'],
   ['', `${seenAc}<small>/${D.action_catalog.length}</small>`, 'PlayerAction variants declared'],
-  ['good', `${skUsed+skProv}<small>/${D.skills.length}</small>`, 'fielded skills with proof they ran'],
+  ['good', `${skUsed+skProv+skMod}<small>/${D.skills.length}</small>`, 'fielded skills with proof they ran'],
   ['warn', `${skSil}`, 'fielded skills whose telemetry never fired'],
-  ['', `${skInv}`, 'fielded skills the stream cannot see'],
+  ['', `${skInv}`, 'fielded skills no stream can see'],
   ['good', `33<small>/33</small>`, 'kick-off results, all three tables'],
   ['warn', `${shortGates}<small>/${M.gates}</small>`, 'gates short on the 34-item checklist'],
 ].forEach(([c,v,l]) => $('#strip').appendChild(el('div','tile '+c,`<div class="v">${v}</div><div class="l">${l}</div>`)));
@@ -397,7 +417,7 @@ const shortGates = D.gates.filter(g=>g.short.length).length;
 // ── skills
 {
   $('#sk-h2').textContent = `${D.skills.length} skills fielded, ${skUsed+skProv} provably exercised, ${skSil} silent, ${skInv} unobservable`;
-  const label = {used:'SkillUse',proven:'proven',silent:'never fired',invisible:'no telemetry'};
+  const label = {used:'SkillUse',proven:'proven',modifier:'modifier',silent:'never fired',invisible:'no telemetry'};
   const maxC = Math.max(...D.skills.map(s=>s.count));
   function render(f){
     const rows = D.skills.filter(s => f==='all' || s.cls===f);
@@ -408,6 +428,45 @@ const shortGates = D.gates.filter(g=>g.short.length).length;
   render('all');
   $('#sk-filter').addEventListener('change', e => render(e.target.value));
   if (D.skills_extra_used.length) $('#sk-extra').innerHTML = 'Also raised SkillUse without being on any roster (granted by a prayer or a kick-off result): ' + D.skills_extra_used.map(s=>`${s.skill} (${fmt(s.count)})`).join(', ') + '.';
+}
+
+// ── reports
+if (D.reports) {
+  const R = D.reports;
+  const ids = Object.entries(R.ids).sort((a,b)=>b[1]-a[1]);
+  const maxId = ids[0][1];
+  $('#rp-h2').textContent = `${ids.length} of ${R.catalog.length} report kinds, ${fmt(R.reports)} reports over ${fmt(R.games)} games`;
+  const modTotal = Object.values(R.modifiers).reduce((a,g)=>a+Object.keys(g).length,0);
+  [
+    ['', fmt(R.reports), `reports captured, ${Math.round(R.reports/R.games)} per game`],
+    ['good', `${ids.length}<small>/${R.catalog.length}</small>`, 'report kinds produced'],
+    ['good', `${modTotal}`, 'distinct modifier names seen'],
+    ['', `${Object.keys(R.skill_use_reasons).length}`, 'skill-use reasons'],
+    ['', `${Object.keys(R.reroll_sources).length}`, 're-roll sources'],
+    ['', `${Object.keys(R.injury_types).length}`, 'injury types'],
+  ].forEach(([c,v,l]) => $('#rp-strip').appendChild(el('div','tile '+c,`<div class="v">${v}</div><div class="l">${l}</div>`)));
+
+  const groups = {armorModifiers:'armour roll', injuryModifiers:'injury roll', casualtyModifiers:'casualty roll', rollModifiers:'agility rolls'};
+  let mh = `<thead><tr><th>modifier</th><th>applies to</th><th class="n">times</th><th></th></tr></thead><tbody>`;
+  const rowsM = [];
+  Object.entries(groups).forEach(([k,lab]) => Object.entries(R.modifiers[k]||{}).forEach(([n,v]) => rowsM.push([n,lab,v])));
+  rowsM.sort((a,b)=>b[2]-a[2]);
+  const maxM = rowsM.length ? rowsM[0][2] : 0;
+  mh += rowsM.map(([n,lab,v]) => `<tr><td>${n}</td><td class="sm" style="color:var(--ink-3)">${lab}</td><td class="n">${fmt(v)}</td><td class="bar">${bar(v,maxM,true)}</td></tr>`).join('');
+  $('#rp-mods').innerHTML = mh + '</tbody>';
+
+  const misc = [];
+  Object.entries(R.skill_use_skills).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>misc.push(['skill used',k,v]));
+  Object.entries(R.skill_declined).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>misc.push(['skill declined',k,v]));
+  Object.entries(R.reroll_sources).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>misc.push(['re-roll source',k,v]));
+  Object.entries(R.injury_types).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>misc.push(['injury type',k,v]));
+  const maxMi = Math.max(...misc.map(r=>r[2]));
+  $('#rp-misc').innerHTML = `<thead><tr><th>kind</th><th>name</th><th class="n">times</th><th></th></tr></thead><tbody>` +
+    misc.map(([g,n,v]) => `<tr><td class="sm" style="color:var(--ink-3)">${g}</td><td>${n}</td><td class="n">${fmt(v)}</td><td class="bar">${bar(v,maxMi,true)}</td></tr>`).join('') + '</tbody>';
+
+  $('#rp-ids').innerHTML = `<thead><tr><th>report</th><th class="n">count</th><th class="n">games</th><th></th></tr></thead><tbody>` +
+    ids.map(([k,v]) => `<tr><td>${k}</td><td class="n">${fmt(v)}</td><td class="n">${R.id_games[k]||0}</td><td class="bar">${bar(v,maxId,true)}</td></tr>`).join('') + '</tbody>';
+  $('#rp-miss').innerHTML = R.never_produced.map(k=>`<div class="miss">${k}</div>`).join('');
 }
 
 // ── races
@@ -460,8 +519,11 @@ const shortGates = D.gates.filter(g=>g.short.length).length;
   cards.unshift({cls:'', title:`${silent.length} fielded skills with telemetry that never fired`, body:
     `<p class="note" style="margin-top:0">These skills are on a drafted squad and the engine has a roll or action event that names them. It stayed at zero in every game.</p><div class="chips">${silent.map(s=>`<span class="red">${s.skill} <small>· ${s.cells} squads</small></span>`).join('')}</div>`});
   const inv = D.skills.filter(s=>s.cls==='invisible');
-  cards.push({cls:'warn', title:`${inv.length} fielded skills the event stream cannot see`, body:
-    `<p class="note" style="margin-top:0">Passive modifiers (armour, block assists, tackle-zone effects, stat tweaks) that change dice targets and outcomes but raise no event of their own. Parity covers them through the state hash, not the census.</p><div class="chips">${inv.map(s=>`<span class="och">${s.skill}</span>`).join('')}</div>`});
+  const viaMod = D.skills.filter(s=>s.cls==='modifier');
+  if (viaMod.length) cards.unshift({cls:'', title:`${viaMod.length} passive skills the REPORT stream does see`, body:
+    `<p class="note" style="margin-top:0">No event of their own, but the report list names them in its modifier lists, so the census can count them after all.</p><div class="chips">${viaMod.map(s=>`<span>${s.skill} <small>· ${fmt(s.count)}</small></span>`).join('')}</div>`});
+  cards.push({cls:'warn', title:`${inv.length} fielded skills neither stream can see`, body:
+    `<p class="note" style="margin-top:0">Passive modifiers (armour, block assists, tackle-zone effects, stat tweaks) that change dice targets and outcomes but raise neither an event nor a named report modifier. Parity covers them through the state hash, not the census.</p><div class="chips">${inv.map(s=>`<span class="och">${s.skill}</span>`).join('')}</div>`});
 
   const fieldedNorm = new Set(D.skills.map(s=>s.skill.toLowerCase().replace(/[^a-z0-9]/g,'')));
   const acOnRoster = acMiss.filter(k => fieldedNorm.has(k.toLowerCase().replace(/[^a-z0-9]/g,'')));

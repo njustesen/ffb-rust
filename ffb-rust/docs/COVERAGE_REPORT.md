@@ -10,6 +10,47 @@ outcome tallies are trustworthy as *shared* coverage. Caveat: the event **stream
 is not part of the compared state hash, so treat the catalog as "what the engine did,"
 verified indirectly by parity rather than event-by-event against Java.
 
+## Two streams, and which one to trust
+
+The engine keeps **two** records of a game, and they are not equally complete.
+
+| | `GameEvent` | `Report` |
+|---|---|---|
+| what it is | a Rust-only side channel | the 1:1 port of Java's `getResult().addReport(...)` |
+| how many kinds | 128 variants, 24 with no construction site at all | 164 `ReportId`s, 129 constructed |
+| carries roll modifiers | no | **yes, by name** |
+| exists in Java | no | yes — it is what the client renders |
+
+The modifier names are the reason this matters. A passive skill (Guard, Mighty Blow, Claws, Stunty,
+Break Tackle, Prehensile Tail, Disturbing Presence, Decay, Dirty Player) raises no event in either
+engine and never will. It appears only inside `rollModifiers` / `armorModifiers` /
+`injuryModifiers` / `casualtyModifiers` on a report. Census the events and those skills look dark;
+census the reports and they are all there. See BACKLOG §H.50.
+
+### Capturing the report stream
+
+Both engines write it, and the harness compares them:
+
+```bash
+# Rust writes parity/<edition>/<h>_vs_<a>/seed_N_rust_reports.jsonl automatically;
+# the Java twin comes from ParityRunner --reports, which ffb-parity passes for you.
+FFB_PARITY_ROOT=parity_rc ./target/release/ffb-parity.exe   --home human --away human --edition bb2025 --tier 3 --seeds 1-25 --no-abort   --agent heuristic --heur-scale 1.0 --heur-classes all
+# prints, next to PARITY:   REPORTS: n/n games identical, m differ, k skipped
+
+# explain one game's difference (aligns the two streams, normalises ids/coords/modifier order)
+python scripts/report_diff.py <...>_java_reports.jsonl <...>_rust_reports.jsonl [--full]
+
+# tally a sweep: reportIds, modifier names, SkillUse reasons, re-roll sources, injury types
+python scripts/sweep_census/report_census.py "parity_rc" docs/report_census.json
+```
+
+`report_census.json` is what the census page's **Reports** section is built from
+(`scripts/sweep_census/build_report.py`), and it is also what re-classes a fielded skill from
+"no telemetry" to "visible as a modifier".
+
+The report comparison is **advisory**: it prints next to the parity verdict and never changes it.
+A difference there is a Rust fidelity gap in the report layer, not a divergence of the game.
+
 ## Where the data lives
 
 Each parity run writes one events log per seed:

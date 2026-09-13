@@ -361,9 +361,42 @@ data = {
     'gates': gate_rows, 'race_rows': race_rows, 'required': REQUIRED,
 }
 
+# ── the REPORT census (report_census.py), when one has been built ────────────
+REPORT_CENSUS = REPO / 'docs' / 'report_census.json'
+if REPORT_CENSUS.exists():
+    rc = json.load(open(REPORT_CENSUS, encoding='utf-8'))
+    data['reports'] = rc
+
+    # Re-class the skills the EVENT stream cannot see: a skill whose name appears in a report's
+    # modifier list IS observable, just not as an event. Modifier names carry a count prefix
+    # ("2 Tacklezones", "1 Prehensile Tail") and sometimes a qualifier ("Break Tackle ST 5+").
+    def mod_key(name):
+        t = re.sub(r'^\d+\s+', '', name)
+        t = norm(t)
+        return t[:-1] if t.endswith('s') else t
+
+    seen_mods = {}
+    for group, counts in rc['modifiers'].items():
+        for name, n in counts.items():
+            k = mod_key(name)
+            seen_mods.setdefault(k, [0, name])
+            seen_mods[k][0] += n
+    for row in data['skills']:
+        if row['cls'] not in ('invisible', 'silent'):
+            continue
+        k = mod_key(row['skill'])
+        hit = seen_mods.get(k)
+        if hit is None:
+            hit = next((v for kk, v in seen_mods.items() if kk.startswith(k) and len(k) > 4), None)
+        if hit:
+            row['cls'] = 'modifier'
+            row['evidence'] = 'modifier "%s"' % hit[1]
+            row['count'] = hit[0]
+    data['skills'].sort(key=lambda r: (-r['count'], -r['cells'], r['skill']))
+
 TEMPLATE = (HERE / 'report_template.html').read_text(encoding='utf-8')
 html = TEMPLATE.replace('/*__DATA__*/', 'const DATA = ' + json.dumps(data, separators=(',', ':')) + ';')
 OUT.write_text(html, encoding='utf-8', newline='\n')
-print('wrote', OUT, len(html) // 1024, 'KB;', 'skills fielded', len(skill_rows),
-      Counter(r['cls'] for r in skill_rows))
+print('wrote', OUT, len(html) // 1024, 'KB;', 'skills fielded', len(data['skills']),
+      Counter(r['cls'] for r in data['skills']))
 print('events seen %d/%d, actions %d/%d' % (len(T), len(EVENTS), len(A), len(ACTIONS)))

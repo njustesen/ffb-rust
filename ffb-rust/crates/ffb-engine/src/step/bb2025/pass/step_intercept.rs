@@ -163,6 +163,9 @@ impl StepIntercept {
 
         let roll = rng.d6();
 
+        // Java's `ReportInterceptionRoll` carries the modifier collection; the names
+        // ("1 Disturbing Presence", "Accurate Pass") are how those effects show up in the census.
+        let mut intercept_modifier_names: Vec<String> = Vec::new();
         let (minimum_roll, easy_intercept) = if easy_intercept {
             // Java: minimumRoll = 2, no modifiers applied
             (2, true)
@@ -193,6 +196,7 @@ impl StepIntercept {
             // globs `bb2025::pass::*`), so using the BB2020 formula made BB2016 interceptions
             // succeed on rolls Java fails: lizardman bb2016 seed 6 i=18, an AG3 interceptor rolled
             // a 2 and Rust caught the ball while Java let the pass through and scattered it.
+            intercept_modifier_names = all.iter().map(|m| m.get_name().to_string()).collect();
             let min = if game.rules == ffb_model::enums::Rules::Bb2016 {
                 InterceptionModifierFactory::minimum_roll_bb2016(interceptor, &all)
             } else {
@@ -238,7 +242,7 @@ impl StepIntercept {
             roll,
             minimum_roll,
             re_rolled,
-            vec![],
+            intercept_modifier_names,
             is_bomb,
             easy_intercept,
         ));

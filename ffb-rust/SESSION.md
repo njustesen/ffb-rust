@@ -1,5 +1,22 @@
 # FFB-Rust Session State
 
+## 2026-09-13 (later) — the REPORT stream is now the coverage record, on both engines
+
+The census said 52 of 128 `GameEvent` variants never fired and 40 fielded skills had no telemetry.
+Almost none of that was a play gap: `GameEvent` is a Rust-only side channel, partly derived from
+reports by a bridge that converts 2 ReportIds of 164, with 24 variants that have no construction
+site at all. `game.report_list` is the 1:1 port of Java's `addReport` and carries the roll modifiers
+BY NAME — the only place a passive skill (Guard, Mighty Blow, Stunty, Claws, Break Tackle) is
+visible in either engine.
+
+Both engines now write that stream per game (`seed_N_{rust,java}_reports.jsonl`; Java's is captured
+in the HARNESS from `sendModelSync`, the engine untouched), `ffb-parity` compares them and prints
+`REPORTS: n/n games identical` beside `PARITY`, and 16 Rust report-fidelity gaps are fixed 1:1 —
+from `ReportPlayerAction` (216 of ~480 reports per game were missing) to the modifier NAME lists on
+catch/pass/interception/Right Stuff/injury. A game's one-sided reports went from 122–407 to 0–4.
+Verification 12 matchups x 25 seeds, all three editions: PARITY 25/25 on every one. BACKLOG §H.50;
+open items (MVP awarded differently, foulMove vs foul, prayer playerEvents) in §H.51.
+
 ## 2026-09-13 — setup heuristic: BB2016 kicker die fixed, A/B +27% TD, full sweep re-running
 
 Sweep 1 on the new setup exposed `bb2016/StepKickoffScatterRoll.findKickingPlayer()`'s random-player

@@ -287,14 +287,30 @@ impl StepPass {
                 .find_passing_distance(game, thrower_coord, game.pass_coordinate, false);
 
         // Java: PassModifierFactory.findModifiers(new PassContext(game, thrower, passingDistance, false))
+        //
+        // The arithmetic only needs the SUM, but the report needs the NAMES: Java's `ReportPassRoll`
+        // carries the modifier collection, and those names ("1 Tacklezone", "Disturbing Presence",
+        // "Accurate", "Cannoneer") are how a passing skill shows up in the census at all. Rust
+        // reported one synthetic "pass_mods" entry carrying the total (H.50).
+        let mut pass_modifier_names: Vec<String> = Vec::new();
         let pass_modifier_total: i32 = {
             if let (Some(thrower), Some(dist)) = (game.thrower(), passing_dist) {
                 let factory = PassModifierFactory::for_rules(game.rules);
                 let ctx = PassContext::new(game, thrower, dist, false);
-                let collection_total: i32 = factory.find_modifiers(&ctx).iter().map(|m| m.get_modifier()).sum();
-                let skill_total: i32 = factory.find_skill_modifiers(&ctx).iter().map(|m| m.get_modifier()).sum();
-                let card_total: i32 = factory.find_card_modifiers(&ctx).iter().map(|m| m.get_modifier()).sum();
-                collection_total + skill_total + card_total
+                let mut total = 0;
+                for m in factory.find_modifiers(&ctx).iter() {
+                    pass_modifier_names.push(m.get_name().to_string());
+                    total += m.get_modifier();
+                }
+                for m in factory.find_skill_modifiers(&ctx).iter() {
+                    pass_modifier_names.push(m.get_name().to_string());
+                    total += m.get_modifier();
+                }
+                for m in factory.find_card_modifiers(&ctx).iter() {
+                    pass_modifier_names.push(m.get_name().to_string());
+                    total += m.get_modifier();
+                }
+                total
             } else {
                 0
             }
@@ -405,7 +421,7 @@ impl StepPass {
             // Java: `passingDistance.getName()` ("Short Pass"), and `passModifiers` — the names
             // are where Accurate / Cannoneer / Disturbing Presence become visible (H.50).
             let dist_name = passing_dist.map(|d| d.name().to_string());
-            let mod_names: Vec<String> = pass_modifiers.iter().map(|m| m.get_name().to_string()).collect();
+            let mod_names = pass_modifier_names.clone();
             game.report_list.add(ReportPassRoll::new(
                 game.thrower_id.clone(),
                 successful,

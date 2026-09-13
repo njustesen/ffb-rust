@@ -64,6 +64,21 @@ pub const BASELINE_SETUP_OPTIONS: &[(&str, &str)] = &[
     // early. The whole rule -- `StepForgoneStalling`, `StallingExtension`, `ReportStallerDetected`
     // -- is implemented and faithful on the Rust side; it was simply switched off.
     (ENABLE_STALLING_CHECK, "true"),
+    // Fourth of the same shape, found by the REPORT diff and NOT yet enabled — see BACKLOG §H.51.
+    // `UtilServerStartGame:224-226` sets `MVP_NOMINATIONS = 6` for the headless game; Rust's unset
+    // option reads 0, so `StepMvp` takes Java's `else` branch and ROLLS a random MVP per team (two
+    // `randomPlayerId` dice Java never throws) where Java nominates through a player-choice dialog
+    // that `ParityRunner` answers with the first eligible player. Invisible to the state hash (it
+    // is the last step of the game and MVP only moves SPP), and the two engines award the MVP to
+    // different players in every game.
+    //
+    // Setting it here is NOT enough on its own: Rust's `StepMvp` dialog branch returns
+    // `StepOutcome::cont()` with NO prompt, so the game would end three reports early
+    // (mostValuablePlayers, winnings, dedicatedFans). Verified by running it: parity stays 10/10 on
+    // lineman bb2025 / goblin bb2020 / chaos bb2016 and the payload differences drop to ZERO, but
+    // the tail of the report stream is lost. The complete fix is the option PLUS a player-choice
+    // prompt from `StepMvp` answered with the first eligible player, mirroring ParityRunner.
+    // (MVP_NOMINATIONS, "6"),
 ];
 
 /// Invoke the Java parity runner as a subprocess.

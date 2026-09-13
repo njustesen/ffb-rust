@@ -138,13 +138,27 @@ impl StepThrowTeamMate {
             // whole TTM (halfling seed 2 i=1). The empty-set minimum_roll/modifier_sum already add the
             // distance modifier; add the factory modifiers (tackle zones, skills, cards) on top, with the
             // PassContext ttm flag = true (so TTM-specific modifier applicability matches Java).
+            // The names go in the report (Java's `ReportThrowTeamMateRoll` carries the modifier
+            // collection); the sum is what the roll needs.
+            let mut ttm_modifier_names: Vec<String> = Vec::new();
             let factory_total: i32 = {
                 let factory = PassModifierFactory::for_rules(game.rules);
                 if let Some(thrower) = game.player(&thrower_id) {
                     let ctx = PassContext::new(game, thrower, passing_distance, true);
-                    factory.find_modifiers(&ctx).iter().map(|m| m.get_modifier()).sum::<i32>()
-                        + factory.find_skill_modifiers(&ctx).iter().map(|m| m.get_modifier()).sum::<i32>()
-                        + factory.find_card_modifiers(&ctx).iter().map(|m| m.get_modifier()).sum::<i32>()
+                    let mut total = 0;
+                    for m in factory.find_modifiers(&ctx).iter() {
+                        ttm_modifier_names.push(m.get_name().to_string());
+                        total += m.get_modifier();
+                    }
+                    for m in factory.find_skill_modifiers(&ctx).iter() {
+                        ttm_modifier_names.push(m.get_name().to_string());
+                        total += m.get_modifier();
+                    }
+                    for m in factory.find_card_modifiers(&ctx).iter() {
+                        ttm_modifier_names.push(m.get_name().to_string());
+                        total += m.get_modifier();
+                    }
+                    total
                 } else { 0 }
             };
             let empty: HashSet<PassModifier> = HashSet::new();
@@ -192,7 +206,7 @@ impl StepThrowTeamMate {
                 roll,
                 self.minimum_roll,
                 re_rolled,
-                vec![],
+                ttm_modifier_names.clone(),
                 Some(passing_distance.name().to_string()),
                 self.thrown_player_id.clone(),
                 pass_result_name,
