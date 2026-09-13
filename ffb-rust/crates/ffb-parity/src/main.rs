@@ -77,6 +77,12 @@ struct ParityArgs {
     /// answered by the embedded parity `RandomAgent`. `none` (rung 0) must reproduce the
     /// random-agent gate exactly. See `agent::PromptClass::name`.
     heur_classes: String,
+    /// `--classes-home <all|none|csv>` / `--classes-away <...>`: per-side `ClassMask` for the
+    /// Rust-only `--heuristic` self-play. The A/B for a single prompt class: give one side the
+    /// class and the other side not, and the difference in touchdowns is that class's worth.
+    /// Both default to `all`. Parity runs ignore them.
+    classes_home: String,
+    classes_away: String,
     /// `--bench`: Rust-only timing mode. Plays `--seeds` games with no Java, no comparison and no
     /// progress file, timing setup / agent / engine / hash / log / write separately so the ENGINE
     /// can be quoted without the parity harness that normally surrounds it. The harness layers are
@@ -140,6 +146,8 @@ impl ParityArgs {
         let mut multimove = 0usize;
         let mut heur_scale = 0.0f32;
         let mut heur_classes = "none".to_string();
+        let mut classes_home = "all".to_string();
+        let mut classes_away = "all".to_string();
         let mut bench = false;
         let mut bench_hash = false;
         let mut bench_log = false;
@@ -175,6 +183,8 @@ impl ParityArgs {
                     heur_scale = parse_flag::<f32>("--heur-scale", &raw[i + 1]); i += 1;
                 }
                 "--heur-classes" if i + 1 < raw.len() => { heur_classes = raw[i + 1].clone(); i += 1; }
+                "--classes-home" if i + 1 < raw.len() => { classes_home = raw[i + 1].clone(); i += 1; }
+                "--classes-away" if i + 1 < raw.len() => { classes_away = raw[i + 1].clone(); i += 1; }
                 "--mode" if i + 1 < raw.len() => { agent_mode = raw[i + 1].clone(); i += 1; }
                 "--mode-away" if i + 1 < raw.len() => { agent_mode_away = Some(raw[i + 1].clone()); i += 1; }
                 "--home" if i + 1 < raw.len() => { home = raw[i + 1].clone(); i += 1; }
@@ -207,7 +217,7 @@ impl ParityArgs {
         let home_java = runner::java_team_id(&home, "home", &edition);
         let away_java = runner::java_team_id(&away, "away", &edition);
 
-        ParityArgs { network, coverage, uniform, all_rosters, all_editions, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize, tier, reuse_java, heuristic, heuristic_away, out_dir, agent_mode, agent_mode_away, agent, multimove, heur_scale, heur_classes, bench, bench_hash, bench_log, bench_write }
+        ParityArgs { network, coverage, uniform, all_rosters, all_editions, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize, tier, reuse_java, heuristic, heuristic_away, out_dir, agent_mode, agent_mode_away, agent, multimove, heur_scale, heur_classes, classes_home, classes_away, bench, bench_hash, bench_log, bench_write }
     }
 }
 
@@ -245,7 +255,8 @@ fn main() {
         let t0 = std::time::Instant::now();
         for seed in args.seed_start..=args.seed_end {
             let (events, sh, sa) = runner::run_heuristic_game(
-                seed, &args.home, &args.away, &args.edition, scale, args.heuristic_away, mode, mode_away);
+                seed, &args.home, &args.away, &args.edition, scale, args.heuristic_away, mode, mode_away,
+                &args.classes_home, &args.classes_away);
             if quiet {
                 // FFB_QUIET: no event dump, no per-seed line. For runtime measurement only.
                 std::hint::black_box((&events, sh, sa));

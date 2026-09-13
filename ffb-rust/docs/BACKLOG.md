@@ -7778,3 +7778,178 @@ scale 0 first.
   and 7 `ffb-parity` processes were live while this session owned 3. Tuning worker count was treating
   the wrong variable; a process count settles it in one command. Workers were stopped via the
   `STOP_SWEEP` file throughout -- nothing killed, no terminal touched.
+
+## §H.44 — 2026-09-13: the setup heuristic exposed a BB2016 kickoff die Rust never rolled; A/B says the setup scores +27%
+
+**Sweep 1 (stopped).** The first full-matrix run on the new setup went red on bb2016 argmax gates
+only: chaos 92, dwarf 92, dark_elf_league_fumbbl 88, chaos_pact 98, chaos_dwarf 99, dark_elf 99,
+plus dwarf @1.0 94, elf @1e6 98. Setups were byte-identical on both sides (FFB_SETUP_TRACE,
+FFB_IDSTATE); the post-hash of the step BEFORE the new drive's first activation differed in the
+ball square AND the away re-roll count, and FFB_DICE_TRACE showed why: after the 22 Sweltering Heat
+d6s, Java rolled `d7 randomPlayer` before the scatter d8/d6, Rust did not, and every later die was
+off by one (Rust's 2d6 read Cheering Fans where Java read High Kick).
+
+**Root cause (Rust engine, bb2016 only).** Java `bb2016/StepKickoffScatterRoll.findKickingPlayer()`
+is the first line of `executeStep`: a centre-field Kick player wins, else the deepest centre-field
+player, else `DiceRoller.randomPlayer(playersOnField)` — a die of `playersOnField.length` sides.
+Rust read `acting_player` and never rolled. The fallback was unreachable while every formation had a
+centre-field player, which the canonical setup always did; a short-handed kicking team the heuristic
+puts entirely on the LOS and in the wide zones (chaos bb2016 seed 35: 3 + 4) reaches it. bb2020 and
+bb2025 have no random fallback in Java and Rust's twins already mirror them.
+
+**Fix.** `step/bb2016/step_kickoff_scatter_roll.rs::find_kicking_player` ported 1:1, called before
+the scatter dice; regression test `no_centre_field_kicker_rolls_the_random_player_die` (3 dice with
+no centre-field kicker, 2 with one; deepest wins). ffb-engine 7495/0. Re-run of the three worst gates
+at 100 seeds: chaos, dwarf, dark_elf_league_fumbbl bb2016 @0 all **100/100**. Sweep 2 launched on
+the fixed binary (6 workers, `parity_st_*` roots, scratch `sweep2/`).
+
+**A/B — is the setup an improvement?** Rust-only self-play, 10 rosters × 3 editions × 2 scales ×
+200 seeds × BOTH orientations (new-setup side swapped), the other side identical except `setup`
+off (= canonical formation). `--classes-home/--classes-away` added to the self-play CLI for this.
+
+| scale | games | TD/game new setup | TD/game canonical | diff | SE |
+|---|---:|---:|---:|---:|---:|
+| 0 (argmax) | 12,000 | 1.075 | 0.841 | **+0.234 (+28%)** | +18 |
+| 1.0 (sampled) | 12,000 | 0.256 | 0.202 | **+0.054 (+27%)** | +8.7 |
+
+Positive in every one of the 10 races and all 3 editions at argmax (weakest amazon +3.1 SE, strongest
+dwarf +11.2 SE); at 1.0 positive in every race, 9 of 10 beyond +1.9 SE (dwarf +0.6 SE). Poisson SE.
+
+## §H.45 — 2026-09-13: second latent BB2016 gap under the new setup — the chainsaw drop skipped the Ball & Chain chain injury
+
+Sweep 2 (fixed kicker die) went red on ONE gate in its first 80: goblin bb2016 @1.0 98/100 (seeds
+8, 78). Both engines chose the same Looney BLOCK on the Fanatic with equal state; Java rolled 9 dice
+through it, Rust 5. Java: chainsaw d6, armour 2d6, injury 2d6 (KO), then TWO more d6 and a
+casualty d6+d8 — `UtilServerInjury.dropPlayer(this, defender, ApothecaryMode.DEFENDER)` runs the
+`placedProneCausesInjuryRoll` branch for a Ball & Chain victim (InjuryTypeBallAndChain: 2d6, casualty
+on 10+), publishes it, and the chainsaw KO supersedes it — dice rolled, result discarded.
+`step/bb2016/block/step_block_chainsaw.rs` used the rng-less `drop_player` (documented "for call
+sites where no Ball & Chain player can occur") for both the victim and the kickback, so the stream
+was four dice short. Also Java's 3-arg `dropPlayer` is `eligibleForSafePairOfHands=false`; Rust passed
+`true` for the victim.
+
+**Fix.** Both sites → `drop_player_rng(game, rng, id, false, mode)`; regression test
+`sawing_a_ball_and_chain_defender_rolls_the_chain_injury_dice` (a Fanatic under the saw costs ≥ 2 more
+dice than a goblin, over 5 seeds). ffb-engine 7496/0. goblin bb2016 @1.0 **100/100**, @0 **100/100**.
+
+Why only now: the canonical formation never put the Fanatic where the Looney reached it in a way the
+old agent blocked; the setup heuristic puts both on or near the line.
+
+Other rng-less `drop_player` sites in bb2016 (`step_foul_chainsaw` attacker, `step_init_feeding`
+defender, `step_special_effect` ×3, `step_catch_scatter_throw_in`) carry the same latent gap for a
+Ball & Chain victim; not touched here — not reached by any red, and each needs its own Java line.
+
+**Sweep bookkeeping.** Sweep 2 keeps running on the pre-§H.45 binary; the two fixes only add dice on
+paths that previously desynced, so a green gate cannot turn red from them. Red gates are re-run with
+the final binary at the end and the verdict table says which.
+
+## §H.46 — 2026-09-13: third latent gap — the shared dodge step showed BB2025's Arm Bar dialog in BB2020 games
+
+old_world_alliance_ogre bb2020 @0 went 95/100 in sweep 2 (seeds 6, 12, 29, 32, 67). Seed 29 i=24:
+a Loner dwarf blitzer fails a dodge next to TWO Arm Bar blockers, spends the team re-roll (Loner 4
+passes), fails again (1). Java bb2020 `StepMoveDodge.failDodge()` is two lines — publish
+`InjuryTypeDropDodge(game.getDefender())` (useArmBarModifiers = true, finds the Arm Bar players
+itself) and GOTO — then the armour roll [3,4]. Rust routes bb2020 through the shared bb2025 step
+(the bb2020 twin is dead, driver.rs), whose `fail_dodge` showed bb2025's ARM_BAR PlayerChoice; the
+answer re-entered `execute_step` with the stale TRR source and, exactly as the bb2025 Java quirk
+that code deliberately mirrors, spent a SECOND team re-roll (Loner 3 + fresh dodge 4 → SUCCESS).
+Rust ended standing at the destination with the bank one short; Java prone, two dice ahead.
+
+**Fix.** `bb2025/move_/step_move_dodge.rs::fail_dodge` edition-gates: under `Rules::Bb2020` it
+publishes `InjuryTypeDropDodge` (or `InjuryTypeDropDodge#dt:<defender>` when `game.defender_id`
+is set — Java's `getDefender()` argument, added to `make_injury_type`) and goes to the failure
+label with no dialog. bb2025 unchanged. Test `bb2020_failed_dodge_between_two_arm_bars_falls_without_a_dialog`
+(bb2020 → GotoLabel, no prompt; the same board in bb2025 → the ARM_BAR PlayerChoice). ffb-engine
+7497/0. old_world_alliance_ogre bb2020 @0 **100/100**; dwarf bb2020 @1.0 (the other Arm Bar roster)
+**100/100**.
+
+Why only now: two Arm Bar dwarfs adjacent to one dodging square needs a compact defensive line
+next to the dodge lane — the heuristic setup's mirrored two-deep screen, never the canonical spread.
+
+## §H.47 — 2026-09-13: three more latent gaps + one stock Java crash, all from sweep 2
+
+Sweep 2 (the fixed-kicker binary) finished with six red gates. Two were §H.45/§H.46 (goblin bb2016,
+old_world_alliance_ogre bb2020). The other four:
+
+**norse bb2025 @1e6 99/100 (seed 91, activation 7).** Rust offered `SecureTheBall` to a Norse Beer
+Boar standing on a loose, still-moving kick; Java did not. `legal_activate_player_actions` tested the
+Unsteady SKILL, Java (`ParityRunner` eligibility, mirroring the client) tests the PROPERTY
+`preventSecureTheBallAction`, which bb2025 Unsteady, **No Ball** and **Ball & Chain** all register.
+One extra option → the uniform pick read a different index. Fix: test the property. norse **100/100**.
+
+**imperial_nobility bb2025 @1e6 99/100 (seed 77) and dark_elf_league_fumbbl bb2025 @1.0 99/100
+(seed 26), both half-2 kickoffs.** A touchback kick, clamped to the pitch edge and NOT yet in play,
+lay on the square of a player Pitch Invasion then stunned. Java `stunPlayers` calls
+`UtilServerInjury.stunPlayer` and DISCARDS the StepParameterSet it returns (SCATTER_BALL,
+DROPPED_BALL_CARRIER, END_TURN); Rust published them, so `CatchScatterThrowIn` bounced the ball (one
+d8 Java never rolls) before the Touchback step. Fix: keep only the Ball & Chain INJURY_RESULT (the
+one parameter Java's `dropPlayer` publishes directly). imperial_nobility **100/100**,
+dark_elf_league_fumbbl **100/100**.
+
+**goblin bb2025 @1.0 65/100 — two things.** (a) Seed 28 i=0: Pitch Invasion stunned the Fanatic;
+the Ball & Chain chain injury (2d6, `convertStunToKO`) was published, and Rust's kickoff sequence
+— the MIXED generator, used for bb2020 AND bb2025 — has APOTHECARY(HOME)/(AWAY) steps that applied
+it (Fanatic KO). Java bb2025's own `Kickoff.java` has no apothecary there, so its published result
+is consumed by nothing and the Fanatic stays STANDING. Fix: under `Rules::Bb2025` the result is not
+handed on (bb2020 keeps it — goblin bb2020 seeds 55/99 of §H.14 need the KO). Test
+`a_pitch_invasion_discards_scatter_parameters_and_bb2025_drops_the_chain_injury`.
+(b) Seed 67: a **stock Java crash** — `bb2025/SneakyGitBehaviour` NPE on a foul against a Ball &
+Chain player (no armour dice to read). It escaped `main`, killed the JVM, and seeds 68–100 were
+counted as failures: 34 of the 35 reds were one exception. Recorded as **JD-002**
+(docs/JAVA_DEFECTS.md); `ParityRunner.main` now catches per seed and logs `JAVA_CRASH`. goblin bb2025
+@1.0 re-run: 1–40 → 39/40 (seed 28 before the fix), 41–70 → 26/30 (67 crash + 3 voided), 71–100 →
+30/30; with both fixes only seed 67 remains, as a Java crash.
+
+**Why all four only now.** Every one needs a player standing exactly where the new formations put
+him: on a loose kick, under a touchback kick at the pitch edge, or a Fanatic on the LOS when Pitch
+Invasion hits. The canonical formation never did that in 33,000 games.
+
+ffb-engine 7498/0 with all six fixes.
+
+## §H.48 — 2026-09-13: setup sweep CERTIFIED 329/330 (+1 stock Java crash); coverage and TD census
+
+Sweep 2 raw: 324/330 (`docs/SWEEP_2026-09-13_SETUP.txt`). Six reds root-caused in §H.44–§H.47 and
+re-run on the final binary: five 100/100; goblin bb2025 @1.0 99/100 where seed 67 is JD-002 (Java
+NPE, `JAVA_CRASH` line). ffb-engine 7498/0, Java ffb-ai 40/0.
+
+Census against the 2026-09-12 baseline (`docs/EVENT_CENSUS_2026-09-13_SETUP.md`): touchdowns +2.0%
+overall, +19.9% at scale 1.0 and +11.3% at 1e6, −1.8% at argmax (mirror matches — both sides
+improved; the A/B in §H.44 is the strength measure: +28%/+27%). Blocks +13.6%, dodges +16.4%, fouls
++19.1%, casualties +6.9%; hand-offs −22%, catches −18%. Skills raising SkillUse 12 → 19 (Diving
+Catch, Eye Gouge, Safe Pass, Side Step, Steady Footing, Sure Hands, Taunt new). No event or action
+variant gained or lost. Checklist: 69 gates short (baseline 30), all but one on `action HandOver`.
+
+Open: the hand-off drop (a follow-up for the agent's give chain, not the setup); JD-002 stays red
+by construction; the 6 rng-less `drop_player` sites in bb2016 (§H.45) untouched. Nothing committed.
+
+## §H.49 — 2026-09-13: JD-002 brought under the house rule; goblin bb2025 @1.0 seed 67 compares
+
+§H.48 left JD-002 "red by construction". The user's rule is that a Java defect is fine as long as it
+is recorded, Rust does the same thing, and Rust can be configured not to. §H.47 had only the first
+of those three. Now all three, the same shape as JD-001 (§H.39):
+
+**Rust.** `defect_fixes.referee_survives_missing_armour_roll` (default `false`). In
+`step/action/foul/step_referee.rs` the branch where Java reads `armorRoll[0]` from null now returns
+`Continue` having touched nothing — no report, no event, no next action — so the driver's
+no-progress guard ends the game exactly where Java's `NullPointerException` does. With the flag on,
+"no armour dice" reads as "no armour doubles" and the referee reads the injury dice (the previous
+Rust-only behaviour, which was a silent deviation from Java). The old test
+`no_armor_roll_returns_goto_label` now sets the flag; new test
+`jd002_missing_armour_roll_stalls_by_default_and_reads_injury_dice_when_fixed` pins both sides.
+`all_fixed()` and the flag tests updated.
+
+**Harness.** `ParityRunner.run` catches a `RuntimeException` from the step/dialog handler, prints
+`JAVA_CRASH seed=… step=…` + stack, sets `END_REASON: java_crash` and finalises the log like a
+`stuck_step` game (pending steps flushed with post-hashes, `game_end` with the pre-crash hash). The
+`main` catch from §H.47 stays as a backstop. Java engine untouched.
+
+**Result.** goblin bb2025 @1.0 seed 67: Java `END_REASON: java_crash iter=36`, both logs end at
+`i=10` with hash `71be2728309848e2` — MATCH. Full gate 1–100 re-run on the new binary + jar, fresh
+JVM: **100/100**. The setup sweep is therefore **330/330** (`docs/SWEEP_2026-09-13_SETUP.txt`).
+ffb-engine step_referee/defect tests 17/17; ffb-ai Java tests green.
+
+**Why the bb2016/bb2020 hooks are covered too.** All three `SneakyGitBehaviour` editions have the
+same unguarded read, and the Rust step is the shared COMMON `StepReferee`, so one gate covers them.
+No matrix seed other than goblin bb2025 @1.0 #67 reaches the path (any that did was red before
+and none was), so the default-behaviour change cannot un-green a gate.
+

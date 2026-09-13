@@ -756,6 +756,11 @@ pub fn make_injury_type(name: &str) -> Box<dyn InjuryTypeServer> {
     if name == "InjuryTypeDropDodge#noArmBar" {
         return Box::new(injuryType::injury_type_drop_dodge::InjuryTypeDropDodge::new_with_arm_bar(None, false));
     }
+    // Java bb2020 `StepMoveDodge.failDodge()`: `new InjuryTypeDropDodge(game.getDefender())` —
+    // the diving tackler as the named Arm Bar source, useArmBarModifiers = true.
+    if let Some(pid) = name.strip_prefix("InjuryTypeDropDodge#dt:") {
+        return Box::new(injuryType::injury_type_drop_dodge::InjuryTypeDropDodge::new_with_arm_bar(Some(pid.to_owned()), true));
+    }
     match name {
         // Use the full `injuryType::` translations — they roll the injury with
         // do_injury_roll_for_player (applies Stunty + Thick Skull), unlike the stale player-less

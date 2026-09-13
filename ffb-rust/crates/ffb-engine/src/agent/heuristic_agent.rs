@@ -55,6 +55,7 @@ use crate::step::GameState;
 
 use super::random_agent::player_action_to_pac;
 use super::det_math::{exp_f32, ln_f32};
+use super::setup_heuristic;
 use super::{Agent, RandomAgent, UniformAgent};
 
 /// `mechanics/movement.rs: STAND_UP_COST`.
@@ -441,6 +442,8 @@ pub enum Rule {
     Reroll,
     Skill,
     Flat,
+    /// §6.21 — one kick-off setup placement.
+    Setup,
 }
 
 /// One enumerated option together with the probability the sampler actually gave it.
@@ -4350,7 +4353,68 @@ impl HeuristicAgent {
                 self.take(i)
             }
 
-            AgentPrompt::TeamSetup { team_id, .. } => canonical_setup_action(g, &team_id),
+            // ── team setup (§6.21) ──────────────────────────────────────────
+            //
+            // One placement per prompt, sampled from the joint (player, square) set that
+            // `setup_heuristic::enumerate` scores; `ConfirmSetup` once it has nothing left to
+            // offer. Legality is by construction (LOS first, wide-zone cap, field cap, must-field
+            // gate), so the confirm never trips `SetupMechanic::check_setup`. The parity
+            // `canonical_setup_action` stays as the answer when the `setup` class is off (the
+            // `ClassMask` branch in `act`), and as the fallback for a team the scorer cannot see.
+            AgentPrompt::TeamSetup { team_id, .. } => {
+                if g.team_home.id != team_id && g.team_away.id != team_id {
+                    return canonical_setup_action(g, &team_id);
+                }
+                let Some((cands, opts)) = setup_heuristic::setup_options(g, &team_id) else {
+                    return Action::ConfirmSetup;
+                };
+                let offence = g.setup_offense;
+                for o in &opts {
+                    let action = Action::PlacePlayer {
+                        player_id: cands[o.player].id.clone(),
+                        coord: FieldCoordinate::new(o.x, o.y),
+                    };
+                    if self.dump_enabled {
+                        self.buf.push_note(
+                            action,
+                            o.w,
+                            Rule::Setup,
+                            o.w,
+                            format!(
+                                "nr{} @{},{} d={} {}",
+                                cands[o.player].nr,
+                                o.x,
+                                o.y,
+                                12 - o.x,
+                                if offence { "offence" } else { "defence" }
+                            ),
+                        );
+                    } else {
+                        self.buf.push(action, o.w, Rule::Setup, o.w);
+                    }
+                }
+                let i = self.sample(setup_heuristic::SETUP_T);
+                // FFB_SETUP_TRACE: one line per placement, mirrored by `JSETUP` in
+                // HeuristicDriver.setupPlacement. The state hash only says the two setups differ;
+                // this says at which placement, and whether it was the option SET or the pick.
+                if std::env::var_os("FFB_SETUP_TRACE").is_some() {
+                    let o = &opts[i];
+                    eprintln!(
+                        "RSETUP side={} off={} n={} cands={} pick={} nr={} x={} y={} w={:08x} draws={}",
+                        if g.team_home.id == team_id { "home" } else { "away" },
+                        offence,
+                        opts.len(),
+                        cands.len(),
+                        i,
+                        cands[o.player].nr,
+                        o.x,
+                        o.y,
+                        o.w.to_bits(),
+                        self.probe_draws
+                    );
+                }
+                self.take(i)
+            }
 
             // Everything else: the long tail this agent does not model.
             //

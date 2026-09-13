@@ -18,7 +18,7 @@ use crate::injury::injuryType::injury_type_chainsaw::InjuryTypeChainsaw;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::abstract_step_with_re_roll::ReRollState;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
-use crate::step::util_server_injury::drop_player;
+use crate::step::util_server_injury::drop_player_rng;
 
 /// Java: `StepBlockChainsaw` (bb2016/block).
 pub struct StepBlockChainsaw {
@@ -139,7 +139,16 @@ impl StepBlockChainsaw {
                 // Java: if (injuryResultDefender.injuryContext().isArmorBroken()) {
                 //         publishParameters(UtilServerInjury.dropPlayer(this, game.getDefender(), DEFENDER)); }
                 if injury_result.injury_context().armor_broken {
-                    for p in drop_player(game, &defender_id, true) { outcome = outcome.publish(p); }
+                    // Java: `UtilServerInjury.dropPlayer(this, game.getDefender(), ApothecaryMode.DEFENDER)`
+                    // -- the 3-arg form is PRONE + eligibleForSafePairOfHands=false, and it carries
+                    // the `placedProneCausesInjuryRoll` branch: a Ball & Chain victim takes the
+                    // InjuryTypeBallAndChain roll (2d6, casualty on 10+) whose result is published
+                    // and then superseded by the chainsaw injury. The rng-less `drop_player` skipped
+                    // those dice, so a Looney sawing a Fanatic desynced the stream by four calls
+                    // (goblin bb2016 seed 78 i=13, seed 8 i=25).
+                    for p in drop_player_rng(game, rng, &defender_id, false, ApothecaryMode::Defender) {
+                        outcome = outcome.publish(p);
+                    }
                 }
                 // Java: publishParameter(new StepParameter(INJURY_RESULT, injuryResultDefender))
                 // Java: getResult().setNextAction(StepAction.GOTO_LABEL, fGotoLabelOnSuccess)
@@ -189,7 +198,12 @@ impl StepBlockChainsaw {
             //         publishParameters(UtilServerInjury.dropPlayer(this, actingPlayer.getPlayer(), ATTACKER))
             //         publishParameter(new StepParameter(END_TURN, true)) }
             if injury_result.injury_context().armor_broken {
-                for p in drop_player(game, &acting_id, false) { outcome = outcome.publish(p); }
+                // Java: `dropPlayer(this, actingPlayer.getPlayer(), ApothecaryMode.ATTACKER)` -- same
+                // Ball & Chain branch for the kickback (a Fanatic cannot carry a chainsaw, so this is
+                // for symmetry with the Java line, not for a case that can occur).
+                for p in drop_player_rng(game, rng, &acting_id, false, ApothecaryMode::Attacker) {
+                    outcome = outcome.publish(p);
+                }
                 outcome = outcome.publish(StepParameter::EndTurn(true));
             }
             // Java: publishParameter(new StepParameter(INJURY_RESULT, injuryResultAttacker))
@@ -369,6 +383,51 @@ mod tests {
             .downcast_ref()
             .expect("report must be a ReportChainsawRoll");
         assert_eq!(chainsaw_report.get_defender_id(), None, "defenderId must be null, matching Java's 6-arg constructor");
+    }
+
+    /// Java drops the sawed defender through `UtilServerInjury.dropPlayer`, whose
+    /// `placedProneCausesInjuryRoll` branch rolls a Ball & Chain victim's chain injury (2d6, and a
+    /// casualty roll on 10+) even though the chainsaw injury supersedes it. A Fanatic under the
+    /// saw must therefore cost at least two more dice than a plain goblin under the same saw.
+    #[test]
+    fn sawing_a_ball_and_chain_defender_rolls_the_chain_injury_dice() {
+        let run = |seed: u64, ball_and_chain: bool| -> (StepAction, bool, u64) {
+            let mut step = StepBlockChainsaw::new();
+            step.set_parameter(&StepParameter::GotoLabelOnSuccess("ok".into()));
+            step.set_parameter(&StepParameter::GotoLabelOnFailure("fail".into()));
+            let mut game = make_game();
+            add_player_with_skill(&mut game, "saw", SkillId::Chainsaw);
+            if ball_and_chain {
+                add_player_with_skill(&mut game, "def", SkillId::BallAndChain);
+            } else {
+                add_player(&mut game, "def");
+            }
+            game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
+            game.acting_player.player_id = Some("saw".into());
+            game.defender_id = Some("def".into());
+            let mut rng = GameRng::new(seed);
+            let out = step.start(&mut game, &mut rng);
+            let broken = out.published.iter().any(|p| matches!(p,
+                StepParameter::InjuryResult(r) if r.injury_context().armor_broken));
+            (out.action, broken, rng.call_count)
+        };
+        let mut checked = 0;
+        for seed in 1..200u64 {
+            let (action, broken, plain) = run(seed, false);
+            if action != StepAction::GotoLabel || !broken {
+                continue;
+            }
+            let (_, _, chained) = run(seed, true);
+            assert!(
+                chained >= plain + 2,
+                "seed {seed}: plain defender {plain} dice, Ball & Chain defender {chained}"
+            );
+            checked += 1;
+            if checked == 5 {
+                break;
+            }
+        }
+        assert_eq!(checked, 5, "no seed produced a successful armour-breaking saw");
     }
 
     #[test]

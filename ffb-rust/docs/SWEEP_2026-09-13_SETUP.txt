@@ -1,0 +1,45 @@
+FULL MATRIX SWEEP - heuristic SETUP (sweep 2, pre-H.45..H.47 binary) - 330 gates, 110 cells x 3 scales
+parity: 324/330 games match, 6 FAILED, 0 without a verdict
+
+summed gate time 1654 min (27.57 h)
+
+PARITY RED - 6 gate(s):
+  dark_elf_league_fumbbl bb2025 @1.0     PARITY: 99/100 passed, 1 FAILED.
+  goblin bb2016 @1.0                     PARITY: 98/100 passed, 2 FAILED.
+  goblin bb2025 @1.0                     PARITY: 65/100 passed, 35 FAILED.
+  imperial_nobility bb2025 @1e6          PARITY: 99/100 passed, 1 FAILED.
+  norse bb2025 @1e6                      PARITY: 99/100 passed, 1 FAILED.
+  old_world_alliance_ogre bb2020 @0      PARITY: 95/100 passed, 5 FAILED.
+
+Separately, 10 gate(s) report the mechanic-coverage checklist unmet
+(parity still 100/100 on every one of them):
+
+  chaos bb2016 @1e6
+  dwarf bb2016 @1e6
+  dwarf bb2020 @1e6
+  khemri bb2025 @1e6
+  khemri_fumbbl bb2020 @0
+  khemri_fumbbl bb2025 @0
+  khorne bb2025 @1e6
+  nurgle bb2025 @1e6
+  slann_fumbbl bb2020 @0
+  slann_fumbbl bb2025 @0
+
+
+RE-RUN on the final binary (BACKLOG §H.44-§H.47 fixes, ParityRunner per-seed crash guard), same
+parity_st_* roots, fresh JVM each:
+  norse bb2025 @1e6                    PARITY: 100/100 games match.
+  goblin bb2016 @1.0                   PARITY: 100/100 games match.
+  old_world_alliance_ogre bb2020 @0    PARITY: 100/100 games match.
+  dark_elf_league_fumbbl bb2025 @1.0   PARITY: 100/100 games match.
+  imperial_nobility bb2025 @1e6        PARITY: 100/100 games match.
+  goblin bb2025 @1.0                   PARITY: 99/100 passed, 1 FAILED.  (seed 67 = JAVA_CRASH, JD-002)
+
+FINAL (08:20): 329/330 gates green; the one red is a stock Java NullPointerException, not a Rust divergence.
+
+JD-002 brought under the house rule (BACKLOG §H.49): Rust ports the crash outcome by default
+(`defect_fixes.referee_survives_missing_armour_roll` = false), `ParityRunner.run` finalises the
+crashed game as END_REASON: java_crash. Re-run, fresh JVM, binary 08:46 + jar 08:41:
+  goblin bb2025 @1.0                   PARITY: 100/100 games match.  (seed 67: java_crash @ i=10 on both sides)
+
+FINAL (08:55): 330/330 gates green.

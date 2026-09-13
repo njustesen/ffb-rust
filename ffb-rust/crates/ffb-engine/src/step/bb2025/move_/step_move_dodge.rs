@@ -496,6 +496,28 @@ impl StepMoveDodge {
     fn fail_dodge(&mut self, game: &Game) -> StepOutcome {
         use ffb_model::util::util_player::UtilPlayer;
         use ffb_model::model::property::NamedProperties;
+        // BB2020 runs this shared step (its own twin is dead — driver.rs routes MoveDodge here for
+        // both editions), and Java's bb2020 `StepMoveDodge.failDodge()` is two lines:
+        //   publishParameter(INJURY_TYPE, new InjuryTypeDropDodge(game.getDefender()));
+        //   GOTO fGotoLabelOnFailure
+        // No Arm Bar dialog exists in bb2020 — `InjuryTypeDropDodge(divingTackler)` is built with
+        // useArmBarModifiers=true and finds the adjacent Arm Bar players itself. Showing bb2025's
+        // ARM_BAR PlayerChoice here did two wrong things: with two adjacent Arm Bar players it
+        // asked, and the answer re-entered `execute_step` with the stale TRR source still set, so
+        // the team re-roll was spent AGAIN (Loner + fresh dodge: old_world_alliance_ogre bb2020 @0
+        // seed 29 i=24 — Rust dwarf blitzer stands on a second re-roll where Java is prone, two
+        // dice ahead, one re-roll short). Reachable only once formations put two Arm Bar dwarfs
+        // next to one dodge, which the heuristic setup does and the canonical never did.
+        if game.rules == ffb_model::enums::Rules::Bb2020 {
+            let name = match game.defender_id.as_deref() {
+                Some(d) if !d.is_empty() => format!("InjuryTypeDropDodge#dt:{d}"),
+                _ => "InjuryTypeDropDodge".to_string(),
+            };
+            let ctx = SteadyFootingContext::from_injury_type_name(name);
+            let label = self.goto_label_on_failure.clone();
+            return StepOutcome::goto(&label)
+                .publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
+        }
         // Java: armBarPlayers = findAdjacentOpposingPlayersWithProperty(game, fCoordinateFrom,
         //   affectsEitherArmourOrInjuryOnDodge, true); filterThrower(...)  — computed once.
         if self.arm_bar_players.is_empty() {
@@ -606,6 +628,54 @@ mod tests {
         step.coordinate_from = Some(FieldCoordinate::new(5, 5));
         step.coordinate_to = Some(FieldCoordinate::new(6, 5));
         (game, step)
+    }
+
+    /// Java's bb2020 `failDodge()` has no Arm Bar dialog: with TWO adjacent Arm Bar players and
+    /// no re-roll left, the step must fall straight to the failure label, where bb2025 asks the
+    /// opposing coach which Arm Bar applies. The bb2025 dialog's re-entry is what spent a second
+    /// team re-roll in bb2020 games (old_world_alliance_ogre bb2020 @0 seed 29).
+    #[test]
+    fn bb2020_failed_dodge_between_two_arm_bars_falls_without_a_dialog() {
+        use ffb_model::enums::{PS_STANDING, PlayerState as PSt, Rules, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        let build = |rules: Rules| {
+            let (mut game, mut step) = dt_threat_fixture_for(3, rules);
+            game.turn_data_home.rerolls = 0;
+            game.turn_data_away.rerolls = 0;
+            game.defender_id = None;
+            // Replace the Diving Tackler's skill with Arm Bar and add a second Arm Bar dwarf, both
+            // adjacent to the FROM square (5,5).
+            let t = game.team_away.players.iter_mut().find(|p| p.id == "tackler").unwrap();
+            t.starting_skills.clear();
+            t.starting_skills.push(SkillWithValue { skill_id: SkillId::ArmBar, value: None });
+            let mut second = ffb_model::model::player::Player {
+                id: "armbar2".into(), name: "a".into(), nr: 3, position_id: "pos".into(),
+                player_type: ffb_model::enums::PlayerType::Regular,
+                gender: ffb_model::enums::PlayerGender::Male,
+                movement: 4, strength: 3, agility: 3, passing: 4, armour: 9,
+                ..Default::default()
+            };
+            second.starting_skills.push(SkillWithValue { skill_id: SkillId::ArmBar, value: None });
+            game.team_away.players.push(second);
+            game.field_model.set_player_coordinate("armbar2", FieldCoordinate::new(4, 6));
+            // The adjacency search wants tackle zones: STANDING + active on both dwarfs.
+            game.field_model.set_player_state("armbar2", PSt::new(PS_STANDING).change_active(true));
+            game.field_model.set_player_state("tackler", PSt::new(PS_STANDING).change_active(true));
+            step.dodge_roll = 1;
+            (game, step)
+        };
+        let (mut game, mut step) = build(Rules::Bb2020);
+        let out = step.execute_step(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, crate::step::framework::StepAction::GotoLabel, "bb2020 falls at once");
+        assert!(out.prompt.is_none(), "bb2020 has no ARM_BAR dialog");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))));
+
+        let (mut game, mut step) = build(Rules::Bb2025);
+        let out = step.execute_step(&mut game, &mut GameRng::new(0));
+        assert!(
+            matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::PlayerChoice { ref reason, .. }) if reason == "ARM_BAR"),
+            "bb2025 asks which Arm Bar applies: {:?}", out.prompt
+        );
     }
 
     /// Java computes the Diving-Tackle what-if as `mechanic.minimumRollDodge(game, player, withDt,

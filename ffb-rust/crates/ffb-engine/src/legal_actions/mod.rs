@@ -593,12 +593,17 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
         }
 
         // SecureTheBall (BB2025): player at ball square can secure with 2+ roll; once per turn.
+        // Java (`ParityRunner` eligibility, mirroring the client): the gate is the PROPERTY
+        // `preventSecureTheBallAction`, which bb2025 Unsteady, No Ball AND Ball & Chain all
+        // register. Testing the Unsteady SKILL alone offered the action to a Norse Beer Boar (No
+        // Ball) standing on a loose, still-moving kick — one extra activation option, and the
+        // uniform arm's next pick read a different index (norse bb2025 @1e6 seed 91 i=7).
         if game.rules == Rules::Bb2025
             && game.field_model.ball_in_play
             && game.field_model.ball_moving
             && ball_coord == Some(coord)
             && !turn_data.secure_the_ball_used
-            && !player.has_skill(SkillId::Unsteady)
+            && !player.has_skill_property(ffb_model::model::property::named_properties::NamedProperties::PREVENT_SECURE_THE_BALL_ACTION)
         {
             actions.push(Action::ActivatePlayer {
                 player_id: pid.clone(),

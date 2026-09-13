@@ -998,6 +998,9 @@ fn make_lineman_team(side: &str, roster_id: &str) -> Team {
         current_spps: 0,
         career_spps: 0,
         race: None,
+        // `roster_lineman_parity.xml` <cost>50000</cost>: the heuristic setup scorer reads the
+        // position cost on both sides, so the synthetic twin has to carry the XML's value.
+        position_cost: 50_000,
         ..Default::default()
     }).collect();
 
@@ -1582,8 +1585,14 @@ pub fn run_heuristic_game(
     away_scale: Option<f32>,
     mode: ffb_engine::agent::Mode,
     mode_away: ffb_engine::agent::Mode,
+    classes_home: &str,
+    classes_away: &str,
 ) -> (Vec<GameEvent>, i32, i32) {
-    use ffb_engine::agent::{Agent, HeuristicAgent};
+    use ffb_engine::agent::{Agent, ClassMask, HeuristicAgent};
+    let mask = |spec: &str| ClassMask::parse(spec).unwrap_or_else(|e| {
+        eprintln!("ffb-parity: bad class mask {spec:?}: {e}");
+        std::process::exit(2);
+    });
 
     let rules = edition_to_rules(edition);
     let home = make_team(home_roster, "home", edition);
@@ -1592,9 +1601,9 @@ pub fn run_heuristic_game(
     options.extend_from_slice(BASELINE_SETUP_OPTIONS);
     let mut engine = GameState::new_full_pregame(home, away, rules, seed, &options);
 
-    let mut home_agent = HeuristicAgent::with_mode(seed, temp_scale, mode);
-    let mut away_agent =
-        HeuristicAgent::with_mode(seed ^ 0xFFFF_FFFF, away_scale.unwrap_or(temp_scale), mode_away);
+    let mut home_agent = HeuristicAgent::with_classes(seed, temp_scale, mode, mask(classes_home));
+    let mut away_agent = HeuristicAgent::with_classes(
+        seed ^ 0xFFFF_FFFF, away_scale.unwrap_or(temp_scale), mode_away, mask(classes_away));
 
     let mut all_events: Vec<GameEvent> = Vec::new();
     // `FFB_HEUR_TIME=1` separates AGENT time from ENGINE time. Wall-clock per game confounds the

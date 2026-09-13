@@ -102,3 +102,57 @@ exception, and the driver's no-progress guard ends the game — the same observa
 Flag `true`: `StepPuntDistance` clears `out_of_bounds` on an in-bounds landing, the punt resolves as
 a normal catch, and the game continues. This is the behaviour the rules describe, and it is NOT
 parity-comparable against stock Java.
+
+---
+
+## JD-002 — a Sneaky Git foul on a Ball & Chain player dereferences a null armour roll
+
+| | |
+|---|---|
+| **Where** | `ffb-server/.../skillbehaviour/bb2025/SneakyGitBehaviour.java:97` (the `StepReferee` hook); the bb2016 (`:88`) and bb2020 (`:97`) hooks have the same unguarded read |
+| **Surfaces as** | `NullPointerException: Cannot load from int array because "armorRoll" is null` out of `StepReferee.executeStep` |
+| **Effect** | Uncaught in the stock engine: the game ends where the step threw, in the state it had before `StepReferee` ran (no report, no next action). In the headless harness it first escaped `main` and killed the JVM, so the crashed seed AND every seed queued behind it produced no Java log (goblin bb2025 @1.0: seed 67 crashed, 68–100 reported as failures). |
+| **Found on** | `goblin` bb2025 @1.0 seed 67, BACKLOG §H.47; closed §H.49 |
+| **Rust flag** | `defect_fixes.referee_survives_missing_armour_roll` (default `false` = defect) |
+
+### The rules situation is valid
+
+A Fanatic (Ball & Chain) may be fouled like any other prone player. `UtilServerInjury.handleInjury`
+marks a `placedProneCausesInjuryRoll` victim's armour as broken WITHOUT rolling (lines 72–76), so
+the injury context of that foul carries `armorRoll == null` and `isArmorBroken() == true`.
+
+### The defect
+
+The hook reads the armour dice whenever the fouler lacks Sneaky Git OR the armour is broken:
+
+```java
+if (!game.isActive(NamedProperties.foulBreaksArmourWithoutRoll) && (!UtilCards.hasSkill(actingPlayer, skill)
+    || state.injuryResultDefender.injuryContext().isArmorBroken() || ...)) {
+    int[] armorRoll = state.injuryResultDefender.injuryContext().getArmorRoll();
+    refereeSpotsFoul = (armorRoll[0] == armorRoll[1]);      // null for a Ball & Chain victim
+}
+```
+
+There is no null guard, and the auto-broken branch is exactly the one where no dice exist.
+
+### What Rust does
+
+The same as JD-001: the defect is ported as its OBSERVABLE outcome and the correction sits behind a
+flag. In `step/action/foul/step_referee.rs`, when Java's branch would read the armour dice and there
+are none, the step returns `Continue` having touched nothing — no report, no event, no next action —
+so the driver's no-progress guard ends the game exactly where Java's exception does. With
+`defect_fixes.referee_survives_missing_armour_roll` on, "no armour dice" reads as "no armour
+doubles" and the referee goes on to the injury dice as Java's next line would; that is the only
+reading the rules support (there were no armour dice to be doubles). Test
+`jd002_missing_armour_roll_stalls_by_default_and_reads_injury_dice_when_fixed`.
+
+### What the harness does
+
+`ParityRunner.run` catches a `RuntimeException` thrown by a step or dialog handler, prints
+`JAVA_CRASH seed=… step=…` with the stack trace, sets `END_REASON: java_crash`, and finalises the
+log like a `stuck_step` game: every step up to the crash is flushed with its post-hash, then
+`game_end` carries the pre-crash state. Rust's log ends at the same index with the same hash, so
+the seed compares — goblin bb2025 @1.0 seed 67 ends at `i=10`, hash `71be2728309848e2`, on both
+sides. `ParityRunner.main` keeps a second catch as a backstop so an exception outside the game loop
+still cannot void the seeds queued behind it. Neither engine is patched; the crash still happens in
+stock Java on every run.

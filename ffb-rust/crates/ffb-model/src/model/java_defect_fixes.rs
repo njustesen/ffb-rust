@@ -27,6 +27,21 @@ pub struct JavaDefectFixes {
     /// driver's no-progress guard rather than a panic. With it `true` the flag is cleared and the
     /// punt resolves as the rules describe.
     pub punt_distance_clears_out_of_bounds: bool,
+
+    /// **JD-002.** Let the referee step survive a foul whose injury context has NO armour dice.
+    ///
+    /// Java's `SneakyGitBehaviour` StepReferee hook (all three editions) reads
+    /// `injuryContext().getArmorRoll()` whenever the fouler lacks Sneaky Git OR the armour is
+    /// broken. A Ball & Chain victim's armour is marked broken WITHOUT a roll
+    /// (`UtilServerInjury.handleInjury`, `placedProneCausesInjuryRoll`), so the array is null and
+    /// the hook throws `NullPointerException` out of `StepReferee.executeStep`. Nothing catches it
+    /// in the stock engine: the game ends right there, in the state it had before the step ran.
+    ///
+    /// With this `false` (the default) Rust reproduces that outcome — the step returns without
+    /// touching anything and the driver's no-progress guard ends the game where Java's crash does.
+    /// With it `true` "no armour dice" reads as "no armour doubles" and the referee goes on to the
+    /// injury dice, the only reading the rules support.
+    pub referee_survives_missing_armour_roll: bool,
 }
 
 impl JavaDefectFixes {
@@ -35,7 +50,7 @@ impl JavaDefectFixes {
 
     /// Every correction enabled. NOT parity-comparable against stock Java.
     pub fn all_fixed() -> Self {
-        Self { punt_distance_clears_out_of_bounds: true }
+        Self { punt_distance_clears_out_of_bounds: true, referee_survives_missing_armour_roll: true }
     }
 }
 
@@ -50,12 +65,14 @@ mod tests {
         let d = JavaDefectFixes::default();
         assert_eq!(d, JavaDefectFixes::faithful_to_java());
         assert!(!d.punt_distance_clears_out_of_bounds);
+        assert!(!d.referee_survives_missing_armour_roll);
     }
 
     #[test]
     fn all_fixed_turns_every_flag_on() {
         let a = JavaDefectFixes::all_fixed();
         assert!(a.punt_distance_clears_out_of_bounds);
+        assert!(a.referee_survives_missing_armour_roll);
         assert_ne!(a, JavaDefectFixes::default());
     }
 }

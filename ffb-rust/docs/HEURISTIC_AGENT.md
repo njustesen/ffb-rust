@@ -1590,39 +1590,97 @@ w(decline) = 1.0 − w(use)
 
 ### 6.21 `TeamSetup { team_id, players }`
 
-**Options.** Formations, not individual placements. Enumerating placements is combinatorial and
-useless; enumerating *formations* is exactly right and is what a human coach does.
+**Implemented 2026-09-12** in `agent/setup_heuristic.rs`, mirrored by `SetupPlacement.java`. The
+formation-book design that used to sit here was never built; what shipped is the opposite shape and
+is better for both play and coverage.
 
-Ship a small formation book (each a fixed list of (slot, coordinate) for offence and defence,
-validated against the 3-on-LOS / max-2-per-wide-zone rules):
+**Options are single placements, not formations.** The engine re-emits `TeamSetup` after every
+`PlacePlayer`, so one prompt is one decision: sample a `(reserve, square)` pair from the joint set,
+and send `ConfirmSetup` once eleven stand on the pitch or the reserves are empty. A formation is what
+emerges from eleven such decisions, each reading what the previous ones put on the board. Because
+every square of the own half is an option for every reserve (only the wide-zone cap and occupancy
+remove squares), any player can end up anywhere — the uniform arm proves it — while the table
+temperature concentrates the mass on the placements a coach would make.
 
-| Formation | Weight when receiving | Weight when kicking |
-|---|---|---|
-| `canonical` (the existing `canonical_setup_action` — keep it, it is the parity answer) | 0.45 | 0.45 |
-| `deep_receiver` (one fast player deep) | 0.85 | 0.10 |
-| `spread_defence` | 0.10 | 0.75 |
-| `cage_ready` (tight, wide-zone light) | 0.70 | 0.20 |
-| `zone_defence` (wide-zone heavy) | 0.10 | 0.65 |
+**Two phases.**
 
-Assign players to slots by role: highest MA + Catch to the deep/receiver slots, highest ST/AV to the
-LOS slots, Guard players to the interior. Sort by `(role_score, player_id)` so it stays deterministic.
+1. *Line of scrimmage first.* While fewer than `min(minPlayersOnLos, held + remaining)` of ours hold
+   the LOS (x = 12, y ∈ 4..=10), only LOS squares are offered. The player term is `line_score`:
+   `0.55·(ST−3) + 0.30·(AV−8)`, −0.6 for AV ≤ 7, +0.5 Block/Wrestle, +0.4 Guard, +0.3 Stand Firm,
+   +0.2 Fend/Side Step, +0.2 Thick Skull, +0.15 Mighty Blow/Claw, **+cheapness** (`0.35·clamp((70 −
+   cost_k)/30, −1.5, 1)` — linemen belong on the line, expensive positionals do not), −1.0 for
+   Stunty/Titchy (who also get no cheapness: they are cheap *because* they die there), −0.15 for a
+   negatrait, −0.35 for Sure Hands/Pass, −0.25 for a fast Catch player. Centre squares get +0.15/+0.10.
+2. *The whole half.* Every unoccupied square with x ∈ 0..=12, minus a wide zone that already holds
+   `maxPlayersInWideZone`. Extra LOS squares stay on offer.
 
-**The legality rule, stated rather than implied.** A formation is dropped from the option set unless
-it satisfies all of:
+**Square terms, both roles.** Sideline rows y ∈ {0, 14}: −3.0 (a once-a-season event at T = 0.30,
+never a rule — the uniform arm must reach them). Edge rows y ∈ {1, 13}: −0.6. Own endzone column
+−1.0, x = 1 −0.4. If the opposition can field a Frenzy player: −0.6 on the edge rows and −0.3 on
+y ∈ {2, 12}, waived for Side Step / Stand Firm. Slow players (MA ≤ 5): +0.25 at depth ≤ 2 else
+−0.15, plus `0.05·(3 − min(|y−7|, 3))` toward the centre.
 
-- **exactly three players on the line of scrimmage** (`FieldCoordinateBounds::LOS_HOME` / `LOS_AWAY`,
-  x = 12 / 13, y ∈ 4..=10) — three is the minimum and the engine rejects fewer;
-- **at most two players in each wide zone** (`UPPER_WIDE_ZONE_*` y ∈ 0..=3, `LOWER_WIDE_ZONE_*`
-  y ∈ 11..=14);
-- **at most eleven players placed**, and never more than the roster can field;
-- every placement inside the team's own half.
+**Offence** (`Game::setup_offense` is set — the receiving team sets up second and SEES the defence):
 
-An earlier draft said only that an illegal formation "is dropped", which on a short roster (a
-Journeyman-thin team, or after casualties) silently collapses the whole book to
-`canonical_setup_action` with nothing in the trace to say why. Log the drop.
-`canonical_setup_action` remains the guaranteed-legal fallback that must always be present.
+- depth prior `d = 12 − x`: 0 / +0.30 / +0.30 / +0.10 / −0.20 / −0.50 for d = 0 / 1–2 / 3 / 4 / ≥ 5;
+- **one or two deep to pick the ball up**: squares with d ∈ 5..=9 and |y−7| ≤ 3 add
+  `0.9·handler_score` (+0.6 Sure Hands, `0.35·(AG−3)` on the BB2016 scale, `0.12·(MA−6)`, +0.35
+  Pass/Accurate, +0.2 Big Hand/Extra Arms, +0.25 Kick-Off Return, +0.1 each Dodge/Sprint/Leap, −3.0
+  No Hands / Ball & Chain, −0.8 negatrait, −0.3 Loner, −0.3 Stunty, −0.4 for ST ≥ 5) plus +0.9 when
+  nobody is deep yet, +0.35 with one, **−1.0 with two**, and +0.15 for d ∈ 6..=8;
+- **more on the scrimmage than the defence**: an LOS square is +0.5 while `los_mine ≤ los_opp`, else
+  −0.3, plus `0.5·line_score`;
+- **contact**: exactly one opponent adjacent is +0.5 for a Block/Wrestle player and +0.1 otherwise;
+  two or more is `−0.45·(c−1)` and a further −0.2 without Block; every contact costs a fragile player
+  `0.7·fragile`, where `fragile = clamp((cost_k−70)/40, 0, 1)·clamp((9−AV)/2, 0, 1)` (+0.5 for a
+  stunty, capped at 1);
+- **fast catchers on the wings near the halfway line**: y ∈ {2, 3, 11, 12} with d ∈ 1..=3 adds
+  `0.7·receiver_score` (`0.35·(MA−6) + 0.25·(AG−3)`, +0.5 Catch/Diving Catch, +0.2 Nerves of Steel,
+  +0.25 Dodge, +0.15 Sprint, +0.1 Leap, the same −3.0/−0.6/−0.4 penalties) and +0.25 on an empty wing;
+- **protection**: a fragile player gains `0.45·fragile` per adjacent team-mate (max two) and loses
+  `0.3·fragile` in the front row.
 
-**T = 0.30.**
+**Defence** (flag clear — the kicking team sets up first; the opposition's squares are last drive's
+and are only read as occupancy):
+
+- **weaker team → few on the scrimmage, stronger → many**: the LOS target is 3 / 4 / 6 for weaker /
+  even / stronger, where strength is the sum of `power` (`ST + 0.5·(AV−8)` + skill bonuses) over the
+  eleven best available players of each side, "weaker" meaning more than 1.0 behind. Below target
+  an LOS square is `+0.45 + 0.5·line_score`; at or above it, −0.8;
+- depth prior 0 / +0.10 / +0.35 / +0.30 / +0.10 / −0.10 / −0.40 for d = 0..5 / ≥ 6;
+- **weak and fast** (mean MA ≥ 6.5): +0.5 for d ∈ 3..=6, −0.6 for d ≤ 1, −0.4 for y ≤ 2 or ≥ 12;
+- **one safety**: while nobody stands at d ≥ 5, squares with d ∈ 5..=7 and |y−7| ≤ 2 add
+  `0.5 + 0.4·receiver_score`;
+- **balanced and mirrored**: +0.6 when the mirror square (x, 14−y) is already ours, and
+  `0.25·clamp(low − up, −2, 2)` toward the emptier flank;
+- **cover each wing**: a wide square with d ∈ 1..=3 is +0.4 on an empty wing, +0.15 on a wing with
+  one; the ≤ 2 cap is what stops a third;
+- Kick may only be used off the LOS and outside the wide zones: +0.6 for a Kick player there;
+- fragile players: −0.5·fragile in the front row, +0.2·fragile behind it.
+
+**Legality is by construction**, which is what lets the confirm never trip `check_setup`: the LOS
+phase guarantees the minimum, the wide-zone cap is a hard filter, `maxPlayersOnField` stops the loop,
+and once the free slots are down to the number of unplaced `needsToBeSetUp` players only those are
+offered. The unit test `full_setups_are_legal_and_cover_the_half` drives 240 uniform setups through
+`UtilServerSetup::setup_player` and `SetupMechanic::check_setup` and asserts every square of the half
+and every player on the LOS and in the backfield.
+
+**Ordering** (contract §5): reserves by jersey, then squares column-major in the home frame,
+`x 0..=12` outer, `y 0..=14` inner. The `PlacePlayer` coordinate is the RAW home-frame square.
+
+**Cost.** `Player::position_cost` was added for this (Java reads `getPosition().getCost()`); the
+synthetic lineman fixture carries the XML's 50,000.
+
+**Measured (2026-09-13, BACKLOG §H.44).** Rust self-play A/B against the same agent with the
+`setup` class off (= the canonical formation), 10 rosters × 3 editions × 200 seeds × both
+orientations: **+0.234 TD/game at argmax (1.075 vs 0.841, +28%, 18 SE)** and **+0.054 at scale 1.0
+(0.256 vs 0.202, +27%, 8.7 SE)**, positive in every race and every edition. The first full-matrix
+sweep also exposed a latent BB2016 engine gap (the random kicking-player die) — fixed there.
+
+**T = 0.30.** Roughly 1,900 options at the first open-board placement, so a role bonus of +1.5 over
+the neutral squares is worth `e^5 ≈ 150` of them — enough that the thrower goes deep and the ogre
+goes to the line in the argmax arm, and not so much that the sampled arm ever plays the same setup
+twice. Two draws per placement, none for the confirm.
 
 ---
 
@@ -2105,7 +2163,8 @@ One place, one table, tuned as a unit.
 | `ReRollOffer`, `SkillUse`, `Interception`, `BlockChoiceProperties` | 2–4 | 0.20 | consequential but recoverable |
 | `FollowUp`, `HitAndRun`, `Trickster`/`RaidingParty`/`FuriousOutburst`, apothecary, foul | 2–10 | 0.25 | genuinely close calls |
 | `ActivatePlayer` | ~12 | 0.18 | flattest of the small-set play decisions — max coverage value |
-| `ReceiveChoice`, weather, `SelectSkill`, `TeamSetup` (formations) | 2–6 | 0.30–0.35 | low information, high coverage value |
+| `ReceiveChoice`, weather, `SelectSkill` | 2–6 | 0.30–0.35 | low information, high coverage value |
+| **`TeamSetup`** (one placement) | ~90 on the LOS, ~1,900 open board | **0.30** | §6.21: role bonuses of +1–2 dominate at this T, the rest stays reachable |
 | `CoinChoice` | 2 | 1.0 | genuinely uniform |
 | **`Move`** (normal) | **~200** | **0.06** | §7.7(a): 0.20 left the top 20 squares only 22% of the mass |
 | `Move` (touchdown available) | ~200 | 0.05 | near-greedy override |

@@ -1,5 +1,22 @@
 # FFB-Rust Session State
 
+## 2026-09-13 — setup heuristic: BB2016 kicker die fixed, A/B +27% TD, full sweep re-running
+
+Sweep 1 on the new setup exposed `bb2016/StepKickoffScatterRoll.findKickingPlayer()`'s random-player
+die that Rust never rolled (BACKLOG §H.44); fixed + tested, worst gates 100/100. A/B (24,000 games):
+new setup +0.234 TD/game at argmax, +0.054 at scale 1.0, positive in all 10 races × 3 editions.
+Sweep 2 (330 gates) ran into `parity_st_*`: 6 reds, ALL root-caused as latent engine gaps the new formations reach (§H.44–§H.47: bb2016 kicker die, bb2016 chainsaw B&C drop, bb2020 dodge Arm Bar dialog, bb2025 SecureTheBall property, Pitch Invasion parameter discard + bb2025 chain-injury, plus stock Java crash JD-002). Each fixed + re-verified 100/100 (goblin bb2025 99/100 = the Java crash). Red gates re-run with the final binary before the census. §H.49: JD-002 then ported per the house rule (`defect_fixes.referee_survives_missing_armour_roll`, default off = Java's crash outcome; `ParityRunner.run` finalises a crashed game as `END_REASON: java_crash`) — seed 67 compares.
+
+## 2026-09-12 (later) — heuristic agent: kick-off SETUP is now scored (both engines)
+
+`agent/setup_heuristic.rs` + `SetupPlacement.java`: one `(player, square)` placement per `TeamSetup`
+prompt at T = 0.30, LOS first, legality by construction, offence/defence rules per
+docs/HEURISTIC_AGENT.md §6.21. Golden-pinned (`setup_golden.txt`), 11 heuristic gates 30/30 across
+all three editions and three scales, Java ffb-ai 40/0. Ledger: docs/BACKLOG.md §H.43. UNCOMMITTED in
+both repos. Rebuilt Rust binary is `target/release/deps/ffb_parity.exe` (the top-level exe was
+locked by background runs — see §H.43 "Trap").
+
+
 ## Current Status (2026-09-10) — 🏁 FULL HEURISTIC PARITY MATRIX GREEN
 
 **333/333 gates** (111 roster×ruleset cells × scales 1.0/0/1e6), 33,300 games, 0 failures, 0 panics.

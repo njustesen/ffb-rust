@@ -979,8 +979,27 @@ impl StepApplyKickoffResult {
             // scales: Java's Fanatic is `-1,-1,Ko` and Rust's `20,5,Standing` on the BALL's square,
             // so the ball differed too (Java 20,5 vs Rust 19,5) and the next die was a block roll
             // in Java against another random-walk d8 in Rust.
-            params.extend(util_server_injury::stun_player_rng(
-                game, rng, &id, ffb_model::enums::ApothecaryMode::Home));
+            let returned = util_server_injury::stun_player_rng(
+                game, rng, &id, ffb_model::enums::ApothecaryMode::Home);
+            // Java `stunPlayers` (bb2020 AND bb2025) calls `UtilServerInjury.stunPlayer(this,
+            // player, HOME)` and DISCARDS the StepParameterSet it returns — SCATTER_BALL,
+            // DROPPED_BALL_CARRIER, END_TURN never reach the stack. Publishing them here bounced a
+            // touchback kick: the clamped, not-yet-in-play ball sat on the square of a player the
+            // invasion stunned, Rust's SCATTER_BALL made CatchScatterThrowIn roll a d8 that Java
+            // never rolls (imperial_nobility bb2025 @1e6 seed 77 half 2, dark_elf_league_fumbbl
+            // bb2025 @1.0 seed 26 half 2). `dropPlayer` sets ballMoving itself, on both sides.
+            //
+            // The ONE parameter that does reach the stack is the Ball & Chain INJURY_RESULT, which
+            // `dropPlayer` publishes directly. Whether anything applies it is the edition's
+            // sequence: the mixed Kickoff generator (bb2016/bb2020) has APOTHECARY(HOME)/(AWAY)
+            // right after this step and the Fanatic ends KO (goblin bb2020 seeds 55/99); bb2025's
+            // own generator has NO apothecary there, so in Java bb2025 the published result is
+            // never consumed and the Fanatic stays STANDING. Rust runs the mixed sequence for both,
+            // so bb2025 must not hand the result to those steps (goblin bb2025 @1.0 seed 28 i=0:
+            // Java Fanatic `12,8,Standing`, Rust `-1,-1,Ko`).
+            if game.rules != ffb_model::enums::Rules::Bb2025 {
+                params.extend(returned.into_iter().filter(|p| matches!(p, StepParameter::InjuryResult(_))));
+            }
             events.push(GameEvent::KickoffPitchInvasionStun { player_id: id });
         }
         (events, params)
@@ -1082,7 +1101,8 @@ mod tests {
         use ffb_model::model::skill_def::SkillWithValue;
         use ffb_model::types::FieldCoordinate;
 
-        let mut game = make_game();
+        // bb2020: the mixed Kickoff sequence has the apothecary steps that apply it.
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
         let mut fanatic = ffb_model::model::player::Player {
             id: "h1".into(), name: "Fanatic".into(), nr: 1, position_id: "pos".into(),
             movement: 3, strength: 7, agility: 3, passing: 6, armour: 8,
@@ -1099,6 +1119,49 @@ mod tests {
         assert_eq!(events.len(), 1, "the Fanatic must be the stunned player");
         assert!(params.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))),
             "the Ball & Chain chain injury must be PUBLISHED for the apothecary step to apply;              discarding it leaves the player STANDING where Java has it KO");
+    }
+
+    /// bb2025's Java kickoff sequence has no apothecary step, so the Ball & Chain result that
+    /// `dropPlayer` publishes is never consumed and the Fanatic stays STANDING; Rust runs the
+    /// mixed sequence (which HAS the steps) for bb2025 too, so the result must not be handed on.
+    /// And in every edition Java's `stunPlayers` discards the SCATTER_BALL / END_TURN parameters
+    /// `stunPlayer` returns — a stunned player on the ball square must not bounce the ball
+    /// (imperial_nobility bb2025 seed 77: the touchback-clamped kick lay under him).
+    #[test]
+    fn a_pitch_invasion_discards_scatter_parameters_and_bb2025_drops_the_chain_injury() {
+        use ffb_model::enums::{PlayerState, PS_STANDING, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+
+        for rules in [Rules::Bb2025, Rules::Bb2020] {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+            let mut fanatic = ffb_model::model::player::Player {
+                id: "h1".into(), name: "Fanatic".into(), nr: 1, position_id: "pos".into(),
+                movement: 3, strength: 7, agility: 3, passing: 6, armour: 8,
+                ..Default::default()
+            };
+            fanatic.starting_skills = vec![SkillWithValue { skill_id: SkillId::BallAndChain, value: None }];
+            game.team_home.players.push(fanatic);
+            game.field_model.set_player_coordinate("h1", FieldCoordinate::new(13, 7));
+            game.field_model.set_player_state("h1", PlayerState::new(PS_STANDING));
+            // The kick lies on his square, clamped and not yet in play.
+            game.field_model.ball_coordinate = Some(FieldCoordinate::new(13, 7));
+            game.field_model.ball_in_play = false;
+
+            let step = make_step();
+            let mut rng = GameRng::new(7);
+            let before = rng.call_count;
+            let (events, params) = step.stun_random_standing_players(&mut game, &mut rng, true, 1);
+            assert_eq!(events.len(), 1);
+            assert_eq!(rng.call_count - before, 3, "d1 pick + the chain injury 2d6, both editions");
+            assert!(
+                !params.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(_))),
+                "{rules:?}: Java discards stunPlayer's SCATTER_BALL"
+            );
+            let published = params.iter().any(|p| matches!(p, StepParameter::InjuryResult(_)));
+            assert_eq!(published, rules == Rules::Bb2020, "{rules:?}: chain injury handed to the apothecary steps only where Java's sequence has them");
+            assert_eq!(game.field_model.player_state("h1").map(|s| s.base()), Some(PS_STANDING));
+        }
     }
 
     /// Java's `handleOfficiousRef` picks BOTH targets before running `insertSteps` for either, so

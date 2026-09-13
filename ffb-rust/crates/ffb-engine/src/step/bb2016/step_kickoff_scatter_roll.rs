@@ -111,6 +111,16 @@ impl StepKickoffScatterRoll {
 
         // Java Phase 1: if (fUseKickChoice == null) — roll scatter direction & distance
         if self.scatter_direction.is_none() {
+            // Java: `Player<?> kickingPlayer = findKickingPlayer();` is the FIRST line of
+            // executeStep, BEFORE the scatter dice — and its no-centre-field fallback ROLLS a
+            // die (`DiceRoller.randomPlayer` = rollDice(n)). This used to read the acting
+            // player instead and never rolled: invisible for as long as every formation had a
+            // player in the centre field, which the canonical setup always did. The heuristic
+            // setup can put a short-handed kicking team entirely on the LOS and in the wide
+            // zones (chaos bb2016 seed 35: 3 on the LOS + 4 wide), and from that kickoff on the
+            // two engines read different scatter dice.
+            let kicking_player = Self::find_kicking_player(game, rng);
+
             let dir_roll = rng.d8();
             let direction = Direction::for_roll(dir_roll).unwrap_or(Direction::North);
             // Java: rollScatterDistance() is rollDice(6) — a plain d6 (1-6), NOT a d8.
@@ -120,16 +130,17 @@ impl StepKickoffScatterRoll {
             self.scatter_distance = distance;
             self.scatter_direction_roll = dir_roll;
 
-            // Java: find kicking player coordinate; fall back to center stub if not on field
+            // Java: kicking player coordinate; the (0,7)/(25,7) stub when nobody is on the field.
             let default_kicker = if game.home_playing {
                 FieldCoordinate::new(0, 7)
             } else {
                 FieldCoordinate::new(25, 7)
             };
             self.kicking_player_coordinate = Some(
-                game.acting_player.player_id.as_deref()
+                kicking_player
+                    .as_deref()
                     .and_then(|id| game.field_model.player_coordinate(id))
-                    .unwrap_or(default_kicker)
+                    .unwrap_or(default_kicker),
             );
 
             // client-only: DialogKickSkillParameter — headless auto-declines Kick skill
@@ -203,6 +214,53 @@ impl StepKickoffScatterRoll {
         // Dialog pending
         StepOutcome::cont()
     }
+
+    /// Java `findKickingPlayer()`, 1:1: walk the kicking team in roster order; a centre-field
+    /// player with `canReduceKickDistance` wins outright, otherwise the centre-field player
+    /// nearest the kicking team's own endzone (strict comparison, so the first of equals stays);
+    /// with nobody in the centre field, `DiceRoller.randomPlayer(playersOnField)` — one die of
+    /// `playersOnField.length` sides — picks any player standing on the pitch. `None` only when
+    /// the kicking team has no player on the pitch at all.
+    fn find_kicking_player(game: &Game, rng: &mut GameRng) -> Option<String> {
+        use ffb_model::model::property::named_properties::NamedProperties;
+        let home = game.home_playing;
+        let kicking_team = if home { &game.team_home } else { &game.team_away };
+        let center = if home {
+            FieldCoordinateBounds::CENTER_FIELD_HOME
+        } else {
+            FieldCoordinateBounds::CENTER_FIELD_AWAY
+        };
+        let mut kicking: Option<(&str, FieldCoordinate)> = None;
+        let mut on_field: Vec<&str> = Vec::new();
+        for p in &kicking_team.players {
+            let Some(c) = game.field_model.player_coordinate(&p.id) else { continue };
+            if !c.is_box_coordinate() {
+                on_field.push(&p.id);
+            }
+            if center.is_in_bounds(c) {
+                if p.has_skill_property(NamedProperties::CAN_REDUCE_KICK_DISTANCE) {
+                    kicking = Some((&p.id, c));
+                    break;
+                }
+                match kicking {
+                    Some((_, kc)) => {
+                        if (home && c.x < kc.x) || (!home && c.x > kc.x) {
+                            kicking = Some((&p.id, c));
+                        }
+                    }
+                    None => kicking = Some((&p.id, c)),
+                }
+            }
+        }
+        if let Some((id, _)) = kicking {
+            return Some(id.to_string());
+        }
+        if on_field.is_empty() {
+            return None;
+        }
+        let idx = rng.die(on_field.len() as u32) - 1;
+        Some(on_field[idx as usize].to_string())
+    }
 }
 
 #[cfg(test)]
@@ -254,6 +312,58 @@ mod tests {
         step.kickoff_start_coordinate = Some(FieldCoordinate::new(13, 7));
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::KickoffBounds(_))));
+    }
+
+    /// Java's `findKickingPlayer()` rolls `randomPlayer(playersOnField)` when nobody of the
+    /// kicking team stands in the centre field — one die of as many sides as there are
+    /// players on the pitch, BEFORE the scatter d8/d6. Three on the LOS and four in the wide
+    /// zones is exactly that board (chaos bb2016 seed 35), and the two engines must consume
+    /// the same number of dice through it.
+    #[test]
+    fn no_centre_field_kicker_rolls_the_random_player_die() {
+        use ffb_model::model::player::Player;
+        let mut home = test_team("home", 0);
+        for nr in 1..=7 {
+            home.players.push(Player {
+                id: format!("home_{nr:02}"),
+                nr,
+                movement: 6,
+                strength: 3,
+                agility: 3,
+                armour: 8,
+                ..Default::default()
+            });
+        }
+        let mut game = Game::new(home, test_team("away", 0), Rules::Bb2016);
+        game.home_playing = true;
+        for (id, c) in [
+            ("home_01", (12, 6)), ("home_02", (12, 7)), ("home_03", (12, 8)),
+            ("home_04", (10, 3)), ("home_05", (9, 3)), ("home_06", (10, 11)), ("home_07", (9, 11)),
+        ] {
+            game.field_model.set_player_coordinate(id, FieldCoordinate::new(c.0, c.1));
+        }
+        let mut rng = GameRng::new(35);
+        let mut step = StepKickoffScatterRoll::new();
+        step.kickoff_start_coordinate = Some(FieldCoordinate::new(19, 7));
+        step.start(&mut game, &mut rng);
+        assert_eq!(rng.call_count, 3, "random player d7, then scatter d8 and d6");
+        let kc = step.kicking_player_coordinate.unwrap();
+        assert!(game.field_model.player_at(kc).is_some(), "the kicker is a player on the pitch");
+
+        // With centre-field players the pick is deterministic (the deepest one) and no die is
+        // spent on it.
+        game.field_model.set_player_coordinate("home_07", FieldCoordinate::new(8, 7));
+        game.field_model.set_player_coordinate("home_06", FieldCoordinate::new(5, 7));
+        let mut rng = GameRng::new(35);
+        let mut step = StepKickoffScatterRoll::new();
+        step.kickoff_start_coordinate = Some(FieldCoordinate::new(19, 7));
+        step.start(&mut game, &mut rng);
+        assert_eq!(rng.call_count, 2, "scatter d8 and d6 only");
+        assert_eq!(
+            step.kicking_player_coordinate,
+            Some(FieldCoordinate::new(5, 7)),
+            "home kicks: the smallest x wins"
+        );
     }
 
     #[test]

@@ -14,6 +14,7 @@
 //!   game's mechanic surface does random play exercise" runs.
 
 pub mod det_math;
+pub mod setup_heuristic;
 mod heuristic_agent;
 mod random_agent;
 mod uniform_agent;

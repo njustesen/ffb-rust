@@ -113,6 +113,7 @@ There is no `TempTable` type; the temperature is a literal at each call site. `d
 | `Touchback` | 0.20 |
 | `CoinChoice` | 1.00 |
 | `ReceiveChoice` | 0.30 |
+| `TeamSetup` (one placement per prompt; none for the confirm) | 0.30 |
 
 Effective temperature is `t = max(t_base * temp_scale, 1e-6)`.
 
@@ -168,6 +169,7 @@ Sites governed by this rule:
 | `Pushback` squares | `(x, y)` |
 | reach output `order` | ascending flat cell index (`sort_unstable`) |
 | `top_moves` | weight desc, ascending flat index as tie-break |
+| `TeamSetup` reserves | `nr` asc (single-sided), then squares `x 0..=12` outer, `y 0..=14` inner in the HOME frame; `needsToBeSetUp` players first when the free slots are down to their count |
 
 All six player-ordering sites are **single-sided** (acting team, opponents, or team-mates only), so
 within a side `(side, nr)` reproduces lexicographic `home_NN` order exactly — which is why adopting

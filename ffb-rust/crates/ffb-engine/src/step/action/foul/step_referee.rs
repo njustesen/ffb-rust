@@ -107,8 +107,24 @@ impl StepReferee {
                 || ctx.is_armor_broken()
                 || (has_sneaky_git && sneaky_git_ban_to_ko))
         {
-            if let Some(armor) = ctx.get_armor_roll() {
-                referee_spots_foul = armor[0] == armor[1];
+            match ctx.get_armor_roll() {
+                Some(armor) => referee_spots_foul = armor[0] == armor[1],
+                // JD-002 (docs/JAVA_DEFECTS.md): Java reads `armorRoll[0]` here with no null
+                // guard. A Ball & Chain victim's armour is marked broken WITHOUT dice
+                // (`UtilServerInjury.handleInjury`, `placedProneCausesInjuryRoll`), so the stock
+                // engine throws `NullPointerException` out of `StepReferee.executeStep` and the
+                // game ends in the state it had before this step ran — no report, no event, no
+                // next action. Mirror that OBSERVABLE outcome rather than the exception: return
+                // without touching anything, so the driver's no-progress guard ends the game
+                // exactly where Java's crash does (the harness records it as `java_crash`).
+                //
+                // With `defect_fixes.referee_survives_missing_armour_roll` on, "no armour dice"
+                // reads as "no armour doubles" and the referee goes on to the injury dice below.
+                None => {
+                    if !game.defect_fixes.referee_survives_missing_armour_roll {
+                        return StepOutcome::cont();
+                    }
+                }
             }
         }
 
@@ -255,6 +271,32 @@ mod tests {
         assert_eq!(out.action, StepAction::GotoLabel, "an unspotted foul skips the ban steps");
     }
 
+    /// JD-002 (docs/JAVA_DEFECTS.md): a foul on a Ball & Chain player marks the armour broken
+    /// WITHOUT dice. Java's hook then reads `armorRoll[0]` from null and the game dies there. With
+    /// the defect flag off (default) Rust returns `Continue` having touched nothing, so the
+    /// driver's no-progress guard ends the game where Java's crash does; with the flag on the
+    /// referee reads the injury dice instead (here [2, 2] — spotted).
+    #[test]
+    fn jd002_missing_armour_roll_stalls_by_default_and_reads_injury_dice_when_fixed() {
+        let (mut game, _) = make_game_with_player(vec![]);
+        let mut step = StepReferee::new();
+        step.goto_label_on_end = "NO_FOUL".into();
+        step.injury_result_defender = Some(make_injury_result(None, true, Some([2, 2])));
+
+        let reports_before = game.report_list.size();
+        let outcome = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(outcome.action, StepAction::Continue, "default = Java's crash: no next action");
+        assert!(outcome.events.is_empty(), "the crashed step publishes nothing");
+        assert_eq!(game.report_list.size(), reports_before, "and adds no report");
+
+        game.defect_fixes.referee_survives_missing_armour_roll = true;
+        let outcome = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(outcome.action, StepAction::NextStep, "fixed: injury doubles → spotted");
+        assert!(outcome.events.iter().any(|e| matches!(
+            e, GameEvent::RefereeSpotsFoul { referee_spots_foul: true, .. }
+        )));
+    }
+
     #[test]
     fn no_injury_result_skips_logic() {
         let (mut game, _) = make_game_with_player(vec![]);
@@ -364,9 +406,12 @@ mod tests {
         assert_eq!(outcome.action, StepAction::NextStep, "armor doubles when armor broken overrides SneakyGit protection");
     }
 
+    /// Stock Java crashes on a missing armour roll (JD-002, tested above); this is the corrected
+    /// reading behind `defect_fixes.referee_survives_missing_armour_roll`.
     #[test]
-    fn no_armor_roll_returns_goto_label() {
+    fn no_armor_roll_returns_goto_label_when_jd002_fixed() {
         let (mut game, _) = make_game_with_player(vec![]);
+        game.defect_fixes.referee_survives_missing_armour_roll = true;
         let mut step = StepReferee::new();
         step.goto_label_on_end = "END".into();
         // No armor roll at all — no doubles possible

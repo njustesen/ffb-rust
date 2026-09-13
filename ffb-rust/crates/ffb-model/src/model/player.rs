@@ -80,6 +80,11 @@ pub struct Player {
     pub position_passing: i32,
     #[serde(default)]
     pub position_armour: i32,
+    /// Java: `player.getPosition().getCost()` — the position's hiring cost in gold. Java reaches
+    /// it through the position; Rust copies it here at creation like the other position facts.
+    /// Read by the heuristic agent's setup scorer ("cheap units on the line").
+    #[serde(default)]
+    pub position_cost: i32,
 
     /// Skills the position starts with (defined on the roster position).
     #[serde(default)]
@@ -542,6 +547,7 @@ impl Player {
             position_agility: pos.agility,
             position_passing: pos.passing,
             position_armour: pos.armour,
+            position_cost: pos.cost,
             starting_skills: pos.skills.clone(),
             extra_skills: vec![],
             temporary_skills: vec![],
@@ -587,6 +593,7 @@ impl Player {
         self.position_agility = position.agility;
         self.position_passing = position.passing;
         self.position_armour = position.armour;
+        self.position_cost = position.cost;
         self.is_thrall = position.is_thrall;
         self.is_big_guy = position.is_big_guy;
         self.is_lineman = position.is_lineman;
@@ -865,6 +872,7 @@ mod tests {
             position_agility: 3,
             position_passing: 4,
             position_armour: 8,
+            position_cost: 0,
             starting_skills: vec![],
             extra_skills: vec![],
             temporary_skills: vec![],

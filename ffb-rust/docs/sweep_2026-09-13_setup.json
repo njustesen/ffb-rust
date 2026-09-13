@@ -1,0 +1,101 @@
+{
+ "gates": 330,
+ "cells": 110,
+ "green": 324,
+ "failed": 6,
+ "noverdict": 0,
+ "short": 10,
+ "summed_minutes": 1654.0,
+ "expected": 330,
+ "complete": true,
+ "red": [
+  {
+   "cell": "dark_elf_league_fumbbl",
+   "edition": "bb2025",
+   "scale": "1.0",
+   "verdict": "PARITY: 99/100 passed, 1 FAILED."
+  },
+  {
+   "cell": "goblin",
+   "edition": "bb2016",
+   "scale": "1.0",
+   "verdict": "PARITY: 98/100 passed, 2 FAILED."
+  },
+  {
+   "cell": "goblin",
+   "edition": "bb2025",
+   "scale": "1.0",
+   "verdict": "PARITY: 65/100 passed, 35 FAILED."
+  },
+  {
+   "cell": "imperial_nobility",
+   "edition": "bb2025",
+   "scale": "1e6",
+   "verdict": "PARITY: 99/100 passed, 1 FAILED."
+  },
+  {
+   "cell": "norse",
+   "edition": "bb2025",
+   "scale": "1e6",
+   "verdict": "PARITY: 99/100 passed, 1 FAILED."
+  },
+  {
+   "cell": "old_world_alliance_ogre",
+   "edition": "bb2020",
+   "scale": "0",
+   "verdict": "PARITY: 95/100 passed, 5 FAILED."
+  }
+ ],
+ "short_gates": [
+  {
+   "cell": "chaos",
+   "edition": "bb2016",
+   "scale": "1e6"
+  },
+  {
+   "cell": "dwarf",
+   "edition": "bb2016",
+   "scale": "1e6"
+  },
+  {
+   "cell": "dwarf",
+   "edition": "bb2020",
+   "scale": "1e6"
+  },
+  {
+   "cell": "khemri",
+   "edition": "bb2025",
+   "scale": "1e6"
+  },
+  {
+   "cell": "khemri_fumbbl",
+   "edition": "bb2020",
+   "scale": "0"
+  },
+  {
+   "cell": "khemri_fumbbl",
+   "edition": "bb2025",
+   "scale": "0"
+  },
+  {
+   "cell": "khorne",
+   "edition": "bb2025",
+   "scale": "1e6"
+  },
+  {
+   "cell": "nurgle",
+   "edition": "bb2025",
+   "scale": "1e6"
+  },
+  {
+   "cell": "slann_fumbbl",
+   "edition": "bb2020",
+   "scale": "0"
+  },
+  {
+   "cell": "slann_fumbbl",
+   "edition": "bb2025",
+   "scale": "0"
+  }
+ ]
+}
