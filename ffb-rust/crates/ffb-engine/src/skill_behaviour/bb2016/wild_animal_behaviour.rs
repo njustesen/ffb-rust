@@ -178,7 +178,7 @@ impl StepModifierTrait for WildAnimalStepModifier {
                 1,
                 min_roll,
                 true,
-                Some(SkillId::WildAnimal.class_name().to_string()),
+                Some(SkillId::WildAnimal.category_and_name_for(game.rules).1.to_string()),
             ));
             cancel_wild_animal_bb2016(game, &player_id);
             state.outcome = Some(
@@ -223,7 +223,7 @@ impl StepModifierTrait for WildAnimalStepModifier {
             roll,
             min_roll,
             re_rolled,
-            Some(SkillId::WildAnimal.class_name().to_string()),
+            Some(SkillId::WildAnimal.category_and_name_for(game.rules).1.to_string()),
         ));
         let confusion_event = GameEvent::ConfusionRoll { player_id: player_id.clone(), roll, confused: !successful };
 

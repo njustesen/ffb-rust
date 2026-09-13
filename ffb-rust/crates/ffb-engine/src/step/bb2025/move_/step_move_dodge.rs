@@ -443,8 +443,12 @@ impl StepMoveDodge {
                     ).is_empty()
                 });
                 if let Some(source) = skill_source {
-                    let pid = player_id.as_deref().unwrap_or("").to_owned();
-                    use_reroll(game, &source, &pid, rng);
+                    // Java `RollMechanic.askForReRollIfAvailable` only SETS reRolledAction +
+                    // reRollSource for a skill source; the single `useReRoll` happens on the
+                    // re-entry (`StepMoveDodge.executeStep:229`), which is the `already_rerolled`
+                    // branch above. Rust consumed here AND on re-entry — harmless to the dice
+                    // (a skill re-roll rolls nothing and marking it used twice is idempotent) but
+                    // it wrote TWO `ReportReRoll(Dodge)` where Java writes one (H.50).
                     self.re_roll_state.re_roll_source = Some(source);
                     self.dodge_roll = 0;
                     // Failed initial roll resolved — event goes first, re-roll events follow.

@@ -78,7 +78,10 @@ impl StateMechanicTrait for StateMechanic {
         }
         game.field_model.ball_coordinate = None;
         game.field_model.ball_in_play = false;
-        // NOTE: ReportStartHalf emitted by the calling step (StepInitKickoff) after start_half returns.
+        // Java: pStep.getResult().addReport(new ReportStartHalf(game.getHalf())) — inside startHalf,
+        // so the SECOND half is reported too. It used to live in StepInitKickoff's StartGame branch
+        // only, and Java's half-2 `startHalf` report was missing from the stream (H.50).
+        game.report_list.add(ffb_model::report::report_start_half::ReportStartHalf::new(game.half));
 
         if half <= 1 {
             events.extend(self.add_apothecaries(game, true));

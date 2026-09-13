@@ -151,6 +151,16 @@ impl RollMechanicTrait for RollMechanic {
 
         let total = injury_roll[0] + injury_roll[1] + injury_modifier_sum(ctx);
 
+        // Java records that Thick Skull ACTUALLY converted the result: the branch that returns
+        // STUNNED also does `defender.getSkillWithProperty(convertKOToStunOn8).getInjuryModifiers()
+        // .forEach(injuryContext::addInjuryModifier)`, so the report names the skill that saved the
+        // player. The modifier is value 0 (`common/ThickSkull.java` registers
+        // `StaticInjuryModifier("Thick Skull", 0)` whose `appliesToContext` is always false, i.e. it
+        // is only ever added HERE), so this cannot move a total (H.50).
+        if has_thick_skull && ((total == 7 && is_stunty) || (total == 8 && !is_stunty)) {
+            ctx.add_injury_modifier(ffb_mechanics::modifiers::Modifier::new(
+                "Thick Skull", 0, game.rules));
+        }
         interpret_injury_total_bb2020(total, is_stunty, has_thick_skull)
             .and_then(injury_outcome_to_player_state)
     }

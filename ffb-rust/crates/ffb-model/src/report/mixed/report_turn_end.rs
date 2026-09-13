@@ -6,17 +6,31 @@ use crate::report::report_id::ReportId;
 pub struct KnockoutRecovery {
     pub player_id: String,
     pub recovered: bool,
+    /// Java: fRoll — the recovery die.
+    pub roll: i32,
+    /// Java: fBloodweiserBabes — kegs applied to the roll.
+    pub bloodweiser_babes: i32,
+    /// Java: reRollReason (null unless a re-roll was involved).
+    pub re_roll_reason: Option<String>,
 }
 
 impl KnockoutRecovery {
     pub fn new(player_id: String, recovered: bool) -> Self {
-        Self { player_id, recovered }
+        Self { player_id, recovered, roll: 0, bloodweiser_babes: 0, re_roll_reason: None }
+    }
+
+    /// Java: `new KnockoutRecovery(playerId, recovering, roll, bloodweiserBabes, null)`.
+    pub fn with_roll(player_id: String, recovered: bool, roll: i32, bloodweiser_babes: i32) -> Self {
+        Self { player_id, recovered, roll, bloodweiser_babes, re_roll_reason: None }
     }
 
     pub fn to_json_value(&self) -> serde_json::Value {
         serde_json::json!({
             "playerId": self.player_id,
             "recovering": self.recovered,
+            "roll": self.roll,
+            "bloodweiserBabes": self.bloodweiser_babes,
+            "reason": self.re_roll_reason,
         })
     }
 
@@ -24,6 +38,9 @@ impl KnockoutRecovery {
         Self {
             player_id: json["playerId"].as_str().unwrap_or("").to_string(),
             recovered: json["recovering"].as_bool().unwrap_or(false),
+            roll: json["roll"].as_i64().unwrap_or(0) as i32,
+            bloodweiser_babes: json["bloodweiserBabes"].as_i64().unwrap_or(0) as i32,
+            re_roll_reason: json["reason"].as_str().map(str::to_string),
         }
     }
 }
@@ -135,6 +152,7 @@ impl ReportTurnEnd {
 }
 
 impl IReport for ReportTurnEnd {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::TURN_END }
 }
 

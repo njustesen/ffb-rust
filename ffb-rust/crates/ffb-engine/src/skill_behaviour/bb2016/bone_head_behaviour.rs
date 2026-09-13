@@ -196,7 +196,7 @@ impl StepModifierTrait for BoneHeadStepModifier {
             roll,
             min_roll,
             re_rolled,
-            Some(SkillId::BoneHead.class_name().to_string()),
+            Some(SkillId::BoneHead.category_and_name_for(game.rules).1.to_string()),
         ));
         let confusion_event = GameEvent::ConfusionRoll { player_id: player_id.clone(), roll, confused: !successful };
 

@@ -20,6 +20,7 @@ impl ReportNervesOfSteel {
 }
 
 impl IReport for ReportNervesOfSteel {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::NERVES_OF_STEEL }
 }
 

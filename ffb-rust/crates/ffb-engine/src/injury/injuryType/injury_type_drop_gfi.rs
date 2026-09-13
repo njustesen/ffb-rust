@@ -17,6 +17,7 @@ impl InjuryTypeDropGFI {
 impl Default for InjuryTypeDropGFI { fn default() -> Self { Self::new() } }
 
 impl InjuryTypeServer for InjuryTypeDropGFI {
+    fn java_type_name(&self) -> &'static str { "dropGfi" }
     fn handle_injury(
         &mut self, game: &Game, rng: &mut GameRng,
         attacker_id: Option<&str>, defender_id: &str,

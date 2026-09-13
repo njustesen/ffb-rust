@@ -43,6 +43,7 @@ impl ReportSecretWeaponBan {
 }
 
 impl IReport for ReportSecretWeaponBan {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::SECRET_WEAPON_BAN }
 }
 

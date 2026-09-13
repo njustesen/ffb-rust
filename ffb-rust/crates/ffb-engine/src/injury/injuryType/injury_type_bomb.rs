@@ -19,6 +19,7 @@ impl InjuryTypeBomb { pub fn new() -> Self { Self { ctx: InjuryContext::new(Apot
 impl Default for InjuryTypeBomb { fn default() -> Self { Self::new() } }
 
 impl InjuryTypeServer for InjuryTypeBomb {
+    fn java_type_name(&self) -> &'static str { "bomb" }
     fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,
         coord: FieldCoordinate, _from_coord: Option<FieldCoordinate>, _old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode) {
         self.ctx.defender_id = Some(defender_id.to_owned());

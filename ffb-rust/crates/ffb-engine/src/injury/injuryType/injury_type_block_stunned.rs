@@ -16,6 +16,7 @@ impl InjuryTypeBlockStunned { pub fn new() -> Self { Self { ctx: InjuryContext::
 impl Default for InjuryTypeBlockStunned { fn default() -> Self { Self::new() } }
 
 impl InjuryTypeServer for InjuryTypeBlockStunned {
+    fn java_type_name(&self) -> &'static str { "blockStunned" }
     fn java_class_name(&self) -> &'static str { "BlockStunned" }
     fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,
         coord: FieldCoordinate, from_coord: Option<FieldCoordinate>, old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode) {

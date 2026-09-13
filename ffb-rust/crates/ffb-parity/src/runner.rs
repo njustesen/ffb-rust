@@ -15,7 +15,7 @@ use ffb_model::model::roster_position::RosterPosition;
 use ffb_model::model::team::Team;
 use ffb_model::prompts::AgentPrompt;
 use ffb_model::option::game_option_id::{INDUCEMENTS, MAX_PLAYERS_ON_FIELD, MIN_PLAYERS_ON_LOS, MAX_PLAYERS_IN_WIDE_ZONE, MB_STACKS_AGAINST_CHAINSAW, CLAW_DOES_NOT_STACK, ENABLE_STALLING_CHECK, ALLOW_BALL_AND_CHAIN_RE_ROLL};
-use crate::log_format::{GameLog, LogLine, java_log_path_for, rust_log_path_for, rust_events_path_for};
+use crate::log_format::{GameLog, LogLine, java_log_path_for, rust_log_path_for, rust_events_path_for, rust_reports_path_for};
 use crate::state_hash::state_hash;
 use ffb_model::util::state_hash::state_string;
 
@@ -256,6 +256,9 @@ pub fn run_java_headless_range(
     args.push(tier.to_string());
     args.push("--seed-end".into());
     args.push(seed_end.to_string());
+    // Java's report stream, captured from `sendModelSync` — the twin of `rust_reports_path_for`.
+    args.push("--reports".into());
+    args.push(format!("{dir}/seed_{{seed}}_java_reports.jsonl"));
     if let Some(rs) = java_ruleset_arg(edition) {
         args.push("--ruleset".into());
         args.push(rs.into());
@@ -558,6 +561,25 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
     let initial_hash = engine.initial_state_hash().to_string();
     let mut lines: Vec<LogLine> = Vec::new();
     let mut all_events: Vec<GameEvent> = Vec::new();
+    // The report stream (see `rust_reports_path_for`): every report the engine has added so far,
+    // as JSON, tagged with the step index it was produced under. `game.report_list` is append-only
+    // for the life of a game (nothing clears it mid-game), so the tail after each `apply` is exactly
+    // what that apply produced; the pregame reports (coin toss, weather, ...) are collected here
+    // under i=0 before the first agent action.
+    let mut report_lines: Vec<String> = Vec::new();
+    let mut reports_seen = 0usize;
+    let mut collect_reports = |engine: &GameState, i: u64, out: &mut Vec<String>, seen: &mut usize| {
+        let reports = engine.game.report_list.get_reports();
+        for r in &reports[(*seen).min(reports.len())..] {
+            let mut v = r.to_json().unwrap_or_else(|| serde_json::json!({"reportId": r.get_id().get_name()}));
+            if let Some(obj) = v.as_object_mut() {
+                obj.insert("i".to_string(), serde_json::Value::from(i));
+            }
+            out.push(v.to_string());
+        }
+        *seen = reports.len();
+    };
+    collect_reports(&engine, 0, &mut report_lines, &mut reports_seen);
     lines.push(LogLine::GameStart {
         i: 0,
         home: home_roster.to_string(),
@@ -709,6 +731,7 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
                 break;
             }
         }
+        collect_reports(&engine, step_index, &mut report_lines, &mut reports_seen);
 
         if ffb_engine::parity_trace_enabled() {
             eprintln!("LOOP applied={chosen} prompt_after={:?} finished={}",
@@ -800,6 +823,15 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
             if let Ok(line) = serde_json::to_string(ev) {
                 let _ = writeln!(f, "{}", line);
             }
+        }
+    }
+
+    // Write the report stream (one JSON line per IReport, Java-shaped keys, plus `i`).
+    let reports_path = rust_reports_path_for(seed, edition, home_roster, away_roster);
+    if let Ok(mut f) = std::fs::File::create(&reports_path) {
+        use std::io::Write;
+        for line in &report_lines {
+            let _ = writeln!(f, "{}", line);
         }
     }
 

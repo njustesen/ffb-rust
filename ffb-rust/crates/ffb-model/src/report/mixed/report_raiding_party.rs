@@ -25,6 +25,7 @@ impl ReportRaidingParty {
 }
 
 impl IReport for ReportRaidingParty {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::RAIDING_PARTY }
 }
 

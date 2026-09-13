@@ -25,6 +25,7 @@ impl ReportJumpUpRoll {
 }
 
 impl IReport for ReportJumpUpRoll {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId {
         ReportId::JUMP_UP_ROLL
     }

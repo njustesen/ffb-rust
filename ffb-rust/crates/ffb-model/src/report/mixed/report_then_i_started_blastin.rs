@@ -51,6 +51,7 @@ impl ReportThenIStartedBlastin {
 }
 
 impl IReport for ReportThenIStartedBlastin {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::THEN_I_STARTED_BLASTIN }
 }
 

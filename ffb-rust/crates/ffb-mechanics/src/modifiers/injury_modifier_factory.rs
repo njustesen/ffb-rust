@@ -160,7 +160,25 @@ fn skill_to_injury_modifier_untagged(
     skill_id: SkillId,
     context: &InjuryModifierContext,
 ) -> Option<Box<dyn InjuryModifier>> {
-    if context.is_defender_mode() { return None; }
+    if context.is_defender_mode() {
+        // Java's factory walks the DEFENDER's skills in defender mode too, and Stunty registers an
+        // InjuryModifier there: `appliesToContext = !isStab && defender.isHurtMoreEasily &&
+        // !preventDamagingInjuryModifications`. Rust returned None for the entire defender pass, so
+        // `injuryModifiers` never listed Stunty — the modifier list is the ONLY place a passive
+        // skill is visible in either engine's telemetry (H.50).
+        //
+        // Value 0 by construction (see `find_registered_injury_modifiers`): the numeric effect of
+        // Stunty lives in `interpret_injury_total_*` via IS_HURT_MORE_EASILY, so this cannot move
+        // an injury total — it only names the skill in the report.
+        if skill_id == SkillId::Stunty
+            && !context.is_stab
+            && !context.get_defender().has_skill_property(NamedProperties::PREVENT_DAMAGING_INJURY_MODIFICATIONS)
+            && context.get_defender().has_skill_property(NamedProperties::IS_HURT_MORE_EASILY)
+        {
+            return Some(Box::new(StaticInjuryModifier::new("Stunty", 0, false)));
+        }
+        return None;
+    }
     match skill_id {
         SkillId::MightyBlow => {
             // Java's `VariableInjuryModifierAttacker.appliesToContext` is

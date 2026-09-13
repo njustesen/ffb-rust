@@ -212,20 +212,36 @@ impl StepPickUp {
                 self.roll, minimum_roll, coord, tz, mod_names);
         }
 
-        // Java line 191: addReport(new ReportPickupRoll(...))
+        // Java line 191: addReport(new ReportPickupRoll(...)). BB2025's `StepPickUp` builds the
+        // bb2025 report, which carries `secureTheBallUsed`; the bb2020 edition of the same step
+        // builds the mixed one without it. Rust served both editions the mixed report (report
+        // diff, H.50).
         {
-            use ffb_model::report::mixed::report_pickup_roll::ReportPickupRoll;
             let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
                 .map(|a| a.name == "PICKUP").unwrap_or(false)
                 && self.re_roll_state.re_roll_source.is_some();
-            game.report_list.add(ReportPickupRoll::new(
-                player_id.clone(),
-                successful,
-                self.roll,
-                minimum_roll,
-                re_rolled,
-                mod_names,
-            ));
+            if game.rules == ffb_model::enums::Rules::Bb2025 {
+                use ffb_model::report::bb2025::report_pickup_roll::ReportPickupRoll;
+                game.report_list.add(ReportPickupRoll::new(
+                    player_id.clone(),
+                    successful,
+                    self.roll,
+                    minimum_roll,
+                    re_rolled,
+                    mod_names,
+                    self.secure_the_ball,
+                ));
+            } else {
+                use ffb_model::report::mixed::report_pickup_roll::ReportPickupRoll;
+                game.report_list.add(ReportPickupRoll::new(
+                    player_id.clone(),
+                    successful,
+                    self.roll,
+                    minimum_roll,
+                    re_rolled,
+                    mod_names,
+                ));
+            }
         }
 
         // Emit one GameEvent per resolved roll (monolith parity: initial roll and

@@ -271,7 +271,7 @@ impl StepModifierTrait for ReallyStupidStepModifier {
             roll,
             min_roll,
             re_rolled,
-            Some(SkillId::ReallyStupid.class_name().to_string()),
+            Some(SkillId::ReallyStupid.category_and_name_for(game.rules).1.to_string()),
         ));
         let confusion_event = GameEvent::ConfusionRoll { player_id: player_id.clone(), roll, confused: !successful };
 

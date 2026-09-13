@@ -20,6 +20,7 @@ impl ReportKickoffSequenceActivationsCount {
 }
 
 impl IReport for ReportKickoffSequenceActivationsCount {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::KICKOFF_SEQUENCE_ACTIVATIONS_COUNT }
 }
 

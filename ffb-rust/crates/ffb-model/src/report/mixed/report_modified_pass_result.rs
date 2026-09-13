@@ -19,6 +19,7 @@ impl ReportModifiedPassResult {
 }
 
 impl IReport for ReportModifiedPassResult {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::MODIFIED_PASS_RESULT }
 }
 

@@ -46,6 +46,7 @@ impl ReportFanFactorRollPostMatch {
 }
 
 impl IReport for ReportFanFactorRollPostMatch {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::FAN_FACTOR_ROLL_POST_MATCH }
 }
 

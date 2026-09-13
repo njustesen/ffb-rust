@@ -18,6 +18,7 @@ impl ReportBriberyAndCorruptionReRoll {
 }
 
 impl IReport for ReportBriberyAndCorruptionReRoll {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::BRIBERY_AND_CORRUPTION_RE_ROLL }
 }
 

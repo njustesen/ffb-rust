@@ -13,6 +13,7 @@ impl InjuryTypeBreatheFireForSpp { pub fn new() -> Self { Self { ctx: InjuryCont
 impl Default for InjuryTypeBreatheFireForSpp { fn default() -> Self { Self::new() } }
 
 impl InjuryTypeServer for InjuryTypeBreatheFireForSpp {
+    fn java_type_name(&self) -> &'static str { "breatheFireForSpp" }
     fn java_class_name(&self) -> &'static str { "BreatheFireForSpp" }
     fn is_vomit_like(&self) -> bool { true }
     fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,

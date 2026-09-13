@@ -223,6 +223,13 @@ pub enum SkillId {
 
 impl SkillId {
     /// The Java class name used for this skill (matches JSON `class_name` field).
+    /// Java `Skill.getName()` — the display name a report serialises ("Eye Gouge", "Bone Head").
+    /// The edition-aware source is `category_and_name_for`; the handful of skills whose NAME (not
+    /// category) differs per edition are spelled here with their BB2020/BB2025 name.
+    pub fn display_name(self) -> &'static str {
+        self.category_and_name_for(crate::enums::Rules::Bb2025).1
+    }
+
     pub fn class_name(self) -> &'static str {
         match self {
             SkillId::Block => "Block",

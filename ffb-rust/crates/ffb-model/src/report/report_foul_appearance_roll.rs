@@ -33,6 +33,7 @@ impl ReportFoulAppearanceRoll {
 }
 
 impl IReport for ReportFoulAppearanceRoll {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId {
         ReportId::FOUL_APPEARANCE_ROLL
     }

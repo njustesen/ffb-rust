@@ -25,6 +25,7 @@ impl ReportGoForItRoll {
 }
 
 impl IReport for ReportGoForItRoll {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId {
         ReportId::GO_FOR_IT_ROLL
     }

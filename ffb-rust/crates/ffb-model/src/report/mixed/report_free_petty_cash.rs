@@ -18,6 +18,7 @@ impl ReportFreePettyCash {
 }
 
 impl IReport for ReportFreePettyCash {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::FREE_PETTY_CASH }
 }
 

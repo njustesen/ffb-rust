@@ -36,6 +36,7 @@ impl ReportPenaltyShootout {
 }
 
 impl IReport for ReportPenaltyShootout {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::PENALTY_SHOOTOUT }
 }
 

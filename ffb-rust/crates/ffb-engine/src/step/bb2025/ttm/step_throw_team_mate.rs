@@ -175,7 +175,17 @@ impl StepThrowTeamMate {
 
             // Java: ThrowTeamMateBehaviour.handleExecuteStepHook → addReport(new ReportThrowTeamMateRoll(...))
             let re_rolled = self.re_rolled_action.is_some() && self.re_roll_source.is_some();
-            let pass_result_name = Some(format!("{:?}", pass_result));
+            // Java serialises `PassResult.name()` (the enum constant) and
+            // `PassingDistance.getName()` (the display name); Rust used the Rust variant `Debug`
+            // for both ("Inaccurate" / "QuickPass" against Java's "INACCURATE" / "Quick Pass").
+            let pass_result_name = Some(match pass_result {
+                PassOutcome::Complete => "ACCURATE",
+                PassOutcome::Inaccurate => "INACCURATE",
+                PassOutcome::Fumble => "FUMBLE",
+                PassOutcome::WildlyInaccurate => "WILDLY_INACCURATE",
+                PassOutcome::Caught => "CAUGHT",
+                PassOutcome::MissedCatch => "MISSED_CATCH",
+            }.to_string());
             game.report_list.add(ReportThrowTeamMateRoll::new(
                 game.thrower_id.clone(),
                 successful,
@@ -183,7 +193,7 @@ impl StepThrowTeamMate {
                 self.minimum_roll,
                 re_rolled,
                 vec![],
-                Some(format!("{:?}", passing_distance)),
+                Some(passing_distance.name().to_string()),
                 self.thrown_player_id.clone(),
                 pass_result_name,
                 self.kicked,

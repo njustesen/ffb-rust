@@ -34,6 +34,7 @@ impl ReportPushback {
 }
 
 impl IReport for ReportPushback {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::PUSHBACK }
 }
 

@@ -21,6 +21,7 @@ impl ReportThrowIn {
 }
 
 impl IReport for ReportThrowIn {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::THROW_IN }
 }
 

@@ -70,6 +70,85 @@ impl StepApothecary {
         let mut do_next_step = true;
         let mut pending_events: Vec<GameEvent> = vec![];
 
+        // Java bb2025 StepApothecary.executeStep, the pre-regeneration block (lines 270-300):
+        //
+        //     if (fInjuryResult.isPreRegeneration()) {
+        //         fInjuryResult.report(this);              // the injury with CAS skipped
+        //         fInjuryResult.setAlreadyReported(false); // so the post-apo report is written too
+        //         if (playerState.isCasualty() && canRollToSaveFromInjury && injuryType.canUseApo()) {
+        //             if (handleRegeneration(...)) { setInjury / RESULT_CHOICE / seriousInjury=null; passedRegeneration(); }
+        //             else if (Igor inducement) { ... }    // absent from the parity teams
+        //             else if (askForReRollIfAvailable(REGENERATION, 4)) { return CONTINUE; }
+        //             else passedRegeneration();
+        //         } else passedRegeneration();
+        //     }
+        //
+        // Rust had folded the Regeneration roll into the tail below (after `applyTo`) and never
+        // called `passed_regeneration`, so (a) the first, CAS-skipped injury report was missing —
+        // Java writes two injury reports per casualty — and (b) every later report kept the
+        // pre-regeneration `skipInjuryParts`. Report order and content only: the one Regeneration
+        // die is thrown in the same place relative to every other die (H.50).
+        let pre_regen = self.injury_result.as_ref().map(|ir| ir.is_pre_regeneration()).unwrap_or(false);
+        if pre_regen {
+            if game.rules == ffb_model::enums::Rules::Bb2025 {
+                if let Some(ref mut ir) = self.injury_result {
+                    if let Some(ev) = ir.report(game) { pending_events.push(ev); }
+                    ir.set_already_reported(false);
+                }
+            }
+            let (defender_id, ctx_state, can_use_apo) = {
+                let ir = self.injury_result.as_ref().unwrap();
+                (ir.injury_context.defender_id.clone(), ir.injury_context.injury, ir.injury_context.can_use_apo)
+            };
+            let can_regen = defender_id.as_deref()
+                .and_then(|id| game.player(id))
+                .map(|p| p.has_skill_property(
+                    ffb_model::model::property::named_properties::NamedProperties::CAN_ROLL_TO_SAVE_FROM_INJURY))
+                .unwrap_or(false);
+            let is_casualty = ctx_state.map(|s| s.is_casualty()).unwrap_or(false);
+            if let (Some(defender_id), true) = (defender_id, is_casualty && can_regen && can_use_apo) {
+                let (regenerated, ev) = crate::step::util_server_injury::handle_regeneration_with_state(
+                    game, rng, &defender_id, ctx_state.unwrap(), false,
+                );
+                if let Some(ev) = ev { self.pending_regeneration.push(ev); }
+                if regenerated {
+                    // Java: injuryContext().setInjury(fieldModel.getPlayerState(player));
+                    //       setApothecaryStatus(RESULT_CHOICE); setSeriousInjury(null); passedRegeneration();
+                    let new_state = game.field_model.player_state(&defender_id);
+                    if let Some(ir) = self.injury_result.as_mut() {
+                        ir.injury_context.injury = new_state;
+                        ir.injury_context.apothecary_status = ffb_model::enums::ApothecaryStatus::ResultChoice;
+                        ir.injury_context.serious_injury = None;
+                        ir.passed_regeneration();
+                    }
+                    self.cure_poison(game);
+                } else {
+                    // Java: the REGENERATION inducement (Igor) is offered first — no parity team
+                    // carries one — then `askForReRollIfAvailable(player, REGENERATION, 4, false)`
+                    // (bb2025's RollMechanic shows the dialog iff a team re-roll is available;
+                    // bb2020's StepApothecary has no such ask). Accepting it re-rolls in
+                    // `handle_command` and calls `passed_regeneration` there.
+                    let offered = game.rules == ffb_model::enums::Rules::Bb2025
+                        && match crate::step::util_server_re_roll::ask_for_reroll_if_available_for(
+                            game, Some(&defender_id), "REGENERATION", 4, false,
+                        ) {
+                            Some(prompt) => {
+                                self.regen_reroll_pending = Some(defender_id.clone());
+                                let mut out = StepOutcome::cont().with_prompt(prompt);
+                                for ev in pending_events { out = out.with_event(ev); }
+                                return out;
+                            }
+                            None => false,
+                        };
+                    if !offered {
+                        if let Some(ir) = self.injury_result.as_mut() { ir.passed_regeneration(); }
+                    }
+                }
+            } else if let Some(ir) = self.injury_result.as_mut() {
+                ir.passed_regeneration();
+            }
+        }
+
         let apo_status = self.injury_result.as_ref().unwrap().injury_context.apothecary_status;
 
         // Java: if (fInjuryResult.injuryContext().getApothecaryStatus() != null) { switch ... }
@@ -177,82 +256,8 @@ impl StepApothecary {
                     if let Some(ir) = self.injury_result.as_ref() {
                         ir.apply_to(game);
                     }
-                    // Java: if (playerState.isCasualty() && canRollToSaveFromInjury && canUseApo())
-                    // canRollToSaveFromInjury is enforced inside handle_regeneration (it only rolls for
-                    // a player with the Regeneration/Decay skill); canUseApo() is the injury-type gate —
-                    // false for an Always-Hungry-eaten player (InjuryTypeEatPlayer), which must NOT roll
-                    // Regeneration. Omitting it rolled an extra d6 for the eaten goblin, desyncing the
-                    // whole stream (goblin seed 12 i=52 TTM: Troll eats the thrown goblin).
-                    let can_use_apo = self.injury_result.as_ref()
-                        .map(|ir| ir.injury_context.can_use_apo)
-                        .unwrap_or(true);
-                    if let Some(defender_id) = self.injury_result.as_ref()
-                        .and_then(|ir| ir.injury_context.defender_id.clone())
-                    {
-                        let is_casualty = game.field_model.player_state(&defender_id)
-                            .map(|s| s.is_casualty())
-                            .unwrap_or(false);
-                        if is_casualty && can_use_apo {
-                            let (regenerated, ev) =
-                                crate::step::util_server_injury::handle_regeneration_reporting(
-                                    game, rng, &defender_id,
-                                );
-                            if let Some(ev) = ev { self.pending_regeneration.push(ev); }
-                            if regenerated {
-                                // Java bb2025 StepApothecary:280-284 — handleRegeneration's javadoc
-                                // says "Callers need to apply that to the injury context
-                                // themselves", and every Java call site does exactly this:
-                                //     injuryContext().setInjury(fieldModel.getPlayerState(player));
-                                //     injuryContext().setApothecaryStatus(RESULT_CHOICE);
-                                //     injuryContext().setSeriousInjury(null);
-                                // Without it the context still reads RIP after a SUCCESSFUL
-                                // regeneration, and handleInjurySideEffects -> handleRaiseDead
-                                // (which gates on injuryContext.playerState == RIP) raised a
-                                // zombie for a player who had just got back up: Rust fielded 25
-                                // players where Java had 24 (necromantic bb2025 seed 6).
-                                let new_state = game.field_model.player_state(&defender_id);
-                                if let Some(ir) = self.injury_result.as_mut() {
-                                    ir.injury_context.injury = new_state;
-                                    ir.injury_context.apothecary_status =
-                                        ffb_model::enums::ApothecaryStatus::ResultChoice;
-                                    ir.injury_context.serious_injury = None;
-                                }
-                                self.cure_poison(game);
-                            } else if game.rules == ffb_model::enums::Rules::Bb2025
-                                && game.player(&defender_id)
-                                    .map(|p| p.has_skill_property(
-                                        ffb_model::model::property::named_properties::NamedProperties::CAN_ROLL_TO_SAVE_FROM_INJURY))
-                                    .unwrap_or(false)
-                            {
-                                // Only a roll that HAPPENED and failed gets the offer — the
-                                // helper returns (false, None) for a casualty WITHOUT the
-                                // Regeneration skill, and offering there invented a dialog Java
-                                // never shows (it moved seed 43's divergence EARLIER, i=8→i=6).
-                                // Java bb2025 StepApothecary.executeStep (pre-regeneration): a
-                                // failed Regeneration first offers a REGENERATION inducement
-                                // (Igor — absent from the parity teams; the client-only
-                                // WAIT_FOR_IGOR_USE dialog), then
-                                // `UtilServerReRoll.askForReRollIfAvailable(player, REGENERATION,
-                                // 4, false)` — the bb2025 RollMechanic shows
-                                // DialogReRollProperties iff a team re-roll is available.
-                                // bb2020's StepApothecary has NO such ask — edition-gated.
-                                // (chaos_pact bb2025 seed 43 i=8: the Troll's failed regen —
-                                // Java's driver spends two draws on the dialog; Rust's silence
-                                // split the agents' streams and Java's next away turn ended with
-                                // zero activations where Rust played on.)
-                                if let Some(prompt) =
-                                    crate::step::util_server_re_roll::ask_for_reroll_if_available_for(
-                                        game, Some(&defender_id), "REGENERATION", 4, false,
-                                    )
-                                {
-                                    self.regen_reroll_pending = Some(defender_id.clone());
-                                    let mut out = StepOutcome::cont().with_prompt(prompt);
-                                    for ev in pending_events { out = out.with_event(ev); }
-                                    return out;
-                                }
-                            }
-                        }
-                    }
+                    // The Regeneration roll for a casualty is made in the pre-regeneration block
+                    // at the top of this method, where Java makes it; only `applyTo` remains here.
                 }
             }
         }
@@ -561,8 +566,12 @@ impl Step for StepApothecary {
                         && crate::step::util_server_re_roll::use_reroll(
                             game, &ffb_model::enums::ReRollSource::new("TRR"), &pid, rng)
                     {
+                        let ctx_state = self.injury_result.as_ref()
+                            .and_then(|ir| ir.injury_context.injury)
+                            .or_else(|| game.field_model.player_state(&pid))
+                            .unwrap_or_default();
                         let (regenerated, ev) = crate::step::util_server_injury::
-                            handle_regeneration_reporting(game, rng, &pid);
+                            handle_regeneration_with_state(game, rng, &pid, ctx_state, true);
                         if let Some(ev) = ev { self.pending_regeneration.push(ev); }
                         if regenerated {
                             if let Some(ir) = self.injury_result.as_mut() {
@@ -574,11 +583,12 @@ impl Step for StepApothecary {
                             }
                         }
                     }
-                    let mut out = self.finish_tail(game, Vec::new());
-                    for ev in std::mem::take(&mut self.pending_regeneration) {
-                        out = out.with_event(ev);
-                    }
-                    return out;
+                    // Java: `fInjuryResult.passedRegeneration(); commandStatus = EXECUTE_STEP;` —
+                    // the pre-regeneration block is skipped and the apothecary switch runs (the
+                    // NO_APOTHECARY report, `applyTo`, side effects). With the ask now ahead of
+                    // the switch, jumping to the tail here skipped `applyTo` (undead bb2025 seed 3).
+                    if let Some(ir) = self.injury_result.as_mut() { ir.passed_regeneration(); }
+                    return self.execute_step(game, rng);
                 }
             }
             // Java: CLIENT_APOTHECARY_CHOICE → handleApothecaryChoice(state, seriousInjury)

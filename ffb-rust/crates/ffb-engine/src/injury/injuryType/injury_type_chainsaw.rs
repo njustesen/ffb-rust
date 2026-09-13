@@ -16,6 +16,7 @@ impl InjuryTypeChainsaw { pub fn new() -> Self { Self { ctx: InjuryContext::new(
 impl Default for InjuryTypeChainsaw { fn default() -> Self { Self::new() } }
 
 impl InjuryTypeServer for InjuryTypeChainsaw {
+    fn java_type_name(&self) -> &'static str { "chainsaw" }
     fn java_class_name(&self) -> &'static str { "Chainsaw" }
     fn is_chainsaw(&self) -> bool { true }
     fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,

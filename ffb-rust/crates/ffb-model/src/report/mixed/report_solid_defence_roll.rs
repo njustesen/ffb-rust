@@ -37,6 +37,7 @@ impl ReportSolidDefenceRoll {
 }
 
 impl IReport for ReportSolidDefenceRoll {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::SOLID_DEFENCE_ROLL }
 }
 

@@ -80,11 +80,18 @@ pub trait StateMechanic: Send + Sync {
             }
         }
 
+        self.add_injury_report(game, injury_result, skip)
+    }
+
+    /// The shared tail of `reportInjury`: the `alreadyReported` guard, the `ReportInjury`, and the
+    /// coverage event. `skip` is the edition's `SkipInjuryParts` decision (bb2025's in the default
+    /// `report_injury`, Java `mixed/StateMechanic.reportInjury`'s in the mixed override).
+    fn add_injury_report(&self, game: &mut Game, injury_result: &mut InjuryResult, skip: SkipInjuryParts) -> Option<GameEvent> {
         if injury_result.is_already_reported() {
             return None;
         }
 
-        let report = build_report_injury(injury_result.injury_context(), skip);
+        let report = build_report_injury(injury_result.injury_context(), skip, game.rules);
         game.report_list.add(report);
         // Java: step.getResult().setSound() — client-only, no-op in headless
         injury_result.set_already_reported(true);
@@ -256,25 +263,81 @@ pub trait StateMechanic: Send + Sync {
     }
 }
 
+/// Java `SeriousInjury.getName()` of the edition's enum — what `ReportInjury` serialises as
+/// `seriousInjury` ("Seriously Hurt (MNG)", bb2016 "Smashed Collar Bone (-ST)", ...). The Rust
+/// context stores the edition-neutral `SeriousInjuryKind`; this is the display half of each
+/// edition's `serious_injury.rs`.
+pub fn serious_injury_display_name(kind: ffb_model::enums::SeriousInjuryKind, _rules: ffb_model::enums::Rules) -> String {
+    use ffb_model::enums::SeriousInjuryKind as K;
+    let s = match kind {
+        K::SeriouslyHurt => "Seriously Hurt (MNG)",
+        K::SeriousInjuryNi => "Serious Injury (NI)",
+        K::HeadInjuryAv => "Head Injury (-AV)",
+        K::SmashedKneeMa => "Smashed Knee (-MA)",
+        K::BrokenArmPa => "Broken Arm (-PA)",
+        K::NeckInjuryAg => "Neck Injury (-AG)",
+        K::DislocatedHipAg => "Dislocated Hip (-AG)",
+        K::DislocatedShoulderSt => "Dislocated Shoulder (-ST)",
+        K::Dead => "Dead (RIP)",
+        K::BrokenRibs => "Broken Ribs (MNG)",
+        K::Groin => "Groin Strain (MNG)",
+        K::GougedEye => "Gouged Eye (MNG)",
+        K::BrokenJaw => "Broken Jaw (MNG)",
+        K::FracturedArm => "Fractured Arm (MNG)",
+        K::FracturedLeg => "Fractured Leg (MNG)",
+        K::SmashedHand => "Smashed Hand (MNG)",
+        K::PinchedNerve => "Pinched Nerve (MNG)",
+        K::DamagedBack => "Damaged Back (NI)",
+        K::SmashedKneeB2016 => "Smashed Knee (NI)",
+        K::SmashedHip => "Smashed Hip (-MA)",
+        K::SmashedAnkle => "Smashed Ankle (-MA)",
+        K::SeriousConcussion => "Serious Concussion (-AV)",
+        K::FracturedSkull => "Fractured Skull (-AV)",
+        K::BrokenNeck => "Broken Neck (-AG)",
+        K::BrokenCollarBone => "Smashed Collar Bone (-ST)",
+        K::Poisoned => "Poisoned (MNG)",
+        // Not in any edition's Java enum: keep the Rust name so the report diff shows it.
+        other => return format!("{other:?}"),
+    };
+    s.to_string()
+}
+
+/// Java `InjuryType.getName()` for a report whose injury type recorded no report name: Java's
+/// names are the lower-camel class names ("block", "foul"), so derive that from the class name.
+fn fallback_java_type_name(class_name: &str) -> String {
+    let mut c = class_name.chars();
+    match c.next() {
+        Some(first) => first.to_lowercase().collect::<String>() + c.as_str(),
+        None => String::new(),
+    }
+}
+
 /// Java: ReportInjury.init(InjuryContext, SkipInjuryParts) — builds a ReportInjury from context.
-fn build_report_injury(ctx: &InjuryContext, skip: SkipInjuryParts) -> ReportInjury {
+///
+/// Three report-layer fixes (H.50): `injuryType` is Java's `InjuryType.getName()` ("block", not
+/// the class name "Block"); the modifier lists carry the modifier NAMES (Java serialises
+/// `getName()`), not the `Debug` of the whole `Modifier` struct; and serious injuries carry the
+/// edition's display name. None of these values is read back by the engine.
+fn build_report_injury(ctx: &InjuryContext, skip: SkipInjuryParts, rules: ffb_model::enums::Rules) -> ReportInjury {
+    let injury_type = ctx.java_type_name.clone()
+        .unwrap_or_else(|| fallback_java_type_name(ctx.injury_type_name.as_deref().unwrap_or_default()));
     ReportInjury::new(
         ctx.attacker_id.clone(),
         ctx.defender_id.clone(),
-        ctx.injury_type_name.clone().unwrap_or_default(),
+        injury_type,
         ctx.armor_broken,
-        ctx.armor_modifiers.iter().map(|m| format!("{m:?}")).collect(),
+        ctx.armor_modifiers.iter().map(|m| m.name.to_string()).collect(),
         ctx.armor_roll.map(|r| r.to_vec()).unwrap_or_default(),
-        ctx.injury_modifiers.iter().map(|m| format!("{m:?}")).collect(),
+        ctx.injury_modifiers.iter().map(|m| m.name.to_string()).collect(),
         ctx.injury_roll.map(|r| r.to_vec()).unwrap_or_default(),
         ctx.casualty_roll.map(|r| r.to_vec()).unwrap_or_default(),
-        ctx.serious_injury.map(|s| format!("{s:?}")),
+        ctx.serious_injury.map(|s| serious_injury_display_name(s, rules)),
         ctx.casualty_roll_decay.map(|r| r.to_vec()).unwrap_or_default(),
-        ctx.serious_injury_decay.map(|s| format!("{s:?}")),
-        ctx.original_serious_injury.map(|s| format!("{s:?}")),
+        ctx.serious_injury_decay.map(|s| serious_injury_display_name(s, rules)),
+        ctx.original_serious_injury.map(|s| serious_injury_display_name(s, rules)),
         ctx.injury,
         ctx.injury_decay,
-        ctx.casualty_modifiers.iter().map(|m| format!("{m:?}")).collect(),
+        ctx.casualty_modifiers.iter().map(|m| m.name.to_string()).collect(),
         skip.to_string(),
     )
 }

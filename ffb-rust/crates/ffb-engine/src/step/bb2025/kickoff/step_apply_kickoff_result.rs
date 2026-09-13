@@ -6,8 +6,11 @@ use ffb_model::inducement::usage::Usage;
 use ffb_model::report::mixed::report_kickoff_sequence_activations_count::ReportKickoffSequenceActivationsCount;
 use ffb_model::report::mixed::report_kickoff_extra_re_roll::ReportKickoffExtraReRoll;
 use ffb_model::report::mixed::report_solid_defence_roll::ReportSolidDefenceRoll;
+use ffb_model::report::mixed::report_quick_snap_roll::ReportQuickSnapRoll;
+use ffb_model::report::mixed::report_blitz_roll::ReportBlitzRoll;
 use ffb_model::report::bb2025::report_cheering_fans::ReportCheeringFans as ReportCheeringFansBb2025;
 use ffb_model::report::report_scatter_ball::ReportScatterBall;
+use ffb_model::report::report_weather::ReportWeather;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::util::util_player::UtilPlayer;
 use ffb_model::util::util_box::UtilBox;
@@ -564,6 +567,10 @@ impl StepApplyKickoffResult {
 
             let cap = (roll + 3).min(on_field.len() as i32);
             self.nr_of_players_allowed = cap;
+            // Java bb2025 StepApplyKickoffResult:699 (Charge): `new ReportBlitzRoll(actingTeamId,
+            // roll, nrOfPlayersAllowed)` — Charge reuses the Blitz! roll report. Rust had none (H.50).
+            let charge_team_id = kicking_team.id.clone();
+            game.report_list.add(ReportBlitzRoll::new(Some(charge_team_id), cap, roll));
             for id in &on_field {
                 if let Some(c) = game.field_model.player_coordinate(id) {
                     self.players_at_coordinates.insert(id.clone(), c);
@@ -707,6 +714,9 @@ impl StepApplyKickoffResult {
         let weather_roll = rng.roll_weather();
         let weather = DiceInterpreter::interpret_roll_weather(&weather_roll);
         game.field_model.weather = weather;
+        // Java: getResult().addReport(new ReportWeather(weather, weatherRoll)) — the bb2016 port
+        // had it, this one did not (H.50).
+        game.report_list.add(ReportWeather::new(weather, weather_roll.to_vec()));
         // client-only: setAnimation based on weather
 
         if weather == Weather::SwelteringHeat {
@@ -800,6 +810,10 @@ impl StepApplyKickoffResult {
             let roll = rng.d3();
             self.nr_of_players_allowed = roll + 3;
             let active_team_id = game.active_team().id.clone();
+            // Java: getResult().addReport(new ReportQuickSnapRoll(actingTeamId, roll, nrOfPlayersAllowed))
+            game.report_list.add(ReportQuickSnapRoll::new(
+                Some(active_team_id.clone()), roll, self.nr_of_players_allowed,
+            ));
             // client-only: setAnimation(KICKOFF_QUICK_SNAP)
 
             // Java: deactivate acting-team players adjacent to opposing tacklers
@@ -868,8 +882,21 @@ impl StepApplyKickoffResult {
 
         // Java insertSteps(player): roll d6 → 1 sends the player to RESERVE (benched for the drive);
         // otherwise the player gets the Dodgy Snack -MA/-AV enhancement for the drive.
+        // Java: getResult().addReport(new ReportKickoffDodgySnack(rollHome, rollAway, playerIds))
+        {
+            let mut ids = Vec::new();
+            if let Some(id) = player_home.clone() { ids.push(id); }
+            if let Some(id) = player_away.clone() { ids.push(id); }
+            game.report_list.add(ffb_model::report::bb2025::report_kickoff_dodgy_snack::ReportKickoffDodgySnack::new(
+                roll_home, roll_away, ids,
+            ));
+        }
         let mut apply_snack = |game: &mut Game, id: &str, rng: &mut GameRng, pending: &mut Vec<GameEvent>| {
             let snack_roll = rng.d6();
+            // Java insertSteps: getResult().addReport(new ReportDodgySnackRoll(roll, player.getId()))
+            game.report_list.add(ffb_model::report::bb2025::report_dodgy_snack_roll::ReportDodgySnackRoll::new(
+                snack_roll, id.to_string(),
+            ));
             pending.push(GameEvent::DodgySnackRoll { player_id: id.to_string(), roll: snack_roll });
             if snack_roll == 1 {
                 if let Some(state) = game.field_model.player_state(id) {
@@ -933,6 +960,14 @@ impl StepApplyKickoffResult {
             stun_params.extend(pr);
         }
 
+        // Java: getResult().addReport(new ReportKickoffPitchInvasion(rollHome, rollAway, affectedPlayers, affectedPlayers.size()))
+        let affected: Vec<String> = stun_events.iter().filter_map(|e| match e {
+            GameEvent::KickoffPitchInvasionStun { player_id } => Some(player_id.clone()),
+            _ => None,
+        }).collect();
+        game.report_list.add(ffb_model::report::mixed::report_kickoff_pitch_invasion::ReportKickoffPitchInvasion::new(
+            roll_home, roll_away, affected.len() as i32, affected,
+        ));
         // client-only: setAnimation(KICKOFF_PITCH_INVASION)
         let mut out = StepOutcome::next()
             .with_event(GameEvent::KickoffPitchInvasion { home_roll: roll_home, away_roll: roll_away });

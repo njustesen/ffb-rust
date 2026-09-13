@@ -32,7 +32,9 @@ impl ReportSkillUse {
         serde_json::json!({
             "reportId": self.get_id().get_name(),
             "playerId": self.player_id,
-            "skill": self.skill.class_name(),
+            // Java `IJsonOption.SKILL.addTo(jsonObject, skill)` writes `skill.getName()` — the
+            // display name ("Eye Gouge"), not the class name ("EyeGouge").
+            "skill": self.skill.display_name(),
             "used": self.used,
             "skillUse": self.skill_use.get_name(),
         })
@@ -49,6 +51,7 @@ impl ReportSkillUse {
 }
 
 impl IReport for ReportSkillUse {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::SKILL_USE }
 }
 

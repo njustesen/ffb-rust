@@ -33,6 +33,7 @@ impl ReportShowStarReRollsLost {
 }
 
 impl IReport for ReportShowStarReRollsLost {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::SHOW_STAR_RE_ROLLS_LOST }
 }
 

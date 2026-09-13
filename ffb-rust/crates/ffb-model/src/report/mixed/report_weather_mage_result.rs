@@ -77,6 +77,7 @@ impl ReportWeatherMageResult {
 }
 
 impl IReport for ReportWeatherMageResult {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::WEATHER_MAGE_RESULT }
 }
 

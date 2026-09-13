@@ -37,6 +37,7 @@ impl ReportRaiseDead {
 }
 
 impl IReport for ReportRaiseDead {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::RAISE_DEAD }
 }
 

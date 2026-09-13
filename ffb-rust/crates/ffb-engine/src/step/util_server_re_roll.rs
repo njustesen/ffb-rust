@@ -352,13 +352,41 @@ pub fn use_reroll_with_events(
             // on 3. Structurally invisible until an agent actually ACCEPTS a re-roll -- under the
             // random parity contract every offer is declined, so the counters never move and the
             // double-subtraction has nothing to bite.
-            if td.rerolls_brilliant_coaching_one_drive > 0 {
+            // Java `updateTurnDataAfterReRollUsage` returns the one-drive source it spent, and
+            // `useTeamReRoll` reports THAT source, else Leader, else the team re-roll itself —
+            // `new ReportReRoll(pid, source, successful=false, 0)` — BEFORE the Loner check. Rust
+            // reported nothing here, so every team re-roll was missing from the stream (H.50).
+            let used_additional = if td.rerolls_brilliant_coaching_one_drive > 0 {
                 td.rerolls_brilliant_coaching_one_drive -= 1;
+                Some("Brilliant Coaching ReRoll")
             } else if td.rerolls_pump_up_the_crowd_one_drive > 0 {
                 td.rerolls_pump_up_the_crowd_one_drive -= 1;
+                Some("Pump up the Crowd")
             } else if td.reroll_show_star_one_drive > 0 {
                 td.reroll_show_star_one_drive -= 1;
-            }
+                Some("Star of the Show")
+            } else {
+                None
+            };
+            let leader_available = td.leader_state == ffb_model::enums::LeaderState::Available;
+            let report_source = match used_additional {
+                Some(name) => name.to_string(),
+                None if leader_available => {
+                    td.leader_state = ffb_model::enums::LeaderState::Used;
+                    "Leader".to_string()
+                }
+                None => match re_roll_source.name.as_str() {
+                    // Rust's internal tag for Java's `ReRollSources.TEAM_RE_ROLL`.
+                    "TRR" => "Team ReRoll".to_string(),
+                    other => other.to_string(),
+                },
+            };
+            game.report_list.add(ffb_model::report::report_re_roll::ReportReRoll::new(
+                Some(player_id.to_string()),
+                ReRollSource::new(&report_source),
+                false,
+                0,
+            ));
             let (success, event) = loner_roll(game, player_id, rng);
             return (success, event.into_iter().collect());
         }
@@ -375,7 +403,19 @@ pub fn use_reroll_with_events(
         let skill_ids: Vec<SkillId> = player.all_skill_ids().collect();
         for id in skill_ids {
             if format!("{:?}", id) == skill_name || id.class_name() == skill_name.as_str() {
+                // Java (bb2025 RollMechanic.useReRoll, skill branch): `successful` is
+                // `!player.isUsed(skill)` for a skill tracked outside its activation, else
+                // `hasSkill` (true here — the id came from the player); then
+                // `addReport(new ReportReRoll(pid, reRollSource, successful, 0))`.
+                let tracked = id.usage_type().track_outside_activation();
+                let successful = if tracked { !player.used_skills.contains(&id) } else { true };
                 player.used_skills.insert(id);
+                game.report_list.add(ffb_model::report::report_re_roll::ReportReRoll::new(
+                    Some(player_id.to_string()),
+                    ReRollSource::new(id.category_and_name_for(game.rules).1),
+                    successful,
+                    0,
+                ));
                 return (true, Vec::new());
             }
         }

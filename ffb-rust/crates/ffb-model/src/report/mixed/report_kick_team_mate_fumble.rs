@@ -12,6 +12,7 @@ impl ReportKickTeamMateFumble {
 }
 
 impl IReport for ReportKickTeamMateFumble {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::KICK_TEAM_MATE_FUMBLE }
 }
 

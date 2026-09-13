@@ -900,15 +900,20 @@ impl StepCatchScatterThrowIn {
             let factory = CatchModifierFactory::for_rules(game.rules);
             let model_mode = to_model_mode(mode);
             let catcher = game.player(&cid).map(|p| p as *const _);
-            let min_roll = if let Some(ptr) = catcher {
+            // Java: `getResult().addReport(new ReportCatchRoll(..., catchModifiers, ...))` — the
+            // report carries the modifier NAMES ("1 Tacklezone", "Inaccurate Pass or Scatter"),
+            // which is where a passive skill becomes visible at all. Rust passed an empty list
+            // (H.50), so the census could not see them.
+            let (min_roll, mod_names) = if let Some(ptr) = catcher {
                 let player = unsafe { &*ptr };
                 let ctx = CatchContext::new(game, Some(player), model_mode, None);
                 let mods = factory.find_applicable(&ctx);
                 let skill_mods = factory.find_skill_modifiers(&ctx);
                 let all: Vec<&ffb_mechanics::modifiers::catch_modifier::CatchModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
-                CatchModifierFactory::minimum_roll_catch(player, &all)
+                let names: Vec<String> = all.iter().map(|m| m.get_name().to_string()).collect();
+                (CatchModifierFactory::minimum_roll_catch(player, &all), names)
             } else {
-                2
+                (2, Vec::new())
             };
 
             if do_roll && self.roll == 0 {
@@ -930,7 +935,7 @@ impl StepCatchScatterThrowIn {
                 self.roll,
                 min_roll,
                 rerolled || self.evaluate,
-                vec![],
+                mod_names,
                 mode.is_bomb(),
             ));
             self.evaluate = false;

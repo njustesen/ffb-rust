@@ -83,6 +83,13 @@ pub fn handle_injury(
     if !type_name.is_empty() {
         injury_type.injury_context_mut().injury_type_name = Some(type_name.to_string());
     }
+    let report_name = injury_type.java_type_name();
+    if !report_name.is_empty() {
+        injury_type.injury_context_mut().java_type_name = Some(report_name.to_string());
+        if let Some(m) = injury_type.injury_context_mut().modified_injury_context.as_mut() {
+            m.java_type_name = Some(report_name.to_string());
+        }
+    }
 
     let knocked_out = injury_type.injury_context().is_knocked_out();
     let rip = injury_type.injury_context().injury
@@ -246,12 +253,38 @@ pub fn handle_regeneration_reporting(
     rng: &mut GameRng,
     player_id: &str,
 ) -> (bool, Option<ffb_model::events::GameEvent>) {
-    let state = game.field_model.player_state(player_id);
+    handle_regeneration_reporting_rerolled(game, rng, player_id, false)
+}
+
+/// `handle_regeneration_reporting` with Java's `rerolled` flag, which only the failed-Regeneration
+/// team re-roll path sets; it lands on the `ReportRegenerationRoll`.
+pub fn handle_regeneration_reporting_rerolled(
+    game: &mut Game,
+    rng: &mut GameRng,
+    player_id: &str,
+    rerolled: bool,
+) -> (bool, Option<ffb_model::events::GameEvent>) {
+    match game.field_model.player_state(player_id) {
+        Some(state) => handle_regeneration_with_state(game, rng, player_id, state, rerolled),
+        None => (false, None),
+    }
+}
+
+/// Java `UtilServerInjury.handleRegeneration(IStep, Player, PlayerState, boolean rerolled)`: the
+/// state to test is a PARAMETER (the injury context's, before `applyTo` has written it to the
+/// field), which is what lets StepApothecary roll Regeneration in its pre-regeneration block.
+pub fn handle_regeneration_with_state(
+    game: &mut Game,
+    rng: &mut GameRng,
+    player_id: &str,
+    state: PlayerState,
+    rerolled: bool,
+) -> (bool, Option<ffb_model::events::GameEvent>) {
     let can_regen = game.player(player_id)
         .map(|p| p.has_skill_property(NamedProperties::CAN_ROLL_TO_SAVE_FROM_INJURY))
         .unwrap_or(false);
 
-    if let Some(state) = state {
+    {
         if state.is_casualty() && can_regen {
             let roll = rng.d6();
             let successful = roll >= 4;
@@ -275,6 +308,17 @@ pub fn handle_regeneration_reporting(
                 ffb_model::util::util_box::UtilBox::put_player_into_box(game, player_id);
                 ffb_model::util::util_box::UtilBox::refresh_boxes(game);
             }
+            // Java: `addReport(new ReportRegenerationRoll(pid, successful, roll, 4, rerolled, null))`.
+            // Rust rolled and evented the die but never REPORTED it (`REGENERATION_ROLL` was one of
+            // the 35 ReportIds the engine never produced, H.50).
+            game.report_list.add(ffb_model::report::report_regeneration_roll::ReportRegenerationRoll::new(
+                Some(player_id.to_string()),
+                successful,
+                roll,
+                4,
+                rerolled,
+                Vec::new(),
+            ));
             let event = ffb_model::events::GameEvent::RegenerationRoll {
                 player_id: player_id.to_string(),
                 roll,

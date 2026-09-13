@@ -256,17 +256,30 @@ impl StepEndTurn {
         if sum <= 0 {
             return;
         }
-        // Java reports each lost source separately (ReportBrilliantCoachingReRollsLost etc.);
-        // the reports are client-facing and not part of the compared state.
+        // Java reports each lost source separately, in this order, as it zeroes the counter.
+        let team_id = Some(if home_team { game.team_home.id.clone() } else { game.team_away.id.clone() });
+        let turn_data = if home_team { &mut game.turn_data_home } else { &mut game.turn_data_away };
         turn_data.rerolls_brilliant_coaching_one_drive = 0;
         turn_data.rerolls_pump_up_the_crowd_one_drive = 0;
         turn_data.reroll_show_star_one_drive = 0;
         if !new_half || half > 1 {
             turn_data.rerolls = (turn_data.rerolls - sum).max(0);
         }
+        if brilliant_coaching > 0 {
+            game.report_list.add(ffb_model::report::mixed::report_brilliant_coaching_re_rolls_lost::ReportBrilliantCoachingReRollsLost::new(team_id.clone(), brilliant_coaching));
+        }
+        if pump_up_the_crowd > 0 {
+            game.report_list.add(ffb_model::report::mixed::report_pump_up_the_crowd_re_rolls_lost::ReportPumpUpTheCrowdReRollsLost::new(team_id.clone(), pump_up_the_crowd));
+        }
+        if show_star > 0 {
+            game.report_list.add(ffb_model::report::mixed::report_show_star_re_rolls_lost::ReportShowStarReRollsLost::new(team_id, show_star));
+        }
     }
 
     fn recover_knockouts_and_fainting(&mut self, game: &mut Game, rng: &mut GameRng, touchdown: bool) {
+        let mut ko_recoveries: Vec<KnockoutRecovery> = Vec::new();
+        let mut heat_exhaustions: Vec<HeatExhaustion> = Vec::new();
+        let mut fainting_count: i32 = 0;
         // Java: getFaintingCount / heatExhaustions / KO recovery — only on new half or touchdown
         if self.new_half || touchdown {
             // BB2016 and BB2020+ resolve Sweltering-Heat fainting DIFFERENTLY. BB2016
@@ -286,8 +299,6 @@ impl StepEndTurn {
                 .chain(game.team_away.players.iter())
                 .map(|p| p.id.clone())
                 .collect();
-            let mut ko_recoveries: Vec<KnockoutRecovery> = Vec::new();
-            let mut heat_exhaustions: Vec<HeatExhaustion> = Vec::new();
             for player_id in &all_player_ids {
                 let player_state = match game.field_model.player_state(player_id) {
                     Some(s) => s,
@@ -311,7 +322,7 @@ impl StepEndTurn {
                     if recovered {
                         game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));
                     }
-                    ko_recoveries.push(KnockoutRecovery::new(player_id.clone(), recovered));
+                    ko_recoveries.push(KnockoutRecovery::with_roll(player_id.clone(), recovered, roll, bloodweiser_keg));
                 }
                 if base == PS_EXHAUSTED {
                     game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));
@@ -333,7 +344,7 @@ impl StepEndTurn {
             // many random on-pitch players per team (one rollDice(onPitch.size()) per faint, the
             // list shrinking as each is removed). NOT used for bb2016 (handled per-player above).
             if !is_bb2016 && sweltering {
-                let fainting_count = rng.d3();
+                fainting_count = rng.d3();
                 for is_home in [true, false] {
                     let team = if is_home { &game.team_home } else { &game.team_away };
                     let mut on_pitch: Vec<String> = team.players.iter()
@@ -355,16 +366,21 @@ impl StepEndTurn {
                     }
                 }
             }
-            let td_player_id = if touchdown { game.acting_player.player_id.clone() } else { None };
-            game.report_list.add(ReportTurnEnd::new(
-                td_player_id,
-                ko_recoveries,
-                heat_exhaustions,
-                vec![],
-                0,
-            ));
             UtilBox::put_all_players_into_box(game);
         }
+        // Java StepEndTurn:495 adds `ReportTurnEnd` on EVERY turn end, outside the
+        // newHalf/touchdown gate — `getFaintingCount` merely leaves the arrays empty when the gate
+        // is closed. Rust added it only inside the gate, so ~34 of Java's turnEnd reports per game
+        // were missing from the stream (H.50).
+        // Java: `touchdownPlayerId` — set when the touchdown check found the scorer.
+        let td_player_id = if touchdown { self.touchdown_player_id.clone() } else { None };
+        game.report_list.add(ReportTurnEnd::new(
+            td_player_id,
+            ko_recoveries,
+            heat_exhaustions,
+            vec![],
+            fainting_count,
+        ));
     }
 
     fn report_secret_weapons_used(&mut self, game: &mut Game, rng: &mut GameRng) {
@@ -372,6 +388,10 @@ impl StepEndTurn {
 
         // A standard secret weapon (penalty 0, e.g. the dwarf Deathroller) is auto-banned with no die
         // (flag left set); a Stunty-Leeg secret weapon (penalty > 0) rolls 2d6 and is banned on total >= penalty.
+        // Java: `ReportSecretWeaponBan reportBan = new ReportSecretWeaponBan(); ... reportBan.add(pid,
+        // total, banned)` per used weapon, added when non-empty (all three editions). Rust never
+        // wrote it (report diff, goblin bb2020; H.50).
+        let mut report_ban = ffb_model::report::report_secret_weapon_ban::ReportSecretWeaponBan::new();
         for is_home in [true, false] {
             let ids: Vec<String> = {
                 let t = if is_home { &game.team_home } else { &game.team_away };
@@ -390,9 +410,16 @@ impl StepEndTurn {
                 if has_skill && penalty > 0 {
                     let total = rng.d6() + rng.d6();
                     let banned = total >= penalty;
+                    report_ban.add(pid.clone(), total, banned);
                     game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon = banned;
+                } else if has_skill {
+                    // Java: `reportBan.add(player.getId(), 0, true)` — the lrb6 auto-ban.
+                    report_ban.add(pid.clone(), 0, true);
                 }
             }
+        }
+        if !report_ban.player_ids.is_empty() {
+            game.report_list.add(report_ban);
         }
     }
 
@@ -800,6 +827,15 @@ impl StepEndTurn {
             && self.bribes_choice_away.is_some();
 
         if self.end_game || all_choices_done {
+            // Java StepEndTurn:489-495: `getFaintingCount` (the KO-recovery / fainting dice) and
+            // `ReportTurnEnd` come BEFORE `deactivateEffectsAndPrayers` and
+            // `removeReRollsLastingForDrive`; Rust ran them after, so the lost-re-roll reports
+            // preceded the turnEnd report (report diff, H.50). Same dice, same state — order only.
+            // bb2016 has already recovered above (its Java step does it before the send-off).
+            if !self.ko_recovery_done {
+                self.ko_recovery_done = true;
+                self.recover_knockouts_and_fainting(game, rng, touchdown);
+            }
             // Java: deactivateEffectsAndPrayers / deactivateCards
             {
                 use crate::util::util_server_cards::UtilServerCards;

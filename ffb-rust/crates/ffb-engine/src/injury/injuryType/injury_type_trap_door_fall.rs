@@ -11,6 +11,7 @@ impl InjuryTypeTrapDoorFall { pub fn new() -> Self { Self { ctx: InjuryContext::
 impl Default for InjuryTypeTrapDoorFall { fn default() -> Self { Self::new() } }
 
 impl InjuryTypeServer for InjuryTypeTrapDoorFall {
+    fn java_type_name(&self) -> &'static str { "trapdoorFall" }
     fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,
         coord: FieldCoordinate, _from_coord: Option<FieldCoordinate>, _old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode) {
         crowd_handle_injury(&mut self.ctx, game, rng, attacker_id, defender_id, coord, apo_mode);

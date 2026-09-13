@@ -41,6 +41,7 @@ impl ReportSkillUseOtherPlayer {
 }
 
 impl IReport for ReportSkillUseOtherPlayer {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::SKILL_USE_OTHER_PLAYER }
 }
 

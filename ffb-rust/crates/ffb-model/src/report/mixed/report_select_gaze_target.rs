@@ -33,6 +33,7 @@ impl ReportSelectGazeTarget {
 }
 
 impl IReport for ReportSelectGazeTarget {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::SELECT_GAZE_TARGET }
 }
 

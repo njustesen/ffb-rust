@@ -402,14 +402,17 @@ impl StepPass {
             let re_rolled = self.re_rolled_action.is_some() && self.re_roll_source.is_some();
             let pass_result_name = self.pass_result.map(|r| r.get_name().to_string());
             let successful = self.pass_result == Some(PassResult::ACCURATE);
-            let dist_name = passing_dist.map(|d| format!("{:?}", d));
+            // Java: `passingDistance.getName()` ("Short Pass"), and `passModifiers` — the names
+            // are where Accurate / Cannoneer / Disturbing Presence become visible (H.50).
+            let dist_name = passing_dist.map(|d| d.name().to_string());
+            let mod_names: Vec<String> = pass_modifiers.iter().map(|m| m.get_name().to_string()).collect();
             game.report_list.add(ReportPassRoll::new(
                 game.thrower_id.clone(),
                 successful,
                 self.roll,
                 self.minimum_roll,
                 re_rolled,
-                vec![],
+                mod_names,
                 dist_name,
                 is_bomb,
                 pass_result_name,

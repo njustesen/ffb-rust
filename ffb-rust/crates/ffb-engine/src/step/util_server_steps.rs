@@ -183,7 +183,32 @@ fn retire_old_acting_player(game: &mut Game) {
 /// The inner half is `change_acting_player` below. Callers that mirror a Java site invoking
 /// `UtilActingPlayer.changeActingPlayer` DIRECTLY (e.g. `StepSwoop`) must call THAT, not this one.
 pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerAction, jumping: bool) {
+    // Java `UtilServerGame.changeActingPlayer` reports the DECLARED action when the acting player
+    // changed to a different action TYPE, or the action forces a log:
+    //     boolean playerChanged = UtilActingPlayer.changeActingPlayer(game, id, actualAction, jumping);
+    //     if (pPlayerAction != null) {
+    //         boolean differentAction = (oldPlayerAction == null) || (pPlayerAction.getType() != oldPlayerAction.getType());
+    //         if ((playerChanged && differentAction) || pPlayerAction.forceLog()) { addReport(new ReportPlayerAction(id, pPlayerAction)); }
+    //     }
+    // Rust never wrote it — 216 of Java's ~480 reports per game were missing from the stream
+    // (H.50). It belongs HERE, not in `change_acting_player`: that is the port of
+    // `UtilActingPlayer.changeActingPlayer`, which StepSwoop and StepTakeRoot call directly and
+    // which reports nothing (a `swoop` playerAction report Java never writes).
+    let old_player_action = game.acting_player.player_action;
+    let player_changed = !player_id.is_empty()
+        && game.acting_player.player_id.as_deref() != Some(player_id);
     change_acting_player(game, player_id, action, jumping);
+    if !player_id.is_empty() {
+        let different_action = old_player_action
+            .map(|old| old.action_type() != action.action_type())
+            .unwrap_or(true);
+        if (player_changed && different_action) || action.force_log() {
+            game.report_list.add(ffb_model::report::report_player_action::ReportPlayerAction::new(
+                player_id.to_owned(),
+                action,
+            ));
+        }
+    }
     if !player_id.is_empty() {
         // Java: UtilServerPlayerMove.updateMoveSquares(pStep.getGameState(), actingPlayer.isJumping());
         crate::util::util_server_player_move::UtilServerPlayerMove::update_move_squares(game, jumping);
@@ -197,6 +222,10 @@ pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerActi
 /// (STANDING + INACTIVE when he has acted), runs the un-acted granted-skill cleanup, installs the
 /// new player as MOVING, and resets the transient BLOCKED/MOVING states.
 pub fn change_acting_player(game: &mut Game, player_id: &str, action: PlayerAction, jumping: bool) {
+    // Java UtilServerGame.changeActingPlayer reports the DECLARED action (before the delegate
+    // swap below) when the acting player changed to a different action type, or the action
+    // forces a log: `new ReportPlayerAction(pActingPlayerId, pPlayerAction)`. Rust never added
+    // that report — 216 of Java's ~480 reports per game were missing from the stream (H.50).
     // Java UtilServerGame.changeActingPlayer: `if (pPlayerAction.getDelegate() != null)
     // actualAction = pPlayerAction.getDelegate();` — a declared ALL_YOU_CAN_EAT is stored as
     // THROW_BOMB, so the pass/bomb dispatch and every downstream site see a plain bomb action.

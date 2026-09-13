@@ -286,7 +286,7 @@ impl StepEndTurn {
                         if recovered {
                             game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));
                         }
-                        ko_recoveries.push(KnockoutRecovery::new(player_id.clone(), recovered));
+                        ko_recoveries.push(KnockoutRecovery::with_roll(player_id.clone(), recovered, roll, bloodweiser_keg));
                     }
                     if base == PS_EXHAUSTED {
                         game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));

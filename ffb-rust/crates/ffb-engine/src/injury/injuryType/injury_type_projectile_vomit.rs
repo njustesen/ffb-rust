@@ -13,6 +13,7 @@ impl InjuryTypeProjectileVomit { pub fn new() -> Self { Self { ctx: InjuryContex
 impl Default for InjuryTypeProjectileVomit { fn default() -> Self { Self::new() } }
 
 impl InjuryTypeServer for InjuryTypeProjectileVomit {
+    fn java_type_name(&self) -> &'static str { "projectileVomit" }
     fn java_class_name(&self) -> &'static str { "ProjectileVomit" }
     fn is_vomit_like(&self) -> bool { true }
     fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,

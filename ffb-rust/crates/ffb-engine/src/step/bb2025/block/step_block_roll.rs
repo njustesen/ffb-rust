@@ -249,10 +249,13 @@ impl StepBlockRoll {
                 } else {
                     game.team_away.id.clone()
                 };
+                // Java's single-block report is the TWO-argument constructor: no defender id
+                // (only `StepBlockRollMultiple` names the target). Rust passed the defender, so
+                // the report stream carried a `defenderId` Java's never has (report diff, H.50).
                 game.report_list.add(ReportBlockRoll::new(
                     team_id,
                     self.block_roll.clone(),
-                    game.defender_id.clone(),
+                    None,
                 ));
             }
             // Coverage event mirroring ReportBlock: emitted once per block action
@@ -300,6 +303,12 @@ impl StepBlockRoll {
         // path, which prefers a SKILL source and adds Pro, while Java's block dialog carries those
         // as `actionToSource` entries the harness never answers and lists only TRR in
         // `properties`. Offering more than the dialog lists costs sampler draws Java never spends.
+        // Java: showBlockRollDialog(...) re-reports the (unchanged) dice —
+        // `getResult().addReport(new ReportBlockRoll(teamId, fBlockRoll))` runs on this path too.
+        {
+            let team_id = if game.home_playing { game.team_home.id.clone() } else { game.team_away.id.clone() };
+            game.report_list.add(ReportBlockRoll::new(team_id, self.block_roll.clone(), None));
+        }
         let mut out = StepOutcome::cont().with_prompt(self.block_choice_prompt(game));
         for ev in reroll_events {
             out = out.with_event(ev);

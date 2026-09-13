@@ -94,9 +94,10 @@ impl StepBlitzTurn {
 
                 UtilServerGame::update_player_state_dependent_properties(game);
 
-                // Java: addReport(ReportBlitzRoll(blitzingTeam.getId(), roll, limit))
-                // Java params: teamId, amount (=d3 roll), roll (=limit)
-                game.report_list.add(ReportBlitzRoll::new(Some(blitzing_team_id.clone()), roll, limit));
+                // Java: addReport(new ReportBlitzRoll(blitzingTeam.getId(), roll, limit)) — the Java
+                // constructor is (teamId, roll, amount); Rust's `new` is (team_id, amount, roll), so
+                // the two ints were SWAPPED here (nrOfPlayers carried the die, roll the limit; H.50).
+                game.report_list.add(ReportBlitzRoll::new(Some(blitzing_team_id.clone()), limit, roll));
                 // Java: pushCurrentStepOnStack(); Select.pushSequence(gameState, true)
                 let self_seq = vec![SequenceStep::new(StepId::BlitzTurn)];
                 let select_seq = Select::build_sequence(&SelectParams {

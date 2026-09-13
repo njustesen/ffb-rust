@@ -33,6 +33,7 @@ impl ReportTeamEvent {
 }
 
 impl IReport for ReportTeamEvent {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::TEAM_EVENT }
 }
 

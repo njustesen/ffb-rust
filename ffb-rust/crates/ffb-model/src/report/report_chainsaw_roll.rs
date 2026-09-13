@@ -36,6 +36,7 @@ impl ReportChainsawRoll {
 }
 
 impl IReport for ReportChainsawRoll {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::CHAINSAW_ROLL }
 }
 

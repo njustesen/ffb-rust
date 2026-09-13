@@ -19,6 +19,7 @@ impl ReportDoubleHiredStarPlayer {
 }
 
 impl IReport for ReportDoubleHiredStarPlayer {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId {
         ReportId::DOUBLE_HIRED_STAR_PLAYER
     }

@@ -16,6 +16,7 @@ impl ReportStartHalf {
 }
 
 impl IReport for ReportStartHalf {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::START_HALF }
 }
 

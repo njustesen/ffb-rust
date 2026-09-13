@@ -21,6 +21,7 @@ impl InjuryTypeBlockProne { pub fn new() -> Self { Self { ctx: InjuryContext::ne
 impl Default for InjuryTypeBlockProne { fn default() -> Self { Self::new() } }
 
 impl InjuryTypeServer for InjuryTypeBlockProne {
+    fn java_type_name(&self) -> &'static str { "blockProne" }
     fn java_class_name(&self) -> &'static str { "BlockProne" }
     fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,
         coord: FieldCoordinate, from_coord: Option<FieldCoordinate>, old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode) {

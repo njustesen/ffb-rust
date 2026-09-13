@@ -29,6 +29,7 @@ impl ReportLookIntoMyEyesRoll {
 }
 
 impl IReport for ReportLookIntoMyEyesRoll {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::LOOK_INTO_MY_EYES_ROLL }
 }
 

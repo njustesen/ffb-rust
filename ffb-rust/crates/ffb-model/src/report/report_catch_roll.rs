@@ -35,6 +35,7 @@ impl ReportCatchRoll {
 }
 
 impl IReport for ReportCatchRoll {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::CATCH_ROLL }
 }
 

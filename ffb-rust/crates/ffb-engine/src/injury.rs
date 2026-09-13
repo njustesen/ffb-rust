@@ -77,6 +77,8 @@ pub struct InjuryContext {
     pub modified_injury_context: Option<Box<InjuryContext>>,
     /// Java: InjuryType.getClass().getSimpleName() — stored for post-injury checks (e.g. isBlock()).
     pub injury_type_name: Option<String>,
+    /// Java: InjuryType.getName() — the report-facing name (see `InjuryTypeServer::java_type_name`).
+    pub java_type_name: Option<String>,
     /// Java: InjuryType.isCausedByOpponent() — whether the injury was caused by an opposing player.
     pub is_caused_by_opponent: bool,
     /// Java: InjuryType.isWorthSpps() — whether the attacker earns a casualty SPP for this injury.
@@ -123,6 +125,7 @@ impl InjuryContext {
             sound: None,
             modified_injury_context: None,
             injury_type_name: None,
+            java_type_name: None,
             is_caused_by_opponent: false,
             is_worth_spps: false,
             can_use_apo: true,
@@ -465,6 +468,10 @@ pub trait InjuryTypeServer {
     /// Java: InjuryType class simple name — used by InjuryContextModification.isValidType().
     /// Implementations should return the Java class simple name (e.g. "Block", "Foul", "Stab").
     fn java_class_name(&self) -> &'static str { "" }
+    /// Java `InjuryType.getName()` of the wrapped ffb-common injury type — the string
+    /// `ReportInjury` serialises as `injuryType` ("block", "dropGfi", "crowdpush", ...). Report
+    /// data only; nothing in the engine keys off it.
+    fn java_type_name(&self) -> &'static str { "" }
     /// Java: InjuryType.isChainsaw() — true for Chainsaw, ChainsawForSpp, FoulWithChainsaw,
     /// FoulForSppWithChainsaw. Routes the injury-modification lookup to the DEFENDER when the
     /// attacker is null (a chainsaw kickback injures its own wielder).

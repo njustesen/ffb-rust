@@ -15,6 +15,7 @@ impl InjuryTypeBlockProneForSpp { pub fn new() -> Self { Self { ctx: InjuryConte
 impl Default for InjuryTypeBlockProneForSpp { fn default() -> Self { Self::new() } }
 
 impl InjuryTypeServer for InjuryTypeBlockProneForSpp {
+    fn java_type_name(&self) -> &'static str { "blockProneForSpp" }
     fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,
         coord: FieldCoordinate, from_coord: Option<FieldCoordinate>, old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode) {
         modification_aware_handle_injury(self, game, rng, attacker_id, defender_id, coord, from_coord, old_ctx, apo_mode);

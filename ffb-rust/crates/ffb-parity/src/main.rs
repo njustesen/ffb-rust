@@ -1,6 +1,7 @@
 mod runner;
 mod log_format;
 mod comparator;
+mod report_compare;
 mod update_progress;
 mod network_test;
 mod state_hash;
@@ -593,6 +594,10 @@ fn main() {
     println!("TIMING java_total={:.3}s (batched JVM, {total} seeds)", java_total.as_secs_f64());
     let mut rust_total = std::time::Duration::ZERO;
     let mut rust_panics = 0usize;
+    // Report-level verdict (report_compare.rs): advisory, printed next to PARITY, never folded in.
+    let mut reports_identical = 0usize;
+    let mut reports_differ = 0usize;
+    let mut reports_skipped = 0usize;
 
     for seed in args.seed_start..=args.seed_end {
         println!("Seed {seed}: {} vs {} ({})", args.home, args.away, args.edition);
@@ -634,6 +639,22 @@ fn main() {
         };
         update_progress::update(seed, &args.home, &args.away, &result);
 
+        match report_compare::compare_reports(seed, &args.edition, &args.home, &args.away) {
+            None => reports_skipped += 1,
+            Some(rc) if rc.identical => reports_identical += 1,
+            Some(rc) => {
+                reports_differ += 1;
+                eprintln!(
+                    "REPORTS DIFF seed={seed} ({} vs {}) at report #{} ({}; java {} / rust {} reports):
+  java={}
+  rust={}",
+                    args.home, args.away, rc.divergence, rc.kind, rc.java_count, rc.rust_count,
+                    rc.java_line.map(|v| v.to_string()).unwrap_or_else(|| "<none>".into()),
+                    rc.rust_line.map(|v| v.to_string()).unwrap_or_else(|| "<none>".into()),
+                );
+            }
+        }
+
         if result.matches {
             passed += 1;
             println!("✓ seed {seed} ({} vs {}) — {passed}/{total}", args.home, args.away);
@@ -659,6 +680,11 @@ fn main() {
 
     println!("TIMING java_total={:.3}s rust_total={:.3}s ({total} seeds; batched JVM)",
         java_total.as_secs_f64(), rust_total.as_secs_f64());
+
+    // The report streams are compared over the same games. Skipped = no file on one side (an older
+    // Java cache or a crashed game). Always printed so a missing line cannot read as "identical".
+    println!("REPORTS: {reports_identical}/{} games identical, {reports_differ} differ, {reports_skipped} skipped.",
+        reports_identical + reports_differ);
 
     // Tier-3 coverage checklist: write T3_COVERAGE.md + t3_coverage.html and print
     // the verdict. A missing required item fails the run even when parity passes.

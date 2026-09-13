@@ -1,7 +1,6 @@
 use ffb_model::enums::{InducementPhase, TurnMode};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
-use ffb_model::report::report_start_half::ReportStartHalf;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::mechanic::bb2025::state_mechanic::StateMechanic;
@@ -55,8 +54,7 @@ impl StepInitKickoff {
             // Java: stateMechanic.startHalf(step, 1) — returns inducement-registration events
             let half_events = StateMechanic::new().start_half(game, 1);
             events.extend(half_events);
-            // Java: getResult().addReport(new ReportStartHalf(game.getHalf()))
-            game.report_list.add(ReportStartHalf::new(game.half));
+            // Java: ReportStartHalf is added inside stateMechanic.startHalf (see start_half).
             events.push(GameEvent::StartHalf { half: game.half });
             game.turn_mode = TurnMode::Setup;
             game.start_turn();

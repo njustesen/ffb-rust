@@ -47,6 +47,7 @@ impl ReportApothecaryRoll {
 }
 
 impl IReport for ReportApothecaryRoll {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::APOTHECARY_ROLL }
 }
 

@@ -25,6 +25,7 @@ impl InjuryTypeStabForSpp {
 impl Default for InjuryTypeStabForSpp { fn default() -> Self { Self::new(true) } }
 
 impl InjuryTypeServer for InjuryTypeStabForSpp {
+    fn java_type_name(&self) -> &'static str { "stabForSpp" }
     fn java_class_name(&self) -> &'static str { "StabForSpp" }
     fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,
         coord: FieldCoordinate, from_coord: Option<FieldCoordinate>, old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode) {

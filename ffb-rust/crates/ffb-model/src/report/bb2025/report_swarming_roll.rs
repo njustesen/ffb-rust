@@ -33,6 +33,7 @@ impl ReportSwarmingRoll {
 }
 
 impl IReport for ReportSwarmingRoll {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::SWARMING_PLAYERS_ROLL }
 }
 

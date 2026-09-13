@@ -47,6 +47,7 @@ impl ReportSaboteurRoll {
 }
 
 impl IReport for ReportSaboteurRoll {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::SABOTEUR_ROLL }
 }
 

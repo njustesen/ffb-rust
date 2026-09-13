@@ -69,6 +69,7 @@ impl ReportChompRoll {
 }
 
 impl IReport for ReportChompRoll {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::CHOMP_ROLL }
 }
 

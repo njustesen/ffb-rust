@@ -21,6 +21,7 @@ impl ReportBombOutOfBounds {
 }
 
 impl IReport for ReportBombOutOfBounds {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::BOMB_OUT_OF_BOUNDS }
 }
 

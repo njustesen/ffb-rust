@@ -238,7 +238,9 @@ impl StepRightStuff {
         }
 
         if do_roll {
-            let minimum_roll = if let Some(player) = game.player(&player_id) {
+            // Java: `getResult().addReport(new ReportRightStuffRoll(..., modifiers))` — the landing
+            // modifier NAMES ("2 Tacklezones", "Subpar Throw"). Rust reported an empty list (H.50).
+            let (minimum_roll, right_stuff_modifier_names) = if let Some(player) = game.player(&player_id) {
                 let factory = RightStuffModifierFactory::for_rules(game.rules);
                 let mechanic_pass_result = self.pass_result.map(|r| match r {
                     ModelPassResult::Fumble | ModelPassResult::MissedCatch => MechanicPassResult::FUMBLE,
@@ -248,9 +250,10 @@ impl StepRightStuff {
                 });
                 let ctx = RightStuffContext::new_full(game, player, mechanic_pass_result, None);
                 let mods = factory.find_applicable(&ctx);
-                RightStuffModifierFactory::minimum_roll(player.agility_with_modifiers(), &mods)
+                let names: Vec<String> = mods.iter().map(|m| m.get_name().to_string()).collect();
+                (RightStuffModifierFactory::minimum_roll(player.agility_with_modifiers(), &mods), names)
             } else {
-                4
+                (4, Vec::new())
             };
 
             if self.roll == 0 {
@@ -285,7 +288,7 @@ impl StepRightStuff {
                     self.roll,
                     minimum_roll,
                     re_rolled,
-                    vec![],
+                    right_stuff_modifier_names.clone(),
                 ));
             }
 

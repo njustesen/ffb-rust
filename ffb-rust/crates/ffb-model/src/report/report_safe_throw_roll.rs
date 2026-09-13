@@ -56,6 +56,7 @@ impl ReportSafeThrowRoll {
 }
 
 impl IReport for ReportSafeThrowRoll {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::SAFE_THROW_ROLL }
 }
 

@@ -255,11 +255,11 @@ impl Step for StepMoveBallAndChain {
         // prompt was issued) was never committed on accept nor cleared on decline, and the
         // scatter re-roll could never actually be consumed.
         if let Action::UseReRoll { use_reroll } = action {
-            let actor_id = game.acting_player.player_id.clone();
-            // Java reports the *actual* skill backing the reroll; the Rust action carries no
-            // skill id for this generic re-roll reply, so we use the same placeholder
-            // (`SkillId::Block`) already established for skill-agnostic replies in `agent.rs`.
-            game.report_list.add(ReportSkillUse::new(actor_id, SkillId::Block, *use_reroll, SkillUse::RE_ROLL_DIRECTION));
+            // Java writes `ReportSkillUse(..., RE_ROLL_DIRECTION)` only in its CLIENT_USE_SKILL
+            // branch — a SKILL re-roll answered through the use-skill dialog. The prompt Rust
+            // raises here is the team re-roll offer, whose Java twin is CLIENT_USE_RE_ROLL and
+            // reports nothing; the placeholder `SkillId::Block` report that used to be written
+            // here had no Java counterpart (goblin bb2020 report diff, H.50).
             if !use_reroll {
                 self.re_roll_state.re_roll_source = None;
             }

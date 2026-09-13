@@ -22,7 +22,7 @@ use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::turn_data::TurnData;
 use ffb_model::util::rng::GameRng;
 use crate::dice_interpreter::DiceInterpreter;
-use crate::injury::InjuryContext;
+use crate::injury::{InjuryContext, InjuryResult};
 use crate::mechanic::state_mechanic::StateMechanic as StateMechanicTrait;
 use crate::util::util_server_game::UtilServerGame;
 
@@ -37,6 +37,41 @@ impl Default for StateMechanic {
 }
 
 impl StateMechanicTrait for StateMechanic {
+    /// Java `mixed/StateMechanic.reportInjury(IStep, InjuryResult)` — BB2016/BB2020. Unlike the
+    /// bb2025 version there is no pre-regeneration split: the default skip is `NONE`, a modified
+    /// context's INJURY modification skips the ARMOUR part, and the alternate-context re-report
+    /// skips ARMOUR / ARMOUR_AND_INJURY (already reported) or INJURY / CAS (not yet). The trait
+    /// default carried bb2025's rules into these editions, so every bb2020 injury read
+    /// `skipInjuryParts: CAS` and a second report followed (report diff, goblin bb2020; H.50).
+    fn report_injury(&self, game: &mut Game, injury_result: &mut InjuryResult) -> Option<GameEvent> {
+        use ffb_model::injury::context::InjuryModification;
+        use ffb_model::report::SkipInjuryParts;
+        let ctx = injury_result.injury_context();
+        let mut skip = SkipInjuryParts::None;
+        if ctx.modification != InjuryModification::NONE {
+            if ctx.modification == InjuryModification::INJURY {
+                skip = SkipInjuryParts::Armour;
+            }
+        } else if let Some(modified) = ctx.modified_injury_context.as_ref() {
+            let modification = modified.modification;
+            if injury_result.is_already_reported() {
+                skip = match modification {
+                    InjuryModification::ARMOUR => SkipInjuryParts::Armour,
+                    InjuryModification::INJURY => SkipInjuryParts::ArmourAndInjury,
+                    InjuryModification::NONE => skip,
+                };
+                injury_result.set_already_reported(false);
+            } else {
+                skip = match modification {
+                    InjuryModification::ARMOUR => SkipInjuryParts::Injury,
+                    InjuryModification::INJURY => SkipInjuryParts::Cas,
+                    InjuryModification::NONE => skip,
+                };
+            }
+        }
+        self.add_injury_report(game, injury_result, skip)
+    }
+
     /// Java: updateLeaderReRollsForTeam.
     fn update_leader_re_rolls_for_team(
         &self,
@@ -92,7 +127,10 @@ impl StateMechanicTrait for StateMechanic {
         }
         game.field_model.ball_coordinate = None;
         game.field_model.ball_in_play = false;
-        // NOTE: ReportStartHalf emitted by the calling step (StepInitKickoff) after start_half returns.
+        // Java: pStep.getResult().addReport(new ReportStartHalf(game.getHalf())) — inside startHalf,
+        // so the SECOND half is reported too. It used to live in StepInitKickoff's StartGame branch
+        // only, and Java's half-2 `startHalf` report was missing from the stream (H.50).
+        game.report_list.add(ffb_model::report::report_start_half::ReportStartHalf::new(game.half));
 
         if half < 2 {
             events.extend(self.add_apothecaries(game, true));

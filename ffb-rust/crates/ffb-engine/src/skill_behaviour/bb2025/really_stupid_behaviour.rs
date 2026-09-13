@@ -117,7 +117,7 @@ impl StepModifierTrait for ReallyStupidStepModifier {
                     1,
                     min_roll,
                     true,
-                    Some(SkillId::ReallyStupid.class_name().to_string()),
+                    Some(SkillId::ReallyStupid.category_and_name_for(game.rules).1.to_string()),
                 ));
                 cancel_negatrait_player_action(game, &player_id);
             crate::step::action::common::mark_target_selection_failed(game);
@@ -158,7 +158,7 @@ impl StepModifierTrait for ReallyStupidStepModifier {
             roll,
             min_roll,
             re_rolled,
-            Some(SkillId::ReallyStupid.class_name().to_string()),
+            Some(SkillId::ReallyStupid.category_and_name_for(game.rules).1.to_string()),
         ));
         let confusion_event = GameEvent::ConfusionRoll { player_id: player_id.clone(), roll, confused: !successful };
 

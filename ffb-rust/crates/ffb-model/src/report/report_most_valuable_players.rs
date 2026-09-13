@@ -48,6 +48,7 @@ impl ReportMostValuablePlayers {
 }
 
 impl IReport for ReportMostValuablePlayers {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId {
         ReportId::MOST_VALUABLE_PLAYERS
     }

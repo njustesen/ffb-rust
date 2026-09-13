@@ -137,6 +137,20 @@ pub fn rust_events_path_for(seed: u64, edition: &str, home: &str, away: &str) ->
     format!("{}/seed_{seed}_rust_events.jsonl", matchup_dir(edition, home, away))
 }
 
+/// The Rust engine's report stream for one game: one JSON line per `IReport` added to
+/// `game.report_list`, in order, each carrying the parity step index `i` it was produced under.
+/// Reports are the 1:1 port of Java's `addReport(...)`, so this is the coverage record that is
+/// complete by construction (the `GameEvent` stream is not — see docs/COVERAGE_REPORT.md).
+pub fn rust_reports_path_for(seed: u64, edition: &str, home: &str, away: &str) -> String {
+    format!("{}/seed_{seed}_rust_reports.jsonl", matchup_dir(edition, home, away))
+}
+
+/// The Java engine's report stream for the same game, captured by the parity harness from
+/// `ServerCommunication.sendModelSync` (the one place the server hands a step's `ReportList` on).
+pub fn java_reports_path_for(seed: u64, edition: &str, home: &str, away: &str) -> String {
+    format!("{}/seed_{seed}_java_reports.jsonl", matchup_dir(edition, home, away))
+}
+
 /// A minimal LogEntry type used by comparator for per-line diffs.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LogEntry {

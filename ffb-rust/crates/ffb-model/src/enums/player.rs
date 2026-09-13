@@ -569,6 +569,12 @@ impl PlayerAction {
         )
     }
 
+    /// Java `PlayerAction.forceLog()`: `isPutridBlock()` — the two Putrid Regurgitation block
+    /// actions are reported even when the acting player and action type did not change.
+    pub fn force_log(self) -> bool {
+        matches!(self, PlayerAction::PutridRegurgitationBlitz | PlayerAction::PutridRegurgitationBlock)
+    }
+
     pub fn force_dispatch(self) -> bool {
         matches!(self, PlayerAction::FuriousOutburst | PlayerAction::Forgo | PlayerAction::Punt)
     }

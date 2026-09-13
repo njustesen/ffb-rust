@@ -169,7 +169,7 @@ impl StepTakeRoot {
             roll,
             minimum_roll,
             re_rolled,
-            Some("TakeRoot".to_string()),
+            Some("Take Root".to_string()),
         ));
 
         if successful {

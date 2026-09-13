@@ -38,6 +38,7 @@ impl ReportScatterBall {
 }
 
 impl IReport for ReportScatterBall {
+    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
     fn get_id(&self) -> ReportId { ReportId::SCATTER_BALL }
 }
 
