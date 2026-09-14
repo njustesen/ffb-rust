@@ -829,6 +829,26 @@ impl DriverGameState {
         use ffb_model::report::report_id::ReportId;
         use ffb_model::report::report_skill_use::ReportSkillUse;
         use ffb_model::report::report_re_roll::ReportReRoll;
+        use ffb_model::report::report_leader::ReportLeader;
+        use ffb_model::report::report_coin_throw::ReportCoinThrow;
+        use ffb_model::report::report_receive_choice::ReportReceiveChoice;
+        use ffb_model::report::mixed::report_select_blitz_target::ReportSelectBlitzTarget;
+        use ffb_model::report::mixed::report_select_gaze_target::ReportSelectGazeTarget;
+        use ffb_model::report::report_interception_roll::ReportInterceptionRoll;
+        use ffb_model::report::bb2016::report_hypnotic_gaze_roll::ReportHypnoticGazeRoll;
+        use ffb_model::report::mixed::report_look_into_my_eyes_roll::ReportLookIntoMyEyesRoll;
+        use ffb_model::report::report_weeping_dagger_roll::ReportWeepingDaggerRoll;
+        use ffb_model::report::report_piling_on::ReportPilingOn;
+        use ffb_model::report::report_bribes_roll::ReportBribesRoll;
+        use ffb_model::report::report_secret_weapon_ban::ReportSecretWeaponBan;
+        use ffb_model::report::report_defecting_players::ReportDefectingPlayers;
+        use ffb_model::report::report_riotous_rookies::ReportRiotousRookies;
+        use ffb_model::report::bb2016::report_kickoff_throw_a_rock::ReportKickoffThrowARock;
+        use ffb_model::report::report_bomb_explodes_after_catch::ReportBombExplodesAfterCatch;
+        use ffb_model::report::report_petty_cash::ReportPettyCash;
+        use ffb_model::report::report_master_chef_roll::ReportMasterChefRoll;
+        use ffb_model::report::bb2016::report_no_players_to_field::ReportNoPlayersToField;
+        use ffb_model::report::mixed::report_prayer_amount::ReportPrayerAmount;
 
         let reports = self.game.report_list.get_reports();
         if reports.len() <= self.reports_evented {
@@ -852,6 +872,15 @@ impl DriverGameState {
                 }
                 ReportId::RE_ROLL => {
                     if let Some(rr) = any.downcast_ref::<ReportReRoll>() {
+                        // Java reports the Pro roll as a `ReportReRoll` with source PRO and the die
+                        // in `roll`; `GameEvent::ProRoll` has no emit site of its own (§H.52).
+                        if rr.re_roll_source.name == "Pro" {
+                            out.push(GameEvent::ProRoll {
+                                player_id: rr.player_id.clone().unwrap_or_default(),
+                                roll: rr.roll,
+                                success: rr.successful,
+                            });
+                        }
                         // `ReportReRoll` carries the player, not the team; resolve the team the
                         // way the rest of the driver does. `rerolled_action` is not on the report
                         // in EITHER engine, so it is left empty rather than invented.
@@ -870,6 +899,201 @@ impl DriverGameState {
                             team_id,
                             source: rr.re_roll_source.clone(),
                             rerolled_action: String::new(),
+                        });
+                    }
+                }
+                // ── the rest of the bridge (BACKLOG §H.52) ───────────────────────────
+                // Everything below names a `GameEvent` variant that HAS no live construction site:
+                // either none at all, or one in a dead edition twin (`step/bb2016|bb2020/*`,
+                // `step/mixed/*` shadowed by the bb2025 glob in `make_step`) or in
+                // `step/engine.rs`, which no `mod` declaration compiles. All of them ran the
+                // mechanic and wrote the report; none of them ever reached the census in 33,000
+                // games. Deriving them here is the same trade the two arms above already make: one
+                // watermark that cannot drift, instead of ~20 scattered `.with_event(...)` calls.
+                //
+                // Only NON-live variants are bridged. A variant a live step already emits would
+                // arrive twice whenever the two payloads differ in any field (`apply`'s dedup only
+                // drops exact duplicates), so those keep their own emit site.
+                ReportId::LEADER => {
+                    if let Some(r) = any.downcast_ref::<ReportLeader>() {
+                        out.push(GameEvent::Leader {
+                            player_id: r.team_id.clone(),
+                            reroll_available: r.leader_state == ffb_model::enums::LeaderState::Available,
+                        });
+                    }
+                }
+                ReportId::COIN_THROW => {
+                    if let Some(r) = any.downcast_ref::<ReportCoinThrow>() {
+                        // Java `ReportCoinThrow(coach, coinThrowHeads, coinChoiceHeads)`: the
+                        // caller wins when the call matches the throw.
+                        out.push(GameEvent::CoinThrow {
+                            home_won: r.coin_throw_heads == r.coin_choice_heads,
+                        });
+                    }
+                }
+                ReportId::RECEIVE_CHOICE => {
+                    if let Some(r) = any.downcast_ref::<ReportReceiveChoice>() {
+                        out.push(GameEvent::ReceiveChoice {
+                            team_id: r.team_id.clone(),
+                            receive: r.receive_choice,
+                        });
+                    }
+                }
+                ReportId::SELECT_BLITZ_TARGET => {
+                    if let Some(r) = any.downcast_ref::<ReportSelectBlitzTarget>() {
+                        out.push(GameEvent::SelectBlitzTarget {
+                            attacker_id: r.attacker.clone().unwrap_or_default(),
+                            defender_id: r.defender.clone().unwrap_or_default(),
+                        });
+                    }
+                }
+                ReportId::SELECT_GAZE_TARGET => {
+                    if let Some(r) = any.downcast_ref::<ReportSelectGazeTarget>() {
+                        out.push(GameEvent::SelectGazeTarget {
+                            attacker_id: r.attacker.clone().unwrap_or_default(),
+                            defender_id: r.defender.clone().unwrap_or_default(),
+                        });
+                    }
+                }
+                ReportId::INTERCEPTION_ROLL => {
+                    if let Some(r) = any.downcast_ref::<ReportInterceptionRoll>() {
+                        out.push(GameEvent::InterceptionRoll {
+                            player_id: r.base.player_id.clone().unwrap_or_default(),
+                            target: r.base.minimum_roll,
+                            roll: r.base.roll,
+                            success: r.base.successful,
+                        });
+                    }
+                }
+                ReportId::HYPNOTIC_GAZE_ROLL => {
+                    if let Some(r) = any.downcast_ref::<ReportHypnoticGazeRoll>() {
+                        // The report names the gazer; the victim is the game's current defender.
+                        out.push(GameEvent::HypnoticGazeRoll {
+                            player_id: r.base.player_id.clone().unwrap_or_default(),
+                            target_id: self.game.defender_id.clone().unwrap_or_default(),
+                            roll: r.base.roll,
+                            success: r.base.successful,
+                        });
+                    }
+                }
+                ReportId::LOOK_INTO_MY_EYES_ROLL => {
+                    if let Some(r) = any.downcast_ref::<ReportLookIntoMyEyesRoll>() {
+                        out.push(GameEvent::LookIntoMyEyesRoll {
+                            player_id: r.base.player_id.clone().unwrap_or_default(),
+                            roll: r.base.roll,
+                            success: r.base.successful,
+                            rerolled: r.base.re_rolled,
+                        });
+                    }
+                }
+                ReportId::WEEPING_DAGGER_ROLL => {
+                    if let Some(r) = any.downcast_ref::<ReportWeepingDaggerRoll>() {
+                        out.push(GameEvent::WeepingDaggerRoll {
+                            player_id: r.base.player_id.clone().unwrap_or_default(),
+                            roll: r.base.roll,
+                        });
+                    }
+                }
+                ReportId::PILING_ON => {
+                    if let Some(r) = any.downcast_ref::<ReportPilingOn>() {
+                        // Java's report names the piler and whether the INJURY roll is the one
+                        // being re-rolled; the victim is the current defender.
+                        out.push(GameEvent::PilingOn {
+                            player_id: r.player_id.clone(),
+                            target_id: self.game.defender_id.clone().unwrap_or_default(),
+                            rerolled: r.re_roll_injury,
+                        });
+                    }
+                }
+                ReportId::BRIBES_ROLL => {
+                    if let Some(r) = any.downcast_ref::<ReportBribesRoll>() {
+                        out.push(GameEvent::BribesRoll {
+                            player_id: r.player_id.clone(),
+                            roll: r.roll,
+                            success: r.successful,
+                        });
+                    }
+                }
+                ReportId::SECRET_WEAPON_BAN => {
+                    // One report carries every banned player; the event is per player.
+                    if let Some(r) = any.downcast_ref::<ReportSecretWeaponBan>() {
+                        for (i, pid) in r.player_ids.iter().enumerate() {
+                            if r.bans.get(i).copied().unwrap_or(false) {
+                                out.push(GameEvent::SecretWeaponBan { player_id: pid.clone() });
+                            }
+                        }
+                    }
+                }
+                ReportId::DEFECTING_PLAYERS => {
+                    if let Some(r) = any.downcast_ref::<ReportDefectingPlayers>() {
+                        let ids: Vec<String> = r.player_ids.iter().enumerate()
+                            .filter(|(i, _)| r.defectings.get(*i).copied().unwrap_or(false))
+                            .map(|(_, p)| p.clone())
+                            .collect();
+                        out.push(GameEvent::DefectingPlayers { player_ids: ids });
+                    }
+                }
+                ReportId::RIOTOUS_ROOKIES => {
+                    if let Some(r) = any.downcast_ref::<ReportRiotousRookies>() {
+                        out.push(GameEvent::RiotousRookies {
+                            team_id: r.team_id.clone(),
+                            player_count: r.amount,
+                        });
+                    }
+                }
+                ReportId::KICKOFF_THROW_A_ROCK => {
+                    if let Some(r) = any.downcast_ref::<ReportKickoffThrowARock>() {
+                        // bb2016's rock can hit a player on each team; one event per victim, and
+                        // one with no player when the rock misses everyone.
+                        if r.players_hit.is_empty() {
+                            out.push(GameEvent::KickoffThrowARock { player_id: None });
+                        }
+                        for pid in &r.players_hit {
+                            out.push(GameEvent::KickoffThrowARock { player_id: Some(pid.clone()) });
+                        }
+                    }
+                }
+                ReportId::BOMB_EXPLODES_AFTER_CATCH => {
+                    if let Some(r) = any.downcast_ref::<ReportBombExplodesAfterCatch>() {
+                        if r.explodes {
+                            let coord = self.game.field_model.player_coordinate(&r.catcher_id)
+                                .unwrap_or_else(|| ffb_model::types::FieldCoordinate::new(0, 0));
+                            out.push(GameEvent::BombExplodesAfterCatch {
+                                player_id: r.catcher_id.clone(),
+                                coord,
+                            });
+                        }
+                    }
+                }
+                ReportId::PETTY_CASH => {
+                    if let Some(r) = any.downcast_ref::<ReportPettyCash>() {
+                        out.push(GameEvent::PettyCash {
+                            team_id: r.team_id.clone(),
+                            amount: r.gold,
+                        });
+                    }
+                }
+                ReportId::MASTER_CHEF_ROLL => {
+                    if let Some(r) = any.downcast_ref::<ReportMasterChefRoll>() {
+                        out.push(GameEvent::MasterChefRoll {
+                            team_id: r.team_id.clone(),
+                            roll: r.master_chef_roll.iter().sum(),
+                            rerolls_stolen: r.re_rolls_stolen,
+                        });
+                    }
+                }
+                ReportId::NO_PLAYERS_TO_FIELD => {
+                    if let Some(r) = any.downcast_ref::<ReportNoPlayersToField>() {
+                        out.push(GameEvent::NoPlayersToField { team_id: Some(r.team_id.clone()) });
+                    }
+                }
+                ReportId::PRAYER_AMOUNT => {
+                    if let Some(r) = any.downcast_ref::<ReportPrayerAmount>() {
+                        out.push(GameEvent::PrayerAmount {
+                            tv_home: r.tv_home,
+                            tv_away: r.tv_away,
+                            prayer_amount: r.prayer_amount,
+                            home_team_receives_prayers: r.home_team_receives_prayers,
                         });
                     }
                 }
@@ -1201,6 +1425,47 @@ pub(crate) fn new_game(seed: u64) -> DriverGameState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The report -> event bridge (§H.52). Every variant below had NO live construction site, so
+    /// the mechanic ran, wrote its report, and the census saw nothing across 33,000 games. Adding
+    /// the report is now enough to make the event appear.
+    #[test]
+    fn report_to_event_bridge_covers_the_variants_with_no_emit_site() {
+        use ffb_model::report::report_coin_throw::ReportCoinThrow;
+        use ffb_model::report::report_receive_choice::ReportReceiveChoice;
+        use ffb_model::report::report_interception_roll::ReportInterceptionRoll;
+        use ffb_model::report::mixed::report_select_blitz_target::ReportSelectBlitzTarget;
+        use ffb_model::report::report_secret_weapon_ban::ReportSecretWeaponBan;
+
+        let mut gs = new_game(1);
+        gs.reports_evented = gs.game.report_list.size();
+
+        // Java `ReportCoinThrow(coach, coinThrowHeads, coinChoiceHeads)`: the caller wins when the
+        // call matches the throw.
+        gs.game.report_list.add(ReportCoinThrow::new(true, "Home".into(), true));
+        gs.game.report_list.add(ReportReceiveChoice::new("home".into(), true));
+        gs.game.report_list.add(ReportSelectBlitzTarget::new(Some("home_01".into()), Some("away_02".into())));
+        gs.game.report_list.add(ReportInterceptionRoll::new(
+            Some("away_03".into()), false, 5, 4, false, vec![], false, false));
+        let mut ban = ReportSecretWeaponBan::new();
+        ban.add("home_11".into(), 8, true);
+        ban.add("home_12".into(), 3, false);   // rolled but NOT banned — no event for this one
+        gs.game.report_list.add(ban);
+
+        let evs = gs.drain_report_events();
+        assert!(evs.contains(&GameEvent::CoinThrow { home_won: true }), "{evs:?}");
+        assert!(evs.contains(&GameEvent::ReceiveChoice { team_id: "home".into(), receive: true }));
+        assert!(evs.contains(&GameEvent::SelectBlitzTarget {
+            attacker_id: "home_01".into(), defender_id: "away_02".into() }));
+        assert!(evs.contains(&GameEvent::InterceptionRoll {
+            player_id: "away_03".into(), target: 4, roll: 5, success: false }));
+        assert!(evs.contains(&GameEvent::SecretWeaponBan { player_id: "home_11".into() }));
+        assert!(!evs.iter().any(|e| matches!(e, GameEvent::SecretWeaponBan { player_id } if player_id == "home_12")),
+            "a weapon that rolled but was not banned raises no event: {evs:?}");
+
+        // The watermark is monotonic: a second drain over the same reports yields nothing.
+        assert!(gs.drain_report_events().is_empty());
+    }
 
     #[test]
     fn step_stack_clear_empties_stack() {

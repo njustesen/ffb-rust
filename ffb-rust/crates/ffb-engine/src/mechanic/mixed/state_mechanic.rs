@@ -93,12 +93,18 @@ impl StateMechanicTrait for StateMechanic {
             if turn_data.leader_state == LeaderState::None {
                 turn_data.leader_state = LeaderState::Available;
                 turn_data.rerolls += 1;
+                let team_id = team.id.clone();
+                game.report_list.add(ffb_model::report::report_leader::ReportLeader::new(
+                    team_id, LeaderState::Available));
                 // NOTE: caller emits GameEvent::Leader { player_id: team_id, reroll_available: true }
                 return Some(LeaderState::Available);
             }
         } else if turn_data.leader_state == LeaderState::Available {
             turn_data.leader_state = LeaderState::None;
             turn_data.rerolls = (turn_data.rerolls - 1).max(0);
+            let team_id = team.id.clone();
+            game.report_list.add(ffb_model::report::report_leader::ReportLeader::new(
+                team_id, LeaderState::None));
             // NOTE: caller emits GameEvent::Leader { player_id: team_id, reroll_available: false }
             return Some(LeaderState::None);
         }

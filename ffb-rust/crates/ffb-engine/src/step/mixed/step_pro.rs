@@ -77,6 +77,15 @@ impl StepPro {
                 game.field_model.set_player_state(&player_id, state.change_used_pro(true));
                 let roll = rng.d6();
                 successful = roll >= MINIMUM_PRO_ROLL;
+                // Java (`RollMechanic.useReRoll`, Pro branch): `stepResult.addReport(new
+                // ReportReRoll(pid, ReRollSources.PRO, successful, proRoll))`. Rust rolled the die
+                // and reported nothing, so Pro was invisible in both streams (§H.52).
+                game.report_list.add(ffb_model::report::report_re_roll::ReportReRoll::new(
+                    Some(player_id.clone()),
+                    ffb_model::enums::ReRollSource::new("Pro"),
+                    successful,
+                    roll,
+                ));
             }
         }
 
