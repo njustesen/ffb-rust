@@ -150,7 +150,7 @@ footer{padding-top:28px;font-size:13px;color:var(--ink-3);max-width:80ch}
 <div class="wrap">
 <header class="mast">
   <div>
-    <div class="eyebrow">FFB-Rust · heuristic-setup sweep · 2026-09-13</div>
+    <div class="eyebrow" id="mast-eyebrow"></div>
     <h1>Pitch Census</h1>
     <div class="sub" id="mast-sub"></div>
   </div>
@@ -167,8 +167,8 @@ footer{padding-top:28px;font-size:13px;color:var(--ink-3);max-width:80ch}
   <header>
     <div class="eyebrow">What was on the pitch</div>
     <h2>Every gate green. This is what the engines agreed on.</h2>
-    <p class="lede">The parity matrix compares Rust against stock Java step by step. It says <em>whether</em> they agree, not <em>about what</em>. This sheet reads the Rust event stream of the same 33,000 games and tallies what actually happened, then holds each tally against the engine's own catalogs to show what never came up.</p>
-    <p class="lede">The event stream is not the whole record. Both engines also keep the report list the game client renders, and that one carries the roll modifiers by name. A separate sample of 300 games captures it from both sides and compares them report by report — see <a href="#s-reports">Reports</a>.</p>
+    <p class="lede">The parity matrix compares Rust against stock Java step by step. It says <em>whether</em> they agree, not <em>about what</em>. This sheet reads the Rust event stream of the same <span id="lede-games"></span> games and tallies what actually happened, then holds each tally against the engine's own catalogs to show what never came up.</p>
+    <p class="lede">The event stream is not the whole record. Both engines also keep the report list the game client renders, and that one carries the roll modifiers by name. A sample of <span id="lede-report-games"></span> games captures it from both sides and compares them report by report — see <a href="#s-reports">Reports</a>.</p>
   </header>
   <div class="strip" id="strip"></div>
 </section>
@@ -272,7 +272,7 @@ footer{padding-top:28px;font-size:13px;color:var(--ink-3);max-width:80ch}
 </section>
 
 <section id="s-missing">
-  <header><div class="eyebrow">Not reached</div><h2>What 33,000 games did not show</h2>
+  <header><div class="eyebrow">Not reached</div><h2 id="miss-h2"></h2>
   <p class="lede">A green matrix certifies agreement on the paths that were walked. These are the paths that were not, sorted by why.</p></header>
   <div class="miss-grid" id="missing"></div>
 </section>
@@ -295,6 +295,9 @@ const EDS = ['bb2016','bb2020','bb2025'];
 const M = D.meta;
 $('#mast-sub').innerHTML = [`${M.gates} gates`, `${fmt(M.games)} games`, `${(M.events/1e6).toFixed(2)} M events`, `${M.races} races · ${M.squads} squads`, `scales 0 · 1.0 · 1e6`].map(s=>`<span>${s}</span>`).join('');
 $('#verdict').textContent = `Parity ${M.parity} green`;
+$('#mast-eyebrow').textContent = `FFB-Rust · ${M.sweep} · ${M.date}`;
+$('#lede-games').textContent = fmt(M.games);
+$('#miss-h2').textContent = `What ${fmt(M.games)} games did not show`;
 const tds = D.types.touchdown||0;
 const seenEv = Object.keys(D.types).length, seenAc = Object.keys(D.actions).length;
 const skUsed = D.skills.filter(s=>s.cls==='used').length, skProv = D.skills.filter(s=>s.cls==='proven').length;
@@ -436,6 +439,7 @@ if (D.reports) {
   const ids = Object.entries(R.ids).sort((a,b)=>b[1]-a[1]);
   const maxId = ids[0][1];
   $('#rp-h2').textContent = `${ids.length} of ${R.catalog.length} report kinds, ${fmt(R.reports)} reports over ${fmt(R.games)} games`;
+  const lrg = $('#lede-report-games'); if (lrg) lrg.textContent = fmt(R.games);
   const modTotal = Object.values(R.modifiers).reduce((a,g)=>a+Object.keys(g).length,0);
   [
     ['', fmt(R.reports), `reports captured, ${Math.round(R.reports/R.games)} per game`],
@@ -554,5 +558,5 @@ if (D.reports) {
   cards.forEach(c => $('#missing').appendChild(el('div','miss-card '+c.cls,`<h3>${c.title}</h3>${c.body}`)));
 }
 
-$('#foot').innerHTML = `Source: <code>scripts/sweep_census/agg.py</code> over the <code>parity_st_*</code> logs of the 2026-09-13 sweep (BACKLOG §H.43–§H.49), roster side from <code>inventory.py</code> over <code>data/teams</code>. Built by <code>build_report.py</code>. Parity certification: <code>docs/SWEEP_2026-09-13_SETUP.txt</code>.`;
+$('#foot').innerHTML = `Source: <code>scripts/sweep_census/agg.py</code> over the ${M.source}, roster side from <code>inventory.py</code> over <code>data/teams</code>; report stream from <code>report_census.py</code>. Built by <code>build_report.py</code>. Parity certification: <code>${M.verdict_file}</code>.`;
 </script>

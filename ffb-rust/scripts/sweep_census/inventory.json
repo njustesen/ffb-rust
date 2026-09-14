@@ -1,0 +1,5663 @@
+{
+ "skill_enum": [
+  "Block",
+  "Catch",
+  "Dauntless",
+  "DisturbingPresence",
+  "DivingCatch",
+  "DumpOff",
+  "ExtraArms",
+  "Fend",
+  "FoulAppearance",
+  "HailMaryPass",
+  "Horns",
+  "JumpUp",
+  "MovementIncrease",
+  "Pass",
+  "Sprint",
+  "StandFirm",
+  "StripBall",
+  "SureHands",
+  "Tackle",
+  "Tentacles",
+  "ThickSkull",
+  "TwoHeads",
+  "Wrestle",
+  "AnimalSavagery",
+  "Animosity",
+  "BallAndChain",
+  "Bombardier",
+  "BoneHead",
+  "Brawler",
+  "BreakTackle",
+  "BreatheFire",
+  "Chainsaw",
+  "CloudBurster",
+  "Defensive",
+  "DirtyPlayer",
+  "Fumblerooskie",
+  "HitAndRun",
+  "HypnoticGaze",
+  "Leap",
+  "MightyBlow",
+  "MonstrousMouth",
+  "NoHands",
+  "PassingIncrease",
+  "PileDriver",
+  "PilingOn",
+  "PogoStick",
+  "ProjectileVomit",
+  "ReallyStupid",
+  "Regeneration",
+  "RightStuff",
+  "RunningPass",
+  "Shadowing",
+  "SideStep",
+  "SneakyGit",
+  "Stab",
+  "StrengthIncrease",
+  "SureFeet",
+  "Swarming",
+  "Swoop",
+  "VeryLongLegs",
+  "ASneakyPair",
+  "BlastIt",
+  "BrutalBlock",
+  "BurstOfSpeed",
+  "ConsummateProfessional",
+  "DwarfenScourge",
+  "ExcuseMeAreYouAZoat",
+  "FrenziedRush",
+  "GhostlyFlames",
+  "Incorporeal",
+  "LordOfChaos",
+  "MasterAssassin",
+  "MesmerizingDance",
+  "PumpUpTheCrowd",
+  "PutridRegurgitation",
+  "TheBallista",
+  "ThenIStartedBlastin",
+  "TwoForOne",
+  "WhirlingDervish",
+  "WisdomOfTheWhiteDwarf",
+  "Yoink",
+  "ArmBar",
+  "BalefulHex",
+  "Cannoneer",
+  "IronHardSkin",
+  "LookIntoMyEyes",
+  "MyBall",
+  "PickMeUp",
+  "SafePass",
+  "SafePairOfHands",
+  "Slayer",
+  "ToxinConnoisseur",
+  "UnchannelledFury",
+  "Accurate",
+  "AlwaysHungry",
+  "ArmourIncrease",
+  "BloodLust",
+  "Claw",
+  "Decay",
+  "Disposable",
+  "DivingTackle",
+  "FanFavourite",
+  "Frenzy",
+  "Grab",
+  "Guard",
+  "KickOffReturn",
+  "KickTeamMate",
+  "Loner",
+  "MultipleBlock",
+  "NervesOfSteel",
+  "NurglesRot",
+  "PassBlock",
+  "PrehensileTail",
+  "SafeThrow",
+  "SecretWeapon",
+  "Stakes",
+  "StrongArm",
+  "Stunty",
+  "TakeRoot",
+  "ThrowTeamMate",
+  "Timmmber",
+  "Titchy",
+  "WeepingDagger",
+  "WildAnimal",
+  "AgilityIncrease",
+  "BigHand",
+  "Bullseye",
+  "Dodge",
+  "EyeGouge",
+  "Fumblerooski",
+  "GiveAndGo",
+  "Hatred",
+  "Insignificant",
+  "Juggernaut",
+  "Kick",
+  "Leader",
+  "LethalFlight",
+  "LoneFouler",
+  "NoBall",
+  "OnTheBall",
+  "Pogo",
+  "Pro",
+  "Punt",
+  "PutTheBootIn",
+  "QuickFoul",
+  "Saboteur",
+  "Sidestep",
+  "BlastinSolvesEverything",
+  "DwarvenScourge",
+  "KrumpAndSmash",
+  "MesmerisingDance",
+  "SlashingNails",
+  "SteadyFooting",
+  "TeamCaptain",
+  "Taunt",
+  "Unsteady",
+  "ViolentInnovator",
+  "WoodlandFury",
+  "WorkingInTandem",
+  "AllYouCanEat",
+  "BeerBarrelBash",
+  "BlackInk",
+  "BlindRage",
+  "BoundingLeap",
+  "BugmansXXXXXX",
+  "CatchOfTheDay",
+  "CrushingBlow",
+  "Drunkard",
+  "FuriousOutburst",
+  "FuryOfTheBloodGod",
+  "GoredByTheBull",
+  "HalflingLuck",
+  "IllBeBack",
+  "Indomitable",
+  "Kaboom",
+  "KeenPlayer",
+  "KickEmWhileTheyReDown",
+  "MaximumCarnage",
+  "OldPro",
+  "PlagueRidden",
+  "PrimalSavagery",
+  "QuickBite",
+  "RaidingParty",
+  "Ram",
+  "Reliable",
+  "SavageBlow",
+  "SavageMauling",
+  "ShotToNothing",
+  "SneakiestOfTheLot",
+  "StarOfTheShow",
+  "StrongPassingGame",
+  "SwiftAsTheBreeze",
+  "TastyMorsel",
+  "TheFlashingBlade",
+  "ThinkingMansTroll",
+  "Treacherous",
+  "Trickster",
+  "UnstoppableMomentum",
+  "ViciousVines",
+  "WatchOut"
+ ],
+ "squads": {
+  "amazon__bb2016": {
+   "race": "amazon",
+   "edition": "bb2016",
+   "players": 13,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dodge": [
+     "amazon.blitzer",
+     "amazon.catcher",
+     "amazon.linewoman",
+     "amazon.thrower"
+    ],
+    "Block": [
+     "amazon.blitzer"
+    ],
+    "Catch": [
+     "amazon.catcher"
+    ],
+    "Pass": [
+     "amazon.thrower"
+    ]
+   },
+   "unresolved": []
+  },
+  "chaos__bb2016": {
+   "race": "chaos",
+   "edition": "bb2016",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Horns": [
+     "chaos.beastman",
+     "chaos.minotaur"
+    ],
+    "Loner": [
+     "chaos.minotaur"
+    ],
+    "Frenzy": [
+     "chaos.minotaur"
+    ],
+    "Mighty Blow": [
+     "chaos.minotaur"
+    ],
+    "Thick Skull": [
+     "chaos.minotaur"
+    ],
+    "Wild Animal": [
+     "chaos.minotaur"
+    ]
+   },
+   "unresolved": []
+  },
+  "chaos_dwarf__bb2016": {
+   "race": "chaos_dwarf",
+   "edition": "bb2016",
+   "players": 13,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Block": [
+     "chaosdwarf.blocker"
+    ],
+    "Tackle": [
+     "chaosdwarf.blocker"
+    ],
+    "Thick Skull": [
+     "chaosdwarf.blocker",
+     "chaosdwarf.bullcentaur",
+     "chaosdwarf.minotaur"
+    ],
+    "Sprint": [
+     "chaosdwarf.bullcentaur"
+    ],
+    "Sure Feet": [
+     "chaosdwarf.bullcentaur"
+    ],
+    "Loner": [
+     "chaosdwarf.minotaur"
+    ],
+    "Frenzy": [
+     "chaosdwarf.minotaur"
+    ],
+    "Horns": [
+     "chaosdwarf.minotaur"
+    ],
+    "Mighty Blow": [
+     "chaosdwarf.minotaur"
+    ],
+    "Wild Animal": [
+     "chaosdwarf.minotaur"
+    ]
+   },
+   "unresolved": []
+  },
+  "chaos_pact__bb2016": {
+   "race": "chaos_pact",
+   "edition": "bb2016",
+   "players": 13,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Animosity": [
+     "chaospact.darkelf.renegade",
+     "chaospact.goblin.renegade",
+     "chaospact.skaven.renegade"
+    ],
+    "Dodge": [
+     "chaospact.goblin.renegade"
+    ],
+    "Right Stuff": [
+     "chaospact.goblin.renegade"
+    ],
+    "Stunty": [
+     "chaospact.goblin.renegade"
+    ],
+    "Always Hungry": [
+     "chaospact.troll.chaos"
+    ],
+    "Loner": [
+     "chaospact.minotaur",
+     "chaospact.ogre.chaos",
+     "chaospact.troll.chaos"
+    ],
+    "Mighty Blow": [
+     "chaospact.minotaur",
+     "chaospact.ogre.chaos",
+     "chaospact.troll.chaos"
+    ],
+    "Really Stupid": [
+     "chaospact.troll.chaos"
+    ],
+    "Regeneration": [
+     "chaospact.troll.chaos"
+    ],
+    "Throw Team-Mate": [
+     "chaospact.ogre.chaos",
+     "chaospact.troll.chaos"
+    ],
+    "Bone-Head": [
+     "chaospact.ogre.chaos"
+    ],
+    "Thick Skull": [
+     "chaospact.minotaur",
+     "chaospact.ogre.chaos"
+    ],
+    "Frenzy": [
+     "chaospact.minotaur"
+    ],
+    "Horns": [
+     "chaospact.minotaur"
+    ],
+    "Wild Animal": [
+     "chaospact.minotaur"
+    ]
+   },
+   "unresolved": []
+  },
+  "dark_elf__bb2016": {
+   "race": "dark_elf",
+   "edition": "bb2016",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Block": [
+     "darkelf.blitzer"
+    ],
+    "Dump-Off": [
+     "darkelf.runner"
+    ],
+    "Shadowing": [
+     "darkelf.assassin"
+    ],
+    "Stab": [
+     "darkelf.assassin"
+    ],
+    "Dodge": [
+     "darkelf.witchelf"
+    ],
+    "Frenzy": [
+     "darkelf.witchelf"
+    ],
+    "Jump Up": [
+     "darkelf.witchelf"
+    ]
+   },
+   "unresolved": []
+  },
+  "dark_elf_league_fumbbl__bb2016": {
+   "race": "dark_elf_league_fumbbl",
+   "edition": "bb2016",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Block": [
+     "37736"
+    ],
+    "Shadowing": [
+     "37737"
+    ],
+    "Stab": [
+     "37737"
+    ],
+    "Dump-off": [
+     "37735"
+    ],
+    "Dodge": [
+     "37738"
+    ],
+    "Frenzy": [
+     "37738"
+    ],
+    "Jump Up": [
+     "37738"
+    ]
+   },
+   "unresolved": []
+  },
+  "dwarf__bb2016": {
+   "race": "dwarf",
+   "edition": "bb2016",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Block": [
+     "dwarf.blitzer",
+     "dwarf.blocker",
+     "dwarf.trollslayer"
+    ],
+    "Tackle": [
+     "dwarf.blocker"
+    ],
+    "Thick Skull": [
+     "dwarf.blitzer",
+     "dwarf.blocker",
+     "dwarf.runner",
+     "dwarf.trollslayer"
+    ],
+    "Sure Hands": [
+     "dwarf.runner"
+    ],
+    "Dauntless": [
+     "dwarf.trollslayer"
+    ],
+    "Frenzy": [
+     "dwarf.trollslayer"
+    ],
+    "Loner": [
+     "dwarf.deathroller"
+    ],
+    "Break Tackle": [
+     "dwarf.deathroller"
+    ],
+    "Dirty Player": [
+     "dwarf.deathroller"
+    ],
+    "Juggernaut": [
+     "dwarf.deathroller"
+    ],
+    "Mighty Blow": [
+     "dwarf.deathroller"
+    ],
+    "No Hands": [
+     "dwarf.deathroller"
+    ],
+    "Secret Weapon": [
+     "dwarf.deathroller"
+    ],
+    "Stand Firm": [
+     "dwarf.deathroller"
+    ]
+   },
+   "unresolved": []
+  },
+  "elf__bb2016": {
+   "race": "elf",
+   "edition": "bb2016",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Catch": [
+     "elf.catcher"
+    ],
+    "Nerves of Steel": [
+     "elf.catcher"
+    ],
+    "Pass": [
+     "elf.thrower"
+    ],
+    "Block": [
+     "elf.blitzer"
+    ],
+    "Side Step": [
+     "elf.blitzer"
+    ]
+   },
+   "unresolved": []
+  },
+  "goblin__bb2016": {
+   "race": "goblin",
+   "edition": "bb2016",
+   "players": 16,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dodge": [
+     "goblin.bombardier",
+     "goblin.goblin",
+     "goblin.pogoer"
+    ],
+    "Right Stuff": [
+     "goblin.goblin"
+    ],
+    "Stunty": [
+     "goblin.bombardier",
+     "goblin.fanatic",
+     "goblin.goblin",
+     "goblin.looney",
+     "goblin.pogoer"
+    ],
+    "Loner": [
+     "goblin.troll"
+    ],
+    "Always Hungry": [
+     "goblin.troll"
+    ],
+    "Mighty Blow": [
+     "goblin.troll"
+    ],
+    "Really Stupid": [
+     "goblin.troll"
+    ],
+    "Regeneration": [
+     "goblin.troll"
+    ],
+    "Throw Team-Mate": [
+     "goblin.troll"
+    ],
+    "Bombardier": [
+     "goblin.bombardier"
+    ],
+    "Secret Weapon": [
+     "goblin.bombardier",
+     "goblin.fanatic",
+     "goblin.looney"
+    ],
+    "Leap": [
+     "goblin.pogoer"
+    ],
+    "Very Long Legs": [
+     "goblin.pogoer"
+    ],
+    "Chainsaw": [
+     "goblin.looney"
+    ],
+    "Ball and Chain": [
+     "goblin.fanatic"
+    ],
+    "No Hands": [
+     "goblin.fanatic"
+    ]
+   },
+   "unresolved": []
+  },
+  "halfling__bb2016": {
+   "race": "halfling",
+   "edition": "bb2016",
+   "players": 16,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Loner": [
+     "halfling.treeman"
+    ],
+    "Mighty Blow": [
+     "halfling.treeman"
+    ],
+    "Stand Firm": [
+     "halfling.treeman"
+    ],
+    "Strong Arm": [
+     "halfling.treeman"
+    ],
+    "Take Root": [
+     "halfling.treeman"
+    ],
+    "Thick Skull": [
+     "halfling.treeman"
+    ],
+    "Throw Team-Mate": [
+     "halfling.treeman"
+    ],
+    "Dodge": [
+     "halfling.halfling"
+    ],
+    "Right Stuff": [
+     "halfling.halfling"
+    ],
+    "Stunty": [
+     "halfling.halfling"
+    ]
+   },
+   "unresolved": []
+  },
+  "high_elf__bb2016": {
+   "race": "high_elf",
+   "edition": "bb2016",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Pass": [
+     "highelf.thrower"
+    ],
+    "Safe Throw": [
+     "highelf.thrower"
+    ],
+    "Block": [
+     "highelf.blitzer"
+    ],
+    "Catch": [
+     "highelf.catcher"
+    ]
+   },
+   "unresolved": []
+  },
+  "human__bb2016": {
+   "race": "human",
+   "edition": "bb2016",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Block": [
+     "human.blitzer"
+    ],
+    "Pass": [
+     "human.thrower"
+    ],
+    "Sure Hands": [
+     "human.thrower"
+    ],
+    "Catch": [
+     "human.catcher"
+    ],
+    "Dodge": [
+     "human.catcher"
+    ],
+    "Loner": [
+     "human.ogre"
+    ],
+    "Bone-Head": [
+     "human.ogre"
+    ],
+    "Mighty Blow": [
+     "human.ogre"
+    ],
+    "Thick Skull": [
+     "human.ogre"
+    ],
+    "Throw Team-Mate": [
+     "human.ogre"
+    ]
+   },
+   "unresolved": []
+  },
+  "khemri__bb2016": {
+   "race": "khemri",
+   "edition": "bb2016",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 0,
+   "special_rules": [],
+   "skills": {
+    "Decay": [
+     "khemri.tombguardian"
+    ],
+    "Regeneration": [
+     "khemri.blitzra",
+     "khemri.skeleton",
+     "khemri.throra",
+     "khemri.tombguardian"
+    ],
+    "Block": [
+     "khemri.blitzra"
+    ],
+    "Pass": [
+     "khemri.throra"
+    ],
+    "Sure Hands": [
+     "khemri.throra"
+    ],
+    "Thick Skull": [
+     "khemri.skeleton"
+    ]
+   },
+   "unresolved": []
+  },
+  "khemri_fumbbl__bb2016": {
+   "race": "khemri_fumbbl",
+   "edition": "bb2016",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 0,
+   "special_rules": [],
+   "skills": {
+    "Pass": [
+     "2893"
+    ],
+    "Regeneration": [
+     "2892",
+     "2893",
+     "2894",
+     "2895"
+    ],
+    "Sure Hands": [
+     "2893"
+    ],
+    "Thick Skull": [
+     "2892"
+    ],
+    "Decay": [
+     "2895"
+    ],
+    "Block": [
+     "2894"
+    ]
+   },
+   "unresolved": []
+  },
+  "lizardman__bb2016": {
+   "race": "lizardman",
+   "edition": "bb2016",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Loner": [
+     "lizardman.kroxigor"
+    ],
+    "Bone-Head": [
+     "lizardman.kroxigor"
+    ],
+    "Mighty Blow": [
+     "lizardman.kroxigor"
+    ],
+    "Prehensile Tail": [
+     "lizardman.kroxigor"
+    ],
+    "Thick Skull": [
+     "lizardman.kroxigor"
+    ],
+    "Dodge": [
+     "lizardman.skink"
+    ],
+    "Stunty": [
+     "lizardman.skink"
+    ]
+   },
+   "unresolved": []
+  },
+  "necromantic__bb2016": {
+   "race": "necromantic",
+   "edition": "bb2016",
+   "players": 13,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 0,
+   "special_rules": [],
+   "skills": {
+    "Claw": [
+     "necromantic.werewolf"
+    ],
+    "Frenzy": [
+     "necromantic.werewolf"
+    ],
+    "Regeneration": [
+     "necromantic.fleshgolem",
+     "necromantic.werewolf",
+     "necromantic.wight",
+     "necromantic.zombie"
+    ],
+    "Stand Firm": [
+     "necromantic.fleshgolem"
+    ],
+    "Thick Skull": [
+     "necromantic.fleshgolem"
+    ],
+    "Block": [
+     "necromantic.wight"
+    ],
+    "Dodge": [
+     "necromantic.ghoul"
+    ]
+   },
+   "unresolved": []
+  },
+  "nippon__bb2016": {
+   "race": "nippon",
+   "edition": "bb2016",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Block": [
+     "43572"
+    ],
+    "Claw": [
+     "43573"
+    ],
+    "Dodge": [
+     "43574"
+    ],
+    "Leap": [
+     "43574"
+    ]
+   },
+   "unresolved": []
+  },
+  "norse__bb2016": {
+   "race": "norse",
+   "edition": "bb2016",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Block": [
+     "norse.berserker",
+     "norse.lineman",
+     "norse.runner",
+     "norse.thrower"
+    ],
+    "Pass": [
+     "norse.thrower"
+    ],
+    "Dauntless": [
+     "norse.runner"
+    ],
+    "Frenzy": [
+     "norse.berserker",
+     "norse.troll.snow",
+     "norse.ulfwerener"
+    ],
+    "Jump Up": [
+     "norse.berserker"
+    ],
+    "Claw": [
+     "norse.troll.snow"
+    ],
+    "Disturbing Presence": [
+     "norse.troll.snow"
+    ],
+    "Loner": [
+     "norse.troll.snow"
+    ],
+    "Wild Animal": [
+     "norse.troll.snow"
+    ]
+   },
+   "unresolved": []
+  },
+  "nurgle__bb2016": {
+   "race": "nurgle",
+   "edition": "bb2016",
+   "players": 13,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 0,
+   "special_rules": [],
+   "skills": {
+    "Decay": [
+     "nurgle.rotter"
+    ],
+    "Nurgle's Rot": [
+     "nurgle.beast",
+     "nurgle.pestigor",
+     "nurgle.rotter",
+     "nurgle.warrior"
+    ],
+    "Horns": [
+     "nurgle.pestigor"
+    ],
+    "Regeneration": [
+     "nurgle.beast",
+     "nurgle.pestigor",
+     "nurgle.warrior"
+    ],
+    "Disturbing Presence": [
+     "nurgle.beast",
+     "nurgle.warrior"
+    ],
+    "Foul Appearance": [
+     "nurgle.beast",
+     "nurgle.warrior"
+    ],
+    "Loner": [
+     "nurgle.beast"
+    ],
+    "Mighty Blow": [
+     "nurgle.beast"
+    ],
+    "Really Stupid": [
+     "nurgle.beast"
+    ],
+    "Tentacles": [
+     "nurgle.beast"
+    ]
+   },
+   "unresolved": []
+  },
+  "ogre__bb2016": {
+   "race": "ogre",
+   "edition": "bb2016",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dodge": [
+     "ogre.snotling"
+    ],
+    "Right Stuff": [
+     "ogre.snotling"
+    ],
+    "Side Step": [
+     "ogre.snotling"
+    ],
+    "Stunty": [
+     "ogre.snotling"
+    ],
+    "Titchy": [
+     "ogre.snotling"
+    ],
+    "Bone-Head": [
+     "ogre.ogre"
+    ],
+    "Mighty Blow": [
+     "ogre.ogre"
+    ],
+    "Thick Skull": [
+     "ogre.ogre"
+    ],
+    "Throw Team-Mate": [
+     "ogre.ogre"
+    ]
+   },
+   "unresolved": []
+  },
+  "orc__bb2016": {
+   "race": "orc",
+   "edition": "bb2016",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Loner": [
+     "orc.troll"
+    ],
+    "Always Hungry": [
+     "orc.troll"
+    ],
+    "Mighty Blow": [
+     "orc.troll"
+    ],
+    "Really Stupid": [
+     "orc.troll"
+    ],
+    "Regeneration": [
+     "orc.troll"
+    ],
+    "Throw Team-Mate": [
+     "orc.troll"
+    ],
+    "Block": [
+     "orc.blitzer"
+    ],
+    "Pass": [
+     "orc.thrower"
+    ],
+    "Sure Hands": [
+     "orc.thrower"
+    ],
+    "Right Stuff": [
+     "orc.goblin"
+    ],
+    "Dodge": [
+     "orc.goblin"
+    ],
+    "Stunty": [
+     "orc.goblin"
+    ]
+   },
+   "unresolved": []
+  },
+  "renegades__bb2016": {
+   "race": "renegades",
+   "edition": "bb2016",
+   "players": 11,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 0,
+   "special_rules": [],
+   "skills": {
+    "Frenzy": [
+     "37732",
+     "37733"
+    ],
+    "Loner": [
+     "37730",
+     "37731",
+     "37732",
+     "37733"
+    ],
+    "Mighty Blow": [
+     "37730",
+     "37731",
+     "37732",
+     "37733"
+    ],
+    "Prehensile Tail": [
+     "37733"
+    ],
+    "Bone-Head": [
+     "37731"
+    ],
+    "Thick Skull": [
+     "37731",
+     "37732"
+    ],
+    "Throw Team-mate": [
+     "37730",
+     "37731"
+    ],
+    "Always Hungry": [
+     "37730"
+    ],
+    "Really Stupid": [
+     "37730"
+    ],
+    "Regeneration": [
+     "37730"
+    ],
+    "Animosity": [
+     "37725",
+     "37726",
+     "37727",
+     "37728",
+     "37729"
+    ],
+    "Pass": [
+     "37725"
+    ],
+    "Dodge": [
+     "37726"
+    ],
+    "Right Stuff": [
+     "37726"
+    ],
+    "Stunty": [
+     "37726"
+    ],
+    "Horns": [
+     "37732"
+    ]
+   },
+   "unresolved": []
+  },
+  "skaven__bb2016": {
+   "race": "skaven",
+   "edition": "bb2016",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Loner": [
+     "skaven.ratogre"
+    ],
+    "Frenzy": [
+     "skaven.ratogre"
+    ],
+    "Mighty Blow": [
+     "skaven.ratogre"
+    ],
+    "Prehensile Tail": [
+     "skaven.ratogre"
+    ],
+    "Wild Animal": [
+     "skaven.ratogre"
+    ],
+    "Block": [
+     "skaven.blitzer"
+    ],
+    "Dodge": [
+     "skaven.gutterrunner"
+    ],
+    "Pass": [
+     "skaven.thrower"
+    ],
+    "Sure Hands": [
+     "skaven.thrower"
+    ]
+   },
+   "unresolved": []
+  },
+  "slann__bb2016": {
+   "race": "slann",
+   "edition": "bb2016",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Leap": [
+     "slann.blitzer",
+     "slann.catcher",
+     "slann.lineman"
+    ],
+    "Very Long Legs": [
+     "slann.blitzer",
+     "slann.catcher",
+     "slann.lineman"
+    ],
+    "Diving Catch": [
+     "slann.catcher"
+    ],
+    "Diving Tackle": [
+     "slann.blitzer"
+    ],
+    "Jump Up": [
+     "slann.blitzer"
+    ],
+    "Bone-Head": [
+     "slann.kroxigor"
+    ],
+    "Loner": [
+     "slann.kroxigor"
+    ],
+    "Mighty Blow": [
+     "slann.kroxigor"
+    ],
+    "Prehensile Tail": [
+     "slann.kroxigor"
+    ],
+    "Thick Skull": [
+     "slann.kroxigor"
+    ]
+   },
+   "unresolved": []
+  },
+  "slann_fumbbl__bb2016": {
+   "race": "slann_fumbbl",
+   "edition": "bb2016",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Diving Tackle": [
+     "2995"
+    ],
+    "Jump Up": [
+     "2995"
+    ],
+    "Leap": [
+     "2993",
+     "2994",
+     "2995"
+    ],
+    "Very Long Legs": [
+     "2993",
+     "2994",
+     "2995"
+    ],
+    "Diving Catch": [
+     "2994"
+    ],
+    "Bone-Head": [
+     "2996"
+    ],
+    "Loner": [
+     "2996"
+    ],
+    "Mighty Blow": [
+     "2996"
+    ],
+    "Prehensile Tail": [
+     "2996"
+    ],
+    "Thick Skull": [
+     "2996"
+    ]
+   },
+   "unresolved": []
+  },
+  "undead__bb2016": {
+   "race": "undead",
+   "edition": "bb2016",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 0,
+   "special_rules": [],
+   "skills": {
+    "Mighty Blow": [
+     "undead.mummy"
+    ],
+    "Regeneration": [
+     "undead.mummy",
+     "undead.skeleton",
+     "undead.wight",
+     "undead.zombie"
+    ],
+    "Block": [
+     "undead.wight"
+    ],
+    "Dodge": [
+     "undead.ghoul"
+    ],
+    "Thick Skull": [
+     "undead.skeleton"
+    ]
+   },
+   "unresolved": []
+  },
+  "underworld__bb2016": {
+   "race": "underworld",
+   "edition": "bb2016",
+   "players": 14,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Right Stuff": [
+     "underworld.goblin"
+    ],
+    "Dodge": [
+     "underworld.goblin"
+    ],
+    "Stunty": [
+     "underworld.goblin"
+    ],
+    "Animosity": [
+     "underworld.skaven.blitzer",
+     "underworld.skaven.lineman",
+     "underworld.skaven.thrower"
+    ],
+    "Pass": [
+     "underworld.skaven.thrower"
+    ],
+    "Sure Hands": [
+     "underworld.skaven.thrower"
+    ],
+    "Block": [
+     "underworld.skaven.blitzer"
+    ],
+    "Always Hungry": [
+     "underworld.troll.warpstone"
+    ],
+    "Loner": [
+     "underworld.troll.warpstone"
+    ],
+    "Mighty Blow": [
+     "underworld.troll.warpstone"
+    ],
+    "Really Stupid": [
+     "underworld.troll.warpstone"
+    ],
+    "Regeneration": [
+     "underworld.troll.warpstone"
+    ],
+    "Throw Team-Mate": [
+     "underworld.troll.warpstone"
+    ]
+   },
+   "unresolved": []
+  },
+  "vampire__bb2016": {
+   "race": "vampire",
+   "edition": "bb2016",
+   "players": 13,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 0,
+   "special_rules": [],
+   "skills": {
+    "Blood Lust": [
+     "vampire.vampire"
+    ],
+    "Hypnotic Gaze": [
+     "vampire.vampire"
+    ],
+    "Regeneration": [
+     "vampire.vampire"
+    ]
+   },
+   "unresolved": []
+  },
+  "wood_elf__bb2016": {
+   "race": "wood_elf",
+   "edition": "bb2016",
+   "players": 11,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Loner": [
+     "woodelf.treeman"
+    ],
+    "Mighty Blow": [
+     "woodelf.treeman"
+    ],
+    "Stand Firm": [
+     "woodelf.treeman"
+    ],
+    "Strong Arm": [
+     "woodelf.treeman"
+    ],
+    "Take Root": [
+     "woodelf.treeman"
+    ],
+    "Thick Skull": [
+     "woodelf.treeman"
+    ],
+    "Throw Team-Mate": [
+     "woodelf.treeman"
+    ],
+    "Block": [
+     "woodelf.wardancer"
+    ],
+    "Dodge": [
+     "woodelf.catcher",
+     "woodelf.wardancer"
+    ],
+    "Leap": [
+     "woodelf.wardancer"
+    ],
+    "Pass": [
+     "woodelf.thrower"
+    ],
+    "Catch": [
+     "woodelf.catcher"
+    ],
+    "Sprint": [
+     "woodelf.catcher"
+    ]
+   },
+   "unresolved": []
+  },
+  "amazon__bb2020": {
+   "race": "amazon",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dodge": [
+     "amazon.blitzer",
+     "amazon.jaguarwarriorblocker",
+     "amazon.linewoman",
+     "amazon.thrower"
+    ],
+    "On the Ball": [
+     "amazon.thrower"
+    ],
+    "Pass": [
+     "amazon.thrower"
+    ],
+    "Safe Pass": [
+     "amazon.thrower"
+    ],
+    "Hit and Run": [
+     "amazon.blitzer"
+    ],
+    "Jump Up": [
+     "amazon.blitzer"
+    ],
+    "Defensive": [
+     "amazon.jaguarwarriorblocker"
+    ]
+   },
+   "unresolved": []
+  },
+  "black_orc__bb2020": {
+   "race": "black_orc",
+   "edition": "bb2020",
+   "players": 13,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dodge": [
+     "blackorc.goblin_bruiser_lineman"
+    ],
+    "Right Stuff": [
+     "blackorc.goblin_bruiser_lineman"
+    ],
+    "Stunty": [
+     "blackorc.goblin_bruiser_lineman"
+    ],
+    "Thick Skull": [
+     "blackorc.goblin_bruiser_lineman"
+    ],
+    "Brawler": [
+     "blackorc.black_orc"
+    ],
+    "Grab": [
+     "blackorc.black_orc"
+    ],
+    "Always Hungry": [
+     "blackorc.trained_troll"
+    ],
+    "Loner": [
+     "blackorc.trained_troll"
+    ],
+    "Mighty Blow": [
+     "blackorc.trained_troll"
+    ],
+    "Projectile Vomit": [
+     "blackorc.trained_troll"
+    ],
+    "Really Stupid": [
+     "blackorc.trained_troll"
+    ],
+    "Regeneration": [
+     "blackorc.trained_troll"
+    ],
+    "Throw Team-mate": [
+     "blackorc.trained_troll"
+    ]
+   },
+   "unresolved": []
+  },
+  "chaos__bb2020": {
+   "race": "chaos",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Horns": [
+     "chaos.beastmanrunnerlineman",
+     "chaos.minotaur"
+    ],
+    "Frenzy": [
+     "chaos.minotaur"
+    ],
+    "Loner": [
+     "chaos.minotaur"
+    ],
+    "Mighty Blow": [
+     "chaos.minotaur"
+    ],
+    "Thick Skull": [
+     "chaos.minotaur"
+    ],
+    "Unchannelled Fury": [
+     "chaos.minotaur"
+    ]
+   },
+   "unresolved": []
+  },
+  "chaos_chaosogre__bb2020": {
+   "race": "chaos_chaosogre",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Horns": [
+     "chaos.beastmanrunnerlineman"
+    ],
+    "Bone Head": [
+     "chaos.chaosogre"
+    ],
+    "Loner": [
+     "chaos.chaosogre"
+    ],
+    "Mighty Blow": [
+     "chaos.chaosogre"
+    ],
+    "Thick Skull": [
+     "chaos.chaosogre"
+    ],
+    "Throw Team-mate": [
+     "chaos.chaosogre"
+    ]
+   },
+   "unresolved": []
+  },
+  "chaos_chaostroll__bb2020": {
+   "race": "chaos_chaostroll",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Horns": [
+     "chaos.beastmanrunnerlineman"
+    ],
+    "Always Hungry": [
+     "chaos.chaostroll"
+    ],
+    "Loner": [
+     "chaos.chaostroll"
+    ],
+    "Mighty Blow": [
+     "chaos.chaostroll"
+    ],
+    "Projectile Vomit": [
+     "chaos.chaostroll"
+    ],
+    "Really Stupid": [
+     "chaos.chaostroll"
+    ],
+    "Regeneration": [
+     "chaos.chaostroll"
+    ],
+    "Throw Team-mate": [
+     "chaos.chaostroll"
+    ]
+   },
+   "unresolved": []
+  },
+  "chaos_dwarf__bb2020": {
+   "race": "chaos_dwarf",
+   "edition": "bb2020",
+   "players": 13,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Shadowing": [
+     "chaosdwarf.hobgoblinsneakystabba"
+    ],
+    "Stab": [
+     "chaosdwarf.hobgoblinsneakystabba"
+    ],
+    "Block": [
+     "chaosdwarf.blocker"
+    ],
+    "Iron Hard Skin": [
+     "chaosdwarf.blocker"
+    ],
+    "Thick Skull": [
+     "chaosdwarf.blocker",
+     "chaosdwarf.bullcentaur",
+     "chaosdwarf.chaosdwarfflamesmith",
+     "chaosdwarf.minotaur"
+    ],
+    "Brawler": [
+     "chaosdwarf.chaosdwarfflamesmith"
+    ],
+    "Breathe Fire": [
+     "chaosdwarf.chaosdwarfflamesmith"
+    ],
+    "Disturbing Presence": [
+     "chaosdwarf.chaosdwarfflamesmith"
+    ],
+    "Sprint": [
+     "chaosdwarf.bullcentaur"
+    ],
+    "Sure Feet": [
+     "chaosdwarf.bullcentaur"
+    ],
+    "Frenzy": [
+     "chaosdwarf.minotaur"
+    ],
+    "Horns": [
+     "chaosdwarf.minotaur"
+    ],
+    "Loner": [
+     "chaosdwarf.minotaur"
+    ],
+    "Mighty Blow": [
+     "chaosdwarf.minotaur"
+    ],
+    "Unchannelled Fury": [
+     "chaosdwarf.minotaur"
+    ]
+   },
+   "unresolved": []
+  },
+  "chaos_pact__bb2020": {
+   "race": "chaos_pact",
+   "edition": "bb2020",
+   "players": 11,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 0,
+   "special_rules": [],
+   "skills": {
+    "Animosity": [
+     "chaospact.renegadedarkelf",
+     "chaospact.renegadegoblin",
+     "chaospact.renegadehumanthrower",
+     "chaospact.renegadeorc",
+     "chaospact.renegadeskaven"
+    ],
+    "Pass": [
+     "chaospact.renegadehumanthrower"
+    ],
+    "Safe Pair of Hands": [
+     "chaospact.renegadehumanthrower"
+    ],
+    "Dodge": [
+     "chaospact.renegadegoblin"
+    ],
+    "Right Stuff": [
+     "chaospact.renegadegoblin"
+    ],
+    "Stunty": [
+     "chaospact.renegadegoblin"
+    ],
+    "Always Hungry": [
+     "chaospact.renegadetroll"
+    ],
+    "Loner": [
+     "chaospact.minotaur",
+     "chaospact.renegadeogre",
+     "chaospact.renegaderatogre",
+     "chaospact.renegadetroll"
+    ],
+    "Mighty Blow": [
+     "chaospact.minotaur",
+     "chaospact.renegadeogre",
+     "chaospact.renegaderatogre",
+     "chaospact.renegadetroll"
+    ],
+    "Projectile Vomit": [
+     "chaospact.renegadetroll"
+    ],
+    "Really Stupid": [
+     "chaospact.renegadetroll"
+    ],
+    "Regeneration": [
+     "chaospact.renegadetroll"
+    ],
+    "Throw Team-mate": [
+     "chaospact.renegadeogre",
+     "chaospact.renegadetroll"
+    ],
+    "Bone Head": [
+     "chaospact.renegadeogre"
+    ],
+    "Thick Skull": [
+     "chaospact.minotaur",
+     "chaospact.renegadeogre"
+    ],
+    "Frenzy": [
+     "chaospact.minotaur",
+     "chaospact.renegaderatogre"
+    ],
+    "Horns": [
+     "chaospact.minotaur"
+    ],
+    "Unchannelled Fury": [
+     "chaospact.minotaur"
+    ],
+    "Animal Savagery": [
+     "chaospact.renegaderatogre"
+    ],
+    "Prehensile Tail": [
+     "chaospact.renegaderatogre"
+    ]
+   },
+   "unresolved": []
+  },
+  "dark_elf__bb2020": {
+   "race": "dark_elf",
+   "edition": "bb2020",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dump-Off": [
+     "darkelf.runner"
+    ],
+    "Block": [
+     "darkelf.blitzer"
+    ],
+    "Shadowing": [
+     "darkelf.assassin"
+    ],
+    "Stab": [
+     "darkelf.assassin"
+    ],
+    "Dodge": [
+     "darkelf.witchelf"
+    ],
+    "Frenzy": [
+     "darkelf.witchelf"
+    ],
+    "Jump Up": [
+     "darkelf.witchelf"
+    ]
+   },
+   "unresolved": []
+  },
+  "dark_elf_league_fumbbl__bb2020": {
+   "race": "dark_elf_league_fumbbl",
+   "edition": "bb2020",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Block": [
+     "37736"
+    ],
+    "Shadowing": [
+     "37737"
+    ],
+    "Stab": [
+     "37737"
+    ],
+    "Dump-off": [
+     "37735"
+    ],
+    "Dodge": [
+     "37738"
+    ],
+    "Frenzy": [
+     "37738"
+    ],
+    "Jump Up": [
+     "37738"
+    ]
+   },
+   "unresolved": []
+  },
+  "dwarf__bb2020": {
+   "race": "dwarf",
+   "edition": "bb2020",
+   "players": 11,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Block": [
+     "dwarf.blitzer",
+     "dwarf.dwarfblockerlineman",
+     "dwarf.trollslayer"
+    ],
+    "Tackle": [
+     "dwarf.dwarfblockerlineman"
+    ],
+    "Thick Skull": [
+     "dwarf.blitzer",
+     "dwarf.dwarfblockerlineman",
+     "dwarf.runner",
+     "dwarf.trollslayer"
+    ],
+    "Sure Hands": [
+     "dwarf.runner"
+    ],
+    "Dauntless": [
+     "dwarf.trollslayer"
+    ],
+    "Frenzy": [
+     "dwarf.trollslayer"
+    ],
+    "Break Tackle": [
+     "dwarf.deathroller"
+    ],
+    "Dirty Player": [
+     "dwarf.deathroller"
+    ],
+    "Juggernaut": [
+     "dwarf.deathroller"
+    ],
+    "Loner": [
+     "dwarf.deathroller"
+    ],
+    "Mighty Blow": [
+     "dwarf.deathroller"
+    ],
+    "No Hands": [
+     "dwarf.deathroller"
+    ],
+    "Secret Weapon": [
+     "dwarf.deathroller"
+    ],
+    "Stand Firm": [
+     "dwarf.deathroller"
+    ]
+   },
+   "unresolved": []
+  },
+  "elf__bb2020": {
+   "race": "elf",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Pass": [
+     "elf.thrower"
+    ],
+    "Catch": [
+     "elf.catcher"
+    ],
+    "Nerves of Steel": [
+     "elf.catcher"
+    ],
+    "Block": [
+     "elf.blitzer"
+    ],
+    "Side Step": [
+     "elf.blitzer"
+    ]
+   },
+   "unresolved": []
+  },
+  "gnome__bb2020": {
+   "race": "gnome",
+   "edition": "bb2020",
+   "players": 16,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Jump Up": [
+     "gnome.gnome_beastmaster",
+     "gnome.gnome_illusionist",
+     "gnome.gnome_lineman"
+    ],
+    "Right Stuff": [
+     "gnome.gnome_lineman"
+    ],
+    "Stunty": [
+     "gnome.gnome_beastmaster",
+     "gnome.gnome_illusionist",
+     "gnome.gnome_lineman",
+     "gnome.woodland_fox"
+    ],
+    "Wrestle": [
+     "gnome.gnome_beastmaster",
+     "gnome.gnome_illusionist",
+     "gnome.gnome_lineman"
+    ],
+    "Guard": [
+     "gnome.gnome_beastmaster"
+    ],
+    "Trickster": [
+     "gnome.gnome_illusionist"
+    ],
+    "Dodge": [
+     "gnome.woodland_fox"
+    ],
+    "My Ball": [
+     "gnome.woodland_fox"
+    ],
+    "Side Step": [
+     "gnome.woodland_fox"
+    ],
+    "Mighty Blow": [
+     "gnome.altern_forest_treeman"
+    ],
+    "Stand Firm": [
+     "gnome.altern_forest_treeman"
+    ],
+    "Strong Arm": [
+     "gnome.altern_forest_treeman"
+    ],
+    "Take Root": [
+     "gnome.altern_forest_treeman"
+    ],
+    "Thick Skull": [
+     "gnome.altern_forest_treeman"
+    ],
+    "Throw Team-mate": [
+     "gnome.altern_forest_treeman"
+    ],
+    "Timmm-ber!": [
+     "gnome.altern_forest_treeman"
+    ]
+   },
+   "unresolved": []
+  },
+  "goblin__bb2020": {
+   "race": "goblin",
+   "edition": "bb2020",
+   "players": 15,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dodge": [
+     "goblin.bomma",
+     "goblin.goblin",
+     "goblin.ooligan",
+     "goblin.pogoer"
+    ],
+    "Right Stuff": [
+     "goblin.doomdiver",
+     "goblin.goblin",
+     "goblin.ooligan"
+    ],
+    "Stunty": [
+     "goblin.bomma",
+     "goblin.doomdiver",
+     "goblin.fanatic",
+     "goblin.goblin",
+     "goblin.looney",
+     "goblin.ooligan",
+     "goblin.pogoer"
+    ],
+    "Bombardier": [
+     "goblin.bomma"
+    ],
+    "Secret Weapon": [
+     "goblin.bomma",
+     "goblin.fanatic",
+     "goblin.looney"
+    ],
+    "Chainsaw": [
+     "goblin.looney"
+    ],
+    "Ball and Chain": [
+     "goblin.fanatic"
+    ],
+    "No Hands": [
+     "goblin.fanatic"
+    ],
+    "Pogo Stick": [
+     "goblin.pogoer"
+    ],
+    "Dirty Player": [
+     "goblin.ooligan"
+    ],
+    "Disturbing Presence": [
+     "goblin.ooligan"
+    ],
+    "Swoop": [
+     "goblin.doomdiver"
+    ],
+    "Always Hungry": [
+     "goblin.troll"
+    ],
+    "Loner": [
+     "goblin.troll"
+    ],
+    "Mighty Blow": [
+     "goblin.troll"
+    ],
+    "Projectile Vomit": [
+     "goblin.troll"
+    ],
+    "Really Stupid": [
+     "goblin.troll"
+    ],
+    "Regeneration": [
+     "goblin.troll"
+    ],
+    "Throw Team-mate": [
+     "goblin.troll"
+    ]
+   },
+   "unresolved": []
+  },
+  "halfling__bb2020": {
+   "race": "halfling",
+   "edition": "bb2020",
+   "players": 16,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dodge": [
+     "halfling.halfling",
+     "halfling.halflingcatcher",
+     "halfling.halflinghefty"
+    ],
+    "Right Stuff": [
+     "halfling.halfling",
+     "halfling.halflingcatcher"
+    ],
+    "Stunty": [
+     "halfling.halfling",
+     "halfling.halflingcatcher",
+     "halfling.halflinghefty"
+    ],
+    "Fend": [
+     "halfling.halflinghefty"
+    ],
+    "Catch": [
+     "halfling.halflingcatcher"
+    ],
+    "Sprint": [
+     "halfling.halflingcatcher"
+    ],
+    "Mighty Blow": [
+     "halfling.treeman"
+    ],
+    "Stand Firm": [
+     "halfling.treeman"
+    ],
+    "Strong Arm": [
+     "halfling.treeman"
+    ],
+    "Take Root": [
+     "halfling.treeman"
+    ],
+    "Thick Skull": [
+     "halfling.treeman"
+    ],
+    "Throw Team-mate": [
+     "halfling.treeman"
+    ],
+    "Timmm-ber!": [
+     "halfling.treeman"
+    ]
+   },
+   "unresolved": []
+  },
+  "high_elf__bb2020": {
+   "race": "high_elf",
+   "edition": "bb2020",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Catch": [
+     "highelf.catcher"
+    ],
+    "Cloud Burster": [
+     "highelf.thrower"
+    ],
+    "Pass": [
+     "highelf.thrower"
+    ],
+    "Safe Pass": [
+     "highelf.thrower"
+    ],
+    "Block": [
+     "highelf.blitzer"
+    ]
+   },
+   "unresolved": []
+  },
+  "human__bb2020": {
+   "race": "human",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Pass": [
+     "human.thrower"
+    ],
+    "Sure Hands": [
+     "human.thrower"
+    ],
+    "Catch": [
+     "human.catcher.old"
+    ],
+    "Dodge": [
+     "human.catcher.old",
+     "human.halflinghopeful"
+    ],
+    "Block": [
+     "human.blitzer"
+    ],
+    "Right Stuff": [
+     "human.halflinghopeful"
+    ],
+    "Stunty": [
+     "human.halflinghopeful"
+    ],
+    "Bone Head": [
+     "human.ogre"
+    ],
+    "Loner": [
+     "human.ogre"
+    ],
+    "Mighty Blow": [
+     "human.ogre"
+    ],
+    "Thick Skull": [
+     "human.ogre"
+    ],
+    "Throw Team-mate": [
+     "human.ogre"
+    ]
+   },
+   "unresolved": []
+  },
+  "imperial_nobility__bb2020": {
+   "race": "imperial_nobility",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Fend": [
+     "imperialnobility.imperial_retainer_lineman"
+    ],
+    "Pass": [
+     "imperialnobility.imperial_thrower"
+    ],
+    "Running Pass": [
+     "imperialnobility.imperial_thrower"
+    ],
+    "Block": [
+     "imperialnobility.noble_blitzer"
+    ],
+    "Catch": [
+     "imperialnobility.noble_blitzer"
+    ],
+    "Stand Firm": [
+     "imperialnobility.bodyguard"
+    ],
+    "Wrestle": [
+     "imperialnobility.bodyguard"
+    ],
+    "Bone Head": [
+     "imperialnobility.ogre"
+    ],
+    "Loner": [
+     "imperialnobility.ogre"
+    ],
+    "Mighty Blow": [
+     "imperialnobility.ogre"
+    ],
+    "Thick Skull": [
+     "imperialnobility.ogre"
+    ],
+    "Throw Team-mate": [
+     "imperialnobility.ogre"
+    ]
+   },
+   "unresolved": []
+  },
+  "khemri__bb2020": {
+   "race": "khemri",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 0,
+   "special_rules": [],
+   "skills": {
+    "Regeneration": [
+     "khemri.anointedblitzer",
+     "khemri.anointedthrower",
+     "khemri.skeleton",
+     "khemri.tombguardian"
+    ],
+    "Thick Skull": [
+     "khemri.anointedblitzer",
+     "khemri.anointedthrower",
+     "khemri.skeleton"
+    ],
+    "Decay": [
+     "khemri.tombguardian"
+    ],
+    "Pass": [
+     "khemri.anointedthrower"
+    ],
+    "Sure Hands": [
+     "khemri.anointedthrower"
+    ],
+    "Block": [
+     "khemri.anointedblitzer"
+    ]
+   },
+   "unresolved": []
+  },
+  "khemri_fumbbl__bb2020": {
+   "race": "khemri_fumbbl",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 0,
+   "special_rules": [],
+   "skills": {
+    "Pass": [
+     "2893"
+    ],
+    "Regeneration": [
+     "2892",
+     "2893",
+     "2894",
+     "2895"
+    ],
+    "Sure Hands": [
+     "2893"
+    ],
+    "Thick Skull": [
+     "2892"
+    ],
+    "Decay": [
+     "2895"
+    ],
+    "Block": [
+     "2894"
+    ]
+   },
+   "unresolved": []
+  },
+  "khorne__bb2020": {
+   "race": "khorne",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Frenzy": [
+     "khorne.bloodborn_marauder_lineman",
+     "khorne.bloodseeker",
+     "khorne.bloodspawn"
+    ],
+    "Horns": [
+     "khorne.khorngor"
+    ],
+    "Juggernaut": [
+     "khorne.khorngor"
+    ],
+    "Claws": [
+     "khorne.bloodspawn"
+    ],
+    "Loner": [
+     "khorne.bloodspawn"
+    ],
+    "Mighty Blow": [
+     "khorne.bloodspawn"
+    ],
+    "Unchannelled Fury": [
+     "khorne.bloodspawn"
+    ]
+   },
+   "unresolved": []
+  },
+  "lizardman__bb2020": {
+   "race": "lizardman",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dodge": [
+     "lizardman.chameleonskink",
+     "lizardman.skink"
+    ],
+    "Stunty": [
+     "lizardman.chameleonskink",
+     "lizardman.skink"
+    ],
+    "On the Ball": [
+     "lizardman.chameleonskink"
+    ],
+    "Shadowing": [
+     "lizardman.chameleonskink"
+    ],
+    "Bone Head": [
+     "lizardman.kroxigor"
+    ],
+    "Loner": [
+     "lizardman.kroxigor"
+    ],
+    "Mighty Blow": [
+     "lizardman.kroxigor"
+    ],
+    "Prehensile Tail": [
+     "lizardman.kroxigor"
+    ],
+    "Thick Skull": [
+     "lizardman.kroxigor"
+    ]
+   },
+   "unresolved": []
+  },
+  "necromantic__bb2020": {
+   "race": "necromantic",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 0,
+   "special_rules": [],
+   "skills": {
+    "Regeneration": [
+     "necromantic.fleshgolem",
+     "necromantic.werewolf",
+     "necromantic.wraith",
+     "necromantic.zombie"
+    ],
+    "Dodge": [
+     "necromantic.ghoul"
+    ],
+    "Block": [
+     "necromantic.wraith"
+    ],
+    "Foul Appearance": [
+     "necromantic.wraith"
+    ],
+    "No Hands": [
+     "necromantic.wraith"
+    ],
+    "Side Step": [
+     "necromantic.wraith"
+    ],
+    "Claws": [
+     "necromantic.werewolf"
+    ],
+    "Frenzy": [
+     "necromantic.werewolf"
+    ],
+    "Stand Firm": [
+     "necromantic.fleshgolem"
+    ],
+    "Thick Skull": [
+     "necromantic.fleshgolem"
+    ]
+   },
+   "unresolved": []
+  },
+  "nippon__bb2020": {
+   "race": "nippon",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Block": [
+     "43572"
+    ],
+    "Claws": [
+     "43573"
+    ],
+    "Dodge": [
+     "43574"
+    ],
+    "Leap": [
+     "43574"
+    ]
+   },
+   "unresolved": []
+  },
+  "norse__bb2020": {
+   "race": "norse",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Block": [
+     "norse.lineman",
+     "norse.norseberzerker"
+    ],
+    "Drunkard": [
+     "norse.lineman"
+    ],
+    "Thick Skull": [
+     "norse.lineman"
+    ],
+    "Dodge": [
+     "norse.beerboar"
+    ],
+    "No Hands": [
+     "norse.beerboar"
+    ],
+    "Pick-me-up": [
+     "norse.beerboar"
+    ],
+    "Stunty": [
+     "norse.beerboar"
+    ],
+    "Titchy": [
+     "norse.beerboar"
+    ],
+    "Frenzy": [
+     "norse.norseberzerker",
+     "norse.ulfwerener",
+     "norse.yhetee"
+    ],
+    "Jump up": [
+     "norse.norseberzerker"
+    ],
+    "Catch": [
+     "norse.valkyrie"
+    ],
+    "Dauntless": [
+     "norse.valkyrie"
+    ],
+    "Pass": [
+     "norse.valkyrie"
+    ],
+    "Strip ball": [
+     "norse.valkyrie"
+    ],
+    "Claws": [
+     "norse.yhetee"
+    ],
+    "Disturbing Presence": [
+     "norse.yhetee"
+    ],
+    "Loner": [
+     "norse.yhetee"
+    ],
+    "Unchannelled Fury": [
+     "norse.yhetee"
+    ]
+   },
+   "unresolved": []
+  },
+  "nurgle__bb2020": {
+   "race": "nurgle",
+   "edition": "bb2020",
+   "players": 13,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 0,
+   "special_rules": [],
+   "skills": {
+    "Decay": [
+     "nurgle.rotter"
+    ],
+    "Plague Ridden": [
+     "nurgle.bloater",
+     "nurgle.pestigor",
+     "nurgle.rotspawn",
+     "nurgle.rotter"
+    ],
+    "Horns": [
+     "nurgle.pestigor"
+    ],
+    "Regeneration": [
+     "nurgle.bloater",
+     "nurgle.pestigor",
+     "nurgle.rotspawn"
+    ],
+    "Disturbing Presence": [
+     "nurgle.bloater",
+     "nurgle.rotspawn"
+    ],
+    "Foul Appearance": [
+     "nurgle.bloater",
+     "nurgle.rotspawn"
+    ],
+    "Loner": [
+     "nurgle.rotspawn"
+    ],
+    "Mighty Blow": [
+     "nurgle.rotspawn"
+    ],
+    "Really Stupid": [
+     "nurgle.rotspawn"
+    ],
+    "Tentacles": [
+     "nurgle.rotspawn"
+    ]
+   },
+   "unresolved": []
+  },
+  "ogre__bb2020": {
+   "race": "ogre",
+   "edition": "bb2020",
+   "players": 14,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dodge": [
+     "ogre.gnoblarlineman"
+    ],
+    "Right Stuff": [
+     "ogre.gnoblarlineman"
+    ],
+    "Side Step": [
+     "ogre.gnoblarlineman"
+    ],
+    "Stunty": [
+     "ogre.gnoblarlineman"
+    ],
+    "Titchy": [
+     "ogre.gnoblarlineman"
+    ],
+    "Bone Head": [
+     "ogre.ogre",
+     "ogre.ogreblocker"
+    ],
+    "Kick Team-mate": [
+     "ogre.ogre"
+    ],
+    "Mighty Blow": [
+     "ogre.ogre",
+     "ogre.ogreblocker"
+    ],
+    "Thick Skull": [
+     "ogre.ogre",
+     "ogre.ogreblocker"
+    ],
+    "Throw Team-mate": [
+     "ogre.ogreblocker"
+    ]
+   },
+   "unresolved": []
+  },
+  "old_world_alliance_ogre__bb2020": {
+   "race": "old_world_alliance_ogre",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Animosity": [
+     "oldworldalliance.halfling_hopeful",
+     "oldworldalliance.human_blitzer",
+     "oldworldalliance.human_catcher",
+     "oldworldalliance.human_thrower"
+    ],
+    "Pass": [
+     "oldworldalliance.human_thrower"
+    ],
+    "Sure Hands": [
+     "oldworldalliance.dwarf_runner",
+     "oldworldalliance.human_thrower"
+    ],
+    "Catch": [
+     "oldworldalliance.human_catcher"
+    ],
+    "Dodge": [
+     "oldworldalliance.halfling_hopeful",
+     "oldworldalliance.human_catcher"
+    ],
+    "Block": [
+     "oldworldalliance.dwarf_blitzer",
+     "oldworldalliance.human_blitzer",
+     "oldworldalliance.trollslayer"
+    ],
+    "Loner": [
+     "oldworldalliance.dwarf_blitzer",
+     "oldworldalliance.dwarf_blocker",
+     "oldworldalliance.dwarf_runner",
+     "oldworldalliance.ogre",
+     "oldworldalliance.trollslayer"
+    ],
+    "Thick Skull": [
+     "oldworldalliance.dwarf_blitzer",
+     "oldworldalliance.dwarf_blocker",
+     "oldworldalliance.dwarf_runner",
+     "oldworldalliance.ogre",
+     "oldworldalliance.trollslayer"
+    ],
+    "Arm Bar": [
+     "oldworldalliance.dwarf_blocker"
+    ],
+    "Brawler": [
+     "oldworldalliance.dwarf_blocker"
+    ],
+    "Dauntless": [
+     "oldworldalliance.trollslayer"
+    ],
+    "Frenzy": [
+     "oldworldalliance.trollslayer"
+    ],
+    "Right Stuff": [
+     "oldworldalliance.halfling_hopeful"
+    ],
+    "Stunty": [
+     "oldworldalliance.halfling_hopeful"
+    ],
+    "Bone Head": [
+     "oldworldalliance.ogre"
+    ],
+    "Mighty Blow": [
+     "oldworldalliance.ogre"
+    ],
+    "Throw Team-mate": [
+     "oldworldalliance.ogre"
+    ]
+   },
+   "unresolved": []
+  },
+  "old_world_alliance_treeman__bb2020": {
+   "race": "old_world_alliance_treeman",
+   "edition": "bb2020",
+   "players": 13,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Animosity": [
+     "oldworldalliance.halfling_hopeful",
+     "oldworldalliance.human_blitzer",
+     "oldworldalliance.human_catcher",
+     "oldworldalliance.human_thrower"
+    ],
+    "Pass": [
+     "oldworldalliance.human_thrower"
+    ],
+    "Sure Hands": [
+     "oldworldalliance.dwarf_runner",
+     "oldworldalliance.human_thrower"
+    ],
+    "Catch": [
+     "oldworldalliance.human_catcher"
+    ],
+    "Dodge": [
+     "oldworldalliance.halfling_hopeful",
+     "oldworldalliance.human_catcher"
+    ],
+    "Block": [
+     "oldworldalliance.dwarf_blitzer",
+     "oldworldalliance.human_blitzer",
+     "oldworldalliance.trollslayer"
+    ],
+    "Loner": [
+     "oldworldalliance.altern_forest_treeman",
+     "oldworldalliance.dwarf_blitzer",
+     "oldworldalliance.dwarf_blocker",
+     "oldworldalliance.dwarf_runner",
+     "oldworldalliance.trollslayer"
+    ],
+    "Thick Skull": [
+     "oldworldalliance.altern_forest_treeman",
+     "oldworldalliance.dwarf_blitzer",
+     "oldworldalliance.dwarf_blocker",
+     "oldworldalliance.dwarf_runner",
+     "oldworldalliance.trollslayer"
+    ],
+    "Arm Bar": [
+     "oldworldalliance.dwarf_blocker"
+    ],
+    "Brawler": [
+     "oldworldalliance.dwarf_blocker"
+    ],
+    "Dauntless": [
+     "oldworldalliance.trollslayer"
+    ],
+    "Frenzy": [
+     "oldworldalliance.trollslayer"
+    ],
+    "Right Stuff": [
+     "oldworldalliance.halfling_hopeful"
+    ],
+    "Stunty": [
+     "oldworldalliance.halfling_hopeful"
+    ],
+    "Mighty Blow": [
+     "oldworldalliance.altern_forest_treeman"
+    ],
+    "Stand Firm": [
+     "oldworldalliance.altern_forest_treeman"
+    ],
+    "Strong Arm": [
+     "oldworldalliance.altern_forest_treeman"
+    ],
+    "Take Root": [
+     "oldworldalliance.altern_forest_treeman"
+    ],
+    "Throw Team-mate": [
+     "oldworldalliance.altern_forest_treeman"
+    ],
+    "Timmm-ber!": [
+     "oldworldalliance.altern_forest_treeman"
+    ]
+   },
+   "unresolved": []
+  },
+  "orc__bb2020": {
+   "race": "orc",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Animosity": [
+     "orc.bigun",
+     "orc.blitzer",
+     "orc.lineman",
+     "orc.thrower"
+    ],
+    "Pass": [
+     "orc.thrower"
+    ],
+    "Sure Hands": [
+     "orc.thrower"
+    ],
+    "Block": [
+     "orc.blitzer"
+    ],
+    "Dodge": [
+     "orc.goblin"
+    ],
+    "Right Stuff": [
+     "orc.goblin"
+    ],
+    "Stunty": [
+     "orc.goblin"
+    ],
+    "Always Hungry": [
+     "orc.troll"
+    ],
+    "Loner": [
+     "orc.troll"
+    ],
+    "Mighty Blow": [
+     "orc.troll"
+    ],
+    "Projectile Vomit": [
+     "orc.troll"
+    ],
+    "Really Stupid": [
+     "orc.troll"
+    ],
+    "Regeneration": [
+     "orc.troll"
+    ],
+    "Throw Team-mate": [
+     "orc.troll"
+    ]
+   },
+   "unresolved": []
+  },
+  "renegades__bb2020": {
+   "race": "renegades",
+   "edition": "bb2020",
+   "players": 11,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Animal Savagery": [
+     "37733"
+    ],
+    "Frenzy": [
+     "37732",
+     "37733"
+    ],
+    "Loner": [
+     "37731",
+     "37732",
+     "37733"
+    ],
+    "Mighty Blow": [
+     "37731",
+     "37732",
+     "37733"
+    ],
+    "Prehensile Tail": [
+     "37733"
+    ],
+    "Bone Head": [
+     "37731"
+    ],
+    "Thick Skull": [
+     "37731",
+     "37732"
+    ],
+    "Throw Team-mate": [
+     "37731"
+    ],
+    "Animosity": [
+     "37725",
+     "37726",
+     "37727",
+     "37728",
+     "37729"
+    ],
+    "Pass": [
+     "37725"
+    ],
+    "Safe Pair of Hands": [
+     "37725"
+    ],
+    "Dodge": [
+     "37726"
+    ],
+    "Right Stuff": [
+     "37726"
+    ],
+    "Stunty": [
+     "37726"
+    ],
+    "Horns": [
+     "37732"
+    ],
+    "Unchannelled Fury": [
+     "37732"
+    ]
+   },
+   "unresolved": []
+  },
+  "renegades_37730__bb2020": {
+   "race": "renegades_37730",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Animal Savagery": [
+     "37733"
+    ],
+    "Frenzy": [
+     "37733"
+    ],
+    "Loner": [
+     "37730",
+     "37731",
+     "37733"
+    ],
+    "Mighty Blow": [
+     "37730",
+     "37731",
+     "37733"
+    ],
+    "Prehensile Tail": [
+     "37733"
+    ],
+    "Bone Head": [
+     "37731"
+    ],
+    "Thick Skull": [
+     "37731"
+    ],
+    "Throw Team-mate": [
+     "37730",
+     "37731"
+    ],
+    "Always Hungry": [
+     "37730"
+    ],
+    "Projectile Vomit": [
+     "37730"
+    ],
+    "Really Stupid": [
+     "37730"
+    ],
+    "Regeneration": [
+     "37730"
+    ],
+    "Animosity": [
+     "37725",
+     "37726",
+     "37727",
+     "37728",
+     "37729"
+    ],
+    "Pass": [
+     "37725"
+    ],
+    "Safe Pair of Hands": [
+     "37725"
+    ],
+    "Dodge": [
+     "37726"
+    ],
+    "Right Stuff": [
+     "37726"
+    ],
+    "Stunty": [
+     "37726"
+    ]
+   },
+   "unresolved": []
+  },
+  "skaven__bb2020": {
+   "race": "skaven",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Pass": [
+     "skaven.thrower"
+    ],
+    "Sure Hands": [
+     "skaven.thrower"
+    ],
+    "Dodge": [
+     "skaven.gutterrunner"
+    ],
+    "Block": [
+     "skaven.blitzer"
+    ],
+    "Animal Savagery": [
+     "skaven.ratogre"
+    ],
+    "Frenzy": [
+     "skaven.ratogre"
+    ],
+    "Loner": [
+     "skaven.ratogre"
+    ],
+    "Mighty Blow": [
+     "skaven.ratogre"
+    ],
+    "Prehensile Tail": [
+     "skaven.ratogre"
+    ]
+   },
+   "unresolved": []
+  },
+  "slann__bb2020": {
+   "race": "slann",
+   "edition": "bb2020",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Leap": [
+     "slann.blitzer",
+     "slann.catcher",
+     "slann.lineman"
+    ],
+    "Very Long Legs": [
+     "slann.blitzer",
+     "slann.catcher",
+     "slann.lineman"
+    ],
+    "Diving Catch": [
+     "slann.catcher"
+    ],
+    "Diving Tackle": [
+     "slann.blitzer"
+    ],
+    "Jump Up": [
+     "slann.blitzer"
+    ],
+    "Bone head": [
+     "slann.kroxigor"
+    ],
+    "Loner": [
+     "slann.kroxigor"
+    ],
+    "Mighty Blow": [
+     "slann.kroxigor"
+    ],
+    "Prehensile Tail": [
+     "slann.kroxigor"
+    ],
+    "Thick Skull": [
+     "slann.kroxigor"
+    ]
+   },
+   "unresolved": []
+  },
+  "slann_fumbbl__bb2020": {
+   "race": "slann_fumbbl",
+   "edition": "bb2020",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Diving Tackle": [
+     "2995"
+    ],
+    "Jump Up": [
+     "2995"
+    ],
+    "Leap": [
+     "2993",
+     "2994",
+     "2995"
+    ],
+    "Very Long Legs": [
+     "2993",
+     "2994",
+     "2995"
+    ],
+    "Diving Catch": [
+     "2994"
+    ],
+    "Bone Head": [
+     "2996"
+    ],
+    "Loner": [
+     "2996"
+    ],
+    "Mighty Blow": [
+     "2996"
+    ],
+    "Prehensile Tail": [
+     "2996"
+    ],
+    "Thick Skull": [
+     "2996"
+    ]
+   },
+   "unresolved": []
+  },
+  "snotling__bb2020": {
+   "race": "snotling",
+   "edition": "bb2020",
+   "players": 16,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dodge": [
+     "snotling.fun_hoppa",
+     "snotling.fungus_flinga",
+     "snotling.snotling_lineman",
+     "snotling.stilty_runna"
+    ],
+    "Right Stuff": [
+     "snotling.fun_hoppa",
+     "snotling.fungus_flinga",
+     "snotling.snotling_lineman",
+     "snotling.stilty_runna"
+    ],
+    "Side Step": [
+     "snotling.fun_hoppa",
+     "snotling.fungus_flinga",
+     "snotling.snotling_lineman",
+     "snotling.stilty_runna"
+    ],
+    "Stunty": [
+     "snotling.fun_hoppa",
+     "snotling.fungus_flinga",
+     "snotling.snotling_lineman",
+     "snotling.stilty_runna"
+    ],
+    "Swarming": [
+     "snotling.snotling_lineman"
+    ],
+    "Titchy": [
+     "snotling.snotling_lineman"
+    ],
+    "Bombardier": [
+     "snotling.fungus_flinga"
+    ],
+    "Secret Weapon": [
+     "snotling.fungus_flinga",
+     "snotling.pump_wagon"
+    ],
+    "Pogo Stick": [
+     "snotling.fun_hoppa"
+    ],
+    "Sprint": [
+     "snotling.stilty_runna"
+    ],
+    "Dirty Player": [
+     "snotling.pump_wagon"
+    ],
+    "Juggernaut": [
+     "snotling.pump_wagon"
+    ],
+    "Mighty Blow": [
+     "snotling.pump_wagon",
+     "snotling.trained_troll"
+    ],
+    "Really Stupid": [
+     "snotling.pump_wagon",
+     "snotling.trained_troll"
+    ],
+    "Stand Firm": [
+     "snotling.pump_wagon"
+    ],
+    "Always Hungry": [
+     "snotling.trained_troll"
+    ],
+    "Loner": [
+     "snotling.trained_troll"
+    ],
+    "Projectile Vomit": [
+     "snotling.trained_troll"
+    ],
+    "Regeneration": [
+     "snotling.trained_troll"
+    ],
+    "Throw Team-mate": [
+     "snotling.trained_troll"
+    ]
+   },
+   "unresolved": []
+  },
+  "undead__bb2020": {
+   "race": "undead",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 0,
+   "special_rules": [],
+   "skills": {
+    "Regeneration": [
+     "undead.mummy",
+     "undead.skeleton",
+     "undead.wight",
+     "undead.zombie"
+    ],
+    "Thick Skull": [
+     "undead.skeleton"
+    ],
+    "Dodge": [
+     "undead.ghoul"
+    ],
+    "Block": [
+     "undead.wight"
+    ],
+    "Mighty Blow": [
+     "undead.mummy"
+    ]
+   },
+   "unresolved": []
+  },
+  "underworld__bb2020": {
+   "race": "underworld",
+   "edition": "bb2020",
+   "players": 15,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dodge": [
+     "37844.gutterrunner",
+     "37844.underworldsnotling",
+     "underworld.goblin"
+    ],
+    "Right Stuff": [
+     "37844.underworldsnotling",
+     "underworld.goblin"
+    ],
+    "Stunty": [
+     "37844.underworldsnotling",
+     "underworld.goblin"
+    ],
+    "Side Step": [
+     "37844.underworldsnotling"
+    ],
+    "Titchy": [
+     "37844.underworldsnotling"
+    ],
+    "Animosity": [
+     "37844.gutterrunner",
+     "37844.skavenclanrat",
+     "underworld.skaven.blitzer",
+     "underworld.skaven.thrower"
+    ],
+    "Pass": [
+     "underworld.skaven.thrower"
+    ],
+    "Sure Hands": [
+     "underworld.skaven.thrower"
+    ],
+    "Block": [
+     "underworld.skaven.blitzer"
+    ],
+    "Animal Savagery": [
+     "37844"
+    ],
+    "Frenzy": [
+     "37844"
+    ],
+    "Loner": [
+     "37844"
+    ],
+    "Mighty Blow": [
+     "37844"
+    ],
+    "Prehensile Tail": [
+     "37844"
+    ]
+   },
+   "unresolved": []
+  },
+  "underworld_underworldtroll__bb2020": {
+   "race": "underworld_underworldtroll",
+   "edition": "bb2020",
+   "players": 16,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dodge": [
+     "37844.gutterrunner",
+     "37844.underworldsnotling",
+     "underworld.goblin"
+    ],
+    "Right Stuff": [
+     "37844.underworldsnotling",
+     "underworld.goblin"
+    ],
+    "Stunty": [
+     "37844.underworldsnotling",
+     "underworld.goblin"
+    ],
+    "Side Step": [
+     "37844.underworldsnotling"
+    ],
+    "Titchy": [
+     "37844.underworldsnotling"
+    ],
+    "Animosity": [
+     "37844.gutterrunner",
+     "37844.skavenclanrat",
+     "underworld.skaven.blitzer",
+     "underworld.skaven.thrower"
+    ],
+    "Pass": [
+     "underworld.skaven.thrower"
+    ],
+    "Sure Hands": [
+     "underworld.skaven.thrower"
+    ],
+    "Block": [
+     "underworld.skaven.blitzer"
+    ],
+    "Always Hungry": [
+     "37844.underworldtroll"
+    ],
+    "Loner": [
+     "37844.underworldtroll"
+    ],
+    "Mighty Blow": [
+     "37844.underworldtroll"
+    ],
+    "Projectile Vomit": [
+     "37844.underworldtroll"
+    ],
+    "Really Stupid": [
+     "37844.underworldtroll"
+    ],
+    "Regeneration": [
+     "37844.underworldtroll"
+    ],
+    "Throw Team-mate": [
+     "37844.underworldtroll"
+    ]
+   },
+   "unresolved": []
+  },
+  "vampire__bb2020": {
+   "race": "vampire",
+   "edition": "bb2020",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Bloodlust": [
+     "vampire.vampire",
+     "vampire.vampireblitzer",
+     "vampire.vampirethrower",
+     "vampire.vargheist"
+    ],
+    "Hypnotic Gaze": [
+     "vampire.vampire",
+     "vampire.vampireblitzer",
+     "vampire.vampirethrower"
+    ],
+    "Regeneration": [
+     "vampire.vampire",
+     "vampire.vampireblitzer",
+     "vampire.vampirethrower",
+     "vampire.vargheist"
+    ],
+    "Juggernaut": [
+     "vampire.vampireblitzer"
+    ],
+    "Pass": [
+     "vampire.vampirethrower"
+    ],
+    "Claws": [
+     "vampire.vargheist"
+    ],
+    "Frenzy": [
+     "vampire.vargheist"
+    ],
+    "Loner": [
+     "vampire.vargheist"
+    ]
+   },
+   "unresolved": []
+  },
+  "wood_elf__bb2020": {
+   "race": "wood_elf",
+   "edition": "bb2020",
+   "players": 11,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Pass": [
+     "woodelf.thrower"
+    ],
+    "Catch": [
+     "woodelf.catcher"
+    ],
+    "Dodge": [
+     "woodelf.catcher",
+     "woodelf.wardancer"
+    ],
+    "Block": [
+     "woodelf.wardancer"
+    ],
+    "Leap": [
+     "woodelf.wardancer"
+    ],
+    "Loner": [
+     "woodelf.treeman"
+    ],
+    "Mighty Blow": [
+     "woodelf.treeman"
+    ],
+    "Stand Firm": [
+     "woodelf.treeman"
+    ],
+    "Strong Arm": [
+     "woodelf.treeman"
+    ],
+    "Take Root": [
+     "woodelf.treeman"
+    ],
+    "Thick Skull": [
+     "woodelf.treeman"
+    ],
+    "Throw Team-mate": [
+     "woodelf.treeman"
+    ]
+   },
+   "unresolved": []
+  },
+  "amazon__bb2025": {
+   "race": "amazon",
+   "edition": "bb2025",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dodge": [
+     "amazon.blitzer",
+     "amazon.catcher",
+     "amazon.linewoman",
+     "amazon.thrower"
+    ],
+    "On the Ball": [
+     "amazon.thrower"
+    ],
+    "Pass": [
+     "amazon.thrower"
+    ],
+    "Safe Pass": [
+     "amazon.thrower"
+    ],
+    "Hit and Run": [
+     "amazon.blitzer"
+    ],
+    "Jump Up": [
+     "amazon.blitzer"
+    ],
+    "Defensive": [
+     "amazon.catcher"
+    ]
+   },
+   "unresolved": []
+  },
+  "black_orc__bb2025": {
+   "race": "black_orc",
+   "edition": "bb2025",
+   "players": 13,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [
+    "Bribery and Corruption",
+    "Brawlin' Brutes"
+   ],
+   "skills": {
+    "Dodge": [
+     "blackorc.goblin_bruiser"
+    ],
+    "Right Stuff": [
+     "blackorc.goblin_bruiser"
+    ],
+    "Stunty": [
+     "blackorc.goblin_bruiser"
+    ],
+    "Thick Skull": [
+     "blackorc.goblin_bruiser"
+    ],
+    "Brawler": [
+     "blackorc.black_orc"
+    ],
+    "Grab": [
+     "blackorc.black_orc"
+    ],
+    "Always Hungry": [
+     "blackorc.trained_troll"
+    ],
+    "Mighty Blow": [
+     "blackorc.trained_troll"
+    ],
+    "Projectile Vomit": [
+     "blackorc.trained_troll"
+    ],
+    "Really Stupid": [
+     "blackorc.trained_troll"
+    ],
+    "Regeneration": [
+     "blackorc.trained_troll"
+    ],
+    "Throw Team-mate": [
+     "blackorc.trained_troll"
+    ]
+   },
+   "unresolved": []
+  },
+  "bretonnian__bb2025": {
+   "race": "bretonnian",
+   "edition": "bb2025",
+   "players": 13,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Wrestle": [
+     "bretonnian.squire"
+    ],
+    "Catch": [
+     "bretonnian.knight_catcher"
+    ],
+    "Dauntless": [
+     "bretonnian.grail_knight",
+     "bretonnian.knight_catcher",
+     "bretonnian.knight_thrower"
+    ],
+    "Nerves of Steel": [
+     "bretonnian.knight_catcher",
+     "bretonnian.knight_thrower"
+    ],
+    "Pass": [
+     "bretonnian.knight_thrower"
+    ],
+    "Block": [
+     "bretonnian.grail_knight"
+    ],
+    "Steady Footing": [
+     "bretonnian.grail_knight"
+    ]
+   },
+   "unresolved": []
+  },
+  "chaos__bb2025": {
+   "race": "chaos",
+   "edition": "bb2025",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [
+    "Favoured of Chaos Undivided"
+   ],
+   "skills": {
+    "Horns": [
+     "chaos.beastman",
+     "chaos.minotaur"
+    ],
+    "Thick Skull": [
+     "chaos.beastman",
+     "chaos.minotaur"
+    ],
+    "Arm Bar": [
+     "chaos.warrior"
+    ],
+    "Frenzy": [
+     "chaos.minotaur"
+    ],
+    "Loner": [
+     "chaos.minotaur"
+    ],
+    "Mighty Blow": [
+     "chaos.minotaur"
+    ],
+    "Unchannelled Fury": [
+     "chaos.minotaur"
+    ]
+   },
+   "unresolved": []
+  },
+  "chaos_dwarf__bb2025": {
+   "race": "chaos_dwarf",
+   "edition": "bb2025",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Shadowing": [
+     "chaosdwarf.sneaky_stabba"
+    ],
+    "Stab": [
+     "chaosdwarf.sneaky_stabba"
+    ],
+    "Block": [
+     "chaosdwarf.blocker"
+    ],
+    "Iron Hard Skin": [
+     "chaosdwarf.blocker"
+    ],
+    "Thick Skull": [
+     "chaosdwarf.blocker",
+     "chaosdwarf.bullcentaur",
+     "chaosdwarf.flamesmith",
+     "chaosdwarf.minotaur"
+    ],
+    "Brawler": [
+     "chaosdwarf.flamesmith"
+    ],
+    "Breathe Fire": [
+     "chaosdwarf.flamesmith"
+    ],
+    "Disturbing Presence": [
+     "chaosdwarf.flamesmith"
+    ],
+    "Sprint": [
+     "chaosdwarf.bullcentaur"
+    ],
+    "Sure Feet": [
+     "chaosdwarf.bullcentaur"
+    ],
+    "Unsteady": [
+     "chaosdwarf.bullcentaur"
+    ],
+    "Frenzy": [
+     "chaosdwarf.minotaur"
+    ],
+    "Horns": [
+     "chaosdwarf.minotaur"
+    ],
+    "Loner": [
+     "chaosdwarf.minotaur"
+    ],
+    "Mighty Blow": [
+     "chaosdwarf.minotaur"
+    ],
+    "Unchannelled Fury": [
+     "chaosdwarf.minotaur"
+    ]
+   },
+   "unresolved": []
+  },
+  "chaos_ogre__bb2025": {
+   "race": "chaos_ogre",
+   "edition": "bb2025",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [
+    "Favoured of Chaos Undivided"
+   ],
+   "skills": {
+    "Horns": [
+     "chaos.beastman"
+    ],
+    "Thick Skull": [
+     "chaos.beastman",
+     "chaos.ogre"
+    ],
+    "Arm Bar": [
+     "chaos.warrior"
+    ],
+    "Bone Head": [
+     "chaos.ogre"
+    ],
+    "Loner": [
+     "chaos.ogre"
+    ],
+    "Mighty Blow": [
+     "chaos.ogre"
+    ],
+    "Throw Team-mate": [
+     "chaos.ogre"
+    ]
+   },
+   "unresolved": []
+  },
+  "chaos_pact__bb2025": {
+   "race": "chaos_pact",
+   "edition": "bb2025",
+   "players": 13,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Animosity": [
+     "chaospact.darkelf.renegade",
+     "chaospact.goblin.renegade",
+     "chaospact.skaven.renegade"
+    ],
+    "Dodge": [
+     "chaospact.goblin.renegade"
+    ],
+    "Right Stuff": [
+     "chaospact.goblin.renegade"
+    ],
+    "Stunty": [
+     "chaospact.goblin.renegade"
+    ],
+    "Always Hungry": [
+     "chaospact.troll.chaos"
+    ],
+    "Loner": [
+     "chaospact.minotaur",
+     "chaospact.ogre.chaos",
+     "chaospact.troll.chaos"
+    ],
+    "Mighty Blow": [
+     "chaospact.minotaur",
+     "chaospact.ogre.chaos",
+     "chaospact.troll.chaos"
+    ],
+    "Really Stupid": [
+     "chaospact.troll.chaos"
+    ],
+    "Regeneration": [
+     "chaospact.troll.chaos"
+    ],
+    "Throw Team-Mate": [
+     "chaospact.ogre.chaos",
+     "chaospact.troll.chaos"
+    ],
+    "bone head": [
+     "chaospact.ogre.chaos"
+    ],
+    "Thick Skull": [
+     "chaospact.minotaur",
+     "chaospact.ogre.chaos"
+    ],
+    "Frenzy": [
+     "chaospact.minotaur"
+    ],
+    "Horns": [
+     "chaospact.minotaur"
+    ]
+   },
+   "unresolved": []
+  },
+  "chaos_troll__bb2025": {
+   "race": "chaos_troll",
+   "edition": "bb2025",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [
+    "Favoured of Chaos Undivided"
+   ],
+   "skills": {
+    "Horns": [
+     "chaos.beastman"
+    ],
+    "Thick Skull": [
+     "chaos.beastman"
+    ],
+    "Arm Bar": [
+     "chaos.warrior"
+    ],
+    "Always Hungry": [
+     "chaos.troll"
+    ],
+    "Loner": [
+     "chaos.troll"
+    ],
+    "Mighty Blow": [
+     "chaos.troll"
+    ],
+    "Projectile Vomit": [
+     "chaos.troll"
+    ],
+    "Really Stupid": [
+     "chaos.troll"
+    ],
+    "Regeneration": [
+     "chaos.troll"
+    ],
+    "Throw Team-mate": [
+     "chaos.troll"
+    ]
+   },
+   "unresolved": []
+  },
+  "dark_elf__bb2025": {
+   "race": "dark_elf",
+   "edition": "bb2025",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dump-off": [
+     "darkelf.runner"
+    ],
+    "Punt": [
+     "darkelf.runner"
+    ],
+    "Hit and Run": [
+     "darkelf.assassin"
+    ],
+    "Shadowing": [
+     "darkelf.assassin"
+    ],
+    "Stab": [
+     "darkelf.assassin"
+    ],
+    "Block": [
+     "darkelf.blitzer"
+    ],
+    "Dodge": [
+     "darkelf.witchelf"
+    ],
+    "Frenzy": [
+     "darkelf.witchelf"
+    ],
+    "Jump Up": [
+     "darkelf.witchelf"
+    ]
+   },
+   "unresolved": []
+  },
+  "dark_elf_league_fumbbl__bb2025": {
+   "race": "dark_elf_league_fumbbl",
+   "edition": "bb2025",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Block": [
+     "37736"
+    ],
+    "Shadowing": [
+     "37737"
+    ],
+    "Stab": [
+     "37737"
+    ],
+    "Dump-off": [
+     "37735"
+    ],
+    "Dodge": [
+     "37738"
+    ],
+    "Frenzy": [
+     "37738"
+    ],
+    "Jump Up": [
+     "37738"
+    ]
+   },
+   "unresolved": []
+  },
+  "dwarf__bb2025": {
+   "race": "dwarf",
+   "edition": "bb2025",
+   "players": 11,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 0,
+   "special_rules": [
+    "Brawlin' Brutes",
+    "Bribery and Corruption"
+   ],
+   "skills": {
+    "Block": [
+     "dwarf.blitzer",
+     "dwarf.blocker",
+     "dwarf.trollslayer"
+    ],
+    "Defensive": [
+     "dwarf.blocker"
+    ],
+    "Thick Skull": [
+     "dwarf.blitzer",
+     "dwarf.blocker",
+     "dwarf.runner",
+     "dwarf.trollslayer"
+    ],
+    "Sprint": [
+     "dwarf.runner"
+    ],
+    "Sure Hands": [
+     "dwarf.runner"
+    ],
+    "Diving Tackle": [
+     "dwarf.blitzer"
+    ],
+    "Tackle": [
+     "dwarf.blitzer"
+    ],
+    "Dauntless": [
+     "dwarf.trollslayer"
+    ],
+    "Frenzy": [
+     "dwarf.trollslayer"
+    ],
+    "Hatred": [
+     "dwarf.trollslayer"
+    ],
+    "Break Tackle": [
+     "dwarf.deathroller"
+    ],
+    "Dirty Player": [
+     "dwarf.deathroller"
+    ],
+    "Juggernaut": [
+     "dwarf.deathroller"
+    ],
+    "Loner": [
+     "dwarf.deathroller"
+    ],
+    "Mighty Blow": [
+     "dwarf.deathroller"
+    ],
+    "No Ball": [
+     "dwarf.deathroller"
+    ],
+    "Secret Weapon": [
+     "dwarf.deathroller"
+    ],
+    "Stand Firm": [
+     "dwarf.deathroller"
+    ]
+   },
+   "unresolved": []
+  },
+  "elf__bb2025": {
+   "race": "elf",
+   "edition": "bb2025",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Fumblerooski": [
+     "elf.lineman"
+    ],
+    "Hail Mary Pass": [
+     "elf.thrower"
+    ],
+    "Pass": [
+     "elf.thrower"
+    ],
+    "Catch": [
+     "elf.catcher"
+    ],
+    "Diving Catch": [
+     "elf.catcher"
+    ],
+    "Nerves of Steel": [
+     "elf.catcher"
+    ],
+    "Block": [
+     "elf.blitzer"
+    ],
+    "Sidestep": [
+     "elf.blitzer"
+    ]
+   },
+   "unresolved": []
+  },
+  "gnome__bb2025": {
+   "race": "gnome",
+   "edition": "bb2025",
+   "players": 16,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Jump Up": [
+     "gnome.gnome_beastmaster",
+     "gnome.gnome_illusionist",
+     "gnome.gnome_lineman"
+    ],
+    "Right Stuff": [
+     "gnome.gnome_lineman"
+    ],
+    "Stunty": [
+     "gnome.gnome_beastmaster",
+     "gnome.gnome_illusionist",
+     "gnome.gnome_lineman",
+     "gnome.woodland_fox"
+    ],
+    "Wrestle": [
+     "gnome.gnome_beastmaster",
+     "gnome.gnome_illusionist",
+     "gnome.gnome_lineman"
+    ],
+    "Dodge": [
+     "gnome.woodland_fox"
+    ],
+    "My Ball": [
+     "gnome.woodland_fox"
+    ],
+    "Sidestep": [
+     "gnome.woodland_fox"
+    ],
+    "Trickster": [
+     "gnome.gnome_illusionist"
+    ],
+    "Guard": [
+     "gnome.gnome_beastmaster"
+    ],
+    "Mighty Blow": [
+     "gnome.altern_forest_treeman"
+    ],
+    "Stand Firm": [
+     "gnome.altern_forest_treeman"
+    ],
+    "Strong Arm": [
+     "gnome.altern_forest_treeman"
+    ],
+    "Take Root": [
+     "gnome.altern_forest_treeman"
+    ],
+    "Thick Skull": [
+     "gnome.altern_forest_treeman"
+    ],
+    "Throw Team-mate": [
+     "gnome.altern_forest_treeman"
+    ],
+    "Timmm-ber!": [
+     "gnome.altern_forest_treeman"
+    ]
+   },
+   "unresolved": []
+  },
+  "goblin__bb2025": {
+   "race": "goblin",
+   "edition": "bb2025",
+   "players": 15,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [
+    "Bribery and Corruption"
+   ],
+   "skills": {
+    "Dodge": [
+     "goblin.bombardier",
+     "goblin.doom_diver",
+     "goblin.goblin",
+     "goblin.ooligan",
+     "goblin.pogoer"
+    ],
+    "Right Stuff": [
+     "goblin.doom_diver",
+     "goblin.goblin",
+     "goblin.ooligan"
+    ],
+    "Stunty": [
+     "goblin.bombardier",
+     "goblin.doom_diver",
+     "goblin.fanatic",
+     "goblin.goblin",
+     "goblin.looney",
+     "goblin.ooligan",
+     "goblin.pogoer"
+    ],
+    "Chainsaw": [
+     "goblin.looney"
+    ],
+    "No Ball": [
+     "goblin.fanatic",
+     "goblin.looney"
+    ],
+    "Secret Weapon": [
+     "goblin.bombardier",
+     "goblin.fanatic",
+     "goblin.looney"
+    ],
+    "Bombardier": [
+     "goblin.bombardier"
+    ],
+    "Dirty Player": [
+     "goblin.ooligan"
+    ],
+    "Disturbing Presence": [
+     "goblin.ooligan"
+    ],
+    "Taunt": [
+     "goblin.ooligan"
+    ],
+    "Swoop": [
+     "goblin.doom_diver"
+    ],
+    "Ball and Chain": [
+     "goblin.fanatic"
+    ],
+    "Pogo": [
+     "goblin.pogoer"
+    ],
+    "Always Hungry": [
+     "goblin.troll"
+    ],
+    "Mighty Blow": [
+     "goblin.troll"
+    ],
+    "Projectile Vomit": [
+     "goblin.troll"
+    ],
+    "Really Stupid": [
+     "goblin.troll"
+    ],
+    "Regeneration": [
+     "goblin.troll"
+    ],
+    "Throw Team-mate": [
+     "goblin.troll"
+    ]
+   },
+   "unresolved": []
+  },
+  "halfling__bb2025": {
+   "race": "halfling",
+   "edition": "bb2025",
+   "players": 16,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dodge": [
+     "halfling.halfling",
+     "halfling.halfling_catcher",
+     "halfling.halfling_hefty"
+    ],
+    "Right Stuff": [
+     "halfling.halfling",
+     "halfling.halfling_catcher"
+    ],
+    "Stunty": [
+     "halfling.halfling",
+     "halfling.halfling_catcher",
+     "halfling.halfling_hefty"
+    ],
+    "Fend": [
+     "halfling.halfling_hefty"
+    ],
+    "Catch": [
+     "halfling.halfling_catcher"
+    ],
+    "Sprint": [
+     "halfling.halfling_catcher"
+    ],
+    "Mighty Blow": [
+     "halfling.treeman"
+    ],
+    "Stand Firm": [
+     "halfling.treeman"
+    ],
+    "Strong Arm": [
+     "halfling.treeman"
+    ],
+    "Take Root": [
+     "halfling.treeman"
+    ],
+    "Thick Skull": [
+     "halfling.treeman"
+    ],
+    "Throw Team-mate": [
+     "halfling.treeman"
+    ],
+    "Timmm-ber!": [
+     "halfling.treeman"
+    ]
+   },
+   "unresolved": []
+  },
+  "high_elf__bb2025": {
+   "race": "high_elf",
+   "edition": "bb2025",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Cloud Burster": [
+     "highelf.phoenix_warrior"
+    ],
+    "Pass": [
+     "highelf.phoenix_warrior"
+    ],
+    "Safe Pass": [
+     "highelf.phoenix_warrior"
+    ],
+    "Block": [
+     "highelf.dragon_prince"
+    ],
+    "My Ball": [
+     "highelf.dragon_prince"
+    ],
+    "Steady Footing": [
+     "highelf.dragon_prince"
+    ],
+    "Claws": [
+     "highelf.white_lion"
+    ],
+    "Wrestle": [
+     "highelf.white_lion"
+    ]
+   },
+   "unresolved": []
+  },
+  "human__bb2025": {
+   "race": "human",
+   "edition": "bb2025",
+   "players": 13,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dodge": [
+     "human.catcher",
+     "human.halfling_hopeful"
+    ],
+    "Right Stuff": [
+     "human.halfling_hopeful"
+    ],
+    "Stunty": [
+     "human.halfling_hopeful"
+    ],
+    "Catch": [
+     "human.catcher"
+    ],
+    "Pass": [
+     "human.thrower"
+    ],
+    "Sure Hands": [
+     "human.thrower"
+    ],
+    "Block": [
+     "human.blitzer"
+    ],
+    "Tackle": [
+     "human.blitzer"
+    ],
+    "Bone Head": [
+     "human.ogre"
+    ],
+    "Loner": [
+     "human.ogre"
+    ],
+    "Mighty Blow": [
+     "human.ogre"
+    ],
+    "Thick Skull": [
+     "human.ogre"
+    ],
+    "Throw Team-mate": [
+     "human.ogre"
+    ]
+   },
+   "unresolved": []
+  },
+  "imperial_nobility__bb2025": {
+   "race": "imperial_nobility",
+   "edition": "bb2025",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Fend": [
+     "imperialnobility.imperial_retainer"
+    ],
+    "Give and Go": [
+     "imperialnobility.imperial_thrower"
+    ],
+    "Pass": [
+     "imperialnobility.imperial_thrower"
+    ],
+    "Pro": [
+     "imperialnobility.imperial_thrower",
+     "imperialnobility.noble_blitzer"
+    ],
+    "Stand Firm": [
+     "imperialnobility.bodyguard"
+    ],
+    "Wrestle": [
+     "imperialnobility.bodyguard"
+    ],
+    "Block": [
+     "imperialnobility.noble_blitzer"
+    ],
+    "Catch": [
+     "imperialnobility.noble_blitzer"
+    ],
+    "Bone Head": [
+     "imperialnobility.ogre"
+    ],
+    "Loner": [
+     "imperialnobility.ogre"
+    ],
+    "Mighty Blow": [
+     "imperialnobility.ogre"
+    ],
+    "Thick Skull": [
+     "imperialnobility.ogre"
+    ],
+    "Throw Team-mate": [
+     "imperialnobility.ogre"
+    ]
+   },
+   "unresolved": []
+  },
+  "khemri__bb2025": {
+   "race": "khemri",
+   "edition": "bb2025",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 0,
+   "special_rules": [
+    "Masters of Undeath"
+   ],
+   "skills": {
+    "Regeneration": [
+     "khemri.blitzra",
+     "khemri.skeleton",
+     "khemri.throra",
+     "khemri.tombguardian"
+    ],
+    "Thick Skull": [
+     "khemri.blitzra",
+     "khemri.skeleton",
+     "khemri.throra"
+    ],
+    "Pass": [
+     "khemri.throra"
+    ],
+    "Sure Hands": [
+     "khemri.throra"
+    ],
+    "Block": [
+     "khemri.blitzra"
+    ],
+    "Brawler": [
+     "khemri.tombguardian"
+    ],
+    "Decay": [
+     "khemri.tombguardian"
+    ]
+   },
+   "unresolved": []
+  },
+  "khemri_fumbbl__bb2025": {
+   "race": "khemri_fumbbl",
+   "edition": "bb2025",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 0,
+   "special_rules": [],
+   "skills": {
+    "Pass": [
+     "2893"
+    ],
+    "Regeneration": [
+     "2892",
+     "2893",
+     "2894",
+     "2895"
+    ],
+    "Sure Hands": [
+     "2893"
+    ],
+    "Thick Skull": [
+     "2892"
+    ],
+    "Decay": [
+     "2895"
+    ],
+    "Block": [
+     "2894"
+    ]
+   },
+   "unresolved": []
+  },
+  "khorne__bb2025": {
+   "race": "khorne",
+   "edition": "bb2025",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [
+    "Favoured of Khorne",
+    "Brawlin' Brutes"
+   ],
+   "skills": {
+    "Frenzy": [
+     "khorne.bloodborn_marauder",
+     "khorne.bloodseeker",
+     "khorne.bloodspawn"
+    ],
+    "Horns": [
+     "khorne.khorngor"
+    ],
+    "Juggernaut": [
+     "khorne.khorngor"
+    ],
+    "Jump Up": [
+     "khorne.khorngor"
+    ],
+    "Thick Skull": [
+     "khorne.khorngor"
+    ],
+    "Claws": [
+     "khorne.bloodspawn"
+    ],
+    "Loner": [
+     "khorne.bloodspawn"
+    ],
+    "Mighty Blow": [
+     "khorne.bloodspawn"
+    ],
+    "Unchannelled Fury": [
+     "khorne.bloodspawn"
+    ]
+   },
+   "unresolved": []
+  },
+  "lizardman__bb2025": {
+   "race": "lizardman",
+   "edition": "bb2025",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dodge": [
+     "lizardman.chameleon_skink",
+     "lizardman.skink"
+    ],
+    "Stunty": [
+     "lizardman.chameleon_skink",
+     "lizardman.skink"
+    ],
+    "On the Ball": [
+     "lizardman.chameleon_skink"
+    ],
+    "Shadowing": [
+     "lizardman.chameleon_skink"
+    ],
+    "Juggernaut": [
+     "lizardman.saurus"
+    ],
+    "Unsteady": [
+     "lizardman.saurus"
+    ],
+    "Bone Head": [
+     "lizardman.kroxigor"
+    ],
+    "Loner": [
+     "lizardman.kroxigor"
+    ],
+    "Mighty Blow": [
+     "lizardman.kroxigor"
+    ],
+    "Prehensile Tail": [
+     "lizardman.kroxigor"
+    ],
+    "Thick Skull": [
+     "lizardman.kroxigor"
+    ]
+   },
+   "unresolved": []
+  },
+  "necromantic__bb2025": {
+   "race": "necromantic",
+   "edition": "bb2025",
+   "players": 13,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 0,
+   "special_rules": [
+    "Masters of Undeath"
+   ],
+   "skills": {
+    "Eye Gouge": [
+     "necromantic.zombie"
+    ],
+    "Regeneration": [
+     "necromantic.fleshgolem",
+     "necromantic.ghoul",
+     "necromantic.werewolf",
+     "necromantic.wraith",
+     "necromantic.zombie"
+    ],
+    "Unsteady": [
+     "necromantic.fleshgolem",
+     "necromantic.zombie"
+    ],
+    "Dodge": [
+     "necromantic.ghoul"
+    ],
+    "Block": [
+     "necromantic.wraith"
+    ],
+    "Foul Appearance": [
+     "necromantic.wraith"
+    ],
+    "No Ball": [
+     "necromantic.wraith"
+    ],
+    "Sidestep": [
+     "necromantic.wraith"
+    ],
+    "Stand Firm": [
+     "necromantic.fleshgolem"
+    ],
+    "Thick Skull": [
+     "necromantic.fleshgolem"
+    ],
+    "Claws": [
+     "necromantic.werewolf"
+    ],
+    "Frenzy": [
+     "necromantic.werewolf"
+    ]
+   },
+   "unresolved": []
+  },
+  "nippon__bb2025": {
+   "race": "nippon",
+   "edition": "bb2025",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Block": [
+     "43572"
+    ],
+    "Claws": [
+     "43573"
+    ],
+    "Dodge": [
+     "43574"
+    ],
+    "Leap": [
+     "43574"
+    ]
+   },
+   "unresolved": []
+  },
+  "norse__bb2025": {
+   "race": "norse",
+   "edition": "bb2025",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [
+    "Favoured of Khorne"
+   ],
+   "skills": {
+    "Block": [
+     "norse.berserker",
+     "norse.lineman"
+    ],
+    "Drunkard": [
+     "norse.lineman"
+    ],
+    "Thick Skull": [
+     "norse.lineman"
+    ],
+    "Unsteady": [
+     "norse.lineman",
+     "norse.ulfwerener"
+    ],
+    "Dodge": [
+     "norse.beer_boar"
+    ],
+    "No Ball": [
+     "norse.beer_boar"
+    ],
+    "Pick-me-up": [
+     "norse.beer_boar"
+    ],
+    "Stunty": [
+     "norse.beer_boar"
+    ],
+    "Titchy": [
+     "norse.beer_boar"
+    ],
+    "Frenzy": [
+     "norse.berserker",
+     "norse.troll.snow",
+     "norse.ulfwerener"
+    ],
+    "Jump Up": [
+     "norse.berserker"
+    ],
+    "Catch": [
+     "norse.thrower"
+    ],
+    "Dauntless": [
+     "norse.thrower"
+    ],
+    "Pass": [
+     "norse.thrower"
+    ],
+    "Strip Ball": [
+     "norse.thrower"
+    ],
+    "Claws": [
+     "norse.troll.snow"
+    ],
+    "Disturbing Presence": [
+     "norse.troll.snow"
+    ],
+    "Loner": [
+     "norse.troll.snow"
+    ],
+    "Unchannelled Fury": [
+     "norse.troll.snow"
+    ]
+   },
+   "unresolved": []
+  },
+  "nurgle__bb2025": {
+   "race": "nurgle",
+   "edition": "bb2025",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 0,
+   "special_rules": [
+    "Favoured of Nurgle",
+    "Brawlin' Brutes"
+   ],
+   "skills": {
+    "Decay": [
+     "nurgle.rotter"
+    ],
+    "Plague Ridden": [
+     "nurgle.beast",
+     "nurgle.pestigor",
+     "nurgle.rotter",
+     "nurgle.warrior"
+    ],
+    "Horns": [
+     "nurgle.pestigor"
+    ],
+    "Regeneration": [
+     "nurgle.beast",
+     "nurgle.pestigor",
+     "nurgle.warrior"
+    ],
+    "Steady Footing": [
+     "nurgle.pestigor"
+    ],
+    "Thick Skull": [
+     "nurgle.pestigor"
+    ],
+    "Disturbing Presence": [
+     "nurgle.beast",
+     "nurgle.warrior"
+    ],
+    "Foul Appearance": [
+     "nurgle.beast",
+     "nurgle.warrior"
+    ],
+    "Stand Firm": [
+     "nurgle.warrior"
+    ],
+    "Unsteady": [
+     "nurgle.warrior"
+    ],
+    "Loner": [
+     "nurgle.beast"
+    ],
+    "Mighty Blow": [
+     "nurgle.beast"
+    ],
+    "Pick-me-up": [
+     "nurgle.beast"
+    ],
+    "Really Stupid": [
+     "nurgle.beast"
+    ],
+    "Tentacles": [
+     "nurgle.beast"
+    ]
+   },
+   "unresolved": []
+  },
+  "ogre__bb2025": {
+   "race": "ogre",
+   "edition": "bb2025",
+   "players": 14,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [
+    "Brawlin' Brutes",
+    "Low Cost Linemen"
+   ],
+   "skills": {
+    "Dodge": [
+     "ogre.snotling"
+    ],
+    "Right Stuff": [
+     "ogre.snotling"
+    ],
+    "Sidestep": [
+     "ogre.snotling"
+    ],
+    "Stunty": [
+     "ogre.snotling"
+    ],
+    "Titchy": [
+     "ogre.snotling"
+    ],
+    "Bone Head": [
+     "ogre.ogre",
+     "ogre.ogre_runt_punter"
+    ],
+    "Mighty Blow": [
+     "ogre.ogre",
+     "ogre.ogre_runt_punter"
+    ],
+    "Thick Skull": [
+     "ogre.ogre",
+     "ogre.ogre_runt_punter"
+    ],
+    "Throw Team-mate": [
+     "ogre.ogre"
+    ],
+    "Kick Team-mate": [
+     "ogre.ogre_runt_punter"
+    ]
+   },
+   "unresolved": []
+  },
+  "old_world_alliance_ogre__bb2025": {
+   "race": "old_world_alliance_ogre",
+   "edition": "bb2025",
+   "players": 13,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dodge": [
+     "oldworldalliance.halfling_hopeful",
+     "oldworldalliance.human_catcher"
+    ],
+    "Right Stuff": [
+     "oldworldalliance.halfling_hopeful"
+    ],
+    "Stunty": [
+     "oldworldalliance.halfling_hopeful"
+    ],
+    "Catch": [
+     "oldworldalliance.human_catcher"
+    ],
+    "Block": [
+     "oldworldalliance.dwarf_blitzer",
+     "oldworldalliance.dwarf_lineman",
+     "oldworldalliance.human_blitzer",
+     "oldworldalliance.trollslayer"
+    ],
+    "Defensive": [
+     "oldworldalliance.dwarf_lineman"
+    ],
+    "Thick Skull": [
+     "oldworldalliance.dwarf_blitzer",
+     "oldworldalliance.dwarf_lineman",
+     "oldworldalliance.dwarf_runner",
+     "oldworldalliance.ogre",
+     "oldworldalliance.trollslayer"
+    ],
+    "Pass": [
+     "oldworldalliance.human_thrower"
+    ],
+    "Sure Hands": [
+     "oldworldalliance.dwarf_runner",
+     "oldworldalliance.human_thrower"
+    ],
+    "Sprint": [
+     "oldworldalliance.dwarf_runner"
+    ],
+    "Tackle": [
+     "oldworldalliance.dwarf_blitzer",
+     "oldworldalliance.human_blitzer"
+    ],
+    "Diving Tackle": [
+     "oldworldalliance.dwarf_blitzer"
+    ],
+    "Dauntless": [
+     "oldworldalliance.trollslayer"
+    ],
+    "Frenzy": [
+     "oldworldalliance.trollslayer"
+    ],
+    "Hatred": [
+     "oldworldalliance.trollslayer"
+    ],
+    "Bone Head": [
+     "oldworldalliance.ogre"
+    ],
+    "Loner": [
+     "oldworldalliance.ogre"
+    ],
+    "Mighty Blow": [
+     "oldworldalliance.ogre"
+    ],
+    "Throw Team-mate": [
+     "oldworldalliance.ogre"
+    ]
+   },
+   "unresolved": []
+  },
+  "old_world_alliance_treeman__bb2025": {
+   "race": "old_world_alliance_treeman",
+   "edition": "bb2025",
+   "players": 13,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Dodge": [
+     "oldworldalliance.halfling_hopeful",
+     "oldworldalliance.human_catcher"
+    ],
+    "Right Stuff": [
+     "oldworldalliance.halfling_hopeful"
+    ],
+    "Stunty": [
+     "oldworldalliance.halfling_hopeful"
+    ],
+    "Catch": [
+     "oldworldalliance.human_catcher"
+    ],
+    "Block": [
+     "oldworldalliance.dwarf_blitzer",
+     "oldworldalliance.dwarf_lineman",
+     "oldworldalliance.human_blitzer",
+     "oldworldalliance.trollslayer"
+    ],
+    "Defensive": [
+     "oldworldalliance.dwarf_lineman"
+    ],
+    "Thick Skull": [
+     "oldworldalliance.altern_forest_treeman",
+     "oldworldalliance.dwarf_blitzer",
+     "oldworldalliance.dwarf_lineman",
+     "oldworldalliance.dwarf_runner",
+     "oldworldalliance.trollslayer"
+    ],
+    "Pass": [
+     "oldworldalliance.human_thrower"
+    ],
+    "Sure Hands": [
+     "oldworldalliance.dwarf_runner",
+     "oldworldalliance.human_thrower"
+    ],
+    "Sprint": [
+     "oldworldalliance.dwarf_runner"
+    ],
+    "Tackle": [
+     "oldworldalliance.dwarf_blitzer",
+     "oldworldalliance.human_blitzer"
+    ],
+    "Diving Tackle": [
+     "oldworldalliance.dwarf_blitzer"
+    ],
+    "Dauntless": [
+     "oldworldalliance.trollslayer"
+    ],
+    "Frenzy": [
+     "oldworldalliance.trollslayer"
+    ],
+    "Hatred": [
+     "oldworldalliance.trollslayer"
+    ],
+    "Loner": [
+     "oldworldalliance.altern_forest_treeman"
+    ],
+    "Mighty Blow": [
+     "oldworldalliance.altern_forest_treeman"
+    ],
+    "Stand Firm": [
+     "oldworldalliance.altern_forest_treeman"
+    ],
+    "Strong Arm": [
+     "oldworldalliance.altern_forest_treeman"
+    ],
+    "Take Root": [
+     "oldworldalliance.altern_forest_treeman"
+    ],
+    "Throw Team-mate": [
+     "oldworldalliance.altern_forest_treeman"
+    ],
+    "Timmm-ber!": [
+     "oldworldalliance.altern_forest_treeman"
+    ]
+   },
+   "unresolved": []
+  },
+  "orc__bb2025": {
+   "race": "orc",
+   "edition": "bb2025",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [
+    "Brawlin' Brutes"
+   ],
+   "skills": {
+    "Dodge": [
+     "orc.goblin"
+    ],
+    "Right Stuff": [
+     "orc.goblin"
+    ],
+    "Stunty": [
+     "orc.goblin"
+    ],
+    "Pass": [
+     "orc.thrower"
+    ],
+    "Sure Hands": [
+     "orc.thrower"
+    ],
+    "Block": [
+     "orc.blitzer"
+    ],
+    "Break Tackle": [
+     "orc.blitzer"
+    ],
+    "Mighty Blow": [
+     "orc.big_un_blocker",
+     "orc.troll"
+    ],
+    "Taunt": [
+     "orc.big_un_blocker"
+    ],
+    "Thick Skull": [
+     "orc.big_un_blocker"
+    ],
+    "Unsteady": [
+     "orc.big_un_blocker"
+    ],
+    "Always Hungry": [
+     "orc.troll"
+    ],
+    "Loner": [
+     "orc.troll"
+    ],
+    "Projectile Vomit": [
+     "orc.troll"
+    ],
+    "Really Stupid": [
+     "orc.troll"
+    ],
+    "Regeneration": [
+     "orc.troll"
+    ],
+    "Throw Team-mate": [
+     "orc.troll"
+    ]
+   },
+   "unresolved": []
+  },
+  "renegades__bb2025": {
+   "race": "renegades",
+   "edition": "bb2025",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [
+    "Favoured of Khorne",
+    "Favoured of Nurgle",
+    "Favoured of Slaanesh",
+    "Favoured of Tzeentch"
+   ],
+   "skills": {
+    "Animosity": [
+     "37724",
+     "37725",
+     "37726",
+     "37727",
+     "37728",
+     "37729"
+    ],
+    "Dodge": [
+     "37726"
+    ],
+    "Right Stuff": [
+     "37726"
+    ],
+    "Stunty": [
+     "37726"
+    ],
+    "Pass": [
+     "37725"
+    ],
+    "Sure Hands": [
+     "37725"
+    ],
+    "Always Hungry": [
+     "37730"
+    ],
+    "Loner": [
+     "37730",
+     "37731",
+     "37732"
+    ],
+    "Mighty Blow": [
+     "37730",
+     "37731",
+     "37732"
+    ],
+    "Projectile Vomit": [
+     "37730"
+    ],
+    "Really Stupid": [
+     "37730"
+    ],
+    "Regeneration": [
+     "37730"
+    ],
+    "Throw Team-mate": [
+     "37730",
+     "37731"
+    ],
+    "Bone Head": [
+     "37731"
+    ],
+    "Thick Skull": [
+     "37731",
+     "37732"
+    ],
+    "Frenzy": [
+     "37732"
+    ],
+    "Horns": [
+     "37732"
+    ],
+    "Unchannelled Fury": [
+     "37732"
+    ]
+   },
+   "unresolved": []
+  },
+  "renegades_37733__bb2025": {
+   "race": "renegades_37733",
+   "edition": "bb2025",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [
+    "Favoured of Khorne",
+    "Favoured of Nurgle",
+    "Favoured of Slaanesh",
+    "Favoured of Tzeentch"
+   ],
+   "skills": {
+    "Animosity": [
+     "37724",
+     "37725",
+     "37726",
+     "37727",
+     "37728",
+     "37729"
+    ],
+    "Dodge": [
+     "37726"
+    ],
+    "Right Stuff": [
+     "37726"
+    ],
+    "Stunty": [
+     "37726"
+    ],
+    "Pass": [
+     "37725"
+    ],
+    "Sure Hands": [
+     "37725"
+    ],
+    "Always Hungry": [
+     "37730"
+    ],
+    "Loner": [
+     "37730",
+     "37731",
+     "37733"
+    ],
+    "Mighty Blow": [
+     "37730",
+     "37731",
+     "37733"
+    ],
+    "Projectile Vomit": [
+     "37730"
+    ],
+    "Really Stupid": [
+     "37730"
+    ],
+    "Regeneration": [
+     "37730"
+    ],
+    "Throw Team-mate": [
+     "37730",
+     "37731"
+    ],
+    "Bone Head": [
+     "37731"
+    ],
+    "Thick Skull": [
+     "37731"
+    ],
+    "Animal Savagery": [
+     "37733"
+    ],
+    "Frenzy": [
+     "37733"
+    ],
+    "Prehensile Tail": [
+     "37733"
+    ]
+   },
+   "unresolved": []
+  },
+  "skaven__bb2025": {
+   "race": "skaven",
+   "edition": "bb2025",
+   "players": 12,
+   "stars": [],
+   "rerolls": 2,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Pass": [
+     "skaven.thrower"
+    ],
+    "Sure Hands": [
+     "skaven.thrower"
+    ],
+    "Dodge": [
+     "skaven.gutterrunner"
+    ],
+    "Stab": [
+     "skaven.gutterrunner"
+    ],
+    "Block": [
+     "skaven.blitzer"
+    ],
+    "Strip Ball": [
+     "skaven.blitzer"
+    ],
+    "Animal Savagery": [
+     "skaven.ratogre"
+    ],
+    "Frenzy": [
+     "skaven.ratogre"
+    ],
+    "Loner": [
+     "skaven.ratogre"
+    ],
+    "Mighty Blow": [
+     "skaven.ratogre"
+    ],
+    "Prehensile Tail": [
+     "skaven.ratogre"
+    ]
+   },
+   "unresolved": []
+  },
+  "slann__bb2025": {
+   "race": "slann",
+   "edition": "bb2025",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Leap": [
+     "slann.blitzer",
+     "slann.catcher",
+     "slann.lineman"
+    ],
+    "Very Long Legs": [
+     "slann.blitzer",
+     "slann.catcher",
+     "slann.lineman"
+    ],
+    "Diving Catch": [
+     "slann.catcher"
+    ],
+    "Diving Tackle": [
+     "slann.blitzer"
+    ],
+    "Jump Up": [
+     "slann.blitzer"
+    ],
+    "Bone head": [
+     "slann.kroxigor"
+    ],
+    "Loner": [
+     "slann.kroxigor"
+    ],
+    "Mighty Blow": [
+     "slann.kroxigor"
+    ],
+    "Prehensile Tail": [
+     "slann.kroxigor"
+    ],
+    "Thick Skull": [
+     "slann.kroxigor"
+    ]
+   },
+   "unresolved": []
+  },
+  "slann_fumbbl__bb2025": {
+   "race": "slann_fumbbl",
+   "edition": "bb2025",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Diving Tackle": [
+     "2995"
+    ],
+    "Jump Up": [
+     "2995"
+    ],
+    "Leap": [
+     "2993",
+     "2994",
+     "2995"
+    ],
+    "Very Long Legs": [
+     "2993",
+     "2994",
+     "2995"
+    ],
+    "Diving Catch": [
+     "2994"
+    ],
+    "Loner": [
+     "2996"
+    ],
+    "Mighty Blow": [
+     "2996"
+    ],
+    "Prehensile Tail": [
+     "2996"
+    ],
+    "Thick Skull": [
+     "2996"
+    ]
+   },
+   "unresolved": []
+  },
+  "snotling__bb2025": {
+   "race": "snotling",
+   "edition": "bb2025",
+   "players": 16,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [
+    "Bribery and Corruption",
+    "Low Cost Linemen",
+    "Swarming"
+   ],
+   "skills": {
+    "Dodge": [
+     "snotling.fun_hoppa",
+     "snotling.fungus_flinga",
+     "snotling.snotling_lineman",
+     "snotling.stilty_runna"
+    ],
+    "Insignificant": [
+     "snotling.snotling_lineman"
+    ],
+    "Right Stuff": [
+     "snotling.fun_hoppa",
+     "snotling.fungus_flinga",
+     "snotling.snotling_lineman",
+     "snotling.stilty_runna"
+    ],
+    "Sidestep": [
+     "snotling.fun_hoppa",
+     "snotling.fungus_flinga",
+     "snotling.snotling_lineman",
+     "snotling.stilty_runna"
+    ],
+    "Stunty": [
+     "snotling.fun_hoppa",
+     "snotling.fungus_flinga",
+     "snotling.snotling_lineman",
+     "snotling.stilty_runna"
+    ],
+    "Titchy": [
+     "snotling.fungus_flinga",
+     "snotling.snotling_lineman"
+    ],
+    "Pogo": [
+     "snotling.fun_hoppa"
+    ],
+    "Sprint": [
+     "snotling.stilty_runna"
+    ],
+    "Bombardier": [
+     "snotling.fungus_flinga"
+    ],
+    "Secret Weapon": [
+     "snotling.fungus_flinga"
+    ],
+    "Dirty Player": [
+     "snotling.pump_wagon"
+    ],
+    "Juggernaut": [
+     "snotling.pump_wagon"
+    ],
+    "Mighty Blow": [
+     "snotling.pump_wagon",
+     "snotling.trained_troll"
+    ],
+    "Really Stupid": [
+     "snotling.pump_wagon",
+     "snotling.trained_troll"
+    ],
+    "Stand Firm": [
+     "snotling.pump_wagon"
+    ],
+    "Always Hungry": [
+     "snotling.trained_troll"
+    ],
+    "Projectile Vomit": [
+     "snotling.trained_troll"
+    ],
+    "Regeneration": [
+     "snotling.trained_troll"
+    ],
+    "Throw Team-mate": [
+     "snotling.trained_troll"
+    ]
+   },
+   "unresolved": []
+  },
+  "undead__bb2025": {
+   "race": "undead",
+   "edition": "bb2025",
+   "players": 13,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 0,
+   "special_rules": [
+    "Masters of Undeath"
+   ],
+   "skills": {
+    "Regeneration": [
+     "undead.ghoul",
+     "undead.mummy",
+     "undead.skeleton",
+     "undead.wight",
+     "undead.zombie"
+    ],
+    "Thick Skull": [
+     "undead.skeleton",
+     "undead.wight"
+    ],
+    "Eye Gouge": [
+     "undead.zombie"
+    ],
+    "Unsteady": [
+     "undead.zombie"
+    ],
+    "Dodge": [
+     "undead.ghoul"
+    ],
+    "Block": [
+     "undead.wight"
+    ],
+    "Tackle": [
+     "undead.wight"
+    ],
+    "Mighty Blow": [
+     "undead.mummy"
+    ]
+   },
+   "unresolved": []
+  },
+  "underworld__bb2025": {
+   "race": "underworld",
+   "edition": "bb2025",
+   "players": 16,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [
+    "Bribery and Corruption"
+   ],
+   "skills": {
+    "Dodge": [
+     "underworld.goblin",
+     "underworld.gutter_runner",
+     "underworld.snotling_lineman"
+    ],
+    "Right Stuff": [
+     "underworld.goblin",
+     "underworld.snotling_lineman"
+    ],
+    "Stunty": [
+     "underworld.goblin",
+     "underworld.snotling_lineman"
+    ],
+    "Insignificant": [
+     "underworld.snotling_lineman"
+    ],
+    "Sidestep": [
+     "underworld.snotling_lineman"
+    ],
+    "Titchy": [
+     "underworld.snotling_lineman"
+    ],
+    "Animosity": [
+     "underworld.gutter_runner",
+     "underworld.skaven.blitzer",
+     "underworld.skaven.lineman",
+     "underworld.skaven.thrower"
+    ],
+    "Pass": [
+     "underworld.skaven.thrower"
+    ],
+    "Sure Hands": [
+     "underworld.skaven.thrower"
+    ],
+    "Stab": [
+     "underworld.gutter_runner"
+    ],
+    "Block": [
+     "underworld.skaven.blitzer"
+    ],
+    "Strip Ball": [
+     "underworld.skaven.blitzer"
+    ],
+    "Always Hungry": [
+     "underworld.troll.warpstone"
+    ],
+    "Loner": [
+     "underworld.troll.warpstone"
+    ],
+    "Mighty Blow": [
+     "underworld.troll.warpstone"
+    ],
+    "Projectile Vomit": [
+     "underworld.troll.warpstone"
+    ],
+    "Really Stupid": [
+     "underworld.troll.warpstone"
+    ],
+    "Regeneration": [
+     "underworld.troll.warpstone"
+    ],
+    "Throw Team-mate": [
+     "underworld.troll.warpstone"
+    ]
+   },
+   "unresolved": []
+  },
+  "underworld_37844__bb2025": {
+   "race": "underworld_37844",
+   "edition": "bb2025",
+   "players": 16,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [
+    "Bribery and Corruption"
+   ],
+   "skills": {
+    "Dodge": [
+     "underworld.goblin",
+     "underworld.gutter_runner",
+     "underworld.snotling_lineman"
+    ],
+    "Right Stuff": [
+     "underworld.goblin",
+     "underworld.snotling_lineman"
+    ],
+    "Stunty": [
+     "underworld.goblin",
+     "underworld.snotling_lineman"
+    ],
+    "Insignificant": [
+     "underworld.snotling_lineman"
+    ],
+    "Sidestep": [
+     "underworld.snotling_lineman"
+    ],
+    "Titchy": [
+     "underworld.snotling_lineman"
+    ],
+    "Animosity": [
+     "underworld.gutter_runner",
+     "underworld.skaven.blitzer",
+     "underworld.skaven.lineman",
+     "underworld.skaven.thrower"
+    ],
+    "Pass": [
+     "underworld.skaven.thrower"
+    ],
+    "Sure Hands": [
+     "underworld.skaven.thrower"
+    ],
+    "Stab": [
+     "underworld.gutter_runner"
+    ],
+    "Block": [
+     "underworld.skaven.blitzer"
+    ],
+    "Strip Ball": [
+     "underworld.skaven.blitzer"
+    ],
+    "Animal Savagery": [
+     "37844"
+    ],
+    "Frenzy": [
+     "37844"
+    ],
+    "Loner": [
+     "37844"
+    ],
+    "Mighty Blow": [
+     "37844"
+    ],
+    "Prehensile Tail": [
+     "37844"
+    ]
+   },
+   "unresolved": []
+  },
+  "vampire__bb2025": {
+   "race": "vampire",
+   "edition": "bb2025",
+   "players": 12,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [
+    "Masters of Undeath"
+   ],
+   "skills": {
+    "Bloodlust": [
+     "vampire.vampire_blitzer",
+     "vampire.vampire_runner",
+     "vampire.vampire_thrower",
+     "vampire.vargheist"
+    ],
+    "Hypnotic Gaze": [
+     "vampire.vampire_blitzer",
+     "vampire.vampire_runner",
+     "vampire.vampire_thrower"
+    ],
+    "Regeneration": [
+     "vampire.vampire_blitzer",
+     "vampire.vampire_runner",
+     "vampire.vampire_thrower",
+     "vampire.vargheist"
+    ],
+    "Pass": [
+     "vampire.vampire_thrower"
+    ],
+    "Juggernaut": [
+     "vampire.vampire_blitzer"
+    ],
+    "Claws": [
+     "vampire.vargheist"
+    ],
+    "Frenzy": [
+     "vampire.vargheist"
+    ],
+    "Loner": [
+     "vampire.vargheist"
+    ]
+   },
+   "unresolved": []
+  },
+  "wood_elf__bb2025": {
+   "race": "wood_elf",
+   "edition": "bb2025",
+   "players": 11,
+   "stars": [],
+   "rerolls": 3,
+   "apothecaries": 1,
+   "special_rules": [],
+   "skills": {
+    "Pass": [
+     "woodelf.thrower"
+    ],
+    "Safe Pair of Hands": [
+     "woodelf.thrower"
+    ],
+    "Catch": [
+     "woodelf.catcher"
+    ],
+    "Dodge": [
+     "woodelf.catcher",
+     "woodelf.wardancer"
+    ],
+    "Sprint": [
+     "woodelf.catcher"
+    ],
+    "Block": [
+     "woodelf.wardancer"
+    ],
+    "Leap": [
+     "woodelf.wardancer"
+    ],
+    "Loner": [
+     "woodelf.treeman"
+    ],
+    "Mighty Blow": [
+     "woodelf.treeman"
+    ],
+    "Stand Firm": [
+     "woodelf.treeman"
+    ],
+    "Strong Arm": [
+     "woodelf.treeman"
+    ],
+    "Take Root": [
+     "woodelf.treeman"
+    ],
+    "Thick Skull": [
+     "woodelf.treeman"
+    ],
+    "Throw Team-mate": [
+     "woodelf.treeman"
+    ]
+   },
+   "unresolved": []
+  }
+ }
+}

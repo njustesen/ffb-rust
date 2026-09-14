@@ -9,6 +9,7 @@ page: aggregated and per-gate statistics on events, actions, mechanics, kick-off
 skills, injuries, weather, prayers -- and, for every catalog, what the sweep never reached.
 """
 import glob
+import os
 import json
 import re
 import sys
@@ -330,10 +331,17 @@ for race in sorted({d['race'] for d in G}):
 R = rolls()
 data = {
     'meta': {
-        'sweep': '2026-09-13 heuristic-setup sweep', 'gates': len(G),
+        # Overridable so a re-run does not ship last week's headline. `SWEEP_LABEL` names the
+        # sweep, `SWEEP_DATE` dates the masthead, `SWEEP_PARITY` is the certified verdict, and
+        # `SWEEP_SOURCE` names the log root and the BACKLOG section in the footer.
+        'sweep': os.environ.get('SWEEP_LABEL', '2026-09-13 heuristic-setup sweep'),
+        'date': os.environ.get('SWEEP_DATE', '2026-09-13'),
+        'source': os.environ.get('SWEEP_SOURCE', 'parity_st_* logs of the 2026-09-13 sweep (BACKLOG §H.43–§H.49)'),
+        'verdict_file': os.environ.get('SWEEP_VERDICT_FILE', 'docs/SWEEP_2026-09-13_SETUP.txt'),
+        'gates': len(G),
         'games': sum(d['games'] for d in G), 'events': sum(T.values()),
         'squads': len(INV['squads']), 'races': len({d['race'] for d in G}),
-        'parity': '330/330',
+        'parity': os.environ.get('SWEEP_PARITY', '330/330'),
     },
     'by_ed': by_ed,
     'types': dict(T), 'event_catalog': EVENTS,
