@@ -29,9 +29,14 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 MODIFIER_KEYS = ("rollModifiers", "armorModifiers", "injuryModifiers", "casualtyModifiers")
 
 
+# A full sweep's logs live on the data volume (`sweep_worker.ps1 -root D:/ffb_sweep`); point
+# CENSUS_ROOT there to census it. Default: the repo, where a hand-run gate writes.
+CENSUS_ROOT = Path(os.environ.get("CENSUS_ROOT", str(ROOT)))
+
+
 def gate_dirs(pattern):
     """Yield (race, edition, scale, dir) for every matchup directory under the given roots."""
-    for root in sorted(ROOT.glob(pattern)):
+    for root in sorted(CENSUS_ROOT.glob(pattern)):
         if not root.is_dir():
             continue
         for d in sorted(root.glob("*/*_vs_*")):

@@ -63,10 +63,13 @@ BLOCK_RESULT = {1: "Skull", 2: "BothDown", 5: "PowPushback", 6: "Pow"}
 # of the same day used parity_rd_*. Set CENSUS_PREFIX to pick, so a census can be re-run against
 # either without editing this file.
 PREFIX = os.environ.get("CENSUS_PREFIX", "parity_sw_")
+# Where those roots live. A full sweep writes ~8 GB of per-seed logs, so `sweep_worker.ps1` puts
+# them on the data volume (`-root D:/ffb_sweep`); point CENSUS_ROOT at the same place.
+CENSUS_ROOT = Path(os.environ.get("CENSUS_ROOT", str(REPO)))
 
 
 def gate_dirs():
-    for root in sorted(REPO.glob(PREFIX + "*")):
+    for root in sorted(CENSUS_ROOT.glob(PREFIX + "*")):
         name = root.name[len(PREFIX):]
         # trailing _<edition>_<scale>
         parts = name.rsplit("_", 2)
