@@ -44,3 +44,7 @@ ffb-rust/target-probe/
 
 # Rendered decision-replay frames (46MB, regenerate with scripts/render_decisions.py)
 seed1_sampled_frames/
+
+# Agent worktrees (Claude Code `isolation: worktree`). 76 of these were once committed by
+# accident as gitlinks, and 135 stale checkouts held 444 GB. They are scratch, never content.
+.claude/worktrees/
