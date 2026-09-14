@@ -8093,3 +8093,65 @@ parity verdict. ffb-engine 7500/0, new test
 a gate, 8 GB in total — and the repo volume had 8.7 GB free. `scripts/sweep_worker.ps1` takes a
 `-root` parameter (default `D:/ffb_sweep`) and `FFB_PARITY_ROOT` accepts an absolute path, so the
 logs land on the data volume. Both engines create the tree under it.
+
+## §H.53 — 2026-09-14: FULL MATRIX 330/330 GREEN on the report stream + event bridge
+
+The certification run for §H.50 and §H.52. Every gate of the matrix (110 race x edition cells x
+3 sampling scales, 100 seeds each) re-run from scratch on the final binary and jar, fresh JVM per
+gate, six workers, logs on the data volume.
+
+**Verdict: 330/330 games match, 0 FAILED, 0 without a verdict** (`docs/SWEEP_2026-09-14_EVENTS.txt`,
+23.8 h of summed gate time in 3.6 h wall clock). Separately 10 gates report the mechanic-coverage
+checklist unmet while still passing parity 100/100 — the same shape as the previous sweep's 10, and
+the same causes (the uniform-sampling arms of slow rosters, and the `action Pass` / `pass rolls`
+items on the three `*_fumbbl` argmax gates).
+
+### Event coverage
+
+| | previous matrix | this matrix |
+|---|---:|---:|
+| `GameEvent` kinds emitted | 76 of 128 | **83 of 128** |
+| events | 27.37 M | 28.18 M |
+| report kinds produced | (not measured) | **82 of 164** |
+| reports | (not measured) | **13.90 M** |
+| distinct modifier NAMES | (not measured) | **65** |
+
+Seven kinds that had never appeared in 33,000 games now do, and none was lost: `coinThrow` (33,000),
+`receiveChoice` (33,000), `selectBlitzTarget` (207,716), `secretWeaponBan` (11,619),
+`interceptionRoll` (5,537), `kickoffThrowARock` (1,455), `bombExplodesAfterCatch` (379). Every one
+is a mechanic that always ran and simply had no emitter.
+
+Play is unchanged, as it must be: touchdowns 25,856 either way, hand-offs 25,854, block rolls and
+dodge rolls within 14 of the earlier figures (that sweep's census included the pre-fix runs of its
+six red gates).
+
+`skillUse` events fell 75,500 -> 70,726. That is a CORRECTION: `StepMoveBallAndChain` wrote a
+placeholder `ReportSkillUse(Block, RE_ROLL_DIRECTION)` on the team-re-roll path where Java writes
+nothing (its report belongs to the CLIENT_USE_SKILL branch), and the bridge derives `skillUse` from
+reports, so deleting the bogus report deleted the bogus events with it.
+
+### Report coverage, the part the event stream cannot reach
+
+65 distinct modifier names across armour, injury, casualty and agility rolls — the only telemetry in
+either engine that names a passive skill. Mighty Blow (86,259 on armour + 34,186 on injury), Stunty
+(83,104 + 13,969), tackle zones 1-7, offensive and defensive assists 1-7 (Guard), Claws 6,566,
+Titchy, Prehensile Tail, Break Tackle at both strength bands, Disturbing Presence 1-5, Dirty Player,
+Arm Bar, Decay, Chainsaw, Drunkard, Nerves of Steel, Very Long Legs, Leap, Diving Catch, Strong Arm,
+Big Hand, Moles under the Pitch, and the weather. Plus 18 `SkillUse` reasons, 8 re-roll sources, 21
+injury types, 19 lasting injuries and 12 prayers.
+
+15 skills that the event stream cannot see are visible in the report stream; the count of skills no
+stream can see fell from 40 to 26.
+
+### Reproduce
+
+```
+python scripts/sweep_census/inventory.py                        # roster side
+powershell -File scripts/sweep_worker.ps1 -jobfile <shard> -mask <cores> -tag w1 \
+    -scratch <dir> -root D:/ffb_sweep                           # x6, sharded by (edition, matchup)
+python scripts/sweep_verdicts.py <dir>/sweep.log --out docs/SWEEP_2026-09-14_EVENTS.txt --expect 330
+CENSUS_ROOT=D:/ffb_sweep CENSUS_PREFIX=parity_ python scripts/sweep_census/agg.py out_s14
+CENSUS_ROOT=D:/ffb_sweep python scripts/sweep_census/report_census.py "parity_*" docs/report_census.json
+SWEEP_LABEL=... python scripts/sweep_census/build_report.py scripts/sweep_census/out_s14 \
+    docs/setup_census_report.html
+```

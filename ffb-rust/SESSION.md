@@ -1,5 +1,13 @@
 # FFB-Rust Session State
 
+## 2026-09-14 — MATRIX 330/330 GREEN, event kinds 76 -> 83 (BACKLOG §H.53)
+
+Full matrix re-run on the final binary: **330/330 games match, 0 failed**
+(`docs/SWEEP_2026-09-14_EVENTS.txt`; 10 gates short on the coverage checklist, all still 100/100).
+Event kinds 76 -> 83 of 128 with none lost (coin throw, receive choice, blitz-target pick,
+interception, secret-weapon ban, Throw a Rock, bomb-after-catch); report kinds 82 of 164 over 13.9 M
+reports, 65 distinct modifier names. Play identical: 25,856 touchdowns either way.
+
 ## 2026-09-14 — event coverage: the bridge, and a full matrix re-run
 
 §H.50 made reports the coverage record; §H.52 fixes the event stream itself. 52 of 128 `GameEvent`

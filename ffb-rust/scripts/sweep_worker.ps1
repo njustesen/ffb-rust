@@ -13,7 +13,8 @@ param(
   [Parameter(Mandatory=$true)][string]$jobfile,
   [Parameter(Mandatory=$true)][int]$mask,
   [Parameter(Mandatory=$true)][string]$tag,
-  [Parameter(Mandatory=$true)][string]$scratch
+  [Parameter(Mandatory=$true)][string]$scratch,
+  [string]$root = "D:/ffb_sweep"
 )
 $repo = "C:\Users\Admin\niels\ffb-rust\ffb-rust"
 $log  = Join-Path $scratch "sweep.log"
@@ -23,7 +24,10 @@ foreach ($line in (Get-Content $jobfile)) {
   if (Test-Path $stop) { Add-Content $log ("[" + $tag + "] STOPPED"); exit 0 }
   $f = $t -split '\s+'; $ed = $f[0]; $race = $f[1]; $sc = $f[2]
   $out = Join-Path $scratch ("sw_" + $race + "_" + $ed + "_" + $sc + ".log")
-  $env:FFB_PARITY_ROOT = "parity_s14_" + $race + "_" + $ed + "_" + $sc
+  # Sweep logs land on the DATA volume: a full 330-gate sweep writes ~8 GB of per-seed step,
+  # event and report logs, which does not fit next to the repo. FFB_PARITY_ROOT takes an absolute
+  # path and both engines create the directory tree under it.
+  $env:FFB_PARITY_ROOT = $root + "/parity_" + $race + "_" + $ed + "_" + $sc
   $t0 = Get-Date
   $p = Start-Process -FilePath (Join-Path $repo "target\release\ffb-parity.exe") -WorkingDirectory $repo `
      -NoNewWindow -PassThru -ArgumentList @("--home",$race,"--away",$race,"--edition",$ed,"--tier","3",
