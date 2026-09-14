@@ -8049,3 +8049,47 @@ the report stream; the census page grew a **Reports** section built by `report_c
    `Swoop`, `BreatheFire` and `ProjectileVomit` are never offered by `legal_actions`; Hypnotic Gaze
    and Secure the Ball are offered and then deselected; the `SkillUse` prompt pins Dump-Off, Primal
    Savagery, Safe Pair of Hands, Swoop and Trickster to decline on both sides.
+
+## §H.52 — 2026-09-14: the report-to-event bridge, and the sweep moves to the data volume
+
+§H.50 made the REPORT stream the coverage record. This closes the other half: the EVENT stream was
+under-counting for a mechanical reason, and the fix is the one `drain_report_events` already names.
+
+**Why 52 of 128 event variants never fired.** Not because the mechanics are dark. A `GameEvent`
+variant is missing when nothing BUILDS it: 24 have no construction site anywhere, and roughly 8 more
+have one only in a dead edition twin (`step/bb2016|bb2020/*`, or a `step/mixed/*` module the bb2025
+glob in `make_step` shadows) or in `step/engine.rs`, which no `mod` declaration compiles. The coin
+toss, the receive choice, every blitz-target selection, every interception — all ran, all wrote
+their `Report`, none reached the census.
+
+**The fix.** `drain_report_events` (`driver.rs`) converted two `ReportId`s and carried a comment
+saying deriving events from reports was the intended shape, "rather than adding ~100 emit sites".
+It now converts 22 more: coin throw, receive choice, blitz and gaze target selection, interception,
+hypnotic gaze, Look Into My Eyes, Weeping Dagger, Piling On, bribes, secret-weapon bans (one event
+per BANNED player, not per rolled one), defecting players, riotous rookies, Throw a Rock (one per
+victim, or one with no player when the rock misses), a bomb that explodes after the catch, petty
+cash, master chef, no-players-to-field, the prayer amount, Leader and Pro.
+
+Only variants with **no live emit site** are bridged. One a live step already emits would arrive
+twice whenever the two payloads differ in any field, because `apply`'s dedup drops only exact
+duplicates. That rule keeps `fumblerooskie`, `jumpUpRoll`, `apothecaryChoice`, `inducement`,
+`throwAtPlayer`, `thenIStartedBlastin` and `wizardUse` on their own sites.
+
+**Two mechanics reported nothing either**, so the bridge alone could not have reached them; both now
+report 1:1 with Java:
+- **Pro** rolled its die inline and wrote no `ReportReRoll(PRO, successful, proRoll)`
+  (`RollMechanic.useReRoll`, all three editions). Pro was invisible in BOTH streams.
+- **Leader**: the state transition carried a `// NOTE: caller emits GameEvent::Leader` comment that
+  no caller ever honoured, and Java's `StateMechanic` reports both transitions
+  (`bb2025/StateMechanic.java:43,49`). Neither the report nor the event existed.
+
+**Measured**, 30 games across the three editions: `coinThrow`, `receiveChoice`, `selectBlitzTarget`
+(224 of them), `interceptionRoll`, `secretWeaponBan` and `bombExplodesAfterCatch` now fire, and
+PARITY is 6/6 on every matchup. No `GameEvent` is part of the state hash, so nothing here can move a
+parity verdict. ffb-engine 7500/0, new test
+`report_to_event_bridge_covers_the_variants_with_no_emit_site`.
+
+**Sweep logistics.** A 330-gate sweep now writes per-seed step, event AND report logs — about 25 MB
+a gate, 8 GB in total — and the repo volume had 8.7 GB free. `scripts/sweep_worker.ps1` takes a
+`-root` parameter (default `D:/ffb_sweep`) and `FFB_PARITY_ROOT` accepts an absolute path, so the
+logs land on the data volume. Both engines create the tree under it.

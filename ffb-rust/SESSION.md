@@ -1,5 +1,21 @@
 # FFB-Rust Session State
 
+## 2026-09-14 — event coverage: the bridge, and a full matrix re-run
+
+§H.50 made reports the coverage record; §H.52 fixes the event stream itself. 52 of 128 `GameEvent`
+variants were missing because nothing BUILDS them — 24 have no construction site at all, ~8 more
+have one only in a dead edition twin or in the uncompiled `step/engine.rs`. The coin toss, the
+receive choice, every blitz-target selection and every interception ran, wrote their report, and
+never reached the census.
+
+`drain_report_events` now derives 22 more variants from the reports (the shape its own comment
+always described), and the two mechanics that reported nothing either — Pro and Leader — report 1:1
+with Java. Six of those variants fire immediately in a 30-game sample, parity 6/6 per matchup; no
+`GameEvent` is in the state hash, so none of it can move a verdict.
+
+Full 330-gate matrix re-running on the D volume (`scripts/sweep_worker.ps1 -root D:/ffb_sweep`) —
+a sweep with report logs writes ~8 GB, which no longer fits beside the repo.
+
 ## 2026-09-13 (later) — the REPORT stream is now the coverage record, on both engines
 
 The census said 52 of 128 `GameEvent` variants never fired and 40 fielded skills had no telemetry.
