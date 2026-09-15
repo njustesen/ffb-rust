@@ -110,15 +110,16 @@ impl StepModifierTrait for ReallyStupidStepModifier {
 
         if !do_roll {
             if cancel_as_failure {
+                // NO REPORT HERE. Java's `doRoll = false` branch (a declined or unusable
+                // re-roll) sets FAILURE and calls `cancelPlayerAction` and that is all — the
+                // `addReport(new ReportConfusionRoll(...))` is inside `if (doRoll)`, after a real
+                // die. This synthesised one (roll 1, reRolled true, for a roll that never
+                // happened) was the only such report in the six negatrait behaviours, and it cost
+                // 98 phantom `confusionRoll` reports over 25 underworld bb2025 games — java 325,
+                // rust 423, with the dice identical and parity 25/25. The Rust-only EVENT stays:
+                // all six behaviours emit it, it marks a cancelled action rather than a roll, and
+                // no Java twin constrains it.
                 let confusion_event = GameEvent::ConfusionRoll { player_id: player_id.clone(), roll: 1, confused: true };
-                game.report_list.add(ReportConfusionRoll::new(
-                    Some(player_id.clone()),
-                    false,
-                    1,
-                    min_roll,
-                    true,
-                    Some(SkillId::ReallyStupid.category_and_name_for(game.rules).1.to_string()),
-                ));
                 cancel_negatrait_player_action(game, &player_id);
             crate::step::action::common::mark_target_selection_failed(game);
                 state.outcome = Some(

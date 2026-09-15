@@ -54,9 +54,15 @@ impl StepShadowing {
             .map(|p| p.has_skill_property(NamedProperties::MOVES_RANDOMLY))
             .unwrap_or(false);
 
+        // The `movesRandomly` term is BB2025-ONLY: `bb2025/ShadowingBehaviour:55` has
+        // `&& !actingPlayer.getPlayer().hasSkillProperty(NamedProperties.movesRandomly)`, and the
+        // BB2020 twin's `doShadowing` is just the first two terms. The shared step applied it to
+        // BB2020 as well, so a Ball & Chain player leaving a shadower's tackle zone raised no
+        // Shadowing roll in Rust where Java raises one (chaos_dwarf bb2020 seed 10 i=45: Java
+        // rolls 5 against a minimum of 6, Rust rolls nothing and the dice stream slides by one).
         let do_shadowing = !self.using_diving_tackle
             && game.turn_mode != TurnMode::KickoffReturn
-            && !actor_moves_randomly;
+            && (game.rules != ffb_model::enums::Rules::Bb2025 || !actor_moves_randomly);
 
         if do_shadowing {
             if let Some(coord_from) = self.coordinate_from {
@@ -85,10 +91,16 @@ impl StepShadowing {
                         }
                     }
 
-                    shadowers.retain(|id| {
-                        let movement = game.player(id).map(|p| p.movement_with_modifiers()).unwrap_or(0);
-                        movement > game.shadowing_count(id) as i32
-                    });
+                    // BB2025 ONLY. The once-per-MA cap comes from `gameState.addShadower` /
+                    // `getShadowerCount`, which the BB2025 `ShadowingBehaviour` is alone in using;
+                    // the BB2020 twin has no such filter at all. This step is dispatched for every
+                    // edition, so an ungated filter dropped BB2020 shadowers Java offers.
+                    if game.rules == ffb_model::enums::Rules::Bb2025 {
+                        shadowers.retain(|id| {
+                            let movement = game.player(id).map(|p| p.movement_with_modifiers()).unwrap_or(0);
+                            movement > game.shadowing_count(id) as i32
+                        });
+                    }
 
                     if !shadowers.is_empty() {
                         let prompt = ffb_model::prompts::AgentPrompt::PlayerChoice {
@@ -125,9 +137,33 @@ impl StepShadowing {
                                 }
 
                                 if roll_shadowing {
-                                    game.add_shadower(defender_id);
+                                    // `gameState.addShadower(defenderId)` is BB2025-only; the
+                                    // BB2020 behaviour never records a shadower.
+                                    if game.rules == ffb_model::enums::Rules::Bb2025 {
+                                        game.add_shadower(defender_id);
+                                    }
                                     let roll = rng.d6();
-                                    let min_roll = 4; // fixed in BB2025
+                                    // BB2025 `ShadowingBehaviour:93`: `int minimumRoll = 4;` — flat.
+                                    // BB2020 `ShadowingBehaviour:97` is NOT flat:
+                                    //   `moveDifference = defender.MA - actingPlayer.MA;`
+                                    //   `minimumRoll = max(6 - moveDifference, 2);`
+                                    // The shared step used the BB2025 constant for BB2020 too, so a
+                                    // slow shadower chasing a fast runner needed 4 where Java needs 6
+                                    // (dark_elf bb2020 seed 9 i=20: the same die of 4 FAILED in Java
+                                    // and SUCCEEDED in Rust). Invisible until both agents began
+                                    // accepting the Shadowing prompt.
+                                    let min_roll = if game.rules == ffb_model::enums::Rules::Bb2025 {
+                                        4
+                                    } else {
+                                        let actor_ma = game.acting_player.player_id.as_deref()
+                                            .and_then(|id| game.player(id))
+                                            .map(|p| p.movement_with_modifiers())
+                                            .unwrap_or(0);
+                                        let defender_ma = game.player(defender_id)
+                                            .map(|p| p.movement_with_modifiers())
+                                            .unwrap_or(0);
+                                        (6 - (defender_ma - actor_ma)).max(2)
+                                    };
                                     // Java `ShadowingBehaviour` uses DiceInterpreter.isSkillRollSuccessful: a natural 6 always succeeds and a
         // natural 1 always fails, whatever the target. Only differs from a bare `>=` when the target
         // leaves 2..6, which is exactly when it matters.
@@ -152,7 +188,27 @@ impl StepShadowing {
 
                                     if !successful {
                                         if !re_rolled {
-                                            if let Some(prompt) = ask_for_reroll_if_available(game, "SHADOWING", min_roll, false) {
+                                            // Java bb2020/bb2025 `ShadowingBehaviour:101` asks
+                                            // `askForReRollIfAvailable(gameState, game.getDefender(), ...)`
+                                            // — the PLAYER overload, and the defender is the SHADOWER, who
+                                            // is on the NON-acting team. `RollMechanic.isTeamReRollAvailable`
+                                            // gates on `actingTeam.hasPlayer(pPlayer)`, so Java offers
+                                            // nothing there. Rust called the ACTING-PLAYER overload, which
+                                            // skips that membership gate, so a failed Shadowing roll was
+                                            // re-rolled on a team re-roll Java never spends. Exactly the bug
+                                            // `step_steady_footing.rs` documents, and it was invisible until
+                                            // both agents started ACCEPTING the Shadowing prompt: lizardman
+                                            // bb2025 seed 15, the very first activation — Java rolls 1 and
+                                            // stops, Rust rolls 1, takes a TRR and rolls 4.
+                                            // bb2016 is left alone: its `ShadowingBehaviour:109` really does
+                                            // ask for the ACTING player (its roll is the dodger's escape).
+                                            let shadow_offer = if game.rules == ffb_model::enums::Rules::Bb2016 {
+                                                ask_for_reroll_if_available(game, "SHADOWING", min_roll, false)
+                                            } else {
+                                                crate::step::util_server_re_roll::ask_for_reroll_if_available_for(
+                                                    game, game.defender_id.clone().as_deref(), "SHADOWING", min_roll, false)
+                                            };
+                                            if let Some(prompt) = shadow_offer {
                                                 self.re_rolled_action = Some("SHADOWING".into());
                                                 // Java sets reRollSource from the client's reply to the offered
                                                 // dialog; the offer itself already carries the actual source

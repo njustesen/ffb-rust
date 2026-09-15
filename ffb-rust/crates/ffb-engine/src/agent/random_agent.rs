@@ -1308,6 +1308,47 @@ impl Agent for RandomAgent {
                     None => Action::SelectPlayer { player_id: String::new() },
                 }
             }
+            // Shadowing and Tentacles STAY DECLINED, and this note records why, because the
+            // mechanism works and the blocker is elsewhere.
+            //
+            // Both agents answer this prompt with an empty selection, so Shadowing and Tentacles
+            // have never executed in a single one of 33,000 games — every matrix is green because
+            // NEITHER engine runs the mechanic. Accepting is cheap and desync-free on the agent
+            // side: pick the min-(x,y) candidate with ZERO draws, which is exactly
+            // `ParityRunner.sortPlayersByCoordinate` followed by index 0 (`PlayerChoice` is
+            // `PromptClass::Other` and the heuristic delegates it by contract, so no draw may be
+            // spent here). That was built, mirrored in ParityRunner and MEASURED: it turns on
+            // `tentaclesShadowingRoll` on both sides and exposed three real BB2020 engine bugs,
+            // each a BB2025-only rule the shared step applied to every edition — the flat
+            // minimum roll of 4 (BB2020 is `max(6 - (defenderMA - actorMA), 2)`), the
+            // `shadowingCount` once-per-MA filter, and the `movesRandomly` term in `doShadowing`.
+            // All three are fixed in `step/bb2025/move_/step_shadowing.rs` and stay fixed.
+            //
+            // What is NOT solved, and is the follow-up:
+            //   * BB2016's Shadowing is a different mechanic — two dice through
+            //     `minimumRollShadowingEscape(shadowerMA, dodgerMA)`, an ESCAPE roll made by the
+            //     DODGER under `SHADOWING_ESCAPE`. The live step is the BB2025 one (no BB2016
+            //     override in `make_step_for`) and rolls a single die.
+            //   * BB2020 pushes its SHADOWING step from `generator/bb2020/Block` and `BlitzBlock`
+            //     as well as `Move`; the BB2025 generators push it only from `Move`/`BlitzMove`,
+            //     and Rust runs the BB2025 generators everywhere. A blitzer following up out of a
+            //     shadower's tackle zone therefore rolls in Java and not in Rust
+            //     (chaos_dwarf bb2020 seed 10 i=45).
+            //   * Even BB2025 is not clean: with the prompt accepted, dark_elf bb2025 went 22/25,
+            //     one seed showing Java rolling Shadowing TWICE for one shadower across
+            //     consecutive move squares where Rust rolls once.
+            // Turning this on is a campaign of its own, not a switch; it is off until that
+            // campaign runs, so the matrix stays green.
+            //
+            // PICK_ME_UP was in the plan for this arm and should NOT be: Java's pick-me-up rolls
+            // are made by the STEP for every eligible player, not driven by an answered dialog, so
+            // they were already firing on both sides (the report id is `pickMeUp`, not the
+            // `pickMeUpRoll` the coverage note looked for). Answering the Rust prompt changed only
+            // RUST's roll ORDER — nurgle bb2025 seed 23 i=29 rolled 5/3/6 for away 9,10,11 in Java
+            // and for away 10,9,11 in Rust, and four seeds went red.
+            //
+            // Diving Tackle could not be added here at all: its prompt carries the TEAM ID in
+            // `reason` (`step_diving_tackle.rs:216`), not a mode string.
             Some(AgentPrompt::PlayerChoice { .. }) => {
                 Action::SelectPlayer { player_id: String::new() }
             }

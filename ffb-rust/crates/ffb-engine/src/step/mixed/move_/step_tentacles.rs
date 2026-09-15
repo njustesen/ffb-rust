@@ -157,7 +157,18 @@ impl StepTentacles {
 
                             if !successful {
                                 if self.re_roll_state.re_rolled_action.as_ref().map(|a| a.name.as_str()) != Some("TENTACLES") {
-                                    if let Some(prompt) = ask_for_reroll_if_available(game, "TENTACLES", min_roll, false) {
+                                    // Java bb2020/bb2025 `TentaclesBehaviour:104` asks for
+                                    // `game.getDefender()` — the TENTACLES player, on the non-acting
+                                    // team, whom `isTeamReRollAvailable` refuses. Same fix and same
+                                    // reason as Shadowing above; bb2016's twin asks for the acting
+                                    // player (its roll is the dodger's escape) and keeps that.
+                                    let tentacle_offer = if game.rules == ffb_model::enums::Rules::Bb2016 {
+                                        ask_for_reroll_if_available(game, "TENTACLES", min_roll, false)
+                                    } else {
+                                        crate::step::util_server_re_roll::ask_for_reroll_if_available_for(
+                                            game, game.defender_id.clone().as_deref(), "TENTACLES", min_roll, false)
+                                    };
+                                    if let Some(prompt) = tentacle_offer {
                                         self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("TENTACLES"));
                                         self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
                                         do_next_step = false;
