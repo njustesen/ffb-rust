@@ -198,6 +198,12 @@ impl StepPassBlock {
                 going_for_it: game.acting_player.goes_for_it,
             };
 
+            // The eligible set is exactly what the window is opened for, and `passBlockEligible`
+            // had no construction site anywhere — sorted so the event is order-deterministic.
+            let mut eligible_ids: Vec<String> = available.iter().cloned().collect();
+            eligible_ids.sort();
+            let home_defending = opposing_team.id == game.team_home.id;
+
             game.turn_mode = TurnMode::PassBlock;
             game.home_playing = !game.home_playing;
             // Java: game.getActingPlayer().setPlayerId(null) — raw id clear, NOT changeActingPlayer.
@@ -234,6 +240,10 @@ impl StepPassBlock {
             // pushed Select sequence emits the ActivatePlayer prompt that drives the window.
             StepOutcome::next()
                 .with_event(ffb_model::events::GameEvent::PassBlock { player_id: None })
+                .with_event(ffb_model::events::GameEvent::PassBlockEligible {
+                    player_ids: eligible_ids,
+                    home_defending,
+                })
                 .push_seq(self.self_seq(&resume))
                 .push_seq(Self::select_seq())
         }

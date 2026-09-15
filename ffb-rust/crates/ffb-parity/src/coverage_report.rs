@@ -467,6 +467,9 @@ impl CoverageReport {
             GameEvent::BiasedRefRoll { referee_spots_foul, .. } =>
                 self.biased_ref_rolls.record(*referee_spots_foul, false),
             GameEvent::CoachBanned { .. } => { self.coach_bans += 1; }
+            // Two dashboard tiles have rendered this counter since the report was written and
+            // nothing incremented it, because no `GameEvent::Touchback` existed to tally.
+            GameEvent::Touchback { .. } => { self.touchbacks += 1; }
 
             GameEvent::KickoffSequenceActivationsExhausted { .. } => {
                 self.kickoff_sequence_activations_exhausted += 1;
@@ -995,6 +998,13 @@ mod tests {
         cov.tally(&GameEvent::DefectingPlayers { player_ids: vec!["p1".into(), "p2".into()] });
         assert_eq!(cov.leader_events, 1);
         assert_eq!(cov.defecting_players, 1);
+    }
+
+    #[test]
+    fn tally_touchback() {
+        let mut cov = CoverageReport::default();
+        cov.tally(&GameEvent::Touchback { team_id: "t1".into() });
+        assert_eq!(cov.touchbacks, 1, "the Touchbacks tile was wired to a counter nothing fed");
     }
 
     #[test]

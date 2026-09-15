@@ -836,6 +836,10 @@ impl DriverGameState {
         use ffb_model::report::mixed::report_select_gaze_target::ReportSelectGazeTarget;
         use ffb_model::report::report_interception_roll::ReportInterceptionRoll;
         use ffb_model::report::bb2016::report_hypnotic_gaze_roll::ReportHypnoticGazeRoll;
+        use ffb_model::report::mixed::report_hypnotic_gaze_roll::ReportHypnoticGazeRoll as ReportHypnoticGazeRollMixed;
+        use ffb_model::report::mixed::report_turn_end::ReportTurnEnd;
+        use ffb_model::report::bb2025::report_swarming_roll::ReportSwarmingRoll;
+        use ffb_model::report::mixed::report_argue_the_call_roll::ReportArgueTheCallRoll;
         use ffb_model::report::mixed::report_look_into_my_eyes_roll::ReportLookIntoMyEyesRoll;
         use ffb_model::report::report_weeping_dagger_roll::ReportWeepingDaggerRoll;
         use ffb_model::report::report_piling_on::ReportPilingOn;
@@ -966,14 +970,57 @@ impl DriverGameState {
                     }
                 }
                 ReportId::HYPNOTIC_GAZE_ROLL => {
-                    if let Some(r) = any.downcast_ref::<ReportHypnoticGazeRoll>() {
-                        // The report names the gazer; the victim is the game's current defender.
+                    // Two distinct structs carry this id: bb2016's own and the `mixed` one the
+                    // live bb2020/bb2025 steps write. The arm downcast to the bb2016 struct alone,
+                    // so on every non-bb2016 game `downcast_ref` returned None and it never fired.
+                    // The report names the gazer; the victim is the game's current defender.
+                    let gaze = any.downcast_ref::<ReportHypnoticGazeRoll>()
+                        .map(|r| (r.base.player_id.clone(), r.base.roll, r.base.successful))
+                        .or_else(|| any.downcast_ref::<ReportHypnoticGazeRollMixed>()
+                            .map(|r| (r.base.player_id.clone(), r.base.roll, r.base.successful)));
+                    if let Some((player_id, roll, success)) = gaze {
                         out.push(GameEvent::HypnoticGazeRoll {
-                            player_id: r.base.player_id.clone().unwrap_or_default(),
+                            player_id: player_id.unwrap_or_default(),
                             target_id: self.game.defender_id.clone().unwrap_or_default(),
-                            roll: r.base.roll,
-                            success: r.base.successful,
+                            roll,
+                            success,
                         });
+                    }
+                }
+                ReportId::TURN_END => {
+                    // Sweltering Heat faints players at the end of a drive. The engine records each
+                    // one in the turn-end report and there is no `heatExhaustion` emit site, so the
+                    // variant read 0 across 33,000 games for a mechanic that fires every hot game.
+                    if let Some(r) = any.downcast_ref::<ReportTurnEnd>() {
+                        for h in &r.heat_exhaustions {
+                            out.push(GameEvent::HeatExhaustion { player_id: h.player_id.clone() });
+                        }
+                    }
+                }
+                ReportId::SWARMING_PLAYERS_ROLL => {
+                    // The LIVE step is the bb2025 twin, which reports and does not emit; the
+                    // `mixed` twin that emits is not dispatched by `make_step`.
+                    if let Some(r) = any.downcast_ref::<ReportSwarmingRoll>() {
+                        out.push(GameEvent::SwarmingPlayersRoll {
+                            team_id: r.team_id.clone(),
+                            roll: r.roll,
+                        });
+                    }
+                }
+                ReportId::ARGUE_THE_CALL => {
+                    // `coachBanned` is set deep inside `argue_and_remove_secret_weapons`, which
+                    // returns no `StepOutcome` to hang an event on; the report already carries the
+                    // bit, so the bridge is the natural site.
+                    if let Some(r) = any.downcast_ref::<ReportArgueTheCallRoll>() {
+                        if r.coach_banned {
+                            let pid = r.player_id.clone().unwrap_or_default();
+                            let team_id = if self.game.team_home.players.iter().any(|p| p.id == pid) {
+                                self.game.team_home.id.clone()
+                            } else {
+                                self.game.team_away.id.clone()
+                            };
+                            out.push(GameEvent::CoachBanned { team_id });
+                        }
                     }
                 }
                 ReportId::LOOK_INTO_MY_EYES_ROLL => {

@@ -88,7 +88,10 @@ impl StepTouchback {
                         Some((p.id.clone(), coord))
                     })
                     .collect();
-                return StepOutcome::cont().with_prompt(AgentPrompt::Touchback { eligible_players: eligible });
+                let receiving_team_id = receiving_team.id.clone();
+                return StepOutcome::cont()
+                    .with_event(ffb_model::events::GameEvent::Touchback { team_id: receiving_team_id })
+                    .with_prompt(AgentPrompt::Touchback { eligible_players: eligible });
             } else {
                 let coord = self.touchback_coordinate.unwrap();
                 // Java: game.getFieldModel().setOutOfBounds(false)

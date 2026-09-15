@@ -175,6 +175,10 @@ pub enum GameEvent {
     SecretWeaponBan { player_id: PlayerId },
     PlayerEjected { player_id: PlayerId },
     CoachBanned { team_id: String },
+    /// The kick left the receiving half or was not caught, so the receiving coach picks the player
+    /// who gets the ball. `coverage_report.rs` has counted touchbacks in two dashboard tiles since
+    /// it was written and nothing ever incremented the counter, because nothing built this variant.
+    Touchback { team_id: String },
     WizardUse { team_id: String, spell: String, coord: Option<FieldCoordinate> },
     BombExplodesAfterCatch { player_id: PlayerId, coord: FieldCoordinate },
     BombOutOfBounds { coord: FieldCoordinate },

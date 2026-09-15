@@ -201,6 +201,25 @@ impl StepUnchannelledFury {
         // Java: actingPlayer.markSkillUsed(skill) — per-activation, see the `do_roll` note above.
         game.acting_player.used_skills.insert(SkillId::UnchannelledFury);
 
+        // Java `UnchannelledFuryBehaviour` (bb2020:115, bb2025:115):
+        //   `addReport(new ReportConfusionRoll(pid, successful, roll, minimumRoll, reRolled, skill))`.
+        // Unchannelled Fury was the one negatrait whose step never wrote it — Bone Head, Really
+        // Stupid, Take Root, Wild Animal and Animal Savagery all do. The gap was exactly measurable
+        // over the 33,000-game matrix: 377,161 `confusionRoll` EVENTS against 373,269 reports.
+        //
+        // Java computes `reRolled` after the re-roll ask, where `getReRolledAction()` is still the
+        // value this pass entered with; Rust sets `self.re_rolled_action` at ask time, so the flag
+        // has to be read HERE, before that branch, to mean the same thing.
+        let uf_re_rolled = self.re_rolled_action.as_deref() == Some("UNCHANNELLED_FURY")
+            && self.re_roll_source.is_some();
+        game.report_list.add(ffb_model::report::report_confusion_roll::ReportConfusionRoll::new(
+            Some(player_id.clone()),
+            successful,
+            roll,
+            min_roll,
+            uf_re_rolled,
+            Some(SkillId::UnchannelledFury.category_and_name_for(game.rules).1.to_string()),
+        ));
         let event = GameEvent::ConfusionRoll { player_id: player_id.clone(), roll, confused: !successful };
 
         if successful {
@@ -463,6 +482,27 @@ mod tests {
     fn set_parameter_unknown_returns_false() {
         let mut step = StepUnchannelledFury::default();
         assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
+    }
+
+    /// Java `UnchannelledFuryBehaviour` reports EVERY confusion roll, pass or fail. Rust emitted
+    /// only the event, which is why the matrix census counted 377,161 `confusionRoll` events
+    /// against 373,269 reports — the difference was exactly the Unchannelled Fury rolls.
+    #[test]
+    fn every_unchannelled_fury_roll_is_reported_not_just_evented() {
+        use ffb_model::report::report_id::ReportId;
+        for seed in 0..24u64 {
+            let mut game = make_game();
+            add_player_with_skill(&mut game, "p1", SkillId::UnchannelledFury);
+            game.acting_player.player_action = Some(PlayerAction::Block);
+            let mut step = StepUnchannelledFury::new("fail");
+            let out = step.start(&mut game, &mut GameRng::new(seed));
+            let evented = out.events.iter().any(|e| matches!(e, GameEvent::ConfusionRoll { .. }));
+            let reported = game.report_list.has_report(ReportId::CONFUSION_ROLL);
+            assert_eq!(
+                evented, reported,
+                "seed {seed}: the roll must reach both streams or neither, never only the event",
+            );
+        }
     }
 
     #[test]

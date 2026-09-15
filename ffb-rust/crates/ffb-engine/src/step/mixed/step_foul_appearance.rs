@@ -171,6 +171,18 @@ impl StepFoulAppearance {
         // Coverage: `GameEvent::FoulAppearanceRoll` had no construction site anywhere in the engine,
         // so the counter read 0 across 8,700 games for a roll that demonstrably fires — this file's
         // own BB2020 ordering bug was found by watching it in a dice trace. Report-only.
+        // Java `FoulAppearanceBehaviour` (bb2016:58, bb2020/bb2025:73):
+        //   `addReport(new ReportFoulAppearanceRoll(pid, mayBlock, roll, minimumRoll, reRolled, null))`
+        // — the six-argument form, so no defender id. Rust emitted the event and wrote no report.
+        game.report_list.add(ffb_model::report::report_foul_appearance_roll::ReportFoulAppearanceRoll::new(
+            game.acting_player.player_id.clone(),
+            may_block,
+            self.roll,
+            minimum_roll,
+            already_rerolled && self.re_roll_state.re_roll_source.is_some(),
+            Vec::new(),
+            None,
+        ));
         let roll_event = GameEvent::FoulAppearanceRoll {
             player_id: game.acting_player.player_id.clone().unwrap_or_default(),
             roll: self.roll,

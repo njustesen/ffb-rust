@@ -131,6 +131,19 @@ impl StepBloodLust {
             player.used_skills.insert(SkillId::BloodLust);
         }
 
+        // Java `BloodLustBehaviour` (bb2016:74, bb2020/bb2025:105):
+        //   `addReport(new ReportBloodLustRoll(pid, successful, roll, minimumRoll, reRolled, null))`.
+        // Rust emitted the event and never wrote the report, so Blood Lust was invisible in the
+        // stream that carries the roll's modifiers. `reRolled` is read before the re-roll ask for
+        // the same reason as Unchannelled Fury: Rust sets the flag at ask time, Java at use time.
+        game.report_list.add(ffb_model::report::report_blood_lust_roll::ReportBloodLustRoll::new(
+            Some(acting_id.clone()),
+            successful,
+            roll,
+            min_roll,
+            rerolled,
+            Vec::new(),
+        ));
         let event = GameEvent::BloodLustRoll { player_id: acting_id.clone(), roll, success: successful };
 
         if !successful {
@@ -143,7 +156,6 @@ impl StepBloodLust {
                 }
             }
             // No re-roll available or already re-rolled — failure
-            let _ = rerolled; // Java uses this for reporting; event covers it
             return self.fail_blood_lust(game).with_event(event);
         }
 

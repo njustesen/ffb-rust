@@ -282,6 +282,19 @@ impl StepSteadyFooting {
         let roll = rng.d6();
         let successful = is_skill_roll_successful(roll, MINIMUM_ROLL);
 
+        // Java `StepSteadyFooting:215`:
+        //   `addReport(new ReportSteadyFootingRoll(player.getId(), successful, roll, MINMUM_ROLL, reRolled))`.
+        // Rust wrote only the `ReportSkillUse` above, so the roll itself reached neither stream.
+        game.report_list.add(
+            ffb_model::report::bb2025::report_steady_footing_roll::ReportSteadyFootingRoll::new(
+                Some(player_id.clone()),
+                successful,
+                roll,
+                MINIMUM_ROLL,
+                re_rolled,
+            ),
+        );
+
         if successful {
             return self.succeed(game, &player_id, player_state);
         }

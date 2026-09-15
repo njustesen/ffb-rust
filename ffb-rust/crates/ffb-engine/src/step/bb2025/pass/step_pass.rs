@@ -227,11 +227,26 @@ impl StepPass {
 
         // Java: if (PASS == reRolledAction) { if (source == null || !useReRoll) proceed with stored result }
         //       else → clear roll + result → re-roll below
+        // Java `StepPass:182-196` early-returns into `handleFailedPass` when a PASS re-roll was
+        // DECLINED (no source) or could not be spent, so it never reaches the `addReport` below and
+        // the roll is reported exactly once. Rust keeps a single flow and routes the stored result
+        // at the bottom instead — state-equivalent (the matrix is green on it) but it wrote the
+        // SAME `passRoll` report a second time on that re-entry: a vampire bb2025 5-seed gate read
+        // java 4 / rust 6 `passRoll`, the only report mismatch left in it. Track where Java would
+        // have returned and skip just the duplicate report; the flow, the dice and the state are
+        // untouched, so no parity verdict can move.
+        let mut java_returned_before_report = false;
         if self.re_rolled_action.as_deref() == Some("PASS") {
             let thrower_id = game.thrower_id.clone().unwrap_or_default();
+            // Java's guard is `usingModifyingSkill == null || !usingModifyingSkill`: the
+            // modifying-skill answer re-enters and DOES report again.
+            java_returned_before_report =
+                self.re_roll_source.is_none() && self.using_modifying_skill != Some(true);
             if let Some(ref source_name) = self.re_roll_source.clone() {
                 let source = ReRollSource::new(source_name.as_str());
-                if use_reroll(game, &source, &thrower_id, rng) {
+                let used = use_reroll(game, &source, &thrower_id, rng);
+                java_returned_before_report = !used && self.using_modifying_skill != Some(true);
+                if used {
                     // Java: `roll = 0; setReRollSource(null);` -- the source is spent by ONE
                     // successful use. Without the clear, every later re-entry of this step (the
                     // Safe Pass answer, a modifying-skill answer) ran this block again, and since
@@ -414,7 +429,7 @@ impl StepPass {
 
         // Java: getResult().addReport(new ReportPassRoll(game.getThrowerId(), roll, minimumRoll, reRolled,
         //   passModifiers, passingDistance, isBomb, state.getResult(), false, statBasedRollModifier))
-        {
+        if !java_returned_before_report {
             let re_rolled = self.re_rolled_action.is_some() && self.re_roll_source.is_some();
             let pass_result_name = self.pass_result.map(|r| r.get_name().to_string());
             let successful = self.pass_result == Some(PassResult::ACCURATE);
