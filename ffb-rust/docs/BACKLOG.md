@@ -8155,3 +8155,109 @@ CENSUS_ROOT=D:/ffb_sweep python scripts/sweep_census/report_census.py "parity_*"
 SWEEP_LABEL=... python scripts/sweep_census/build_report.py scripts/sweep_census/out_s14 \
     docs/setup_census_report.html
 ```
+
+## §H.54 — 2026-09-15: four rolls that reported nothing, and what the Shadowing accept found
+
+§H.50–§H.53 made the REPORT stream the coverage record and bridged it to the event stream. This
+session went after the remaining gaps in both, and the honest result is lopsided: the reporting half
+landed in full, the agent half produced four engine fixes and a map instead of coverage.
+
+### Reporting (landed)
+
+**Four rolls that happened every game and reported nothing.** Every negatrait reports its confusion
+roll except Unchannelled Fury, whose step built the `GameEvent` and skipped `addReport` — measurable
+to the report over the 33,000-game matrix: 377,161 `confusionRoll` events against 373,269 reports,
+the 3,892 difference being exactly the Unchannelled Fury rolls. Blood Lust (three steps), Foul
+Appearance and Steady Footing had the same shape, and none of the three had ever appeared in a
+164-id catalogue that only 82 ids had reached.
+
+Java computes each `reRolled` flag AFTER the re-roll ask, where the step's re-rolled action is still
+what the pass entered with. Rust sets that field AT ask time, so the flag has to be read before the
+branch to mean the same thing. That difference is the whole subtlety in all four ports.
+
+**bb2020 and bb2025 now match Java report-for-report.** Four reports the live path never wrote —
+`passDeviate`, `kickoffTimeout`, `kickoffOfficiousRef`, `playerEvent` (every prayer handler applied
+its enhancement and dropped the report; `ReportPrayerWasted` was missing on the same path) — plus one
+Rust wrote where Java cannot: `stallerDetected`. That last is not a report bug. `check_for_staller`
+is a 1:1 port of the BB2025-only `StepInitSelecting.checkForStaller`, and the gate is a CLASS split,
+not a condition: neither `bb2020/shared/StepInitSelecting.java` nor `bb2016/move/StepInitSelecting.java`
+has one. The shared step runs for BB2020 too, so Rust was writing reports Java never writes AND
+setting `game.stalling`, which is BB2025-only state.
+
+Measured: chaos bb2020 and norse bb2025, 10 games each, agree with Java on every report id and every
+game length (4,323 and 4,529 reports, zero deltas), parity 10/10.
+
+**Two duplicate-report bugs.** `StepPass` wrote the same `passRoll` twice — Java early-returns into
+`handleFailedPass` when a PASS re-roll is declined and never reaches its `addReport`, while Rust
+keeps one flow and routes the stored result at the bottom. And the BB2025 Really Stupid behaviour
+synthesised a `ReportConfusionRoll` (roll 1, reRolled true) on the declined-re-roll branch where
+Java's `addReport` sits inside `if (doRoll)`, after a real die: 98 phantom reports over 25 underworld
+games. Both fixes suppress only the report; no die, no state, no flow moves.
+
+**Five events with no construction site.** `heatExhaustion`, `swarmingPlayersRoll` and `coachBanned`
+come off the report bridge in `driver.rs`, where the report already carries everything the event
+needs and the emitting code has no `StepOutcome` to hang one on. `passBlockEligible` names the set
+the pass-block window opens for. `GameEvent::Touchback` did not exist as a variant at all, while
+`coverage_report.rs` has rendered a Touchbacks tile in two dashboards since it was written, wired to
+a counter nothing ever incremented.
+
+**A bridge arm that could never fire.** The Hypnotic Gaze arm downcast to
+`report::bb2016::ReportHypnoticGazeRoll` while the live bb2020/bb2025 step writes the distinct
+`report::mixed::` struct, so `downcast_ref` returned `None` on every non-bb2016 game.
+
+### Agent (four fixes, no coverage — and why)
+
+Accepting the Shadowing/Tentacles `PlayerChoice` is cheap and desync-free on the agent side:
+min-(x,y) with ZERO draws, which is `ParityRunner.sortPlayersByCoordinate` then index 0. It was
+built, mirrored in `ParityRunner`, and measured. The mechanic fired on both sides for the first time
+in 33,000 games and immediately exposed four real Rust bugs, all fixed and all kept:
+
+| bug | Java | found by |
+|---|---|---|
+| Shadowing minimum roll flat 4 in every edition | bb2020 is `max(6 - (defenderMA - actorMA), 2)` | dark_elf bb2020 seed 9: the same die of 4 failed in Java, succeeded in Rust |
+| `shadowingCount` once-per-MA filter applied to bb2020 | BB2025-only (`gameState.addShadower`) | shadowers Java offers, Rust dropped |
+| `movesRandomly` term in `doShadowing` applied to bb2020 | BB2025-only | — |
+| Shadowing/Tentacles re-roll asked for the ACTING player | Java names `game.getDefender()`, whom `isTeamReRollAvailable` refuses | lizardman bb2025 seed 15, the first activation: Rust re-rolls a failed Shadowing on a TRR Java never spends |
+
+The accept itself is REVERTED and the matrix stays green. Three gaps remain, each its own piece of
+work:
+
+1. **BB2016 Shadowing is a different mechanic** — `ShadowingBehaviour:98` rolls TWO dice through
+   `minimumRollShadowingEscape(shadowerMA, dodgerMA)`, an ESCAPE roll made by the DODGER under
+   `SHADOWING_ESCAPE`. The live step is the BB2025 one (no BB2016 override in `make_step_for`) and
+   rolls one die.
+2. **BB2020 rolls in more places** — `generator/bb2020/Block` and `BlitzBlock` both push a SHADOWING
+   step; the BB2025 generators push it only from `Move`/`BlitzMove`, and Rust runs the BB2025
+   generators everywhere. A blitzer following up out of a shadower's tackle zone rolls in Java and
+   not in Rust (chaos_dwarf bb2020 seed 10 i=45).
+3. **Even BB2025 is not clean** — dark_elf bb2025 went 22/25 with the accept on, one seed showing
+   Java roll Shadowing TWICE for one shadower across consecutive move squares where Rust rolls once.
+
+**`PICK_ME_UP` does not belong in that arm**, and the plan that put it there was wrong. Java's
+pick-me-up rolls are made by the STEP for every eligible player, not driven by an answered dialog, so
+the mechanic was already firing on both sides — the report id is `pickMeUp`, not the `pickMeUpRoll`
+the coverage note looked for. Answering the Rust prompt changed only RUST's roll ORDER: nurgle bb2025
+seed 23 i=29 rolled 5/3/6 for away 9,10,11 in Java and for away 10,9,11 in Rust, four seeds red.
+
+**Diving Tackle could not be attempted**: its prompt carries the TEAM ID in `reason`
+(`step_diving_tackle.rs:216`), not a mode string, so the agent cannot dispatch on it.
+
+### Deliberately not done, with the reason
+
+* `ReportModifiedDodgeResultSuccessful` / `ReportModifiedPassResult` are reachable only through the
+  modifier-ignoring-skill dialog, which the headless dodge step explicitly never applies.
+* `ReportNoPlayersToField` exists only in bb2016's `StepSetup`, guarded by a state-changing
+  `checkNoPlayersInBoxOrField` that awards a touchdown. Adding it to the shared bb2025 step would
+  diverge from the bb2025 Java, not converge.
+* **The bb2016 end-game and pregame report cluster** (`winningsRoll`, `fanFactorRoll`, `cardsBought`,
+  `inducementsBought`, `pettyCash`, and the `dedicatedFans`/`winnings` written in their place) is a
+  bigger, separate item with two independent causes. `sequences.rs::end_game_sequence` is hard-coded
+  to the BB2020/25 shape for every edition and the correct `generator/bb2016/end_game.rs` has no
+  callers; and the parity harness's pregame uses `GameState::new_with_options`, which never pushes
+  `PettyCash`/`BuyCards`/`BuyInducements` in any edition. Note before costing it: the 510
+  `winningsRoll` reports per 10 games are a JAVA HARNESS artifact — `RandomStrategy` answers the
+  winnings re-roll dialog with `sendUseReRoll(null, null)`, leaving `getReRolledAction()` null, so
+  `StepWinnings` re-rolls and re-reports ~51 times per game. Matching that is matching a pathology.
+* The `playerAction` label difference (Java logs the declaring `foulMove`/`passMove`, Rust the
+  concrete `foul`/`pass`; 20 labels per 5 games) is a declaration difference, not a reporting one. It
+  touches agent-visible state that 330 green gates currently agree on.
