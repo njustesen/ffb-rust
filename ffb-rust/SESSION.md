@@ -1,5 +1,38 @@
 # FFB-Rust Session State
 
+## 2026-09-15 — the reporting gaps closed; the Shadowing accept mapped, not shipped (BACKLOG §H.54)
+
+**Reporting, landed.** Four rolls that happen every game reported nothing: Unchannelled Fury's
+confusion roll (the one negatrait whose step forgot it — exactly the 3,892-report gap the matrix
+census measured), Blood Lust in all three steps, Foul Appearance, and Steady Footing. Four more
+reports the live path never wrote are in: `passDeviate`, `kickoffTimeout`, `kickoffOfficiousRef` and
+`playerEvent` (every prayer handler applied its enhancement and dropped the report). Two duplicate
+reports removed — `StepPass` wrote the same `passRoll` twice, and the BB2025 Really Stupid behaviour
+synthesised a confusion report for a roll that never happened (98 phantom reports per 25 games).
+`stallerDetected` was the opposite bug: `check_for_staller` is BB2025-only in Java by a CLASS split,
+and the shared step was writing it — and setting `game.stalling` — in BB2020 games too.
+
+chaos bb2020 and norse bb2025 now agree with Java on EVERY report id and every game length, 10 games
+each, parity 10/10.
+
+Five events that had no construction site anywhere now have one: `heatExhaustion`,
+`swarmingPlayersRoll` and `coachBanned` off the report bridge, `passBlockEligible` at the window, and
+a new `GameEvent::Touchback` — `coverage_report.rs` has rendered a Touchbacks tile in two dashboards
+since it was written, wired to a counter nothing incremented. The bridge's Hypnotic Gaze arm
+downcast to the bb2016 struct while the live step writes the `mixed` one, so it could never fire.
+
+**Agent, mapped not shipped.** Accepting the Shadowing/Tentacles `PlayerChoice` (min-(x,y), zero
+draws, mirrored in ParityRunner) fired the mechanic on both sides for the first time in 33,000 games
+and exposed FOUR real Rust bugs, all fixed and kept: the Shadowing minimum roll is flat 4 only in
+BB2025 (BB2020 is `max(6 - MAdiff, 2)`), the `shadowingCount` filter and the `movesRandomly` term are
+BB2025-only, and both Shadowing and Tentacles asked for their re-roll with the ACTING-player overload
+where Java names `game.getDefender()`, whom `isTeamReRollAvailable` refuses. The accept itself is
+REVERTED: BB2016's Shadowing is a two-dice ESCAPE roll by the dodger, BB2020 pushes the step from
+`Block`/`BlitzBlock` as well as `Move`, and even BB2025 went 22/25 on dark_elf. §H.54 has the seeds.
+
+`PICK_ME_UP` was in the plan and does not belong: Java rolls it per eligible player from the STEP,
+not from an answered dialog, so it was already firing on both sides all along.
+
 ## 2026-09-14 — MATRIX 330/330 GREEN, event kinds 76 -> 83 (BACKLOG §H.53)
 
 Full matrix re-run on the final binary: **330/330 games match, 0 failed**
