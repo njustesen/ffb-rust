@@ -8233,11 +8233,20 @@ work:
 3. **Even BB2025 is not clean** — dark_elf bb2025 went 22/25 with the accept on, one seed showing
    Java roll Shadowing TWICE for one shadower across consecutive move squares where Rust rolls once.
 
-**`PICK_ME_UP` does not belong in that arm**, and the plan that put it there was wrong. Java's
-pick-me-up rolls are made by the STEP for every eligible player, not driven by an answered dialog, so
-the mechanic was already firing on both sides — the report id is `pickMeUp`, not the `pickMeUpRoll`
-the coverage note looked for. Answering the Rust prompt changed only RUST's roll ORDER: nurgle bb2025
-seed 23 i=29 rolled 5/3/6 for away 9,10,11 in Java and for away 10,9,11 in Rust, four seeds red.
+**`PICK_ME_UP` is agent-gated too, and accepting it is not free.** `pickMeUp` appears ZERO times in
+the 33,000-game report census, so the mechanic has never run. With BOTH harnesses accepting it, both
+engines rolled for three eligible players but in a different ORDER: nurgle bb2025 seed 23 i=29 rolled
+5/3/6 for away 9,10,11 in Java and for away 10,9,11 in Rust, and four seeds went red. The same
+min-(x,y) rule runs on both sides, so what differs is the eligible LIST or the re-prompt order, and
+that has to be root-caused before the mode is added.
+
+CORRECTION, recorded because it was briefly believed and written down: an earlier reading of this
+said Java rolls pick-me-up from the STEP rather than from an answered dialog, and that the mechanic
+was therefore already firing on both sides. That was wrong — the run it was read from had the accept
+switched on in BOTH harnesses. Two further notes for whoever picks this up: the census keys its
+pick-me-up evidence on an event named `pickMeUpRoll`, which does not exist (the REPORT id is
+`pickMeUp`), and `Pro` still shows no re-roll source in 33,000 games despite §H.52 adding its report,
+so Pro is genuinely never used by either agent.
 
 **Diving Tackle could not be attempted**: its prompt carries the TEAM ID in `reason`
 (`step_diving_tackle.rs:216`), not a mode string, so the agent cannot dispatch on it.
@@ -8261,3 +8270,29 @@ seed 23 i=29 rolled 5/3/6 for away 9,10,11 in Java and for away 10,9,11 in Rust,
 * The `playerAction` label difference (Java logs the declaring `foulMove`/`passMove`, Rust the
   concrete `foul`/`pass`; 20 labels per 5 games) is a declaration difference, not a reporting one. It
   touches agent-visible state that 330 green gates currently agree on.
+
+### Verdict — 2026-09-15 matrix
+
+**330/330 gates 100/100, 0 FAILED** (`docs/SWEEP_2026-09-15_REPORTS.txt`; 10 gates pass parity while
+reporting the mechanic-coverage checklist unmet, the same shape and count as the previous sweep).
+
+| | 2026-09-14 | 2026-09-15 |
+|---|---:|---:|
+| `GameEvent` kinds emitted | 83 of 128 | **88 of 129** |
+| events | 28.18 M | 28.25 M |
+| report kinds produced | 82 of 164 | **87 of 164** |
+| reports | 13.90 M | 13.98 M |
+| games whose report streams are the same LENGTH as Java's | (not measured) | **20,398 of 33,000** |
+
+The five new event kinds all fire with real volume: `heatExhaustion` 44,603, `touchback` 14,223,
+`coachBanned` 3,627, `swarmingPlayersRoll` 1,690, `passBlockEligible` 850.
+
+**Skill visibility did not move, and that is the honest result**: 26 fielded skills remain invisible
+and 10 silent, exactly as before. The four roll reports added this session belong to skills that were
+already proven through their `GameEvent` twin, so they closed REPORT-STREAM fidelity (which is what
+the Java comparison and the modifier census read) without changing the skill count. Of the 26
+invisible, most are passive by design — Block, Frenzy, Guard, Thick Skull, Catch, Sure Feet, Pass,
+Grab, Hatred, Insignificant, No Hands — and raise no telemetry in either engine. The ones that a
+working agent change WOULD reach are Shadowing, Tentacles, Diving Tackle, Unsteady, My Ball and On
+the Ball, plus the silent Hypnotic Gaze, Jump Up, Pick-me-up, Pro and Stab. That is the whole
+remaining prize, and every one of them is behind the agent work mapped above.

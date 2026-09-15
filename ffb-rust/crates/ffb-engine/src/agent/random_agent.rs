@@ -1340,12 +1340,16 @@ impl Agent for RandomAgent {
             // Turning this on is a campaign of its own, not a switch; it is off until that
             // campaign runs, so the matrix stays green.
             //
-            // PICK_ME_UP was in the plan for this arm and should NOT be: Java's pick-me-up rolls
-            // are made by the STEP for every eligible player, not driven by an answered dialog, so
-            // they were already firing on both sides (the report id is `pickMeUp`, not the
-            // `pickMeUpRoll` the coverage note looked for). Answering the Rust prompt changed only
-            // RUST's roll ORDER — nurgle bb2025 seed 23 i=29 rolled 5/3/6 for away 9,10,11 in Java
-            // and for away 10,9,11 in Rust, and four seeds went red.
+            // PICK_ME_UP is agent-gated like the other two — `pickMeUp` appears zero times in a
+            // 33,000-game report census — and accepting it is NOT a free win. With BOTH harnesses
+            // accepting it, both engines rolled for three eligible players but in a different
+            // ORDER: nurgle bb2025 seed 23 i=29 rolled 5/3/6 for away 9,10,11 in Java and for away
+            // 10,9,11 in Rust, and four seeds went red. Same min-(x,y) rule on both sides, so the
+            // eligible LIST or the re-prompt order is what differs; that has to be root-caused
+            // before this mode is added. (An earlier note here claimed Java rolled these from the
+            // step rather than from an answered dialog and that they already fired on both sides.
+            // That was wrong: the run it was read from had the accept switched on in BOTH
+            // harnesses. The census with the accept off shows the report never appears.)
             //
             // Diving Tackle could not be added here at all: its prompt carries the TEAM ID in
             // `reason` (`step_diving_tackle.rs:216`), not a mode string.

@@ -1,5 +1,17 @@
 # FFB-Rust Session State
 
+## 2026-09-15 — MATRIX 330/330 GREEN; report kinds 82→87, event kinds 83→88 (BACKLOG §H.54)
+
+Full matrix re-run on the final binary and jar: **330/330 games match, 0 failed**
+(`docs/SWEEP_2026-09-15_REPORTS.txt`; 10 gates short on the coverage checklist, all still 100/100).
+Event kinds 83→88 of 129 with none lost — `heatExhaustion` 44,603, `touchback` 14,223, `coachBanned`
+3,627, `swarmingPlayersRoll` 1,690, `passBlockEligible` 850. Report kinds 82→87 of 164 over 13.98 M
+reports, and 20,398 of 33,000 games now have a report stream the same LENGTH as Java's.
+
+Skill visibility did NOT move: 26 fielded skills invisible, 10 silent, unchanged. The four roll
+reports added this session belong to skills already proven through their `GameEvent` twin, so they
+closed report-stream fidelity rather than skill coverage. What is left is behind the agent work.
+
 ## 2026-09-15 — the reporting gaps closed; the Shadowing accept mapped, not shipped (BACKLOG §H.54)
 
 **Reporting, landed.** Four rolls that happen every game reported nothing: Unchannelled Fury's
