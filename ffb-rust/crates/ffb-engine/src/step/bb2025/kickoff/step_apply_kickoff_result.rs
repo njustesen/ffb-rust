@@ -272,6 +272,13 @@ impl StepApplyKickoffResult {
         for pid in [player_id_home.as_ref(), player_id_away.as_ref()].into_iter().flatten() {
             targeted_ids.push(pid.clone());
         }
+        // Java `StepApplyKickoffResult:680`: the report goes HERE — after both victims are known
+        // and before `insertSteps` pushes their injury sequences. Rust had only the `GameEvent`.
+        game.report_list.add(
+            ffb_model::report::bb2020::report_kickoff_officious_ref::ReportKickoffOfficiousRef::new(
+                roll_home, roll_away, targeted_ids.clone(),
+            ),
+        );
         // Java passes ApothecaryMode.HOME for the home victim and AWAY for the away one
         // (`StepApplyKickoffResult:684,688`); it reaches `dropPlayer`, which needs it for a
         // Ball & Chain player's injury result.
@@ -387,6 +394,15 @@ impl StepApplyKickoffResult {
         let modifier = if kicking_turn >= 6 { -1 } else { 1 };
         game.turn_data_home.turn_nr += modifier;
         game.turn_data_away.turn_nr += modifier;
+        // Java `StepApplyKickoffResult:391` (bb2025) and `:346` (bb2020):
+        //   `addReport(new ReportKickoffTimeout(kickingTeamTurn, turnModifier))`.
+        // Rust emitted only the event. NOTE the argument order: Java's ctor is
+        // (turnNumber, turnModifier); the Rust ctor is (turn_modifier, turn_number).
+        game.report_list.add(
+            ffb_model::report::mixed::report_kickoff_timeout::ReportKickoffTimeout::new(
+                modifier, kicking_turn,
+            ),
+        );
         StepOutcome::next().with_event(GameEvent::KickoffTimeout { turn_number: kicking_turn, turn_modifier: modifier })
     }
 

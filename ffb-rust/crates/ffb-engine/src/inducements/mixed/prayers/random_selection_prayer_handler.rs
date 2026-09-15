@@ -12,6 +12,31 @@ use crate::inducements::mixed::prayers::player_selector::PlayerSelector;
 use crate::inducements::mixed::prayers::prayer_player_effect::{apply_prayer_player_effect, remove_prayer_player_effect};
 use crate::prayer_state::PrayerState;
 
+/// The handlers carry a prayer as its SCREAMING_SNAKE enum-constant name, because that is the key
+/// `field_model.prayer_enhancements` uses and what `apply_prayer_player_effect` matches on. Java's
+/// reports want two things off the enum itself — `eventMessage()` for the per-player event and
+/// `getName()` for the wasted report — so resolve the edition's enum here once.
+pub fn prayer_event_message(rules: ffb_model::enums::Rules, prayer_name: &str) -> Option<&'static str> {
+    match rules {
+        ffb_model::enums::Rules::Bb2025 =>
+            ffb_model::inducement::bb2025::prayer::Prayer::for_enum_name(prayer_name)
+                .map(|p| p.event_message()),
+        _ => ffb_model::inducement::bb2020::prayer::Prayer::for_enum_name(prayer_name)
+            .map(|p| p.event_message()),
+    }
+}
+
+/// Java `handledPrayer().getName()` — the display name a `ReportPrayerWasted` carries.
+pub fn prayer_display_name(rules: ffb_model::enums::Rules, prayer_name: &str) -> Option<&'static str> {
+    match rules {
+        ffb_model::enums::Rules::Bb2025 =>
+            ffb_model::inducement::bb2025::prayer::Prayer::for_enum_name(prayer_name)
+                .map(|p| p.get_name()),
+        _ => ffb_model::inducement::bb2020::prayer::Prayer::for_enum_name(prayer_name)
+            .map(|p| p.get_name()),
+    }
+}
+
 /// Java: RandomSelectionPrayerHandler.initEffect(GameState, Team)
 /// Selects `nr_of_players` players via the given selector and marks the prayer as active on each.
 ///
@@ -31,11 +56,30 @@ pub fn init_effect_random_selection(
     let mut collections_rng = game.collections_rng.lock().clone();
     let selected = selector.select_players(game, team_id, nr_of_players, &mut collections_rng, added_skills);
     *game.collections_rng.lock() = collections_rng;
+    // Java `RandomSelectionPrayerHandler.initEffect`:
+    //     if (players.isEmpty()) reports.add(new ReportPrayerWasted(handledPrayer().getName()));
+    //     players.forEach(p -> { addPrayerEnhancements(p, prayer);
+    //                            reports.add(new ReportPlayerEvent(p.getId(), prayer.eventMessage())); });
+    // Rust applied both effects and wrote NEITHER report, so `playerEvent` never appeared in the
+    // stream for a prayer (chaos bb2020, 10 games: java 4, rust 0) and `prayerWasted` never at all.
+    if selected.is_empty() {
+        game.report_list.add(
+            ffb_model::report::mixed::report_prayer_wasted::ReportPrayerWasted::new(
+                prayer_display_name(game.rules, prayer_name).map(str::to_owned),
+                None,
+            ),
+        );
+    }
     for player_id in &selected {
         game.field_model.add_prayer_enhancement(player_id, prayer_name);
         apply_prayer_player_effect(game, player_id, prayer_name);
+        game.report_list.add(
+            ffb_model::report::mixed::report_player_event::ReportPlayerEvent::new(
+                Some(player_id.clone()),
+                prayer_event_message(game.rules, prayer_name).map(str::to_owned),
+            ),
+        );
     }
-    // Java: if players.isEmpty() → ReportPrayerWasted; not yet ported (report infra)
     true
 }
 

@@ -92,6 +92,32 @@ impl Prayer {
         }
     }
 
+    /// The inverse of `name()`: resolve the SCREAMING_SNAKE enum-constant name back to the
+    /// variant. The prayer handlers carry the prayer as that string (it is the key
+    /// `field_model.prayer_enhancements` and `apply_prayer_player_effect` both match on), so this
+    /// is what lets them reach `event_message()` and `get_name()` for their reports.
+    pub fn for_enum_name(name: &str) -> Option<Self> {
+        match name {
+            "TREACHEROUS_TRAPDOOR" => Some(Prayer::TREACHEROUS_TRAPDOOR),
+            "FRIENDS_WITH_THE_REF" => Some(Prayer::FRIENDS_WITH_THE_REF),
+            "STILETTO" => Some(Prayer::STILETTO),
+            "IRON_MAN" => Some(Prayer::IRON_MAN),
+            "KNUCKLE_DUSTERS" => Some(Prayer::KNUCKLE_DUSTERS),
+            "BAD_HABITS" => Some(Prayer::BAD_HABITS),
+            "GREASY_CLEATS" => Some(Prayer::GREASY_CLEATS),
+            "BLESSED_STATUE_OF_NUFFLE" => Some(Prayer::BLESSED_STATUE_OF_NUFFLE),
+            "MOLES_UNDER_THE_PITCH" => Some(Prayer::MOLES_UNDER_THE_PITCH),
+            "PERFECT_PASSING" => Some(Prayer::PERFECT_PASSING),
+            "FAN_INTERACTION" => Some(Prayer::FAN_INTERACTION),
+            "NECESSARY_VIOLENCE" => Some(Prayer::NECESSARY_VIOLENCE),
+            "FOULING_FRENZY" => Some(Prayer::FOULING_FRENZY),
+            "THROW_A_ROCK" => Some(Prayer::THROW_A_ROCK),
+            "UNDER_SCRUTINY" => Some(Prayer::UNDER_SCRUTINY),
+            "INTENSIVE_TRAINING" => Some(Prayer::INTENSIVE_TRAINING),
+            _ => None,
+        }
+    }
+
     /// Java: name() — enum constant name used for serialization.
     pub fn name(self) -> &'static str {
         match self {

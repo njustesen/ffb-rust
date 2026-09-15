@@ -690,6 +690,16 @@ impl StepInitSelecting {
     }
 
     fn check_for_staller(game: &mut Game) {
+        // BB2025 ONLY, and the gate is a CLASS split, not a condition: Java's
+        // `bb2025/shared/StepInitSelecting` is the only StepInitSelecting with a `checkForStaller`
+        // at all — grep `bb2020/shared/StepInitSelecting.java` and `bb2016/move/StepInitSelecting.java`
+        // and there is none. This file is dispatched for BB2020 too (bb2016 has its own override),
+        // so an ungated check both wrote `stallerDetected` reports Java never writes and set
+        // `game.stalling`, which is BB2025-only STATE (chaos bb2020, 10 games: java 0, rust 2).
+        // The whole method has to be skipped, not just the report.
+        if game.rules != ffb_model::enums::Rules::Bb2025 {
+            return;
+        }
         if !game.options.is_enabled("enableStallingCheck") || game.stalling {
             return;
         }

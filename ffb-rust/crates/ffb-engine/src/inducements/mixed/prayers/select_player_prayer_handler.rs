@@ -57,6 +57,16 @@ pub fn apply_selection_select_player(game: &mut Game, player_id: &str, prayer_na
     }
     game.field_model.add_prayer_enhancement(player_id, prayer_name);
     apply_prayer_player_effect(game, player_id, prayer_name);
+    // Java `SelectPlayerPrayerHandler.applySelection:29`:
+    //     reports.add(new ReportPlayerEvent(player.getId(), handledPrayer().eventMessage()));
+    game.report_list.add(
+        ffb_model::report::mixed::report_player_event::ReportPlayerEvent::new(
+            Some(player_id.to_owned()),
+            crate::inducements::mixed::prayers::random_selection_prayer_handler::prayer_event_message(
+                game.rules, prayer_name,
+            ).map(str::to_owned),
+        ),
+    );
 }
 
 #[cfg(test)]

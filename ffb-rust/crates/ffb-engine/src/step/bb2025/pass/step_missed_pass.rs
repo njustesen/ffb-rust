@@ -179,6 +179,17 @@ impl StepMissedPass {
         // the driver never routes to (BB2016 has its own override, BB2020 and BB2025 both land
         // here), so a wildly-inaccurate pass deviated without reporting it. Parked because this
         // helper returns nothing; `execute_step` attaches it. Report-only.
+        // The REPORT is not parked: `game` is already `&mut` here. Java BB2020
+        // `StepMissedPass:133` writes it on this branch and Rust wrote nothing, so `passDeviate`
+        // was absent from the report stream in every BB2020 game (chaos bb2020, 10 games: java 4,
+        // rust 0). The bb2025 TTM twin already reports its own deviation correctly.
+        if let (Some(end), Some(dir)) = (self.coordinate_end, self.direction) {
+            game.report_list.add(
+                ffb_model::report::report_pass_deviate::ReportPassDeviate::new(
+                    end, dir, direction_roll, distance_roll, false,
+                ),
+            );
+        }
         if let Some(start) = self.coordinate_start {
             self.pending_deviate = Some(GameEvent::PassDeviate {
                 from: start,
