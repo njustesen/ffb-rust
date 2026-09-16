@@ -9,6 +9,7 @@ use crate::step::util_server_injury::handle_injury_by_name;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::util::pathfinding::path_finder_with_pass_block_support::PathFinderWithPassBlockSupport;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::report::mixed::report_throw_at_stalling_player::ReportThrowAtStallingPlayer;
 use ffb_model::util::util_player::UtilPlayer;
 
 pub struct StallingExtension;
@@ -118,6 +119,17 @@ impl StallingExtension {
             roll = rng.die(6);
             successful = roll >= turn_nr;
         }
+
+        // Java `StallingExtension.handleStaller:78` adds the report here, immediately after the
+        // roll and BEFORE setStalled. This is the live BB2025 path (the driver routes
+        // StepId::StallingPlayer to the bb2020 rock step, so bb2020/step_stalling_player.rs's
+        // own report never ran); without this the mechanic emitted a GameEvent and nothing
+        // else, so `throwAtStallingPlayer` was absent from the report stream in 33,000 games.
+        game.report_list.add(ReportThrowAtStallingPlayer::new(
+            Some(player_id.to_string()),
+            roll,
+            successful,
+        ));
 
         // Mark team as having stalled (reduces winnings).
         let home_has_player = game.team_home.has_player(player_id);

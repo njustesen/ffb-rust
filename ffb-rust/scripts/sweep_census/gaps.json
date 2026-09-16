@@ -1,0 +1,1254 @@
+{
+ "gates": 330,
+ "games": 33000,
+ "squads": 110,
+ "dead": [
+  {
+   "skill": "Jump Up",
+   "cells": [
+    "amazon__bb2020",
+    "amazon__bb2025",
+    "dark_elf__bb2016",
+    "dark_elf__bb2020",
+    "dark_elf__bb2025",
+    "dark_elf_league_fumbbl__bb2016",
+    "dark_elf_league_fumbbl__bb2020",
+    "dark_elf_league_fumbbl__bb2025",
+    "gnome__bb2020",
+    "gnome__bb2025",
+    "khorne__bb2025",
+    "norse__bb2016",
+    "norse__bb2020",
+    "norse__bb2025",
+    "slann__bb2016",
+    "slann__bb2020",
+    "slann__bb2025",
+    "slann_fumbbl__bb2016",
+    "slann_fumbbl__bb2020",
+    "slann_fumbbl__bb2025"
+   ],
+   "site": "event jumpUpRoll + report jumpUpRoll"
+  },
+  {
+   "skill": "Projectile Vomit",
+   "cells": [
+    "black_orc__bb2020",
+    "black_orc__bb2025",
+    "chaos_chaostroll__bb2020",
+    "chaos_pact__bb2020",
+    "chaos_troll__bb2025",
+    "goblin__bb2020",
+    "goblin__bb2025",
+    "orc__bb2020",
+    "orc__bb2025",
+    "renegades_37730__bb2020",
+    "renegades_37733__bb2025",
+    "renegades__bb2025",
+    "snotling__bb2020",
+    "snotling__bb2025",
+    "underworld__bb2025",
+    "underworld_underworldtroll__bb2020"
+   ],
+   "site": "event projectileVomitRoll + report projectileVomit"
+  },
+  {
+   "skill": "Shadowing",
+   "cells": [
+    "chaos_dwarf__bb2020",
+    "chaos_dwarf__bb2025",
+    "dark_elf__bb2016",
+    "dark_elf__bb2020",
+    "dark_elf__bb2025",
+    "dark_elf_league_fumbbl__bb2016",
+    "dark_elf_league_fumbbl__bb2020",
+    "dark_elf_league_fumbbl__bb2025",
+    "lizardman__bb2020",
+    "lizardman__bb2025"
+   ],
+   "site": "report tentaclesShadowingRoll"
+  },
+  {
+   "skill": "Tentacles",
+   "cells": [
+    "nurgle__bb2016",
+    "nurgle__bb2020",
+    "nurgle__bb2025"
+   ],
+   "site": "report tentaclesShadowingRoll"
+  },
+  {
+   "skill": "Hypnotic Gaze",
+   "cells": [
+    "vampire__bb2016",
+    "vampire__bb2020",
+    "vampire__bb2025"
+   ],
+   "site": "event hypnoticGazeRoll + report hypnoticGazeRoll"
+  },
+  {
+   "skill": "Pick-me-up",
+   "cells": [
+    "norse__bb2020",
+    "norse__bb2025",
+    "nurgle__bb2025"
+   ],
+   "site": "event pickMeUpRoll + report pickMeUp"
+  },
+  {
+   "skill": "Breathe Fire",
+   "cells": [
+    "chaos_dwarf__bb2020",
+    "chaos_dwarf__bb2025"
+   ],
+   "site": "event breatheFireRoll + report breatheFire"
+  },
+  {
+   "skill": "Trickster",
+   "cells": [
+    "gnome__bb2020",
+    "gnome__bb2025"
+   ],
+   "site": "report trapDoor (shared, not skill-specific)"
+  },
+  {
+   "skill": "Fumblerooski",
+   "cells": [
+    "elf__bb2025"
+   ],
+   "site": "event fumblerooskie + report fumblerooskie"
+  },
+  {
+   "skill": "Pro",
+   "cells": [
+    "imperial_nobility__bb2025"
+   ],
+   "site": "event proRoll + report oldPro"
+  }
+ ],
+ "dark": [
+  {
+   "skill": "Thick Skull",
+   "cells": [
+    "black_orc__bb2020",
+    "black_orc__bb2025",
+    "chaos__bb2016",
+    "chaos__bb2020",
+    "chaos__bb2025",
+    "chaos_chaosogre__bb2020",
+    "chaos_dwarf__bb2016",
+    "chaos_dwarf__bb2020",
+    "chaos_dwarf__bb2025",
+    "chaos_ogre__bb2025",
+    "chaos_pact__bb2016",
+    "chaos_pact__bb2020",
+    "chaos_pact__bb2025",
+    "chaos_troll__bb2025",
+    "dwarf__bb2016",
+    "dwarf__bb2020",
+    "dwarf__bb2025",
+    "gnome__bb2020",
+    "gnome__bb2025",
+    "halfling__bb2016",
+    "halfling__bb2020",
+    "halfling__bb2025",
+    "human__bb2016",
+    "human__bb2020",
+    "human__bb2025",
+    "imperial_nobility__bb2020",
+    "imperial_nobility__bb2025",
+    "khemri__bb2016",
+    "khemri__bb2020",
+    "khemri__bb2025",
+    "khemri_fumbbl__bb2016",
+    "khemri_fumbbl__bb2020",
+    "khemri_fumbbl__bb2025",
+    "khorne__bb2025",
+    "lizardman__bb2016",
+    "lizardman__bb2020",
+    "lizardman__bb2025",
+    "necromantic__bb2016",
+    "necromantic__bb2020",
+    "necromantic__bb2025",
+    "norse__bb2020",
+    "norse__bb2025",
+    "nurgle__bb2025",
+    "ogre__bb2016",
+    "ogre__bb2020",
+    "ogre__bb2025",
+    "old_world_alliance_ogre__bb2020",
+    "old_world_alliance_ogre__bb2025",
+    "old_world_alliance_treeman__bb2020",
+    "old_world_alliance_treeman__bb2025",
+    "orc__bb2025",
+    "renegades_37730__bb2020",
+    "renegades_37733__bb2025",
+    "renegades__bb2016",
+    "renegades__bb2020",
+    "renegades__bb2025",
+    "slann__bb2016",
+    "slann__bb2020",
+    "slann__bb2025",
+    "slann_fumbbl__bb2016",
+    "slann_fumbbl__bb2020",
+    "slann_fumbbl__bb2025",
+    "undead__bb2016",
+    "undead__bb2020",
+    "undead__bb2025",
+    "wood_elf__bb2016",
+    "wood_elf__bb2020",
+    "wood_elf__bb2025"
+   ]
+  },
+  {
+   "skill": "Block",
+   "cells": [
+    "amazon__bb2016",
+    "bretonnian__bb2025",
+    "chaos_dwarf__bb2016",
+    "chaos_dwarf__bb2020",
+    "chaos_dwarf__bb2025",
+    "dark_elf__bb2016",
+    "dark_elf__bb2020",
+    "dark_elf__bb2025",
+    "dark_elf_league_fumbbl__bb2016",
+    "dark_elf_league_fumbbl__bb2020",
+    "dark_elf_league_fumbbl__bb2025",
+    "dwarf__bb2016",
+    "dwarf__bb2020",
+    "dwarf__bb2025",
+    "elf__bb2016",
+    "elf__bb2020",
+    "elf__bb2025",
+    "high_elf__bb2016",
+    "high_elf__bb2020",
+    "high_elf__bb2025",
+    "human__bb2016",
+    "human__bb2020",
+    "human__bb2025",
+    "imperial_nobility__bb2020",
+    "imperial_nobility__bb2025",
+    "khemri__bb2016",
+    "khemri__bb2020",
+    "khemri__bb2025",
+    "khemri_fumbbl__bb2016",
+    "khemri_fumbbl__bb2020",
+    "khemri_fumbbl__bb2025",
+    "necromantic__bb2016",
+    "necromantic__bb2020",
+    "necromantic__bb2025",
+    "nippon__bb2016",
+    "nippon__bb2020",
+    "nippon__bb2025",
+    "norse__bb2016",
+    "norse__bb2020",
+    "norse__bb2025",
+    "old_world_alliance_ogre__bb2020",
+    "old_world_alliance_ogre__bb2025",
+    "old_world_alliance_treeman__bb2020",
+    "old_world_alliance_treeman__bb2025",
+    "orc__bb2016",
+    "orc__bb2020",
+    "orc__bb2025",
+    "skaven__bb2016",
+    "skaven__bb2020",
+    "skaven__bb2025",
+    "undead__bb2016",
+    "undead__bb2020",
+    "undead__bb2025",
+    "underworld_37844__bb2025",
+    "underworld__bb2016",
+    "underworld__bb2020",
+    "underworld__bb2025",
+    "underworld_underworldtroll__bb2020",
+    "wood_elf__bb2016",
+    "wood_elf__bb2020",
+    "wood_elf__bb2025"
+   ]
+  },
+  {
+   "skill": "Frenzy",
+   "cells": [
+    "chaos__bb2016",
+    "chaos__bb2020",
+    "chaos__bb2025",
+    "chaos_dwarf__bb2016",
+    "chaos_dwarf__bb2020",
+    "chaos_dwarf__bb2025",
+    "chaos_pact__bb2016",
+    "chaos_pact__bb2020",
+    "chaos_pact__bb2025",
+    "dark_elf__bb2016",
+    "dark_elf__bb2020",
+    "dark_elf__bb2025",
+    "dark_elf_league_fumbbl__bb2016",
+    "dark_elf_league_fumbbl__bb2020",
+    "dark_elf_league_fumbbl__bb2025",
+    "dwarf__bb2016",
+    "dwarf__bb2020",
+    "dwarf__bb2025",
+    "khorne__bb2020",
+    "khorne__bb2025",
+    "necromantic__bb2016",
+    "necromantic__bb2020",
+    "necromantic__bb2025",
+    "norse__bb2016",
+    "norse__bb2020",
+    "norse__bb2025",
+    "old_world_alliance_ogre__bb2020",
+    "old_world_alliance_ogre__bb2025",
+    "old_world_alliance_treeman__bb2020",
+    "old_world_alliance_treeman__bb2025",
+    "renegades_37730__bb2020",
+    "renegades_37733__bb2025",
+    "renegades__bb2016",
+    "renegades__bb2020",
+    "renegades__bb2025",
+    "skaven__bb2016",
+    "skaven__bb2020",
+    "skaven__bb2025",
+    "underworld_37844__bb2025",
+    "underworld__bb2020",
+    "vampire__bb2020",
+    "vampire__bb2025"
+   ]
+  },
+  {
+   "skill": "Sprint",
+   "cells": [
+    "chaos_dwarf__bb2016",
+    "chaos_dwarf__bb2020",
+    "chaos_dwarf__bb2025",
+    "dwarf__bb2025",
+    "halfling__bb2020",
+    "halfling__bb2025",
+    "old_world_alliance_ogre__bb2025",
+    "old_world_alliance_treeman__bb2025",
+    "snotling__bb2020",
+    "snotling__bb2025",
+    "wood_elf__bb2016",
+    "wood_elf__bb2025"
+   ]
+  },
+  {
+   "skill": "Diving Tackle",
+   "cells": [
+    "dwarf__bb2025",
+    "old_world_alliance_ogre__bb2025",
+    "old_world_alliance_treeman__bb2025",
+    "slann__bb2016",
+    "slann__bb2020",
+    "slann__bb2025",
+    "slann_fumbbl__bb2016",
+    "slann_fumbbl__bb2020",
+    "slann_fumbbl__bb2025"
+   ]
+  },
+  {
+   "skill": "Brawler",
+   "cells": [
+    "black_orc__bb2020",
+    "black_orc__bb2025",
+    "chaos_dwarf__bb2020",
+    "chaos_dwarf__bb2025",
+    "khemri__bb2025",
+    "old_world_alliance_ogre__bb2020",
+    "old_world_alliance_treeman__bb2020"
+   ]
+  },
+  {
+   "skill": "Unsteady",
+   "cells": [
+    "chaos_dwarf__bb2025",
+    "lizardman__bb2025",
+    "necromantic__bb2025",
+    "norse__bb2025",
+    "nurgle__bb2025",
+    "orc__bb2025",
+    "undead__bb2025"
+   ]
+  },
+  {
+   "skill": "No Hands",
+   "cells": [
+    "dwarf__bb2016",
+    "dwarf__bb2020",
+    "goblin__bb2016",
+    "goblin__bb2020",
+    "necromantic__bb2020",
+    "norse__bb2020"
+   ]
+  },
+  {
+   "skill": "Timmm-ber!",
+   "cells": [
+    "gnome__bb2020",
+    "gnome__bb2025",
+    "halfling__bb2020",
+    "halfling__bb2025",
+    "old_world_alliance_treeman__bb2020",
+    "old_world_alliance_treeman__bb2025"
+   ]
+  },
+  {
+   "skill": "On the Ball",
+   "cells": [
+    "amazon__bb2020",
+    "amazon__bb2025",
+    "lizardman__bb2020",
+    "lizardman__bb2025"
+   ]
+  },
+  {
+   "skill": "No Ball",
+   "cells": [
+    "dwarf__bb2025",
+    "goblin__bb2025",
+    "necromantic__bb2025",
+    "norse__bb2025"
+   ]
+  },
+  {
+   "skill": "My Ball",
+   "cells": [
+    "gnome__bb2020",
+    "gnome__bb2025",
+    "high_elf__bb2025"
+   ]
+  },
+  {
+   "skill": "Hatred",
+   "cells": [
+    "dwarf__bb2025",
+    "old_world_alliance_ogre__bb2025",
+    "old_world_alliance_treeman__bb2025"
+   ]
+  },
+  {
+   "skill": "Insignificant",
+   "cells": [
+    "snotling__bb2025",
+    "underworld_37844__bb2025",
+    "underworld__bb2025"
+   ]
+  },
+  {
+   "skill": "Grab",
+   "cells": [
+    "black_orc__bb2020",
+    "black_orc__bb2025"
+   ]
+  },
+  {
+   "skill": "Iron Hard Skin",
+   "cells": [
+    "chaos_dwarf__bb2020",
+    "chaos_dwarf__bb2025"
+   ]
+  },
+  {
+   "skill": "Guard",
+   "cells": [
+    "gnome__bb2020",
+    "gnome__bb2025"
+   ]
+  },
+  {
+   "skill": "Plague Ridden",
+   "cells": [
+    "nurgle__bb2020",
+    "nurgle__bb2025"
+   ]
+  },
+  {
+   "skill": "Nurgle's Rot",
+   "cells": [
+    "nurgle__bb2016"
+   ]
+  },
+  {
+   "skill": "Running Pass",
+   "cells": [
+    "imperial_nobility__bb2020"
+   ]
+  },
+  {
+   "skill": "Give and Go",
+   "cells": [
+    "imperial_nobility__bb2025"
+   ]
+  }
+ ],
+ "thin": [
+  {
+   "skill": "Cloud Burster",
+   "cells": [
+    "high_elf__bb2020",
+    "high_elf__bb2025"
+   ],
+   "count": 3,
+   "hits": [
+    [
+     "report cloudBurster",
+     3
+    ]
+   ]
+  },
+  {
+   "skill": "Safe Throw",
+   "cells": [
+    "high_elf__bb2016"
+   ],
+   "count": 4,
+   "hits": [
+    [
+     "event safeThrowRoll",
+     4
+    ]
+   ]
+  },
+  {
+   "skill": "Safe Pass",
+   "cells": [
+    "amazon__bb2020",
+    "amazon__bb2025",
+    "high_elf__bb2020",
+    "high_elf__bb2025"
+   ],
+   "count": 9,
+   "hits": [
+    [
+     "report SkillUse",
+     9
+    ],
+    [
+     "event skillUse",
+     9
+    ],
+    [
+     "event safeThrowRoll",
+     4
+    ]
+   ]
+  },
+  {
+   "skill": "Side Step",
+   "cells": [
+    "elf__bb2016",
+    "elf__bb2020",
+    "elf__bb2025",
+    "gnome__bb2020",
+    "gnome__bb2025",
+    "necromantic__bb2020",
+    "necromantic__bb2025",
+    "ogre__bb2016",
+    "ogre__bb2020",
+    "ogre__bb2025",
+    "snotling__bb2020",
+    "snotling__bb2025",
+    "underworld_37844__bb2025",
+    "underworld__bb2020",
+    "underworld__bb2025",
+    "underworld_underworldtroll__bb2020"
+   ],
+   "count": 11,
+   "hits": [
+    [
+     "report SkillUse (declined)",
+     11
+    ],
+    [
+     "event skillUse (declined)",
+     11
+    ],
+    [
+     "report SkillUse (declined)",
+     5
+    ],
+    [
+     "event skillUse (declined)",
+     5
+    ]
+   ]
+  },
+  {
+   "skill": "Hail Mary Pass",
+   "cells": [
+    "elf__bb2025"
+   ],
+   "count": 22,
+   "hits": [
+    [
+     "action HailMaryPass",
+     22
+    ]
+   ]
+  },
+  {
+   "skill": "Diving Catch",
+   "cells": [
+    "elf__bb2025",
+    "slann__bb2016",
+    "slann__bb2020",
+    "slann__bb2025",
+    "slann_fumbbl__bb2016",
+    "slann_fumbbl__bb2020",
+    "slann_fumbbl__bb2025"
+   ],
+   "count": 60,
+   "hits": [
+    [
+     "report rollModifiers \"Diving Catch\"",
+     60
+    ],
+    [
+     "report SkillUse (declined)",
+     1
+    ],
+    [
+     "event skillUse (declined)",
+     1
+    ]
+   ]
+  },
+  {
+   "skill": "Swoop",
+   "cells": [
+    "goblin__bb2020",
+    "goblin__bb2025"
+   ],
+   "count": 62,
+   "hits": [
+    [
+     "event swoopPlayer",
+     62
+    ]
+   ]
+  },
+  {
+   "skill": "Strip Ball",
+   "cells": [
+    "norse__bb2020",
+    "norse__bb2025",
+    "skaven__bb2025",
+    "underworld_37844__bb2025",
+    "underworld__bb2025"
+   ],
+   "count": 106,
+   "hits": [
+    [
+     "report SkillUse",
+     106
+    ],
+    [
+     "event skillUse",
+     106
+    ]
+   ]
+  },
+  {
+   "skill": "Safe Pair of Hands",
+   "cells": [
+    "chaos_pact__bb2020",
+    "renegades_37730__bb2020",
+    "renegades__bb2020",
+    "wood_elf__bb2025"
+   ],
+   "count": 117,
+   "hits": [
+    [
+     "report SkillUse (declined)",
+     117
+    ],
+    [
+     "event skillUse (declined)",
+     117
+    ]
+   ]
+  },
+  {
+   "skill": "Break Tackle",
+   "cells": [
+    "dwarf__bb2016",
+    "dwarf__bb2020",
+    "dwarf__bb2025",
+    "orc__bb2025"
+   ],
+   "count": 143,
+   "hits": [
+    [
+     "report rollModifiers \"Break Tackle ST 3-\"",
+     143
+    ],
+    [
+     "report rollModifiers \"Break Tackle ST 5+\"",
+     129
+    ],
+    [
+     "report rollModifiers \"Break Tackle\"",
+     62
+    ]
+   ]
+  },
+  {
+   "skill": "Punt",
+   "cells": [
+    "dark_elf__bb2025"
+   ],
+   "count": 183,
+   "hits": [
+    [
+     "action Punt",
+     183
+    ]
+   ]
+  },
+  {
+   "skill": "Dirty Player",
+   "cells": [
+    "dwarf__bb2016",
+    "dwarf__bb2020",
+    "dwarf__bb2025",
+    "goblin__bb2020",
+    "goblin__bb2025",
+    "snotling__bb2020",
+    "snotling__bb2025"
+   ],
+   "count": 333,
+   "hits": [
+    [
+     "report armorModifiers \"Dirty Player\"",
+     333
+    ],
+    [
+     "report injuryModifiers \"Dirty Player\"",
+     161
+    ],
+    [
+     "report armorModifiers \"Dirty Player +1\"",
+     1
+    ]
+   ]
+  },
+  {
+   "skill": "Stab",
+   "cells": [
+    "chaos_dwarf__bb2020",
+    "chaos_dwarf__bb2025",
+    "dark_elf__bb2016",
+    "dark_elf__bb2020",
+    "dark_elf__bb2025",
+    "dark_elf_league_fumbbl__bb2016",
+    "dark_elf_league_fumbbl__bb2020",
+    "dark_elf_league_fumbbl__bb2025",
+    "skaven__bb2025",
+    "underworld_37844__bb2025",
+    "underworld__bb2025"
+   ],
+   "count": 444,
+   "hits": [
+    [
+     "report playerEvent \"gains Stab\"",
+     444
+    ]
+   ]
+  },
+  {
+   "skill": "Juggernaut",
+   "cells": [
+    "dwarf__bb2016",
+    "dwarf__bb2020",
+    "dwarf__bb2025",
+    "khorne__bb2020",
+    "khorne__bb2025",
+    "lizardman__bb2025",
+    "snotling__bb2020",
+    "snotling__bb2025",
+    "vampire__bb2020",
+    "vampire__bb2025"
+   ],
+   "count": 565,
+   "hits": [
+    [
+     "report SkillUse",
+     565
+    ],
+    [
+     "event skillUse",
+     540
+    ],
+    [
+     "report SkillUse (declined)",
+     72
+    ],
+    [
+     "event skillUse (declined)",
+     72
+    ]
+   ]
+  },
+  {
+   "skill": "Leap",
+   "cells": [
+    "goblin__bb2016",
+    "nippon__bb2016",
+    "nippon__bb2020",
+    "nippon__bb2025",
+    "slann__bb2016",
+    "slann__bb2020",
+    "slann__bb2025",
+    "slann_fumbbl__bb2016",
+    "slann_fumbbl__bb2020",
+    "slann_fumbbl__bb2025",
+    "wood_elf__bb2016",
+    "wood_elf__bb2020",
+    "wood_elf__bb2025"
+   ],
+   "count": 664,
+   "hits": [
+    [
+     "event jumpRoll",
+     664
+    ],
+    [
+     "report rollModifiers \"Leap\"",
+     162
+    ]
+   ]
+  },
+  {
+   "skill": "Very Long Legs",
+   "cells": [
+    "goblin__bb2016",
+    "slann__bb2016",
+    "slann__bb2020",
+    "slann__bb2025",
+    "slann_fumbbl__bb2016",
+    "slann_fumbbl__bb2020",
+    "slann_fumbbl__bb2025"
+   ],
+   "count": 664,
+   "hits": [
+    [
+     "event jumpRoll",
+     664
+    ],
+    [
+     "report rollModifiers \"Very Long Legs\"",
+     401
+    ]
+   ]
+  },
+  {
+   "skill": "Pogo Stick",
+   "cells": [
+    "goblin__bb2020",
+    "snotling__bb2020"
+   ],
+   "count": 664,
+   "hits": [
+    [
+     "event jumpRoll",
+     664
+    ]
+   ]
+  },
+  {
+   "skill": "Pogo",
+   "cells": [
+    "goblin__bb2025",
+    "snotling__bb2025"
+   ],
+   "count": 664,
+   "hits": [
+    [
+     "event jumpRoll",
+     664
+    ]
+   ]
+  },
+  {
+   "skill": "Ball and Chain",
+   "cells": [
+    "goblin__bb2016",
+    "goblin__bb2020",
+    "goblin__bb2025"
+   ],
+   "count": 820,
+   "hits": [
+    [
+     "event escapeRoll",
+     820
+    ]
+   ]
+  },
+  {
+   "skill": "Chainsaw",
+   "cells": [
+    "goblin__bb2016",
+    "goblin__bb2020",
+    "goblin__bb2025"
+   ],
+   "count": 828,
+   "hits": [
+    [
+     "report armorModifiers \"Chainsaw\"",
+     828
+    ],
+    [
+     "event chainsawRoll",
+     144
+    ]
+   ]
+  },
+  {
+   "skill": "Sure Feet",
+   "cells": [
+    "chaos_dwarf__bb2016",
+    "chaos_dwarf__bb2020",
+    "chaos_dwarf__bb2025"
+   ],
+   "count": 847,
+   "hits": [
+    [
+     "report ReRoll source",
+     847
+    ]
+   ]
+  },
+  {
+   "skill": "Hit and Run",
+   "cells": [
+    "amazon__bb2020",
+    "amazon__bb2025",
+    "dark_elf__bb2025"
+   ],
+   "count": 993,
+   "hits": [
+    [
+     "report SkillUse",
+     993
+    ],
+    [
+     "event skillUse",
+     993
+    ],
+    [
+     "event hitAndRun",
+     993
+    ]
+   ]
+  }
+ ],
+ "residue": {
+  "Tackle": [
+   "chaos_dwarf__bb2016",
+   "dwarf__bb2016",
+   "dwarf__bb2020",
+   "dwarf__bb2025"
+  ],
+  "Side Step": [
+   "elf__bb2016",
+   "ogre__bb2016",
+   "gnome__bb2020",
+   "necromantic__bb2020",
+   "ogre__bb2020",
+   "snotling__bb2020"
+  ],
+  "Diving Catch": [
+   "slann__bb2016",
+   "slann__bb2020",
+   "slann_fumbbl__bb2020",
+   "elf__bb2025",
+   "slann__bb2025",
+   "slann_fumbbl__bb2025"
+  ],
+  "Safe Pass": [
+   "amazon__bb2020",
+   "high_elf__bb2020"
+  ],
+  "Pass": [
+   "khemri_fumbbl__bb2020",
+   "khemri_fumbbl__bb2025"
+  ],
+  "Sidestep": [
+   "snotling__bb2025"
+  ]
+ },
+ "actions_declared": {
+  "Block": 455756,
+  "Move": 4272202,
+  "HandOverMove": 21411,
+  "Blitz": 72864,
+  "HandOver": 5563,
+  "PassMove": 21634,
+  "Pass": 6214,
+  "Foul": 65133,
+  "BlitzMove": 207716,
+  "ThrowTeamMate": 101363,
+  "Punt": 183,
+  "HailMaryPass": 22,
+  "ThrowBomb": 8844,
+  "KickTeamMate": 4566
+ },
+ "actions_all": [
+  "Move",
+  "Block",
+  "Blitz",
+  "BlitzMove",
+  "BlitzSelect",
+  "HandOver",
+  "HandOverMove",
+  "Pass",
+  "PassMove",
+  "Foul",
+  "FoulMove",
+  "StandUp",
+  "ThrowTeamMate",
+  "ThrowTeamMateMove",
+  "RemoveConfusion",
+  "Gaze",
+  "GazeSelect",
+  "GazeMove",
+  "MultipleBlock",
+  "HailMaryPass",
+  "DumpOff",
+  "StandUpBlitz",
+  "ThrowBomb",
+  "HailMaryBomb",
+  "Swoop",
+  "KickTeamMateMove",
+  "KickTeamMate",
+  "Treacherous",
+  "WisdomOfTheWhiteDwarf",
+  "ThrowKeg",
+  "RaidingParty",
+  "MaximumCarnage",
+  "LookIntoMyEyes",
+  "BalefulHex",
+  "AllYouCanEat",
+  "PutridRegurgitationMove",
+  "PutridRegurgitationBlitz",
+  "PutridRegurgitationBlock",
+  "KickEmBlock",
+  "KickEmBlitz",
+  "BlackInk",
+  "CatchOfTheDay",
+  "ThenIStartedBlastin",
+  "TheFlashingBlade",
+  "ViciousVines",
+  "FuriousOutburst",
+  "SecureTheBall",
+  "BreatheFire",
+  "Chainsaw",
+  "Stab",
+  "ProjectileVomit",
+  "AutoGazeZoat",
+  "Forgo",
+  "Incorporeal",
+  "Chomp",
+  "Punt",
+  "PuntMove"
+ ],
+ "actions_offered": [
+  "AllYouCanEat",
+  "AutoGazeZoat",
+  "BalefulHex",
+  "BlackInk",
+  "Blitz",
+  "Block",
+  "CatchOfTheDay",
+  "Foul",
+  "FuriousOutburst",
+  "Gaze",
+  "HailMaryPass",
+  "HandOver",
+  "KickTeamMate",
+  "LookIntoMyEyes",
+  "Move",
+  "MultipleBlock",
+  "Pass",
+  "Punt",
+  "RaidingParty",
+  "SecureTheBall",
+  "StandUpBlitz",
+  "ThenIStartedBlastin",
+  "ThrowBomb",
+  "ThrowKeg",
+  "ThrowTeamMate",
+  "Treacherous",
+  "WisdomOfTheWhiteDwarf"
+ ],
+ "actions_scored": [
+  "Blitz",
+  "BlitzMove",
+  "Block",
+  "Foul",
+  "FoulMove",
+  "Gaze",
+  "HailMaryPass",
+  "HandOver",
+  "HandOverMove",
+  "KickEmBlitz",
+  "KickTeamMate",
+  "Move",
+  "Pass",
+  "PassMove",
+  "StandUpBlitz",
+  "ThrowTeamMate"
+ ],
+ "kickoff": {
+  "CheeringFans": 14492,
+  "PerfectDefence": 2170,
+  "ThrowARock": 1285,
+  "Riot": 1271,
+  "HighKick": 11206,
+  "WeatherChange": 11897,
+  "BrilliantCoaching": 12685,
+  "GetTheRef": 2485,
+  "QuickSnap": 10049,
+  "Blitz": 4428,
+  "PitchInvasion": 2724,
+  "SolidDefence": 5353,
+  "TimeOut": 3219,
+  "OficiousRef": 1474,
+  "DodgySnack": 1554,
+  "Charge": 2941
+ },
+ "kickoff_all": [
+  "GetTheRef",
+  "HighKick",
+  "CheeringFans",
+  "WeatherChange",
+  "BrilliantCoaching",
+  "QuickSnap",
+  "Blitz",
+  "PitchInvasion",
+  "Riot",
+  "PerfectDefence",
+  "ThrowARock",
+  "TimeOut",
+  "SolidDefence",
+  "OficiousRef",
+  "Charge",
+  "DodgySnack"
+ ],
+ "events_never": [
+  "AllYouCanEatRoll",
+  "ApothecaryChoice",
+  "BalefulHexRoll",
+  "BallScattered",
+  "BiasedRefRoll",
+  "BreatheFireRoll",
+  "BribesRoll",
+  "BuyInducement",
+  "CardDeactivated",
+  "CardEffectRoll",
+  "CardsAndInducementsBought",
+  "DefectingPlayers",
+  "DoubleHiredStarPlayer",
+  "Fumblerooskie",
+  "GameOptions",
+  "HypnoticGazeRoll",
+  "Inducement",
+  "JumpUpRoll",
+  "KegThrow",
+  "KickoffSequenceActivationsExhausted",
+  "Leader",
+  "LookIntoMyEyesRoll",
+  "MasterChefRoll",
+  "NoPlayersToField",
+  "PettyCash",
+  "PickMeUpRoll",
+  "PilingOn",
+  "PlayCard",
+  "PrayerAmount",
+  "ProRoll",
+  "ProjectileVomitRoll",
+  "PumpUpTheCrowdReRoll",
+  "RiotousRookies",
+  "SelectGazeTarget",
+  "SpecialEffectRoll",
+  "TeamCaptainRoll",
+  "ThenIStartedBlastin",
+  "ThrowAtPlayer",
+  "TimeoutEnforced",
+  "WeepingDaggerRoll",
+  "WizardUse"
+ ],
+ "reports_never": [
+  "allYouCanEat",
+  "apothecaryChoice",
+  "balefulHex",
+  "biasedRef",
+  "blockReRoll",
+  "breatheFire",
+  "bribesRoll",
+  "cardDeactivated",
+  "cardEffectRoll",
+  "cardsAndInducementsBought",
+  "cardsBought",
+  "catchOfTheDay",
+  "chompRemoved",
+  "chompRoll",
+  "defectingPlayers",
+  "doubleHiredStaff",
+  "doubleHiredStarPlayer",
+  "fanFactorRoll",
+  "freePettyCash",
+  "fumbblResultUpload",
+  "fumblerooskie",
+  "gameOptions",
+  "hypnoticGazeRoll",
+  "indomitable",
+  "inducement",
+  "inducementsBought",
+  "jumpUpRoll",
+  "kickTeamMateRoll",
+  "kickoffSequenceActivationsCount",
+  "kickoffSequenceActivationsExhausted",
+  "leader",
+  "lookIntoMyEyesRoll",
+  "mascotUsed",
+  "masterChefRoll",
+  "modifiedDodgeResultSuccessful",
+  "modifiedPassResult",
+  "nervesOfSteel",
+  "noPlayersToField",
+  "oldPro",
+  "passBlock",
+  "penaltyShootout",
+  "pettyCash",
+  "pickMeUp",
+  "pilingOn",
+  "placedBallDirection",
+  "playCard",
+  "prayerAmount",
+  "prayerWasted",
+  "prayersAndInducementsBought",
+  "projectileVomit",
+  "pumpUpTheCrowdReRoll",
+  "pumpUpTheCrowdReRollLost",
+  "raidingParty",
+  "riotousRookies",
+  "saboteurRoll",
+  "selectGazeTarget",
+  "showStarReRoll",
+  "showStarReRollLost",
+  "skillUseOtherPlayer",
+  "skillWasted",
+  "swoopDirectionRoll",
+  "swoopDistanceRoll",
+  "teamCaptainRoll",
+  "teamEvent",
+  "tentaclesShadowingRoll",
+  "thenIStartedBlastin",
+  "throwAtPlayer",
+  "thrownKeg",
+  "timeoutEnforced",
+  "twoForOne",
+  "weatherMageResult",
+  "weatherMageRoll",
+  "weepingDaggerRoll",
+  "wizardUse"
+ ]
+}

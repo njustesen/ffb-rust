@@ -53,6 +53,10 @@ impl Step for StepGettingEven {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             StepParameter::PlayerId(v) => { self.player_id = Some(v.clone()); true }
+            // Java `StepGettingEven:49` reads StepParameterKey.KEYWORD. Rust never accepted it,
+            // so `keyword_name` stayed None and every gettingEvenRoll report carried an empty
+            // keyword where Java writes the real one (e.g. "Human").
+            StepParameter::Keyword(v) => { self.keyword_name = Some(v.clone()); true }
             _ => false,
         }
     }

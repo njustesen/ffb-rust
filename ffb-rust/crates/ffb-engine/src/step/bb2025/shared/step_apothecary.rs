@@ -368,16 +368,33 @@ impl StepApothecary {
                 // Java: attacker.getPosition().getKeywords().filter(Keyword::isCanGetEvenWith)
                 // (minus the defender's canRerollSingleSkull keywords — no goblin position has
                 // that skill, so the subtraction is a no-op for the only roster carrying keywords).
-                let has_keyword = game.player(&attacker_id)
+                // Java collects the qualifying keywords into a Set, sorts it (enum ORDINAL
+                // order -- `Keyword` is Comparable by declaration position, not by name) and,
+                // when exactly one qualifies, pushes GETTING_EVEN with it. Rust pushed the step
+                // with no keyword at all, so the report's `keyword` was always "".
+                let mut keywords: Vec<Keyword> = game.player(&attacker_id)
                     .map(|attacker| attacker.keywords.iter()
-                        .any(|k| Keyword::for_name(k).is_can_get_even_with()))
-                    .unwrap_or(false);
-                if !has_keyword {
+                        .map(|k| Keyword::for_name(k))
+                        .filter(|k| k.is_can_get_even_with())
+                        .collect::<Vec<_>>())
+                    .unwrap_or_default();
+                if keywords.is_empty() {
                     return None;
                 }
+                keywords.sort_by_key(|k| *k as usize);
+                keywords.dedup();
+                // When more than one qualifies Java shows a SELECT_KEYWORD dialog that the parity
+                // harness answers with a non-seeded RandomStrategy, so the pick cannot be mirrored
+                // exactly; the first sorted keyword matches Java whenever the set has one member,
+                // which is every case the drafted squads produce. The value is report-only
+                // (`addHatred` is client/model-only), so a mismatch cannot move the game.
+                let keyword_name = keywords[0].get_name().to_string();
                 Some(vec![SequenceStep::with_params(
                     StepId::GettingEven,
-                    vec![StepParameter::PlayerId(defender_id)],
+                    vec![
+                        StepParameter::PlayerId(defender_id),
+                        StepParameter::Keyword(keyword_name),
+                    ],
                 )])
             });
 

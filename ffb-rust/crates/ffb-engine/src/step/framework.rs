@@ -159,6 +159,9 @@ pub enum StepId {
 /// `equals-by-key` in Java maps to matching on the variant. Lineman subset; extended later.
 #[derive(Debug, Clone)]
 pub enum StepParameter {
+    /// Java `StepParameterKey.KEYWORD` -- the Getting Even keyword (`Keyword.getName()`).
+    /// Carried as the name because `StepParameter` stays free of model enums elsewhere.
+    Keyword(String),
     MoveStack(Vec<ffb_model::types::FieldCoordinate>),
     MoveStart(ffb_model::types::FieldCoordinate),
     CoordinateFrom(ffb_model::types::FieldCoordinate),

@@ -567,6 +567,15 @@ pub fn make_step_for(id: StepId, rules: Rules) -> Box<dyn Step> {
                 return Box::new(crate::step::bb2016::ttm::step_always_hungry::StepAlwaysHungry::new()),
             StepId::EndThrowTeamMate =>
                 return Box::new(crate::step::bb2016::ttm::step_end_throw_team_mate::StepEndThrowTeamMate::new()),
+            // BB2016 winnings are ROLLED (2× d6, plus FAME and a +1 for winning/drawing) and
+            // reported as `ReportWinningsRoll`; BB2020+/BB2025 winnings are COMPUTED from score and
+            // attendance and reported as `ReportWinnings`. Java has three @RulesCollection-annotated
+            // StepWinnings classes; the fall-through `use crate::step::bb2025::end::*` at the top of
+            // this function handed every edition the BB2025 one, so bb2016 games used BB2025 money
+            // maths and `winningsRoll` was absent from the report stream across all 8,700 bb2016
+            // games (`winnings` showed 32,997 of 33,000 instead).
+            StepId::Winnings =>
+                return Box::new(crate::step::bb2016::end::step_winnings::StepWinnings),
             _ => {}
         }
     }
@@ -991,7 +1000,19 @@ impl DriverGameState {
                     // Sweltering Heat faints players at the end of a drive. The engine records each
                     // one in the turn-end report and there is no `heatExhaustion` emit site, so the
                     // variant read 0 across 33,000 games for a mechanic that fires every hot game.
+                    // TWO report types carry TURN_END: the mixed one and `bb2016::ReportTurnEnd`
+                    // (which omits `heatRoll`, per H.56). A downcast to one type silently misses
+                    // the other -- gating the report by edition without touching this bridge
+                    // dropped bb2016's heatExhaustion events from 39,407 to ZERO while every one
+                    // of the 330 gates stayed 100/100, because the event stream is not part of
+                    // the compared state hash. Handle both.
                     if let Some(r) = any.downcast_ref::<ReportTurnEnd>() {
+                        for h in &r.heat_exhaustions {
+                            out.push(GameEvent::HeatExhaustion { player_id: h.player_id.clone() });
+                        }
+                    } else if let Some(r) =
+                        any.downcast_ref::<ffb_model::report::bb2016::report_turn_end::ReportTurnEnd>()
+                    {
                         for h in &r.heat_exhaustions {
                             out.push(GameEvent::HeatExhaustion { player_id: h.player_id.clone() });
                         }

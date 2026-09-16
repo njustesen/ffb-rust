@@ -24,7 +24,10 @@
 use ffb_model::enums::{TurnMode, Weather, PS_KNOCKED_OUT, PS_EXHAUSTED, PS_RESERVE};
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
-use ffb_model::report::mixed::report_turn_end::{ReportTurnEnd, KnockoutRecovery, HeatExhaustion};
+// BB2016 has its OWN ReportTurnEnd (no `heatRoll`); the mixed one was being used here, so
+// every bb2016 turn end wrote a key Java never writes. The helper types are shared.
+use ffb_model::report::bb2016::report_turn_end::ReportTurnEnd;
+use ffb_model::report::mixed::report_turn_end::{KnockoutRecovery, HeatExhaustion};
 use ffb_model::types::FIELD_WIDTH;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_box::UtilBox;
@@ -282,7 +285,6 @@ impl StepEndTurn {
                     ko_recoveries,
                     heat_exhaustions,
                     vec![],
-                    0,
                 ));
                 UtilBox::put_all_players_into_box(game);
             }

@@ -91,8 +91,20 @@ pub trait StateMechanic: Send + Sync {
             return None;
         }
 
-        let report = build_report_injury(injury_result.injury_context(), skip, game.rules);
-        game.report_list.add(report);
+        // Java has TWO ReportInjury classes and BB2016 uses its own: `bb2016/ReportInjury`
+        // stops at INJURY_MODIFIERS, while `mixed/ReportInjury` also writes SERIOUS_INJURY_OLD,
+        // CASUALTY_MODIFIERS and SKIP_INJURY_PARTS. Every bb2016 injury was being serialised
+        // through the mixed shape, so it carried three keys Java never writes -- one payload
+        // diff on each of ~390,000 bb2016 injury reports.
+        if game.rules == ffb_model::enums::Rules::Bb2016 {
+            game.report_list.add_boxed(Box::new(build_report_injury_bb2016(
+                injury_result.injury_context(),
+                game.rules,
+            )));
+        } else {
+            let report = build_report_injury(injury_result.injury_context(), skip, game.rules);
+            game.report_list.add(report);
+        }
         // Java: step.getResult().setSound() — client-only, no-op in headless
         injury_result.set_already_reported(true);
 
@@ -339,6 +351,34 @@ fn build_report_injury(ctx: &InjuryContext, skip: SkipInjuryParts, rules: ffb_mo
         ctx.injury_decay,
         ctx.casualty_modifiers.iter().map(|m| m.name.to_string()).collect(),
         skip.to_string(),
+    )
+}
+
+/// Java `bb2016/ReportInjury.init(InjuryContext)` -- the BB2016 twin of `build_report_injury`.
+/// Same values, minus the three BB2020+ entries (`seriousInjuryOld`, `casualtyModifiers`,
+/// `skipInjuryParts`), which the BB2016 class does not serialise.
+fn build_report_injury_bb2016(
+    ctx: &InjuryContext,
+    rules: ffb_model::enums::Rules,
+) -> ffb_model::report::bb2016::report_injury::ReportInjury {
+    use ffb_model::report::bb2016::report_injury::ReportInjury as ReportInjuryBb2016;
+    let injury_type = ctx.java_type_name.clone()
+        .unwrap_or_else(|| fallback_java_type_name(ctx.injury_type_name.as_deref().unwrap_or_default()));
+    ReportInjuryBb2016::new(
+        ctx.defender_id.clone().unwrap_or_default(),
+        injury_type,
+        ctx.armor_broken,
+        ctx.armor_modifiers.iter().map(|m| m.name.to_string()).collect(),
+        ctx.armor_roll.map(|r| r.to_vec()).unwrap_or_default(),
+        ctx.injury_modifiers.iter().map(|m| m.name.to_string()).collect(),
+        ctx.injury_roll.map(|r| r.to_vec()).unwrap_or_default(),
+        ctx.casualty_roll.map(|r| r.to_vec()).unwrap_or_default(),
+        ctx.serious_injury.map(|s| serious_injury_display_name(s, rules)),
+        ctx.casualty_roll_decay.map(|r| r.to_vec()).unwrap_or_default(),
+        ctx.serious_injury_decay.map(|s| serious_injury_display_name(s, rules)),
+        ctx.injury,
+        ctx.injury_decay,
+        ctx.attacker_id.clone(),
     )
 }
 

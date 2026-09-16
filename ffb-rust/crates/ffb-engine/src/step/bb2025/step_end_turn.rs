@@ -374,13 +374,29 @@ impl StepEndTurn {
         // were missing from the stream (H.50).
         // Java: `touchdownPlayerId` — set when the touchdown check found the scorer.
         let td_player_id = if touchdown { self.touchdown_player_id.clone() } else { None };
-        game.report_list.add(ReportTurnEnd::new(
-            td_player_id,
-            ko_recoveries,
-            heat_exhaustions,
-            vec![],
-            fainting_count,
-        ));
+        // Java has a BB2016 ReportTurnEnd whose `toJsonValue` stops at UNZAP_ARRAY, and a mixed
+        // one that also writes HEAT_ROLL. This shared step serves all three editions (the driver
+        // deliberately does NOT reroute EndTurn -- see the bb2020 kickoff lesson at
+        // driver.rs:393), so gate the ONE differing thing here rather than the whole step:
+        // bb2016 games were writing a `heatRoll` key Java never emits, on the single
+        // highest-volume report in the sweep (1.14M turnEnds).
+        if game.rules == ffb_model::enums::Rules::Bb2016 {
+            use ffb_model::report::bb2016::report_turn_end::ReportTurnEnd as ReportTurnEndBb2016;
+            game.report_list.add(ReportTurnEndBb2016::new(
+                td_player_id,
+                ko_recoveries,
+                heat_exhaustions,
+                vec![],
+            ));
+        } else {
+            game.report_list.add(ReportTurnEnd::new(
+                td_player_id,
+                ko_recoveries,
+                heat_exhaustions,
+                vec![],
+                fainting_count,
+            ));
+        }
     }
 
     fn report_secret_weapons_used(&mut self, game: &mut Game, rng: &mut GameRng) {

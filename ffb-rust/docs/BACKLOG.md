@@ -8296,3 +8296,484 @@ Grab, Hatred, Insignificant, No Hands — and raise no telemetry in either engin
 working agent change WOULD reach are Shadowing, Tentacles, Diving Tackle, Unsteady, My Ball and On
 the Ball, plus the silent Hypnotic Gaze, Jump Up, Pick-me-up, Pro and Stab. That is the whole
 remaining prize, and every one of them is behind the agent work mapped above.
+
+
+## §H.55 — 2026-09-16: the coverage-gap inventory, and the ordered queue it produces
+
+§H.54 ended on the right instinct — "the remaining prize is behind the agent work" — but
+counted by hand. `scripts/sweep_census/gaps.py` now derives it, and
+`docs/COVERAGE_GAPS_2026-09-15.md` is the written result. Regenerate with:
+
+```bash
+python scripts/sweep_census/gaps.py          # defaults to out_s15 + docs/report_census.json
+```
+
+It replaces `skills.py`, which had been dead for two sweeps: it read a retired `out/*.json`
+layout and joined display names ("Always Hungry") against CamelCase enum keys, so most rows
+silently missed. The new join normalises on `[^a-z0-9]` (collapsing Bone Head / Bone-Head /
+bone head, Claw / Claws, Side Step / Sidestep, Timmm-ber! / Timmmber) and matches modifier
+names by **substring**, because they are phrases — `1 for being marked with Prehensile Tail`,
+`2 Disturbing Presences`. An exact-match join reports both of those skills as dark; they are
+not.
+
+**Reconciliation with §H.54's hand count.** That section said "26 invisible, 10 silent";
+this says **21 never named, 10 dead site**, over **98** distinct fielded skills (107 display
+names). The 10 agree. The 26 → 21 is the substring fix plus the spelling collapse, not a
+change in the engine.
+
+### The three-way split — the finding that orders the queue
+
+The dead mechanics do not share one cause:
+
+1. **Never offered.** `legal_actions/mod.rs` surfaces 27 of 57 `PlayerAction` variants (via
+   `PlayerActionChoice`, through its own `PAC::X => PA::Y` table — `HypnoticGaze` becomes
+   `Gaze`). Stab, BreatheFire, ProjectileVomit (+`PutridRegurgitation*`), Chainsaw-as-action,
+   Swoop, DumpOff, HailMaryBomb, StandUp, RemoveConfusion are **not offered at all**. No
+   agent could ever pick them.
+2. **Offered, never chosen — the agent.** `heuristic_agent.rs` scores 16 action kinds; only
+   **14 of 57 are ever declared**. `Gaze` is offered to bb2016 vampires and declared zero
+   times; `StandUpBlitz` (the Jump Up path) is offered *and* scored and declared zero times;
+   `DumpOff` is declined 3,619 times and executed zero. This is the dominant lever.
+3. **No emit site.** `GameEvent::BreatheFireRoll` is constructed only in
+   `ffb-server/src/net/wire.rs` and `ffb-parity/src/coverage_report.rs` — **the engine has
+   none** (`grep -rn "GameEvent::BreatheFireRoll" crates/ffb-engine` → 0 hits).
+
+Kickoff is **16/16** and activations are even across every drafted position in every gate
+(32,537–53,959 per cell over its three scale gates). Neither is a gap; stop looking there.
+
+### The queue, cheapest and most certain first
+
+1. **`BreatheFireRoll` has no engine emit site.** chaos_dwarf bb2020/bb2025 field Breathe
+   Fire and nothing can observe it. Smallest, most certain defect in this report.
+2. **Nine one-sided streams** — a report never produced although the mechanic demonstrably
+   runs: `throwAtStallingPlayer` (event 412), `kickTeamMateRoll` (action 4,566 +
+   `kickTeamMateFumble` 181), `swoopDirectionRoll` and `swoopDistanceRoll` (event
+   `swoopPlayer` 62), `passBlock` (event 850), `nervesOfSteel` (modifier 1,135),
+   `winningsRoll` (event 65,994), `blockReRoll` (Brawler/Pro on 8 squads), `oldPro`. Same
+   shape as the §H.54 batch: report-layer fidelity, not game divergence.
+3. **Diagnose the not-offered set against Java's ParityRunner** — Stab, BreatheFire,
+   ProjectileVomit, Chainsaw, Swoop, DumpOff, Fumblerooskie. If Java does not offer them
+   either, the cap is the shared harness and the item is a documented limit, not a Rust bug.
+   Decide this before writing any `legal_actions` change.
+4. **Agent repertoire — the main coverage lever.** One mechanic at a time, each with its own
+   parity gate, in the shape of §§9–12: `Gaze` (unblocks Hypnotic Gaze, vampire ×3),
+   `StandUpBlitz` (unblocks Jump Up, **20 squads** — the widest single gap),
+   `DumpOff` execution, `MultipleBlock` (offered, no scorer term), `FoulMove` and
+   `KickEmBlitz` (scored branches the offer set never reaches — confirm they are not dead
+   code before adding terms).
+5. **The remaining dead sites once their gate is open**: Projectile Vomit (16 squads),
+   Shadowing (10) / Tentacles (3) — the §H.54 Shadowing-accept thread continues here —
+   Pick-me-up (3), Trickster (2, no skill-specific report exists today), Pro (1).
+6. **Diving Tackle and Guard**: both fielded and named nowhere. Java names dodge and assist
+   modifiers, so check whether a named modifier is expected. Diving Tackle is a −2 dodge
+   modifier; Guard is visible today only as a *smaller* assist count, never by name. Verify
+   against Java before treating either as a defect.
+
+### Closed by design — do not schedule
+
+Rosters are fixed and **no star player is drafted in any of the 110 squads**. That makes ~18
+star actions and the inducement / card / wizard / league slice of the 76 never-produced
+reports unreachable by construction. 102 of the 199 distinct `SkillId` variants are fielded
+by no squad at all. None of this is a defect and none of it is backlog material.
+
+
+## §H.56 — 2026-09-16: six report-layer fixes from the gap report, and the bb2016 report stream
+
+§H.55 inventoried the gaps; this is the first pass at closing them. All six changes are
+report-layer: none of them moves a die, and the 150-game validation spread below confirms it.
+The theme is the one §H.54 already named for bb2020 — **a shared step serving every edition
+with the BB2025 report shape** — except that bb2016 had never been brought in line at all.
+
+### What changed
+
+1. **`ReportThrowAtStallingPlayer` had no live emit site.** The driver routes
+   `StepId::StallingPlayer` to the bb2020 rock step, so `bb2020/step_stalling_player.rs`'s own
+   report never ran; the live BB2025 path is `bb2025/shared/stalling_extension.rs`, which
+   emitted the GameEvent and nothing else. Java `StallingExtension.handleStaller:78` adds the
+   report immediately after the roll, before `setStalled` — matched.
+2. **bb2016 was computing BB2025 winnings.** `use crate::step::bb2025::end::*` at the top of
+   `make_step_for` handed every edition the BB2025 `StepWinnings`. BB2016 winnings are ROLLED
+   (2× d6 + FAME + 1) and reported as `winningsRoll`; BB2020+ are computed and reported as
+   `winnings`. Added the BB2016 arm. `winnings` had been 32,997 of 33,000 games — i.e. all
+   8,700 bb2016 games too. Rust's values now match Java's field for field.
+3. **bb2016 `turnEnd` wrote a `heatRoll` Java never emits.** `bb2016/ReportTurnEnd.toJsonValue`
+   stops at `UNZAP_ARRAY`; the mixed one adds `HEAT_ROLL`. The bb2016 Rust report existed but
+   was un-constructible (it imported `model::{knockout_recovery, heat_exhaustion}` rather than
+   the mixed module's helper types) and its `to_json_value` was a stub that hardcoded empty
+   arrays — rewritten, and the shared `bb2025/step_end_turn.rs` now edition-gates the one
+   differing construction. Per the driver.rs:393 lesson this gates the REPORT, not the step.
+   `turnEnd` is the highest-volume report in the sweep (1.14M).
+4. **bb2016 injuries used the mixed shape.** `bb2016/ReportInjury` stops at INJURY_MODIFIERS;
+   `mixed/ReportInjury` also writes SERIOUS_INJURY_OLD, CASUALTY_MODIFIERS and
+   SKIP_INJURY_PARTS. `state_mechanic::add_injury_report` now branches on `game.rules`.
+5. **bb2016 `blockRoll` carried a `defenderId`.** Java's `bb2016/block/StepBlockRoll:133` uses
+   the two-arg constructor; only `StepBlockRollMultiple` passes a target. The Rust comment
+   already quoted the two-arg Java line while passing `game.defender_id`.
+6. **`gettingEvenRoll` always reported an empty keyword.** `StepGettingEven` had no
+   `StepParameterKey.KEYWORD` equivalent, so `keyword_name` stayed None. Added
+   `StepParameter::Keyword` and populated it at the push site in `step_apothecary`, mirroring
+   Java's sorted-by-ordinal set (`keywords.get(0)` when exactly one qualifies — every case the
+   drafted squads produce; more than one is a dialog the harness answers non-seeded, and the
+   value is report-only since `addHatred` is client/model-only).
+
+### Measured
+
+| | before | after |
+|---|---:|---:|
+| bb2016 amazon seed 1, payload diffs | 87 | **18** |
+| bb2025 amazon seed 1, payload diffs | 5 | **4** |
+| bb2016 amazon seed 1, reports only-in-one-stream | 8 / 8 | 8 / 8 |
+
+Unit tests 14,852 pass / 0 fail. Parity validated at 5 seeds on amazon bb2016/bb2020/bb2025
+and 25 seeds on vampire bb2016, nurgle bb2016, goblin bb2020, dwarf bb2020, goblin bb2025,
+nurgle bb2025 — **150/150 games match**, no regression.
+
+### What is still between us and a report-identical stream
+
+None of these were touched, and the first is the one that blocks report identity everywhere:
+
+1. **`playerAction` reports the base action, not the declared one.** Java's
+   `UtilServerGame.changeActingPlayer` reports `pPlayerAction` (FOUL_MOVE, BLITZ_MOVE,
+   PASS_MOVE) while setting `actualAction`; only ALL_YOU_CAN_EAT has a delegate, so the two are
+   the same value and Java stores the …_MOVE variant. Rust's callers pass the base action, so
+   it both stores and reports `foul`/`blitz`/`pass`. **This is not purely cosmetic** —
+   `PlayerAction::is_moving()` is true for the …_MOVE variants and false for the base ones, so
+   changing the call sites changes what the engine thinks the acting player is doing. It needs
+   its own investigation and its own gate; it is 18 of bb2016's remaining diffs and 2 of
+   bb2025's.
+
+   Partially traced 2026-09-16. The difference is at the **activation**, not at the commit:
+   Java's `CLIENT_FOUL` branch (`bb2016/move/StepInitSelecting:147`) passes `PlayerAction.FOUL`
+   exactly as Rust does, but by then `changeActingPlayer` no longer reports — `playerChanged` is
+   false for the same player, so Java's single report per foul is the earlier FOUL_MOVE one.
+   Find the activation site, not the commit site.
+
+   **Do not treat this as a report-only change.** Thirteen Java files READ the …_MOVE variants,
+   and five of them gate real dice: `RollMechanic` (bb2016/bb2020/bb2025) plus
+   `WildAnimalBehaviour`, `AnimalSavageryBehaviour`, `BloodLustBehaviour`,
+   `UnchannelledFuryBehaviour` and `FoulAppearanceBehaviour`, which all test
+   `playerAction == BLITZ_MOVE` for their "good conditions" branch. The rest are
+   `ServerUtilBlock`, `StepEndBlocking`, `StepEndMoving`, `StepInitBlocking`, `StepInitMoving`,
+   `StepInitSelecting`, `StepSelectBlitzTargetEnd`. Rust already passes `BlitzMove` at some
+   sites (`bb2016/block/step_end_blocking.rs:245`, `bb2016/move_/step_end_selecting.rs:170`)
+   and the base action at others, so the first job is to map which site feeds the report, not
+   to change them all.
+2. **`blockRoll` `choosingTeamId`** — ROOT-CAUSED 2026-09-16, fix not yet applied (the matrix
+   was mid-run; apply and gate it on its own). Java `bb2025/block/StepBlockRoll:349-355`:
+
+   ```java
+   String teamId = game.isHomePlaying() ? home : away;
+   if ((fNrOfDice < 0) && (noReRollUsed
+        || (properties.stream().noneMatch(ReRollProperty::isActualReRoll) && actionToSource.isEmpty()))) {
+     ...
+     teamId = game.isHomePlaying() ? away : home;   // the DEFENDER is choosing
+   }
+   ```
+
+   Rust's report site derives `team_id` from `game.home_playing` alone and never flips, so a
+   2-dice-against block with no re-roll on offer names the acting team instead of the defender.
+   The flip condition is already understood in this very file — `team_reroll_option`'s doc
+   comment spells it out ("TRR *is* an actual re-roll, so a first pass with a team re-roll in
+   the bank ... addresses the dialog to the ACTING team even on 2-dice-against") — the report
+   just never used it. First cut: flip when `nr_of_dice < 0 && !team_reroll_option(game)`, but
+   check Brawler/Hatred/Pro against Java's `isActualReRoll` set before trusting it.
+   Report-only in effect: the same comment records that BOTH engines derive the die choice from
+   `nr_of_dice >= 0`, not from the dialog's choosing team, which is why parity never saw it.
+3. **`mostValuablePlayers`** — CONFIRMED a harness-contract mismatch 2026-09-16, not a random
+   -number bug. Java `bb2025/end/StepMvp` shows a `DialogPlayerChoiceParameter` whenever more
+   than one player is eligible, and `ParityRunner:1589-1592` answers it with **`pids[0]`** --
+   "pick the first available player object" -- after which `randomPlayerId` draws from that
+   one-element nomination array and trivially returns it. So Java's MVP is deterministically
+   the FIRST eligible player (home_01/away_01 in the observed seed); Rust picks at random over
+   all eligible (home_10/away_07).
+
+   Fix: mirror the harness -- take the first entry of the eligible list rather than drawing.
+   Post-game and therefore outside the compared window (which is why 330 green gates never saw
+   it), so it is report-fidelity only, one report per game.
+4. **bb2016 runs the BB2020+ end-game SEQUENCE.** ROOT-CAUSED 2026-09-16, fix not yet applied.
+   `step/sequences.rs::end_game_sequence` is edition-blind and hardcodes
+   `SequenceStep::new(StepId::DedicatedFans)`; there is no `FanFactor` in it at all. The
+   correct bb2016 sequence already exists at `step/generator/bb2016/end_game.rs` (`InitEndGame
+   → PenaltyShootout → Mvp → Winnings → FanFactor → PlayerLoss → EndGame`) and is DEAD — the
+   only references to `EndGame::build_sequence` are inside its own `#[cfg(test)]` module.
+   That is exactly why bb2016 streams carry `dedicatedFans` (a BB2020+ concept) and lack
+   `fanFactorRoll`. This is the same class as fix 2 in this section, one level up: fix 2 routed
+   the STEP, this needs the SEQUENCE edition-gated.
+
+   Like the winnings fix it changes bb2016 end-game dice, which the winnings change already
+   demonstrated is outside the compared window (bb2016 stayed 25/25 across the switch) — but
+   gate it rather than assume.
+
+   The rest of that seed's only-in-one-stream set is NOT this bug and should not be swept in
+   with it: `pettyCash` ×2, `cardsBought` ×2 and `inducementsBought` ×2 are only-in-Java
+   because the parity harness runs a flattened pregame that deliberately skips PettyCash and
+   BuyInducements (see the `push_end_game_sequence` neighbourhood in driver.rs) — expected, not
+   a defect. The only-in-Rust `reRoll` ×6 IS explained, and is a
+   separate defect worth its own item: **Rust adds the same `ReportReRoll` twice per skill
+   re-roll.** bb2016 amazon seed 1 has 20 rust reports against Java's 14 over only 13 distinct
+   stream positions -- at i=8, 16, 20, 69 and 119 the same (playerId, reRollSource) pair appears
+   as `successful:true` immediately followed by `successful:false`, and i=101 three times:
+
+   ```
+   {"i":8,"playerId":"home_13","reRollSource":"Dodge","reportId":"reRoll","successful":true}
+   {"i":8,"playerId":"home_13","reRollSource":"Dodge","reportId":"reRoll","successful":false}
+   ```
+
+   The payload is CORRECT -- playerId and reRollSource are both present and match Java -- only
+   the duplication is wrong. The true/false pairing points at
+   `util_server_re_roll::use_reroll` being called twice for one re-roll: its skill branch
+   (line ~413) computes `successful = !player.used_skills.contains(&id)` and then inserts the
+   id, so a first call reports true and marks it used while a second call on the same skill
+   reports false. Java calls `useReRoll` once. Check the call path before changing anything:
+   `use_reroll` has ~100 call sites and the second call's RETURN value may be load-bearing, so
+   the fix may be to stop the second CALL rather than the second REPORT.
+
+
+## §H.57 — 2026-09-16: the EXHAUSTIVE coverage backlog (no roster changes)
+
+§H.56's six fixes moved the report stream from 87 to 89 of 164 kinds. That is a small return,
+and the reason is that §H.56 fixed what the report DIFF happened to show on two seeds rather
+than working from the denominators. This section works from the denominators.
+
+**The headline: the ceiling is 147 of 164, not 89.** Of the 74 never-produced report kinds,
+only 16 are genuinely locked behind drafting a star player. The other **58 are reachable
+without touching a roster**:
+
+| bucket | kinds | lever |
+|---|---:|---|
+| star-player traits (EXCLUDED — needs a roster change) | 16 | — |
+| pregame: inducements, cards, wizards, staff | **24** | harness feature (§E) |
+| engine report-layer: sites that never construct | **24** | engine (§C, §D) |
+| agent never reaches the mechanic | **10** | mostly legal_actions (§B), little agent (§A) |
+
+Same story on the other two denominators: **88 of 129 GameEvents** emitted (41 never), and
+**14 of 57 PlayerActions** ever declared (27 offered, 16 scored).
+
+Ordered by coverage-per-unit-effort. **§E is where the volume is** (24 kinds from one
+switched-off pregame); **§C is where the certainty is** (sites that simply never construct);
+**§D is the only one that finds bugs we do not already know about**. §A is deliberately LAST
+and small: the agent turned out to be healthy (see the correction at the head of that section),
+so agent work is the worst coverage-per-effort of the five, not the best.
+
+---
+
+### §A — Agent-side gaps (much smaller than first written — see the correction)
+
+> **CORRECTION, 2026-09-16.** The first draft of this section claimed the agent's scoring rate
+> was "inverted" and that random football outscored argmax 31x. **That was wrong: the
+> `--heur-scale` semantics were read backwards.** `main.rs:73` documents `0 = argmax`, and
+> `heuristic_agent.rs:2024` computes `t = t_base * temp_scale`, so a LARGER scale is a HIGHER
+> softmax temperature, i.e. more random. `@1e6` is near-uniform random, `@0` is argmax. The
+> withdrawn claim and the A1 item built on it are struck below. Thanks to the reviewer who
+> caught it — the numbers were right, the labels were not.
+
+Read correctly, over the 2026-09-16 matrix at 11,000 games per scale:
+
+| heur-scale | what it is | TD/game | pickups/game | GFI/game | handOver/game |
+|---|---|---:|---:|---:|---:|
+| `0` | **argmax** (no agent RNG) | **1.85** | 6.4 | 2.3 | 1.50 |
+| `1.0` | nominal temperature | 0.44 | 3.1 | 48.6 | 0.57 |
+| `1e6` | **≈ uniform random** | 0.06 | 1.5 | 55.1 | 0.28 |
+
+This is a **healthy** picture, not a broken one. The argmax agent scores 1.85 touchdowns a
+game, picks the ball up four times more often than the random policy, and Goes For It 2.3
+times a game rather than 55 — careful, purposeful play. The random policy barely scores,
+which is exactly what a random policy should do.
+
+**~~A1. Give the scorer a ball-and-end-zone term.~~ WITHDRAWN.** It was based on the inverted
+reading. The scorer already values the ball and the end zone, and the evidence for that is the
+4x pickup rate and the 31x scoring rate at argmax over random. Do not spend effort here.
+
+**A2. The six gates that fail the REQUIRED `touchdowns` checklist item are all `@1e6`** —
+chaos bb2016, dwarf bb2016, dwarf bb2020, khemri bb2025, khorne bb2025, nurgle bb2025 — and
+none are `@0` or `@1.0`. At 0.06 TD/game a 100-game gate expects ~6 touchdowns, so a gate
+with zero is ordinary variance for a uniform-random policy, not an engine or agent defect.
+**This is a checklist calibration bug, not a coverage bug**: `t3_checklist.rs:109` marks
+`touchdowns` `required: true` unconditionally. Either make the requirement scale-aware (drop
+it at high temperature) or mark it blocked there with the reason. Right now it produces a
+standing red that is guaranteed never to clear and trains everyone to ignore the checklist.
+
+**A3. Offered actions the agent never chooses**, at ANY scale, so not a temperature artifact:
+`Gaze` (offered to bb2016 vampires at `legal_actions/mod.rs:636`, declared ZERO times —
+unlocks `hypnoticGazeRoll` + `selectGazeTarget`), `MultipleBlock` (offered, no scorer term),
+`SecureTheBall`. A zero at all three scales cannot be explained by sampling; either the offer
+never reaches the scorer or the scorer has no term for it.
+
+**A4. `DumpOff` is declined 3,619 times and executed zero** — it is not in the offer set at all
+(§B), so the agent cannot take it even when it would.
+
+**A5. The three scales have genuinely complementary coverage, and the census hides that.**
+Argmax gives ball play, scoring and careful movement; the random end gives GFI volume, wild
+passes and positional chaos. The census SUMS all three, so a mechanic reached only at one
+temperature reads as covered. A per-scale coverage view would show which mechanics depend on
+the sampler rather than on the engine — and would have made the A1 error obvious immediately.
+
+**A6. Do not tune the scorer on coverage alone.** [[heuristic_agent_ballmoves]] records that
+three separate tuning attempts measured worse, and that passing was under-powered rather than
+mistuned. Coverage is a poor objective for a scorer whose job is parity; prefer §B/§C/§D/§E,
+which raise coverage without touching agent behaviour at all.
+
+---
+
+### §B — `legal_actions` never offers 30 of the 57 actions
+
+No agent can pick what is never offered. `legal_actions/mod.rs` surfaces 27 of 57
+`PlayerActionChoice` variants (via its own `PAC::X => PA::Y` table). Never offered, and
+reachable from a FIELDED skill:
+
+| action | fielded on | unlocks |
+|---|---|---|
+| `Stab` | 11 squads | the Stab action (the 444 "gains Stab" hits are the STILETTO prayer, not the skill) |
+| `ProjectileVomit` + `PutridRegurgitation{Move,Blitz,Block}` | 16 squads | `projectileVomit` report + event |
+| `BreatheFire` | 2 squads | `breatheFire` (also needs C1) |
+| `Chainsaw` | 3 squads | the Chainsaw ACTION (the roll fires 144x via block only) |
+| `Swoop` | 2 squads | `swoopDirectionRoll`, `swoopDistanceRoll` |
+| `Fumblerooskie` | 1 squad | `fumblerooskie` report + event |
+| `DumpOff` | 6 squads | the execution path behind 3,619 declines |
+| `HailMaryBomb` | Bombardier ×5 | — |
+| `RemoveConfusion` | Bone Head / Really Stupid / Take Root, 63 squads | — |
+
+Also never offered but star-only, so out of scope: `MaximumCarnage`, `TheFlashingBlade`,
+`ViciousVines`, `Incorporeal`, `Chomp`, `KickEmBlock`, `Forgo`.
+
+**B0. Do the Java check FIRST, once, for the whole list.** If `ParityRunner` does not offer
+these either, the cap is the shared harness and every row changes shape from "Rust defect" to
+"harness feature". One investigation covers all nine rows — do not start nine separate fixes.
+
+---
+
+### §C — Engine report-layer: 24 kinds whose construction site never runs
+
+No agent and no roster involvement. Highest certainty per unit effort in this document.
+
+**C1. `BreatheFireRoll` has NO engine emit site at all.** Constructed only in
+`ffb-server/src/net/wire.rs` and `ffb-parity/src/coverage_report.rs`. Smallest, most certain
+defect known.
+
+**C2. One-sided streams — the mechanic demonstrably runs, the report never fires**:
+`passBlock` (event 850), `kickTeamMateRoll` (action 4,566 + `kickTeamMateFumble` 181),
+`nervesOfSteel` (modifier 1,135), `blockReRoll` (Brawler/Pro on 8 squads), `oldPro`,
+`swoopDirectionRoll` / `swoopDistanceRoll` (event `swoopPlayer` 62), `throwAtPlayer`.
+`winningsRoll` and `throwAtStallingPlayer` were this exact shape and §H.56 closed both.
+
+**C3. Never constructed, no agent dependency** — 15 kinds, each needing a Java-site check to
+find where it belongs: `indomitable`, `skillWasted`, `skillUseOtherPlayer`,
+`modifiedDodgeResultSuccessful`, `modifiedPassResult`, `placedBallDirection`, `prayerAmount`,
+`prayerWasted`, `teamEvent`, `kickoffSequenceActivationsCount`,
+`kickoffSequenceActivationsExhausted`, `noPlayersToField`, `apothecaryChoice`, `gameOptions`,
+`timeoutEnforced`. Cheap individually; 15 kinds together.
+
+**C4. `penaltyShootout`** — needs a drawn game plus knockout mode: a harness game-option, not a
+roster change.
+
+**C5. `fumbblResultUpload`** — genuinely unreachable offline. Mark exempt so it stops counting
+against the denominator.
+
+**C6. Rust adds the same `ReportReRoll` TWICE per skill re-roll** (20 against Java's 14 on
+bb2016 amazon seed 1). Traced in §H.56; probably a double `use_reroll` call, and the second
+call's return value may be load-bearing.
+
+**C7. Never-emitted EVENTS with no report twin**: `BallScattered`, `SpecialEffectRoll`.
+
+---
+
+### §D — Edition-blind shared code (the class that produced every §H.56 win)
+
+Four of §H.56's six fixes were one bug shape: shared step / report / sequence code serving all
+three editions with the BB2025 shape. **This shape has never been audited systematically** —
+every instance so far was found by accident, from a report diff on one seed.
+
+**D1. Known and pending: `step/sequences.rs::end_game_sequence` is edition-blind** and hardcodes
+`DedicatedFans` with no `FanFactor` anywhere in it. The correct bb2016 sequence exists at
+`step/generator/bb2016/end_game.rs` and is DEAD CODE — its only callers are its own tests.
+Unlocks `fanFactorRoll`.
+
+**D2. Audit every `use crate::step::bb2025::*` glob and every shared `sequences.rs` builder**
+against Java's `@RulesCollection` annotations. Java states the edition of every class
+explicitly; Rust's driver re-derives it by hand and silently falls through to BB2025. A
+mechanical cross-check of the two lists finds the rest of this class in one pass instead of one
+seed-diff at a time. **Highest-leverage engine item in this document**, because it is the only
+one that finds bugs we do not already know about.
+
+**D3. Dead bb2016/bb2020 twins generally.** `bb2016/step_end_turn.rs`,
+`generator/bb2016/end_game.rs` and `bb2020/step_stalling_player.rs` were all complete ports
+sitting unreferenced. Enumerate every `step/bb2016/**` and `step/bb2020/**` file the driver
+never instantiates; each is either a routing bug or should be deleted.
+
+---
+
+### §E — Harness: the pregame is switched off, and it is 24 report kinds
+
+The parity harness runs a flattened pregame that skips `PettyCash` and `BuyInducements`
+entirely. That one omission accounts for **24 of the 74** never-produced kinds:
+`pettyCash`, `freePettyCash`, `inducement`, `inducementsBought`, `cardsBought`,
+`cardsAndInducementsBought`, `prayersAndInducementsBought`, `playCard`, `cardEffectRoll`,
+`cardDeactivated`, `wizardUse`, `weatherMageRoll`, `weatherMageResult`, `masterChefRoll`,
+`bribesRoll`, `biasedRef`, `saboteurRoll`, `mascotUsed`, `defectingPlayers`, `riotousRookies`,
+`twoForOne`, `doubleHiredStaff`, `pumpUpTheCrowdReRoll`, `pumpUpTheCrowdReRollLost`.
+
+**E1. Turn the pregame on in both engines.** **Scope caveat, stated plainly**: inducements are
+bought with the team's treasury, which lives in the team spec. Enabling the pregame is a
+harness / game-option change, not a roster edit — but it makes the drafted squads' treasury
+meaningful, which is adjacent to "changing the rosters". This is the largest single reporting
+item in the document and it needs an explicit decision before anyone starts it.
+
+**E2. Game options are never exercised**: `MVP_NOMINATIONS`, `EXTRA_MVP`, admin mode. Unlocks
+`gameOptions` and the multi-MVP paths.
+
+**E3. Concession never happens**, so every concede branch is dead — including the
+`concedeWinnings` transfer §H.56 just wired into the bb2016 winnings step.
+
+**E4. MVP selection mismatch** (§H.56 item 3): `ParityRunner:1589` answers with `pids[0]`;
+Rust draws at random. Mirror the harness.
+
+**E5. `timeoutEnforced`** needs the clock, which the harness does not run.
+
+---
+
+### §F — Coverage instrumentation (how we stop losing ground)
+
+**F1. The event stream is NOT part of the compared state hash, so event regressions are
+invisible to all 330 gates.** Demonstrated today: the §H.56 bb2016 `ReportTurnEnd` change broke
+a `downcast_ref` in the driver's report-to-event bridge and dropped bb2016 `heatExhaustion`
+from **39,407 to ZERO** while every gate stayed 100/100. It was caught only by diffing the new
+census against the previous sweep by hand.
+**Make that diff automatic**: after each sweep, compare per-event-kind counts against the
+previous census and fail loudly when a kind drops to zero or moves beyond a threshold. Cheapest
+high-value item in this document.
+
+**F2. Wire `gaps.py` into the sweep** so the gap report regenerates with the census rather than
+being run by hand.
+
+**F3. Per-scale coverage view** (see A5), so scale-specific holes stop hiding in the sum.
+
+**F4. Mark genuinely-unreachable kinds exempt** (`fumbblResultUpload`, and star-only traits
+while no stars are drafted) so the denominator reflects what is actually in play.
+
+---
+
+### What is NOT addressable without a roster change
+
+16 roster-locked report kinds, in two groups.
+
+**Star-player traits and hires** (13): `allYouCanEat`, `balefulHex`, `catchOfTheDay`,
+`chompRoll`, `chompRemoved`, `lookIntoMyEyesRoll`, `raidingParty`, `thenIStartedBlastin`,
+`thrownKeg`, `weepingDaggerRoll`, `teamCaptainRoll`, `showStarReRoll`, `showStarReRollLost`,
+plus `doubleHiredStarPlayer`.
+
+**Ordinary skills that simply no drafted squad carries** (3): `leader` (Leader),
+`pilingOn` (Piling On / Pile Driver), `indomitable` (Indomitable) — verified against
+`inventory.json`. These are NOT star-only; any roster that starts with the skill would reach
+them, so they are locked by the drafting decision rather than by the star-player rule. Listed
+here for honesty about why they are out of scope, not because they are exotic.
+(`indomitable` also appears in C3 above, which is wrong: with the skill unfielded there is no
+site to reach, so treat C3 as 14 kinds, not 15.)
+
+Also ~18 star `PlayerAction` variants, and 102 of the 199 `SkillId` variants no drafted
+squad carries.
+
+Also the 19 genuinely passive fielded skills — Block, Frenzy, Thick Skull, Sprint, Brawler,
+Unsteady, No Hands, Timmm-ber!, On the Ball, No Ball, My Ball, Hatred, Insignificant, Grab,
+Iron Hard Skin, Plague Ridden, Nurgle's Rot, Running Pass, Give and Go — which raise no
+telemetry in EITHER engine and never will. The two exceptions worth checking are **Diving
+Tackle** and **Guard**, which Java may name as roll/assist modifiers.

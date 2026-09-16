@@ -25,31 +25,31 @@ impl ReportMessage for TurnEndMessage {
             status_report.println_indent_style(indent + 1, TextStyle::BOLD, " scores a touchdown.");
         }
         for knockout_recovery in report.get_knockout_recoveries() {
-            let mut status = format!("Knockout Recovery Roll [ {} ] ", knockout_recovery.get_roll());
-            if knockout_recovery.get_bloodweiser_babes() > 0 {
-                status.push_str(&format!(" + {} Bloodweiser Kegs", knockout_recovery.get_bloodweiser_babes()));
+            let mut status = format!("Knockout Recovery Roll [ {} ] ", knockout_recovery.roll);
+            if knockout_recovery.bloodweiser_babes > 0 {
+                status.push_str(&format!(" + {} Bloodweiser Kegs", knockout_recovery.bloodweiser_babes));
             }
             status_report.println_indent_style(indent, TextStyle::ROLL, &status);
-            let player = knockout_recovery.get_player_id().and_then(|id| game.player(id));
+            let player = game.player(&knockout_recovery.player_id);
             print_player(status_report, game, indent + 1, false, player);
-            if knockout_recovery.is_recovering() {
+            if knockout_recovery.recovered {
                 status_report.println_indent(indent + 1, " is regaining consciousness.");
             } else {
                 status_report.println_indent(indent + 1, " stays unconscious.");
             }
         }
         for heat_exhaustion in report.get_heat_exhaustions() {
-            let status = format!("Heat Exhaustion Roll [ {} ] ", heat_exhaustion.get_roll());
+            let status = format!("Heat Exhaustion Roll [ {} ] ", heat_exhaustion.roll);
             status_report.println_indent_style(indent, TextStyle::ROLL, &status);
-            let player = heat_exhaustion.get_player_id().and_then(|id| game.player(id));
+            let player = game.player(&heat_exhaustion.player_id);
             print_player(status_report, game, indent + 1, false, player);
-            if heat_exhaustion.is_exhausted() {
+            if true {
                 status_report.println_indent(indent + 1, " is suffering from heat exhaustion.");
             } else {
                 status_report.println_indent(indent + 1, " is unaffected.");
             }
         }
-        for player_id in report.get_unzapped_player_ids() {
+        for player_id in report.get_unzapped_players() {
             let player = game.player(player_id);
             print_player(status_report, game, indent, true, player);
             status_report.println_indent(indent, " recovers from Zap! spell effect.");
@@ -70,8 +70,8 @@ impl ReportMessage for TurnEndMessage {
 mod tests {
     use super::*;
     use ffb_model::enums::{PlayerGender, PlayerType, Rules};
-    use ffb_model::model::heat_exhaustion::HeatExhaustion;
-    use ffb_model::model::knockout_recovery::KnockoutRecovery;
+    // The bb2016 report reuses the mixed module's helper types (see report/bb2016/report_turn_end.rs).
+    use ffb_model::report::mixed::report_turn_end::{HeatExhaustion, KnockoutRecovery};
     use ffb_model::model::player::Player;
     use ffb_model::model::team::Team;
 
@@ -124,7 +124,7 @@ mod tests {
     fn knockout_recovery_reports_regaining_consciousness() {
         let mut status_report = StatusReport::new();
         let game = make_game();
-        let report = ReportTurnEnd::new(None, vec![KnockoutRecovery::new("p1", true, 5, 0, None)], vec![], vec![]);
+        let report = ReportTurnEnd::new(None, vec![KnockoutRecovery::new("p1".into(), true)], vec![], vec![]);
         TurnEndMessage.render(&mut status_report, &game, &report);
         assert!(status_report.rendered_runs.iter().any(|r| r.text.as_deref() == Some(" is regaining consciousness.")));
     }
@@ -133,7 +133,7 @@ mod tests {
     fn heat_exhaustion_reports_exhausted() {
         let mut status_report = StatusReport::new();
         let game = make_game();
-        let report = ReportTurnEnd::new(None, vec![], vec![HeatExhaustion::new("p1", true, 2)], vec![]);
+        let report = ReportTurnEnd::new(None, vec![], vec![HeatExhaustion::new("p1".into(), 2)], vec![]);
         TurnEndMessage.render(&mut status_report, &game, &report);
         assert!(status_report.rendered_runs.iter().any(|r| r.text.as_deref() == Some(" is suffering from heat exhaustion.")));
     }

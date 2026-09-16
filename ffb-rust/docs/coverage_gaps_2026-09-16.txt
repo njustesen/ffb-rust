@@ -1,0 +1,178 @@
+COVERAGE GAPS  --  330 gates, 33000 games, 110 squads
+fielded skills 98   exercised 67   DEAD SITE 10   never named 21   thin (<1000) 22
+
+== A. FIELDED, dedicated telemetry exists, NEVER fired ==
+  Jump Up                 20 squads  event jumpUpRoll + report jumpUpRoll
+                           amazon__bb2020, amazon__bb2025, dark_elf__bb2016, dark_elf__bb2020, dark_elf__bb2025, dark_elf_league_fumbbl__bb2016, dark_elf_league_fumbbl__bb2020, dark_elf_league_fumbbl__bb2025, gnome__bb2020, gnome__bb2025, khorne__bb2025, norse__bb2016, norse__bb2020, norse__bb2025, slann__bb2016, slann__bb2020, slann__bb2025, slann_fumbbl__bb2016, slann_fumbbl__bb2020, slann_fumbbl__bb2025
+  Projectile Vomit        16 squads  event projectileVomitRoll + report projectileVomit
+                           black_orc__bb2020, black_orc__bb2025, chaos_chaostroll__bb2020, chaos_pact__bb2020, chaos_troll__bb2025, goblin__bb2020, goblin__bb2025, orc__bb2020, orc__bb2025, renegades_37730__bb2020, renegades_37733__bb2025, renegades__bb2025, snotling__bb2020, snotling__bb2025, underworld__bb2025, underworld_underworldtroll__bb2020
+  Shadowing               10 squads  report tentaclesShadowingRoll
+                           chaos_dwarf__bb2020, chaos_dwarf__bb2025, dark_elf__bb2016, dark_elf__bb2020, dark_elf__bb2025, dark_elf_league_fumbbl__bb2016, dark_elf_league_fumbbl__bb2020, dark_elf_league_fumbbl__bb2025, lizardman__bb2020, lizardman__bb2025
+  Tentacles                3 squads  report tentaclesShadowingRoll
+                           nurgle__bb2016, nurgle__bb2020, nurgle__bb2025
+  Hypnotic Gaze            3 squads  event hypnoticGazeRoll + report hypnoticGazeRoll
+                           vampire__bb2016, vampire__bb2020, vampire__bb2025
+  Pick-me-up               3 squads  event pickMeUpRoll + report pickMeUp
+                           norse__bb2020, norse__bb2025, nurgle__bb2025
+  Breathe Fire             2 squads  event breatheFireRoll + report breatheFire
+                           chaos_dwarf__bb2020, chaos_dwarf__bb2025
+  Trickster                2 squads  report trapDoor (shared, not skill-specific)
+                           gnome__bb2020, gnome__bb2025
+  Fumblerooski             1 squads  event fumblerooskie + report fumblerooskie
+                           elf__bb2025
+  Pro                      1 squads  event proRoll + report oldPro
+                           imperial_nobility__bb2025
+
+== B. FIELDED, the engine names it nowhere (no event, no report, no modifier) ==
+  Thick Skull             68 squads  black_orc__bb2020, black_orc__bb2025, chaos__bb2016, chaos__bb2020 ...
+  Block                   61 squads  amazon__bb2016, bretonnian__bb2025, chaos_dwarf__bb2016, chaos_dwarf__bb2020 ...
+  Frenzy                  42 squads  chaos__bb2016, chaos__bb2020, chaos__bb2025, chaos_dwarf__bb2016 ...
+  Sprint                  12 squads  chaos_dwarf__bb2016, chaos_dwarf__bb2020, chaos_dwarf__bb2025, dwarf__bb2025 ...
+  Diving Tackle            9 squads  dwarf__bb2025, old_world_alliance_ogre__bb2025, old_world_alliance_treeman__bb2025, slann__bb2016 ...
+  Brawler                  7 squads  black_orc__bb2020, black_orc__bb2025, chaos_dwarf__bb2020, chaos_dwarf__bb2025 ...
+  Unsteady                 7 squads  chaos_dwarf__bb2025, lizardman__bb2025, necromantic__bb2025, norse__bb2025 ...
+  No Hands                 6 squads  dwarf__bb2016, dwarf__bb2020, goblin__bb2016, goblin__bb2020 ...
+  Timmm-ber!               6 squads  gnome__bb2020, gnome__bb2025, halfling__bb2020, halfling__bb2025 ...
+  On the Ball              4 squads  amazon__bb2020, amazon__bb2025, lizardman__bb2020, lizardman__bb2025
+  No Ball                  4 squads  dwarf__bb2025, goblin__bb2025, necromantic__bb2025, norse__bb2025
+  My Ball                  3 squads  gnome__bb2020, gnome__bb2025, high_elf__bb2025
+  Hatred                   3 squads  dwarf__bb2025, old_world_alliance_ogre__bb2025, old_world_alliance_treeman__bb2025
+  Insignificant            3 squads  snotling__bb2025, underworld_37844__bb2025, underworld__bb2025
+  Grab                     2 squads  black_orc__bb2020, black_orc__bb2025
+  Iron Hard Skin           2 squads  chaos_dwarf__bb2020, chaos_dwarf__bb2025
+  Guard                    2 squads  gnome__bb2020, gnome__bb2025
+  Plague Ridden            2 squads  nurgle__bb2020, nurgle__bb2025
+  Nurgle's Rot             1 squads  nurgle__bb2016
+  Running Pass             1 squads  imperial_nobility__bb2020
+  Give and Go              1 squads  imperial_nobility__bb2025
+
+== C. FIELDED and exercised, but fewer than 1000 times ==
+  Cloud Burster            2 squads        3   report cloudBurster=3
+  Safe Throw               1 squads        4   event safeThrowRoll=4
+  Safe Pass                4 squads        9   report SkillUse=9; event skillUse=9
+  Side Step               16 squads       11   report SkillUse (declined)=11; event skillUse (declined)=11
+  Hail Mary Pass           1 squads       22   action HailMaryPass=22
+  Diving Catch             7 squads       60   report rollModifiers "Diving Catch"=60; report SkillUse (declined)=1
+  Swoop                    2 squads       62   event swoopPlayer=62
+  Strip Ball               5 squads      106   report SkillUse=106; event skillUse=106
+  Safe Pair of Hands       4 squads      117   report SkillUse (declined)=117; event skillUse (declined)=117
+  Break Tackle             4 squads      143   report rollModifiers "Break Tackle ST 3-"=143; report rollModifiers "Break Tackle ST 5+"=129
+  Punt                     1 squads      183   action Punt=183
+  Dirty Player             7 squads      333   report armorModifiers "Dirty Player"=333; report injuryModifiers "Dirty Player"=161
+  Stab                    11 squads      444   report playerEvent "gains Stab"=444
+  Juggernaut              10 squads      565   report SkillUse=565; event skillUse=540
+  Leap                    13 squads      664   event jumpRoll=664; report rollModifiers "Leap"=162
+  Very Long Legs           7 squads      664   event jumpRoll=664; report rollModifiers "Very Long Legs"=401
+  Pogo Stick               2 squads      664   event jumpRoll=664
+  Pogo                     2 squads      664   event jumpRoll=664
+  Ball and Chain           3 squads      820   event escapeRoll=820
+  Chainsaw                 3 squads      828   report armorModifiers "Chainsaw"=828; event chainsawRoll=144
+  Sure Feet                3 squads      847   report ReRoll source=847
+  Hit and Run              3 squads      993   report SkillUse=993; event skillUse=993
+
+== D. Fielded by a squad, never exercised in that squad's own gates ==
+  Side Step                6 cells: elf__bb2016, ogre__bb2016, gnome__bb2020, necromantic__bb2020, ogre__bb2020, snotling__bb2020
+  Diving Catch             6 cells: slann__bb2016, slann__bb2020, slann_fumbbl__bb2020, elf__bb2025, slann__bb2025, slann_fumbbl__bb2025
+  Tackle                   4 cells: chaos_dwarf__bb2016, dwarf__bb2016, dwarf__bb2020, dwarf__bb2025
+  Safe Pass                2 cells: amazon__bb2020, high_elf__bb2020
+  Pass                     2 cells: khemri_fumbbl__bb2020, khemri_fumbbl__bb2025
+  Sidestep                 1 cells: snotling__bb2025
+
+== E. Actions: 14 of 57 declared, 27 offered by legal_actions, 16 scored by the agent ==
+  declared  Move                        4272202
+  declared  Block                        455756
+  declared  BlitzMove                    207716
+  declared  ThrowTeamMate                101363
+  declared  Blitz                         72864
+  declared  Foul                          65133
+  declared  PassMove                      21634
+  declared  HandOverMove                  21411
+  declared  ThrowBomb                      8844
+  declared  Pass                           6214
+  declared  HandOver                       5563
+  declared  KickTeamMate                   4566
+  declared  Punt                            183
+  declared  HailMaryPass                     22
+  -- never declared --
+    BlitzSelect                NOT offered by legal_actions
+    FoulMove                   scored by agent
+    StandUp                    NOT offered by legal_actions
+    ThrowTeamMateMove          NOT offered by legal_actions
+    RemoveConfusion            NOT offered by legal_actions
+    Gaze                       offered + scored by agent
+    GazeSelect                 NOT offered by legal_actions
+    GazeMove                   NOT offered by legal_actions
+    MultipleBlock              offered
+    DumpOff                    NOT offered by legal_actions
+    StandUpBlitz               offered + scored by agent
+    HailMaryBomb               NOT offered by legal_actions
+    Swoop                      NOT offered by legal_actions
+    KickTeamMateMove           NOT offered by legal_actions
+    Treacherous                offered
+    WisdomOfTheWhiteDwarf      offered
+    ThrowKeg                   offered
+    RaidingParty               offered
+    MaximumCarnage             NOT offered by legal_actions
+    LookIntoMyEyes             offered
+    BalefulHex                 offered
+    AllYouCanEat               offered
+    PutridRegurgitationMove    NOT offered by legal_actions
+    PutridRegurgitationBlitz   NOT offered by legal_actions
+    PutridRegurgitationBlock   NOT offered by legal_actions
+    KickEmBlock                NOT offered by legal_actions
+    KickEmBlitz                scored by agent
+    BlackInk                   offered
+    CatchOfTheDay              offered
+    ThenIStartedBlastin        offered
+    TheFlashingBlade           NOT offered by legal_actions
+    ViciousVines               NOT offered by legal_actions
+    FuriousOutburst            offered
+    SecureTheBall              offered
+    BreatheFire                NOT offered by legal_actions
+    Chainsaw                   NOT offered by legal_actions
+    Stab                       NOT offered by legal_actions
+    ProjectileVomit            NOT offered by legal_actions
+    AutoGazeZoat               offered
+    Forgo                      NOT offered by legal_actions
+    Incorporeal                NOT offered by legal_actions
+    Chomp                      NOT offered by legal_actions
+    PuntMove                   NOT offered by legal_actions
+
+== F. Kickoff: 16 of 16 results seen ==
+  CheeringFans            14492
+  BrilliantCoaching       12685
+  WeatherChange           11897
+  HighKick                11206
+  QuickSnap               10049
+  SolidDefence             5353
+  Blitz                    4428
+  TimeOut                  3219
+  Charge                   2941
+  PitchInvasion            2724
+  GetTheRef                2485
+  PerfectDefence           2170
+  DodgySnack               1554
+  OficiousRef              1474
+  ThrowARock               1285
+  Riot                     1271
+  missing: none
+
+== G. Activations ==
+  110 cells, 32537-53959 activations per cell across its 3 scale gates; no dead position
+
+== H. Streams: 88 of 129 GameEvents emitted, 89 of 164 ReportIds produced ==
+  events never emitted (41): AllYouCanEatRoll, ApothecaryChoice, BalefulHexRoll, BallScattered, BiasedRefRoll, BreatheFireRoll, BribesRoll, BuyInducement, CardDeactivated, CardEffectRoll, CardsAndInducementsBought, DefectingPlayers, DoubleHiredStarPlayer, Fumblerooskie, GameOptions, HypnoticGazeRoll, Inducement, JumpUpRoll, KegThrow, KickoffSequenceActivationsExhausted, Leader, LookIntoMyEyesRoll, MasterChefRoll, NoPlayersToField, PettyCash, PickMeUpRoll, PilingOn, PlayCard, PrayerAmount, ProRoll, ProjectileVomitRoll, PumpUpTheCrowdReRoll, RiotousRookies, SelectGazeTarget, SpecialEffectRoll, TeamCaptainRoll, ThenIStartedBlastin, ThrowAtPlayer, TimeoutEnforced, WeepingDaggerRoll, WizardUse
+  reports never produced (74): allYouCanEat, apothecaryChoice, balefulHex, biasedRef, blockReRoll, breatheFire, bribesRoll, cardDeactivated, cardEffectRoll, cardsAndInducementsBought, cardsBought, catchOfTheDay, chompRemoved, chompRoll, defectingPlayers, doubleHiredStaff, doubleHiredStarPlayer, fanFactorRoll, freePettyCash, fumbblResultUpload, fumblerooskie, gameOptions, hypnoticGazeRoll, indomitable, inducement, inducementsBought, jumpUpRoll, kickTeamMateRoll, kickoffSequenceActivationsCount, kickoffSequenceActivationsExhausted, leader, lookIntoMyEyesRoll, mascotUsed, masterChefRoll, modifiedDodgeResultSuccessful, modifiedPassResult, nervesOfSteel, noPlayersToField, oldPro, passBlock, penaltyShootout, pettyCash, pickMeUp, pilingOn, placedBallDirection, playCard, prayerAmount, prayerWasted, prayersAndInducementsBought, projectileVomit, pumpUpTheCrowdReRoll, pumpUpTheCrowdReRollLost, raidingParty, riotousRookies, saboteurRoll, selectGazeTarget, showStarReRoll, showStarReRollLost, skillUseOtherPlayer, skillWasted, swoopDirectionRoll, swoopDistanceRoll, teamCaptainRoll, teamEvent, tentaclesShadowingRoll, thenIStartedBlastin, throwAtPlayer, thrownKeg, timeoutEnforced, twoForOne, weatherMageResult, weatherMageRoll, weepingDaggerRoll, wizardUse
+
+== I. One-sided streams: report never produced, though the mechanic runs ==
+  report throwAtStallingPlayer    = 412     but event throwAtStallingPlayer = 412
+  report kickTeamMateRoll         = 0       but action KickTeamMate = 4566
+  report swoopDirectionRoll       = 0       but event swoopPlayer = 62
+  report swoopDistanceRoll        = 0       but event swoopPlayer = 62
+  report passBlock                = 0       but event passBlock = 850
+  report nervesOfSteel            = 0       but rollModifier "Nerves of Steel" = 1135
+  report winningsRoll             = 8699    but event winningsRoll = 65994
+  report blockReRoll              = 0       but Brawler/Pro fielded, squads = 8
+  report oldPro                   = 0       but Pro fielded, squads = 1
+
+wrote C:\Users\Admin\niels\ffb-rust\ffb-rust\scripts\sweep_census\gaps.json

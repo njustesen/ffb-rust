@@ -1,5 +1,118 @@
 # FFB-Rust Session State
 
+## 2026-09-16 — MATRIX 330/330 GREEN; report kinds 87→89; the coverage-gap inventory and the exhaustive backlog (BACKLOG §H.55–§H.57)
+
+Full matrix re-run on the final binary and jar: **330/330 games match, 0 failed, 0 duplicate
+gates** (`docs/SWEEP_2026-09-16_REPORTS.txt`; the same 10 gates short on the coverage checklist,
+all still 100/100). Summed gate time 806 min against the previous sweep's 1430 min for the same
+330 gates — the earlier sweep was competing with itself.
+
+### What moved
+
+Report kinds **87 → 89** of 164, never-produced 76 → 74, and games whose report stream matches
+Java's LENGTH 20,398 → 20,672. `winningsRoll` 0 → 8,699 and `throwAtStallingPlayer` 0 → 412; the
+arithmetic cross-checks (`winningsRoll` 8,699 + `winnings` 24,298 = the old `winnings` 32,997).
+Event kinds unchanged at 88 of 129, and after the regression below was repaired the event stream
+is **identical to the pre-session baseline on every kind**.
+
+Six report-layer fixes, all 1:1 to Java (§H.56):
+
+1. `ReportThrowAtStallingPlayer` had no live emit site — the driver routes `StepId::StallingPlayer`
+   to the bb2020 rock step, so the live BB2025 path (`stalling_extension.rs`) emitted a GameEvent
+   and no report.
+2. bb2016 was computing **BB2025 winnings**: `use crate::step::bb2025::end::*` handed every edition
+   the BB2025 `StepWinnings`. BB2016 winnings are rolled (2× d6 + FAME + 1).
+3. bb2016 `turnEnd` wrote a `heatRoll` Java never emits — the highest-volume report in the sweep.
+4. bb2016 injuries used the mixed shape (3 keys the BB2016 class does not write).
+5. bb2016 `blockRoll` carried a `defenderId` Java omits.
+6. `gettingEvenRoll` always reported an empty keyword — the step had no KEYWORD parameter.
+
+Measured: bb2016 amazon seed 1 payload diffs **87 → 18**; bb2025 **5 → 4**. Tests 14,852 / 0.
+
+### The regression, and the lesson
+
+Fix 3 broke a `downcast_ref` in the driver's report-to-event bridge: the bridge downcasts to the
+*mixed* `ReportTurnEnd`, so once bb2016 constructed its own type the downcast silently failed and
+**bb2016 `heatExhaustion` went 39,407 → 0**. All 330 gates stayed 100/100 throughout, because the
+event stream is not part of the compared state hash. It was caught only by diffing the new census
+against the previous sweep by hand, and repaired by handling both types in the bridge; the same
+gate at the same 100 seeds then produced exactly 408 again, matching the baseline.
+
+**Standing lesson: a green matrix is not evidence the event stream is intact.** Introducing a
+second type behind an existing `downcast_ref` fails silently. BACKLOG §F1 proposes making the
+sweep-to-sweep event-count diff automatic; it is the cheapest high-value instrumentation item we
+have.
+
+Because of this the 87 bb2016 gates were re-run on the fixed binary (87/87, 0 failures) and the
+event aggregation regenerated; `scripts/sweep_census/out_s16` is the clean one.
+
+### New tooling and documents
+
+- `scripts/sweep_census/gaps.py` — regenerates the coverage-gap inventory from any census.
+  **Replaces `skills.py`, which had been silently broken for two sweeps** (retired `out/*.json`
+  layout, and a display-name→CamelCase join that missed most rows). Normalises on `[^a-z0-9]`
+  (Bone Head/Bone-Head, Claw/Claws, Side Step/Sidestep, Timmm-ber!/Timmmber) and matches modifier
+  names by SUBSTRING, because they are phrases like `1 for being marked with Prehensile Tail`.
+- `scripts/post_sweep.sh` — the post-sweep pipeline. Note it pins `NPROC=6`; `agg.py` defaults to 8.
+- `docs/COVERAGE_GAPS_2026-09-15.md` + `docs/coverage_gaps_2026-09-16.txt` — the gap inventory.
+- BACKLOG **§H.55** (the inventory), **§H.56** (the six fixes + five root-caused follow-ups),
+  **§H.57** (the exhaustive no-roster-change backlog).
+
+### §H.57 headline: the ceiling is 147 of 164, not 89
+
+Of the 74 never-produced report kinds only **16 are roster-locked**. **58 are reachable without
+touching a roster**: 24 from the switched-off pregame (inducements/cards/wizards/staff), 24 from
+engine report sites that never construct, 10 from `legal_actions` never offering the action.
+Priority order is **§E (volume) → §C (certainty) → §D (finds unknown bugs) → §B → §A (last)**.
+
+**§D is the one that finds bugs we do not already know about**: four of the six fixes above were a
+single shape — shared step/report/sequence code serving all three editions with the BB2025 shape —
+and that shape has never been audited systematically. Java annotates every class with
+`@RulesCollection`; Rust re-derives it by hand in `make_step_for` and falls through to BB2025.
+
+### Correction recorded in §A
+
+The first draft of §A claimed the agent's scoring was "inverted" and that random outscored argmax
+31×. **That was wrong: `--heur-scale` was read backwards.** `main.rs:73` documents `0 = argmax`,
+and `heuristic_agent.rs:2024` computes `t = t_base * temp_scale`, so a larger scale is a HIGHER
+temperature. `@1e6` is near-uniform random. Read correctly the agent is healthy: **1.85 TD/game at
+argmax**, 4× the pickup rate of random, 2.3 GFI/game rather than 55. The A1 item built on the
+inverted reading is struck.
+
+The one real finding that survives: the six gates failing the REQUIRED `touchdowns` checklist item
+are **all `@1e6`**, i.e. the uniform-random end, where ~6 TDs per 100 games is ordinary variance.
+That is a **checklist calibration bug** (`t3_checklist.rs:109` marks it `required: true`
+unconditionally), not an agent or engine defect — it produces a standing red that can never clear.
+
+### Still open (root-caused this session, not applied)
+
+1. `playerAction` reports the base action where Java reports `foulMove`/`blitzMove`/`passMove`.
+   **Not cosmetic** — 13 Java files read the `…_MOVE` variants and five gate dice (`RollMechanic`
+   ×3, Wild Animal, Animal Savagery, Blood Lust, Unchannelled Fury, Foul Appearance). The
+   difference is at the ACTIVATION site, not the `CLIENT_FOUL` commit site.
+2. `blockRoll` `choosingTeamId` — Java flips it to the defender on negative dice with no real
+   re-roll offered (`StepBlockRoll:349-355`); Rust never flips.
+3. bb2016 runs the **BB2020+ end-game sequence** — `sequences.rs::end_game_sequence` is
+   edition-blind and hardcodes `DedicatedFans`; the correct bb2016 sequence exists at
+   `generator/bb2016/end_game.rs` and is dead code. Unlocks `fanFactorRoll`.
+4. MVP: `ParityRunner:1589` answers the dialog with `pids[0]`; Rust draws at random.
+5. Rust adds the same `ReportReRoll` **twice** per skill re-roll (20 vs Java's 14) — probably a
+   double `use_reroll` call whose second return value may be load-bearing.
+
+`StandUp`/`StandUpBlitz` are NOT gaps: `t3_checklist.rs:127,130` marks both optional, "mapped into
+the Move/Blitz choice by both agents". That is the harness contract on both sides.
+
+### Two decisions for the next session
+
+- **§E1** — enabling the pregame is the largest single reporting item (24 kinds) and is a
+  harness/game-option change, but it makes the drafted squads' treasury meaningful, which is
+  adjacent to "no roster changes". Needs an explicit call.
+- **§A/§B ordering** — §B0 says to check what Java's ParityRunner offers ONCE for all nine
+  never-offered actions before starting any of them; the answer decides whether they are Rust
+  defects or a documented harness cap.
+
+---
+
 ## 2026-09-15 — MATRIX 330/330 GREEN; report kinds 82→87, event kinds 83→88 (BACKLOG §H.54)
 
 Full matrix re-run on the final binary and jar: **330/330 games match, 0 failed**

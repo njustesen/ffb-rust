@@ -302,10 +302,14 @@ impl StepBlockRoll {
         // Java: getResult().addReport(new ReportBlockRoll(teamId, fBlockRoll))
         {
             use ffb_model::report::report_block_roll::ReportBlockRoll;
+            // Java `bb2016/block/StepBlockRoll:133` uses the TWO-arg constructor, leaving
+            // defenderId null; only StepBlockRollMultiple passes a target. Rust passed
+            // `game.defender_id`, so every bb2016 block roll carried a `defenderId` key that
+            // Java's report omits (IJsonOption drops nulls) — 2 payload diffs per block.
             game.report_list.add(ReportBlockRoll::new(
                 team_id,
                 self.block_roll.clone(),
-                game.defender_id.clone(),
+                None,
             ));
         }
 

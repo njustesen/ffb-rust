@@ -7,7 +7,7 @@ full-matrix sweep (`docs/SWEEP_2026-09-10.txt`, milestone `docs/MILESTONE_FULL_P
 Parity is green on all 333 gates. This document asks the *other* question: **which rules were on the
 pitch when it went green.** It is the coverage half of the milestone, and it is not green.
 
-Reproduce with `scripts/sweep_census/` (`agg.py` → `pass2.py`/`pass3.py` → `report.py`/`skills.py` →
+Reproduce with `scripts/sweep_census/` (`agg.py` → `pass2.py`/`pass3.py` → `report.py`/`gaps.py` →
 `build_page.py`). `agg.py` mirrors `coverage_report.rs::tally()` line for line, and the
 reconstruction **reproduces the sweep's 26 short gates exactly, item for item** — that agreement is
 what licenses everything else here.
