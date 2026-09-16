@@ -8928,9 +8928,10 @@ natural vehicle is `ReportSkillUse(playerId, skill, used, SkillUse reason)`: it 
 both sides, both `SkillUse` enums already carry the same 68 reasons, and the census already
 tallies `skill_use_skills` / `skill_use_reasons`, so nothing new has to be built to read it.
 
-**This reverses the standing "never modify the Java engine" rule** for report-only lines, on an
-explicit instruction. Keep the additions strictly to `addReport` calls so stock Java's behaviour
-is untouched, and audit them as one reviewable set.
+**WITHDRAWN — see H.61.** This paragraph proposed reversing the "never modify the Java engine"
+rule for report-only lines. That is wrong: `niels/ffb/ffb` is a non-touched reference engine and
+stock Java is the ORACLE. Adding reports to it would mean every green gate since was measured
+against a moved target. Rust is fixed to match Java, never the reverse.
 
 ### The lesson
 
@@ -9026,12 +9027,53 @@ dice, so each addition SHOULD be behaviour-neutral — but Diving Tackle is the 
 that "make the telemetry reachable" and "change no behaviour" are not the same statement: the
 report was already there, and the only thing needed to reach it broke three games in ten.
 
-Recommended sequencing:
+**WITHDRAWN — see H.61.** The sequencing above assumed the Java engine could be edited. It
+cannot: `niels/ffb/ffb` is a non-touched reference and stock Java is the oracle. The 28
+genuinely-silent skills are therefore at the ceiling, not on the backlog. What remains from this
+section is the dirty-working-tree observation, which matters only as a reason NOT to build from
+that repo.
 
-1. Decide the fate of the `niels/ffb` working tree, and confirm a clean `mvn package` reproduces
-   the current jar (otherwise no Java change can be trusted).
-2. Do ONE skill end-to-end — Guard or Block — to establish the pattern and prove the loop.
-3. Batch the rest in groups that share a site (the block-result skills together, the
-   armour/injury ones together), gating each group.
 
-Do not start at (3).
+## §H.61 — 2026-09-16: CORRECTION — the Java engine is never modified, and what that means for the 28
+
+**§H.59 and §H.60 both proposed adding `ReportSkillUse` sites to the Java engine. That is wrong
+and is withdrawn.** `niels/ffb/ffb` is a reference to a **non-touched Java engine** and must never
+be used for anything else. `ffb-rust/ffb-java/` is a read-only copy of the same. The standing rule
+stands: **fix Rust only; `ParityRunner.java` is the sole co-editable Java file.**
+
+Stock Java is the oracle. The moment we add reports to it, it stops being one, and every green
+gate since would be measuring Rust against a moved target. Keeping it pristine is worth more than
+any coverage number.
+
+### What that means for "both engines must report all skills"
+
+With the oracle fixed, the goal resolves to something narrower and fully achievable:
+
+> **Rust must report exactly what Java reports — no more, no less.**
+
+For a skill Java names, Rust naming it too is a real, comparable coverage gain. For a skill Java
+names nowhere, there is nothing to compare against, and adding a Rust-only report would make the
+two streams DIFFER — the opposite of the goal. Rust-only `GameEvent`s have the same problem in a
+quieter way: they raise a coverage number while proving nothing about Java, which is exactly the
+false comfort this whole investigation has been unpicking.
+
+So the 28 genuinely-silent skills are **not addressable** while stock Java is the reference. That
+is a property of the oracle, not a defect, and it should be recorded as the ceiling rather than
+chased. The honest statement for the coverage report is:
+
+* 3 skills Java names and Rust did not — **real gaps** (2 fixed: Thick Skull, Iron Hard Skin;
+  1 open: Diving Tackle, which is a parity frontier, §H.60).
+* 28 skills neither engine names — **at the ceiling**, unreachable without changing the oracle.
+
+### The method that found the three, which is the reusable part
+
+Grep BOTH streams for every fielded skill's display name and diff the counts. That is what turned
+"silent by design" into three concrete Rust bugs. It should be automated:
+
+**`report_census.py` must tally the JAVA twin alongside the Rust one**, and the sweep should fail
+(or at least flag) on any name Java produces and Rust does not. Today the census reads
+`seed_N_rust_reports.jsonl` only, which is precisely why three fidelity bugs sat invisible behind
+330 green gates and a coverage page that called them "expected dark".
+
+That single change is worth more than the rest of this section, because it makes the ENTIRE class
+self-detecting instead of needing a hand grep per skill.

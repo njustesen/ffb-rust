@@ -63,6 +63,8 @@ def census(pattern):
     per_gate = {}
     java_games = 0
     java_identical = 0
+    java_ids = Counter()      # reportId -> count, from the JAVA twin
+    java_names = Counter()    # modifier / skill NAMES Java wrote
 
     for race, edition, _scale, d in gate_dirs(pattern):
         g_ids = Counter()
@@ -126,6 +128,28 @@ def census(pattern):
                 rl = [l for l in open(f, encoding="utf-8", errors="replace") if l.strip()]
                 if len(jl) == len(rl):
                     java_identical += 1
+                # Tally the JAVA side's reportIds and modifier/skill NAMES too. Until 2026-09-16
+                # this census read the Rust stream only, so "neither engine reports this skill"
+                # and "OUR engine is missing it" were indistinguishable -- which is how Thick
+                # Skull (Java 476, Rust 0), Iron Hard Skin (137 / 0) and Diving Tackle (72 / 0)
+                # sat invisible behind 330 green gates and a coverage page that called them
+                # expected-dark (H.59/H.61). Stock Java is the oracle and is never modified, so
+                # anything Java names and Rust does not is a RUST BUG by definition.
+                for line in jl:
+                    try:
+                        jr = json.loads(line)
+                    except Exception:
+                        continue
+                    jrid = jr.get("reportId")
+                    if jrid:
+                        java_ids[jrid] += 1
+                    for bucket in MODIFIER_KEYS:
+                        for name in jr.get(bucket) or []:
+                            if isinstance(name, str):
+                                java_names[name] += 1
+                    jskill = jr.get("skill")
+                    if isinstance(jskill, str):
+                        java_names[jskill] += 1
         if g_games:
             per_gate["%s__%s" % (race, edition)] = {
                 "race": race, "edition": edition, "games": g_games,
@@ -146,6 +170,7 @@ def census(pattern):
         "player_events": dict(player_events),
         "per_gate": per_gate,
         "java_games": java_games, "java_same_length": java_identical,
+        "java_ids": dict(java_ids), "java_names": dict(java_names),
     }
 
 
@@ -185,3 +210,25 @@ if __name__ == "__main__":
     print("skillUse reasons:", len(data["skill_use_reasons"]),
           " re-roll sources:", len(data["reroll_sources"]))
     print("java twins:", data["java_games"], "same length:", data["java_same_length"])
+
+    # The oracle check. Stock Java is never modified, so any reportId or modifier/skill NAME that
+    # Java writes and Rust does not is a RUST fidelity bug -- by definition, with no judgement
+    # call. Reading only the Rust stream hid three of these behind 330 green gates (H.59/H.61).
+    rust_names = Counter()
+    for bucket in MODIFIER_KEYS:
+        rust_names.update(data["modifiers"].get(bucket, {}))
+    rust_names.update(data["skill_use_skills"])
+    id_gap = sorted(set(data["java_ids"]) - set(data["ids"]))
+    name_gap = sorted(n for n in data["java_names"] if n not in rust_names)
+    data["java_only_ids"] = id_gap
+    data["java_only_names"] = name_gap
+    out.write_text(json.dumps(data), encoding="utf-8")
+    if id_gap or name_gap:
+        print()
+        print("!! JAVA REPORTS IT, RUST DOES NOT -- these are Rust bugs, not coverage gaps:")
+        for i in id_gap:
+            print("     reportId %-32s java=%d" % (i, data["java_ids"][i]))
+        for n in name_gap:
+            print("     name     %-32s java=%d" % (n, data["java_names"][n]))
+    else:
+        print("oracle check: Rust names everything Java names.")
