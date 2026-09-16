@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamAmazonParityAway">
+
+    <coach>Away</coach>
+    <name>Amazon Parity Away</name>
+    <race>Amazon</race>
+    <rosterId>amazon.lrb6</rosterId>
+    <reRolls>3</reRolls>
+    <fanFactor>5</fanFactor>
+    <apothecaries>1</apothecaries>
+    <cheerleaders>0</cheerleaders>
+    <assistantCoaches>0</assistantCoaches>
+    <teamRating>100</teamRating>
+    <currentTeamValue>790000</currentTeamValue>
+    <teamStrength>790000</teamStrength>
+    <division>[X]</division>
+    <treasury>0</treasury>
+    <baseIconPath>http://localhost:2224/icons/</baseIconPath>
+    <logo>teamlogos/amazon.gif</logo>
+    <specialRules/>
+
+    <player nr="1" id="teamAmazonParityAway1">
+        <name>Catcher 1</name>
+        <gender>male</gender>
+        <positionId>amazon.catcher</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="2" id="teamAmazonParityAway2">
+        <name>Catcher 2</name>
+        <gender>male</gender>
+        <positionId>amazon.catcher</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="3" id="teamAmazonParityAway3">
+        <name>Thrower 3</name>
+        <gender>male</gender>
+        <positionId>amazon.thrower</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="4" id="teamAmazonParityAway4">
+        <name>Thrower 4</name>
+        <gender>male</gender>
+        <positionId>amazon.thrower</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="5" id="teamAmazonParityAway5">
+        <name>Blitzer 5</name>
+        <gender>male</gender>
+        <positionId>amazon.blitzer</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="6" id="teamAmazonParityAway6">
+        <name>Blitzer 6</name>
+        <gender>male</gender>
+        <positionId>amazon.blitzer</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="7" id="teamAmazonParityAway7">
+        <name>Blitzer 7</name>
+        <gender>male</gender>
+        <positionId>amazon.blitzer</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="8" id="teamAmazonParityAway8">
+        <name>Blitzer 8</name>
+        <gender>male</gender>
+        <positionId>amazon.blitzer</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="9" id="teamAmazonParityAway9">
+        <name>Linewoman 9</name>
+        <gender>male</gender>
+        <positionId>amazon.linewoman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="10" id="teamAmazonParityAway10">
+        <name>Linewoman 10</name>
+        <gender>male</gender>
+        <positionId>amazon.linewoman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="11" id="teamAmazonParityAway11">
+        <name>Linewoman 11</name>
+        <gender>male</gender>
+        <positionId>amazon.linewoman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+</team>

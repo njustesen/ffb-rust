@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamOrcParityHome">
+
+    <coach>Home</coach>
+    <name>Orc Parity Home</name>
+    <race>Orc</race>
+    <rosterId>orc.lrb6</rosterId>
+    <reRolls>3</reRolls>
+    <fanFactor>5</fanFactor>
+    <apothecaries>1</apothecaries>
+    <cheerleaders>0</cheerleaders>
+    <assistantCoaches>0</assistantCoaches>
+    <teamRating>100</teamRating>
+    <currentTeamValue>890000</currentTeamValue>
+    <teamStrength>890000</teamStrength>
+    <division>[X]</division>
+    <treasury>0</treasury>
+    <baseIconPath>http://localhost:2224/icons/</baseIconPath>
+    <logo>teamlogos/orc.gif</logo>
+    <specialRules/>
+
+    <player nr="1" id="teamOrcParityHome1">
+        <name>Troll 1</name>
+        <gender>male</gender>
+        <positionId>orc.troll</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="2" id="teamOrcParityHome2">
+        <name>Thrower 2</name>
+        <gender>male</gender>
+        <positionId>orc.thrower</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="3" id="teamOrcParityHome3">
+        <name>Thrower 3</name>
+        <gender>male</gender>
+        <positionId>orc.thrower</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="4" id="teamOrcParityHome4">
+        <name>Blitzer 4</name>
+        <gender>male</gender>
+        <positionId>orc.blitzer</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="5" id="teamOrcParityHome5">
+        <name>Blitzer 5</name>
+        <gender>male</gender>
+        <positionId>orc.blitzer</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="6" id="teamOrcParityHome6">
+        <name>Blitzer 6</name>
+        <gender>male</gender>
+        <positionId>orc.blitzer</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="7" id="teamOrcParityHome7">
+        <name>Blitzer 7</name>
+        <gender>male</gender>
+        <positionId>orc.blitzer</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="8" id="teamOrcParityHome8">
+        <name>Black Orc 8</name>
+        <gender>male</gender>
+        <positionId>orc.blackorc</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="9" id="teamOrcParityHome9">
+        <name>Black Orc 9</name>
+        <gender>male</gender>
+        <positionId>orc.blackorc</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="10" id="teamOrcParityHome10">
+        <name>Black Orc 10</name>
+        <gender>male</gender>
+        <positionId>orc.blackorc</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="11" id="teamOrcParityHome11">
+        <name>Black Orc 11</name>
+        <gender>male</gender>
+        <positionId>orc.blackorc</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+</team>

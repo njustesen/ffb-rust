@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamNecromanticParityAway">
+
+    <coach>Away</coach>
+    <name>Necromantic Parity Away</name>
+    <race>Necromantic</race>
+    <rosterId>necromantic.lrb6</rosterId>
+    <reRolls>3</reRolls>
+    <fanFactor>5</fanFactor>
+    <apothecaries>0</apothecaries>
+    <cheerleaders>0</cheerleaders>
+    <assistantCoaches>0</assistantCoaches>
+    <teamRating>100</teamRating>
+    <currentTeamValue>870000</currentTeamValue>
+    <teamStrength>870000</teamStrength>
+    <division>[X]</division>
+    <treasury>0</treasury>
+    <baseIconPath>http://localhost:2224/icons/</baseIconPath>
+    <logo>teamlogos/necromantic.gif</logo>
+    <specialRules/>
+
+    <player nr="1" id="teamNecromanticParityAway1">
+        <name>Werewolf 1</name>
+        <gender>male</gender>
+        <positionId>necromantic.werewolf</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="2" id="teamNecromanticParityAway2">
+        <name>Werewolf 2</name>
+        <gender>male</gender>
+        <positionId>necromantic.werewolf</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="3" id="teamNecromanticParityAway3">
+        <name>Flesh Golem 3</name>
+        <gender>male</gender>
+        <positionId>necromantic.fleshgolem</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="4" id="teamNecromanticParityAway4">
+        <name>Flesh Golem 4</name>
+        <gender>male</gender>
+        <positionId>necromantic.fleshgolem</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="5" id="teamNecromanticParityAway5">
+        <name>Wight 5</name>
+        <gender>male</gender>
+        <positionId>necromantic.wight</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="6" id="teamNecromanticParityAway6">
+        <name>Wight 6</name>
+        <gender>male</gender>
+        <positionId>necromantic.wight</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="7" id="teamNecromanticParityAway7">
+        <name>Ghoul 7</name>
+        <gender>male</gender>
+        <positionId>necromantic.ghoul</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="8" id="teamNecromanticParityAway8">
+        <name>Ghoul 8</name>
+        <gender>male</gender>
+        <positionId>necromantic.ghoul</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="9" id="teamNecromanticParityAway9">
+        <name>Zombie 9</name>
+        <gender>male</gender>
+        <positionId>necromantic.zombie</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="10" id="teamNecromanticParityAway10">
+        <name>Zombie 10</name>
+        <gender>male</gender>
+        <positionId>necromantic.zombie</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="11" id="teamNecromanticParityAway11">
+        <name>Zombie 11</name>
+        <gender>male</gender>
+        <positionId>necromantic.zombie</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+</team>

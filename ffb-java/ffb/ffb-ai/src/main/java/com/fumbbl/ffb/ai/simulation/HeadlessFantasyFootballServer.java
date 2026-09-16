@@ -64,6 +64,19 @@ public class HeadlessFantasyFootballServer extends FantasyFootballServer {
             protected void send(Session[] pSessions, com.fumbbl.ffb.net.NetCommand command, boolean pLog) {
                 // No-op: no network in headless mode
             }
+            @Override
+            public void sendModelSync(GameState gameState,
+                                      com.fumbbl.ffb.model.change.ModelChangeList pModelChanges,
+                                      com.fumbbl.ffb.report.ReportList pReports,
+                                      com.fumbbl.ffb.model.Animation pAnimation,
+                                      com.fumbbl.ffb.SoundId pSound, long pGameTime, long pTurnTime) {
+                // The one place the server hands a step's ReportList on (UtilServerGame.syncGameModel
+                // fetches it, calls sendModelSync, then reset()s it). The parity harness records it
+                // here — the untransformed home-side list, once per sync — so the Java report stream
+                // can be compared with Rust's. Nothing is sent: the stock method would only build a
+                // ServerCommandModelSync and call the two no-op send overloads above.
+                com.fumbbl.ffb.ai.parity.ReportSink.record(pReports);
+            }
         };
         this.dbUpdater = new DbUpdater(this);
         this.sessionManager = new HeadlessSessionManager();

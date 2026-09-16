@@ -194,6 +194,9 @@ public class ParityRunner {
         int multimoveArg = 0;
         float heurScaleArg = 0.0f;
         String heurClassesArg = "none";
+        // `--reports <path-template>`: write the engine's report stream per seed (ReportSink);
+        // "{seed}" is substituted like the step-log template. Absent = no report file, as before.
+        String reportsArg = null;
         List<String> positional = new ArrayList<>();
         for (int i = 0; i < args.length; i++) {
             if ("--tier".equals(args[i]) && i + 1 < args.length) {
@@ -210,6 +213,8 @@ public class ParityRunner {
                 heurScaleArg = Float.parseFloat(args[++i]);
             } else if ("--heur-classes".equals(args[i]) && i + 1 < args.length) {
                 heurClassesArg = args[++i];
+            } else if ("--reports".equals(args[i]) && i + 1 < args.length) {
+                reportsArg = args[++i];
             } else {
                 positional.add(args[i]);
             }
@@ -267,6 +272,11 @@ public class ParityRunner {
                     new java.io.OutputStreamWriter(System.out, StandardCharsets.UTF_8)), true);
             }
 
+            if (reportsArg != null) {
+                ReportSink.open(reportsArg.replace("{seed}", Long.toUnsignedString(s)));
+            }
+            ReportSink.stepIndex = 0;
+
             ParityRunner runner = new ParityRunner(out);
             runner.tier = tierArg;
             runner.multimove = multimoveArg;
@@ -291,10 +301,22 @@ public class ParityRunner {
                 System.err.println("--agent must be 'random' or 'heuristic', got: " + agentArg);
                 System.exit(2);
             }
-            runner.run(gameState, homeTeamId, awayTeamId, s);
-
-            out.flush();
-            if (path != null) out.close();
+            try {
+                runner.run(gameState, homeTeamId, awayTeamId, s);
+            } catch (RuntimeException e) {
+                // A stock-engine exception used to escape main and kill the JVM, and with it every
+                // seed still queued behind this one: goblin bb2025 @1.0 seed 67 threw
+                // NullPointerException from bb2025 SneakyGitBehaviour (a foul on a Ball & Chain
+                // player has no armour roll to read — docs/JAVA_DEFECTS.md JD-002) and the gate
+                // reported 35 failures for ONE defect. Log it loudly and go on to the next seed;
+                // the crashed seed still has no verdict of its own.
+                System.err.println("JAVA_CRASH seed=" + Long.toUnsignedString(s) + " " + e);
+                e.printStackTrace(System.err);
+            } finally {
+                out.flush();
+                if (path != null) out.close();
+                ReportSink.close();
+            }
         }
     }
 
@@ -408,10 +430,24 @@ public class ParityRunner {
             }
 
             probeState(stepId, dialog, game);
-            if (dialog != null && stepId != StepId.INIT_SELECTING) {
-                handleDialog(dialog, game, gameState);
-            } else {
-                handleStep(stepId, game, gameState);
+            try {
+                if (dialog != null && stepId != StepId.INIT_SELECTING) {
+                    handleDialog(dialog, game, gameState);
+                } else {
+                    handleStep(stepId, game, gameState);
+                }
+            } catch (RuntimeException e) {
+                // A stock-engine exception (docs/JAVA_DEFECTS.md JD-002: bb2025 SneakyGitBehaviour
+                // reads a null armour roll on a foul against a Ball & Chain player) ends the game
+                // right here, in the state it had before the throwing step ran. Finalise the log
+                // like a STUCK_STEP so the steps up to the crash still compare: Rust ports the
+                // defect as "the step does nothing" and its no-progress guard ends the game at
+                // the same point. The seed is a `java_crash`, never a `finished` game.
+                System.err.println("JAVA_CRASH seed=" + Long.toUnsignedString(currentSeed)
+                    + " step=" + stepId + " " + e);
+                e.printStackTrace(System.err);
+                endReason = "java_crash";
+                break;
             }
         }
 
@@ -491,7 +527,22 @@ public class ParityRunner {
 
             case SETUP:
                 resetCurrentTeam(game);
-                placeReserves(game, gameState);
+                // The heuristic agent SCORES the setup one placement at a time (Rust
+                // `AgentPrompt::TeamSetup`, T = 0.30) when the `setup` class is on; Rust's engine
+                // re-prompts after every PlacePlayer, and this loop is that prompt sequence.
+                if (heuristic != null
+                    && heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.TEAM_SETUP)) {
+                    for (int guard = 0; guard < 64; guard++) {
+                        com.fumbbl.ffb.ai.parity.heuristic.SetupPlacement.Placement pl =
+                            heuristic.setupPlacement(game);
+                        if (pl == null) {
+                            break;
+                        }
+                        UtilServerSetup.setupPlayer(gameState, pl.playerId, new FieldCoordinate(pl.x, pl.y));
+                    }
+                } else {
+                    placeReserves(game, gameState);
+                }
                 MatchRunner.inject(gameState, new ClientCommandEndTurn(TurnMode.SETUP, null));
                 break;
 
@@ -1765,6 +1816,14 @@ public class ParityRunner {
                             }
                         }
                         selection = (lowest != null) ? new Player[]{ lowest } : new Player[0];
+                    // Shadowing and Tentacles STAY DECLINED here, mirroring random_agent.rs.
+                    // Accepting them (coordinate-sort, index 0, no actionRng draw) was built and
+                    // measured: it turns the mechanic on in both engines and exposed three real
+                    // BB2020 Rust bugs, all now fixed. It is off because three gaps remain --
+                    // BB2016's Shadowing is a two-dice ESCAPE roll by the DODGER, BB2020 pushes
+                    // SHADOWING from Block/BlitzBlock as well as Move while Rust runs the BB2025
+                    // generators everywhere, and even BB2025 showed dark_elf 22/25. See the long
+                    // note in random_agent.rs for the exact seeds.
                     } else {
                         selection = new Player[0];
                     }
@@ -1877,6 +1936,8 @@ public class ParityRunner {
     // ── Step recording ────────────────────────────────────────────────────────
 
     private void recordStep(Game game, String chosen, int callCount) {
+        // Reports produced while this step is handled are stamped with its index (ReportSink).
+        ReportSink.stepIndex = stepIndex;
         boolean homePlaying = game.isHomePlaying();
         int turn = homePlaying
             ? game.getTurnDataHome().getTurnNr()

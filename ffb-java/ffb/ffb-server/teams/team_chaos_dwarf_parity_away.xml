@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamChaosDwarfParityAway">
+
+    <coach>Away</coach>
+    <name>Chaos Dwarf Parity Away</name>
+    <race>Chaos Dwarf</race>
+    <rosterId>chaosdwarf.lrb6</rosterId>
+    <reRolls>3</reRolls>
+    <fanFactor>5</fanFactor>
+    <apothecaries>1</apothecaries>
+    <cheerleaders>0</cheerleaders>
+    <assistantCoaches>0</assistantCoaches>
+    <teamRating>100</teamRating>
+    <currentTeamValue>910000</currentTeamValue>
+    <teamStrength>910000</teamStrength>
+    <division>[X]</division>
+    <treasury>0</treasury>
+    <baseIconPath>http://localhost:2224/icons/</baseIconPath>
+    <logo>teamlogos/chaos_dwarf.gif</logo>
+    <specialRules/>
+
+    <player nr="1" id="teamChaosDwarfParityAway1">
+        <name>Minotaur 1</name>
+        <gender>male</gender>
+        <positionId>chaosdwarf.minotaur</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="2" id="teamChaosDwarfParityAway2">
+        <name>Bull Centaur 2</name>
+        <gender>male</gender>
+        <positionId>chaosdwarf.bullcentaur</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="3" id="teamChaosDwarfParityAway3">
+        <name>Bull Centaur 3</name>
+        <gender>male</gender>
+        <positionId>chaosdwarf.bullcentaur</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="4" id="teamChaosDwarfParityAway4">
+        <name>Chaos Dwarf Blocker 4</name>
+        <gender>male</gender>
+        <positionId>chaosdwarf.blocker</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="5" id="teamChaosDwarfParityAway5">
+        <name>Chaos Dwarf Blocker 5</name>
+        <gender>male</gender>
+        <positionId>chaosdwarf.blocker</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="6" id="teamChaosDwarfParityAway6">
+        <name>Chaos Dwarf Blocker 6</name>
+        <gender>male</gender>
+        <positionId>chaosdwarf.blocker</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="7" id="teamChaosDwarfParityAway7">
+        <name>Chaos Dwarf Blocker 7</name>
+        <gender>male</gender>
+        <positionId>chaosdwarf.blocker</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="8" id="teamChaosDwarfParityAway8">
+        <name>Chaos Dwarf Blocker 8</name>
+        <gender>male</gender>
+        <positionId>chaosdwarf.blocker</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="9" id="teamChaosDwarfParityAway9">
+        <name>Chaos Dwarf Blocker 9</name>
+        <gender>male</gender>
+        <positionId>chaosdwarf.blocker</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="10" id="teamChaosDwarfParityAway10">
+        <name>Hobgoblin 10</name>
+        <gender>male</gender>
+        <positionId>chaosdwarf.hobgoblin</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="11" id="teamChaosDwarfParityAway11">
+        <name>Hobgoblin 11</name>
+        <gender>male</gender>
+        <positionId>chaosdwarf.hobgoblin</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+</team>

@@ -777,6 +777,46 @@ public final class HeuristicDriver {
     }
 
     /**
+     * Rust {@code AgentPrompt::TeamSetup} (§6.21). {@code T = 0.30}.
+     *
+     * <p>ONE placement per call, sampled from the joint (reserve, legal square) set that
+     * {@link SetupPlacement#enumerate} scores; {@code null} once nothing is left to place, which
+     * is when the harness sends the setup EndTurn. Same option order and the same {@code pick}
+     * on the shared sampler as Rust, so the draw count per placement is identical on both sides.
+     * {@code ParityRunner}'s {@code placeReserves} stays the answer when this class is off.
+     */
+    public SetupPlacement.Placement setupPlacement(Game game) {
+        SetupPlacement.Decision d = SetupPlacement.setupOptions(game, editionIsBb2016(game));
+        if (d == null) {
+            return null;
+        }
+        sampler.clear();
+        for (SetupPlacement.Option o : d.options) {
+            sampler.push(o.w);
+        }
+        int idx = sampler.pick(SetupPlacement.SETUP_T);
+        SetupPlacement.Option pick = d.options.get(idx);
+        // FFB_SETUP_TRACE: mirror of Rust's RSETUP line, one per placement.
+        if (System.getenv("FFB_SETUP_TRACE") != null) {
+            System.err.println("JSETUP side=" + (game.isHomePlaying() ? "home" : "away")
+                + " off=" + game.isSetupOffense() + " n=" + d.options.size()
+                + " cands=" + d.candidates.size() + " pick=" + idx
+                + " nr=" + d.candidates.get(pick.player).nr + " x=" + pick.x + " y=" + pick.y
+                + " w=" + String.format("%08x", Float.floatToRawIntBits(pick.w))
+                + " draws=" + sampler.drawCount());
+        }
+        return new SetupPlacement.Placement(d.candidates.get(pick.player).id, pick.x, pick.y);
+    }
+
+    /** Same test {@code ActivationDriver} uses: the AGILITY mechanic's class lives in a bb2016 package. */
+    private static boolean editionIsBb2016(Game game) {
+        com.fumbbl.ffb.mechanics.Mechanic m = (com.fumbbl.ffb.mechanics.Mechanic) game
+            .getFactory(com.fumbbl.ffb.FactoryType.Factory.MECHANIC)
+            .forName(com.fumbbl.ffb.mechanics.Mechanic.Type.AGILITY.name());
+        return m != null && m.getClass().getName().contains("bb2016");
+    }
+
+    /**
      * Rust checks `p.has_skill(SkillId::Block)` — the literal SKILL, not one of the properties a
      * skill happens to register. Match on the skill NAME so the two sides mean the same thing:
      * several properties are shared by more than one skill, and keying off a property would make

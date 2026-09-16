@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<roster team="55051">
+<roster id="55051">
     <name>Tomb Kings</name>
     <type>Regular</type>
     <reRollCost>70000</reRollCost>

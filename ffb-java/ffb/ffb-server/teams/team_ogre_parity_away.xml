@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamOgreParityAway">
+
+    <coach>Away</coach>
+    <name>Ogre Parity Away</name>
+    <race>Ogre</race>
+    <rosterId>ogre.lrb6</rosterId>
+    <reRolls>3</reRolls>
+    <fanFactor>5</fanFactor>
+    <apothecaries>1</apothecaries>
+    <cheerleaders>0</cheerleaders>
+    <assistantCoaches>0</assistantCoaches>
+    <teamRating>100</teamRating>
+    <currentTeamValue>940000</currentTeamValue>
+    <teamStrength>940000</teamStrength>
+    <division>[X]</division>
+    <treasury>0</treasury>
+    <baseIconPath>http://localhost:2224/icons/</baseIconPath>
+    <logo>teamlogos/ogre.gif</logo>
+    <specialRules/>
+
+    <player nr="1" id="teamOgreParityAway1">
+        <name>Ogre 1</name>
+        <gender>male</gender>
+        <positionId>ogre.ogre</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="2" id="teamOgreParityAway2">
+        <name>Ogre 2</name>
+        <gender>male</gender>
+        <positionId>ogre.ogre</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="3" id="teamOgreParityAway3">
+        <name>Ogre 3</name>
+        <gender>male</gender>
+        <positionId>ogre.ogre</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="4" id="teamOgreParityAway4">
+        <name>Ogre 4</name>
+        <gender>male</gender>
+        <positionId>ogre.ogre</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="5" id="teamOgreParityAway5">
+        <name>Ogre 5</name>
+        <gender>male</gender>
+        <positionId>ogre.ogre</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="6" id="teamOgreParityAway6">
+        <name>Ogre 6</name>
+        <gender>male</gender>
+        <positionId>ogre.ogre</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="7" id="teamOgreParityAway7">
+        <name>Snotling 7</name>
+        <gender>male</gender>
+        <positionId>ogre.snotling</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="8" id="teamOgreParityAway8">
+        <name>Snotling 8</name>
+        <gender>male</gender>
+        <positionId>ogre.snotling</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="9" id="teamOgreParityAway9">
+        <name>Snotling 9</name>
+        <gender>male</gender>
+        <positionId>ogre.snotling</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="10" id="teamOgreParityAway10">
+        <name>Snotling 10</name>
+        <gender>male</gender>
+        <positionId>ogre.snotling</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="11" id="teamOgreParityAway11">
+        <name>Snotling 11</name>
+        <gender>male</gender>
+        <positionId>ogre.snotling</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+</team>

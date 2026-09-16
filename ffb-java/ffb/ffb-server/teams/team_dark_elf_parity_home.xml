@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamDarkElfParityHome">
+
+    <coach>Home</coach>
+    <name>Dark Elf Parity Home</name>
+    <race>Dark Elf</race>
+    <rosterId>darkelf.lrb6</rosterId>
+    <reRolls>3</reRolls>
+    <fanFactor>5</fanFactor>
+    <apothecaries>1</apothecaries>
+    <cheerleaders>0</cheerleaders>
+    <assistantCoaches>0</assistantCoaches>
+    <teamRating>100</teamRating>
+    <currentTeamValue>1030000</currentTeamValue>
+    <teamStrength>1030000</teamStrength>
+    <division>[X]</division>
+    <treasury>0</treasury>
+    <baseIconPath>http://localhost:2224/icons/</baseIconPath>
+    <logo>teamlogos/dark_elf.gif</logo>
+    <specialRules/>
+
+    <player nr="1" id="teamDarkElfParityHome1">
+        <name>Witch Elf 1</name>
+        <gender>male</gender>
+        <positionId>darkelf.witchelf</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="2" id="teamDarkElfParityHome2">
+        <name>Witch Elf 2</name>
+        <gender>male</gender>
+        <positionId>darkelf.witchelf</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="3" id="teamDarkElfParityHome3">
+        <name>Assassin 3</name>
+        <gender>male</gender>
+        <positionId>darkelf.assassin</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="4" id="teamDarkElfParityHome4">
+        <name>Assassin 4</name>
+        <gender>male</gender>
+        <positionId>darkelf.assassin</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="5" id="teamDarkElfParityHome5">
+        <name>Runner 5</name>
+        <gender>male</gender>
+        <positionId>darkelf.runner</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="6" id="teamDarkElfParityHome6">
+        <name>Runner 6</name>
+        <gender>male</gender>
+        <positionId>darkelf.runner</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="7" id="teamDarkElfParityHome7">
+        <name>Blitzer 7</name>
+        <gender>male</gender>
+        <positionId>darkelf.blitzer</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="8" id="teamDarkElfParityHome8">
+        <name>Blitzer 8</name>
+        <gender>male</gender>
+        <positionId>darkelf.blitzer</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="9" id="teamDarkElfParityHome9">
+        <name>Blitzer 9</name>
+        <gender>male</gender>
+        <positionId>darkelf.blitzer</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="10" id="teamDarkElfParityHome10">
+        <name>Blitzer 10</name>
+        <gender>male</gender>
+        <positionId>darkelf.blitzer</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="11" id="teamDarkElfParityHome11">
+        <name>Lineman 11</name>
+        <gender>male</gender>
+        <positionId>darkelf.lineman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+</team>

@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamUnderworldParityHome">
+
+    <coach>Home</coach>
+    <name>Underworld Parity Home</name>
+    <race>Underworld</race>
+    <rosterId>underworld.lrb6</rosterId>
+    <reRolls>3</reRolls>
+    <fanFactor>5</fanFactor>
+    <apothecaries>1</apothecaries>
+    <cheerleaders>0</cheerleaders>
+    <assistantCoaches>0</assistantCoaches>
+    <teamRating>100</teamRating>
+    <currentTeamValue>960000</currentTeamValue>
+    <teamStrength>960000</teamStrength>
+    <division>[X]</division>
+    <treasury>0</treasury>
+    <baseIconPath>http://localhost:2224/icons/</baseIconPath>
+    <logo>teamlogos/underworld.gif</logo>
+    <specialRules/>
+
+    <player nr="1" id="teamUnderworldParityHome1">
+        <name>Mutant Rat Ogre 1</name>
+        <gender>male</gender>
+        <positionId>37844</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="2" id="teamUnderworldParityHome2">
+        <name>Mutant Rat Ogre 2</name>
+        <gender>male</gender>
+        <positionId>37844</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="3" id="teamUnderworldParityHome3">
+        <name>Warpstone Troll 3</name>
+        <gender>male</gender>
+        <positionId>underworld.troll.warpstone</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="4" id="teamUnderworldParityHome4">
+        <name>Warpstone Troll 4</name>
+        <gender>male</gender>
+        <positionId>underworld.troll.warpstone</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="5" id="teamUnderworldParityHome5">
+        <name>Skaven Blitzer 5</name>
+        <gender>male</gender>
+        <positionId>underworld.skaven.blitzer</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="6" id="teamUnderworldParityHome6">
+        <name>Skaven Blitzer 6</name>
+        <gender>male</gender>
+        <positionId>underworld.skaven.blitzer</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="7" id="teamUnderworldParityHome7">
+        <name>Skaven Thrower 7</name>
+        <gender>male</gender>
+        <positionId>underworld.skaven.thrower</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="8" id="teamUnderworldParityHome8">
+        <name>Skaven Thrower 8</name>
+        <gender>male</gender>
+        <positionId>underworld.skaven.thrower</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="9" id="teamUnderworldParityHome9">
+        <name>Underworld Goblin 9</name>
+        <gender>male</gender>
+        <positionId>underworld.goblin</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="10" id="teamUnderworldParityHome10">
+        <name>Underworld Goblin 10</name>
+        <gender>male</gender>
+        <positionId>underworld.goblin</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="11" id="teamUnderworldParityHome11">
+        <name>Underworld Goblin 11</name>
+        <gender>male</gender>
+        <positionId>underworld.goblin</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+</team>

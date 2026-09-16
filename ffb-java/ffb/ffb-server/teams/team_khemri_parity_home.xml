@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamKhemriParityHome">
+
+    <coach>Home</coach>
+    <name>Khemri Parity Home</name>
+    <race>Khemri</race>
+    <rosterId>khemri.lrb6</rosterId>
+    <reRolls>3</reRolls>
+    <fanFactor>5</fanFactor>
+    <apothecaries>0</apothecaries>
+    <cheerleaders>0</cheerleaders>
+    <assistantCoaches>0</assistantCoaches>
+    <teamRating>100</teamRating>
+    <currentTeamValue>840000</currentTeamValue>
+    <teamStrength>840000</teamStrength>
+    <division>[X]</division>
+    <treasury>0</treasury>
+    <baseIconPath>http://localhost:2224/icons/</baseIconPath>
+    <logo>teamlogos/khemri.gif</logo>
+    <specialRules/>
+
+    <player nr="1" id="teamKhemriParityHome1">
+        <name>Blitz-Ra 1</name>
+        <gender>male</gender>
+        <positionId>khemri.blitzra</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="2" id="teamKhemriParityHome2">
+        <name>Blitz-Ra 2</name>
+        <gender>male</gender>
+        <positionId>khemri.blitzra</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="3" id="teamKhemriParityHome3">
+        <name>Thro-Ra 3</name>
+        <gender>male</gender>
+        <positionId>khemri.throra</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="4" id="teamKhemriParityHome4">
+        <name>Thro-Ra 4</name>
+        <gender>male</gender>
+        <positionId>khemri.throra</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="5" id="teamKhemriParityHome5">
+        <name>Tomb Guardian 5</name>
+        <gender>male</gender>
+        <positionId>khemri.tombguardian</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="6" id="teamKhemriParityHome6">
+        <name>Tomb Guardian 6</name>
+        <gender>male</gender>
+        <positionId>khemri.tombguardian</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="7" id="teamKhemriParityHome7">
+        <name>Tomb Guardian 7</name>
+        <gender>male</gender>
+        <positionId>khemri.tombguardian</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="8" id="teamKhemriParityHome8">
+        <name>Tomb Guardian 8</name>
+        <gender>male</gender>
+        <positionId>khemri.tombguardian</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="9" id="teamKhemriParityHome9">
+        <name>Skeleton 9</name>
+        <gender>male</gender>
+        <positionId>khemri.skeleton</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="10" id="teamKhemriParityHome10">
+        <name>Skeleton 10</name>
+        <gender>male</gender>
+        <positionId>khemri.skeleton</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="11" id="teamKhemriParityHome11">
+        <name>Skeleton 11</name>
+        <gender>male</gender>
+        <positionId>khemri.skeleton</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+</team>

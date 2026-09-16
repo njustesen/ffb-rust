@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamChaosParityAway">
+
+    <coach>Away</coach>
+    <name>Chaos Parity Away</name>
+    <race>Chaos</race>
+    <rosterId>chaos.lrb6</rosterId>
+    <reRolls>3</reRolls>
+    <fanFactor>5</fanFactor>
+    <apothecaries>1</apothecaries>
+    <cheerleaders>0</cheerleaders>
+    <assistantCoaches>0</assistantCoaches>
+    <teamRating>100</teamRating>
+    <currentTeamValue>910000</currentTeamValue>
+    <teamStrength>910000</teamStrength>
+    <division>[X]</division>
+    <treasury>0</treasury>
+    <baseIconPath>http://localhost:2224/icons/</baseIconPath>
+    <logo>teamlogos/chaos.gif</logo>
+    <specialRules/>
+
+    <player nr="1" id="teamChaosParityAway1">
+        <name>Minotaur 1</name>
+        <gender>male</gender>
+        <positionId>chaos.minotaur</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="2" id="teamChaosParityAway2">
+        <name>Chaos Warrior 2</name>
+        <gender>male</gender>
+        <positionId>chaos.warrior</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="3" id="teamChaosParityAway3">
+        <name>Chaos Warrior 3</name>
+        <gender>male</gender>
+        <positionId>chaos.warrior</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="4" id="teamChaosParityAway4">
+        <name>Chaos Warrior 4</name>
+        <gender>male</gender>
+        <positionId>chaos.warrior</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="5" id="teamChaosParityAway5">
+        <name>Chaos Warrior 5</name>
+        <gender>male</gender>
+        <positionId>chaos.warrior</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="6" id="teamChaosParityAway6">
+        <name>Chaos Beastman 6</name>
+        <gender>male</gender>
+        <positionId>chaos.beastman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="7" id="teamChaosParityAway7">
+        <name>Chaos Beastman 7</name>
+        <gender>male</gender>
+        <positionId>chaos.beastman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="8" id="teamChaosParityAway8">
+        <name>Chaos Beastman 8</name>
+        <gender>male</gender>
+        <positionId>chaos.beastman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="9" id="teamChaosParityAway9">
+        <name>Chaos Beastman 9</name>
+        <gender>male</gender>
+        <positionId>chaos.beastman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="10" id="teamChaosParityAway10">
+        <name>Chaos Beastman 10</name>
+        <gender>male</gender>
+        <positionId>chaos.beastman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="11" id="teamChaosParityAway11">
+        <name>Chaos Beastman 11</name>
+        <gender>male</gender>
+        <positionId>chaos.beastman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+</team>

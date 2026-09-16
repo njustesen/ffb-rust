@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamWoodElfParityHome">
+
+    <coach>Home</coach>
+    <name>Wood Elf Parity Home</name>
+    <race>Wood Elf</race>
+    <rosterId>woodelf.lrb6</rosterId>
+    <reRolls>3</reRolls>
+    <fanFactor>5</fanFactor>
+    <apothecaries>1</apothecaries>
+    <cheerleaders>0</cheerleaders>
+    <assistantCoaches>0</assistantCoaches>
+    <teamRating>100</teamRating>
+    <currentTeamValue>1040000</currentTeamValue>
+    <teamStrength>1040000</teamStrength>
+    <division>[X]</division>
+    <treasury>0</treasury>
+    <baseIconPath>http://localhost:2224/icons/</baseIconPath>
+    <logo>teamlogos/wood_elf.gif</logo>
+    <specialRules/>
+
+    <player nr="1" id="teamWoodElfParityHome1">
+        <name>Treeman 1</name>
+        <gender>male</gender>
+        <positionId>woodelf.treeman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="2" id="teamWoodElfParityHome2">
+        <name>Wardancer 2</name>
+        <gender>male</gender>
+        <positionId>woodelf.wardancer</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="3" id="teamWoodElfParityHome3">
+        <name>Wardancer 3</name>
+        <gender>male</gender>
+        <positionId>woodelf.wardancer</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="4" id="teamWoodElfParityHome4">
+        <name>Thrower 4</name>
+        <gender>male</gender>
+        <positionId>woodelf.thrower</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="5" id="teamWoodElfParityHome5">
+        <name>Thrower 5</name>
+        <gender>male</gender>
+        <positionId>woodelf.thrower</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="6" id="teamWoodElfParityHome6">
+        <name>Catcher 6</name>
+        <gender>male</gender>
+        <positionId>woodelf.catcher</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="7" id="teamWoodElfParityHome7">
+        <name>Catcher 7</name>
+        <gender>male</gender>
+        <positionId>woodelf.catcher</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="8" id="teamWoodElfParityHome8">
+        <name>Catcher 8</name>
+        <gender>male</gender>
+        <positionId>woodelf.catcher</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="9" id="teamWoodElfParityHome9">
+        <name>Catcher 9</name>
+        <gender>male</gender>
+        <positionId>woodelf.catcher</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="10" id="teamWoodElfParityHome10">
+        <name>Lineman 10</name>
+        <gender>male</gender>
+        <positionId>woodelf.lineman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="11" id="teamWoodElfParityHome11">
+        <name>Lineman 11</name>
+        <gender>male</gender>
+        <positionId>woodelf.lineman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+</team>

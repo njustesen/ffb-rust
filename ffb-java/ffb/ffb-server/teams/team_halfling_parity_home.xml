@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamHalflingParityHome">
+
+    <coach>Home</coach>
+    <name>Halfling Parity Home</name>
+    <race>Halfling</race>
+    <rosterId>halfling.lrb6</rosterId>
+    <reRolls>3</reRolls>
+    <fanFactor>5</fanFactor>
+    <apothecaries>1</apothecaries>
+    <cheerleaders>0</cheerleaders>
+    <assistantCoaches>0</assistantCoaches>
+    <teamRating>100</teamRating>
+    <currentTeamValue>510000</currentTeamValue>
+    <teamStrength>510000</teamStrength>
+    <division>[X]</division>
+    <treasury>0</treasury>
+    <baseIconPath>http://localhost:2224/icons/</baseIconPath>
+    <logo>teamlogos/halfling.gif</logo>
+    <specialRules/>
+
+    <player nr="1" id="teamHalflingParityHome1">
+        <name>Treeman 1</name>
+        <gender>male</gender>
+        <positionId>halfling.treeman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="2" id="teamHalflingParityHome2">
+        <name>Treeman 2</name>
+        <gender>male</gender>
+        <positionId>halfling.treeman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="3" id="teamHalflingParityHome3">
+        <name>Halfling 3</name>
+        <gender>male</gender>
+        <positionId>halfling.halfling</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="4" id="teamHalflingParityHome4">
+        <name>Halfling 4</name>
+        <gender>male</gender>
+        <positionId>halfling.halfling</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="5" id="teamHalflingParityHome5">
+        <name>Halfling 5</name>
+        <gender>male</gender>
+        <positionId>halfling.halfling</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="6" id="teamHalflingParityHome6">
+        <name>Halfling 6</name>
+        <gender>male</gender>
+        <positionId>halfling.halfling</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="7" id="teamHalflingParityHome7">
+        <name>Halfling 7</name>
+        <gender>male</gender>
+        <positionId>halfling.halfling</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="8" id="teamHalflingParityHome8">
+        <name>Halfling 8</name>
+        <gender>male</gender>
+        <positionId>halfling.halfling</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="9" id="teamHalflingParityHome9">
+        <name>Halfling 9</name>
+        <gender>male</gender>
+        <positionId>halfling.halfling</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="10" id="teamHalflingParityHome10">
+        <name>Halfling 10</name>
+        <gender>male</gender>
+        <positionId>halfling.halfling</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="11" id="teamHalflingParityHome11">
+        <name>Halfling 11</name>
+        <gender>male</gender>
+        <positionId>halfling.halfling</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+</team>

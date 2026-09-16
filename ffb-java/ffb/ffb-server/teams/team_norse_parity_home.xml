@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamNorseParityHome">
+
+    <coach>Home</coach>
+    <name>Norse Parity Home</name>
+    <race>Norse</race>
+    <rosterId>norse.lrb6</rosterId>
+    <reRolls>3</reRolls>
+    <fanFactor>5</fanFactor>
+    <apothecaries>1</apothecaries>
+    <cheerleaders>0</cheerleaders>
+    <assistantCoaches>0</assistantCoaches>
+    <teamRating>100</teamRating>
+    <currentTeamValue>960000</currentTeamValue>
+    <teamStrength>960000</teamStrength>
+    <division>[X]</division>
+    <treasury>0</treasury>
+    <baseIconPath>http://localhost:2224/icons/</baseIconPath>
+    <logo>teamlogos/norse.gif</logo>
+    <specialRules/>
+
+    <player nr="1" id="teamNorseParityHome1">
+        <name>Snow Troll 1</name>
+        <gender>male</gender>
+        <positionId>norse.troll.snow</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="2" id="teamNorseParityHome2">
+        <name>Ulfwerener 2</name>
+        <gender>male</gender>
+        <positionId>norse.ulfwerener</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="3" id="teamNorseParityHome3">
+        <name>Ulfwerener 3</name>
+        <gender>male</gender>
+        <positionId>norse.ulfwerener</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="4" id="teamNorseParityHome4">
+        <name>Runner 4</name>
+        <gender>male</gender>
+        <positionId>norse.runner</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="5" id="teamNorseParityHome5">
+        <name>Runner 5</name>
+        <gender>male</gender>
+        <positionId>norse.runner</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="6" id="teamNorseParityHome6">
+        <name>Berserker 6</name>
+        <gender>male</gender>
+        <positionId>norse.berserker</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="7" id="teamNorseParityHome7">
+        <name>Berserker 7</name>
+        <gender>male</gender>
+        <positionId>norse.berserker</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="8" id="teamNorseParityHome8">
+        <name>Thrower 8</name>
+        <gender>male</gender>
+        <positionId>norse.thrower</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="9" id="teamNorseParityHome9">
+        <name>Thrower 9</name>
+        <gender>male</gender>
+        <positionId>norse.thrower</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="10" id="teamNorseParityHome10">
+        <name>Lineman 10</name>
+        <gender>male</gender>
+        <positionId>norse.lineman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="11" id="teamNorseParityHome11">
+        <name>Lineman 11</name>
+        <gender>male</gender>
+        <positionId>norse.lineman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+</team>

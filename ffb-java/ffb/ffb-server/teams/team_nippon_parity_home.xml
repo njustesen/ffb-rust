@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamNipponParityHome">
+
+    <coach>Home</coach>
+    <name>Nippon Parity Home</name>
+    <race>Nippon</race>
+    <rosterId>5681</rosterId>
+    <reRolls>3</reRolls>
+    <fanFactor>5</fanFactor>
+    <apothecaries>1</apothecaries>
+    <cheerleaders>0</cheerleaders>
+    <assistantCoaches>0</assistantCoaches>
+    <teamRating>100</teamRating>
+    <currentTeamValue>810000</currentTeamValue>
+    <teamStrength>810000</teamStrength>
+    <division>[X]</division>
+    <treasury>0</treasury>
+    <baseIconPath>http://localhost:2224/icons/</baseIconPath>
+    <logo>teamlogos/nippon.gif</logo>
+    <specialRules/>
+
+    <player nr="1" id="teamNipponParityHome1">
+        <name>Ninja 1</name>
+        <gender>male</gender>
+        <positionId>43574</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="2" id="teamNipponParityHome2">
+        <name>Ninja 2</name>
+        <gender>male</gender>
+        <positionId>43574</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="3" id="teamNipponParityHome3">
+        <name>Warrior Monk 3</name>
+        <gender>male</gender>
+        <positionId>43573</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="4" id="teamNipponParityHome4">
+        <name>Warrior Monk 4</name>
+        <gender>male</gender>
+        <positionId>43573</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="5" id="teamNipponParityHome5">
+        <name>Samurai 5</name>
+        <gender>male</gender>
+        <positionId>43572</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="6" id="teamNipponParityHome6">
+        <name>Samurai 6</name>
+        <gender>male</gender>
+        <positionId>43572</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="7" id="teamNipponParityHome7">
+        <name>Samurai 7</name>
+        <gender>male</gender>
+        <positionId>43572</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="8" id="teamNipponParityHome8">
+        <name>Samurai 8</name>
+        <gender>male</gender>
+        <positionId>43572</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="9" id="teamNipponParityHome9">
+        <name>Ashigaru 9</name>
+        <gender>male</gender>
+        <positionId>43571</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="10" id="teamNipponParityHome10">
+        <name>Ashigaru 10</name>
+        <gender>male</gender>
+        <positionId>43571</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="11" id="teamNipponParityHome11">
+        <name>Ashigaru 11</name>
+        <gender>male</gender>
+        <positionId>43571</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+</team>
