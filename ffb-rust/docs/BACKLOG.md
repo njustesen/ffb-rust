@@ -8976,3 +8976,62 @@ both the bb2016 and the bb2020/2025 arms of `step_diving_tackle.rs`, and the ste
 `!diving_tacklers.is_empty() && self.dodge_roll > 0`, and `self.dodge_roll` is evidently 0, so the
 branch is never reached. Java produces 1 per 10 seeds on dwarf bb2025.
 Next step: find who should publish the dodge roll into `StepDivingTackle`, and why it arrives as 0.
+
+
+## §H.60 — 2026-09-16: Diving Tackle is a parity frontier, and what the 28 paired additions actually cost
+
+### Diving Tackle — root-caused, attempted, REVERTED
+
+The chain is fully understood:
+
+1. `StepDivingTackle`'s body is gated on `!diving_tacklers.is_empty() && self.dodge_roll > 0`.
+2. `self.dodge_roll` only ever arrives via `StepParameter::DodgeRoll`.
+3. **Nothing in the Rust engine publishes `StepParameter::DodgeRoll`** — every occurrence is a
+   consumer (`set_parameter`) or a unit test. Verified: zero publish sites.
+4. Java publishes it the moment it rolls, in all three editions, e.g.
+   `bb2025/move/StepMoveDodge:309`:
+   `publishParameter(new StepParameter(StepParameterKey.DODGE_ROLL, diceRoller.rollSkill()))`.
+5. Rust's `step_move_dodge.rs` keeps the die in `self.dodge_roll` and publishes nothing, so every
+   downstream consumer sees 0 and the whole Diving Tackle body is unreachable — including the
+   `ReportSkillUse(.., WOULD_NOT_HELP)` call it already contains.
+
+**Adding the publish breaks parity.** dwarf bb2025 @0 went 10/10 → **7/10**, with Rust's log
+ending before Java's (seed 1 step 126, seed 2 step 149, seed 8 step 70 — all `rust=None`).
+Making `StepDivingTackle` reachable does not merely add a report: its other branches PROMPT the
+defending coach, which consumes agent RNG and can trip the dodger. Reverted; parity back to 10/10.
+
+So this is not a reporting fix. It is a **mechanic that has never run in Rust**, in the shape of
+the §§9–12 campaigns: publish the die, handle the prompt on both sides, give ParityRunner the
+matching arm, and gate it across three editions. Worth doing — Java reaches it ~1 per 10 seeds on
+dwarf bb2025 — but it is its own piece of work, not a line change.
+
+### The prerequisite nobody has written down: the Java engine lives in ANOTHER repo
+
+`ffb-rust/ffb-java/` is a **read-only reference copy**. The jar the harness actually runs is
+`C:\Users\Admin\niels\ffb\ffb\ffb-ai\target\ffb-ai-jar-with-dependencies.jar`
+(`ffb-parity/src/runner.rs:100`), built from the separate **`niels/ffb`** checkout. Every Java
+edit therefore means: edit `niels/ffb`, `mvn package` (~194 MB jar), then re-run the gate.
+
+That repo is **not clean**: on `master`, with `ffb-server/pom.xml` and
+`bb2025/kickoff/StepKickoffScatterRoll.java` modified and a dozen untracked helper classes
+(`InjuryCalc`, `CasualtyCalc`, `BlockDiceCalc`, …) plus its own `CLAUDE.md`. Anyone starting the
+paired additions must first decide what to do with that working tree — and must not assume the
+jar on disk matches what is committed there.
+
+### What the 28 paired additions cost, honestly
+
+For each of the 28 genuinely-silent skills: a `ReportSkillUse` site in the Java engine (in the
+OTHER repo), the mirrored site in Rust, a jar rebuild, and a parity gate. `addReport` consumes no
+dice, so each addition SHOULD be behaviour-neutral — but Diving Tackle is the standing warning
+that "make the telemetry reachable" and "change no behaviour" are not the same statement: the
+report was already there, and the only thing needed to reach it broke three games in ten.
+
+Recommended sequencing:
+
+1. Decide the fate of the `niels/ffb` working tree, and confirm a clean `mvn package` reproduces
+   the current jar (otherwise no Java change can be trusted).
+2. Do ONE skill end-to-end — Guard or Block — to establish the pattern and prove the loop.
+3. Batch the rest in groups that share a site (the block-result skills together, the
+   armour/injury ones together), gating each group.
+
+Do not start at (3).
