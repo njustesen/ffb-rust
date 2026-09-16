@@ -20,6 +20,21 @@ pub struct ArmorModifierFactory {
     modifier_aggregator: ModifierAggregator,
 }
 
+/// Java `ArmorModifierFactory`'s three `ignoresArmourModifiersFromSkills` early returns do NOT
+/// return an empty set — they return the skill's own modifiers:
+///   return new HashSet<>(defender.getSkillWithProperty(
+///       NamedProperties.ignoresArmourModifiersFromSkills).getArmorModifiers());
+/// `mixed/IronHardSkin.java` registers `StaticArmourModifier("Iron Hard Skin", 0, false)` whose
+/// `appliesToContext` is always false, so this is the ONLY place it is ever added, and its value
+/// is 0 so no armour total moves. Rust returned an empty vec: the suppression was right but the
+/// NAME was dropped, so Java wrote "Iron Hard Skin" 137 times across the 2026-09-16 matrix and
+/// Rust wrote it zero times (H.59).
+fn iron_hard_skin_modifiers() -> Vec<Box<dyn ArmorModifier>> {
+    vec![Box::new(
+        StaticArmourModifier::new("Iron Hard Skin", 0, false).with_predicate(|_| false),
+    )]
+}
+
 impl ArmorModifierFactory {
     pub fn new(rules: Rules) -> Self {
         Self {
@@ -40,8 +55,8 @@ impl ArmorModifierFactory {
             .into_iter()
             .find(|m| m.get_name() == name)
     }
-
     /// Java: findArmorModifiers — scans attacker skills for applicable modifiers.
+
     pub fn find_armor_modifiers(
         &self,
         game: &Game,
@@ -51,7 +66,7 @@ impl ArmorModifierFactory {
         is_foul: bool,
     ) -> Vec<Box<dyn ArmorModifier>> {
         if defender.has_skill_property(NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS) {
-            return vec![];
+            return iron_hard_skin_modifiers();
         }
         let context = ArmorModifierContext::new(game, attacker, defender, is_stab, is_foul);
         get_armor_modifiers_from_skills(attacker, &context)
@@ -63,6 +78,13 @@ impl ArmorModifierFactory {
         special_effect: SpecialEffect,
         defender: &Player,
     ) -> Vec<Box<dyn ArmorModifier>> {
+        // NOT `iron_hard_skin_modifiers()` here, unlike the other two early returns. Java returns
+        // the skill's own modifier from this site too, but `injury_type_lightning.rs:38` asks this
+        // function only whether the result IS EMPTY and adds ARMOR_LIGHTNING when it is not --
+        // so naming the skill here would flip that test and BREAK ARMOUR that currently holds.
+        // That is a behaviour change, and the sweep cannot adjudicate it: Lightning is a wizard
+        // effect and `wizardUse` is never produced, so no gate exercises this path. Left as the
+        // empty vec until the emptiness test is rewritten to ask what it actually means.
         if defender.has_skill_property(NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS) {
             return vec![];
         }
@@ -75,7 +97,7 @@ impl ArmorModifierFactory {
     /// Java: getFoulAssist(ArmorModifierContext) — returns foul-assist modifiers matching context.
     pub fn get_foul_assist(&self, context: &ArmorModifierContext<'_>) -> Vec<Box<dyn ArmorModifier>> {
         if context.defender.has_skill_property(NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS) {
-            return vec![];
+            return iron_hard_skin_modifiers();
         }
         self.armor_modifiers.values()
             .into_iter()
@@ -576,13 +598,19 @@ mod tests {
     }
 
     #[test]
-    fn find_armor_modifiers_iron_hard_skin_blocks_all() {
+    fn find_armor_modifiers_iron_hard_skin_names_itself_and_blocks_all() {
         let f = ArmorModifierFactory::new(Rules::Bb2025);
         let game = make_game(Rules::Bb2025);
         let attacker = player_with_skill("a", SkillId::MightyBlow);
         let defender = player_with_skill("d", SkillId::IronHardSkin);
         let mods = f.find_armor_modifiers(&game, Some(&attacker), &defender, false, false);
-        assert!(mods.is_empty());
+        // Java returns the skill's OWN modifiers here, not an empty set, so the report NAMES the
+        // skill that ate the attacker's Mighty Blow. Value 0, so the armour total is unchanged --
+        // which is what "blocks all" has to mean (H.59).
+        assert_eq!(mods.len(), 1, "Iron Hard Skin names itself");
+        assert_eq!(mods[0].get_name(), "Iron Hard Skin");
+        assert_eq!(mods.iter().map(|m| m.get_modifier(Some(&attacker), &defender)).sum::<i32>(), 0,
+            "naming the skill must not move the armour total");
     }
 
     #[test]
@@ -601,7 +629,12 @@ mod tests {
         let defender = player_with_skill("d", SkillId::IronHardSkin);
         let ctx = ArmorModifierContext::new_with_foul_assists(&game, Some(&attacker), &defender, false, true, 3);
         let mods = f.get_foul_assist(&ctx);
-        assert!(mods.is_empty());
+        // As above: Java returns Iron Hard Skin's own value-0 modifier, so the foul assists are
+        // still all denied but the report says WHY.
+        assert_eq!(mods.len(), 1, "Iron Hard Skin names itself");
+        assert_eq!(mods[0].get_name(), "Iron Hard Skin");
+        assert_eq!(mods.iter().map(|m| m.get_modifier(Some(&attacker), &defender)).sum::<i32>(), 0,
+            "naming the skill must not move the armour total");
     }
 
     #[test]

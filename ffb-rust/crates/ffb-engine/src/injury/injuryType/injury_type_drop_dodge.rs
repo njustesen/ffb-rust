@@ -89,6 +89,18 @@ impl InjuryTypeServer for InjuryTypeDropDodge {
                 {
                     self.ctx.add_armor_modifier(ARMOR_CHAINSAW_3);
                 }
+            } else {
+                // Java's ArmorModifierFactory does not return an EMPTY set when the defender
+                // ignores skill modifiers -- it returns that skill's own modifiers, so the report
+                // NAMES the skill that ate them:
+                //   return new HashSet<>(defender.getSkillWithProperty(
+                //       ignoresArmourModifiersFromSkills).getArmorModifiers());
+                // `mixed/IronHardSkin.java` registers `StaticArmourModifier("Iron Hard Skin", 0)`,
+                // value 0, so no armour total moves. This branch short-circuits the factory, so
+                // the name has to be added here: Java named it on every dropDodge against an Iron
+                // Hard Skin player and Rust named none of them (H.59).
+                self.ctx.add_armor_modifier(ffb_mechanics::modifiers::Modifier::new(
+                    "Iron Hard Skin", 0, game.rules));
             }
             do_armor_roll(game, rng, &mut self.ctx, defender_id);
         }

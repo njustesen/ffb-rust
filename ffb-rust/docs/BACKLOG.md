@@ -8535,15 +8535,15 @@ None of these were touched, and the first is the one that blocks report identity
 and the reason is that §H.56 fixed what the report DIFF happened to show on two seeds rather
 than working from the denominators. This section works from the denominators.
 
-**The headline: the ceiling is 147 of 164, not 89.** Of the 74 never-produced report kinds,
-only 16 are genuinely locked behind drafting a star player. The other **58 are reachable
-without touching a roster**:
+**The headline: the ceiling is 146 of 164, not 89.** Of the 74 never-produced report kinds,
+only **17** are locked behind the drafted squads (14 star-player traits plus 3 ordinary skills
+no squad carries). The other **57 are reachable without touching a roster**:
 
 | bucket | kinds | lever |
 |---|---:|---|
-| star-player traits (EXCLUDED — needs a roster change) | 16 | — |
+| roster-locked: 14 star traits + 3 unfielded skills (EXCLUDED) | 17 | — |
 | pregame: inducements, cards, wizards, staff | **24** | harness feature (§E) |
-| engine report-layer: sites that never construct | **24** | engine (§C, §D) |
+| engine report-layer: sites that never construct | **23** | engine (§C, §D) |
 | agent never reaches the mechanic | **10** | mostly legal_actions (§B), little agent (§A) |
 
 Same story on the other two denominators: **88 of 129 GameEvents** emitted (41 never), and
@@ -8642,7 +8642,7 @@ these either, the cap is the shared harness and every row changes shape from "Ru
 
 ---
 
-### §C — Engine report-layer: 24 kinds whose construction site never runs
+### §C — Engine report-layer: 23 kinds whose construction site never runs
 
 No agent and no roster involvement. Highest certainty per unit effort in this document.
 
@@ -8754,7 +8754,7 @@ while no stars are drafted) so the denominator reflects what is actually in play
 
 ### What is NOT addressable without a roster change
 
-16 roster-locked report kinds, in two groups.
+17 roster-locked report kinds, in two groups.
 
 **Star-player traits and hires** (13): `allYouCanEat`, `balefulHex`, `catchOfTheDay`,
 `chompRoll`, `chompRemoved`, `lookIntoMyEyesRoll`, `raidingParty`, `thenIStartedBlastin`,
@@ -8777,3 +8777,202 @@ Unsteady, No Hands, Timmm-ber!, On the Ball, No Ball, My Ball, Hatred, Insignifi
 Iron Hard Skin, Plague Ridden, Nurgle's Rot, Running Pass, Give and Go — which raise no
 telemetry in EITHER engine and never will. The two exceptions worth checking are **Diving
 Tackle** and **Guard**, which Java may name as roll/assist modifiers.
+
+
+## §H.58 — 2026-09-16: why the ten dead skills never fire (corrected)
+
+> **This section was rewritten after review.** Its first draft concluded that nine of the ten were
+> "a shared contract limitation" and implied the mechanics were out of reach without a large
+> vocabulary change on both sides. **That was wrong on the most important point.** Every one of
+> these skills works in Java, and for five of them the plumbing ALREADY EXISTS on both sides —
+> they are switched off by a hardcoded `false`, not missing. The first draft reached its
+> conclusion by checking only the action-DECLARATION path (`legal_actions` vs ParityRunner's
+> eligible-action builder) and never looking at how the Java server actually dispatches the
+> skills. Expanding the search to `StepInitSelecting`'s command handlers changed the answer.
+
+### The mechanism the first draft missed: they are BLOCK FLAGS, not actions
+
+`bb2025/shared/StepInitSelecting.java:229-243`, the `CLIENT_BLOCK` handler:
+
+```java
+ClientCommandBlock blockCommand = (ClientCommandBlock) pReceivedCommand.getCommand();
+publishParameter(new StepParameter(StepParameterKey.BLOCK_DEFENDER_ID, blockCommand.getDefenderId()));
+publishParameter(new StepParameter(StepParameterKey.USING_STAB,         blockCommand.isUsingStab()));
+publishParameter(new StepParameter(StepParameterKey.USING_CHAINSAW,     blockCommand.isUsingChainsaw()));
+publishParameter(new StepParameter(StepParameterKey.USING_VOMIT,        blockCommand.isUsingVomit()));
+publishParameter(new StepParameter(StepParameterKey.USING_BREATHE_FIRE, blockCommand.isUsingBreatheFire()));
+publishParameter(new StepParameter(StepParameterKey.USING_CHOMP,        blockCommand.isUsingChomp()));
+fDispatchPlayerAction = (targetSelectionState != null) ? PlayerAction.BLITZ : PlayerAction.BLOCK;
+```
+
+**Stab, Chainsaw, Projectile Vomit, Breathe Fire and Chomp are not actions you declare.** They are
+booleans on the block command, and the dispatched action is plain `BLOCK`. (Chainsaw rides the
+FOUL command the same way, `:223`.) So "the action is in neither offer set" was true and
+irrelevant — there is no such action to offer.
+
+**Both sides already carry the plumbing.** Rust has `StepParameter::{UsingStab, UsingChainsaw,
+UsingVomit, UsingBreatheFire, UsingChomp}` in `step/framework.rs`, consumed by `step_stab.rs`,
+`step_dauntless.rs`, `bb2016/block/step_end_blocking.rs` and others. Java has the full
+`ClientCommandBlock` constructor. What is missing is only the caller:
+
+* **Rust**: `Action::Block { defender_id }` in `action/mod.rs` has NO flag fields, so nothing can
+  ever publish the parameters as true.
+* **Java**: every one of ParityRunner's `new ClientCommandBlock(...)` calls passes
+  `false, false, false, false, false` — five hardcoded offs (lines 1038, 2123, 2130, 2146, …).
+
+That is the entire reason Stab (11 squads), Projectile Vomit (16), Chainsaw (3) and Breathe Fire
+(2) never fire. It is one mechanism, not four fixes.
+
+### Jump Up: also reachable, via the same handler
+
+`JumpUpBehaviour` gates on `playerAction.isBlockAction() || MULTIPLE_BLOCK` in BOTH engines
+(verified: `skillbehaviour/mixed/JumpUpBehaviour.java:52` against `step_jump_up.rs`), and
+`isBlockAction()` is BLOCK / VICIOUS_VINES / BREATHE_FIRE / CHAINSAW / STAB / PROJECTILE_VOMIT /
+CHOMP in both. Since the `CLIENT_BLOCK` handler above sets `fDispatchPlayerAction = BLOCK`, **a
+prone player who declares a block gets `isBlockAction() == true` and Jump Up rolls.** Nothing in
+the server forbids it — that is exactly how Jump Up works at the table.
+
+What blocks it is the harness offer set on both sides: a prone player is given Move→StandUp and
+Blitz→StandUpBlitz and then `continue`s past the block offer entirely
+(`legal_actions/mod.rs`, and ParityRunner's equivalent). Offering Block to a prone player who has
+Jump Up is the fix — 20 squads, the widest of the ten.
+
+### Corrected per-skill table
+
+| skill | squads | why it never fires | shape of the fix |
+|---|---:|---|---|
+| Jump Up | 20 | prone players are never offered Block in either harness | offer-set change, both sides |
+| Projectile Vomit | 16 | `USING_VOMIT` hardcoded false | **block flag** |
+| Stab | 11 | `USING_STAB` hardcoded false | **block flag** |
+| Shadowing | 10 | `PlayerChoice{reason:"TENTACLES"}` has no arm in Rust's parity contract (falls to the catch-all `SelectPlayer{player_id:""}` = decline) and none in ParityRunner | decision arm, both sides |
+| Chainsaw | 3 | `USING_CHAINSAW` hardcoded false (block AND foul) | **block flag** |
+| Tentacles | 3 | as Shadowing | decision arm |
+| Hypnotic Gaze | 3 | GAZE **is** in both offer sets; the scorer never ranks it | scorer term only |
+| Breathe Fire | 2 | `USING_BREATHE_FIRE` hardcoded false, AND `GameEvent::BreatheFireRoll` has no engine emit site | block flag + a real Rust defect |
+| Trickster | 2 | no skill-specific report exists; shares the generic `trapDoor` | by design |
+| Pick-me-up / Pro | 3 / 1 | not yet traced | — |
+
+### Order of work
+
+1. **Block flags** — one mechanism, four skills, 32 squad-slots, plumbing already on both sides.
+   Add the five booleans to `Action::Block`, set them in the agent when the blocker has the skill,
+   publish the step parameters, and pass them in ParityRunner's `ClientCommandBlock` calls.
+2. **Jump Up** — offer Block to prone Jump Up players in both offer sets. 20 squads.
+3. **Shadowing + Tentacles** — a TENTACLES arm in the parity contract and in ParityRunner.
+4. **Hypnotic Gaze** — a scorer term; nothing else needed.
+5. **Breathe Fire's emit site** — independently correct, do it with (1).
+
+Every one of these moves the shared agent RNG stream, so each needs its own 100-seed gate across
+three editions. Gate them one at a time.
+
+### The lesson worth keeping
+
+A mechanic that "no agent can take" is a claim about the DECLARATION path only. Before concluding
+a mechanic is unreachable, check every command handler in `StepInitSelecting` that can set
+`fDispatchPlayerAction` — actions, skill-use pairs (`CLIENT_USE_SKILL`, which is how the star
+specials dispatch), and boolean flags on other commands. Three different mechanisms reach the
+same step, and only one of them looks like an entry in an action list.
+
+
+## §H.59 — 2026-09-16: the census only ever read the RUST stream, and it hid three Rust bugs
+
+Every "this skill is silent in both engines" claim in §H.57 and §H.58 was derived from
+`report_census.json`, which is built from `seed_N_rust_reports.jsonl` **only**. Nobody had
+checked the Java twin. Checking it changes three of the thirty-one answers.
+
+Grepping all 330 gates (6 seeds each) for each missing skill's display name, Java against Rust:
+
+| skill | squads | java | rust | verdict |
+|---|---:|---:|---:|---|
+| Thick Skull | 68 | 476 | **0** | RUST GAP |
+| Iron Hard Skin | 2 | 137 | **0** | RUST GAP |
+| Diving Tackle | 9 | 72 | **0** | RUST GAP |
+| the other 28 | — | 0 | 0 | genuinely silent in both |
+
+So three skills were not "silent by design" at all — Java has been naming them the whole time and
+Rust has not. They are ordinary fidelity bugs that the report comparison exists to catch, and the
+coverage census could not see them because it only reads one side.
+
+### Thick Skull — FIXED
+
+`common/ThickSkull.java` registers `StaticInjuryModifier("Thick Skull", 0)` whose
+`appliesToContext` is always false, so it is only ever added by the one site that matters:
+Java's `RollMechanic` STUNNED branch runs
+`defender.getSkillWithProperty(convertKOToStunOn8).getInjuryModifiers().forEach(ctx::addInjuryModifier)`,
+naming the skill that saved the player. Value 0, so it cannot move a total.
+
+**Rust had this add — in dead code.** `mechanic/bb2020/roll_mechanic.rs` and
+`mechanic/bb2025/roll_mechanic.rs` both carry it, correct and commented, inside
+`interpret_injury_roll_and_add_modifiers` — a method with **no callers**. The live path is
+`injury.rs::interpret_and_set_injury`, which computed `has_thick_skull` and never added the
+modifier.
+
+Fixed on the live path, after `total` is computed so the interpretation cannot shift.
+Verified: black_orc bb2020 @0, 10 seeds — **java=6, rust=6**, parity 10/10.
+
+### Still to fix
+
+* **Iron Hard Skin** (2 squads, java=137) — same shape, not yet traced.
+* **Diving Tackle** (9 squads, java=72) — `DivingTackleBehaviour` adds `ReportSkillUse` in all
+  three editions when a dodge would fail and the defender opts in.
+
+### The instrumentation decision, and what it now means
+
+The standing goal is that **both engines report every skill, through one comparable stream**.
+`GameEvent` cannot serve that: it is a Rust-only side channel with no Java counterpart, so an
+event proves only that Rust did something. Reports are the only stream that can prove the two
+engines agree, and `addReport` consumes no dice, so adding one cannot change behaviour.
+
+For the 28 genuinely-silent skills that means adding a paired report site to BOTH engines. The
+natural vehicle is `ReportSkillUse(playerId, skill, used, SkillUse reason)`: it already exists on
+both sides, both `SkillUse` enums already carry the same 68 reasons, and the census already
+tallies `skill_use_skills` / `skill_use_reasons`, so nothing new has to be built to read it.
+
+**This reverses the standing "never modify the Java engine" rule** for report-only lines, on an
+explicit instruction. Keep the additions strictly to `addReport` calls so stock Java's behaviour
+is untouched, and audit them as one reviewable set.
+
+### The lesson
+
+A coverage census built from one engine's stream cannot distinguish "neither engine reports this"
+from "our engine is missing it". Both conclusions look identical in the data. **Always diff the
+two streams before calling a mechanic silent by design** — `report_census.py` should read and
+tally the Java twin alongside the Rust one so this class of bug shows up as a coverage number
+rather than needing a hand grep.
+
+
+### Update — two of the three fixed, 2026-09-16
+
+**Thick Skull** and **Iron Hard Skin** now match Java exactly; the full suite passes (14,852 / 0)
+and parity holds on 75 games across bb2016 / bb2020 / bb2025.
+
+| skill | gate | java | rust |
+|---|---|---:|---:|
+| Thick Skull | black_orc bb2020 @0, 10 seeds | 6 | **6** |
+| Iron Hard Skin | chaos_dwarf bb2025 @0, 10 seeds | 78 | **78** |
+
+**Iron Hard Skin took three attempts, and the wrong turns are the useful part.**
+Java's `ArmorModifierFactory` has THREE `ignoresArmourModifiersFromSkills` early returns, each
+returning the skill's own value-0 modifier rather than an empty set. Patching all three got 66 of
+Java's 78; the shortfall was `dropDodge`, whose injury type short-circuits the factory entirely and
+needed the name added in its own ignore branch. Centralising the add in `do_armor_roll` instead
+OVER-fired (152 against 78), because that names the skill on armour rolls Java never routes through
+the factory. **The add belongs where Java's early return is, not where the dice are.**
+
+**One site was deliberately NOT changed.** `special_effect_armour_modifiers` keeps its empty vec:
+`injury_type_lightning.rs:38` asks that function only whether the result IS EMPTY and adds
+`ARMOR_LIGHTNING` when it is not, so naming the skill there flips the test and BREAKS ARMOUR that
+currently holds. That is a behaviour change, and no gate can adjudicate it because Lightning is a
+wizard effect and `wizardUse` is never produced. A unit test caught it — the only thing that would
+have.
+
+Two existing tests asserted `mods.is_empty()` for the patched sites. They encoded the Rust bug;
+they now assert exactly one modifier named "Iron Hard Skin" whose values sum to 0, so the
+"blocks all" guarantee is still tested.
+
+**Diving Tackle is NOT fixed.** The `ReportSkillUse(.., WOULD_NOT_HELP)` call exists in Rust at
+both the bb2016 and the bb2020/2025 arms of `step_diving_tackle.rs`, and the step IS in the live
+`move_` / `blitz_move` sequences — but the enclosing gate is
+`!diving_tacklers.is_empty() && self.dodge_roll > 0`, and `self.dodge_roll` is evidently 0, so the
+branch is never reached. Java produces 1 per 10 seeds on dwarf bb2025.
+Next step: find who should publish the dodge roll into `StepDivingTackle`, and why it arrives as 0.

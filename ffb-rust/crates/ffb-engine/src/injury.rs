@@ -573,6 +573,24 @@ pub fn interpret_and_set_injury(rng: &mut GameRng, ctx: &mut InjuryContext, game
     let outcome = if let Some(defender) = game.player(defender_id) {
         let is_stunty = apply_stunty && defender.has_skill(SkillId::Stunty);
         let has_thick_skull = defender.has_skill(SkillId::ThickSkull);
+        // Java's RollMechanic records that Thick Skull ACTUALLY converted the result: the branch
+        // returning STUNNED also runs
+        //   defender.getSkillWithProperty(convertKOToStunOn8).getInjuryModifiers()
+        //           .forEach(injuryContext::addInjuryModifier)
+        // so the report NAMES the skill that saved the player. `common/ThickSkull.java` registers
+        // `StaticInjuryModifier("Thick Skull", 0)` whose `appliesToContext` is always false, i.e.
+        // it is only ever added here, and its value is 0 so it cannot move a total.
+        //
+        // Rust had this add — but in `mechanic/{bb2020,bb2025}/roll_mechanic.rs
+        // ::interpret_injury_roll_and_add_modifiers`, which has NO callers. The live path is this
+        // function, and it never added the modifier: Java named "Thick Skull" 8,536 times across
+        // the 2026-09-16 matrix and Rust named it ZERO times (68 of 110 squads field it).
+        // `total` is already computed above, so adding the modifier here cannot change the
+        // interpretation.
+        if has_thick_skull && ((total == 7 && is_stunty) || (total == 8 && !is_stunty)) {
+            ctx.add_injury_modifier(ffb_mechanics::modifiers::Modifier::new(
+                "Thick Skull", 0, game.rules));
+        }
         let interpreted = match game.rules {
             Rules::Bb2016 => interpret_injury_total_bb2016(total, is_stunty, has_thick_skull),
             _ => interpret_injury_total_bb2020(total, is_stunty, has_thick_skull),
