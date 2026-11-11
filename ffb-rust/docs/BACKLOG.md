@@ -9380,3 +9380,11 @@ which needed no layout shim — the census globs `<root>/<edition>/<home>_vs_<aw
   (4011/4012) because nothing is bought, but 10,249 of 12,036 games have a longer Java report
   stream for this reason alone. This is §E of the coverage backlog, now with cross-match
   evidence; it is the next queue item after the certification sweeps.
+
+## §I.10 — 2026-11-11: MIRROR RE-CERTIFICATION 330/330 on the §I.1-§I.7 build
+
+`docs/SWEEP_2026-11-11_RECERT.txt`: 110 cells × 3 scales × 100 seeds, **330/330**, 0 failed, 0
+without a verdict, summed 567 min on 6 workers — under the whole-roster hash, which the previous
+certifications never had. The same 10 gates as before are short on the coverage checklist (parity
+100/100 on all of them). The final cross re-sweep runs next on the binary that also carries the
+§I.9 report-naming fixes (report-only; no step hash moves).

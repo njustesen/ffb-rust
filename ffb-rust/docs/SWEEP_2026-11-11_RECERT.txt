@@ -1,0 +1,19 @@
+MIRROR RE-CERTIFICATION after the cross campaign (§I.1-§I.7, whole-roster hash) - 330 gates, 110 cells x 3 scale(s)
+parity: 330/330 games match, 0 FAILED, 0 without a verdict
+
+summed gate time 567 min (9.45 h)
+
+Separately, 10 gate(s) report the mechanic-coverage checklist unmet
+(parity still 100/100 on every one of them):
+
+  chaos bb2016 @1e6
+  dwarf bb2016 @1e6
+  dwarf bb2020 @1e6
+  khemri bb2025 @1e6
+  khemri_fumbbl bb2020 @0
+  khemri_fumbbl bb2025 @0
+  khorne bb2025 @1e6
+  nurgle bb2025 @1e6
+  slann_fumbbl bb2020 @0
+  slann_fumbbl bb2025 @0
+
