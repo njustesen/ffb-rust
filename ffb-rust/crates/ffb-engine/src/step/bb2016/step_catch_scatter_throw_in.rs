@@ -584,6 +584,7 @@ impl StepCatchScatterThrowIn {
         if do_roll {
             let factory = CatchModifierFactory::for_rules(Rules::Bb2016);
             let catcher = game.player(&cid).map(|p| p as *const _);
+            let mut catch_mod_names: Vec<String> = Vec::new();
             let min_roll = if let Some(ptr) = catcher {
                 let player = unsafe { &*ptr };
                 let ctx = CatchContext::new(game, Some(player), mode, None);
@@ -596,6 +597,11 @@ impl StepCatchScatterThrowIn {
                 // succeed on rolls Java fails (amazon seed8 i=180: catcher AG3, accurate pass -1 →
                 // Rust min 2 vs Java min 3; d6=2 → Rust caught, Java bounced → turnover desync).
                 let modifier_total: i32 = all.iter().map(|m| m.get_modifier()).sum();
+                // Java: `new ReportCatchRoll(..., catchModifiers.toArray(new CatchModifier[0]))` —
+                // the report carries the modifier NAMES ("Hand Off", "Accurate Pass", "1 Tacklezone"
+                // ...). This step applied them to the minimum and reported `vec![]`, so the bb2016
+                // stream never named "Hand Off" where Java did 6,822 times (oracle check 2026-09-17).
+                catch_mod_names = all.iter().map(|m| m.get_name().to_string()).collect();
                 ffb_mechanics::mechanics::minimum_roll_catch_edition(
                     player.agility_with_modifiers(), modifier_total, game.rules)
             } else {
@@ -619,7 +625,7 @@ impl StepCatchScatterThrowIn {
                 roll,
                 min_roll,
                 rerolled,
-                vec![],
+                catch_mod_names,
                 mode.is_bomb(),
             ));
 
@@ -735,6 +741,32 @@ mod tests {
             "declined team re-roll must clear re_roll_source");
         assert!(step.re_roll_state.re_rolled_action.is_some(),
             "re_rolled_action must stay set so already_rerolled short-circuits (no fresh re-roll)");
+    }
+
+    #[test]
+    fn hand_off_catch_report_names_the_hand_off_modifier() {
+        // Java bb2016 StepCatchScatterThrowIn.catchBall: `new ReportCatchRoll(..., catchModifiers
+        // .toArray(new CatchModifier[0]))` — the "Hand Off" (+1) modifier is NAMED in the report.
+        // Rust applied it to the minimum and reported `vec![]` (6,822 unnamed in the 2026-09-17
+        // oracle check).
+        let mut game = make_game();
+        let coord = FieldCoordinate::new(12, 7);
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_in_play = true;
+        let p = make_player("c1");
+        game.team_home.players.push(p);
+        game.field_model.set_player_coordinate("c1", coord);
+        game.field_model.set_player_state("c1", PlayerState::new(PS_STANDING));
+        let mut step = StepCatchScatterThrowIn::new();
+        step.catch_scatter_throw_in_mode = Some(CatchScatterThrowInMode::CatchHandOff);
+        step.catcher_id = Some("c1".into());
+        step.catch_ball(&mut game, &mut GameRng::new(1));
+        let json = game.report_list.get_reports().iter().rev()
+            .find_map(|r| r.to_json())
+            .map(|v| v.to_string())
+            .unwrap_or_default();
+        assert!(json.contains("catchRoll"), "{json}");
+        assert!(json.contains("Hand Off"), "the catch report must name the Hand Off modifier: {json}");
     }
 
     fn make_player(id: &str) -> Player {

@@ -154,6 +154,17 @@ pub fn end_turn_sequence(check_forgo: bool) -> Vec<SequenceStep> {
 
 /// Mirrors Java `com.fumbbl.ffb.server.step.generator.bb2025.EndGame.pushSequence`.
 pub fn end_game_sequence(admin_mode: bool) -> Vec<SequenceStep> {
+    end_game_sequence_for(ffb_model::enums::Rules::Bb2025, admin_mode)
+}
+
+/// Edition-aware end-game sequence. Java `generator/bb2016/EndGame.java` runs **FAN_FACTOR**
+/// where bb2020+ (`generator/mixed/EndGame.java`) run DEDICATED_FANS; everything else is the
+/// same. The edition-blind version above handed every bb2016 game the BB2020+ step, so
+/// `fanFactorRoll` (2d6/3d6 per team, `StepFanFactor`) never happened in Rust while Java
+/// reported it in 5,765 games of the 2026-09-17 sweep (oracle check). Hash-safe: the game-end
+/// hash carries the score, not the fan factor, and Java rolls these dice too.
+pub fn end_game_sequence_for(rules: ffb_model::enums::Rules, admin_mode: bool) -> Vec<SequenceStep> {
+    let fans = if rules == ffb_model::enums::Rules::Bb2016 { StepId::FanFactor } else { StepId::DedicatedFans };
     vec![
         SequenceStep::with_params(StepId::InitEndGame, vec![
             StepParameter::GotoLabelOnEnd("END_GAME".into()),
@@ -162,7 +173,7 @@ pub fn end_game_sequence(admin_mode: bool) -> Vec<SequenceStep> {
         SequenceStep::new(StepId::PenaltyShootout),
         SequenceStep::new(StepId::Mvp),
         SequenceStep::new(StepId::Winnings),
-        SequenceStep::new(StepId::DedicatedFans),
+        SequenceStep::new(fans),
         SequenceStep::new(StepId::PlayerLoss),
         SequenceStep::labelled(StepId::EndGame, "END_GAME", vec![]),
     ]
@@ -471,6 +482,24 @@ mod tests {
     fn start_game_sequence_starts_with_init_start_game() {
         let seq = start_game_sequence();
         assert_eq!(seq[0].step_id, StepId::InitStartGame);
+    }
+
+    #[test]
+    fn bb2016_end_game_runs_fan_factor_not_dedicated_fans() {
+        // Java generator/bb2016/EndGame.java: INIT_END_GAME, PENALTY_SHOOTOUT, MVP, WINNINGS,
+        // FAN_FACTOR, PLAYER_LOSS, END_GAME. bb2020+ (generator/mixed) swap FAN_FACTOR for
+        // DEDICATED_FANS. The edition-blind sequence gave bb2016 the bb2020+ step, so Rust never
+        // rolled the post-match fan factor Java reported in 5,765 games (oracle check 2026-09-17).
+        use ffb_model::enums::Rules;
+        let ids = |rules| end_game_sequence_for(rules, false).iter().map(|s| s.step_id).collect::<Vec<_>>();
+        assert_eq!(ids(Rules::Bb2016), vec![
+            StepId::InitEndGame, StepId::PenaltyShootout, StepId::Mvp, StepId::Winnings,
+            StepId::FanFactor, StepId::PlayerLoss, StepId::EndGame,
+        ]);
+        for rules in [Rules::Bb2020, Rules::Bb2025] {
+            assert!(ids(rules).contains(&StepId::DedicatedFans), "{rules:?}");
+            assert!(!ids(rules).contains(&StepId::FanFactor), "{rules:?}");
+        }
     }
 
     #[test]

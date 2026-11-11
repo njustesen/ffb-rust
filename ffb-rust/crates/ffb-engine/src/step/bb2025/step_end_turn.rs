@@ -926,7 +926,7 @@ impl StepEndTurn {
 
             // Java: endGenerator.pushSequence / kickoffGenerator
             use ffb_model::enums::InducementPhase;
-            use crate::step::sequences::{inducement_sequence, h2_kickoff_sequence_for, end_game_sequence};
+            use crate::step::sequences::{inducement_sequence, h2_kickoff_sequence_for, end_game_sequence_for};
             // BB2016 shares this StepEndTurn (make_step_for(bb2016) does not override EndTurn), but its
             // ApplyKickoffResult (bb2016-routed) GOTOs GotoLabelOnEnd=END_KICKOFF / GotoLabelOnBlitz=
             // BLITZ_TURN on a turn>8 Riot or a Blitz! result. The hand-rolled `h2_kickoff_sequence`
@@ -952,7 +952,7 @@ impl StepEndTurn {
                 // Java: half > 2 → end_game; half > 1 → overtime check or end_game; else → H2 kickoff
                 if game.half > 1 {
                     // Half 2+ ended → end game (overtime check not yet ported)
-                    outcome = outcome.push_seq(end_game_sequence(game.admin_mode));
+                    outcome = outcome.push_seq(end_game_sequence_for(game.rules, game.admin_mode));
                 } else {
                     // Java: if (game.getHalf() == 1 || (half == 2 && drawWithOvertime))
                     //   stateMechanic.startHalf(this, game.getHalf() + 1)
@@ -975,7 +975,7 @@ impl StepEndTurn {
                 // Java: touchdownEndsGame check → end_game if last turn
                 let td_ends_game = game.turn_data_home.turn_nr >= 8 && game.turn_data_away.turn_nr >= 8;
                 if td_ends_game {
-                    outcome = outcome.push_seq(end_game_sequence(game.admin_mode));
+                    outcome = outcome.push_seq(end_game_sequence_for(game.rules, game.admin_mode));
                 } else {
                     outcome = outcome.push_seq(kickoff_seq(game));
                 }

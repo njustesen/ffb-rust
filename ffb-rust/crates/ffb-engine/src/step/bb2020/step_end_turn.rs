@@ -319,18 +319,18 @@ impl StepEndTurn {
             game.turn_data_away.reset_for_turn();
 
             use ffb_model::enums::InducementPhase;
-            use crate::step::sequences::{inducement_sequence, h2_kickoff_sequence_for, end_game_sequence};
+            use crate::step::sequences::{inducement_sequence, h2_kickoff_sequence_for, end_game_sequence_for};
             let mut outcome = StepOutcome::next();
             if self.new_half {
                 if game.half > 1 {
-                    outcome = outcome.push_seq(end_game_sequence(game.admin_mode));
+                    outcome = outcome.push_seq(end_game_sequence_for(game.rules, game.admin_mode));
                 } else {
                     outcome = outcome.push_seq(h2_kickoff_sequence_for(game.rules));
                 }
             } else if touchdown {
                 let td_ends_game = game.turn_data_home.turn_nr >= 8 && game.turn_data_away.turn_nr >= 8;
                 if td_ends_game {
-                    outcome = outcome.push_seq(end_game_sequence(game.admin_mode));
+                    outcome = outcome.push_seq(end_game_sequence_for(game.rules, game.admin_mode));
                 } else {
                     outcome = outcome.push_seq(h2_kickoff_sequence_for(game.rules));
                 }

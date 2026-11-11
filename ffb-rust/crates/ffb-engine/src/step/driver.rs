@@ -1188,8 +1188,9 @@ impl DriverGameState {
     /// Java: `((EndGame) factory.forName("EndGame")).pushSequence(new EndGame.SequenceParams(gameState, adminMode))`.
     /// Reuses the same `end_game_sequence` helper the in-engine `StepEndTurn` variants push.
     pub fn push_end_game_sequence(&mut self, admin_mode: bool) {
-        use crate::step::sequences::end_game_sequence;
-        self.push_sequence(end_game_sequence(admin_mode));
+        use crate::step::sequences::end_game_sequence_for;
+        let rules = self.game.rules;
+        self.push_sequence(end_game_sequence_for(rules, admin_mode));
     }
 
     fn apply_effects(&mut self, entry: &mut DriverStepEntry, outcome: &mut StepOutcome) {
