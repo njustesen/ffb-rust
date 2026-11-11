@@ -50,6 +50,10 @@ pub struct StepMoveDodge {
     pub re_roll_used: bool,
     /// Java: AbstractStepWithReRoll fields
     pub re_roll_state: ReRollState,
+    /// A die rolled on THIS pass, waiting to be published as `StepParameter::DodgeRoll` —
+    /// Java `dodge(doRoll=true)` publishes `DODGE_ROLL` the moment it rolls (see the bb2025
+    /// twin for why this matters: `StepDivingTackle` is gated on it).
+    dodge_roll_to_publish: Option<i32>,
 }
 
 impl StepMoveDodge {
@@ -63,6 +67,7 @@ impl StepMoveDodge {
             using_break_tackle: false,
             re_roll_used: false,
             re_roll_state: ReRollState::new(),
+            dodge_roll_to_publish: None,
         }
     }
 }
@@ -105,7 +110,17 @@ impl Step for StepMoveDodge {
 }
 
 impl StepMoveDodge {
+    /// Java `dodge(pDoRoll)`: `if (pDoRoll) publishParameter(new StepParameter(DODGE_ROLL,
+    /// rollSkill()))` — attached once to whatever outcome the pass produced (see the bb2025 twin).
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        let mut out = self.execute_step_inner(game, rng);
+        if let Some(roll) = self.dodge_roll_to_publish.take() {
+            out = out.publish(StepParameter::DodgeRoll(roll));
+        }
+        out
+    }
+
+    fn execute_step_inner(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: if (!actingPlayer.isDodging()) { setNextAction(NEXT_STEP); return; }
         if !game.acting_player.dodging {
             return StepOutcome::next();
@@ -125,13 +140,25 @@ impl StepMoveDodge {
                 .unwrap_or(false);
             if consumed {
                 self.re_roll_used = true;
+                // Java: `doRoll = reRolledAction || fUsingDivingTackle == null` where
+                // `reRolledAction = DODGE == getReRolledAction() && getReRollSource() != null` —
+                // a consumed re-roll ALWAYS rolls a fresh die, whatever `fDodgeRoll` holds. Rust
+                // signals "roll fresh" with `dodge_roll == 0`, and the reset at the TRR offer is
+                // undone before re-entry: `publishParameter` delivers DODGE_ROLL to the publishing
+                // step itself (driver `apply_effects`), so the failed die was written back and the
+                // re-roll re-used it (slann bb2016 @1.0 seed 10 i=7: Java re-rolled 2 -> 4 and ran
+                // on, Rust "re-rolled" 2 -> 2, fell, and was KO'd — one die ahead, nine seeds red).
+                // The bb2025 twin already resets here; this is its missing bb2016 half.
+                self.dodge_roll = 0;
             } else {
                 return self.fail_dodge();
             }
         }
 
+        // Java: dodge(doRoll) rolls and publishes DODGE_ROLL.
         if self.dodge_roll == 0 {
             self.dodge_roll = rng.d6();
+            self.dodge_roll_to_publish = Some(self.dodge_roll);
         }
 
         let (minimum_roll, mod_names, has_bt, min_no_bt, names_no_bt) =
@@ -346,6 +373,66 @@ mod tests {
         step.dodge_roll = 1;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))));
+    }
+
+    #[test]
+    fn fresh_dodge_die_is_published_as_dodge_roll() {
+        // Java `dodge(pDoRoll=true)`: `publishParameter(new StepParameter(DODGE_ROLL,
+        // rollSkill()))` — the die must reach `StepDivingTackle`, whose whole body is gated on
+        // `dodgeRoll > 0`. Before the fix nothing in the engine published it (BACKLOG §H.60).
+        let mut game = make_game();
+        game.acting_player.dodging = true;
+        let mut step = StepMoveDodge::new("fail".into());
+        let mut rng = GameRng::new(7);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(rng.call_count, 1, "one fresh d6");
+        let published: Vec<i32> = out.published.iter().filter_map(|p| match p {
+            StepParameter::DodgeRoll(v) => Some(*v),
+            _ => None,
+        }).collect();
+        assert_eq!(published, vec![step.dodge_roll], "the rolled die is published exactly once");
+        assert!((1..=6).contains(&step.dodge_roll));
+    }
+
+    #[test]
+    fn preset_dodge_roll_is_not_republished() {
+        // Java `dodge(pDoRoll=false)` (a RETRY_DODGE re-entry with usingDivingTackle set)
+        // publishes nothing — the step reuses the die the stack already carries.
+        let mut game = make_game();
+        game.acting_player.dodging = true;
+        let mut step = StepMoveDodge::new("fail".into());
+        step.dodge_roll = 6;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::DodgeRoll(_))));
+    }
+
+    #[test]
+    fn consumed_team_reroll_rolls_fresh_even_after_self_delivery_of_dodge_roll() {
+        // The driver delivers every published parameter to the publishing step too (Java
+        // AbstractStep.publishParameter: setParameter(self) then the stack). After the TRR offer
+        // the step has reset `dodge_roll` to 0 and published the FAILED die; self-delivery writes
+        // it back. Java still rolls fresh on the re-entry (`doRoll = reRolledAction`), so the
+        // re-entry must not re-use the delivered die.
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        add_player(&mut game, "p1");
+        let mut step = StepMoveDodge::new("fail".into());
+        step.dodge_roll = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue, "TRR offered");
+        assert_eq!(step.dodge_roll, 0, "the offer resets the die so the re-entry rolls fresh");
+        // What the driver does with the DODGE_ROLL the step published when it rolled the 1
+        // (the preset above stands in for that roll): deliver it back to the publishing step.
+        step.set_parameter(&StepParameter::DodgeRoll(1));
+        assert_eq!(step.dodge_roll, 1, "self-delivery wrote the failed die back");
+        let mut rng = GameRng::new(3);
+        let out = step.handle_command(&Action::UseReRoll { use_reroll: true }, &mut game, &mut rng);
+        assert_eq!(rng.call_count, 1, "the consumed re-roll must roll ONE fresh die");
+        assert_ne!(out.action, StepAction::Continue);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DodgeRoll(v) if *v == step.dodge_roll)),
+            "the fresh die is published");
     }
 
     #[test]

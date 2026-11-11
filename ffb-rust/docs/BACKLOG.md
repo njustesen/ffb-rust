@@ -9093,3 +9093,91 @@ Grep BOTH streams for every fielded skill's display name and diff the counts. Th
 
 That single change is worth more than the rest of this section, because it makes the ENTIRE class
 self-detecting instead of needing a hand grep per skill.
+
+
+# §I — The cross-matchup campaign (2026-11-11 → )
+
+The mirror matrix (110 squads × 3 scales, `docs/SWEEP_2026-09-17_REPORTS.txt`, 330/330) only ever
+runs a squad against ITSELF. A rule whose two halves sit on OPPOSITE teams is reachable only in a
+cross matchup, and the only cross data ever taken was 870 bb2020 pairs × 1 seed under the RANDOM
+agent (2026-08-17, pre-re-draft). User decision 2026-11-11: **logic parity before any GUI work**;
+run every non-mirror matchup, a few games each, and drive the reds green.
+
+Shape: all **4012 ordered pairs** (bb2016 29×28, bb2020 40×39, bb2025 41×40), **seeds 1-3 each**
+(every unordered pair gets 6 games across both orientations), heuristic agent `@1.0`, tier 3.
+Tooling: `scripts/cross_jobs.py` (job shards from `data/teams/<ed>/team_*.json`),
+`scripts/cross_worker.ps1` (sibling of `sweep_worker.ps1`, one `FFB_PARITY_ROOT` per worker on
+`D:/ffb_cross/sweep`), `scripts/sweep_verdicts.py --per-cell 1 --expect 4012`. The loop command is
+`.claude/commands/cross-iter.md`. Branch state: `heuristic-agent` was a strict superset of `main`
+and fully pushed; `main` fast-forwarded to it (`7633a8d63`) and is the working branch.
+
+## §I.1 — 2026-11-11: Diving Tackle had never run in Rust (the §H.60 frontier), fixed before the sweep
+
+The one entry of the 2026-09-17 oracle check (`docs/oracle_check_2026-09-17.txt`) that was a
+MECHANIC rather than a report name: Java names `Diving Tackle` 1,358× across the sweep, Rust 0×.
+Nine squads field it, so left alone it would have reddened ~9 rows of the cross matrix with one
+cause. Fixed first, per the user's "fundamental divergences before the sweep" rule.
+
+### What was wrong (three things, found in order)
+
+1. **Nothing published `StepParameter::DodgeRoll`.** Java's `StepMoveDodge.dodge(pDoRoll)` does
+   `publishParameter(new StepParameter(DODGE_ROLL, rollSkill()))` the moment it rolls, in all three
+   editions; Rust kept the die in `self.dodge_roll`. `StepDivingTackle`'s whole body is gated on
+   `dodgeRoll > 0`, so the step was constructed, sequenced and dispatched — and did nothing. Fix:
+   both live dodge steps (`bb2025/move_/step_move_dodge.rs`, which also serves bb2020, and
+   `bb2016/move_/step_move_dodge.rs`) wrap their many-exit `execute_step` so a die rolled on the
+   pass is attached once as `DodgeRoll` to whatever outcome the pass produced.
+
+2. **The step could not take the harness's decline.** With the die published, `StepDivingTackle`
+   prompted the defending coach (`AgentPrompt::PlayerChoice`) and the parity contract answered
+   with `Action::SelectPlayer { player_id: "" }` — the generic PlayerChoice arm of
+   `random_agent.rs`, mirroring Java ParityRunner's `new Player[0]`. The step's `handle_command`
+   only matched `Action::PlayerChoice { mode: "DIVING_TACKLE" }`, so the decline fell through,
+   `using_diving_tackle` stayed `None`, and the step re-prompted forever. **That is §H.60's
+   "Rust's log ends before Java's" (7/10)**: not RNG consumed by the prompt, a stuck step. Fix:
+   accept `SelectPlayer` exactly as `step_shadowing.rs` does (empty = decline, id = accept).
+
+3. **Self-delivery undid the bb2016 re-roll reset.** `driver.rs::apply_effects` delivers every
+   published parameter to the publishing step too (Java `publishParameter` is `setParameter(self)`
+   then the stack). The bb2016 dodge step signals "roll fresh" by `dodge_roll = 0` at the TRR
+   offer; the published failed die was written straight back, and the consumed re-roll re-used
+   it. slann bb2016 @1.0 went 11/20: seed 10 i=7, Java re-rolled 2 → 4 and ran on, Rust
+   "re-rolled" 2 → 2, fell, broke armour (4+5 vs AV7) and was KO'd — one die ahead by step 8.
+   `statediff_step.py --step 8` named it in one line (`h07: java=15,14,Standing rust=-1,-1,Ko`).
+   Java's `doRoll = reRolledAction || fUsingDivingTackle == null` always rolls on the re-entry;
+   the bb2025 twin already resets there, bb2016 did not. Fix: reset on the consumed re-entry.
+
+### Gates (fresh JVM, this binary)
+
+| gate | before | after | Diving Tackle reports java / rust |
+|---|---|---|---|
+| dwarf bb2025 @0, seeds 1-10 (the §H.60 case) | 7/10 | **10/10** | 1 / 1 |
+| dwarf bb2025 random, seeds 1-30 | — | **30/30** | 17 / 17 |
+| slann bb2016 @1.0, seeds 1-30 | 11/20 (after fix 1+2) | **30/30** | 14 / 14 |
+| dwarf bb2020 @1.0, seeds 1-30 | — | **30/30** | 0 / 0 |
+| amazon bb2025 @1.0, seeds 1-30 (control, no DT) | — | **30/30** | 0 / 0 |
+| dwarf bb2025 @1.0 / @0 / @1e6, seeds 1-100 | — | **100 / 100 / 100** | |
+
+Workspace tests 14,859 / 0. Six new regression tests: `fresh_dodge_die_is_published_as_dodge_roll`
+and `preset_dodge_roll_is_not_republished` in both dodge twins,
+`consumed_team_reroll_rolls_fresh_even_after_self_delivery_of_dodge_roll` (bb2016),
+`select_player_with_empty_id_is_the_harness_decline` and `select_player_with_an_id_accepts_diving_tackle`.
+
+### Still only half-exercised
+
+Both harnesses DECLINE Diving Tackle, so the accept path (`GOTO RETRY_DODGE` with
+`USING_DIVING_TACKLE=true`, the +2 modifier, `DROP_DIVING_TACKLER`) is ported but ungated. Turning
+the accept on is a both-harness change in the Shadowing/Tentacles shape (see the long note in
+`random_agent.rs`) and is NOT on this campaign's critical path.
+
+### Deferred from Phase 1b (report-only oracle gaps, not fundamental)
+
+* `pettyCash` / `cardsBought` / `inducementsBought` (17,400 each = 2 per bb2016 game): Java's
+  bb2016 `StartGame` runs Weather → **PettyCash → BuyCards → BuyInducements** → Spectators and the
+  three steps report with 0 gold; Rust's flattened parity pregame (`sequences.rs`) skips them and
+  the driver routes `StepId::PettyCash` to the MIXED step. Not a report line: enabling three steps
+  in the live bb2016 pregame with a prompt-free answer path. §I queue, after the sweep.
+* `fanFactorRoll` 5,765: bb2016 end-game sequence is still the BB2020+ one (SESSION "still open" 3).
+* `Hand Off` 6,822 (bb2016 catch modifier name), `Dump-Off` 161, `Safe Pair Of Hands` 117,
+  `N Tacklezone` names, `Side Step`/`Sidestep`, `Big Hand`, `modifiedDodgeResultSuccessful`,
+  `prayerWasted`; SESSION "still open" 1, 2, 4, 5. All report-level; none moves a hash.

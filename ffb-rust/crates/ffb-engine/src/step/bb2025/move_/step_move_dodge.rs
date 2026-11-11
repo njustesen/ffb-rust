@@ -63,6 +63,11 @@ pub struct StepMoveDodge {
     pub dt_reroll_asked: bool,
     /// Java: AbstractStepWithReRoll fields
     pub re_roll_state: ReRollState,
+    /// A die rolled on THIS pass of `execute_step`, waiting to be published as
+    /// `StepParameter::DodgeRoll`. Java `dodge(doRoll=true)` publishes `DODGE_ROLL` the moment it
+    /// rolls, in every edition; Rust kept the die private, so `StepDivingTackle` (whose body is
+    /// gated on `dodgeRoll > 0`) never ran and Diving Tackle was a dead mechanic (BACKLOG §H.60).
+    dodge_roll_to_publish: Option<i32>,
 }
 
 impl StepMoveDodge {
@@ -82,6 +87,7 @@ impl StepMoveDodge {
             arm_bar_choice: false,
             dt_reroll_asked: false,
             re_roll_state: ReRollState::new(),
+            dodge_roll_to_publish: None,
         }
     }
 }
@@ -136,7 +142,20 @@ impl Step for StepMoveDodge {
 }
 
 impl StepMoveDodge {
+    /// Java `dodge(pDoRoll)`: `if (pDoRoll) publishParameter(new StepParameter(DODGE_ROLL,
+    /// rollSkill()))`. The body below has many exits (prompts, gotos, a recursive re-entry after
+    /// a skill re-roll), so the publish is attached here, once, to whatever outcome the pass
+    /// produced. A re-entry that rolls again overwrites the pending die, which is what Java's
+    /// second `publishParameter` does to the steps on the stack.
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        let mut out = self.execute_step_inner(game, rng);
+        if let Some(roll) = self.dodge_roll_to_publish.take() {
+            out = out.publish(StepParameter::DodgeRoll(roll));
+        }
+        out
+    }
+
+    fn execute_step_inner(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: if (!actingPlayer.isDodging()) { setNextAction(NEXT_STEP); return; }
         if !game.acting_player.dodging {
             return StepOutcome::next();
@@ -182,9 +201,10 @@ impl StepMoveDodge {
             }
         }
 
-        // Java: dodge(doRoll) → roll and check
+        // Java: dodge(doRoll) → roll and check; a fresh die is published as DODGE_ROLL.
         if self.dodge_roll == 0 {
             self.dodge_roll = rng.d6();
+            self.dodge_roll_to_publish = Some(self.dodge_roll);
         }
 
         let factory = DodgeModifierFactory::for_rules(game.rules);
@@ -1003,6 +1023,37 @@ mod tests {
         // No Tackle → Dodge skill re-roll fires → one fresh die rolled.
         assert_eq!(dodger_with_tackle_neighbour(false), 1,
             "without Tackle the Dodge skill re-roll must fire (one fresh die)");
+    }
+
+    #[test]
+    fn fresh_dodge_die_is_published_as_dodge_roll() {
+        // Java `dodge(pDoRoll=true)`: `publishParameter(new StepParameter(DODGE_ROLL,
+        // rollSkill()))` — the die must reach `StepDivingTackle`, whose whole body is gated on
+        // `dodgeRoll > 0`. Before the fix nothing in the engine published it (BACKLOG §H.60).
+        let mut game = make_game();
+        game.acting_player.dodging = true;
+        let mut step = StepMoveDodge::new("fail".into());
+        let mut rng = GameRng::new(7);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(rng.call_count, 1, "one fresh d6");
+        let published: Vec<i32> = out.published.iter().filter_map(|p| match p {
+            StepParameter::DodgeRoll(v) => Some(*v),
+            _ => None,
+        }).collect();
+        assert_eq!(published, vec![step.dodge_roll], "the rolled die is published exactly once");
+        assert!((1..=6).contains(&step.dodge_roll));
+    }
+
+    #[test]
+    fn preset_dodge_roll_is_not_republished() {
+        // Java `dodge(pDoRoll=false)` (a RETRY_DODGE re-entry with usingDivingTackle set)
+        // publishes nothing — the step reuses the die the stack already carries.
+        let mut game = make_game();
+        game.acting_player.dodging = true;
+        let mut step = StepMoveDodge::new("fail".into());
+        step.dodge_roll = 6;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::DodgeRoll(_))));
     }
 
     #[test]

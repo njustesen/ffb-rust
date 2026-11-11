@@ -440,12 +440,23 @@ impl Step for StepDivingTackle {
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // Java: handleCommand receives CLIENT_PLAYER_CHOICE(DIVING_TACKLE) → usingDivingTackle.
-        if let Action::PlayerChoice { player_id, mode, .. } = action {
-            if mode == "DIVING_TACKLE" {
+        // Java: handleCommand receives CLIENT_PLAYER_CHOICE(DIVING_TACKLE) →
+        //   usingDivingTackle = isProvided(playerId); game.setDefenderId(playerId); EXECUTE_STEP.
+        match action {
+            Action::PlayerChoice { player_id, mode, .. } if mode == "DIVING_TACKLE" => {
                 self.using_diving_tackle = Some(player_id.is_some());
                 game.defender_id = player_id.clone();
             }
+            // The parity contract answers EVERY PlayerChoice prompt with `SelectPlayer` -- an empty
+            // id is Java ParityRunner's `new Player[0]` decline (`random_agent.rs`, the generic
+            // PlayerChoice arm; `step_shadowing.rs` takes the same shape). Before this arm the
+            // decline fell through unhandled, `using_diving_tackle` stayed `None`, and the step
+            // re-prompted forever: the "Rust log ends before Java's" of BACKLOG §H.60.
+            Action::SelectPlayer { player_id } => {
+                self.using_diving_tackle = Some(!player_id.is_empty());
+                game.defender_id = if player_id.is_empty() { None } else { Some(player_id.clone()) };
+            }
+            _ => {}
         }
         self.execute_step(game)
     }
@@ -669,6 +680,48 @@ mod tests {
         );
         assert_eq!(outcome.action, StepAction::NextStep);
         assert_eq!(step.using_diving_tackle, Some(false));
+    }
+
+    #[test]
+    fn select_player_with_empty_id_is_the_harness_decline() {
+        // Java ParityRunner answers PLAYER_CHOICE(DIVING_TACKLE) with `new Player[0]`;
+        // `StepDivingTackle.handleCommand` then sets usingDivingTackle=false, defenderId=null and
+        // the hook publishes USING_DIVING_TACKLE(false) + NEXT_STEP. The Rust contract sends that
+        // decline as `SelectPlayer { player_id: "" }` (random_agent.rs, generic PlayerChoice arm);
+        // without this arm the step re-prompted forever.
+        let mut game = make_game(Rules::Bb2025);
+        game.defender_id = Some("stale".into());
+        let mut step = StepDivingTackle::new();
+        step.using_diving_tackle = None;
+        let outcome = step.handle_command(
+            &Action::SelectPlayer { player_id: String::new() },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert_eq!(outcome.action, StepAction::NextStep);
+        assert_eq!(step.using_diving_tackle, Some(false));
+        assert_eq!(game.defender_id, None);
+        assert!(outcome.published.iter().any(|p| matches!(p, StepParameter::UsingDivingTackle(false))));
+    }
+
+    #[test]
+    fn select_player_with_an_id_accepts_diving_tackle() {
+        let mut game = make_game(Rules::Bb2016);
+        game.acting_player.player_id = Some("home1".into());
+        add_player(&mut game, true, "home1", FieldCoordinate::new(5, 5), 3, 3, &[]);
+        add_player(&mut game, false, "away1", FieldCoordinate::new(6, 5), 3, 3, &[SkillId::DivingTackle]);
+        let mut step = StepDivingTackle::new();
+        step.goto_label_on_success = "DT_LABEL".into();
+        step.coordinate_from = Some(FieldCoordinate::new(5, 5));
+        step.coordinate_to = Some(FieldCoordinate::new(6, 6));
+        step.using_diving_tackle = None;
+        let outcome = step.handle_command(
+            &Action::SelectPlayer { player_id: "away1".into() },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert_eq!(game.defender_id.as_deref(), Some("away1"));
+        assert_eq!(outcome.action, StepAction::GotoLabel);
     }
 
     fn bb2025_leaving_tz_only_scenario(leaving_tz_only: bool) -> StepOutcome {
