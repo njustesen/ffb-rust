@@ -378,6 +378,27 @@ impl StepApothecary {
                         .filter(|k| k.is_can_get_even_with())
                         .collect::<Vec<_>>())
                     .unwrap_or_default();
+                // Java: UtilCards.getSkillWithProperty(defender, canRerollSingleSkull).ifPresent(
+                //   skill -> skill.evaluator().values(skill, defender).stream().map(Keyword::forName)
+                //            .forEach(availableKeywords::remove))
+                // -- a keyword the defender ALREADY hates (Hatred's values: the configured one plus
+                // any temporary ones) cannot be gained again. The comment that used to sit here
+                // called this a no-op "for the only roster carrying keywords" (goblin); the Old World
+                // Alliance Troll Slayer carries Hatred(troll), and a Renegade Troll put it in the SI
+                // box: Rust pushed GETTING_EVEN and rolled a d6 Java never rolled
+                // (renegades_37733 vs old_world_alliance_treeman bb2025 seed 2 i=91, BACKLOG §I.7).
+                if let Some(defender) = game.player(&defender_id) {
+                    if defender.has_skill_property_in(game.rules, ffb_model::model::property::named_properties::NamedProperties::CAN_REROLL_SINGLE_SKULL) {
+                        let mut hated: Vec<String> = defender.temporary_skill_values(ffb_model::enums::SkillId::Hatred).into_iter().collect();
+                        if let Some(v) = defender.skill_value_excluding_temporary_ones(ffb_model::enums::SkillId::Hatred) {
+                            hated.push(v);
+                        }
+                        for v in hated {
+                            let k = Keyword::for_name(&v);
+                            keywords.retain(|kw| *kw != k);
+                        }
+                    }
+                }
                 if keywords.is_empty() {
                     return None;
                 }
@@ -1040,6 +1061,36 @@ mod tests {
     /// Regression (goblin seed 2 step ~165): a Serious Injury inflicted by an attacker whose position
     /// carries a can-get-even-with keyword must push StepGettingEven (Java StepApothecary.java:231-372).
     /// StepGettingEven rolls a d6, so omitting the push desynced the shared dice stream.
+    #[test]
+    fn a_defender_who_already_hates_the_attackers_keyword_gets_no_getting_even() {
+        // Java StepApothecary: the defender's Hatred values are REMOVED from the attacker's
+        // can-get-even-with keywords. Troll Slayer (Hatred(troll)) put in the SI box by a Troll:
+        // nothing left to gain, no GETTING_EVEN step, no d6.
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "d1".into(),
+            starting_skills: vec![SkillWithValue { skill_id: ffb_model::enums::SkillId::Hatred, value: Some("troll".into()) }],
+            ..Default::default()
+        });
+        game.team_away.players.push(Player { id: "a1".into(), keywords: vec!["Troll".into()], ..Default::default() });
+        game.field_model.set_player_coordinate("d1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("d1", PlayerState::new(PS_SERIOUS_INJURY));
+        let mut step = StepApothecary::default();
+        step.apothecary_mode = Some(ApothecaryMode::Defender);
+        let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+        ir.injury_context.defender_id = Some("d1".into());
+        ir.injury_context.attacker_id = Some("a1".into());
+        ir.injury_context.set_injury(PlayerState::new(PS_SERIOUS_INJURY));
+        ir.injury_context.apothecary_status = ApothecaryStatus::NoApothecary;
+        step.injury_result = Some(ir);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(!out.pushes.iter().flatten().any(|s| s.step_id == StepId::GettingEven),
+            "an already-hated keyword must not push StepGettingEven");
+    }
+
     #[test]
     fn serious_injury_with_hated_attacker_pushes_getting_even() {
         use ffb_model::model::player::Player;

@@ -9317,3 +9317,22 @@ nulled — the same fault the bb2025 twin fixed at human bb2025 @1e6 seed 3. Now
 The second sweep (old binary) is stopped at this point and restarted on the committed build: its
 remaining reds were re-finding these families (`snotling_vs_black_orc` bb2025,
 `underworld_vs_black_orc` bb2025, `wood_elf_vs_chaos_dwarf` bb2016, `gnome_vs_black_orc` bb2020).
+
+## §I.7 — 2026-11-11: Getting Even offered a keyword the victim already hated (one phantom d6)
+
+`renegades_37733 vs old_world_alliance_treeman` bb2025 seed 2: a Renegade Troll put the Troll
+Slayer (Hatred(troll)) in the SI box at i=91; Rust pushed GETTING_EVEN and rolled a d6 Java never
+rolled, so the next activation's Animal Savagery die differed (i=92). Java `StepApothecary` removes
+the defender's Hatred values (`skill.evaluator().values(skill, defender)`, temporary + configured)
+from the attacker's can-get-even-with keywords before deciding; Rust's port had left that
+subtraction out on the note that "no goblin position has that skill" — true for goblin, false for
+the Old World Alliance Troll Slayer and the dwarf squads. Ported 1:1 with
+`a_defender_who_already_hates_the_attackers_keyword_gets_no_getting_even`.
+
+| gate | before | after |
+|---|---|---|
+| renegades_37733 vs old_world_alliance_treeman bb2025 1-30 | 2/3 | **30/30** |
+| old_world_alliance_treeman vs renegades_37733 bb2025 1-10 | — | 10/10 |
+| old_world_alliance_treeman bb2025 mirror 1-30, goblin bb2025 mirror 1-30 (controls) | — | 30/30, 30/30 |
+
+Sweep 3 at this point: 2,768 / 4,012 gates, this the only red.
