@@ -8704,6 +8704,22 @@ never instantiates; each is either a routing bug or should be deleted.
 
 ### §E — Harness: the pregame is switched off, and it is 24 report kinds
 
+> **UNDER REVIEW, 2026-09-16.** The premise below — that these 24 kinds are unreachable
+> because the harness skips the pregame — is at least partly WRONG. The new oracle check in
+> `report_census.py` (which reads the JAVA twin, see H.61) flagged on a four-gate sample:
+>
+> ```
+> reportId inducementsBought   java=20  rust=0
+> reportId pettyCash           java=20  rust=0
+> name     Hand Off            java=20  rust=0
+> ```
+>
+> Two per game, systematic: **Java emits them and Rust does not**. So at least part of this
+> bucket is ordinary Rust naming gaps, not a harness limitation, and the "turn the pregame on"
+> framing does not apply to them. Do not act on the numbers in this section until the oracle
+> check has been run over a full sweep and the bucket re-derived from its output. The claim was
+> made from the Rust stream alone, which is the exact mistake H.59 records.
+
 The parity harness runs a flattened pregame that skips `PettyCash` and `BuyInducements`
 entirely. That one omission accounts for **24 of the 74** never-produced kinds:
 `pettyCash`, `freePettyCash`, `inducement`, `inducementsBought`, `cardsBought`,

@@ -25,9 +25,18 @@ echo "== 2/4 per-gate event aggregation -> $OUTDIR"
 CENSUS_ROOT="$ROOT" CENSUS_PREFIX="parity_" NPROC=6 \
   python scripts/sweep_census/agg.py "$OUTDIR"
 
-echo "== 3/4 report-stream census -> docs/report_census.json"
+# The census tail is the ORACLE CHECK (H.61): every reportId and every modifier/skill NAME
+# the JAVA twin writes that Rust does not. Stock Java is never modified, so each line there is
+# a Rust fidelity bug by definition -- no judgement call. Tee it to a file, because it is the
+# actionable half of the whole census and scrollback loses it.
+echo "== 3/4 report-stream census -> docs/report_census.json (+ oracle check)"
 CENSUS_ROOT="$ROOT" \
-  python scripts/sweep_census/report_census.py "parity_*" docs/report_census.json
+  python scripts/sweep_census/report_census.py "parity_*" docs/report_census.json \
+  | tee "docs/oracle_check_${TAG}.txt"
+if grep -q "JAVA REPORTS IT, RUST DOES NOT" "docs/oracle_check_${TAG}.txt"; then
+  echo
+  echo "   ^^ oracle check found Rust naming gaps - see docs/oracle_check_${TAG}.txt"
+fi
 
 echo "== 4/4 coverage gaps -> docs/COVERAGE_GAPS_${TAG}.md inputs"
 python scripts/sweep_census/gaps.py "$OUTDIR" docs/report_census.json \
