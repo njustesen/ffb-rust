@@ -29,6 +29,8 @@ def main():
     ap.add_argument("--title", default="FULL MATRIX SWEEP")
     ap.add_argument("--expect", type=int, default=330)
     ap.add_argument("--json", help="also write the verdicts as JSON (for the review page)")
+    ap.add_argument("--per-cell", type=int, default=3,
+                    help="gates per cell: 3 for the mirror matrix (three scales), 1 for a cross sweep")
     args = ap.parse_args()
 
     gates, dupes = {}, []
@@ -51,7 +53,7 @@ def main():
     def fmt(k):
         return f"{k[0]} {k[1]} @{k[2]}"
 
-    L = [f"{args.title} - {len(gates)} gates, {len(gates) // 3} cells x 3 scales"]
+    L = [f"{args.title} - {len(gates)} gates, {len(gates) // args.per_cell} cells x {args.per_cell} scale(s)"]
     L.append(f"parity: {len(green)}/{len(gates)} games match, {len(failed)} FAILED, "
              f"{len(noverdict)} without a verdict")
     L.append("")
@@ -83,7 +85,7 @@ def main():
     if args.json:
         import json
         payload = {
-            "gates": len(gates), "cells": len(gates) // 3,
+            "gates": len(gates), "cells": len(gates) // args.per_cell,
             "green": len(green), "failed": len(failed), "noverdict": len(noverdict),
             "short": len(short), "summed_minutes": round(total_min, 1),
             "expected": args.expect, "complete": len(gates) == args.expect,
