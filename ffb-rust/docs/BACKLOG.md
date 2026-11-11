@@ -9358,3 +9358,25 @@ Not yet done for the campaign's "done":
 3. the report-stream oracle check over the cross logs — `report_census.py` keys gate dirs as
    `parity_<race>_<ed>_<sc>` and does not understand `wN/<ed>/<home>_vs_<away>`; needs a small
    layout shim before the cross games' report names can be censused.
+
+## §I.9 — 2026-11-11: the cross-sweep oracle check (12,036 games): two real naming gaps, two census asymmetries, one structural item
+
+`docs/oracle_check_cross_2026-11-11.txt` (`report_census.py` over `D:/ffb_cross/sweep3/w*`,
+which needed no layout shim — the census globs `<root>/<edition>/<home>_vs_<away>`):
+
+* **Fixed (Rust):** bb2020 interception tackle-zone modifiers are named `"N Tacklezone"`
+  (singular, all N) in `bb2020/InterceptionModifierCollection.java`; Rust wrote the plural
+  (dwarf vs snotling bb2020 seed 1: 0/2 → 2/2). Pickup reports carried the modifier's REPORT
+  STRING where Java writes its NAME — visible only for Big Hand, whose two strings differ
+  (renegades vs high_elf bb2020: 0/1 → 1/1).
+* **Fixed (census):** `Diving Tackle 489 vs 0`, `Dump-Off`, `Safe Pair Of Hands`, `Sidestep`
+  were DECLINED skill uses (Rust tallied them in a separate bucket; equal on both sides), and
+  `Sure Hands` was a re-roll SOURCE. The oracle check now counts both buckets on the Rust side.
+* **Open, structural — the pregame in a CROSS match:** `freePettyCash` 7,536,
+  `cardsAndInducementsBought` 7,716, `prayersAndInducementsBought` 7,356 (bb2020/bb2025) and
+  `pettyCash`/`cardsBought`/`inducementsBought` 4,872 (bb2016). Unequal team values give the
+  poorer side inducement gold, so Java runs its inducement phase (and the harness declines every
+  purchase) while Rust's flattened parity pregame skips the steps entirely. Parity holds
+  (4011/4012) because nothing is bought, but 10,249 of 12,036 games have a longer Java report
+  stream for this reason alone. This is §E of the coverage backlog, now with cross-match
+  evidence; it is the next queue item after the certification sweeps.
