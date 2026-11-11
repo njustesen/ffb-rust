@@ -1,0 +1,12 @@
+CROSS-MATCHUP SWEEP 3 (all ordered pairs, 3 seeds, heuristic @1.0) - 4012 gates, 4012 cells x 1 scale(s)
+parity: 4011/4012 games match, 1 FAILED, 0 without a verdict
+
+summed gate time 479 min (7.99 h)
+
+PARITY RED - 1 gate(s):
+  renegades_37733_vs_old_world_alliance_treeman bb2025 @1.0 PARITY: 2/3 passed, 1 FAILED.  first-fail seed=2 step=92
+
+Separately, 0 gate(s) report the mechanic-coverage checklist unmet
+(parity still 100/100 on every one of them):
+
+

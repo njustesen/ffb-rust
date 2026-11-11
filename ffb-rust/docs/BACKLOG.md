@@ -9336,3 +9336,25 @@ the Old World Alliance Troll Slayer and the dwarf squads. Ported 1:1 with
 | old_world_alliance_treeman bb2025 mirror 1-30, goblin bb2025 mirror 1-30 (controls) | — | 30/30, 30/30 |
 
 Sweep 3 at this point: 2,768 / 4,012 gates, this the only red.
+
+## §I.8 — 2026-11-11: CROSS SWEEP 3 — 4011 / 4012 on the §I.1-§I.6 build
+
+`docs/CROSS_SWEEP_2026-11-11.txt`: all 4,012 ordered pairs, 3 seeds each, heuristic @1.0, one
+binary + one jar (the §I.1-§I.6 build, hash widened), summed 479 min on 5 workers. **4011 green,
+1 red** — `renegades_37733 vs old_world_alliance_treeman` bb2025 (§I.7, fixed after the sweep and
+gated 30/30 + 10/10 reversed + two mirror controls). 1,112 of the verdicts were recovered from the
+per-gate logs after a monitor's `tail -f` locked `sweep.log` (`scripts/cross_recover.py`,
+`feedback_no_tail_f_on_worker_logs`); every recovered gate has its PARITY line in its own
+`cw_*.log`, so the count is exact.
+
+What the matrix now says: every drafted squad against every other, in every edition, agrees with
+stock Java step-for-step on three seeds. The six cross-only rules found this session (Diving
+Tackle, Grab vs Side Step, roster keywords, Tackle vs Dodge, the bb2016 TRR overload, Getting Even
+vs an already-hated keyword) were all invisible to the mirror matrix by construction.
+
+Not yet done for the campaign's "done":
+1. the 330-gate MIRROR re-certification on the final build (§I.1-§I.7, the whole-roster hash);
+2. a cross RE-SWEEP on that same final build (sweep 3 ran one commit short of §I.7);
+3. the report-stream oracle check over the cross logs — `report_census.py` keys gate dirs as
+   `parity_<race>_<ed>_<sc>` and does not understand `wN/<ed>/<home>_vs_<away>`; needs a small
+   layout shim before the cross games' report names can be censused.

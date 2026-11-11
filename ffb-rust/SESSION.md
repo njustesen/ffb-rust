@@ -1,5 +1,30 @@
 # FFB-Rust Session State
 
+## 2026-11-11 — CROSS-MATCHUP CAMPAIGN: 4011/4012 non-mirror pairs green; seven cross-only engine bugs fixed (BACKLOG §I)
+
+User decisions: **logic parity before any GUI work**; run every non-mirror matchup, 2-5 games
+each, and fix fundamental divergences first. `main` fast-forwarded to `heuristic-agent` (strict
+superset) and is the working branch; everything below is on `main`.
+
+- **§I.1 Diving Tackle had never run in Rust** (DodgeRoll never published; the harness decline
+  `SelectPlayer{""}` unhandled; self-delivery of the published die undid the bb2016 re-roll reset).
+- **§I.2 the state hash stopped at 11 players** — widened to the whole roster on both sides
+  (ParityRunner is co-editable); 90 of 110 squads carry 12-16 players.
+- **§I.3 Grab vs Side Step** — hooks asked the edition UNION of skill properties (bb2016's cancel
+  leaked into bb2020/bb2025); bb2025's conflict test was inverted; `conflicting_properties_for`.
+- **§I.4 the Java data generator dropped roster-level keywords** (Vampire Lord, Master Chef);
+  it also still wrote into the forbidden `niels/ffb` checkout — removed.
+- **§I.5/§I.6 bb2016 Tackle never cancelled the Dodge re-roll**, and the TRR offer resurrected it.
+- **§I.7 Getting Even offered a keyword the victim already hated.**
+- Phase 1b report items: bb2016 end-game runs FAN_FACTOR; bb2016 catchRoll names its modifiers.
+
+Tooling: `scripts/cross_jobs.py`, `scripts/cross_worker.ps1` (per-worker logs + retry),
+`scripts/cross_recover.py`, `sweep_verdicts.py --per-cell 1`, `/cross-iter`.
+Result: `docs/CROSS_SWEEP_2026-11-11.txt` — 4011/4012, the red fixed after the sweep.
+**Next:** mirror re-cert (330) on the final build, cross re-sweep on it, census shim (§I.8).
+
+---
+
 ## 2026-09-16 — MATRIX 330/330 GREEN; report kinds 87→89; the coverage-gap inventory and the exhaustive backlog (BACKLOG §H.55–§H.57)
 
 Full matrix re-run on the final binary and jar: **330/330 games match, 0 failed, 0 duplicate
