@@ -11,7 +11,7 @@
 # <root>/<edition>/<home>_vs_<away>/, so distinct pairs never clobber each other, and a pair is
 # on exactly one worker. No --reuse-java: every gate gets a fresh JVM.
 #
-# sweep.log line shape (read by scripts/sweep_verdicts.py --per-cell 1):
+# sweep_<tag>.log line shape (read by scripts/sweep_verdicts.py --per-cell 1 after concatenation):
 #   <home>_vs_<away> <edition> @<scale>   <minutes>m  PARITY: ...
 param(
   [Parameter(Mandatory=$true)][string]$jobfile,
@@ -23,13 +23,16 @@ param(
   [string]$scale = "1.0"
 )
 $repo = "C:\Users\Admin\niels\ffb-rust\ffb-rust"
-$log  = Join-Path $scratch "sweep.log"
+# One verdict log PER WORKER: a `tail -f` monitor on a shared sweep.log locked it on Windows and
+# every worker's Add-Content failed for 30 minutes (1,110 verdicts lost, recovered by
+# scripts/cross_recover.py). Concatenate sweep_w*.log for scripts/sweep_verdicts.py.
+$log  = Join-Path $scratch ("sweep_" + $tag + ".log")
 $stop = Join-Path $scratch "STOP_SWEEP"
 $env:FFB_PARITY_ROOT = $root + "/" + $tag
 $env:PARITY_JVM_CORES = "2"
 foreach ($line in (Get-Content $jobfile)) {
   $t = $line.Trim(); if (-not $t) { continue }
-  if (Test-Path $stop) { Add-Content $log ("[" + $tag + "] STOPPED"); exit 0 }
+  if (Test-Path $stop) { try { Add-Content $log ("[" + $tag + "] STOPPED") } catch {}; exit 0 }
   $f = $t -split '\s+'; $ed = $f[0]; $hm = $f[1]; $aw = $f[2]
   $cell = $hm + "_vs_" + $aw
   $out = Join-Path $scratch ("cw_" + $cell + "_" + $ed + ".log")
@@ -54,6 +57,11 @@ foreach ($line in (Get-Content $jobfile)) {
   }
   if (-not $v) { $v = "NO VERDICT exit=" + $p.ExitCode }
   if ($ff -and $ff -match '^PARITY FAIL seed=(\d+)[^,]*, step (\d+)') { $v = $v + "  first-fail seed=" + $matches[1] + " step=" + $matches[2] }
-  Add-Content $log ("{0,-50} {1,5}m  {2}" -f ("$cell $ed @$scale"), [math]::Round(((Get-Date)-$t0).TotalMinutes,1), $v)
+  $line = ("{0,-50} {1,5}m  {2}" -f ("$cell $ed @$scale"), [math]::Round(((Get-Date)-$t0).TotalMinutes,1), $v)
+  $ok = $false
+  for ($try = 0; $try -lt 20 -and -not $ok; $try++) {
+    try { Add-Content $log $line -ErrorAction Stop; $ok = $true } catch { Start-Sleep -Milliseconds 250 }
+  }
+  if (-not $ok) { Add-Content (Join-Path $scratch ("sweep_" + $tag + ".lost")) $line }
 }
-Add-Content $log ("[" + $tag + "] shard done")
+try { Add-Content $log ("[" + $tag + "] shard done") } catch {}
