@@ -9388,3 +9388,22 @@ without a verdict, summed 567 min on 6 workers — under the whole-roster hash, 
 certifications never had. The same 10 gates as before are short on the coverage checklist (parity
 100/100 on all of them). The final cross re-sweep runs next on the binary that also carries the
 §I.9 report-naming fixes (report-only; no step hash moves).
+
+## §I.11 — 2026-11-12: 🏁 CROSS SWEEP 4 — 4012 / 4012, one build. The campaign's parity goal is met
+
+`docs/CROSS_SWEEP_2026-11-12_FINAL.txt`: every ordered pair of drafted squads (bb2016 812,
+bb2020 1,560, bb2025 1,640), 3 seeds each, heuristic @1.0, on ONE binary and ONE jar (the §I.1-§I.9
+build, whole-roster hash), summed 656 min on 5 workers: **4012 green, 0 failed, 0 without a
+verdict, 0 lost lines**. Together with §I.10 (mirror 330/330 on the same engine commit, report-only
+naming commits apart) this is the campaign's "done": Rust agrees with stock Java step-for-step on
+every drafted matchup, mirror and cross, in all three editions.
+
+Ledger of the campaign (one day, 2026-11-11 → 12): seven engine bugs (§I.1, §I.3, §I.5, §I.6,
+§I.7 and the two halves of §I.4) plus one instrument bug (§I.2, the hash), four report-fidelity
+fixes, and the tooling to run and recover a 4,000-gate sweep. Every one of the seven was
+unreachable from a mirror cell by construction.
+
+What remains open, in order: (1) §I.9 — the cross-match pregame (Java runs its inducement phase
+on unequal team values; Rust's parity pregame skips it; report-only today); (2) the GUI-client
+tier (`ffb-server` wire fidelity), deferred by the user until logic parity — which this closes;
+(3) the 10 mirror gates short on the coverage checklist, unchanged since §H.57.

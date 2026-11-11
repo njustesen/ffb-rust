@@ -20,8 +20,10 @@ superset) and is the working branch; everything below is on `main`.
 
 Tooling: `scripts/cross_jobs.py`, `scripts/cross_worker.ps1` (per-worker logs + retry),
 `scripts/cross_recover.py`, `sweep_verdicts.py --per-cell 1`, `/cross-iter`.
-Result: `docs/CROSS_SWEEP_2026-11-11.txt` — 4011/4012, the red fixed after the sweep.
-**Next:** mirror re-cert (330) on the final build, cross re-sweep on it, census shim (§I.8).
+Result: `docs/CROSS_SWEEP_2026-11-11.txt` 4011/4012 → the red fixed (§I.7) → mirror re-cert
+**330/330** (`docs/SWEEP_2026-11-11_RECERT.txt`, §I.10) → final cross sweep **4012/4012** on one
+build (`docs/CROSS_SWEEP_2026-11-12_FINAL.txt`, §I.11). 🏁 **Logic parity goal met: mirror and
+cross, all three editions.** Next: §I.9 cross-match pregame (report-only), then the GUI tier.
 
 ---
 
