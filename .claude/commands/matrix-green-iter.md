@@ -146,7 +146,7 @@ When every group is closed, run the full sweep to certify:
 - **Nesting, not logic.** §H.16.3 was Java nesting `putPlayerIntoBox` inside the precedence guard
   while Rust had it outside. Zero dice differed. Compare the CONTROL FLOW, not just the statements.
 - **Hash-invisible state.** The hash carries half/turn/active/score/ball/weather/turn-mode, per-team
-  flags and re-rolls, the acting player, and for each of the first 11 players by number: coordinate,
+  flags and re-rolls, the acting player, and for every rostered player by number (whole roster since §I.2; it used to stop at 11): coordinate,
   state label, effective MA/ST/AG/AV and the ACTIVE bit. It does **not** carry `passing`, the rooted
   flag, casualty severity, prayer-granted skills, or anything about players numbered above 11. A
   divergence in those stays silent until a downstream mechanic reads it.

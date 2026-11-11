@@ -311,3 +311,19 @@ history. Its only footprint was a re-roll count nothing compared.
 3. ~~Acting-player state~~ — done, iteration 4.
 4. Candidates not yet taken: ball carrier id, weather, turn mode, temporary player stat modifiers
    (the Dodgy Snack -MA/-AV class), KO-box contents.
+
+
+## Iteration 6 — the whole roster (2026-11-11, cross-matchup campaign §I.2)
+
+Every iteration above hashed **the first 11 players per team by squad number**. Nearly every
+drafted squad carries 12-16 players (snotling, goblin, halfling, gnome, underworld field 16), so
+a bench player's coordinate, state, stats and ACTIVE bit were invisible to parity for whole games.
+The cross sweep made it concrete on its first red: `black_orc vs snotling` bb2020 seed 1 — a
+snotling lineman (nr 16) stood on (15,3) in Rust and (14,4) in Java for a whole drive with every
+hash green, and the divergence only surfaced at step 122 when a Black Orc's reachable-square set
+differed (`FFB_CAND` diff: Java's candidates include (15,3), Rust's (14,4)).
+
+The cap is gone on both sides: `state_hash.rs::collect_player_parts` / `acting_player_part` and
+`ParityRunner.addPlayersFromTeam` / `actingPlayerPart` now walk the whole roster. The `?,<move>`
+acting-player fallback remains for a player on neither roster. Index labels stay positional
+(`a15` is the sixteenth away player by number), as before.

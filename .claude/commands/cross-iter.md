@@ -112,8 +112,9 @@ then the mirror re-certification (`sweepjobs/w*.txt` + `scripts/sweep_worker.ps1
   re-prompts forever and the Rust log ends early (§I.1).
 - **Nesting, not logic.** Compare CONTROL FLOW, not statements; zero dice may differ.
 - **Hash-invisible state.** The hash does not carry `passing`, the rooted flag, casualty
-  severity, prayer-granted skills, or players numbered above 11; a divergence there stays silent
-  until a downstream mechanic reads it.
+  severity or prayer-granted skills; a divergence there stays silent until a downstream mechanic
+  reads it. (It DOES carry every rostered player since §I.2 — it used to stop at the first 11,
+  which is how the sweep's first red hid a bench snotling on the wrong square for a whole drive.)
 - **Green is not exercised.** Confirm the mechanic FIRED in the gate (grep the Java report stream
   for its name and compare the Rust count) before calling a cross pair "covered".
 

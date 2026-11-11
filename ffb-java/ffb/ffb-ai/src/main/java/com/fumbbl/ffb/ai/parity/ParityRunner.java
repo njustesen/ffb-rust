@@ -2058,7 +2058,7 @@ public class ParityRunner {
     }
 
     /** `h03,2` — the acting player's index in the same ordering addPlayersFromTeam uses (sorted by
-     *  squad number, first 11 per team) plus its spent movement; `-` when nobody is activated.
+     *  squad number, the whole roster) plus its spent movement; `-` when nobody is activated.
      *  Must stay byte-identical with ffb-rust `state_hash.rs::acting_player_part`. */
     private static String actingPlayerPart(Game game) {
         ActingPlayer actingPlayer = game.getActingPlayer();
@@ -2071,7 +2071,6 @@ public class ParityRunner {
             if (teams[t] == null) continue;
             List<Player<?>> players = new ArrayList<>(java.util.Arrays.asList(teams[t].getPlayers()));
             players.sort(java.util.Comparator.comparingInt(Player::getNr));
-            if (players.size() > 11) players = players.subList(0, 11);
             for (int i = 0; i < players.size(); i++) {
                 if (pid.equals(players.get(i).getId())) {
                     return String.format("%s%02d,%d", prefixes[t], i, currentMove);
@@ -2085,7 +2084,8 @@ public class ParityRunner {
         if (team == null) return;
         List<Player<?>> players = new ArrayList<>(java.util.Arrays.asList(team.getPlayers()));
         players.sort(java.util.Comparator.comparingInt(Player::getNr));
-        if (players.size() > 11) players = players.subList(0, 11);
+        // EVERY player on the roster (the hash used to stop at the first 11 and was blind to a
+        // 16-player squad's bench -- see ffb-rust state_hash.rs::collect_player_parts).
         for (int i = 0; i < players.size(); i++) {
             Player<?> p = players.get(i);
             PlayerState ps = fm.getPlayerState(p);

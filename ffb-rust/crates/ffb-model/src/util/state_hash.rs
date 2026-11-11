@@ -120,11 +120,14 @@ fn collect_player_parts(game: &Game, out: &mut Vec<String>, home: bool) {
     let fm = &game.field_model;
     let prefix = if home { "h" } else { "a" };
 
+    // EVERY player on the roster, sorted by squad number. The hash used to stop at the first
+    // 11, so a squad's 12th-16th players (snotling, goblin, halfling, underworld, ... field up
+    // to 16) were invisible to parity: in the cross sweep a snotling lineman stood on (15,3) in
+    // Rust and (14,4) in Java for a whole drive with every hash green, until a Black Orc's
+    // reachable squares differed (black_orc vs snotling bb2020 seed 1, BACKLOG §I.2). Must stay
+    // byte-identical with `ParityRunner.addPlayersFromTeam`.
     let mut players: Vec<_> = team.players.iter().collect();
     players.sort_by_key(|p| p.nr);
-    if players.len() > 11 {
-        players.truncate(11);
-    }
 
     for (i, player) in players.iter().enumerate() {
         let coord = fm.player_coordinate(&player.id);
@@ -158,7 +161,7 @@ fn collect_player_parts(game: &Game, out: &mut Vec<String>, home: bool) {
 }
 
 /// `h03,2` — the acting player's index in the same ordering `collect_player_parts` uses (sorted by
-/// squad number, first 11 per team) plus its spent movement; `-` when no player is activated.
+/// squad number, the whole roster) plus its spent movement; `-` when no player is activated.
 fn acting_player_part(game: &Game) -> String {
     let pid = match game.acting_player.player_id.as_deref() {
         Some(id) if !id.is_empty() => id,
@@ -168,15 +171,12 @@ fn acting_player_part(game: &Game) -> String {
         let team = if home { &game.team_home } else { &game.team_away };
         let mut players: Vec<_> = team.players.iter().collect();
         players.sort_by_key(|p| p.nr);
-        if players.len() > 11 {
-            players.truncate(11);
-        }
         if let Some(i) = players.iter().position(|p| p.id == pid) {
             return format!("{prefix}{i:02},{}", game.acting_player.current_move);
         }
     }
-    // Activated but not among the first 11 of either squad — report the move alone rather than
-    // silently claiming nobody is acting.
+    // Activated but on neither roster — report the move alone rather than silently claiming
+    // nobody is acting.
     format!("?,{}", game.acting_player.current_move)
 }
 
