@@ -7,6 +7,9 @@
 	<apothecary>false</apothecary>
 	<undead>true</undead>
 	<raisedPositionId>vampire.thrall</raisedPositionId>
+	<keywords>
+		<keyword>vampire lord</keyword>
+	</keywords>
 	<position id="vampire.vampire">
 		<quantity>6</quantity>
 		<name>Vampire</name>

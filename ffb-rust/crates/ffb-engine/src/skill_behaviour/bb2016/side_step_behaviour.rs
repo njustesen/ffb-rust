@@ -51,7 +51,7 @@ impl StepModifierTrait for SideStepStepModifier {
             .and_then(|id| game.player(id))
             .and_then(|p| {
                 p.all_skill_ids().find(|id| {
-                    id.properties().contains(&"cancelsCanChooseOwnPushedBackSquare")
+                    id.properties_for(game.rules).contains(&"cancelsCanChooseOwnPushedBackSquare")
                 })
             });
 

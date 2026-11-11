@@ -76,11 +76,16 @@ impl StepModifierTrait for GrabStepModifier {
         // Java: Skill cancellingSkill = UtilCards.getSkillCancelling(state.defender, skill)
         let defender_id = state.defender_id.clone();
         let has_cancelling = game.player(&defender_id)
-            .map(|p| p.all_skill_ids().any(|id| id.properties().contains(&"cancelsCanPushBackToAnySquare")))
+            .map(|p| p.all_skill_ids().any(|id| id.properties_for(game.rules).contains(&"cancelsCanPushBackToAnySquare")))
             .unwrap_or(false);
 
         // Java: boolean attackerHasConflictingSkill = skill.conflictsWithAnySkill(actingPlayer.getPlayer())
-        let attacker_conflicts = false; // simplified: Grab has no self-conflict in standard rules
+        // Java: skill.conflictsWithAnySkill(actingPlayer.getPlayer()) -- a Frenzy or Ball & Chain
+        // attacker cannot Grab (mixed/Grab.java registers forceSecondBlock + movesRandomly).
+        let attacker_conflicts = game.player(&attacker_id)
+            .map(|p| SkillId::Grab.conflicting_properties_for(game.rules).iter()
+                .any(|prop| p.has_skill_property_in(game.rules, prop)))
+            .unwrap_or(false);
 
         // Java: boolean allowGrabOutsideBlock = actingPlayer.getPlayer().hasSkillProperty(NamedProperties.grabOutsideBlock)
         let allow_grab_outside_block = game.player(&attacker_id)
@@ -370,6 +375,34 @@ mod tests {
         let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
         assert!(result, "Grab should fire when conditions met");
         assert_eq!(hs.pushback_mode, PushbackMode::GRAB, "mode should switch to GRAB");
+    }
+
+    #[test]
+    fn bb2020_side_step_defender_does_not_cancel_grab() {
+        // Java mixed/Grab.java cancels Side Step (CancelSkillProperty(canChooseOwnPushedBackSquare));
+        // bb2020/SideStep.java registers NO cancel of Grab -- only bb2016/SideStep.java does. The
+        // hook read the edition-blind property union, so a Side Step defender cancelled Grab in
+        // bb2020 too: black_orc vs snotling bb2020 seed 2 i=20, Java grabbed the snotling to
+        // (13,3), Rust offered the plain three-square fan (BACKLOG §I.3).
+        let mut game = make_game();
+        game.team_home.players.push(player_with_skills("att", vec![SkillId::Grab]));
+        game.acting_player.player_id = Some("att".into());
+        game.acting_player.player_action = Some(PlayerAction::Block);
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(5, 5));
+        game.defender_id = Some("def".into());
+        game.team_away.players.push(player_with_skills("def", vec![SkillId::SideStep]));
+        let def_coord = FieldCoordinate::new(5, 6);
+        game.field_model.set_player_coordinate("def", def_coord);
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        let sq = PushbackSquare::new(def_coord, Direction::North, true);
+        let m = GrabStepModifier;
+        let mut hs = default_hook_state_with_sq("def", sq);
+        hs.pushback_squares = vec![
+            PushbackSquare::new(FieldCoordinate::new(4, 6), Direction::Northwest, true),
+        ];
+        let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
+        assert!(result, "bb2020 Grab must fire against a Side Step defender");
+        assert_eq!(hs.pushback_mode, PushbackMode::GRAB);
     }
 
     #[test]

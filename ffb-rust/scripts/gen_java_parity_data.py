@@ -27,8 +27,9 @@ from xml.sax.saxutils import escape
 
 ROOT = Path(__file__).parent.parent
 SERVER_DIRS = [
-    Path(r"C:/Users/Admin/niels/ffb/ffb/ffb-server"),          # runtime (parity harness)
-    ROOT.parent / "ffb-java" / "ffb" / "ffb-server",           # in-repo mirror
+    # IN-REPO ONLY. `niels/ffb` is a non-touched reference checkout (ffb-rust/CLAUDE.md); the
+    # harness resolves rosters/teams under ffb-java/ffb/ffb-server and nothing else.
+    ROOT.parent / "ffb-java" / "ffb" / "ffb-server",
 ]
 SPECIAL_RULE_JAVA = (ROOT.parent / "ffb-java" / "ffb" / "ffb-common" / "src" / "main"
                      / "java" / "com" / "fumbbl" / "ffb" / "model" / "SpecialRule.java")
@@ -65,6 +66,17 @@ def roster_xml(d: dict, roster_id: str, drafted_star_ids: set = frozenset()) -> 
     rp = d.get("raised_position_id")
     if rp and any(p["id"] == rp for p in d["positions"]):
         L.append(f"\t<raisedPositionId>{escape(rp)}</raisedPositionId>")
+    # ROSTER-level keywords. Java `Roster.hasVampireLord()` reads them, and the bb2016/bb2020
+    # `InjuryMechanic.canRaiseDead` treats a Vampire Lord roster like Masters of Undeath. Only the
+    # POSITION keywords were emitted until 2026-11-11, so Java's vampire rosters silently lost the
+    # keyword the JSON (and FUMBBL's original roster_vampire.xml) carry: Rust raised a Thrall from a
+    # killed opponent and Java did not (dark_elf_league_fumbbl vs vampire bb2020 seed 2, BACKLOG §I.4).
+    rkws = d.get("keywords") or []
+    if rkws:
+        L.append("\t<keywords>")
+        for k in rkws:
+            L.append(f"\t\t<keyword>{escape(k)}</keyword>")
+        L.append("\t</keywords>")
     for p in d["positions"]:
         if p.get("type") in ("Star", "Infamous Staff") and p["id"] not in drafted_star_ids:
             continue

@@ -55,8 +55,10 @@ impl StepModifierTrait for SidestepStepModifier {
                 .and_then(|id| game.player(id))
                 .and_then(|p| {
                     p.all_skill_ids().find(|id| {
-                        id.properties().contains(&"cancelsCan ChooseOwnPushedBackSquare")
-                            || id.properties().contains(&NamedProperties::CAN_PUSH_BACK_TO_ANY_SQUARE)
+                        // (the first literal used to carry a stray space, so only the
+                        // second alternative ever matched)
+                        id.properties_for(game.rules).contains(&"cancelsCanChooseOwnPushedBackSquare")
+                            || id.properties_for(game.rules).contains(&NamedProperties::CAN_PUSH_BACK_TO_ANY_SQUARE)
                     })
                 })
         } else {
@@ -64,10 +66,15 @@ impl StepModifierTrait for SidestepStepModifier {
         };
 
         // Java: boolean attackerHasConflictingSkill = cancellingSkill != null && cancellingSkill.conflictsWithAnySkill(actingPlayer.getPlayer())
-        let attacker_cancels = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.has_skill_property(NamedProperties::CAN_PUSH_BACK_TO_ANY_SQUARE))
-            .unwrap_or(false);
+        // i.e. the attacker ALSO holds a property the cancelling skill (Grab) conflicts with --
+        // Frenzy's forceSecondBlock or Ball & Chain's movesRandomly -- in which case Grab is void
+        // and Sidestep stands. This used to read "attacker has Grab", which is the opposite test:
+        // every Grab attacker un-cancelled the Sidestep it had just cancelled.
+        let attacker_cancels = match (cancelling_skill, game.acting_player.player_id.as_deref().and_then(|id| game.player(id))) {
+            (Some(cs), Some(p)) => cs.conflicting_properties_for(game.rules).iter()
+                .any(|prop| p.has_skill_property_in(game.rules, prop)),
+            _ => false,
+        };
 
         let defender_state = game.field_model.player_state(&defender_id);
         let has_tacklezones = defender_state.map(|s| s.has_tacklezones()).unwrap_or(true);
@@ -304,6 +311,58 @@ mod tests {
             PushbackMode::SIDE_STEP,
             "the mode switch belongs to the ACCEPT path, not to making the offer"
         );
+    }
+
+    /// Java `SidestepBehaviour`: `cancellingSkill = getSkillCancelling(attacker, Sidestep)` is Grab
+    /// (mixed/Grab.java: CancelSkillProperty(canChooseOwnPushedBackSquare)), and
+    /// `attackerHasConflictingSkill = cancellingSkill.conflictsWithAnySkill(attacker)` is false for
+    /// a plain Grab attacker -- so the hook SKIPS: no dialog, no Sidestep, Grab decides the square.
+    /// The Rust hook read "attacker has Grab" for the conflict test and asked anyway (black_orc vs
+    /// elf bb2025 seed 2 i=2; black_orc vs snotling bb2025 2/10).
+    #[test]
+    fn a_grab_attacker_cancels_the_sidestep_offer() {
+        use ffb_model::enums::Direction;
+        use ffb_model::types::PushbackSquare;
+        let mut game = make_game();
+        game.team_home.players.push(player_with_skills("att", vec![SkillId::Grab]));
+        game.acting_player.player_id = Some("att".into());
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(10, 8));
+        game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
+        game.team_away.players.push(player_with_skills("def1", vec![SkillId::Sidestep]));
+        game.defender_id = Some("def1".into());
+        game.field_model.set_player_coordinate("def1", FieldCoordinate::new(10, 7));
+        game.field_model.set_player_state("def1", PlayerState::new(PS_STANDING));
+
+        let m = SidestepStepModifier;
+        let mut hs = default_hook_state("def1", true);
+        hs.starting_pushback_square =
+            Some(PushbackSquare::new(FieldCoordinate::new(10, 7), Direction::North, true));
+        let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
+        assert!(!result, "Grab cancels Sidestep: the hook must not fire");
+        assert_eq!(hs.pending_skill_use, None, "no Sidestep dialog against a Grab attacker");
+    }
+
+    /// ...but a Frenzy attacker's Grab is void (`forceSecondBlock` conflicts), so Sidestep stands.
+    #[test]
+    fn a_frenzied_grab_attacker_does_not_cancel_sidestep() {
+        use ffb_model::enums::Direction;
+        use ffb_model::types::PushbackSquare;
+        let mut game = make_game();
+        game.team_home.players.push(player_with_skills("att", vec![SkillId::Grab, SkillId::Frenzy]));
+        game.acting_player.player_id = Some("att".into());
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(10, 8));
+        game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
+        game.team_away.players.push(player_with_skills("def1", vec![SkillId::Sidestep]));
+        game.defender_id = Some("def1".into());
+        game.field_model.set_player_coordinate("def1", FieldCoordinate::new(10, 7));
+        game.field_model.set_player_state("def1", PlayerState::new(PS_STANDING));
+        let m = SidestepStepModifier;
+        let mut hs = default_hook_state("def1", true);
+        hs.starting_pushback_square =
+            Some(PushbackSquare::new(FieldCoordinate::new(10, 7), Direction::North, true));
+        let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
+        assert!(result);
+        assert_eq!(hs.pending_skill_use, Some(("def1".to_string(), SkillId::Sidestep)));
     }
 
     /// ...and once the answer is in, the hook takes its other branch and switches the mode.

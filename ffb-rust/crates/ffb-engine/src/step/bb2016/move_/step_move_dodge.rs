@@ -10,7 +10,7 @@ use crate::drop_player_context::SteadyFootingContext;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::abstract_step_with_re_roll::{ReRollState, find_skill_reroll_source};
-use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available_for, ask_for_reroll_if_available, use_reroll};
 use ffb_mechanics::modifiers::dodge_modifier_factory::DodgeModifierFactory;
 use ffb_mechanics::modifiers::dodge_context::DodgeContext;
 
@@ -230,6 +230,24 @@ impl StepMoveDodge {
 
             // Skill re-roll (Dodge property canRerollDodge) — auto-used
             let skill_source = find_skill_reroll_source(game, "DODGE");
+            // Java bb2016 StepMoveDodge.dodge(): the skill source is CANCELLED when an adjacent
+            // opposing player with tackle zones at the FROM square cancels it --
+            //   opponents = UtilPlayer.findAdjacentPlayersWithTacklezones(game, otherTeam, fCoordinateFrom, false);
+            //   for (opponent : opponents) if (UtilCards.cancelsSkill(opponent, skillRerollSource.getSkill(game))) skillRerollSource = null;
+            // Tackle registers CancelSkillProperty(canRerollDodge). The bb2025 twin has carried this
+            // filter since human seed 13; this twin never did, and a mirror cell can never show it
+            // (Tackle and Dodge sit on opposite teams): dwarf vs halfling bb2016 seed 1 i=21, the
+            // Halfling dodging out of a Blocker's zone re-rolled 2 -> 3 and ran on in Rust while
+            // Java fell at the first square (BACKLOG §I.5).
+            let skill_source = skill_source.filter(|_| {
+                use ffb_model::util::util_player::UtilPlayer;
+                use ffb_model::model::property::NamedProperties;
+                let acting = game.acting_player.player_id.clone().unwrap_or_default();
+                let from = self.coordinate_from.unwrap_or_else(|| FieldCoordinate::new(0, 0));
+                UtilPlayer::find_adjacent_opposing_players_with_property(
+                    game, &acting, from, NamedProperties::CANCELS_CAN_REROLL_DODGE, false,
+                ).is_empty()
+            });
             if let Some(source) = skill_source {
                 let pid = player_id.as_deref().unwrap_or("").to_owned();
                 use_reroll(game, &source, &pid, rng);
@@ -238,8 +256,16 @@ impl StepMoveDodge {
                 return self.execute_step(game, rng);
             }
 
-            // TRR offer
-            if let Some(prompt) = ask_for_reroll_if_available(game, "DODGE", minimum_roll, false) {
+            // TRR offer. Java bb2016: `askForReRollIfAvailable(getGameState(), actingPlayer.getPlayer(),
+            // ReRolledActions.DODGE, minimumRoll, false)` -- the PLAYER overload, which passes NO
+            // re-roll skill. Rust's acting-player overload re-derives the action-keyed source and
+            // resurrected the very Dodge skill the Tackle filter above had just nulled: the offer
+            // went out as `ReRollOffer{source: Dodge}`, the heuristic scored it (two sampler draws
+            // Java never spends) and declined, and every draw after it was one off (dwarf vs
+            // halfling bb2016 seed 1 i=22, after §I.5's filter had moved the red from i=21).
+            if let Some(prompt) = ask_for_reroll_if_available_for(
+                game, player_id.as_deref(), "DODGE", minimum_roll, false)
+            {
                 self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
                 self.dodge_roll = 0;
                 // Emit the FAILED initial roll here, exactly as the BB2025 twin does when it
@@ -433,6 +459,59 @@ mod tests {
         assert_ne!(out.action, StepAction::Continue);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::DodgeRoll(v) if *v == step.dodge_roll)),
             "the fresh die is published");
+    }
+
+    #[test]
+    fn tackle_opponent_cancels_dodge_skill_reroll_bb2016() {
+        use ffb_model::enums::{SkillId, PlayerState, PS_STANDING};
+        use ffb_model::model::skill_def::SkillWithValue;
+        let dodger_with_tackle_neighbour = |tackle: bool| -> u64 {
+            let mut game = make_game();
+            game.home_playing = true;
+            game.turn_mode = TurnMode::Regular;
+            game.turn_data_home.rerolls = 0; // no TRR -- isolate the skill re-roll
+            game.team_home.players.push(Player {
+                id: "p1".into(), name: "p1".into(), nr: 1, position_id: "catcher".into(),
+                player_type: PlayerType::Regular, gender: PlayerGender::Male,
+                movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+                starting_skills: vec![SkillWithValue::new(SkillId::Dodge)],
+                extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
+                niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0,
+                race: None, is_big_guy: false, ..Default::default()
+            });
+            game.field_model.set_player_coordinate("p1", FieldCoordinate::new(5, 5));
+            game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+            game.acting_player.player_id = Some("p1".into());
+            game.acting_player.dodging = true;
+            game.team_away.players.push(Player {
+                id: "opp".into(), name: "opp".into(), nr: 2, position_id: "blocker".into(),
+                player_type: PlayerType::Regular, gender: PlayerGender::Male,
+                movement: 4, strength: 3, agility: 2, passing: 4, armour: 9,
+                starting_skills: if tackle { vec![SkillWithValue::new(SkillId::Tackle)] } else { vec![] },
+                extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
+                niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0,
+                race: None, is_big_guy: false, ..Default::default()
+            });
+            game.field_model.set_player_coordinate("opp", FieldCoordinate::new(5, 6));
+            game.field_model.set_player_state("opp", PlayerState::new(PS_STANDING));
+            let mut step = StepMoveDodge::new("fail".into());
+            step.coordinate_from = Some(FieldCoordinate::new(5, 5));
+            step.coordinate_to = Some(FieldCoordinate::new(6, 6));
+            step.dodge_roll = 1; // preset failing roll -- start() rolls no initial die
+            let mut rng = GameRng::new(0);
+            let out = step.start(&mut game, &mut rng);
+            if tackle {
+                // Java's PLAYER overload offers nothing here (no TRR, no re-roll skill): the dodge
+                // simply fails. The acting-player overload re-found the cancelled Dodge source and
+                // raised a ReRollOffer the Java side never shows.
+                assert!(out.prompt.is_none(), "no re-roll offer once Tackle cancelled Dodge: {:?}", out.prompt);
+            }
+            rng.call_count
+        };
+        assert_eq!(dodger_with_tackle_neighbour(true), 0,
+            "an adjacent Tackle opponent must cancel the Dodge skill re-roll (no re-roll die)");
+        assert_eq!(dodger_with_tackle_neighbour(false), 1,
+            "without Tackle the Dodge skill re-roll must fire (one fresh die)");
     }
 
     #[test]

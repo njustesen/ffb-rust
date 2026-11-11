@@ -63,7 +63,7 @@ impl StepModifierTrait for GrabStepModifier {
         // Java: Skill cancellingSkill = UtilCards.getSkillCancelling(state.defender, skill)
         let defender_id = state.defender_id.clone();
         let has_cancelling = game.player(&defender_id)
-            .map(|p| p.all_skill_ids().any(|id| id.properties().contains(&"cancelsCanPushBackToAnySquare")))
+            .map(|p| p.all_skill_ids().any(|id| id.properties_for(game.rules).contains(&"cancelsCanPushBackToAnySquare")))
             .unwrap_or(false);
 
         // Java: boolean allowGrabOutsideBlock = actingPlayer.getPlayer().hasSkillProperty(NamedProperties.grabOutsideBlock)

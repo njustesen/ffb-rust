@@ -9181,3 +9181,139 @@ the accept on is a both-harness change in the Shadowing/Tentacles shape (see the
 * `Hand Off` 6,822 (bb2016 catch modifier name), `Dump-Off` 161, `Safe Pair Of Hands` 117,
   `N Tacklezone` names, `Side Step`/`Sidestep`, `Big Hand`, `modifiedDodgeResultSuccessful`,
   `prayerWasted`; SESSION "still open" 1, 2, 4, 5. All report-level; none moves a hash.
+
+## §I.2 — 2026-11-11: the state hash stopped at 11 players; the first cross red hid behind it
+
+The first sweep (stopped at 171 gates, 1 red) failed `black_orc vs snotling` bb2020 0/3, seed 1
+at step 122 — a Black Orc's Move ended one square short in Rust. `FFB_CANDSUM`/`FFB_CAND=129`
+on both agents: identical draws, identical weights, but Rust's candidate list had (14,4) where
+Java's had (15,3), for three different movers. Both agents were right about their own board:
+**snotling lineman nr 16 stood on (15,3) in Rust and (14,4) in Java**, and had done so for a
+whole drive with every step hash green, because `collect_player_parts` / `addPlayersFromTeam`
+hashed only the first 11 players by number. 90 of the 110 drafted squads carry 12-16 players.
+
+Fixed on both sides (the Java side is `ParityRunner`, co-editable): the hash and the acting-player
+index walk the whole roster. Validation on the rebuilt jar + binary:
+
+| gate | result |
+|---|---|
+| goblin bb2016 @1.0, 1-100 (16 players) | 100/100 |
+| snotling bb2020 @1.0, 1-100 (16) | 100/100 |
+| halfling bb2025 @1.0, 1-100 (16) | 100/100 |
+| human bb2025 @1.0, 1-30 (control) | 30/30 |
+| slann bb2016 @1.0, 1-30 (control) | 30/30 |
+| black_orc vs snotling bb2020, 1-3 | 0/3 — now red at seeds 1/2/3 steps **120 / 20 / 49** (was 122 / ? / ?): the true first divergence |
+
+The mirror matrix stays green under the wider hash on the three largest squads, so the blind spot
+was specifically a CROSS phenomenon here — but it could have hidden a mirror bug just as well.
+The sweep restarts on this build (`D:/ffb_cross/sweep2`); the 171 earlier gates are discarded.
+
+Also landed in this build, from the Phase 1b report batch (both 1:1, both report-only, slann
+bb2016 1-30 still 30/30):
+* bb2016 end-game runs **FAN_FACTOR** (`generator/bb2016/EndGame.java`), not the BB2020+
+  DEDICATED_FANS — `end_game_sequence_for(rules, ..)`. On slann bb2016 1-30 `fanFactorRoll` is
+  rust=30, **java=21**: in 9 games the JAVA report capture ends at `winningsRoll` (the harness
+  stops reading model syncs before FAN_FACTOR ran — a capture gap in ParityRunner, not an oracle
+  statement; the 21 games that do carry it match dice-for-dice). To look at when convenient.
+* bb2016 `catchRoll` names its modifiers (`catchModifiers.toArray(...)`) — "Hand Off" java=rust.
+
+Next: `black_orc vs snotling` seed 2 step 20 (the earliest), `statediff_step.py --step 21`.
+
+## §I.3 — 2026-11-11: Grab vs Side Step — the edition-blind property union cancelled Grab (bb2020) and un-cancelled it (bb2025)
+
+`black_orc vs snotling` bb2020 seed 2 i=20: attacker Black Orc (Grab) at (12,3), defender Snotling
+(Side Step) at (12,2). Java pushed to (13,3) with the HOME (attacker) choosing — a Grab push; Rust
+offered the plain three-square fan north. Same shape at `gnome vs black_orc` bb2020 seed 3 i=36 and,
+with the opposite sign, `black_orc vs elf` / `black_orc vs snotling` bb2025 (Rust ASKED the
+defender's Sidestep where Java let Grab decide).
+
+Java: `skill/mixed/Grab.java` (BB2020+BB2025) registers `CancelSkillProperty(canChooseOwnPushedBackSquare)`
+and conflicting properties `forceSecondBlock` + `movesRandomly`; `bb2020/SideStep.java` and
+`bb2025/Sidestep.java` register ONLY `canChooseOwnPushedBackSquare`; only `bb2016/SideStep.java`
+cancels Grab (`CancelSkillProperty(canPushBackToAnySquare)`). So in BB2020/2025 Grab beats Side
+Step; in BB2016 they cancel each other.
+
+Rust had three faults on that one line of Java:
+1. The pushback hooks asked `SkillId::properties()` — the EDITION UNION — so the bb2016 cancel
+   leaked into every edition and a bb2020 Grab against a Side Step defender was cancelled.
+   `properties_for(rules)` already carried the correct `(SideStep, Bb2020)` row; nobody called it,
+   and `Sidestep` (the bb2025 id) had no row at all. All six push hooks now ask the edition.
+2. bb2025 `sidestep_behaviour.rs` computed Java's `attackerHasConflictingSkill` as "attacker has
+   Grab" — the opposite test, so every Grab attacker un-cancelled the Sidestep it had cancelled.
+   (Its cancel literal also carried a stray space, `"cancelsCan ChooseOwnPushedBackSquare"`.)
+3. The grab hooks hard-coded `attacker_conflicts = false`. New `SkillId::conflicting_properties_for`
+   ports every `registerConflictingProperty` in the Java skill classes; the four bb2020/bb2025
+   hooks use it (a Frenzy or Ball & Chain attacker cannot Grab).
+
+| gate | before | after |
+|---|---|---|
+| black_orc vs snotling bb2020 1-30 | 0/3 | **30/30** |
+| black_orc vs snotling bb2025 1-10 | 2/10 | **10/10** |
+| black_orc vs elf bb2025 1-10 | 1/3 | **10/10** |
+| black_orc bb2020 mirror 1-30 / elf bb2025 mirror 1-30 (controls) | — | 30/30 / 30/30 |
+
+Tests: `side_step_cancels_grab_only_in_bb2016`, `bb2020_side_step_defender_does_not_cancel_grab`,
+`a_grab_attacker_cancels_the_sidestep_offer`, `a_frenzied_grab_attacker_does_not_cancel_sidestep`.
+
+## §I.4 — 2026-11-11: the Java data generator dropped ROSTER-level keywords (Vampire Lord, Master Chef)
+
+`dark_elf_league_fumbbl vs vampire` bb2020 seed 2 i=95: a Dark Elf died to a foul and Rust's
+vampire team raised a Thrall (`raiseDead` report, a 13th away player — visible only because §I.2
+widened the hash); Java did not. Both engines run `canRaiseDead = (MASTERS_OF_UNDEATH ||
+roster.hasVampireLord()) && ...` in bb2020; the ROSTERS differed: `data/rosters/*/roster_vampire.json`
+carries the roster-level keyword `"vampire lord"` (as does FUMBBL's original `roster_vampire.xml`),
+but `scripts/gen_java_parity_data.py` only ever emitted POSITION keywords, so Java's generated
+`roster_vampire_bb20xx.xml` had none and `hasVampireLord()` was false. The generator now emits the
+roster `<keywords>` block (vampire ×3 editions, halfling ×3 — Master Chef — regenerated), and its
+stale write path into the forbidden `niels/ffb` checkout is removed.
+
+| gate (regenerated rosters) | before | after |
+|---|---|---|
+| dark_elf_league_fumbbl vs vampire bb2020 1-30 | 2/3 | **30/30** |
+| vampire mirror bb2016 / bb2020 / bb2025, 1-30 | — | 30/30 ×3 |
+| halfling mirror bb2016 / bb2020, 1-30 | — | 30/30 ×2 |
+
+NOTE: the data changed mid-sweep. Cross gates involving `vampire` or `halfling` that ran before
+the regeneration (`nippon_vs_vampire`, `renegades_37730_vs_vampire` bb2020 and any green ones) are
+measured against the OLD Java rosters and must be re-run on the final sweep anyway.
+
+## §I.5 — 2026-11-11: bb2016 Tackle never cancelled the Dodge re-roll (a cross-only rule)
+
+`dwarf vs halfling` bb2016 seed 1 i=21, `chaos_dwarf vs lizardman` seed 1 i=33, `lizardman vs
+dwarf`, `chaos_dwarf vs halfling`: a Dodge player dodging out of a Tackle player's zone fails, and
+Rust re-rolls with the Dodge skill while Java (`bb2016/StepMoveDodge.dodge()`: `UtilCards.cancelsSkill
+(opponent, skillRerollSource.getSkill())` over the adjacent tackle-zone opponents) falls. The bb2025
+twin has carried this filter since human seed 13; the bb2016 twin never did, and no MIRROR cell can
+show it — Tackle (dwarf) and Dodge (halfling/skink) sit on opposite teams. Ported 1:1, test
+`tackle_opponent_cancels_dodge_skill_reroll_bb2016`.
+
+| gate | before | after |
+|---|---|---|
+| chaos_dwarf vs lizardman bb2016 1-10 | 2/3 | **10/10** |
+| dwarf vs halfling bb2016 1-30 | 0/3 | 27/30 (seeds 1, 5, 26 — seed 1 moved from i=21 to i=22: a SECOND divergence) |
+| lizardman vs dwarf bb2016 1-10 | 1/3 | 9/10 (seed 7 i=83) |
+| dwarf bb2016 mirror 1-30 (control) | — | 30/30 |
+
+Next: dwarf vs halfling seed 1 i=22 on the fixed binary.
+
+## §I.6 — 2026-11-11: the bb2016 TRR offer resurrected the cancelled Dodge source (two phantom draws)
+
+With §I.5 in, `dwarf vs halfling` bb2016 seed 1 moved from i=21 to i=22 and `FFB_CANDSUM` showed
+identical candidate sets with Rust TWO sampler draws ahead; `FFB_DRAWS` named them: a
+`ReRollOffer{source: Dodge, action: DODGE}` the heuristic scored and declined, which Java never
+raised. Java bb2016 calls the PLAYER overload `askForReRollIfAvailable(gameState,
+actingPlayer.getPlayer(), DODGE, minimumRoll, false)` with no re-roll skill; Rust's ACTING-PLAYER
+overload re-derives the action-keyed source and found the Dodge skill the Tackle filter had just
+nulled — the same fault the bb2025 twin fixed at human bb2025 @1e6 seed 3. Now
+`ask_for_reroll_if_available_for(game, player_id, ..)`, and the §I.5 test asserts no offer.
+
+| gate | §I.5 | now |
+|---|---|---|
+| dwarf vs halfling bb2016 1-30 | 27/30 | **30/30** |
+| lizardman vs dwarf bb2016 1-10 | 9/10 | **10/10** |
+| chaos_dwarf vs halfling bb2016 1-10 | 1/3 | **10/10** |
+| halfling bb2016 mirror 1-30, skaven bb2016 mirror 1-30 (controls) | — | 30/30, 30/30 |
+
+The second sweep (old binary) is stopped at this point and restarted on the committed build: its
+remaining reds were re-finding these families (`snotling_vs_black_orc` bb2025,
+`underworld_vs_black_orc` bb2025, `wood_elf_vs_chaos_dwarf` bb2016, `gnome_vs_black_orc` bb2020).

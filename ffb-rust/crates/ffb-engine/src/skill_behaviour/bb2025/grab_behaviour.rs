@@ -72,12 +72,17 @@ impl StepModifierTrait for GrabStepModifier {
         // Java: Skill cancellingSkill = UtilCards.getSkillCancelling(state.defender, skill)
         let defender_id = state.defender_id.clone();
         let has_cancelling = game.player(&defender_id)
-            .map(|p| p.all_skill_ids().any(|id| id.properties().contains(&"cancelsCanPushBackToAnySquare")))
+            .map(|p| p.all_skill_ids().any(|id| id.properties_for(game.rules).contains(&"cancelsCanPushBackToAnySquare")))
             .unwrap_or(false);
 
         // Java: boolean attackerHasConflictingSkill = skill.conflictsWithAnySkill(actingPlayer.getPlayer())
         // Grab conflicts with itself — if attacker somehow has conflicting skill
-        let attacker_conflicts = false; // simplified: Grab has no self-conflict in standard rules
+        // Java: skill.conflictsWithAnySkill(actingPlayer.getPlayer()) -- a Frenzy or Ball & Chain
+        // attacker cannot Grab (mixed/Grab.java registers forceSecondBlock + movesRandomly).
+        let attacker_conflicts = game.player(&attacker_id)
+            .map(|p| SkillId::Grab.conflicting_properties_for(game.rules).iter()
+                .any(|prop| p.has_skill_property_in(game.rules, prop)))
+            .unwrap_or(false);
 
         // Java: boolean allowGrabOutsideBlock = actingPlayer.getPlayer().hasSkillProperty(NamedProperties.grabOutsideBlock)
         let allow_grab_outside_block = game.player(&attacker_id)

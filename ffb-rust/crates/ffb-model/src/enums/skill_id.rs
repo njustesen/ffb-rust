@@ -1089,6 +1089,14 @@ impl SkillId {
             (SkillId::SecretWeapon, Rules::Bb2025 | Rules::Common) => &["getsSentOffAtEndOfDrive"],
             (SkillId::SideStep, Rules::Bb2016) => &["canChooseOwnPushedBackSquare", "cancelsCanPushBackToAnySquare"],
             (SkillId::SideStep, Rules::Bb2020) => &["canChooseOwnPushedBackSquare"],
+            // Java bb2020/SideStep.java and bb2025/Sidestep.java register ONLY
+            // canChooseOwnPushedBackSquare; the CancelSkillProperty(canPushBackToAnySquare) that
+            // cancels Grab is bb2016/SideStep.java alone. The union below carries it for every
+            // edition, so a bb2020 Grab against a Side Step defender was cancelled in Rust and
+            // used in Java (black_orc vs snotling bb2020 seed 2 step 20, BACKLOG §I.3).
+            (SkillId::SideStep, Rules::Bb2025 | Rules::Common) => &["canChooseOwnPushedBackSquare"],
+            (SkillId::Sidestep, Rules::Bb2025 | Rules::Common) => &["canChooseOwnPushedBackSquare"],
+            (SkillId::Sidestep, Rules::Bb2020) => &["canChooseOwnPushedBackSquare"],
             (SkillId::SneakyGit, Rules::Bb2016) => &["canAlwaysAssistFouls"],
             (SkillId::SneakyGit, Rules::Bb2020) => &["canAlwaysAssistFouls", "canMoveAfterFoul"],
             (SkillId::SneakyGit, Rules::Bb2025 | Rules::Common) => &[],
@@ -1119,6 +1127,28 @@ impl SkillId {
             SkillId::MightyBlow => 1,
             SkillId::DirtyPlayer => 1,
             _ => 0,
+        }
+    }
+
+    /// Java `Skill.registerConflictingProperty(..)` / `conflictsWithAnySkill(player)`: the
+    /// properties a PLAYER may not hold alongside this skill. Used by the pushback hooks --
+    /// `GrabBehaviour`: `skill.conflictsWithAnySkill(attacker)`, `SidestepBehaviour`:
+    /// `cancellingSkill.conflictsWithAnySkill(attacker)` -- which the Rust hooks had hard-coded as
+    /// `false` (grab) or as "attacker has Grab" (bb2025 sidestep, which inverted the test and
+    /// let a Sidestep defender dodge a Black Orc's Grab: black_orc vs elf bb2025 seed 2 i=2,
+    /// BACKLOG §I.3). Per edition, from the Java skill classes; skills not listed register none.
+    pub fn conflicting_properties_for(self, rules: crate::enums::Rules) -> &'static [&'static str] {
+        use crate::enums::Rules;
+        match (self, rules) {
+            // skill/mixed/Grab.java (BB2020 + BB2025); skill/bb2016/Grab.java registers none
+            (SkillId::Grab, Rules::Bb2020 | Rules::Bb2025 | Rules::Common) => &["forceSecondBlock", "movesRandomly"],
+            (SkillId::BallAndChain, Rules::Bb2020) => &["forceSecondBlock", "canAttemptToTackleDodgingPlayer", "canLeap", "canBlockTwoAtOnce", "canMoveDuringKickOffScatter", "canFollowPlayerLeavingTacklezones"],
+            (SkillId::BallAndChain, Rules::Bb2025 | Rules::Common) => &["canAttemptToTackleDodgingPlayer", "canRemoveOpponentAssists", "forceSecondBlock", "canPushBackToAnySquare", "canMoveAfterBlock", "canLeap", "canBlockTwoAtOnce", "canMoveDuringKickOffScatter", "canFollowPlayerLeavingTacklezones", "canAvoidFallingDown"],
+            (SkillId::Leap, Rules::Bb2020) => &["movesRandomly"],
+            (SkillId::Shadowing, Rules::Bb2020) => &["movesRandomly"],
+            (SkillId::EyeGouge, Rules::Bb2025 | Rules::Common) => &["movesRandomly"],
+            (SkillId::HitAndRun, Rules::Bb2025 | Rules::Common) => &["movesRandomly"],
+            _ => &[],
         }
     }
 
@@ -1905,6 +1935,19 @@ mod tests {
 
     /// Skills with no per-edition arm must fall through to the union unchanged, so adding
     /// `properties_for` cannot silently alter anything else.
+    #[test]
+    fn side_step_cancels_grab_only_in_bb2016() {
+        use crate::enums::Rules;
+        assert!(SkillId::SideStep.properties_for(Rules::Bb2016).contains(&"cancelsCanPushBackToAnySquare"));
+        for (id, r) in [(SkillId::SideStep, Rules::Bb2020), (SkillId::SideStep, Rules::Bb2025),
+                        (SkillId::Sidestep, Rules::Bb2020), (SkillId::Sidestep, Rules::Bb2025)] {
+            let props = id.properties_for(r);
+            assert!(props.contains(&"canChooseOwnPushedBackSquare"), "{id:?} {r:?}");
+            assert!(!props.contains(&"cancelsCanPushBackToAnySquare"),
+                "{id:?} under {r:?} must not cancel Grab (Java registers no CancelSkillProperty)");
+        }
+    }
+
     #[test]
     fn properties_for_falls_through_to_the_union_for_other_skills() {
         use crate::enums::Rules;

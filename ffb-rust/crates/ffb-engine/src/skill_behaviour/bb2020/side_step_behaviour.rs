@@ -68,7 +68,7 @@ impl StepModifierTrait for SideStepStepModifier {
                 .and_then(|id| game.player(id))
                 .and_then(|p| {
                     p.all_skill_ids().find(|id| {
-                        id.properties().contains(&"cancelsCanChooseOwnPushedBackSquare")
+                        id.properties_for(game.rules).contains(&"cancelsCanChooseOwnPushedBackSquare")
                     })
                 })
         } else {
@@ -76,7 +76,12 @@ impl StepModifierTrait for SideStepStepModifier {
         };
 
         // Java: boolean attackerHasConflictingSkill = cancellingSkill != null && cancellingSkill.conflictsWithAnySkill(actingPlayer.getPlayer())
-        let attacker_conflicts = false; // simplified: SideStep-cancelling skills have no self-conflict in standard rules
+        // (Grab conflicts with Frenzy's forceSecondBlock and Ball & Chain's movesRandomly.)
+        let attacker_conflicts = match (cancelling_skill, game.acting_player.player_id.as_deref().and_then(|id| game.player(id))) {
+            (Some(cs), Some(p)) => cs.conflicting_properties_for(game.rules).iter()
+                .any(|prop| p.has_skill_property_in(game.rules, prop)),
+            _ => false,
+        };
 
         let defender_state = game.field_model.player_state(&defender_id);
         let has_tacklezones = defender_state.map(|s| s.has_tacklezones()).unwrap_or(true);
