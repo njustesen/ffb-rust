@@ -223,6 +223,9 @@ if __name__ == "__main__":
     # WOULD_NOT_HELP, Safe Pair of Hands, Dump-Off, Sidestep) showed up as "Java names it, Rust
     # does not" with equal counts on both sides (cross sweep 3: Diving Tackle 489 vs 489).
     rust_names.update(data.get("skill_declined", {}))
+    # ...and the same for `reRoll.reRollSource` (Java's tally counts it as a name; "Sure Hands"
+    # 2 == 2 in cross sweep 3).
+    rust_names.update(data.get("reroll_sources", {}))
     id_gap = sorted(set(data["java_ids"]) - set(data["ids"]))
     name_gap = sorted(n for n in data["java_names"] if n not in rust_names)
     data["java_only_ids"] = id_gap

@@ -194,7 +194,9 @@ impl StepPickUp {
                 // Java: secureTheBall uses fixed agility 2; otherwise player agility
                 let effective_agility = if self.secure_the_ball { 2 } else { player.agility as i32 };
                 let min = PickupModifierFactory::minimum_roll(effective_agility, &all);
-                let names: Vec<String> = all.iter().map(|m| m.get_report_string().to_string()).collect();
+                // Java `ReportSkillRoll.toJsonValue` writes each modifier by NAME (the stream shows "Big Hand",
+                // not its report string) -- cross sweep 3 oracle check: "Big Hand" java=2 rust=0.
+                let names: Vec<String> = all.iter().map(|m| m.get_name().to_string()).collect();
                 (min, names)
             } else {
                 (2, vec![])

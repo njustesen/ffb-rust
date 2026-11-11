@@ -160,7 +160,9 @@ impl StepPickUp {
                 let skill_mods = factory.find_skill_modifiers(&ctx);
                 let all: Vec<&ffb_mechanics::modifiers::pickup_modifier::PickupModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
                 let min = PickupModifierFactory::minimum_roll(player.agility as i32, &all);
-                let names: Vec<String> = all.iter().map(|m| m.get_report_string().to_string()).collect();
+                // Java `ReportSkillRoll.toJsonValue` writes each modifier by NAME (the stream shows "Big Hand",
+                // not its report string) -- cross sweep 3 oracle check: "Big Hand" java=2 rust=0.
+                let names: Vec<String> = all.iter().map(|m| m.get_name().to_string()).collect();
                 (min, names)
             } else {
                 (2, vec![])
