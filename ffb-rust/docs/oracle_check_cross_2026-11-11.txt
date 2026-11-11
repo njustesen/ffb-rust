@@ -1,0 +1,21 @@
+games 12036, reports 4959444, distinct reportIds 89 of 164 in the catalog
+modifier names seen: {'rollModifiers': 44, 'injuryModifiers': 5, 'armorModifiers': 15, 'casualtyModifiers': 1}
+skillUse reasons: 18  re-roll sources: 8
+java twins: 12036 same length: 1787
+
+!! JAVA REPORTS IT, RUST DOES NOT -- these are Rust bugs, not coverage gaps:
+     reportId cardsAndInducementsBought        java=7716
+     reportId cardsBought                      java=4872
+     reportId freePettyCash                    java=7536
+     reportId inducementsBought                java=4872
+     reportId pettyCash                        java=4872
+     reportId prayersAndInducementsBought      java=7356
+     name     2 Tacklezone                     java=61
+     name     3 Tacklezone                     java=9
+     name     4 Tacklezone                     java=1
+     name     Big Hand                         java=2
+     name     Diving Tackle                    java=489
+     name     Dump-Off                         java=19
+     name     Safe Pair Of Hands               java=17
+     name     Sidestep                         java=1
+     name     Sure Hands                       java=2

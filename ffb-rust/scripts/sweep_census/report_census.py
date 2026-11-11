@@ -218,6 +218,11 @@ if __name__ == "__main__":
     for bucket in MODIFIER_KEYS:
         rust_names.update(data["modifiers"].get(bucket, {}))
     rust_names.update(data["skill_use_skills"])
+    # Java's name tally counts every `skillUse.skill`, used OR declined; the Rust tally kept the
+    # declined ones in a separate bucket, so a skill Rust only ever DECLINES (Diving Tackle's
+    # WOULD_NOT_HELP, Safe Pair of Hands, Dump-Off, Sidestep) showed up as "Java names it, Rust
+    # does not" with equal counts on both sides (cross sweep 3: Diving Tackle 489 vs 489).
+    rust_names.update(data.get("skill_declined", {}))
     id_gap = sorted(set(data["java_ids"]) - set(data["ids"]))
     name_gap = sorted(n for n in data["java_names"] if n not in rust_names)
     data["java_only_ids"] = id_gap
