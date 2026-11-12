@@ -20,12 +20,64 @@ impl TakeRootBehaviour {
     pub fn register_into(registry: &mut SkillRegistry) {
         let mut sb = SbContainer::new();
         sb.register_step_modifier(Box::new(TakeRootStepModifier));
+        sb.register_step_modifier(Box::new(TakeRootPushbackStepModifier));
         registry.register(SkillId::TakeRoot, sb);
     }
 }
 
 impl Default for TakeRootBehaviour {
     fn default() -> Self { Self::new() }
+}
+
+// ── TakeRootPushbackStepModifier ─────────────────────────────────────────────
+
+/// Java bb2025 `TakeRootBehaviour`'s second modifier: `StepModifier<StepPushback>(1)` — priority
+/// 1, AHEAD of Stand Firm (2). A ROOTED defender is never pushed: the push is cancelled silently
+/// (no ReportSkillUse) and the hook returns true, so Stand Firm never runs. Rust lacked it, so a
+/// rooted Treeman fell through to Stand Firm's auto-stand-firm branch and reported AVOID_PUSH
+/// (chaos_dwarf_vs_wood_elf bb2025 seed 2 i=72).
+pub struct TakeRootPushbackStepModifier;
+
+impl StepModifierTrait for TakeRootPushbackStepModifier {
+    fn applies_to(&self, step_id: StepId) -> bool { step_id == StepId::Pushback }
+
+    fn priority(&self) -> i32 { 1 }
+
+    fn handle_execute_step(
+        &self,
+        game: &mut Game,
+        _rng: &mut GameRng,
+        step_state: &mut dyn std::any::Any,
+    ) -> bool {
+        let state = step_state
+            .downcast_mut::<crate::step::bb2025::block::step_pushback::StepPushbackHookState>()
+            .expect("TakeRootPushbackStepModifier: step_state must be StepPushbackHookState");
+        // Java: `playerState = fieldModel.getPlayerState(state.defender); if (playerState.isRooted())`
+        let rooted = game.field_model.player_state(&state.defender_id)
+            .map(|s| s.is_rooted()).unwrap_or(false);
+        if !rooted {
+            return false;
+        }
+        // Java: doPush = true; pushbackStack.clear(); publish STARTING_PUSHBACK_SQUARE(null),
+        // FOLLOWUP_CHOICE(false), BALL_KNOCKED_LOSE(false), CATCH_SCATTER_THROW_IN_MODE(null) —
+        // the same plumbing (and the same two unported publishes) as StandFirm's accepted branch.
+        state.do_push = true;
+        state.pushback_squares.clear();
+        state.clear_pushback_stack = true;
+        state.starting_pushback_square = None;
+        state.published.push(crate::step::framework::StepParameter::FollowupChoice(false));
+        // Java: if (UtilPlayer.hasBall(game, defender)) addReport(ReportEvent("Strip ball is
+        // prevented as the player is rooted."))
+        let defender_coord = game.field_model.player_coordinate(&state.defender_id);
+        if defender_coord.is_some() && game.field_model.ball_coordinate == defender_coord
+            && !game.field_model.ball_moving
+        {
+            game.report_list.add(ffb_model::report::mixed::report_event::ReportEvent::new(Some(
+                "Strip ball is prevented as the player is rooted.".to_string(),
+            )));
+        }
+        true
+    }
 }
 
 // ── TakeRootStepModifier ──────────────────────────────────────────────────────
@@ -186,7 +238,11 @@ mod tests {
         let mut reg = SkillRegistry::empty();
         TakeRootBehaviour::register_into(&mut reg);
         let sb = reg.get(SkillId::TakeRoot).expect("TakeRoot must be registered");
-        assert_eq!(sb.get_step_modifiers().len(), 1);
+        // Java registers two: the StepTakeRoot roll and the priority-1 StepPushback guard.
+        assert_eq!(sb.get_step_modifiers().len(), 2);
+        let pushback = sb.get_step_modifiers().iter()
+            .find(|m| m.applies_to(StepId::Pushback)).expect("StepPushback modifier");
+        assert_eq!(pushback.priority(), 1, "must run before Stand Firm (2)");
     }
 
     #[test]
