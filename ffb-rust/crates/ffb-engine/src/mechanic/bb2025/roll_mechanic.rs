@@ -47,7 +47,10 @@ fn current_stat_value(attr: InjuryAttribute, player: &Player) -> i32 {
 }
 
 /// BB2025 SI detail table: map d6 roll to SeriousInjuryKind, with stat-floor fallback.
-fn map_si_roll_bb2025(game: &Game, ctx: &InjuryContext, si_roll: i32) -> Option<SeriousInjuryKind> {
+/// `original_out` receives Java's `injuryContext.setOriginalSeriousInjury(originalInjury)` —
+/// set only when the rolled injury cannot reduce its stat and SERIOUSLY_HURT replaces it.
+fn map_si_roll_bb2025(game: &Game, ctx: &InjuryContext, si_roll: i32,
+    original_out: &mut Option<SeriousInjuryKind>) -> Option<SeriousInjuryKind> {
     let original = serious_injury_bb2025(si_roll)?;
     let attr = original.injury_attribute();
     let defender = ctx.defender_id.as_deref().and_then(|id| game.player(id));
@@ -61,6 +64,7 @@ fn map_si_roll_bb2025(game: &Game, ctx: &InjuryContext, si_roll: i32) -> Option<
     if reduceable {
         Some(original)
     } else {
+        *original_out = Some(original);
         Some(SeriousInjuryKind::SeriouslyHurt)
     }
 }
@@ -70,9 +74,10 @@ fn interpret_si_from_rolls(
     ctx: &InjuryContext,
     cas_roll: i32,
     si_roll: i32,
+    original_out: &mut Option<SeriousInjuryKind>,
 ) -> Option<SeriousInjuryKind> {
     if requires_si_table_bb2020(cas_roll) {
-        return map_si_roll_bb2025(game, ctx, si_roll);
+        return map_si_roll_bb2025(game, ctx, si_roll, original_out);
     }
     si_sub_type_bb2025(cas_roll).map(|st| match st {
         SiSubType::SeriousInjury => SeriousInjuryKind::SeriousInjuryNi,
@@ -167,17 +172,20 @@ impl RollMechanicTrait for RollMechanic {
     fn interpret_serious_injury_roll(
         &self,
         game: &Game,
-        ctx: &InjuryContext,
+        ctx: &mut InjuryContext,
     ) -> Option<SeriousInjuryKind> {
         let roll = ctx.casualty_roll?;
         let cas_roll = roll[0] + ctx.casualty_modifier_sum();
-        interpret_si_from_rolls(game, ctx, cas_roll, roll[1])
+        let mut original = None;
+        let si = interpret_si_from_rolls(game, ctx, cas_roll, roll[1], &mut original);
+        if original.is_some() { ctx.original_serious_injury = original; }
+        si
     }
 
     fn interpret_serious_injury_roll_decay(
         &self,
         game: &Game,
-        ctx: &InjuryContext,
+        ctx: &mut InjuryContext,
         _use_decay: bool,
     ) -> Option<SeriousInjuryKind> {
         // BB2025: decay path delegates to normal path
@@ -191,7 +199,7 @@ impl RollMechanicTrait for RollMechanic {
         roll: [i32; 2],
     ) -> Option<SeriousInjuryKind> {
         let cas_roll = roll[0] + ctx.casualty_modifier_sum();
-        interpret_si_from_rolls(game, ctx, cas_roll, roll[1])
+        interpret_si_from_rolls(game, ctx, cas_roll, roll[1], &mut None)
     }
 
     fn multi_block_attacker_modifier(&self) -> i32 { -2 }
@@ -399,9 +407,9 @@ mod tests {
         let g = make_game();
         let mut ctx = InjuryContext::new(ApothecaryMode::Attacker);
         ctx.casualty_roll = Some([9, 1]);
-        assert_eq!(m.interpret_serious_injury_roll(&g, &ctx), Some(SeriousInjuryKind::SeriouslyHurt));
+        assert_eq!(m.interpret_serious_injury_roll(&g, &mut ctx.clone()), Some(SeriousInjuryKind::SeriouslyHurt));
         ctx.casualty_roll = Some([10, 6]);
-        assert_eq!(m.interpret_serious_injury_roll(&g, &ctx), Some(SeriousInjuryKind::SeriouslyHurt));
+        assert_eq!(m.interpret_serious_injury_roll(&g, &mut ctx.clone()), Some(SeriousInjuryKind::SeriouslyHurt));
     }
 
     #[test]
@@ -410,9 +418,9 @@ mod tests {
         let g = make_game();
         let mut ctx = InjuryContext::new(ApothecaryMode::Attacker);
         ctx.casualty_roll = Some([11, 1]);
-        assert_eq!(m.interpret_serious_injury_roll(&g, &ctx), Some(SeriousInjuryKind::SeriousInjuryNi));
+        assert_eq!(m.interpret_serious_injury_roll(&g, &mut ctx.clone()), Some(SeriousInjuryKind::SeriousInjuryNi));
         ctx.casualty_roll = Some([12, 3]);
-        assert_eq!(m.interpret_serious_injury_roll(&g, &ctx), Some(SeriousInjuryKind::SeriousInjuryNi));
+        assert_eq!(m.interpret_serious_injury_roll(&g, &mut ctx.clone()), Some(SeriousInjuryKind::SeriousInjuryNi));
     }
 
     #[test]
@@ -431,7 +439,7 @@ mod tests {
         let mut ctx = InjuryContext::new(ApothecaryMode::Attacker);
         ctx.defender_id = Some("d1".into());
         ctx.casualty_roll = Some([13, 1]); // d6=1 → HeadInjuryAv
-        assert_eq!(m.interpret_serious_injury_roll(&g, &ctx), Some(SeriousInjuryKind::SeriouslyHurt));
+        assert_eq!(m.interpret_serious_injury_roll(&g, &mut ctx.clone()), Some(SeriousInjuryKind::SeriouslyHurt));
     }
 
     #[test]

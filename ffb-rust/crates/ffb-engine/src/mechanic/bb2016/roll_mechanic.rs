@@ -84,7 +84,7 @@ impl RollMechanicTrait for RollMechanic {
     fn interpret_serious_injury_roll(
         &self,
         _game: &Game,
-        ctx: &InjuryContext,
+        ctx: &mut InjuryContext,
     ) -> Option<SeriousInjuryKind> {
         self.interpret_serious_injury_roll_decay(_game, ctx, false)
     }
@@ -92,7 +92,7 @@ impl RollMechanicTrait for RollMechanic {
     fn interpret_serious_injury_roll_decay(
         &self,
         _game: &Game,
-        ctx: &InjuryContext,
+        ctx: &mut InjuryContext,
         use_decay: bool,
     ) -> Option<SeriousInjuryKind> {
         let roll = if use_decay { ctx.casualty_roll_decay } else { ctx.casualty_roll };
@@ -316,7 +316,7 @@ mod tests {
         // die1=4, die2=1 → BROKEN_RIBS
         let mut ctx2 = ctx;
         ctx2.casualty_roll = Some([4, 1]);
-        assert_eq!(m.interpret_serious_injury_roll(&g, &ctx2), Some(SeriousInjuryKind::BrokenRibs));
+        assert_eq!(m.interpret_serious_injury_roll(&g, &mut ctx2.clone()), Some(SeriousInjuryKind::BrokenRibs));
     }
 
     #[test]
@@ -326,7 +326,7 @@ mod tests {
         let mut ctx = InjuryContext::new(ApothecaryMode::Attacker);
         // die1=5, die2=2 → SMASHED_KNEE (NI)
         ctx.casualty_roll = Some([5, 2]);
-        assert_eq!(m.interpret_serious_injury_roll(&g, &ctx), Some(SeriousInjuryKind::SmashedKneeB2016));
+        assert_eq!(m.interpret_serious_injury_roll(&g, &mut ctx.clone()), Some(SeriousInjuryKind::SmashedKneeB2016));
     }
 
     #[test]
@@ -335,7 +335,7 @@ mod tests {
         let g = make_game();
         let mut ctx = InjuryContext::new(ApothecaryMode::Attacker);
         ctx.casualty_roll = Some([6, 1]); // die1=6 → dead, not SI table
-        assert_eq!(m.interpret_serious_injury_roll(&g, &ctx), None);
+        assert_eq!(m.interpret_serious_injury_roll(&g, &mut ctx.clone()), None);
     }
 
     #[test]

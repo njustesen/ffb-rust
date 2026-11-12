@@ -57,7 +57,10 @@ const ORDERED_INJURIES: [SeriousInjuryKind; 6] = [
 
 /// BB2020 `mapSIRoll`: returns a reduceable injury for this player, or the original.
 /// Java shuffles the reduceable list via the shared Collections stream; so does Rust.
-fn map_si_roll_bb2020(game: &Game, ctx: &InjuryContext, si_roll: i32) -> Option<SeriousInjuryKind> {
+/// `original_out` receives Java's `injuryContext.setOriginalSeriousInjury(originalInjury)`,
+/// set only when the rolled injury is remapped (it surfaces as the report's `seriousInjuryOld`).
+fn map_si_roll_bb2020(game: &Game, ctx: &InjuryContext, si_roll: i32,
+    original_out: &mut Option<SeriousInjuryKind>) -> Option<SeriousInjuryKind> {
     let original = serious_injury_bb2020(si_roll)?;
     let defender = ctx.defender_id.as_deref().and_then(|id| game.player(id));
 
@@ -81,6 +84,7 @@ fn map_si_roll_bb2020(game: &Game, ctx: &InjuryContext, si_roll: i32) -> Option<
         // dark_elf bb2020 seed 31 picked IRON_MAN at a mid-game Cheering Fans where Java
         // picked a different prayer, because a serious-injury remap earlier in the drive
         // had consumed a shuffle Java made and Rust did not.
+        *original_out = Some(original);
         let mut reduceable = reduceable;
         ffb_model::util::java_random::collections_shuffle(
             &mut reduceable, &mut *game.collections_rng.lock());
@@ -93,9 +97,10 @@ fn interpret_si_from_rolls_bb2020(
     ctx: &InjuryContext,
     cas_roll: i32,
     si_roll: i32,
+    original_out: &mut Option<SeriousInjuryKind>,
 ) -> Option<SeriousInjuryKind> {
     if requires_si_table_bb2020(cas_roll) {
-        return map_si_roll_bb2020(game, ctx, si_roll);
+        return map_si_roll_bb2020(game, ctx, si_roll, original_out);
     }
     si_sub_type_bb2020(cas_roll).map(|st| match st {
         SiSubType::SeriousInjury => SeriousInjuryKind::SeriousInjuryNi,
@@ -188,17 +193,20 @@ impl RollMechanicTrait for RollMechanic {
     fn interpret_serious_injury_roll(
         &self,
         game: &Game,
-        ctx: &InjuryContext,
+        ctx: &mut InjuryContext,
     ) -> Option<SeriousInjuryKind> {
         let roll = ctx.casualty_roll?;
         let cas_roll = roll[0] + ctx.casualty_modifier_sum();
-        interpret_si_from_rolls_bb2020(game, ctx, cas_roll, roll[1])
+        let mut original = None;
+        let si = interpret_si_from_rolls_bb2020(game, ctx, cas_roll, roll[1], &mut original);
+        if original.is_some() { ctx.original_serious_injury = original; }
+        si
     }
 
     fn interpret_serious_injury_roll_decay(
         &self,
         game: &Game,
-        ctx: &InjuryContext,
+        ctx: &mut InjuryContext,
         _use_decay: bool,
     ) -> Option<SeriousInjuryKind> {
         // BB2020: useDecay delegates to normal path
@@ -212,7 +220,7 @@ impl RollMechanicTrait for RollMechanic {
         roll: [i32; 2],
     ) -> Option<SeriousInjuryKind> {
         let cas_roll = roll[0] + ctx.casualty_modifier_sum();
-        interpret_si_from_rolls_bb2020(game, ctx, cas_roll, roll[1])
+        interpret_si_from_rolls_bb2020(game, ctx, cas_roll, roll[1], &mut None)
     }
 
     fn multi_block_attacker_modifier(&self) -> i32 { -2 }
@@ -392,7 +400,7 @@ mod tests {
         let mut ctx = InjuryContext::new(ApothecaryMode::Attacker);
         for cas in [7i32, 8, 9] {
             ctx.casualty_roll = Some([cas, 1]);
-            assert_eq!(m.interpret_serious_injury_roll(&g, &ctx), Some(SeriousInjuryKind::SeriouslyHurt), "cas={cas}");
+            assert_eq!(m.interpret_serious_injury_roll(&g, &mut ctx.clone()), Some(SeriousInjuryKind::SeriouslyHurt), "cas={cas}");
         }
     }
 
@@ -403,7 +411,7 @@ mod tests {
         let mut ctx = InjuryContext::new(ApothecaryMode::Attacker);
         for cas in [10i32, 11, 12] {
             ctx.casualty_roll = Some([cas, 1]);
-            assert_eq!(m.interpret_serious_injury_roll(&g, &ctx), Some(SeriousInjuryKind::SeriousInjuryNi), "cas={cas}");
+            assert_eq!(m.interpret_serious_injury_roll(&g, &mut ctx.clone()), Some(SeriousInjuryKind::SeriousInjuryNi), "cas={cas}");
         }
     }
 
@@ -431,7 +439,7 @@ mod tests {
         ctx.defender_id = Some("d1".into());
         // cas=13 → detail table, si_roll=1 → HeadInjuryAv
         ctx.casualty_roll = Some([13, 1]);
-        assert_eq!(m.interpret_serious_injury_roll(&g, &ctx), Some(SeriousInjuryKind::HeadInjuryAv));
+        assert_eq!(m.interpret_serious_injury_roll(&g, &mut ctx.clone()), Some(SeriousInjuryKind::HeadInjuryAv));
     }
 
     #[test]
@@ -441,7 +449,24 @@ mod tests {
         let mut ctx = InjuryContext::new(ApothecaryMode::Attacker);
         ctx.defender_id = Some("d1".into());
         ctx.casualty_roll = Some([14, 6]);
-        assert_eq!(m.interpret_serious_injury_roll(&g, &ctx), Some(SeriousInjuryKind::DislocatedShoulderSt));
+        assert_eq!(m.interpret_serious_injury_roll(&g, &mut ctx.clone()), Some(SeriousInjuryKind::DislocatedShoulderSt));
+        assert_eq!(ctx.original_serious_injury, None, "no remap → no seriousInjuryOld");
+    }
+
+    /// Java bb2020 `mapSIRoll`: when the rolled injury's stat cannot be reduced, the remapped
+    /// injury is returned AND `injuryContext.setOriginalSeriousInjury(originalInjury)` records the
+    /// rolled one — the report's `seriousInjuryOld` (undead_vs_snotling bb2020 seed 2).
+    #[test]
+    fn unreduceable_si_records_the_original_injury_bb2020() {
+        let m = RollMechanic::new();
+        let mut g = make_game_with_defender();
+        g.team_away.players[0].strength = 0; // ST cannot be reduced below 0
+        let mut ctx = InjuryContext::new(ApothecaryMode::Attacker);
+        ctx.defender_id = Some("d1".into());
+        ctx.casualty_roll = Some([14, 6]);
+        let si = m.interpret_serious_injury_roll(&g, &mut ctx);
+        assert_ne!(si, Some(SeriousInjuryKind::DislocatedShoulderSt));
+        assert_eq!(ctx.original_serious_injury, Some(SeriousInjuryKind::DislocatedShoulderSt));
     }
 
     #[test]

@@ -39,14 +39,14 @@ pub trait RollMechanic: Send + Sync {
     fn interpret_serious_injury_roll(
         &self,
         game: &Game,
-        ctx: &InjuryContext,
+        ctx: &mut InjuryContext,
     ) -> Option<SeriousInjuryKind>;
 
     /// Variant with explicit use_decay flag (BB2016 Decay skill path).
     fn interpret_serious_injury_roll_decay(
         &self,
         game: &Game,
-        ctx: &InjuryContext,
+        ctx: &mut InjuryContext,
         use_decay: bool,
     ) -> Option<SeriousInjuryKind>;
 
@@ -182,8 +182,8 @@ mod tests {
         fn roll_casualty(&self, rng: &mut GameRng) -> [i32; 2] { [rng.die(16), rng.d6()] }
         fn interpret_injury_roll(&self, _g: &Game, _c: &mut InjuryContext) -> Option<PlayerState> { None }
         fn interpret_casualty_roll_and_add_modifiers(&self, _g: &Game, _c: &mut InjuryContext, _d: &Player, _dec: bool) -> Option<PlayerState> { None }
-        fn interpret_serious_injury_roll(&self, _g: &Game, _c: &InjuryContext) -> Option<SeriousInjuryKind> { None }
-        fn interpret_serious_injury_roll_decay(&self, _g: &Game, _c: &InjuryContext, _u: bool) -> Option<SeriousInjuryKind> { None }
+        fn interpret_serious_injury_roll(&self, _g: &Game, _c: &mut InjuryContext) -> Option<SeriousInjuryKind> { None }
+        fn interpret_serious_injury_roll_decay(&self, _g: &Game, _c: &mut InjuryContext, _u: bool) -> Option<SeriousInjuryKind> { None }
         fn interpret_serious_injury_roll_explicit(&self, _g: &Game, _c: &InjuryContext, _r: [i32; 2]) -> Option<SeriousInjuryKind> { None }
         fn multi_block_attacker_modifier(&self) -> i32 { -2 }
         fn multi_block_defender_modifier(&self) -> i32 { 0 }

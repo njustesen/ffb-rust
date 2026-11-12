@@ -92,8 +92,10 @@ impl StepApothecary {
         // BB2016 runs this shared step but has NO pre-regeneration block: bb2016 StepApothecary
         // asks for the apothecary first (DO_REQUEST reports the injury; a decline reports the
         // apothecary roll) and rolls Regeneration in the default branch AFTER applyTo (line 245),
-        // handled in the tail below.
-        if pre_regen && game.rules == ffb_model::enums::Rules::Bb2016 {
+        // handled in the tail below. BB2020 is the same shape: bb2020 StepApothecary.executeStep
+        // has no pre-regeneration block either — DO_REQUEST / NO_APOTHECARY report the injury,
+        // then the default branch does applyTo and handleRegeneration (bb2020 StepApothecary:254-273).
+        if pre_regen && game.rules != ffb_model::enums::Rules::Bb2025 {
             if let Some(ir) = self.injury_result.as_mut() { ir.passed_regeneration(); }
         } else if pre_regen {
             if game.rules == ffb_model::enums::Rules::Bb2025 {
@@ -262,11 +264,12 @@ impl StepApothecary {
                     if let Some(ir) = self.injury_result.as_ref() {
                         ir.apply_to(game);
                     }
-                    // bb2020/bb2025 roll Regeneration in the pre-regeneration block at the top of
-                    // this method; bb2016 rolls it HERE, after applyTo (bb2016 StepApothecary:242-258):
+                    // bb2025 rolls Regeneration in the pre-regeneration block at the top of this
+                    // method; bb2016 and bb2020 roll it HERE, after applyTo (bb2016
+                    // StepApothecary:242-258, bb2020 StepApothecary:254-273):
                     //     if (playerState.isCasualty() && canRollToSaveFromInjury && canUseApo())
                     //         if (!handleRegeneration(this, player)) { Igor offer } else curePoison();
-                    if game.rules == ffb_model::enums::Rules::Bb2016 {
+                    if game.rules != ffb_model::enums::Rules::Bb2025 {
                         let (defender_id, can_use_apo) = self.injury_result.as_ref()
                             .map(|ir| (ir.injury_context.defender_id.clone(), ir.injury_context.can_use_apo))
                             .unwrap_or((None, false));
