@@ -182,12 +182,23 @@ impl StepHailMaryPass {
         // Java: AbstractStepWithReRoll retry contract — if a reroll was granted for this step's
         // own action key (e.g. TheBallista's handleCommandHook), consuming it successfully forces
         // a genuine second roll instead of reusing the cached one.
+        // Java PassBehaviour(bb2025) :111-127 — `doRoll` is false for a declined (source null) or
+        // unusable re-roll; a spent one rolls fresh and `step.setReRollSource(null)`, so the
+        // second ReportPassRoll carries reRolled=false like the first (elf bb2025 seed 5).
+        let mut do_roll = true;
         if self.re_rolled_action.as_deref() == Some(REROLLED_ACTION_PASS) {
             if let Some(source_name) = self.re_roll_source.clone() {
                 let thrower_id_for_reroll = game.thrower_id.clone().unwrap_or_default();
                 if use_reroll(game, &ReRollSource::new(source_name), &thrower_id_for_reroll, rng) {
                     self.roll = 0;
+                    if game.rules == ffb_model::enums::Rules::Bb2025 {
+                        self.re_roll_source = None;
+                    }
+                } else {
+                    do_roll = false;
                 }
+            } else {
+                do_roll = false;
             }
         }
 
@@ -206,6 +217,7 @@ impl StepHailMaryPass {
         // triple-scattered instead of bouncing at the thrower). ACCURATE converts to INACCURATE
         // (a Hail Mary always deviates); the minimum reported/offered to the reroll dialog is
         // Java :148's explicit `max(2, 2 + distance.mod2020 + sum(mods))`.
+        let mut report_mods: Vec<String> = Vec::new();
         let (raw_result, java_min) = if game.rules == ffb_model::enums::Rules::Bb2016 {
             // Java bb2016 PassBehaviour's StepHailMaryPass hook bypasses the pass mechanic
             // entirely: `state.result = (roll == 1) ? FUMBLE : INACCURATE` — no distance or
@@ -240,6 +252,7 @@ impl StepHailMaryPass {
                         &t, self.roll, PassingDistance::LongBomb, &modifiers, bomb_action);
                     let min = std::cmp::max(2, 2 + PassingDistance::LongBomb.modifier_2020()
                         + modifiers.iter().map(|m| m.get_modifier()).sum::<i32>());
+                    report_mods = modifiers.iter().map(|m| m.get_name().to_string()).collect();
                     (raw, min)
                 }
                 None => (ffb_mechanics::pass_result::PassResult::FUMBLE, self.minimum_roll),
@@ -251,6 +264,32 @@ impl StepHailMaryPass {
             | ffb_mechanics::pass_result::PassResult::SAVED_FUMBLE);
         self.saved_fumble = raw_result == ffb_mechanics::pass_result::PassResult::SAVED_FUMBLE
             || (is_fumble && self.using_safe_pass == Some(true));
+
+        // Java PassBehaviour(bb2025) :152-157: `passState.setResult(result); addReport(new
+        // ReportPassRoll(thrower, roll, minimumRoll, reRolled, modifiers, LONG_BOMB, bombAction,
+        // result, true, statBased))` — written under `doRoll`, BEFORE the fumble re-roll
+        // cascade, so a fumble that is then re-rolled reports BOTH rolls. Rust wrote one report
+        // after the cascade with no distance/result/modifiers (elf bb2025 seed 5).
+        let bb2025_report = game.rules == ffb_model::enums::Rules::Bb2025;
+        if bb2025_report && do_roll {
+            use ffb_mechanics::pass_result::PassResult as PR;
+            let state_result = if raw_result == PR::ACCURATE { PR::INACCURATE } else { raw_result };
+            let re_rolled = self.re_rolled_action.as_deref() == Some(REROLLED_ACTION_PASS)
+                && self.re_roll_source.is_some();
+            game.report_list.add(ReportPassRoll::new(
+                game.thrower_id.clone(),
+                state_result == PR::INACCURATE, // Java: ACCURATE || (hailMary && INACCURATE)
+                self.roll,
+                self.minimum_roll,
+                re_rolled,
+                report_mods.clone(),
+                Some(PassingDistance::LongBomb.name().to_string()),
+                game.thrower_action == Some(ffb_model::enums::PlayerAction::HailMaryBomb),
+                Some(state_result.get_name().to_string()),
+                true,
+                None,
+            ));
+        }
 
         // Java PassBehaviour :159-176 — fumble reroll cascade: the pass-skill re-roll is a
         // DialogSkillUseParameter (the coach may decline!), then the team reroll offer.
@@ -294,7 +333,7 @@ impl StepHailMaryPass {
         });
 
         let re_rolled = self.re_rolled_action.is_some() && self.re_roll_source.is_some();
-        game.report_list.add(ReportPassRoll::new(
+        if !bb2025_report { game.report_list.add(ReportPassRoll::new(
             game.thrower_id.clone(),
             self.roll >= self.minimum_roll,
             self.roll,
@@ -306,7 +345,7 @@ impl StepHailMaryPass {
             None,      // result name
             true,      // hail_mary_pass
             None,      // stat_based_roll_modifier
-        ));
+        )); }
 
         // Java PassBehaviour :188-217 — the ball placement follows the result:
         //   SAVED_FUMBLE → ball at the THROWER, not moving, GOTO;
@@ -503,6 +542,30 @@ mod tests {
         let mut step = StepHailMaryPass::new("fail".into());
         step.roll = 2; // modified 2-3 <= 1 → FUMBLE for the PA2 thrower
         (game, step)
+    }
+
+    /// Java writes the fumbled roll's ReportPassRoll BEFORE the Pass-skill dialog, and the
+    /// re-rolled one after `useReRoll` (reRolled=false — the source is cleared first), each with
+    /// LONG_BOMB and its result (elf bb2025 seed 5).
+    #[test]
+    fn a_rerolled_hmp_fumble_reports_both_rolls() {
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, mut step) = fumbled_hmp_with_pass_thrower();
+        let mut rng = GameRng::new(7);
+        step.start(&mut game, &mut rng);
+        step.handle_command(&crate::action::Action::UseSkill {
+            skill_id: SkillId::Pass, use_skill: true,
+        }, &mut game, &mut rng);
+        let reports: Vec<serde_json::Value> = game.report_list.get_reports().iter()
+            .filter(|r| matches!(r.get_id(), ReportId::PASS_ROLL | ReportId::RE_ROLL))
+            .filter_map(|r| r.to_json()).collect();
+        let ids: Vec<&str> = reports.iter().map(|j| j["reportId"].as_str().unwrap()).collect();
+        assert_eq!(ids, vec!["passRoll", "reRoll", "passRoll"]);
+        for j in [&reports[0], &reports[2]] {
+            assert_eq!(j["passingDistance"], "Long Bomb");
+            assert_eq!(j["reRolled"], false);
+            assert!(j["passResult"].is_string());
+        }
     }
 
     /// Java PassBehaviour shows a DialogSkillUseParameter for the fumbled HMP's Pass-skill
