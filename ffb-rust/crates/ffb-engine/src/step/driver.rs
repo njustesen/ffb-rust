@@ -440,6 +440,15 @@ pub fn make_step_for(id: StepId, rules: Rules) -> Box<dyn Step> {
             // BB2016 StepSpectators rolls 2D6 per team (spectators + fame via ReportSpectators),
             // vs the mixed BB2020+ single-D3 fan-factor (bb2016 amazon seed 1 pregame divergence).
             StepId::Spectators => return Box::new(crate::step::bb2016::start::StepSpectators::new()),
+            // BB2016 pregame (BACKLOG §I.9). Java bb2016/StartGame runs PETTY_CASH → BUY_CARDS →
+            // BUY_INDUCEMENTS from `server.step.bb2016.start.*`. The shared table routes PettyCash
+            // to the mixed (bb2020+) step, which never reports `pettyCash`, and BuyInducements to
+            // the bb2025 step, which pushes its OWN Kickoff + Prayers on top of the one bb2016
+            // StepSpectators pushes (two kickoffs). Both bb2016 twins were translated 1:1 and dead.
+            StepId::PettyCash =>
+                return Box::new(crate::step::bb2016::start::step_petty_cash::StepPettyCash::new()),
+            StepId::BuyInducements =>
+                return Box::new(crate::step::bb2016::start::step_buy_inducements::StepBuyInducements::new()),
             // BB2016 has its own kickoff path: the "Changing Weather → Nice" gust scatters the ball
             // exactly ONE square (bb2020+/bb2025 scatter up to three, with a different bounds check),
             // and the kickoff bounds + catch/scatter/throw-in flow differ. Route the whole bb2016
@@ -710,12 +719,14 @@ impl DriverGameState {
     /// flattened, PettyCash/BuyInducements-skipping pregame (`InitStartGame` → `Spectators`
     /// → `Weather` → `CoinChoice` → `ReceiveChoice` → `InitKickoff` → ... directly).
     ///
-    /// `new`/`new_with_options` deliberately keep the flattened sequence — it's what the
-    /// Java-parity RNG contract (`AGENT_CONTRACT.md`) and `RandomAgent` were built and
-    /// verified against, and changing dice/prompt ordering there would desync byte-for-byte
-    /// parity tests. This constructor exists for callers that need the *real* pregame flow
-    /// (petty cash + inducement purchasing actually reachable) and don't need Java-parity
-    /// RNG-stream sync — e.g. `UniformAgent`-driven mechanic-coverage runs.
+    /// This is the PARITY constructor (BACKLOG §I.9, 2026-11-12): Java's headless game runs the
+    /// real edition pregame, so the parity harness does too. Petty cash and the purchase phase
+    /// consume no dice when nothing is bought (both harnesses decline every purchase), and the
+    /// BB2020/BB2025 buy step pushes the same certified opening kickoff the flattened sequence
+    /// ran (`sequences::opening_kickoff_sequence_for`), so the step stream is unchanged while the
+    /// report stream gains Java's `pettyCash` / `cardsBought` / `*InducementsBought` /
+    /// `freePettyCash` reports. `new`/`new_with_options` keep the flattened sequence for the
+    /// remaining non-parity callers.
     pub fn new_full_pregame(home: Team, away: Team, rules: Rules, seed: u64, options: &[(&str, &str)]) -> Self {
         let mut game = Game::new(home, away, rules);
         for (key, value) in options { game.options.set(*key, *value); }

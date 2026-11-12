@@ -40,6 +40,7 @@ use ffb_model::model::special_rule::SpecialRule;
 use ffb_model::option::game_option_id::{
     INDUCEMENTS, FREE_INDUCEMENT_CASH, USE_PREDEFINED_INDUCEMENTS,
     INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV, INDUCEMENTS_ALLOW_OVERDOG_SPENDING,
+    INDUCEMENTS_ALWAYS_USE_TREASURY,
 };
 use ffb_model::option::util_game_option::{is_option_enabled, get_int_option};
 use ffb_model::prompts::AgentPrompt;
@@ -51,9 +52,12 @@ use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::generator::common::inducement::{Inducement, InducementParams};
 use crate::step::generator::common::riotous_rookies::RiotousRookies;
 use crate::step::generator::sequence::SequenceStep;
-use crate::step::generator::mixed::kickoff::{Kickoff, KickoffParams};
 use crate::step::game::start::util_inducement_catalog::{apply_purchases, available_list};
-use crate::step::game::start::util_inducement_sequence::UtilInducementSequence;
+use crate::step::game::start::util_minimum_inducement_cost::minimum_inducement_cost;
+
+/// Java: `StepBuyInducements.MAX_UNDERDOG_ALLOWANCE` — the most treasury an underdog may add to
+/// its petty cash.
+pub const MAX_UNDERDOG_ALLOWANCE: i32 = 50_000;
 
 /// Java `StepBuyInducements.leaveStep`: grant the special-rule / skill-derived inducements that
 /// exist regardless of any purchase — Bribery and Corruption (special rule → REROLL_ARGUE) and
@@ -100,6 +104,10 @@ pub struct StepBuyInducements {
     pub used_inducement_gold_home: i32,
     /// Java: usedInducementGoldAway (Integer, init 0)
     pub used_inducement_gold_away: i32,
+    /// Java: transient pettyCash (the dialog's petty-cash share, set by getAvailableGold)
+    pub petty_cash: i32,
+    /// Java: transient treasury (the dialog's treasury share, set by getAvailableGold)
+    pub treasury: i32,
     /// Java: parallel
     pub parallel: bool,
     /// Java: phase (Phase private enum: INIT/HOME/AWAY/DONE) — stored as name
@@ -111,6 +119,10 @@ pub struct StepBuyInducements {
     /// Java: buyInducementCommands (List<ClientCommandBuyInducements>) — stored as JSON blobs.
     /// Unused in this translation: parallel-mode buffering is not implemented (see module docs).
     pub buy_inducement_commands: Vec<String>,
+    /// The dialog `showDialog` opened and that is still waiting for its answer:
+    /// (home?, availableGold). Java hands it to `UtilServerDialog.showDialog`; here it becomes
+    /// the step's prompt.
+    dialog: Option<(bool, i32)>,
 }
 
 impl StepBuyInducements {
@@ -120,16 +132,20 @@ impl StepBuyInducements {
             available_inducement_gold_away: None,
             used_inducement_gold_home: 0,
             used_inducement_gold_away: 0,
+            petty_cash: 0,
+            treasury: 0,
             parallel: false,
             phase_name: "INIT".to_string(),
             prayers_bought_home: 0,
             prayers_bought_away: 0,
             buy_inducement_commands: Vec::new(),
+            dialog: None,
         }
     }
 
     /// Java: `executeStep()` — main state machine dispatch.
     fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
+        self.dialog = None;
         match self.phase_name.as_str() {
             "INIT" => self.init(game),
             "HOME" | "AWAY" => self.swap_team(game),
@@ -142,84 +158,127 @@ impl StepBuyInducements {
         self.build_prompt(game)
     }
 
-    /// Java: `getAvailableGold(int, boolean, boolean)`, simplified: `petty_cash_from_tv_diff`
-    /// (0 for the overdog) plus free cash, plus treasury when overdog spending is allowed.
-    fn budget_for(game: &Game, home: bool, free_cash: i32, allow_overdog: bool) -> i32 {
-        let petty = if home {
-            game.game_result.home.petty_cash_from_tv_diff
-        } else {
-            game.game_result.away.petty_cash_from_tv_diff
-        };
-        let treasury = if home { game.team_home.treasury } else { game.team_away.treasury };
-        petty + free_cash + if allow_overdog { treasury } else { 0 }
-    }
-
-    /// Java: `init(Game game)` — determine who has petty cash and set initial phase.
+    /// Java: `init(Game game)`. The team that does NOT receive petty cash (the overdog) is asked
+    /// first, from its treasury when overdog spending is allowed; with equal team values and
+    /// no reason to spend, the phase is DONE without any dialog.
     fn init(&mut self, game: &mut Game) {
-        // Java: if (!INDUCEMENTS) → phase = DONE
-        // Java: if (USE_PREDEFINED_INDUCEMENTS) → apply predefined sets, skip dialog
-        // no-op: InducementTypeFactory not ported — headless auto-skips inducement dialog
-        if !is_option_enabled(game, INDUCEMENTS) || is_option_enabled(game, USE_PREDEFINED_INDUCEMENTS) {
+        if !is_option_enabled(game, INDUCEMENTS) {
             self.phase_name = "DONE".into();
-            self.available_inducement_gold_home = Some(0);
-            self.available_inducement_gold_away = Some(0);
+            return;
+        }
+        // Java: USE_PREDEFINED_INDUCEMENTS applies the teams' predefined sets and goes DONE.
+        // no-op: predefined sets are not modelled (see module docs); DONE without a dialog.
+        if is_option_enabled(game, USE_PREDEFINED_INDUCEMENTS) {
+            self.phase_name = "DONE".into();
             return;
         }
 
         let free_cash = get_int_option(game, FREE_INDUCEMENT_CASH);
-        let petty_home = game.game_result.home.petty_cash_from_tv_diff;
-        let petty_away = game.game_result.away.petty_cash_from_tv_diff;
-        let allow_even_ctv = is_option_enabled(game, INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV)
-            || free_cash > 0;
-        let allow_overdog = is_option_enabled(game, INDUCEMENTS_ALLOW_OVERDOG_SPENDING);
+        let allow_inducements_on_even_ctv =
+            is_option_enabled(game, INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV) || free_cash > 0;
+        let mut same_tv = false;
 
-        if petty_home > 0 {
-            self.phase_name = "HOME".into();
-            self.available_inducement_gold_home = Some(Self::budget_for(game, true, free_cash, allow_overdog));
-        } else if petty_away > 0 {
+        let overdog_home = if game.game_result.home.petty_cash_from_tv_diff > 0 {
             self.phase_name = "AWAY".into();
-            self.available_inducement_gold_away = Some(Self::budget_for(game, false, free_cash, allow_overdog));
-        } else if allow_even_ctv {
+            false
+        } else if game.game_result.away.petty_cash_from_tv_diff > 0 {
+            self.phase_name = "HOME".into();
+            true
+        } else if allow_inducements_on_even_ctv {
             self.phase_name = "HOME".into();
             self.parallel = true;
-            self.available_inducement_gold_home = Some(game.team_home.treasury + free_cash);
-            self.available_inducement_gold_away = Some(game.team_away.treasury + free_cash);
+            same_tv = true;
+            true
         } else {
+            self.phase_name = "DONE".into();
             self.available_inducement_gold_home = Some(0);
             self.available_inducement_gold_away = Some(0);
+            return;
+        };
+
+        let allow_overdog_spending = is_option_enabled(game, INDUCEMENTS_ALLOW_OVERDOG_SPENDING);
+        if !self.show_dialog(game, overdog_home, free_cash, true, allow_overdog_spending || same_tv) {
+            self.swap_team(game);
+        }
+    }
+
+    /// Java: `getAvailableGold(int freeCash, boolean useUnlimitedTreasury, boolean allowSpending)`
+    /// for the team whose phase is active. Sets the transient `petty_cash` / `treasury` split the
+    /// dialog carries, and records the team's available gold.
+    fn get_available_gold(&mut self, game: &Game, free_cash: i32, use_unlimited_treasury: bool,
+                          allow_spending: bool) -> i32 {
+        let home = self.phase_name == "HOME";
+        let (team_treasury, petty_from_tv_diff, other_used) = if home {
+            (game.team_home.treasury, game.game_result.home.petty_cash_from_tv_diff, self.used_inducement_gold_away)
+        } else {
+            (game.team_away.treasury, game.game_result.away.petty_cash_from_tv_diff, self.used_inducement_gold_home)
+        };
+        let available = if allow_spending {
+            if use_unlimited_treasury {
+                self.treasury = free_cash + team_treasury;
+                self.petty_cash = 0;
+                self.treasury
+            } else {
+                self.petty_cash = (other_used - free_cash).max(0) + petty_from_tv_diff + free_cash;
+                self.treasury = MAX_UNDERDOG_ALLOWANCE.min(team_treasury);
+                self.petty_cash + self.treasury
+            }
+        } else {
+            self.petty_cash = 0;
+            self.treasury = 0;
+            0
+        };
+        if home {
+            self.available_inducement_gold_home = Some(available);
+        } else {
+            self.available_inducement_gold_away = Some(available);
+        }
+        available
+    }
+
+    /// Java: `showDialog(Team, freeCash, usesUnlimitedTreasury, allowSpending)` — computes the
+    /// team's gold and opens its dialog when it can afford the cheapest inducement.
+    fn show_dialog(&mut self, game: &Game, home: bool, free_cash: i32, uses_unlimited_treasury: bool,
+                   allow_spending: bool) -> bool {
+        let available_gold = self.get_available_gold(game, free_cash, uses_unlimited_treasury, allow_spending);
+        let team = if home { &game.team_home } else { &game.team_away };
+        let can_buy_inducements = minimum_inducement_cost(game, team) <= available_gold;
+        if can_buy_inducements {
+            self.dialog = Some((home, available_gold));
+            return true;
+        }
+        false
+    }
+
+    /// Java: `swapTeam()` — move to the team that has not been visited yet and show its dialog,
+    /// or go DONE once both have been (or the second team cannot afford anything).
+    fn swap_team(&mut self, game: &Game) {
+        let home = if self.phase_name == "HOME" && self.available_inducement_gold_away.is_none() {
+            self.phase_name = "AWAY".into();
+            false
+        } else if self.phase_name == "AWAY" && self.available_inducement_gold_home.is_none() {
+            self.phase_name = "HOME".into();
+            true
+        } else {
+            self.phase_name = "DONE".into();
+            return;
+        };
+        let free_cash = get_int_option(game, FREE_INDUCEMENT_CASH);
+        let unlimited = self.parallel || is_option_enabled(game, INDUCEMENTS_ALWAYS_USE_TREASURY);
+        if !self.show_dialog(game, home, free_cash, unlimited, true) {
             self.phase_name = "DONE".into();
         }
     }
 
-    /// Java: `swapTeam()` — move to the next team (computing its budget on first visit) or DONE.
-    fn swap_team(&mut self, game: &Game) {
-        let free_cash = get_int_option(game, FREE_INDUCEMENT_CASH);
-        let allow_overdog = is_option_enabled(game, INDUCEMENTS_ALLOW_OVERDOG_SPENDING);
-        match self.phase_name.as_str() {
-            "HOME" if self.available_inducement_gold_away.is_none() => {
-                self.phase_name = "AWAY".into();
-                self.available_inducement_gold_away = Some(Self::budget_for(game, false, free_cash, allow_overdog));
-            }
-            "AWAY" if self.available_inducement_gold_home.is_none() => {
-                self.phase_name = "HOME".into();
-                self.available_inducement_gold_home = Some(Self::budget_for(game, true, free_cash, allow_overdog));
-            }
-            _ => {
-                self.phase_name = "DONE".into();
-            }
-        }
-    }
-
-    /// Java: `showDialog(Team, ...)` — builds the `DialogBuyPrayersAndInducementsParameter`
-    /// for whichever team's phase is active.
+    /// The open `DialogBuyPrayersAndInducementsParameter` as a prompt. Its budget is the
+    /// dialog's `availableGold`.
     fn build_prompt(&self, game: &Game) -> StepOutcome {
-        let home = self.phase_name == "HOME";
-        let team = if home { &game.team_home } else { &game.team_away };
-        let budget = if home {
-            self.available_inducement_gold_home.unwrap_or(0) - self.used_inducement_gold_home
-        } else {
-            self.available_inducement_gold_away.unwrap_or(0) - self.used_inducement_gold_away
+        let (home, budget) = match self.dialog {
+            Some(d) => d,
+            // Java never leaves executeStep in HOME/AWAY without an open dialog.
+            None => return StepOutcome::cont(),
         };
+        let team = if home { &game.team_home } else { &game.team_away };
         let catalog = &BB2025_INDUCEMENTS.inducements;
         let full = available_list(catalog, team);
         let (prayers, available): (Vec<_>, Vec<_>) = full.into_iter().partition(|(id, _)| id == "prayers");
@@ -229,6 +288,30 @@ impl StepBuyInducements {
             prayers,
             budget,
         })
+    }
+
+    /// Java: `generateReport(Team, gold, newTv, boughtPrayers)`.
+    fn generate_report(game: &Game, home: bool, gold: i32, new_tv: i32, bought_prayers: i32)
+        -> ReportPrayersAndInducementsBought
+    {
+        let (team_id, inducement_set) = if home {
+            (game.team_home.id.clone(), &game.turn_data_home.inducement_set)
+        } else {
+            (game.team_away.id.clone(), &game.turn_data_away.inducement_set)
+        };
+        let mut nr_of_inducements = bought_prayers;
+        let mut nr_of_stars = 0;
+        let mut nr_of_mercenaries = 0;
+        for inducement in inducement_set.get_inducements() {
+            if inducement.has_usage(Usage::STAR) {
+                nr_of_stars = inducement.get_value();
+            } else if inducement.has_usage(Usage::LONER) {
+                nr_of_mercenaries = inducement.get_value();
+            } else {
+                nr_of_inducements += inducement.get_value();
+            }
+        }
+        ReportPrayersAndInducementsBought::new(team_id, nr_of_inducements, nr_of_stars, nr_of_mercenaries, gold, new_tv)
     }
 
     /// Java: `handleTeamInducements(TurnData, Team, ClientCommandBuyInducements, int)` —
@@ -288,15 +371,18 @@ impl StepBuyInducements {
         let new_tv_away = game.team_away.team_value + self.used_inducement_gold_away;
 
         if self.parallel {
-            game.report_list.add(ReportPrayersAndInducementsBought::new(
-                game.team_home.id.clone(), 0, 0, 0, self.used_inducement_gold_home, new_tv_home,
-            ));
-            game.report_list.add(ReportPrayersAndInducementsBought::new(
-                game.team_away.id.clone(), 0, 0, 0, self.used_inducement_gold_away, new_tv_away,
-            ));
+            let report = Self::generate_report(game, true, self.used_inducement_gold_home, new_tv_home,
+                self.prayers_bought_home);
+            game.report_list.add(report);
+            let report = Self::generate_report(game, false, self.used_inducement_gold_away, new_tv_away,
+                self.prayers_bought_away);
+            game.report_list.add(report);
         }
 
-        let seq_kickoff = Kickoff::build_sequence(&KickoffParams { with_coin_choice: true });
+        // Java: `Kickoff.pushSequence(new Kickoff.SequenceParams(gameState, true))` — the
+        // game-opening kickoff with the coin toss, in the certified form (see
+        // `sequences::opening_kickoff_sequence_for`).
+        let seq_kickoff = crate::step::sequences::opening_kickoff_sequence_for(game.rules);
         let (first_home, second_home) = if new_tv_home > new_tv_away { (true, false) } else { (false, true) };
         let seq_first = Inducement::build_sequence(&InducementParams {
             inducement_phase: InducementPhase::AfterInducementsPurchased,
@@ -312,8 +398,21 @@ impl StepBuyInducements {
         // Java: `Sequence prayerSequence = new Sequence(...); prayerSequence.add(StepId.PRAYERS);`
         let seq_prayers = vec![SequenceStep::new(StepId::Prayers)];
 
-        game.game_result.home.petty_cash_used = UtilInducementSequence::calculate_inducement_gold(Some(game), true);
-        game.game_result.away.petty_cash_used = UtilInducementSequence::calculate_inducement_gold(Some(game), false);
+        // Java: treasury / petty-cash bookkeeping. A team without petty cash (or when the treasury
+        // is always used) spent its treasury; the underdog splits its spend via
+        // setUnderDogCashValues.
+        let always_use_treasury = is_option_enabled(game, INDUCEMENTS_ALWAYS_USE_TREASURY);
+        let free_cash = get_int_option(game, FREE_INDUCEMENT_CASH);
+        if game.game_result.home.petty_cash_from_tv_diff == 0 || always_use_treasury {
+            game.game_result.home.treasury_spent_on_inducements = (self.used_inducement_gold_home - free_cash).max(0);
+        } else {
+            self.set_under_dog_cash_values(game, true, free_cash);
+        }
+        if game.game_result.away.petty_cash_from_tv_diff == 0 || always_use_treasury {
+            game.game_result.away.treasury_spent_on_inducements = (self.used_inducement_gold_away - free_cash).max(0);
+        } else {
+            self.set_under_dog_cash_values(game, false, free_cash);
+        }
 
         grant_special_rule_inducements(game);
 
@@ -330,6 +429,23 @@ impl StepBuyInducements {
             .push_seq(seq_riotous)
             .push_seq(seq_prayers)
     }
+
+    /// Java: `setUnderDogCashValues(TeamResult, usedInducementGold, availableInducementGold,
+    /// freeCash)`. Uses the transient `treasury` share of the last dialog shown, as Java does.
+    fn set_under_dog_cash_values(&self, game: &mut Game, home: bool, free_cash: i32) {
+        let (used, available) = if home {
+            (self.used_inducement_gold_home, self.available_inducement_gold_home.unwrap_or(0))
+        } else {
+            (self.used_inducement_gold_away, self.available_inducement_gold_away.unwrap_or(0))
+        };
+        let unspent = available - used;
+        let unspent_allowance = unspent.min(self.treasury);
+        let treasury_spent = self.treasury - unspent_allowance;
+        let used_petty_cash = used - treasury_spent - free_cash;
+        let result = if home { &mut game.game_result.home } else { &mut game.game_result.away };
+        result.treasury_spent_on_inducements = treasury_spent;
+        result.petty_cash_used = used_petty_cash.min(available - free_cash);
+    }
 }
 
 impl Default for StepBuyInducements {
@@ -344,11 +460,21 @@ impl Step for StepBuyInducements {
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // Java: CLIENT_BUY_INDUCEMENTS → handleBuyInducements (or buffer, in parallel mode).
+        // Java: CLIENT_BUY_INDUCEMENTS → handleBuyInducements, then (not parallel) report this
+        // team's purchase straight away: `addReport(generateReport(team, used, newTv, prayers))`.
         // headless: parallel-mode buffering not implemented — see module docs.
         let mut events = Vec::new();
         if let Action::BuyInducements { home, purchases } = action {
             events = self.apply_purchase(game, *home, purchases);
+            if !self.parallel {
+                let (used, prayers, team_value) = if *home {
+                    (self.used_inducement_gold_home, self.prayers_bought_home, game.team_home.team_value)
+                } else {
+                    (self.used_inducement_gold_away, self.prayers_bought_away, game.team_away.team_value)
+                };
+                let report = Self::generate_report(game, *home, used, team_value + used, prayers);
+                game.report_list.add(report);
+            }
         }
         let mut out = self.execute_step(game);
         for ev in events { out = out.with_event(ev); }
@@ -413,20 +539,43 @@ mod tests {
         assert_eq!(step.available_inducement_gold_away, Some(0));
     }
 
+    fn answer(step: &mut StepBuyInducements, game: &mut Game, home: bool,
+              purchases: Vec<InducementPurchase>) -> StepOutcome {
+        step.handle_command(&Action::BuyInducements { home, purchases }, game, &mut GameRng::new(0))
+    }
+
+    /// Java `init`: the team WITHOUT petty cash (the overdog) is asked first, from its treasury
+    /// (overdog spending is allowed by default, `useUnlimitedTreasury = true`).
     #[test]
-    fn home_underdog_shows_prompt_for_home_first() {
-        use ffb_model::option::game_option_id::INDUCEMENTS;
+    fn overdog_is_asked_first_from_its_treasury() {
         let mut game = make_game_with_petty_cash(100_000, 0);
-        game.options.set(INDUCEMENTS, "true");
+        game.team_away.treasury = 30_000;
         let mut step = StepBuyInducements::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(step.phase_name, "HOME");
+        assert_eq!(step.phase_name, "AWAY");
         match out.prompt {
             Some(AgentPrompt::BuyPrayersAndInducements { team_id, budget, .. }) => {
-                assert_eq!(team_id, "home");
-                assert_eq!(budget, 100_000);
+                assert_eq!(team_id, "away");
+                assert_eq!(budget, 30_000);
             }
             other => panic!("expected BuyPrayersAndInducements prompt, got {other:?}"),
+        }
+    }
+
+    /// Java `minimumInducementCost` is 0 (the INDUCEMENT_DUMMY-priced types), so even an overdog
+    /// with no treasury at all is shown its dialog — Java reports a purchase for both teams in
+    /// every unequal-TV parity game.
+    #[test]
+    fn overdog_with_no_gold_is_still_shown_its_dialog() {
+        let mut game = make_game_with_petty_cash(5_000, 0);
+        let mut step = StepBuyInducements::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        match out.prompt {
+            Some(AgentPrompt::BuyPrayersAndInducements { team_id, budget, .. }) => {
+                assert_eq!(team_id, "away");
+                assert_eq!(budget, 0);
+            }
+            other => panic!("expected the overdog's dialog, got {other:?}"),
         }
     }
 
@@ -447,84 +596,86 @@ mod tests {
         }
     }
 
+    /// Java `getAvailableGold` for the underdog: max(overdogSpend - freeCash, 0) + its petty cash
+    /// from the TV difference + freeCash, plus at most MAX_UNDERDOG_ALLOWANCE of its treasury.
     #[test]
-    fn away_gets_prompted_after_home_submits() {
-        use ffb_model::option::game_option_id::INDUCEMENTS;
+    fn underdog_is_asked_second_with_petty_cash_plus_capped_treasury() {
         let mut game = make_game_with_petty_cash(100_000, 0);
-        game.options.set(INDUCEMENTS, "true");
+        game.team_home.treasury = 80_000;
         let mut step = StepBuyInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
-        let out = step.handle_command(
-            &Action::BuyInducements { home: true, purchases: vec![] },
-            &mut game,
-            &mut GameRng::new(0),
-        );
-        assert_eq!(step.phase_name, "AWAY");
+        let out = answer(&mut step, &mut game, false, vec![]);
+        assert_eq!(step.phase_name, "HOME");
         match out.prompt {
-            Some(AgentPrompt::BuyPrayersAndInducements { team_id, .. }) => assert_eq!(team_id, "away"),
-            other => panic!("expected BuyPrayersAndInducements prompt for away, got {other:?}"),
+            Some(AgentPrompt::BuyPrayersAndInducements { team_id, budget, .. }) => {
+                assert_eq!(team_id, "home");
+                assert_eq!(budget, 100_000 + MAX_UNDERDOG_ALLOWANCE);
+            }
+            other => panic!("expected BuyPrayersAndInducements prompt for home, got {other:?}"),
         }
+    }
+
+    /// Java `handleCommand` (not parallel): each answer is reported immediately, so the overdog's
+    /// report precedes the underdog's, and Bribery and Corruption comes after both (leaveStep).
+    #[test]
+    fn each_answer_is_reported_in_answer_order() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game_with_petty_cash(5_000, 0);
+        game.team_home.team_value = 1_095_000;
+        game.team_away.team_value = 1_100_000;
+        game.team_home.special_rules.push("Bribery and Corruption".into());
+        let mut step = StepBuyInducements::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        answer(&mut step, &mut game, false, vec![]);
+        let out = answer(&mut step, &mut game, true, vec![]);
+        assert_eq!(out.action, StepAction::NextStep);
+        let reports = game.report_list.get_reports();
+        let ids: Vec<ReportId> = reports.iter().map(|r| r.get_id()).collect();
+        assert_eq!(ids, vec![
+            ReportId::PRAYERS_AND_INDUCEMENTS_BOUGHT,
+            ReportId::PRAYERS_AND_INDUCEMENTS_BOUGHT,
+            ReportId::BRIBERY_AND_CORRUPTION_RE_ROLL,
+        ]);
+        let first = reports[0].to_json().unwrap();
+        assert_eq!(first["teamId"], "away");
+        assert_eq!(first["gold"], 0);
+        assert_eq!(first["teamValue"], 1_100_000);
+        let second = reports[1].to_json().unwrap();
+        assert_eq!(second["teamId"], "home");
+        assert_eq!(second["teamValue"], 1_095_000);
     }
 
     #[test]
     fn both_sides_submitting_advances_to_next_step() {
-        use ffb_model::option::game_option_id::INDUCEMENTS;
         let mut game = make_game_with_petty_cash(200_000, 0);
-        game.options.set(INDUCEMENTS, "true");
         let mut step = StepBuyInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
-        step.handle_command(
-            &Action::BuyInducements {
-                home: true,
-                purchases: vec![InducementPurchase { id: "bribes".into(), count: 1 }],
-            },
-            &mut game,
-            &mut GameRng::new(0),
-        );
-        let out = step.handle_command(
-            &Action::BuyInducements { home: false, purchases: vec![] },
-            &mut game,
-            &mut GameRng::new(0),
-        );
+        answer(&mut step, &mut game, false, vec![]);
+        let out = answer(&mut step, &mut game, true,
+            vec![InducementPurchase { id: "bribes".into(), count: 1 }]);
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(game.team_home.bribes, 1);
     }
 
     #[test]
     fn purchase_deducts_treasury_and_tracks_used_gold() {
-        use ffb_model::option::game_option_id::INDUCEMENTS;
         let mut game = make_game_with_petty_cash(200_000, 0);
-        game.options.set(INDUCEMENTS, "true");
         game.team_home.treasury = 500_000;
         let mut step = StepBuyInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
-        step.handle_command(
-            &Action::BuyInducements {
-                home: true,
-                purchases: vec![InducementPurchase { id: "bribes".into(), count: 1 }],
-            },
-            &mut game,
-            &mut GameRng::new(0),
-        );
+        answer(&mut step, &mut game, false, vec![]);
+        answer(&mut step, &mut game, true, vec![InducementPurchase { id: "bribes".into(), count: 1 }]);
         assert_eq!(game.team_home.treasury, 400_000);
         assert_eq!(step.used_inducement_gold_home, 100_000);
     }
 
     #[test]
     fn prayers_purchase_tracked_separately_from_inducement_set() {
-        use ffb_model::option::game_option_id::INDUCEMENTS;
         let mut game = make_game_with_petty_cash(200_000, 0);
-        game.options.set(INDUCEMENTS, "true");
         let mut step = StepBuyInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
-        step.handle_command(
-            &Action::BuyInducements {
-                home: true,
-                purchases: vec![InducementPurchase { id: "prayers".into(), count: 2 }],
-            },
-            &mut game,
-            &mut GameRng::new(0),
-        );
+        answer(&mut step, &mut game, false, vec![]);
+        answer(&mut step, &mut game, true, vec![InducementPurchase { id: "prayers".into(), count: 2 }]);
         assert_eq!(step.prayers_bought_home, 2);
         assert!(game.turn_data_home.inducement_set.get("prayers").is_none());
         assert_eq!(step.used_inducement_gold_home, 200_000);
@@ -532,47 +683,39 @@ mod tests {
 
     #[test]
     fn prayers_purchase_clamped_to_max_count() {
-        use ffb_model::option::game_option_id::INDUCEMENTS;
         let mut game = make_game_with_petty_cash(1_000_000, 0);
-        game.options.set(INDUCEMENTS, "true");
         let mut step = StepBuyInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
-        step.handle_command(
-            &Action::BuyInducements {
-                home: true,
-                purchases: vec![InducementPurchase { id: "prayers".into(), count: 10 }],
-            },
-            &mut game,
-            &mut GameRng::new(0),
-        );
+        answer(&mut step, &mut game, false, vec![]);
+        answer(&mut step, &mut game, true, vec![InducementPurchase { id: "prayers".into(), count: 10 }]);
         // prayers max_count is 3.
         assert_eq!(step.prayers_bought_home, 3);
     }
 
     #[test]
     fn leave_step_publishes_prayers_bought_parameters() {
-        use ffb_model::option::game_option_id::INDUCEMENTS;
         let mut game = make_game_with_petty_cash(200_000, 0);
-        game.options.set(INDUCEMENTS, "true");
         let mut step = StepBuyInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
-        step.handle_command(
-            &Action::BuyInducements {
-                home: true,
-                purchases: vec![InducementPurchase { id: "prayers".into(), count: 1 }],
-            },
-            &mut game,
-            &mut GameRng::new(0),
-        );
-        let out = step.handle_command(
-            &Action::BuyInducements { home: false, purchases: vec![] },
-            &mut game,
-            &mut GameRng::new(0),
-        );
+        answer(&mut step, &mut game, false, vec![]);
+        let out = answer(&mut step, &mut game, true,
+            vec![InducementPurchase { id: "prayers".into(), count: 1 }]);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::PrayersBoughtHome(1))));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::PrayersBoughtAway(0))));
     }
 
+    /// The pushed kickoff is the certified game-opening kickoff (coin toss first).
+    #[test]
+    fn leave_step_pushes_the_opening_kickoff_with_the_coin_toss() {
+        let mut game = make_game_with_petty_cash(5_000, 0);
+        let mut step = StepBuyInducements::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        answer(&mut step, &mut game, false, vec![]);
+        let out = answer(&mut step, &mut game, true, vec![]);
+        let kickoff = &out.pushes[0];
+        assert_eq!(kickoff[0].step_id, StepId::CoinChoice);
+        assert_eq!(kickoff.len(), crate::step::sequences::opening_kickoff_sequence_for(Rules::Bb2025).len());
+    }
     #[test]
     fn leave_step_pushes_kickoff_inducements_riotous_and_prayers_sequences() {
         use ffb_model::option::game_option_id::INDUCEMENTS;

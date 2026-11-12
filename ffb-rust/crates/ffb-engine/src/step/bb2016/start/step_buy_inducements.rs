@@ -113,8 +113,14 @@ impl StepBuyInducements {
             return self.leave_step(game);
         }
 
-        // Show the dialog for whichever team hasn't bought yet (home first, then away).
-        if !self.inducements_selected_home {
+        // Java: when neither team has decided, the HIGHER-TV team (TeamResult values, strict `>`,
+        // so away on a tie) is asked first; otherwise whichever team is still open.
+        let home_first = if !self.inducements_selected_home && !self.inducements_selected_away {
+            game.game_result.home.team_value > game.game_result.away.team_value
+        } else {
+            !self.inducements_selected_home
+        };
+        if home_first {
             let available = available_list(&BB2016_INDUCEMENTS.inducements, &game.team_home);
             return StepOutcome::cont().with_prompt(AgentPrompt::BuyInducements {
                 team_id: game.team_home.id.clone(),
@@ -169,9 +175,15 @@ impl StepBuyInducements {
             check_forgo: false,
         });
         let seq_rr = RiotousRookies::build_sequence();
-        // Java: game.getTeamHome/Away().getTeamData().setPettyCashUsed(UtilInducementSequence.calculateInducementGold(...))
-        game.game_result.home.petty_cash_used = UtilInducementSequence::calculate_inducement_gold(Some(game), true);
-        game.game_result.away.petty_cash_used = UtilInducementSequence::calculate_inducement_gold(Some(game), false);
+        // Java: restGold = max(0, inducementGold - goldUsed);
+        //       setPettyCashUsed(max(0, calculateInducementGold(game, side) - restGold))
+        // i.e. only the gold actually SPENT counts as used petty cash (0 when nothing is bought).
+        let rest_home = (self.inducement_gold_home - self.gold_used_home).max(0);
+        let max_home = UtilInducementSequence::calculate_inducement_gold(Some(game), true);
+        game.game_result.home.petty_cash_used = (max_home - rest_home).max(0);
+        let rest_away = (self.inducement_gold_away - self.gold_used_away).max(0);
+        let max_away = UtilInducementSequence::calculate_inducement_gold(Some(game), false);
+        game.game_result.away.petty_cash_used = (max_away - rest_away).max(0);
         StepOutcome::next().push_seq(seq1).push_seq(seq2).push_seq(seq_rr)
     }
 
@@ -514,21 +526,28 @@ mod tests {
     // ── dialog + purchase flow tests ──────────────────────────────────────────
 
     #[test]
-    fn rich_home_gets_buy_inducements_prompt_first() {
+    fn higher_tv_team_gets_buy_inducements_prompt_first() {
+        // Java: `if (homeTV > awayTV)` ask home, else away — on the TeamResult team values.
         use ffb_model::option::game_option_id::INDUCEMENTS;
-        let mut game = make_game();
-        game.options.set(INDUCEMENTS, "true");
-        let mut step = StepBuyInducements::new();
-        step.inducement_gold_home = 200_000;
-        step.inducement_gold_away = 200_000;
-        let out = step.start(&mut game, &mut GameRng::new(0));
-        match out.prompt {
-            Some(AgentPrompt::BuyInducements { team_id, budget, .. }) => {
-                assert_eq!(team_id, "home");
-                assert_eq!(budget, 200_000);
+        let prompt_team = |home_tv: i32, away_tv: i32| {
+            let mut game = make_game();
+            game.options.set(INDUCEMENTS, "true");
+            game.game_result.home.team_value = home_tv;
+            game.game_result.away.team_value = away_tv;
+            let mut step = StepBuyInducements::new();
+            step.inducement_gold_home = 200_000;
+            step.inducement_gold_away = 200_000;
+            match step.start(&mut game, &mut GameRng::new(0)).prompt {
+                Some(AgentPrompt::BuyInducements { team_id, budget, .. }) => {
+                    assert_eq!(budget, 200_000);
+                    team_id
+                }
+                other => panic!("expected BuyInducements prompt, got {other:?}"),
             }
-            other => panic!("expected BuyInducements prompt for home, got {other:?}"),
-        }
+        };
+        assert_eq!(prompt_team(1_100_000, 1_000_000), "home");
+        assert_eq!(prompt_team(1_000_000, 1_100_000), "away");
+        assert_eq!(prompt_team(1_000_000, 1_000_000), "away", "a tie asks away first (strict >)");
     }
 
     #[test]

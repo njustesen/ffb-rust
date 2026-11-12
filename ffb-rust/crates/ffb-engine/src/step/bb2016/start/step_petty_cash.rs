@@ -10,8 +10,9 @@
 /// - If PETTY_CASH_AFFECTS_TV: add petty_cash_transferred to team_value.
 /// - Reports ReportPettyCash once per team.
 ///
-/// client-only: DialogPettyCashParameter — headless skips petty cash dialog
+/// DialogPettyCashParameter → `AgentPrompt::PettyCash` (answered with `Action::PettyCash`).
 use ffb_model::events::GameEvent;
+use ffb_model::prompts::AgentPrompt;
 use ffb_model::model::game::Game;
 use ffb_model::option::game_option_id::{PETTY_CASH, FORCE_TREASURY_TO_PETTY_CASH, PETTY_CASH_AFFECTS_TV};
 use ffb_model::option::util_game_option::is_option_enabled;
@@ -124,10 +125,22 @@ impl StepPettyCash {
             self.reported_away = true;
         }
 
-        let mut out = if self.petty_cash_selected_home && self.petty_cash_selected_away {
-            StepOutcome::next()
+        // Java: the DialogPettyCashParameter branch. When neither team has decided, the
+        // higher-TV team is asked first (home on a tie: the second test is a strict `>`); once one
+        // has answered, the other is asked against the stored TeamResult values. The dialog is a
+        // prompt here; the parity agents answer 0, as ParityRunner's PETTY_CASH case does.
+        let prompt_for = |home: bool, game: &Game| {
+            let team = if home { &game.team_home } else { &game.team_away };
+            AgentPrompt::PettyCash { team_id: team.id.clone(), amount: team.treasury }
+        };
+        let mut out = if !self.petty_cash_selected_home && !self.petty_cash_selected_away {
+            let home = game.team_home.team_value >= game.team_away.team_value;
+            StepOutcome::cont().with_prompt(prompt_for(home, game))
+        } else if !self.petty_cash_selected_home {
+            StepOutcome::cont().with_prompt(prompt_for(true, game))
+        } else if !self.petty_cash_selected_away {
+            StepOutcome::cont().with_prompt(prompt_for(false, game))
         } else {
-            // client-only: DialogPettyCashParameter — headless auto-skips
             StepOutcome::next()
         };
         for ev in pending_events { out = out.with_event(ev); }

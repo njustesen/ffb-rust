@@ -14,7 +14,10 @@ use ffb_model::model::player::Player;
 use ffb_model::model::roster_position::RosterPosition;
 use ffb_model::model::team::Team;
 use ffb_model::prompts::AgentPrompt;
-use ffb_model::option::game_option_id::{INDUCEMENTS, MAX_PLAYERS_ON_FIELD, MIN_PLAYERS_ON_LOS, MAX_PLAYERS_IN_WIDE_ZONE, MB_STACKS_AGAINST_CHAINSAW, CLAW_DOES_NOT_STACK, ENABLE_STALLING_CHECK, ALLOW_BALL_AND_CHAIN_RE_ROLL};
+use ffb_model::option::game_option_id::{INDUCEMENTS, MAX_PLAYERS_ON_FIELD, MIN_PLAYERS_ON_LOS, MAX_PLAYERS_IN_WIDE_ZONE, MB_STACKS_AGAINST_CHAINSAW, CLAW_DOES_NOT_STACK, ENABLE_STALLING_CHECK, ALLOW_BALL_AND_CHAIN_RE_ROLL,
+    WIZARD_AVAILABLE, INDUCEMENT_IGORS_MAX, INDUCEMENT_APOS_MAX, INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG,
+    INDUCEMENT_PRAYERS_MAX, INDUCEMENT_PRAYERS_COST, ALLOW_STAFF_ON_BOTH_TEAMS, INDUCEMENT_BRIBES_REDUCED_MAX,
+    INDUCEMENT_CHEFS_REDUCED_MAX, FORCE_TREASURY_TO_PETTY_CASH, PETTY_CASH_AFFECTS_TV};
 use crate::log_format::{GameLog, LogLine, java_log_path_for, rust_log_path_for, rust_events_path_for, rust_reports_path_for};
 use crate::state_hash::state_hash;
 use ffb_model::util::state_hash::state_string;
@@ -64,6 +67,23 @@ pub const BASELINE_SETUP_OPTIONS: &[(&str, &str)] = &[
     // early. The whole rule -- `StepForgoneStalling`, `StallingExtension`, `ReportStallerDetected`
     // -- is implemented and faithful on the Rust side; it was simply switched off.
     (ENABLE_STALLING_CHECK, "true"),
+    // The PREGAME half of `UtilServerStartGame.addDefaultGameOptions` (STANDALONE), which only
+    // matters now that parity games run the real petty-cash / inducement phase (BACKLOG §I.9).
+    // Each is an `addOption` line that is NOT commented out in Java. Two differ from the factory
+    // default and decide behaviour: underdog Prayers OFF (else the Prayers step would shuffle
+    // prayers Java never draws) and treasury NOT forced into petty cash. The rest are copied
+    // verbatim so both engines carry the same option set.
+    (WIZARD_AVAILABLE, "true"),
+    (INDUCEMENT_IGORS_MAX, "9"),
+    (INDUCEMENT_APOS_MAX, "9"),
+    (INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG, "false"),
+    (INDUCEMENT_PRAYERS_MAX, "3"),
+    (INDUCEMENT_PRAYERS_COST, "30000"),
+    (ALLOW_STAFF_ON_BOTH_TEAMS, "true"),
+    (INDUCEMENT_BRIBES_REDUCED_MAX, "5"),
+    (INDUCEMENT_CHEFS_REDUCED_MAX, "5"),
+    (FORCE_TREASURY_TO_PETTY_CASH, "false"),
+    (PETTY_CASH_AFFECTS_TV, "true"),
     // Fourth of the same shape, found by the REPORT diff and NOT yet enabled — see BACKLOG §H.51.
     // `UtilServerStartGame:224-226` sets `MVP_NOMINATIONS = 6` for the headless game; Rust's unset
     // option reads 0, so `StepMvp` takes Java's `else` branch and ROLLS a random MVP per team (two
@@ -568,7 +588,7 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
     let home = make_team(home_roster, "home", edition);
     let away = make_team(away_roster, "away", edition);
 
-    let mut engine = GameState::new_with_options(home, away, rules, seed, BASELINE_SETUP_OPTIONS);
+    let mut engine = GameState::new_full_pregame(home, away, rules, seed, BASELINE_SETUP_OPTIONS);
     // ONE shared agent for both teams, mirroring ParityRunner's single-object shape.
     // `new_parity` seeds both decision and action RNGs to match Java's decisionRng and actionRng
     // exactly; the heuristic agent seeds its own single stream and embeds a parity RandomAgent for
@@ -1408,7 +1428,7 @@ pub fn run_visual_game(
     let rules = edition_to_rules(edition);
     let home = make_team(home_roster, "home", edition);
     let away = make_team(away_roster, "away", edition);
-    let mut engine = GameState::new_with_options(home, away, rules, seed, BASELINE_SETUP_OPTIONS);
+    let mut engine = GameState::new_full_pregame(home, away, rules, seed, BASELINE_SETUP_OPTIONS);
 
     // Separate agents for home and away so they don't share RNG state.
     let mut home_agent = ffb_engine::agent::RandomAgent::new(seed);
@@ -1450,7 +1470,7 @@ pub fn run_coverage_game(
     let rules = edition_to_rules(edition);
     let home = make_team(home_roster, "home", edition);
     let away = make_team(away_roster, "away", edition);
-    let mut engine = GameState::new_with_options(home, away, rules, seed, BASELINE_SETUP_OPTIONS);
+    let mut engine = GameState::new_full_pregame(home, away, rules, seed, BASELINE_SETUP_OPTIONS);
 
     let mut home_agent = ffb_engine::agent::RandomAgent::new(seed);
     let mut away_agent = ffb_engine::agent::RandomAgent::new(seed ^ 0xFFFF_FFFF);
@@ -2378,7 +2398,7 @@ pub fn run_bench_game(
     let setup_t0 = std::time::Instant::now();
     let home = make_team(home_roster, "home", edition);
     let away = make_team(away_roster, "away", edition);
-    let mut engine = GameState::new_with_options(home, away, rules, seed, BASELINE_SETUP_OPTIONS);
+    let mut engine = GameState::new_full_pregame(home, away, rules, seed, BASELINE_SETUP_OPTIONS);
     let mut agent = Driver::new(agent_spec, seed);
     t.setup_ns += setup_t0.elapsed().as_nanos();
 

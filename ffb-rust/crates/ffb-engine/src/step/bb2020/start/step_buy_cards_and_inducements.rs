@@ -49,6 +49,7 @@ use ffb_model::option::game_option_id::{
     USE_PREDEFINED_INDUCEMENTS, INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG,
     ALLOW_STAR_ON_BOTH_TEAMS, ALLOW_STAFF_ON_BOTH_TEAMS,
     INDUCEMENT_MERCENARIES_EXTRA_COST, INDUCEMENT_MERCENARIES_SKILL_COST,
+    INDUCEMENTS_ALWAYS_USE_TREASURY,
 };
 use ffb_model::option::util_game_option::{is_option_enabled, get_int_option};
 use ffb_model::util::rng::GameRng;
@@ -57,9 +58,8 @@ use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::generator::sequence::SequenceStep;
 use crate::step::generator::common::inducement::InducementParams;
 use crate::step::generator::common::{Inducement, RiotousRookies};
-use crate::step::generator::mixed::kickoff::{Kickoff, KickoffParams};
 use crate::step::game::start::util_inducement_catalog::{apply_purchases, available_list};
-use crate::step::game::start::util_inducement_sequence::UtilInducementSequence;
+use crate::step::game::start::util_minimum_inducement_cost::minimum_inducement_cost;
 
 /// Phase enum mirroring the private inner `Phase` in Java.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,6 +112,10 @@ pub struct StepBuyCardsAndInducements {
     pub buy_inducement_commands: Vec<String>,
     /// Java: `currentSelection` — the card the coach just chose (None = not choosing card).
     pub current_selection: Option<String>,
+    /// The dialog `showDialog` opened and that is still waiting for its answer:
+    /// (home?, availableGold). Java hands it to `UtilServerDialog.showDialog`; here it becomes
+    /// the step's prompt.
+    dialog: Option<(bool, i32)>,
 }
 
 impl StepBuyCardsAndInducements {
@@ -125,11 +129,13 @@ impl StepBuyCardsAndInducements {
             phase: Phase::Init,
             buy_inducement_commands: Vec::new(),
             current_selection: None,
+            dialog: None,
         }
     }
 
     /// Java: `executeStep()` — main state machine dispatch.
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        self.dialog = None;
         match self.phase {
             Phase::Init => self.init(game),
             Phase::Home | Phase::Away => {
@@ -149,29 +155,57 @@ impl StepBuyCardsAndInducements {
         }
     }
 
-    /// Java: `getAvailableGold(...)`, simplified: `petty_cash_from_tv_diff` (0 for the overdog)
-    /// plus free cash, plus treasury when overdog spending is allowed.
-    fn budget_for(game: &Game, home: bool, free_cash: i32, allow_overdog: bool) -> i32 {
-        let petty = if home {
-            game.game_result.home.petty_cash_from_tv_diff
+    /// Java: `getAvailableGold(int freeCash, boolean useTreasury, boolean allowSpending)` for the
+    /// team whose phase is active: its treasury (plus free cash), or the overdog's spend plus its
+    /// own petty cash from the team-value difference.
+    fn get_available_gold(&mut self, game: &Game, free_cash: i32, use_treasury: bool, allow_spending: bool) -> i32 {
+        let home = self.phase == Phase::Home;
+        let available = if !allow_spending {
+            0
+        } else if home {
+            if use_treasury { free_cash + game.team_home.treasury }
+            else { self.used_inducement_gold_away + game.game_result.home.petty_cash_from_tv_diff }
+        } else if use_treasury {
+            free_cash + game.team_away.treasury
         } else {
-            game.game_result.away.petty_cash_from_tv_diff
+            self.used_inducement_gold_home + game.game_result.away.petty_cash_from_tv_diff
         };
-        let treasury = if home { game.team_home.treasury } else { game.team_away.treasury };
-        petty + free_cash + if allow_overdog { treasury } else { 0 }
+        if home {
+            self.available_inducement_gold_home = Some(available);
+        } else {
+            self.available_inducement_gold_away = Some(available);
+        }
+        available
     }
 
-    /// Java: `showDialog(Team, ...)` — builds the `DialogBuyCardsAndInducementsParameter` for
-    /// whichever team's phase is active. Card drawing/choice is out of scope (see module docs),
-    /// so `available` here only carries the catalog-driven inducements.
-    fn build_prompt(&self, game: &Game) -> StepOutcome {
-        let home = self.phase == Phase::Home;
+    /// Java: `showDialog(Team, freeCash, usesTreasury, allowSpending)` — opens the team's dialog
+    /// when it can buy a card or afford the cheapest inducement.
+    ///
+    /// `canBuyCards` needs `MAX_NR_OF_CARDS > 0`, gold of at least CARDS_SPECIAL_PLAY_COST (100k)
+    /// and a deck with more than one card. Java then draws card choices with six `rollDice` calls
+    /// (`updateChoices`); the card system is not ported (see module docs), so this translation
+    /// cannot take that branch. No drafted squad reaches it: the largest treasury is 50k and no
+    /// team-value gap reaches 100k (checked over every cross game of 2026-11-12's sweep).
+    fn show_dialog(&mut self, game: &Game, home: bool, free_cash: i32, uses_treasury: bool, allow_spending: bool) -> bool {
+        let available_gold = self.get_available_gold(game, free_cash, uses_treasury, allow_spending);
         let team = if home { &game.team_home } else { &game.team_away };
-        let budget = if home {
-            self.available_inducement_gold_home.unwrap_or(0) - self.used_inducement_gold_home
-        } else {
-            self.available_inducement_gold_away.unwrap_or(0) - self.used_inducement_gold_away
+        let can_buy_inducements = minimum_inducement_cost(game, team) <= available_gold;
+        if can_buy_inducements {
+            self.dialog = Some((home, available_gold));
+            return true;
+        }
+        false
+    }
+
+    /// The open `DialogBuyCardsAndInducementsParameter` as a prompt. Card drawing/choice is out of
+    /// scope (see module docs), so `available` here only carries the catalog-driven inducements.
+    fn build_prompt(&self, game: &Game) -> StepOutcome {
+        let (home, budget) = match self.dialog {
+            Some(d) => d,
+            // Java never leaves executeStep in HOME/AWAY without an open dialog.
+            None => return StepOutcome::cont(),
         };
+        let team = if home { &game.team_home } else { &game.team_away };
         let available = available_list(&BB2020_INDUCEMENTS.inducements, team);
         StepOutcome::cont().with_prompt(AgentPrompt::BuyInducements {
             team_id: team.id.clone(),
@@ -228,42 +262,31 @@ impl StepBuyCardsAndInducements {
 
         let allow_even_ctv = is_option_enabled(game, INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV)
             || free_cash > 0;
-        let allow_overdog = is_option_enabled(game, INDUCEMENTS_ALLOW_OVERDOG_SPENDING);
+        let mut same_tv = false;
 
-        if petty_home > 0 {
-            // Away is the overdog; home team (underdog) shops first.
-            self.phase = Phase::Home;
-            let gold = if allow_overdog {
-                petty_home + game.team_home.treasury + free_cash
-            } else {
-                petty_home + free_cash
-            };
-            self.available_inducement_gold_home = Some(gold);
-            // client-only: DialogBuyCardsAndInducementsParameter for home coach
-        } else if petty_away > 0 {
-            // Home is the overdog; away team (underdog) shops first.
+        // Java: the team WITHOUT petty cash is the overdog and is asked first.
+        let overdog_home = if petty_home > 0 {
             self.phase = Phase::Away;
-            let gold = if allow_overdog {
-                petty_away + game.team_away.treasury + free_cash
-            } else {
-                petty_away + free_cash
-            };
-            self.available_inducement_gold_away = Some(gold);
-            // client-only: DialogBuyCardsAndInducementsParameter for away coach
+            false
+        } else if petty_away > 0 {
+            self.phase = Phase::Home;
+            true
         } else if allow_even_ctv {
-            // Equal TV but treasury/free-cash spending allowed: both teams shop in parallel.
             self.phase = Phase::Home;
             self.parallel = true;
-            let gold_home = game.team_home.treasury + free_cash;
-            let gold_away = game.team_away.treasury + free_cash;
-            self.available_inducement_gold_home = Some(gold_home);
-            self.available_inducement_gold_away = Some(gold_away);
-            // client-only: DialogBuyCardsAndInducementsParameter for both coaches (parallel)
+            same_tv = true;
+            true
         } else {
             // Equal TV and no treasury spending: skip.
             self.available_inducement_gold_home = Some(0);
             self.available_inducement_gold_away = Some(0);
             self.phase = Phase::Done;
+            return;
+        };
+
+        let allow_overdog = is_option_enabled(game, INDUCEMENTS_ALLOW_OVERDOG_SPENDING);
+        if !self.show_dialog(game, overdog_home, free_cash, true, allow_overdog || same_tv) {
+            self.swap_team(game);
         }
     }
 
@@ -276,22 +299,49 @@ impl StepBuyCardsAndInducements {
     }
 
     /// Java: `swapTeam()` — move to the next team (computing its budget on first visit) or DONE.
-    fn swap_team(&mut self, game: &mut Game) {
-        let free_cash = get_int_option(game, FREE_INDUCEMENT_CASH) + get_int_option(game, FREE_CARD_CASH);
-        let allow_overdog = is_option_enabled(game, INDUCEMENTS_ALLOW_OVERDOG_SPENDING);
-        match self.phase {
+    fn swap_team(&mut self, game: &Game) {
+        let home = match self.phase {
             Phase::Home if self.available_inducement_gold_away.is_none() => {
                 self.phase = Phase::Away;
-                self.available_inducement_gold_away = Some(Self::budget_for(game, false, free_cash, allow_overdog));
+                false
             }
             Phase::Away if self.available_inducement_gold_home.is_none() => {
                 self.phase = Phase::Home;
-                self.available_inducement_gold_home = Some(Self::budget_for(game, true, free_cash, allow_overdog));
+                true
             }
             _ => {
                 self.phase = Phase::Done;
+                return;
+            }
+        };
+        let free_cash = get_int_option(game, FREE_INDUCEMENT_CASH) + get_int_option(game, FREE_CARD_CASH);
+        let uses_treasury = self.parallel || is_option_enabled(game, INDUCEMENTS_ALWAYS_USE_TREASURY);
+        if !self.show_dialog(game, home, free_cash, uses_treasury, true) {
+            self.phase = Phase::Done;
+        }
+    }
+
+    /// Java: `generateReport(Team, gold, newTv)`.
+    fn generate_report(game: &Game, home: bool, gold: i32, new_tv: i32) -> ReportCardsAndInducementsBought {
+        let (team_id, inducement_set) = if home {
+            (game.team_home.id.clone(), &game.turn_data_home.inducement_set)
+        } else {
+            (game.team_away.id.clone(), &game.turn_data_away.inducement_set)
+        };
+        let mut nr_of_inducements = 0;
+        let mut nr_of_stars = 0;
+        let mut nr_of_mercenaries = 0;
+        for inducement in inducement_set.get_inducements() {
+            if inducement.has_usage(Usage::STAR) {
+                nr_of_stars = inducement.get_value();
+            } else if inducement.has_usage(Usage::LONER) {
+                nr_of_mercenaries = inducement.get_value();
+            } else {
+                nr_of_inducements += inducement.get_value();
             }
         }
+        // `inducementSet.getAllCards().length`: no card is ever bought (card system not ported).
+        ReportCardsAndInducementsBought::new(team_id, 0, nr_of_inducements, nr_of_stars, nr_of_mercenaries, gold, new_tv)
     }
 
     /// Java: `leaveStep()` — push sequences, record gold spent, NEXT_STEP.
@@ -307,22 +357,16 @@ impl StepBuyCardsAndInducements {
 
         // Java: if parallel → addReport for both teams now (serial: already reported per-command).
         if self.parallel {
-            game.report_list.add(ReportCardsAndInducementsBought::new(
-                game.team_home.id.clone(),
-                0, 0, 0, 0,
-                self.used_inducement_gold_home,
-                new_tv_home,
-            ));
-            game.report_list.add(ReportCardsAndInducementsBought::new(
-                game.team_away.id.clone(),
-                0, 0, 0, 0,
-                self.used_inducement_gold_away,
-                new_tv_away,
-            ));
+            let report = Self::generate_report(game, true, self.used_inducement_gold_home, new_tv_home);
+            game.report_list.add(report);
+            let report = Self::generate_report(game, false, self.used_inducement_gold_away, new_tv_away);
+            game.report_list.add(report);
         }
 
         // Java: ((Kickoff) factory.forName(Kickoff)).pushSequence(new Kickoff.SequenceParams(gameState, true))
-        let seq_kickoff = Kickoff::build_sequence(&KickoffParams { with_coin_choice: true });
+        // — the game-opening kickoff with the coin toss, in the certified form (see
+        // `sequences::opening_kickoff_sequence_for`).
+        let seq_kickoff = crate::step::sequences::opening_kickoff_sequence_for(game.rules);
 
         // Java: push Inducement(AFTER_INDUCEMENTS_PURCHASED) × 2.
         // Order: if newTvHome > newTvAway → home first; else away first.
@@ -356,9 +400,20 @@ impl StepBuyCardsAndInducements {
             None
         };
 
-        // Java: game.getTeamHome/Away().getTeamData().setPettyCashUsed(UtilInducementSequence.calculateInducementGold(...))
-        game.game_result.home.petty_cash_used = UtilInducementSequence::calculate_inducement_gold(Some(game), true);
-        game.game_result.away.petty_cash_used = UtilInducementSequence::calculate_inducement_gold(Some(game), false);
+        // Java: a team without petty cash (or when the treasury is always used) spent treasury;
+        // the underdog's spend is all petty cash (`setPettyCashUsed(usedInducementGold)`).
+        let always_use_treasury = is_option_enabled(game, INDUCEMENTS_ALWAYS_USE_TREASURY);
+        let free_cash = get_int_option(game, FREE_INDUCEMENT_CASH) + get_int_option(game, FREE_CARD_CASH);
+        if game.game_result.home.petty_cash_from_tv_diff == 0 || always_use_treasury {
+            game.game_result.home.treasury_spent_on_inducements = (self.used_inducement_gold_home - free_cash).max(0);
+        } else {
+            game.game_result.home.petty_cash_used = self.used_inducement_gold_home;
+        }
+        if game.game_result.away.petty_cash_from_tv_diff == 0 || always_use_treasury {
+            game.game_result.away.treasury_spent_on_inducements = (self.used_inducement_gold_away - free_cash).max(0);
+        } else {
+            game.game_result.away.petty_cash_used = self.used_inducement_gold_away;
+        }
 
         // Java: inducementTypeFactory.allTypes() filtered by Usage.REROLL_ARGUE → "briberyAndCorruption".
         // If team has BriberyAndCorruption special rule → add 1 briberyAndCorruption inducement.
@@ -404,18 +459,17 @@ impl StepBuyCardsAndInducements {
             }
         }
 
-        // Java: publishParameter(INDUCEMENT_GOLD_HOME, newTvHome)
-        // Java: publishParameter(INDUCEMENT_GOLD_AWAY, newTvAway)
+        // Java: publishParameter(TV_HOME / TV_AWAY) only together with the PRAYERS sequence.
         // Java: setNextAction(StepAction.NEXT_STEP)
         let mut out = StepOutcome::next()
-            .publish(StepParameter::InducementGoldHome(new_tv_home))
-            .publish(StepParameter::InducementGoldAway(new_tv_away))
             .push_seq(seq_kickoff)
             .push_seq(seq_first)
             .push_seq(seq_second)
             .push_seq(seq_riotous);
         if let Some(seq) = seq_prayers {
-            out = out.push_seq(seq);
+            out = out.push_seq(seq)
+                .publish(StepParameter::TvHome(new_tv_home))
+                .publish(StepParameter::TvAway(new_tv_away));
         }
         out
     }
@@ -711,6 +765,17 @@ impl Step for StepBuyCardsAndInducements {
         let mut events = Vec::new();
         if let Action::BuyInducements { home, purchases } = action {
             events = self.apply_purchase(game, *home, purchases);
+            if !self.parallel {
+                // Java: `getNewTv(used, turnData, team)` = team value + gold used + card cost
+                // (no card is ever bought here), then `addReport(generateReport(team, used, newTv))`.
+                let (used, team_value) = if *home {
+                    (self.used_inducement_gold_home, game.team_home.team_value)
+                } else {
+                    (self.used_inducement_gold_away, game.team_away.team_value)
+                };
+                let report = Self::generate_report(game, *home, used, team_value + used);
+                game.report_list.add(report);
+            }
         }
         let mut out = self.execute_step(game, rng);
         for ev in events { out = out.with_event(ev); }
@@ -757,15 +822,24 @@ mod tests {
         assert_eq!(step.phase, Phase::Done);
     }
 
+    /// Java leaveStep publishes TV_HOME / TV_AWAY only together with the PRAYERS sequence
+    /// (INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG), and never INDUCEMENT_GOLD_*.
     #[test]
-    fn equal_tv_publishes_inducement_gold_parameters() {
+    fn tv_is_published_only_with_the_prayers_sequence() {
         let mut game = make_game();
         let mut step = StepBuyCardsAndInducements::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::InducementGoldHome(_))));
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::InducementGoldAway(_))));
-    }
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::TvHome(_))));
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::InducementGoldHome(_))));
 
+        let mut game = make_game();
+        game.options.set(INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG, "false");
+        let mut step = StepBuyCardsAndInducements::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::TvHome(_))));
+        // Kickoff + 2 × Inducement + RiotousRookies, no Prayers.
+        assert_eq!(out.pushes.len(), 4);
+    }
     #[test]
     fn equal_tv_pushes_two_inducement_sequences_and_riotous_rookies() {
         let mut game = make_game();
@@ -785,25 +859,31 @@ mod tests {
         assert_eq!(step.phase, Phase::Done);
     }
 
+    fn answer(step: &mut StepBuyCardsAndInducements, game: &mut Game, home: bool,
+              purchases: Vec<InducementPurchase>) -> StepOutcome {
+        step.handle_command(&Action::BuyInducements { home, purchases }, game, &mut GameRng::new(0))
+    }
+
+    /// Java `init`: home has petty cash, so AWAY is the overdog and is asked first, from its
+    /// treasury; the underdog's gold is not computed until `swapTeam`.
     #[test]
-    fn home_underdog_sets_home_phase() {
-        // home has petty cash (away is overdog)
+    fn home_underdog_means_away_overdog_is_asked_first() {
         let mut game = make_game_with_petty_cash(100_000, 0);
         let mut step = StepBuyCardsAndInducements::new();
-        // After init() completes without dialog: phase transitions to Done (no actual dialog).
         step.start(&mut game, &mut GameRng::new(0));
-        // Regardless of phase, the gold was set before any dialog.
-        // available_inducement_gold_home should be initialised.
-        assert!(step.available_inducement_gold_home.is_some());
+        assert_eq!(step.phase, Phase::Away);
+        assert_eq!(step.available_inducement_gold_away, Some(0));
+        assert_eq!(step.available_inducement_gold_home, None);
     }
 
     #[test]
-    fn away_underdog_sets_away_gold() {
-        // away has petty cash (home is overdog)
+    fn away_underdog_means_home_overdog_is_asked_first() {
         let mut game = make_game_with_petty_cash(0, 80_000);
+        game.team_home.treasury = 40_000;
         let mut step = StepBuyCardsAndInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
-        assert!(step.available_inducement_gold_away.is_some());
+        assert_eq!(step.phase, Phase::Home);
+        assert_eq!(step.available_inducement_gold_home, Some(40_000));
     }
 
     #[test]
@@ -819,35 +899,39 @@ mod tests {
         assert_eq!(step.available_inducement_gold_away, Some(0));
     }
 
+    /// Java `getAvailableGold(useTreasury = false)` for the underdog: the overdog's spend plus
+    /// its petty cash from the TV difference.
     #[test]
-    fn inducements_enabled_home_underdog_sets_phase_and_gold() {
-        use ffb_model::option::game_option_id::INDUCEMENTS;
+    fn underdog_gold_is_overdog_spend_plus_petty_cash() {
         let mut game = make_game_with_petty_cash(100_000, 0);
-        game.options.set(INDUCEMENTS, "true");
         let mut step = StepBuyCardsAndInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
-        // available_inducement_gold_home = petty_home + free_cash(0)
+        answer(&mut step, &mut game, false, vec![]);
+        assert_eq!(step.phase, Phase::Home);
         assert_eq!(step.available_inducement_gold_home, Some(100_000));
     }
 
+    /// Free inducement and card cash go to the treasury-funded (overdog) budget only; the
+    /// underdog's petty-cash budget does not add them.
     #[test]
-    fn free_cash_added_to_underdog_gold() {
-        use ffb_model::option::game_option_id::{INDUCEMENTS, FREE_INDUCEMENT_CASH, FREE_CARD_CASH};
+    fn free_cash_is_added_to_the_overdog_treasury_budget() {
+        use ffb_model::option::game_option_id::{FREE_INDUCEMENT_CASH, FREE_CARD_CASH};
         let mut game = make_game_with_petty_cash(100_000, 0);
-        game.options.set(INDUCEMENTS, "true");
         game.options.set(FREE_INDUCEMENT_CASH, "20000");
         game.options.set(FREE_CARD_CASH, "10000");
         let mut step = StepBuyCardsAndInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
-        // 100,000 petty + 20,000 + 10,000 free cash = 130,000
-        assert_eq!(step.available_inducement_gold_home, Some(130_000));
+        assert_eq!(step.available_inducement_gold_away, Some(30_000));
+        answer(&mut step, &mut game, false, vec![]);
+        assert_eq!(step.available_inducement_gold_home, Some(100_000));
     }
 
+    /// Equal TV with treasury spending allowed: parallel mode; home first from its treasury, then
+    /// away also from its treasury (`parallel` forces useTreasury).
     #[test]
     fn allow_even_ctv_enables_parallel_mode() {
-        use ffb_model::option::game_option_id::{INDUCEMENTS, INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV};
+        use ffb_model::option::game_option_id::INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV;
         let mut game = make_game();
-        game.options.set(INDUCEMENTS, "true");
         game.options.set(INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV, "true");
         game.team_home.treasury = 50_000;
         game.team_away.treasury = 30_000;
@@ -855,9 +939,9 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert!(step.parallel);
         assert_eq!(step.available_inducement_gold_home, Some(50_000));
+        answer(&mut step, &mut game, true, vec![]);
         assert_eq!(step.available_inducement_gold_away, Some(30_000));
     }
-
     #[test]
     fn phase_name_round_trips() {
         for (phase, name) in [
@@ -896,13 +980,21 @@ mod tests {
 
     // ── dialog + purchase flow tests ──────────────────────────────────────────
 
+    /// The overdog's dialog is shown even with 0 gold (Java `minimumInducementCost` is 0); the
+    /// underdog follows with its petty cash.
     #[test]
-    fn home_underdog_gets_buy_inducements_prompt() {
-        use ffb_model::option::game_option_id::INDUCEMENTS;
+    fn overdog_then_underdog_get_buy_inducements_prompts() {
         let mut game = make_game_with_petty_cash(100_000, 0);
-        game.options.set(INDUCEMENTS, "true");
         let mut step = StepBuyCardsAndInducements::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
+        match out.prompt {
+            Some(AgentPrompt::BuyInducements { team_id, budget, .. }) => {
+                assert_eq!(team_id, "away");
+                assert_eq!(budget, 0);
+            }
+            other => panic!("expected BuyInducements prompt for away, got {other:?}"),
+        }
+        let out = answer(&mut step, &mut game, false, vec![]);
         match out.prompt {
             Some(AgentPrompt::BuyInducements { team_id, budget, .. }) => {
                 assert_eq!(team_id, "home");
@@ -912,107 +1004,73 @@ mod tests {
         }
     }
 
+    /// Java `handleCommand` (not parallel) reports each answer immediately: the overdog's report
+    /// first, with `teamValue` = team value + gold used.
     #[test]
-    fn away_gets_prompted_after_home_submits() {
-        use ffb_model::option::game_option_id::INDUCEMENTS;
-        let mut game = make_game_with_petty_cash(100_000, 0);
-        game.options.set(INDUCEMENTS, "true");
+    fn each_answer_is_reported_in_answer_order() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game_with_petty_cash(5_000, 0);
+        game.team_home.team_value = 1_095_000;
+        game.team_away.team_value = 1_100_000;
         let mut step = StepBuyCardsAndInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
-        let out = step.handle_command(
-            &Action::BuyInducements { home: true, purchases: vec![] },
-            &mut game,
-            &mut GameRng::new(0),
-        );
-        assert_eq!(step.phase, Phase::Away);
-        match out.prompt {
-            Some(AgentPrompt::BuyInducements { team_id, .. }) => assert_eq!(team_id, "away"),
-            other => panic!("expected BuyInducements prompt for away, got {other:?}"),
-        }
+        answer(&mut step, &mut game, false, vec![]);
+        let out = answer(&mut step, &mut game, true, vec![]);
+        assert_eq!(out.action, StepAction::NextStep);
+        let reports = game.report_list.get_reports();
+        assert_eq!(reports.len(), 2);
+        assert!(reports.iter().all(|r| r.get_id() == ReportId::CARDS_AND_INDUCEMENTS_BOUGHT));
+        let first = reports[0].to_json().unwrap();
+        assert_eq!(first["teamId"], "away");
+        assert_eq!(first["teamValue"], 1_100_000);
+        assert_eq!(reports[1].to_json().unwrap()["teamId"], "home");
     }
 
     #[test]
     fn both_sides_submitting_advances_to_next_step() {
-        use ffb_model::option::game_option_id::INDUCEMENTS;
         let mut game = make_game_with_petty_cash(200_000, 0);
-        game.options.set(INDUCEMENTS, "true");
         let mut step = StepBuyCardsAndInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
-        step.handle_command(
-            &Action::BuyInducements {
-                home: true,
-                purchases: vec![InducementPurchase { id: "bribes".into(), count: 1 }],
-            },
-            &mut game,
-            &mut GameRng::new(0),
-        );
-        let out = step.handle_command(
-            &Action::BuyInducements { home: false, purchases: vec![] },
-            &mut game,
-            &mut GameRng::new(0),
-        );
+        answer(&mut step, &mut game, false, vec![]);
+        let out = answer(&mut step, &mut game, true,
+            vec![InducementPurchase { id: "bribes".into(), count: 1 }]);
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(game.team_home.bribes, 1);
     }
 
     #[test]
     fn purchase_deducts_treasury_and_tracks_used_gold() {
-        use ffb_model::option::game_option_id::INDUCEMENTS;
         let mut game = make_game_with_petty_cash(200_000, 0);
-        game.options.set(INDUCEMENTS, "true");
         game.team_home.treasury = 500_000;
         let mut step = StepBuyCardsAndInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
-        step.handle_command(
-            &Action::BuyInducements {
-                home: true,
-                purchases: vec![InducementPurchase { id: "bribes".into(), count: 1 }],
-            },
-            &mut game,
-            &mut GameRng::new(0),
-        );
+        answer(&mut step, &mut game, false, vec![]);
+        answer(&mut step, &mut game, true, vec![InducementPurchase { id: "bribes".into(), count: 1 }]);
         assert_eq!(game.team_home.treasury, 400_000);
         assert_eq!(step.used_inducement_gold_home, 100_000);
     }
 
     #[test]
     fn purchase_routes_weather_mage_into_inducement_set() {
-        use ffb_model::option::game_option_id::INDUCEMENTS;
         let mut game = make_game_with_petty_cash(200_000, 0);
-        game.options.set(INDUCEMENTS, "true");
         let mut step = StepBuyCardsAndInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
-        step.handle_command(
-            &Action::BuyInducements {
-                home: true,
-                purchases: vec![InducementPurchase { id: "weatherMage".into(), count: 1 }],
-            },
-            &mut game,
-            &mut GameRng::new(0),
-        );
+        answer(&mut step, &mut game, false, vec![]);
+        answer(&mut step, &mut game, true, vec![InducementPurchase { id: "weatherMage".into(), count: 1 }]);
         assert_eq!(game.turn_data_home.inducement_set.get("weatherMage").map(|i| i.get_value()), Some(1));
     }
 
     #[test]
     fn purchase_clamps_over_budget_purchase() {
-        use ffb_model::option::game_option_id::INDUCEMENTS;
         let mut game = make_game_with_petty_cash(150_000, 0);
-        game.options.set(INDUCEMENTS, "true");
         let mut step = StepBuyCardsAndInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
-        step.handle_command(
-            &Action::BuyInducements {
-                home: true,
-                purchases: vec![InducementPurchase { id: "bribes".into(), count: 3 }], // 300,000 requested
-            },
-            &mut game,
-            &mut GameRng::new(0),
-        );
-        // Only 1 bribe (100,000) fits in a 150,000 budget.
+        answer(&mut step, &mut game, false, vec![]);
+        // 300,000 requested; only 1 bribe (100,000) fits in a 150,000 budget.
+        answer(&mut step, &mut game, true, vec![InducementPurchase { id: "bribes".into(), count: 3 }]);
         assert_eq!(game.team_home.bribes, 1);
         assert_eq!(step.used_inducement_gold_home, 100_000);
     }
-
     #[test]
     fn leave_step_pushes_kickoff_and_inducement_sequences_after_both_submit() {
         use ffb_model::option::game_option_id::INDUCEMENTS;

@@ -15,6 +15,7 @@
 use ffb_model::model::game::Game;
 use ffb_model::option::game_option_id::{FREE_CARD_CASH, FREE_INDUCEMENT_CASH, MAX_NR_OF_CARDS, USE_PREDEFINED_INDUCEMENTS};
 use ffb_model::option::util_game_option::{get_int_option, is_option_enabled};
+use ffb_model::report::bb2016::report_cards_bought::ReportCardsBought;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -67,6 +68,19 @@ impl StepBuyCards {
         // receive the correct available gold, not 0.
         self.cards_selected_home = true;
         self.cards_selected_away = true;
+        // Java: `if (fCardsSelectedHome && !fReportedHome) addReport(new ReportCardsBought(home,
+        // cardsHome.length, totalCostHome))`, then the same for away. With no deck ported no card
+        // is ever drawn, so both teams report 0 cards for 0 gold, which is exactly what Java
+        // reports in every parity game: a card dialog needs inducement gold of at least the
+        // cheapest card (50k), and every drafted squad's team-value gap is below that.
+        if !self.reported_home {
+            self.reported_home = true;
+            game.report_list.add(ReportCardsBought::new(game.team_home.id.clone(), 0, 0));
+        }
+        if !self.reported_away {
+            self.reported_away = true;
+            game.report_list.add(ReportCardsBought::new(game.team_away.id.clone(), 0, 0));
+        }
         let free_cash = get_int_option(game, FREE_INDUCEMENT_CASH) + get_int_option(game, FREE_CARD_CASH);
         self.inducement_gold_home = UtilInducementSequence::calculate_inducement_gold(Some(game), true) + free_cash;
         self.inducement_gold_away = UtilInducementSequence::calculate_inducement_gold(Some(game), false) + free_cash;

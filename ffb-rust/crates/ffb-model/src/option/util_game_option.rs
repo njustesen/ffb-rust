@@ -19,7 +19,16 @@ pub fn is_option_enabled(game: &Game, option_id: &str) -> bool {
 }
 
 pub fn get_int_option(game: &Game, option_id: &str) -> i32 {
-    game.options.get_int(option_id).unwrap_or(0)
+    // Java: `(GameOptionInt) getOptions().getOptionWithDefault(pOptionId)` → `getValue()`, so an
+    // option the game never stored reads its FACTORY default, exactly as `is_option_enabled` does.
+    // Reading 0 instead made e.g. MAX_NR_OF_CARDS (factory 5) look disabled, so bb2016
+    // StepBuyCards skipped its whole card phase and never reported `cardsBought` (BACKLOG §I.9).
+    match GameOptionEnum::for_name(option_id) {
+        Some(id) => game.options.get_option_with_default(id)
+            .get_value_as_string().parse().unwrap_or(0),
+        // Unknown id: no factory default to fall back to (mirrors Java's null option → 0).
+        None => game.options.get_int(option_id).unwrap_or(0),
+    }
 }
 
 pub fn get_str_option<'a>(game: &'a Game, option_id: &str, default: &'a str) -> &'a str {
@@ -49,9 +58,18 @@ mod tests {
     }
 
     #[test]
-    fn get_int_option_missing_returns_zero() {
+    fn get_int_option_missing_returns_factory_default() {
+        // Java getOptionWithDefault: an unset real option reads its GameOptionFactory default.
         let game = make_game();
-        assert_eq!(get_int_option(&game, "maxPlayersOnField"), 0);
+        assert_eq!(get_int_option(&game, "maxPlayersOnField"), 11);
+        assert_eq!(get_int_option(&game, "maxNrOfCards"), 5);
+        assert_eq!(get_int_option(&game, "inducementDummy"), 0);
+    }
+
+    #[test]
+    fn get_int_option_unknown_id_returns_zero() {
+        let game = make_game();
+        assert_eq!(get_int_option(&game, "noSuchOption"), 0);
     }
 
     #[test]

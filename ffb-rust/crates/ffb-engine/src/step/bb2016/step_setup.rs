@@ -212,6 +212,13 @@ mod tests {
         game.team_away.players.push(p_away);
         game.field_model.set_player_state("h1", PlayerState::new(PS_RESERVE));
         game.field_model.set_player_state("a1", PlayerState::new(PS_RESERVE));
+        // An empty board is only a VALID setup with the field and line-of-scrimmage minimums off.
+        // These tests exercise the confirm transition, not setup validation, and used to get both
+        // for free because an unset int option read 0; they now read the factory defaults 11 / 3
+        // (Java getOptionWithDefault), under which the one available player must be fielded on
+        // the line.
+        game.options.set(ffb_model::option::game_option_id::MAX_PLAYERS_ON_FIELD, "0");
+        game.options.set(ffb_model::option::game_option_id::MIN_PLAYERS_ON_LOS, "0");
         game
     }
 

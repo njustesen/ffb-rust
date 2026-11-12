@@ -31,6 +31,15 @@ pub fn start_game_sequence_for(rules: ffb_model::enums::Rules) -> Vec<SequenceSt
     seq
 }
 
+/// The game-opening kickoff (with the coin toss): what Java's `Kickoff.pushSequence(params,
+/// withCoinChoice = true)` builds when the BB2020/BB2025 buy-inducements step leaves (BACKLOG
+/// §I.9). It is the same hand-tuned tail the flattened pregame ran and every parity gate has
+/// certified, rather than `generator::mixed::kickoff`, which still differs from Java (it swarms
+/// after the scatter in BB2025 and labels steps in every edition).
+pub fn opening_kickoff_sequence_for(rules: ffb_model::enums::Rules) -> Vec<SequenceStep> {
+    kickoff_tail(rules)
+}
+
 /// The parity harness's flattened kickoff tail.
 ///
 /// BB2020 additionally needs the two GOTO labels Java's `generator/mixed/Kickoff` threads onto

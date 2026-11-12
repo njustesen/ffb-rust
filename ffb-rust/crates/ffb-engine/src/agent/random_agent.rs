@@ -1491,6 +1491,11 @@ impl Agent for RandomAgent {
                 Action::BuyInducements { home: *team_id == gs.game.team_home.id, purchases: vec![] },
             Some(AgentPrompt::BuyPrayersAndInducements { team_id, .. }) =>
                 Action::BuyInducements { home: *team_id == gs.game.team_home.id, purchases: vec![] },
+            // Java ParityRunner PETTY_CASH case: `new ClientCommandPettyCash(0)` for the dialog's
+            // team. No RNG consumed. (Raised by the bb2016 StepPettyCash for a team with at least
+            // 50k treasury.)
+            Some(AgentPrompt::PettyCash { team_id, .. }) =>
+                Action::PettyCash { home: *team_id == gs.game.team_home.id, amount: 0 },
             // AgentPrompt::SwarmingPlayers is (mis)named — in the live engine it is emitted ONLY by
             // StepCatchScatterThrowIn::diving_catch as the DIVING CATCH declaration dialog (Java
             // DialogParameterDivingCatch), NOT by StepSwarming. The step advances its DivingCatchPhase
@@ -1529,7 +1534,6 @@ impl Agent for RandomAgent {
             | Some(AgentPrompt::StartGame)
             | Some(AgentPrompt::GameStatistics)
             | Some(AgentPrompt::DefenderAction { .. })
-            | Some(AgentPrompt::PettyCash { .. })
             | Some(AgentPrompt::UseInducement { .. })
             | Some(AgentPrompt::WizardSpell { .. })
             | Some(AgentPrompt::BriberyAndCorruption { .. })
