@@ -201,6 +201,19 @@ impl StepMoveDodge {
             }
         }
 
+        // Java: `doRoll = (reRolledAction || (fUsingDivingTackle == null && !dtRerollAsked))
+        //   && !usingModifyingSkill && !usingModifierIgnoringSkill` — and `dodge(pDoRoll)` writes
+        // its ReportDodgeRoll (and the Break-Tackle WOULD_NOT_HELP report) only when pDoRoll.
+        // A re-entry after a DECLINED pre-emptive Diving-Tackle re-roll re-evaluates the same die
+        // without reporting it again (dwarf_vs_human bb2025 seed 2: Rust reported it twice).
+        let re_rolled_action_with_source = self.re_roll_state.re_rolled_action.as_ref()
+            .map(|a| a.name == "DODGE").unwrap_or(false)
+            && self.re_roll_state.re_roll_source.is_some();
+        let do_roll = (re_rolled_action_with_source
+                || (self.using_diving_tackle.is_none() && !self.dt_reroll_asked))
+            && self.using_modifying_skill != Some(true)
+            && self.using_modifier_ignoring_skill != Some(true);
+
         // Java: dodge(doRoll) → roll and check; a fresh die is published as DODGE_ROLL.
         if self.dodge_roll == 0 {
             self.dodge_roll = rng.d6();
@@ -259,7 +272,7 @@ impl StepMoveDodge {
         // Java (failure branch, no modifying skill): remove the BT modifier and, when Break
         // Tackle is not already committed this activation, `addReport(new ReportSkillUse(null,
         // btSkill, false, WOULD_NOT_HELP))` — BEFORE the ReportDodgeRoll (dwarf_vs_orc bb2020 s3).
-        if has_bt && !self.using_break_tackle
+        if do_roll && has_bt && !self.using_break_tackle
             && !DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll)
         {
             game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
@@ -294,7 +307,7 @@ impl StepMoveDodge {
         let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
             .map(|a| a.name == "DODGE").unwrap_or(false)
             && self.re_roll_state.re_roll_source.is_some();
-        {
+        if do_roll {
             use ffb_model::report::mixed::report_dodge_roll::ReportDodgeRoll;
             game.report_list.add(ReportDodgeRoll::new(
                 player_id.clone(),
@@ -744,6 +757,23 @@ mod tests {
         assert!(out.prompt.is_some(),
             "AG3: min 3 succeeds bare but max(2, 3+2) = 5 fails, so Java asks 'Diving Tackle can \
              make this dodge fail. Reroll the dodge now?'");
+    }
+
+    /// Java writes ReportDodgeRoll only when `pDoRoll`; DECLINING the pre-emptive Diving-Tackle
+    /// re-roll re-enters with `doRoll == false`, so the dodge is reported exactly once
+    /// (dwarf_vs_human bb2025 seed 2: Rust reported it a second time).
+    #[test]
+    fn declined_diving_tackle_reroll_does_not_report_the_dodge_twice() {
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, mut step) = dt_threat_fixture(3);
+        step.dodge_roll = 3;
+        let mut rng = GameRng::new(0);
+        let out = step.execute_step(&mut game, &mut rng);
+        assert!(out.prompt.is_some(), "the DT re-roll is offered");
+        step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut rng);
+        let dodges = game.report_list.get_reports().iter()
+            .filter(|r| r.get_id() == ReportId::DODGE_ROLL).count();
+        assert_eq!(dodges, 1, "one dodge, one report");
     }
 
     /// The whole pre-emptive Diving-Tackle re-roll is a BB2025 addition. `make_step_for` has no
