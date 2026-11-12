@@ -14,8 +14,4 @@ java twins: 12036 same length: 1787
      name     3 Tacklezone                     java=9
      name     4 Tacklezone                     java=1
      name     Big Hand                         java=2
-     name     Diving Tackle                    java=489
-     name     Dump-Off                         java=19
-     name     Safe Pair Of Hands               java=17
-     name     Sidestep                         java=1
      name     Sure Hands                       java=2
