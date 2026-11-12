@@ -50,6 +50,14 @@ impl ModificationAwareInjuryType for InjuryTypeFoul {
         let defender_ignores_skill_armor_mods = game.player(defender_id)
             .map(|p| p.has_unused_skill_with_property(NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS))
             .unwrap_or(false);
+        if defender_ignores_skill_armor_mods
+            && !self.ctx.armor_modifiers.iter().any(|m| m.name == "Iron Hard Skin")
+        {
+            // Java getFoulAssist returns IHS's own value-0 modifier, which NAMES the skill in the
+            // report (dark_elf_vs_chaos_dwarf bb2025 seed 3 foul). The armour total is unchanged.
+            self.ctx.add_armor_modifier(ffb_mechanics::modifiers::Modifier::new(
+                "Iron Hard Skin", 0, game.rules));
+        }
         if let Some(aid) = attacker_id {
             let off = UtilPlayer::find_offensive_foul_assists(game, aid, defender_id) as i32;
             let def = UtilPlayer::find_defensive_foul_assists(game, aid, defender_id) as i32;
@@ -240,6 +248,8 @@ mod tests {
         it.armour_roll(&game, &mut ffb_model::util::rng::GameRng::new(0), Some("att"), "vic", true);
         assert!(it.ctx.armor_modifiers.iter().all(|m| !m.name.contains("Assist")),
             "IHS must suppress the foul-assist modifiers, negative included");
+        // ...and the skill's own value-0 modifier takes their place, naming it in the report.
+        assert!(it.ctx.armor_modifiers.iter().any(|m| m.name == "Iron Hard Skin" && m.value == 0));
 
         // Without IHS the -2 applies.
         let mut game2 = game.clone();
