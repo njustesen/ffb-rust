@@ -244,11 +244,9 @@ impl StepBlockRoll {
             // can answer with Action::BlockChoice (a bare cont() waits forever).
             // Java: getResult().addReport(new ReportBlockRoll(teamId, fBlockRoll))
             {
-                let team_id = if game.home_playing {
-                    game.team_home.id.clone()
-                } else {
-                    game.team_away.id.clone()
-                };
+                // Java `showBlockRollDialog(false)`: the defender's team on dice-against with no
+                // re-roll to offer (see `block_roll_report_team`).
+                let team_id = self.block_roll_report_team(game, false);
                 // Java's single-block report is the TWO-argument constructor: no defender id
                 // (only `StepBlockRollMultiple` names the target). Rust passed the defender, so
                 // the report stream carried a `defenderId` Java's never has (report diff, H.50).
@@ -306,7 +304,8 @@ impl StepBlockRoll {
         // Java: showBlockRollDialog(...) re-reports the (unchanged) dice —
         // `getResult().addReport(new ReportBlockRoll(teamId, fBlockRoll))` runs on this path too.
         {
-            let team_id = if game.home_playing { game.team_home.id.clone() } else { game.team_away.id.clone() };
+            // Java `showBlockRollDialog(getReRollSource() == null)`.
+            let team_id = self.block_roll_report_team(game, self.re_roll_source.is_none());
             game.report_list.add(ReportBlockRoll::new(team_id, self.block_roll.clone(), None));
         }
         let mut out = StepOutcome::cont().with_prompt(self.block_choice_prompt(game));
@@ -335,6 +334,141 @@ impl StepBlockRoll {
         let Some(pid) = game.acting_player.player_id.as_deref() else { return false };
         let Some(player) = game.player(pid) else { return false };
         crate::util::util_server_re_roll::UtilServerReRoll::is_team_re_roll_available(game, player)
+    }
+
+    /// Java `showBlockRollDialog(noReRollUsed)`'s choice of reporting team:
+    ///
+    /// ```java
+    /// String teamId = homePlaying ? home : away;
+    /// if ((fNrOfDice < 0) && (noReRollUsed
+    ///         || (properties.stream().noneMatch(ReRollProperty::isActualReRoll) && actionToSource.isEmpty())))
+    ///     teamId = homePlaying ? away : home;     // the DEFENDER picks the die
+    /// getResult().addReport(new ReportBlockRoll(teamId, fBlockRoll));
+    /// ```
+    ///
+    /// `properties` / `actionToSource` are built only while no re-roll source is set, so on any
+    /// pass after a re-roll both are empty. The report is the only consumer here: Rust's prompts
+    /// already follow the Java dialog through `team_reroll_option` and `own_choice`.
+    fn block_roll_report_team(&self, game: &Game, no_re_roll_used: bool) -> String {
+        let defender_picks = self.nr_of_dice < 0
+            && (no_re_roll_used || !self.dialog_has_re_roll_option(game));
+        if game.home_playing != defender_picks { game.team_home.id.clone() } else { game.team_away.id.clone() }
+    }
+
+    /// Whether Java's block dialog lists any ACTUAL re-roll property (TRR, MASCOT) or any
+    /// skill re-roll in `actionToSource`. Mirrors the property-building block of
+    /// `showBlockRollDialog`, which runs only while `getReRollSource() == null`.
+    fn dialog_has_re_roll_option(&self, game: &Game) -> bool {
+        if self.re_roll_source.is_some() {
+            return false;
+        }
+        let Some(pid) = game.acting_player.player_id.as_deref() else { return false };
+        let Some(player) = game.player(pid) else { return false };
+        let blitzing = game.acting_player.player_action.map(|a| a.is_blitzing()).unwrap_or(false);
+        let unused = |property: &str| player.all_skill_ids()
+            .any(|id| id.properties().contains(&property) && !player.used_skills.contains(&id));
+        // Java UtilCards.getUnusedRerollSource(actingPlayer, action): an unused skill registering it.
+        let source_for = |action: &str| player.all_skill_ids()
+            .filter(|id| !player.used_skills.contains(id))
+            .any(|id| id.reroll_sources_for(game.rules).iter().any(|(a, _)| *a == action));
+        let factory = ffb_model::factory::block_result_factory::BlockResultFactory;
+        let results: Vec<Option<BlockResult>> = self.block_roll.iter().map(|r| factory.for_roll(*r)).collect();
+
+        // BB2020 runs this shared step, but Java's `bb2020/block/StepBlockRoll.showBlockRollDialog`
+        // decides the reporting team from a different option list (no properties/actionToSource):
+        // team, single-use, Pro, Consummate, Brawler, the blitz single-die skill and any-dice.
+        // With no re-roll source set (guarded above) every "after a re-roll" clause is moot and
+        // `reRolledDiceIndexes` is empty, so each option reduces to its availability.
+        if game.rules == ffb_model::enums::Rules::Bb2020 {
+            use crate::util::util_server_re_roll::UtilServerReRoll;
+            let brawler = !blitzing
+                && player.has_skill_property(NamedProperties::CAN_REROLL_SINGLE_BOTH_DOWN)
+                && results.contains(&Some(BlockResult::BothDown));
+            return UtilServerReRoll::is_team_re_roll_available(game, player)
+                || UtilServerReRoll::is_single_use_re_roll_available(game, player)
+                || unused(NamedProperties::CAN_REROLL_ONCE_PER_TURN)
+                || unused(NamedProperties::CAN_REROLL_SINGLE_DIE_ONCE_PER_PERIOD)
+                || brawler
+                || (blitzing && unused(NamedProperties::CAN_REROLL_SINGLE_BLOCK_DIE_DURING_BLITZ))
+                || unused(NamedProperties::CAN_RE_ROLL_ANY_NUMBER_OF_BLOCK_DICE);
+        }
+
+        // singleBlock (SINGLE_BLOCK_DIE), in Java's if/else order.
+        let single_block = (Self::block_would_knock_down_attacker(game, player, blitzing, &results, self.nr_of_dice < 0)
+                && unused(NamedProperties::CAN_REROLL_SINGLE_BLOCK_DIE_WHEN_WOULD_BE_KNOCKED_DOWN))
+            || (blitzing && unused(NamedProperties::CAN_REROLL_SINGLE_BLOCK_DIE_DURING_BLITZ))
+            || unused(NamedProperties::CAN_REROLL_SINGLE_BLOCK_DIE_ONCE_PER_PERIOD)
+            || Self::is_attacker_working_in_tandem(game, player);
+        if single_block
+            || source_for("SINGLE_DIE")
+            || source_for("MULTI_BLOCK_DICE")
+            || source_for("SINGLE_DIE_PER_ACTIVATION")
+        {
+            return true;
+        }
+        // properties: TRR and MASCOT are the actual re-rolls (findAdditionalReRollProperty only ever
+        // adds non-actual ones such as BRILLIANT_COACHING).
+        if crate::util::util_server_re_roll::UtilServerReRoll::is_team_re_roll_available(game, player) {
+            return true;
+        }
+        let mechanic = crate::mechanic::roll_mechanic_for(game.rules);
+        if mechanic.is_mascot_available(game, player) {
+            return true;
+        }
+        // evaluateBrawlerAvailability: a both-down with an unused (or always-allowed) Brawler.
+        if let Some(brawler) = player.skill_id_with_property(NamedProperties::CAN_REROLL_SINGLE_BOTH_DOWN) {
+            let allowed = !blitzing
+                && (ffb_model::option::util_game_option::is_option_enabled(
+                        game, ffb_model::option::game_option_id::ALLOW_BRAWLER_ON_BOTH_BLOCKS)
+                    || !player.used_skills.contains(&brawler));
+            if allowed && results.contains(&Some(BlockResult::BothDown)) && source_for("SINGLE_BOTH_DOWN") {
+                return true;
+            }
+        }
+        // evaluateHatredAvailability: a skull against a defender carrying a hated keyword.
+        if let Some(hatred) = player.skill_id_with_property(NamedProperties::CAN_REROLL_SINGLE_SKULL) {
+            let hated = player.skill_value_excluding_temporary_ones(hatred).unwrap_or_default().to_lowercase();
+            let hated_present = game.defender_id.as_deref().and_then(|d| game.player(d))
+                .map(|def| def.keywords.iter().any(|k| !hated.is_empty() && hated.contains(&k.to_lowercase())))
+                .unwrap_or(false);
+            if hated_present && results.contains(&Some(BlockResult::Skull)) && source_for("SINGLE_SKULL") {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Java `UtilPlayer.blockWouldKnockDownAttacker(game, actingPlayer, blockRoll, defenderChooses)`.
+    fn block_would_knock_down_attacker(game: &Game, player: &ffb_model::model::player::Player, blitzing: bool,
+                                       results: &[Option<BlockResult>], defender_chooses: bool) -> bool {
+        let _ = game;
+        let both_down_safe = player.has_skill_property(NamedProperties::PREVENT_FALL_ON_BOTH_DOWN)
+            || player.has_skill_property(NamedProperties::CAN_TAKE_DOWN_PLAYERS_WITH_HIM_ON_BOTH_DOWN)
+            || (blitzing && player.has_skill_property(NamedProperties::CAN_CONVERT_BOTH_DOWN_TO_PUSH));
+        let knocks = |r: &Option<BlockResult>| matches!(r, Some(BlockResult::Skull))
+            || (matches!(r, Some(BlockResult::BothDown)) && !both_down_safe);
+        if defender_chooses { results.iter().any(knocks) } else { results.iter().all(knocks) }
+    }
+
+    /// Java `UtilPlayer.isAttackerWorkingInTandem(game, attacker, defender)`: the attacker's
+    /// Working in Tandem is the BLOCK variant and more than one opposing player with that skill is
+    /// adjacent to the defender (`partnerMarksDefender`).
+    fn is_attacker_working_in_tandem(game: &Game, player: &ffb_model::model::player::Player) -> bool {
+        let Some(tandem) = player.skill_id_with_property(
+            NamedProperties::CAN_REROLL_SINGLE_BLOCK_DIE_WHEN_PARTNER_IS_MARKING) else { return false };
+        let variant = player.skill_value_excluding_temporary_ones(tandem).unwrap_or_default();
+        if !variant.eq_ignore_ascii_case("block") {
+            return false;
+        }
+        let Some(def_id) = game.defender_id.as_deref() else { return false };
+        let Some(def_coord) = game.field_model.player_coordinate(def_id) else { return false };
+        let def_home = game.team_home.players.iter().any(|p| p.id == def_id);
+        let opponents = if def_home { &game.team_away.players } else { &game.team_home.players };
+        opponents.iter()
+            .filter(|p| p.all_skill_ids().any(|id| id == tandem))
+            .filter(|p| game.field_model.player_coordinate(&p.id)
+                .map(|c| c.is_adjacent(def_coord)).unwrap_or(false))
+            .count() > 1
     }
 
     /// The TRR half of Java's block dialog, as an agent prompt. The source is `"TRR"` because
