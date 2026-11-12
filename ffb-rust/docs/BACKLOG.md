@@ -9408,6 +9408,25 @@ on unequal team values; Rust's parity pregame skips it; report-only today); (2) 
 tier (`ffb-server` wire fidelity), deferred by the user until logic parity — which this closes;
 (3) the 10 mirror gates short on the coverage checklist, unchanged since §H.57.
 
+## §I.12 — 2026-11-12: §I.9 (real pregame) CERTIFIED — mirror 330/330 + cross 4012/4012, one build
+
+The §I.9 build (`2a105e7a6`, the real edition pregame with purchases declined, pushed before its
+certification) re-certified on the unchanged binary and jar:
+
+- **Mirror** `docs/SWEEP_2026-11-12_REPORTS.txt`: 110 cells x 3 scales x 100 seeds, **330/330**,
+  the same 10 coverage-short gates as before. Post-sweep artifacts: census, oracle check, coverage
+  gaps, and the first `docs/REPORT_PARITY_2026-11-12.txt` (report-identical baseline: 8/33,000).
+- **Cross** `docs/CROSS_SWEEP_2026-11-12_PREGAME.txt`: every ordered pair, 3 seeds, **4012/4012**,
+  0 failed, 0 without a verdict, 823 min summed on 5 workers.
+- **Pregame census** over the 12,036 cross games (equal-TV mirrors skip the bb2020/bb2025 purchase
+  phase, so only cross games exercise it): pettyCash 4872, freePettyCash 7536, cardsBought 4872,
+  inducementsBought 4872, cardsAndInducementsBought 7716, prayersAndInducementsBought 7356 —
+  **java == rust for every kind**; the oracle check is empty.
+
+The step-0 hazards of §I.9 (option-default change, kickoff push) produced no red. Report-stream
+work on top of this build is §J; the 859/362 report-count gap §I.9 flagged was the bb2016
+WINNINGS_RE_ROLL harness gap, fixed in §J.
+
 ## §J — 2026-11-12: REPORT-STREAM PARITY (in progress)
 
 Goal (user-selected 2026-11-12): on top of 100% step parity, drive the per-game **report streams**
