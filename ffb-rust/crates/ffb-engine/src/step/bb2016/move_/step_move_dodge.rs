@@ -249,8 +249,10 @@ impl StepMoveDodge {
                 ).is_empty()
             });
             if let Some(source) = skill_source {
-                let pid = player_id.as_deref().unwrap_or("").to_owned();
-                use_reroll(game, &source, &pid, rng);
+                // Java: setReRollSource(skill); useReRoll(...); status = dodge(true) — ONE use. The
+                // re-entry below takes the `already_rerolled` branch, which is where that single
+                // `use_reroll` happens; calling it here as well wrote a second `reRoll` report
+                // (Dodge, successful=false, the skill now spent) that Java never writes.
                 self.re_roll_state.re_roll_source = Some(source);
                 self.dodge_roll = 0;
                 return self.execute_step(game, rng);
@@ -324,12 +326,14 @@ impl StepMoveDodge {
     }
 
     fn fail_dodge(&self) -> StepOutcome {
-        // Java: BB2016 uses InjuryTypeDropDodge (not InjuryTypeFallDown)
+        // Java bb2016 failDodge: publishParameter(INJURY_TYPE, new InjuryTypeDropDodge()).
+        // bb2016 has no Steady Footing; its StepFallDown reads INJURY_TYPE only. Publishing a
+        // SteadyFootingContext left StepFallDown on its default InjuryTypeDropGFI, so every failed
+        // bb2016 dodge was reported as `dropGfi`.
         // client-only: Arm-Bar dialog can override injuryType to InjuryTypeArmBar — headless uses default injury type
-        let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeDropDodge".into());
         let label = self.goto_label_on_failure.clone();
         StepOutcome::goto(&label)
-            .publish(StepParameter::SteadyFootingContext(Box::new(ctx)))
+            .publish(StepParameter::InjuryTypeName("InjuryTypeDropDodge".into()))
     }
 }
 
@@ -390,7 +394,9 @@ mod tests {
     }
 
     #[test]
-    fn failure_publishes_steady_footing_context() {
+    fn failure_publishes_the_drop_dodge_injury_type() {
+        // Java bb2016 failDodge: publishParameter(INJURY_TYPE, new InjuryTypeDropDodge()) — read by
+        // the bb2016 StepFallDown (which otherwise defaults to InjuryTypeDropGFI).
         let mut game = make_game();
         game.home_playing = true;
         game.turn_data_home.rerolls = 0;
@@ -398,7 +404,9 @@ mod tests {
         let mut step = StepMoveDodge::new("fail".into());
         step.dodge_roll = 1;
         let out = step.start(&mut game, &mut GameRng::new(0));
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))));
+        assert!(out.published.iter().any(|p|
+            matches!(p, StepParameter::InjuryTypeName(n) if n == "InjuryTypeDropDodge")));
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))));
     }
 
     #[test]

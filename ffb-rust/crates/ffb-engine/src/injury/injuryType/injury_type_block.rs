@@ -276,6 +276,15 @@ impl ModificationAwareInjuryType for InjuryTypeBlock {
             if let Some(m) = niggling_injury_modifier(defender.niggling_injuries) {
                 self.ctx.add_injury_modifier(m);
             }
+            // Java (BEFORE the mode gate, so also for DO_NOT_USE_MODIFIERS, e.g. the bb2020
+            // both-down defender):
+            //     Skill stunty = pDefender.getSkillWithProperty(isHurtMoreEasily);
+            //     if (stunty != null) injuryContext.addInjuryModifiers(stunty.getInjuryModifiers());
+            // Stunty registers one value-0 StaticInjuryModifier("Stunty") in every edition; the
+            // numeric effect lives in the injury interpretation, so this only names it.
+            if defender.has_skill_property(NamedProperties::IS_HURT_MORE_EASILY) {
+                self.ctx.add_injury_modifier(Modifier::new("Stunty", 0, game.rules));
+            }
         }
         // Java injuryRoll (lines 54-60): mode != USE_ARMOUR_MODIFIERS_ONLY_AGAINST_TEAM_MATES &&
         // (mode == USE_MODIFIERS_AGAINST_TEAM_MATES || (mode != DO_NOT_USE_MODIFIERS && different teams)).
@@ -332,6 +341,11 @@ impl ModificationAwareInjuryType for InjuryTypeBlock {
                             am.name == m.get_name() || (chainsaw_withholds_mb && am.name == "Chainsaw")
                         });
                         if affects_either_on_block && armour_used_either_or {
+                            continue;
+                        }
+                        // Java adds into a Set: the Stunty modifier added unconditionally above is
+                        // the same object the factory returns, so it is not listed twice.
+                        if self.ctx.injury_modifiers.iter().any(|im| im.name == m.get_name()) {
                             continue;
                         }
                         self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), Some(attacker), defender, game.rules));

@@ -151,8 +151,15 @@ impl StepReferee {
             .unwrap_or(false);
         referee_spots_foul |= under_scrutiny;
 
-        // Java: addReport(new ReportReferee(refereeSpotsFoul, underScrutiny))
-        game.report_list.add(ReportReferee::new(referee_spots_foul, under_scrutiny));
+        // Java: addReport(new ReportReferee(refereeSpotsFoul, underScrutiny)) — bb2020/bb2025.
+        // bb2016 SneakyGitBehaviour writes the bb2016 class, `new ReportReferee(refereeSpotsFoul)`,
+        // which has no underScrutiny field at all (bb2016 has no prayers).
+        if game.rules == ffb_model::enums::Rules::Bb2016 {
+            game.report_list.add(
+                ffb_model::report::bb2016::report_referee::ReportReferee::new(referee_spots_foul));
+        } else {
+            game.report_list.add(ReportReferee::new(referee_spots_foul, under_scrutiny));
+        }
         let referee_event = GameEvent::RefereeSpotsFoul { referee_spots_foul, under_scrutiny };
 
         // Java: if (!refereeSpotsFoul) { loop over opponentInducementSet.value(Usage.SPOT_FOUL) }

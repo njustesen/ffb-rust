@@ -1037,6 +1037,13 @@ impl DriverGameState {
                             team_id: r.team_id.clone(),
                             roll: r.roll,
                         });
+                    } else if let Some(r) = any.downcast_ref::<
+                        ffb_model::report::mixed::report_swarming_roll::ReportSwarmingRoll>() {
+                        // BB2016/BB2020 write the mixed report from the same live step.
+                        out.push(GameEvent::SwarmingPlayersRoll {
+                            team_id: r.team_id.clone().unwrap_or_default(),
+                            roll: if r.roll >= 0 { r.roll } else { r.amount },
+                        });
                     }
                 }
                 ReportId::ARGUE_THE_CALL => {

@@ -167,9 +167,15 @@ impl StepSwarming {
         let mut has_swarming_reserves = false;
         let mut players_on_pitch: Vec<String> = Vec::new();
         let mut players_reserve_no_swarming: Vec<String> = Vec::new();
+        // Java bb2020 SwarmingBehaviour: `limitingAmount = swarmersOnPitch` (Swarming players
+        // already on the field cap how many may swarm on).
+        let mut swarmers_on_pitch = 0;
         for p in &team.players {
             let coord = game.field_model.player_coordinate(&p.id);
             if coord.map(|c| FieldCoordinateBounds::FIELD.is_in_bounds(c)).unwrap_or(false) {
+                if p.has_skill(SkillId::Swarming) {
+                    swarmers_on_pitch += 1;
+                }
                 players_on_pitch.push(p.id.clone());
             } else if game.field_model.player_state(&p.id).map(|s| s.base() == PS_RESERVE).unwrap_or(false) {
                 // bb2025 keys the reserve on the LINEMAN keyword; the bb2016/bb2020 behaviour
@@ -210,8 +216,20 @@ impl StepSwarming {
         // read d6, so even where the step did fire it consumed the wrong die.
         self.rolled_amount = rng.d3();
 
-        // Java: addReport(new ReportSwarmingRoll(state.teamId, state.rolledAmount))
-        game.report_list.add(ReportSwarmingRoll::new(team_id.clone(), self.rolled_amount));
+        // The report differs per edition, and BB2016/BB2020 run this shared step:
+        //   bb2025 StepSwarming:     new ReportSwarmingRoll(teamId, rolledAmount)
+        //   bb2020 SwarmingBehaviour: new ReportSwarmingRoll(teamId, allowedAmount = min(limit, rolled),
+        //                                                    rolledAmount, limitingAmount)
+        //   bb2016 SwarmingBehaviour: new ReportSwarmingRoll(teamId, allowedAmount = rolled, -1, -1)
+        match game.rules {
+            ffb_model::enums::Rules::Bb2020 => game.report_list.add(
+                ffb_model::report::mixed::report_swarming_roll::ReportSwarmingRoll::new(
+                    Some(team_id.clone()), swarmers_on_pitch.min(self.rolled_amount), self.rolled_amount, swarmers_on_pitch)),
+            ffb_model::enums::Rules::Bb2016 => game.report_list.add(
+                ffb_model::report::mixed::report_swarming_roll::ReportSwarmingRoll::new(
+                    Some(team_id.clone()), self.rolled_amount, -1, -1)),
+            _ => game.report_list.add(ReportSwarmingRoll::new(team_id.clone(), self.rolled_amount)),
+        }
 
         // Java pushes itself back on the stack and shows DialogSwarmingPlayersParameter, then
         // waits for the coach to place swarmers and end the turn. **ParityRunner has no SWARMING

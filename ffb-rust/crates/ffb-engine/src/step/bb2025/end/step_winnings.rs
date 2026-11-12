@@ -32,15 +32,19 @@ impl StepWinnings {
         let mut home_winnings = game.game_result.home.score as f64;
         let mut away_winnings = game.game_result.away.score as f64;
 
-        if !game.game_result.home.stalled { home_winnings += 1.0; }
-        if !game.game_result.away.stalled { away_winnings += 1.0; }
+        // BB2020 runs this shared step, but `bb2020/end/StepWinnings` has neither the
+        // "+1 unless the team stalled" bonus nor the zeroing of an illegally-conceding team: there
+        // winnings are just score + attendance share (every bb2020 game reported 10k more per team).
+        let bb2025 = game.rules != ffb_model::enums::Rules::Bb2020;
+        if bb2025 && !game.game_result.home.stalled { home_winnings += 1.0; }
+        if bb2025 && !game.game_result.away.stalled { away_winnings += 1.0; }
 
         if game.game_result.home.conceded && !game.conceded_legally {
             away_winnings += attendance;
-            home_winnings = 0.0;
+            if bb2025 { home_winnings = 0.0; }
         } else if game.game_result.away.conceded && !game.conceded_legally {
             home_winnings += attendance;
-            away_winnings = 0.0;
+            if bb2025 { away_winnings = 0.0; }
         } else {
             home_winnings += attendance / 2.0;
             away_winnings += attendance / 2.0;
@@ -86,6 +90,28 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2025)
+    }
+
+    /// BB2020 runs this step too, with Java's bb2020 formula: no "+1 unless stalled" bonus, and an
+    /// illegally-conceding team keeps its score share.
+    #[test]
+    fn bb2020_has_no_stall_bonus_and_no_concession_zeroing() {
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        game.game_result.home.score = 2;
+        game.game_result.away.score = 1;
+        game.game_result.home.fan_factor = 5;
+        game.game_result.away.fan_factor = 5;
+        StepWinnings.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.game_result.home.winnings, 70_000);
+        assert_eq!(game.game_result.away.winnings, 60_000);
+
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        game.game_result.home.score = 1;
+        game.game_result.home.conceded = true;
+        game.game_result.away.fan_factor = 4;
+        StepWinnings.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.game_result.home.winnings, 10_000, "bb2020 does not zero the conceding team");
+        assert_eq!(game.game_result.away.winnings, 40_000);
     }
 
     /// Symmetric normal game: each team gets score+1 + half of attendance.
