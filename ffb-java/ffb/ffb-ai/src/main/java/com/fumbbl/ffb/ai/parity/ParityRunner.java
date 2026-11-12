@@ -1335,6 +1335,22 @@ public class ParityRunner {
                 break;
             }
 
+            case WINNINGS_RE_ROLL: {
+                // bb2016 StepWinnings shows DialogWinningsReRollParameter to the WINNING team after
+                // the winnings roll. Unhandled, the dialog re-fired until the sameDialog abort and
+                // the step re-rolled winnings ~500 times (BACKLOG §J: Java 859 / Rust 360 reports).
+                // DECLINE: CLIENT_USE_RE_ROLL(WINNINGS, null) -> reRolledAction WINNINGS with no
+                // source -> no re-roll, dialog stays null -> concedeWinnings + NEXT_STEP. Inject
+                // as the dialog's team (StepWinnings is answered by the winner).
+                comm.clearCaptured();
+                comm.sendUseReRoll(com.fumbbl.ffb.ReRolledActions.WINNINGS, null);
+                injectCaptured(dialog, game, gameState);
+                if (game.getDialogParameter() == dialog) {
+                    game.setDialogParameter(null);
+                }
+                break;
+            }
+
             case PETTY_CASH: {
                 // bb2016 StepPettyCash blocks on a ClientCommandPettyCash whenever a team's
                 // treasury is >= 50k and FORCE_TREASURY_TO_PETTY_CASH is off (goblin 80k,
@@ -4368,6 +4384,9 @@ public class ParityRunner {
         }
         if (dialog instanceof com.fumbbl.ffb.dialog.DialogPettyCashParameter) {
             return ((com.fumbbl.ffb.dialog.DialogPettyCashParameter) dialog).getTeamId();
+        }
+        if (dialog instanceof com.fumbbl.ffb.dialog.DialogWinningsReRollParameter) {
+            return ((com.fumbbl.ffb.dialog.DialogWinningsReRollParameter) dialog).getTeamId();
         }
         return null;
     }
