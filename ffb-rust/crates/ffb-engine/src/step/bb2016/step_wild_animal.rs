@@ -278,4 +278,19 @@ mod tests {
             "CONFUSION_ROLL report must be added after a failed Wild Animal roll"
         );
     }
+
+    /// Java: a DECLINED re-roll (reRolledAction == WILD_ANIMAL, source == null) sets
+    /// `doRoll = false` and fails the action — no die, no ReportConfusionRoll.
+    #[test]
+    fn declined_reroll_writes_no_confusion_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game(vec![SkillId::WildAnimal], Some(PlayerAction::Block));
+        game.turn_data_home.rerolls = 1;
+        let mut step = StepWildAnimal::new("fail".into());
+        step.start(&mut game, &mut GameRng::new(seed_for_d6(1)));
+        game.report_list.clear();
+        let out = step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::CONFUSION_ROLL));
+        assert_eq!(out.action, StepAction::GotoLabel);
+    }
 }

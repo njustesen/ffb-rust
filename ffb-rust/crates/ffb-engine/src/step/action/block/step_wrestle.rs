@@ -225,6 +225,8 @@ impl StepWrestle {
                     SkillUse::NO_TACKLEZONE,
                 ));
             } else if attacker_has || defender_has {
+                // Java (all editions): addReport(new ReportSkillUse(null, skill, false, null)).
+                game.report_list.add(ReportSkillUse::new_without_skill_use(None, SkillId::Wrestle, false));
                 events.push(GameEvent::SkillUse { player_id: player_id.to_string(), skill_id: skill_num, used: false });
             }
         }
@@ -439,6 +441,13 @@ mod tests {
         let outcome = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(outcome.action, StepAction::NextStep);
         assert!(outcome.events.iter().any(|e| matches!(e, GameEvent::SkillUse { used: false, .. })));
+        // Java: addReport(new ReportSkillUse(null, skill, false, null)) — no player, null use.
+        let json = game.report_list.get_reports().iter()
+            .filter_map(|r| r.to_json())
+            .find(|j| j["reportId"] == "skillUse").expect("a Wrestle skillUse report");
+        assert!(json["playerId"].is_null());
+        assert!(json["skillUse"].is_null());
+        assert_eq!(json["used"], false);
     }
 
     #[test]

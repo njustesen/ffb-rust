@@ -134,11 +134,10 @@ impl StepJuggernaut {
             outcome
         } else {
             // Java: addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, false, null))
-            game.report_list.add(ReportSkillUse::new(
+            game.report_list.add(ReportSkillUse::new_without_skill_use(
                 Some(player_id.clone()),
                 SkillId::Juggernaut,
                 false,
-                SkillUse::WOULD_NOT_HELP,
             ));
             StepOutcome::next()
                 .with_event(GameEvent::SkillUse { player_id, skill_id: skill_num, used: false })

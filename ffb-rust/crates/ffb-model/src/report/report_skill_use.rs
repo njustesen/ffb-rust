@@ -11,6 +11,10 @@ pub struct ReportSkillUse {
     pub skill: SkillId,
     pub used: bool,
     pub skill_use: SkillUse,
+    /// Java passes `skillUse == null` at a handful of sites (a declined Dump-Off, Wrestle, a
+    /// Juggernaut that is not used): the JSON then carries `"skillUse": null`. `skill_use` keeps
+    /// a placeholder for the accessors; this flag is what the serialiser honours.
+    pub skill_use_is_null: bool,
 }
 
 impl ReportSkillUse {
@@ -20,7 +24,12 @@ impl ReportSkillUse {
         used: bool,
         skill_use: SkillUse,
     ) -> Self {
-        Self { player_id, skill, used, skill_use }
+        Self { player_id, skill, used, skill_use, skill_use_is_null: false }
+    }
+
+    /// Java `new ReportSkillUse(playerId, skill, used, null)`.
+    pub fn new_without_skill_use(player_id: Option<String>, skill: SkillId, used: bool) -> Self {
+        Self { player_id, skill, used, skill_use: SkillUse::WOULD_NOT_HELP, skill_use_is_null: true }
     }
 
     pub fn get_player_id(&self) -> Option<&str> { self.player_id.as_deref() }
@@ -36,7 +45,8 @@ impl ReportSkillUse {
             // display name ("Eye Gouge"), not the class name ("EyeGouge").
             "skill": self.skill.display_name(),
             "used": self.used,
-            "skillUse": self.skill_use.get_name(),
+            "skillUse": if self.skill_use_is_null { serde_json::Value::Null }
+                        else { serde_json::Value::from(self.skill_use.get_name()) },
         })
     }
 
@@ -46,6 +56,7 @@ impl ReportSkillUse {
             skill: json["skill"].as_str().and_then(SkillId::from_class_name).unwrap_or(SkillId::Block),
             used: json["used"].as_bool().unwrap_or(false),
             skill_use: json["skillUse"].as_str().and_then(SkillUse::for_name).unwrap_or(SkillUse::WOULD_NOT_HELP),
+            skill_use_is_null: json["skillUse"].is_null(),
         }
     }
 }

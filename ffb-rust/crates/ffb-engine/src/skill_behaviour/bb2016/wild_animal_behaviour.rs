@@ -171,15 +171,11 @@ impl StepModifierTrait for WildAnimalStepModifier {
         let min_roll = minimum_roll_confusion(good_conditions);
 
         if skip_roll {
+            // Java: `doRoll = false; status = FAILURE; cancelPlayerAction(step)` — the
+            // ReportConfusionRoll lives inside `if (doRoll)`, so a declined (or unusable) re-roll
+            // writes NO report. Rust wrote a fabricated roll-1 reRolled report here (bb2016
+            // norse_vs_chaos seed 1, every declined Wild Animal re-roll).
             let confusion_event = GameEvent::ConfusionRoll { player_id: player_id.clone(), roll: 1, confused: true };
-            game.report_list.add(ReportConfusionRoll::new(
-                Some(player_id.clone()),
-                false,
-                1,
-                min_roll,
-                true,
-                Some(SkillId::WildAnimal.category_and_name_for(game.rules).1.to_string()),
-            ));
             cancel_wild_animal_bb2016(game, &player_id);
             state.outcome = Some(
                 StepOutcome::goto(&state.goto_label_on_failure)

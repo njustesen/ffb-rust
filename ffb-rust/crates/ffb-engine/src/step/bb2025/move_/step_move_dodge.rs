@@ -256,6 +256,17 @@ impl StepMoveDodge {
         let bt_saved_it = has_bt
             && DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll)
             && !DiceInterpreter::is_skill_roll_successful(self.dodge_roll, min_no_bt);
+        // Java (failure branch, no modifying skill): remove the BT modifier and, when Break
+        // Tackle is not already committed this activation, `addReport(new ReportSkillUse(null,
+        // btSkill, false, WOULD_NOT_HELP))` — BEFORE the ReportDodgeRoll (dwarf_vs_orc bb2020 s3).
+        if has_bt && !self.using_break_tackle
+            && !DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll)
+        {
+            game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
+                None, ffb_model::enums::SkillId::BreakTackle, false,
+                ffb_model::model::skill_use::SkillUse::WOULD_NOT_HELP,
+            ));
+        }
         let (minimum_roll, mod_names, dodge_total) = if has_bt && !bt_saved_it {
             (min_no_bt, names_no_bt, total_no_bt)
         } else {
@@ -786,6 +797,22 @@ mod tests {
         assert!(!step.using_break_tackle);
         assert!(!game.player("dodger").unwrap().used_skills.contains(&SkillId::BreakTackle),
             "BT unused when the bare roll already succeeds");
+    }
+
+    /// Java FAILURE branch: BT could not save the dodge → `ReportSkillUse(null, btSkill, false,
+    /// WOULD_NOT_HELP)` before the dodge roll report (dwarf_vs_orc bb2020 seed 3).
+    #[test]
+    fn break_tackle_that_cannot_save_the_dodge_reports_would_not_help() {
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, mut step) = bt_dodge_fixture();
+        step.dodge_roll = 1; // fails even with BT
+        let mut rng = GameRng::new(0);
+        step.execute_step(&mut game, &mut rng);
+        let ids: Vec<ReportId> = game.report_list.get_reports().iter().map(|r| r.get_id()).collect();
+        let su = ids.iter().position(|i| *i == ReportId::SKILL_USE).expect("BT wouldNotHelp report");
+        let dr = ids.iter().position(|i| *i == ReportId::DODGE_ROLL).expect("dodge roll report");
+        assert!(su < dr, "skillUse precedes the dodge roll: {ids:?}");
+        assert!(!step.using_break_tackle);
     }
 
     /// Java `StepMoveDodge.dodge` FAILURE branch: `uncanceledDodgeRerollSource` returns null when

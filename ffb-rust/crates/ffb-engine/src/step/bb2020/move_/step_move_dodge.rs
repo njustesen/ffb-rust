@@ -172,6 +172,17 @@ impl StepMoveDodge {
         let bt_saved_it = has_bt
             && DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll)
             && !DiceInterpreter::is_skill_roll_successful(self.dodge_roll, min_no_bt);
+        // Java (failure branch, no modifying skill): remove the BT modifier and, when Break
+        // Tackle is not already committed this activation, `addReport(new ReportSkillUse(null,
+        // btSkill, false, WOULD_NOT_HELP))` — BEFORE the ReportDodgeRoll (dwarf_vs_orc bb2020 s3).
+        if has_bt && !self.using_break_tackle
+            && !DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll)
+        {
+            game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
+                None, ffb_model::enums::SkillId::BreakTackle, false,
+                ffb_model::model::skill_use::SkillUse::WOULD_NOT_HELP,
+            ));
+        }
         let (minimum_roll, mod_names) = if has_bt && !bt_saved_it {
             (min_no_bt, names_no_bt)
         } else {

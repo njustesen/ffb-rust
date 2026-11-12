@@ -129,11 +129,10 @@ impl StepDumpOff {
                 .unwrap_or(false);
             if defender_has {
                 // Java: addReport(new ReportSkillUse(defenderId, skill, false, null))
-                game.report_list.add(ReportSkillUse::new(
+                game.report_list.add(ReportSkillUse::new_without_skill_use(
                     defender_id.clone(),
                     SkillId::DumpOff,
                     false,
-                    SkillUse::WOULD_NOT_HELP,
                 ));
                 let event = GameEvent::SkillUse {
                     player_id: defender_id.unwrap_or_default(),
