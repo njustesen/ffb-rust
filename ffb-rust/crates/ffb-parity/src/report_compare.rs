@@ -108,8 +108,10 @@ pub fn normalise(v: &serde_json::Value) -> serde_json::Value {
 /// Java builds its modifier collections with `Collectors.toSet()` (`InjuryModifierFactory
 /// .getInjuryModifiers`), so the ORDER in `injuryModifiers` / `armorModifiers` / `rollModifiers` is
 /// a `HashSet` artefact, not information. Sort those arrays on both sides before comparing.
-const MODIFIER_KEYS: [&str; 5] =
-    ["armorModifiers", "injuryModifiers", "casualtyModifiers", "rollModifiers", "passModifiers"];
+const MODIFIER_KEYS: [&str; 7] =
+    ["armorModifiers", "injuryModifiers", "casualtyModifiers", "rollModifiers", "passModifiers",
+     // bb2025 ReportCheeringFans keeps both team lists in a java.util.HashSet.
+     "teamIdsAdditionalAssist", "teamIdsReRolledCheeringFangs"];
 
 fn report_id(v: &serde_json::Value) -> &str {
     v.get("reportId").and_then(|x| x.as_str()).unwrap_or("")

@@ -9407,3 +9407,49 @@ What remains open, in order: (1) §I.9 — the cross-match pregame (Java runs it
 on unequal team values; Rust's parity pregame skips it; report-only today); (2) the GUI-client
 tier (`ffb-server` wire fidelity), deferred by the user until logic parity — which this closes;
 (3) the 10 mirror gates short on the coverage checklist, unchanged since §H.57.
+
+## §J — 2026-11-12: REPORT-STREAM PARITY (in progress)
+
+Goal (user-selected 2026-11-12): on top of 100% step parity, drive the per-game **report streams**
+to identical — every `addReport` Java makes, Rust makes too, with the same payload. Stock Java is
+the oracle, so every difference is a Rust fidelity bug unless proven a harness artefact.
+
+**Instruments.** `scripts/report_first_diff.py` (new) ranks a sweep's divergences into families
+(only-java / only-rust / payload {keys}) by games affected, plus the FIRST divergence per game and
+the >10%-count gaps. `scripts/post_sweep.sh` step 5 now writes `docs/REPORT_PARITY_<tag>.txt`
+(identical games per edition) on every sweep — the instrument guard, since `report_compare` is
+advisory and a report regression never turns a step gate red. `report_diff.py` /
+`report_compare.rs` normalise numeric FUMBBL team ids and raised-player ids (`…Away1R1`).
+
+**Baseline.** The §I.12 mirror sweep (2026-11-12, the pushed §I.9 build):
+`docs/REPORT_PARITY_2026-11-12.txt` — **8 / 33,000** games report-identical.
+
+**Families fixed (19 commits, every one 1:1 with a Java line and a unit test; steps stayed 100%
+on every gate):** fired MOVE-form declarations (foul, bb2016 blitz, pass/hand-off moves);
+blockRoll choosingTeamId (dice-against with no re-roll; mascot availability needed its inducement);
+pushbackMode; confusion-skill display names; swarming payloads; Stunty; bb2020 winnings; bb2016
+referee, dodge, argue-the-call, half-time order, TTM distance, serious-injury kinds, regeneration
+order, roll modifiers, Dauntless, feeding, pitch-invasion roster arrays, heat-exhaustion flag,
+Wild Animal declined re-roll, leap modifiers, Break Tackle wouldNotHelp; bb2020 regeneration order
+and seriousInjuryOld; MVP nominations (prompt + MVP_NOMINATIONS=6); prayerEnd / prayerWasted /
+Intensive Training events; roll-modifier NAMES (not report strings); cheeringFans tie team;
+Dump-Off/Wrestle/Juggernaut skillUse (incl. Java's null skillUse); bb2025 dodge doRoll and
+modifiedDodgeResultSuccessful; Take Root's pushback guard (before Stand Firm) and Stand Firm's
+strip-ball event; Nerves of Steel pass marker; Catch interception re-roll; Iron Hard Skin armour
+name (10 injury types); bb2025 Hail Mary pass reports. The two oracle-check gaps of the baseline
+census (`modifiedDodgeResultSuccessful`, `prayerWasted`) are closed.
+
+**Measured on the current build (discovery mirrors, 2-seed batches):** bb2020 40/40 and bb2025
+40/41 identical on an all-roster seed-5 batch (the one red was the Hail Mary family, since fixed);
+earlier batches 51/62, 65/72, 53/78 with every bb2016 residue being the family below.
+
+**Open:**
+1. **bb2016 WINNINGS_RE_ROLL** — ParityRunner never answered the dialog, so Java re-rolls winnings
+   ~500 times (the 859-vs-360 "report-count gaps" are all this). Harness fix written
+   (`ParityRunner` `case WINNINGS_RE_ROLL` → decline as the dialog's team); needs the jar rebuilt,
+   which waits for cross sweep 5. Rust's StepWinnings already behaves like a decline.
+2. **Stab armour port** — `InjuryTypeStab` lacks Sneaky Git and the Iron Hard Skin name (rare pair).
+3. bb2020/bb2025 pregame purchase reports appear only in CROSS games (equal-TV mirrors skip the
+   phase); census check moves to the cross-sweep output.
+4. Final certification: mirror + cross on one build with the identical-report count recorded.
+

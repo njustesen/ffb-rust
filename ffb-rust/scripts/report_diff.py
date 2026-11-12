@@ -45,7 +45,9 @@ def norm_str(s):
 
 
 # Java builds modifier collections with Collectors.toSet(), so their order is a HashSet artefact.
-MODIFIER_KEYS = {'armorModifiers', 'injuryModifiers', 'casualtyModifiers', 'rollModifiers', 'passModifiers'}
+MODIFIER_KEYS = {'armorModifiers', 'injuryModifiers', 'casualtyModifiers', 'rollModifiers', 'passModifiers',
+                 # bb2025 ReportCheeringFans keeps both team lists in a java.util.HashSet.
+                 'teamIdsAdditionalAssist', 'teamIdsReRolledCheeringFangs'}
 
 
 def norm(v):
