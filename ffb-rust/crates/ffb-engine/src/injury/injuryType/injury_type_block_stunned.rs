@@ -2,7 +2,7 @@
 /// ModificationAware: armor roll + injury roll. savedByArmour -> STUNNED (override).
 ///
 /// See `injury_type_block_prone.rs` for the detailed Java trace: Stunty's registered injury
-/// modifier is value-0 (a marker only; Rust detects Stunty directly via `has_skill`), and this
+/// modifier is value-0 (added after the roll only so the report names it), and this
 /// type never adds niggling injury modifiers (unlike plain `Block`, which does).
 use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE, PS_STUNNED};
 use ffb_model::types::FieldCoordinate;
@@ -37,6 +37,15 @@ impl ModificationAwareInjuryType for InjuryTypeBlockStunned {
     }
     fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str) {
         do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
+        // Java: `addInjuryModifiers(stunty.getInjuryModifiers())` — Stunty's value-0
+        // StaticInjuryModifier carries no total but NAMES the skill in the report
+        // (goblin_vs_renegades_37733 bb2025 seed 3, blockStunned).
+        if game.player(defender_id).map(|p| p.has_skill_property(
+            ffb_model::model::property::named_properties::NamedProperties::IS_HURT_MORE_EASILY)).unwrap_or(false)
+            && !self.ctx.injury_modifiers.iter().any(|m| m.name == "Stunty")
+        {
+            self.ctx.add_injury_modifier(ffb_mechanics::modifiers::Modifier::new("Stunty", 0, game.rules));
+        }
     }
     fn saved_by_armour(&mut self) {
         self.ctx.injury = Some(PlayerState::new(PS_STUNNED));

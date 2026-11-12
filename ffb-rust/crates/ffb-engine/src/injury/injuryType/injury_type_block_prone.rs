@@ -6,7 +6,8 @@
 /// registered modifier is `new StaticInjuryModifier("Stunty", 0, false)`, i.e. value **0**; it
 /// exists purely as a marker so `RollMechanic.interpretInjuryRoll` can detect Stunty via the
 /// modifier list. `do_injury_roll_for_player` (called below) instead detects Stunty directly via
-/// `defender.has_skill(SkillId::Stunty)`, so no marker-modifier equivalent is needed here.
+/// `defender.has_skill(SkillId::Stunty)` for the TOTAL, but the value-0 marker is still added after
+/// the roll because the report names it (§J).
 /// Java's `injuryRoll()` never touches niggling injuries for this type (unlike plain `Block`,
 /// which calls `factory.getNigglingInjuryModifier` explicitly) — no niggling modifier is added.
 use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE};
@@ -42,6 +43,15 @@ impl ModificationAwareInjuryType for InjuryTypeBlockProne {
     }
     fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str) {
         do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
+        // Java: `addInjuryModifiers(stunty.getInjuryModifiers())` — Stunty's value-0
+        // StaticInjuryModifier carries no total but NAMES the skill in the report
+        // (goblin_vs_renegades_37733 bb2025 seed 3, blockStunned).
+        if game.player(defender_id).map(|p| p.has_skill_property(
+            ffb_model::model::property::named_properties::NamedProperties::IS_HURT_MORE_EASILY)).unwrap_or(false)
+            && !self.ctx.injury_modifiers.iter().any(|m| m.name == "Stunty")
+        {
+            self.ctx.add_injury_modifier(ffb_mechanics::modifiers::Modifier::new("Stunty", 0, game.rules));
+        }
     }
     // savedByArmour: default PRONE
 }
