@@ -28,8 +28,15 @@ impl PrayerHandler for BlessedStatueOfNuffleHandler {
     /// and advance if it is empty, otherwise SHOW A DIALOG and wait (`handled()` == false for
     /// `SelectPlayerPrayerHandler`). The coach picks — there is NO shuffle on this path.
     fn init_effect(&self, _prayer_state: &mut PrayerState, game: &mut Game, _rng: &mut GameRng, team_id: &str) -> bool {
-        // Java: reports.add(new ReportPrayerWasted(...)) on the empty branch (report infra deferred).
-        self.eligible_dialog_players(game, team_id).is_empty()
+        // Java DialogPrayerHandler.initEffect: an empty eligible list →
+        // `reports.add(new ReportPrayerWasted(handledPrayer().getName()))` (display name, no player).
+        let wasted = self.eligible_dialog_players(game, team_id).is_empty();
+        if wasted {
+            let display = ffb_model::inducement::bb2020::prayer::Prayer::for_enum_name("BLESSED_STATUE_OF_NUFFLE")
+                .map(|p| p.get_name().to_string());
+            game.report_list.add(ffb_model::report::mixed::report_prayer_wasted::ReportPrayerWasted::new(display, None));
+        }
+        wasted
     }
 
     fn dialog_choice_mode(&self) -> Option<&'static str> { Some("BLESSED_STATUE_OF_NUFFLE") }

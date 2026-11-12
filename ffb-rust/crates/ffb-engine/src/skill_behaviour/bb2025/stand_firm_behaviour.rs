@@ -172,6 +172,16 @@ impl StepModifierTrait for StandFirmStepModifier {
             true,
             SkillUse::AVOID_PUSH,
         ));
+        // Java: if (UtilPlayer.hasBall(game, state.defender))
+        //   addReport(new ReportEvent("Strip ball is prevented as the player is standing firm."))
+        // (halfling bb2025 seed 4).
+        let defender_coord = game.field_model.player_coordinate(&defender_id);
+        if defender_coord.is_some() && game.field_model.ball_coordinate == defender_coord
+            && !game.field_model.ball_moving
+        {
+            game.report_list.add(ffb_model::report::mixed::report_event::ReportEvent::new(Some(
+                "Strip ball is prevented as the player is standing firm.".to_string())));
+        }
 
         true
     }

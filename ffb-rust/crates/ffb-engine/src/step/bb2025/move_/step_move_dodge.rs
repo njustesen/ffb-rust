@@ -68,6 +68,9 @@ pub struct StepMoveDodge {
     /// rolls, in every edition; Rust kept the die private, so `StepDivingTackle` (whose body is
     /// gated on `dodgeRoll > 0`) never ran and Diving Tackle was a dead mechanic (BACKLOG §H.60).
     dodge_roll_to_publish: Option<i32>,
+    /// The minimum of the last `dodge()` pass — Java keeps `dodgeModifiers` as a field, so a
+    /// re-entry's `getModifyingSkillInCaseItHelps` re-tests the STALE roll against it.
+    last_minimum_roll: i32,
 }
 
 impl StepMoveDodge {
@@ -88,6 +91,7 @@ impl StepMoveDodge {
             dt_reroll_asked: false,
             re_roll_state: ReRollState::new(),
             dodge_roll_to_publish: None,
+            last_minimum_roll: 0,
         }
     }
 }
@@ -197,6 +201,21 @@ impl StepMoveDodge {
                 // here is Java's dodge(doRoll=true), not just the offer-time reset.
                 self.dodge_roll = 0;
             } else {
+                // Java: `if (usingModifyingSkill != null || !showUseModifyingSkillDialog(...) ||
+                // !TRUE.equals(usingModifierIgnoringSkill)) failDodge();` — the dialog probe calls
+                // `getModifyingSkillInCaseItHelps(mechanic, dodgeModifiers, addReport=true)`, which
+                // writes ReportModifiedDodgeResultSuccessful(player.getSkillWithProperty(
+                // canAddStrengthToDodge)) — null for most players — whenever the stale roll beats
+                // the last minimum (slann bb2025 seed 15: accepted DT re-roll, Loner fails).
+                // The third disjunct is always true here, so the dodge fails either way.
+                if self.using_modifying_skill.is_none() && self.last_minimum_roll > 0
+                    && DiceInterpreter::is_skill_roll_successful(self.dodge_roll, self.last_minimum_roll)
+                {
+                    let skill = game.player(&pid).and_then(|p|
+                        p.skill_id_with_property(ffb_model::model::property::named_properties::NamedProperties::CAN_ADD_STRENGTH_TO_DODGE));
+                    game.report_list.add(
+                        ffb_model::report::mixed::report_modified_dodge_result_successful::ReportModifiedDodgeResultSuccessful::new(skill));
+                }
                 return self.fail_dodge(game);
             }
         }
@@ -297,6 +316,7 @@ impl StepMoveDodge {
             }
         }
         let successful = DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll);
+        self.last_minimum_roll = minimum_roll;
         if std::env::var_os("FFB_TRACE").is_some() {
             eprintln!("RDODGEMIN pid={} roll={} min={} from={:?} to={:?} mods={:?} ok={}",
                 player_id.as_deref().unwrap_or("-"), self.dodge_roll, minimum_roll,

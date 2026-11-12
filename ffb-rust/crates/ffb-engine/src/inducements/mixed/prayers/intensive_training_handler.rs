@@ -12,9 +12,7 @@ use ffb_model::util::rng::GameRng;
 use ffb_model::enums::SkillId;
 use ffb_model::factory::skill_factory::SkillFactory;
 use crate::inducements::mixed::prayers::player_selector::PlayerSelector;
-use crate::inducements::mixed::prayers::random_selection_prayer_handler::{
-    init_effect_random_selection, remove_effect_internal_random_selection,
-};
+use crate::inducements::mixed::prayers::random_selection_prayer_handler::remove_effect_internal_random_selection;
 use crate::prayer_state::PrayerState;
 
 pub const PRAYER_NAME: &str = "INTENSIVE_TRAINING";
@@ -32,11 +30,35 @@ pub fn animation_type() -> AnimationType {
 /// Returns Java's `handled()`, i.e. `game.getDialogParameter() == null`: true when NO dialog is
 /// pending. A dialog is pending exactly when the chosen player has at least one eligible skill;
 /// with an empty list Java reports the prayer wasted and moves on.
-pub fn init_effect(prayer_state: &mut PrayerState, game: &mut Game, rng: &mut GameRng, team_id: &str, selector: &dyn PlayerSelector) -> bool {
-    init_effect_random_selection(prayer_state, game, rng, team_id, PRAYER_NAME, 1, selector, &[]);
+pub fn init_effect(_prayer_state: &mut PrayerState, game: &mut Game, _rng: &mut GameRng, team_id: &str, selector: &dyn PlayerSelector) -> bool {
+    // Java `DialogPrayerHandler.initEffect` + `IntensiveTrainingHandler.createDialog`: the
+    // selector's one Collections shuffle picks the player; an empty list is
+    // `ReportPrayerWasted(name)` (no player). Unlike `RandomSelectionPrayerHandler` there is NO
+    // `ReportPlayerEvent(prayer.eventMessage())` here — the event is "gains <skill>", written by
+    // `applySelection` (amazon bb2020 seed 3: Rust wrote an empty-message playerEvent at init).
+    // The enhancement only records the chosen player so the dialog answer can find it.
+    let mut collections_rng = game.collections_rng.lock().clone();
+    let selected = selector.select_players(game, team_id, 1, &mut collections_rng, &[]);
+    *game.collections_rng.lock() = collections_rng;
+    if selected.is_empty() {
+        game.report_list.add(ffb_model::report::mixed::report_prayer_wasted::ReportPrayerWasted::new(
+            Some("Intensive Training".to_string()), None));
+    }
+    for player_id in &selected {
+        game.field_model.add_prayer_enhancement(player_id, PRAYER_NAME);
+    }
     // Java: `if (!skills.isEmpty()) showDialog(...) else reports.add(new ReportPrayerWasted(...))`.
     match chosen_player(game) {
-        Some(player_id) => eligible_skills(game, &player_id).is_empty(),
+        Some(player_id) => {
+            let wasted = eligible_skills(game, &player_id).is_empty();
+            if wasted {
+                // Java: reports.add(new ReportPrayerWasted(handledPrayer().getName(), player.getId()))
+                // — the display name (gnome bb2020 seed 50: "Intensive Training").
+                game.report_list.add(ffb_model::report::mixed::report_prayer_wasted::ReportPrayerWasted::new(
+                    Some("Intensive Training".to_string()), Some(player_id)));
+            }
+            wasted
+        }
         None => true,
     }
 }
@@ -114,6 +136,10 @@ pub fn apply_skill_selection(_prayer_state: &mut PrayerState, game: &mut Game, p
     if let Some(player) = game.player_mut(player_id) {
         player.add_prayer_skill(PRAYER_NAME, skill_id, None);
     }
+    // Java applySelection: reports.add(new ReportPlayerEvent(playerId, "gains " + skill.getName())).
+    let skill_name = skill_id.category_and_name_for(game.rules).1.to_string();
+    game.report_list.add(ffb_model::report::mixed::report_player_event::ReportPlayerEvent::new(
+        Some(player_id.to_string()), Some(format!("gains {}", skill_name))));
 }
 
 pub fn remove_effect_internal(game: &mut Game, team_id: &str, selector: &dyn PlayerSelector) {
@@ -209,11 +235,36 @@ mod tests {
         // Tracked against the prayer name so `remove_effect_internal` can take it away again.
         assert!(game.player("h1").unwrap().temporary_skill_sources.iter()
             .any(|(src, s)| src == PRAYER_NAME && *s == SkillId::Block));
+        // Java: ReportPlayerEvent(playerId, "gains " + skill.getName()).
+        let ev = game.report_list.get_reports().iter().filter_map(|r| r.to_json())
+            .find(|j| j["reportId"] == "playerEvent").expect("gains event");
+        assert_eq!(ev["message"], "gains Block");
     }
 
     #[test]
     fn animation_type_is_correct() {
         assert_eq!(animation_type(), AnimationType::PRAYER_INTENSIVE_TRAINING);
+    }
+
+    /// Java: a chosen player with no eligible skill → `ReportPrayerWasted("Intensive Training",
+    /// playerId)` and no dialog (gnome bb2020 seed 50).
+    #[test]
+    fn a_player_with_nothing_to_learn_reports_the_prayer_wasted() {
+        struct PickH1;
+        impl PlayerSelector for PickH1 {
+            fn select_players(&self, _g: &Game, _t: &str, _n: i32,
+                _r: &mut ffb_model::util::java_random::JavaRandom, _a: &[SkillId]) -> Vec<String> {
+                vec!["h1".to_string()]
+            }
+        }
+        let mut state = PrayerState::new();
+        let mut game = make_game();
+        add_reserve_player(&mut game, "h1");
+        assert!(init_effect(&mut state, &mut game, &mut GameRng::new(0), "home", &PickH1));
+        let json = game.report_list.get_reports().iter().filter_map(|r| r.to_json())
+            .find(|j| j["reportId"] == "prayerWasted").expect("prayerWasted report");
+        assert_eq!(json["name"], "Intensive Training");
+        assert_eq!(json["playerId"], "h1");
     }
 
     #[test]

@@ -39,6 +39,11 @@ fn read(path: &str) -> Option<Vec<serde_json::Value>> {
 /// players `home_14`; coaches are "Home" / "Coach_home". Everything becomes `home` / `home_14`.
 /// Anything else is returned unchanged.
 pub fn normalise_id(s: &str) -> String {
+    // A RAISED player (Raise Dead / Necromancer) carries its victim's id plus `R<n>` in both
+    // engines (`teamVampireParity20Away1R1` / `away_01R1`): normalise the number, keep the suffix.
+    fn split_raised(nr: &str) -> (&str, &str) {
+        match nr.find('R') { Some(i) => (&nr[..i], &nr[i..]), None => (nr, "") }
+    }
     fn side_of(word: &str) -> Option<&'static str> {
         match word { "Home" | "home" => Some("home"), "Away" | "away" => Some("away"), _ => None }
     }
@@ -49,15 +54,17 @@ pub fn normalise_id(s: &str) -> String {
             let side = side_of(&tail[..4]).unwrap();
             let nr = &tail[4..];
             if nr.is_empty() { return side.to_string(); }
-            if let Ok(n) = nr.parse::<u32>() { return format!("{side}_{n:02}"); }
+            let (num, raised) = split_raised(nr);
+            if let Ok(n) = num.parse::<u32>() { return format!("{side}_{n:02}{raised}"); }
         }
     }
     for side in ["home", "away"] {
         if let Some(rest) = s.strip_prefix(&format!("{side}_")) {
             // Player ids are `home_01`..`home_16` (at most two digits). A longer number is a TEAM
             // id built from a numeric FUMBBL roster id (`away_4959` = dark_elf_league_fumbbl).
-            if rest.len() <= 2 {
-                if let Ok(n) = rest.parse::<u32>() { return format!("{side}_{n:02}"); }
+            let (num, raised) = split_raised(rest);
+            if num.len() <= 2 && (raised.is_empty() || raised[1..].chars().all(|c| c.is_ascii_digit())) {
+                if let Ok(n) = num.parse::<u32>() { return format!("{side}_{n:02}{raised}"); }
             }
             if !rest.is_empty() && rest.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.') {
                 return side.to_string();
@@ -165,6 +172,8 @@ mod tests {
         assert_eq!(normalise_id("teamGoblinParity25Away3"), "away_03");
         assert_eq!(normalise_id("teamHumanParity25Home"), "home");
         assert_eq!(normalise_id("home_14"), "home_14");
+        assert_eq!(normalise_id("teamVampireParity20Away1R1"), "away_01R1");
+        assert_eq!(normalise_id("away_01R1"), "away_01R1");
         assert_eq!(normalise_id("away_3"), "away_03");
         assert_eq!(normalise_id("home_human.lrb6"), "home");
         // A numeric FUMBBL roster id makes a TEAM id, not a player (dark_elf_league_fumbbl).

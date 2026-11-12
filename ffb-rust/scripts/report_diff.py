@@ -14,24 +14,26 @@ import re
 import sys
 from collections import Counter
 
-RE_JAVA_PID = re.compile(r'^team[A-Za-z0-9_]*?Parity(?:16|20|25)?(Home|Away)(\d+)$')
+# A RAISED player (Raise Dead / Necromancer) gets its victim's id plus an `R<n>` suffix in both
+# engines (`teamVampireParity20Away1R1` / `away_01R1`), so the suffix rides along.
+RE_JAVA_PID = re.compile(r'^team[A-Za-z0-9_]*?Parity(?:16|20|25)?(Home|Away)(\d+)(R\d+)?$')
 RE_JAVA_TID = re.compile(r'^team[A-Za-z0-9_]*?Parity(?:16|20|25)?(Home|Away)$')
 # Rust player ids are `home_01`..`home_16`: at most two digits. A longer number is a TEAM id built
 # from a numeric FUMBBL roster id (`away_4959` = dark_elf_league_fumbbl), and matches RE_RUST_TID.
-RE_RUST_PID = re.compile(r'^(home|away)_(\d{1,2})$')
+RE_RUST_PID = re.compile(r'^(home|away)_(\d{1,2})(R\d+)?$')
 RE_RUST_TID = re.compile(r'^(home|away)_[a-z0-9_.]+$')
 
 
 def norm_str(s):
     m = RE_JAVA_PID.match(s)
     if m:
-        return '%s_%02d' % (m.group(1).lower(), int(m.group(2)))
+        return '%s_%02d%s' % (m.group(1).lower(), int(m.group(2)), m.group(3) or '')
     m = RE_JAVA_TID.match(s)
     if m:
         return m.group(1).lower()
     m = RE_RUST_PID.match(s)
     if m:
-        return '%s_%02d' % (m.group(1), int(m.group(2)))
+        return '%s_%02d%s' % (m.group(1), int(m.group(2)), m.group(3) or '')
     if RE_RUST_TID.match(s):
         return s.split('_', 1)[0]
     low = s.lower()
