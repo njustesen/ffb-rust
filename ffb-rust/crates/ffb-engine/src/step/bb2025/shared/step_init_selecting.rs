@@ -378,6 +378,15 @@ impl Step for StepInitSelecting {
                     game.original_bombardier = None;
                     game.throw_two_bombs = None;
                 }
+                // A foul is TWO client commands in Java: the declaration `ClientCommandActingPlayer
+                // (FOUL_MOVE)` (ParityRunner.actionFromName maps "Foul" to FOUL_MOVE), then
+                // CLIENT_FOUL, whose `StepInitSelecting:224` arm calls `changePlayerAction(FOUL)`.
+                // Rust folds both into this one ActivatePlayer, so replay the pair: the declaration
+                // reports `playerAction: foulMove` (UtilServerGame.changeActingPlayer), and the
+                // FOUL that follows shares its PlayerActionType, so it reports nothing.
+                if pa == PlayerAction::Foul {
+                    util_server_steps::change_player_action(game, player_id, PlayerAction::FoulMove, false);
+                }
                 util_server_steps::change_player_action(game, player_id, pa, false);
                 if let Some(def_id) = block_defender_id {
                     game.defender_id = Some(def_id.clone());

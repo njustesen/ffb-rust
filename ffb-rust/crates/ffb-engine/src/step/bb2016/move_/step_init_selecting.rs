@@ -250,6 +250,19 @@ impl Step for StepInitSelecting {
                     self.end_player_action = true;
                     return self.execute_step(game, rng);
                 }
+                // A foul or a blitz is TWO client commands in Java: the declaration (FOUL_MOVE /
+                // BLITZ_MOVE, which ParityRunner.actionFromName sends for "Foul" / "Blitz") and then
+                // the targeted CLIENT_FOUL / CLIENT_BLOCK (`bb2016 StepInitSelecting:147` calls
+                // `changePlayerAction(FOUL)`). Replay the declaration so it reports
+                // `playerAction: foulMove` / `blitzMove`; the FOUL / BLITZ that follows shares its
+                // PlayerActionType and reports nothing.
+                match pa {
+                    PlayerAction::Foul =>
+                        change_player_action(game, player_id, PlayerAction::FoulMove, false),
+                    PlayerAction::Blitz =>
+                        change_player_action(game, player_id, PlayerAction::BlitzMove, false),
+                    _ => {}
+                }
                 change_player_action(game, player_id, pa, false);
                 // Report the activation (see `pending_activation`). Parked rather than returned so
                 // every folded-target and deselect path below reports identically.
