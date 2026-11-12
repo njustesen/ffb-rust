@@ -169,6 +169,22 @@ impl StepMoveDodge {
         let bt_saved_it = has_bt
             && DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll)
             && !DiceInterpreter::is_skill_roll_successful(self.dodge_roll, min_no_bt);
+        // Java bb2016 failure branch: `if (pDoRoll && btModifier.isPresent())` — drop BT, and when it
+        // is not already committed `addReport(new ReportSkillUse(null, btSkill, false,
+        // WOULD_NOT_HELP))` before the ReportDodgeRoll. pDoRoll = reRolledAction ||
+        // fUsingDivingTackle == null (dwarf bb2016 seed 4).
+        let re_rolled_with_source = self.re_roll_state.re_rolled_action.as_ref()
+            .map(|a| a.name == "DODGE").unwrap_or(false)
+            && self.re_roll_state.re_roll_source.is_some();
+        let do_roll = re_rolled_with_source || self.using_diving_tackle.is_none();
+        if do_roll && has_bt && !self.using_break_tackle
+            && !DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll)
+        {
+            game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
+                None, ffb_model::enums::SkillId::BreakTackle, false,
+                ffb_model::model::skill_use::SkillUse::WOULD_NOT_HELP,
+            ));
+        }
         let (minimum_roll, mod_names) = if has_bt && !bt_saved_it {
             (min_no_bt, names_no_bt)
         } else {

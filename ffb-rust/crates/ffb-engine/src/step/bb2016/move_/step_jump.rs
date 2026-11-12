@@ -155,17 +155,15 @@ impl StepJump {
         // BB2020 formula. The two errors CANCELLED for the only players who could reach this code
         // (AG3 leapers WITH Very Long Legs: 7-3-1 == 3 == 3+0), so fixing either one alone makes
         // the step wrong; they are one fix.
-        let modifier_total: i32 = player_id.as_deref()
+        let (modifier_total, modifier_names): (i32, Vec<String>) = player_id.as_deref()
             .and_then(|id| game.player(id))
             .map(|p| {
                 let ctx = JumpContext::new(game, p, FieldCoordinate::new(0, 0), FieldCoordinate::new(0, 0));
-                JumpModifierFactory::for_rules(game.rules)
-                    .find_skill_modifiers(&ctx, 0, 0)
-                    .iter()
-                    .map(|m| m.get_modifier())
-                    .sum()
+                let mods = JumpModifierFactory::for_rules(game.rules).find_skill_modifiers(&ctx, 0, 0);
+                (mods.iter().map(|m| m.get_modifier()).sum(),
+                 mods.iter().map(|m| m.get_name().to_string()).collect())
             })
-            .unwrap_or(0);
+            .unwrap_or((0, Vec::new()));
         let minimum_roll = minimum_roll_base_bb2016(agility, modifier_total);
         let successful = DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
 
@@ -179,7 +177,9 @@ impl StepJump {
             self.roll,
             minimum_roll,
             re_rolled,
-            vec![],
+            // Java: `jumpModifiers.toArray(...)` — the report names Very Long Legs (slann bb2016
+            // seed 3); Rust computed the set for the minimum but reported an empty list.
+            modifier_names,
         ));
 
         // `GameEvent::JumpRoll` had no producer anywhere in the engine (BACKLOG E12), so

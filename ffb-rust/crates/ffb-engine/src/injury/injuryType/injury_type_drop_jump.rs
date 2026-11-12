@@ -43,6 +43,13 @@ impl InjuryTypeServer for InjuryTypeDropJump {
                 {
                     self.ctx.add_armor_modifier(ARMOR_CHAINSAW_3);
                 }
+            } else {
+                // Java: `injuryContext.addArmorModifiers(defender.getSkillWithProperty(
+                //   ignoresArmourModifiersFromSkills).getArmorModifiers())` — Iron Hard Skin's
+                // value-0 StaticArmourModifier, so the report NAMES the skill (H.59; chaos_dwarf
+                // bb2025 seed 3 dropGfi). No armour total moves.
+                self.ctx.add_armor_modifier(ffb_mechanics::modifiers::Modifier::new(
+                    "Iron Hard Skin", 0, game.rules));
             }
             // TODO: add affectsEitherArmourOrInjuryOnDodge modifier (diving tackle) — needs UtilPlayer.findAdjacentPlayersWithTacklezones
             let _ = self.diving_tackler_id.as_deref();

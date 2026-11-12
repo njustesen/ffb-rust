@@ -46,6 +46,12 @@ impl ModificationAwareInjuryType for InjuryTypeChainsawForSpp {
         if !defender_ignores && !self.ctx.armor_modifiers.iter().any(|m| m.name == "Chainsaw") {
             self.ctx.add_armor_modifier(ARMOR_CHAINSAW_3);
         }
+        if defender_ignores {
+            // Java: `addArmorModifiers(defender.getSkillWithProperty(ignoresArmourModifiersFromSkills)
+            //   .getArmorModifiers())` — Iron Hard Skin's value-0 modifier names the skill.
+            self.ctx.add_armor_modifier(ffb_mechanics::modifiers::Modifier::new(
+                "Iron Hard Skin", 0, game.rules));
+        }
         do_armor_roll(game, rng, &mut self.ctx, defender_id);
     }
     fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str) {
