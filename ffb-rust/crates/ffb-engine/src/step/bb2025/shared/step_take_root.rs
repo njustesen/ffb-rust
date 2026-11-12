@@ -204,7 +204,9 @@ impl StepTakeRoot {
             roll,
             minimum_roll,
             report_rerolled,
-            Some(ffb_model::enums::SkillId::TakeRoot.class_name().to_string()),
+            // Java passes the Skill, which serialises as its display NAME ("Take Root"), not the
+            // class name ("TakeRoot").
+            Some(ffb_model::enums::SkillId::TakeRoot.category_and_name_for(game.rules).1.to_string()),
         ));
 
         if successful {

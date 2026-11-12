@@ -58,11 +58,15 @@ pub struct StepPushback {
     /// defender / injury target), so the chain push moves the right occupant while the injury
     /// still lands on the original defender.
     pub defender_id: Option<String>,
+    /// Java: state.pushbackMode — REGULAR when the squares are calculated, SIDE_STEP / GRAB once
+    /// those behaviours switch it; what ReportPushback carries.
+    pub pushback_mode: PushbackMode,
 }
 
 impl StepPushback {
     pub fn new() -> Self {
         Self {
+            pushback_mode: PushbackMode::REGULAR,
             old_defender_state: None,
             starting_pushback_square: None,
             grabbing: None,
@@ -193,6 +197,9 @@ impl StepPushback {
                 self.side_stepping = hook_state.side_stepping;
                 self.standing_firm = hook_state.standing_firm;
                 self.grabbing = hook_state.grabbing;
+                // Java state.pushbackMode (fresh hook state = the REGULAR reset; Side Step / Grab
+                // switch it).
+                self.pushback_mode = hook_state.pushback_mode;
                 self.starting_pushback_square = hook_state.starting_pushback_square;
                 do_push = hook_state.do_push;
                 // Java shows `DialogSkillUseParameter` from inside the behaviour and returns; the
@@ -282,7 +289,7 @@ impl StepPushback {
                 if self.starting_pushback_square.is_none() {
                     game.report_list.add(ReportPushback::new(
                         defender_id.clone(),
-                        PushbackMode::REGULAR,
+                        self.pushback_mode,
                     ));
                 }
 

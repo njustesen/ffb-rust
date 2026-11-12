@@ -194,6 +194,10 @@ impl Step for StepInitSelecting {
                 util_server_steps::change_player_action_to_none(game);
             }
             Action::ActivatePlayer { player_id, player_action, block_defender_id } => {
+                // A fired MOVE-form ball declaration acts as the immediate Pass / HandOff; only the
+                // declaration report below differs (see `PlayerActionChoice::split_fired`).
+                let (normalized_pac, fired_declaration) = player_action.split_fired();
+                let player_action = &normalized_pac;
                 if std::env::var_os("FFB_TRACE").is_some() {
                     eprintln!("RACT pid={player_id} pac={player_action:?} bdef={block_defender_id:?} game_def={:?}",
                         game.defender_id);
@@ -386,6 +390,12 @@ impl Step for StepInitSelecting {
                 // FOUL that follows shares its PlayerActionType, so it reports nothing.
                 if pa == PlayerAction::Foul {
                     util_server_steps::change_player_action(game, player_id, PlayerAction::FoulMove, false);
+                }
+                // Same two-command shape for a fired PASS_MOVE / HAND_OVER_MOVE: Java declares the
+                // MOVE form and `StepInitSelecting:260` re-declares the immediate action when the
+                // CLIENT_PASS / CLIENT_HAND_OVER arrives (same PlayerActionType, no second report).
+                if let Some(declaration) = fired_declaration {
+                    util_server_steps::change_player_action(game, player_id, declaration, false);
                 }
                 util_server_steps::change_player_action(game, player_id, pa, false);
                 if let Some(def_id) = block_defender_id {
@@ -955,6 +965,9 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         // The real client's declarations: move first, then give/throw.
         PlayerActionChoice::HandOffMove => PlayerAction::HandOverMove,
         PlayerActionChoice::PassMove => PlayerAction::PassMove,
+        // Normalised by `split_fired` before this is reached; the immediate form is what acts.
+        PlayerActionChoice::PassMoveFired => PlayerAction::Pass,
+        PlayerActionChoice::HandOffMoveFired => PlayerAction::HandOver,
         PlayerActionChoice::StandUp => PlayerAction::StandUp,
         PlayerActionChoice::StandUpBlitz => PlayerAction::StandUpBlitz,
         PlayerActionChoice::ThrowTeamMate => PlayerAction::ThrowTeamMate,

@@ -118,11 +118,15 @@ pub struct StepPushback {
     /// `game.defender_id`. The Rust `Action::PushTo` carries only a coordinate (Java's `Pushback`
     /// carries the player id), so the step must remember whom it is pushing across chain re-prompts.
     pub chain_pushed_player: Option<String>,
+    /// Java: state.pushbackMode — REGULAR when the squares are calculated, SIDE_STEP / GRAB once
+    /// those behaviours switch it; what ReportPushback carries.
+    pub pushback_mode: PushbackMode,
 }
 
 impl StepPushback {
     pub fn new() -> Self {
         Self {
+            pushback_mode: PushbackMode::REGULAR,
             old_defender_state: None,
             starting_pushback_square: None,
             grabbing: None,
@@ -289,6 +293,10 @@ impl StepPushback {
                 self.side_stepping = hook_state.side_stepping;
                 self.standing_firm = hook_state.standing_firm;
                 self.grabbing = hook_state.grabbing;
+                // Java `state.pushbackMode`: reset to REGULAR when new squares are calculated (the
+                // fresh hook state starts there) and switched to SIDE_STEP / GRAB by those
+                // behaviours; it is what ReportPushback carries.
+                self.pushback_mode = hook_state.pushback_mode;
                 self.starting_pushback_square = hook_state.starting_pushback_square;
                 // Java shows `DialogSkillUseParameter` from inside the behaviour and returns; the
                 // Rust hook cannot raise a prompt, so it parks the request and the step asks. The
@@ -393,9 +401,10 @@ impl StepPushback {
                 // Reached unconditionally — including the crowd-push branch above, since it just
                 // cleared starting_pushback_square. SideStep/Grab hooks may also have cleared it.
                 if self.starting_pushback_square.is_none() {
+                    // Java: new ReportPushback(state.defender.getId(), state.pushbackMode)
                     game.report_list.add(ReportPushback::new(
                         defender_id.clone(),
-                        PushbackMode::REGULAR,
+                        self.pushback_mode,
                     ));
                 }
 

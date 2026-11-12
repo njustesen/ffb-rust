@@ -230,6 +230,14 @@ pub enum PlayerActionChoice {
     HandOffMove,
     /// Move first, THEN throw — Java `PlayerAction.PASS_MOVE`, likewise what the real client sends.
     PassMove,
+    /// A `PASS_MOVE` declaration whose throw fires at once (empty run-up): Java sends TWO commands,
+    /// `ActingPlayer(PASS_MOVE)` then `CLIENT_PASS`, which `StepInitSelecting` answers by
+    /// re-declaring PASS. The select step treats this exactly as `Pass` after replaying the
+    /// PASS_MOVE declaration, so the report stream carries Java's `playerAction: passMove`.
+    PassMoveFired,
+    /// The `HAND_OVER_MOVE` counterpart of `PassMoveFired` (an immediate give, declared in its MOVE
+    /// form first).
+    HandOffMoveFired,
     StandUp,
     StandUpBlitz,
     ThrowTeamMate,
@@ -275,6 +283,20 @@ pub enum PlayerActionChoice {
     BreatheFire,
     ProjectileVomit,
     SecureTheBall,
+}
+
+impl PlayerActionChoice {
+    /// Split a fired MOVE-form ball declaration into the choice the select step acts on and the
+    /// declaration Java sent first. `PassMoveFired` → (`Pass`, PASS_MOVE), `HandOffMoveFired` →
+    /// (`HandOff`, HAND_OVER_MOVE); every other choice is returned unchanged with nothing to replay.
+    pub fn split_fired(self) -> (PlayerActionChoice, Option<ffb_model::enums::PlayerAction>) {
+        use ffb_model::enums::PlayerAction;
+        match self {
+            PlayerActionChoice::PassMoveFired => (PlayerActionChoice::Pass, Some(PlayerAction::PassMove)),
+            PlayerActionChoice::HandOffMoveFired => (PlayerActionChoice::HandOff, Some(PlayerAction::HandOverMove)),
+            other => (other, None),
+        }
+    }
 }
 
 /// Wizard spell choices.

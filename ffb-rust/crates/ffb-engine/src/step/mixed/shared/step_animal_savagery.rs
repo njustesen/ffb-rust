@@ -189,7 +189,8 @@ impl StepAnimalSavagery {
                     roll,
                     min_roll,
                     reported_rerolled,
-                    Some(SkillId::AnimalSavagery.class_name().to_string()),
+                    // The Skill serialises as its display NAME ("Animal Savagery").
+                    Some(SkillId::AnimalSavagery.category_and_name_for(game.rules).1.to_string()),
                 ));
                 let event = GameEvent::AnimalSavagery {
                     player_id: acting_player_id.clone(),

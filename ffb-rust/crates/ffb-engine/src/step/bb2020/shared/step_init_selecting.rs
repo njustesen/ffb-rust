@@ -187,6 +187,8 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         // The real client's declarations: move first, then give/throw.
         PlayerActionChoice::HandOffMove => PlayerAction::HandOverMove,
         PlayerActionChoice::PassMove => PlayerAction::PassMove,
+        PlayerActionChoice::PassMoveFired => PlayerAction::Pass,
+        PlayerActionChoice::HandOffMoveFired => PlayerAction::HandOver,
         PlayerActionChoice::StandUp => PlayerAction::StandUp,
         PlayerActionChoice::StandUpBlitz => PlayerAction::StandUpBlitz,
         PlayerActionChoice::ThrowTeamMate => PlayerAction::ThrowTeamMate,

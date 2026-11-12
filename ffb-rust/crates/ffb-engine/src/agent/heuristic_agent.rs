@@ -118,7 +118,13 @@ fn move_variant(pac: PlayerActionChoice) -> PlayerActionChoice {
 /// state hash cannot see `ballMoving`).
 fn declared_pac(pac: PlayerActionChoice, run_up_empty: bool, has_target: bool) -> PlayerActionChoice {
     if folds_terminal(pac, run_up_empty, has_target) {
-        pac
+        // The `*Fired` choices act exactly as the immediate form, but tell the select step that
+        // Java's DECLARATION was the move-variant, so it reports `passMove` / `handOverMove`.
+        match pac {
+            PlayerActionChoice::Pass => PlayerActionChoice::PassMoveFired,
+            PlayerActionChoice::HandOff => PlayerActionChoice::HandOffMoveFired,
+            other => other,
+        }
     } else {
         move_variant(pac)
     }
@@ -6623,14 +6629,17 @@ mod tests {
     /// terminal fires later at `INIT_MOVING`.
     #[test]
     fn an_empty_run_up_declares_the_immediate_give() {
+        // The fired forms act as the immediate give/throw (see `split_fired`).
         assert_eq!(
             declared_pac(PlayerActionChoice::HandOff, true, true),
-            PlayerActionChoice::HandOff
+            PlayerActionChoice::HandOffMoveFired
         );
         assert_eq!(
             declared_pac(PlayerActionChoice::Pass, true, true),
-            PlayerActionChoice::Pass
+            PlayerActionChoice::PassMoveFired
         );
+        assert_eq!(PlayerActionChoice::PassMoveFired.split_fired().0, PlayerActionChoice::Pass);
+        assert_eq!(PlayerActionChoice::HandOffMoveFired.split_fired().0, PlayerActionChoice::HandOff);
         assert_eq!(
             declared_pac(PlayerActionChoice::HandOff, false, true),
             PlayerActionChoice::HandOffMove

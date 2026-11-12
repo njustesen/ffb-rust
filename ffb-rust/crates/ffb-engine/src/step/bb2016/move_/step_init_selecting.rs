@@ -245,6 +245,10 @@ impl Step for StepInitSelecting {
             }
             // This path fires for STAND_UP / STAND_UP_BLITZ / REMOVE_CONFUSION → NEXT_STEP in executeStep
             Action::ActivatePlayer { player_id, player_action, block_defender_id } => {
+                // A fired MOVE-form ball declaration acts as the immediate Pass / HandOff; only the
+                // declaration report differs (see `PlayerActionChoice::split_fired`).
+                let (normalized_pac, fired_declaration) = player_action.split_fired();
+                let player_action = &normalized_pac;
                 let pa = pac_to_player_action(*player_action);
                 if !game.is_active_team_player(player_id) {
                     self.end_player_action = true;
@@ -262,6 +266,9 @@ impl Step for StepInitSelecting {
                     PlayerAction::Blitz =>
                         change_player_action(game, player_id, PlayerAction::BlitzMove, false),
                     _ => {}
+                }
+                if let Some(declaration) = fired_declaration {
+                    change_player_action(game, player_id, declaration, false);
                 }
                 change_player_action(game, player_id, pa, false);
                 // Report the activation (see `pending_activation`). Parked rather than returned so
@@ -537,6 +544,9 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         // The real client's declarations: move first, then give/throw.
         PlayerActionChoice::HandOffMove => PlayerAction::HandOverMove,
         PlayerActionChoice::PassMove => PlayerAction::PassMove,
+        // Normalised by `split_fired` before this is reached; the immediate form is what acts.
+        PlayerActionChoice::PassMoveFired => PlayerAction::Pass,
+        PlayerActionChoice::HandOffMoveFired => PlayerAction::HandOver,
         PlayerActionChoice::StandUp => PlayerAction::StandUp,
         PlayerActionChoice::StandUpBlitz => PlayerAction::StandUpBlitz,
         PlayerActionChoice::ThrowTeamMate => PlayerAction::ThrowTeamMate,
