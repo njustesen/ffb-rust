@@ -270,11 +270,11 @@ impl StepIntercept {
             if let Some((skill_id, _)) = source {
                 self.re_rolled_action = Some(action.to_string());
                 self.re_roll_source = Some(format!("{:?}", skill_id));
-                if let Some(p) = game.team_home.player_mut(interceptor_id)
-                    .or_else(|| game.team_away.player_mut(interceptor_id))
-                {
-                    p.used_skills.insert(skill_id);
-                }
+                // Java: `UtilServerReRoll.useReRoll(this, getReRollSource(), pInterceptor)` —
+                // marks the skill used AND writes `ReportReRoll(interceptor, source, ...)`.
+                // Marking it by hand dropped the report (human bb2016 seed 1: Catch re-roll).
+                let src = ffb_model::enums::ReRollSource::new(format!("{:?}", skill_id));
+                crate::step::util_server_re_roll::use_reroll(game, &src, interceptor_id, rng);
                 return self.intercept(interceptor_id, game, rng);
             }
         }
@@ -1131,6 +1131,11 @@ mod tests {
         assert_eq!(calls_with, 2, "Catch re-rolls the failed interception exactly once");
         assert!(with.team_away.player("opp1").unwrap().used_skills.contains(&SkillId::Catch),
             "the re-roll consumes the skill");
+        // Java useReRoll writes ReportReRoll(interceptor, Catch, ...) between the two rolls.
+        let ids: Vec<ffb_model::report::report_id::ReportId> =
+            with.report_list.get_reports().iter().map(|r| r.get_id()).collect();
+        use ffb_model::report::report_id::ReportId;
+        assert_eq!(ids, vec![ReportId::INTERCEPTION_ROLL, ReportId::RE_ROLL, ReportId::INTERCEPTION_ROLL]);
     }
 
     #[test]

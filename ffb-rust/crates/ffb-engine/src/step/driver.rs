@@ -1018,13 +1018,15 @@ impl DriverGameState {
                     // of the 330 gates stayed 100/100, because the event stream is not part of
                     // the compared state hash. Handle both.
                     if let Some(r) = any.downcast_ref::<ReportTurnEnd>() {
-                        for h in &r.heat_exhaustions {
+                        // bb2016 lists every ROLLED player; only the fainted ones are events.
+                        for h in r.heat_exhaustions.iter().filter(|h| h.exhausted) {
                             out.push(GameEvent::HeatExhaustion { player_id: h.player_id.clone() });
                         }
                     } else if let Some(r) =
                         any.downcast_ref::<ffb_model::report::bb2016::report_turn_end::ReportTurnEnd>()
                     {
-                        for h in &r.heat_exhaustions {
+                        // bb2016 lists every ROLLED player; only the fainted ones are events.
+                        for h in r.heat_exhaustions.iter().filter(|h| h.exhausted) {
                             out.push(GameEvent::HeatExhaustion { player_id: h.player_id.clone() });
                         }
                     }

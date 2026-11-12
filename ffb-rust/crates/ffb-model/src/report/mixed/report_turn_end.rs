@@ -50,17 +50,25 @@ impl KnockoutRecovery {
 pub struct HeatExhaustion {
     pub player_id: String,
     pub roll: i32,
+    /// Java `HeatExhaustion.isExhausted()`. bb2020/bb2025 only ever list fainted players
+    /// (`new HeatExhaustion(id, true, 0)`); bb2016 lists EVERY rolled player with the real flag.
+    pub exhausted: bool,
 }
 
 impl HeatExhaustion {
     pub fn new(player_id: String, roll: i32) -> Self {
-        Self { player_id, roll }
+        Self { player_id, roll, exhausted: true }
+    }
+
+    /// Java `new HeatExhaustion(playerId, isExhausted, exhaustionRoll)` (bb2016 heatExhaust).
+    pub fn with_exhausted(player_id: String, exhausted: bool, roll: i32) -> Self {
+        Self { player_id, roll, exhausted }
     }
 
     pub fn to_json_value(&self) -> serde_json::Value {
         serde_json::json!({
             "playerId": self.player_id,
-            "exhausted": true,
+            "exhausted": self.exhausted,
             "roll": self.roll,
         })
     }
@@ -69,6 +77,7 @@ impl HeatExhaustion {
         Self {
             player_id: json["playerId"].as_str().unwrap_or("").to_string(),
             roll: json["roll"].as_i64().unwrap_or(0) as i32,
+            exhausted: json["exhausted"].as_bool().unwrap_or(true),
         }
     }
 }
@@ -159,6 +168,17 @@ impl IReport for ReportTurnEnd {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Java bb2016 lists every rolled player with its real `exhausted` flag (dark_elf bb2016
+    /// seed 2: Rust wrote `exhausted: true` for all 18).
+    #[test]
+    fn heat_exhaustion_serialises_the_real_flag() {
+        let survivor = HeatExhaustion::with_exhausted("p1".into(), false, 4).to_json_value();
+        assert_eq!(survivor["exhausted"], false);
+        let fainted = HeatExhaustion::new("p2".into(), 0).to_json_value();
+        assert_eq!(fainted["exhausted"], true);
+        assert!(!HeatExhaustion::from_json(&survivor).exhausted);
+    }
 
     fn make() -> ReportTurnEnd {
         ReportTurnEnd::new(

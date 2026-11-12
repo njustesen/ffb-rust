@@ -193,6 +193,20 @@ impl PassModifierFactory {
                     // Java: bb2016.Stunty registers PassModifier("Stunty", +1, REGULAR) — penalty.
                     result.push(PassModifier::new("Stunty", 1, ModifierType::REGULAR));
                 }
+                SkillId::NervesOfSteel => {
+                    // Java: NervesOfSteel (bb2016 + mixed) registers a 0-value reporting marker
+                    // PassModifier("Nerves of Steel", "0 tackle zones due to Nerves of Steel", 0,
+                    // REGULAR) with isModifierIncluded() = true; the mixed form also requires
+                    // `!context.isTtm()`. Catch/interception already carried their twins; the pass
+                    // one was missing, so the report lost its rollModifiers entry (bretonnian
+                    // bb2025 seed 1).
+                    if rules == Rules::Bb2016 || !context.ttm {
+                        result.push(PassModifier::with_report(
+                            "Nerves of Steel", "0 tackle zones due to Nerves of Steel", 0,
+                            ModifierType::REGULAR,
+                        ));
+                    }
+                }
                 _ => {}
             }
         }
@@ -391,6 +405,25 @@ mod tests {
         let ctx_normal = PassContext::new(&g, &p, PassingDistance::ShortPass, false);
         assert!(factory.find_skill_modifiers(&ctx_ttm).iter().any(|m| m.get_name() == "Throw Team-Mate"));
         assert!(!factory.find_skill_modifiers(&ctx_normal).iter().any(|m| m.get_name() == "Throw Team-Mate"));
+    }
+
+    /// Java NervesOfSteel registers a 0-value pass marker (mixed: not on a team-mate throw).
+    #[test]
+    fn find_skill_modifiers_nerves_of_steel_marker() {
+        for rules in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            let g = make_game(rules, Weather::Nice);
+            let p = player_with_skill("h1", SkillId::NervesOfSteel, 4);
+            let factory = PassModifierFactory::for_rules(rules);
+            let ctx = PassContext::new(&g, &p, PassingDistance::LongPass, false);
+            let nos = factory.find_skill_modifiers(&ctx).into_iter()
+                .find(|m| m.get_name() == "Nerves of Steel").expect("NoS marker");
+            assert_eq!(nos.get_modifier(), 0);
+        }
+        let g = make_game(Rules::Bb2025, Weather::Nice);
+        let p = player_with_skill("h1", SkillId::NervesOfSteel, 4);
+        let ttm = PassContext::new(&g, &p, PassingDistance::ShortPass, true);
+        assert!(!PassModifierFactory::for_rules(Rules::Bb2025).find_skill_modifiers(&ttm).iter()
+            .any(|m| m.get_name() == "Nerves of Steel"), "mixed NoS is not a TTM modifier");
     }
 
     #[test]

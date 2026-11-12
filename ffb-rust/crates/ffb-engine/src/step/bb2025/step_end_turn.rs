@@ -345,7 +345,8 @@ impl StepEndTurn {
                         game.field_model.set_player_state(player_id, player_state.change_base(PS_EXHAUSTED));
                         UtilBox::put_player_into_box(game, player_id);
                     }
-                    heat_exhaustions.push(HeatExhaustion::new(player_id.clone(), roll));
+                    // Java bb2016 heatExhaust: one entry per ROLLED player, with the real flag.
+                    heat_exhaustions.push(HeatExhaustion::with_exhausted(player_id.clone(), exhausted, roll));
                 }
             }
             // BB2020+ (mixed/bb2025): AFTER KO recovery, roll ONE d3 fainting COUNT and pick that
