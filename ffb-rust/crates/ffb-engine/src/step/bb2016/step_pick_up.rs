@@ -134,6 +134,8 @@ impl StepPickUp {
             self.roll = rng.d6();
         }
 
+        // Java passes the same pickupModifiers set to ReportPickupRoll as to the minimum roll.
+        let mut modifier_names: Vec<String> = Vec::new();
         let minimum_roll = {
             let factory = PickupModifierFactory::for_rules(game.rules);
             if let Some(player) = game.player(player_id) {
@@ -141,6 +143,7 @@ impl StepPickUp {
                 let mods = factory.find_applicable(&ctx);
                 let skill_mods = factory.find_skill_modifiers(&ctx);
                 let all: Vec<&ffb_mechanics::modifiers::pickup_modifier::PickupModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
+                modifier_names = all.iter().map(|m| m.get_name().to_string()).collect();
                 let agility = player.agility as i32;
                 // BB2016 uses the OLD AG scale for the pickup minimum ((7-AG)-1+total), not the
                 // shared bb2025 (agility+total) — see PickupModifierFactory::minimum_roll_edition.
@@ -162,7 +165,7 @@ impl StepPickUp {
             self.roll,
             minimum_roll,
             already_rerolled_for_report,
-            vec![],
+            modifier_names,
         ));
 
         // Coverage instrument: mirror the BB2025 twin's PickupRoll/BallPickedUp events. This is a

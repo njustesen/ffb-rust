@@ -197,11 +197,11 @@ mod tests {
     }
 
     #[test]
-    fn bb2016_gouged_eye_is_ag_loss() {
+    fn bb2016_gouged_eye_is_miss_next_game() {
+        // Java bb2016 SeriousInjury.GOUGED_EYE("Gouged Eye (MNG)", ..., null): no stat attribute.
         let result = casualty_result(Rules::Bb2016, 4).unwrap();
         assert_eq!(result, SeriousInjuryKind::GougedEye);
-        use ffb_model::enums::InjuryAttribute;
-        assert_eq!(result.injury_attribute(), Some(InjuryAttribute::AG));
+        assert_eq!(result.injury_attribute(), None);
     }
 
     #[test]

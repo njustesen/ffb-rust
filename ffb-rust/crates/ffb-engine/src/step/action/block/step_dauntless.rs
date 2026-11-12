@@ -189,7 +189,9 @@ impl StepDauntless {
                     min_roll,
                     false,
                     defender_st,
-                    game.defender_id.clone(),
+                    // Java DauntlessBehaviour (mixed :81, bb2016 :70) uses the 6-arg constructor —
+                    // no defender; only the multi-block report names its target.
+                    None,
                 ));
                 if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == player_id)
                     .or_else(|| game.team_away.players.iter_mut().find(|p| p.id == player_id))
@@ -215,7 +217,8 @@ impl StepDauntless {
             min_roll,
             reported_rerolled,
             defender_st,
-            game.defender_id.clone(),
+            // Java's single-block report has no defender (see above).
+            None,
         ));
 
         let mut outcome = StepOutcome::next();

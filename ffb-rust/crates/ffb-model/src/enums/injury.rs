@@ -147,7 +147,6 @@ impl SeriousInjuryKind {
             | SeriousInjuryKind::BrokenNeck => Some(InjuryAttribute::AG),
             SeriousInjuryKind::DislocatedShoulderSt => Some(InjuryAttribute::ST),
             SeriousInjuryKind::SeriousInjuryNi => Some(InjuryAttribute::NI),
-            SeriousInjuryKind::GougedEye => Some(InjuryAttribute::AG),
             SeriousInjuryKind::BrokenCollarBone
             | SeriousInjuryKind::SmashedElbow
             | SeriousInjuryKind::ShatteredWrist

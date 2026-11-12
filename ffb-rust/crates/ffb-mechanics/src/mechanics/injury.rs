@@ -232,21 +232,26 @@ pub enum SiSubType {
 /// and (4,6)=FRACTURED_LEG use BrokenShoulder/SmashedElbow as stand-ins.
 pub fn serious_injury_bb2016(die1: i32, die2: i32) -> Option<SeriousInjuryKind> {
     match (die1, die2) {
-        (4, 1) => Some(SeriousInjuryKind::BrokenRibs),       // MNG
-        (4, 2) => Some(SeriousInjuryKind::Groin),             // MNG
-        (4, 3) => Some(SeriousInjuryKind::BrokenJaw),         // MNG (GOUGED_EYE in Java)
+        // Java bb2016 RollMechanic.interpretSeriousInjuryRoll, one bb2016 SeriousInjury per cell.
+        // The stand-ins this table used to return (BrokenJaw for Gouged Eye, three ST injuries for
+        // the MNG arm/leg/hand, HeadInjuryAv / NeckInjuryAg for the -AV / -AG rows) reported the
+        // bb2020 names ("Head Injury (-AV)" for Java's "Serious Concussion (-AV)") and, for 45-47,
+        // carried an ST reduction Java's MNG injuries do not have.
+        (4, 1) => Some(SeriousInjuryKind::BrokenRibs),        // MNG
+        (4, 2) => Some(SeriousInjuryKind::Groin),             // MNG (GROIN_STRAIN)
+        (4, 3) => Some(SeriousInjuryKind::GougedEye),         // MNG
         (4, 4) => Some(SeriousInjuryKind::BrokenJaw),         // MNG
-        (4, 5) => Some(SeriousInjuryKind::BrokenShoulder),    // MNG (FRACTURED_ARM)
-        (4, 6) => Some(SeriousInjuryKind::SmashedElbow),      // MNG (FRACTURED_LEG)
-        (4, 7) => Some(SeriousInjuryKind::ShatteredWrist),    // MNG (SMASHED_HAND)
-        (4, 8) => Some(SeriousInjuryKind::PinchedNerve),      // MNG, -AV (PINCHED_NERVE)
-        (5, 1) => Some(SeriousInjuryKind::SeriousInjuryNi),   // NI (DAMAGED_BACK)
-        (5, 2) => Some(SeriousInjuryKind::SmashedKneeB2016),  // -MA
-        (5, 3) => Some(SeriousInjuryKind::SmashedHip),        // -MA (SMASHED_HIP)
-        (5, 4) => Some(SeriousInjuryKind::SmashedAnkle),      // -MA (SMASHED_ANKLE)
-        (5, 5) => Some(SeriousInjuryKind::HeadInjuryAv),      // -AV (SERIOUS_CONCUSSION)
-        (5, 6) => Some(SeriousInjuryKind::HeadInjuryAv),      // -AV (FRACTURED_SKULL)
-        (5, 7) => Some(SeriousInjuryKind::NeckInjuryAg),      // -AG (BROKEN_NECK; GougedEye reused for -AG)
+        (4, 5) => Some(SeriousInjuryKind::FracturedArm),      // MNG
+        (4, 6) => Some(SeriousInjuryKind::FracturedLeg),      // MNG
+        (4, 7) => Some(SeriousInjuryKind::SmashedHand),       // MNG
+        (4, 8) => Some(SeriousInjuryKind::PinchedNerve),      // MNG
+        (5, 1) => Some(SeriousInjuryKind::DamagedBack),       // NI
+        (5, 2) => Some(SeriousInjuryKind::SmashedKneeB2016),  // NI (SMASHED_KNEE)
+        (5, 3) => Some(SeriousInjuryKind::SmashedHip),        // -MA
+        (5, 4) => Some(SeriousInjuryKind::SmashedAnkle),      // -MA
+        (5, 5) => Some(SeriousInjuryKind::SeriousConcussion), // -AV
+        (5, 6) => Some(SeriousInjuryKind::FracturedSkull),    // -AV
+        (5, 7) => Some(SeriousInjuryKind::BrokenNeck),        // -AG
         (5, 8) => Some(SeriousInjuryKind::BrokenCollarBone),  // -ST (SMASHED_COLLAR_BONE)
         _ => None,
     }
@@ -628,28 +633,32 @@ mod tests {
 
     #[test]
     fn bb2016_si_table_die4_all_mng() {
+        // Java bb2016 RollMechanic: 41-48, every one Miss Next Game with no stat attribute.
         let mng_variants = [
             SeriousInjuryKind::BrokenRibs,
             SeriousInjuryKind::Groin,
+            SeriousInjuryKind::GougedEye,
             SeriousInjuryKind::BrokenJaw,
-            SeriousInjuryKind::BrokenJaw,
-            SeriousInjuryKind::BrokenShoulder,
-            SeriousInjuryKind::SmashedElbow,
-            SeriousInjuryKind::ShatteredWrist,
+            SeriousInjuryKind::FracturedArm,
+            SeriousInjuryKind::FracturedLeg,
+            SeriousInjuryKind::SmashedHand,
             SeriousInjuryKind::PinchedNerve,
         ];
         for (die2, expected) in (1..=8).zip(mng_variants.iter()) {
             let result = serious_injury_bb2016(4, die2);
             assert_eq!(result, Some(*expected), "die2={die2}");
+            assert_eq!(expected.injury_attribute(), None, "{expected:?} is MNG in bb2016");
         }
     }
 
     #[test]
     fn bb2016_si_table_die5_stat_effects() {
-        assert_eq!(serious_injury_bb2016(5, 1), Some(SeriousInjuryKind::SeriousInjuryNi)); // NI
-        assert_eq!(serious_injury_bb2016(5, 2), Some(SeriousInjuryKind::SmashedKneeB2016)); // NI (Smashed Knee BB2016)
-        assert_eq!(serious_injury_bb2016(5, 5), Some(SeriousInjuryKind::HeadInjuryAv)); // -AV
-        assert_eq!(serious_injury_bb2016(5, 7), Some(SeriousInjuryKind::NeckInjuryAg)); // -AG
+        // Java bb2016 RollMechanic: 51-58.
+        assert_eq!(serious_injury_bb2016(5, 1), Some(SeriousInjuryKind::DamagedBack)); // NI
+        assert_eq!(serious_injury_bb2016(5, 2), Some(SeriousInjuryKind::SmashedKneeB2016)); // NI
+        assert_eq!(serious_injury_bb2016(5, 5), Some(SeriousInjuryKind::SeriousConcussion)); // -AV
+        assert_eq!(serious_injury_bb2016(5, 6), Some(SeriousInjuryKind::FracturedSkull)); // -AV
+        assert_eq!(serious_injury_bb2016(5, 7), Some(SeriousInjuryKind::BrokenNeck)); // -AG
         assert_eq!(serious_injury_bb2016(5, 8), Some(SeriousInjuryKind::BrokenCollarBone)); // -ST
     }
 

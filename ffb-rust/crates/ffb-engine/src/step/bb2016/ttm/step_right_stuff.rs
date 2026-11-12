@@ -111,10 +111,14 @@ impl StepRightStuff {
 
         // Compute minimum roll using AgilityMechanic + all modifiers including tacklezones.
         let ktm_str = self.ktm_range.map(|r| r.get_name().to_string());
+        // Java passes the same `rightStuffModifiers` set to ReportRightStuffRoll as to
+        // minimumRollRightStuff; collect its names from the same three parts the sum below uses.
+        let mut modifier_names: Vec<String> = Vec::new();
         let minimum_roll = {
             let player_agility = game.player(&player_id).map(|p| p.agility_with_modifiers());
             if let Some(agility) = player_agility {
-                let regular_total: i32 = Bb2016RightStuffModifiers::new()
+                let collection = Bb2016RightStuffModifiers::new();
+                let regular: Vec<_> = collection
                     .get_modifiers()
                     .iter()
                     .filter(|m| m.get_type() != ModifierType::TACKLEZONE)
@@ -123,14 +127,24 @@ impl StepRightStuff {
                         "Long Kick"   => ktm_str.as_deref() == Some("long"),
                         _             => true,
                     })
-                    .map(|m| m.get_modifier())
-                    .sum();
+                    .collect();
+                let regular_total: i32 = regular.iter().map(|m| m.get_modifier()).sum();
+                modifier_names.extend(regular.iter().map(|m| m.get_name().to_string()));
                 // Java: GenerifiedModifierFactory.getTacklezoneModifier → count = findTacklezones
                 // BB2016 has "N Tacklezones" → +N per adjacent opponent tacklezone.
                 let tacklezone_modifier = UtilPlayer::find_tacklezones(game, &player_id) as i32;
+                // The tacklezone modifier Java adds is the collection's TACKLEZONE entry of that size.
+                if tacklezone_modifier > 0 {
+                    if let Some(m) = collection.get_modifiers().iter().find(|m|
+                        m.get_type() == ModifierType::TACKLEZONE && m.get_modifier() == tacklezone_modifier)
+                    {
+                        modifier_names.push(m.get_name().to_string());
+                    }
+                }
                 // Java: GenerifiedModifierFactory.getSkillModifiers → skill.bb2016.Swoop.postConstruct()
                 // registers RightStuffModifier("Swoop", -1, REGULAR) on the player's own skill set.
                 let swoop_modifier = if game.player(&player_id).map(|p| p.has_skill(SkillId::Swoop)).unwrap_or(false) {
+                    modifier_names.push("Swoop".to_string());
                     -1
                 } else {
                     0
@@ -153,7 +167,7 @@ impl StepRightStuff {
             self.roll,
             minimum_roll,
             re_rolled,
-            vec![],
+            modifier_names,
         ));
 
         if successful {

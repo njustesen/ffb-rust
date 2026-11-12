@@ -89,7 +89,13 @@ impl StepApothecary {
         // pre-regeneration `skipInjuryParts`. Report order and content only: the one Regeneration
         // die is thrown in the same place relative to every other die (H.50).
         let pre_regen = self.injury_result.as_ref().map(|ir| ir.is_pre_regeneration()).unwrap_or(false);
-        if pre_regen {
+        // BB2016 runs this shared step but has NO pre-regeneration block: bb2016 StepApothecary
+        // asks for the apothecary first (DO_REQUEST reports the injury; a decline reports the
+        // apothecary roll) and rolls Regeneration in the default branch AFTER applyTo (line 245),
+        // handled in the tail below.
+        if pre_regen && game.rules == ffb_model::enums::Rules::Bb2016 {
+            if let Some(ir) = self.injury_result.as_mut() { ir.passed_regeneration(); }
+        } else if pre_regen {
             if game.rules == ffb_model::enums::Rules::Bb2025 {
                 if let Some(ref mut ir) = self.injury_result {
                     if let Some(ev) = ir.report(game) { pending_events.push(ev); }
@@ -256,8 +262,31 @@ impl StepApothecary {
                     if let Some(ir) = self.injury_result.as_ref() {
                         ir.apply_to(game);
                     }
-                    // The Regeneration roll for a casualty is made in the pre-regeneration block
-                    // at the top of this method, where Java makes it; only `applyTo` remains here.
+                    // bb2020/bb2025 roll Regeneration in the pre-regeneration block at the top of
+                    // this method; bb2016 rolls it HERE, after applyTo (bb2016 StepApothecary:242-258):
+                    //     if (playerState.isCasualty() && canRollToSaveFromInjury && canUseApo())
+                    //         if (!handleRegeneration(this, player)) { Igor offer } else curePoison();
+                    if game.rules == ffb_model::enums::Rules::Bb2016 {
+                        let (defender_id, can_use_apo) = self.injury_result.as_ref()
+                            .map(|ir| (ir.injury_context.defender_id.clone(), ir.injury_context.can_use_apo))
+                            .unwrap_or((None, false));
+                        if let Some(pid) = defender_id {
+                            let state = game.field_model.player_state(&pid);
+                            let can_regen = game.player(&pid)
+                                .map(|p| p.has_skill_property(
+                                    ffb_model::model::property::named_properties::NamedProperties::CAN_ROLL_TO_SAVE_FROM_INJURY))
+                                .unwrap_or(false);
+                            if let (Some(state), true) = (state, can_use_apo && can_regen) {
+                                if state.is_casualty() {
+                                    let (regenerated, ev) = crate::step::util_server_injury::
+                                        handle_regeneration_with_state(game, rng, &pid, state, false);
+                                    if let Some(ev) = ev { self.pending_regeneration.push(ev); }
+                                    // The Igor offer on failure: no parity team carries an Igor.
+                                    if regenerated { self.cure_poison(game); }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
