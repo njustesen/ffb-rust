@@ -662,6 +662,18 @@ impl StepApplyKickoffResult {
                     }
                 }
             }
+            // Java bb2025: `nrOfPlayersAllowed = Math.min(roll + 3, eligiblePlayers.size())`, the
+            // eligible set being on-pitch players with NO adjacent opposing tackle-zone player
+            // (amazon_vs_goblin bb2025 seed 3: Java 5, Rust 6). BB2020 keeps the bare roll + 3.
+            // NOTE: bb2025's Solid Defence is a player-CHOICE dialog over that set; Rust still runs
+            // the bb2020 free re-setup flow (BACKLOG §J open item) — only the reported limit is ported.
+            if game.rules == Rules::Bb2025 {
+                let other = if game.home_playing { &game.team_away } else { &game.team_home };
+                let eligible = self.players_at_coordinates.values()
+                    .filter(|c| UtilPlayer::find_adjacent_players_with_tacklezones(game, other, **c, false).is_empty())
+                    .count() as i32;
+                self.nr_of_players_allowed = self.nr_of_players_allowed.min(eligible);
+            }
             game.turn_mode = TurnMode::SolidDefence;
             game.report_list.add(ReportSolidDefenceRoll::new(
                 Some(acting_team_id.clone()),

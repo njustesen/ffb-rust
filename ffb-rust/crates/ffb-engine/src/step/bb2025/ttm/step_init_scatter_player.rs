@@ -481,13 +481,21 @@ impl StepInitScatterPlayer {
         // Java: publishParameter(THROWN_PLAYER_COORDINATE, lastValidCoordinate)
         self.thrown_player_coordinate = Some(last_valid);
         // Java: getResult().addReport(new ReportSwoopPlayer(throwerCoordinate, coordinateEnd, direction, distanceRoll, !inBounds));
-        game.report_list.add(ReportSwoopPlayer::new(
-            start_coord,
-            coord_end,
-            direction,
-            distance_roll,
-            !in_bounds,
-        ));
+        // BB2020 runs this shared step, but its Java report is `bb2020.ReportSwoopPlayer`, which
+        // has NO outOfBounds field (black_orc_vs_goblin bb2020 seed 3).
+        if game.rules == ffb_model::enums::Rules::Bb2020 {
+            game.report_list.add(ffb_model::report::bb2020::report_swoop_player::ReportSwoopPlayer::new(
+                start_coord, coord_end, direction, distance_roll,
+            ));
+        } else {
+            game.report_list.add(ReportSwoopPlayer::new(
+                start_coord,
+                coord_end,
+                direction,
+                distance_roll,
+                !in_bounds,
+            ));
+        }
         // SwoopPlayer GameEvent emitted in execute_step after swoop_scatter returns.
 
         ScatterResult::new(last_valid, in_bounds)

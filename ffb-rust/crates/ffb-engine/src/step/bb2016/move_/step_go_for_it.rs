@@ -151,6 +151,7 @@ impl StepGoForIt {
         }
 
         let player_id = game.acting_player.player_id.clone();
+        let mut modifier_names: Vec<String> = Vec::new();
         let minimum_roll = {
             let factory = GoForItModifierFactory::for_rules(game.rules);
             if let Some(pid) = player_id.as_deref() {
@@ -164,6 +165,7 @@ impl StepGoForIt {
                     let card_mods = factory.find_card_modifiers(&ctx);
                     let skill_mods = factory.find_skill_modifiers(&ctx);
                     let all: Vec<&ffb_mechanics::modifiers::go_for_it_modifier::GoForItModifier> = mods.iter().copied().chain(card_mods.iter()).chain(skill_mods.iter()).collect();
+                    modifier_names = all.iter().map(|m| m.get_name().to_string()).collect();
                     GoForItModifierFactory::minimum_roll_going_for_it(&all)
                 } else { 2 }
             } else { 2 }
@@ -184,7 +186,9 @@ impl StepGoForIt {
             self.roll,
             minimum_roll,
             re_rolled,
-            vec![],
+            // Java: goForItModifiers.toArray(...) — names the Blizzard (nurgle_vs_chaos_dwarf
+            // bb2016 seed 2); the set was computed for the minimum but reported empty.
+            modifier_names,
         ));
 
         // Coverage event, mirroring `bb2025/move_/step_go_for_it.rs`: one per RESOLVED roll, so an

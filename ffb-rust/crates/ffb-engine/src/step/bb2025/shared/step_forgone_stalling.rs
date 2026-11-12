@@ -84,11 +84,12 @@ impl StepForgoneStalling {
 
         if let Some(player_id) = stalling_player_id {
             if self.stalling_extension.is_considered_stalling(game, &player_id) {
+                // Java order: addReport(ReportPlayerEvent(id, "is stalling")) THEN handleStaller
+                // (which writes ReportThrowAtStallingPlayer) — underworld_vs_renegades bb2025 s2.
+                game.report_list.add(ReportPlayerEvent::new(Some(player_id.clone()), Some("is stalling".into())));
                 let turn_nr = game.turn_data().turn_nr;
                 let (stalling_ev, steady_footing) =
                     self.stalling_extension.handle_staller(game, &player_id, turn_nr, rng);
-                // Java: getResult().addReport(new ReportPlayerEvent(player.getId(), "is stalling"))
-                game.report_list.add(ReportPlayerEvent::new(Some(player_id.clone()), Some("is stalling".into())));
                 let out = StepOutcome::next()
                     .with_event(stalling_ev)
                     .with_event(GameEvent::PlayerNote { player_id, note: "is stalling".into() });

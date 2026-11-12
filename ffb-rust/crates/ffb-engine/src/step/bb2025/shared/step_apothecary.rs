@@ -372,7 +372,9 @@ impl StepApothecary {
             &defender.name,
             raise_type,
             &raise_positions[0],
-            false,
+            // Java: sendRaisedPlayer(..., raiseType == RaiseType.ROTTER) — a Nurgle raise reports
+            // nurglesRot=true (high_elf_vs_nurgle bb2025 seed 1).
+            raise_type == ffb_model::util::raise_type::RaiseType::ROTTER,
         )
     }
 
