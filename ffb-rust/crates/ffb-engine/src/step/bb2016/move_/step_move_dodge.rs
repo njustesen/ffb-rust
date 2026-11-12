@@ -309,7 +309,7 @@ impl StepMoveDodge {
             // 4 (human seed4 i=185: fall+turnover in Java, standing in Rust).
             let strength = game.player(pid).map(|p| p.strength as i32).unwrap_or(3);
             let min = DodgeModifierFactory::minimum_roll_edition(strength, agility, &all, game.rules);
-            let names: Vec<String> = all.iter().map(|m| m.get_report_string().to_string()).collect();
+            let names: Vec<String> = all.iter().map(|m| m.get_name().to_string()).collect();
             // Java bb2016 StepMoveDodge: the same Break Tackle axis as the later editions —
             // the use-strength modifier (ST-for-AG substitution) is dropped when the roll
             // succeeds without it or fails regardless, and consumed (markSkillUsed) only when
@@ -318,7 +318,7 @@ impl StepMoveDodge {
                 all.iter().copied().filter(|m| !m.use_strength).collect();
             let has_bt = without_bt.len() != all.len();
             let min_no_bt = DodgeModifierFactory::minimum_roll_edition(strength, agility, &without_bt, game.rules);
-            let names_no_bt: Vec<String> = without_bt.iter().map(|m| m.get_report_string().to_string()).collect();
+            let names_no_bt: Vec<String> = without_bt.iter().map(|m| m.get_name().to_string()).collect();
             (min, names, has_bt, min_no_bt, names_no_bt)
         } else {
             (2, vec![], false, 2, vec![])

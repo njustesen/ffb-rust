@@ -111,9 +111,9 @@ impl StepThrowTeamMate {
             let modifier_total: i32 = collection_mods.iter().map(|m| m.get_modifier()).sum::<i32>()
                 + skill_mods.iter().map(|m| m.get_modifier()).sum::<i32>()
                 + card_mods.iter().map(|m| m.get_modifier()).sum::<i32>();
-            let modifier_names: Vec<String> = collection_mods.iter().map(|m| m.get_report_string().to_string())
-                .chain(skill_mods.iter().map(|m| m.get_report_string().to_string()))
-                .chain(card_mods.iter().map(|m| m.get_report_string().to_string()))
+            let modifier_names: Vec<String> = collection_mods.iter().map(|m| m.get_name().to_string())
+                .chain(skill_mods.iter().map(|m| m.get_name().to_string()))
+                .chain(card_mods.iter().map(|m| m.get_name().to_string()))
                 .collect();
 
             // Java: TtmMechanic.minimumRoll(distance, modifiers) = max(2, 2 + modifierSum)

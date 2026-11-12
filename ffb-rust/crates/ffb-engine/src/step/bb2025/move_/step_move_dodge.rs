@@ -230,14 +230,14 @@ impl StepMoveDodge {
             let all: Vec<&ffb_mechanics::modifiers::dodge_modifier::DodgeModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
             let agility = game.player(pid).map(|p| p.agility as i32).unwrap_or(3);
             let min = DodgeModifierFactory::minimum_roll(agility, &all);
-            let names: Vec<String> = all.iter().map(|m| m.get_report_string().to_string()).collect();
+            let names: Vec<String> = all.iter().map(|m| m.get_name().to_string()).collect();
             // Java: `Optional<DodgeModifier> btModifier = dodgeModifiers.stream()
             //   .filter(DodgeModifier::isUseStrength).findFirst()` — the Break Tackle axis.
             let without_bt: Vec<&ffb_mechanics::modifiers::dodge_modifier::DodgeModifier> =
                 all.iter().copied().filter(|m| !m.use_strength).collect();
             let has_bt = without_bt.len() != all.len();
             let min_no_bt = DodgeModifierFactory::minimum_roll(agility, &without_bt);
-            let names_no_bt: Vec<String> = without_bt.iter().map(|m| m.get_report_string().to_string()).collect();
+            let names_no_bt: Vec<String> = without_bt.iter().map(|m| m.get_name().to_string()).collect();
             let total_all: i32 = all.iter().map(|m| m.get_modifier()).sum();
             let total_no_bt: i32 = without_bt.iter().map(|m| m.get_modifier()).sum();
             (min, names, has_bt, min_no_bt, names_no_bt, agility, total_all, total_no_bt)
