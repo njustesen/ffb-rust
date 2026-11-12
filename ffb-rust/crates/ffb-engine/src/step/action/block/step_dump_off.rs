@@ -87,7 +87,14 @@ impl StepDumpOff {
                     skill_name: format!("{:?}", SkillId::DumpOff),
                 });
             } else {
+                // Java (all three DumpOffBehaviours): `state.usingDumpOff = false;
+                // setNextAction(NEXT_STEP)` — straight out, NO report. Only a declined DIALOG
+                // reaches the `else` branch below that writes ReportSkillUse(..., false, null);
+                // falling through here wrote a spurious Dump-Off skillUse before every block on
+                // a Dump-Off carrier that was not holding the ball (bb2016
+                // amazon_vs_dark_elf_league_fumbbl seed 1).
                 self.using_dump_off = Some(false);
+                return StepOutcome::next();
             }
         }
 
@@ -239,8 +246,9 @@ mod tests {
         step.defender_position = Some(FieldCoordinate::new(6, 5)); // defender is at (6,5), ball at (3,3)
         let outcome = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(outcome.action, StepAction::NextStep);
-        // Skill declined (has skill but conditions not met → using_dump_off = false)
-        assert!(outcome.events.iter().any(|e| matches!(e, GameEvent::SkillUse { used: false, .. })));
+        // Java: conditions not met → `usingDumpOff = false; NEXT_STEP` with NO report/event.
+        assert!(outcome.events.is_empty());
+        assert!(!game.report_list.has_report(ReportId::SKILL_USE));
     }
 
     #[test]
@@ -312,11 +320,11 @@ mod tests {
 
     #[test]
     fn defender_has_skill_but_declines_adds_skill_use_report() {
+        // Java: a DECLINED dialog (`usingDumpOff == false` from the command) writes
+        // ReportSkillUse(defenderId, skill, false, null).
         let mut game = make_game(vec![SkillId::DumpOff]);
-        // Ball not at defender → conditions not met → using_dump_off = false
-        game.field_model.ball_coordinate = Some(FieldCoordinate::new(3, 3));
         let mut step = StepDumpOff::new();
-        step.defender_position = Some(FieldCoordinate::new(6, 5));
+        step.using_dump_off = Some(false);
         step.start(&mut game, &mut GameRng::new(0));
         assert!(
             game.report_list.has_report(ReportId::SKILL_USE),

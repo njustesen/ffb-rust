@@ -23,7 +23,8 @@ impl ReportCheeringFans {
     pub fn to_json_value(&self) -> serde_json::Value {
         serde_json::json!({
             "reportId": self.get_id().get_name(),
-            "teamId": self.team_id,
+            // Java's teamId is null on a tie (no winner, no prayer); "" is Rust's stand-in for it.
+            "teamId": if self.team_id.is_empty() { serde_json::Value::Null } else { serde_json::Value::from(self.team_id.clone()) },
             "prayerAvailable": self.prayer_available,
             "rollHome": self.roll_home,
             "rollAway": self.roll_away,
@@ -68,5 +69,14 @@ mod tests {
     fn to_json_value_has_report_id() {
         let json = make().to_json_value();
         assert_eq!(json["reportId"].as_str(), Some("cheeringFans"));
+    }
+
+    /// Java writes `teamId: null` when the cheering-fans roll ties (skaven_vs_elf bb2020 seed 3).
+    #[test]
+    fn a_tie_serialises_a_null_team_id_and_round_trips() {
+        let tie = ReportCheeringFans::new(String::new(), false, 4, 4);
+        let json = tie.to_json_value();
+        assert!(json["teamId"].is_null());
+        assert_eq!(ReportCheeringFans::from_json(&json).team_id, "");
     }
 }

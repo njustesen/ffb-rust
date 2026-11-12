@@ -495,7 +495,11 @@ impl StepApplyKickoffResult {
         let fame_away = game.game_result.away.fame;
 
         // Home players are affected by away fame
-        let home_ids: Vec<String> = on_field_player_ids(game, true);
+        // Java sizes both arrays to `team.getPlayers().length` and rolls only for
+        // `isPlayerOnField` players: an off-field slot keeps roll 0 / affected false, so the
+        // report carries one entry per ROSTER player, in roster order.
+        let home_on_field: Vec<String> = on_field_player_ids(game, true);
+        let home_ids: Vec<String> = game.team_home.players.iter().map(|p| p.id.clone()).collect();
         // Java's dropPlayer publishes INJURY_RESULT immediately via pStep.publishParameter; collect
         // the Ball & Chain chain-injury results here and publish them on this step's outcome so the
         // Apothecary step that follows in the bb2016 kickoff sequence applies them (Java KOs the
@@ -505,6 +509,11 @@ impl StepApplyKickoffResult {
         let mut rolls_home: Vec<i32> = Vec::new();
         let mut affected_home: Vec<bool> = Vec::new();
         for id in &home_ids {
+            if !home_on_field.contains(id) {
+                rolls_home.push(0);
+                affected_home.push(false);
+                continue;
+            }
             let roll = rng.d6();
             let affected = DiceInterpreter::is_affected_by_pitch_invasion(roll, fame_away + fan_favs_away);
             rolls_home.push(roll);
@@ -523,10 +532,16 @@ impl StepApplyKickoffResult {
         }
 
         // Away players are affected by home fame
-        let away_ids: Vec<String> = on_field_player_ids(game, false);
+        let away_on_field: Vec<String> = on_field_player_ids(game, false);
+        let away_ids: Vec<String> = game.team_away.players.iter().map(|p| p.id.clone()).collect();
         let mut rolls_away: Vec<i32> = Vec::new();
         let mut affected_away: Vec<bool> = Vec::new();
         for id in &away_ids {
+            if !away_on_field.contains(id) {
+                rolls_away.push(0);
+                affected_away.push(false);
+                continue;
+            }
             let roll = rng.d6();
             let affected = DiceInterpreter::is_affected_by_pitch_invasion(roll, fame_home + fan_favs_home);
             rolls_away.push(roll);
@@ -888,6 +903,31 @@ mod tests {
         // Away player should not be stunned (fame_home=0)
         let away_state = game.field_model.player_state("away1").unwrap();
         assert_eq!(away_state.base(), PS_STANDING, "away player should be unaffected by 0 home fame");
+    }
+
+    /// Java sizes the report arrays to the whole roster: an off-field player keeps roll 0 and
+    /// affected false (bb2016 amazon_vs_dark_elf_league_fumbbl seed 2: 13 home entries, 2 zero).
+    #[test]
+    fn pitch_invasion_report_has_one_entry_per_roster_player() {
+        let mut game = make_game();
+        add_player(&mut game, "home1", true);
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: "bench".into(), ..Default::default()
+        });
+        add_player(&mut game, "away1", false);
+        let mut step = StepApplyKickoffResult::new("end".into(), "blitz".into());
+        step.kickoff_result = Some(KickoffResult::PitchInvasion);
+        let out = step.start(&mut game, &mut GameRng::new(1));
+        let ev = out.events.iter().find_map(|e| match e {
+            GameEvent::KickoffPitchInvasionBb2016 { rolls_home, affected_home, rolls_away, .. } =>
+                Some((rolls_home.clone(), affected_home.clone(), rolls_away.clone())),
+            _ => None,
+        }).expect("pitch invasion event");
+        assert_eq!(ev.0.len(), game.team_home.players.len());
+        let bench = game.team_home.players.iter().position(|p| p.id == "bench").unwrap();
+        assert_eq!(ev.0[bench], 0, "an off-field player is not rolled");
+        assert!(!ev.1[bench]);
+        assert_eq!(ev.2.len(), game.team_away.players.len());
     }
 
     #[test]
