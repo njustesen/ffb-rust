@@ -76,6 +76,12 @@ pub struct StepEndTurn {
     pub touchdown_player_id: Option<String>,
     /// Java: isHomeTurnEnding = game.isHomePlaying() — captured before home_playing is flipped.
     pub is_home_turn_ending: Option<bool>,
+    /// BB2016 starts the new half BEFORE `ReportTurnEnd` (bb2016 StepEndTurn:320 then :352), so
+    /// its `startHalf` report precedes the turn end and the Secret Weapon ban. Set when that early
+    /// start ran, so the later half-transition block does not start the half a second time.
+    half_started_early: bool,
+    /// The StateMechanic events of that early start, attached when the step leaves.
+    early_half_events: Vec<GameEvent>,
 }
 
 impl StepEndTurn {
@@ -101,6 +107,8 @@ impl StepEndTurn {
             ko_recovery_done: false,
             touchdown_player_id: None,
             is_home_turn_ending: None,
+            half_started_early: false,
+            early_half_events: Vec::new(),
         }
     }
 
@@ -381,6 +389,15 @@ impl StepEndTurn {
         // bb2016 games were writing a `heatRoll` key Java never emits, on the single
         // highest-volume report in the sweep (1.14M turnEnds).
         if game.rules == ffb_model::enums::Rules::Bb2016 {
+            // Java bb2016 StepEndTurn: `if (fNewHalf) { ... else stateMechanic.startHalf(this,
+            // half + 1); }` (line 320, for the end of half 1; OVERTIME is off in parity games)
+            // runs BEFORE `addReport(new ReportTurnEnd(...))` (line 352).
+            if self.new_half && game.half == 1 && !self.half_started_early {
+                use crate::mechanic::bb2025::state_mechanic::StateMechanic;
+                use crate::mechanic::state_mechanic::StateMechanic as StateMechanicTrait;
+                self.early_half_events = StateMechanic::new().start_half(game, game.half + 1);
+                self.half_started_early = true;
+            }
             use ffb_model::report::bb2016::report_turn_end::ReportTurnEnd as ReportTurnEndBb2016;
             game.report_list.add(ReportTurnEndBb2016::new(
                 td_player_id,
@@ -523,9 +540,16 @@ impl StepEndTurn {
                     modified += biased_ref_bonus;
                     let successful = DiceInterpreter::is_argue_the_call_successful(modified);
                     let coach_ban = DiceInterpreter::is_coach_banned(modified);
-                    game.report_list.add(ReportArgueTheCallRoll::new(
-                        Some(pid.clone()), successful, coach_ban, roll, false, friends, biased_ref_bonus,
-                    ));
+                    // Java bb2016 StepEndTurn:543 writes the 4-field bb2016 class.
+                    if game.rules == ffb_model::enums::Rules::Bb2016 {
+                        game.report_list.add(
+                            ffb_model::report::bb2016::report_argue_the_call_roll::ReportArgueTheCallRoll::new(
+                                pid.clone(), successful, coach_ban, roll));
+                    } else {
+                        game.report_list.add(ReportArgueTheCallRoll::new(
+                            Some(pid.clone()), successful, coach_ban, roll, false, friends, biased_ref_bonus,
+                        ));
+                    }
                     if successful {
                         game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon = false;
                     }
@@ -648,7 +672,11 @@ impl StepEndTurn {
 
         UtilServerGame::mark_played_and_secret_weapons(game);
 
-        self.new_half = Self::check_end_of_half(game);
+        // Once a bb2016 half has been started early (see `half_started_early`) the turn counters
+        // are reset, so re-checking on a re-entered pass would forget that the half ended.
+        if !self.half_started_early {
+            self.new_half = Self::check_end_of_half(game);
+        }
 
         // Events collected during this pass, attached to the final outcome.
         let mut pending_events: Vec<GameEvent> = Vec::new();
@@ -715,7 +743,9 @@ impl StepEndTurn {
                         game.home_playing = home_has_carrier;
                         if off_turn_touchdown {
                             game.turn_data_mut().turn_nr += 1;
-                            self.new_half = Self::check_end_of_half(game);
+                            if !self.half_started_early {
+                                self.new_half = Self::check_end_of_half(game);
+                            }
                         }
                     }
                 }
@@ -790,8 +820,10 @@ impl StepEndTurn {
         // (game.half is not yet incremented at this point): the final half ending, or a game-ending TD.
         // Without this Rust banned a played Secret Weapon at the end of half 2 (game end) where Java
         // keeps it — a final-state (game_end hash) divergence, dwarf seed 4 step 294.
+        // The half that just ENDED (a bb2016 early start has already advanced `game.half`).
+        let ended_half = if self.half_started_early { game.half - 1 } else { game.half };
         let is_end_of_game = Self::is_end_of_game(
-            self.new_half, touchdown, game.half,
+            self.new_half, touchdown, ended_half,
             game.turn_data_home.turn_nr, game.turn_data_away.turn_nr,
         );
         // bb2016 `StepEndTurn` calls `recoverKnockout` (line 281) BEFORE `reportSecretWeaponsUsed`
@@ -950,7 +982,8 @@ impl StepEndTurn {
             for ev in pending_events { outcome = outcome.with_event(ev); }
             if self.new_half {
                 // Java: half > 2 → end_game; half > 1 → overtime check or end_game; else → H2 kickoff
-                if game.half > 1 {
+                let ended_half = if self.half_started_early { game.half - 1 } else { game.half };
+                if ended_half > 1 {
                     // Half 2+ ended → end game (overtime check not yet ported)
                     outcome = outcome.push_seq(end_game_sequence_for(game.rules, game.admin_mode));
                 } else {
@@ -961,7 +994,12 @@ impl StepEndTurn {
                     {
                         use crate::mechanic::bb2025::state_mechanic::StateMechanic;
                         use crate::mechanic::state_mechanic::StateMechanic as StateMechanicTrait;
-                        let half_events = StateMechanic::new().start_half(game, game.half + 1);
+                        // bb2016 already started it before ReportTurnEnd (`half_started_early`).
+                        let half_events = if self.half_started_early {
+                            std::mem::take(&mut self.early_half_events)
+                        } else {
+                            StateMechanic::new().start_half(game, game.half + 1)
+                        };
                         for ev in half_events { outcome = outcome.with_event(ev); }
                         // Java: ReportStartHalf for the new (second) half. H1's StartHalf is
                         // emitted by StepInitKickoff (TurnMode::StartGame path); the H2 kickoff

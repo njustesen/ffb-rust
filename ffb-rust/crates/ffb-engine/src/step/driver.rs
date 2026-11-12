@@ -1050,9 +1050,17 @@ impl DriverGameState {
                     // `coachBanned` is set deep inside `argue_and_remove_secret_weapons`, which
                     // returns no `StepOutcome` to hang an event on; the report already carries the
                     // bit, so the bridge is the natural site.
-                    if let Some(r) = any.downcast_ref::<ReportArgueTheCallRoll>() {
-                        if r.coach_banned {
-                            let pid = r.player_id.clone().unwrap_or_default();
+                    // BB2016 writes the 4-field bb2016 class; read the same two fields from either.
+                    let banned_pid: Option<String> = if let Some(r) = any.downcast_ref::<ReportArgueTheCallRoll>() {
+                        r.coach_banned.then(|| r.player_id.clone().unwrap_or_default())
+                    } else if let Some(r) = any.downcast_ref::<
+                        ffb_model::report::bb2016::report_argue_the_call_roll::ReportArgueTheCallRoll>() {
+                        r.coach_banned.then(|| r.player_id.clone())
+                    } else {
+                        None
+                    };
+                    {
+                        if let Some(pid) = banned_pid {
                             let team_id = if self.game.team_home.players.iter().any(|p| p.id == pid) {
                                 self.game.team_home.id.clone()
                             } else {

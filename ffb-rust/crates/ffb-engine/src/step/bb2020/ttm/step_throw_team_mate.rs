@@ -143,7 +143,8 @@ impl StepThrowTeamMate {
                 self.minimum_roll,
                 re_rolled,
                 vec![],
-                Some(format!("{:?}", passing_distance)),
+                // Java serialises the PassingDistance by NAME ("Quick Pass"), not the Debug form.
+                Some(passing_distance.name().to_string()),
                 self.thrown_player_id.clone(),
                 pass_result_name,
                 self.kicked,

@@ -113,15 +113,25 @@ impl StepBribes {
                     let successful = crate::dice_interpreter::DiceInterpreter::is_argue_the_call_successful(modified);
                     let coach_banned_by_argue = crate::dice_interpreter::DiceInterpreter::is_coach_banned(roll);
                     self.argue_the_call_successful = Some(successful);
-                    game.report_list.add(ReportArgueTheCallRoll::new(
-                        game.acting_player.player_id.clone(),
-                        successful,
-                        coach_banned_by_argue,
-                        roll,
-                        true,
-                        friends,
-                        biased_ref_bonus,
-                    ));
+                    // BB2016 fouls run this shared step, but Java bb2016 StepBribes:152 writes the
+                    // bb2016 class `ReportArgueTheCallRoll(playerId, successful, coachBanned, roll)`
+                    // (no staysOnPitch / friendsWithRef / biasedRefs fields).
+                    if game.rules == ffb_model::enums::Rules::Bb2016 {
+                        game.report_list.add(
+                            ffb_model::report::bb2016::report_argue_the_call_roll::ReportArgueTheCallRoll::new(
+                                game.acting_player.player_id.clone().unwrap_or_default(),
+                                successful, coach_banned_by_argue, roll));
+                    } else {
+                        game.report_list.add(ReportArgueTheCallRoll::new(
+                            game.acting_player.player_id.clone(),
+                            successful,
+                            coach_banned_by_argue,
+                            roll,
+                            true,
+                            friends,
+                            biased_ref_bonus,
+                        ));
+                    }
                     // One ArgueTheCall coverage event per roll (initial + any B&C re-roll).
                     argue_event = Some(GameEvent::ArgueTheCall {
                         player_id: fouler_id.clone(),
