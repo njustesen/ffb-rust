@@ -148,6 +148,13 @@ impl ModificationAwareInjuryType for InjuryTypeFoul {
 
                     let av = defender.armour_with_modifiers();
                     for m in modifiers {
+                        // Java's armour-modifier collection is a Set of the skills' registered
+                        // modifier objects: Iron Hard Skin's marker, already added via
+                        // getFoulAssist above, is the same object and collapses (elf_vs_chaos_dwarf
+                        // bb2020 seed 3 reported it twice).
+                        if self.ctx.armor_modifiers.iter().any(|x| x.name == m.get_name()) {
+                            continue;
+                        }
                         self.ctx.add_armor_modifier(leak_armor_modifier(
                             m.as_ref(),
                             attacker,

@@ -225,10 +225,16 @@ impl StepJump {
     /// branch publishes INJURY_TYPE and GOTOs the failure label but does NOT reset
     /// `actingPlayer.setJumping(false)` — unlike the leap() FAILURE branch.
     fn fail_without_clearing_jumping(&mut self, _game: &mut Game) -> StepOutcome {
+        // Java bb2016 LeapBehaviour: publishParameter(INJURY_TYPE, new InjuryTypeDropJump()).
+        // bb2016 has no Steady Footing — its StepFallDown reads INJURY_TYPE only, so the
+        // SteadyFootingContext left it on its default dropGfi (slann_fumbbl_vs_necromantic bb2016
+        // seed 2) — the same fix the bb2016 dodge got. The context stays published for any
+        // shared consumer that reads it; the injury name is what StepFallDown uses.
         let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeDropJump".into());
         let label = self.goto_label_on_failure.clone();
         StepOutcome::goto(&label)
             .publish(StepParameter::SteadyFootingContext(Box::new(ctx)))
+            .publish(StepParameter::InjuryTypeName("InjuryTypeDropJump".into()))
     }
 }
 
