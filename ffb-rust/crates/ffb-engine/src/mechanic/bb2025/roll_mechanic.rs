@@ -229,8 +229,20 @@ impl RollMechanicTrait for RollMechanic {
     }
 
     fn is_mascot_available(&self, game: &Game, player: &Player) -> bool {
-        // TODO: InducementSet stub; simplified to team-re-roll check with amount=1
-        self.is_team_re_roll_available_amount(game, player, 1)
+        // Java bb2025 RollMechanic.isMascotAvailable: the ACTIVE team's inducement set must hold a
+        // CONDITIONAL_REROLL inducement (Team Mascot) with uses left, AND a team re-roll must be
+        // available. The stub skipped the inducement half, so every team "had" a mascot whenever
+        // it had a re-roll — which made StepBlockRoll's dialog think the attacker held an actual
+        // re-roll and report the attacker's team as choosing on dice-against (orc_vs_human
+        // bb2025 seed 3, blockRoll.choosingTeamId).
+        let inducement_set = if game.home_playing {
+            &game.turn_data_home.inducement_set
+        } else {
+            &game.turn_data_away.inducement_set
+        };
+        inducement_set.get_inducements().iter()
+            .any(|ind| ind.has_usage(ffb_model::inducement::usage::Usage::CONDITIONAL_REROLL) && ind.get_uses_left() > 0)
+            && self.is_team_re_roll_available_amount(game, player, 1)
     }
 
     fn get_attacker_base_strength(
@@ -298,6 +310,18 @@ mod tests {
             crate::step::framework::test_team("away", 0),
             Rules::Bb2025,
         )
+    }
+
+    /// Java bb2025 `isMascotAvailable` needs a CONDITIONAL_REROLL inducement with uses left on
+    /// the active team ON TOP of an available team re-roll; a re-roll alone is not a mascot.
+    #[test]
+    fn mascot_needs_the_inducement_not_just_a_team_re_roll() {
+        let m = RollMechanic::new();
+        let mut g = make_game();
+        g.home_playing = true;
+        g.turn_data_home.rerolls = 3;
+        let p = Player::default();
+        assert!(!m.is_mascot_available(&g, &p), "no Team Mascot inducement → no mascot re-roll");
     }
 
     #[test]

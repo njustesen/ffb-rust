@@ -184,9 +184,32 @@ impl PrayerHandlerFactory {
                 }
                 game.prayer_state = prayer_state;
                 use ffb_model::report::mixed::report_prayer_end::ReportPrayerEnd;
-                game.report_list.add(ReportPrayerEnd::new(Some(name.clone())));
+                // Java serialises the Prayer enum by `getName()` ("Bad Habits"), not the constant.
+                let display = prayer_display_name_by_name(game.rules, &name).unwrap_or(name.clone());
+                game.report_list.add(ReportPrayerEnd::new(Some(display)));
             }
         }
+    }
+}
+
+/// Java `Prayer.getName()` (the display name a report serialises), resolved from the stored
+/// prayer NAME (constant or display form) for the game's ruleset.
+fn prayer_display_name_by_name(rules: ffb_model::enums::Rules, name: &str) -> Option<String> {
+    match rules {
+        Rules::Bb2020 => {
+            let table = ffb_model::inducement::bb2020::prayers::Prayers::new();
+            table.get_exhibition_prayers().values()
+                .chain(table.get_league_only_prayers().values())
+                .find(|p| p.get_name() == name || p.name() == name)
+                .map(|p| p.get_name().to_string())
+        }
+        Rules::Bb2025 => {
+            let table = ffb_model::inducement::bb2025::prayers::Prayers::new();
+            table.get_all_prayers().values()
+                .find(|p| p.get_name() == name || p.name() == name)
+                .map(|p| p.get_name().to_string())
+        }
+        _ => None,
     }
 }
 
@@ -222,6 +245,16 @@ impl Default for PrayerHandlerFactory {
 mod tests {
     use super::*;
     use ffb_model::enums::Rules;
+
+    /// Java `ReportPrayerEnd` serialises `prayer.getName()` — the display name — so the stored
+    /// constant must be translated (necromantic_vs_khemri bb2020 seed 1: "Bad Habits").
+    #[test]
+    fn prayer_end_reports_the_display_name() {
+        for rules in [Rules::Bb2020, Rules::Bb2025] {
+            assert_eq!(prayer_display_name_by_name(rules, "BAD_HABITS").as_deref(), Some("Bad Habits"));
+            assert_eq!(prayer_display_name_by_name(rules, "Bad Habits").as_deref(), Some("Bad Habits"));
+        }
+    }
 
     #[test]
     fn new_factory_is_empty() {
