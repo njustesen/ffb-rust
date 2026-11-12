@@ -16,7 +16,9 @@ from collections import Counter
 
 RE_JAVA_PID = re.compile(r'^team[A-Za-z0-9_]*?Parity(?:16|20|25)?(Home|Away)(\d+)$')
 RE_JAVA_TID = re.compile(r'^team[A-Za-z0-9_]*?Parity(?:16|20|25)?(Home|Away)$')
-RE_RUST_PID = re.compile(r'^(home|away)_(\d+)$')
+# Rust player ids are `home_01`..`home_16`: at most two digits. A longer number is a TEAM id built
+# from a numeric FUMBBL roster id (`away_4959` = dark_elf_league_fumbbl), and matches RE_RUST_TID.
+RE_RUST_PID = re.compile(r'^(home|away)_(\d{1,2})$')
 RE_RUST_TID = re.compile(r'^(home|away)_[a-z0-9_.]+$')
 
 

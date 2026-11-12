@@ -54,7 +54,11 @@ pub fn normalise_id(s: &str) -> String {
     }
     for side in ["home", "away"] {
         if let Some(rest) = s.strip_prefix(&format!("{side}_")) {
-            if let Ok(n) = rest.parse::<u32>() { return format!("{side}_{n:02}"); }
+            // Player ids are `home_01`..`home_16` (at most two digits). A longer number is a TEAM
+            // id built from a numeric FUMBBL roster id (`away_4959` = dark_elf_league_fumbbl).
+            if rest.len() <= 2 {
+                if let Ok(n) = rest.parse::<u32>() { return format!("{side}_{n:02}"); }
+            }
             if !rest.is_empty() && rest.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.') {
                 return side.to_string();
             }
@@ -163,6 +167,9 @@ mod tests {
         assert_eq!(normalise_id("home_14"), "home_14");
         assert_eq!(normalise_id("away_3"), "away_03");
         assert_eq!(normalise_id("home_human.lrb6"), "home");
+        // A numeric FUMBBL roster id makes a TEAM id, not a player (dark_elf_league_fumbbl).
+        assert_eq!(normalise_id("away_4959"), "away");
+        assert_eq!(normalise_id("teamDarkElfLeagueFumbblParity16Away"), "away");
         assert_eq!(normalise_id("Coach_home"), "home");
         assert_eq!(normalise_id("Home"), "home");
         assert_eq!(normalise_id("Bone Head"), "Bone Head");
