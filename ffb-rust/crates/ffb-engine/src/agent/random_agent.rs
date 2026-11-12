@@ -1170,6 +1170,21 @@ impl Agent for RandomAgent {
             // Raiding Party team-mate choice (multi-eligible only; the step auto-picks a lone
             // candidate like Java). Contract with ParityRunner: single actionRng pick over the
             // dialog's list in the step's given order (Java's findPlayers = team nr order).
+            // MVP nomination (MVP_NOMINATIONS > 0). ParityRunner's PLAYER_CHOICE arm: "MVP must have
+            // a non-empty selection — pick the first available player" (`pids[0]`), no RNG. The
+            // list is Java's findPlayerIdsForMvp order (team order), which Rust mirrors.
+            Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
+                if reason == "MVP" =>
+            {
+                match eligible_players.first() {
+                    Some(pid) => Action::PlayerChoice {
+                        player_id: Some(pid.clone()),
+                        player_ids: vec![pid.clone()],
+                        mode: "MVP".into(),
+                    },
+                    None => Action::SelectPlayer { player_id: String::new() },
+                }
+            }
             Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
                 if reason == "RAIDING_PARTY" =>
             {

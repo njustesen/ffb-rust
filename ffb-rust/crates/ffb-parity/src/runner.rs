@@ -17,7 +17,7 @@ use ffb_model::prompts::AgentPrompt;
 use ffb_model::option::game_option_id::{INDUCEMENTS, MAX_PLAYERS_ON_FIELD, MIN_PLAYERS_ON_LOS, MAX_PLAYERS_IN_WIDE_ZONE, MB_STACKS_AGAINST_CHAINSAW, CLAW_DOES_NOT_STACK, ENABLE_STALLING_CHECK, ALLOW_BALL_AND_CHAIN_RE_ROLL,
     WIZARD_AVAILABLE, INDUCEMENT_IGORS_MAX, INDUCEMENT_APOS_MAX, INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG,
     INDUCEMENT_PRAYERS_MAX, INDUCEMENT_PRAYERS_COST, ALLOW_STAFF_ON_BOTH_TEAMS, INDUCEMENT_BRIBES_REDUCED_MAX,
-    INDUCEMENT_CHEFS_REDUCED_MAX, FORCE_TREASURY_TO_PETTY_CASH, PETTY_CASH_AFFECTS_TV};
+    INDUCEMENT_CHEFS_REDUCED_MAX, FORCE_TREASURY_TO_PETTY_CASH, PETTY_CASH_AFFECTS_TV, MVP_NOMINATIONS};
 use crate::log_format::{GameLog, LogLine, java_log_path_for, rust_log_path_for, rust_events_path_for, rust_reports_path_for};
 use crate::state_hash::state_hash;
 use ffb_model::util::state_hash::state_string;
@@ -84,7 +84,9 @@ pub const BASELINE_SETUP_OPTIONS: &[(&str, &str)] = &[
     (INDUCEMENT_CHEFS_REDUCED_MAX, "5"),
     (FORCE_TREASURY_TO_PETTY_CASH, "false"),
     (PETTY_CASH_AFFECTS_TV, "true"),
-    // Fourth of the same shape, found by the REPORT diff and NOT yet enabled — see BACKLOG §H.51.
+    // Fourth of the same shape, found by the REPORT diff — see BACKLOG §H.51; ENABLED in §J now
+    // that StepMvp raises the MVP PlayerChoice prompt and RandomAgent answers it with the first
+    // eligible player, exactly as ParityRunner does.
     // `UtilServerStartGame:224-226` sets `MVP_NOMINATIONS = 6` for the headless game; Rust's unset
     // option reads 0, so `StepMvp` takes Java's `else` branch and ROLLS a random MVP per team (two
     // `randomPlayerId` dice Java never throws) where Java nominates through a player-choice dialog
@@ -98,7 +100,7 @@ pub const BASELINE_SETUP_OPTIONS: &[(&str, &str)] = &[
     // lineman bb2025 / goblin bb2020 / chaos bb2016 and the payload differences drop to ZERO, but
     // the tail of the report stream is lost. The complete fix is the option PLUS a player-choice
     // prompt from `StepMvp` answered with the first eligible player, mirroring ParityRunner.
-    // (MVP_NOMINATIONS, "6"),
+    (MVP_NOMINATIONS, "6"),
 ];
 
 /// Invoke the Java parity runner as a subprocess.

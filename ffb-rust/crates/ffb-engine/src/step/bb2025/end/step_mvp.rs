@@ -63,10 +63,22 @@ impl Step for StepMvp {
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: CLIENT_PLAYER_CHOICE (PlayerChoiceMode.MVP) → sets home/away nominated players.
         // client-only: proper home/away routing requires dialog side-tracking; headless never receives this action
-        if let Action::SelectPlayer { player_id } = action {
+        // Java files the nomination under the team of the coach who sent it
+        // (checkCommandIsFromHomePlayer); the dialog is always the home team's until its choices
+        // are complete, then the away team's, so the pending side identifies the sender.
+        let nominated = match action {
+            Action::SelectPlayer { player_id } if !player_id.is_empty() => Some(vec![player_id.clone()]),
+            Action::PlayerChoice { player_id: Some(pid), mode, .. } if mode == "MVP" => Some(vec![pid.clone()]),
+            _ => None,
+        };
+        if let Some(nominated) = nominated {
             self.home_players_nominated = None;
             self.away_players_nominated = None;
-            self.home_players_nominated = Some(vec![player_id.clone()]);
+            if self.nr_of_home_choices < self.nr_of_home_mvps {
+                self.home_players_nominated = Some(nominated);
+            } else {
+                self.away_players_nominated = Some(nominated);
+            }
         }
         self.execute_step(game, rng)
     }
@@ -92,7 +104,8 @@ impl StepMvp {
         }
 
         // Java: int mvpNominations = UtilGameOption.getIntOption(game, GameOptionId.MVP_NOMINATIONS);
-        let mvp_nominations: i32 = game.options.get_int(MVP_NOMINATIONS_OPTION).unwrap_or(0);
+        let mvp_nominations: i32 =
+            ffb_model::option::util_game_option::get_int_option(game, MVP_NOMINATIONS_OPTION);
 
         if mvp_nominations > 0 && !game.admin_mode {
             // Java: if (fHomePlayersNominated != null) { random pick; fNrOfHomeChoices++; clear }
@@ -121,8 +134,8 @@ impl StepMvp {
                         self.home_players_mvp.push(players_for_mvp[0].clone());
                         self.nr_of_home_choices += 1;
                     } else {
-                        // client-only: DialogPlayerChoiceParameter(home, MVP) — headless waits for SelectPlayer
-                        return StepOutcome::cont();
+                        // Java: showDialog(new DialogPlayerChoiceParameter(home, MVP, playersForMvp, ...))
+                        return StepOutcome::cont().with_prompt(mvp_prompt(players_for_mvp));
                     }
                 } else {
                     self.nr_of_home_mvps = 0;
@@ -138,8 +151,8 @@ impl StepMvp {
                         self.away_players_mvp.push(players_for_mvp[0].clone());
                         self.nr_of_away_choices += 1;
                     } else {
-                        // client-only: DialogPlayerChoiceParameter(away, MVP) — headless waits for SelectPlayer
-                        return StepOutcome::cont();
+                        // Java: showDialog(new DialogPlayerChoiceParameter(away, MVP, playersForMvp, ...))
+                        return StepOutcome::cont().with_prompt(mvp_prompt(players_for_mvp));
                     }
                 } else {
                     self.nr_of_away_mvps = 0;
@@ -204,6 +217,15 @@ impl StepMvp {
             });
         }
         out
+    }
+}
+
+/// Java `DialogPlayerChoiceParameter(teamId, PlayerChoiceMode.MVP, playersForMvp, null, max, max)`.
+fn mvp_prompt(players_for_mvp: Vec<String>) -> ffb_model::prompts::AgentPrompt {
+    ffb_model::prompts::AgentPrompt::PlayerChoice {
+        eligible_players: players_for_mvp,
+        reason: "MVP".into(),
+        descriptions: Vec::new(),
     }
 }
 

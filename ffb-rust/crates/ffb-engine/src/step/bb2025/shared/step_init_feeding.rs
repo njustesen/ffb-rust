@@ -175,11 +175,15 @@ impl StepInitFeeding {
         } else {
             self.end_turn = true;
 
-            // Java: getResult().addReport(new ReportPlayerEvent(actingPlayer.getPlayerId(), "failed to bite anyone causing a turnover"))
-            game.report_list.add(ReportPlayerEvent::new(
-                game.acting_player.player_id.clone(),
-                Some("failed to bite anyone causing a turnover".into()),
-            ));
+            // Java bb2020/bb2025: addReport(new ReportPlayerEvent(..., "failed to bite anyone causing
+            // a turnover")). bb2016 StepInitFeeding writes no such event — its only report on this
+            // branch is ReportBiteSpectator, below.
+            if game.rules != Rules::Bb2016 {
+                game.report_list.add(ReportPlayerEvent::new(
+                    game.acting_player.player_id.clone(),
+                    Some("failed to bite anyone causing a turnover".into()),
+                ));
+            }
 
             let is_eligible = player_state.map(|s| {
                 !s.is_casualty() && s.base() != PS_KNOCKED_OUT && s.base() != PS_RESERVE
