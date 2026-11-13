@@ -42,192 +42,203 @@ impl InjuryTypeServer for InjuryTypeFoul {
 }
 impl ModificationAwareInjuryType for InjuryTypeFoul {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str, roll: bool) {
-        // Java: `if (game.isActive(foulBreaksArmourWithoutRoll)) setArmorBroken(true);
-        //        if (!injuryContext.isArmorBroken()) { roll; chainsaw; getFoulAssist; ... }`
-        // EVERY armour modifier (chainsaw, the foul assists, IHS's marker, the Foul bonus) lives
-        // inside that guard. Rust added the assists first, so a Blatant-Foul (no armour roll)
-        // report carried "1 Offensive Assist" that Java never adds (goblin bb2025 seed 67 @1.0).
-        if game.is_active(NamedProperties::FOUL_BREAKS_ARMOUR_WITHOUT_ROLL) {
-            self.ctx.armor_broken = true;
-        }
-        if self.ctx.armor_broken {
-            return;
-        }
-        // Add foul-assist armor modifier based on net offensive - defensive assists
-        // Java `ArmorModifierFactory.getFoulAssist`: when the DEFENDER has an unused
-        // `ignoresArmourModifiersFromSkills` skill (Iron Hard Skin), the whole foul-assist set —
-        // positive, NEGATIVE, and the Foul static bonus — is replaced by that skill's own modifiers
-        // (IHS registers one marker whose appliesToContext is `false`, i.e. nothing applies).
-        // Rust applied the assists unconditionally, so a chaos-dwarf Blocker with two defensive
-        // assists took armour 10-2=8 < AV10 (held) where Java's 10 >= 10 broke and stunned him
-        // (chaos_dwarf bb2020 seed 12 i=99, bb2025 seed 51; JFOUL: `assists=-2 mods=Iron Hard
-        // Skin/ broken=true`).
-        let defender_ignores_skill_armor_mods = game.player(defender_id)
-            .map(|p| p.has_unused_skill_with_property(NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS))
-            .unwrap_or(false);
-        if defender_ignores_skill_armor_mods
-            && !self.ctx.armor_modifiers.iter().any(|m| m.name == "Iron Hard Skin")
-        {
-            // Java getFoulAssist returns IHS's own value-0 modifier, which NAMES the skill in the
-            // report (dark_elf_vs_chaos_dwarf bb2025 seed 3 foul). The armour total is unchanged.
-            self.ctx.add_armor_modifier(ffb_mechanics::modifiers::Modifier::new(
-                "Iron Hard Skin", 0, game.rules));
-        }
-        if let Some(aid) = attacker_id {
-            let off = UtilPlayer::find_offensive_foul_assists(game, aid, defender_id) as i32;
-            let def = UtilPlayer::find_defensive_foul_assists(game, aid, defender_id) as i32;
-            let net = off - def;
-            if !defender_ignores_skill_armor_mods {
-                if let Some(m) = foul_assist_armor_modifier(net) {
-                    self.ctx.add_armor_modifier(m);
-                }
-            }
-            if std::env::var_os("FFB_TRACE").is_some() {
-                // `RFOUL`: the assist arithmetic feeding the armour roll.
-                eprintln!("RFOUL att={aid} def={defender_id} off={off} def_assists={def} net={net} mods={:?}",
-                    self.ctx.armor_modifiers.iter().map(|m| (m.name.clone(), m.value)).collect::<Vec<_>>());
-            }
-            // Add "Foul" blatant-foul modifier if option enabled or attacker has no tackle zones
-            if !defender_ignores_skill_armor_mods
-                && (game.options.is_enabled(game_option_id::FOUL_BONUS)
-                    || (game.options.is_enabled(game_option_id::FOUL_BONUS_OUTSIDE_TACKLEZONE)
-                        && UtilPlayer::find_tacklezones(game, aid) < 1))
-            {
-                self.ctx.add_armor_modifier(ARMOR_FOUL);
-            }
-        }
-        // Java: if (game.isActive(foulBreaksArmourWithoutRoll)) { setArmorBroken(true); }
-        //       if (!isArmorBroken()) { rollArmour(); ... setArmorBroken(interpreter.isArmourBroken(...)); }
-        if game.is_active(NamedProperties::FOUL_BREAKS_ARMOUR_WITHOUT_ROLL) {
-            self.ctx.armor_broken = true;
-        }
-        if !self.ctx.armor_broken {
-            // Java: if (useChainsaw) — chainsaw foul adds +3 unless defender has IronHardSkin
-            if self.use_chainsaw {
-                let defender_ignores = game.player(defender_id)
-                    .map(|p| p.has_unused_skill_with_property(NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS))
-                    .unwrap_or(false);
-                if !defender_ignores {
-                    if let Some(aid) = attacker_id {
-                        if game.player(aid)
-                            .map(|p| p.has_skill_property(NamedProperties::BLOCKS_LIKE_CHAINSAW))
-                            .unwrap_or(false)
-                        {
-                            self.ctx.add_armor_modifier(ARMOR_CHAINSAW_3);
-                        }
-                    }
-                }
-            }
-            // Java InjuryTypeFoul.armourRoll rolls with the foul-assist (+chainsaw) modifiers and
-            // checks `isArmourBroken` FIRST; only `if (!injuryContext.isArmorBroken())` does it then
-            // add the general skill-based armour modifiers (Dirty Player) and re-check.
-            // roll=false (InjuryContextModification alternate path) re-evaluates the EXISTING dice.
-            if roll {
-                do_armor_roll(game, rng, &mut self.ctx, defender_id);
-            } else {
-                crate::injury::recalc_armor_broken(game, &mut self.ctx, defender_id);
-            }
-            // Java `InjuryTypeFoul.armourRoll:75-91`, ported in full. Only when the base roll did
-            // NOT break armour does Java add the general skill-based armour modifiers and re-check.
-            // The chief one on a foul is Dirty Player (registered to
-            // affectsEitherArmourOrInjuryOnFoul); if it is spent here it is mutually excluded from
-            // the injury roll (see injury_roll), and if the base roll already broke armour it is
-            // left free to boost the injury roll instead. (dwarf seed 60: base 7 < AV8 -> DP breaks
-            // armour, injury 8 stays Thick-Skull Stunned. seed 8: base roll already breaks AV -> DP
-            // boosts the injury roll.) Dirty Player's VALUE comes from the factory, which reads the
-            // attacker's own skill value in bb2020/bb2025 and a static +1 in bb2016 — the dwarf
-            // Deathroller's "Dirty Player (2)" is +2 (`JAVA_AVBROKE ... modTotal=2 broken=true`).
-            //
-            // This replaces a hand-rolled Dirty-Player-only special case that also duplicated the
-            // factory's value logic; the general form additionally covers every other armour
-            // modifier Java would apply on a foul.
-            if !self.ctx.armor_broken {
-                let defender = game.player(defender_id);
-                if let Some(defender) = defender {
-                    let attacker = attacker_id.and_then(|aid| game.player(aid));
-                    let factory = ArmorModifierFactory::new(game.rules);
-                    let mut modifiers =
-                        factory.find_armor_modifiers(game, attacker, defender, false, true);
-
-                    // Java holds back a single "sneaky pair" modifier
-                    // (affectsEitherArmourOrInjuryWithPartner) for a SECOND pass, so it is only
-                    // spent if the others were not enough to break armour. The sole owner is the
-                    // bb2025 special skill `ASneakyPair`, which no drafted roster has — this branch
-                    // is fidelity, not something the parity suites currently reach.
-                    let sneaky_idx = modifiers.iter().position(|m| {
-                        m.is_registered_to_skill_with_property(
-                            NamedProperties::AFFECTS_EITHER_ARMOUR_OR_INJURY_WITH_PARTNER,
-                        )
-                    });
-                    let sneaky = sneaky_idx.map(|i| modifiers.remove(i));
-
-                    let av = defender.armour_with_modifiers();
-                    for m in modifiers {
-                        // Java's armour-modifier collection is a Set of the skills' registered
-                        // modifier objects: Iron Hard Skin's marker, already added via
-                        // getFoulAssist above, is the same object and collapses (elf_vs_chaos_dwarf
-                        // bb2020 seed 3 reported it twice).
-                        if self.ctx.armor_modifiers.iter().any(|x| x.name == m.get_name()) {
-                            continue;
-                        }
-                        self.ctx.add_armor_modifier(leak_armor_modifier(
-                            m.as_ref(),
-                            attacker,
-                            defender,
-                            game.rules,
-                        ));
-                    }
-                    if let Some(roll) = self.ctx.armor_roll {
-                        self.ctx.armor_broken = armor_broken_for_rules(
-                            av, roll, &self.ctx.armor_modifiers, game.rules);
-                    }
-
-                    if !self.ctx.armor_broken {
-                        if let Some(sneaky) = sneaky {
-                            self.ctx.add_armor_modifier(leak_armor_modifier(
-                                sneaky.as_ref(), attacker, defender, game.rules));
-                            if let Some(roll) = self.ctx.armor_roll {
-                                self.ctx.armor_broken = armor_broken_for_rules(
-                                    av, roll, &self.ctx.armor_modifiers, game.rules);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        foul_armour_roll(&mut self.ctx, self.use_chainsaw, game, rng, attacker_id, defender_id, roll);
     }
     fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str) {
-        // Java: `factory.findInjuryModifiers(game, injuryContext, pAttacker, pDefender, isStab(),
-        // isFoul(), isVomitLike())` — includes niggling internally (unlike Block's
-        // `findInjuryModifiersWithoutNiggling`), so no separate niggling call here. Foul is never
-        // stab/vomit-like (separate InjuryType classes), isFoul=true.
-        if let Some(defender) = game.player(defender_id) {
-            let attacker = attacker_id.and_then(|aid| game.player(aid));
-            let factory = InjuryModifierFactory::new(game.rules);
-            // Java DirtyPlayer injury modifier `appliesToContext`: applies only if the armour
-            // modifiers contain nothing registered to affectsEitherArmourOrInjuryOnFoul. Our only
-            // such modifier is Dirty Player's armour +1 — if it was spent on the armour roll, exclude
-            // the Dirty Player injury +1 (mutual exclusion).
-            // Match by NAME, not by exact constant: the armour-side modifier now carries the
-            // attacker's own Dirty Player value (ARMOR_DIRTY_PLAYER_2 for the dwarf Deathroller),
-            // so an equality test against the +1 constant would miss it and let Dirty Player boost
-            // BOTH rolls, which is exactly what the mutual exclusion forbids.
-            let dirty_player_on_armour = self
-                .ctx
-                .armor_modifiers
-                .iter()
-                .any(|m| m.name.starts_with("Dirty Player"));
-            for m in factory.find_injury_modifiers(game, attacker, defender, false, true, false) {
-                let leaked = leak_injury_modifier(m.as_ref(), attacker, defender, game.rules);
-                if dirty_player_on_armour && leaked.name == "Dirty Player" {
-                    continue;
-                }
-                self.ctx.add_injury_modifier(leaked);
-            }
-        }
-        do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
+        foul_injury_roll(&mut self.ctx, game, rng, attacker_id, defender_id);
     }
     // savedByArmour: default PRONE
+}
+
+/// Java `InjuryTypeFoul.armourRoll`. `InjuryTypeFoulForSpp` is the same Java code line for line
+/// (only the injury type differs), so both Rust types share this body.
+pub(crate) fn foul_armour_roll(ctx: &mut InjuryContext, use_chainsaw: bool, game: &Game, rng: &mut GameRng,
+attacker_id: Option<&str>, defender_id: &str, roll: bool) {
+    // Java: `if (game.isActive(foulBreaksArmourWithoutRoll)) setArmorBroken(true);
+    //        if (!injuryContext.isArmorBroken()) { roll; chainsaw; getFoulAssist; ... }`
+    // EVERY armour modifier (chainsaw, the foul assists, IHS's marker, the Foul bonus) lives
+    // inside that guard. Rust added the assists first, so a Blatant-Foul (no armour roll)
+    // report carried "1 Offensive Assist" that Java never adds (goblin bb2025 seed 67 @1.0).
+    if game.is_active(NamedProperties::FOUL_BREAKS_ARMOUR_WITHOUT_ROLL) {
+        ctx.armor_broken = true;
+    }
+    if ctx.armor_broken {
+        return;
+    }
+    // Add foul-assist armor modifier based on net offensive - defensive assists
+    // Java `ArmorModifierFactory.getFoulAssist`: when the DEFENDER has an unused
+    // `ignoresArmourModifiersFromSkills` skill (Iron Hard Skin), the whole foul-assist set —
+    // positive, NEGATIVE, and the Foul static bonus — is replaced by that skill's own modifiers
+    // (IHS registers one marker whose appliesToContext is `false`, i.e. nothing applies).
+    // Rust applied the assists unconditionally, so a chaos-dwarf Blocker with two defensive
+    // assists took armour 10-2=8 < AV10 (held) where Java's 10 >= 10 broke and stunned him
+    // (chaos_dwarf bb2020 seed 12 i=99, bb2025 seed 51; JFOUL: `assists=-2 mods=Iron Hard
+    // Skin/ broken=true`).
+    let defender_ignores_skill_armor_mods = game.player(defender_id)
+        .map(|p| p.has_unused_skill_with_property(NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS))
+        .unwrap_or(false);
+    if defender_ignores_skill_armor_mods
+        && !ctx.armor_modifiers.iter().any(|m| m.name == "Iron Hard Skin")
+    {
+        // Java getFoulAssist returns IHS's own value-0 modifier, which NAMES the skill in the
+        // report (dark_elf_vs_chaos_dwarf bb2025 seed 3 foul). The armour total is unchanged.
+        ctx.add_armor_modifier(ffb_mechanics::modifiers::Modifier::new(
+            "Iron Hard Skin", 0, game.rules));
+    }
+    if let Some(aid) = attacker_id {
+        let off = UtilPlayer::find_offensive_foul_assists(game, aid, defender_id) as i32;
+        let def = UtilPlayer::find_defensive_foul_assists(game, aid, defender_id) as i32;
+        let net = off - def;
+        if !defender_ignores_skill_armor_mods {
+            if let Some(m) = foul_assist_armor_modifier(net) {
+                ctx.add_armor_modifier(m);
+            }
+        }
+        if std::env::var_os("FFB_TRACE").is_some() {
+            // `RFOUL`: the assist arithmetic feeding the armour roll.
+            eprintln!("RFOUL att={aid} def={defender_id} off={off} def_assists={def} net={net} mods={:?}",
+                ctx.armor_modifiers.iter().map(|m| (m.name.clone(), m.value)).collect::<Vec<_>>());
+        }
+        // Add "Foul" blatant-foul modifier if option enabled or attacker has no tackle zones
+        if !defender_ignores_skill_armor_mods
+            && (game.options.is_enabled(game_option_id::FOUL_BONUS)
+                || (game.options.is_enabled(game_option_id::FOUL_BONUS_OUTSIDE_TACKLEZONE)
+                    && UtilPlayer::find_tacklezones(game, aid) < 1))
+        {
+            ctx.add_armor_modifier(ARMOR_FOUL);
+        }
+    }
+    // Java: if (game.isActive(foulBreaksArmourWithoutRoll)) { setArmorBroken(true); }
+    //       if (!isArmorBroken()) { rollArmour(); ... setArmorBroken(interpreter.isArmourBroken(...)); }
+    if game.is_active(NamedProperties::FOUL_BREAKS_ARMOUR_WITHOUT_ROLL) {
+        ctx.armor_broken = true;
+    }
+    if !ctx.armor_broken {
+        // Java: if (useChainsaw) — chainsaw foul adds +3 unless defender has IronHardSkin
+        if use_chainsaw {
+            let defender_ignores = game.player(defender_id)
+                .map(|p| p.has_unused_skill_with_property(NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS))
+                .unwrap_or(false);
+            if !defender_ignores {
+                if let Some(aid) = attacker_id {
+                    if game.player(aid)
+                        .map(|p| p.has_skill_property(NamedProperties::BLOCKS_LIKE_CHAINSAW))
+                        .unwrap_or(false)
+                    {
+                        ctx.add_armor_modifier(ARMOR_CHAINSAW_3);
+                    }
+                }
+            }
+        }
+        // Java InjuryTypeFoul.armourRoll rolls with the foul-assist (+chainsaw) modifiers and
+        // checks `isArmourBroken` FIRST; only `if (!injuryContext.isArmorBroken())` does it then
+        // add the general skill-based armour modifiers (Dirty Player) and re-check.
+        // roll=false (InjuryContextModification alternate path) re-evaluates the EXISTING dice.
+        if roll {
+            do_armor_roll(game, rng, ctx, defender_id);
+        } else {
+            crate::injury::recalc_armor_broken(game, ctx, defender_id);
+        }
+        // Java `InjuryTypeFoul.armourRoll:75-91`, ported in full. Only when the base roll did
+        // NOT break armour does Java add the general skill-based armour modifiers and re-check.
+        // The chief one on a foul is Dirty Player (registered to
+        // affectsEitherArmourOrInjuryOnFoul); if it is spent here it is mutually excluded from
+        // the injury roll (see injury_roll), and if the base roll already broke armour it is
+        // left free to boost the injury roll instead. (dwarf seed 60: base 7 < AV8 -> DP breaks
+        // armour, injury 8 stays Thick-Skull Stunned. seed 8: base roll already breaks AV -> DP
+        // boosts the injury roll.) Dirty Player's VALUE comes from the factory, which reads the
+        // attacker's own skill value in bb2020/bb2025 and a static +1 in bb2016 — the dwarf
+        // Deathroller's "Dirty Player (2)" is +2 (`JAVA_AVBROKE ... modTotal=2 broken=true`).
+        //
+        // This replaces a hand-rolled Dirty-Player-only special case that also duplicated the
+        // factory's value logic; the general form additionally covers every other armour
+        // modifier Java would apply on a foul.
+        if !ctx.armor_broken {
+            let defender = game.player(defender_id);
+            if let Some(defender) = defender {
+                let attacker = attacker_id.and_then(|aid| game.player(aid));
+                let factory = ArmorModifierFactory::new(game.rules);
+                let mut modifiers =
+                    factory.find_armor_modifiers(game, attacker, defender, false, true);
+
+                // Java holds back a single "sneaky pair" modifier
+                // (affectsEitherArmourOrInjuryWithPartner) for a SECOND pass, so it is only
+                // spent if the others were not enough to break armour. The sole owner is the
+                // bb2025 special skill `ASneakyPair`, which no drafted roster has — this branch
+                // is fidelity, not something the parity suites currently reach.
+                let sneaky_idx = modifiers.iter().position(|m| {
+                    m.is_registered_to_skill_with_property(
+                        NamedProperties::AFFECTS_EITHER_ARMOUR_OR_INJURY_WITH_PARTNER,
+                    )
+                });
+                let sneaky = sneaky_idx.map(|i| modifiers.remove(i));
+
+                let av = defender.armour_with_modifiers();
+                for m in modifiers {
+                    // Java's armour-modifier collection is a Set of the skills' registered
+                    // modifier objects: Iron Hard Skin's marker, already added via
+                    // getFoulAssist above, is the same object and collapses (elf_vs_chaos_dwarf
+                    // bb2020 seed 3 reported it twice).
+                    if ctx.armor_modifiers.iter().any(|x| x.name == m.get_name()) {
+                        continue;
+                    }
+                    ctx.add_armor_modifier(leak_armor_modifier(
+                        m.as_ref(),
+                        attacker,
+                        defender,
+                        game.rules,
+                    ));
+                }
+                if let Some(roll) = ctx.armor_roll {
+                    ctx.armor_broken = armor_broken_for_rules(
+                        av, roll, &ctx.armor_modifiers, game.rules);
+                }
+
+                if !ctx.armor_broken {
+                    if let Some(sneaky) = sneaky {
+                        ctx.add_armor_modifier(leak_armor_modifier(
+                            sneaky.as_ref(), attacker, defender, game.rules));
+                        if let Some(roll) = ctx.armor_roll {
+                            ctx.armor_broken = armor_broken_for_rules(
+                                av, roll, &ctx.armor_modifiers, game.rules);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Java `InjuryTypeFoul.injuryRoll` (shared with `InjuryTypeFoulForSpp`, identical in Java).
+pub(crate) fn foul_injury_roll(ctx: &mut InjuryContext, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str) {
+    // Java: `factory.findInjuryModifiers(game, injuryContext, pAttacker, pDefender, isStab(),
+    // isFoul(), isVomitLike())` — includes niggling internally (unlike Block's
+    // `findInjuryModifiersWithoutNiggling`), so no separate niggling call here. Foul is never
+    // stab/vomit-like (separate InjuryType classes), isFoul=true.
+    if let Some(defender) = game.player(defender_id) {
+        let attacker = attacker_id.and_then(|aid| game.player(aid));
+        let factory = InjuryModifierFactory::new(game.rules);
+        // Java DirtyPlayer injury modifier `appliesToContext`: applies only if the armour
+        // modifiers contain nothing registered to affectsEitherArmourOrInjuryOnFoul. Our only
+        // such modifier is Dirty Player's armour +1 — if it was spent on the armour roll, exclude
+        // the Dirty Player injury +1 (mutual exclusion).
+        // Match by NAME, not by exact constant: the armour-side modifier now carries the
+        // attacker's own Dirty Player value (ARMOR_DIRTY_PLAYER_2 for the dwarf Deathroller),
+        // so an equality test against the +1 constant would miss it and let Dirty Player boost
+        // BOTH rolls, which is exactly what the mutual exclusion forbids.
+        let dirty_player_on_armour = ctx
+            .armor_modifiers
+            .iter()
+            .any(|m| m.name.starts_with("Dirty Player"));
+        for m in factory.find_injury_modifiers(game, attacker, defender, false, true, false) {
+            let leaked = leak_injury_modifier(m.as_ref(), attacker, defender, game.rules);
+            if dirty_player_on_armour && leaked.name == "Dirty Player" {
+                continue;
+            }
+            ctx.add_injury_modifier(leaked);
+        }
+    }
+    do_injury_roll_for_player(rng, ctx, game, defender_id);
 }
 
 #[cfg(test)]

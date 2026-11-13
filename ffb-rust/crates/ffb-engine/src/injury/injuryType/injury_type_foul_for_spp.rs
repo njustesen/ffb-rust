@@ -1,17 +1,13 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeFoulForSpp.
 /// ModificationAware: foul armor roll (foul-assist + blatant-foul modifiers) + injury roll.
 /// savedByArmour -> PRONE (default). isFoul=true, isStab=false.
-use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE, SendToBoxReason, SkillId};
-use ffb_model::model::property::NamedProperties;
-use ffb_model::option::game_option_id;
+use ffb_model::enums::{ApothecaryMode, PS_PRONE, SendToBoxReason};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
-use ffb_model::util::util_player::UtilPlayer;
 use ffb_model::model::game::Game;
-use ffb_mechanics::modifiers::{foul_assist_armor_modifier, ARMOR_CHAINSAW_3, ARMOR_DIRTY_PLAYER_1, ARMOR_FOUL};
-use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
-use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
-use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury, leak_injury_modifier};
+use crate::injury::{InjuryContext, InjuryTypeServer};
+use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury};
+use crate::injury::injuryType::injury_type_foul::{foul_armour_roll, foul_injury_roll};
 
 pub struct InjuryTypeFoulForSpp { ctx: InjuryContext, use_chainsaw: bool }
 impl InjuryTypeFoulForSpp {
@@ -39,67 +35,16 @@ impl InjuryTypeServer for InjuryTypeFoulForSpp {
     fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::Fouled) }
 }
 impl ModificationAwareInjuryType for InjuryTypeFoulForSpp {
-    fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
-        // TODO: Java (lines 75-91) additionally re-checks `armorModifierFactory.findArmorModifiers`
-        // (general attacker/defender skill-based armor modifiers, including a "sneaky pair"
-        // affectsEitherArmourOrInjuryWithPartner modifier held back for a second pass) when the
-        // roll above didn't break armor. Not modeled here yet — same known gap as InjuryTypeStab.
-        if let Some(aid) = attacker_id {
-            let off = UtilPlayer::find_offensive_foul_assists(game, aid, defender_id) as i32;
-            let def = UtilPlayer::find_defensive_foul_assists(game, aid, defender_id) as i32;
-            if let Some(m) = foul_assist_armor_modifier(off - def) {
-                self.ctx.add_armor_modifier(m);
-            }
-            if game.options.is_enabled(game_option_id::FOUL_BONUS)
-                || (game.options.is_enabled(game_option_id::FOUL_BONUS_OUTSIDE_TACKLEZONE)
-                    && UtilPlayer::find_tacklezones(game, aid) < 1)
-            {
-                self.ctx.add_armor_modifier(ARMOR_FOUL);
-            }
-            // DirtyPlayer: +1 to armor roll for fouls
-            if let Some(attacker) = game.player(aid) {
-                if attacker.has_skill(SkillId::DirtyPlayer) {
-                    self.ctx.add_armor_modifier(ARMOR_DIRTY_PLAYER_1);
-                }
-            }
-        }
-        // Java: if (game.isActive(foulBreaksArmourWithoutRoll)) { setArmorBroken(true); }
-        //       if (!isArmorBroken()) { rollArmour(); ... setArmorBroken(interpreter.isArmourBroken(...)); }
-        if game.is_active(NamedProperties::FOUL_BREAKS_ARMOUR_WITHOUT_ROLL) {
-            self.ctx.armor_broken = true;
-        }
-        if !self.ctx.armor_broken {
-            // Java: if (useChainsaw) — chainsaw foul adds +3 unless defender has IronHardSkin
-            if self.use_chainsaw {
-                let defender_ignores = game.player(defender_id)
-                    .map(|p| p.has_unused_skill_with_property(NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS))
-                    .unwrap_or(false);
-                if !defender_ignores {
-                    if let Some(aid) = attacker_id {
-                        if game.player(aid)
-                            .map(|p| p.has_skill_property(NamedProperties::BLOCKS_LIKE_CHAINSAW))
-                            .unwrap_or(false)
-                        {
-                            self.ctx.add_armor_modifier(ARMOR_CHAINSAW_3);
-                        }
-                    }
-                }
-            }
-            do_armor_roll(game, rng, &mut self.ctx, defender_id);
-        }
+    // Java `InjuryTypeFoulForSpp.armourRoll`/`injuryRoll` are line-for-line copies of
+    // `InjuryTypeFoul`'s. The Rust port had drifted to a simplified copy that added a hardcoded
+    // "Dirty Player +1" armour modifier before rolling, where Java adds the factory's "Dirty Player"
+    // only when the base roll did not break armour (snotling bb2020 seed 51 @1.0, injury
+    // foulForSpp: armorModifiers ["Dirty Player +1"] vs Java ["Dirty Player"]). Share the body.
+    fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str, roll: bool) {
+        foul_armour_roll(&mut self.ctx, self.use_chainsaw, game, rng, attacker_id, defender_id, roll);
     }
     fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str) {
-        // Java: `factory.findInjuryModifiers(game, injuryContext, pAttacker, pDefender, isStab(),
-        // isFoul(), isVomitLike())` — includes niggling internally. FoulForSpp is never
-        // stab/vomit-like (separate InjuryType classes), isFoul=true.
-        if let Some(defender) = game.player(defender_id) {
-            let attacker = attacker_id.and_then(|aid| game.player(aid));
-            let factory = InjuryModifierFactory::new(game.rules);
-            for m in factory.find_injury_modifiers(game, attacker, defender, false, true, false) {
-                self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), attacker, defender, game.rules));
-            }
-        }
-        do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
+        foul_injury_roll(&mut self.ctx, game, rng, attacker_id, defender_id);
     }
     // savedByArmour: default PRONE
 }
@@ -108,7 +53,10 @@ impl ModificationAwareInjuryType for InjuryTypeFoulForSpp {
 mod tests {
     use super::*;
     use ffb_model::enums::{Rules, SkillId};
-    use ffb_mechanics::modifiers::{ARMOR_DIRTY_PLAYER_1, Modifier};
+    use ffb_mechanics::modifiers::{ARMOR_CHAINSAW_3, Modifier};
+    fn has_dp_armor(t: &InjuryTypeFoulForSpp) -> bool {
+        t.ctx.armor_modifiers.iter().any(|m| m.name.starts_with("Dirty Player"))
+    }
 
     /// Real `InjuryModifierFactory`-sourced Dirty Player injury modifier is named "Dirty Player"
     /// (not the pre-Phase-ABJ placeholder constant `INJURY_DIRTY_PLAYER_1` = "Dirty Player +1").
@@ -170,11 +118,24 @@ mod tests {
     }
     #[test]
     fn dirty_player_adds_armor_modifier() {
+        // AV 13 is never broken by the base roll, so Java's second pass adds the factory's
+        // "Dirty Player" (named without a "+1" suffix, like InjuryTypeFoul).
+        let game = game_with_attacker_and_defender(vec![SkillId::DirtyPlayer], 13);
+        let mut t = InjuryTypeFoulForSpp::new();
+        let mut rng = GameRng::new(1);
+        t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
+        assert!(t.ctx.armor_modifiers.iter().any(|m| m.name == "Dirty Player"),
+            "got {:?}", t.ctx.armor_modifiers);
+    }
+    #[test]
+    fn dirty_player_not_added_when_base_roll_breaks_armour() {
+        // Java adds the skill-based armour modifiers only `if (!injuryContext.isArmorBroken())`;
+        // AV 2 is always broken by the base roll, so Dirty Player stays free for the injury roll.
         let game = game_with_attacker_and_defender(vec![SkillId::DirtyPlayer], 2);
         let mut t = InjuryTypeFoulForSpp::new();
         let mut rng = GameRng::new(1);
         t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
-        assert!(t.ctx.armor_modifiers.contains(&ARMOR_DIRTY_PLAYER_1));
+        assert!(!has_dp_armor(&t));
     }
     #[test]
     fn no_dirty_player_no_armor_modifier() {
@@ -182,7 +143,7 @@ mod tests {
         let mut t = InjuryTypeFoulForSpp::new();
         let mut rng = GameRng::new(1);
         t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
-        assert!(!t.ctx.armor_modifiers.contains(&ARMOR_DIRTY_PLAYER_1));
+        assert!(!has_dp_armor(&t));
     }
     #[test]
     fn dirty_player_adds_injury_modifier() {
