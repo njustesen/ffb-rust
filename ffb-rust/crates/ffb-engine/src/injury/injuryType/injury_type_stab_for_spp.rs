@@ -1,6 +1,5 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeStabForSpp.
 /// ModificationAware: stab armor roll + injury roll. savedByArmour -> None.
-/// Sneaky git pair armor modifier is TODO.
 use ffb_model::enums::{ApothecaryMode, SendToBoxReason};
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::types::FieldCoordinate;
@@ -10,6 +9,7 @@ use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
 use ffb_mechanics::modifiers::Modifier;
 use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player, recalc_armor_broken};
 use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury, leak_injury_modifier};
+use crate::injury::injuryType::injury_type_stab::stab_armour_roll;
 
 pub struct InjuryTypeStabForSpp { ctx: InjuryContext, use_injury_modifiers: bool, add_defender_chainsaw: bool }
 impl InjuryTypeStabForSpp {
@@ -48,23 +48,10 @@ impl InjuryTypeServer for InjuryTypeStabForSpp {
     fn failed_armour_places_prone(&self) -> bool { false }
 }
 impl ModificationAwareInjuryType for InjuryTypeStabForSpp {
-    fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
-        // TODO: add sneaky git pair armor modifier when ArmorModifierFactory is ported
-        do_armor_roll(game, rng, &mut self.ctx, defender_id);
-        // Java (lines 64-71): unless the defender has an unused
-        // `ignoresArmourModifiersFromSkills` skill (not modeled here — see TODO above), a
-        // defender-side Chainsaw skill contributes its own armor modifier when
-        // `addDefenderChainsaw` is set. Chainsaw's armor bonus is a flat +3 (see
-        // InjuryTypeBlock's `chainsaw_modifier`).
-        if self.add_defender_chainsaw {
-            if let Some(defender) = game.player(defender_id) {
-                if defender.has_skill_property(NamedProperties::BLOCKS_LIKE_CHAINSAW) {
-                    self.ctx.add_armor_modifier(Modifier::new("Chainsaw", 3, game.rules));
-                    recalc_armor_broken(game, &mut self.ctx, defender_id);
-                }
-            }
-        }
+    fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str, roll: bool) {
+        stab_armour_roll(&mut self.ctx, self.add_defender_chainsaw, game, rng, attacker_id, defender_id, roll);
     }
+    // Java `InjuryTypeStabForSpp.armourRoll` is line-for-line `InjuryTypeStab`'s; shared body.
     fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str) {
         // Java: `factory.findInjuryModifiers(game, injuryContext, pAttacker, pDefender, isStab(),
         // isFoul(), isVomitLike())` — StabForSpp has isStab=true, isFoul=false, isVomitLike=false. The

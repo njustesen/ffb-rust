@@ -1,6 +1,5 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeStab.
 /// ModificationAware: stab armor roll + injury roll. savedByArmour -> None.
-/// Sneaky git pair armor modifier is TODO.
 use ffb_model::enums::{ApothecaryMode, SendToBoxReason};
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::types::FieldCoordinate;
@@ -9,7 +8,8 @@ use ffb_model::model::game::Game;
 use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
 use ffb_mechanics::modifiers::Modifier;
 use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player, recalc_armor_broken};
-use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury, leak_injury_modifier};
+use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury, leak_injury_modifier, leak_armor_modifier};
+use ffb_mechanics::modifiers::armor_modifier_factory::ArmorModifierFactory;
 
 pub struct InjuryTypeStab { ctx: InjuryContext, use_injury_modifiers: bool, add_defender_chainsaw: bool }
 impl InjuryTypeStab {
@@ -51,22 +51,8 @@ impl InjuryTypeServer for InjuryTypeStab {
     fn failed_armour_places_prone(&self) -> bool { false }
 }
 impl ModificationAwareInjuryType for InjuryTypeStab {
-    fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
-        // TODO: add sneaky git pair armor modifier when ArmorModifierFactory is ported
-        do_armor_roll(game, rng, &mut self.ctx, defender_id);
-        // Java (lines 64-71): unless the defender has an unused
-        // `ignoresArmourModifiersFromSkills` skill (not modeled here — see TODO above), a
-        // defender-side Chainsaw skill contributes its own armor modifier when
-        // `addDefenderChainsaw` is set (used by e.g. `StepTreacherous`'s `new InjuryTypeStab(true,
-        // true)`). Chainsaw's armor bonus is a flat +3 (see InjuryTypeBlock's `chainsaw_modifier`).
-        if self.add_defender_chainsaw {
-            if let Some(defender) = game.player(defender_id) {
-                if defender.has_skill_property(NamedProperties::BLOCKS_LIKE_CHAINSAW) {
-                    self.ctx.add_armor_modifier(Modifier::new("Chainsaw", 3, game.rules));
-                    recalc_armor_broken(game, &mut self.ctx, defender_id);
-                }
-            }
-        }
+    fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str, roll: bool) {
+        stab_armour_roll(&mut self.ctx, self.add_defender_chainsaw, game, rng, attacker_id, defender_id, roll);
     }
     fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str) {
         // Java: `factory.findInjuryModifiers(game, injuryContext, pAttacker, pDefender, isStab(),
@@ -86,6 +72,70 @@ impl ModificationAwareInjuryType for InjuryTypeStab {
     fn saved_by_armour(&mut self) {
         // Stab: no injury when armor holds
         self.ctx.injury = None;
+    }
+}
+
+/// Java `InjuryTypeStab.armourRoll`, ported in full. `InjuryTypeStabForSpp` is the same Java code
+/// line for line (only the injury type differs), so both Rust types share this body.
+///
+/// The old port only rolled the dice: it skipped the not-already-broken guard, the
+/// `ArmorModifierFactory.findArmorModifiers(isStab=true)` pass (A Sneaky Pair, bb2016 Stakes, the
+/// Iron Hard Skin marker), the ignoresArmourModifiersFromSkills branch, the `roll=false`
+/// re-evaluation, and the sneaky-pair second pass.
+pub(crate) fn stab_armour_roll(ctx: &mut InjuryContext, add_defender_chainsaw: bool, game: &Game,
+    rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str, roll: bool) {
+    // Java: if (!injuryContext.isArmorBroken()) { ... }
+    if ctx.armor_broken {
+        return;
+    }
+    let defender = match game.player(defender_id) {
+        Some(d) => d,
+        None => {
+            if roll { do_armor_roll(game, rng, ctx, defender_id); }
+            return;
+        }
+    };
+    let attacker = attacker_id.and_then(|aid| game.player(aid));
+    // Java: modifiers = armorModifierFactory.findArmorModifiers(game, pAttacker, pDefender,
+    //   isStab(), isFoul()) -- Stab: isStab=true, isFoul=false.
+    let factory = ArmorModifierFactory::new(game.rules);
+    let mut modifiers = factory.find_armor_modifiers(game, attacker, defender, true, false);
+    // Java: the first modifier registered to affectsEitherArmourOrInjuryWithPartner (A Sneaky
+    // Pair) is held back for a second pass, spent only if the rest did not break armour.
+    let sneaky_idx = modifiers.iter().position(|m| {
+        m.is_registered_to_skill_with_property(NamedProperties::AFFECTS_EITHER_ARMOUR_OR_INJURY_WITH_PARTNER)
+    });
+    let sneaky = sneaky_idx.map(|i| modifiers.remove(i));
+    for m in modifiers {
+        // Java's armour modifiers are a Set of the skills' registered objects; a repeat collapses.
+        if ctx.armor_modifiers.iter().any(|x| x.name == m.get_name()) {
+            continue;
+        }
+        ctx.add_armor_modifier(leak_armor_modifier(m.as_ref(), attacker, defender, game.rules));
+    }
+    if defender.has_unused_skill_with_property(NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS) {
+        // Java: addArmorModifiers(defender.getSkillWithProperty(ignoresArmourModifiersFromSkills)
+        //   .getArmorModifiers()) -- Iron Hard Skin's value-0 marker, which names the skill in
+        //   the report (the factory already returned the same object, so the Set collapses it).
+        if !ctx.armor_modifiers.iter().any(|m| m.name == "Iron Hard Skin") {
+            ctx.add_armor_modifier(Modifier::new("Iron Hard Skin", 0, game.rules));
+        }
+    } else if add_defender_chainsaw && defender.has_skill_property(NamedProperties::BLOCKS_LIKE_CHAINSAW) {
+        // Java: addDefenderChainsaw ? defender's Chainsaw armour modifiers (+3) -- used by e.g.
+        // StepTreacherous's `new InjuryTypeStab(true, true)`.
+        ctx.add_armor_modifier(Modifier::new("Chainsaw", 3, game.rules));
+    }
+    // Java: if (roll) setArmorRoll(rollArmour()); setArmorBroken(isArmourBroken(...)).
+    if roll {
+        do_armor_roll(game, rng, ctx, defender_id);
+    } else {
+        recalc_armor_broken(game, ctx, defender_id);
+    }
+    if !ctx.armor_broken {
+        if let Some(sneaky) = sneaky {
+            ctx.add_armor_modifier(leak_armor_modifier(sneaky.as_ref(), attacker, defender, game.rules));
+            recalc_armor_broken(game, ctx, defender_id);
+        }
     }
 }
 
@@ -245,5 +295,96 @@ mod tests {
         let mut rng = GameRng::new(1);
         t.handle_injury(&game_with_chainsaw_defender(8), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
         assert!(!t.ctx.armor_modifiers.iter().any(|m| m.name == "Chainsaw"));
+    }
+
+    fn stab_player(id: &str, armour: i32, skills: Vec<ffb_model::enums::SkillId>) -> ffb_model::model::player::Player {
+        use std::collections::HashSet;
+        use ffb_model::model::player::Player;
+        use ffb_model::model::SkillWithValue;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        Player { id: id.into(), name: id.into(), nr: 1,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour, starting_skills: skills.into_iter().map(SkillWithValue::new).collect(), extra_skills: vec![],
+            temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default() }
+    }
+
+    /// Stabber + an A-Sneaky-Pair partner both marking the victim (bb2025).
+    fn sneaky_pair_game(victim_av: i32) -> Game {
+        use ffb_model::enums::{SkillId, PlayerState, PS_STANDING};
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(stab_player("stabber", 7, vec![SkillId::Stab, SkillId::ASneakyPair]));
+        home.players.push(stab_player("partner", 7, vec![SkillId::ASneakyPair]));
+        let mut away = crate::step::framework::test_team("away", 0);
+        away.players.push(stab_player("victim", victim_av, vec![]));
+        let mut game = Game::new(home, away, Rules::Bb2025);
+        for (id, x, y) in [("stabber", 5, 5), ("partner", 7, 5), ("victim", 6, 5)] {
+            game.field_model.set_player_coordinate(id, FieldCoordinate::new(x, y));
+            game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+        }
+        game
+    }
+
+    fn seed_with_armour_total(total: i32) -> u64 {
+        let mut seed = 0u64;
+        loop {
+            let mut probe = GameRng::new(seed);
+            if probe.d6() + probe.d6() == total { return seed; }
+            seed += 1;
+            assert!(seed < 10_000, "no seed found");
+        }
+    }
+
+    /// Java `InjuryTypeStab.armourRoll`: A Sneaky Pair is held back and only spent when the
+    /// roll without it does not break armour. A 9 against AV10 breaks only with its +1.
+    #[test]
+    fn sneaky_pair_breaks_armour_only_on_the_second_pass() {
+        let game = sneaky_pair_game(10);
+        let mut t = InjuryTypeStab::new(true);
+        let mut rng = GameRng::new(seed_with_armour_total(9));
+        t.armour_roll(&game, &mut rng, Some("stabber"), "victim", true);
+        assert!(t.ctx.armor_broken, "A Sneaky Pair +1 must break AV10 on a 9");
+        assert!(t.ctx.armor_modifiers.iter().any(|m| m.name == "A Sneaky Pair"));
+    }
+
+    /// When the roll alone breaks armour, the held-back Sneaky Pair is never added.
+    #[test]
+    fn sneaky_pair_not_added_when_the_roll_already_breaks() {
+        let game = sneaky_pair_game(7);
+        let mut t = InjuryTypeStab::new(true);
+        let mut rng = GameRng::new(seed_with_armour_total(10));
+        t.armour_roll(&game, &mut rng, Some("stabber"), "victim", true);
+        assert!(t.ctx.armor_broken);
+        assert!(!t.ctx.armor_modifiers.iter().any(|m| m.name == "A Sneaky Pair"));
+    }
+
+    /// Java's whole armourRoll sits inside `if (!injuryContext.isArmorBroken())`.
+    #[test]
+    fn already_broken_armour_adds_nothing() {
+        let game = sneaky_pair_game(10);
+        let mut t = InjuryTypeStab::new(true);
+        t.ctx.armor_broken = true;
+        let mut rng = GameRng::new(1);
+        t.armour_roll(&game, &mut rng, Some("stabber"), "victim", true);
+        assert!(t.ctx.armor_roll.is_none());
+        assert!(t.ctx.armor_modifiers.is_empty());
+    }
+
+    /// Java names Iron Hard Skin's value-0 marker on a stab against an IHS defender.
+    #[test]
+    fn iron_hard_skin_defender_is_named() {
+        use ffb_model::enums::SkillId;
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(stab_player("stabber", 7, vec![SkillId::Stab]));
+        let mut away = crate::step::framework::test_team("away", 0);
+        away.players.push(stab_player("victim", 10, vec![SkillId::IronHardSkin]));
+        let game = Game::new(home, away, Rules::Bb2025);
+        let mut t = InjuryTypeStab::new(true);
+        let mut rng = GameRng::new(1);
+        t.armour_roll(&game, &mut rng, Some("stabber"), "victim", true);
+        assert_eq!(t.ctx.armor_modifiers.iter().filter(|m| m.name == "Iron Hard Skin").count(), 1);
     }
 }

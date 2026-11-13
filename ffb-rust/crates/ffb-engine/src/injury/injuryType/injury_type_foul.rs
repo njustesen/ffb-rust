@@ -405,6 +405,28 @@ mod tests {
         game
     }
 
+    /// The hold-back itself: a 9 against AV10 breaks with Dirty Player's +1 in the first pass, so
+    /// A Sneaky Pair must never be added. Before the armour factory tagged its modifiers with
+    /// their skill, `is_registered_to_skill_with_property` was always false and A Sneaky Pair went
+    /// on in the first pass alongside Dirty Player (the AV13 test above cannot tell the difference).
+    #[test]
+    fn sneaky_pair_not_spent_when_the_first_pass_breaks_armour() {
+        let game = sneaky_pair_game(10);
+        let mut seed = 0u64;
+        loop {
+            let mut probe = GameRng::new(seed);
+            if probe.d6() + probe.d6() == 9 { break; }
+            seed += 1;
+            assert!(seed < 10_000);
+        }
+        let mut t = InjuryTypeFoul::new();
+        let mut rng = GameRng::new(seed);
+        t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
+        assert!(t.ctx.armor_broken);
+        let names: Vec<&str> = t.ctx.armor_modifiers.iter().map(|m| m.name).collect();
+        assert_eq!(names, vec!["Dirty Player"], "got {names:?}");
+    }
+
     #[test]
     fn sneaky_pair_is_held_back_and_spent_only_on_the_second_pass() {
         // AV high enough that Dirty Player alone cannot break it, so the second pass must run.

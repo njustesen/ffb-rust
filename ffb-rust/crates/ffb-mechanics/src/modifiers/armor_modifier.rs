@@ -15,7 +15,13 @@ pub trait ArmorModifier: Send + Sync {
     /// Overridden by SpecialEffectArmourModifier; all others return None.
     fn get_special_effect(&self) -> Option<SpecialEffect> { None }
 
-    /// Java: isRegisteredToSkillWithProperty — checks if registered_to skill has property.
-    /// The Rust port uses direct per-skill matching instead of SkillFactory registration.
-    fn is_registered_to_skill_with_property(&self, _property: &str) -> bool { false }
+    /// Java: `isRegisteredToSkillWithProperty` -- the owning skill (`registered_to`, a Java skill
+    /// class name) has the property. Was a hard `false`, so InjuryTypeFoul/InjuryTypeStab never
+    /// held A Sneaky Pair back for their second armour pass and spent it in the first.
+    fn is_registered_to_skill_with_property(&self, property: &str) -> bool {
+        self.registered_to()
+            .and_then(ffb_model::enums::SkillId::from_class_name)
+            .map(|id| id.properties().contains(&property))
+            .unwrap_or(false)
+    }
 }

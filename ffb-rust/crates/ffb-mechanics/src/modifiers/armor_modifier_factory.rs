@@ -237,7 +237,13 @@ fn get_armor_modifiers_from_skills(
     let Some(attacker) = attacker else { return vec![]; };
     attacker
         .all_skill_ids()
-        .filter_map(|skill_id| skill_to_armor_modifier(skill_id, context))
+        .filter_map(|skill_id| {
+            // Java's Skill.registerModifier ties every modifier to its owning skill; tag it so
+            // isRegisteredToSkillWithProperty works (same fix as the injury factory's #9).
+            let mut m = skill_to_armor_modifier(skill_id, context)?;
+            m.set_registered_to(Some(skill_id.class_name().to_string()));
+            Some(m)
+        })
         .collect()
 }
 
