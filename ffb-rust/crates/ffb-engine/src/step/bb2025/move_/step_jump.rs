@@ -233,7 +233,12 @@ impl StepJump {
         // Java: actingPlayer.setJumping(false)
         game.acting_player.jumping = false;
         // Java: publishParameter(STEADY_FOOTING_CONTEXT, new SteadyFootingContext(new InjuryTypeDropJump(defender)))
-        let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeDropJump".into());
+        // Java passes `game.getDefender()` as the DropJump diving tackler (fallback Arm Bar source).
+        let injury_name = match game.defender_id.as_deref() {
+            Some(d) if !d.is_empty() => format!("InjuryTypeDropJump#dt:{d}"),
+            _ => "InjuryTypeDropJump".to_string(),
+        };
+        let ctx = SteadyFootingContext::from_injury_type_name(injury_name);
         let label = self.goto_label_on_failure.clone();
         let coord_from = if self.roll > 1 {
             self.move_start

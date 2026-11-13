@@ -1,0 +1,17 @@
+report-stream divergence families over 12036 games (0 unreadable) under: D:/ffb_cross/final3
+
+IDENTICAL GAMES per edition
+  bb2016    2436 / 2436   identical (100.0%)
+  bb2020    4680 / 4680   identical (100.0%)
+  bb2025    4919 / 4920   identical (100.0%)
+  ALL      12035 / 12036  identical (100.0%)
+
+FAMILIES ranked by games affected (games / occurrences / editions)
+       1        2  payload   injury                           {injuryModifiers}               2025:1
+           e.g. D:/ffb_cross/final3\w5\bb2025\chaos_troll_vs_slann_fumbbl\seed_3_java_reports.jsonl
+
+FIRST DIVERGENCE ranked by games (what each gate's REPORTS DIFF line shows)
+       1  payload   injury                           {injuryModifiers}               e.g. D:/ffb_cross/final3\w5\bb2025\chaos_troll_vs_slann_fumbbl\seed_3_java_reports.jsonl @#142
+
+REPORT-COUNT GAPS > 10% (whole missing families)
+  0 games

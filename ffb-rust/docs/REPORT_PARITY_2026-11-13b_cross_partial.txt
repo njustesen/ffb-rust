@@ -1,0 +1,14 @@
+report-stream divergence families over 4302 games (0 unreadable) under: D:/ffb_cross/final2
+
+IDENTICAL GAMES per edition
+  bb2016     780 / 780    identical (100.0%)
+  bb2020    1689 / 1689   identical (100.0%)
+  bb2025    1833 / 1833   identical (100.0%)
+  ALL       4302 / 4302   identical (100.0%)
+
+FAMILIES ranked by games affected (games / occurrences / editions)
+
+FIRST DIVERGENCE ranked by games (what each gate's REPORTS DIFF line shows)
+
+REPORT-COUNT GAPS > 10% (whole missing families)
+  0 games

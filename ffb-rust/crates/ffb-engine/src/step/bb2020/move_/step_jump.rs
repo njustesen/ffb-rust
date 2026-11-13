@@ -208,7 +208,12 @@ impl StepJump {
             }
             None
         };
-        let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeDropJump".into());
+        // Java passes `game.getDefender()` as the DropJump diving tackler (fallback Arm Bar source).
+        let injury_name = match game.defender_id.as_deref() {
+            Some(d) if !d.is_empty() => format!("InjuryTypeDropJump#dt:{d}"),
+            _ => "InjuryTypeDropJump".to_string(),
+        };
+        let ctx = SteadyFootingContext::from_injury_type_name(injury_name);
         let mut out = StepOutcome::goto(&label)
             .publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
         if let Some(c) = coord_from {

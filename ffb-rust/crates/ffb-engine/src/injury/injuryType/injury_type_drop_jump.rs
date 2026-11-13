@@ -1,5 +1,5 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeDropJump.
-/// Armor roll + injury or PRONE. Diving tackler modifier is TODO.
+/// Armor roll (+ Arm Bar armour-or-injury modifier) + injury or PRONE.
 use ffb_model::enums::{ApothecaryMode, PlayerState, SendToBoxReason, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
@@ -12,7 +12,8 @@ use crate::injury::injuryType::modification_aware_injury_type_server::leak_injur
 
 pub struct InjuryTypeDropJump {
     ctx: InjuryContext,
-    /// Java: pDivingTackler. Diving tackle modifier source (TODO when ArmorModifierFactory is ported).
+    /// Java: `divingTackler` (`new InjuryTypeDropJump(game.getDefender())` in bb2020/bb2025
+    /// StepJump) -- the fallback Arm Bar source.
     diving_tackler_id: Option<String>,
 }
 
@@ -21,13 +22,48 @@ impl InjuryTypeDropJump {
     pub fn new_with_diving_tackler(id: Option<String>) -> Self {
         Self { ctx: InjuryContext::new(ApothecaryMode::Defender), diving_tackler_id: id }
     }
+
+    /// Java `InjuryTypeDropJump.handleInjury`'s `avOrInjModifierSkill` search. Unlike DropDodge:
+    /// the square is `vacatedFromCoordinate` falling back to the defender's own square; the
+    /// adjacent opponents are matched on `affectsEitherArmourOrInjuryOnJump`; the player on the
+    /// vacated square is added only when one was given, with no extra tacklezone filter; and the
+    /// diving tackler fallback uses `...OnDodge` with no position check. Java streams a HashSet,
+    /// but every candidate skill registers the same "Arm Bar" +1 modifiers, so which one is found
+    /// first does not matter.
+    fn has_av_or_inj_skill(&self, game: &Game, defender_id: &str, vacated: Option<FieldCoordinate>) -> bool {
+        use ffb_model::util::util_player::UtilPlayer;
+        let from = match vacated.or_else(|| game.field_model.player_coordinate(defender_id)) {
+            Some(c) => c,
+            None => return false,
+        };
+        let defender_is_home = game.team_home.players.iter().any(|p| p.id == defender_id);
+        let opposing = if defender_is_home { &game.team_away } else { &game.team_home };
+        let mut candidates: Vec<String> = UtilPlayer::find_adjacent_players_with_tacklezones(
+            game, opposing, from, false,
+        ).into_iter().cloned().collect();
+        if let Some(v) = vacated {
+            if let Some(pid) = game.field_model.player_at(v) {
+                candidates.push(pid.to_owned());
+            }
+        }
+        let found = candidates.iter().any(|pid| game.player(pid)
+            .map(|p| p.has_skill_property(NamedProperties::AFFECTS_EITHER_ARMOUR_OR_INJURY_ON_JUMP))
+            .unwrap_or(false));
+        if found {
+            return true;
+        }
+        self.diving_tackler_id.as_deref()
+            .and_then(|dt| game.player(dt))
+            .map(|p| p.has_skill_property(NamedProperties::AFFECTS_EITHER_ARMOUR_OR_INJURY_ON_DODGE))
+            .unwrap_or(false)
+    }
 }
 impl Default for InjuryTypeDropJump { fn default() -> Self { Self::new() } }
 
 impl InjuryTypeServer for InjuryTypeDropJump {
     fn java_type_name(&self) -> &'static str { "dropLeap" }
     fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,
-        coord: FieldCoordinate, _from_coord: Option<FieldCoordinate>, _old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode) {
+        coord: FieldCoordinate, from_coord: Option<FieldCoordinate>, _old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode) {
         self.ctx.defender_id = Some(defender_id.to_owned());
         self.ctx.attacker_id = attacker_id.map(str::to_owned);
         self.ctx.defender_coordinate = Some(coord);
@@ -51,9 +87,20 @@ impl InjuryTypeServer for InjuryTypeDropJump {
                 self.ctx.add_armor_modifier(ffb_mechanics::modifiers::Modifier::new(
                     "Iron Hard Skin", 0, game.rules));
             }
-            // TODO: add affectsEitherArmourOrInjuryOnDodge modifier (diving tackle) — needs UtilPlayer.findAdjacentPlayersWithTacklezones
-            let _ = self.diving_tackler_id.as_deref();
             do_armor_roll(game, rng, &mut self.ctx, defender_id);
+        }
+        // Java: avOrInjModifierSkill -- Arm Bar's armour-OR-injury mutual exclusion, skipped when
+        // the defender has an unused ignoresArmourModifiersFromSkills skill. It first tries to
+        // break armour (+1, re-check); if armour broke without it, the +1 goes on the injury roll
+        // (chaos_troll_vs_slann_fumbbl bb2025 seed 3: Java injury ["Arm Bar"], Rust none).
+        let defender_ignores = game.player(defender_id)
+            .map(|p| p.has_unused_skill_with_property(NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS))
+            .unwrap_or(false);
+        let mut av_or_inj = !defender_ignores && self.has_av_or_inj_skill(game, defender_id, from_coord);
+        if !self.ctx.armor_broken && av_or_inj {
+            self.ctx.add_armor_modifier(ffb_mechanics::modifiers::Modifier::new("Arm Bar", 1, game.rules));
+            crate::injury::recalc_armor_broken(game, &mut self.ctx, defender_id);
+            av_or_inj = false;
         }
         if self.ctx.armor_broken {
             // Java: InjuryModifierFactory factory = game.getFactory(FactoryType.Factory.INJURY_MODIFIER);
@@ -65,6 +112,9 @@ impl InjuryTypeServer for InjuryTypeDropJump {
                 for m in factory.find_injury_modifiers(game, attacker, defender, false, false, false) {
                     self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), attacker, defender, game.rules));
                 }
+            }
+            if av_or_inj {
+                self.ctx.add_injury_modifier(ffb_mechanics::modifiers::Modifier::new("Arm Bar", 1, game.rules));
             }
             do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
         }
@@ -175,5 +225,80 @@ mod tests {
         t.handle_injury(&game, &mut rng, Some("attacker"), "defender", coord(), None, None, ApothecaryMode::Defender);
         assert!(t.ctx.armor_broken);
         assert!(!t.ctx.injury_modifiers.contains(&Modifier::new("Mighty Blow", 1, game.rules)));
+    }
+
+    fn place(game: &mut Game, id: &str, c: FieldCoordinate) {
+        use ffb_model::enums::PS_STANDING;
+        game.field_model.set_player_coordinate(id, c);
+        game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+    }
+
+    fn make_jump_player(id: &str, armour: i32, skills: Vec<ffb_model::enums::SkillId>) -> ffb_model::model::player::Player {
+        use std::collections::HashSet;
+        use ffb_model::model::player::Player;
+        use ffb_model::model::SkillWithValue;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        Player { id: id.into(), name: id.into(), nr: 1,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour, starting_skills: skills.into_iter().map(SkillWithValue::new).collect(), extra_skills: vec![],
+            temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default() }
+    }
+
+    fn arm_bar_game(jumper_av: i32, arm_bar_at: FieldCoordinate) -> Game {
+        use ffb_model::enums::SkillId;
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(make_jump_player("jumper", jumper_av, vec![]));
+        let mut away = crate::step::framework::test_team("away", 0);
+        away.players.push(make_jump_player("armbar", 7, vec![SkillId::ArmBar]));
+        let mut game = Game::new(home, away, Rules::Bb2025);
+        place(&mut game, "jumper", FieldCoordinate::new(6, 5));
+        place(&mut game, "armbar", arm_bar_at);
+        game
+    }
+
+    /// Java DropJump: an opponent with Arm Bar adjacent to the jumper's square, when armour
+    /// breaks on its own, adds "Arm Bar" +1 to the INJURY roll (chaos_troll_vs_slann_fumbbl
+    /// bb2025 seed 3).
+    #[test]
+    fn arm_bar_adjacent_goes_on_injury_when_armour_breaks_alone() {
+        let game = arm_bar_game(2, FieldCoordinate::new(7, 5));
+        let mut t = InjuryTypeDropJump::new();
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game, &mut rng, None, "jumper", FieldCoordinate::new(6, 5), None, None, ApothecaryMode::Defender);
+        assert!(t.ctx.armor_broken);
+        assert!(!t.ctx.armor_modifiers.iter().any(|m| m.name == "Arm Bar"));
+        assert!(t.ctx.injury_modifiers.iter().any(|m| m.name == "Arm Bar"));
+    }
+
+    /// Armour side: a 9 against AV10 breaks with Arm Bar's +1, which is then NOT also on injury.
+    #[test]
+    fn arm_bar_adjacent_breaks_armour_on_a_one_short_roll() {
+        let game = arm_bar_game(10, FieldCoordinate::new(7, 6));
+        let mut seed = 0u64;
+        loop {
+            let mut probe = GameRng::new(seed);
+            if probe.d6() + probe.d6() == 9 { break; }
+            seed += 1;
+            assert!(seed < 10_000);
+        }
+        let mut t = InjuryTypeDropJump::new();
+        let mut rng = GameRng::new(seed);
+        t.handle_injury(&game, &mut rng, None, "jumper", FieldCoordinate::new(6, 5), None, None, ApothecaryMode::Defender);
+        assert!(t.ctx.armor_broken, "Arm Bar +1 must break AV10 on a 9");
+        assert!(t.ctx.armor_modifiers.iter().any(|m| m.name == "Arm Bar"));
+        assert!(!t.ctx.injury_modifiers.iter().any(|m| m.name == "Arm Bar"));
+    }
+
+    #[test]
+    fn no_arm_bar_without_an_adjacent_arm_bar_player() {
+        let game = arm_bar_game(2, FieldCoordinate::new(10, 5));
+        let mut t = InjuryTypeDropJump::new();
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game, &mut rng, None, "jumper", FieldCoordinate::new(6, 5), None, None, ApothecaryMode::Defender);
+        assert!(!t.ctx.injury_modifiers.iter().any(|m| m.name == "Arm Bar"));
     }
 }
