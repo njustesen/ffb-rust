@@ -63,7 +63,10 @@ pub fn normalise_id(s: &str) -> String {
             // Player ids are `home_01`..`home_16` (at most two digits). A longer number is a TEAM
             // id built from a numeric FUMBBL roster id (`away_4959` = dark_elf_league_fumbbl).
             let (num, raised) = split_raised(rest);
-            if num.len() <= 2 && (raised.is_empty() || raised[1..].chars().all(|c| c.is_ascii_digit())) {
+            // A player raised TWICE carries the suffix twice (`home_02R1R1`, undead bb2025 seed 54).
+            let raised_ok = raised.split('R').skip(1)
+                .all(|g| !g.is_empty() && g.chars().all(|c| c.is_ascii_digit()));
+            if num.len() <= 2 && (raised.is_empty() || raised_ok) {
                 if let Ok(n) = num.parse::<u32>() { return format!("{side}_{n:02}{raised}"); }
             }
             if !rest.is_empty() && rest.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.') {
@@ -125,6 +128,27 @@ pub fn compare_reports(seed: u64, edition: &str, home: &str, away: &str) -> Opti
     Some(compare_sequences(&java, &rust))
 }
 
+/// Report kinds Java emits by iterating a `HashSet` of identity-hashed objects, so their ORDER
+/// within one burst is not reproducible: `StepEndTurn.deactivatePrayers` walks
+/// `new HashSet<>(inducementSet.getPrayers())` of `Prayer` enum constants (chaos_chaosogre
+/// bb2020 seed 30: Java ended Treacherous Trapdoor then Moles, Rust the reverse). A run of
+/// consecutive reports of one such kind is compared as a multiset.
+const UNORDERED_RUN_IDS: [&str; 1] = ["prayerEnd"];
+
+fn sort_unordered_runs(mut v: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
+    let mut k = 0;
+    while k < v.len() {
+        let id = report_id(&v[k]).to_string();
+        let mut e = k + 1;
+        if UNORDERED_RUN_IDS.contains(&id.as_str()) {
+            while e < v.len() && report_id(&v[e]) == id { e += 1; }
+            v[k..e].sort_by_key(|x| x.to_string());
+        }
+        k = e;
+    }
+    v
+}
+
 pub fn compare_sequences(java: &[serde_json::Value], rust: &[serde_json::Value]) -> ReportCompare {
     let n = java.len().min(rust.len());
     for k in 0..n {
@@ -141,8 +165,10 @@ pub fn compare_sequences(java: &[serde_json::Value], rust: &[serde_json::Value])
             java_line: java.get(n).cloned(), rust_line: rust.get(n).cloned(), kind: "ids",
         };
     }
+    let jn = sort_unordered_runs(java.iter().map(normalise).collect());
+    let rn = sort_unordered_runs(rust.iter().map(normalise).collect());
     for k in 0..n {
-        if normalise(&java[k]) != normalise(&rust[k]) {
+        if jn[k] != rn[k] {
             return ReportCompare {
                 identical: false, java_count: java.len(), rust_count: rust.len(), divergence: k,
                 java_line: Some(java[k].clone()), rust_line: Some(rust[k].clone()), kind: "payload",
@@ -173,6 +199,8 @@ mod tests {
         assert_eq!(normalise_id("teamLinemanParityHome14"), "home_14");
         assert_eq!(normalise_id("teamGoblinParity25Away3"), "away_03");
         assert_eq!(normalise_id("teamHumanParity25Home"), "home");
+        assert_eq!(normalise_id("teamUndeadParity25Home2R1R1"), "home_02R1R1");
+        assert_eq!(normalise_id("home_02R1R1"), "home_02R1R1");
         assert_eq!(normalise_id("home_14"), "home_14");
         assert_eq!(normalise_id("teamVampireParity20Away1R1"), "away_01R1");
         assert_eq!(normalise_id("away_01R1"), "away_01R1");

@@ -712,6 +712,11 @@ impl StepEndTurn {
             // home turn 1 was a lone deselecting TTM → home_02's turn-2 blitz kept a stale +1 → a 2-dice
             // block where Java rolled 1). The correct discriminator is the ACTING team's turn_nr: it is 0
             // at the pre-turn-1 handoff (preserve) and ≥1 once that team has actually taken a turn (clear).
+            // Java StepEndTurn: `getGameState().resetStalling()` in the same REGULAR/BLITZ block
+            // (no turn_nr guard: a cleared flag before turn 1 is the flag's initial state anyway).
+            if matches!(game.turn_mode, TurnMode::Regular | TurnMode::Blitz) {
+                game.stalling = false;
+            }
             if matches!(game.turn_mode, TurnMode::Regular | TurnMode::Blitz)
                 && game.turn_data().turn_nr >= 1
             {

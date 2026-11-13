@@ -66,6 +66,9 @@ impl StepSelectBlitzTargetEnd {
             if ts.is_canceled() {
                 // Java: if (actingPlayer.hasActed()) mark skills used; else resetStalling()
                 // Java: removeSkillEnhancements, changePlayerAction(null), setTargetSelectionState(null), push Select
+                if !game.acting_player.acted() {
+                    game.stalling = false; // Java: getGameState().resetStalling()
+                }
                 game.field_model.target_selection_state = None;
                 return StepOutcome::next();
             } else if ts.is_selected() {

@@ -1,0 +1,40 @@
+report-stream divergence families over 33000 games (0 unreadable) under: D:/ffb_sweep_final
+
+IDENTICAL GAMES per edition
+  bb2016    8652 / 8700   identical (99.4%)
+  bb2020   11977 / 12000  identical (99.8%)
+  bb2025   12263 / 12300  identical (99.7%)
+  ALL      32892 / 33000  identical (99.7%)
+
+FAMILIES ranked by games affected (games / occurrences / editions)
+      43       44  only-rust playerEvent                                                      2016:11 2020:13 2025:19
+           e.g. D:/ffb_sweep_final\parity_amazon_bb2025_1e6\bb2025\amazon_vs_amazon\seed_100_java_reports.jsonl
+      43       48  only-java skillUse                                                         2016:27 2025:16
+           e.g. D:/ffb_sweep_final\parity_skaven_bb2025_0\bb2025\skaven_vs_skaven\seed_13_java_reports.jsonl
+      12       15  payload   injury                           {injuryType}                    2016:12
+           e.g. D:/ffb_sweep_final\parity_goblin_bb2016_0\bb2016\goblin_vs_goblin\seed_59_java_reports.jsonl
+       9        9  payload   skillUse                         {playerId,skill,skillUse,used}  2025:9
+           e.g. D:/ffb_sweep_final\parity_skaven_bb2025_0\bb2025\skaven_vs_skaven\seed_13_java_reports.jsonl
+       4        5  only-rust event                                                            2020:4
+           e.g. D:/ffb_sweep_final\parity_old_world_alliance_treeman_bb2020_0\bb2020\old_world_alliance_treeman_vs_old_world_alliance_treeman\seed_53_java_reports.jsonl
+       3        3  payload   interceptionRoll                 {minimumRoll,rollModifiers}     2020:3
+           e.g. D:/ffb_sweep_final\parity_high_elf_bb2020_1.0\bb2020\high_elf_vs_high_elf\seed_29_java_reports.jsonl
+       2        4  payload   prayerEnd                        {prayer}                        2020:2
+           e.g. D:/ffb_sweep_final\parity_chaos_chaosogre_bb2020_0\bb2020\chaos_chaosogre_vs_chaos_chaosogre\seed_30_java_reports.jsonl
+       2        3  payload   injury                           {armorModifiers}                2020:1 2025:1
+           e.g. D:/ffb_sweep_final\parity_goblin_bb2025_1.0\bb2025\goblin_vs_goblin\seed_67_java_reports.jsonl
+       1        1  payload   raiseDead                        {playerId}                      2025:1
+           e.g. D:/ffb_sweep_final\parity_undead_bb2025_0\bb2025\undead_vs_undead\seed_54_java_reports.jsonl
+
+FIRST DIVERGENCE ranked by games (what each gate's REPORTS DIFF line shows)
+      42  only-rust playerEvent                                                      e.g. D:/ffb_sweep_final\parity_amazon_bb2025_1e6\bb2025\amazon_vs_amazon\seed_100_java_reports.jsonl @#360
+      42  only-java skillUse                                                         e.g. D:/ffb_sweep_final\parity_skaven_bb2025_0\bb2025\skaven_vs_skaven\seed_13_java_reports.jsonl @#59
+      12  payload   injury                           {injuryType}                    e.g. D:/ffb_sweep_final\parity_goblin_bb2016_0\bb2016\goblin_vs_goblin\seed_59_java_reports.jsonl @#140
+       4  only-rust event                                                            e.g. D:/ffb_sweep_final\parity_old_world_alliance_treeman_bb2020_0\bb2020\old_world_alliance_treeman_vs_old_world_alliance_treeman\seed_53_java_reports.jsonl @#418
+       3  payload   interceptionRoll                 {minimumRoll,rollModifiers}     e.g. D:/ffb_sweep_final\parity_high_elf_bb2020_1.0\bb2020\high_elf_vs_high_elf\seed_29_java_reports.jsonl @#359
+       2  payload   prayerEnd                        {prayer}                        e.g. D:/ffb_sweep_final\parity_chaos_chaosogre_bb2020_0\bb2020\chaos_chaosogre_vs_chaos_chaosogre\seed_30_java_reports.jsonl @#447
+       2  payload   injury                           {armorModifiers}                e.g. D:/ffb_sweep_final\parity_goblin_bb2025_1.0\bb2025\goblin_vs_goblin\seed_67_java_reports.jsonl @#53
+       1  payload   raiseDead                        {playerId}                      e.g. D:/ffb_sweep_final\parity_undead_bb2025_0\bb2025\undead_vs_undead\seed_54_java_reports.jsonl @#434
+
+REPORT-COUNT GAPS > 10% (whole missing families)
+  0 games

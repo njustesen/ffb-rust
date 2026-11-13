@@ -28,6 +28,9 @@ $repo = "C:\Users\Admin\niels\ffb-rust\ffb-rust"
 # scripts/cross_recover.py). Concatenate sweep_w*.log for scripts/sweep_verdicts.py.
 $log  = Join-Path $scratch ("sweep_" + $tag + ".log")
 $stop = Join-Path $scratch "STOP_SWEEP"
+# A missing scratch dir silently swallowed EVERY verdict line (each Add-Content failed while the
+# gates themselves ran on) -- the 2026-11-13 crossjobs6 run lost 1,250 pairs this way.
+New-Item -ItemType Directory -Force -Path $scratch | Out-Null
 $env:FFB_PARITY_ROOT = $root + "/" + $tag
 $env:PARITY_JVM_CORES = "2"
 foreach ($line in (Get-Content $jobfile)) {

@@ -19,6 +19,7 @@ param(
 $repo = "C:\Users\Admin\niels\ffb-rust\ffb-rust"
 $log  = Join-Path $scratch "sweep.log"
 $stop = Join-Path $scratch "STOP_SWEEP"
+New-Item -ItemType Directory -Force -Path $scratch | Out-Null  # a missing dir silently loses verdicts
 foreach ($line in (Get-Content $jobfile)) {
   $t = $line.Trim(); if (-not $t) { continue }
   if (Test-Path $stop) { Add-Content $log ("[" + $tag + "] STOPPED"); exit 0 }

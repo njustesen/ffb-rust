@@ -30,7 +30,7 @@ from collections import Counter, defaultdict
 from multiprocessing import Pool
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from report_diff import load, norm  # noqa: E402
+from report_diff import load, norm, sort_unordered_runs  # noqa: E402
 
 RE_JAVA = re.compile(r'^seed_(\d+)_java_reports\.jsonl$')
 EDITIONS = ('bb2016', 'bb2020', 'bb2025')
@@ -74,7 +74,7 @@ def classify(pair):
         J, R = load(jp), load(rp)
     except (OSError, ValueError) as e:
         return {'game': jp, 'error': str(e)}
-    jn, rn = [norm(x) for x in J], [norm(x) for x in R]
+    jn, rn = sort_unordered_runs([norm(x) for x in J]), sort_unordered_runs([norm(x) for x in R])
     jid = [x.get('reportId', '?') for x in jn]
     rid = [x.get('reportId', '?') for x in rn]
     families = Counter()

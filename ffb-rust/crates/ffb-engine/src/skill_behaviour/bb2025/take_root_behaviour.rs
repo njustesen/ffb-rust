@@ -53,6 +53,11 @@ impl StepModifierTrait for TakeRootPushbackStepModifier {
             .downcast_mut::<crate::step::bb2025::block::step_pushback::StepPushbackHookState>()
             .expect("TakeRootPushbackStepModifier: step_state must be StepPushbackHookState");
         // Java: `playerState = fieldModel.getPlayerState(state.defender); if (playerState.isRooted())`
+        // BB2016 has no TakeRootBehaviour pushback hook at all: its rooted defender is handled
+        // by bb2016 StandFirmBehaviour's `isRooted()` branch (which reports AVOID_PUSH).
+        if game.rules == ffb_model::enums::Rules::Bb2016 {
+            return false;
+        }
         let rooted = game.field_model.player_state(&state.defender_id)
             .map(|s| s.is_rooted()).unwrap_or(false);
         if !rooted {
@@ -68,8 +73,11 @@ impl StepModifierTrait for TakeRootPushbackStepModifier {
         state.published.push(crate::step::framework::StepParameter::FollowupChoice(false));
         // Java: if (UtilPlayer.hasBall(game, defender)) addReport(ReportEvent("Strip ball is
         // prevented as the player is rooted."))
+        // BB2020's twin (`skillbehaviour/bb2020/TakeRootBehaviour`) stops at FOLLOWUP_CHOICE: no
+        // strip-ball event (old_world_alliance_treeman bb2020 seed 53 @0).
         let defender_coord = game.field_model.player_coordinate(&state.defender_id);
-        if defender_coord.is_some() && game.field_model.ball_coordinate == defender_coord
+        if game.rules == ffb_model::enums::Rules::Bb2025
+            && defender_coord.is_some() && game.field_model.ball_coordinate == defender_coord
             && !game.field_model.ball_moving
         {
             game.report_list.add(ffb_model::report::mixed::report_event::ReportEvent::new(Some(

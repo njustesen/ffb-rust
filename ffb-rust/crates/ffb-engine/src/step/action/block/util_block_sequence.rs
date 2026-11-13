@@ -76,6 +76,17 @@ pub fn init_pushback(game: &mut Game) -> Vec<StepParameter> {
             }
             params.push(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall));
             params.push(StepParameter::BallKnockedLoose(true));
+            // Java: if (!defenderHasTacklezones && skillCanCounterOpponentForcingDropBall != null)
+            //   addReport(new ReportSkillUse(defenderId, counterSkill, false, NO_TACKLEZONE))
+            // (skaven bb2025 seed 13 @0: a POW'd Sure Hands carrier names its unusable skill).
+            if let (Some(cancel_skill), Some(did)) = (cancel, defender_id.clone()) {
+                let defender_has_tz = game.field_model.player_state(&did)
+                    .map(|s| s.has_tacklezones())
+                    .unwrap_or(false);
+                if !defender_has_tz {
+                    game.report_list.add(ReportSkillUse::new(Some(did), cancel_skill, false, SkillUse::NO_TACKLEZONE));
+                }
+            }
         }
     }
 

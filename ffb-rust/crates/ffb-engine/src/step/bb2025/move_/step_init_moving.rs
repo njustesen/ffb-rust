@@ -262,6 +262,19 @@ impl Step for StepInitMoving {
                 {
                     game.acting_player.has_moved = false;
                 }
+                // The same phase-2 deselect lands, in Java, in StepInitSelecting's
+                // CLIENT_ACTING_PLAYER(null) branch, which calls `getGameState().resetStalling()`
+                // on every path but the committed-target-selection confirm dialog. Without it a
+                // pass-block mover that never took a square reached STALLING_PLAYER with the
+                // thrower's staller flag still up and wrote "did not stall after all" (amazon
+                // bb2025 seed 100 @1e6, lizardman bb2025 seeds 6/91 @1e6).
+                if !game.acting_player.took_square {
+                    let committed = game.field_model.target_selection_state.as_ref()
+                        .map(|t| t.is_committed()).unwrap_or(false);
+                    if !committed {
+                        game.stalling = false;
+                    }
+                }
                 self.end_player_action = true;
                 return self.execute_step(game, rng);
             }

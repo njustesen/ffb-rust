@@ -23,8 +23,12 @@ impl InjuryTypeFoul {
 impl Default for InjuryTypeFoul { fn default() -> Self { Self::new() } }
 
 impl InjuryTypeServer for InjuryTypeFoul {
-    fn java_type_name(&self) -> &'static str { "foul" }
-    fn java_class_name(&self) -> &'static str { "Foul" }
+    // Java `InjuryTypeFoul(useChainsaw)`: `super(useChainsaw ? new FoulWithChainsaw() : new Foul())`
+    // — `FoulWithChainsaw` names itself "foulWithChainsaw" and is its own class in every
+    // modification's valid-type set (goblin bb2016 seed 59 @0: report injuryType "foul" vs Java's
+    // "foulWithChainsaw").
+    fn java_type_name(&self) -> &'static str { if self.use_chainsaw { "foulWithChainsaw" } else { "foul" } }
+    fn java_class_name(&self) -> &'static str { if self.use_chainsaw { "FoulWithChainsaw" } else { "Foul" } }
     fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,
         coord: FieldCoordinate, from_coord: Option<FieldCoordinate>, old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode) {
         modification_aware_handle_injury(self, game, rng, attacker_id, defender_id, coord, from_coord, old_ctx, apo_mode);
@@ -38,6 +42,17 @@ impl InjuryTypeServer for InjuryTypeFoul {
 }
 impl ModificationAwareInjuryType for InjuryTypeFoul {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str, roll: bool) {
+        // Java: `if (game.isActive(foulBreaksArmourWithoutRoll)) setArmorBroken(true);
+        //        if (!injuryContext.isArmorBroken()) { roll; chainsaw; getFoulAssist; ... }`
+        // EVERY armour modifier (chainsaw, the foul assists, IHS's marker, the Foul bonus) lives
+        // inside that guard. Rust added the assists first, so a Blatant-Foul (no armour roll)
+        // report carried "1 Offensive Assist" that Java never adds (goblin bb2025 seed 67 @1.0).
+        if game.is_active(NamedProperties::FOUL_BREAKS_ARMOUR_WITHOUT_ROLL) {
+            self.ctx.armor_broken = true;
+        }
+        if self.ctx.armor_broken {
+            return;
+        }
         // Add foul-assist armor modifier based on net offensive - defensive assists
         // Java `ArmorModifierFactory.getFoulAssist`: when the DEFENDER has an unused
         // `ignoresArmourModifiersFromSkills` skill (Iron Hard Skin), the whole foul-assist set —

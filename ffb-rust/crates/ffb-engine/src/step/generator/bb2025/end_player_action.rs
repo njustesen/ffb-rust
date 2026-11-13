@@ -51,6 +51,19 @@ impl EndPlayerAction {
     /// `CHECK_STALLING` entirely. BB2020 also passes RESET_FOR_FAILED_BLOCK=false to
     /// RESET_FUMBLEROOSKIE and takes no CHECK_FORGO on END_FEEDING.
     pub fn build_sequence(params: &EndPlayerActionParams) -> Vec<SequenceStep> {
+        // BB2016 (`generator/bb2016/EndPlayerAction.java`) is 4 steps: INIT_FEEDING,
+        // APOTHECARY(FEEDING), CATCH_SCATTER_THROW_IN, END_FEEDING[END_FEEDING]. Building this
+        // BB2025 sequence for BB2016 ran BB2025's stalling check, whose "did not stall after all"
+        // report fires on any touchdown (chaos bb2016 seed 2: a hand-off TD wrote a report Java
+        // never writes).
+        if params.rules == ffb_model::enums::Rules::Bb2016 {
+            use crate::step::generator::bb2016::end_player_action as bb2016;
+            return bb2016::EndPlayerAction::build_sequence(&bb2016::EndPlayerActionParams {
+                feeding_allowed: params.feeding_allowed,
+                end_player_action: params.end_player_action,
+                end_turn: params.end_turn,
+            });
+        }
         if params.rules == ffb_model::enums::Rules::Bb2020 {
             use crate::step::generator::bb2020::end_player_action as bb2020;
             return bb2020::EndPlayerAction::build_sequence(&bb2020::EndPlayerActionParams {

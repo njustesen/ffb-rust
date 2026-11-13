@@ -191,6 +191,13 @@ impl Step for StepInitSelecting {
             // Without this arm the command fell through and the MultiBlockTargets window
             // re-prompted forever (dark_elf bb2020 seed 2 i=6).
             Action::EndPlayerAction => {
+                // Java: every deselect branch except the committed-target-selection confirm
+                // dialog calls `getGameState().resetStalling()` before ending the action.
+                let committed = game.field_model.target_selection_state.as_ref()
+                    .map(|t| t.is_committed()).unwrap_or(false);
+                if !committed {
+                    game.stalling = false;
+                }
                 util_server_steps::change_player_action_to_none(game);
             }
             Action::ActivatePlayer { player_id, player_action, block_defender_id } => {

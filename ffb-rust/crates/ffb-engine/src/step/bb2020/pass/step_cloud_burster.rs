@@ -61,6 +61,9 @@ pub struct StepCloudBurster {
     interceptor_id: Option<String>,
     /// Java: `PassState.deflectionSuccessful` — set by the preceding `StepIntercept`.
     deflection_successful: bool,
+    /// Java: `PassState.result` — the re-pushed StepIntercept is a fresh instance, so the pass
+    /// result it computes its modifiers from must be handed on (Java reads the shared PassState).
+    pass_result: Option<ffb_model::enums::PassOutcome>,
 }
 
 impl StepCloudBurster {
@@ -69,6 +72,7 @@ impl StepCloudBurster {
             goto_label_on_failure,
             interceptor_id: None,
             deflection_successful: false,
+            pass_result: None,
         }
     }
 
@@ -138,9 +142,17 @@ impl StepCloudBurster {
             // the local copy above reached nobody.
             StepOutcome::next()
                 .publish(StepParameter::DeflectionSuccessful(false))
-                .push_seq(vec![
-                    SequenceStep::with_params(StepId::Intercept, vec![StepParameter::GotoLabelOnFailure(label)]),
-                ])
+                .push_seq(vec![{
+                    // The second roll must see the same PassState.result as the first: a
+                    // WILDLY_INACCURATE long pass re-rolled through Cloud Burster kept its
+                    // "Wildly Inaccurate Pass" modifier in Java, while the fresh Rust step fell
+                    // back to its INACCURATE default (high_elf bb2020 seed 29 @1.0).
+                    let mut params = vec![StepParameter::GotoLabelOnFailure(label)];
+                    if let Some(pr) = self.pass_result {
+                        params.push(StepParameter::PassResultParam(pr));
+                    }
+                    SequenceStep::with_params(StepId::Intercept, params)
+                }])
         } else {
             // Java: getResult().setNextAction(StepAction.GOTO_LABEL, fGotoLabelOnFailure);
             StepOutcome::goto(&label)
@@ -173,6 +185,7 @@ impl Step for StepCloudBurster {
             StepParameter::GotoLabelOnFailure(v) => { self.goto_label_on_failure = v.clone(); true }
             StepParameter::InterceptorId(v) => { self.interceptor_id = v.clone(); true }
             StepParameter::DeflectionSuccessful(v) => { self.deflection_successful = *v; true }
+            StepParameter::PassResultParam(v) => { self.pass_result = Some(*v); true }
             _ => false,
         }
     }

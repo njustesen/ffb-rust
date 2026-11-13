@@ -16,11 +16,11 @@ from collections import Counter
 
 # A RAISED player (Raise Dead / Necromancer) gets its victim's id plus an `R<n>` suffix in both
 # engines (`teamVampireParity20Away1R1` / `away_01R1`), so the suffix rides along.
-RE_JAVA_PID = re.compile(r'^team[A-Za-z0-9_]*?Parity(?:16|20|25)?(Home|Away)(\d+)(R\d+)?$')
+RE_JAVA_PID = re.compile(r'^team[A-Za-z0-9_]*?Parity(?:16|20|25)?(Home|Away)(\d+)((?:R\d+)*)$')
 RE_JAVA_TID = re.compile(r'^team[A-Za-z0-9_]*?Parity(?:16|20|25)?(Home|Away)$')
 # Rust player ids are `home_01`..`home_16`: at most two digits. A longer number is a TEAM id built
 # from a numeric FUMBBL roster id (`away_4959` = dark_elf_league_fumbbl), and matches RE_RUST_TID.
-RE_RUST_PID = re.compile(r'^(home|away)_(\d{1,2})(R\d+)?$')
+RE_RUST_PID = re.compile(r'^(home|away)_(\d{1,2})((?:R\d+)*)$')
 RE_RUST_TID = re.compile(r'^(home|away)_[a-z0-9_.]+$')
 
 
@@ -72,6 +72,25 @@ def norm(v):
     return v
 
 
+# Report kinds Java emits by iterating a HashSet of identity-hashed objects (StepEndTurn
+# deactivatePrayers walks new HashSet<>(prayers) of Prayer enum constants), so the order inside
+# one burst is not reproducible. A run of consecutive reports of such a kind compares as a multiset.
+UNORDERED_RUN_IDS = {'prayerEnd'}
+
+
+def sort_unordered_runs(v):
+    out, k = list(v), 0
+    while k < len(out):
+        rid = out[k].get('reportId')
+        e = k + 1
+        if rid in UNORDERED_RUN_IDS:
+            while e < len(out) and out[e].get('reportId') == rid:
+                e += 1
+            out[k:e] = sorted(out[k:e], key=lambda x: json.dumps(x, sort_keys=True))
+        k = e
+    return out
+
+
 def load(p):
     out = []
     for line in open(p, encoding='utf-8', errors='replace'):
@@ -85,7 +104,7 @@ def main():
     jp, rp = sys.argv[1], sys.argv[2]
     full = '--full' in sys.argv
     J, R = load(jp), load(rp)
-    jn, rn = [norm(x) for x in J], [norm(x) for x in R]
+    jn, rn = sort_unordered_runs([norm(x) for x in J]), sort_unordered_runs([norm(x) for x in R])
     jid = [x.get('reportId', '?') for x in jn]
     rid = [x.get('reportId', '?') for x in rn]
     print('java %d reports, rust %d reports' % (len(J), len(R)))

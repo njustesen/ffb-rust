@@ -175,16 +175,6 @@ impl StepInitFeeding {
         } else {
             self.end_turn = true;
 
-            // Java bb2020/bb2025: addReport(new ReportPlayerEvent(..., "failed to bite anyone causing
-            // a turnover")). bb2016 StepInitFeeding writes no such event — its only report on this
-            // branch is ReportBiteSpectator, below.
-            if game.rules != Rules::Bb2016 {
-                game.report_list.add(ReportPlayerEvent::new(
-                    game.acting_player.player_id.clone(),
-                    Some("failed to bite anyone causing a turnover".into()),
-                ));
-            }
-
             let is_eligible = player_state.map(|s| {
                 !s.is_casualty() && s.base() != PS_KNOCKED_OUT && s.base() != PS_RESERVE
             }).unwrap_or(false);
@@ -218,8 +208,19 @@ impl StepInitFeeding {
                     }
                     UtilBox::put_player_into_box(game, &acting_id);
                     game.report_list.add(ReportBiteSpectator::new(acting_id.clone()));
-                } else if let Some(s) = player_state {
-                    game.field_model.set_player_state(&acting_id, s.change_confused(true));
+                } else {
+                    if let Some(s) = player_state {
+                        game.field_model.set_player_state(&acting_id, s.change_confused(true));
+                    }
+                    // Java bb2020/bb2025: the "failed to bite anyone causing a turnover" event sits
+                    // INSIDE this not-casualty/not-KO/not-reserve block, after changeConfused. A
+                    // vampire that fell and was knocked out or injured gets no event (vampire
+                    // bb2020 seed 2 @0: a failed dodge KO'd the hungry vampire). bb2016 writes no
+                    // such event — its only report on this branch is ReportBiteSpectator, above.
+                    game.report_list.add(ReportPlayerEvent::new(
+                        game.acting_player.player_id.clone(),
+                        Some("failed to bite anyone causing a turnover".into()),
+                    ));
                 }
                 outcome = outcome.with_event(GameEvent::BiteSpectator { player_id: acting_id.clone() });
             }
@@ -382,11 +383,30 @@ mod tests {
         step.goto_label_on_end = Some("lbl".into());
         step.feeding_allowed = Some(false); // forces feed_on_player_choice = false
         let mut game = make_game();
+        add_player(&mut game, "vamp", FieldCoordinate::new(5, 5), true);
         game.acting_player.player_id = Some("vamp".into());
         game.acting_player.suffering_blood_lust = true;
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::PLAYER_EVENT),
             "should have PLAYER_EVENT report when vampire fails to bite");
+    }
+
+    /// Java writes "failed to bite anyone causing a turnover" only inside the
+    /// not-casualty/not-KO/not-reserve block (vampire bb2020 seed 2: a hungry vampire KO'd by a
+    /// failed dodge gets no event).
+    #[test]
+    fn knocked_out_vampire_gets_no_failed_to_bite_event() {
+        let mut step = StepInitFeeding::new();
+        step.goto_label_on_end = Some("lbl".into());
+        step.feeding_allowed = Some(false);
+        let mut game = make_game();
+        add_player(&mut game, "vamp", FieldCoordinate::new(5, 5), true);
+        game.field_model.set_player_state("vamp", PlayerState::new(PS_KNOCKED_OUT));
+        game.acting_player.player_id = Some("vamp".into());
+        game.acting_player.suffering_blood_lust = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::PLAYER_EVENT),
+            "a knocked-out vampire writes no failed-to-bite event");
     }
 
     #[test]
