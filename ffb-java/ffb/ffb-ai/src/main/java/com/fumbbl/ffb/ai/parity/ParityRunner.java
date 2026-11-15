@@ -2416,6 +2416,31 @@ public class ParityRunner {
      */
     private static ClientCommandBlock blockCommand(Game game, String playerId, String defenderId) {
         PlayerAction action = game.getActingPlayer().getPlayerAction();
+        if (!isBb2025(game)) {
+            // bb2016/bb2020 choose the kind AT THE BLOCK: the client's
+            // BlockLogicExtension.blockActionContext menu, shown when the attacker has an unused
+            // providesBlockAlternative skill. Agent policy (Rust legal_actions::client_block_alternative):
+            // a declared BLOCK takes the FIRST menu entry it qualifies for -- STAB, CHAINSAW,
+            // PROJECTILE_VOMIT, BREATHE_FIRE (multiBlock = false); blitz / frenzy blocks stay plain.
+            Player<?> p = game.getPlayerById(playerId);
+            boolean stab = false, chainsaw = false, vomit = false, fire = false;
+            if (action == PlayerAction.BLOCK && p != null
+                    && com.fumbbl.ffb.util.UtilCards.hasUnusedSkillWithProperty(p,
+                        com.fumbbl.ffb.model.property.NamedProperties.providesBlockAlternative)) {
+                if (p.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.providesStabBlockAlternative)) {
+                    stab = true;
+                } else if (p.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.providesChainsawBlockAlternative)) {
+                    chainsaw = true;
+                } else if (com.fumbbl.ffb.util.UtilCards.getUnusedSkillWithProperty(p,
+                        com.fumbbl.ffb.model.property.NamedProperties.canPerformArmourRollInsteadOfBlockThatMightFail).isPresent()) {
+                    vomit = true;
+                } else if (com.fumbbl.ffb.util.UtilCards.getUnusedSkillWithProperty(p,
+                        com.fumbbl.ffb.model.property.NamedProperties.canPerformArmourRollInsteadOfBlockThatMightFailWithTurnover).isPresent()) {
+                    fire = true;
+                }
+            }
+            return new ClientCommandBlock(playerId, defenderId, stab, chainsaw, vomit, fire, false);
+        }
         return new ClientCommandBlock(playerId, defenderId,
             action == PlayerAction.STAB, action == PlayerAction.CHAINSAW,
             action == PlayerAction.PROJECTILE_VOMIT, action == PlayerAction.BREATHE_FIRE,

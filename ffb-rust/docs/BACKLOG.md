@@ -9538,8 +9538,13 @@ the skill (Multiple Block, Kick 'em, Putrid Regurgitation, Chomp — stars only)
    `chainsawRoll` named the victim where Java passes null (bb2020 + bb2025; bb2025 also had an
    invented `&& armor_broken` turnover term); (d) Stunty's `!isStab` injury-modifier gate is
    bb2016-only, Rust applied it in every edition.
-2. bb2016/bb2020 block-time kinds (Stab/Chainsaw/Vomit chosen at CLIENT_BLOCK) — needs a shared
-   choose-kind rule.
+2. bb2016/bb2020 block-time kinds (Stab/Chainsaw/Vomit chosen at CLIENT_BLOCK). **DONE
+   2026-11-15.** Agent policy (Rust `legal_actions::client_block_alternative`, Java
+   `ParityRunner.blockCommand`): a declared BLOCK whose attacker has an unused
+   providesBlockAlternative skill takes the first entry of the client's
+   `blockActionContext` menu order STAB > CHAINSAW > VOMIT > BREATHE FIRE; blitz / frenzy blocks
+   stay plain. Gate 4 bb2016 + 8 bb2020 squads x 10 + bb2025 regression: 130/130 steps + reports,
+   no new Rust bug (vomit 68, breathe fire 6, stab injuries 13 fired).
 3. Jump Up: offer BLOCK to a prone Jump Up player with an adjacent blockable opponent (Java
    `isBlockActionAvailable` allows PRONE + canStandUpForFree); StandUpBlitz alone does not roll it.
 4. Gaze (bb2016 handled-list gap, BACKLOG E17; bb2020/bb2025 offer).

@@ -900,6 +900,36 @@ pub fn eligible_players_for_activation(game: &Game) -> Vec<(PlayerId, Vec<ffb_mo
     out
 }
 
+/// §K: the block kind the parity agents pick for a declared BLOCK in bb2016/bb2020, where the
+/// kind is chosen AT THE BLOCK (the client's `BlockLogicExtension.blockActionContext` menu, shown
+/// when the attacker has an unused `providesBlockAlternative` skill) rather than declared as an
+/// action (bb2025). Policy, mirrored by `ParityRunner.blockCommand`: take the FIRST entry of the
+/// client's menu order -- STAB, CHAINSAW, PROJECTILE_VOMIT, BREATHE_FIRE (multiBlock = false) --
+/// that the attacker qualifies for; `None` = a plain block. Blitz / Frenzy blocks stay plain on
+/// both sides. Returns the CLIENT_BLOCK flag as the step parameter Rust folds it into.
+pub fn client_block_alternative(game: &Game, player_id: &str) -> Option<crate::step::framework::StepParameter> {
+    use crate::step::framework::StepParameter;
+    use ffb_model::model::property::named_properties::NamedProperties as NP;
+    if game.rules == Rules::Bb2025 {
+        return None;
+    }
+    let p = game.player(player_id)?;
+    if !p.has_unused_skill_with_property(NP::PROVIDES_BLOCK_ALTERNATIVE) {
+        return None;
+    }
+    if p.has_skill_property(NP::PROVIDES_STAB_BLOCK_ALTERNATIVE) {
+        Some(StepParameter::UsingStab(true))
+    } else if p.has_skill_property(NP::PROVIDES_CHAINSAW_BLOCK_ALTERNATIVE) {
+        Some(StepParameter::UsingChainsaw(true))
+    } else if p.has_unused_skill_with_property(NP::CAN_PERFORM_ARMOUR_ROLL_INSTEAD_OF_BLOCK_THAT_MIGHT_FAIL) {
+        Some(StepParameter::UsingVomit(true))
+    } else if p.has_unused_skill_with_property(NP::CAN_PERFORM_ARMOUR_ROLL_INSTEAD_OF_BLOCK_THAT_MIGHT_FAIL_WITH_TURNOVER) {
+        Some(StepParameter::UsingBreatheFire(true))
+    } else {
+        None
+    }
+}
+
 /// Returns all squares the player can legally move to (BFS, within MA moves, empty squares only).
 /// Excludes the player's current square. Sorted by (x, y).
 /// Returns the 8 adjacent squares of the player that are on-pitch and unoccupied,
@@ -1803,6 +1833,27 @@ mod tests {
         game.rules = Rules::Bb2020;
         let a3 = legal_activate_player_actions(&game, TeamSide::Home);
         assert!(!has_action(&a3, "p1", PlayerActionChoice::Stab));
+    }
+
+    /// §K block-kind policy (mirrors ParityRunner.blockCommand): bb2016/bb2020 take the first
+    /// entry of the client's menu order STAB > CHAINSAW > VOMIT > BREATHE FIRE, only when the
+    /// attacker has an unused providesBlockAlternative skill; bb2025 declares kinds as actions.
+    #[test]
+    fn client_block_alternative_follows_menu_order() {
+        use crate::step::framework::StepParameter;
+        let mut game = make_game(Rules::Bb2020);
+        add_player(&mut game, true, "v", c(5, 5), PS_STANDING, vec![SkillId::BreatheFire, SkillId::ProjectileVomit]);
+        add_player(&mut game, true, "s", c(7, 7), PS_STANDING, vec![SkillId::Stab, SkillId::Chainsaw]);
+        add_player(&mut game, true, "plain", c(9, 9), PS_STANDING, vec![SkillId::Block]);
+        assert!(matches!(client_block_alternative(&game, "v"), Some(StepParameter::UsingVomit(true))));
+        assert!(matches!(client_block_alternative(&game, "s"), Some(StepParameter::UsingStab(true))));
+        assert!(client_block_alternative(&game, "plain").is_none());
+        // a used vomit falls through to Breathe Fire
+        game.team_home.players.iter_mut().find(|p| p.id == "v").unwrap()
+            .used_skills.insert(SkillId::ProjectileVomit);
+        assert!(matches!(client_block_alternative(&game, "v"), Some(StepParameter::UsingBreatheFire(true))));
+        game.rules = Rules::Bb2025;
+        assert!(client_block_alternative(&game, "s").is_none());
     }
 
     /// §11: Look Into My Eyes is offered under the CLIENT's rule

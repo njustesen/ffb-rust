@@ -873,6 +873,15 @@ impl StepInitSelecting {
                                     target_params.push(StepParameter::UsingVomit(true)),
                                 Some(PlayerAction::BreatheFire) =>
                                     target_params.push(StepParameter::UsingBreatheFire(true)),
+                                // bb2020 picks the kind at the block (§K agent policy, mirrored by
+                                // ParityRunner.blockCommand): a declared BLOCK only, never a blitz.
+                                Some(PlayerAction::Block) if dispatch == PlayerAction::Block => {
+                                    if let Some(flag) = game.acting_player.player_id.as_deref()
+                                        .and_then(|pid| crate::legal_actions::client_block_alternative(game, pid))
+                                    {
+                                        target_params.push(flag);
+                                    }
+                                }
                                 _ => {}
                             }
                         }

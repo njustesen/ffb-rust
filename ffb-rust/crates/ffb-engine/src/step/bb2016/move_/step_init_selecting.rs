@@ -286,8 +286,15 @@ impl Step for StepInitSelecting {
                     match pa {
                         PlayerAction::Block | PlayerAction::Blitz => {
                             self.dispatch_player_action = Some(pa);
-                            return self.execute_step(game, rng)
+                            // CLIENT_BLOCK's usingStab: the §K block-kind policy for a declared
+                            // BLOCK (ParityRunner.blockCommand); a blitz stays a plain block.
+                            let kind = if pa == PlayerAction::Block {
+                                crate::legal_actions::client_block_alternative(game, player_id)
+                            } else { None };
+                            let mut out = self.execute_step(game, rng)
                                 .publish(StepParameter::BlockDefenderId(def.clone()));
+                            if let Some(flag) = kind { out = out.publish(flag); }
+                            return out;
                         }
                         PlayerAction::Foul => {
                             self.dispatch_player_action = Some(PlayerAction::Foul);
