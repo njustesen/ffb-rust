@@ -55,7 +55,13 @@ impl StepProjectileVomit {
         }
 
         // Java: actingPlayer.markSkillUsed(NamedProperties.canPerformArmourRollInsteadOfBlockThatMightFail)
-        // (skill marking not yet fully ported)
+        // -- `getPlayer().getSkillWithProperty(property)`, then the activation's set (and the
+        // player's only for a skill tracked outside the activation).
+        if let Some(sid) = game.player(&acting_id).and_then(|p| p.all_skill_ids().find(|id|
+            id.properties().contains(&NamedProperties::CAN_PERFORM_ARMOUR_ROLL_INSTEAD_OF_BLOCK_THAT_MIGHT_FAIL)))
+        {
+            crate::step::util_server_steps::mark_skill_used(game, &acting_id, sid);
+        }
 
         let mut drop_self = false;
         let mut vomit_event: Option<GameEvent> = None;
@@ -122,6 +128,9 @@ impl StepProjectileVomit {
                     label: Some(self.goto_label_on_success.clone()),
                     player_id: Some(defender_id),
                     apothecary_mode: Some(ApothecaryMode::Defender),
+                    // Java passes requiresArmourBreak = true: the victim only goes down when the
+                    // vomit breaks armour (a failed vomit with intact armour leaves the vomiter standing).
+                    requires_armour_break: true,
                     ..DropPlayerContext::new()
                 };
                 let out = StepOutcome::next()
@@ -169,6 +178,9 @@ impl StepProjectileVomit {
                 label: Some(self.goto_label_on_failure.clone()),
                 player_id: Some(acting_id),
                 apothecary_mode: Some(ApothecaryMode::Attacker),
+                // Java passes requiresArmourBreak = true: the victim only goes down when the
+                // vomit breaks armour (a failed vomit with intact armour leaves the vomiter standing).
+                requires_armour_break: true,
                 ..DropPlayerContext::new()
             };
             let out = StepOutcome::next()
@@ -279,6 +291,38 @@ mod tests {
             game.report_list.has_report(ReportId::PROJECTILE_VOMIT),
             "should add ReportProjectileVomit when vomit roll is made"
         );
+    }
+
+    /// §K: Java builds BOTH vomit drop contexts with `requiresArmourBreak = true` -- a failed
+    /// vomit (roll 1) whose self-armour roll holds leaves the vomiter STANDING (snotling bb2025
+    /// seed 5: Rust placed him prone). Walk seeds until both the success and the failure branch
+    /// have published a context, and require the flag on each.
+    #[test]
+    fn both_vomit_drop_contexts_require_armour_break() {
+        let (mut saw_hit, mut saw_self) = (false, false);
+        for seed in 0..200u64 {
+            let mut game = make_game();
+            add_player(&mut game, "att", PS_STANDING, &[SkillId::ProjectileVomit]);
+            game.acting_player.set_player("att".into(), ffb_model::enums::PlayerAction::ProjectileVomit);
+            game.team_home.players.push(Player { id: "def".into(), name: "def".into(), nr: 2,
+                armour: 9, ..Default::default() });
+            game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
+            game.field_model.set_player_state("def", ffb_model::enums::PlayerState::new(PS_STANDING));
+            game.defender_id = Some("def".into());
+            let mut step = StepProjectileVomit {
+                goto_label_on_success: "success".into(),
+                goto_label_on_failure: "failure".into(),
+                using_vomit: true,
+                ..Default::default()
+            };
+            let out = step.start(&mut game, &mut GameRng::new(seed));
+            let Some(dpc) = out.published.iter().find_map(|p| match p {
+                StepParameter::DropPlayerContext(c) => Some(c), _ => None }) else { continue };
+            assert!(dpc.requires_armour_break, "seed {seed}: {:?}", dpc.label);
+            match dpc.label.as_deref() { Some("success") => saw_hit = true, Some("failure") => saw_self = true, _ => {} }
+            if saw_hit && saw_self { return; }
+        }
+        panic!("did not reach both branches: hit={saw_hit} self={saw_self}");
     }
 
     #[test]

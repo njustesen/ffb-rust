@@ -343,6 +343,42 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             }
         }
 
+        // bb2025 declared block alternatives — the client's `SelectLogicModule.actionContext`
+        // rule: `isSpecialBlockActionAvailable` (no preventRegularBlockAction, block allowed in
+        // this turn mode, not PRONE, an adjacent blockable opponent) AND
+        // `canDeclareSkillAction(property, state)` (an UNUSED skill with the property whose
+        // declare condition — STANDING for all four bb2025 skills — holds). Offered in the
+        // client's order STAB, CHAINSAW, PROJECTILE_VOMIT, BREATHE_FIRE, after MULTIPLE_BLOCK;
+        // ParityRunner.computeEligiblePlayers inserts them at the same slot (BACKLOG §K).
+        if game.rules == Rules::Bb2025
+            && !player.has_skill_property(
+                ffb_model::model::property::named_properties::NamedProperties::PREVENT_REGULAR_BLOCK_ACTION,
+            )
+            && game.turn_mode != ffb_model::enums::TurnMode::Blitz
+            && state.base() == ffb_model::enums::PS_STANDING
+            && !ffb_model::util::util_player::UtilPlayer::find_adjacent_blockable_players(
+                game, opponent_team, coord,
+            ).is_empty()
+        {
+            use ffb_model::model::property::named_properties::NamedProperties as NP;
+            for (property, choice) in [
+                (NP::PROVIDES_STAB_BLOCK_ALTERNATIVE, PlayerActionChoice::Stab),
+                (NP::PROVIDES_CHAINSAW_BLOCK_ALTERNATIVE, PlayerActionChoice::Chainsaw),
+                (NP::CAN_PERFORM_ARMOUR_ROLL_INSTEAD_OF_BLOCK_THAT_MIGHT_FAIL,
+                    PlayerActionChoice::ProjectileVomit),
+                (NP::CAN_PERFORM_ARMOUR_ROLL_INSTEAD_OF_BLOCK_THAT_MIGHT_FAIL_WITH_TURNOVER,
+                    PlayerActionChoice::BreatheFire),
+            ] {
+                if player.has_unused_skill_with_property(property) {
+                    actions.push(Action::ActivatePlayer {
+                        player_id: pid.clone(),
+                        player_action: choice,
+                        block_defender_id: None,
+                    });
+                }
+            }
+        }
+
         // Treacherous (bb2020+ star special): the client's isTreacherousAvailable rule —
         // unused canStabTeamMateForBall skill + an adjacent BLOCKABLE teammate carrying the
         // ball (bb2025 SelectLogicModule.isTreacherousAvailable: UtilCards.hasUnusedSkill…
@@ -833,6 +869,10 @@ pub fn eligible_players_for_activation(game: &Game) -> Vec<(PlayerId, Vec<ffb_mo
             PAC::ThrowBomb => PA::ThrowBomb,
             PAC::HailMaryPass => PA::HailMaryPass,
             PAC::MultipleBlock => PA::MultipleBlock,
+            PAC::Stab => PA::Stab,
+            PAC::Chainsaw => PA::Chainsaw,
+            PAC::ProjectileVomit => PA::ProjectileVomit,
+            PAC::BreatheFire => PA::BreatheFire,
             PAC::RaidingParty => PA::RaidingParty,
             PAC::LookIntoMyEyes => PA::LookIntoMyEyes,
             PAC::BalefulHex => PA::BalefulHex,
@@ -1730,6 +1770,39 @@ mod tests {
         }
         let a2 = legal_activate_player_actions(&game, TeamSide::Home);
         assert!(!has_action(&a2, "p1", PlayerActionChoice::Treacherous));
+    }
+
+    /// §K: bb2025 declares Stab/Chainsaw/Projectile Vomit/Breathe Fire as ACTIONS
+    /// (SelectLogicModule.actionContext): an unused skill + STANDING + an adjacent blockable
+    /// opponent, offered in the client's order right after Block/Blitz. bb2020 chooses the block
+    /// kind at the block instead, so nothing is offered there; a used skill withdraws its entry.
+    #[test]
+    fn bb2025_special_blocks_offered_in_client_order() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING,
+            vec![SkillId::BreatheFire, SkillId::Stab, SkillId::ProjectileVomit, SkillId::Chainsaw]);
+        // no adjacent opponent → nothing special
+        let a0 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a0, "p1", PlayerActionChoice::Stab));
+        add_player(&mut game, false, "opp", c(6, 5), PS_STANDING, vec![]);
+        let a1 = legal_activate_player_actions(&game, TeamSide::Home);
+        let order: Vec<PlayerActionChoice> = a1.iter().filter_map(|a| match a {
+            Action::ActivatePlayer { player_id, player_action, .. } if player_id == "p1" => Some(*player_action),
+            _ => None,
+        }).collect();
+        assert_eq!(order, vec![
+            PlayerActionChoice::Move, PlayerActionChoice::Block, PlayerActionChoice::Blitz,
+            PlayerActionChoice::Stab, PlayerActionChoice::Chainsaw,
+            PlayerActionChoice::ProjectileVomit, PlayerActionChoice::BreatheFire,
+        ]);
+        game.team_home.players.iter_mut().find(|p| p.id == "p1").unwrap()
+            .used_skills.insert(SkillId::ProjectileVomit);
+        let a2 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a2, "p1", PlayerActionChoice::ProjectileVomit));
+        assert!(has_action(&a2, "p1", PlayerActionChoice::Stab));
+        game.rules = Rules::Bb2020;
+        let a3 = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&a3, "p1", PlayerActionChoice::Stab));
     }
 
     /// §11: Look Into My Eyes is offered under the CLIENT's rule

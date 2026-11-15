@@ -2173,6 +2173,12 @@ public class ParityRunner {
                 sendMoveAction(game, gameState, pid);
                 break;
             case BLOCK:
+            // bb2025 declared block alternatives: the same block command, with the flag the
+            // declared action names (sendBlockAction -> blockCommand). BACKLOG §K.
+            case STAB:
+            case CHAINSAW:
+            case PROJECTILE_VOMIT:
+            case BREATHE_FIRE:
                 sendBlockAction(game, gameState, pid);
                 break;
             case BLITZ:
@@ -2391,8 +2397,7 @@ public class ParityRunner {
         // both ignore that choice and spend an actionRng draw the Rust side does not spend. This
         // is what step 8 of seed 1 was: the same declaration on both sides, a different defender.
         if (activation != null && heuristicTarget != null) {
-            MatchRunner.inject(gameState, new ClientCommandBlock(playerId, heuristicTarget,
-                false, false, false, false, false));
+            MatchRunner.inject(gameState, blockCommand(game, playerId, heuristicTarget));
             return;
         }
         Player<?> target = pickBlockTarget(game, playerId);
@@ -2400,8 +2405,21 @@ public class ParityRunner {
             MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));
             return;
         }
-        MatchRunner.inject(gameState,
-            new ClientCommandBlock(playerId, target.getId(), false, false, false, false, false));
+        MatchRunner.inject(gameState, blockCommand(game, playerId, target.getId()));
+    }
+
+    /**
+     * The CLIENT_BLOCK the real client sends: bb2025 BlockLogicModule.block sets the flag that the
+     * DECLARED acting action names (STAB / CHAINSAW / PROJECTILE_VOMIT / BREATHE_FIRE / CHOMP).
+     * A plain BLOCK declares none of them, so this is the old all-false command for it. Rust folds
+     * the same flags in StepInitSelecting from the acting action (BACKLOG §K).
+     */
+    private static ClientCommandBlock blockCommand(Game game, String playerId, String defenderId) {
+        PlayerAction action = game.getActingPlayer().getPlayerAction();
+        return new ClientCommandBlock(playerId, defenderId,
+            action == PlayerAction.STAB, action == PlayerAction.CHAINSAW,
+            action == PlayerAction.PROJECTILE_VOMIT, action == PlayerAction.BREATHE_FIRE,
+            action == PlayerAction.CHOMP);
     }
 
     /**
@@ -3889,6 +3907,32 @@ public class ParityRunner {
                     actions.add(PlayerAction.MULTIPLE_BLOCK);
                 }
 
+                // bb2025 declared block alternatives: the client's SelectLogicModule.actionContext
+                // rule -- isSpecialBlockActionAvailable (no preventRegularBlockAction, block allowed
+                // in this turn mode, not PRONE, an adjacent blockable opponent) AND
+                // canDeclareSkillAction(property, state) (an unused skill with the property whose
+                // declare condition -- STANDING for all four bb2025 skills -- holds). Client order
+                // STAB, CHAINSAW, PROJECTILE_VOMIT, BREATHE_FIRE, after MULTIPLE_BLOCK; Rust
+                // legal_activate_player_actions inserts them at the same slot (BACKLOG §K).
+                if (isBb2025(game)
+                        && !p.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.preventRegularBlockAction)
+                        && game.getTurnMode() != TurnMode.BLITZ
+                        && ps.getBase() == PlayerState.STANDING
+                        && com.fumbbl.ffb.util.UtilPlayer.findAdjacentBlockablePlayers(game, opponent, coord).length > 0) {
+                    if (p.canDeclareSkillAction(com.fumbbl.ffb.model.property.NamedProperties.providesStabBlockAlternative, ps)) {
+                        actions.add(PlayerAction.STAB);
+                    }
+                    if (p.canDeclareSkillAction(com.fumbbl.ffb.model.property.NamedProperties.providesChainsawBlockAlternative, ps)) {
+                        actions.add(PlayerAction.CHAINSAW);
+                    }
+                    if (p.canDeclareSkillAction(com.fumbbl.ffb.model.property.NamedProperties.canPerformArmourRollInsteadOfBlockThatMightFail, ps)) {
+                        actions.add(PlayerAction.PROJECTILE_VOMIT);
+                    }
+                    if (p.canDeclareSkillAction(com.fumbbl.ffb.model.property.NamedProperties.canPerformArmourRollInsteadOfBlockThatMightFailWithTurnover, ps)) {
+                        actions.add(PlayerAction.BREATHE_FIRE);
+                    }
+                }
+
                 // Treacherous (bb2020+ star special): the client's isTreacherousAvailable rule —
                 // unused canStabTeamMateForBall skill + an adjacent BLOCKABLE teammate carrying
                 // the ball (bb2025 SelectLogicModule). Declared as the client's command pair:
@@ -4324,6 +4368,10 @@ public class ParityRunner {
             case MOVE:
             case STAND_UP:
             case BLOCK:
+            case STAB:
+            case CHAINSAW:
+            case PROJECTILE_VOMIT:
+            case BREATHE_FIRE:
             case BLITZ:
             case BLITZ_MOVE:
             case BLITZ_SELECT:

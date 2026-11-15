@@ -221,6 +221,9 @@ pub enum PlayerActionChoice {
     Blitz,
     Block,
     Stab,
+    /// Chainsaw (bb2025): a declared block alternative, like `Stab` — Java
+    /// `SelectLogicModule` sends ActingPlayer(CHAINSAW), then a CLIENT_BLOCK with usingChainsaw.
+    Chainsaw,
     Foul,
     Pass,
     HandOff,

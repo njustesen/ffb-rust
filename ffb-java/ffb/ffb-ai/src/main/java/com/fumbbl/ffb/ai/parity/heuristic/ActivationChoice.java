@@ -344,6 +344,12 @@ public final class ActivationChoice {
                         }
                         break;
                     case "Block":
+                    // bb2025 declared block alternatives score exactly like a block on the same
+                    // targets (Rust build_plans shares the arm). BACKLOG §K.
+                    case "STAB":
+                    case "CHAINSAW":
+                    case "PROJECTILE_VOMIT":
+                    case "BREATHE_FIRE":
                         PlanBuilder.blockCandidates(f, m, e.id, pac, board.blockTargets(e.id),
                             wPlayer, coverage.floor(pac), coverage.novelty(bucket), out);
                         break;

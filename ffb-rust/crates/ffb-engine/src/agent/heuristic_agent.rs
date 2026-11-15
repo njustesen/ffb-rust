@@ -3498,7 +3498,13 @@ impl HeuristicAgent {
                         ),
                     }
                 }
-                PlayerActionChoice::Block => {
+                // The bb2025 declared block alternatives score exactly like a block on the same
+                // targets (Java ActivationChoice: `case "Stab": ... case "Block":` share the arm).
+                PlayerActionChoice::Block
+                | PlayerActionChoice::Stab
+                | PlayerActionChoice::Chainsaw
+                | PlayerActionChoice::ProjectileVomit
+                | PlayerActionChoice::BreatheFire => {
                     // Java's board for the heuristic is `ActivationDriver.foes(..., adjacentOnly)`,
                     // which keeps an opponent only while `os.hasTacklezones()` --
                     // `(STANDING || MOVING || BLOCKED) && !confused && !hypnotized`.

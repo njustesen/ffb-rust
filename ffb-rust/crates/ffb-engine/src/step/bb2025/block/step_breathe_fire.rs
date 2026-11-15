@@ -119,9 +119,10 @@ impl StepBreatheFire {
         if let Some(skill_id) = game.player(&attacker_id)
             .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_PERFORM_ARMOUR_ROLL_INSTEAD_OF_BLOCK_THAT_MIGHT_FAIL_WITH_TURNOVER))
         {
-            if let Some(p) = game.team_home.player_mut(&attacker_id).or_else(|| game.team_away.player_mut(&attacker_id)) {
-                p.used_skills.insert(skill_id);
-            }
+            // ActingPlayer.markSkillUsed: the activation's set, and the player's only for a skill
+            // tracked outside the activation -- Breathe Fire is REGULAR, so the player may declare it
+            // again on his next activation (chaos_dwarf bb2025 seed 1: Rust hid the offer, §K).
+            crate::step::util_server_steps::mark_skill_used(game, &attacker_id, skill_id);
         }
 
         // Java: if (BREATHE_FIRE == reRolledAction) { if (source != null && useReRoll) result = null }

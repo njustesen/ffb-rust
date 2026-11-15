@@ -39,8 +39,9 @@ fn causes_turn_over_chainsaw(player_has_ball: bool, chainsaw_option: &str, armor
 /// - Failed roll or re-roll unavailable → chainsaw backfires on attacker → publish
 ///   `STEADY_FOOTING_CONTEXT(DropPlayerContext{attacker})` → NEXT_STEP.
 ///
-/// Game option `CHAINSAW_TURNOVER` is not yet ported; behaviour is `all_av_breaks` (if armor
-/// broken → causesTurnOver = true). `KICKBACK` and `NEVER` variants are stubs.
+/// Game option `CHAINSAW_TURNOVER` defaults to `kickback` (`GameOptionFactory:321`
+/// `setDefault(CHAINSAW_TURNOVER_KICKBACK)`): a successful chainsaw whose armour break would
+/// only end the turn under `allAvBreaks` does NOT (goblin bb2025 seed 10, §K).
 pub struct StepBlockChainsaw {
     pub goto_label_on_success: String,
     pub goto_label_on_failure: String,
@@ -109,9 +110,8 @@ impl StepBlockChainsaw {
             let sid = game.player(&attacker_id).and_then(|p| UtilCards::get_unused_skill_with_property(
                 p, NamedProperties::BLOCKS_LIKE_CHAINSAW));
             if let Some(sid) = sid {
-                let is_home = game.team_home.player(&attacker_id).is_some();
-                if is_home { game.team_home.player_mut(&attacker_id).map(|p| p.used_skills.insert(sid)); }
-                else { game.team_away.player_mut(&attacker_id).map(|p| p.used_skills.insert(sid)); }
+                // ActingPlayer.markSkillUsed (activation set; player set only if tracked).
+                crate::step::util_server_steps::mark_skill_used(game, &attacker_id, sid);
             }
         }
 
@@ -120,9 +120,8 @@ impl StepBlockChainsaw {
             let sid = game.player(&attacker_id).and_then(|p| UtilCards::get_unused_skill_with_property(
                 p, NamedProperties::CAN_PERFORM_SECOND_CHAINSAW_ATTACK));
             if let Some(sid) = sid {
-                let is_home = game.team_home.player(&attacker_id).is_some();
-                if is_home { game.team_home.player_mut(&attacker_id).map(|p| p.used_skills.insert(sid)); }
-                else { game.team_away.player_mut(&attacker_id).map(|p| p.used_skills.insert(sid)); }
+                // ActingPlayer.markSkillUsed (activation set; player set only if tracked).
+                crate::step::util_server_steps::mark_skill_used(game, &attacker_id, sid);
                 // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skillWithProperty.get(), true, SkillUse.PERFORM_SECOND_CHAINSAW_ATTACK))
                 use ffb_model::model::skill_use::SkillUse;
                 use ffb_model::report::report_skill_use::ReportSkillUse;
@@ -165,7 +164,7 @@ impl StepBlockChainsaw {
                 minimum_roll,
                 re_rolled,
                 vec![],
-                game.defender_id.clone(),
+                None, // Java: `new ReportChainsawRoll(..., reRolled, null)` -- no defender
             ));
         }
 
@@ -192,8 +191,10 @@ impl StepBlockChainsaw {
             );
 
             let armor_broken = injury_result_defender.injury_context().is_armor_broken();
-            let chainsaw_option = game.options.get(game_option_id::CHAINSAW_TURNOVER).unwrap_or(CHAINSAW_TURNOVER_ALL_AV_BREAKS);
-            let causes_turn_over = chainsaw_option.eq_ignore_ascii_case(CHAINSAW_TURNOVER_ALL_AV_BREAKS) && armor_broken;
+            let chainsaw_option = game.options.get(game_option_id::CHAINSAW_TURNOVER).unwrap_or(CHAINSAW_TURNOVER_KICKBACK);
+            // Java: `CHAINSAW_TURNOVER_ALL_AV_BREAKS.equalsIgnoreCase(chainsawOption)` -- no armour
+            // term (the bb2020 twin dropped the same invented `&& armor_broken`).
+            let causes_turn_over = chainsaw_option.eq_ignore_ascii_case(CHAINSAW_TURNOVER_ALL_AV_BREAKS);
 
             let dpc = DropPlayerContext {
                 injury_result: Some(Box::new(injury_result_defender)),
@@ -242,7 +243,7 @@ impl StepBlockChainsaw {
             attacker_coord, None, None, ApothecaryMode::Attacker,
         );
 
-        let chainsaw_option = game.options.get(game_option_id::CHAINSAW_TURNOVER).unwrap_or(CHAINSAW_TURNOVER_ALL_AV_BREAKS);
+        let chainsaw_option = game.options.get(game_option_id::CHAINSAW_TURNOVER).unwrap_or(CHAINSAW_TURNOVER_KICKBACK);
         let armor_broken = injury_result_attacker.injury_context().is_armor_broken();
         let causes_turn_over = causes_turn_over_chainsaw(player_has_ball, chainsaw_option, armor_broken);
 

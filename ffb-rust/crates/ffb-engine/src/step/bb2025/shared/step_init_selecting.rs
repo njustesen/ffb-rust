@@ -415,14 +415,23 @@ impl Step for StepInitSelecting {
                     game.defender_id = None;
                 }
                 // Block/Blitz variants: go directly to label (forceGotoOnDispatch)
-                self.force_goto_on_dispatch = matches!(
+                let special_block = matches!(
+                    player_action,
+                    PlayerActionChoice::Stab | PlayerActionChoice::Chainsaw
+                    | PlayerActionChoice::ProjectileVomit | PlayerActionChoice::BreatheFire
+                );
+                self.force_goto_on_dispatch = special_block || matches!(
                     player_action,
                     PlayerActionChoice::Block | PlayerActionChoice::Blitz
                 );
                 // Java dispatch reads actingPlayer.getPlayerAction() (the DELEGATE) unless
                 // forceDispatch set the raw action; ALL_YOU_CAN_EAT therefore dispatches as
                 // THROW_BOMB (EndSelecting has no ALL_YOU_CAN_EAT case in Java either).
-                self.dispatch_player_action = Some(pa.delegate().unwrap_or(pa));
+                // A declared block alternative (STAB/CHAINSAW/PROJECTILE_VOMIT/BREATHE_FIRE) keeps
+                // that acting action, and its CLIENT_BLOCK — which Rust folds into this command —
+                // dispatches BLOCK (`StepInitSelecting:229-243`, no target selection state).
+                self.dispatch_player_action =
+                    if special_block { Some(PlayerAction::Block) } else { Some(pa.delegate().unwrap_or(pa)) };
                 // A prone Blitz/Block declared with NO target: Java resolves the target BEFORE the
                 // stand-up (Blitz via SelectBlitzTarget; a plain Block reaches StepInitBlocking's
                 // no-defender branch), so a null-target block/blitz ends the turn with the player still
@@ -851,6 +860,21 @@ impl StepInitSelecting {
                     match dispatch {
                         PlayerAction::Block | PlayerAction::Blitz => {
                             target_params.push(StepParameter::BlockDefenderId(def));
+                            // CLIENT_BLOCK's flags (`StepInitSelecting:233-237`). The client sets
+                            // the one its declared acting action names (bb2025
+                            // `BlockLogicModule.block`), so a declared STAB/CHAINSAW/VOMIT/FIRE
+                            // block carries it into the Block sequence.
+                            match game.acting_player.player_action {
+                                Some(PlayerAction::Stab) =>
+                                    target_params.push(StepParameter::UsingStab(true)),
+                                Some(PlayerAction::Chainsaw) =>
+                                    target_params.push(StepParameter::UsingChainsaw(true)),
+                                Some(PlayerAction::ProjectileVomit) =>
+                                    target_params.push(StepParameter::UsingVomit(true)),
+                                Some(PlayerAction::BreatheFire) =>
+                                    target_params.push(StepParameter::UsingBreatheFire(true)),
+                                _ => {}
+                            }
                         }
                         PlayerAction::Foul => {
                             target_params.push(StepParameter::FoulDefenderId(def));
@@ -966,6 +990,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::Blitz => PlayerAction::Blitz,
         PlayerActionChoice::Block => PlayerAction::Block,
         PlayerActionChoice::Stab => PlayerAction::Stab,
+        PlayerActionChoice::Chainsaw => PlayerAction::Chainsaw,
         PlayerActionChoice::Foul => PlayerAction::Foul,
         PlayerActionChoice::Pass => PlayerAction::Pass,
         PlayerActionChoice::HandOff => PlayerAction::HandOver,

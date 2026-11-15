@@ -131,9 +131,10 @@ impl StepBreatheFire {
         if let Some(skill_id) = game.player(&attacker_id)
             .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_PERFORM_ARMOUR_ROLL_INSTEAD_OF_BLOCK_THAT_MIGHT_FAIL_WITH_TURNOVER))
         {
-            if let Some(p) = game.team_home.player_mut(&attacker_id).or_else(|| game.team_away.player_mut(&attacker_id)) {
-                p.used_skills.insert(skill_id);
-            }
+            // ActingPlayer.markSkillUsed: the activation's set, and the player's only for a skill
+            // tracked outside the activation -- Breathe Fire is REGULAR, so the player may declare it
+            // again on his next activation (chaos_dwarf bb2025 seed 1: Rust hid the offer, §K).
+            crate::step::util_server_steps::mark_skill_used(game, &attacker_id, skill_id);
         }
 
         // Java: if (ReRolledActions.BREATHE_FIRE == getReRolledAction()) {
@@ -423,10 +424,15 @@ mod tests {
         step.result = Some(BreatheFireResult::NO_EFFECT);
         step.goto_on_end = "end".into();
         step.start(&mut game, &mut GameRng::new(0));
-        let used = game.team_home.player("att")
+        // Java `ActingPlayer.markSkillUsed`: the ACTIVATION's set; Breathe Fire is REGULAR (not
+        // tracked outside the activation), so the player's own set stays clean and he may declare
+        // it again next activation (§K, chaos_dwarf bb2025 seed 1).
+        assert!(game.acting_player.used_skills.contains(&breathe_fire_skill),
+            "Breathe Fire is marked on the acting player");
+        let on_player = game.team_home.player("att")
             .map(|p| p.used_skills.contains(&breathe_fire_skill))
             .unwrap_or(false);
-        assert!(used, "BreatheFireSkill should be in used_skills after executing");
+        assert!(!on_player, "a REGULAR skill is not marked on the player");
     }
 
     #[test]

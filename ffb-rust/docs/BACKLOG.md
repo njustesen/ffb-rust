@@ -9506,3 +9506,43 @@ needed (JAVA_DEFECTS.md unchanged). What the number does not cover: mechanics th
 reach (coverage gaps §A/§E — Stab, Jump Up, Projectile Vomit, Hypnotic Gaze, ...), whose report
 fidelity is only as good as their unit tests.
 
+## §K — 2026-11-15: COVERAGE REACH — switch on the mechanics the agents never use (in progress)
+
+Goal (user-selected 2026-11-15, after §J closed and was pushed `d9648efc9`): the 100% step +
+report parity of §J only covers what the two heuristic agents reach. The FINAL5 coverage report
+(`docs/coverage_gaps_2026-11-13e.txt`) shows 43 of 57 PlayerActions never declared, 10 drafted skills
+with telemetry never fired, 40 GameEvents and 68 ReportIds never produced. Wire each dead mechanic
+into BOTH agents identically (Rust `legal_actions` + `heuristic_agent`/`random_agent`, Java
+`ParityRunner` + `parity/heuristic`; harness only, never the Java engine), gate, fix every Rust
+divergence 1:1, then re-certify mirror + cross.
+
+**Why each is dead (agent-side gates, both engines alike):** G1 never offered by the eligibility
+list; G2 offered but not in the handled-action list (declared, then deselected); G3 every
+CLIENT_BLOCK is sent with all five block-kind flags false; G4 PlayerChoice prompts (Shadowing,
+Tentacles, Pick-me-up, Diving Tackle) answered with an empty selection; G5 no drafted squad fields
+the skill (Multiple Block, Kick 'em, Putrid Regurgitation, Chomp — stars only).
+
+**Queue:**
+1. **bb2025 declared block alternatives** (G1+G2+G3): STAB / CHAINSAW / PROJECTILE_VOMIT /
+   BREATHE_FIRE are declared ACTIONS in bb2025 (`SelectLogicModule.actionContext`), and the
+   following CLIENT_BLOCK carries the flag the acting action names (`BlockLogicModule.block`).
+   Offered after MULTIPLE_BLOCK in client order, handled, scored like a block, Rust folds the flag
+   in `StepInitSelecting`. **DONE 2026-11-15.** Gate: 8 bb2025 squads + 3 bb2020 x 10 seeds,
+   110/110 steps + reports (vomit 124, breathe fire 27, stab 19, chainsaw 2 declarations; the
+   first gate was 2-8/10 per squad). Four Rust bugs it exposed, all 1:1 with Java + tests:
+   (a) StepProjectileVomit dropped the victim without `requiresArmourBreak` (a failed vomit whose
+   self-armour held left Java's vomiter STANDING); (b) Breathe Fire / Chainsaw wrote the skill to
+   `Player.used_skills` instead of `ActingPlayer.markSkillUsed` (REGULAR skill => the player's own
+   set stays clean, so the next activation offers it again), and the vomit step never marked at all;
+   (c) `CHAINSAW_TURNOVER` defaulted to `allAvBreaks` -- Java's default is `kickback` -- and
+   `chainsawRoll` named the victim where Java passes null (bb2020 + bb2025; bb2025 also had an
+   invented `&& armor_broken` turnover term); (d) Stunty's `!isStab` injury-modifier gate is
+   bb2016-only, Rust applied it in every edition.
+2. bb2016/bb2020 block-time kinds (Stab/Chainsaw/Vomit chosen at CLIENT_BLOCK) — needs a shared
+   choose-kind rule.
+3. Jump Up: offer BLOCK to a prone Jump Up player with an adjacent blockable opponent (Java
+   `isBlockActionAvailable` allows PRONE + canStandUpForFree); StandUpBlitz alone does not roll it.
+4. Gaze (bb2016 handled-list gap, BACKLOG E17; bb2020/bb2025 offer).
+5. PlayerChoice accepts: Shadowing, Tentacles, Pick-me-up, Diving Tackle (known step gaps first).
+6. Pro re-roll source, Trickster, Fumblerooski.
+7. Data (G5): draft carriers of Multiple Block / Kick 'em / Putrid Regurgitation / Chomp.

@@ -170,8 +170,10 @@ fn skill_to_injury_modifier_untagged(
         // Value 0 by construction (see `find_registered_injury_modifiers`): the numeric effect of
         // Stunty lives in `interpret_injury_total_*` via IS_HURT_MORE_EASILY, so this cannot move
         // an injury total — it only names the skill in the report.
+        // `!isStab` is bb2016's gate only (`skill/bb2016/Stunty`); the mixed bb2020/bb2025
+        // Stunty names itself on a stab injury too (underworld bb2025 seed 3, §K).
         if skill_id == SkillId::Stunty
-            && !context.is_stab
+            && !(context.is_stab && context.game.rules == Rules::Bb2016)
             && !context.get_defender().has_skill_property(NamedProperties::PREVENT_DAMAGING_INJURY_MODIFICATIONS)
             && context.get_defender().has_skill_property(NamedProperties::IS_HURT_MORE_EASILY)
         {
@@ -269,7 +271,8 @@ pub fn find_registered_injury_modifiers(rules: Rules) -> Vec<Box<dyn InjuryModif
     // `interpret_injury_total_bb2016`/`_bb2020` via the `IS_HURT_MORE_EASILY` property, so this
     // registered modifier never changes a numeric total; it exists for `for_name()` lookup only.
     mods.push(Box::new(StaticInjuryModifier::new("Stunty", 0, false).with_predicate(|ctx| {
-        if ctx.is_stab() { return false; }
+        // bb2016 only: the mixed Stunty has no isStab gate.
+        if ctx.is_stab() && ctx.game.rules == Rules::Bb2016 { return false; }
         !ctx.get_defender().has_skill_property(NamedProperties::PREVENT_DAMAGING_INJURY_MODIFICATIONS)
             && ctx.get_defender().has_skill_property(NamedProperties::IS_HURT_MORE_EASILY)
     })));
@@ -409,6 +412,22 @@ mod tests {
         };
         let away = home.clone();
         Game::new(home, away, rules)
+    }
+
+    /// §K: only `skill/bb2016/Stunty` excludes stab injuries (`!context.isStab()`); the mixed
+    /// bb2020/bb2025 Stunty has no such gate, so a stabbed Stunty victim lists "Stunty"
+    /// (underworld bb2025 seed 3).
+    #[test]
+    fn stunty_names_itself_on_a_stab_except_in_bb2016() {
+        let stabber = bare_player("a");
+        let victim = player_with_skill("d", SkillId::Stunty);
+        for (rules, expected) in [(Rules::Bb2025, true), (Rules::Bb2020, true), (Rules::Bb2016, false)] {
+            let f = InjuryModifierFactory::new(rules);
+            let game = make_game(rules);
+            let mods = f.find_injury_modifiers_without_niggling(
+                &game, Some(&stabber), &victim, true, false, false, false);
+            assert_eq!(mods.iter().any(|m| m.get_name() == "Stunty"), expected, "{rules:?}");
+        }
     }
 
     /// Java's `VariableInjuryModifierAttacker.appliesToContext` is

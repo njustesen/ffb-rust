@@ -133,6 +133,13 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             | PlayerActionChoice::StandUp
             // BLOCK
             | PlayerActionChoice::Block
+            // STAB / CHAINSAW / PROJECTILE_VOMIT / BREATHE_FIRE (bb2025 declared block
+            // alternatives): ParityRunner routes them to sendBlockAction, whose CLIENT_BLOCK
+            // carries the flag the declared action names (bb2025 BlockLogicModule.block).
+            | PlayerActionChoice::Stab
+            | PlayerActionChoice::Chainsaw
+            | PlayerActionChoice::ProjectileVomit
+            | PlayerActionChoice::BreatheFire
             // BLITZ / BLITZ_MOVE / BLITZ_SELECT / STAND_UP_BLITZ
             | PlayerActionChoice::Blitz
             | PlayerActionChoice::StandUpBlitz
@@ -547,6 +554,10 @@ impl Agent for RandomAgent {
                     PlayerActionChoice::Blitz if gs.game.rules != ffb_model::enums::Rules::Bb2016 => None,
                     PlayerActionChoice::Blitz
                     | PlayerActionChoice::Block
+                    | PlayerActionChoice::Stab
+                    | PlayerActionChoice::Chainsaw
+                    | PlayerActionChoice::ProjectileVomit
+                    | PlayerActionChoice::BreatheFire
                     | PlayerActionChoice::StandUpBlitz => {
                         let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
                         let targets = legal_block_targets(&gs.game, player_id, side);
@@ -1603,7 +1614,8 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         PlayerAction::BreatheFire => PlayerActionChoice::BreatheFire,
         PlayerAction::ProjectileVomit | PlayerAction::PutridRegurgitationMove
         | PlayerAction::PutridRegurgitationBlitz | PlayerAction::PutridRegurgitationBlock => PlayerActionChoice::ProjectileVomit,
-        PlayerAction::Chainsaw | PlayerAction::Stab => PlayerActionChoice::Stab,
+        PlayerAction::Stab => PlayerActionChoice::Stab,
+        PlayerAction::Chainsaw => PlayerActionChoice::Chainsaw,
         // Skills that modify existing actions — treat as the underlying action type
         PlayerAction::MultipleBlock | PlayerAction::KickEmBlock => PlayerActionChoice::Block,
         PlayerAction::KickEmBlitz => PlayerActionChoice::Blitz,
@@ -2262,15 +2274,17 @@ mod rng_trace_tests {
             // PUNT is forceDispatch and driven end-to-end since the dark_elf campaign
             // (ParityRunner isHandledActingAction gained PUNT/PUNT_MOVE).
             PlayerActionChoice::Punt,
+            // §K: the bb2025 declared block alternatives ride sendBlockAction.
+            PlayerActionChoice::Stab,
+            PlayerActionChoice::Chainsaw,
+            PlayerActionChoice::BreatheFire,
+            PlayerActionChoice::ProjectileVomit,
         ] {
             assert!(is_handled_acting_action(pa), "{pa:?} has a sendConcreteAction arm");
         }
         for pa in [
-            PlayerActionChoice::Stab,
             PlayerActionChoice::HypnoticGaze,
             PlayerActionChoice::Swoop,
-            PlayerActionChoice::BreatheFire,
-            PlayerActionChoice::ProjectileVomit,
             PlayerActionChoice::SecureTheBall,
         ] {
             assert!(!is_handled_acting_action(pa),

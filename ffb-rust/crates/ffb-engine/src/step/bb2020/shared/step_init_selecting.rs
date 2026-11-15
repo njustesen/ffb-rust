@@ -181,6 +181,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::Blitz => PlayerAction::Blitz,
         PlayerActionChoice::Block => PlayerAction::Block,
         PlayerActionChoice::Stab => PlayerAction::Stab,
+        PlayerActionChoice::Chainsaw => PlayerAction::Chainsaw,
         PlayerActionChoice::Foul => PlayerAction::Foul,
         PlayerActionChoice::Pass => PlayerAction::Pass,
         PlayerActionChoice::HandOff => PlayerAction::HandOver,
