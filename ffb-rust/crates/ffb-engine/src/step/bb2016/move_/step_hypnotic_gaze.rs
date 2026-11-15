@@ -125,10 +125,11 @@ impl StepHypnoticGaze {
 
         if do_gaze {
             // Java: actingPlayer.markSkillUsed(gazeSkill)
-            if let Some(pid) = player_id.as_deref() {
-                if let Some(p) = game.team_home.player_mut(pid).or_else(|| game.team_away.player_mut(pid)) {
-                    p.used_skills.insert(SkillId::HypnoticGaze);
-                }
+            // ActingPlayer.markSkillUsed: the activation's set (and the player's only if the skill
+            // is tracked outside the activation) -- the gaze may be declared again next
+            // activation (vampire bb2025 seed 4, §K).
+            if let Some(pid) = player_id.clone() {
+                crate::step::util_server_steps::mark_skill_used(game, &pid, SkillId::HypnoticGaze);
             }
 
             let roll = rng.d6();
@@ -325,10 +326,8 @@ mod tests {
         let (mut game, mut step) = setup_gaze_game();
         game.turn_data_home.rerolls = 0;
         step.start(&mut game, &mut GameRng::new(0));
-        let used = game.team_home.player("a1")
-            .map(|p| p.used_skills.contains(&SkillId::HypnoticGaze))
-            .unwrap_or(false);
-        assert!(used);
+        // ActingPlayer.markSkillUsed: the activation's set (§K).
+        assert!(game.acting_player.used_skills.contains(&SkillId::HypnoticGaze));
     }
 
     #[test]

@@ -2183,6 +2183,7 @@ public class ParityRunner {
                 break;
             // bb2016 GAZE (BACKLOG §K / E17): the client's ActingPlayer(GAZE) + CLIENT_GAZE.
             case GAZE:
+            case GAZE_MOVE:
                 sendGazeAction(game, gameState, pid);
                 break;
             case BLITZ:
@@ -4003,6 +4004,19 @@ public class ParityRunner {
                     }
                 }
 
+                // bb2020/bb2025 GAZE (BACKLOG §K): the client's isHypnoticGazeActionAvailable(true,
+                // player, inflictsConfusion) -- both editions declare the gaze at the start, so canGaze
+                // is an unused inflictsConfusion skill on an active player, plus isGazeActionAllowed
+                // (not the kick-off Blitz turn). The client declares GAZE_MOVE. Same slot as Rust.
+                // bb2025 only for now: bb2020 routes GAZE_MOVE through SELECT_GAZE_TARGET, not driven yet.
+                if (isBb2025(game) && game.getTurnMode() != TurnMode.BLITZ && ps.isActive()) {
+                    com.fumbbl.ffb.model.skill.Skill gazeSkill =
+                        p.getSkillWithProperty(com.fumbbl.ffb.model.property.NamedProperties.inflictsConfusion);
+                    if (gazeSkill != null && !p.isUsed(gazeSkill)) {
+                        actions.add(PlayerAction.GAZE_MOVE);
+                    }
+                }
+
                 // Treacherous (bb2020+ star special): the client's isTreacherousAvailable rule —
                 // unused canStabTeamMateForBall skill + an adjacent BLOCKABLE teammate carrying
                 // the ball (bb2025 SelectLogicModule). Declared as the client's command pair:
@@ -4443,6 +4457,7 @@ public class ParityRunner {
             case PROJECTILE_VOMIT:
             case BREATHE_FIRE:
             case GAZE:
+            case GAZE_MOVE:
             case BLITZ:
             case BLITZ_MOVE:
             case BLITZ_SELECT:

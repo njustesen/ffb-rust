@@ -141,7 +141,12 @@ impl StepBloodLust {
                 // `StepInitMoving.executeStep`: `actingPlayer.setHasMoved(true)`); when it is
                 // already true the publish above has a real stack to throw away and nothing is
                 // owed. See `ActingPlayer::blood_lust_discards_move_stack`.
-                if !game.acting_player.has_moved {
+                // A GAZE's first command is CLIENT_GAZE, already folded into the activation, so
+                // the debt is settled and the next path is Java's real delivery (§K, vampire
+                // bb2025 seed 19: Rust discarded it and skipped the gaze Java made).
+                if !game.acting_player.has_moved
+                    && game.acting_player.player_action != Some(PlayerAction::Gaze)
+                {
                     game.acting_player.blood_lust_discards_move_stack = true;
                 }
             }
@@ -292,7 +297,10 @@ impl StepBloodLust {
         // so the discard is owed to the first path that arrives — see
         // `ActingPlayer::blood_lust_discards_move_stack`. bb2020 seed 7 i=29/i=30 is the pair that
         // separates the two: the same failure with `has_moved` true already had a real stack.
-        if !game.acting_player.has_moved {
+        // Not for a GAZE: its first command (CLIENT_GAZE) is already folded in -- see above.
+        if !game.acting_player.has_moved
+            && game.acting_player.player_action != Some(PlayerAction::Gaze)
+        {
             game.acting_player.blood_lust_discards_move_stack = true;
         }
         let out = base.publish(StepParameter::MoveStack(vec![]));
@@ -406,6 +414,20 @@ mod tests {
         game.acting_player.player_action = action;
         game.turn_mode = TurnMode::Regular;
         game
+    }
+
+    /// §K: a failed Blood Lust owes the deferred move-stack discard to the activation's first
+    /// client command. For a GAZE that command is CLIENT_GAZE, already folded into the
+    /// declaration, so nothing is owed and the next path is a real delivery (vampire bb2025 seed
+    /// 19). A plain MOVE still owes it.
+    #[test]
+    fn failed_blood_lust_owes_no_discard_for_a_gaze() {
+        for (action, owed) in [(PlayerAction::Gaze, false), (PlayerAction::Move, true)] {
+            let mut game = make_game(vec![SkillId::BloodLust], Some(action));
+            let mut step = StepBloodLust::new("END");
+            let _ = step.fail_blood_lust(&mut game);
+            assert_eq!(game.acting_player.blood_lust_discards_move_stack, owed, "{action:?}");
+        }
     }
 
     fn seed_for_d6(target: i32) -> u64 {

@@ -838,6 +838,14 @@ impl Agent for RandomAgent {
                 if gs.game.turn_mode == ffb_model::enums::TurnMode::PassBlock {
                     return Action::EndPlayerAction;
                 }
+                // A GAZE activation's phase-2 command was the CLIENT_GAZE (folded into the
+                // declaration), so a Move prompt here -- e.g. the fresh Move sequence after a failed
+                // Blood Lust -- is ParityRunner's INIT_MOVING, which the random contract answers by
+                // deselecting (§K, vampire bb2025 random seeds 2/3/6/7).
+                if gs.game.acting_player.player_action == Some(PlayerAction::Gaze) {
+                    self.moved_this_activation = true;
+                    return Action::EndPlayerAction;
+                }
                 // Blitz: with the two-phase declaration the target was chosen at
                 // SELECT_BLITZ_TARGET (which spent the actionRng pick) and the acting action is
                 // now BLITZ_MOVE, so this Move prompt is where the BLOCK is issued — exactly what

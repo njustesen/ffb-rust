@@ -404,6 +404,19 @@ impl Step for StepInitSelecting {
                 if let Some(declaration) = fired_declaration {
                     util_server_steps::change_player_action(game, player_id, declaration, false);
                 }
+                // bb2020/bb2025 GAZE (§K): the client declares GAZE_MOVE
+                // (`SelectLogicModule: case GAZE -> sendActingPlayer(GAZE_MOVE)`), then CLIENT_GAZE,
+                // whose `StepInitSelecting:247` arm changes the action to GAZE and dispatches it with
+                // GAZE_VICTIM_ID. Rust folds the victim into this command; with no canBeGazed victim
+                // ParityRunner.sendGazeAction deselects right after the GAZE_MOVE declaration.
+                if pa == PlayerAction::Gaze {
+                    util_server_steps::change_player_action(game, player_id, PlayerAction::GazeMove, false);
+                    if block_defender_id.is_none() {
+                        game.defender_id = None;
+                        self.end_player_action = true;
+                        return self.execute_step(game, rng);
+                    }
+                }
                 util_server_steps::change_player_action(game, player_id, pa, false);
                 if let Some(def_id) = block_defender_id {
                     game.defender_id = Some(def_id.clone());
@@ -887,6 +900,10 @@ impl StepInitSelecting {
                         }
                         PlayerAction::Foul => {
                             target_params.push(StepParameter::FoulDefenderId(def));
+                        }
+                        // CLIENT_GAZE's GAZE_VICTIM_ID (§K bb2020/bb2025 gaze).
+                        PlayerAction::Gaze => {
+                            target_params.push(StepParameter::GazeVictimId(Some(def)));
                         }
                         // A bomb travels the same route as a pass: it dispatches into the Pass
                         // sequence and `StepInitPassing` takes its target from TARGET_COORDINATE

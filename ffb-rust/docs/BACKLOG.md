@@ -9558,7 +9558,22 @@ the skill (Multiple Block, Kick 'em, Putrid Regurgitation, Chomp — stars only)
    GAZE stalled the bb2016 select step (no deselect), and `hypnoticGazeRoll` sent no modifiers
    ("1 Tacklezone"). Noted, pre-existing and mirrored: vampire bb2016 Java logs
    `UNHANDLED_STEP: INIT_BLOCKING turnMode=REGULAR` (58x in FINAL5) -- a harness gap both engines
-   resolve identically. *bb2020/bb2025 gaze (a mid-move GAZE_MOVE flow) still open.*
+   resolve identically.
+   **bb2025 DONE 2026-11-15:** offered under the client's isHypnoticGazeActionAvailable (unused
+   inflictsConfusion skill, active, not the kick-off Blitz turn), declared GAZE_MOVE, then
+   CLIENT_GAZE with the same victim rule (Rust folds it: GAZE_MOVE declaration replayed, GAZE
+   dispatched with GAZE_VICTIM_ID; no victim deselects). Gate vampire bb2025 x3 scales: 40/40
+   steps + reports, 90 gaze rolls; bb2020/bb2016 regression green. Three Rust bugs: the gaze steps
+   marked HypnoticGaze on the PLAYER instead of `ActingPlayer.markSkillUsed` (a vampire could gaze
+   once per game); a failed Blood Lust owed the deferred move-stack discard even for a GAZE, whose
+   first command (CLIENT_GAZE) had already settled it, so Rust threw away the real path and skipped
+   the gaze Java made; the random agent answered the post-Blood-Lust Move prompt of a GAZE instead
+   of deselecting like ParityRunner's INIT_MOVING. Noted, random-agent only and pre-existing: Java's
+   random contract declares FOUL where Rust replays the heuristic's FOUL_MOVE (playerAction payload;
+   steps match).
+   *bb2020 gaze still open:* bb2020 dispatches GAZE_MOVE into SELECT_GAZE_TARGET (target first,
+   activation, then the move sends the gaze) -- neither harness drives that dialog yet; the offer is
+   gated to bb2025 on both sides until it does.
 5. PlayerChoice accepts: Shadowing, Tentacles, Pick-me-up, Diving Tackle (known step gaps first).
 6. Pro re-roll source, Trickster, Fumblerooski.
 7. Data (G5): draft carriers of Multiple Block / Kick 'em / Putrid Regurgitation / Chomp.

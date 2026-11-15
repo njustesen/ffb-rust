@@ -397,6 +397,27 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             }
         }
 
+        // bb2020/bb2025 GAZE (§K): the client's `isHypnoticGazeActionAvailable(true, player,
+        // inflictsConfusion)` -- both editions declare the gaze at the start
+        // (`declareGazeActionAtStart`), so `canGaze` reduces to an unused inflictsConfusion skill on
+        // an active player, plus `isGazeActionAllowed` (not the kick-off Blitz turn; bb2025 also not
+        // PRONE, which a standing player never is). Declared as GAZE_MOVE; offered after the block
+        // alternatives, ParityRunner.computeEligiblePlayers inserts it at the same slot.
+        // bb2025 only for now: bb2020 dispatches GAZE_MOVE into the SELECT_GAZE_TARGET family
+        // (target chosen first, gaze sent from the move), which neither agent drives yet (§K).
+        if game.rules == Rules::Bb2025
+            && game.turn_mode != ffb_model::enums::TurnMode::Blitz
+            && state.is_active()
+            && player.has_unused_skill_with_property(
+                ffb_model::model::property::named_properties::NamedProperties::INFLICTS_CONFUSION)
+        {
+            actions.push(Action::ActivatePlayer {
+                player_id: pid.clone(),
+                player_action: PlayerActionChoice::HypnoticGaze,
+                block_defender_id: None,
+            });
+        }
+
         // Treacherous (bb2020+ star special): the client's isTreacherousAvailable rule —
         // unused canStabTeamMateForBall skill + an adjacent BLOCKABLE teammate carrying the
         // ball (bb2025 SelectLogicModule.isTreacherousAvailable: UtilCards.hasUnusedSkill…
