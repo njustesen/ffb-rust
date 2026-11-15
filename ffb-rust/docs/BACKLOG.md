@@ -9427,7 +9427,7 @@ The step-0 hazards of §I.9 (option-default change, kickoff push) produced no re
 work on top of this build is §J; the 859/362 report-count gap §I.9 flagged was the bb2016
 WINNINGS_RE_ROLL harness gap, fixed in §J.
 
-## §J — 2026-11-12: REPORT-STREAM PARITY (in progress)
+## §J — 2026-11-12 → 15: 🏁 REPORT-STREAM PARITY — 33,000/33,000 mirror + 12,036/12,036 cross, one build
 
 Goal (user-selected 2026-11-12): on top of 100% step parity, drive the per-game **report streams**
 to identical — every `addReport` Java makes, Rust makes too, with the same payload. Stock Java is
@@ -9460,15 +9460,49 @@ census (`modifiedDodgeResultSuccessful`, `prayerWasted`) are closed.
 
 **Measured on the current build (discovery mirrors, 2-seed batches):** bb2020 40/40 and bb2025
 40/41 identical on an all-roster seed-5 batch (the one red was the Hail Mary family, since fixed);
-earlier batches 51/62, 65/72, 53/78 with every bb2016 residue being the family below.
+earlier batches 51/62, 65/72, 53/78 with every bb2016 residue being the WINNINGS_RE_ROLL family.
 
-**Open:**
-1. **bb2016 WINNINGS_RE_ROLL** — ParityRunner never answered the dialog, so Java re-rolls winnings
-   ~500 times (the 859-vs-360 "report-count gaps" are all this). Harness fix written
-   (`ParityRunner` `case WINNINGS_RE_ROLL` → decline as the dialog's team); needs the jar rebuilt,
-   which waits for cross sweep 5. Rust's StepWinnings already behaves like a decline.
-2. **Stab armour port** — `InjuryTypeStab` lacks Sneaky Git and the Iron Hard Skin name (rare pair).
-3. bb2020/bb2025 pregame purchase reports appear only in CROSS games (equal-TV mirrors skip the
-   phase); census check moves to the cross-sweep output.
-4. Final certification: mirror + cross on one build with the identical-report count recorded.
+**Closing families (4 commits, 2026-11-13):**
+- `82787408d` — the 9 families of the first full mirror (FINAL, 32,892/33,000): resetStalling
+  sites (Java's phase-2 InitSelecting branch, folded into Rust's InitMoving), bb2016
+  EndPlayerAction, bite / strip / foul / take-root / cloud-burster reports. The bb2016
+  WINNINGS_RE_ROLL harness fix (`ParityRunner` declines as the dialog's team) went into the jar
+  rebuilt for this build (jar 23:02); every 859-vs-360 report-count gap closed with it.
+- `bf28a8969` — foulForSpp was a drifted copy of InjuryTypeFoul ("Dirty Player +1"); it now shares
+  `foul_armour_roll` / `foul_injury_roll`, which also closes foul-for-SPP's missing foul assists.
+- `d33a3a011` — DropJump's Arm Bar armour-or-injury modifier (the last cross family).
+- `d4513b93e` — InjuryTypeStab's armour roll ported in full (Iron Hard Skin marker, defender
+  Chainsaw, A Sneaky Pair held back for a second pass). Porting it exposed that the armour
+  factory never set `registered_to`, so `is_registered_to_skill_with_property` was always false
+  and A Sneaky Pair was spent in the FIRST pass — in Foul too. **Stab is unreachable by the
+  sweeps** (no agent declares it: "Stab NOT offered by legal_actions"; no drafted roster fields A
+  Sneaky Pair), so that path is certified by unit tests (4 Stab + 1 Foul), not by the sweep.
+
+**Certification runs (heuristic agent, mirror = 330 gates × 100 seeds, cross = 4012 pairs × 3 seeds):**
+
+| run | build | mirror report-identical | cross report-identical | steps |
+|---|---|---|---|---|
+| baseline (§I.12) | `2a105e7a6` | 8 / 33,000 | — | 330 + 4012 |
+| FINAL | 23:04 | 32,892 / 33,000 | — | 330/330 |
+| FINAL2 | 01:48 | 32,999 / 33,000 (foulForSpp) | 4,302 / 4,302 (stopped at 1,434 pairs) | green |
+| FINAL3 | 04:07 | 33,000 / 33,000 | 12,035 / 12,036 (Arm Bar) | 330 + 4012 |
+| FINAL4 | 07:42 | — | 9,219 / 9,219 (stopped at 3,070 pairs for the Stab port) | green |
+| **FINAL5** | **`d4513b93e`** (09:19, jar 23:02) | **33,000 / 33,000** | **12,036 / 12,036** | **330/330 + 4012/4012** |
+
+FINAL5 artifacts: `docs/SWEEP_2026-11-13e_REPORTS.txt` (mirror 330/330, the same 10
+coverage-short gates as ever), `docs/REPORT_PARITY_2026-11-13e.txt` (bb2016 8,700, bb2020 12,000,
+bb2025 12,300 — all identical, 0 families, 0 count gaps), `docs/SWEEP_2026-11-13e_CROSS.txt`
+(4012/4012), `docs/REPORT_PARITY_2026-11-13e_cross.txt` (bb2016 2,436, bb2020 4,680, bb2025
+4,920 — all identical), `docs/oracle_check_2026-11-13e.txt` ("Rust names everything Java names";
+33,000 java twins, 33,000 the same length), `docs/coverage_gaps_2026-11-13e.txt`. The mirror ran
+in three sittings (Claude Code's low-memory reaper killed the workers twice; gates resumed on the
+same binary, so it is still one build). **Pregame census on cross** (the only games with a
+bb2020/bb2025 purchase phase): pettyCash 4872, freePettyCash 7536, cardsBought 4872,
+inducementsBought 4872, cardsAndInducementsBought 7716, prayersAndInducementsBought 7356 — every
+stream identical, oracle check empty.
+
+**Done.** Every family the ranking ever showed is fixed in Rust 1:1; no documented exception was
+needed (JAVA_DEFECTS.md unchanged). What the number does not cover: mechanics the agents never
+reach (coverage gaps §A/§E — Stab, Jump Up, Projectile Vomit, Hypnotic Gaze, ...), whose report
+fidelity is only as good as their unit tests.
 

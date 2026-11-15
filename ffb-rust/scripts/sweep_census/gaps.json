@@ -257,20 +257,6 @@
    ]
   },
   {
-   "skill": "Diving Tackle",
-   "cells": [
-    "dwarf__bb2025",
-    "old_world_alliance_ogre__bb2025",
-    "old_world_alliance_treeman__bb2025",
-    "slann__bb2016",
-    "slann__bb2020",
-    "slann__bb2025",
-    "slann_fumbbl__bb2016",
-    "slann_fumbbl__bb2020",
-    "slann_fumbbl__bb2025"
-   ]
-  },
-  {
    "skill": "Brawler",
    "cells": [
     "black_orc__bb2020",
@@ -504,33 +490,6 @@
    ]
   },
   {
-   "skill": "Diving Catch",
-   "cells": [
-    "elf__bb2025",
-    "slann__bb2016",
-    "slann__bb2020",
-    "slann__bb2025",
-    "slann_fumbbl__bb2016",
-    "slann_fumbbl__bb2020",
-    "slann_fumbbl__bb2025"
-   ],
-   "count": 60,
-   "hits": [
-    [
-     "report rollModifiers \"Diving Catch\"",
-     60
-    ],
-    [
-     "report SkillUse (declined)",
-     1
-    ],
-    [
-     "event skillUse (declined)",
-     1
-    ]
-   ]
-  },
-  {
    "skill": "Swoop",
    "cells": [
     "goblin__bb2020",
@@ -566,6 +525,33 @@
    ]
   },
   {
+   "skill": "Diving Catch",
+   "cells": [
+    "elf__bb2025",
+    "slann__bb2016",
+    "slann__bb2020",
+    "slann__bb2025",
+    "slann_fumbbl__bb2016",
+    "slann_fumbbl__bb2020",
+    "slann_fumbbl__bb2025"
+   ],
+   "count": 113,
+   "hits": [
+    [
+     "report rollModifiers \"Diving Catch\"",
+     113
+    ],
+    [
+     "report SkillUse (declined)",
+     1
+    ],
+    [
+     "event skillUse (declined)",
+     1
+    ]
+   ]
+  },
+  {
    "skill": "Safe Pair of Hands",
    "cells": [
     "chaos_pact__bb2020",
@@ -586,26 +572,24 @@
    ]
   },
   {
-   "skill": "Break Tackle",
+   "skill": "Dump-Off",
    "cells": [
-    "dwarf__bb2016",
-    "dwarf__bb2020",
-    "dwarf__bb2025",
-    "orc__bb2025"
+    "dark_elf__bb2016",
+    "dark_elf__bb2020",
+    "dark_elf__bb2025",
+    "dark_elf_league_fumbbl__bb2016",
+    "dark_elf_league_fumbbl__bb2020",
+    "dark_elf_league_fumbbl__bb2025"
    ],
-   "count": 143,
+   "count": 161,
    "hits": [
     [
-     "report rollModifiers \"Break Tackle ST 3-\"",
-     143
+     "report SkillUse (declined)",
+     161
     ],
     [
-     "report rollModifiers \"Break Tackle ST 5+\"",
-     129
-    ],
-    [
-     "report rollModifiers \"Break Tackle\"",
-     62
+     "event skillUse (declined)",
+     161
     ]
    ]
   },
@@ -623,6 +607,38 @@
    ]
   },
   {
+   "skill": "Break Tackle",
+   "cells": [
+    "dwarf__bb2016",
+    "dwarf__bb2020",
+    "dwarf__bb2025",
+    "orc__bb2025"
+   ],
+   "count": 291,
+   "hits": [
+    [
+     "report SkillUse (declined)",
+     291
+    ],
+    [
+     "event skillUse (declined)",
+     291
+    ],
+    [
+     "report rollModifiers \"Break Tackle ST 3-\"",
+     143
+    ],
+    [
+     "report rollModifiers \"Break Tackle ST 5+\"",
+     125
+    ],
+    [
+     "report rollModifiers \"Break Tackle\"",
+     62
+    ]
+   ]
+  },
+  {
    "skill": "Dirty Player",
    "cells": [
     "dwarf__bb2016",
@@ -633,19 +649,15 @@
     "snotling__bb2020",
     "snotling__bb2025"
    ],
-   "count": 333,
+   "count": 334,
    "hits": [
     [
      "report armorModifiers \"Dirty Player\"",
-     333
+     334
     ],
     [
      "report injuryModifiers \"Dirty Player\"",
-     161
-    ],
-    [
-     "report armorModifiers \"Dirty Player +1\"",
-     1
+     162
     ]
    ]
   },
@@ -736,29 +748,6 @@
    ]
   },
   {
-   "skill": "Very Long Legs",
-   "cells": [
-    "goblin__bb2016",
-    "slann__bb2016",
-    "slann__bb2020",
-    "slann__bb2025",
-    "slann_fumbbl__bb2016",
-    "slann_fumbbl__bb2020",
-    "slann_fumbbl__bb2025"
-   ],
-   "count": 664,
-   "hits": [
-    [
-     "event jumpRoll",
-     664
-    ],
-    [
-     "report rollModifiers \"Very Long Legs\"",
-     401
-    ]
-   ]
-  },
-  {
    "skill": "Pogo Stick",
    "cells": [
     "goblin__bb2020",
@@ -787,6 +776,29 @@
    ]
   },
   {
+   "skill": "Very Long Legs",
+   "cells": [
+    "goblin__bb2016",
+    "slann__bb2016",
+    "slann__bb2020",
+    "slann__bb2025",
+    "slann_fumbbl__bb2016",
+    "slann_fumbbl__bb2020",
+    "slann_fumbbl__bb2025"
+   ],
+   "count": 696,
+   "hits": [
+    [
+     "report rollModifiers \"Very Long Legs\"",
+     696
+    ],
+    [
+     "event jumpRoll",
+     664
+    ]
+   ]
+  },
+  {
    "skill": "Ball and Chain",
    "cells": [
     "goblin__bb2016",
@@ -808,11 +820,11 @@
     "goblin__bb2020",
     "goblin__bb2025"
    ],
-   "count": 828,
+   "count": 831,
    "hits": [
     [
      "report armorModifiers \"Chainsaw\"",
-     828
+     831
     ],
     [
      "event chainsawRoll",
@@ -1077,7 +1089,6 @@
   "LookIntoMyEyesRoll",
   "MasterChefRoll",
   "NoPlayersToField",
-  "PettyCash",
   "PickMeUpRoll",
   "PilingOn",
   "PlayCard",
@@ -1106,14 +1117,12 @@
   "cardDeactivated",
   "cardEffectRoll",
   "cardsAndInducementsBought",
-  "cardsBought",
   "catchOfTheDay",
   "chompRemoved",
   "chompRoll",
   "defectingPlayers",
   "doubleHiredStaff",
   "doubleHiredStarPlayer",
-  "fanFactorRoll",
   "freePettyCash",
   "fumbblResultUpload",
   "fumblerooskie",
@@ -1121,7 +1130,6 @@
   "hypnoticGazeRoll",
   "indomitable",
   "inducement",
-  "inducementsBought",
   "jumpUpRoll",
   "kickTeamMateRoll",
   "kickoffSequenceActivationsCount",
@@ -1130,20 +1138,17 @@
   "lookIntoMyEyesRoll",
   "mascotUsed",
   "masterChefRoll",
-  "modifiedDodgeResultSuccessful",
   "modifiedPassResult",
   "nervesOfSteel",
   "noPlayersToField",
   "oldPro",
   "passBlock",
   "penaltyShootout",
-  "pettyCash",
   "pickMeUp",
   "pilingOn",
   "placedBallDirection",
   "playCard",
   "prayerAmount",
-  "prayerWasted",
   "prayersAndInducementsBought",
   "projectileVomit",
   "pumpUpTheCrowdReRoll",

@@ -1,0 +1,14 @@
+report-stream divergence families over 33000 games (0 unreadable) under: D:/ffb_sweep_final5b
+
+IDENTICAL GAMES per edition
+  bb2016    8700 / 8700   identical (100.0%)
+  bb2020   12000 / 12000  identical (100.0%)
+  bb2025   12300 / 12300  identical (100.0%)
+  ALL      33000 / 33000  identical (100.0%)
+
+FAMILIES ranked by games affected (games / occurrences / editions)
+
+FIRST DIVERGENCE ranked by games (what each gate's REPORTS DIFF line shows)
+
+REPORT-COUNT GAPS > 10% (whole missing families)
+  0 games
