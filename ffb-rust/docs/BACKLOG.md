@@ -9634,4 +9634,20 @@ the skill (Multiple Block, Kick 'em, Putrid Regurgitation, Chomp — stars only)
    Brawler/Unstoppable Momentum/Savage Blow, tracks reRolledDiceIndexes (a failed Pro uses its die)
    and brawlerIndex, and keeps Pro/Brawler open after another skill re-roll; StepInitMoving parked
    with NO prompt after CLIENT_USE_FUMBLEROOSKIE (both editions), so the driver waited forever.
+6c. **bb2020 Hypnotic Gaze DONE 2026-11-15.** bb2020 declares GAZE_MOVE, dispatches GAZE_SELECT
+   (the SelectGazeTarget sequence: target dialog FIRST, then the activation), and gazes from the
+   second Select pass with CLIENT_GAZE on the selected target. Both agents now offer it in bb2020;
+   ParityRunner answers SELECT_GAZE_TARGET (step + dialog) with the adjacent-tackle-zone pick (one
+   actionRng; none -> select self = cancel) and the second pass's CLIENT_GAZE draw-free; Rust draws
+   the same pick at the declaration and answers the new `AgentPrompt::GazeTarget` with it. Gate:
+   vampire bb2020 x 3 scales + random, bb2025 vampire, bb2020 human: 35/35 heuristic steps +
+   reports (59 gaze target selections). Rust bugs, all 1:1 + tests: StepSelectGazeTarget parked
+   with no prompt and never recorded `lastTurnMode` (the cancel "restored" SELECT_GAZE_TARGET);
+   SelectGazeTargetEnd's cancel re-declared MOVE where Java clears the acting player (an extra
+   Blood Lust roll); bb2020's gaze collection matched all eight tackle-zone modifiers and the
+   shared gaze step used bb2025's flat 3 (bb2020: AG + (N-1), floor 2, modifier named); the
+   bb2025-only `fGazeVictimId = null` for a Blood-Lusted GAZE ran in bb2020 too.
+   Harness side-fix: the RANDOM contract declared bare FOUL where the client (and the heuristic
+   path) declares FOUL_MOVE, so every random gate with a foul had a `foul`/`foulMove` report diff
+   with identical steps; now FOUL_MOVE in all editions (random human bb2016/2020/2025 10/10).
 7. Data (G5): draft carriers of Multiple Block / Kick 'em / Putrid Regurgitation / Chomp.

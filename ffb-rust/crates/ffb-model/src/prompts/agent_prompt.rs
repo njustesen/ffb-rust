@@ -53,6 +53,13 @@ pub enum AgentPrompt {
         brawler: bool,
         pro: bool,
     },
+    /// bb2020 `StepSelectGazeTarget`'s DialogSelectGazeTarget (TurnMode SELECT_GAZE_TARGET):
+    /// answered with `Action::SelectPlayer` naming the victim, or the attacker himself to cancel.
+    /// The agents answer with the victim they drew when the gaze was declared -- the same single
+    /// actionRng pick `ParityRunner.sendGazeTargetSelection` spends here (BACKLOG §K).
+    GazeTarget {
+        attacker_id: PlayerId,
+    },
     BlockChoiceProperties {
         attacker_id: PlayerId,
         defender_id: PlayerId,

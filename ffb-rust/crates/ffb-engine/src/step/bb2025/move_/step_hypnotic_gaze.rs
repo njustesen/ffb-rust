@@ -56,6 +56,24 @@ impl Step for StepHypnoticGaze {
 }
 
 impl StepHypnoticGaze {
+    /// Java `AgilityMechanic.minimumRollHypnoticGaze` with `GazeModifierFactory.findModifiers`.
+    fn minimum_roll_and_modifiers(game: &Game, player_id: Option<&str>) -> (i32, Vec<String>) {
+        if game.rules != ffb_model::enums::Rules::Bb2020 {
+            return (MINIMUM_ROLL_HYPNOTIC_GAZE, Vec::new());
+        }
+        let Some(p) = player_id.and_then(|id| game.player(id)) else {
+            return (MINIMUM_ROLL_HYPNOTIC_GAZE, Vec::new());
+        };
+        use ffb_model::model::property::named_properties::NamedProperties;
+        let variable = p.get_skill_int_value(NamedProperties::INFLICTS_CONFUSION);
+        let base = if variable == 0 { p.agility_with_modifiers() } else { variable };
+        let col = ffb_mechanics::modifiers::bb2020::gaze_modifier_collection::GazeModifierCollection::new();
+        let ctx = ffb_mechanics::modifiers::gaze_modifier_context::GazeModifierContext::new(game, p);
+        let found = col.find_applicable(&ctx);
+        let total: i32 = found.iter().map(|m| m.get_modifier()).sum();
+        ((base + total).max(2), found.iter().map(|m| m.get_name().to_string()).collect())
+    }
+
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: doGaze = (playerAction == GAZE) && (defender != null) && defender.team != actingTeam
         let is_gaze_action = game.acting_player.player_action == Some(PlayerAction::Gaze);
@@ -108,18 +126,25 @@ impl StepHypnoticGaze {
             }
 
             let roll = rng.d6();
-            let successful = is_skill_roll_successful(roll, MINIMUM_ROLL_HYPNOTIC_GAZE);
+            // Java `mechanic.minimumRollHypnoticGaze(player, GazeModifierFactory.findModifiers(..))`.
+            // bb2025: a flat 3, no modifiers. bb2020 (this shared step runs it too): the
+            // inflictsConfusion skill value, else agility, plus the tackle-zone modifier, floored
+            // at 2 -- and the report names that modifier. Rust used the bb2025 flat 3 for both.
+            let (minimum_roll, modifier_names) = Self::minimum_roll_and_modifiers(game, acting_player_id.as_deref());
+            let successful = is_skill_roll_successful(roll, minimum_roll);
 
             let re_rolled = self.re_rolled_action.as_deref() == Some("HYPNOTIC_GAZE")
                 && self.re_roll_source.is_some();
-            game.report_list.add(ReportHypnoticGazeRoll::new(
+            let mut report = ReportHypnoticGazeRoll::new(
                 acting_player_id.clone(),
                 successful,
                 roll,
-                MINIMUM_ROLL_HYPNOTIC_GAZE,
+                minimum_roll,
                 re_rolled,
                 defender_id.clone(),
-            ));
+            );
+            report.base.roll_modifier_names = modifier_names;
+            game.report_list.add(report);
 
             if successful {
                 // Java: PlayerState oldVictimState = ...; if (!oldVictimState.isConfused())
@@ -134,7 +159,7 @@ impl StepHypnoticGaze {
             } else if self.re_rolled_action.is_none() {
                 // Java: if (reRolledAction != HYPNOTIC_GAZE && askForReRollIfAvailable(...)) gotoEndLabel = false
                 let pid = acting_player_id.as_deref().unwrap_or("");
-                if let Some(prompt) = ask_for_reroll_if_available(game, "HYPNOTIC_GAZE", MINIMUM_ROLL_HYPNOTIC_GAZE, false) {
+                if let Some(prompt) = ask_for_reroll_if_available(game, "HYPNOTIC_GAZE", minimum_roll, false) {
                     self.re_rolled_action = Some("HYPNOTIC_GAZE".into());
                     self.re_roll_source = Some("TRR".into());
                     let _ = pid;
@@ -170,6 +195,44 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2025)
+    }
+
+    /// bb2020 `AgilityMechanic.minimumRollHypnoticGaze`: agility plus the ONE tackle-zone gaze
+    /// modifier (N-1 for N opposing tackle zones), floored at 2, the modifier named in the
+    /// report. bb2025 is a flat 3 with no modifiers. Rust used the flat 3 for both, and the
+    /// bb2020 collection matched all eight modifiers (§K bb2020 gaze).
+    #[test]
+    fn bb2020_gaze_minimum_counts_tacklezones() {
+        for (rules, opponents, expected) in [
+            (Rules::Bb2020, 1, (2, vec!["1 Tacklezone".to_string()])),
+            (Rules::Bb2020, 2, (3, vec!["2 Tacklezones".to_string()])),
+            (Rules::Bb2025, 2, (3, Vec::new())),
+        ] {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+            game.home_playing = true;
+            game.team_home.players.push(Player {
+                id: "vamp".into(), name: "vamp".into(), nr: 1, position_id: "p".into(),
+                movement: 6, strength: 4, agility: 2, passing: 3, armour: 9,
+                starting_skills: vec![SkillWithValue { skill_id: SkillId::HypnoticGaze, value: None }],
+                ..Default::default()
+            });
+            game.field_model.set_player_coordinate("vamp", FieldCoordinate::new(10, 7));
+            game.field_model.set_player_state("vamp",
+                ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING).change_active(true));
+            for i in 0..opponents {
+                let id = format!("opp{i}");
+                game.team_away.players.push(Player {
+                    id: id.clone(), name: id.clone(), nr: 2 + i, position_id: "p".into(),
+                    movement: 6, strength: 3, agility: 3, passing: 3, armour: 8,
+                    ..Default::default()
+                });
+                game.field_model.set_player_coordinate(&id, FieldCoordinate::new(11, 6 + i));
+                game.field_model.set_player_state(&id,
+                    ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING));
+            }
+            assert_eq!(StepHypnoticGaze::minimum_roll_and_modifiers(&game, Some("vamp")), expected,
+                "{rules:?} with {opponents} adjacent opponents");
+        }
     }
 
     #[test]

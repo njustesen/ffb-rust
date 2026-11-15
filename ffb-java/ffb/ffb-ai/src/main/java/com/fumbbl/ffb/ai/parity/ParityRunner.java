@@ -1024,6 +1024,15 @@ public class ParityRunner {
                             break;
                         }
                         PlayerAction declared = (action == PlayerAction.BLITZ) ? PlayerAction.BLITZ_MOVE : action;
+                        // The real client declares a foul as FOUL_MOVE in every edition
+                        // (SelectLogicModule), as the heuristic path already does
+                        // (actionFromName); CLIENT_FOUL then changes it to FOUL. Declaring bare FOUL
+                        // here made the random contract's playerAction report read "foul" where
+                        // Rust's fold (and the client) report "foulMove" -- steps identical, report
+                        // stream not (BACKLOG §K, found on bb2020 random gates).
+                        if (action == PlayerAction.FOUL) {
+                            declared = PlayerAction.FOUL_MOVE;
+                        }
                         MatchRunner.inject(gameState, new ClientCommandActingPlayer(playerId, declared, false));
                         break;
                     }
@@ -1101,6 +1110,10 @@ public class ParityRunner {
 
             case SELECT_BLITZ_TARGET:
                 sendBlitzTargetSelection(game, gameState);
+                break;
+
+            case SELECT_GAZE_TARGET:
+                sendGazeTargetSelection(game, gameState);
                 break;
 
             case END_TURN:
@@ -1195,6 +1208,11 @@ public class ParityRunner {
             // to RandomStrategy here would be non-seeded nondeterminism)
             case SELECT_BLITZ_TARGET:
                 sendBlitzTargetSelection(game, gameState);
+                break;
+
+            // bb2020 gaze target dialog (StepSelectGazeTarget): same handling as the step.
+            case SELECT_GAZE_TARGET:
+                sendGazeTargetSelection(game, gameState);
                 break;
 
             // ── Seeded coin / receive (original parity behavior) ────────────
@@ -2500,6 +2518,16 @@ public class ParityRunner {
      */
     private void sendGazeAction(Game game, GameState gameState, String playerId) {
         FieldModel fm = game.getFieldModel();
+        // bb2020 second pass: the victim was chosen (and its actionRng pick spent) at
+        // SELECT_GAZE_TARGET, so the CLIENT_GAZE names the selected target with NO draw. Rust's
+        // StepInitSelecting continues the same way from the target selection state.
+        if (!isBb2025(game) && !isBb2016(game) && fm.getTargetSelectionState() != null
+                && fm.getTargetSelectionState().isSelected()
+                && fm.getTargetSelectionState().getSelectedPlayerId() != null) {
+            MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandGaze(playerId,
+                fm.getTargetSelectionState().getSelectedPlayerId()));
+            return;
+        }
         FieldCoordinate coord = playerCoordinate(game, playerId);
         Team opponent = game.isHomePlaying() ? game.getTeamAway() : game.getTeamHome();
         List<Player<?>> targets = new ArrayList<>();
@@ -2522,6 +2550,45 @@ public class ParityRunner {
         int idx = (int) Long.remainderUnsigned(actionRng.nextLong(), targets.size());
         MatchRunner.inject(gameState,
             new com.fumbbl.ffb.net.commands.ClientCommandGaze(playerId, targets.get(idx).getId()));
+    }
+
+    /**
+     * bb2020 gaze target selection (SELECT_GAZE_TARGET step / dialog, BACKLOG §K): the same
+     * candidates and ONE actionRng pick as {@link #sendGazeAction} -- adjacent opposing players
+     * with tackle zones, coordinate-sorted. With none, the acting player selects HIMSELF, which
+     * cancels the gaze (StepSelectGazeTarget -> END_SELECTING -> changePlayerAction(null)) with no
+     * draw. Rust draws the same pick when the gaze is declared and answers
+     * {@code AgentPrompt::GazeTarget} with it.
+     */
+    private void sendGazeTargetSelection(Game game, GameState gameState) {
+        ActingPlayer ap = game.getActingPlayer();
+        String pid = (ap != null) ? ap.getPlayerId() : null;
+        if (pid == null) {
+            MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
+            return;
+        }
+        FieldModel fm = game.getFieldModel();
+        FieldCoordinate coord = playerCoordinate(game, pid);
+        Team opponent = game.isHomePlaying() ? game.getTeamAway() : game.getTeamHome();
+        List<Player<?>> targets = new ArrayList<>();
+        if (coord != null) {
+            for (Player<?> op : opponent.getPlayers()) {
+                FieldCoordinate oc = fm.getPlayerCoordinate(op);
+                PlayerState ops = fm.getPlayerState(op);
+                if (oc == null || ops == null) continue;
+                boolean onPitch = oc.getX() >= 0 && oc.getX() <= 25 && oc.getY() >= 0 && oc.getY() <= 14;
+                if (onPitch && isAdjacentCoord(coord, oc) && ops.hasTacklezones()) {
+                    targets.add(op);
+                }
+            }
+        }
+        String chosen = pid;
+        if (!targets.isEmpty()) {
+            sortPlayersByCoordinate(targets, fm);
+            int idx = (int) Long.remainderUnsigned(actionRng.nextLong(), targets.size());
+            chosen = targets.get(idx).getId();
+        }
+        MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandTargetSelected(chosen));
     }
 
     /**
@@ -4139,8 +4206,9 @@ public class ParityRunner {
                 // player, inflictsConfusion) -- both editions declare the gaze at the start, so canGaze
                 // is an unused inflictsConfusion skill on an active player, plus isGazeActionAllowed
                 // (not the kick-off Blitz turn). The client declares GAZE_MOVE. Same slot as Rust.
-                // bb2025 only for now: bb2020 routes GAZE_MOVE through SELECT_GAZE_TARGET, not driven yet.
-                if (isBb2025(game) && game.getTurnMode() != TurnMode.BLITZ && ps.isActive()) {
+                // bb2020 routes GAZE_MOVE through SELECT_GAZE_TARGET (sendGazeTargetSelection), then
+                // CLIENT_GAZE on the selected target (sendGazeAction). BACKLOG §K.
+                if (!isBb2016(game) && game.getTurnMode() != TurnMode.BLITZ && ps.isActive()) {
                     com.fumbbl.ffb.model.skill.Skill gazeSkill =
                         p.getSkillWithProperty(com.fumbbl.ffb.model.property.NamedProperties.inflictsConfusion);
                     if (gazeSkill != null && !p.isUsed(gazeSkill)) {

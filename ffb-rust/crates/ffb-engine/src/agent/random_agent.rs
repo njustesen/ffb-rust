@@ -119,6 +119,9 @@ pub struct RandomAgent {
     /// arrive (negatrait passed / none), the square is reused without a second draw. Reset at each
     /// activation. See docs/PARITY_TTM.md "FRONTIER (human)" — the Ogre Bone-head case.
     pending_move: Option<FieldCoordinate>,
+    /// The gaze victim drawn when a GAZE was declared (`fold_gaze_target`). bb2020 asks for it
+    /// later, at `AgentPrompt::GazeTarget`, where Java spends that same single actionRng pick.
+    pending_gaze_target: Option<String>,
 }
 
 /// Mirror of `ParityRunner.isHandledActingAction` — the `PlayerAction`s whose
@@ -222,6 +225,7 @@ impl RandomAgent {
             current_activation_is_blitz: false,
             moved_this_activation: false,
             pending_move: None,
+            pending_gaze_target: None,
         }
     }
 
@@ -242,6 +246,7 @@ impl RandomAgent {
             current_activation_is_blitz: false,
             moved_this_activation: false,
             pending_move: None,
+            pending_gaze_target: None,
         }
     }
 
@@ -320,6 +325,7 @@ impl RandomAgent {
     /// ONE actionRng draw; 1:1 with `ParityRunner.sendGazeAction`. Empty -> None (Java deselects
     /// with no draw).
     pub(crate) fn fold_gaze_target(&mut self, game: &ffb_model::model::game::Game, player_id: &str) -> Option<String> {
+        self.pending_gaze_target = None;
         let side = if game.home_playing { TeamSide::Home } else { TeamSide::Away };
         let coord = game.field_model.player_coordinate(player_id)?;
         let opponents = match side { TeamSide::Home => &game.team_away, TeamSide::Away => &game.team_home };
@@ -331,10 +337,12 @@ impl RandomAgent {
             })
             .collect();
         if targets.is_empty() {
+            self.pending_gaze_target = None;
             return None;
         }
         targets.sort_by_key(|(c, _)| (c.x, c.y));
         let tidx = self.pick_action(targets.len());
+        self.pending_gaze_target = Some(targets[tidx].1.clone());
         Some(targets[tidx].1.clone())
     }
 
@@ -984,6 +992,12 @@ impl Agent for RandomAgent {
             // with the heuristic `reroll` class on.
             Some(AgentPrompt::BlockSkillReRoll { .. }) =>
                 Action::UseReRoll { use_reroll: false },
+            // bb2020 StepSelectGazeTarget (BACKLOG §K): the victim drawn at the GAZE declaration
+            // -- Java's sendGazeTargetSelection spends that pick here -- or, with none, the gazer
+            // himself, which cancels the gaze. 0 rng.
+            Some(AgentPrompt::GazeTarget { attacker_id }) => Action::SelectPlayer {
+                player_id: self.pending_gaze_target.take().unwrap_or_else(|| attacker_id.clone()),
+            },
             // Re-roll offer: AGENT_CONTRACT §7 — ALWAYS DECLINE, deterministically, 0 rng. Java
             // ParityRunner RE_ROLL / RE_ROLL_PROPERTIES = sendUseReRoll(action, null) (decline, no
             // decisionRng, no extra game die). The old code random-sampled via pick_bool, which both

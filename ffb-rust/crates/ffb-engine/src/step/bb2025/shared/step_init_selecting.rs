@@ -106,6 +106,25 @@ impl Step for StepInitSelecting {
                 .publish(StepParameter::UseAlternateLabel(true));
         }
 
+        // bb2020 post-GAZE_SELECT continuation (BACKLOG §K). StepSelectGazeTargetEnd sets the
+        // action back to GAZE_MOVE and pushes the Select sequence; the client then sends
+        // CLIENT_GAZE on the selected target (ParityRunner.sendGazeAction's bb2020 arm, no draw),
+        // whose `StepInitSelecting:228` arm publishes GAZE_VICTIM_ID, changes the action to GAZE
+        // and dispatches it -- no USE_ALTERNATE_LABEL, unlike the blitz's CLIENT_BLOCK.
+        if game.rules == ffb_model::enums::Rules::Bb2020
+            && game.acting_player.player_action == Some(PlayerAction::GazeMove)
+        {
+            let selected = game.field_model.target_selection_state.as_ref()
+                .filter(|t| t.is_selected())
+                .and_then(|t| t.get_selected_player_id().cloned());
+            if let (Some(victim), Some(pid)) = (selected, game.acting_player.player_id.clone()) {
+                util_server_steps::change_player_action(game, &pid, PlayerAction::Gaze, false);
+                game.defender_id = Some(victim);
+                self.dispatch_player_action = Some(PlayerAction::Gaze);
+                return self.execute_step(game, _rng);
+            }
+        }
+
         if !acted {
             match game.acting_player.player_action {
                 Some(PlayerAction::PassMove) => {
@@ -278,6 +297,25 @@ impl Step for StepInitSelecting {
                     Self::check_for_staller(game);
                     return self.execute_step(game, rng)
                         .with_event(GameEvent::PlayerAction { player_id: player_id.clone(), action: PlayerAction::BlitzMove });
+                }
+                // bb2020 Java StepInitSelecting :113 -- the gaze twin of the BLITZ_SELECT arm above:
+                //   else if (playerAction == GAZE_MOVE && targetSelectionState == null) {
+                //     fDispatchPlayerAction = GAZE_SELECT; changeActingPlayer(pid, GAZE_MOVE, ..);
+                //     forceGotoOnDispatch = true; }   // then the shared CLIENT_ACTING_PLAYER tail
+                // The victim is asked later, by StepSelectGazeTarget (AgentPrompt::GazeTarget).
+                if *player_action == PlayerActionChoice::HypnoticGaze
+                    && game.rules == ffb_model::enums::Rules::Bb2020
+                    && game.field_model.target_selection_state.is_none()
+                {
+                    game.original_bombardier = None;
+                    util_server_steps::change_player_action(game, player_id, PlayerAction::GazeMove, false);
+                    game.defender_id = None;
+                    self.dispatch_player_action = Some(PlayerAction::GazeSelect);
+                    self.force_goto_on_dispatch = true;
+                    Self::apply_moving_activation_updates(game, player_id, PlayerAction::GazeMove);
+                    Self::check_for_staller(game);
+                    return self.execute_step(game, rng)
+                        .with_event(GameEvent::PlayerAction { player_id: player_id.clone(), action: PlayerAction::GazeMove });
                 }
                 if *player_action == PlayerActionChoice::AutoGazeZoat {
                     game.original_bombardier = None;

@@ -28,8 +28,13 @@ impl GazeModifierCollection {
     }
 
     pub fn get_modifiers(&self) -> &[GazeModifier] { &self.modifiers }
+    /// Java `GenerifiedModifierFactory.getTacklezoneModifier` (isAffectedByTackleZones = true):
+    /// the ONE modifier whose multiplier equals the opposing tackle zones the gazer stands in.
+    /// The modifiers carry no predicate, so the old `applies_to_context` filter returned all
+    /// eight (BACKLOG §K bb2020 gaze) -- same shape as the bb2016 collection.
     pub fn find_applicable<'a>(&'a self, ctx: &GazeModifierContext<'_>) -> Vec<&'a GazeModifier> {
-        self.modifiers.iter().filter(|m| m.applies_to_context(ctx)).collect()
+        let tz_count = ffb_model::util::util_player::UtilPlayer::find_tacklezones(ctx.game, &ctx.player.id) as i32;
+        self.modifiers.iter().filter(|m| m.get_multiplier() == tz_count).collect()
     }
 }
 

@@ -4217,6 +4217,9 @@ impl HeuristicAgent {
             AgentPrompt::BlockSkillReRoll { dice, own_choice, brawler, pro, .. } => {
                 block_skill_reroll_answer(&dice, own_choice, brawler, pro)
             }
+            // bb2020 gaze target (BACKLOG §K): the declaration folded the victim through the
+            // parity agent's `fold_gaze_target`, which kept it; answer from there, 0 draws.
+            AgentPrompt::GazeTarget { .. } => self.parity.act(gs),
             // ── skill use (§6.16) ───────────────────────────────────────────
             AgentPrompt::SkillUse { skill_name, .. } => {
                 let skill_id = SkillId::from_class_name(&skill_name).unwrap_or(SkillId::Block);

@@ -262,6 +262,9 @@ impl Agent for UniformAgent {
             }
             // The block dialog's skill half: always declined, no draw.
             Some(AgentPrompt::BlockSkillReRoll { .. }) => Action::UseReRoll { use_reroll: false },
+            // bb2020 gaze target: cancel (select the gazer himself).
+            Some(AgentPrompt::GazeTarget { attacker_id }) =>
+                Action::SelectPlayer { player_id: attacker_id.clone() },
             Some(AgentPrompt::BlockChoiceProperties { .. }) => {
                 let _ = self.pick_bool();
                 Action::BlockChoice { die_index: 0, target_id: None }

@@ -194,9 +194,18 @@ impl StepSelectGazeTarget {
         // Case 2: no player selected yet
         // Java: game.setTurnMode(SELECT_GAZE_TARGET); showDialog(SelectGazeTarget); CONTINUE
         if self.selected_player_id.is_none() {
-            game.turn_mode = TurnMode::SelectGazeTarget;
-            // client-only: DialogSelectGazeTargetParameter
-            return StepOutcome::cont();
+            // Java `Game.setTurnMode` records the mode it replaces; every exit below restores
+            // `game.getLastTurnMode()`. Rust assigned the field bare, so the cancel / target paths
+            // "restored" SELECT_GAZE_TARGET and the turn ran on in the wrong mode (§K bb2020 gaze).
+            if game.turn_mode != TurnMode::SelectGazeTarget {
+                game.last_turn_mode = Some(game.turn_mode);
+                game.turn_mode = TurnMode::SelectGazeTarget;
+            }
+            // Java: showDialog(DialogSelectGazeTargetParameter) -- the agent's question. A bare
+            // cont() here parked the step with nothing asked (BACKLOG §K bb2020 gaze).
+            return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::GazeTarget {
+                attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
+            });
         }
 
         let selected_id = self.selected_player_id.clone().unwrap();
@@ -285,6 +294,25 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::Continue);
         assert_eq!(game.turn_mode, TurnMode::SelectGazeTarget);
+    }
+
+    /// Java shows DialogSelectGazeTarget and `setTurnMode` remembers the mode it replaced; the
+    /// cancel path restores it. Rust parked with no prompt and no remembered mode (§K).
+    #[test]
+    fn waiting_asks_the_agent_and_cancel_restores_the_turn_mode() {
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        game.acting_player.player_id = Some("gazer".into());
+        let mut step = StepSelectGazeTarget::new();
+        step.goto_label_on_end = "END_SELECTING".into();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::GazeTarget { .. })),
+            "{:?}", out.prompt);
+        assert_eq!(game.last_turn_mode, Some(TurnMode::Regular));
+        let out = step.handle_command(&Action::SelectPlayer { player_id: "gazer".into() },
+            &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(game.turn_mode, TurnMode::Regular, "the cancel restores the replaced mode");
     }
 
     #[test]

@@ -99,10 +99,11 @@ impl StepSelectGazeTargetEnd {
         // Java isCanceled() path:
         //   changePlayerAction(null, null, false); setTargetSelectionState(null); Select(false)
         if is_canceled {
+            // Java `changePlayerAction(this, null, null, false)` CLEARS the acting player. Rust
+            // re-declared MOVE instead, so the Select sequence pushed below ran the activation
+            // (Blood Lust) for the gazer who had just cancelled (§K bb2020 gaze, vampire seed 3).
+            util_server_steps::change_player_action_to_none(game);
             game.field_model.target_selection_state = None;
-            if let Some(ref pid) = player_id {
-                util_server_steps::change_player_action(game, pid, PlayerAction::Move, false);
-            }
             let seq = Select::build_sequence(&SelectParams {
                 update_persistence: false,
                 is_blitz_move: false,
@@ -330,6 +331,9 @@ mod tests {
         assert!(game.field_model.target_selection_state.is_none());
         // Pushes Select sequence
         assert_eq!(out.pushes[0][0].step_id, StepId::InitSelecting);
+        // Java `changePlayerAction(this, null, null, false)`: the gazer who cancelled is no longer
+        // acting, so the pushed Select sequence runs no activation (Blood Lust) for him.
+        assert!(game.acting_player.player_id.is_none(), "cancel clears the acting player");
     }
 
     #[test]

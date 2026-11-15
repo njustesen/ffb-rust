@@ -230,8 +230,10 @@ impl StepEndSelecting {
                         if let Some(ref pid) = game.acting_player.player_id.clone() {
                             crate::step::util_server_steps::change_player_action(game, pid, dpa, jumping);
                         }
-                    } else if dpa == PlayerAction::Gaze {
-                        // Java: fGazeVictimId = null
+                    } else if dpa == PlayerAction::Gaze && game.rules == Rules::Bb2025 {
+                        // Java bb2025 StepEndSelecting:261: fGazeVictimId = null. bb2020's
+                        // StepEndSelecting has no such arm, so a Blood-Lusted bb2020 gazer still
+                        // gazes its selected victim (§K bb2020 gaze, vampire seed 1 i=17).
                         self.gaze_victim_id = None;
                     }
                     dpa
