@@ -9547,6 +9547,9 @@ the skill (Multiple Block, Kick 'em, Putrid Regurgitation, Chomp — stars only)
    no new Rust bug (vomit 68, breathe fire 6, stab injuries 13 fired).
 3. Jump Up: offer BLOCK to a prone Jump Up player with an adjacent blockable opponent (Java
    `isBlockActionAvailable` allows PRONE + canStandUpForFree); StandUpBlitz alone does not roll it.
+   **DONE 2026-11-15.** Offered between MOVE and BLITZ on both sides. Gate 14 squads x 10 (all
+   editions): 140/140 steps + reports, 77 Jump Up rolls. One Rust bug: `jumpUpRoll` sent an empty
+   rollModifiers list where Java passes the factory's modifiers ("Jump Up").
 4. Gaze (bb2016 handled-list gap, BACKLOG E17; bb2020/bb2025 offer).
 5. PlayerChoice accepts: Shadowing, Tentacles, Pick-me-up, Diving Tackle (known step gaps first).
 6. Pro re-roll source, Trickster, Fumblerooski.

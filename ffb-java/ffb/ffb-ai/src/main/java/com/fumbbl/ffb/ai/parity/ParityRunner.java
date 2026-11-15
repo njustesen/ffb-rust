@@ -3827,6 +3827,16 @@ public class ParityRunner {
                 // Prone players: MOVE (= stand up and move), optionally BLITZ (= stand up and blitz)
                 // Mirrors Rust: [StandUp (→PlayerActionChoice::Move), StandUpBlitz (→Blitz)]
                 actions.add(PlayerAction.MOVE);
+                // Jump Up (BACKLOG §K): the client's LogicModule.isBlockActionAvailable lets a PRONE
+                // canStandUpForFree player declare BLOCK (no preventRegularBlockAction, block allowed
+                // in this turn mode, an adjacent blockable opponent). Between MOVE and BLITZ; Rust
+                // legal_activate_player_actions inserts it at the same slot.
+                if (p.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canStandUpForFree)
+                        && !p.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.preventRegularBlockAction)
+                        && (isBb2016(game) || game.getTurnMode() != TurnMode.BLITZ)
+                        && com.fumbbl.ffb.util.UtilPlayer.findAdjacentBlockablePlayers(game, opponent, coord).length > 0) {
+                    actions.add(PlayerAction.BLOCK);
+                }
                 if (!td.isBlitzUsed()) {
                     if (hasAdjacentPlayerWithTackleZones(coord, opponent.getPlayers(), fm)) {
                         actions.add(PlayerAction.BLITZ);

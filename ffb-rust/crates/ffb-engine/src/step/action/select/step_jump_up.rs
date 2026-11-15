@@ -129,10 +129,15 @@ impl StepJumpUp {
         let agility = game.player(&player_id).map(|p| p.agility).unwrap_or(3);
         let factory = JumpUpModifierFactory::for_rules(game.rules);
         let ctx = JumpUpContext::new(game, &game.acting_player);
-        let modifiers: Vec<Modifier> = factory
-            .find_modifiers(&ctx)
+        // Java: `new ReportJumpUpRoll(..., modifiers.toArray(new JumpUpModifier[0]))` -- the report
+        // names every modifier the factory found (bb2020/bb2025 "Jump Up"); Rust passed none (§K).
+        let found: Vec<(String, i32)> = factory.find_modifiers(&ctx).iter()
+            .map(|m| (m.get_name().to_string(), m.get_modifier()))
+            .collect();
+        let modifier_names: Vec<String> = found.iter().map(|(n, _)| n.clone()).collect();
+        let modifiers: Vec<Modifier> = found
             .iter()
-            .map(|m| Modifier::new("Jump Up", m.get_modifier(), game.rules))
+            .map(|(_, v)| Modifier::new("Jump Up", *v, game.rules))
             .collect();
         let min_roll = minimum_roll_jump_up(agility, &modifiers);
         let roll = rng.d6();
@@ -155,7 +160,7 @@ impl StepJumpUp {
             roll,
             min_roll,
             re_rolled,
-            vec![],
+            modifier_names,
         ));
 
         mark_used(game, &player_id);
@@ -431,6 +436,11 @@ mod tests {
         assert!(outcome.events.iter().any(|e| matches!(
             e, GameEvent::JumpUpRoll { success: true, target: 3, .. }
         )), "modifier should lower the target from 4 to 3");
+        // §K: the report names the modifier (Java passes the factory's modifiers to the report).
+        let json: Vec<String> = game.report_list.get_reports().iter()
+            .filter_map(|r| r.to_json()).map(|v| v.to_string()).collect();
+        assert!(json.iter().any(|j| j.contains("jumpUpRoll") && j.contains("\"Jump Up\"")),
+            "jumpUpRoll must list the Jump Up modifier: {json:?}");
     }
 
     #[test]

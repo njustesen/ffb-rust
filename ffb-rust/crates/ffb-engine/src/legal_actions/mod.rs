@@ -80,6 +80,24 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
                 player_action: PlayerActionChoice::Move,
                 block_defender_id: None,
             });
+            // §K Jump Up: the client's `LogicModule.isBlockActionAvailable` lets a PRONE player with
+            // canStandUpForFree declare BLOCK (no preventRegularBlockAction, block allowed in this
+            // turn mode, an adjacent blockable opponent). Offered between MOVE and BLITZ;
+            // ParityRunner.computeEligiblePlayers inserts it at the same slot.
+            if player.has_skill_property(
+                    ffb_model::model::property::named_properties::NamedProperties::CAN_STAND_UP_FOR_FREE)
+                && !player.has_skill_property(
+                    ffb_model::model::property::named_properties::NamedProperties::PREVENT_REGULAR_BLOCK_ACTION)
+                && (game.rules == Rules::Bb2016 || game.turn_mode != ffb_model::enums::TurnMode::Blitz)
+                && !ffb_model::util::util_player::UtilPlayer::find_adjacent_blockable_players(
+                    game, opponent_team, coord).is_empty()
+            {
+                actions.push(Action::ActivatePlayer {
+                    player_id: pid.clone(),
+                    player_action: PlayerActionChoice::Block,
+                    block_defender_id: None,
+                });
+            }
             if !turn_data.blitz_used {
                 let adj_opponent = opponent_team.players.iter().any(|op| {
                     game.field_model.player_coordinate(&op.id)
@@ -1833,6 +1851,25 @@ mod tests {
         game.rules = Rules::Bb2020;
         let a3 = legal_activate_player_actions(&game, TeamSide::Home);
         assert!(!has_action(&a3, "p1", PlayerActionChoice::Stab));
+    }
+
+    /// §K Jump Up: a PRONE canStandUpForFree player is offered BLOCK (client
+    /// isBlockActionAvailable) between MOVE and BLITZ when an opponent is adjacent and blockable;
+    /// a prone player without the skill still gets only MOVE (+ BLITZ).
+    #[test]
+    fn prone_jump_up_player_is_offered_block() {
+        use ffb_model::enums::PS_PRONE;
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "ju", c(5, 5), PS_PRONE, vec![SkillId::JumpUp]);
+        add_player(&mut game, true, "plain", c(9, 9), PS_PRONE, vec![]);
+        add_player(&mut game, false, "opp", c(6, 5), PS_STANDING, vec![]);
+        add_player(&mut game, false, "opp2", c(10, 9), PS_STANDING, vec![]);
+        let a = legal_activate_player_actions(&game, TeamSide::Home);
+        let order = |id: &str| -> Vec<PlayerActionChoice> { a.iter().filter_map(|x| match x {
+            Action::ActivatePlayer { player_id, player_action, .. } if player_id == id => Some(*player_action),
+            _ => None }).collect() };
+        assert_eq!(order("ju"), vec![PlayerActionChoice::Move, PlayerActionChoice::Block, PlayerActionChoice::Blitz]);
+        assert_eq!(order("plain"), vec![PlayerActionChoice::Move, PlayerActionChoice::Blitz]);
     }
 
     /// §K block-kind policy (mirrors ParityRunner.blockCommand): bb2016/bb2020 take the first
