@@ -9605,4 +9605,15 @@ the skill (Multiple Block, Kick 'em, Putrid Regurgitation, Chomp — stars only)
    - `bb2025/StepEndTurn` calls `resetShadowers()` every turn; Rust never cleared the list, so the
      once-per-MA Shadowing cap accumulated across the game.
 6. Pro re-roll source, Trickster, Fumblerooski.
+   **Trickster DONE 2026-11-15.** It was pinned to DECLINE in both agents because an accept parks
+   Java's StepTrickster in TurnMode.TRICKSTER waiting for CLIENT_FIELD_COORDINATE that ParityRunner
+   never sent. ParityRunner now answers the TRICKSTER step (MoveSquares coordinate-sorted, one
+   actionRng draw, sent as the flipped current team) and the bb2025 PICK_UP_CHOICE dialog (decline,
+   no draw; it fell to RandomStrategy's UNSEEDED coin flip); Rust's TricksterMove arm sorts the same
+   way; the decline pin is lifted on both sides (w_use 0.50). Gate gnome bb2020/bb2025 x 3 scales
+   (80 games) + 2 regression cells: 90/90 steps + reports; ~2 accepted Tricksters per 5 games. Two
+   Rust bugs: the chosen square ran only the first half of Java's NEXT_STEP_AND_REPEAT +
+   pushCurrentStepOnStack, so the defender was NEVER moved; the loose-ball tail ignored the edition
+   split (bb2020 scatters with no dialog; bb2025 publishes ATTEMPT_PICK_UP, PLAYER_ON_BALL_ID =
+   defender, PICK_UP_OPTIONAL = true -- Rust named the attacker and false).
 7. Data (G5): draft carriers of Multiple Block / Kick 'em / Putrid Regurgitation / Chomp.

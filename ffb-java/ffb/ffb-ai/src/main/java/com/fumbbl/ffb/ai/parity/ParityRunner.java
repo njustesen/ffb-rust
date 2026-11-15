@@ -1124,11 +1124,45 @@ public class ParityRunner {
                 break;
             }
 
+            case TRICKSTER:
+                // BACKLOG section K item 6: an ACCEPTED Trickster switches the turn mode to
+                // TRICKSTER, flips homePlaying to the defender's team, publishes the eligible
+                // squares as MoveSquares and waits for CLIENT_FIELD_COORDINATE. Coordinate-sort
+                // them and spend ONE actionRng draw -- identical to random_agent.rs's
+                // TricksterMove arm.
+                if (game.getTurnMode() == TurnMode.TRICKSTER) {
+                    sendTricksterTarget(game, gameState);
+                } else {
+                    System.err.println("UNHANDLED_STEP: " + stepId + " turnMode=" + game.getTurnMode());
+                    MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
+                }
+                break;
+
             default:
                 System.err.println("UNHANDLED_STEP: " + stepId + " turnMode=" + game.getTurnMode());
                 MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
                 break;
         }
+    }
+
+    /** Trickster square: sorted MoveSquares, one actionRng draw, sent as the (flipped) current team. */
+    private void sendTricksterTarget(Game game, GameState gameState) {
+        FieldModel fm = game.getFieldModel();
+        List<FieldCoordinate> squares = new ArrayList<>();
+        for (com.fumbbl.ffb.MoveSquare ms : fm.getMoveSquares()) {
+            squares.add(ms.getCoordinate());
+        }
+        squares.sort(Comparator.comparingInt(FieldCoordinate::getX).thenComparingInt(FieldCoordinate::getY));
+        if (squares.isEmpty()) {
+            MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
+            return;
+        }
+        int idx = (int) Long.remainderUnsigned(actionRng.nextLong(), squares.size());
+        FieldCoordinate target = squares.get(idx);
+        if (DEBUG) System.err.println("JAVA_TRICKSTER_SQ N=" + squares.size() + " idx=" + idx + " target=" + target);
+        boolean home = game.isHomePlaying();
+        MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandFieldCoordinate(
+            home ? target : target.transform()));
     }
 
     // ── Dialog handling ───────────────────────────────────────────────────────
@@ -1620,6 +1654,18 @@ public class ParityRunner {
                         game.setDialogParameter(null);
                     }
                 } else {
+                    game.setDialogParameter(null);
+                }
+                break;
+            }
+
+            // ── Pick-up choice (bb2025 StepTrickster: the defender lands on a loose ball) ──
+            // Without an arm this fell to RandomStrategy's UNSEEDED coin flip. Decline, no draw
+            // -- Rust's StepTrickster mirrors the decline branch (BACKLOG section K item 6).
+            case PICK_UP_CHOICE: {
+                try {
+                    MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandPickUpChoice(false));
+                } catch (RuntimeException e) {
                     game.setDialogParameter(null);
                 }
                 break;

@@ -4172,8 +4172,9 @@ impl HeuristicAgent {
                     // dialog forever: gnome bb2020 seed 2 asked Trickster at draws 233/235/237/239
                     // and ran 1965 agent events against Rust's 536): pinned to DECLINE, still
                     // spending the sampler draws. Mirrored in HeuristicDriver.useSkill.
-                    "DumpOff" | "PrimalSavagery" | "SafePairOfHands" | "Swoop"
-                    | "Trickster" => 0.0,
+                    // Trickster left this list in BACKLOG §K item 6: both harnesses now answer
+                    // its square wait (TricksterMove here, ParityRunner's TRICKSTER step arm).
+                    "DumpOff" | "PrimalSavagery" | "SafePairOfHands" | "Swoop" => 0.0,
                     _ => 0.50,
                 };
                 self.buf.push(

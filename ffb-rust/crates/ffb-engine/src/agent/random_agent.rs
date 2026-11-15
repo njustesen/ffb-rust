@@ -1512,12 +1512,16 @@ impl Agent for RandomAgent {
                     Action::Punt { coord: if is_home { target } else { target.transform() } }
                 }
             }
+            // Trickster square (BACKLOG §K item 6): coordinate-sort, ONE action draw — the same
+            // contract as ParityRunner.sendTricksterTarget over StepTrickster's MoveSquares.
             Some(AgentPrompt::TricksterMove { squares, .. }) => {
                 if squares.is_empty() {
                     return Action::Acknowledge;
                 }
-                let idx = self.pick_action(squares.len());
-                Action::TricksterMove { coord: squares[idx] }
+                let mut sorted = squares.clone();
+                sorted.sort_by_key(|c| (c.x, c.y));
+                let idx = self.pick_action(sorted.len());
+                Action::TricksterMove { coord: sorted[idx] }
             }
             // Java harness: `ParityRunner` has no SELECT_SKILL case, so the dialog falls through to
             // `UNHANDLED_DIALOG` -> `RandomStrategy.respondToDialog`:

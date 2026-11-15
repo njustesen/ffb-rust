@@ -1,5 +1,6 @@
 use ffb_model::types::{FieldCoordinate, MoveSquare};
-use ffb_model::enums::TurnMode;
+use ffb_model::enums::{Rules, TurnMode};
+use ffb_model::util::util_player::UtilPlayer;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
@@ -179,64 +180,60 @@ impl StepTrickster {
                     player_id: defender_id.clone().unwrap_or_default(),
                     squares: self.eligible_squares.clone(),
                 });
-            } else if self.action_status == TricksterPhase::WaitingForSkillUse {
-                // Java: move defender and update state — then push current step for pick-up
-                let def_id = defender_id.clone().unwrap_or_default();
-                let to = self.to_coordinate.unwrap();
-
-                // Java: fieldModel.replaceMultiBlockTargetCoordinate(defCoordinate, toCoordinate)
-                if let Some(old_coord) = game.field_model.player_coordinate(&def_id) {
-                    game.field_model.replace_multi_block_target_coordinate(old_coord, to);
-                }
-
-                // Check if defender has ball
-                self.with_ball = game.field_model.ball_coordinate
-                    .map(|bc| bc == game.field_model.player_coordinate(&def_id).unwrap_or(FieldCoordinate::new(-1, -1)))
-                    .unwrap_or(false);
-
-                self.action_status = TricksterPhase::SkillChoiceYes;
-                // Java: getResult().setNextAction(NEXT_STEP_AND_REPEAT); getGameState().pushCurrentStepOnStack()
-                // This means: advance + re-deliver same command. In Rust: just publish DefenderPosition and cont
-                return StepOutcome::next()
-                    .publish(StepParameter::DefenderPosition(to));
             } else {
-                // Actually move the defender
                 let def_id = defender_id.clone().unwrap_or_default();
                 let to = self.to_coordinate.unwrap();
+                if self.action_status == TricksterPhase::WaitingForSkillUse {
+                    // Java: withBall = UtilPlayer.hasBall(game, defender);
+                    //   fieldModel.replaceMultiBlockTargetCoordinate(defCoordinate, toCoordinate);
+                    //   animation; NEXT_STEP_AND_REPEAT + pushCurrentStepOnStack() with
+                    //   actionStatus = SKILL_CHOICE_YES — i.e. this same step runs again at once
+                    //   (the re-delivered command maps straight to EXECUTE_STEP) and takes the
+                    //   branch below. Rust used to return NEXT_STEP here, so the step was gone and
+                    //   the defender was NEVER moved (BACKLOG §K item 6).
+                    self.with_ball = UtilPlayer::has_ball(game, &def_id);
+                    if let Some(old_coord) = game.field_model.player_coordinate(&def_id) {
+                        game.field_model.replace_multi_block_target_coordinate(old_coord, to);
+                    }
+                    self.action_status = TricksterPhase::SkillChoiceYes;
+                }
+                // Java SKILL_CHOICE_YES branch: move the defender.
                 game.field_model.set_player_coordinate(&def_id, to);
-
                 let mut outcome = StepOutcome::next()
                     .publish(StepParameter::DefenderPosition(to));
-
                 if self.with_ball {
                     game.field_model.ball_coordinate = Some(to);
                 }
-
-                // If ball on destination (not carrying), handle pick-up
                 if !self.with_ball
                     && game.field_model.ball_coordinate == Some(to)
                     && game.field_model.ball_moving
                 {
-                    if self.attempt_pick_up.is_none() {
-                        // Would show DialogPickUpChoice — stub: default to attempt
-                        self.attempt_pick_up = Some(false);
-                    }
-                    if let Some(true) = self.attempt_pick_up {
-                        // Java: publish AttemptPickUp=true, PlayerOnBallId=mover, PickUpOptional=false
-                        let mover = game.acting_player.player_id.clone().unwrap_or_default();
+                    if game.rules == Rules::Bb2025 {
+                        // Java bb2025: DialogPickUpChoiceParameter. Both harnesses DECLINE it with
+                        // no draw (ParityRunner's PICK_UP_CHOICE arm), so `attemptPickUp = false`.
+                        if self.attempt_pick_up.is_none() {
+                            self.attempt_pick_up = Some(false);
+                        }
+                        if self.attempt_pick_up == Some(true) {
+                            outcome = outcome.publish(StepParameter::AttemptPickUp(true));
+                        } else {
+                            outcome = outcome
+                                .publish(StepParameter::AttemptPickUp(false))
+                                .publish(StepParameter::CatchScatterThrowInMode(
+                                    crate::step::framework::CatchScatterThrowInMode::ScatterBall,
+                                ));
+                        }
+                        // Java: PLAYER_ON_BALL_ID = the DEFENDER, PICK_UP_OPTIONAL = true.
                         outcome = outcome
-                            .publish(StepParameter::AttemptPickUp(true))
-                            .publish(StepParameter::PlayerOnBallId(mover))
-                            .publish(StepParameter::PickUpOptional(false));
+                            .publish(StepParameter::PlayerOnBallId(def_id.clone()))
+                            .publish(StepParameter::PickUpOptional(true));
                     } else {
-                        // Java: publish CatchScatterThrowInMode::ScatterBall
+                        // Java bb2020: no dialog, the ball scatters.
                         outcome = outcome.publish(StepParameter::CatchScatterThrowInMode(
                             crate::step::framework::CatchScatterThrowInMode::ScatterBall,
                         ));
                     }
                 }
-
-                outcome = outcome.publish(StepParameter::DefenderPosition(to));
                 return self.leave_outcome(game, outcome);
             }
         }
@@ -271,7 +268,7 @@ mod tests {
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::StepAction;
-    use ffb_model::enums::{Rules, PS_STANDING};
+    use ffb_model::enums::{Rules, PS_STANDING, SkillId};
     use ffb_model::types::FieldCoordinate;
 
     fn make_game() -> Game {
@@ -478,6 +475,30 @@ mod tests {
             }
             other => panic!("expected AgentPrompt::TricksterMove, got {:?}", other),
         }
+    }
+
+    /// Java: the chosen square runs `NEXT_STEP_AND_REPEAT` + `pushCurrentStepOnStack()`, so the
+    /// same step immediately takes its SKILL_CHOICE_YES branch and MOVES the defender. Rust used to
+    /// stop after the first half, leaving the defender where it stood (BACKLOG §K item 6).
+    #[test]
+    fn chosen_trickster_square_moves_the_defender_and_hands_the_turn_back() {
+        let mut game = make_game_with_trickster_defender();
+        let mut step = StepTrickster::new();
+        assert!(matches!(step.start(&mut game, &mut GameRng::new(0)).prompt, Some(AgentPrompt::SkillUse { .. })));
+        let home_playing = game.home_playing;
+        let out = step.handle_command(&Action::UseSkill { skill_id: SkillId::Trickster, use_skill: true },
+            &mut game, &mut GameRng::new(0));
+        let to = match out.prompt {
+            Some(AgentPrompt::TricksterMove { squares, .. }) => squares[0],
+            other => panic!("expected TricksterMove, got {other:?}"),
+        };
+        assert_eq!(game.turn_mode, TurnMode::Trickster);
+        let out = step.handle_command(&Action::TricksterMove { coord: to }, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(game.field_model.player_coordinate("def"), Some(to), "the defender moved");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DefenderPosition(c) if *c == to)));
+        assert_eq!(game.home_playing, home_playing, "turn handed back");
+        assert_ne!(game.turn_mode, TurnMode::Trickster);
     }
 
     /// After leave(), move_squares are cleared.
