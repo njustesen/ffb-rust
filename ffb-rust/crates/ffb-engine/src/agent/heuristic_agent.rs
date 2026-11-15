@@ -2884,6 +2884,7 @@ impl HeuristicAgent {
                 pac @ (PlayerActionChoice::ThrowTeamMate
                 | PlayerActionChoice::KickTeamMate
                 | PlayerActionChoice::ThrowKeg
+                | PlayerActionChoice::HypnoticGaze
                 | PlayerActionChoice::HailMaryPass
                 | PlayerActionChoice::ThrowBomb
                 | PlayerActionChoice::AllYouCanEat),
@@ -2909,6 +2910,7 @@ impl HeuristicAgent {
                 // in docs/PARITY_DWARF_CAMPAIGN.md.
                 let t = match pac {
                     PlayerActionChoice::ThrowKeg => self.parity.fold_keg_target(g, &pid),
+                    PlayerActionChoice::HypnoticGaze => self.parity.fold_gaze_target(g, &pid),
                     _ if pass_family => self.parity.fold_pass_receiver(g, &pid),
                     _ => self.parity.fold_ttm_target(g, &pid),
                 };
@@ -3191,11 +3193,12 @@ impl HeuristicAgent {
             | PlayerActionChoice::ThrowBomb
             | PlayerActionChoice::AllYouCanEat);
         let target = if (matches!(c.pac, PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate
-            | PlayerActionChoice::ThrowKeg)
+            | PlayerActionChoice::ThrowKeg | PlayerActionChoice::HypnoticGaze)
             && c.target.is_none()) || deep_pass_family
         {
             let t = match c.pac {
                 PlayerActionChoice::ThrowKeg => self.parity.fold_keg_target(g, &c.player),
+                PlayerActionChoice::HypnoticGaze => self.parity.fold_gaze_target(g, &c.player),
                 _ if deep_pass_family => self.parity.fold_pass_receiver(g, &c.player),
                 _ => self.parity.fold_ttm_target(g, &c.player),
             };
@@ -7001,7 +7004,8 @@ mod tests {
         // unused player left the re-pick ends the turn (`liveRemaining.isEmpty()`). Before the
         // mirror existed Rust declared `ActivatePlayer { player_action: HypnoticGaze }` here,
         // which the Java harness would have deselected.
-        let only_gaze = vec![("home_01".to_string(), vec![PlayerAction::Gaze])];
+        // (§K made GAZE handled; SWOOP is still unhandled and exercises the same re-pick.)
+        let only_gaze = vec![("home_01".to_string(), vec![PlayerAction::Swoop])];
         for scale in [0.0f32, 1.0] {
             let mut agent = HeuristicAgent::new(7, scale);
             let a = agent.handle_activate(&g, &f, only_gaze.clone());
@@ -7012,7 +7016,7 @@ mod tests {
         }
         // And the shared table this depends on must still call GAZE unhandled.
         assert!(!crate::agent::random_agent::is_handled_acting_action(
-            PlayerActionChoice::HypnoticGaze
+            PlayerActionChoice::Swoop
         ));
     }
 

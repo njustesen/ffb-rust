@@ -2181,6 +2181,10 @@ public class ParityRunner {
             case BREATHE_FIRE:
                 sendBlockAction(game, gameState, pid);
                 break;
+            // bb2016 GAZE (BACKLOG §K / E17): the client's ActingPlayer(GAZE) + CLIENT_GAZE.
+            case GAZE:
+                sendGazeAction(game, gameState, pid);
+                break;
             case BLITZ:
             case BLITZ_MOVE:
             case BLITZ_SELECT:
@@ -2406,6 +2410,37 @@ public class ParityRunner {
             return;
         }
         MatchRunner.inject(gameState, blockCommand(game, playerId, target.getId()));
+    }
+
+    /**
+     * Hypnotic Gaze victim (BACKLOG §K / E17): the client's GazeLogicModule.canBeGazed rule -- an
+     * ADJACENT opponent whose state has tackle zones -- coordinate-sorted, ONE actionRng draw, then
+     * CLIENT_GAZE. No victim deselects without a draw. Rust: RandomAgent::fold_gaze_target.
+     */
+    private void sendGazeAction(Game game, GameState gameState, String playerId) {
+        FieldModel fm = game.getFieldModel();
+        FieldCoordinate coord = playerCoordinate(game, playerId);
+        Team opponent = game.isHomePlaying() ? game.getTeamAway() : game.getTeamHome();
+        List<Player<?>> targets = new ArrayList<>();
+        if (coord != null) {
+            for (Player<?> op : opponent.getPlayers()) {
+                FieldCoordinate oc = fm.getPlayerCoordinate(op);
+                PlayerState ops = fm.getPlayerState(op);
+                if (oc == null || ops == null) continue;
+                boolean onPitch = oc.getX() >= 0 && oc.getX() <= 25 && oc.getY() >= 0 && oc.getY() <= 14;
+                if (onPitch && isAdjacentCoord(coord, oc) && ops.hasTacklezones()) {
+                    targets.add(op);
+                }
+            }
+        }
+        if (targets.isEmpty()) {
+            MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));
+            return;
+        }
+        sortPlayersByCoordinate(targets, fm);
+        int idx = (int) Long.remainderUnsigned(actionRng.nextLong(), targets.size());
+        MatchRunner.inject(gameState,
+            new com.fumbbl.ffb.net.commands.ClientCommandGaze(playerId, targets.get(idx).getId()));
     }
 
     /**
@@ -4407,6 +4442,7 @@ public class ParityRunner {
             case CHAINSAW:
             case PROJECTILE_VOMIT:
             case BREATHE_FIRE:
+            case GAZE:
             case BLITZ:
             case BLITZ_MOVE:
             case BLITZ_SELECT:

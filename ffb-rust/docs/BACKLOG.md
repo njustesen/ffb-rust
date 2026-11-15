@@ -9550,7 +9550,15 @@ the skill (Multiple Block, Kick 'em, Putrid Regurgitation, Chomp — stars only)
    **DONE 2026-11-15.** Offered between MOVE and BLITZ on both sides. Gate 14 squads x 10 (all
    editions): 140/140 steps + reports, 77 Jump Up rolls. One Rust bug: `jumpUpRoll` sent an empty
    rollModifiers list where Java passes the factory's modifiers ("Jump Up").
-4. Gaze (bb2016 handled-list gap, BACKLOG E17; bb2020/bb2025 offer).
+4. Gaze (bb2016 handled-list gap, BACKLOG E17; bb2020/bb2025 offer). **bb2016 DONE 2026-11-15**
+   (closes E17): GAZE handled on both sides; victim = the client's `canBeGazed` rule (adjacent
+   opponent with tackle zones), coordinate-sorted, one actionRng draw (`ParityRunner.sendGazeAction`
+   / `RandomAgent::fold_gaze_target`); no victim deselects. Gate vampire bb2016 x3 scales + bb2020/
+   bb2025 vampire + bb2016 human: 70/70 steps + reports, 210 gaze rolls. Two Rust bugs: a no-victim
+   GAZE stalled the bb2016 select step (no deselect), and `hypnoticGazeRoll` sent no modifiers
+   ("1 Tacklezone"). Noted, pre-existing and mirrored: vampire bb2016 Java logs
+   `UNHANDLED_STEP: INIT_BLOCKING turnMode=REGULAR` (58x in FINAL5) -- a harness gap both engines
+   resolve identically. *bb2020/bb2025 gaze (a mid-move GAZE_MOVE flow) still open.*
 5. PlayerChoice accepts: Shadowing, Tentacles, Pick-me-up, Diving Tackle (known step gaps first).
 6. Pro re-roll source, Trickster, Fumblerooski.
 7. Data (G5): draft carriers of Multiple Block / Kick 'em / Putrid Regurgitation / Chomp.

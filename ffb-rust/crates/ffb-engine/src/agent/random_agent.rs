@@ -199,6 +199,9 @@ pub(crate) fn is_handled_acting_action(pa: PlayerActionChoice) -> bool {
             // Rust random agent kept DESELECTING punts Java now declares (bb2025 random control
             // 94/100: all six reds `J Activate(*,PUNT)` vs a Rust deselect+re-pick).
             | PlayerActionChoice::Punt
+            // GAZE (bb2016 declared action, §K / BACKLOG E17): ParityRunner.sendGazeAction sends
+            // the client's CLIENT_GAZE with the canBeGazed victim pick (fold_gaze_target).
+            | PlayerActionChoice::HypnoticGaze
     )
 }
 
@@ -310,6 +313,29 @@ impl RandomAgent {
             let tidx = self.pick_action(targets.len());
             Some(targets[tidx].clone())
         }
+    }
+
+    /// §K: the parity contract's Hypnotic Gaze victim pick -- the client's `GazeLogicModule
+    /// .canBeGazed` rule (an ADJACENT opponent whose state has tackle zones), coordinate-sorted,
+    /// ONE actionRng draw; 1:1 with `ParityRunner.sendGazeAction`. Empty -> None (Java deselects
+    /// with no draw).
+    pub(crate) fn fold_gaze_target(&mut self, game: &ffb_model::model::game::Game, player_id: &str) -> Option<String> {
+        let side = if game.home_playing { TeamSide::Home } else { TeamSide::Away };
+        let coord = game.field_model.player_coordinate(player_id)?;
+        let opponents = match side { TeamSide::Home => &game.team_away, TeamSide::Away => &game.team_home };
+        let mut targets: Vec<(ffb_model::types::FieldCoordinate, String)> = opponents.players.iter()
+            .filter_map(|op| {
+                let oc = game.field_model.player_coordinate(&op.id)?;
+                let st = game.field_model.player_state(&op.id)?;
+                (oc.is_on_pitch() && oc.is_adjacent(coord) && st.has_tacklezones()).then(|| (oc, op.id.clone()))
+            })
+            .collect();
+        if targets.is_empty() {
+            return None;
+        }
+        targets.sort_by_key(|(c, _)| (c.x, c.y));
+        let tidx = self.pick_action(targets.len());
+        Some(targets[tidx].1.clone())
     }
 
     /// The parity contract's Beer Barrel Bash target pick: opponents within 3, STANDING
@@ -634,6 +660,8 @@ impl Agent for RandomAgent {
                     // coordinate-sorted, 1 actionRng — identical to ParityRunner's arm.
                     // Empty → None → deselect below (Java has no valid click either).
                     PlayerActionChoice::ThrowKeg => self.fold_keg_target(&gs.game, player_id),
+                    // §K bb2016 GAZE: ActingPlayer(GAZE) + CLIENT_GAZE(victim) folded.
+                    PlayerActionChoice::HypnoticGaze => self.fold_gaze_target(&gs.game, player_id),
                     PlayerActionChoice::ThrowTeamMate | PlayerActionChoice::KickTeamMate => {
                         self.fold_ttm_target(&gs.game, player_id)
                     }
@@ -2282,8 +2310,8 @@ mod rng_trace_tests {
         ] {
             assert!(is_handled_acting_action(pa), "{pa:?} has a sendConcreteAction arm");
         }
+        assert!(is_handled_acting_action(PlayerActionChoice::HypnoticGaze), "§K: GAZE is handled");
         for pa in [
-            PlayerActionChoice::HypnoticGaze,
             PlayerActionChoice::Swoop,
             PlayerActionChoice::SecureTheBall,
         ] {

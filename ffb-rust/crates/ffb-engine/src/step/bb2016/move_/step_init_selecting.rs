@@ -352,6 +352,13 @@ impl Step for StepInitSelecting {
                             return self.execute_step(game, rng)
                                 .publish(StepParameter::KickedPlayerId(Some(def.clone())));
                         }
+                        // GAZE (§K, BACKLOG E17): the folded victim IS Java's second command,
+                        // CLIENT_GAZE -- same as the `Action::HypnoticGaze` arm above.
+                        PlayerAction::Gaze => {
+                            self.dispatch_player_action = Some(PlayerAction::Gaze);
+                            return self.execute_step(game, rng)
+                                .publish(StepParameter::GazeVictimId(Some(def.clone())));
+                        }
                         _ => {}
                     }
                 }
@@ -390,7 +397,10 @@ impl Step for StepInitSelecting {
                     match pa {
                         PlayerAction::Block | PlayerAction::Blitz | PlayerAction::Foul
                         | PlayerAction::Pass | PlayerAction::HandOver
-                        | PlayerAction::ThrowTeamMate | PlayerAction::KickTeamMate => {
+                        | PlayerAction::ThrowTeamMate | PlayerAction::KickTeamMate
+                        // GAZE with no canBeGazed victim: ParityRunner.sendGazeAction deselects
+                        // (§K) -- the activation is recorded and the turn goes on.
+                        | PlayerAction::Gaze => {
                             self.end_player_action = true;
                         }
                         _ => {}

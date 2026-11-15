@@ -136,11 +136,15 @@ impl StepHypnoticGaze {
             let player = player_id.as_deref().and_then(|id| game.player(id));
             let agility = player.map(|p| p.agility_with_modifiers()).unwrap_or(3);
             let gaze_col = GazeModifierCollection::new();
-            let modifier_total: i32 = if let Some(p) = player {
+            // Java: `ReportHypnoticGazeRoll(..., gazeModifiers.toArray(...))` names every modifier
+            // the factory found (bb2016 "1 Tacklezone"...); Rust passed none (§K).
+            let (modifier_total, modifier_names): (i32, Vec<String>) = if let Some(p) = player {
                 let ctx = GazeModifierContext::new(game, p);
-                gaze_col.find_applicable(&ctx).iter().map(|m| m.get_modifier()).sum()
+                let found = gaze_col.find_applicable(&ctx);
+                (found.iter().map(|m| m.get_modifier()).sum(),
+                 found.iter().map(|m| m.get_name().to_string()).collect())
             } else {
-                0
+                (0, Vec::new())
             };
             let minimum_roll = minimum_roll_base_bb2016(agility, modifier_total);
             let successful = DiceInterpreter::is_skill_roll_successful(roll, minimum_roll);
@@ -152,7 +156,7 @@ impl StepHypnoticGaze {
                 roll,
                 minimum_roll,
                 already_rerolled,
-                vec![],
+                modifier_names,
             ));
 
             if successful {
