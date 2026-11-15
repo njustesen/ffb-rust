@@ -255,10 +255,36 @@ public final class ActivationDriver {
             plan.path.remove(0);
             return MoveReplay.Verdict.DECLARE_JUMP;
         }
+        // BACKLOG §K item 6 -- Fumblerooski, layered after the jump the same way (Rust
+        // `fumblerooskie_now`): a separate command BEFORE the move; the plan is left untouched so
+        // the next prompt delivers the path.
+        if (v == MoveReplay.Verdict.DELIVER_PATH && fumblerooskieNow(game, playerId)) {
+            return MoveReplay.Verdict.USE_FUMBLEROOSKIE;
+        }
         if (v == MoveReplay.Verdict.END_PLAYER_ACTION) {
             plan = null;
         }
         return v;
+    }
+
+    /**
+     * Should the ball-carrier use Fumblerooski before walking its planned path? Rust
+     * {@code fumblerooskie_now}. A fixed rule with no sampler draws: the mover carries a
+     * {@code canDropBall} skill, holds the ball, its declared action allows it, it has not already
+     * dropped it this action, and it stands in an opposing tackle zone.
+     */
+    private static boolean fumblerooskieNow(Game game, String playerId) {
+        ActingPlayer ap = game.getActingPlayer();
+        if (ap == null || ap.isFumblerooskiePending() || ap.getPlayerAction() == null
+                || !ap.getPlayerAction().allowsFumblerooskie()) {
+            return false;
+        }
+        Player<?> p = game.getPlayerById(playerId);
+        if (p == null || !p.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canDropBall)
+                || !com.fumbbl.ffb.util.UtilPlayer.hasBall(game, p)) {
+            return false;
+        }
+        return tzOn(game, playerId, coordOf(game, playerId)) > 0;
     }
 
     /**

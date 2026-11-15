@@ -1307,6 +1307,10 @@ public class ParityRunner {
                 if (answerBlockReRoll(bpr.hasTeamReRollOption(), dialog, game, gameState)) {
                     break;
                 }
+                if (answerBlockSkillReRoll(bpr.getNrOfDice(), bpr.getBlockRoll(),
+                        bpr.hasBrawlerOption(), bpr.hasProReRollOption(), dialog, game, gameState)) {
+                    break;
+                }
                 int bprIdx = heuristicBlockChoice(game, bpr.getNrOfDice(), bpr.getBlockRoll());
                 comm.clearCaptured();
                 comm.sendBlockChoice(bprIdx);
@@ -1328,6 +1332,19 @@ public class ParityRunner {
                 if (answerBlockReRoll(brp.hasProperty(com.fumbbl.ffb.ReRollProperty.TRR),
                         dialog, game, gameState)) {
                     break;
+                }
+                {
+                    // The skill half: the dialog's rrActionToSource map, keyed by ReRolledAction
+                    // name. Brawler = SINGLE_BOTH_DOWN; Pro = SINGLE_DIE_PER_ACTIVATION -> "Pro".
+                    java.util.Map<String, String> a2s = brp.getRrActionToSource();
+                    boolean brpBrawler = a2s != null
+                        && a2s.containsKey(com.fumbbl.ffb.ReRolledActions.SINGLE_BOTH_DOWN.getName());
+                    boolean brpPro = a2s != null && com.fumbbl.ffb.ReRollSources.PRO.getName(game).equals(
+                        a2s.get(com.fumbbl.ffb.ReRolledActions.SINGLE_DIE_PER_ACTIVATION.getName()));
+                    if (answerBlockSkillReRoll(brp.getNrOfDice(), brp.getBlockRoll(), brpBrawler, brpPro,
+                            dialog, game, gameState)) {
+                        break;
+                    }
                 }
                 int brpIdx = heuristicBlockChoice(game, brp.getNrOfDice(), brp.getBlockRoll());
                 comm.clearCaptured();
@@ -3178,6 +3195,49 @@ public class ParityRunner {
     }
 
     /**
+     * The SKILL half of a block-roll dialog (BACKLOG §K item 6): Brawler and Pro, asked after the
+     * TRR half and before the die choice. A fixed rule with ZERO sampler draws, mirrored by Rust's
+     * {@code heuristic_agent::block_skill_reroll_answer} on {@code AgentPrompt::BlockSkillReRoll}:
+     * only on the attacker's own choice and only when every die is a Skull or Both Down; Brawler
+     * first (when offered and a Both Down shows), else Pro on the first Skull (else the first Both
+     * Down). Off unless the heuristic owns the {@code reroll} class, so the random contract and the
+     * lower rungs keep their streams.
+     *
+     * @return true when a skill re-roll was sent; false to fall through to the die choice.
+     */
+    private boolean answerBlockSkillReRoll(int nrOfDice, int[] blockRoll, boolean brawler, boolean pro,
+            IDialogParameter dialog, Game game, GameState gameState) {
+        if (heuristic == null
+            || !heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.RE_ROLL_OFFER)
+            || (!brawler && !pro) || nrOfDice < 0 || blockRoll == null || blockRoll.length == 0) {
+            return false;
+        }
+        com.fumbbl.ffb.factory.BlockResultFactory brf =
+            game.getFactory(com.fumbbl.ffb.FactoryType.Factory.BLOCK_RESULT);
+        int firstSkull = -1, firstBothDown = -1;
+        for (int i = 0; i < blockRoll.length; i++) {
+            com.fumbbl.ffb.BlockResult r = brf.forRoll(blockRoll[i]);
+            if (r == com.fumbbl.ffb.BlockResult.SKULL) {
+                if (firstSkull < 0) firstSkull = i;
+            } else if (r == com.fumbbl.ffb.BlockResult.BOTH_DOWN) {
+                if (firstBothDown < 0) firstBothDown = i;
+            } else {
+                return false;
+            }
+        }
+        comm.clearCaptured();
+        if (brawler && firstBothDown >= 0) {
+            comm.sendUseBrawler(null);
+        } else if (pro) {
+            comm.sendUseProReRollForBlock(firstSkull >= 0 ? firstSkull : (firstBothDown >= 0 ? firstBothDown : 0));
+        } else {
+            return false;
+        }
+        injectCaptured(dialog, game, gameState);
+        return true;
+    }
+
+    /**
      * The block-die index to send. Delegates to the heuristic agent when the {@code blockchoice}
      * class is switched on, and otherwise answers 0 — the value the byte-matched random parity
      * contract picks, so switching the class off leaves the existing gate untouched.
@@ -3704,6 +3764,14 @@ public class ParityRunner {
                     probeMoveVerdict(playerId, coord, "DECLARE_JUMP", targets);
                     MatchRunner.inject(gameState, new ClientCommandActingPlayer(playerId,
                         game.getActingPlayer().getPlayerAction(), true));
+                    return;
+                case USE_FUMBLEROOSKIE:
+                    // BACKLOG §K item 6. CLIENT_USE_FUMBLEROOSKIE leaves StepInitSelecting /
+                    // StepInitMoving waiting (UNHANDLED_COMMAND), so the harness comes straight
+                    // back here with the pending flag set and delivers the path.
+                    probeMoveVerdict(playerId, coord, "USE_FUMBLEROOSKIE", targets);
+                    MatchRunner.inject(gameState,
+                        new com.fumbbl.ffb.net.commands.ClientCommandUseFumblerooskie());
                     return;
                 case FIRE_TERMINAL:
                     probeMoveVerdict(playerId, coord, "FIRE_TERMINAL", targets);

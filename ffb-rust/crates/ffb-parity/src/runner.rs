@@ -1627,6 +1627,7 @@ fn prompt_class(p: &AgentPrompt) -> &'static str {
         AgentPrompt::Move { .. } => "Move",
         AgentPrompt::BlockChoice { .. } => "BlockChoice",
         AgentPrompt::BlockChoiceProperties { .. } => "BlockChoiceProperties",
+        AgentPrompt::BlockSkillReRoll { .. } => "BlockSkillReRoll",
         AgentPrompt::BlitzTarget { .. } => "BlitzTarget",
         AgentPrompt::BlockTarget { .. } => "BlockTarget",
         AgentPrompt::Pushback { .. } => "Pushback",

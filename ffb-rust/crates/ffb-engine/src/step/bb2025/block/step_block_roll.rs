@@ -6,6 +6,7 @@ use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::report::report_block::ReportBlock;
 use ffb_model::report::report_block_roll::ReportBlockRoll;
+use ffb_model::report::mixed::report_block_re_roll::ReportBlockReRoll;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -36,6 +37,13 @@ pub struct StepBlockRoll {
     // AbstractStepWithReRoll fields
     pub re_rolled_action: Option<String>,
     pub re_roll_source: Option<String>,
+    /// bb2020 Java: reRolledDiceIndexes -- the dice a skill re-roll already replaced.
+    pub re_rolled_dice_indexes: Vec<i32>,
+    /// bb2020 Java: brawlerIndex -- the die Brawler replaced (-1 = Brawler not used).
+    pub brawler_index: i32,
+    /// Whether this dialog's skill half (`AgentPrompt::BlockSkillReRoll`) was already asked,
+    /// so its decline falls through to the die choice instead of asking again.
+    pub skill_offer_asked: bool,
 }
 
 impl StepBlockRoll {
@@ -51,6 +59,9 @@ impl StepBlockRoll {
             double_target_strength: false,
             re_rolled_action: None,
             re_roll_source: None,
+            re_rolled_dice_indexes: Vec::new(),
+            brawler_index: -1,
+            skill_offer_asked: false,
         }
     }
 }
@@ -88,9 +99,16 @@ impl Step for StepBlockRoll {
             // declines by answering the SAME dialog with a die choice, so the decline arm returns
             // straight to the die-choice prompt: re-entering `execute_step` here would roll a
             // fresh set of block dice, because `re_rolled_action` is still unset.
+            //
+            // The same answer declines the dialog's SKILL half (`AgentPrompt::BlockSkillReRoll`),
+            // which is asked after the TRR half and before the die choice. Only the TRR decline
+            // clears the source: a skill decline may follow an already-spent re-roll (bb2020
+            // offers Pro after Brawler), whose source must survive into the published result.
             Action::UseReRoll { use_reroll: false } => {
-                self.re_roll_source = None;
-                return StepOutcome::cont().with_prompt(self.block_choice_prompt(game));
+                if !self.skill_offer_asked {
+                    self.re_roll_source = None;
+                }
+                return StepOutcome::cont().with_prompt(self.after_team_reroll_prompt(game));
             }
             // Java: CLIENT_USE_BRAWLER
             Action::UseBrawler { .. } => {
@@ -206,11 +224,26 @@ impl StepBlockRoll {
         if self.re_rolled_action.as_deref() == Some("BLOCK") {
             if let Some(ref source_name) = self.re_roll_source.clone() {
                 // Java: !UtilServerReRoll.useReRoll(this, getReRollSource(), player)
+                // bb2020 `StepBlockRoll.executeStep` never calls useReRoll for BRAWLER,
+                // UNSTOPPABLE_MOMENTUM or SAVAGE_BLOW -- those re-roll unconditionally.
+                let is_bb2020 = game.rules == ffb_model::enums::Rules::Bb2020;
+                let skips_use = is_bb2020
+                    && matches!(source_name.as_str(), "Brawler" | "UnstoppableMomentum" | "SavageBlow");
                 let source = ReRollSource::new(source_name.as_str());
-                let (consumed, evs) = use_reroll_with_events(game, &source, &player_id, rng);
-                reroll_events = evs;
+                let consumed = if skips_use {
+                    true
+                } else {
+                    let (consumed, evs) = use_reroll_with_events(game, &source, &player_id, rng);
+                    reroll_events = evs;
+                    consumed
+                };
                 if !consumed {
                     do_roll = false;
+                    // bb2020: a failed Pro still uses up its die --
+                    // `reRolledDiceIndexes = add(reRolledDiceIndexes, proIndex)`.
+                    if is_bb2020 && source_name == "Pro" {
+                        self.re_rolled_dice_indexes.push(self.die_index);
+                    }
                     // Java: showBlockRollDialog(false) — source was non-null
                 }
             } else {
@@ -228,13 +261,17 @@ impl StepBlockRoll {
             }
             let source = self.re_roll_source.clone();
             match source.as_deref() {
+                Some("Brawler") if game.rules == ffb_model::enums::Rules::Bb2020 => {
+                    // Java bb2020 `handleBrawler`: the first BOTH_DOWN not already re-rolled.
+                    self.handle_brawler_bb2020(game, rng);
+                }
                 Some("Brawler") => {
                     // Java: actingPlayer.markSkillUsed(BRAWLER, SINGLE_BOTH_DOWN) if no game option
                     // (use_reroll above already marked the skill used)
-                    self.handle_implicit_reroll_index(rng, BlockResult::BothDown);
+                    self.handle_implicit_reroll_index(game, rng, BlockResult::BothDown);
                 }
                 Some("Hatred") => {
-                    self.handle_implicit_reroll_index(rng, BlockResult::Skull);
+                    self.handle_implicit_reroll_index(game, rng, BlockResult::Skull);
                 }
                 _ => {
                     self.handle_initial_roll_and_reroll_with_explicit_selection(game, rng);
@@ -266,10 +303,11 @@ impl StepBlockRoll {
             // the die choice. Declining answers the die choice WITHOUT re-rolling — see
             // `handle_command`. `ParityRunner` mirrors the pair on one dialog: `reRollSourceFor`
             // then `heuristicBlockChoice`, in that order.
+            self.skill_offer_asked = false;
             let mut out = if self.team_reroll_option(game) {
                 StepOutcome::cont().with_prompt(self.block_reroll_offer_prompt(game))
             } else {
-                StepOutcome::cont().with_prompt(self.block_choice_prompt(game))
+                StepOutcome::cont().with_prompt(self.after_team_reroll_prompt(game))
             };
             if self.re_rolled_action.is_none() {
                 if let Some(ref did) = game.defender_id {
@@ -308,11 +346,119 @@ impl StepBlockRoll {
             let team_id = self.block_roll_report_team(game, self.re_roll_source.is_none());
             game.report_list.add(ReportBlockRoll::new(team_id, self.block_roll.clone(), None));
         }
-        let mut out = StepOutcome::cont().with_prompt(self.block_choice_prompt(game));
+        // The re-shown dialog may still carry skill options (bb2020 after a failed Pro offers
+        // Brawler); bb2025 builds none once a source is set.
+        self.skill_offer_asked = false;
+        let mut out = StepOutcome::cont().with_prompt(self.after_team_reroll_prompt(game));
         for ev in reroll_events {
             out = out.with_event(ev);
         }
         out
+    }
+
+    /// The prompt after the dialog's TRR half: its SKILL half (`AgentPrompt::BlockSkillReRoll`)
+    /// when the dialog lists Brawler or Pro and it has not been asked yet, else the die choice.
+    /// Java shows both halves on one dialog; `ParityRunner` answers them in the same order.
+    fn after_team_reroll_prompt(&mut self, game: &Game) -> ffb_model::prompts::AgentPrompt {
+        if !self.skill_offer_asked {
+            let (brawler, pro) = self.skill_reroll_options(game);
+            if brawler || pro {
+                self.skill_offer_asked = true;
+                return ffb_model::prompts::AgentPrompt::BlockSkillReRoll {
+                    attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
+                    dice: self.block_roll.clone(),
+                    own_choice: self.nr_of_dice >= 0,
+                    brawler,
+                    pro,
+                };
+            }
+        }
+        self.block_choice_prompt(game)
+    }
+
+    /// Whether the block dialog lists a Brawler and/or a Pro re-roll.
+    ///
+    /// bb2025 `showBlockRollDialog` (only while `getReRollSource() == null`):
+    /// `evaluateBrawlerAvailability` maps SINGLE_BOTH_DOWN, and
+    /// `addReRollSourceMapping(SINGLE_DIE_PER_ACTIVATION)` maps Pro's source.
+    ///
+    /// bb2020 `showBlockRollDialog`: `proReRollOption` / `brawlerOption`, which stay open after
+    /// another skill re-roll while some die has not been re-rolled yet.
+    fn skill_reroll_options(&self, game: &Game) -> (bool, bool) {
+        let Some(pid) = game.acting_player.player_id.as_deref() else { return (false, false) };
+        let Some(player) = game.player(pid) else { return (false, false) };
+        let blitzing = game.acting_player.player_action.map(|a| a.is_blitzing()).unwrap_or(false);
+        let unused_id = |id: ffb_model::enums::SkillId| !player.used_skills.contains(&id)
+            && !game.acting_player.used_skills.contains(&id);
+        let unused = |property: &str| player.all_skill_ids()
+            .any(|id| id.properties().contains(&property) && unused_id(id));
+        let results: Vec<BlockResult> = self.block_roll.iter().map(|r| block_result_for_roll(*r)).collect();
+
+        if game.rules == ffb_model::enums::Rules::Bb2020 {
+            let source = self.re_roll_source.as_deref();
+            let skill_source = |property: &str| player.skill_id_with_property(property)
+                .map(|id| source == Some(id.class_name()))
+                .unwrap_or(false);
+            let single_die_used = skill_source(NamedProperties::CAN_REROLL_SINGLE_DIE_ONCE_PER_PERIOD);
+            let single_block_die_used = skill_source(NamedProperties::CAN_REROLL_SINGLE_BLOCK_DIE_DURING_BLITZ);
+            let any_block_dice_used = skill_source(NamedProperties::CAN_RE_ROLL_ANY_NUMBER_OF_BLOCK_DICE);
+            let dice_left = self.block_roll.len() > self.re_rolled_dice_indexes.len();
+            let pro = (source.is_none()
+                    || ((source == Some("Brawler") || single_die_used || single_block_die_used || any_block_dice_used)
+                        && dice_left))
+                && unused(NamedProperties::CAN_REROLL_ONCE_PER_TURN);
+            let brawler = !blitzing
+                && player.has_skill_property(NamedProperties::CAN_REROLL_SINGLE_BOTH_DOWN)
+                && self.brawler_index < 0
+                && (source.is_none()
+                    || ((source == Some("Pro") || single_die_used || single_block_die_used || any_block_dice_used)
+                        && dice_left))
+                && results.iter().enumerate().any(|(i, r)| *r == BlockResult::BothDown
+                    && !self.re_rolled_dice_indexes.contains(&(i as i32)));
+            return (brawler, pro);
+        }
+
+        if self.re_roll_source.is_some() {
+            return (false, false);
+        }
+        // Java UtilCards.getUnusedRerollSource(actingPlayer, action): the first unused skill
+        // registering a re-roll source for that action.
+        let source_for = |action: &str| player.all_skill_ids()
+            .filter(|id| unused_id(*id))
+            .find(|id| id.reroll_sources_for(game.rules).iter().any(|(a, _)| *a == action));
+        let brawler = player.skill_id_with_property(NamedProperties::CAN_REROLL_SINGLE_BOTH_DOWN)
+            .map(|skill| !blitzing
+                && (ffb_model::option::util_game_option::is_option_enabled(
+                        game, ffb_model::option::game_option_id::ALLOW_BRAWLER_ON_BOTH_BLOCKS)
+                    || unused_id(skill))
+                && results.contains(&BlockResult::BothDown)
+                && source_for("SINGLE_BOTH_DOWN").is_some())
+            .unwrap_or(false);
+        let pro = source_for("SINGLE_DIE_PER_ACTIVATION") == Some(ffb_model::enums::SkillId::Pro);
+        (brawler, pro)
+    }
+
+    /// Java bb2020 `handleBrawler`: roll one die, report it, and replace the first BOTH_DOWN
+    /// that no earlier skill re-roll has replaced.
+    fn handle_brawler_bb2020(&mut self, game: &mut Game, rng: &mut GameRng) {
+        let rerolled_die = rng.d6();
+        game.report_list.add(ReportBlockReRoll::new(
+            vec![rerolled_die],
+            game.acting_player.player_id.clone(),
+            self.re_roll_source.as_deref().map(ReRollSource::new),
+        ));
+        for i in 0..self.block_roll.len() {
+            if block_result_for_roll(self.block_roll[i]) == BlockResult::BothDown
+                && !self.re_rolled_dice_indexes.contains(&(i as i32))
+            {
+                self.brawler_index = i as i32;
+                break;
+            }
+        }
+        if self.brawler_index >= 0 {
+            self.block_roll[self.brawler_index as usize] = rerolled_die;
+            self.re_rolled_dice_indexes.push(self.brawler_index);
+        }
     }
 
     /// Java `showBlockRollDialog`: `properties.add(ReRollProperty.TRR)` iff
@@ -503,8 +649,14 @@ impl StepBlockRoll {
     ///
     /// Rolls one new block die, then finds the first die in block_roll that matches
     /// resultToReplace and replaces it. BRAWLER uses BothDown; HATRED uses Skull.
-    fn handle_implicit_reroll_index(&mut self, rng: &mut GameRng, result_to_replace: BlockResult) {
+    fn handle_implicit_reroll_index(&mut self, game: &mut Game, rng: &mut GameRng, result_to_replace: BlockResult) {
         let rerolled_die = rng.d6();
+        // Java: addReport(new ReportBlockReRoll(new int[]{rerolledDie}, player.getPlayerId(), getReRollSource()))
+        game.report_list.add(ReportBlockReRoll::new(
+            vec![rerolled_die],
+            game.acting_player.player_id.clone(),
+            self.re_roll_source.as_deref().map(ReRollSource::new),
+        ));
         // Java: for (int i = 0; i < fBlockRoll.length; i++) { if (factory.forRoll(fBlockRoll[i]) == resultToReplace) { dieIndex = i; break; } }
         for i in 0..self.block_roll.len() {
             if block_result_for_roll(self.block_roll[i]) == result_to_replace {
@@ -615,18 +767,41 @@ impl StepBlockRoll {
         // Consummate Professional has canRerollSingleDieOncePerPeriod
         let is_pro_type = source == "Pro" || source == "ConsummateProfessional";
 
+        let source_owned = source.to_string();
+        let report = |game: &mut Game, dice: Vec<i32>| {
+            game.report_list.add(ReportBlockReRoll::new(
+                dice,
+                game.acting_player.player_id.clone(),
+                Some(ReRollSource::new(source_owned.as_str())),
+            ));
+        };
         if is_pro_type {
-            // Java: roll 1 die, replace fBlockRoll[dieIndex]
+            // Java: if (source == PRO) actingPlayer.markSkillUsed(canRerollOncePerTurn);
+            //       roll 1 die, addReport(ReportBlockReRoll), replace fBlockRoll[dieIndex]
+            //       (bb2020 also: reRolledDiceIndexes = add(reRolledDiceIndexes, proIndex)).
+            if source == "Pro" {
+                let pid = game.acting_player.player_id.clone().unwrap_or_default();
+                let pro = game.player(&pid)
+                    .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_REROLL_ONCE_PER_TURN));
+                if let Some(skill) = pro {
+                    crate::step::util_server_steps::mark_skill_used(game, &pid, skill);
+                }
+            }
             let new_die = rng.d6();
+            report(game, vec![new_die]);
             if self.die_index >= 0 {
                 if let Some(slot) = self.block_roll.get_mut(self.die_index as usize) {
                     *slot = new_die;
+                }
+                if game.rules == ffb_model::enums::Rules::Bb2020 {
+                    self.re_rolled_dice_indexes.push(self.die_index);
                 }
             }
         } else if matches!(source, "UnstoppableMomentum" | "LordOfChaos" | "WorkingInTandem" | "WoodlandFury") {
             // Java: these also replace a single die at dieIndex
             if self.die_index >= 0 {
                 let new_die = rng.d6();
+                report(game, vec![new_die]);
                 if let Some(slot) = self.block_roll.get_mut(self.die_index as usize) {
                     *slot = new_die;
                 }
@@ -635,6 +810,7 @@ impl StepBlockRoll {
             // Java: roll diceIndexes.length dice, replace each position
             let n = self.dice_indexes.len();
             let new_dice: Vec<i32> = (0..n).map(|_| rng.d6()).collect();
+            report(game, new_dice.clone());
             for (pos, &idx) in self.dice_indexes.iter().enumerate() {
                 if let Some(slot) = self.block_roll.get_mut(idx) {
                     *slot = new_dice[pos];
@@ -1019,7 +1195,7 @@ mod tests {
         step.die_index = -1;
         // Simulate: Brawler re-roll path already reached handle_implicit_reroll_index
         let mut rng = GameRng::new(5);
-        step.handle_implicit_reroll_index(&mut rng, BlockResult::BothDown);
+        step.handle_implicit_reroll_index(&mut make_game(), &mut rng, BlockResult::BothDown);
         // die_index should remain -1 since no BothDown found
         assert_eq!(step.die_index, -1);
         // block_roll should be unchanged
@@ -1033,7 +1209,7 @@ mod tests {
         step.block_roll = vec![2, 6, 2];
         step.die_index = -1;
         let mut rng = GameRng::new(3);
-        step.handle_implicit_reroll_index(&mut rng, BlockResult::BothDown);
+        step.handle_implicit_reroll_index(&mut make_game(), &mut rng, BlockResult::BothDown);
         // Should find the FIRST BothDown (index 0)
         assert_eq!(step.die_index, 0);
     }
@@ -1047,7 +1223,7 @@ mod tests {
         step.block_roll = vec![1, 6, 3];
         step.die_index = -1;
         let mut rng = GameRng::new(4);
-        step.handle_implicit_reroll_index(&mut rng, BlockResult::Skull);
+        step.handle_implicit_reroll_index(&mut make_game(), &mut rng, BlockResult::Skull);
         assert_eq!(step.die_index, 0);
         // block_roll[0] should be updated
     }
@@ -1059,7 +1235,7 @@ mod tests {
         step.die_index = -1;
         let original = step.block_roll.clone();
         let mut rng = GameRng::new(2);
-        step.handle_implicit_reroll_index(&mut rng, BlockResult::Skull);
+        step.handle_implicit_reroll_index(&mut make_game(), &mut rng, BlockResult::Skull);
         assert_eq!(step.die_index, -1);
         assert_eq!(step.block_roll, original);
     }
@@ -1283,5 +1459,110 @@ mod tests {
             _ => None,
         });
         assert_eq!(rerolled, Some(true));
+    }
+
+    // ── Block skill re-roll half (BACKLOG §K item 6) ─────────────────────────
+
+    fn skill_game(rules: Rules, skills: &[SkillId]) -> Game {
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+        add_player_with_skill(&mut game, "atk", skills[0]);
+        for s in &skills[1..] {
+            game.team_home.players.last_mut().unwrap().starting_skills
+                .push(SkillWithValue { skill_id: *s, value: None });
+        }
+        game.home_playing = true;
+        game.acting_player.player_id = Some("atk".into());
+        game.acting_player.player_action = Some(ffb_model::enums::PlayerAction::Block);
+        game.defender_id = Some("def".into());
+        game.turn_data_home.rerolls = 0;
+        game
+    }
+
+    fn preset(rules_dice: Vec<i32>) -> StepBlockRoll {
+        let mut step = StepBlockRoll::new();
+        step.nr_of_dice = rules_dice.len() as i32;
+        step.block_roll = rules_dice;
+        step
+    }
+
+    /// bb2025 `showBlockRollDialog` maps SINGLE_BOTH_DOWN to Brawler only while a Both Down
+    /// shows, and SINGLE_DIE_PER_ACTIVATION to Pro; the skill half is asked once, then the die.
+    #[test]
+    fn bb2025_skill_half_lists_brawler_on_a_both_down_and_pro_always() {
+        use ffb_model::prompts::AgentPrompt;
+        let game = skill_game(Rules::Bb2025, &[SkillId::Brawler, SkillId::Pro]);
+        let mut step = preset(vec![2, 1]); // Both Down, Skull
+        match step.after_team_reroll_prompt(&game) {
+            AgentPrompt::BlockSkillReRoll { brawler, pro, own_choice, .. } => {
+                assert!(brawler && pro && own_choice);
+            }
+            other => panic!("expected the skill half, got {other:?}"),
+        }
+        assert!(matches!(step.after_team_reroll_prompt(&game), AgentPrompt::BlockChoice { .. }),
+            "asked once per dialog");
+
+        let mut step = preset(vec![1, 6]); // no Both Down
+        assert_eq!(step.skill_reroll_options(&game), (false, true));
+        step.re_roll_source = Some("Pro".into());
+        assert_eq!(step.skill_reroll_options(&game), (false, false),
+            "bb2025 builds no options once a re-roll source is set");
+    }
+
+    /// bb2025 Brawler: useReRoll reports the skill, the first Both Down is re-rolled and
+    /// `ReportBlockReRoll` names the source; the dialog re-shows with no options.
+    #[test]
+    fn bb2025_brawler_rerolls_the_both_down_and_reports_it() {
+        use ffb_model::prompts::AgentPrompt;
+        let mut game = skill_game(Rules::Bb2025, &[SkillId::Brawler]);
+        let mut step = preset(vec![1, 2]);
+        let out = step.handle_command(&Action::UseBrawler { target_id: None }, &mut game, &mut GameRng::new(5));
+        assert_eq!(step.die_index, 1);
+        assert!(matches!(out.prompt, Some(AgentPrompt::BlockChoice { .. })));
+        let json: Vec<String> = game.report_list.get_reports().iter()
+            .filter_map(|r| r.to_json()).map(|j| j.to_string()).collect();
+        assert!(json.iter().any(|j| j.contains("blockReRoll") && j.contains("Brawler")), "{json:?}");
+    }
+
+    /// Java `RollMechanic.useReRoll`, PRO branch: spending Pro rolls the skill die, sets usedPro
+    /// and reports the roll -- before the block die itself is re-rolled.
+    #[test]
+    fn pro_block_reroll_rolls_for_pro_and_marks_it_used() {
+        let mut game = skill_game(Rules::Bb2025, &[SkillId::Pro]);
+        game.field_model.set_player_state("atk", ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING));
+        let mut step = preset(vec![1, 1]);
+        step.handle_command(&Action::UseProReRollForBlock { die_index: 0 }, &mut game, &mut GameRng::new(3));
+        assert!(game.field_model.player_state("atk").unwrap().has_used_pro());
+        assert!(game.acting_player.used_skills.contains(&SkillId::Pro));
+        let json: Vec<String> = game.report_list.get_reports().iter()
+            .filter_map(|r| r.to_json()).map(|j| j.to_string()).collect();
+        assert!(json.iter().any(|j| j.contains("reRoll") && j.contains("Pro")), "{json:?}");
+    }
+
+    /// bb2020 Brawler skips useReRoll, replaces a not-yet-re-rolled Both Down, and leaves Pro
+    /// open while a die remains un-re-rolled (`proReRollOption` after BRAWLER).
+    #[test]
+    fn bb2020_brawler_then_pro_stays_offered() {
+        let mut game = skill_game(Rules::Bb2020, &[SkillId::Brawler, SkillId::Pro]);
+        let mut step = preset(vec![2, 1]);
+        assert_eq!(step.skill_reroll_options(&game), (true, true));
+        step.handle_command(&Action::UseBrawler { target_id: None }, &mut game, &mut GameRng::new(5));
+        assert_eq!(step.brawler_index, 0);
+        assert_eq!(step.re_rolled_dice_indexes, vec![0]);
+        let (brawler, pro) = step.skill_reroll_options(&game);
+        assert!(!brawler, "Brawler is once per block");
+        assert!(pro, "one die is still un-re-rolled");
+        assert!(game.report_list.get_reports().iter().filter_map(|r| r.to_json())
+            .all(|j| !j.to_string().contains("\"reRoll\"")), "bb2020 Brawler never calls useReRoll");
+    }
+
+    /// The agents' fixed rule: own choice, every die bad; Brawler before Pro; Pro on a Skull.
+    #[test]
+    fn block_skill_reroll_rule() {
+        use crate::agent::block_skill_reroll_answer as answer;
+        assert!(matches!(answer(&[2, 1], true, true, true), Action::UseBrawler { .. }));
+        assert!(matches!(answer(&[2, 1], true, false, true), Action::UseProReRollForBlock { die_index: 1 }));
+        assert!(matches!(answer(&[2, 2], true, false, true), Action::UseProReRollForBlock { die_index: 0 }));
+        assert!(matches!(answer(&[2, 6], true, true, true), Action::UseReRoll { use_reroll: false }));
+        assert!(matches!(answer(&[1], false, true, true), Action::UseReRoll { use_reroll: false }));
     }
 }

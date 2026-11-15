@@ -979,6 +979,11 @@ impl Agent for RandomAgent {
             Some(AgentPrompt::BlockChoiceProperties { .. }) => {
                 Action::BlockChoice { die_index: 0, target_id: None }
             }
+            // The block dialog's skill half (Brawler / Pro): the random contract never uses a
+            // skill re-roll -- DECLINE, 0 rng. ParityRunner only reaches its Brawler/Pro branch
+            // with the heuristic `reroll` class on.
+            Some(AgentPrompt::BlockSkillReRoll { .. }) =>
+                Action::UseReRoll { use_reroll: false },
             // Re-roll offer: AGENT_CONTRACT §7 — ALWAYS DECLINE, deterministically, 0 rng. Java
             // ParityRunner RE_ROLL / RE_ROLL_PROPERTIES = sendUseReRoll(action, null) (decline, no
             // decisionRng, no extra game die). The old code random-sampled via pick_bool, which both

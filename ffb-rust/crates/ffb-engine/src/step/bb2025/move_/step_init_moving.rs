@@ -319,7 +319,9 @@ impl Step for StepInitMoving {
                 }
                 // Java: commandStatus stays UNHANDLED_COMMAND (no explicit assignment in this
                 // case), so executeStep() is NOT re-invoked. Mirrored as cont() (no re-run).
-                return StepOutcome::cont();
+                // The step stays parked on its empty move stack, so re-run it: that only re-emits
+                // the move prompt (the agent's next answer delivers the path, BACKLOG §K item 6).
+                return self.execute_step(game, rng);
             }
 
             // Java: CLIENT_USE_SKILL → canAddBlockDie → ReportSkillUse(skill, true, ADD_BLOCK_DIE)
@@ -1027,13 +1029,17 @@ mod tests {
         game.field_model.ball_moving = false;
         let mut step = StepInitMoving::new("end".into());
         let action = crate::action::Action::UseSkill { skill_id: SkillId::Fumblerooskie, use_skill: true };
-        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        let out = step.handle_command(&action, &mut game, &mut GameRng::new(0));
         assert!(
             game.report_list.has_report(ReportId::FUMBLEROOSKIE),
             "expected FUMBLEROOSKIE report when moving and carrying the ball"
         );
         assert!(game.field_model.ball_moving, "ball should be set moving");
         assert!(game.acting_player.is_fumblerooskie_pending(), "fumblerooskie_pending should be set");
+        // Java leaves the step parked (UNHANDLED_COMMAND); the agent must be asked for the move
+        // again, or the driver waits on a prompt nothing raised (BACKLOG §K item 6).
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::Move { .. })),
+            "the move prompt is re-emitted: {:?}", out.prompt);
     }
 
     #[test]

@@ -263,6 +263,8 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
         // Purely internal like BlockTarget: Java's multi-block target selection is a client-side
         // dice-decoration flow ending in CLIENT_SYNCHRONOUS_MULTI_BLOCK — no server dialog.
         AgentPrompt::MultiBlockTargets { .. } => None,
+        // Agent-only half of the block dialog; the GUI shows Brawler/Pro on the BlockChoice dialog.
+        AgentPrompt::BlockSkillReRoll { .. } => None,
         AgentPrompt::BlockChoice { attacker_id, defender_id, dice, own_choice, nr_of_dice } =>
             Some(WireDialog::BlockChoice {
                 attacker_id: attacker_id.clone(), defender_id: defender_id.clone(),

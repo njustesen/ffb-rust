@@ -260,6 +260,8 @@ impl Agent for UniformAgent {
                 let idx = self.pick(dice.len().max(1));
                 Action::BlockChoice { die_index: idx, target_id: None }
             }
+            // The block dialog's skill half: always declined, no draw.
+            Some(AgentPrompt::BlockSkillReRoll { .. }) => Action::UseReRoll { use_reroll: false },
             Some(AgentPrompt::BlockChoiceProperties { .. }) => {
                 let _ = self.pick_bool();
                 Action::BlockChoice { die_index: 0, target_id: None }

@@ -41,6 +41,12 @@ public final class MoveReplay {
          * needs the board and this class is deliberately a pure function of the facts it is handed.
          */
         DECLARE_JUMP,
+        /**
+         * Use Fumblerooski (drop the ball where the carrier stands), then deliver the path on the
+         * NEXT prompt. Layered on top of {@code DELIVER_PATH} after the jump, like DECLARE_JUMP;
+         * Rust {@code fumblerooskie_now} in {@code handle_move}. BACKLOG §K item 6.
+         */
+        USE_FUMBLEROOSKIE,
         /** Send the plan's terminal action. */
         FIRE_TERMINAL,
         END_PLAYER_ACTION,

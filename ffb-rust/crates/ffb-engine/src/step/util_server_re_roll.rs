@@ -392,6 +392,36 @@ pub fn use_reroll_with_events(
         }
     }
 
+    // Java `RollMechanic.useReRoll`, PRO branch (all three editions): spending Pro is itself a
+    // roll. `successful = canRerollOncePerTurn && !playerState.hasUsedPro()`; only then mark
+    // usedPro, roll the skill die against `minimumProRoll()` and report `ReportReRoll(PRO,
+    // successful, roll)`. Afterwards the skill is marked used on the acting player. Rust sent Pro
+    // down the generic skill branch below -- no die, no usedPro bit, a roll-less report -- which
+    // stayed invisible until an agent first accepted a block Pro re-roll (BACKLOG §K item 6).
+    if re_roll_source.name == "Pro" {
+        use ffb_model::model::property::named_properties::NamedProperties;
+        let state = game.field_model.player_state(player_id).unwrap_or_default();
+        let pro_skill = game.player(player_id)
+            .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_REROLL_ONCE_PER_TURN));
+        let mut successful = pro_skill.is_some() && !state.has_used_pro();
+        if successful {
+            game.field_model.set_player_state(player_id, state.change_used_pro(true));
+            let roll = rng.d6();
+            let minimum = crate::mechanic::roll_mechanic_for(game.rules).minimum_pro_roll();
+            successful = roll >= minimum;
+            game.report_list.add(ffb_model::report::report_re_roll::ReportReRoll::new(
+                Some(player_id.to_string()),
+                ReRollSource::new("Pro"),
+                successful,
+                roll,
+            ));
+        }
+        if let Some(skill) = pro_skill {
+            crate::step::util_server_steps::mark_skill_used(game, player_id, skill);
+        }
+        return (successful, Vec::new());
+    }
+
     // Skill-based re-roll: mark the skill as used.
     use ffb_model::enums::SkillId;
     let skill_name = re_roll_source.name.clone();

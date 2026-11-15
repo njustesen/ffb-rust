@@ -187,7 +187,9 @@ impl Step for StepInitMoving {
                     game.report_list.add(ReportFumblerooskie::new(player_id, true));
                     game.acting_player.fumblerooskie_pending = true;
                 }
-                return StepOutcome::cont();
+                // The step stays parked on its empty move stack, so re-run it: that only re-emits
+                // the move prompt (the agent's next answer delivers the path, BACKLOG §K item 6).
+                return self.execute_step(game, rng);
             }
 
             // Java: CLIENT_USE_SKILL → canAddBlockDie → ReportSkillUse(skill, true, ADD_BLOCK_DIE)

@@ -40,6 +40,19 @@ pub enum AgentPrompt {
         own_choice: bool,
         nr_of_dice: i32,
     },
+    /// The SKILL half of Java's block-roll dialog: asked after its TRR half (`ReRollOffer`
+    /// action BLOCK) and before the die choice, only while the dialog lists a Brawler
+    /// (SINGLE_BOTH_DOWN / bb2020 `brawlerOption`) or Pro (SINGLE_DIE_PER_ACTIVATION /
+    /// bb2020 `proReRollOption`) re-roll. Answered with `Action::UseBrawler`,
+    /// `Action::UseProReRollForBlock` or, to decline, `Action::UseReRoll { use_reroll: false }`
+    /// -- always with ZERO sampler draws.
+    BlockSkillReRoll {
+        attacker_id: PlayerId,
+        dice: Vec<i32>,
+        own_choice: bool,
+        brawler: bool,
+        pro: bool,
+    },
     BlockChoiceProperties {
         attacker_id: PlayerId,
         defender_id: PlayerId,

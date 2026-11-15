@@ -9616,4 +9616,22 @@ the skill (Multiple Block, Kick 'em, Putrid Regurgitation, Chomp — stars only)
    pushCurrentStepOnStack, so the defender was NEVER moved; the loose-ball tail ignored the edition
    split (bb2020 scatters with no dialog; bb2025 publishes ATTEMPT_PICK_UP, PLAYER_ON_BALL_ID =
    defender, PICK_UP_OPTIONAL = true -- Rust named the attacker and false).
+   **Pro + Brawler + Fumblerooski DONE 2026-11-15.** Both need a USE policy, so each got a fixed
+   zero-draw rule mirrored in both agents (zero draws, so the sampler streams are untouched):
+   - Block skill re-rolls: the block dialog's skill half is a new Rust prompt
+     `AgentPrompt::BlockSkillReRoll` (after the TRR half, before the die choice; class `reroll`),
+     answered in ParityRunner from DialogBlockRollProperties' rrActionToSource (bb2025) /
+     DialogBlockRollPartialReRoll's options (bb2020). Rule: own choice and every die Skull/Both
+     Down -> Brawler if offered and a Both Down shows, else Pro on the first Skull (else Both Down).
+   - Fumblerooski: a new move-replay verdict layered after the jump (`fumblerooskie_now` /
+     `ActivationDriver.fumblerooskieNow`): a marked carrier with canDropBall drops the ball before
+     walking its planned path.
+   Gates: imperial_nobility / black_orc / chaos_dwarf / khemri / old_world_alliance_ogre / elf over
+   bb2020+bb2025 and three scales, 195/195 steps + reports (Pro 46 rolls incl. 10 failed, Brawler
+   30, Fumblerooski 15). Rust bugs, all 1:1 + tests: `use_reroll` sent PRO down the generic skill
+   branch (no Pro d6, no usedPro bit, roll-less report); the single-block step never wrote
+   `ReportBlockReRoll` (Brawler/Hatred/Pro/single-die/Savage Blow); bb2020 skips useReRoll for
+   Brawler/Unstoppable Momentum/Savage Blow, tracks reRolledDiceIndexes (a failed Pro uses its die)
+   and brawlerIndex, and keeps Pro/Brawler open after another skill re-roll; StepInitMoving parked
+   with NO prompt after CLIENT_USE_FUMBLEROOSKIE (both editions), so the driver waited forever.
 7. Data (G5): draft carriers of Multiple Block / Kick 'em / Putrid Regurgitation / Chomp.

@@ -278,6 +278,29 @@ fn adjacent_diving_tackler(g: &Game, mover_id: &str, coord: FieldCoordinate) -> 
 ///
 /// Both engines' agents run this identical function; the Java twin is
 /// `ActivationDriver.jumpOverFirstStep`.
+/// Should the ball-carrier use Fumblerooski before walking its planned path (BACKLOG §K item 6)?
+/// Java twin: `ActivationDriver.fumblerooskieNow`.
+///
+/// A fixed rule with no sampler draws: the mover carries a `canDropBall` skill, holds the ball,
+/// its declared action allows it, it has not already dropped it this action, and it stands in an
+/// opposing tackle zone. The engine then leaves the ball in the square the carrier walks out of
+/// (`StepResetFumblerooskie`).
+fn fumblerooskie_now(g: &Game, player_id: &str) -> bool {
+    use ffb_model::model::property::named_properties::NamedProperties;
+    use ffb_model::util::util_player::UtilPlayer;
+    let ap = &g.acting_player;
+    if ap.fumblerooskie_pending || ap.player_action.map(|a| !a.allows_fumblerooskie()).unwrap_or(true) {
+        return false;
+    }
+    let Some(p) = g.player(player_id) else { return false };
+    if !p.has_skill_property(NamedProperties::CAN_DROP_BALL) || !UtilPlayer::has_ball(g, player_id) {
+        return false;
+    }
+    g.field_model.player_coordinate(player_id)
+        .map(|here| tz_on(g, player_id, here) > 0)
+        .unwrap_or(false)
+}
+
 fn jump_over_first_step(g: &Game, player_id: &str, path: &[FieldCoordinate]) -> bool {
     use ffb_mechanics::jump_mechanic::JumpMechanic as _;
     use ffb_model::model::property::named_properties::NamedProperties;
@@ -1867,6 +1890,34 @@ impl ClassMask {
     }
 }
 
+/// The answer to the block dialog's skill half (`AgentPrompt::BlockSkillReRoll`), a fixed rule
+/// with no sampler draws, mirrored by `ParityRunner.answerBlockSkillReRoll`:
+///
+/// * only on the attacker's own choice, and only when EVERY die is a Skull or Both Down;
+/// * Brawler first, when offered and a Both Down is showing;
+/// * else Pro on the first Skull (else the first Both Down);
+/// * otherwise decline (`UseReRoll { use_reroll: false }`).
+pub fn block_skill_reroll_answer(dice: &[i32], own_choice: bool, brawler: bool, pro: bool) -> Action {
+    use ffb_model::enums::BlockResult;
+    let results: Vec<BlockResult> = dice.iter()
+        .map(|d| ffb_mechanics::mechanics::block_result_for_roll(*d)).collect();
+    let all_bad = !results.is_empty()
+        && results.iter().all(|r| matches!(r, BlockResult::Skull | BlockResult::BothDown));
+    if !own_choice || !all_bad {
+        return Action::UseReRoll { use_reroll: false };
+    }
+    if brawler && results.contains(&BlockResult::BothDown) {
+        return Action::UseBrawler { target_id: None };
+    }
+    if pro {
+        let idx = results.iter().position(|r| *r == BlockResult::Skull)
+            .or_else(|| results.iter().position(|r| *r == BlockResult::BothDown))
+            .unwrap_or(0);
+        return Action::UseProReRollForBlock { die_index: idx };
+    }
+    Action::UseReRoll { use_reroll: false }
+}
+
 /// Which class a prompt belongs to, for [`ClassMask`].
 pub fn prompt_class_of(p: &AgentPrompt) -> PromptClass {
     match p {
@@ -1877,6 +1928,7 @@ pub fn prompt_class_of(p: &AgentPrompt) -> PromptClass {
         AgentPrompt::TeamSetup { .. } => PromptClass::TeamSetup,
         AgentPrompt::FollowUp { .. } => PromptClass::FollowUp,
         AgentPrompt::ReRollOffer { .. } => PromptClass::ReRollOffer,
+        AgentPrompt::BlockSkillReRoll { .. } => PromptClass::ReRollOffer,
         AgentPrompt::SkillUse { .. } => PromptClass::SkillUse,
         AgentPrompt::Interception { .. } => PromptClass::Interception,
         AgentPrompt::BlockChoice { .. } => PromptClass::BlockChoice,
@@ -2312,6 +2364,13 @@ impl HeuristicAgent {
                         pl.path.remove(0);
                         self.plan = Some(pl);
                         return Action::DeclareJump;
+                    }
+                    // BACKLOG §K item 6 -- Fumblerooski, layered after the jump the same way: a
+                    // separate command BEFORE the move, the path delivered on the next prompt.
+                    if fumblerooskie_now(g, &player_id) {
+                        self.plan = Some(pl);
+                        // The step arms key CLIENT_USE_FUMBLEROOSKIE on this id in both editions.
+                        return Action::UseSkill { skill_id: SkillId::Fumblerooskie, use_skill: true };
                     }
                     let path = std::mem::take(&mut pl.path);
                     pl.delivered = true;
@@ -4154,6 +4213,10 @@ impl HeuristicAgent {
     /// Prompts that read nothing about the board, so §20.7 never builds it for them.
     fn act_boardless(&mut self, gs: &GameState, g: &Game, prompt: AgentPrompt) -> Action {
         match prompt {
+            // ── block skill re-roll (BACKLOG §K item 6): fixed rule, ZERO draws ─────────
+            AgentPrompt::BlockSkillReRoll { dice, own_choice, brawler, pro, .. } => {
+                block_skill_reroll_answer(&dice, own_choice, brawler, pro)
+            }
             // ── skill use (§6.16) ───────────────────────────────────────────
             AgentPrompt::SkillUse { skill_name, .. } => {
                 let skill_id = SkillId::from_class_name(&skill_name).unwrap_or(SkillId::Block);
