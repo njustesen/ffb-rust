@@ -208,12 +208,11 @@ impl StepDivingTackle {
                         }
 
                         if should_prompt {
-                            let team_id = game.inactive_team().id.clone();
-                            self.using_diving_tackle = None;
+                                                        self.using_diving_tackle = None;
                             return Some(StepOutcome::cont().with_prompt(
                                 ffb_model::prompts::AgentPrompt::PlayerChoice {
                                     eligible_players: diving_tacklers,
-                                    reason: team_id,
+                                    reason: "DIVING_TACKLE".into(),
                                     descriptions,
                                 },
                             ));
@@ -345,12 +344,11 @@ impl StepDivingTackle {
                         }
 
                         if should_prompt {
-                            let team_id = game.inactive_team().id.clone();
-                            self.using_diving_tackle = None;
+                                                        self.using_diving_tackle = None;
                             return Some(StepOutcome::cont().with_prompt(
                                 ffb_model::prompts::AgentPrompt::PlayerChoice {
                                     eligible_players: diving_tacklers,
-                                    reason: team_id,
+                                    reason: "DIVING_TACKLE".into(),
                                     descriptions,
                                 },
                             ));
@@ -395,7 +393,12 @@ impl StepDivingTackle {
 
         if has_strength && DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll) {
             self.using_break_tackle = true;
+            // Java: `actingPlayer.markSkillUsed(strengthSkill)` — the activation set, plus the
+            // player only for a usage type tracked outside the activation.
+            // `DodgeModifierFactory` reads `Player.used_skills`, so mark that too, exactly as
+            // both StepMoveDodge twins do when Break Tackle saves a dodge.
             if let Some(pid) = acting.player_id.as_deref() {
+                crate::step::util_server_steps::mark_skill_used(game, pid, SkillId::BreakTackle);
                 if let Some(player) = game.player_mut(pid) {
                     player.used_skills.insert(SkillId::BreakTackle);
                 }
@@ -464,7 +467,7 @@ impl Step for StepDivingTackle {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             StepParameter::GotoLabelOnSuccess(v) => { self.goto_label_on_success = v.clone(); true }
-            StepParameter::CoordinateFrom(v) => { self.coordinate_from = Some(*v); true }
+            StepParameter::CoordinateFrom(v) => { self.coordinate_from = *v; true }
             StepParameter::CoordinateTo(v) => { self.coordinate_to = Some(*v); true }
             StepParameter::DodgeRoll(v) => { self.dodge_roll = *v; true }
             StepParameter::UsingBreakTackle(v) => { self.using_break_tackle = *v; true }
@@ -546,7 +549,7 @@ mod tests {
         let mut step = StepDivingTackle::new();
         let coord = FieldCoordinate::new(3, 5);
         assert!(step.set_parameter(&StepParameter::GotoLabelOnSuccess("S".into())));
-        assert!(step.set_parameter(&StepParameter::CoordinateFrom(coord)));
+        assert!(step.set_parameter(&StepParameter::CoordinateFrom(Some(coord))));
         assert!(step.set_parameter(&StepParameter::CoordinateTo(coord)));
         assert!(step.set_parameter(&StepParameter::DodgeRoll(3)));
         assert!(step.set_parameter(&StepParameter::UsingBreakTackle(true)));

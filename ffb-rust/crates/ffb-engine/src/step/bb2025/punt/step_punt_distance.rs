@@ -50,7 +50,7 @@ impl Step for StepPuntDistance {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             StepParameter::Direction(d) => { self.direction = Some(*d); true }
-            StepParameter::CoordinateFrom(c) => { self.coordinate_from = Some(*c); true }
+            StepParameter::CoordinateFrom(c) => { self.coordinate_from = *c; true }
             _ => false,
         }
     }
@@ -194,7 +194,7 @@ mod tests {
         let mut step = StepPuntDistance::new();
         let coord = FieldCoordinate::new(5, 7);
         step.set_parameter(&StepParameter::Direction(Direction::North));
-        step.set_parameter(&StepParameter::CoordinateFrom(coord));
+        step.set_parameter(&StepParameter::CoordinateFrom(Some(coord)));
         assert_eq!(step.direction, Some(Direction::North));
         assert_eq!(step.coordinate_from, Some(coord));
     }

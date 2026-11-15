@@ -98,7 +98,7 @@ impl Step for StepMoveDodge {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             StepParameter::GotoLabelOnFailure(v) => { self.goto_label_on_failure = v.clone(); true }
-            StepParameter::CoordinateFrom(v) => { self.coordinate_from = Some(*v); true }
+            StepParameter::CoordinateFrom(v) => { self.coordinate_from = *v; true }
             StepParameter::CoordinateTo(v) => { self.coordinate_to = Some(*v); true }
             StepParameter::DodgeRoll(v) => { self.dodge_roll = *v; true }
             StepParameter::UsingDivingTackle(v) => { self.using_diving_tackle = Some(*v); true }
@@ -155,8 +155,13 @@ impl StepMoveDodge {
             }
         }
 
-        // Java: dodge(doRoll) rolls and publishes DODGE_ROLL.
-        if self.dodge_roll == 0 {
+        // Java: `doRoll = reRolledAction || (fUsingDivingTackle == null)`; dodge(doRoll) rolls and
+        // publishes DODGE_ROLL only then. The RETRY_DODGE re-entry after a Diving Tackle
+        // (usingDivingTackle = true) re-evaluates the published die under the DT modifier.
+        let do_roll_now = (self.re_roll_state.re_rolled_action.as_ref().map(|a| a.name == "DODGE").unwrap_or(false)
+            && self.re_roll_state.re_roll_source.is_some())
+            || self.using_diving_tackle.is_none();
+        if do_roll_now && self.dodge_roll == 0 {
             self.dodge_roll = rng.d6();
             self.dodge_roll_to_publish = Some(self.dodge_roll);
         }
@@ -206,10 +211,11 @@ impl StepMoveDodge {
         let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
             .map(|a| a.name == "DODGE").unwrap_or(false)
             && self.re_roll_state.re_roll_source.is_some();
+        // Java: `(pDoRoll ? fDodgeRoll : 0)` — the Diving Tackle re-evaluation reports no die.
         game.report_list.add(ReportDodgeRoll::new(
             player_id.clone(),
             successful,
-            self.dodge_roll,
+            if do_roll { self.dodge_roll } else { 0 },
             minimum_roll,
             re_rolled,
             mod_names,
@@ -317,7 +323,14 @@ impl StepMoveDodge {
             let ctx = DodgeContext::new_with_break_tackle(game, &acting, src, tgt, self.using_break_tackle);
             let mods = factory.find_applicable(&ctx);
             let skill_mods = factory.find_skill_modifiers(&ctx);
-            let all: Vec<&ffb_mechanics::modifiers::dodge_modifier::DodgeModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
+            let mut all: Vec<&ffb_mechanics::modifiers::dodge_modifier::DodgeModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
+            // Java: `if (fUsingDivingTackle != null && fUsingDivingTackle)
+            //   dodgeModifiers.addAll(modifierFactory.forType(ModifierType.DIVING_TACKLE));`
+            let dt_modifier = ffb_mechanics::modifiers::dodge_modifier::DodgeModifier::new(
+                "Diving Tackle", 2, ffb_mechanics::modifiers::modifier_type::ModifierType::DIVING_TACKLE);
+            if self.using_diving_tackle == Some(true) {
+                all.push(&dt_modifier);
+            }
             let agility = game.player(pid).map(|p| p.agility as i32).unwrap_or(3);
             // BB2016 uses the OLD AG scale for the dodge minimum ((7-stat)-1+total), NOT the shared
             // bb2025 (agility+total) — see DodgeModifierFactory::minimum_roll_edition. The bb2025
@@ -442,6 +455,28 @@ mod tests {
         }).collect();
         assert_eq!(published, vec![step.dodge_roll], "the rolled die is published exactly once");
         assert!((1..=6).contains(&step.dodge_roll));
+    }
+
+    /// Java bb2016 RETRY_DODGE after a Diving Tackle: `doRoll` is false (usingDivingTackle set),
+    /// the published die is re-evaluated with the DIVING_TACKLE modifier, and the report carries
+    /// `roll = 0` (slann bb2016 seed 3: Java min 5 with "Diving Tackle", fail; Rust had min 3).
+    #[test]
+    fn diving_tackle_retry_reevaluates_the_die_with_the_dt_modifier() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        add_player(&mut game, "p1");
+        let mut step = StepMoveDodge::new("fail".into());
+        step.dodge_roll = 4;
+        assert!(step.set_parameter(&StepParameter::UsingDivingTackle(true)));
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert_eq!(rng.call_count, 0, "no die on the re-evaluation");
+        let r = game.report_list.get_reports().iter().filter_map(|r| r.to_json())
+            .find(|j| j["reportId"] == "dodgeRoll").expect("dodge report");
+        assert_eq!(r["roll"], 0);
+        assert!(r["rollModifiers"].as_array().map(|a| a.iter().any(|m| m == "Diving Tackle")).unwrap_or(false),
+            "DT modifier listed: {r}");
     }
 
     #[test]

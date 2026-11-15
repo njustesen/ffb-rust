@@ -1370,51 +1370,58 @@ impl Agent for RandomAgent {
                     None => Action::SelectPlayer { player_id: String::new() },
                 }
             }
-            // Shadowing and Tentacles STAY DECLINED, and this note records why, because the
-            // mechanism works and the blocker is elsewhere.
-            //
-            // Both agents answer this prompt with an empty selection, so Shadowing and Tentacles
-            // have never executed in a single one of 33,000 games — every matrix is green because
-            // NEITHER engine runs the mechanic. Accepting is cheap and desync-free on the agent
-            // side: pick the min-(x,y) candidate with ZERO draws, which is exactly
-            // `ParityRunner.sortPlayersByCoordinate` followed by index 0 (`PlayerChoice` is
-            // `PromptClass::Other` and the heuristic delegates it by contract, so no draw may be
-            // spent here). That was built, mirrored in ParityRunner and MEASURED: it turns on
-            // `tentaclesShadowingRoll` on both sides and exposed three real BB2020 engine bugs,
-            // each a BB2025-only rule the shared step applied to every edition — the flat
-            // minimum roll of 4 (BB2020 is `max(6 - (defenderMA - actorMA), 2)`), the
-            // `shadowingCount` once-per-MA filter, and the `movesRandomly` term in `doShadowing`.
-            // All three are fixed in `step/bb2025/move_/step_shadowing.rs` and stay fixed.
-            //
-            // What is NOT solved, and is the follow-up:
-            //   * BB2016's Shadowing is a different mechanic — two dice through
-            //     `minimumRollShadowingEscape(shadowerMA, dodgerMA)`, an ESCAPE roll made by the
-            //     DODGER under `SHADOWING_ESCAPE`. The live step is the BB2025 one (no BB2016
-            //     override in `make_step_for`) and rolls a single die.
-            //   * BB2020 pushes its SHADOWING step from `generator/bb2020/Block` and `BlitzBlock`
-            //     as well as `Move`; the BB2025 generators push it only from `Move`/`BlitzMove`,
-            //     and Rust runs the BB2025 generators everywhere. A blitzer following up out of a
-            //     shadower's tackle zone therefore rolls in Java and not in Rust
-            //     (chaos_dwarf bb2020 seed 10 i=45).
-            //   * Even BB2025 is not clean: with the prompt accepted, dark_elf bb2025 went 22/25,
-            //     one seed showing Java rolling Shadowing TWICE for one shadower across
-            //     consecutive move squares where Rust rolls once.
-            // Turning this on is a campaign of its own, not a switch; it is off until that
-            // campaign runs, so the matrix stays green.
-            //
-            // PICK_ME_UP is agent-gated like the other two — `pickMeUp` appears zero times in a
-            // 33,000-game report census — and accepting it is NOT a free win. With BOTH harnesses
-            // accepting it, both engines rolled for three eligible players but in a different
-            // ORDER: nurgle bb2025 seed 23 i=29 rolled 5/3/6 for away 9,10,11 in Java and for away
-            // 10,9,11 in Rust, and four seeds went red. Same min-(x,y) rule on both sides, so the
-            // eligible LIST or the re-prompt order is what differs; that has to be root-caused
-            // before this mode is added. (An earlier note here claimed Java rolled these from the
-            // step rather than from an answered dialog and that they already fired on both sides.
-            // That was wrong: the run it was read from had the accept switched on in BOTH
-            // harnesses. The census with the accept off shows the report never appears.)
-            //
-            // Diving Tackle could not be added here at all: its prompt carries the TEAM ID in
-            // `reason` (`step_diving_tackle.rs:216`), not a mode string.
+            // SHADOWING / TENTACLES / DIVING_TACKLE (BACKLOG §K item 5): ACCEPT with the min-(x,y) candidate and
+            // ZERO draws — `ParityRunner.sortPlayersByCoordinate` then index 0 on the Java side.
+            // `PlayerChoice` is `PromptClass::Other` and the heuristic delegates it here by
+            // contract, so no decision draw may be spent. Board coordinates are engine-agnostic.
+            Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
+                if reason == "SHADOWING" || reason == "TENTACLES" || reason == "DIVING_TACKLE" =>
+            {
+                let best = eligible_players.iter().min_by_key(|pid| {
+                    gs.game
+                        .field_model
+                        .player_coordinate(pid)
+                        .map(|c| (c.x, c.y))
+                        .unwrap_or((i32::MAX, i32::MAX))
+                });
+                match best {
+                    Some(pid) => Action::PlayerChoice {
+                        player_id: Some(pid.clone()),
+                        player_ids: vec![pid.clone()],
+                        mode: reason.clone(),
+                    },
+                    None => Action::SelectPlayer { player_id: String::new() },
+                }
+            }
+            // PICK_ME_UP (BACKLOG §K item 5): select ALL candidates in ONE command, sorted by
+            // (x,y), ZERO draws. Both engines roll in SELECTION order (`playerIdsSelected`), while
+            // the dialog's own list order is a HashSet's in both (Java `Collectors.toSet()`, Rust
+            // `HashSet`) — so the list must never be taken as given. ParityRunner sorts the same.
+            Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
+                if reason == "PICK_ME_UP" =>
+            {
+                let mut cands: Vec<String> = eligible_players.clone();
+                cands.sort_by_key(|pid| {
+                    gs.game.field_model.player_coordinate(pid)
+                        .map(|c| (c.x, c.y))
+                        .unwrap_or((i32::MAX, i32::MAX))
+                });
+                Action::PlayerChoice {
+                    player_id: cands.first().cloned(),
+                    player_ids: cands,
+                    mode: "PICK_ME_UP".into(),
+                }
+            }
+            // History of the four accepts above (all off until BACKLOG §K item 5): with both agents
+            // declining, Shadowing, Tentacles, Pick-me-up and Diving Tackle never executed in any of
+            // 33,000 games. A first attempt at Shadowing/Tentacles exposed three BB2020 bugs in the
+            // shared step (flat minimum 4, the BB2025-only `shadowingCount` filter, the
+            // `movesRandomly` term). §K item 5 closed the rest: BB2016 now routes to its own
+            // Shadowing/Tentacles steps (a 2d6 ESCAPE roll by the dodger), bb2020 BlitzBlock runs
+            // TENTACLES + SHADOWING after FOLLOWUP, the acting player's strength is copied on every
+            // activation (BB2016 Tentacles reads it), the Diving Tackle prompt names its mode, and
+            // Pick-me-up selects in coordinate order because both engines' candidate lists are
+            // hash-set ordered. Every other mode below still declines with an empty selection.
             Some(AgentPrompt::PlayerChoice { .. }) => {
                 Action::SelectPlayer { player_id: String::new() }
             }
@@ -1871,6 +1878,41 @@ mod tests {
         }
         assert_eq!(agent.decision_rng_count, before,
             "the candidate comes from actionRng, not the decision stream");
+    }
+
+    /// §K item 5: Shadowing / Tentacles / Diving Tackle accept the min-(x,y) candidate, and
+    /// Pick-me-up selects EVERY candidate sorted by (x,y) — both engines roll in selection order.
+    #[test]
+    fn skill_player_choices_are_accepted_in_coordinate_order() {
+        let mut gs = new_game(1);
+        gs.game.field_model.set_player_coordinate("x1", ffb_model::types::FieldCoordinate::new(7, 2));
+        gs.game.field_model.set_player_coordinate("x2", ffb_model::types::FieldCoordinate::new(4, 9));
+        gs.game.field_model.set_player_coordinate("x3", ffb_model::types::FieldCoordinate::new(4, 3));
+        let eligible = vec!["x1".to_string(), "x2".to_string(), "x3".to_string()];
+        for mode in ["SHADOWING", "TENTACLES", "DIVING_TACKLE"] {
+            gs.pending_prompt = Some(AgentPrompt::PlayerChoice {
+                eligible_players: eligible.clone(), reason: mode.into(), descriptions: vec![],
+            });
+            let mut agent = RandomAgent::new_parity(1);
+            match agent.act(&gs) {
+                Action::PlayerChoice { player_id, mode: m, .. } => {
+                    assert_eq!(player_id.as_deref(), Some("x3"), "{mode}");
+                    assert_eq!(m, mode);
+                }
+                other => panic!("{mode}: expected an accept, got {other:?}"),
+            }
+        }
+        gs.pending_prompt = Some(AgentPrompt::PlayerChoice {
+            eligible_players: eligible, reason: "PICK_ME_UP".into(), descriptions: vec![],
+        });
+        let mut agent = RandomAgent::new_parity(1);
+        match agent.act(&gs) {
+            Action::PlayerChoice { player_ids, mode, .. } => {
+                assert_eq!(mode, "PICK_ME_UP");
+                assert_eq!(player_ids, vec!["x3".to_string(), "x2".to_string(), "x1".to_string()]);
+            }
+            other => panic!("expected all Pick-me-up candidates, got {other:?}"),
+        }
     }
 
     /// An empty candidate list declines, matching Java's `sendInterceptorChoice(null, null)`.

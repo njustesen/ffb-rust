@@ -136,7 +136,7 @@ impl StepInitPunt {
             game.field_model.clear_move_squares();
             return StepOutcome::next()
                 .publish(StepParameter::CoordinateTo(coord))
-                .publish(StepParameter::CoordinateFrom(from));
+                .publish(StepParameter::CoordinateFrom(Some(from)));
         }
 
         // Java: findPuntSquares(playerCoordinate).map(MoveSquare::new).forEach(fieldModel::add);

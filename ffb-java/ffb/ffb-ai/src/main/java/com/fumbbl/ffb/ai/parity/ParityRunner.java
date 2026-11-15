@@ -1832,14 +1832,31 @@ public class ParityRunner {
                             }
                         }
                         selection = (lowest != null) ? new Player[]{ lowest } : new Player[0];
-                    // Shadowing and Tentacles STAY DECLINED here, mirroring random_agent.rs.
-                    // Accepting them (coordinate-sort, index 0, no actionRng draw) was built and
-                    // measured: it turns the mechanic on in both engines and exposed three real
-                    // BB2020 Rust bugs, all now fixed. It is off because three gaps remain --
-                    // BB2016's Shadowing is a two-dice ESCAPE roll by the DODGER, BB2020 pushes
-                    // SHADOWING from Block/BlitzBlock as well as Move while Rust runs the BB2025
-                    // generators everywhere, and even BB2025 showed dark_elf 22/25. See the long
-                    // note in random_agent.rs for the exact seeds.
+                    } else if ((mode == PlayerChoiceMode.SHADOWING || mode == PlayerChoiceMode.TENTACLES
+                            || mode == PlayerChoiceMode.DIVING_TACKLE)
+                            && pids != null && pids.length > 0) {
+                        // BACKLOG section K item 5: ACCEPT Shadowing / Tentacles with the min-(x,y)
+                        // candidate and NO actionRng draw -- identical to random_agent.rs's
+                        // SHADOWING/TENTACLES arm. Board coordinates are engine-agnostic.
+                        List<Player<?>> shCands = new ArrayList<>();
+                        for (String pid : pids) {
+                            Player<?> cand = game.getPlayerById(pid);
+                            if (cand != null) shCands.add(cand);
+                        }
+                        sortPlayersByCoordinate(shCands, game.getFieldModel());
+                        selection = shCands.isEmpty() ? new Player[0] : new Player[]{ shCands.get(0) };
+                    } else if (mode == PlayerChoiceMode.PICK_ME_UP && pids != null && pids.length > 0) {
+                        // BACKLOG section K item 5: select ALL candidates in one command, sorted
+                        // by (x,y), no actionRng draw. StepPickMeUp rolls in SELECTION order and
+                        // its dialog list is HashSet order (Collectors.toSet()), so sort first --
+                        // identical to random_agent.rs's PICK_ME_UP arm.
+                        List<Player<?>> pmuCands = new ArrayList<>();
+                        for (String pid : pids) {
+                            Player<?> cand = game.getPlayerById(pid);
+                            if (cand != null) pmuCands.add(cand);
+                        }
+                        sortPlayersByCoordinate(pmuCands, game.getFieldModel());
+                        selection = pmuCands.toArray(new Player[0]);
                     } else {
                         selection = new Player[0];
                     }

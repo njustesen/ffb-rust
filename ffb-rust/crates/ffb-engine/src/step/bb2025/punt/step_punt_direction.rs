@@ -61,7 +61,7 @@ impl Step for StepPuntDirection {
             // Java init(): GOTO_LABEL_ON_END
             StepParameter::GotoLabelOnEnd(v) => { self.goto_label_on_end = v.clone(); true }
             StepParameter::CoordinateTo(c) => { self.coordinate_to = Some(*c); true }
-            StepParameter::CoordinateFrom(c) => { self.coordinate_from = Some(*c); true }
+            StepParameter::CoordinateFrom(c) => { self.coordinate_from = *c; true }
             StepParameter::Touchback(v) => { self.out_of_bounds = *v; true }
             _ => false,
         }
@@ -209,7 +209,7 @@ mod tests {
         let mut step = StepPuntDirection::new("end".into());
         let from = FieldCoordinate::new(5, 5);
         let to = FieldCoordinate::new(6, 5);
-        step.set_parameter(&StepParameter::CoordinateFrom(from));
+        step.set_parameter(&StepParameter::CoordinateFrom(Some(from)));
         step.set_parameter(&StepParameter::CoordinateTo(to));
         assert_eq!(step.coordinate_from, Some(from));
         assert_eq!(step.coordinate_to, Some(to));

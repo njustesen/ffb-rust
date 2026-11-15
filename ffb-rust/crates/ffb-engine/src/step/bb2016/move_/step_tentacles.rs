@@ -8,7 +8,7 @@ use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
-use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available_for, use_reroll};
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2016.move.StepTentacles +
 /// inline of com.fumbbl.ffb.server.skillbehaviour.bb2016.TentaclesBehaviour.
@@ -58,11 +58,12 @@ impl StepTentacles {
             if game.acting_player.dodging || game.acting_player.jumping {
                 if let Some(coord_from) = self.coordinate_from {
                     let actor_id = game.acting_player.player_id.clone().unwrap_or_default();
-                    let tentaclers: Vec<String> = UtilPlayer::find_adjacent_opposing_players_with_property(
+                    // Java: UtilPlayer.findAdjacentOpposingPlayersWithSkill(game, coordinateFrom, skill, false)
+                    let tentaclers: Vec<String> = UtilPlayer::find_adjacent_opposing_players_with_skill(
                         game,
                         &actor_id,
                         coord_from,
-                        NamedProperties::CAN_HOLD_PLAYERS_LEAVING_TACKLEZONES,
+                        ffb_model::enums::SkillId::Tentacles,
                         false,
                     ).into_iter().cloned().collect();
 
@@ -123,18 +124,24 @@ impl StepTentacles {
                                 dice.to_vec(),
                                 successful,
                                 min_roll,
-                                re_rolled,
+                                // Java: reRolled = (reRolledAction == TENTACLES_ESCAPE) && (reRollSource != null)
+                                re_rolled && self.re_roll_source.is_some(),
                             ));
 
                             if successful {
                                 self.using_tentacles = Some(false);
                             } else if !re_rolled {
+                                // Java: askForReRollIfAvailable(gameState, actingPlayer.getPlayer(), TENTACLES_ESCAPE, ..)
                                 let actor_id = game.acting_player.player_id.clone().unwrap_or_default();
-                                if let Some(prompt) = ask_for_reroll_if_available(game, "TENTACLES_ESCAPE", min_roll, false) {
+                                if let Some(prompt) = ask_for_reroll_if_available_for(
+                                    game, Some(actor_id.as_str()), "TENTACLES_ESCAPE", min_roll, false)
+                                {
                                     self.re_rolled_action = Some("TENTACLES_ESCAPE".into());
-                                    self.re_roll_source = Some("TRR".into());
+                                    // The offer carries the real source (skill re-roll or TRR).
+                                    if let ffb_model::prompts::AgentPrompt::ReRollOffer { ref source, .. } = prompt {
+                                        self.re_roll_source = Some(source.name.clone());
+                                    }
                                     do_next_step = false;
-                                    let _ = actor_id;
                                     return StepOutcome::cont().with_prompt(prompt);
                                 }
                                 // No re-roll available — tentacles wins, fall through to do_next_step
@@ -158,7 +165,7 @@ impl StepTentacles {
                     return StepOutcome::goto(&label)
                         .publish(StepParameter::FeedingAllowed(false))
                         .publish(StepParameter::EndPlayerAction(true))
-                        .publish(StepParameter::CoordinateFrom(FieldCoordinate::new(0, 0)));
+                        .publish(StepParameter::CoordinateFrom(None));
                 }
                 return StepOutcome::next();
             }
@@ -182,19 +189,15 @@ impl Step for StepTentacles {
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
             // Java: CLIENT_PLAYER_CHOICE (PlayerChoiceMode.TENTACLES)
+            // Java bb2016: usingTentacles = isProvided(playerId); game.setDefenderId(playerId) —
+            // unconditional, and unlike BB2020+ no lastDefenderId bookkeeping.
             Action::PlayerChoice { player_id, mode, .. } if mode == "TENTACLES" => {
                 self.using_tentacles = Some(player_id.is_some());
-                if let Some(ref pid) = player_id {
-                    game.last_defender_id = game.defender_id.clone();
-                    game.defender_id = Some(pid.clone());
-                }
+                game.defender_id = player_id.clone();
             }
             Action::SelectPlayer {player_id } => {
                 self.using_tentacles = Some(!player_id.is_empty());
-                if !player_id.is_empty() {
-                    game.last_defender_id = game.defender_id.clone();
-                    game.defender_id = Some(player_id.clone());
-                }
+                game.defender_id = if player_id.is_empty() { None } else { Some(player_id.clone()) };
             }
             Action::UseReRoll { use_reroll: false } => {
                 self.re_roll_source = None;
@@ -207,7 +210,7 @@ impl Step for StepTentacles {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             StepParameter::GotoLabelOnSuccess(v) => { self.goto_label_on_success = v.clone(); true }
-            StepParameter::CoordinateFrom(v)     => { self.coordinate_from = Some(*v); true }
+            StepParameter::CoordinateFrom(v)     => { self.coordinate_from = *v; true }
             _ => false,
         }
     }
@@ -235,7 +238,7 @@ mod tests {
     fn coordinate_from_parameter_accepted() {
         let mut step = StepTentacles::new("label");
         let coord = FieldCoordinate::new(5, 5);
-        assert!(step.set_parameter(&StepParameter::CoordinateFrom(coord)));
+        assert!(step.set_parameter(&StepParameter::CoordinateFrom(Some(coord))));
         assert_eq!(step.coordinate_from, Some(coord));
     }
 

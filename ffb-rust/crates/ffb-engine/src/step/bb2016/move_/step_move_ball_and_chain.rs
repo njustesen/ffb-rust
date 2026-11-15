@@ -80,7 +80,7 @@ impl Step for StepMoveBallAndChain {
         match param {
             StepParameter::GotoLabelOnEnd(v) => { self.goto_label_on_end = v.clone(); true }
             StepParameter::GotoLabelOnFallDown(v) => { self.goto_label_on_fall_down = v.clone(); true }
-            StepParameter::CoordinateFrom(v) => { self.coordinate_from = Some(*v); true }
+            StepParameter::CoordinateFrom(v) => { self.coordinate_from = *v; true }
             StepParameter::CoordinateTo(v) => { self.coordinate_to = Some(*v); true }
             _ => false,
         }
@@ -384,7 +384,7 @@ mod tests {
     fn set_parameter_coordinate_from_accepted() {
         let mut step = StepMoveBallAndChain::new("end".into(), "fall".into());
         let coord = FieldCoordinate::new(5, 5);
-        assert!(step.set_parameter(&StepParameter::CoordinateFrom(coord)));
+        assert!(step.set_parameter(&StepParameter::CoordinateFrom(Some(coord))));
         assert_eq!(step.coordinate_from, Some(coord));
     }
 

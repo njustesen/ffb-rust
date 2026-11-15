@@ -9575,5 +9575,34 @@ the skill (Multiple Block, Kick 'em, Putrid Regurgitation, Chomp — stars only)
    activation, then the move sends the gaze) -- neither harness drives that dialog yet; the offer is
    gated to bb2025 on both sides until it does.
 5. PlayerChoice accepts: Shadowing, Tentacles, Pick-me-up, Diving Tackle (known step gaps first).
+   **DONE 2026-11-15.** Both agents accept SHADOWING / TENTACLES / DIVING_TACKLE with the min-(x,y)
+   candidate and zero draws, and PICK_ME_UP with ALL candidates sorted by (x,y) in one command
+   (both engines roll in selection order; both candidate lists are hash-set ordered -- the cause of
+   the earlier 5/3/6 vs 3/5/6 roll-order reds). Gates (heuristic, tier 3, seeds 1-10): Shadowing +
+   Tentacles squads (dark_elf, chaos_dwarf, lizardman, nurgle) x 3 editions, Diving Tackle carriers
+   (slann x 3, dwarf / elf / old_world_alliance_ogre bb2025), Pick-me-up (norse bb2020/bb2025,
+   nurgle bb2025), dark_elf/nurgle at scales 0 and 1e6 -- all steps AND reports identical in the
+   final runs (b24-b27). Live counts: 13-40 Shadowing/Tentacles rolls per 10-game set, ~340
+   pickMeUp rolls, Diving Tackle used in every carrier gate. Rust bugs fixed (11):
+   - BB2016 Shadowing and Tentacles were routed to the shared BB2020+ steps (one die by the
+     shadower/tentacler); BB2016's are 2d6 ESCAPE rolls by the dodger. Routed to the bb2016 twins;
+     bb2016 Shadowing re-ported line for line (it had no `tentaclesShadowingRoll` report).
+   - bb2016 Tentacles: Tentacles skill lookup (not a property), no lastDefenderId bookkeeping,
+     PLAYER-overload re-roll ask; bb2016 Shadowing/Tentacles and the shared Tentacles step all
+     hard-coded a TRR re-roll source instead of taking the offer's.
+   - bb2020 BlitzBlock lacked TENTACLES + SHADOWING after FOLLOWUP (`bb2020/BlitzBlock.java:69-70`).
+   - `ActingPlayer.setPlayerId` copies the player's modified strength; Rust never did outside a
+     block, so BB2016 Tentacles (`6 + tentaclerST - actingPlayer.getStrength()`) needed 11 for 8.
+   - COORDINATE_FROM `null` was published as (0,0) -- a real square -- so a Shadowing/Tentacles step
+     after a declined follow-up searched (0,0). `StepParameter::CoordinateFrom` now carries an
+     Option (32 files).
+   - Both StepMoveDodge twins never added the DIVING_TACKLE modifier on the RETRY_DODGE
+     re-evaluation, so a tackled dodger ran on; bb2016 reported the die where Java reports roll 0;
+     bb2020 must report the re-evaluation (roll 0) where bb2025 does not; bb2025 must not offer a
+     re-roll after it (`fUsingDivingTackle == null`), bb2020 may; `!fReRollUsed` was missing in both.
+   - The Diving Tackle prompt carried the team id in `reason`, so no agent rule could match it.
+   - Break Tackle forced by Diving Tackle now goes through `mark_skill_used`.
+   - `bb2025/StepEndTurn` calls `resetShadowers()` every turn; Rust never cleared the list, so the
+     once-per-MA Shadowing cap accumulated across the game.
 6. Pro re-roll source, Trickster, Fumblerooski.
 7. Data (G5): draft carriers of Multiple Block / Kick 'em / Putrid Regurgitation / Chomp.

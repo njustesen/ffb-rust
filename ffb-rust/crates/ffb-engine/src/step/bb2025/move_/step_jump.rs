@@ -265,7 +265,7 @@ impl StepJump {
         let mut out = StepOutcome::goto(&label)
             .publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
         if let Some(c) = coord_from {
-            out = out.publish(StepParameter::CoordinateFrom(c));
+            out = out.publish(StepParameter::CoordinateFrom(Some(c)));
         }
         out
     }

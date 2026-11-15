@@ -67,7 +67,7 @@ impl Step for StepMove {
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
-            StepParameter::CoordinateFrom(v) => { self.coordinate_from = Some(*v); true }
+            StepParameter::CoordinateFrom(v) => { self.coordinate_from = *v; true }
             StepParameter::CoordinateTo(v) => { self.coordinate_to = Some(*v); true }
             // Java: fMoveStackSize set from the remaining MOVE_STACK length
             StepParameter::MoveStack(v) => { self.move_stack_size = v.len(); true }
@@ -281,7 +281,7 @@ mod tests {
     fn set_parameter_coordinate_from_accepted() {
         let mut step = StepMove::new();
         let coord = FieldCoordinate::new(5, 5);
-        assert!(step.set_parameter(&StepParameter::CoordinateFrom(coord)));
+        assert!(step.set_parameter(&StepParameter::CoordinateFrom(Some(coord))));
         assert_eq!(step.coordinate_from, Some(coord));
     }
 

@@ -131,7 +131,7 @@ impl Step for StepMoveDodge {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             StepParameter::GotoLabelOnFailure(v) => { self.goto_label_on_failure = v.clone(); true }
-            StepParameter::CoordinateFrom(v) => { self.coordinate_from = Some(*v); true }
+            StepParameter::CoordinateFrom(v) => { self.coordinate_from = *v; true }
             StepParameter::CoordinateTo(v) => { self.coordinate_to = Some(*v); true }
             StepParameter::DodgeRoll(v) => { self.dodge_roll = *v; true }
             StepParameter::UsingDivingTackle(v) => { self.using_diving_tackle = Some(*v); true }
@@ -259,7 +259,16 @@ impl StepMoveDodge {
             let ctx = DodgeContext::new_with_break_tackle(game, &acting, src, tgt, self.using_break_tackle);
             let mods = factory.find_applicable(&ctx);
             let skill_mods = factory.find_skill_modifiers(&ctx);
-            let all: Vec<&ffb_mechanics::modifiers::dodge_modifier::DodgeModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
+            let mut all: Vec<&ffb_mechanics::modifiers::dodge_modifier::DodgeModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
+            // Java: `if ((fUsingDivingTackle != null) && fUsingDivingTackle)
+            //   dodgeModifiers.addAll(modifierFactory.forType(ModifierType.DIVING_TACKLE));` —
+            // the RETRY_DODGE re-evaluation after an accepted Diving Tackle. Missing, so a tackled
+            // dodger kept moving (dwarf bb2025 seed 3 i=3: Java drops home_11, Rust ran on).
+            let dt_modifier = ffb_mechanics::modifiers::dodge_modifier::DodgeModifier::new(
+                "Diving Tackle", 2, ffb_mechanics::modifiers::modifier_type::ModifierType::DIVING_TACKLE);
+            if self.using_diving_tackle == Some(true) {
+                all.push(&dt_modifier);
+            }
             let agility = game.player(pid).map(|p| p.agility as i32).unwrap_or(3);
             let min = DodgeModifierFactory::minimum_roll(agility, &all);
             let names: Vec<String> = all.iter().map(|m| m.get_name().to_string()).collect();
@@ -327,12 +336,16 @@ impl StepMoveDodge {
         let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
             .map(|a| a.name == "DODGE").unwrap_or(false)
             && self.re_roll_state.re_roll_source.is_some();
-        if do_roll {
+        // Java bb2025 reports only `if (pDoRoll)`; Java bb2020 (`StepMoveDodge:334`) reports
+        // every evaluation, with `(pDoRoll ? fDodgeRoll : 0)` — the Diving Tackle re-check shows
+        // up as roll 0 (slann bb2020 seed 3 i=35).
+        let is_bb2020 = game.rules == ffb_model::enums::Rules::Bb2020;
+        if do_roll || is_bb2020 {
             use ffb_model::report::mixed::report_dodge_roll::ReportDodgeRoll;
             game.report_list.add(ReportDodgeRoll::new(
                 player_id.clone(),
                 successful,
-                self.dodge_roll,
+                if do_roll { self.dodge_roll } else { 0 },
                 minimum_roll,
                 re_rolled,
                 mod_names,
@@ -482,8 +495,14 @@ impl StepMoveDodge {
                 .publish(StepParameter::ReRollUsed(self.re_roll_used || re_rolled))
                 .publish(StepParameter::UsingBreakTackle(self.using_break_tackle))
         } else {
-            // Try re-roll on first failure
-            if !already_rerolled {
+            // Try re-roll on first failure. Java bb2025: `if (fUsingDivingTackle == null &&
+            // !fReRollUsed && (getReRolledAction() != DODGE || …))` — the RETRY_DODGE
+            // re-evaluation after an accepted Diving Tackle is final (dwarf bb2025 seed 3 i=3:
+            // Rust spent a team re-roll Java never offers). Java bb2020 (`StepMoveDodge:343`) has
+            // only `!fReRollUsed && …`, so there the re-evaluation can still be re-rolled.
+            let dt_blocks_reroll = game.rules == ffb_model::enums::Rules::Bb2025
+                && self.using_diving_tackle.is_some();
+            if !already_rerolled && !dt_blocks_reroll && !self.re_roll_used {
                 use ffb_model::model::re_rolled_action::ReRolledAction;
                 self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("DODGE"));
 

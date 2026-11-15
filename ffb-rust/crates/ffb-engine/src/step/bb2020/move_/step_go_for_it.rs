@@ -253,7 +253,7 @@ impl StepGoForIt {
                     game.field_model.update_player_and_ball_position(id, start);
                 }
             }
-            outcome = outcome.publish(StepParameter::CoordinateFrom(FieldCoordinate::new(0, 0)));
+            outcome = outcome.publish(StepParameter::CoordinateFrom(None));
         }
         if self.ball_and_chain_gfi {
             game.acting_player.fell_from_rush = true;

@@ -250,7 +250,7 @@ impl Step for StepShadowing {
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
-            StepParameter::CoordinateFrom(v)           => { self.coordinate_from = Some(*v); true }
+            StepParameter::CoordinateFrom(v)           => { self.coordinate_from = *v; true }
             StepParameter::DefenderPosition(v)         => { self.defender_position = Some(*v); true }
             StepParameter::UsingDivingTackle(v)        => { self.using_diving_tackle = *v; true }
             StepParameter::Jumped(_)                   => { self.using_shadowing = Some(false); true }
@@ -276,7 +276,7 @@ mod tests {
     fn coordinate_from_parameter_accepted() {
         let mut step = StepShadowing::new();
         let coord = FieldCoordinate::new(3, 4);
-        assert!(step.set_parameter(&StepParameter::CoordinateFrom(coord)));
+        assert!(step.set_parameter(&StepParameter::CoordinateFrom(Some(coord))));
         assert_eq!(step.coordinate_from, Some(coord));
     }
 

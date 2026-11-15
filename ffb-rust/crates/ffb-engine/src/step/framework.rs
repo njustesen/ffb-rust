@@ -164,7 +164,9 @@ pub enum StepParameter {
     Keyword(String),
     MoveStack(Vec<ffb_model::types::FieldCoordinate>),
     MoveStart(ffb_model::types::FieldCoordinate),
-    CoordinateFrom(ffb_model::types::FieldCoordinate),
+    /// Java `COORDINATE_FROM`; `None` is Java's published `null` (a declined follow-up, a
+    /// failed GFI/Jump, a Tentacles hold), which consumers store as-is.
+    CoordinateFrom(Option<ffb_model::types::FieldCoordinate>),
     CoordinateTo(ffb_model::types::FieldCoordinate),
     BlockDefenderId(String),
     FoulDefenderId(String),

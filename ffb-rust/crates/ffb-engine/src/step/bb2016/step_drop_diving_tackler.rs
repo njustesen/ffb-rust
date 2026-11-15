@@ -73,7 +73,7 @@ impl Step for StepDropDivingTackler {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             StepParameter::UsingDivingTackle(v) => { self.using_diving_tackle = *v; true }
-            StepParameter::CoordinateFrom(v)    => { self.coordinate_from = Some(*v); true }
+            StepParameter::CoordinateFrom(v)    => { self.coordinate_from = *v; true }
             _ => false,
         }
     }
@@ -141,7 +141,7 @@ mod tests {
         let mut step = StepDropDivingTackler::new();
         step.set_parameter(&StepParameter::UsingDivingTackle(true));
         let new_pos = FieldCoordinate::new(10, 7);
-        step.set_parameter(&StepParameter::CoordinateFrom(new_pos));
+        step.set_parameter(&StepParameter::CoordinateFrom(Some(new_pos)));
         let mut game = make_game();
         add_player(&mut game, "def", PS_STANDING);
         game.defender_id = Some("def".into());

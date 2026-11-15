@@ -323,7 +323,7 @@ impl StepInitMoving {
 
                 return StepOutcome::next()
                     .publish(StepParameter::MoveStack(new_move_stack))
-                    .publish(StepParameter::CoordinateFrom(coordinate_from))
+                    .publish(StepParameter::CoordinateFrom(Some(coordinate_from)))
                     .publish(StepParameter::CoordinateTo(coordinate_to));
             }
         }

@@ -269,7 +269,7 @@ impl Step for StepMoveBallAndChain {
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
-            StepParameter::CoordinateFrom(v)        => { self.coordinate_from = Some(*v); true }
+            StepParameter::CoordinateFrom(v)        => { self.coordinate_from = *v; true }
             StepParameter::CoordinateTo(v)           => {
                 self.coordinate_to = Some(*v);
                 self.original_coordinate_to = Some(*v);

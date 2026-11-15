@@ -254,6 +254,17 @@ pub fn change_acting_player(game: &mut Game, player_id: &str, action: PlayerActi
         let was_prone = pre_state
             .map(|s| s.base() == ffb_model::enums::PS_PRONE).unwrap_or(false);
         game.acting_player.set_player(player_id.to_owned(), action);
+        // Java `ActingPlayer.setPlayerId` (past its same-id early return):
+        //   setStrength((player != null) ? player.getStrengthWithModifiers() : 0);
+        // The model's `set_player` cannot see player stats, so the copy lives here. Without it a
+        // MOVE kept the previous activation's (or 0) strength, and BB2016 Tentacles — the one
+        // reader outside a block, `minimumRollTentaclesEscape(tentaclerST, actingPlayer.getStrength())`
+        // — needed 11 where Java needs 8 (nurgle bb2016 seed 1, first tentacles roll).
+        if changed {
+            game.acting_player.strength = game.player(player_id)
+                .map(|p| p.strength_with_modifiers())
+                .unwrap_or(0);
+        }
         // `standingUp` is set ONLY on a genuine player change: Java puts setPlayer /
         // setOldPlayerState / setStandingUp / the MOVING write inside `if (newPlayer != oldPlayer)`
         // and leaves only setPlayerAction / setJumping outside it. Rust set it unconditionally, so a
@@ -782,6 +793,25 @@ mod tests {
         game.field_model.ball_coordinate = Some(ball_pos);
         add_player_to_home(&mut game, "p01", ball_pos, PS_PRONE);
         assert!(!check_touchdown(&game));
+    }
+
+    /// Java `ActingPlayer.setPlayerId` copies `player.getStrengthWithModifiers()` into the acting
+    /// player on every genuine change. BB2016 Tentacles reads it for a plain MOVE
+    /// (`minimumRollTentaclesEscape(tentaclerST, actingPlayer.getStrength())`).
+    #[test]
+    fn change_acting_player_copies_the_new_players_strength() {
+        let mut game = make_game();
+        add_player_to_home(&mut game, "p01", FieldCoordinate::new(5, 5), PS_STANDING);
+        add_player_to_home(&mut game, "p02", FieldCoordinate::new(6, 5), PS_STANDING);
+        game.team_home.players[1].strength = 5;
+        change_acting_player(&mut game, "p01", PlayerAction::Move, false);
+        assert_eq!(game.acting_player.strength, 3);
+        change_acting_player(&mut game, "p02", PlayerAction::Move, false);
+        assert_eq!(game.acting_player.strength, 5);
+        // A same-player re-dispatch keeps whatever a block step has set since (Java's early return).
+        game.acting_player.strength = 7;
+        change_acting_player(&mut game, "p02", PlayerAction::Block, false);
+        assert_eq!(game.acting_player.strength, 7);
     }
 }
 

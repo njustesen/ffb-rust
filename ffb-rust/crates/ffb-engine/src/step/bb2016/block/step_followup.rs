@@ -213,7 +213,7 @@ impl StepFollowup {
                 {
                     let current_coord = game.field_model.player_coordinate(attacker_id)
                         .unwrap_or(FieldCoordinate::new(0, 0));
-                    outcome = outcome.publish(StepParameter::CoordinateFrom(current_coord));
+                    outcome = outcome.publish(StepParameter::CoordinateFrom(Some(current_coord)));
 
                     // Java: updatePlayerAndBallPosition — ball follows if carried
                     if !game.field_model.ball_moving {
@@ -229,7 +229,7 @@ impl StepFollowup {
                 }
             } else {
                 // Java: publishParameter(COORDINATE_FROM, null) → null/zero coord
-                outcome = outcome.publish(StepParameter::CoordinateFrom(FieldCoordinate::new(0, 0)));
+                outcome = outcome.publish(StepParameter::CoordinateFrom(None));
             }
 
             // Java: publishParameter(DEFENDER_POSITION,
@@ -291,7 +291,7 @@ impl Step for StepFollowup {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             // Java: COORDINATE_FROM
-            StepParameter::CoordinateFrom(v) => { self.coordinate_from = Some(*v); true }
+            StepParameter::CoordinateFrom(v) => { self.coordinate_from = *v; true }
             // Java: DEFENDER_POSITION
             StepParameter::DefenderPosition(v) => { self.defender_position = Some(*v); true }
             // Java: FOLLOWUP_CHOICE
@@ -347,7 +347,7 @@ mod tests {
         assert!(step.set_parameter(&StepParameter::DefenderPosition(coord)));
         assert!(step.set_parameter(&StepParameter::FollowupChoice(true)));
         assert!(step.set_parameter(&StepParameter::OldDefenderState(PlayerState::new(PS_STANDING))));
-        assert!(step.set_parameter(&StepParameter::CoordinateFrom(coord)));
+        assert!(step.set_parameter(&StepParameter::CoordinateFrom(Some(coord))));
         assert_eq!(step.defender_position, Some(coord));
         assert_eq!(step.followup_choice, Some(true));
         assert!(step.old_defender_state.is_some());

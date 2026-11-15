@@ -726,6 +726,12 @@ impl StepEndTurn {
                     game.away_additional_assists = 0;
                 }
             }
+            // Java `bb2025/StepEndTurn:246`: `getGameState().resetShadowers()` — unconditional,
+            // every turn end. Rust never cleared the list, so the BB2025 once-per-MA Shadowing cap
+            // (`movement > shadowingCount`) accumulated over the whole game and a shadower Java
+            // offers on a later turn was filtered out (dark_elf bb2025 @1e6 seed 8 i=104).
+            // Harmless for BB2020, whose Shadowing never records shadowers.
+            game.active_shadowers.clear();
 
             if touchdown {
                 // Identify ball carrier and update score

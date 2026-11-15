@@ -189,6 +189,16 @@ impl BlitzBlock {
         ]);
         // 32 FOLLOWUP
         seq.add(StepId::Followup, vec![]);
+        // BB2020 ONLY: `bb2020/BlitzBlock.java:69-70` runs TENTACLES and SHADOWING between
+        // FOLLOWUP and this PICK_UP (the Block twin is gated the same way in `block.rs`);
+        // `bb2025/BlitzBlock.java` has neither. A blitzer following up out of a shadower's
+        // tackle zone rolls Shadowing in Java (chaos_dwarf bb2020 seed 10 i=45).
+        if params.rules == Rules::Bb2020 {
+            seq.add(StepId::Tentacles, vec![
+                StepParameter::GotoLabelOnSuccess(labels::DROP_FALLING_PLAYERS.into()),
+            ]);
+            seq.add(StepId::Shadowing, vec![]);
+        }
         // 33 PICK_UP (second pick-up — for ball dropped during followup)
         seq.add(StepId::PickUp, vec![
             StepParameter::GotoLabelOnFailure(labels::DROP_FALLING_PLAYERS.into()),
@@ -424,18 +434,23 @@ mod tests {
         assert_eq!(pos(Rules::Bb2025), 1, "bb2025 picks up between TRICKSTER and CATCH_SCATTER");
         assert_eq!(pos(Rules::Bb2020), 0, "bb2020 has no PICK_UP between TRICKSTER and CATCH_SCATTER");
 
-        // The pushback-branch PICK_UP after FOLLOWUP — which BB2020 has too — stays in both, and
-        // nothing else about the sequence moves.
-        for rules in [Rules::Bb2025, Rules::Bb2020] {
+        // The pushback-branch PICK_UP after FOLLOWUP — which BB2020 has too — stays in both;
+        // BB2020 runs TENTACLES and SHADOWING before it (`bb2020/BlitzBlock.java:68-71`).
+        let after_followup = |rules: Rules| {
             let steps = BlitzBlock::build_sequence(&BlitzBlockParams { rules, ..Default::default() });
             let followup = steps.iter().position(|s| s.step_id == StepId::Followup).unwrap();
-            assert_eq!(steps[followup + 1].step_id, StepId::PickUp, "{rules:?}");
-        }
+            let pick = steps.iter().skip(followup).position(|s| s.step_id == StepId::PickUp).unwrap() + followup;
+            steps[followup + 1..=pick].iter().map(|s| s.step_id).collect::<Vec<_>>()
+        };
+        assert_eq!(after_followup(Rules::Bb2025), vec![StepId::PickUp]);
+        assert_eq!(after_followup(Rules::Bb2020),
+            vec![StepId::Tentacles, StepId::Shadowing, StepId::PickUp]);
         let bb2025 = BlitzBlock::build_sequence(&BlitzBlockParams::default());
         let bb2020 = BlitzBlock::build_sequence(&BlitzBlockParams { rules: Rules::Bb2020, ..Default::default() });
-        // Three entries are edition-gated: this PICK_UP and the FOUL_APPEARANCE below are BB2025
-        // only, and the ball-and-chain GO_FOR_IT (`bb2020/BlitzBlock.java:89-90`) is BB2020 only.
-        assert_eq!(bb2020.len(), bb2025.len() - 2 + 1);
+        // Five entries are edition-gated: this PICK_UP and the FOUL_APPEARANCE below are BB2025
+        // only; the ball-and-chain GO_FOR_IT (`bb2020/BlitzBlock.java:89-90`) and the
+        // TENTACLES + SHADOWING pair after FOLLOWUP are BB2020 only.
+        assert_eq!(bb2020.len(), bb2025.len() - 2 + 3);
     }
 
     /// `bb2020/BlitzBlock.java:31-33` adds FOUL_APPEARANCE here only for a frenzy follow-up; the

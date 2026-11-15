@@ -84,7 +84,7 @@ impl Step for StepFollowup {
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
-            StepParameter::CoordinateFrom(v) => { self.coordinate_from = Some(*v); true }
+            StepParameter::CoordinateFrom(v) => { self.coordinate_from = *v; true }
             StepParameter::DefenderPosition(v) => { self.defender_position = Some(*v); true }
             StepParameter::FollowupChoice(v) => { self.followup_choice = Some(*v); true }
             StepParameter::OldDefenderState(v) => { self.old_defender_state = Some(*v); true }
@@ -318,9 +318,7 @@ impl StepFollowup {
                 if let Some(ref attacker_id) = acting_player_id {
                     let current_coord = game.field_model.player_coordinate(attacker_id);
                     if let Some(followup_coord) = self.defender_position {
-                        outcome = outcome.publish(StepParameter::CoordinateFrom(
-                            current_coord.unwrap_or(FieldCoordinate::new(0, 0)),
-                        ));
+                        outcome = outcome.publish(StepParameter::CoordinateFrom(current_coord));
                         // Java: updatePlayerAndBallPosition — ball follows if carried
                         if !game.field_model.ball_moving {
                             if let (Some(old), Some(ball)) = (current_coord, game.field_model.ball_coordinate) {
@@ -336,7 +334,7 @@ impl StepFollowup {
                     }
                 }
             } else {
-                outcome = outcome.publish(StepParameter::CoordinateFrom(FieldCoordinate::new(0, 0)));
+                outcome = outcome.publish(StepParameter::CoordinateFrom(None));
             }
             // Publish updated defender position
             let defender_pos = game.defender_id.as_deref()

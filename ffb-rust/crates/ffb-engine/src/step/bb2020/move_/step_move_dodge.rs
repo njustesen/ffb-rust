@@ -91,7 +91,7 @@ impl Step for StepMoveDodge {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             StepParameter::GotoLabelOnFailure(v) => { self.goto_label_on_failure = v.clone(); true }
-            StepParameter::CoordinateFrom(v) => { self.coordinate_from = Some(*v); true }
+            StepParameter::CoordinateFrom(v) => { self.coordinate_from = *v; true }
             StepParameter::CoordinateTo(v) => { self.coordinate_to = Some(*v); true }
             StepParameter::DodgeRoll(v) => { self.dodge_roll = *v; true }
             StepParameter::UsingDivingTackle(v) => { self.using_diving_tackle = Some(*v); true }

@@ -48,7 +48,7 @@ impl Step for StepFallDown {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             StepParameter::InjuryTypeName(v) => { self.injury_type_name = Some(v.clone()); true }
-            StepParameter::CoordinateFrom(v) => { self.coordinate_from = Some(*v); true }
+            StepParameter::CoordinateFrom(v) => { self.coordinate_from = *v; true }
             _ => false,
         }
     }
@@ -264,7 +264,7 @@ mod tests {
     fn set_parameter_coordinate_from_accepted() {
         let mut step = StepFallDown::new();
         let coord = FieldCoordinate::new(3, 7);
-        assert!(step.set_parameter(&StepParameter::CoordinateFrom(coord)));
+        assert!(step.set_parameter(&StepParameter::CoordinateFrom(Some(coord))));
         assert_eq!(step.coordinate_from, Some(coord));
     }
 

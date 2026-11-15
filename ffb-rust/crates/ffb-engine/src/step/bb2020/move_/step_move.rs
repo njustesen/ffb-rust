@@ -52,7 +52,7 @@ impl Step for StepMove {
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
-            StepParameter::CoordinateFrom(v) => { self.coordinate_from = Some(*v); true }
+            StepParameter::CoordinateFrom(v) => { self.coordinate_from = *v; true }
             StepParameter::CoordinateTo(v) => { self.coordinate_to = Some(*v); true }
             StepParameter::MoveStack(v) => { self.move_stack_size = v.len() as i32; true }
             _ => false,

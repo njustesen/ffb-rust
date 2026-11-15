@@ -585,6 +585,16 @@ pub fn make_step_for(id: StepId, rules: Rules) -> Box<dyn Step> {
             // games (`winnings` showed 32,997 of 33,000 instead).
             StepId::Winnings =>
                 return Box::new(crate::step::bb2016::end::step_winnings::StepWinnings),
+            // BB2016 Shadowing and Tentacles are ESCAPE rolls by the DODGER — 2d6 against
+            // `8 + shadowerMA - dodgerMA` / `strength`-based thresholds, re-rolled by the acting
+            // player under SHADOWING_ESCAPE / TENTACLES_ESCAPE (`skillbehaviour/bb2016/*`). The
+            // shared steps implement the BB2020+ single-die roll made by the shadower/tentacler.
+            // Both bb2016 twins were translated and sat dead behind the shared table; it never
+            // mattered while both agents declined the PlayerChoice prompt (BACKLOG §K item 5).
+            StepId::Shadowing =>
+                return Box::new(crate::step::bb2016::step_shadowing::StepShadowing::new()),
+            StepId::Tentacles =>
+                return Box::new(crate::step::bb2016::move_::step_tentacles::StepTentacles::new(String::new())),
             _ => {}
         }
     }

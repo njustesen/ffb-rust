@@ -177,7 +177,7 @@ impl Step for StepSwoop {
             StepParameter::ThrownPlayerState(v) => { self.thrown_player_state = Some(*v); true }
             StepParameter::ThrowScatter(v) => { self.throw_scatter = *v; true }
             StepParameter::GotoLabelOnFallDown(v) => { self.goto_label_on_fall_down = v.clone(); true }
-            StepParameter::CoordinateFrom(v) => { self.coordinate_from = Some(*v); true }
+            StepParameter::CoordinateFrom(v) => { self.coordinate_from = *v; true }
             StepParameter::CoordinateTo(v) => { self.coordinate_to = Some(*v); true }
             _ => false,
         }
@@ -545,7 +545,7 @@ mod tests {
     fn set_coordinate_from_accepted() {
         let mut step = StepSwoop::default();
         let c = FieldCoordinate { x: 1, y: 2 };
-        assert!(step.set_parameter(&StepParameter::CoordinateFrom(c)));
+        assert!(step.set_parameter(&StepParameter::CoordinateFrom(Some(c))));
         assert_eq!(step.coordinate_from, Some(c));
     }
 

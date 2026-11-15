@@ -170,7 +170,11 @@ impl StepTentacles {
                                     };
                                     if let Some(prompt) = tentacle_offer {
                                         self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("TENTACLES"));
-                                        self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
+                                        // The offer carries the real source (a skill re-roll or TRR);
+                                        // Java takes it from the client's reply to that dialog.
+                                        if let ffb_model::prompts::AgentPrompt::ReRollOffer { ref source, .. } = prompt {
+                                            self.re_roll_state.re_roll_source = Some(source.clone());
+                                        }
                                         do_next_step = false;
                                         return StepOutcome::cont().with_prompt(prompt);
                                     } else {
@@ -252,7 +256,7 @@ impl Step for StepTentacles {
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
-            StepParameter::CoordinateFrom(v)     => { self.state.coordinate_from = Some(*v); true }
+            StepParameter::CoordinateFrom(v)     => { self.state.coordinate_from = *v; true }
             StepParameter::GotoLabelOnSuccess(v) => { self.state.go_to_label_on_success = v.clone(); true }
             _ => false,
         }
@@ -584,7 +588,7 @@ mod tests {
     fn coordinate_from_parameter_accepted() {
         let mut step = StepTentacles::new();
         let coord = FieldCoordinate::new(3, 4);
-        assert!(step.set_parameter(&StepParameter::CoordinateFrom(coord)));
+        assert!(step.set_parameter(&StepParameter::CoordinateFrom(Some(coord))));
         assert_eq!(step.state.coordinate_from, Some(coord));
     }
 

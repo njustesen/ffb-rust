@@ -315,7 +315,7 @@ impl StepInitMoving {
                 published: vec![
                     StepParameter::BallAndChainRrSetting(self.ball_and_chain_rr_setting.clone()),
                     StepParameter::MoveStack(new_stack),
-                    StepParameter::CoordinateFrom(coordinate_from),
+                    StepParameter::CoordinateFrom(Some(coordinate_from)),
                     StepParameter::CoordinateTo(coordinate_to),
                 ],
                 clear_stack: false, push_self: false
