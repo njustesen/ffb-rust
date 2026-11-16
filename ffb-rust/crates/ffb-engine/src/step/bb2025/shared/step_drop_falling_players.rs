@@ -82,6 +82,9 @@ pub struct StepDropFallingPlayers {
     pub saboteur_triggered_defender: bool,
     /// Java: state.usingSaboteurDefender (Boolean tristate)
     pub using_saboteur_defender: Option<bool>,
+    /// Which side the outstanding Saboteur dialog asked (true = defender); routes the answer
+    /// the way Java's `handleCommandHook` matches the command's player id.
+    pub saboteur_dialog_defender: Option<bool>,
 }
 
 impl StepDropFallingPlayers {
@@ -95,6 +98,7 @@ impl StepDropFallingPlayers {
             using_saboteur_attacker: None,
             saboteur_triggered_defender: false,
             using_saboteur_defender: None,
+            saboteur_dialog_defender: None,
         }
     }
 }
@@ -114,6 +118,18 @@ impl Step for StepDropFallingPlayers {
         // Java: CLIENT_USE_SKILL → handleSkillCommand → EXECUTE_STEP
         // (bb2016/bb2020 `PilingOnBehaviour.handleCommandHook`; never reached for BB2025 since
         // no `AgentPrompt::PilingOn` is ever emitted there.)
+        // bb2025 `SaboteurBehaviour.handleCommandHook`: a canSabotageBlockerOnKnockdown answer
+        // fills the tri-state of the side that was asked, then EXECUTE_STEP.
+        if let Action::UseSkill { skill_id, use_skill } = action {
+            if skill_id.properties().contains(&NamedProperties::CAN_SABOTAGE_BLOCKER_ON_KNOCKDOWN) {
+                match self.saboteur_dialog_defender.take() {
+                    Some(true) => self.using_saboteur_defender = Some(*use_skill),
+                    Some(false) => self.using_saboteur_attacker = Some(*use_skill),
+                    None => return StepOutcome::cont(),
+                }
+                return self.execute_step(game, rng);
+            }
+        }
         if let Action::UseSkill { use_skill, .. } = action {
             self.using_piling_on = Some(*use_skill);
         }
@@ -146,6 +162,7 @@ impl StepDropFallingPlayers {
             using_saboteur_attacker: self.using_saboteur_attacker,
             saboteur_triggered_defender: self.saboteur_triggered_defender,
             using_saboteur_defender: self.using_saboteur_defender,
+            dialog: None,
         };
         let hooked = dispatch::execute_step_hooks(game, rng, StepId::DropFallingPlayers, &mut hook_state);
         self.saboteur_triggered_attacker = hook_state.saboteur_triggered_attacker;
@@ -153,6 +170,14 @@ impl StepDropFallingPlayers {
         self.saboteur_triggered_defender = hook_state.saboteur_triggered_defender;
         self.using_saboteur_defender = hook_state.using_saboteur_defender;
         if hooked {
+            if let Some((player_id, skill, defender)) = hook_state.dialog {
+                self.saboteur_dialog_defender = Some(defender);
+                return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
+                    player_id,
+                    skill_id: skill as u16,
+                    skill_name: format!("{:?}", skill),
+                });
+            }
             return StepOutcome::cont();
         }
 

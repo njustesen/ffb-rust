@@ -82,6 +82,7 @@ impl StepFoulAppearance {
         // defender and rolled a d6 Java never rolls, putting Rust one die ahead for the rest of the
         // game (necromantic bb2025 seed 6 i=20: Rust's die 44 is StepFoulAppearance, so its pass
         // roll lands at 46 = 5 INACCURATE where Java's is 45 = 2 FUMBLE).
+        let from_target_selection = game.field_model.target_selection_state.is_some();
         let defender_id = match game.field_model.target_selection_state.as_ref() {
             Some(ts) => ts.get_selected_player_id().cloned(),
             None => game.defender_id.clone(),
@@ -103,7 +104,27 @@ impl StepFoulAppearance {
         let action_can_block = game.acting_player.player_action
             .map(|pa| pa.is_block_action() || pa.is_blitzing() || pa.is_kicking_downed())
             .unwrap_or(false);
-        if !action_can_block {
+        // The one other way Java's defender becomes non-null mid-move: bb2025 `StepShadowing`'s
+        // PLAYER_CHOICE arm sets `game.setDefenderId(shadower)`, and the next square's move sequence
+        // runs this step against it — a Foul-Appearance shadower costs the mover a d6 on every
+        // square (star tier: Gretchen Wächter, elf vs vampire bb2025 seed 1). A shadower is always
+        // an OPPONENT, while the receiver channel above carries a team-mate; the foul/gaze victims
+        // that channel also carries are opponents Java has not made the defender yet, so those
+        // actions stay excluded.
+        let shadower_defender = !action_can_block
+            && !game.acting_player.player_action
+                .map(|pa| matches!(pa, PlayerAction::Foul | PlayerAction::FoulMove
+                    | PlayerAction::Gaze | PlayerAction::GazeMove))
+                .unwrap_or(true)
+            && defender_id.as_deref().map(|d| {
+                let acting_home = game.home_playing;
+                if acting_home { game.team_away.has_player(d) } else { game.team_home.has_player(d) }
+            }).unwrap_or(false);
+        // The action gate guards only the `game.defender_id` channel. A defender read from the
+        // TargetSelectionState is exactly Java's, whatever the action: the bb2020 gaze's
+        // SelectGazeTarget sequence rolls Foul Appearance against the selected victim (star tier:
+        // Count Luthor gazing a Nurgle player, vampire vs nurgle bb2020 seed 2 -- Java die 99).
+        if !from_target_selection && !action_can_block && !shadower_defender {
             return StepOutcome::next();
         }
         let defender_has_fa = defender_id.as_deref()

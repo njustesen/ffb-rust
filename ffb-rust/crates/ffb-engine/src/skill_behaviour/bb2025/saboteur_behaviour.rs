@@ -29,6 +29,11 @@ pub struct StepDropFallingPlayersHookState {
     pub saboteur_triggered_defender: bool,
     /// Java: state.usingSaboteurDefender (Boolean tristate: None/Some(true)/Some(false))
     pub using_saboteur_defender: Option<bool>,
+    /// Java `UtilServerDialog.showDialog(new DialogSkillUseParameter(playerId, skill, 0), ...)`:
+    /// set when the hook parks the step on a Saboteur question. `(player_id, skill, defender)`
+    /// -- `defender` says which tri-state the answer fills (Java matches the command's player id
+    /// against the defender, then the attacker).
+    pub dialog: Option<(String, SkillId, bool)>,
 }
 
 impl StepDropFallingPlayersHookState {
@@ -39,6 +44,7 @@ impl StepDropFallingPlayersHookState {
             using_saboteur_attacker: None,
             saboteur_triggered_defender: false,
             using_saboteur_defender: None,
+            dialog: None,
         }
     }
 }
@@ -131,8 +137,13 @@ impl StepModifierTrait for SaboteurStepModifier {
                 //           new DialogSkillUseParameter(attacker.getId(), skill, 0), false));
                 //       step.getResult().setNextAction(StepAction.CONTINUE);
                 //       return true;
-                // headless: UtilServerDialog.showDialog not yet ported — skip dialog, return false
-                return false;
+                // Rust skipped the dialog ("headless") -- star tier: bb2025 Nobbla Blackwart.
+                if let Some(skill) = game.player(&attacker_id)
+                    .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_SABOTAGE_BLOCKER_ON_KNOCKDOWN))
+                {
+                    state.dialog = Some((attacker_id.clone(), skill, false));
+                }
+                return true;
             }
             if state.using_saboteur_attacker == Some(true) {
                 // Java: int roll = step.getGameState().getDiceRoller().rollSkill();  // d6
@@ -169,14 +180,15 @@ impl StepModifierTrait for SaboteurStepModifier {
         //         && defender.hasUsableSkillProperty(canSabotageBlockerOnKnockdown, oldDefenderState)
         //         && defenderState.getBase() == FALLING;
         //
-        // hasUsableSkillProperty not yet ported — stubbed as has_skill_property
-        // (ignores the oldDefenderState "usable" check against player state)
+        // Java `Player.hasUsableSkillProperty(property, state)`:
+        //   hasSkillProperty(property) && state.isStanding() && !state.isDistracted()
         let defender_state_now = game.field_model.player_state(&defender_id);
         let defender_eligible = block_action
             && !state.saboteur_triggered_defender
             && game.player(&defender_id)
                 .map(|p| p.has_skill_property(NamedProperties::CAN_SABOTAGE_BLOCKER_ON_KNOCKDOWN))
                 .unwrap_or(false)
+            && state.old_defender_state.map(|s| s.is_standing() && !s.is_distracted()).unwrap_or(false)
             && defender_state_now.map(|s| s.base() == PS_FALLING).unwrap_or(false);
 
         if defender_eligible {
@@ -186,8 +198,12 @@ impl StepModifierTrait for SaboteurStepModifier {
                 //           new DialogSkillUseParameter(defender.getId(), skill, 0), true));
                 //       step.getResult().setNextAction(StepAction.CONTINUE);
                 //       return true;
-                // headless: UtilServerDialog.showDialog not yet ported — skip dialog, return false
-                return false;
+                if let Some(skill) = game.player(&defender_id)
+                    .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_SABOTAGE_BLOCKER_ON_KNOCKDOWN))
+                {
+                    state.dialog = Some((defender_id.clone(), skill, true));
+                }
+                return true;
             }
             if state.using_saboteur_defender == Some(true) {
                 // Java: int roll = step.getGameState().getDiceRoller().rollSkill();  // d6
@@ -362,8 +378,9 @@ mod tests {
     }
 
     #[test]
-    fn attacker_saboteur_headless_dialog_none_returns_false() {
-        // In headless: using_saboteur_attacker is None, dialog skipped, returns false.
+    fn attacker_saboteur_unanswered_raises_the_dialog() {
+        // Java: usingSaboteurAttacker == null -> showDialog(DialogSkillUseParameter(attacker,
+        // Saboteur, 0)) and CONTINUE (the hook returns true).
         let m = SaboteurStepModifier;
         let mut game = make_game();
         let coord = FieldCoordinate::new(5, 5);
@@ -375,7 +392,30 @@ mod tests {
         game.defender_id = Some("def".into());
         let mut state = StepDropFallingPlayersHookState::new();
         let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut state);
-        assert!(!result);
+        assert!(result);
+        assert_eq!(state.dialog, Some(("atk".to_string(), SkillId::Saboteur, false)));
+    }
+
+    #[test]
+    fn knocked_down_standing_defender_is_asked_and_a_prone_one_is_not() {
+        // Java defenderEligible uses hasUsableSkillProperty(.., oldDefenderState): the defender
+        // must have been standing and not distracted before the block.
+        let m = SaboteurStepModifier;
+        for (old, asked) in [(PS_STANDING, true), (ffb_model::enums::PS_PRONE, false)] {
+            let mut game = make_game();
+            let coord = FieldCoordinate::new(5, 5);
+            add_player(&mut game, "home", "atk", coord, PS_STANDING);
+            add_player(&mut game, "away", "def", coord, PS_FALLING);
+            give_saboteur(&mut game, "away", "def");
+            game.acting_player.player_id = Some("atk".into());
+            game.acting_player.player_action = Some(PlayerAction::Blitz);
+            game.defender_id = Some("def".into());
+            let mut state = StepDropFallingPlayersHookState::new();
+            state.old_defender_state = Some(PlayerState::new(old));
+            let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut state);
+            assert_eq!(result, asked);
+            assert_eq!(state.dialog.is_some(), asked);
+        }
     }
 
     #[test]
@@ -471,6 +511,7 @@ mod tests {
         game.defender_id = Some("def".into());
         let mut state = StepDropFallingPlayersHookState::new();
         state.using_saboteur_defender = Some(true);
+        state.old_defender_state = Some(PlayerState::new(PS_STANDING));
         m.handle_execute_step(&mut game, &mut GameRng::new(42), &mut state);
         assert!(game.report_list.has_report(ffb_model::report::ReportId::SABOTEUR_ROLL));
     }
@@ -489,6 +530,7 @@ mod tests {
             g.defender_id = Some("def".into());
             let mut st = StepDropFallingPlayersHookState::new();
             st.using_saboteur_defender = Some(true);
+            st.old_defender_state = Some(PlayerState::new(PS_STANDING));
             m.handle_execute_step(&mut g, &mut GameRng::new(seed), &mut st);
             if st.saboteur_triggered_defender {
                 let ats = g.field_model.player_state("atk").unwrap();

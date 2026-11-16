@@ -294,7 +294,7 @@ impl StepEndBlocking {
             }
             let seq = Move::build_sequence(&MoveParams {
                 bloodlust_action: self.bloodlust_action,
-                ..Default::default()
+                rules: game.rules,                ..Default::default()
             });
             return StepOutcome::next().push_seq(seq);
         }

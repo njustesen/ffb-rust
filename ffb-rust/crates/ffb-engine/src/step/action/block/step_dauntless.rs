@@ -8,6 +8,7 @@
 use ffb_model::enums::{ReRollSource, SkillId};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::report_dauntless_roll::ReportDauntlessRoll;
 use ffb_model::report::mixed::report_indomitable::ReportIndomitable;
@@ -253,10 +254,7 @@ impl StepDauntless {
     /// Java: IndomitableBehaviour.handleExecuteStepHook — chained (priority 3) onto this same
     /// step. Only relevant once Dauntless has already succeeded.
     ///
-    /// Headless simplification (matching the established Grab/StandFirm/SideStep precedent from
-    /// Phase AAG): when undecided, auto-decline immediately rather than waiting for a live dialog
-    /// — `using_indomitable` can still be pre-set (or set via a real `Action::UseSkill` command,
-    /// see `handle_command`) to exercise the accepted path.
+    /// Undecided: raise the skill-use dialog; the answer arrives via `handle_command`.
     fn resolve_indomitable(&mut self, game: &mut Game, player_id: &str, mut outcome: StepOutcome) -> StepOutcome {
         let has_indomitable = game.player(player_id)
             .map(|p| p.has_skill(SkillId::Indomitable) && !p.used_skills.contains(&SkillId::Indomitable))
@@ -265,8 +263,20 @@ impl StepDauntless {
             return outcome;
         }
 
+        // Java DauntlessBehaviour: a successful roll with an unused canDoubleStrengthAfterDauntless
+        // skill shows DialogSkillUseParameter(actingPlayer, indomitable, 0) and waits
+        // (WAITING_FOR_SKILL_USE). Rust auto-declined ("headless") -- star tier: bb2020 Karla
+        // von Kill, slann vs chaos_ogre seed 1 (two coach draws, then a 2-die block).
         if self.using_indomitable.is_none() {
-            self.using_indomitable = Some(false);
+            let skill = game.player(player_id)
+                .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_DOUBLE_STRENGTH_AFTER_DAUNTLESS))
+                .unwrap_or(SkillId::Indomitable);
+            outcome.action = crate::step::framework::StepAction::Continue;
+            return outcome.with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
+                player_id: player_id.to_string(),
+                skill_id: skill as u16,
+                skill_name: format!("{:?}", skill),
+            });
         }
 
         if self.using_indomitable == Some(true) {
@@ -550,14 +560,17 @@ mod tests {
     }
 
     #[test]
-    fn successful_dauntless_with_indomitable_headless_auto_declines() {
+    fn successful_dauntless_with_indomitable_asks_the_coach() {
+        // Java: successful roll + unused Indomitable -> DialogSkillUseParameter, WAITING.
         let seed = seed_for_d6(5);
         let mut game = make_game(2, vec![SkillId::Dauntless, SkillId::Indomitable], 4);
         let mut step = StepDauntless::new();
         let out = step.start(&mut game, &mut GameRng::new(seed));
-        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::SkillUse { .. })));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::SuccessfulDauntless(true))));
         assert!(!out.published.iter().any(|p| matches!(p, StepParameter::DoubleTargetStrength(_))));
-        assert_eq!(step.using_indomitable, Some(false));
+        assert_eq!(step.using_indomitable, None);
         assert!(step.successful);
     }
 

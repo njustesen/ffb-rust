@@ -91,16 +91,20 @@ fn ask_for_reroll_if_available_inner(
     // A catch by the opposing team is offered NO team re-roll — Rust offered one and spent it,
     // which showed up as `r1,3` (Java) against `r0,3` (Rust) with the dice otherwise identical
     // (lineman bb2025 seed 45 i=265). Only reachable once an agent accepts re-rolls at all.
-    if let Some(pid) = player_id {
-        let on_acting_team = if game.home_playing {
+    // The membership term gates ONLY the team re-roll (and, as before, Pro): Java's
+    // `dialogShown = teamReRollOption || proOption || singleUse || reRollSkill != null || …`, so
+    // a non-acting player with an unused single-die skill still gets the dialog (shown to the
+    // other coach). Rust returned None for every non-acting roller (star tier: bb2025 Ripper
+    // Bolgrot fails Getting Even on the opponent's turn, Java offers Thinking Man's Troll, the
+    // bb2025 coach spends two draws; orc vs human seed 2).
+    let on_acting_team = match player_id {
+        Some(pid) => if game.home_playing {
             game.team_home.has_player(pid)
         } else {
             game.team_away.has_player(pid)
-        };
-        if !on_acting_team {
-            return None;
-        }
-    }
+        },
+        None => true,
+    };
     let acting_team_id = if game.home_playing {
         game.team_home.id.clone()
     } else {
@@ -127,9 +131,24 @@ fn ask_for_reroll_if_available_inner(
                 .contains(&ffb_model::model::property::named_properties::NamedProperties::CAN_REROLL_SINGLE_DIE_ONCE_PER_PERIOD))
             .map(|id| ReRollSource::new(format!("{:?}", id)))
     });
-    if let Some(source) = skill_source {
+    // Java shows ONE dialog carrying both the skill and `teamReRollOption`, and the parity coach
+    // (`ParityRunner.reRollSourceFor`) answers it with `TEAM_RE_ROLL` or null — never with the
+    // skill. bb2016/bb2020 raise `DialogReRollParameter` with the real `isTeamReRollOption()`, and
+    // the harness returns null WITHOUT consulting the heuristic when it is false; bb2025 raises
+    // `DialogReRollPropertiesParameter` and always consults. Rust offered the skill itself, so a
+    // skill-only offer in the older editions cost two sampler draws Java never spends (star tier:
+    // bb2020 Ripper Bolgrot's Thinking Man's Troll on a failed Rush, black_orc vs ogre seed 1 —
+    // identical candidates at the next activation, 515 vs 513 draws, different pick), and an
+    // accepted offer consumed the skill where Java consumes the team re-roll. Same harness-level
+    // gate as the Pro offer below.
+    if skill_source.is_some() {
+        if game.rules != ffb_model::enums::Rules::Bb2025
+            && !(on_acting_team && team_re_roll_available(game, player_id))
+        {
+            return None;
+        }
         return Some(AgentPrompt::ReRollOffer {
-            source,
+            source: ReRollSource::new("TRR"),
             action: rerolled_action.to_owned(),
             team_id: acting_team_id,
         });
@@ -140,6 +159,22 @@ fn ask_for_reroll_if_available_inner(
     // team re-rolls. Without this gate a failed catch of a scattered/bouncing ball DURING the
     // kickoff wrongly consumed a team re-roll (bb2016 amazon seed2 i=149: a receiving-team catch
     // on the kickoff — Java bounces the ball, Rust rerolled the catch → desync).
+    if !on_acting_team {
+        return None;
+    }
+    if team_re_roll_available(game, player_id) {
+        return Some(AgentPrompt::ReRollOffer {
+            source: ReRollSource::new("TRR"),
+            action: rerolled_action.to_owned(),
+            team_id: acting_team_id,
+        });
+    }
+    pro_offer(game, player_id, rerolled_action, acting_team_id)
+}
+
+/// Java `RollMechanic.isTeamReRollAvailable` (the acting-team membership term is checked by the
+/// caller).
+fn team_re_roll_available(game: &Game, player_id: Option<&str>) -> bool {
     let td = game.turn_data();
     let team_re_roll_allowed = crate::mechanic::roll_mechanic_for(game.rules)
         .allows_team_re_roll(game.turn_mode);
@@ -158,13 +193,16 @@ fn ask_for_reroll_if_available_inner(
             _ => true,
         }
     };
-    if td.rerolls > 0 && !td.reroll_used && team_re_roll_allowed && bomb_side_ok {
-        return Some(AgentPrompt::ReRollOffer {
-            source: ReRollSource::new("TRR"),
-            action: rerolled_action.to_owned(),
-            team_id: acting_team_id,
-        });
-    }
+    td.rerolls > 0 && !td.reroll_used && team_re_roll_allowed && bomb_side_ok
+}
+
+/// The Pro half of `RollMechanic.askForReRollIfAvailable` (see the comment inside).
+fn pro_offer(
+    game: &Game,
+    player_id: Option<&str>,
+    rerolled_action: &str,
+    acting_team_id: String,
+) -> Option<AgentPrompt> {
 
     // Java `RollMechanic.askForReRollIfAvailable` adds `ReRollProperty.PRO` to the SAME dialog
     // whenever `isProReRollAvailable` holds, and `dialogShown` is true if ANY listed property

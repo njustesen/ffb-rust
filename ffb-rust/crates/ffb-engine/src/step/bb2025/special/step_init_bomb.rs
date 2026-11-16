@@ -163,7 +163,12 @@ impl Step for StepInitBomb {
 
 impl StepInitBomb {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        game.turn_data_mut().bomb_used = true;
+        // Java bb2020/bb2025 StepInitBomb: game.getTurnData().setBombUsed(true). The bb2016
+        // StepInitBomb never sets it, so a bb2016 team may throw a second bomb in the same turn
+        // with another Bombardier (star tier: goblin bb2016, Bomber Dribblesnot after a Bomma).
+        if game.rules != ffb_model::enums::Rules::Bb2016 {
+            game.turn_data_mut().bomb_used = true;
+        }
         game.field_model.range_ruler = None;
 
         // Clear catcher on fumble or OOB
@@ -416,6 +421,17 @@ mod tests {
             "an unrelated skill's UseSkill command must not affect explode_skill_used");
         assert!(!game.player(&actor_id).unwrap().used_skills.contains(&SkillId::Kaboom),
             "an unrelated skill's UseSkill command must not mark the Kaboom skill used");
+    }
+
+    #[test]
+    fn bomb_used_is_set_in_bb2020_and_bb2025_but_never_in_bb2016() {
+        // Java: only the bb2020/bb2025 StepInitBomb call setBombUsed(true).
+        for (rules, used) in [(Rules::Bb2016, false), (Rules::Bb2020, true), (Rules::Bb2025, true)] {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+            let mut step = StepInitBomb::new("end".into());
+            step.start(&mut game, &mut GameRng::new(0));
+            assert_eq!(game.turn_data().bomb_used, used, "{rules:?}");
+        }
     }
 
     #[test]

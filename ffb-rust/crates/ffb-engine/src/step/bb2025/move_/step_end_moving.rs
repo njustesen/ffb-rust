@@ -289,7 +289,7 @@ impl StepEndMoving {
                     move_stack: self.move_stack.clone(),
                     move_start: self.move_start,
                     bloodlust_action: self.bloodlust_action,
-                    ..Default::default()
+                    rules: game.rules,                    ..Default::default()
                 })
             };
             return StepOutcome::next().push_seq(seq);
@@ -333,7 +333,7 @@ impl StepEndMoving {
             } else {
                 Move::build_sequence(&MoveParams {
                     bloodlust_action: self.bloodlust_action,
-                    ..Default::default()
+                    rules: game.rules,                    ..Default::default()
                 })
             };
             return StepOutcome::next().push_seq(seq);
@@ -441,6 +441,7 @@ impl StepEndMoving {
             PlayerAction::Gaze => {
                 Some(Move::build_sequence(&MoveParams {
                     bloodlust_action: self.bloodlust_action,
+                    rules,
                     ..Default::default()
                 }))
             }

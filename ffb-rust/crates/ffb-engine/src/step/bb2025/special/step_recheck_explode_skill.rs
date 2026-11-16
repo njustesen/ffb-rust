@@ -82,7 +82,10 @@ impl Step for StepRecheckExplodeSkill {
 
 impl StepRecheckExplodeSkill {
     fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
-        game.turn_data_mut().bomb_used = true;
+        // bb2016 never marks the bomb used (see StepInitBomb).
+        if game.rules != ffb_model::enums::Rules::Bb2016 {
+            game.turn_data_mut().bomb_used = true;
+        }
 
         if !self.skip
             && game.options.is_enabled(BOMB_BOUNCES_ON_EMPTY_SQUARES)
