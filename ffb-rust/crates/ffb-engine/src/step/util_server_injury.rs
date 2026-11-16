@@ -608,6 +608,12 @@ pub fn handle_injury_side_effects(
     if pump_up_granted {
         let attacker_id = injury_result.injury_context().attacker_id.clone()
             .unwrap_or_default();
+        // Java handlePumpUp: `addReport(new ReportPumpUpTheCrowdReRoll(attacker.getId()))` —
+        // Rust emitted only the event, so the report stream lost it (star tier: bb2020 Skrorg
+        // Snowpelt, imperial_nobility vs snotling seed 2).
+        game.report_list.add(
+            ffb_model::report::mixed::report_pump_up_the_crowd_re_roll::ReportPumpUpTheCrowdReRoll::new(
+                Some(attacker_id.clone())));
         events.push(GameEvent::PumpUpTheCrowdReRoll { player_id: attacker_id });
     }
     events
@@ -1383,6 +1389,21 @@ mod tests {
         assert_eq!(events.len(), 1);
         assert!(matches!(&events[0], GameEvent::PumpUpTheCrowdReRoll { player_id }
             if player_id == "att"));
+        assert_eq!(game.turn_data_home.rerolls, 1);
+    }
+
+    /// Java handlePumpUp: `hasUnusedSkillWithProperty(...)` gates the grant, which marks the skill
+    /// used and writes ReportPumpUpTheCrowdReRoll — a second casualty grants nothing more.
+    #[test]
+    fn pump_up_reports_once_and_needs_the_skill_unused() {
+        use ffb_model::enums::PS_STANDING;
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.home_playing = true;
+        let ir = make_pump_up_ir(&mut game, true, PS_STANDING, Some("Block"));
+        assert_eq!(handle_injury_side_effects(&mut game, &ir).len(), 1);
+        assert!(game.report_list.has_report(ReportId::PUMP_UP_THE_CROWD_RE_ROLL));
+        assert!(handle_injury_side_effects(&mut game, &ir).is_empty());
         assert_eq!(game.turn_data_home.rerolls, 1);
     }
 

@@ -133,7 +133,7 @@ impl StateMechanicTrait for StateMechanic {
 
         let has_skill = game
             .player(&attacker_id)
-            .map(|p| p.has_skill_property(NamedProperties::GRANTS_TEAM_RE_ROLL_WHEN_CAUSING_BLOCK_CAS))
+            .map(|p| p.has_unused_skill_with_property(NamedProperties::GRANTS_TEAM_RE_ROLL_WHEN_CAUSING_BLOCK_CAS))
             .unwrap_or(false);
 
         if !has_skill {
