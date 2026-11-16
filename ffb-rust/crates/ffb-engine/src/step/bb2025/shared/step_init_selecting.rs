@@ -540,10 +540,21 @@ impl Step for StepInitSelecting {
                 Self::apply_moving_activation_updates(game, player_id, pa);
                 // Java: checkForStaller() called after CLIENT_ACTIVATE_PLAYER
                 Self::check_for_staller(game);
-                // Java: UtilServerGame.changePlayerAction syncs the activation to clients;
-                // coverage counts activations per action type via GameEvent::PlayerAction.
-                return self.execute_step(game, rng)
+                // Java `StepInitSelecting` CLIENT_BLOCK (bb2025 :238, bb2020 :219) — the target
+                // command Rust folds into this activation — publishes USE_ALTERNATE_LABEL=true, so
+                // the Select sequence's GOTO_LABEL(NEXT, alternate=END_SELECTING) skips the select
+                // JUMP_UP/STAND_UP and the Block sequence stands the player up AFTER its
+                // FOUL_APPEARANCE. Without it a prone Jump-Up blocker rolled Jump Up first, on the
+                // die Java spends on Foul Appearance (Akhorne vs Gretchen, khemri vs nippon bb2025
+                // seed 1). A blitz's CLIENT_BLOCK is its second pass (the BlitzMove branch above).
+                let client_block = block_defender_id.is_some()
+                    && (special_block || *player_action == PlayerActionChoice::Block);
+                let mut out = self.execute_step(game, rng)
                     .with_event(GameEvent::PlayerAction { player_id: player_id.clone(), action: pa });
+                if client_block {
+                    out = out.publish(StepParameter::UseAlternateLabel(true));
+                }
+                return out;
             }
             // Java: CLIENT_SYNCHRONOUS_MULTI_BLOCK (bb2025 shared StepInitSelecting:328-334) —
             // publish BLOCK_TARGETS, changePlayerAction(MULTIPLE_BLOCK), dispatch, EXECUTE.
@@ -1664,6 +1675,8 @@ mod tests {
         let out = step.handle_command(&action, &mut game, &mut GameRng::new(0));
         assert!(step.force_goto_on_dispatch);
         assert_eq!(out.action, StepAction::GotoLabel);
+        // Java CLIENT_BLOCK publishes USE_ALTERNATE_LABEL=true (skip the select JUMP_UP/STAND_UP).
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::UseAlternateLabel(true))));
     }
 
     #[test]

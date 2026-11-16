@@ -977,6 +977,12 @@ impl StepEndTurn {
                 PrayerHandlerFactory::deactivate_prayers_for_duration(
                     game, InducementDuration::UntilEndOfOpponentsTurn, is_home);
                 if self.new_half || touchdown {
+                    // Java bb2020/StepEndTurn:490 — `updatePlayerStateDependentProperties(this)`
+                    // opens the (fNewHalf || fTouchdown) block (leader / single-use re-rolls follow
+                    // the players into the box).
+                    if game.rules == ffb_model::enums::Rules::Bb2020 {
+                        crate::util::util_server_game::UtilServerGame::update_player_state_dependent_properties(game);
+                    }
                     UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfDrive, is_home);
                     PrayerHandlerFactory::deactivate_prayers_for_duration(
                         game, InducementDuration::UntilEndOfDrive, is_home);
@@ -1011,6 +1017,13 @@ impl StepEndTurn {
                 // `deactivate_cards(UntilEndOfHalf)` call sits in the wider block — a pre-existing
                 // deviation left untouched, since BB2025 is 30/30 with it.)
                 if self.new_half {
+                    // Java bb2025/StepEndTurn:511-514 — `if (game.getHalf() <= 1)
+                    // updatePlayerStateDependentProperties(this)` before the UNTIL_END_OF_HALF
+                    // deactivation: the boxed leader drops the team's Leader re-roll and reports
+                    // `leader: none` (Lord Borak, chaos_dwarf vs elf bb2025 seed 2).
+                    if game.rules == ffb_model::enums::Rules::Bb2025 && game.half <= 1 {
+                        crate::util::util_server_game::UtilServerGame::update_player_state_dependent_properties(game);
+                    }
                     PrayerHandlerFactory::deactivate_prayers_for_duration(
                         game, InducementDuration::UntilEndOfHalf, is_home);
                 }
@@ -1045,6 +1058,12 @@ impl StepEndTurn {
                         self.touchdown_player_id.clone()));
             }
             game.start_turn();
+            // Java bb2016/StepEndTurn:407-408 and bb2020/StepEndTurn:514-515:
+            // `game.startTurn(); UtilServerGame.updatePlayerStateDependentProperties(this);`
+            // (bb2025's StepEndTurn has no such call).
+            if game.rules != ffb_model::enums::Rules::Bb2025 {
+                crate::util::util_server_game::UtilServerGame::update_player_state_dependent_properties(game);
+            }
 
             // Java: endGenerator.pushSequence / kickoffGenerator
             use ffb_model::enums::InducementPhase;
